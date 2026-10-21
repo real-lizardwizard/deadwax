@@ -231,6 +231,14 @@
  *    inside the panel; closed by a move through the history (review). Properties come from the bridge
  *    answer the album page asks already (no new request), and the unresized cover is asked for by the
  *    viewer alone, first, the sized one its fallback (review).
+ *  - Up Next, shuffle and repeat (2.0.0-player.57): the new actions - playNext, playLast, jumpTo, setShuffle, setRepeat,
+ *    moveInQueue, removeFromQueue, clearPlayingNext and (Part B) extendQueue - are reached only from the song menu
+ *    (app/QueueMenu.tsx: Play Next and Play Last, after rememberAdded, in the tap), Up Next (app/UpNext.tsx: a row's
+ *    jump, Edit, the chips), the player bar's Shuffle and Repeat, the Library's Shuffle (app/ShuffleSongs.tsx:
+ *    playTracks, the first page in hand) and its feed (app/useShuffleFeed.ts: extendQueue alone, called once in
+ *    App); the song rows' ••• (Search's, the Library's, an album page's) call App's menu, never the player;
+ *    ActionsContext isn't widened; lib/upNext.ts is pure; Up Next and the menu are sheets by the one hook with locks
+ *    of their own, Up Next's scroller Info's; Now Playing's icon row has Up next always, before •••.
  *  - The page's entry renders App, and the old shell and settings sheet are gone.
  *
  * Run it with:  node ui/test/app-rules.sim.cjs
@@ -308,7 +316,8 @@ const ALLOWED = {
   //? a Done row's ▶ on Requests, since 2.0.0-player.17: its album, in hand, else it opens it
   'app/Requests.tsx': ['playTracks'],
   //? the desktop's player bar, since 2.0.0-player.19: its transport and AirPlay, from the click
-  'player/PlayerBar.tsx': ['toggle', 'next', 'previous', 'showAirPlay'],
+  //? (2.0.0-player.57: and Shuffle and Repeat beside its previous and next)
+  'player/PlayerBar.tsx': ['toggle', 'next', 'previous', 'showAirPlay', 'setRepeat', 'setShuffle'],
   //? the desktop's visualizer, since 2.0.0-player.20: its play/pause, from the click or the Space key
   'player/Visualizer.tsx': ['toggle'],
   //? names them for ActionsContext and calls none (pickActions)
@@ -317,12 +326,21 @@ const ALLOWED = {
   //? and the chip on the cover and the desktop's player bar, whose tap puts it back to 1x
   'player/SpeedFader.tsx': ['setSpeed'],
   'player/SpeedChip.tsx': ['setSpeed'],
+  //? Up Next, shuffle and repeat (2.0.0-player.57): the song menu's two rows - a song's or an album's Play Next and Play Last
+  'app/QueueMenu.tsx': ['playLast', 'playNext'],
+  //? ...Up Next's rows (a tap plays one now), its Edit (moves, removals, Clear) and its Shuffle and Repeat chips
+  'app/UpNext.tsx': ['clearPlayingNext', 'jumpTo', 'moveInQueue', 'removeFromQueue', 'setRepeat', 'setShuffle'],
+  //? ...the Library's Shuffle (Part B): the first page of the whole library's order, in hand at the tap
+  'app/ShuffleSongs.tsx': ['playTracks'],
+  //? ...and its feed, which brings the rest of the order in as it plays - nothing that plays
+  'app/useShuffleFeed.ts': ['extendQueue'],
 }
 
 /** Which playback actions a file's code reaches: by name, as a member, or taken apart from one. */
 function actionsIn(text) {
   const found = new Set()
-  for (const match of text.matchAll(/\b(playTracks|setGapless|showAirPlay|setSpeed)\b/g)) found.add(match[1])
+  //? (2.0.0-player.57: and Up Next's, each distinctive enough to find by name, as setSpeed is)
+  for (const match of text.matchAll(/\b(playTracks|setGapless|showAirPlay|setSpeed|playNext|playLast|jumpTo|setShuffle|setRepeat|moveInQueue|removeFromQueue|clearPlayingNext|extendQueue)\b/g)) found.add(match[1])
   //? toggle, next and previous are ordinary words, so only as a member - classList.toggle aside
   for (const match of text.matchAll(/(?<!classList)\.(toggle|next|previous)\b/g)) found.add(match[1])
   //? and taken out of an object: const { toggle } = player (the KEY taken - `{ nav: next }` takes nav)
@@ -385,13 +403,17 @@ console.log('\nthe playback actions only from the files allowed')
   check('where they are reached', Object.fromEntries(reached), {
     'app/ArtistPage.tsx': ['playTracks'],
     'app/GaplessChoice.tsx': ['setGapless'],
+    'app/QueueMenu.tsx': ['playLast', 'playNext'],
     'app/Requests.tsx': ['playTracks'],
     'app/Search.tsx': ['playTracks'],
+    'app/ShuffleSongs.tsx': ['playTracks'],
+    'app/UpNext.tsx': ['clearPlayingNext', 'jumpTo', 'moveInQueue', 'removeFromQueue', 'setRepeat', 'setShuffle'],
     'app/context.ts': ['next', 'playTracks', 'previous', 'setGapless', 'showAirPlay', 'toggle'],
+    'app/useShuffleFeed.ts': ['extendQueue'],
     'player/AlbumPage.tsx': ['playTracks'],
     'player/MiniPlayer.tsx': ['next', 'toggle'],
     'player/NowPlaying.tsx': ['next', 'previous', 'showAirPlay', 'toggle'],
-    'player/PlayerBar.tsx': ['next', 'previous', 'showAirPlay', 'toggle'],
+    'player/PlayerBar.tsx': ['next', 'previous', 'setRepeat', 'setShuffle', 'showAirPlay', 'toggle'],
     'player/SpeedChip.tsx': ['setSpeed'],
     'player/SpeedFader.tsx': ['setSpeed'],
     'player/Turntable.tsx': ['toggle'],
@@ -551,15 +573,16 @@ console.log('\nNow Playing covers everything behind it')
       (app.match(/const visualizerShown =/g) ?? []).length], [true, true, 1])
   //? (2.0.0-player.20) ...and a desktop's Sources or Info panel left open goes inert under the visualizer
   //? too - outside that wrapper, each takes it as `covered`, as Now Playing takes what is over it
+  //? (2.0.0-player.57: and under the song menu - `panelsCovered`, the visualizer or the menu)
   check('...and a desktop\'s Sources and Info panels, outside it, are inert under the visualizer',
-    [/<Sources\b[^\n]*\bcovered=\{visualizerShown\}[^\n]*\/>/.test(app), /<InfoSheet\b[^>]*\bcovered=\{visualizerShown\}/.test(app),
+    [/<Sources\b[^\n]*\bcovered=\{panelsCovered\}[^\n]*\/>/.test(app) && /\n\s*const panelsCovered = visualizerShown \|\| queueMenuOpen\n/.test(app), /<InfoSheet\b[^>]*\bcovered=\{panelsCovered\}/.test(app),
       ...['app/Sources.tsx', 'app/InfoSheet.tsx'].flatMap((file) => [/aria-hidden=\{!open \|\| covered\} inert=\{!open \|\| covered\}/.test(code(read(file))),
         /useSheet\(\{ open, covered, onClose/.test(code(read(file)))])],
     [true, true, true, true, true, true])
   //? (2.0.0-player.21, after the rebase onto .20) ...and the Edit panel the same: built beside the
   //? visualizer, it had no `covered`, and stayed live and tabbable under it
   check('...and so is the Edit panel',
-    [/<EditPanel\b[^\n]*\bcovered=\{visualizerShown\}[^\n]*\/>/.test(app),
+    [/<EditPanel\b[^\n]*\bcovered=\{panelsCovered\}[^\n]*\/>/.test(app),
       /aria-hidden=\{!open \|\| covered\} inert=\{!open \|\| covered\}/.test(code(read('app/EditPanel.tsx'))),
       /useSheet\(\{ open, covered: inner \|\| covered, onClose/.test(code(read('app/EditPanel.tsx')))],
     [true, true, true])
@@ -585,15 +608,18 @@ console.log('\nevery sheet is a sheet by the one hook')
     'app/EditPanel.tsx': 'app-edit-open',
     //? the artist page's panel (2.0.0-player.45) - a sheet on a phone, a side panel on a desktop
     'app/ArtistPanel.tsx': 'app-artist-panel-open',
+    //? Up Next (2.0.0-player.57) - over Now Playing on a phone, a side panel on a desktop - and the song menu
+    'app/UpNext.tsx': 'app-upnext-open',
+    'app/QueueMenu.tsx': 'app-queue-menu-open',
   }
   const texts = Object.fromEntries(Object.keys(SHEETS).map((file) => [file, code(read(file))]))
   check('each calls useSheet with a scroll lock of its own',
     Object.fromEntries(Object.entries(texts).map(([file, text]) => [file, /useSheet\(\{[^}]*lockClass: '([^']+)'/.exec(text)?.[1] ?? null])), SHEETS)
   check('...and they are the only ones', files.filter((file) => /\buseSheet\(/.test(code(read(file))) && file !== 'app/useSheet.ts').sort(), Object.keys(SHEETS).sort())
-  check('each is inert while closed', Object.values(texts).map((text) => /\binert=\{!open\b/.test(text)), [true, true, true, true, true, true])
+  check('each is inert while closed', Object.values(texts).map((text) => /\binert=\{!open\b/.test(text)), Object.keys(SHEETS).map(() => true))
   check('Now Playing is inert under the menu or Info, and they are hidden from it', /aria-hidden=\{!open \|\| covered\}\s*inert=\{!open \|\| covered\}/.test(texts['player/NowPlaying.tsx']), true)
-  check('the menu, Info, the sources and the artist page\'s close on their backdrop (a panel\'s is not drawn)',
-    ['app/ActionMenu.tsx', 'app/InfoSheet.tsx', 'app/Sources.tsx', 'app/ArtistPanel.tsx'].map((file) => /<div class="app-backdrop" onClick=\{onClose\} \/>/.test(texts[file])), [true, true, true, true])
+  check('the menu, Info, the sources and the artist page\'s close on their backdrop (a panel\'s is not drawn) - and Up Next and the song menu',
+    ['app/ActionMenu.tsx', 'app/InfoSheet.tsx', 'app/Sources.tsx', 'app/ArtistPanel.tsx', 'app/UpNext.tsx', 'app/QueueMenu.tsx'].map((file) => /<div class="app-backdrop" onClick=\{onClose\} \/>/.test(texts[file])), [true, true, true, true, true, true])
   //? (2.0.0-player.47, review: beside a phone's Edit sheet - a phone on its side, an iPad upright - a stray
   //? tap on the backdrop threw away an edit half made)
   check('...the Edit sheet\'s takes a tap and closes nothing - it holds typed work; its close button and Escape close it',
@@ -666,8 +692,11 @@ console.log('\nnothing below the title in Now Playing can change height')
     /\{turntable \? <TurntableTime player=\{player\} previewing=\{previewing\} \/> : <Scrubber player=\{player\} \/>\}/.test(body), true)
   check('the album line is one box, link or not', (body.match(/<span class="pl-sheet-byline">\{byline\}<\/span>/g) ?? []).length, 2)
   const footer = body.slice(at('class="pl-sheet-footer"'))
-  check('the icon row: AirPlay only with a speaker, ••• always, and no dead Lyrics or Up next',
-    [/\{player\.airplay && \(\s*<button[^>]*onClick=\{player\.showAirPlay\}/.test(footer), /onClick=\{onMore\}/.test(footer), /Lyrics|Up next/.test(footer)], [true, true, false])
+  //? (2.0.0-player.57: Up next drawn - it opens Up Next - after AirPlay's place and before •••)
+  check('the icon row: AirPlay only with a speaker, ••• always, Up next always (opening Up Next), and no dead Lyrics',
+    [/\{player\.airplay && \(\s*<button[^>]*onClick=\{player\.showAirPlay\}/.test(footer), /onClick=\{onMore\}/.test(footer), /onClick=\{onUpNext\}/.test(footer), /Lyrics/.test(footer),
+      footer.indexOf('onClick={player.showAirPlay}') < footer.indexOf('onClick={onUpNext}') && footer.indexOf('onClick={onUpNext}') < footer.indexOf('onClick={onMore}')],
+    [true, true, true, false, true])
   const css = fs.readFileSync(path.resolve(SRC, '../../interface/player/player.css'), 'utf8')
   check('...a fixed height, so AirPlay coming and going moves nothing', /\.pl-sheet-footer \{[^}]*(?<![-\w])height: var\(--pl-hit\);/.test(css), true)
   const appCss = fs.readFileSync(path.resolve(SRC, '../../interface/player/app.css'), 'utf8')
@@ -1219,7 +1248,7 @@ console.log('\nGet: the Sources sheet, a download from the tap, and Requests')
   check('a download asked for: the sheet goes, focus with nowhere to land, and Requests shows at its root',
     /const gotten = useCallback\(\(\) => \{\s*sourcesOpener\.current = null\s*setSourcesOpen\(false\)\s*router\.root\('requests'\)/.test(app), true)
   check('...the Sources element handed that, its opener, its own open and how it is drawn (2.0.0-player.19), and the visualizer over it (.20)',
-    /<Sources open=\{sourcesOpen\} request=\{getting\} opener=\{sourcesOpener\} onClose=\{closeSources\} onQueued=\{gotten\} panel=\{panel\} covered=\{visualizerShown\} \/>/.test(app), true)
+    /<Sources open=\{sourcesOpen\} request=\{getting\} opener=\{sourcesOpener\} onClose=\{closeSources\} onQueued=\{gotten\} panel=\{panel\} covered=\{panelsCovered\} \/>/.test(app), true)
   check('a card\'s Get asks for the download, then hands over - in the tap, nothing awaited',
     [/onClick=\{\(\) => onGet\(candidate\)\}/.test(card), /const get = \(candidate: Candidate\) => \{\s*if \(state\.download\(candidate, shown\)\) onQueued\(\)\s*\}/.test(sheet)], [true, true])
   const ask = /function ask\([^)]*\): boolean \{([\s\S]*?)\n  \}/.exec(hook)?.[1] ?? ''
@@ -1459,16 +1488,18 @@ console.log('\nthe desktop frame: chosen below the engine, panels beside the pag
     [true, [true, true], true])
   //? (2.0.0-player.21: and the Edit panel, each putting it away too)
   //? (2.0.0-player.45: and the artist page's panel, each putting it away and it every other)
-  check('one side panel at a time: Sources puts Info, Edit and the artist\'s away, and Info Sources, Edit and the artist\'s',
-    [/setSourcesOpen\(true\)[\s\S]{0,250}?infoOpener\.current = null\s*setInfoPanel\(false\)\s*editOpener\.current = null\s*setEditOpen\(false\)\s*artistOpener\.current = null\s*setArtistOpen\(false\)/.test(/const openSources = useCallback[\s\S]*?\}, \[\]\)/.exec(app)?.[0] ?? ''),
-      /infoOpener\.current = takeOpener\(event\)\s*sourcesOpener\.current = null\s*setSourcesOpen\(false\)\s*editOpener\.current = null\s*setEditOpen\(false\)\s*artistOpener\.current = null\s*setArtistOpen\(false\)\s*setInfoPanel\(true\)/.test(app)],
-    [true, true])
+  //? (2.0.0-player.57: and Up Next's - Sources and Info putting it away, it them, Edit and the artist's)
+  check('one side panel at a time: Sources puts Info, Up Next, Edit and the artist\'s away, and Info Sources, Edit, the artist\'s and Up Next',
+    [/setSourcesOpen\(true\)[\s\S]{0,300}?infoOpener\.current = null\s*setInfoPanel\(false\)\s*upNextOpener\.current = null\s*setUpNextPanel\(false\)\s*editOpener\.current = null\s*setEditOpen\(false\)\s*artistOpener\.current = null\s*setArtistOpen\(false\)/.test(/const openSources = useCallback[\s\S]*?\}, \[\]\)/.exec(app)?.[0] ?? ''),
+      /infoOpener\.current = takeOpener\(event\)\s*sourcesOpener\.current = null\s*setSourcesOpen\(false\)\s*editOpener\.current = null\s*setEditOpen\(false\)\s*artistOpener\.current = null\s*setArtistOpen\(false\)\s*upNextOpener\.current = null\s*setUpNextPanel\(false\)\s*setInfoPanel\(true\)/.test(app),
+      /upNextOpener\.current = takeOpener\(event\)\s*infoOpener\.current = null\s*setInfoPanel\(false\)\s*sourcesOpener\.current = null\s*setSourcesOpen\(false\)\s*editOpener\.current = null\s*setEditOpen\(false\)\s*artistOpener\.current = null\s*setArtistOpen\(false\)\s*setUpNextPanel\(true\)/.test(app)],
+    [true, true, true])
   //? (review) the player bar's Info closes the panel it opened - "the Info button again"
   check('...and the player bar\'s Info, pressed again, closes it',
     /const toggleInfo = useCallback\(\(event: MouseEvent\) => \{\s*if \(infoPanelOpen\.current\) \{\s*setInfoPanel\(false\)\s*return\s*\}/.test(app), true)
   //? (review) which panel shows feeds both the shell's classes: room made for a column, a drawer over the page
   check('what the panel shows - Sources or Info - makes room for a column (`.has-side`) and marks a drawer (`.has-drawer`)',
-    [/const side = sideOf\(frame, \{ sources: sourcesOpen, info: infoPanel, edit: editOpen, artist: artistOpen \}\)/.test(app),
+    [/const side = sideOf\(frame, \{ sources: sourcesOpen, info: infoPanel, edit: editOpen, artist: artistOpen, upnext: upNextPanel \}\)/.test(app),
       /\$\{makesRoom\(panel, side\) \? ' has-side' : ''\}\$\{liesOver\(panel, side\) \? ' has-drawer' : ''\}/.test(app)],
     [true, true])
   //? (review) a drawer lies over the page Go to album and Info's artist open: the Info drawer goes with them
@@ -1669,7 +1700,7 @@ console.log('\nediting an album on a desktop: the Edit panel, a side panel by th
   const page = code(read('player/AlbumPage.tsx'))
   //? (2.0.0-player.47: drawn on both frames - a phone's sheet, as the artist page's panel is)
   check('drawn after Info, on both frames - a side panel on a desktop, a sheet over the whole screen on a phone',
-    [/\n\s*<EditPanel open=\{editOpen\} request=\{edit\} opener=\{editOpener\} onClose=\{closeEdit\} onChanged=\{albumChanged\} panel=\{panel\} covered=\{visualizerShown\} \/>\n/.test(app),
+    [/\n\s*<EditPanel open=\{editOpen\} request=\{edit\} opener=\{editOpener\} onClose=\{closeEdit\} onChanged=\{albumChanged\} panel=\{panel\} covered=\{panelsCovered\} \/>\n/.test(app),
       /desktop && <EditPanel\b/.test(app), app.indexOf('<EditPanel') > app.indexOf('<InfoSheet'), files.filter((file) => file !== 'app/App.tsx' && /<EditPanel\b/.test(code(read(file))))],
     [true, false, true, []])
   //? (2.0.0-player.47: an admin's on both frames - after Play and Shuffle on a desktop, in the bar beside the pin on a phone)
@@ -1996,12 +2027,12 @@ console.log('\nthe artist page, as the main page had it (2.0.0-player.45)')
     [actionsIn(panel), /useContext|usePlayerActions|PlayerContext/.test(panel)], [[], false])
   check('it is the frame\'s side panel on a desktop and a sheet on a phone: modal only as a sheet, inert while closed or under the visualizer',
     [/const modal = panelIsModal\(panel\)/.test(panel), /useSheet\(\{ open, covered, onClose, lockClass: 'app-artist-panel-open', first: close, opener, modal, area: box \}\)/.test(panel),
-      /aria-hidden=\{!open \|\| covered\} inert=\{!open \|\| covered\}/.test(panel), /<ArtistPanel\b[^\n]*\bcovered=\{visualizerShown\}[^\n]*\/>/.test(app),
+      /aria-hidden=\{!open \|\| covered\} inert=\{!open \|\| covered\}/.test(panel), /<ArtistPanel\b[^\n]*\bcovered=\{panelsCovered\}[^\n]*\/>/.test(app),
       /<ArtistPanel\b[^\n]*\bpanel=\{panel\}[^\n]*\/>/.test(app)],
     [true, true, true, true, true])
   const toggle = /const toggleArtistManage = useCallback[\s\S]*?\}, \[\]\)/.exec(app)?.[0] ?? ''
   check('one panel at a time: it puts Sources, Info and Edit away - and Edit, on an album or a folder, puts it away',
-    [/sourcesOpener\.current = null\s*setSourcesOpen\(false\)\s*infoOpener\.current = null\s*setInfoPanel\(false\)\s*editOpener\.current = null\s*setEditOpen\(false\)/.test(toggle),
+    [/sourcesOpener\.current = null\s*setSourcesOpen\(false\)\s*infoOpener\.current = null\s*setInfoPanel\(false\)\s*upNextOpener\.current = null\s*setUpNextPanel\(false\)\s*editOpener\.current = null\s*setEditOpen\(false\)/.test(toggle),
       /setEdit\(\{ album, key: editKeys\.current \}\)[\s\S]{0,300}?artistOpener\.current = null\s*setArtistOpen\(false\)\s*\}, \[\]\)/.test(app),
       /setEdit\(\{ \.\.\.request, key: editKeys\.current \}\)[\s\S]{0,300}?artistOpener\.current = null\s*setArtistOpen\(false\)\s*\}, \[\]\)/.test(app)],
     [true, true, true])
@@ -2272,6 +2303,42 @@ console.log('\ninside a track (2.0.0-player.44): the track inspector, the cover 
   //? cover first, the page's own sized one its fallback
   check('(review) ...shown first, the page\'s own sized cover its fallback',
     /sources: \[coverFullUrl\(shown\.coverArt\), coverUrl\(shown\.coverArt, 800\)\]/.test(page), true)
+}
+
+console.log('\nUp Next, shuffle and repeat (2.0.0-player.57): each new action from its one place, in the tap')
+{
+  const app = code(read('app/App.tsx'))
+  const menu = code(read('app/QueueMenu.tsx'))
+  const upNext = code(read('app/UpNext.tsx'))
+  const lib = code(read('lib/upNext.ts'))
+  const shuffle = code(read('app/ShuffleSongs.tsx'))
+  const feed = code(read('app/useShuffleFeed.ts'))
+  const add = /const add = \(how: 'next' \| 'last'\) => \{([\s\S]*?)\n  \}/.exec(menu)?.[1] ?? ''
+  check('the song menu\'s rows: the albums remembered, then Play Next or Play Last with the songs in hand - nothing awaited first',
+    [/rememberAdded\(pick\.albums\)\s*const started = how === 'next' \? player\.playNext\(pick\.tracks\) : player\.playLast\(pick\.tracks\)/.test(add), /\bawait\b|\.then\(/.test(add.split('player.playNext')[0] ?? ''),
+      /onClick=\{\(\) => add\('next'\)\}/.test(menu), /onClick=\{\(\) => add\('last'\)\}/.test(menu)], [true, false, true, true])
+  check('...its notice only when the songs were queued, not when the music started from them', /onClose\(\)\s*if \(!started\) sayPins\(queuedWords\(how, pick\.label\)\)/.test(add), true)
+  //? (review) through jump(), which says first where focus goes once the row has left the list - nothing awaited
+  const jump = /const jump = \(group: Group, rows: readonly UpNextRow\[\], index: number\) => \{([\s\S]*?)\n  \}/.exec(upNext)?.[1] ?? ''
+  check('Up Next\'s row: a tap jumps to it by its key, straight from the click',
+    [/onClick=\{\(\) => jump\(group, rows, index\)\}/.test(upNext), /const row = rows\[index\]!/.test(jump), /\n\s*player\.jumpTo\(row\.key\)\s*$/.test(jump), /\bawait\b|\.then\(/.test(jump)], [true, true, true, false])
+  check('...a desktop\'s Up Next drawer goes as an album or artist opens from the player, as Info\'s does',
+    /const leaveInfoDrawer = \(\) => \{\s*if \(liesOver\(panel, upNextPanel \? 'upnext' : 'none'\)\) \{\s*upNextOpener\.current = null\s*setUpNextPanel\(false\)\s*\}/.test(app), true)
+  check('...its scroller Info\'s (its own touch-action), its shell Info\'s', [/class="app-info-scroll"/.test(upNext), /class="app-info app-upnext"/.test(upNext), /class=\{`app-layer app-info-layer app-upnext-layer/.test(upNext)], [true, true, true])
+  check('lib/upNext.ts is pure: no fetch, no page, no storage, no Preact', [/\bfetch\(|\bdocument\.|\bwindow\.|localStorage|from 'preact/.test(lib)], [false])
+  check('the song rows\' ••• - Search\'s, the Library\'s, an album page\'s - reach none of Up Next\'s actions: they call App\'s menu',
+    ['app/SearchRows.tsx', 'app/LibraryViews.tsx', 'player/AlbumPage.tsx', 'player/Library.tsx', 'app/Search.tsx'].map((file) => actionsIn(code(read(file))).filter((name) => name !== 'playTracks')),
+    [[], [], [], [], []])
+  check('...each the menu\'s by its own prop', [/context\.onSongMenu\(song, event/.test(code(read('app/SearchRows.tsx'))), /onSongMenu\(song, event/.test(code(read('app/LibraryViews.tsx'))),
+    /onQueueMenu\(event as unknown as MouseEvent, \{ label: song\.title, tracks: \[toQueueTrack\(song, album\)\], albums: \[album\] \}\)/.test(code(read('player/AlbumPage.tsx')))], [true, true, true])
+  check('ActionsContext isn\'t widened: App hands the player to Up Next, the menu and the bar as props',
+    [/'playTracks' \| 'toggle' \| 'next' \| 'previous' \| 'seek' \| 'showAirPlay' \| 'setGapless' \| 'setMaxRate'\s*>/.test(code(read('app/context.ts'))),
+      /<UpNext open=\{upNextOpen\}[^\n]*player=\{player\}/.test(app), /<QueueMenu open=\{queueMenuOpen\}[^\n]*player=\{player\}/.test(app)], [true, true, true])
+  check('the Library\'s Shuffle: playTracks with the first page already in hand, nothing fetched or awaited before it',
+    [/const play = \(\) => \{\s*if \(!first \|\| !first\.songs\.length\) return\s*actions\.playTracks\(first\.songs\.map\(shuffledTrack\), 0, false, \{/.test(shuffle), /onClick=\{play\}/.test(shuffle)], [true, true])
+  check('...its feed calls nothing of the player but extendQueue, and is called once - in App', [actionsIn(feed), (app.match(/\buseShuffleFeed\(/g) ?? []).length,
+    files.filter((file) => file !== 'app/App.tsx' && file !== 'app/useShuffleFeed.ts' && /\buseShuffleFeed\(/.test(code(read(file))))], [['extendQueue'], 1, []])
+  check('...and the Library hands its Shuffle the actions as one object, naming none', [/actions=\{actions\}/.test(code(read('player/Library.tsx'))), /const actions = usePlayerActions\(\)/.test(code(read('player/Library.tsx')))], [true, true])
 }
 
 console.log('\nthe checks themselves')

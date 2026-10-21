@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks'
 
+import { usePlayerActions } from '../app/context'
 import { ARTIST_ORDERS, ArtistsView, EmptyLibrary, SongsView, countText, type ArtistOrder } from '../app/LibraryViews'
+import { ShuffleSongs } from '../app/ShuffleSongs'
 import { chooseLibrary, onLibraryLeaving, setLibrarySongs, useLibraryPick } from '../app/libraryPick'
 import { useFrame } from '../app/useFrame'
 import { hasLibrary, useMyLibrary } from '../app/useMyLibrary'
@@ -11,7 +13,7 @@ import { latestOnly } from '../lib/latest'
 import { isNew, newMarks } from '../lib/myLibrary'
 import { EMPTY_LIBRARY, NOTHING_OF_YOURS_PLAYED, yourEmptyNotice } from '../lib/yourLibrary'
 import { readPlayerOrder, writePlayerOrder } from '../state/persisted'
-import { PAGE_SIZE, albumPage, dropPrefetch, librarySongs, prefetchAlbum, type Album, type AlbumOrder, type Artist } from './api'
+import { PAGE_SIZE, albumPage, dropPrefetch, librarySongs, prefetchAlbum, type Album, type AlbumOrder, type Artist, type Song } from './api'
 import { Cover } from './Cover'
 import { ChevronDownIcon } from './icons'
 
@@ -187,9 +189,21 @@ function AlbumsView({
  * - in any order and in Your artists too (review), and an album is added from its page. With logins off - and for the break-glass admin - there is no Browse and no second row: the store is
  * the library, exactly as before.
  *
+ * UP NEXT (2.0.0-player.57): a song row's ••• opens App's song menu (`onSongMenu`: Play Next, Play Last). And Part B,
+ * the whole library shuffled (app/ShuffleSongs.tsx): Shuffle at the top of your albums with logins on (every song of
+ * every album you've starred), of the Songs with them off (the store is the library then), and of Browse's Songs
+ * (everything) - handed the ActionsContext object as one, so this file names no playback action. `shown`: the tab
+ * is what shows, which is when a Shuffle asks for its first page.
+ *
  * Tiles and rows navigate; nothing here plays (see "The one app" in CLAUDE.md).
  */
-export function Library({ onOpen, onOpenArtist }: { onOpen: (album: Album) => void; onOpenArtist: (artist: Artist) => void }) {
+export function Library({ onOpen, onOpenArtist, onSongMenu, shown = true }: {
+  onOpen: (album: Album) => void
+  onOpenArtist: (artist: Artist) => void
+  onSongMenu?: ((song: Song, event: MouseEvent) => void) | undefined
+  shown?: boolean
+}) {
+  const actions = usePlayerActions()
   //? what shows is the store's (app/libraryPick.ts): chosen by the chips here, or the desktop sidebar -
   //? and so is whether Navidrome's empty search lists songs, which both leave Songs out without
   const { pick, hasSongs } = useLibraryPick()
@@ -379,6 +393,8 @@ export function Library({ onOpen, onOpenArtist }: { onOpen: (album: Album) => vo
 
       {(visited.has('albums') || drawn === 'albums') && (
         <div hidden={drawn !== 'albums'}>
+          {/* (2.0.0-player.57, Part B) your whole library, shuffled - above your albums */}
+          {personal && <ShuffleSongs scope="yours" shown={shown && drawn === 'albums'} actions={actions} count />}
           <AlbumsView order={order} onOpen={onOpen} onCount={onAlbumsCount} yours={personal} onBrowse={browse} />
         </div>
       )}
@@ -406,7 +422,10 @@ export function Library({ onOpen, onOpenArtist }: { onOpen: (album: Album) => vo
       )}
       {(visited.has('songs') || drawn === 'songs') && hasSongs !== false && (
         <div hidden={drawn !== 'songs'}>
-          <SongsView onOpen={onOpen} onCount={onSongsCount} />
+          {/* (2.0.0-player.57, Part B) every song, shuffled - the store's (Browse) with a library of your own, else
+              the library's, which is the store */}
+          <ShuffleSongs scope={personal ? 'store' : 'yours'} shown={shown && drawn === 'songs'} actions={actions} />
+          <SongsView onOpen={onOpen} onCount={onSongsCount} onSongMenu={onSongMenu} />
         </div>
       )}
     </section>

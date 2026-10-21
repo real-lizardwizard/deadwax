@@ -154,6 +154,9 @@ ROUTES = {
     ("GET", "/deadwax/navidrome/stream/{song_id}"): "user",
     ("GET", "/deadwax/navidrome/scrub/{song_id}"): "user",
     ("POST", "/deadwax/navidrome/scrobble/{song_id}"): "user",
+    #? (2.0.0-player.57) the Library's Shuffle: an order of the asker's library (or the store), and its pages - theirs
+    ("GET", "/deadwax/navidrome/shuffle"): "user",
+    ("GET", "/deadwax/navidrome/shuffle/{token}"): "user",
     ("GET", "/deadwax/me"): "user",
     ("GET", "/deadwax/me/preferences"): "user",
     ("PUT", "/deadwax/me/preferences"): "user",

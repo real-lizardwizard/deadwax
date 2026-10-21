@@ -20,9 +20,10 @@ import { alsoChips, otherPressingsGroup } from '../lib/idBridge'
 import { isAbort, latestOnly } from '../lib/latest'
 import { announceAddedToLibrary, announceRemovedFromLibrary } from '../lib/libraryEvents'
 import { pinOf, type AlbumPinTarget } from '../lib/pins'
+import type { QueuePick } from '../lib/upNext'
 import { ADD_FROM_PAGE, albumMine } from '../lib/whose'
 import { album as fetchAlbum, coverFullUrl, coverUrl, prefetchAlbum, rememberPlayed, toQueueTrack, type Album, type AlbumWithSongs } from './api'
-import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, PlayIcon, PlayingBars, ShuffleIcon } from './icons'
+import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, MoreIcon, PlayIcon, PlayingBars, ShuffleIcon } from './icons'
 import { Cover } from './Cover'
 import type { Player } from './usePlayer'
 
@@ -98,6 +99,11 @@ import type { Player } from './usePlayer'
  * list's tile) and the bridge's; until both are in, the chips row is unseen and the line under Play holds
  * its place (review). With logins off, and for the break-glass admin, the badge reads "In your library" as
  * it always did and nothing is offered.
+ *
+ * Since 2.0.0-player.57 (Up Next, shuffle and repeat) every song's row ends with a ••• and the bar has one for
+ * the whole album, between the phone's Edit and the pin - each opening the song menu (App's QueueMenu: Play
+ * Next, Play Last) through `onQueueMenu`, with the songs in hand: the album's ••• is aria-disabled until they
+ * are. This page names no Up Next action - the menu plays them, in its tap.
  */
 export function AlbumPage({
   id,
@@ -112,6 +118,7 @@ export function AlbumPage({
   editAt = 'actions',
   editing = false,
   refresh = 0,
+  onQueueMenu,
 }: {
   id: string
   preview: Album | null
@@ -132,6 +139,8 @@ export function AlbumPage({
   editing?: boolean
   /** asked again after an edit: a new number each time */
   refresh?: number
+  /** (2.0.0-player.57) a song's or the album's •••: the song menu (Play Next, Play Last), the songs in hand */
+  onQueueMenu?: ((event: MouseEvent, pick: QueuePick<AlbumWithSongs>) => void) | undefined
 }) {
   const [album, setAlbum] = useState<AlbumWithSongs | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -293,6 +302,21 @@ export function AlbumPage({
             Edit
           </button>
         )}
+        {/* (2.0.0-player.57) the whole album's Play Next and Play Last - live once its songs are in hand */}
+        {onQueueMenu && (
+          <button
+            type="button"
+            class="app-pin-toggle is-icon app-album-more"
+            aria-label="More for this album"
+            aria-haspopup="dialog"
+            aria-disabled={!album || !tracks.length}
+            onClick={(event) => {
+              if (album && tracks.length) onQueueMenu(event as unknown as MouseEvent, { label: album.name, tracks, albums: [album] })
+            }}
+          >
+            <MoreIcon class="app-pin-icon" />
+          </button>
+        )}
         {!(storeDone && !release) && (
           <PinToggle
             look="icon"
@@ -451,7 +475,7 @@ export function AlbumPage({
           return (
             <Fragment key={song.id}>
               {heading && <li class="pl-disc">{heading}</li>}
-              <li>
+              <li class={onQueueMenu ? 'app-track-row' : undefined}>
                 <button
                   type="button"
                   class={`pl-track${isCurrent ? ' is-current' : ''}`}
@@ -466,6 +490,18 @@ export function AlbumPage({
                   </span>
                   <span class="pl-track-time">{trackTime(song.duration)}</span>
                 </button>
+                {/* (2.0.0-player.57) this song's Play Next and Play Last */}
+                {onQueueMenu && album && (
+                  <button
+                    type="button"
+                    class="app-row-more"
+                    aria-label={`More for ${song.title}`}
+                    aria-haspopup="dialog"
+                    onClick={(event) => onQueueMenu(event as unknown as MouseEvent, { label: song.title, tracks: [toQueueTrack(song, album)], albums: [album] })}
+                  >
+                    <MoreIcon class="app-row-more-icon" />
+                  </button>
+                )}
               </li>
             </Fragment>
           )

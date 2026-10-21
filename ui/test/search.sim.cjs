@@ -1293,6 +1293,9 @@ async function main() {
     check('on a desktop, up to six tinted lockups three across - each with the place on its own third line', [find(byClass('app-top-tiles')).length, tiles.length,
       find(byClass('app-top-place'), top()).map(text)], [1, 6, ['In your library', 'In your library', 'In your library', 'In your library', 'In your library', 'On MusicBrainz']])
     check('...and the sections\' previews the desktop\'s: albums 4 + 4', keysOf('albums').length, 4)
+    //? (2.0.0-player.57 review) a song's tile has no room beside its cover and ▶ for a •••: the Songs row below has it
+    const songTiles = tiles.filter((tile) => find((node) => typeof node.props?.['aria-label'] === 'string' && /^Play /.test(node.props['aria-label']), tile).length || /Roads|Sour Times|Glory Box/.test(text(tile)))
+    check('...a song\'s tile carries no •••; the same song\'s row in Songs does', [songTiles.length > 0, find(byClass('app-row-more'), top()).length, find(byClass('app-row-more'), sectionOf('app-search-songs')).length > 0], [true, 0, true])
     globalThis.__search.frame = 'phone'
     draw()
     check('the window crossing to a phone after the draw: the list kept as drawn - six, tiles - until the next text redraws it', [find(byClass('app-top-tile')).length, topKeys().length], [6, 6])

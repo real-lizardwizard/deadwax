@@ -4,6 +4,7 @@ import type { FormatPreference } from '../api/types'
 import { isSpeed, roundSpeed, SPEED_NORMAL } from '../lib/playSpeed'
 import type { MaxRate } from '../lib/streamWrap'
 import type { Look } from '../lib/turntable'
+import type { Repeat } from '../lib/upNext'
 import type { AmbientChoice, Colours, Effect } from '../lib/visualizer'
 
 /**
@@ -63,6 +64,9 @@ export const STORAGE_KEYS = {
    *  stored - nothing, a word, a number out of range - is 1, the song's own speed. Per device, like
    *  the others: a deck's pitch fader stays where you left it. */
   playerSpeed: 'deadwax-player-speed',
+  /** Repeat (2.0.0-player.57): 'all' or 'one'; anything else - nothing stored, a mistyped value, storage that
+   *  can't be read - is off. Per device, like Gapless: the queue (and with it Shuffle) is the page's alone. */
+  playerRepeat: 'deadwax-player-repeat',
   /** "Confirm before cancelling" in You > Getting albums (2.0.0-player.41), per device: 'off', 'on',
    *  or 'default' - carried over from the main page's own setting in this browser, which said to ask
    *  (or said nothing), so it reads as the default, on. Nothing stored: not yet carried over. */
@@ -280,6 +284,22 @@ export function readPlayerGapless(): boolean {
 
 export function writePlayerGapless(on: boolean): void {
   writeRaw(STORAGE_KEYS.playerGapless, on ? 'on' : 'off')
+}
+
+/* ===== deadwax-player-repeat ===== */
+
+/**
+ * Repeat (2.0.0-player.57), per device like the gapless switch and for the same reason. All or One only when it
+ * says exactly that: anything else - nothing stored, an old or mistyped value, storage that can't be read - is
+ * off, which is what the player always did at the end of the queue.
+ */
+export function readPlayerRepeat(): Repeat {
+  const saved = readRaw(STORAGE_KEYS.playerRepeat)
+  return saved === 'all' || saved === 'one' ? saved : 'off'
+}
+
+export function writePlayerRepeat(mode: Repeat): void {
+  writeRaw(STORAGE_KEYS.playerRepeat, mode)
 }
 
 /* ===== deadwax-player-max-rate ===== */

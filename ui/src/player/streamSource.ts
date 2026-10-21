@@ -190,7 +190,8 @@ interface Seek {
   target: number
 }
 
-type Op = { kind: 'init'; song: number } | { kind: 'piece'; piece: Piece } | { kind: 'remove' }
+//? an init carries its song's id (2.0.0-player.57): replan() can put another song at the same index while it is in flight
+type Op = { kind: 'init'; song: number; id: string } | { kind: 'piece'; piece: Piece } | { kind: 'remove' }
 
 interface Fetched {
   status: number
@@ -201,7 +202,8 @@ interface Fetched {
 
 export class StreamSource {
   readonly element: HTMLAudioElement
-  readonly tracks: QueueTrack[]
+  /** the queue's songs - from replan() once the queue changes after the song playing (2.0.0-player.57) */
+  tracks: QueueTrack[]
   readonly startIndex: number
 
   private readonly engine: Engine
@@ -310,6 +312,61 @@ export class StreamSource {
   /** The run's last song, once known. */
   runEnd(): number | null {
     return this.end
+  }
+
+  /**
+   * The queue changed after the song at `current` (2.0.0-player.57: Play Next, a move, a removal, Shuffle,
+   * Repeat). From here on the stream reads its songs from `tracks`, whose songs up to `current` are the ones it
+   * already has. Whatever it placed, asked a head for or decided about PAST the first place where the new list
+   * has another song is let go - what of it is already in the buffer taken out (cutAt), as for a later song
+   * that can't be had - and the run goes on from there with the song now next, if it joins. A run whose end
+   * was decided at a song that is now followed by another is decided again. False, with nothing changed, when
+   * the playhead is already past `current` (a join no 'timeupdate' has seen yet - the player catches up first,
+   * and holds the change if it still can't) or the list doesn't have the stream's song at `current`.
+   */
+  replan(tracks: QueueTrack[], current: number): boolean {
+    if (this.closed) return true
+    const before = this.tracks
+    if (tracks[current]?.id !== before[current]?.id) return false
+    const playing = songAt(this.songs, this.element.currentTime)
+    if (playing && playing.index > current) return false
+    this.tracks = tracks
+    const placedTo = this.songs[this.songs.length - 1]?.index ?? current
+    const reach = Math.max(current, placedTo, this.end ?? -1, ...this.heads.keys())
+    let keep = current
+    while (keep < reach && before[keep + 1]?.id === tracks[keep + 1]?.id) keep += 1
+    const nextChanged = before[keep + 1]?.id !== tracks[keep + 1]?.id
+    if (keep < reach) {
+      for (const [index, entry] of this.heads) {
+        if (index <= keep) continue
+        if (entry.state === 'pending') {
+          entry.controller.abort()
+          if (entry.timer !== undefined) clearTimeout(entry.timer)
+        }
+        this.heads.delete(index)
+      }
+      const first = this.songs.find((song) => song.index > keep)
+      if (first) this.cutAt = this.cutAt === null ? first.start : Math.min(this.cutAt, first.start)
+      this.songs = this.songs.filter((song) => song.index <= keep)
+      if (this.fetching && this.fetching.want.song.index > keep) {
+        this.fetching.controller.abort()
+        this.fetching = null
+      }
+      if (this.piece && this.piece.song.index > keep) this.piece = null
+      this.rest = this.rest.filter((piece) => piece.song.index <= keep)
+      //? a let-go song's backoff is not the new song's: strikes are keyed `${index}:${from}`, and the new song at that
+      //? index would inherit them - and a retry waiting for it holds feed() back up to 4 s
+      if (this.strikes && Number(this.strikes.key.split(':')[0]) > keep) {
+        this.strikes = null
+        if (this.retry) clearTimeout(this.retry.timer)
+        this.retry = null
+      }
+      //? the next song placed at keep + 1 is ANOTHER song at the same index: its init must go in before its frames
+      if (this.lastInit !== null && this.lastInit > keep) this.lastInit = null
+    }
+    if (this.end !== null && (this.end > keep || (this.end === keep && nextChanged))) this.end = null
+    this.pump()
+    return true
   }
 
   /** The "Maximum quality" setting the stream started with, which it keeps - see StreamDeps. */
@@ -758,7 +815,7 @@ export class StreamSource {
       }
       try {
         sb.timestampOffset = piece.song.start
-        this.op = { kind: 'init', song: piece.song.index }
+        this.op = { kind: 'init', song: piece.song.index, id: piece.song.id }
         sb.appendBuffer(entry.head.init as BufferSource)
         this.lastInit = piece.song.index
       } catch {
@@ -838,12 +895,19 @@ export class StreamSource {
   private appendFailed() {
     const op = this.op
     const index = op?.kind === 'piece' ? op.piece.song.index : op?.kind === 'init' ? op.song : (this.lastInit ?? this.startIndex)
+    const id = op?.kind === 'piece' ? op.piece.song.id : op?.kind === 'init' ? op.id : this.tracks[index]?.id
     //? A later song's bytes that won't parse: that song never streams, but the browser has given the
     //? whole source up with it (WebKit detaches it on an append error; Chromium ends it with a decode
     //? error) - so the song playing, which is fine, goes on the URL way from where it had got to
     const playing = songAt(this.songs, this.element.currentTime)
     if (playing && index > playing.index) {
-      this.events.refused(this, index, "the browser couldn't play what deadwax sent for it", false)
+      //? (2.0.0-player.57) blamed only while it is still the song at its index: a song replan() let go of whose
+      //? append fails after it is not the song that took its place (the player keeps `refused` by the queue's).
+      //? By the queue's tracks alone - replan() changes them - never by the stream's songs: a run ended before the
+      //? song meanwhile (pieceFailed's endAt) still blames it, as it always did
+      if (id !== undefined && id === this.tracks[index]?.id) {
+        this.events.refused(this, index, "the browser couldn't play what deadwax sent for it", false)
+      }
       this.fail(playing.index, 'broken', "the browser gave the stream up over a later song's audio")
       return
     }

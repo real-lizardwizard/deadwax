@@ -8,6 +8,7 @@ import {
   SONGS_PAGE, dropPrefetch, libraryArtists, librarySongs, prefetchAlbum, type Album, type Artist, type Song,
 } from '../player/api'
 import { Cover } from '../player/Cover'
+import { MoreIcon } from '../player/icons'
 import { usePaged } from './usePaged'
 import { useYourAlbumsGeneration, yourAlbums } from './useYourAlbums'
 
@@ -129,8 +130,15 @@ export function ArtistsView({
  * asked for as the finger lands): Play is pressed there, in the tap, with the songs in hand - a row
  * that fetched and then played would start the music outside the tap (the gesture rule). Navidrome's
  * own order; the Library hides this view altogether when the empty search finds nothing.
+ *
+ * (2.0.0-player.57) Each row ends with a ••• - `onSongMenu`, App's song menu (Play Next, Play Last), with the
+ * song in hand - which names no player action here either.
  */
-export function SongsView({ onOpen, onCount }: { onOpen: (album: Album) => void; onCount: (count: number | null) => void }) {
+export function SongsView({ onOpen, onCount, onSongMenu }: {
+  onOpen: (album: Album) => void
+  onCount: (count: number | null) => void
+  onSongMenu?: ((song: Song, event: MouseEvent) => void) | undefined
+}) {
   const songs = usePaged<Song>((offset, signal) => librarySongs(offset, SONGS_PAGE, signal), SONGS_PAGE, 'songs')
 
   useEffect(() => {
@@ -151,7 +159,7 @@ export function SongsView({ onOpen, onCount }: { onOpen: (album: Album) => void;
     <>
       <ul class="app-results app-library-list">
         {songs.items.map((song) => (
-          <li key={song.id}>
+          <li key={song.id} class={onSongMenu ? 'app-result-row' : undefined}>
             <button
               type="button"
               class="app-result"
@@ -170,6 +178,17 @@ export function SongsView({ onOpen, onCount }: { onOpen: (album: Album) => void;
               </span>
               <span class="app-visually-hidden">, opens its album</span>
             </button>
+            {onSongMenu && (
+              <button
+                type="button"
+                class="app-row-more"
+                aria-label={`More for ${song.title}`}
+                aria-haspopup="dialog"
+                onClick={(event) => onSongMenu(song, event as unknown as MouseEvent)}
+              >
+                <MoreIcon class="app-row-more-icon" />
+              </button>
+            )}
           </li>
         ))}
       </ul>

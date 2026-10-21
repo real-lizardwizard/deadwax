@@ -1865,3 +1865,42 @@ def test_the_log_on_a_phone_wraps_its_lines_and_the_care_runs_words_are_drawn_wh
     assert phone(".app-log-row.is-warning .app-log-words")["color"] == "var(--dw-amber-text)"
     assert phone(".app-care-result:empty")["margin-top"] == "calc(-1 * var(--app-ph-lines))"
     assert "display" not in phone(".app-care-result")
+
+
+def test_up_next_and_the_song_menu_lock_the_page_and_reuse_infos_look():
+    """Up Next, shuffle and repeat (2.0.0-player.57): Up Next and the song menu each lock the page behind with a class
+    of their own - a rule of their own beside the old list - and Up Next is Info's shell, so nearly nothing is new;
+    a song row's ••• is a full tap target with its glyph drawn small inside; an album page's row keeps its hairline
+    to the edge, the •••'s glyph where the time ended; the album bar's ••• and the pin keep their reaches apart; the
+    desktop bar's Shuffle and Repeat are tinted when on, inside the desktop query only."""
+    for lock in ("html.app-upnext-open", "html.app-queue-menu-open"):
+        assert declarations(APP, lock)["overflow"] == "hidden", lock
+    ui = Path(__file__).resolve().parent.parent / "ui" / "src"
+    assert "lockClass: 'app-upnext-open'" in (ui / "app" / "UpNext.tsx").read_text()
+    assert "lockClass: 'app-queue-menu-open'" in (ui / "app" / "QueueMenu.tsx").read_text()
+    #? the •••: 44px every way, its glyph the row's own small size
+    more = declarations(APP, ".app-row-more")
+    assert (more["width"], more["height"], more["flex"]) == ("var(--pl-hit)", "var(--pl-hit)", "none")
+    assert px("--app-row-more-icon") < px("--pl-hit")
+    #? on an album page's row: the song's button gives up its right padding to the •••, whose own reaches the edge
+    assert declarations(APP, ".app-track-row .pl-track")["padding-right"] == "0"
+    track_more = declarations(APP, ".app-track-row .app-row-more")
+    assert track_more["width"] == "calc(var(--pl-hit) + var(--app-track-more-edge))" and track_more["padding-right"] == "var(--app-track-more-edge)"
+    assert track_more["border-bottom"] == "var(--app-track-rule) solid var(--pl-separator)"
+    assert ALL_TOKENS["--app-track-more-edge"] == "calc(var(--pl-edge-right) - (var(--pl-hit) - var(--app-row-more-icon)) / 2)"
+    #? the album bar: the ••• beside the pin, their 44px reaches meeting and no more
+    assert declarations(APP, ".app-album-bar .app-album-more + .app-pin-toggle")["margin-left"] == "var(--app-album-more-room)"
+    assert ALL_TOKENS["--app-album-more-room"] == "calc(2 * var(--app-pin-toggle-reach) - var(--pl-gap-sm))"
+    #? Now Playing's footer unchanged - one fixed height, its icons at the right end - and its Up next tinted when on
+    footer = declarations(PLAYER_CSS, ".pl-sheet-footer")
+    assert footer["height"] == "var(--pl-hit)" and footer["justify-content"] == "flex-end"
+    assert declarations(APP, ".pl-sheet-footer .app-upnext-button.is-on")["color"] == "var(--dw-accent)"
+    #? Up Next's head: Edit at the left in Done's look, the chips' row inside the gutter
+    edit = declarations(APP, ".app-upnext-edit")
+    assert (edit["grid-column"], edit["justify-self"], edit["color"]) == ("1", "start", "var(--dw-accent)")
+    assert declarations(APP, ".app-upnext-modes")["padding"] == "var(--app-chip-reach) var(--dw-gutter-grouped)"
+    #? the desktop's: only inside its query
+    desk = (PLAYER / "app-desktop.css").read_text()
+    query = "@media (min-width: 1024px)"
+    assert declarations(desk, ".app-desk .app-playbar-transport .app-playbar-button.is-on", query)["color"] == "var(--dw-accent)"
+    assert all(context.startswith("@media") for context, selector, _ in rules(desk) if "app-playbar-shuffle" in selector or "app-playbar-repeat" in selector)

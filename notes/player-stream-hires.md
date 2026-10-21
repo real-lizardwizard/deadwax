@@ -151,6 +151,52 @@ wrote a failing scenario first. Everything confirmed was fixed:
   join rule), and the tick before play (progressed-while-paused, since the sim's timers run). Three
   new tests in test_player_cache.py catch the three server mutations.
 
+##### When the queue changes under the stream (2.0.0-player.57)
+
+Up Next, shuffle and repeat (notes/app.md) lets the queue change AFTER the song playing while it plays - Play Next,
+Play Last, a move, a removal, Shuffle, Repeat's top-ups. The stream reads `this.tracks[i]` lazily, at `last + 1`, about a
+minute before each join, so `tracks` became writable and ONE method follows a changed queue: `replan(tracks, current)`.
+
+- **What it lets go of**: whatever it placed, asked a head for or decided about past the first place where the new list
+  has another song (`keep` walks forward from `current` while the songs match, up to the furthest the stream reached -
+  placed, decided or asked). Pending heads aborted and every head past `keep` forgotten; the placed songs past it dropped,
+  and what of them is already in the SourceBuffer taken out by the existing `cutAt` (pump() removes `[cutAt, Infinity)`
+  once the buffer is free - "a later song that can't be had"'s own path; an append of a let-go song in flight finishes and
+  is then removed); a fetch, a piece and the rest of a split piece of a let-go song let go; a let-go song's strikes and
+  retry cleared (they are keyed `${index}:${from}`, and the new song at that index would inherit them - a retry waiting
+  held feed() back up to 4 s); `lastInit` cleared past `keep`, so the new song at `keep + 1` gets its init before its
+  frames (appended after the old one's init, the fake - like WebKit - refuses them).
+- **What it decides again**: a run end past `keep`, or at `keep` with another song now after it, is cleared; `pump()` then
+  goes on - `lookAhead`/`place` decide the end again if the new next song can't join, and `runEnded` tells the player again.
+  While `end` is null the player's standbyPlan answers 'clear' inside the run, so a standby got ready for the old end lets
+  go (`fitStandby()` in replaceUpcoming). An ended source (`endOfStream()`) isn't reopened by clearing `end`; the next
+  append reopens it (MSE: an append to an 'ended' source sets it 'open') - Repeat All turned on in the last song joins at
+  0 ms if the next round's head arrives before the end, else 'ended' and onEnded play it the URL way, no song skipped.
+- **What it refuses**: the playhead already past `current` (a join no 'timeupdate' has seen) or a list without the
+  stream's song at `current` - false, nothing changed; the player catches up first (`catchUp()`) and holds the change if it
+  still can't. The playhead's own song is never let go: harness C (`work/design-queue/critic`) found the stall that cutting
+  the song the playhead had just crossed into made.
+- **appendFailed()** blames (`refused`) a later song only while it is still the song at its index (`this.songs` holding it
+  with the id the append was for - an init op now carries its song's id): a let-go song's append failing after replan must
+  not mark the song that took its index refused, or it would never stream again.
+- **A run is not an album**: every next song in QUEUE order that is streamable and joins the one before it. A shuffled
+  album still joins song to song with nothing added between (what is heard at each join is the two songs' own edges; an
+  album's "gapless" means something only in its own order); an inserted FLAC of the same format joins at 0 ms and the album
+  after it joins it at 0 ms; an inserted MP3 or another rate ends the run before it, as a mixed album does. Repeat All's
+  wrap and Repeat One's loop are joins like any other, sample-exact.
+- **Not free, and not claimed to be**: `cutAt` takes out media after the song playing's end that the browser may already
+  have handed its decoder - WebKit's removeCodedFrames re-enqueues what it had enqueued past the range, and an
+  AVSampleBufferAudioRenderer may flush on re-feed (the risk notes/turntable.md records for a change of rate). So an edit
+  in the last seconds before a join could cost a moment of the playing song's end on an iPhone - not verified, and not on
+  Chromium either: the real-page run made its Play Next mid-song, before the next song was placed, so nothing was cut
+  (only that its joins were 0 ms is known). The gate is a Play Next 1 s and 3 s before a join, recorded through Web Audio,
+  in Chromium and then on the iPhone (notes/app.md's NOT verified list). Plan B, if either drops anything:
+  `stream.lockedThrough()` (the last placed song starting within 5 s of the playhead) passed to the pure edits as
+  `keepThrough`, the notice "Playing after the next song: …" - named, not built.
+- **An album in order, Up Next untouched, Repeat off** takes exactly the path it took before: toppedUp returns the same
+  object, no replaceUpcoming runs, replan is never called - player.sim's first new section pins it under one element,
+  Gapless, and both MediaSources.
+
 #### Maximum quality: hi-res resampled to 48 kHz (1.1.0-player.6)
 
 James, on 24/192 Dark Side of the Moon never going into the one stream (formatStreamable admitted 48

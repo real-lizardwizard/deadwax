@@ -3,24 +3,31 @@ What the player at /player/ may ask Navidrome, and nothing else.
 
 Each route is one Subsonic call with its own parameters, rather than a proxy that passes on
 whatever it is sent - see src/api/navidrome_endpoint.py for why that line matters. Adding a
-call means adding a route here, on purpose.
+call means adding a route here, on purpose. (The Library's Shuffle, 2.0.0-player.57, makes several:
+search3 and getAlbumList2 as the asker, deadwax's own order of what they list - see the end.)
 """
 
+import asyncio
+import random
+import secrets
 import time
+from array import array
 from collections import OrderedDict
+from dataclasses import dataclass
 from typing import Literal
 
 import httpx
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi import Path as PathParam
 from fastapi.responses import Response, StreamingResponse
 from starlette.background import BackgroundTask
 
-from src import player_cache
+from src import library_ledger, player_cache
 from src.api.navidrome_endpoint import NOT_CONFIGURED, NavidromeError, SignedOut, asks_as_shared, client_for
 from src.config import Config
 from src.logger import logger
 from src.routes.download import ClientGone, unless_abandoned
+from src.users import current_user
 
 router = APIRouter()
 
@@ -574,3 +581,203 @@ async def scrobble(song_id: str, request: Request, submission: bool = False, tim
         raise _fail(e)
 
     return {"ok": True}
+
+
+# ---------------------------------------------------------------- the Library's Shuffle (2.0.0-player.57, Part B)
+
+#? A page of a shuffle's order, as the app asks for it - about 70 KB of JSON a page (15 KB gzipped).
+SHUFFLE_PAGE = 200
+#? search3's songs a call while a list is built: Navidrome's empty query pages them by rowid, and songCount has no cap
+SCAN_PAGE = 2000
+#? getAlbumList2's own ceiling, a page of your starred albums
+STARRED_PAGE = 500
+#? the most songs a shuffle reads - past it the route says so (413): far beyond a home server
+SHUFFLE_MAX = 200_000
+#? how long the songs of a scope are kept per user before the next order builds the list again - so a song added
+#? since is in the next shuffle
+SHUFFLE_LIST_TTL_S = 600
+#? how long an order is kept after it was last asked for: it slides, so a shuffle that plays for a week is kept
+SHUFFLE_ORDER_TTL_S = 24 * 3600
+#? per user and scope: orders never handed to the player - what each visit to the list asks for ahead, kept a few so
+#? one device's visit never takes the order another device's list holds for its tap (one person on a phone and a
+#? desktop, or everyone as `local` with logins off) - and, per user, the ones claimed most recently (handed to the
+#? player: paged, named as `playing`, or made with `claim`)
+SHUFFLE_UNCLAIMED_KEPT = 4
+SHUFFLE_CLAIMED_KEPT = 2
+#? a token as secrets.token_urlsafe(16) makes it (22 characters), bounded like an id
+SHUFFLE_TOKEN = r"^[A-Za-z0-9_-]{1,64}$"
+#? what the queue takes of each song, in Navidrome's own names, so the page's toQueueTrack reads it as it is
+SHUFFLE_FIELDS = ("id", "title", "artist", "album", "albumId", "coverArt", "duration", "contentType", "suffix",
+                  "samplingRate", "bitDepth", "channelCount", "track", "discNumber")
+SHUFFLE_TOO_BIG = "Your library is too big to shuffle here"
+
+
+@dataclass
+class ShuffleOrder:
+    """One order of a scope's songs, as a permutation of them: whose it is, the scope it was asked for under, when it
+    was last asked for, and whether it has been handed to the player (claimed) - a visit to the list makes one it may
+    never play."""
+
+    user: str
+    scope: str
+    songs: list[dict]
+    order: array
+    used: float
+    claimed: bool = False
+
+
+#? (user, scope) -> (when built, the songs); one build at a time per (user, scope); token -> its order
+_shuffle_lists: dict[tuple[str, str], tuple[float, list[dict]]] = {}
+_shuffle_builds: dict[tuple[str, str], asyncio.Lock] = {}
+_shuffle_orders: dict[str, ShuffleOrder] = {}
+
+
+def forget_shuffles() -> None:
+    """Every list and order forgotten (the tests; a start)."""
+    _shuffle_lists.clear()
+    _shuffle_builds.clear()
+    _shuffle_orders.clear()
+
+
+async def _shuffle_songs(request: Request, user: str, scope: str) -> list[dict]:
+    """
+    Every song of `scope`, as the asker sees them: `store` all of Navidrome's, read with search3's empty query a
+    SCAN_PAGE at a time (in Navidrome's natural order, by rowid - persistence/sql_search.go, read at 0.64.2), each
+    song once (a scan between pages can move a rowid); `yours` only those of the albums the asker starred
+    (getAlbumList2 starred, STARRED_PAGE at a time). Kept SHUFFLE_LIST_TTL_S per (user, scope); one build at a time.
+    """
+    key = (user, scope)
+    lock = _shuffle_builds.setdefault(key, asyncio.Lock())
+    async with lock:
+        now = time.monotonic()
+        for held_key, (built, _) in list(_shuffle_lists.items()):
+            if now - built >= SHUFFLE_LIST_TTL_S:
+                del _shuffle_lists[held_key]
+        held = _shuffle_lists.get(key)
+        if held is not None:
+            return held[1]
+        client = client_for(request)
+        albums: set[str] | None = None
+        if scope == "yours":
+            albums = set()
+            offset = 0
+            while True:
+                body = await client.call("getAlbumList2", {"type": "starred", "size": STARRED_PAGE, "offset": offset})
+                page = (body.get("albumList2") or {}).get("album") or []
+                albums.update(album["id"] for album in page if isinstance(album, dict) and isinstance(album.get("id"), str))
+                if len(page) < STARRED_PAGE:
+                    break
+                offset += STARRED_PAGE
+        songs: list[dict] = []
+        seen: set[str] = set()
+        offset = 0
+        while True:
+            body = await client.call("search3", {
+                "query": "", "artistCount": 0, "albumCount": 0, "songCount": SCAN_PAGE, "songOffset": offset,
+            })
+            page = (body.get("searchResult3") or {}).get("song") or []
+            before = len(seen)
+            for song in page:
+                if not isinstance(song, dict) or not isinstance(song.get("id"), str) or song["id"] in seen:
+                    continue
+                seen.add(song["id"])
+                if albums is None or song.get("albumId") in albums:
+                    songs.append({name: song[name] for name in SHUFFLE_FIELDS if name in song})
+            if len(seen) > SHUFFLE_MAX:
+                raise HTTPException(status_code=413, detail=SHUFFLE_TOO_BIG)
+            #? a short page is the end - and so is a full one that brought nothing new (a server that ignores the offset)
+            if len(page) < SCAN_PAGE or len(seen) == before:
+                break
+            offset += SCAN_PAGE
+        _shuffle_lists[key] = (time.monotonic(), songs)
+        return songs
+
+
+def _keep_orders(user: str, claimed: bool, kept: int, scope: str | None = None) -> None:
+    """The user's orders of one kind (and of one `scope`, if named), the most recently asked-for `kept` of them kept,
+    the oldest going first."""
+    theirs = sorted((held.used, token) for token, held in _shuffle_orders.items()
+                    if held.user == user and held.claimed == claimed and (scope is None or held.scope == scope))
+    for _, token in theirs[:max(0, len(theirs) - kept)]:
+        del _shuffle_orders[token]
+
+
+def _forget_old_orders(now: float) -> None:
+    for token, held in list(_shuffle_orders.items()):
+        if now - held.used >= SHUFFLE_ORDER_TTL_S:
+            del _shuffle_orders[token]
+
+
+def _shuffle_page(held: ShuffleOrder, offset: int) -> list[dict]:
+    return [held.songs[at] for at in held.order[offset:offset + SHUFFLE_PAGE]]
+
+
+def _claim(held: ShuffleOrder, now: float) -> None:
+    """An order handed to the player: kept among the user's SHUFFLE_CLAIMED_KEPT claimed most recently."""
+    held.used = now
+    held.claimed = True
+    _keep_orders(held.user, claimed=True, kept=SHUFFLE_CLAIMED_KEPT)
+
+
+@router.get("/shuffle")
+async def shuffle(
+    request: Request,
+    scope: Literal["yours", "store"] = Query(...),
+    playing: str | None = Query(None, pattern=SHUFFLE_TOKEN),
+    claim: bool = False,
+    user: str = Depends(current_user),
+):
+    """
+    A new order of every song of `scope` (2.0.0-player.57, Part B: the Library's Shuffle) - each once, in a random
+    order deadwax makes (random.SystemRandom over the list), held under a new token for the asker. `yours`: the songs
+    of your starred albums - with logins off, or for the break-glass admin (who has no library), the store, which is
+    the library then. Answers the token, how many songs the order has, and its first SHUFFLE_PAGE; the app asks for
+    the rest as it plays (/shuffle/{token}). Nothing the page sends reaches Navidrome but the scope, which picks the
+    calls. A user keeps SHUFFLE_UNCLAIMED_KEPT orders per scope never handed to the player (each visit to the list
+    asks for one ahead, on whichever device; the oldest goes when there are more - 2.0.0-player.57's second review: at
+    one, a phone's visit took the order a desktop's list held, and its tap's shuffle "started over"). `playing`: the token of the order the list's Shuffle just played - claimed
+    here, before that replacing, since the list asks for the next tap's order straight after the tap, long before the
+    order playing is paged (2.0.0-player.57's review: it went, and its second page was a 404). `claim`: the order
+    made now is to play at once (the feed's fresh order), so claimed as it is made.
+    """
+    asked = scope if scope == "store" or (Config.logins_on() and library_ledger.has_library(user)) else "store"
+    try:
+        songs = await _shuffle_songs(request, user, asked)
+    except NavidromeError as e:
+        raise _fail(e)
+    order = array("I", range(len(songs)))
+    random.SystemRandom().shuffle(order)
+    now = time.monotonic()
+    _forget_old_orders(now)
+    played = _shuffle_orders.get(playing) if playing is not None else None
+    if played is not None and played.user == user:
+        _claim(played, now)
+    token = secrets.token_urlsafe(16)
+    held = ShuffleOrder(user=user, scope=scope, songs=songs, order=order, used=now)
+    _shuffle_orders[token] = held
+    if claim:
+        _claim(held, now)
+    else:
+        _keep_orders(user, claimed=False, kept=SHUFFLE_UNCLAIMED_KEPT, scope=scope)
+    return {"token": token, "total": len(order), "songs": _shuffle_page(held, 0)}
+
+
+@router.get("/shuffle/{token}")
+async def shuffle_more(
+    token: str = PathParam(..., pattern=SHUFFLE_TOKEN),
+    offset: int = Query(..., ge=0, le=SHUFFLE_MAX),
+    user: str = Depends(current_user),
+):
+    """
+    The next page of an order, from `offset` - claiming it: a user keeps the SHUFFLE_CLAIMED_KEPT orders most recently
+    claimed (paged, or claimed by /shuffle), each SHUFFLE_ORDER_TTL_S after it was last asked for, so opening the list again and again never pushes out
+    the order that is playing. Another user's token, or one deadwax no longer holds (it restarted, or a day passed
+    untouched), is a 404 saying "gone" - the app's feed then starts a fresh order. Asks Navidrome nothing.
+    """
+    now = time.monotonic()
+    _forget_old_orders(now)
+    held = _shuffle_orders.get(token)
+    if held is None or held.user != user:
+        raise HTTPException(status_code=404, detail="gone")
+    _claim(held, now)
+    return {"total": len(held.order), "songs": _shuffle_page(held, offset)}

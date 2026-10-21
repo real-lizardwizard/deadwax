@@ -18,8 +18,9 @@ import { pinOf, type AlbumPinTarget } from '../lib/pins'
 import { newShelf } from '../lib/myLibrary'
 import { songIds } from '../lib/songs'
 import type { Look } from '../lib/turntable'
+import type { QueuePick } from '../lib/upNext'
 import { AlbumPage } from '../player/AlbumPage'
-import { navidromeStatus, playedAlbum, sentFormat, type Album, type Artist, type NavidromeStatus } from '../player/api'
+import { navidromeStatus, playedAlbum, sentFormat, toQueueTrack, type Album, type AlbumWithSongs, type Artist, type NavidromeStatus, type Song } from '../player/api'
 import { Library } from '../player/Library'
 import { MiniPlayer } from '../player/MiniPlayer'
 import { NowPlaying } from '../player/NowPlaying'
@@ -53,10 +54,13 @@ import { useFrame } from './useFrame'
 import { adminUntilAsked } from './session'
 import { useInfoDetails } from './useInfoDetails'
 import { PinNotice } from './PinNotice'
+import { QueueMenu } from './QueueMenu'
 import { setPinned, usePins } from './usePins'
 import { askQueueSummary, useQueueSummary } from './useQueueSummary'
 import { askMyLibrary, hasLibrary, seenAlbum, useMyLibrary } from './useMyLibrary'
 import { takeOpener } from './useSheet'
+import { useShuffleFeed } from './useShuffleFeed'
+import { UpNext } from './UpNext'
 import { You } from './You'
 
 /** How many albums opened this session are kept to draw a page's hero before its songs arrive. */
@@ -249,6 +253,15 @@ function usePageShown(): boolean {
  * as the desktop's visualizer does. The Navidrome gate's "Set up Navidrome" opens Server settings at
  * Connections (navidromeSetUp.ts), and a save that touched Navidrome's settings asks Navidrome again, so
  * a first run from a phone can set it up and play.
+ *
+ * UP NEXT, SHUFFLE AND REPEAT (2.0.0-player.57, app/UpNext.tsx, lib/upNext.ts): the queue, with Shuffle and Repeat
+ * at its top - on a phone a sheet over Now Playing (`over` 'upnext', never with the menu or Info), opened from its
+ * Up next button; on a desktop the side panel, from the player bar's Up Next, by the one-panel rule (it puts Info,
+ * Sources, Edit and the artist's away, and each of them puts it away), closed going back to the phone as Info's
+ * is. It closes by itself once nothing plays. Every song row's ••• and an album page's own open the song menu
+ * (QueueMenu.tsx: Play Next, Play Last) over everything - the page behind inert, a side panel too - with the songs
+ * in hand, and the menu plays them in its tap. A whole library's shuffle (Part B) is fed its pages by
+ * useShuffleFeed, called here once, as the player is.
  */
 export function App() {
   const player = usePlayer()
@@ -305,8 +318,17 @@ export function App() {
   //? the Sources sheet: whether it shows, and the last Get it was opened for (kept as it slides away)
   const [sourcesOpen, setSourcesOpen] = useState(false)
   const [getting, setGetting] = useState<GetRequest | null>(null)
-  //? what is over Now Playing: its ••• menu, or Info - never both
-  const [over, setOver] = useState<'none' | 'menu' | 'info'>('none')
+  //? what is over Now Playing: its ••• menu, Info, or (2.0.0-player.57) Up Next - never two at once
+  const [over, setOver] = useState<'none' | 'menu' | 'info' | 'upnext'>('none')
+  //? (2.0.0-player.57) a desktop's Up Next: the side panel, from the player bar - and what it gives focus back to
+  const [upNextPanel, setUpNextPanel] = useState(false)
+  const upNextPanelOpen = useRef(false)
+  upNextPanelOpen.current = upNextPanel
+  const upNextOpener = useRef<HTMLElement | null>(null)
+  //? the song menu: whether it shows, what it was opened with (kept as it slides away), and its •••
+  const [queueMenuOpen, setQueueMenuOpen] = useState(false)
+  const [queuePick, setQueuePick] = useState<QueuePick<AlbumWithSongs> | null>(null)
+  const queueMenuOpener = useRef<HTMLElement | null>(null)
   //? the desktop's Edit panel (2.0.0-player.21): whether it shows, and the last album it was opened for
   //? (kept as it slides away) - and what it gives focus back to, the album page's Edit
   const [editOpen, setEditOpen] = useState(false)
@@ -588,6 +610,8 @@ export function App() {
     //? nothing (Sources takes it)
     infoOpener.current = null
     setInfoPanel(false)
+    upNextOpener.current = null
+    setUpNextPanel(false)
     editOpener.current = null
     setEditOpen(false)
     artistOpener.current = null
@@ -648,9 +672,47 @@ export function App() {
     setEditOpen(false)
     artistOpener.current = null
     setArtistOpen(false)
+    upNextOpener.current = null
+    setUpNextPanel(false)
     setInfoPanel(true)
   }, [])
   const closeInfoPanel = useCallback(() => setInfoPanel(false), [])
+
+  //? Up Next (2.0.0-player.57): on a phone a sheet over Now Playing, from its Up next button - in place of the menu
+  //? or Info, never with them; on a desktop the side panel, from the player bar's Up Next, by the one-panel rule
+  const openUpNext = useCallback((event: MouseEvent) => {
+    upNextOpener.current = takeOpener(event)
+    setOver('upnext')
+  }, [])
+  const toggleUpNext = useCallback((event: MouseEvent) => {
+    if (upNextPanelOpen.current) {
+      setUpNextPanel(false)
+      return
+    }
+    upNextOpener.current = takeOpener(event)
+    infoOpener.current = null
+    setInfoPanel(false)
+    sourcesOpener.current = null
+    setSourcesOpen(false)
+    editOpener.current = null
+    setEditOpen(false)
+    artistOpener.current = null
+    setArtistOpen(false)
+    setUpNextPanel(true)
+  }, [])
+  const closeUpNextPanel = useCallback(() => setUpNextPanel(false), [])
+
+  //? The song menu (2.0.0-player.57): a song row's ••• or an album page's, with the songs in hand - the menu plays
+  //? them in its own tap. A song from the Library's Songs comes without its album's answer (none is in hand)
+  const openQueueMenu = useCallback((event: MouseEvent, pick: QueuePick<AlbumWithSongs>) => {
+    queueMenuOpener.current = takeOpener(event)
+    setQueuePick(pick)
+    setQueueMenuOpen(true)
+  }, [])
+  const openSongMenu = useCallback((song: Song, event: MouseEvent) => {
+    openQueueMenu(event, { label: song.title, tracks: [toQueueTrack(song, { id: song.albumId ?? '', name: song.album ?? '' })], albums: [] })
+  }, [])
+  const closeQueueMenu = useCallback(() => setQueueMenuOpen(false), [])
 
   //? The desktop's visualizer (2.0.0-player.20): the player bar's button opens it - its audio context
   //? made in this click, the gesture a browser lets it run from - and focus goes back to that button
@@ -679,6 +741,8 @@ export function App() {
     setSourcesOpen(false)
     infoOpener.current = null
     setInfoPanel(false)
+    upNextOpener.current = null
+    setUpNextPanel(false)
     artistOpener.current = null
     setArtistOpen(false)
   }, [])
@@ -696,6 +760,8 @@ export function App() {
     setSourcesOpen(false)
     infoOpener.current = null
     setInfoPanel(false)
+    upNextOpener.current = null
+    setUpNextPanel(false)
     artistOpener.current = null
     setArtistOpen(false)
   }, [])
@@ -717,6 +783,8 @@ export function App() {
     setSourcesOpen(false)
     infoOpener.current = null
     setInfoPanel(false)
+    upNextOpener.current = null
+    setUpNextPanel(false)
     editOpener.current = null
     setEditOpen(false)
   }, [])
@@ -813,7 +881,23 @@ export function App() {
       //? the visualizer is a desktop's: a phone's width closes it, and it doesn't come back by itself
       setVisualizing(false)
     }
+    //? (2.0.0-player.57) Up Next is a sheet over Now Playing on a phone, which isn't open
+    if (closes.upNextPanel) {
+      upNextOpener.current = null
+      setUpNextPanel(false)
+    }
   }, [frame])
+
+  //? Up Next closes by itself once nothing is playing any more - Now Playing has gone already (2.0.0-player.57)
+  const nothingPlaying = !player.track
+  useEffect(() => {
+    if (!nothingPlaying) return
+    setUpNextPanel(false)
+    setOver((was) => (was === 'upnext' ? 'none' : was))
+  }, [nothingPlaying])
+
+  //? a whole library's shuffle (Part B): its pages fed as it plays - once, here, beside the engine
+  useShuffleFeed(player)
 
   //? The Edit panel is the album page's: as that page stops being the one showing - another page, a
   //? tab, the sidebar - it closes, focus given back to nothing (the Edit it came from is gone). Opened
@@ -986,8 +1070,13 @@ export function App() {
    * artist at once. The ••• button is in a sheet that is closing, so focus isn't sent back to it.
    */
   //? A desktop's Info as a drawer (1024-1279px) lies over the page these open, so it goes too - focus
-  //? given back to nothing, the page opening takes it; as a third column it stays beside the page
+  //? given back to nothing, the page opening takes it; as a third column it stays beside the page.
+  //? (2.0.0-player.57) Up Next as a drawer the same - the player bar's album link opens the page under it
   const leaveInfoDrawer = () => {
+    if (liesOver(panel, upNextPanel ? 'upnext' : 'none')) {
+      upNextOpener.current = null
+      setUpNextPanel(false)
+    }
     if (!liesOver(panel, infoPanel ? 'info' : 'none')) return
     infoOpener.current = null
     setInfoPanel(false)
@@ -1097,13 +1186,13 @@ export function App() {
   const library = useMemo(
     () => (
       <NeedsNavidrome status={status} onRetry={checkNavidrome} title={TAB_LABELS.library}>
-        {librarySeen && <Library onOpen={openAlbum} onOpenArtist={openLibraryArtist} />}
+        {librarySeen && <Library onOpen={openAlbum} onOpenArtist={openLibraryArtist} onSongMenu={openSongMenu} shown={libraryShown} />}
       </NeedsNavidrome>
     ),
-    [status, librarySeen],
+    [status, librarySeen, libraryShown],
   )
   const search = useMemo(
-    () => <Search shown={searchSeen} active={searchActive} status={status} onRetry={checkNavidrome} onOpenAlbum={openAlbum} onOpenGroup={openGroup} onOpenSongAlbum={openSongAlbum} onOpenArtist={openLibraryArtist} onOpenMusicBrainzArtist={openCreditedArtist} onGet={openSources} />,
+    () => <Search shown={searchSeen} active={searchActive} status={status} onRetry={checkNavidrome} onOpenAlbum={openAlbum} onOpenGroup={openGroup} onOpenSongAlbum={openSongAlbum} onOpenArtist={openLibraryArtist} onOpenMusicBrainzArtist={openCreditedArtist} onGet={openSources} onQueueMenu={openQueueMenu} />,
     [status, searchSeen, searchActive],
   )
   const you = useMemo(
@@ -1221,6 +1310,7 @@ export function App() {
           editAt={desktop ? 'actions' : 'bar'}
           editing={editOpen && edit?.album?.id === page.id}
           refresh={refreshes.get(page.id) ?? 0}
+          onQueueMenu={openQueueMenu}
         />
       </NeedsNavidrome>
     )
@@ -1255,10 +1345,15 @@ export function App() {
   //? side panel leaves the page beside it as it is
   //? (2.0.0-player.20: and behind the desktop's visualizer, which covers the whole screen; 2.0.0-player.47:
   //? and behind a phone's Edit sheet)
-  const covered = (!desktop && (sheetOpen || sourcesOpen || artistOpen || editOpen)) || visualizerShown
+  //? (2.0.0-player.57: and behind the song menu, on either frame)
+  const covered = (!desktop && (sheetOpen || sourcesOpen || artistOpen || editOpen)) || visualizerShown || queueMenuOpen
+  //? a desktop's side panels are inert under the visualizer, and under the song menu
+  const panelsCovered = visualizerShown || queueMenuOpen
   //? the main area makes room for a desktop's panel only as a third column; a drawer lies over its edge
   //? (lib/appFrame.ts)
-  const side = sideOf(frame, { sources: sourcesOpen, info: infoPanel, edit: editOpen, artist: artistOpen })
+  const side = sideOf(frame, { sources: sourcesOpen, info: infoPanel, edit: editOpen, artist: artistOpen, upnext: upNextPanel })
+  //? Up Next: a sheet over Now Playing on a phone; on a desktop the side panel the player bar opens
+  const upNextOpen = desktop ? upNextPanel : sheetOpen && over === 'upnext'
 
   //? The ••• menu's pin (2.0.0-player.18): the playing song's album, by its release where the answer
   //? it was played from says it (none at all, "", and it can't be pinned), else by Navidrome's id,
@@ -1312,14 +1407,14 @@ export function App() {
 
             {/* the player: the mini player over the tab bar, or a desktop's player bar */}
             {desktop ? (
-              <PlayerBar player={player} onAlbum={toAlbum} onInfo={toggleInfo} infoOpen={infoPanel} onVisualizer={openVisualizer} />
+              <PlayerBar player={player} onAlbum={toAlbum} onInfo={toggleInfo} infoOpen={infoPanel} onVisualizer={openVisualizer} onUpNext={toggleUpNext} upNextOpen={upNextPanel} />
             ) : (
               <MiniPlayer player={player} onOpen={openSheet} />
             )}
             {!desktop && <TabBar current={nav.tab} onSelect={chooseTab} arriving={view.arriving.length} />}
           </div>
           {/* a Get's sources (2.0.0-player.15): over the page, under Now Playing's menu and Info - a desktop's side panel */}
-          <Sources open={sourcesOpen} request={getting} opener={sourcesOpener} onClose={closeSources} onQueued={gotten} panel={panel} covered={visualizerShown} />
+          <Sources open={sourcesOpen} request={getting} opener={sourcesOpener} onClose={closeSources} onQueued={gotten} panel={panel} covered={panelsCovered} />
           <NowPlaying
             player={player}
             open={sheetOpen}
@@ -1331,6 +1426,8 @@ export function App() {
             openAs={opensAs}
             windDown={windDown}
             pinnable={menuPinNow.current !== null}
+            onUpNext={openUpNext}
+            upNextOpen={over === 'upnext'}
           />
           {/* over Now Playing: its menu, then Info - the menu first, so where one closes as the
               other opens, focus ends in the one that opened */}
@@ -1357,12 +1454,16 @@ export function App() {
             details={infoDetails}
             onArtist={toArtist}
             panel={panel}
-            covered={visualizerShown}
+            covered={panelsCovered}
           />
+          {/* (2.0.0-player.57) Up Next: over Now Playing on a phone, a desktop's side panel - after Info, never with it */}
+          <UpNext open={upNextOpen} opener={upNextOpener} onClose={desktop ? closeUpNextPanel : closeOver} player={player} panel={panel} covered={desktop && panelsCovered} />
           {/* the album page's Edit panel (2.0.0-player.21) - a side panel on a desktop, a sheet on a phone (2.0.0-player.47) */}
-          <EditPanel open={editOpen} request={edit} opener={editOpener} onClose={closeEdit} onChanged={albumChanged} panel={panel} covered={visualizerShown} />
+          <EditPanel open={editOpen} request={edit} opener={editOpener} onClose={closeEdit} onChanged={albumChanged} panel={panel} covered={panelsCovered} />
           {/* the artist page's panel (2.0.0-player.45) - a side panel on a desktop, a sheet on a phone */}
-          <ArtistPanel open={artistOpen} request={artistManage} opener={artistOpener} onClose={closeArtistManage} onSettled={artistSettled} panel={panel} covered={visualizerShown} />
+          <ArtistPanel open={artistOpen} request={artistManage} opener={artistOpener} onClose={closeArtistManage} onSettled={artistSettled} panel={panel} covered={panelsCovered} />
+          {/* (2.0.0-player.57) the song menu - a song's or an album's Play Next and Play Last - over everything */}
+          <QueueMenu open={queueMenuOpen} pick={queuePick} opener={queueMenuOpener} onClose={closeQueueMenu} player={player} />
           {/* what became of a pin, said over everything (2.0.0-player.18) */}
           <PinNotice />
           {/* the desktop's full-screen visualizer, over everything (2.0.0-player.20) */}

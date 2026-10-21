@@ -855,9 +855,16 @@ console.log('\nthe desktop frame picks panels over sheets (2.0.0-player.19)')
   check('the main area makes room only for a third column - a drawer lies over it',
     [F.makesRoom('column', 'sources'), F.makesRoom('column', 'info'), F.makesRoom('column', 'none'), F.makesRoom('drawer', 'sources'), F.makesRoom('sheet', 'sources')],
     [true, true, false, false, false])
-  check('crossing into the desktop closes Now Playing; back to the phone, the Info panel',
+  check('crossing into the desktop closes Now Playing; back to the phone, the Info panel - and (2.0.0-player.57) the Up Next panel',
     [F.closesOnCrossing('desktop'), F.closesOnCrossing('phone')],
-    [{ nowPlaying: true, infoPanel: false }, { nowPlaying: false, infoPanel: true }])
+    [{ nowPlaying: true, infoPanel: false, upNextPanel: false }, { nowPlaying: false, infoPanel: true, upNextPanel: true }])
+  //? 2.0.0-player.57: Up Next, a fifth kind - opened from the player bar as Info is, a sheet over Now Playing on a phone
+  check('the Up Next panel is a side panel too: shown alone, under Info, over Edit, the artist\'s and Sources - and no side on a phone',
+    [F.sideOf('desktop', { sources: false, info: false, edit: false, upnext: true }), F.sideOf('desktop', { sources: false, info: true, edit: false, upnext: true }),
+      F.sideOf('desktop', { sources: true, info: false, edit: true, artist: true, upnext: true }), F.sideOf('phone', { sources: false, info: false, edit: false, upnext: true })],
+    ['upnext', 'info', 'upnext', 'none'])
+  check('...making room as a column, lying over the page as a drawer',
+    [F.makesRoom('column', 'upnext'), F.makesRoom('drawer', 'upnext'), F.liesOver('drawer', 'upnext'), F.liesOver('column', 'upnext')], [true, false, true, false])
   //? 2.0.0-player.47: the Edit panel is a phone's sheet too, so it stays open across, as the artist page's does
   check('...and the Edit panel is left open as the window crosses 1024px, either way - a panel one side, a sheet the other',
     ['editPanel' in F.closesOnCrossing('phone'), 'editPanel' in F.closesOnCrossing('desktop')], [false, false])

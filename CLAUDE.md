@@ -186,7 +186,10 @@ src/
                    src/logger.py keeps, numbered - see "Server settings and the log in the
                    app"), library,
                    settings (editable since v0.5.1 - see "The settings tab"), navidrome
-                   (the player's FIXED list of Subsonic calls - see "The phone player"),
+                   (the player's FIXED list of Subsonic calls - see "The phone player"; and
+                   since 2.0.0-player.57 /shuffle and /shuffle/{token}, the Library's Shuffle:
+                   every song of your library once, in an order deadwax makes, paged - see
+                   "Up Next, shuffle and repeat"),
                    me, auth (sign-in and sign-out, the two routes needing no session),
                    store_album (the app's id bridge - see "Artists, and the two
                    libraries joined"), pins (/deadwax/me/pins - see "Pins, and a finished Home"),
@@ -233,6 +236,11 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    MusicBrainz answers app/searchAnswers.ts - see "Search like Apple Music". Its
                    Songs section groups a recording search's takes into songs with lib/songs.ts -
                    see "Song search (2.0.0-player.53)".
+                   lib/upNext.ts is PURE - Up Next's account of the queue beside the engine's
+                   { tracks, index }: Play Next/Last, moves, Shuffle, Repeat unrolled into it;
+                   app/UpNext.tsx draws it (both frames), app/QueueMenu.tsx is a song's or an
+                   album's Play Next and Play Last, app/ShuffleSongs.tsx the Library's Shuffle and
+                   app/useShuffleFeed.ts its pages - see "Up Next, shuffle and repeat".
                    app/LibraryCare.tsx is Rescan and the bulk runs (both frames; its runs
                    app/useLibraryCare.ts; which albums each takes lib/bulkTargets.ts, the main
                    page's too) - see "Looking after the library".
@@ -243,7 +251,7 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    ui/src/lab/ is the turntable's test bench at /player/lab/, a third page built
                    in a pass of its own: the real Turntable and deck over signals it makes, set
                    beside an ideal turntable - see notes/turntable-bench.md.
-tests/             3118 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             3156 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -489,7 +497,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 3118 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 3156 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see `notes/tooling.md`:
@@ -527,7 +535,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 3118 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 3156 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

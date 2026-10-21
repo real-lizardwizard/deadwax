@@ -360,11 +360,12 @@ def test_it_is_a_library_route_and_the_navidrome_list_is_unchanged():
     assert serves_media(ROUTE)
     #? the player's own list - search3 joined it in 2.0.0-player.13, on purpose, the turntable's
     #? window of a song in 2.0.0-player.14 (test_scrub_window.py), and the artists and a song in
-    #? 2.0.0-player.17 (test_navidrome_artists.py); this route never did
+    #? 2.0.0-player.17 (test_navidrome_artists.py), and the Library's Shuffle in 2.0.0-player.57
+    #? (test_navidrome_shuffle.py); this route never did
     assert sorted(route.path for route in navidrome_routes.router.routes) == [
         "/albums", "/albums/{album_id}", "/artists", "/artists/{artist_id}", "/cover/{cover_id}",
-        "/scrobble/{song_id}", "/scrub/{song_id}", "/search", "/songs/{song_id}", "/status",
-        "/stream/{song_id}",
+        "/scrobble/{song_id}", "/scrub/{song_id}", "/search", "/shuffle", "/shuffle/{token}", "/songs/{song_id}",
+        "/status", "/stream/{song_id}",
     ]
     assert "/disc_art/navidrome" in {route.path for route in library_routes.router.routes}
 

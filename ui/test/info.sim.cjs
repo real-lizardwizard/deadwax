@@ -336,6 +336,24 @@ console.log('\nthe albums played from')
   const small = createPlayedAlbums(2, 3)
   small.rememberQueue([{ id: 'b1' }, { id: 'b2' }, { id: 'b3' }, { id: 'b4' }, { id: 'b5' }])
   check(`...and never more than QUEUE_ALBUMS_KEPT (${QUEUE_ALBUMS_KEPT}) of one: the first to play kept`, ['b1', 'b2', 'b3', 'b4', 'b5'].map((id) => !!small.get(id)), [true, true, true, false, false])
+  //? (2.0.0-player.57) an album added to Up Next - Play Next, Play Last - kept beside the queue's, which stay
+  const added = createPlayedAlbums()
+  added.remember({ id: 'playing' })
+  for (let n = 1; n <= PLAYED_KEPT + 2; n++) added.also({ id: `added${n}` })
+  check(`songs added to Up Next: their albums kept past ${PLAYED_KEPT}, the queue's album with them`,
+    [added.get('playing')?.id, added.get('added1')?.id, added.get(`added${PLAYED_KEPT + 2}`)?.id], ['playing', 'added1', `added${PLAYED_KEPT + 2}`])
+  const artistPlay = createPlayedAlbums()
+  artistPlay.rememberQueue(twelve)
+  artistPlay.also({ id: 'extra' })
+  check('...an artist\'s Play\'s albums too, every one of them', [twelve.every((album) => artistPlay.get(album.id)?.id === album.id), artistPlay.get('extra')?.id], [true, 'extra'])
+  const capped = createPlayedAlbums(2, 3)
+  for (const id of ['c1', 'c2', 'c3', 'c4', 'c5']) capped.also({ id })
+  check('...up to QUEUE_ALBUMS_KEPT, the oldest going first past it', ['c1', 'c2', 'c3', 'c4', 'c5'].map((id) => !!capped.get(id)), [false, false, true, true, true])
+  const again = createPlayedAlbums()
+  again.also({ id: 'twice' })
+  again.also({ id: 'twice' })
+  for (let n = 1; n <= PLAYED_KEPT; n++) again.remember({ id: `r${n}` })
+  check('...an album added again counts once; remember() still starts afresh, back to its own bound', [again.get('twice'), again.get(`r${PLAYED_KEPT}`)?.id], [null, `r${PLAYED_KEPT}`])
 }
 
 /* ===== the sheets ===== */
@@ -348,6 +366,8 @@ const player = {
   track: queueTrack(), gapless: true, maxRate: '48000', gaps: [], lastSeek: null,
   wrapped: { id: 'd2t3', got: 'stream', resampled: null, hiRes: null },
   playing: true, buffering: false, duration: 308, error: null, airplay: false,
+  //? (2.0.0-player.57) Up Next's: neither on
+  shuffle: false, repeat: 'off',
   toggle() {}, previous() {}, showAirPlay() {}, seek() {}, position: () => 0, onPosition: () => () => {},
 }
 
@@ -709,10 +729,10 @@ console.log('\nNow Playing is a sheet too, and deaf under the others')
   draw(false)
   check('...and focus goes back to the mini player', [document.activeElement === opener, locks()], [true, []])
   check('the album line goes to the album', one(view, (node) => node.type === 'button' && byClass('pl-sheet-artist')(node)).props['aria-label'], 'Go to the album: Pink Floyd — Wish You Were Here')
-  check('the icon row: ••• only, with no speaker to send to', view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['More: info, go to album, pin'])
+  check('the icon row: Up next and •••, with no speaker to send to (2.0.0-player.57: Up next always there)', view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['Up next', 'More: info, go to album, pin'])
   view.render({ player, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum() {}, openAs: 'cover', pinnable: false })
   check('...an album the menu has no pin for (no release id, or deadwax can\'t keep pins): ••• doesn\'t promise one',
-    view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['More: info, go to album'])
+    view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['Up next', 'More: info, go to album'])
   let albums = 0
   view.render({ player, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum: () => { albums += 1 }, openAs: 'cover' })
   one(view, (node) => node.type === 'button' && byClass('pl-sheet-artist')(node)).props.onClick()
@@ -724,7 +744,17 @@ console.log('\nNow Playing is a sheet too, and deaf under the others')
     [view.find((node) => node.type === 'button' && byClass('pl-sheet-artist')(node)).length, one(view, (node) => node.type === 'p' && byClass('pl-sheet-artist')(node)) && text(one(view, byClass('pl-sheet-byline')))],
     [0, 'Pink Floyd — Wish You Were Here'])
   check('...••• says the menu holds only Info, and AirPlay sits before it with a speaker there',
-    view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['AirPlay', 'More: info'])
+    view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['AirPlay', 'Up next', 'More: info'])
+  //? (2.0.0-player.57) Up next: named and tinted by what is on, opening Up Next from its tap, expanded while it is over
+  let upNexts = 0
+  view.render({ player: { ...player, shuffle: true, repeat: 'all' }, open: true, covered: true, opener: openerRef, onClose() {}, onMore() {}, onAlbum() {}, openAs: 'cover', onUpNext: () => { upNexts += 1 }, upNextOpen: true })
+  const upNext = one(view, (node) => node.type === 'button' && byClass('app-upnext-button')(node))
+  upNext.props.onClick()
+  check('Up next with Shuffle and Repeat All on: named so, tinted, expanded while Up Next is over it - and ••• not, its tap App\'s',
+    [upNext.props['aria-label'], byClass('is-on')(upNext), upNext.props['aria-expanded'], upNext.props['aria-haspopup'], one(view, (node) => node.type === 'button' && byClass('pl-icon-button')(node) && !byClass('app-upnext-button')(node)).props['aria-expanded'], upNexts],
+    ['Up next - Shuffle and Repeat all', true, true, 'dialog', false, 1])
+  view.render({ player, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum() {}, openAs: 'cover', onUpNext() {} })
+  check('...neither on: plain, and not tinted', [one(view, byClass('app-upnext-button')).props['aria-label'], byClass('is-on')(one(view, byClass('app-upnext-button')))], ['Up next', false])
   view.render({ player: { ...player, error: 'Skipped "Shine On" - it wouldn\'t play' }, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum() {}, openAs: 'cover' })
   const titles = one(view, byClass('pl-sheet-titles')).props.children.filter(Boolean)
   check('a failure is drawn above the title, never under it', titles.map((node) => node.props.class.split(' ')[0]), ['pl-sheet-error', 'pl-sheet-title', 'pl-sheet-artist'])

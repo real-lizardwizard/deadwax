@@ -308,7 +308,7 @@ These are stored in your browser, so each browser and device has its own. They'r
 
 ## The phone player's settings (per device)
 
-[The phone player](player.md) at `/player/` keeps eleven settings of its own, on the device, in the
+[The phone player](player.md) at `/player/` keeps twelve settings of its own, on the device, in the
 app's own storage: a home-screen app keeps its storage apart from Safari's, so set them in the app
 itself. None of them is on the main page's Settings tab.
 
@@ -319,6 +319,7 @@ itself. None of them is on the main page's Settings tab.
 | Now Playing opens as | Cover | **You** → Playback | whether the now-playing screen opens as the cover or as [the turntable](player.md#the-turntable). The button at the screen's top right switches between them for as long as it's open, without changing this. The phone layout's only: [on a desktop](player.md#on-a-desktop) there's no now-playing screen, so it changes nothing there. |
 | Pause winds the record down | on | **You** → Playback | whether pausing from [the turntable](player.md#the-turntable) slows the song's sound to a stop with the record over about a second (on), or stops it at once. The turntable's only: the cover's pause, the lock screen's and a song ending are always instant - and on a desktop, which has no turntable, it changes nothing. A checkbox. |
 | Speed | 1x | the turntable's **speed fader**, beside the platter (and the chip that shows a speed that isn't 1x, on the cover and the desktop's player bar, which puts it back to 1x) | how fast the song plays, from 0.25x to 2x, its pitch moving with it - a record deck's speed, not a time-stretch - since 2.0.0-player.39; see [the speed fader](player.md#the-speed-fader). Kept as `deadwax-player-speed`, a number from 0.25 to 2 in hundredths: anything else stored there - nothing, a word, a number out of range - plays at 1x. It holds for every song after, until you change it. |
+| Repeat | off | **Up Next**'s Repeat chip (on a desktop, the player bar's Repeat too) | off, **Repeat all** (the album or list again from the top, a new order with Shuffle on) or **Repeat one** (the song again until you skip it) - since 2.0.0-player.57; see [Up Next, shuffle and repeat](player.md#up-next-shuffle-and-repeat). Kept as `deadwax-player-repeat`, `all` or `one`: anything else stored there - nothing, a mistyped value, storage that can't be read - is off. Shuffle isn't kept: it belongs to what's playing. |
 | Library view | Albums | **Library**, the chips under the title (on a desktop, the sidebar's Library views) | Albums, Artists or Songs (since 2.0.0-player.17). Songs is left out where Navidrome won't list songs, and the albums show instead. A desktop's **Recently added** (since 2.0.0-player.19) isn't kept: the view kept is the last of the other three. |
 | Library order | Recently added | **Library**, the sort under the chips, on Albums | Recently added, Recently played, Artist or Title. (Artists has its own sort - Name or Most albums - which isn't kept.) |
 | Visualizer effect | Ambient | the [visualizer](player.md#the-visualizer)'s effects, at its top right | Bars, Scope, Halo or Ambient (since 2.0.0-player.20) - what it opens on next time; **V** steps through them too. The visualizer is a desktop's, so on a phone this changes nothing. |

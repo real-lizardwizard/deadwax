@@ -4703,6 +4703,768 @@ async function outcome(promise, ms = 1_000) {
     check('no switch at all: the rate all the same, and Debug says it has none', [elements[0].playbackRate, p.player.speedReading().pitch], [1.5, 'no switch'])
   }
 
+
+  /* ======================================================================== */
+  //? Up Next, shuffle and repeat (2.0.0-player.57): the queue changing after the song playing, which reaches the
+  //? engine through replaceUpcoming() and the stream through StreamSource.replan(), and Repeat unrolled into the
+  //? queue (lib/upNext.ts). Counted from here: every replan, every stream made, and every call the engine makes
+  //? into lib/upNext - wrapped on the compiled modules the engine itself requires.
+  const { StreamSource } = require(path.join(OUT, 'player/streamSource.js'))
+  const UP = require(path.join(OUT, 'lib/upNext.js'))
+  let replans = 0
+  const madeStreams = []
+  const realReplan = StreamSource.prototype.replan
+  StreamSource.prototype.replan = function (...args) { replans++; return realReplan.apply(this, args) }
+  const realStreamAttach = StreamSource.prototype.attach
+  StreamSource.prototype.attach = function (...args) { madeStreams.push(this); return realStreamAttach.apply(this, args) }
+  const upNextCalls = {}
+  for (const name of ['toppedUp', 'withShuffle', 'withRepeat', 'withNext', 'withLast', 'withoutKey', 'movedKey', 'withoutAdded', 'jumpedTo', 'withMore']) {
+    const real = UP[name]
+    UP[name] = (...args) => { upNextCalls[name] = (upNextCalls[name] ?? 0) + 1; return real(...args) }
+  }
+  const resetCounts = () => { replans = 0; madeStreams.length = 0; for (const name of Object.keys(upNextCalls)) delete upNextCalls[name] }
+  //? the queue's song as the clock runs - `${index}:${id}` each time it changes - and the lock screen's titles
+  async function follow(p, ms, step = 100) {
+    const moves = [], titles = []
+    const note = () => {
+      const q = p.player.queue
+      const entry = q.index < 0 ? null : `${q.index}:${q.tracks[q.index]?.id}`
+      if (moves[moves.length - 1] !== entry) moves.push(entry)
+      const title = media.metadata?.title ?? null
+      if (titles[titles.length - 1] !== title) titles.push(title)
+    }
+    note()
+    for (let t = 0; t < ms; t += step) { await run(step); note() }
+    return { moves, titles }
+  }
+  //? the key of a song's row in Up Next (the `nth` time it comes after the song playing), and what comes after it
+  const keyIn = (p, id, nth = 0) => {
+    const q = p.player.queue
+    const places = q.tracks.map((t, i) => (i > q.index && t.id === id ? i : -1)).filter((i) => i >= 0)
+    return q.upNext.marks[places[nth]]?.key ?? null
+  }
+  const comingIds = (p) => { const q = p.player.queue; return q.tracks.slice(q.index + 1).map((t) => t.id) }
+  const joinsRead = (p) => p.player.gaps.map((g) => `${g.ms} ${g.how.kind}`)
+  const r9u = (x) => (x == null ? x : Math.round(x * 1e9) / 1e9)
+  const mp3 = (ids) => tracks(ids).map((t) => ({ ...t, contentType: 'audio/mpeg', suffix: 'mp3' }))
+
+  console.log('\nUp Next untouched: the engine as before - nothing replanned, nothing edited')
+  {
+    resetCounts()
+    const p = streamPage({ durations: { 1: 6, 2: 5, 3: 7 } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
+    await run((starts(['1', '2', '3'])[3] + 1.5) * 1000)
+    check('one stream (ManagedMediaSource): the album to its end, every join 0 ms in one stream, one MediaSource',
+      [p.player.track.id, e0.ended, e0.stalls.length, p.gapLine(), mediaSources.length], ['3', true, 0, 'Last song change 0 ms, in one stream · before: 0 ms', 1])
+    check('...one head asked per song, as before', ['1', '2', '3'].map(heads), [1, 1, 1])
+    check('...replan never called, and lib/upNext asked only to top the queue up as it started (Repeat off: nothing)', [replans, upNextCalls], [0, { toppedUp: 1 }])
+  }
+  for (const [label, options] of [['one element', {}], ['Gapless, two elements', { gapless: true }], ['one stream in Chromium', { mse: 'plain', userAgent: ARC, maxTouchPoints: 0 }]]) {
+    resetCounts()
+    const p = options.mse ? streamPage({ ...options, durations: { 1: 5, 2: 6 } }) : page({ ...options, durations: { 1: 5, 2: 6 } })
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(16_000)
+    check(`${label}: the album to its end, nothing replanned or edited`, [p.player.track.id, p.player.playing, replans, upNextCalls, madeStreams.length], ['2', false, 0, { toppedUp: 1 }, options.mse ? 1 : 0])
+  }
+
+  console.log('\nPlay Next mid-song in one stream: the inserted FLAC joins the run')
+  {
+    resetCounts()
+    const p = streamPage({ durations: { 1: 60, 2: 60, 3: 60, 9: 60 } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
+    await run(2_000)
+    let started = null
+    tap(() => { started = p.player.playNext(tracks(['9'])) })
+    check('2 s into song 1: queued after it - the music was playing, so it says false', [started, comingIds(p)], [false, ['9', '2', '3']])
+    const first = await follow(p, 70_000, 500)
+    check('...song 9 joined song 1 in the same stream, one buffered range', [first.moves, rangesOf(e0.buffered).length, mediaSources.length], [['0:1', '1:9'], 1, 1])
+    const rest = await follow(p, 180_000, 500)
+    check('1, 9, 2, 3 in that order, in ONE MediaSource, every join 0 ms and no stall',
+      [[...first.moves, ...rest.moves.slice(1)], mediaSources.length, joinsRead(p), e0.stalls.length], [['0:1', '1:9', '2:2', '3:3'], 1, ['0 stream', '0 stream', '0 stream'], 0])
+    check('...the lock screen\'s titles in that order', [...first.titles, ...rest.titles.slice(1)], ['song 1', 'song 9', 'song 2', 'song 3'])
+    check('...each a play, under its own id', scrobbles.filter((s) => s.endsWith(':played')), ['1:played', '9:played', '2:played', '3:played'])
+  }
+
+  console.log('\nPlay Next in a song\'s last seconds: what the stream had of the next song is taken out')
+  {
+    const p = streamPage({ durations: { 1: 40, 2: 40, 9: 6 } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    const at = starts(['1', '2'])
+    await run((at[1] - 8) * 1000)
+    const sb = streamOf(e0).sourceBuffers[0]
+    check('8 s before song 1\'s end: song 2\'s head and first pieces are in', [heads('2'), sb.frames.some((f) => f.id === '2')], [1, true])
+    const logged = sb.log.length
+    tap(() => p.player.playNext(tracks(['9'])))
+    await run(1_500)
+    const len9 = mseSong('9').seconds
+    check('...none of song 2\'s frames left where song 9 goes', sb.frames.filter((f) => f.id === '2' && f.start < at[1] + len9 - 1e-6).length, 0)
+    check('...song 9\'s init in first, then its frames from exactly where song 1 ends (sample-exact)',
+      [sb.log.slice(logged).find((entry) => entry.inits.length)?.inits, r9u(sb.frames.find((f) => f.id === '9')?.start), sb.log.slice(logged).some((entry) => entry.error)], [['9'], r9u(at[1]), false])
+    const { moves } = await follow(p, (at[1] + len9 + 3 - e0.currentTime) * 1000, 250)
+    check('1, then 9, then 2 - in one MediaSource, every join 0 ms', [moves, mediaSources.length, joinsRead(p), e0.stalls.length], [['0:1', '1:9', '2:2'], 1, ['0 stream', '0 stream'], 0])
+    check('...song 2 placed again after song 9, from exactly its end', r9u(sb.frames.filter((f) => f.id === '2')[0]?.start), r9u(at[1] + len9))
+  }
+
+  console.log('\nan inserted song that can\'t join: the run ends before it, as a mixed album does')
+  {
+    const p = streamPage({ durations: { 1: 8, 2: 8, 3: 8, 9: 8 } })
+    net.cannotPlay = /opus/
+    const [, e1] = elements
+    tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
+    await run(2_000)
+    tap(() => p.player.playNext(tracks(['9'], { 9: 'opus' })))
+    await run((starts(['1'])[1] - 3) * 1000)
+    check('the run ends at song 1, the Opus song after it got ready on the standby, transcoded', [madeStreams[madeStreams.length - 1].runEnd(), /\/stream\/9\?format=mp3$/.test(e1.src)], [0, true])
+    await run(2_500)
+    check('...handed over to it at song 1\'s end', [p.player.track.id, e1.playingNow], ['9', true])
+    await run(mseSong('9').seconds * 1000)
+    check('...song 2 after it the URL way: no new stream without a tap', [p.player.track.id, mediaSources.length], ['2', 1])
+    tap(() => p.player.next())
+    await run(800)
+    check('...the next tap streams again', [p.player.track.id, mediaSources.length], ['3', 2])
+    net.cannotPlay = NET.cannotPlay
+  }
+
+  console.log('\nremove, move and Clear while streaming')
+  {
+    const p = streamPage({ durations: { 1: 8, 2: 8, 3: 8 } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
+    await run(3_000)
+    check('song 2 placed in the stream', streamOf(e0).sourceBuffers[0].frames.some((f) => f.id === '2'), true)
+    tap(() => p.player.removeFromQueue(keyIn(p, '2')))
+    const { moves } = await follow(p, 12_000)
+    check('song 2 removed after it was placed: song 3 joins song 1 at 0 ms, in the same stream', [moves, joinsRead(p), mediaSources.length, e0.stalls.length], [['0:1', '1:3'], ['0 stream'], 1, 0])
+  }
+  {
+    const p = streamPage({ durations: { 1: 8, 2: 8, 3: 8 } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
+    await run(3_000)
+    tap(() => p.player.moveInQueue(keyIn(p, '3'), 0))
+    check('song 3 moved before song 2', comingIds(p), ['3', '2'])
+    const { moves } = await follow(p, 22_000)
+    check('...1, 3, 2 in one stream, every join 0 ms', [moves, joinsRead(p), mediaSources.length, e0.stalls.length], [['0:1', '1:3', '2:2'], ['0 stream', '0 stream'], 1, 0])
+  }
+  {
+    const p = streamPage({ durations: { 1: 8, 2: 8, 8: 8, 9: 8 } })
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(2_000)
+    tap(() => { p.player.playNext(tracks(['9'])); p.player.playLast(tracks(['8'])) })
+    check('Play Next and Play Last: 9, then 8, then the album', comingIds(p), ['9', '8', '2'])
+    await run(1_000)
+    tap(() => p.player.clearPlayingNext())
+    const { moves } = await follow(p, 9_000)
+    check('Clear: the songs added out, the album\'s next song follows at 0 ms', [moves, joinsRead(p)], [['0:1', '1:2'], ['0 stream']])
+  }
+  {
+    //? song 2's pieces failing (503) with a retry waiting - its strikes at 4 s - then song 2 taken out: song 3's audio
+    //? comes at once, not after the retry's wait (the let-go song's backoff isn't the new song's)
+    const p = streamPage({ durations: { 1: 20, 2: 30, 3: 30 } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
+    for (let k = 0; k < 400 && !fmp4Requests.some((r) => r.id === '2' && r.status === 206); k++) await run(10)
+    net.fmp4Answer['2'] = { status: 503, times: 999 }
+    const stream = madeStreams[madeStreams.length - 1]
+    for (let k = 0; k < 2000 && !(stream.strikes?.attempt >= 4 && stream.retry); k++) await run(10)
+    check('song 2\'s pieces failing: its fourth strike, a retry waiting', [stream.strikes?.attempt, !!stream.retry], [4, true])
+    const sb = streamOf(e0).sourceBuffers[0]
+    tap(() => p.player.removeFromQueue(keyIn(p, '2')))
+    await run(400)
+    check('...song 2 removed: song 3\'s head asked and its audio in within 400 ms', [comingIds(p), sb.frames.some((f) => f.id === '3')], [['3'], true])
+    net.fmp4Answer = {}
+  }
+  {
+    //? song 2's init in flight, slow, and refused as it lands - song 2 taken out of the queue meanwhile and song 3
+    //? placed in its index: the browser gives the stream up, and song 1 goes on the URL way - but song 3 is not
+    //? blamed for song 2's bytes, and streams the next time it is tapped
+    const p = streamPage({ durations: { 1: 10, 2: 10, 3: 10 } })
+    const [e0] = elements
+    let hooked = false
+    const realAppend = FakeSourceBuffer.prototype.appendBuffer
+    FakeSourceBuffer.prototype.appendBuffer = function (data) {
+      const stream = madeStreams[madeStreams.length - 1]
+      if (hooked || stream?.op?.kind !== 'init' || stream.op.id !== '2') return realAppend.call(this, data)
+      hooked = true
+      const delay = net.appendDelay
+      net.appendDelay = 300
+      try {
+        return realAppend.call(this, data)
+      } finally {
+        net.appendDelay = delay
+        net.refuseInitAbove = 1
+        later(0, () => tap(() => p.player.removeFromQueue(keyIn(p, '2'))))
+      }
+    }
+    tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
+    await run(2_500)
+    FakeSourceBuffer.prototype.appendBuffer = realAppend
+    net.refuseInitAbove = null
+    check('song 2\'s init refused after song 2 was taken out: the stream given up, song 1 on the URL way', [hooked, p.player.track.id, e0.srcObject, comingIds(p)], [true, '1', null, ['3']])
+    tap(() => p.player.playTracks(tracks(['3']), 0))
+    await run(800)
+    check('...song 3 never blamed for it: a tap on it streams', [p.player.track.id, e0.srcObject === mediaSources[mediaSources.length - 1], e0.playingNow], ['3', true, true])
+  }
+  {
+    //? (2.0.0-player.57's second review) an album in order, nothing replanned: song 2's piece in flight, and the run
+    //? ended before song 2 meanwhile - what pieceFailed does when a LATER piece of song 2 answers 'changed' (cutAt,
+    //? then endAt at the song before), done here at that moment - and then the piece in flight won't parse. Song 2 is still the song
+    //? at its index, so it is blamed as before this change: it never streams again on this page. (A guard that also
+    //? asked whether song 2 was still among the stream's songs let it off.)
+    const p = streamPage({ durations: { 1: 10, 2: 10, 3: 10 } })
+    const [e0] = elements
+    let hooked = false
+    const realAppend = FakeSourceBuffer.prototype.appendBuffer
+    FakeSourceBuffer.prototype.appendBuffer = function (data) {
+      const stream = madeStreams[madeStreams.length - 1]
+      if (hooked || stream?.op?.kind !== 'piece' || stream.op.piece.song.id !== '2') return realAppend.call(this, data)
+      hooked = true
+      const delay = net.appendDelay
+      net.appendDelay = 300
+      try {
+        //? bytes that are no MP4 box: the append fails as it lands
+        return realAppend.call(this, new Uint8Array([0, 0, 0, 16, 1, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0, 0]))
+      } finally {
+        net.appendDelay = delay
+        later(0, () => {
+          const song2 = stream.songs.find((song) => song.id === '2')
+          stream.cutAt = song2.start
+          stream.endAt(song2.index - 1)
+        })
+      }
+    }
+    tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
+    await run(2_500)
+    FakeSourceBuffer.prototype.appendBuffer = realAppend
+    check('song 2\'s piece failed after the run ended before song 2: the stream given up, song 1 on the URL way',
+      [hooked, p.player.track.id, e0.srcObject, /\/stream\/1\?format=raw$/.test(e0.getAttribute('src') ?? '')], [true, '1', null, true])
+    const before = mediaSources.length
+    tap(() => p.player.playTracks(tracks(['2', '3']), 0))
+    await run(800)
+    check('...song 2 blamed all the same: a tap on it plays the file as it is, the URL way - no new stream',
+      [p.player.track.id, mediaSources.length - before, e0.srcObject, /\/stream\/2\?format=raw$/.test(e0.getAttribute('src') ?? ''), e0.playingNow], ['2', 0, null, true, true])
+  }
+
+  console.log('\na row\'s tap in Up Next: that song, now')
+  {
+    const p = streamPage({ durations: { 1: 20, 2: 20, 3: 20 } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
+    await run(2_000)
+    tap(() => p.player.jumpTo(keyIn(p, '3')))
+    await run(600)
+    check('song 3 at once - a tap, so a new stream from it - and song 2 gone from the queue', [p.player.track.id, p.player.queue.tracks.map((t) => t.id), e0.playingNow, mediaSources.length], ['3', ['1', '3'], true, 2])
+    tap(() => p.player.previous())
+    await run(400)
+    check('...Previous early in song 3: back to song 1', p.player.track.id, '1')
+  }
+  {
+    const p = streamPage({ durations: { 1: 20, 2: 20, 3: 20 } })
+    tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
+    await run(2_000)
+    tap(() => p.player.toggle())
+    await run(500)
+    tap(() => p.player.jumpTo(keyIn(p, '3')))
+    await run(800)
+    check('...from pause: the row\'s tap plays it', [p.player.track.id, p.player.playing], ['3', true])
+    tap(() => p.player.jumpTo(999))
+    check('...a key no longer in Up Next does nothing', p.player.track.id, '3')
+  }
+
+  console.log('\nShuffle mid-song: the song playing goes on, untouched')
+  {
+    const p = streamPage({ durations: { 1: 12, 2: 12, 3: 12, 4: 12, 5: 12 } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(tracks(['1', '2', '3', '4', '5']), 0))
+    await run(3_000)
+    const seeks = e0.seekGen, source = e0.srcObject, at = e0.currentTime
+    //? a known order (Fisher-Yates over [2, 3, 4, 5] with these draws): 3, 2, 4, 5 - song 3 next, then 4 and 5 after it
+    const realRandom = Math.random
+    const draws = [0.9, 0.9, 0.1]
+    Math.random = () => draws.shift() ?? 0
+    tap(() => p.player.setShuffle(true))
+    Math.random = realRandom
+    await run(1_000)
+    check('Shuffle on: no new source, no seek, the position running on', [e0.srcObject === source, mediaSources.length, e0.seekGen === seeks, e0.currentTime > at + 0.8, p.player.shuffle], [true, 1, true, true, true])
+    check('...the songs not yet heard, in a new order', [comingIds(p).slice().sort().join(), comingIds(p).join() !== '2,3,4,5', comingIds(p)[0]], ['2,3,4,5', true, '3'])
+    const next = comingIds(p)[0]
+    await run((starts(['1'])[1] - e0.currentTime + 1) * 1000)
+    check('...song 1 joins the shuffled next song in the stream', [p.player.track.id, joinsRead(p), mediaSources.length], [next, ['0 stream'], 1])
+    const seeksNow = e0.seekGen, playingNow = p.player.track.id
+    tap(() => p.player.setShuffle(false))
+    await run(500)
+    check('Shuffle off: no new source, no seek, the album\'s own order from the song playing\'s place', [e0.srcObject === source, e0.seekGen === seeksNow, p.player.track.id, comingIds(p), p.player.shuffle],
+      [true, true, playingNow, ['1', '2', '3', '4', '5'].slice(Number(playingNow)), false])
+  }
+
+  console.log('\nRepeat All in one stream: the list again, joined sample to sample')
+  {
+    resetCounts()
+    const p = streamPage({ durations: { 1: 35, 2: 35, 3: 35 } })
+    const [e0] = elements
+    tap(() => p.player.setRepeat('all'))
+    tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
+    const round = starts(['1', '2', '3'])[3]
+    const { moves } = await follow(p, (round * 3 + 20) * 1000, 500)
+    check('three times round a three-song album, in the same MediaSource, with no stall',
+      [moves, mediaSources.length, e0.stalls.length], [['0:1', '1:2', '2:3', '3:1', '4:2', '5:3', '6:1', '7:2', '8:3', '9:1'], 1, 0])
+    check('...the wraps joined at 0 ms, in one stream', joinsRead(p), ['0 stream', '0 stream', '0 stream', '0 stream', '0 stream'])
+    check('...a play counted each time round', scrobbles.filter((s) => s.endsWith(':played')), ['1:played', '2:played', '3:played', '1:played', '2:played', '3:played', '1:played', '2:played', '3:played', '1:played'])
+    check('...the stream replanned once a time round - only when a top-up changed the queue', replans, 3)
+  }
+  {
+    const p = streamPage({ durations: { 1: 10, 2: 10, 3: 10 } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
+    await run((starts(['1', '2'])[2] + 4) * 1000)
+    check('in the last song, the run\'s end decided and the source ended', [p.player.track.id, madeStreams[madeStreams.length - 1].runEnd(), streamOf(e0).readyState], ['3', 2, 'ended'])
+    tap(() => p.player.setRepeat('all'))
+    const { moves } = await follow(p, 10_000)
+    check('...Repeat All turned on there: the source reopened, the wrap joined at 0 ms in the same MediaSource',
+      [moves, mediaSources.length, joinsRead(p)[0], e0.stalls.length], [['2:3', '3:1'], 1, '0 stream', 0])
+  }
+  {
+    const p = streamPage({ durations: { 1: 20 } })
+    const [e0] = elements
+    tap(() => p.player.setRepeat('all'))
+    tap(() => p.player.playTracks(tracks(['1']), 0))
+    const { moves } = await follow(p, (mseSong('1').seconds * 3 + 2) * 1000, 250)
+    check('a 20 s single on Repeat All: round and round in one stream, at 0 ms', [moves, mediaSources.length, e0.stalls.length, joinsRead(p)], [['0:1', '1:1', '2:1', '3:1'], 1, 0, ['0 stream', '0 stream', '0 stream']])
+  }
+
+  console.log('\nRepeat One: the song again, from its start')
+  {
+    const p = streamPage({ durations: { 1: 35, 2: 35, 3: 35 } })
+    const [e0] = elements
+    tap(() => p.player.setRepeat('one'))
+    tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
+    const { moves, titles } = await follow(p, (mseSong('1').seconds * 2 + 20) * 1000, 500)
+    check('song 1 joins its own start at 0 ms, three times, in one stream', [moves, mediaSources.length, joinsRead(p), e0.stalls.length], [['0:1', '1:1', '2:1'], 1, ['0 stream', '0 stream'], 0])
+    check('..."now playing" each time round, and a play counted each time past the rule', [scrobbles.filter((s) => s === '1:now').length, scrobbles.filter((s) => s === '1:played').length, titles], [3, 3, ['song 1']])
+    tap(() => p.player.next())
+    await run(2_400)
+    check('Next: the next song - not this one again - and Repeat One repeats that one from then', [p.player.track.id, comingIds(p).slice(0, 3)], ['2', ['2', '2', '3']])
+    await run((mseSong('2').seconds - 2.4 + 1) * 1000)
+    check('...song 2 round again', [p.player.track.id, p.player.queue.upNext.marks[p.player.queue.index].from], ['2', 'one'])
+    tap(() => p.player.previous())
+    await run(400)
+    check('Previous early in a repeat: the song before the run of repeats', p.player.track.id, '1')
+  }
+  {
+    const p = streamPage({ durations: { 1: 10, 2: 10 } })
+    const [e0] = elements
+    tap(() => p.player.setRepeat('one'))
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(3_000)
+    tap(() => p.player.setRepeat('off'))
+    const { moves } = await follow(p, 10_000)
+    check('Repeat One turned off mid-song: the album carries on, in the same stream', [moves, mediaSources.length, joinsRead(p), e0.stalls.length], [['0:1', '1:2'], 1, ['0 stream'], 0])
+  }
+  {
+    const p = page({ gapless: true, durations: { 1: 5 } })
+    tap(() => p.player.setRepeat('one'))
+    tap(() => p.player.playTracks(mp3(['1']), 0))
+    await run(7_000)
+    check('the URL way with Gapless: the same song handed over from the standby', [p.player.queue.index, p.player.track.id, /handed over/.test(p.gapLine()), p.player.playing], [1, '1', true, true])
+  }
+  {
+    const p = page({ durations: { 1: 5 } })
+    tap(() => p.player.setRepeat('one'))
+    tap(() => p.player.playTracks(tracks(['1']), 0))
+    await run(7_000)
+    check('Gapless off: the one element loads it again', [p.player.queue.index, elements.length, elements[0].playingNow, /one element/.test(p.gapLine())], [1, 1, true, true])
+  }
+
+  console.log('\na failed song with Repeat on: asked once more, then skipped - never looping')
+  {
+    const p = page({ durations: { 2: 30 } })
+    const [e0] = elements
+    let errors = 0
+    e0.addEventListener('error', () => errors++)
+    tap(() => p.player.setRepeat('one'))
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(5_000)
+    check('Repeat One, song 1\'s file failing: asked once more, then past its copies to song 2, saying so', [errors, p.player.track.id, /^Skipped "song 1"/.test(p.player.error ?? '')], [2, '2', true])
+  }
+  {
+    const p = page({ durations: {} })
+    const [e0] = elements
+    let errors = 0
+    e0.addEventListener('error', () => errors++)
+    tap(() => p.player.setRepeat('all'))
+    tap(() => p.player.playTracks(tracks(['a', 'b']), 0))
+    await run(600_000)
+    check('Repeat All, every song failing: stops within the time round already queued, ten minutes on', [errors, p.player.queue.tracks.length, p.player.playing], [8, 4, false])
+  }
+  {
+    const p = page({ durations: { x: 30 } })
+    const [e0] = elements
+    let plays = 0
+    e0.addEventListener('playing', () => { plays++; later(50, () => { if (e0.playingNow) e0.fail(3) }) })
+    tap(() => p.player.setRepeat('all'))
+    tap(() => p.player.playTracks(tracks(['x']), 0))
+    await run(600_000)
+    check('...a one-song list whose song fails 50 ms after it starts playing: its times round already queued, then it stops', [plays, p.player.queue.tracks.length, p.player.playing], [3, 3, false])
+  }
+
+  console.log('\nthe standby follows Up Next')
+  {
+    const p = page({ gapless: true, durations: { 1: 10, 2: 10, 9: 10 } })
+    const [, e1] = elements
+    tap(() => p.player.playTracks(mp3(['1', '2']), 0))
+    await run(4_500)
+    check('Gapless, an MP3 album: the standby holds song 2', blobs.get(e1.src) ?? null, '2')
+    tap(() => p.player.playNext(mp3(['9'])))
+    await run(100)
+    check('Play Next: the standby lets go of song 2 at once', [e1.getAttribute('src'), blobs.get(e1.src) ?? null], [null, null])
+    await run(4_400)
+    check('...and gets song 9 ready', blobs.get(e1.src) ?? null, '9')
+    await run(2_500)
+    check('...handed over to song 9 at song 1\'s end', [p.player.track.id, e1.playingNow, /handed over/.test(p.gapLine())], ['9', true, true])
+  }
+  {
+    const p = page({ gapless: true, durations: { 1: 10, 2: 10, 3: 10 } })
+    const [, e1] = elements
+    tap(() => p.player.playTracks(mp3(['1', '2', '3']), 0))
+    await run(4_500)
+    tap(() => p.player.removeFromQueue(keyIn(p, '2')))
+    await run(4_500)
+    check('the standby\'s song taken out: it gets the song now next ready', blobs.get(e1.src) ?? null, '3')
+    await run(2_500)
+    check('...and hands over to it', [p.player.track.id, e1.playingNow], ['3', true])
+  }
+
+  console.log('\na handover refused across an edit')
+  {
+    const p = page({ gapless: true, durations: { 1: 6, 2: 6, 9: 6 } })
+    const [e0, e1] = elements
+    tap(() => p.player.playTracks(mp3(['1', '2']), 0))
+    await run(5_000)
+    //? the standby's play() refused - its promise settling a moment after it is called, as iOS's does
+    const realPlay = e1.play
+    e1.play = function () { e1.play = realPlay; return new Promise((_, reject) => later(200, () => reject(new DOMException('refused', 'NotAllowedError')))) }
+    for (let k = 0; k < 300 && p.player.track.id !== '2'; k++) await run(10)
+    tap(() => p.player.playNext(mp3(['9'])))
+    await run(800)
+    check('refused after a Play Next landed: song 2 plays on the element that was playing, the edit kept', [p.player.track.id, e0.playingNow, /\/stream\/2\?/.test(e0.getAttribute('src') ?? ''), comingIds(p)], ['2', true, true, ['9']])
+  }
+  {
+    const p = page({ gapless: true, durations: { 1: 6, 2: 6, 3: 6 } })
+    const [, e1] = elements
+    tap(() => p.player.playTracks(mp3(['1', '2', '3']), 0))
+    await run(5_000)
+    const realPlay = e1.play
+    e1.play = function () { e1.play = realPlay; return new Promise((_, reject) => later(200, () => reject(new DOMException('refused', 'NotAllowedError')))) }
+    for (let k = 0; k < 300 && p.player.track.id !== '2'; k++) await run(10)
+    let loads = 0
+    const realLoad = FakeAudio.prototype.loadResource
+    FakeAudio.prototype.loadResource = function () { if (/\/stream\/2\?/.test(this.attrs.src ?? '')) loads++; return realLoad.call(this) }
+    tap(() => p.player.next())
+    tap(() => p.player.previous())
+    await run(800)
+    FakeAudio.prototype.loadResource = realLoad
+    check('refused after Next then Previous: song 2 loaded once, by Previous - nothing loaded twice', [loads, p.player.track.id, p.player.playing], [1, '2', true])
+  }
+
+  console.log('\nan edit just after a join no timeupdate has seen')
+  {
+    const p = streamPage({ durations: { 1: 10, 2: 10, 3: 10, 9: 10 } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
+    const at = starts(['1', '2'])
+    await run((at[1] - 0.5) * 1000)
+    //? as the critic's harness C: the playhead set 0.2 s past the join, with no 'timeupdate' since
+    e0.clock = e0.heard = at[1] + 0.2
+    tap(() => p.player.playNext(tracks(['9'])))
+    check('the queue caught up with the clock first - song 2 - and song 9 after it', [p.player.track.id, comingIds(p)], ['2', ['9', '3']])
+    await run(3_000)
+    check('...no stall, song 2 playing on from where it was', [e0.stalls.length, p.player.track.id, near(e0.currentTime - at[1], 3.2, 0.4)], [0, '2', true])
+  }
+  {
+    const p = streamPage({ durations: { 1: 10, 2: 10, 3: 10, 9: 10 } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
+    const at = starts(['1', '2'])
+    await run((at[1] - 1) * 1000)
+    tap(() => p.player.seek(mseSong('1').seconds - 0.3))
+    e0.clock = e0.heard = at[1] + 0.2
+    tap(() => p.player.playNext(tracks(['9'])))
+    check('a seek on its way at that moment: the edit held, not made against the song that ended', [p.player.track.id, comingIds(p)], ['1', ['2', '3']])
+    await run(1_500)
+    check('...and made at the next update, after the song now playing', [p.player.track.id, comingIds(p), e0.stalls.length], ['2', ['9', '3'], 0])
+  }
+
+  console.log('\nPlay Next after the queue has played out')
+  {
+    const p = page({ durations: { 1: 4, 9: 4 } })
+    tap(() => p.player.playTracks(tracks(['1']), 0))
+    await run(5_500)
+    check('the queue played out', [p.player.playing, elements[0].ended], [false, true])
+    let started = null
+    tap(() => { started = p.player.playNext(tracks(['9'])) })
+    await run(600)
+    check('Play Next there: song 9 at once, and it says it started the music (so no notice)', [started, p.player.track.id, p.player.playing, p.player.queue.tracks.map((t) => t.id)], [true, '9', true, ['9']])
+  }
+  {
+    const p = page({ durations: { 1: 4 } })
+    tap(() => p.player.playTracks(tracks(['1']), 0))
+    await run(5_500)
+    tap(() => p.player.toggle())
+    await run(600)
+    check('...play pressed there instead: the last song again, as ever', [p.player.track.id, p.player.playing], ['1', true])
+  }
+  {
+    const p = page({ durations: { 9: 4 } })
+    let started = null
+    tap(() => { started = p.player.playLast(tracks(['9'])) })
+    await run(600)
+    check('Play Last with nothing queued: the song plays', [started, p.player.track.id, p.player.playing], [true, '9', true])
+  }
+
+  console.log('\nthe lock screen follows Up Next')
+  {
+    const p = streamPage({ durations: { 1: 10, 2: 10, 3: 10 } })
+    tap(() => p.player.setRepeat('one'))
+    tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
+    await run(2_500)
+    tap(() => media.handlers.nexttrack())
+    await run(600)
+    check('its next with Repeat One: the next song, not this one again', p.player.track.id, '2')
+    tap(() => media.handlers.previoustrack())
+    await run(400)
+    check('...its previous early: the song before', p.player.track.id, '1')
+  }
+  {
+    const p = streamPage({ durations: { 1: 10, 2: 10, 9: 10 } })
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(2_000)
+    tap(() => p.player.playNext(tracks(['9'])))
+    tap(() => media.handlers.nexttrack())
+    await run(600)
+    check('its next with a song added: that song', [p.player.track.id, media.metadata?.title], ['9', 'song 9'])
+  }
+
+  console.log('\nRepeat kept on the device, read with care')
+  {
+    const readBack = (stored) => {
+      freshPage({})
+      if (stored !== null) storage.set('deadwax-player-repeat', stored)
+      return hooks.root(usePlayer)().repeat
+    }
+    check('\'all\' and \'one\' read back; nothing, a mistyped value or a word is off',
+      ['all', 'one', null, 'ALL', 'repeat', ''].map(readBack), ['all', 'one', 'off', 'off', 'off', 'off'])
+    const realStorage = globalThis.localStorage
+    define('localStorage', { getItem: () => { throw new Error('denied') }, setItem: () => { throw new Error('denied') } })
+    freshPage({})
+    const unreadable = hooks.root(usePlayer)()
+    define('localStorage', realStorage)
+    check('...storage that can\'t be read: off', unreadable.repeat, 'off')
+    freshPage({})
+    const render = hooks.root(usePlayer)
+    render().setRepeat('one')
+    const one = [render().repeat, storage.get('deadwax-player-repeat')]
+    render().setRepeat('off')
+    check('setRepeat shows it and keeps it', [one, render().repeat, storage.get('deadwax-player-repeat')], [['one', 'one'], 'off', 'off'])
+  }
+
+  console.log('\n(Part B) a whole library shuffled: 450 songs, three pages, fed as it plays, in one stream')
+  {
+    const durations = {}
+    const order = Array.from({ length: 450 }, (_, i) => `s${i + 1}`)
+    const fresh = Array.from({ length: 200 }, (_, i) => `f${i + 1}`)
+    for (const id of [...order, ...fresh]) durations[id] = { duration: 2, seconds: 2 }
+    const p = streamPage({ durations })
+    const [e0] = elements
+    tap(() => p.player.setRepeat('all'))
+    tap(() => p.player.playTracks(tracks(order.slice(0, 200)), 0, false, { token: 't1', total: 450, fetched: 200, scope: 'store' }))
+    //? the feed, as app/useShuffleFeed.ts does it: under 50 of the round's songs left, the next page - and at the
+    //? end of the whole order, with Repeat All, a fresh order as the next round
+    const fed = []
+    const joinedAt = {}
+    for (let t = 0; t < 1_100_000 && p.player.queue.index < 452; t += 500) {
+      await run(500)
+      const q = p.player.queue
+      const paged = q.upNext?.paged
+      const index = q.index
+      if (!(index in joinedAt) && (index === 200 || index === 400 || index === 450)) joinedAt[index] = joinsRead(p)[0]
+      if (!paged || paged.token !== 't1' || q.tracks.length - q.index - 1 >= 50) continue
+      if (paged.fetched < paged.total) {
+        fed.push(paged.fetched)
+        p.player.extendQueue(paged.token, tracks(order.slice(paged.fetched, paged.fetched + 200)))
+      } else if (paged.token === 't1') {
+        fed.push('fresh')
+        p.player.extendQueue('t1', tracks(fresh), { token: 't2', total: 450, fetched: 0, scope: 'store' })
+      }
+    }
+    const q = p.player.queue
+    check('every song of the order once, in its order, then the fresh order\'s', [q.tracks.slice(0, 450).map((t) => t.id).join() === order.join(), q.tracks[450]?.id, fed], [true, 'f1', [200, 400, 'fresh']])
+    check('...each song asked for once', order.every((id) => heads(id) === 1), true)
+    check('...the second and third pages joined at 0 ms, and the fresh order\'s first song too, all in one MediaSource',
+      [joinedAt[200], joinedAt[400], joinedAt[450], mediaSources.length, e0.stalls.length], ['0 stream', '0 stream', '0 stream', 1, 0])
+    check('...the queue now the fresh order, its next round', [q.index >= 450, q.upNext.paged.token, q.upNext.marks[450].pass], [true, 't2', 1])
+  }
+
+  console.log('\n(review) the clean-up of a let-go song: a piece of it on its way, or fetched and waiting, never lands under the song added')
+  for (const [label, caught] of [
+    ['a piece of song 2 being fetched', (stream) => stream.fetching?.want.song.id === '2'],
+    //? song 2's first piece in hand while its init goes in ahead of it - the piece waits for that append
+    ['a piece of song 2 fetched, waiting for its init\'s append to finish', (stream) => stream.piece?.song.id === '2' && stream.op?.kind === 'init' && stream.op.id === '2'],
+  ]) {
+    const p = streamPage({ durations: { 1: 40, 2: 40, 9: 6 } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    const at = starts(['1', '2'])
+    //? slow appends, so a fetched piece waits on the one before it
+    net.appendDelay = 120
+    const stream = madeStreams[madeStreams.length - 1]
+    let seen = false
+    for (let k = 0; k < 20_000 && !seen; k++) { await run(2); seen = caught(stream) }
+    check(`${label}: caught in the act`, seen, true)
+    tap(() => p.player.playNext(tracks(['9'])))
+    net.appendDelay = NET.appendDelay
+    await run(3_000)
+    const sb = streamOf(e0).sourceBuffers[0]
+    const len9 = mseSong('9').seconds
+    check('...none of song 2\'s frames where song 9 goes, song 9 from exactly where song 1 ends',
+      [sb.frames.filter((f) => f.id === '2' && f.start < at[1] + len9 - 1e-6).length, r9u(sb.frames.find((f) => f.id === '9')?.start)], [0, r9u(at[1])])
+    const { moves } = await follow(p, (at[1] + len9 + 3 - e0.currentTime) * 1000, 250)
+    check('...1, 9, 2 in one MediaSource, every join 0 ms', [moves, mediaSources.length, joinsRead(p), e0.stalls.length], [['0:1', '1:9', '2:2'], 1, ['0 stream', '0 stream'], 0])
+  }
+
+  console.log('\n(review) Next, Previous, a row\'s tap and an edit just after a join no timeupdate has seen: on the song the clock is in')
+  {
+    //? since 2.0.0-player.57 every action catches the queue up with the stream's clock first (catchUp): the song
+    //? heard is the one acted on - Next goes to the song after it, not to the song already playing
+    const unseenJoin = async () => {
+      const p = streamPage({ durations: { 1: 10, 2: 10, 3: 10, 4: 10 } })
+      const [e0] = elements
+      tap(() => p.player.playTracks(tracks(['1', '2', '3', '4']), 0))
+      const at = starts(['1', '2'])
+      await run((at[1] - 0.5) * 1000)
+      e0.clock = e0.heard = at[1] + 0.2
+      return p
+    }
+    let p = await unseenJoin()
+    tap(() => p.player.next())
+    await run(600)
+    check('Next 0.2 s into song 2, before any update saw the join: song 3, the song after the one heard', p.player.track.id, '3')
+    p = await unseenJoin()
+    tap(() => p.player.previous())
+    await run(600)
+    check('Previous there: song 1 from its start (song 2 heard 0.2 s - under the restart rule)', [p.player.track.id, p.player.queue.index, near(elements[0].currentTime, 0, 0.6)], ['1', 0, true])
+    p = await unseenJoin()
+    tap(() => p.player.jumpTo(keyIn(p, '4')))
+    await run(600)
+    check('a row\'s tap there (song 4): it plays - not refused for the song that ended', p.player.track.id, '4')
+    p = await unseenJoin()
+    tap(() => p.player.removeFromQueue(keyIn(p, '3')))
+    check('a removal there: made at once, against song 2 - not held', [p.player.track.id, comingIds(p)], ['2', ['4']])
+    p = await unseenJoin()
+    tap(() => p.player.moveInQueue(keyIn(p, '4'), 0))
+    check('a move there: made at once, against song 2', [p.player.track.id, comingIds(p)], ['2', ['4', '3']])
+  }
+
+  console.log('\n(review) a change held through a seek: composed with the next, made at the join, and dropped by a new queue')
+  {
+    const held = async (repeat) => {
+      const p = streamPage({ durations: { 1: 10, 2: 10, 3: 10, 8: 10, 9: 10, 4: 10, 5: 10 } })
+      const [e0] = elements
+      if (repeat) tap(() => p.player.setRepeat(repeat))
+      tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
+      const at = starts(['1', '2'])
+      await run((at[1] - 1) * 1000)
+      //? a seek that takes 1.5 s to land, with the playhead already past the join: the stream can't take an edit
+      net.mseSeekDelay = 1_500
+      tap(() => p.player.seek(mseSong('1').seconds - 0.3))
+      e0.clock = e0.heard = at[1] + 0.2
+      return { p, e0, at }
+    }
+    {
+      const { p } = await held('all')
+      tap(() => p.player.playNext(tracks(['9'])))
+      tap(() => p.player.playLast(tracks(['8'])))
+      check('Repeat All, two edits while held: neither made yet', [p.player.track.id, comingIds(p)], ['1', ['2', '3']])
+      let joined = null
+      for (let k = 0; k < 400 && !joined; k++) {
+        await run(5)
+        if (p.player.track.id === '2') joined = comingIds(p)
+      }
+      net.mseSeekDelay = NET.mseSeekDelay
+      check('...at the very update that crossed into song 2, both made - 9, then 8, then the album - none lost to the other or to Repeat\'s top-up',
+        joined, ['9', '8', '3'])
+    }
+    {
+      const { p } = await held(null)
+      tap(() => p.player.playNext(tracks(['9'])))
+      tap(() => p.player.playTracks(tracks(['4', '5']), 0))
+      net.mseSeekDelay = NET.mseSeekDelay
+      await run(3_000)
+      check('a Play Next held, then another album played: the new queue is that album alone', [p.player.track.id, p.player.queue.tracks.map((t) => t.id)], ['4', ['4', '5']])
+    }
+  }
+
+  console.log('\n(review) Repeat on, the list\'s last song begun under 2 s ago: Next and its end still go round')
+  {
+    const p = streamPage({ durations: { 1: 30, 2: 30, 3: 30 } })
+    tap(() => p.player.setRepeat('all'))
+    tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
+    await run(500)
+    tap(() => p.player.next())
+    await run(400)
+    tap(() => p.player.next())
+    await run(400)
+    check('two quick Nexts: the last song, heard under 2 s - nothing queued after it yet', [p.player.track.id, comingIds(p)], ['3', []])
+    tap(() => p.player.next())
+    await run(600)
+    check('...Next again: the list from the top, its next time round', [p.player.track.id, p.player.queue.index], ['1', 3])
+  }
+  {
+    const p = page({ durations: { 1: 30, 2: 30, 3: 30 } })
+    tap(() => p.player.setRepeat('all'))
+    tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
+    await run(500)
+    tap(() => p.player.next())
+    await run(400)
+    tap(() => p.player.next())
+    await run(400)
+    tap(() => p.player.seek(29.5))
+    await run(2_500)
+    check('Repeat All, the last song sought to its end in its first 2 s: the list again from the top, not stopped', [p.player.track.id, p.player.queue.index, p.player.playing], ['1', 3, true])
+  }
+  {
+    const p = page({ durations: { 1: 30, 2: 30, 3: 30 } })
+    tap(() => p.player.setRepeat('one'))
+    tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
+    await run(500)
+    tap(() => p.player.next())
+    await run(400)
+    tap(() => p.player.next())
+    await run(400)
+    tap(() => p.player.seek(29.5))
+    await run(2_500)
+    check('...Repeat One the same: song 3 again', [p.player.track.id, p.player.queue.upNext.marks[p.player.queue.index].from, p.player.playing], ['3', 'one', true])
+  }
+
+  console.log('\n(review) a song shorter than 4 s: Repeat tops up once half of it is heard')
+  {
+    //? Repeat One's copies are used up one a time round; each new one is queued once half the 1.5 s song is heard -
+    //? had it to be heard whole, the update that would see it is the one that crosses the join, and the copies ran out
+    const p = streamPage({ durations: { 1: { duration: 1.5, seconds: 1.5 } } })
+    const [e0] = elements
+    tap(() => p.player.setRepeat('one'))
+    tap(() => p.player.playTracks(tracks(['1']), 0))
+    await follow(p, 12_000, 100)
+    const joins = joinsRead(p)
+    check('a 1.5 s single on Repeat One: still going round 12 s on, every loop a join in the one stream - never its end',
+      [p.player.playing, p.player.queue.index >= 6, joins.length >= 5 && joins.every((join) => join === '0 stream'), mediaSources.length, e0.stalls.length, e0.ended], [true, true, true, 1, 0, false])
+  }
+
+  StreamSource.prototype.replan = realReplan
+  StreamSource.prototype.attach = realStreamAttach
+
   console.warn = realWarn
 
   define('fetch', realFetch)

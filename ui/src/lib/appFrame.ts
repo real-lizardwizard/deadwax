@@ -70,16 +70,17 @@ export function panelIsModal(panel: PanelStyle): boolean {
 
 /** What the desktop's side panel shows - one at a time: the column has room for one, and opening
  *  any puts the others away (App). `edit` is the album page's Edit panel (2.0.0-player.21), `artist`
- *  the artist page's (2.0.0-player.45: Artist images…, Move albums to …, Which artist is this?). */
-export type Side = 'none' | 'sources' | 'info' | 'edit' | 'artist'
+ *  the artist page's (2.0.0-player.45: Artist images…, Move albums to …, Which artist is this?), `upnext`
+ *  the queue (2.0.0-player.57, app/UpNext.tsx), opened from the player bar as Info is. */
+export type Side = 'none' | 'sources' | 'info' | 'upnext' | 'edit' | 'artist'
 
 /** What the side panel shows, from what is open: Info when it is (it is opened over the others -
- *  opening any puts the rest away), then the Edit panel, then the artist's, then Sources; on a phone
- *  none is a panel (the artist's and, since 2.0.0-player.47, the Edit panel are sheets there, as
- *  Sources is). */
-export function sideOf(frame: Frame, open: { sources: boolean; info: boolean; edit: boolean; artist?: boolean }): Side {
+ *  opening any puts the rest away), then Up Next, then the Edit panel, then the artist's, then Sources;
+ *  on a phone none is a panel (the artist's and, since 2.0.0-player.47, the Edit panel are sheets there,
+ *  as Sources is; Up Next is a sheet over Now Playing, as Info is). */
+export function sideOf(frame: Frame, open: { sources: boolean; info: boolean; edit: boolean; artist?: boolean; upnext?: boolean }): Side {
   if (frame === 'phone') return 'none'
-  return open.info ? 'info' : open.edit ? 'edit' : open.artist ? 'artist' : open.sources ? 'sources' : 'none'
+  return open.info ? 'info' : open.upnext ? 'upnext' : open.edit ? 'edit' : open.artist ? 'artist' : open.sources ? 'sources' : 'none'
 }
 
 /** Whether the main area makes room for the panel: only a third column does; a drawer lies over it. */
@@ -105,12 +106,13 @@ export function liesOver(panel: PanelStyle, side: Side): boolean {
  * Back to the phone: the Info panel - Info is a sheet over Now Playing there, which isn't open. The
  * artist page's panel (2.0.0-player.45) and the Edit panel (since 2.0.0-player.47 - until then a
  * phone had no editor, and crossing back closed it) stay open either way, a panel on one side and a
- * full-screen sheet on the other, as Sources does.
+ * full-screen sheet on the other, as Sources does. The Up Next panel (2.0.0-player.57) goes back to the
+ * phone as the Info panel does: it is a sheet over Now Playing there, which isn't open.
  */
-export function closesOnCrossing(to: Frame): { nowPlaying: boolean; infoPanel: boolean } {
+export function closesOnCrossing(to: Frame): { nowPlaying: boolean; infoPanel: boolean; upNextPanel: boolean } {
   return to === 'desktop'
-    ? { nowPlaying: true, infoPanel: false }
-    : { nowPlaying: false, infoPanel: true }
+    ? { nowPlaying: true, infoPanel: false, upNextPanel: false }
+    : { nowPlaying: false, infoPanel: true, upNextPanel: true }
 }
 
 /* ===== the sidebar ===== */

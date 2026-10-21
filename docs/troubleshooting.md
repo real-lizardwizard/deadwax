@@ -713,6 +713,27 @@ ask again. A Navidrome that answers an empty
 search with nothing (an older one, or one set up to) can't list songs this way, and the Library
 shows Albums and Artists only. The albums of the songs are all in Albums.
 
+## The app's Shuffle says "Getting ready…" for a long time
+
+The Library's **Shuffle** ([shuffling the whole library](player.md#shuffling-the-whole-library), since
+2.0.0-player.57) waits for deadwax to read every song of your library from Navidrome before it can make an
+order - 15 calls of 2,000 songs for a library of 30,000, which should take several seconds on a NAS the
+first time (an estimate: it hasn't been timed on one yet); within ten minutes of that a new order is instant. Leave it a little: it turns into
+**Shuffle** once the list is in (above your albums, with how many songs under it).
+
+- **It never gets ready**, and its title (or VoiceOver) says "Couldn't get your songs ready to shuffle":
+  deadwax couldn't ask Navidrome - see [the player says "Can't reach Navidrome"](#the-player-says-connect-navidrome-or-cant-reach-navidrome).
+  It asks again the next time the list shows: go to another view and back.
+- **"Your library is too big to shuffle here"** in deadwax's answer: the shuffle reads at most 200,000
+  songs, far beyond a home server's library.
+- **A song you added a moment ago isn't in the shuffle**: the order is made from the list as it was read,
+  kept ten minutes; the next shuffle after that has it.
+- **"Your shuffle started over - deadwax had restarted"**: deadwax keeps a shuffle's order in memory, so
+  after a restart (or a day without it being played) a fresh order takes over, and songs already heard in
+  the old one can come round again. It keeps the last four orders each Shuffle button asked for ahead,
+  across all your devices, so it can also happen if the list sat open on one device while that same
+  Shuffle got ready (or was tapped) more than four times elsewhere before you tapped it.
+
 ## The app's Library looks empty
 
 With logins on (since 2.0.0-player.52) the **Library** tab is **your** library - your starred albums
@@ -1467,6 +1488,11 @@ For the second player, which gets everything else ready:
   AirPlay in Control Center works whatever the button does. Say so if it happens.
 - **The app reloads by itself**, and the music stops: iOS taking memory back. Songs up to 64 MB are
   held in memory ahead of time, and hi-res albums come close to that. Turn Gapless off.
+- **A shuffled album, or one with songs added from Up Next** (2.0.0-player.57): the stream follows Up
+  Next's order, so the same rules hold - every FLAC song of one format joins in one stream, in whatever
+  order; an MP3 or a song of another sample rate added in the middle ends the stream before it, and the
+  next tap starts one again. A Play Next in a song's last minute takes the next song back out of the
+  stream and fetches the song now next: a `0 ms` reading after it is a join that played straight through.
 
 ## A hi-res song takes a while to start, or sounds quieter
 

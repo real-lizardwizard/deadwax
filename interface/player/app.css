@@ -4677,6 +4677,114 @@ html.app-viewer-open { overflow: hidden; }
     margin-top: var(--app-line-gap);
 }
 
+/* ===== Up Next, shuffle and repeat (2.0.0-player.57) =====
+   Up Next is Info's shell - .app-layer, .app-info, its head, its scroller, its card, and on a desktop Info's panel
+   by app-desktop.css's .app-layer.is-panel .app-info rules - its rows Search's results and, in Edit, Home's Pinned
+   rows; the song menu is ActionMenu's sheet. What is new here: the two sheets' locks, the Edit at the head's left,
+   the row of Shuffle and Repeat, a group's gutter, Now Playing's Up next tinted while Shuffle or Repeat is on, and
+   the ••• at the end of a song's row - a full tap target, its glyph's right edge on an album page where the row's
+   time ended - and the album bar's ••• beside the pin, their reaches kept apart. */
+:root {
+    --app-row-more-icon: 20px;            /* the ••• glyph at the end of a song's row */
+    --app-track-rule: 0.5px;              /* an album page's row's own hairline, which player.css writes raw */
+    /* the album row's •••: past its 44px target, the room that puts its glyph's right edge at the row's edge */
+    --app-track-more-edge: calc(var(--pl-edge-right) - (var(--pl-hit) - var(--app-row-more-icon)) / 2);
+    /* the album bar's ••• to the pin (and to the phone's Edit): their 44px reaches meeting, never overlapping */
+    --app-album-more-room: calc(2 * var(--app-pin-toggle-reach) - var(--pl-gap-sm));
+}
+
+html.app-upnext-open,
+html.app-queue-menu-open { overflow: hidden; }
+
+/* Edit, at the head's left: Done's look, in the first column */
+.app-upnext-edit {
+    grid-column: 1;
+    justify-self: start;
+    min-height: var(--dw-row);
+    padding-right: var(--dw-gutter-grouped);
+    color: var(--dw-accent);
+    font-size: var(--dw-text-body);
+    font-weight: var(--dw-weight-semibold);
+}
+
+.app-upnext-edit:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+    border-radius: var(--dw-radius-control);
+}
+
+/* Shuffle and Repeat: the app's chips, their reach above and below kept inside the row */
+.app-upnext-modes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--app-chip-gap);
+    margin-top: var(--app-shelf-gap);
+    padding: var(--app-chip-reach) var(--dw-gutter-grouped);
+}
+
+.app-upnext-modes .app-chip[aria-disabled='true'] { opacity: var(--app-pin-off); }
+
+/* a group's rows and lines inside the gutter its heading has (Info's own .app-info .app-section-title rule); Edit's
+   rows are cards the scroller's width, as the song playing's is */
+.app-upnext .app-results,
+.app-upnext .app-store-line { padding: 0 var(--dw-gutter-grouped); }
+
+.app-upnext-group,
+.app-upnext .app-store-line { margin-top: var(--app-shelf-gap); }
+
+/* Now Playing's Up next while Shuffle or Repeat is on, so a song repeating isn't a mystery */
+.pl-sheet-footer .app-upnext-button.is-on { color: var(--dw-accent); }
+
+/* the ••• at the end of a song's row: a tap target, the glyph drawn small inside it */
+.app-row-more {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: var(--pl-hit);
+    height: var(--pl-hit);
+    border-radius: var(--dw-radius-control);
+    color: var(--dw-text-2);
+}
+
+.app-row-more:active { background: var(--dw-pressed); }
+
+.app-row-more:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring-inset);
+}
+
+.app-row-more-icon { width: var(--app-row-more-icon); height: var(--app-row-more-icon); }
+
+/* an album page's row: the song's button, then its •••, the row's own hairline under both, to the edge */
+.app-track-row { display: flex; align-items: stretch; }
+.app-track-row .pl-track { flex: 1; min-width: 0; padding-right: 0; }
+
+.app-track-row .app-row-more {
+    width: calc(var(--pl-hit) + var(--app-track-more-edge));
+    height: auto;
+    padding-right: var(--app-track-more-edge);
+    border-radius: 0;
+    border-bottom: var(--app-track-rule) solid var(--pl-separator);
+}
+
+/* the album's ••• in the bar: at the bar's right with the pin when no Edit is drawn - the phone's Edit chip has
+   that margin itself - and its reach clear of the pin's and of Edit's */
+.app-album-bar .pl-back + .app-album-more { margin-left: auto; }
+.app-album-bar .app-album-more + .app-pin-toggle { margin-left: var(--app-album-more-room); }
+.app-album-bar .app-edit-chip + .app-album-more { margin-left: var(--app-album-more-room); }
+
+/* the Library's Shuffle (Part B): above its list, inside the page's edges, the count under it */
+.app-shuffle-songs {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--app-tab-gap);
+    margin-bottom: var(--app-shelf-gap);
+    padding: 0 var(--pl-edge-right) 0 var(--pl-edge-left);
+}
+
+.app-shuffle-button[aria-disabled='true'] { opacity: var(--app-pin-off); }
+
 /* ===== looking after deadwax from a phone (2.0.0-player.47) =====
    The phone gets every managing page the desktop has: the Edit panel as a sheet over the whole screen
    (app/EditPanel.tsx - the main page's editors hosted in it as they are, styled here by their own ids

@@ -203,6 +203,37 @@ export async function librarySongs(offset: number, count: number = SONGS_PAGE, s
   return found.songs ?? []
 }
 
+/** (2.0.0-player.57, Part B) A whole library's shuffle, as deadwax holds it: its order's token, how many songs it
+ *  has, and its first page - every song of the scope once, in a random order deadwax made. */
+export interface ShuffleStart {
+  token: string
+  total: number
+  songs: Song[]
+}
+
+/** How many songs a page of a library's shuffle holds - SHUFFLE_PAGE in src/routes/navidrome.py. */
+export const SHUFFLE_PAGE = 200
+
+/**
+ * A new order of every song of `scope` (Part B): `yours` your starred albums' songs with logins on (the store's
+ * with logins off, or for the break-glass admin), `store` everything - each once, in a random order deadwax makes
+ * as you (src/routes/navidrome.py /shuffle). Asked as the list shows, so its first page is in hand at the tap.
+ */
+export function shuffleStart(
+  scope: 'yours' | 'store', signal?: AbortSignal, how: { playing?: string | null; claim?: boolean } = {},
+): Promise<ShuffleStart> {
+  //? `playing`: the order the list's Shuffle just played, claimed before this ask's order replaces it; `claim`: the
+  //? order asked for plays at once (the feed's), so claimed as it is made - see /shuffle in src/routes/navidrome.py
+  const playing = how.playing ? `&playing=${encodeURIComponent(how.playing)}` : ''
+  return get<ShuffleStart>(`/navidrome/shuffle?scope=${scope}${playing}${how.claim ? '&claim=true' : ''}`, signal)
+}
+
+/** The next page of a shuffle's order, from `offset` - a 404 once deadwax no longer holds it (it restarted, or a
+ *  day untouched): the feed then starts a fresh order (app/useShuffleFeed.ts). */
+export function shufflePage(token: string, offset: number, signal?: AbortSignal): Promise<{ total: number; songs: Song[] }> {
+  return get(`/navidrome/shuffle/${encodeURIComponent(token)}?offset=${offset}`, signal)
+}
+
 /** How long an album asked for ahead of its page opening is worth using. */
 export const PREFETCH_KEEP_MS = 30_000
 
@@ -292,6 +323,15 @@ export function rememberPlayed(album: AlbumWithSongs): void {
  */
 export function rememberQueue(albums: readonly AlbumWithSongs[]): void {
   played.rememberQueue(albums)
+}
+
+/**
+ * (2.0.0-player.57) The albums of songs added to Up Next - Play Next and Play Last, from the song menu - in the
+ * tap, before the player is called: each kept beside the queue's, which stay (lib/playedAlbums.ts `also`), so
+ * Info and the turntable know an added song's album as they know the queue's.
+ */
+export function rememberAdded(albums: readonly AlbumWithSongs[]): void {
+  for (const album of albums) played.also(album)
 }
 
 /** The answer a song's album was played from, exactly as Navidrome sent it; null when not in hand. */

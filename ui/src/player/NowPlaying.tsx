@@ -3,12 +3,13 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
 import { useSheet } from '../app/useSheet'
 import { clock, dragEnd, dragFor, dragMove, dragStart, keyTarget, shownTime, timeAt, type Drag } from '../lib/scrub'
 import { lookButtonLabel, otherLook, playingDisc, type Look } from '../lib/turntable'
+import { upNextLabel } from '../lib/upNext'
 import { discArtUrl, playedAlbum } from './api'
 import { Cover } from './Cover'
 import { wakeDeckAudio, type Deck } from './deck'
 import { SpeedChip } from './SpeedChip'
 import {
-  AirPlayIcon, ChevronDownIcon, MoreIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon, RecordIcon, SquareIcon,
+  AirPlayIcon, ChevronDownIcon, MoreIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon, QueueIcon, RecordIcon, SquareIcon,
 } from './icons'
 import { Turntable, TurntableTime, type TurntablePreview } from './Turntable'
 import { usePosition, type Player } from './usePlayer'
@@ -131,7 +132,10 @@ export function Scrubber({ player }: { player: Player }) {
  * there is a speaker to send to, and ••• for Info and "Go to album". No readout and no Gapless
  * control: how the song was sent and how the last changes and seek went are in Info > Debug
  * (app/InfoSheet.tsx), and Gapless is a setting, in You > Playback (app/GaplessChoice.tsx). The
- * board's Lyrics and Up next icons aren't drawn until there is something for them to open.
+ * board's Lyrics icon isn't drawn until there is something for it to open; Up next opens app/UpNext.tsx
+ * (2.0.0-player.57) - the queue, with Shuffle and Repeat at its top, where the iPhone's Music app has them,
+ * so nothing else on this screen changes - and is tinted while Shuffle or Repeat is on, so a song
+ * repeating isn't a mystery.
  *
  * THE BODY IS ANCHORED TO THE BOTTOM of the sheet, so a change in the height of anything in it
  * moves what is above it and nothing below. Everything from the title down is therefore a fixed
@@ -175,10 +179,12 @@ export function NowPlaying({
   openAs,
   windDown = true,
   pinnable = false,
+  onUpNext,
+  upNextOpen = false,
 }: {
   player: Player
   open: boolean
-  /** Info or the ••• menu is over it */
+  /** Info, the ••• menu or Up Next is over it */
   covered: boolean
   /** what opened it, given focus back as it closes */
   opener: { current: HTMLElement | null }
@@ -193,6 +199,10 @@ export function NowPlaying({
   windDown?: boolean
   /** the ••• menu will have the album's pin (App's: a song whose album can be pinned) */
   pinnable?: boolean
+  /** (2.0.0-player.57) the Up next button's tap - the event, so the button can be given focus back */
+  onUpNext?: ((event: MouseEvent) => void) | undefined
+  /** Up Next is over it */
+  upNextOpen?: boolean
 }) {
   const track = player.track
   const [dragY, setDragY] = useState(0)
@@ -376,8 +386,9 @@ export function NowPlaying({
         </div>
 
         {/* The icon row, a tap target tall whatever is in it. ••• is always there, at the right
-            end; AirPlay comes and goes to its left, so nothing moves when a speaker does - nor the
-            speed's chip, at the left end, when the speed leaves 1x and comes back (2.0.0-player.39). */}
+            end, and Up next (2.0.0-player.57) always beside it; AirPlay comes and goes to their left,
+            so nothing moves when a speaker does - nor the speed's chip, at the left end, when the speed
+            leaves 1x and comes back (2.0.0-player.39). */}
         <div class="pl-sheet-footer">
           <SpeedChip player={player} />
           {player.airplay && (
@@ -387,13 +398,24 @@ export function NowPlaying({
           )}
           <button
             type="button"
+            class={`pl-icon-button app-upnext-button${player.shuffle || player.repeat !== 'off' ? ' is-on' : ''}`}
+            onClick={onUpNext}
+            //? what is on, named: "Up next - Shuffle and Repeat all"
+            aria-label={upNextLabel(player.shuffle, player.repeat)}
+            aria-haspopup="dialog"
+            aria-expanded={upNextOpen}
+          >
+            <QueueIcon class="pl-icon" />
+          </button>
+          <button
+            type="button"
             class="pl-icon-button"
             onClick={onMore}
             //? what the menu holds: "Go to album" only for a song that names its album, and the album's pin
             //? (2.0.0-player.18) only when the menu will have one - App says so
             aria-label={`More: info${track.albumId ? ', go to album' : ''}${track.albumId && pinnable ? ', pin' : ''}`}
             aria-haspopup="dialog"
-            aria-expanded={covered}
+            aria-expanded={covered && !upNextOpen}
           >
             <MoreIcon class="pl-icon" />
           </button>

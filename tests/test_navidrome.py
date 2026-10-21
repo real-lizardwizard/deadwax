@@ -246,13 +246,18 @@ def test_there_is_no_general_proxy():
     Info's play count and writers. Each READS the library the account can see, as every Subsonic app
     does; getArtists takes nothing from the page, and the other two only an id, bounded, passed as
     Navidrome's `id` parameter - see test_navidrome_artists.py.
+
+    `/shuffle` and `/shuffle/{token}` joined it in 2.0.0-player.57, deliberately: the Library's Shuffle - every song
+    of the asker's library, or of the store, once each in a random order, read with search3 and getAlbumList2 as the
+    asker. Nothing the page sends reaches Navidrome but the scope, which picks the calls; the second asks Navidrome
+    nothing, paging deadwax's own order - see test_navidrome_shuffle.py.
     """
     paths = sorted(route.path for route in navidrome_routes.router.routes)
 
     assert paths == [
         "/albums", "/albums/{album_id}", "/artists", "/artists/{artist_id}", "/cover/{cover_id}",
-        "/scrobble/{song_id}", "/scrub/{song_id}", "/search", "/songs/{song_id}", "/status",
-        "/stream/{song_id}",
+        "/scrobble/{song_id}", "/scrub/{song_id}", "/search", "/shuffle", "/shuffle/{token}", "/songs/{song_id}",
+        "/status", "/stream/{song_id}",
     ]
 
 

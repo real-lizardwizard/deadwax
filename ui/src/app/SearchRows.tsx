@@ -9,7 +9,7 @@ import {
 import type { Album, AlbumWithSongs, Artist, Song } from '../player/api'
 import { dropPrefetch, prefetchAlbum } from '../player/api'
 import { Cover } from '../player/Cover'
-import { ChevronDownIcon, PlayIcon } from '../player/icons'
+import { ChevronDownIcon, MoreIcon, PlayIcon } from '../player/icons'
 import { ArchiveCover } from './ArchiveCover'
 
 /**
@@ -31,6 +31,9 @@ import { ArchiveCover } from './ArchiveCover'
  *    MusicBrainz", why there are none, or its failure with Try again.
  *  - WHAT'S SAVED (2.0.0-player.56): a row from MusicBrainz's saved answers is MusicBrainz's row - drawn, tapped and
  *    got the same - its place saying "saved" (a tile's third line "Saved from MusicBrainz") unless it is held.
+ *  - (2.0.0-player.57, Up Next) a library song's row ends with a ••• - `onSongMenu`, App's song menu (Play Next, Play
+ *    Last) - in Top results (as rows, never on a desktop's lockup tile, which hasn't the room) and in Songs; it names no
+ *    player action either.
  */
 
 /** What every row needs: the marks, the live state of a Get or a look, and what a tap calls. */
@@ -48,6 +51,8 @@ export interface RowContext extends LineContext {
   openFolds: ReadonlySet<string>
   /** Search's playSong - called in the tap, nothing awaited */
   onPlay: (song: Song) => void
+  /** (2.0.0-player.57) a library song's •••: App's song menu, Play Next and Play Last */
+  onSongMenu: (song: Song, event: MouseEvent) => void
   onOpenAlbum: (album: Album) => void
   onOpenArtist: (artist: Artist) => void
   onOpenMusicBrainzArtist: (artist: { mbid: string; name: string }) => void
@@ -187,6 +192,23 @@ const press = (row: Row) => (row.type === 'album'
   ? { onPointerDown: () => void prefetchAlbum(row.album.id), onPointerCancel: () => dropPrefetch(row.album.id) }
   : {})
 
+/** (2.0.0-player.57) A library song's •••: the song menu - Play Next, Play Last. Nothing else has one. */
+function songMore(row: Row, context: RowContext) {
+  if (row.type !== 'song') return null
+  const { song } = row
+  return (
+    <button
+      type="button"
+      class="app-row-more"
+      aria-label={`More for ${song.title}`}
+      aria-haspopup="dialog"
+      onClick={(event) => context.onSongMenu(song, event as unknown as MouseEvent)}
+    >
+      <MoreIcon class="app-row-more-icon" />
+    </button>
+  )
+}
+
 /** ▶ on a library song that will play, and the words saying which it will do. */
 function playMark(row: Row, context: RowContext) {
   if (row.type !== 'song') return null
@@ -235,10 +257,14 @@ export function topRow(row: Row, context: RowContext, tile: boolean) {
       {playMark(row, context)}
     </button>
   )
+  //? not on a desktop's lockup tile: its text would have ~40 px left beside the cover and the ▶ - the same song's row
+  //? in Songs below carries the •••
+  const more = tile ? null : songMore(row, context)
   return (
-    <li key={`top:${row.key}`} class={[get ? 'app-result-row' : '', tile ? 'app-top-tile' : ''].filter(Boolean).join(' ') || undefined}>
+    <li key={`top:${row.key}`} class={[get || more ? 'app-result-row' : '', tile ? 'app-top-tile' : ''].filter(Boolean).join(' ') || undefined}>
       {button}
       {get}
+      {more}
     </li>
   )
 }
@@ -325,8 +351,9 @@ export function sectionRow(row: Row, context: RowContext, index: number) {
   const busy = lookKey(row, context)
   const looking = !!busy && context.opening === busy
   const get = getChip(row, context)
+  const more = songMore(row, context)
   return (
-    <li key={row.key} class={get ? 'app-result-row' : undefined}>
+    <li key={row.key} class={get || more ? 'app-result-row' : undefined}>
       <button
         type="button"
         class={`app-result${looking ? ' is-busy' : ''}`}
@@ -348,6 +375,7 @@ export function sectionRow(row: Row, context: RowContext, index: number) {
         {playMark(row, context)}
       </button>
       {get}
+      {more}
     </li>
   )
 }

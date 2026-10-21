@@ -71,7 +71,7 @@ import {
 } from '../lib/gapless'
 import {
   EMPTY_QUEUE, LOAD_RETRY_DELAY_MS, MEDIA_ERR_DECODE, NEW_LISTEN, current, listenHeard, listenStarted,
-  listenedStep, nextIndex, previousAction, startQueue, type PlayQueue, type QueueTrack,
+  listenedStep, nextIndex, type PlayQueue, type QueueTrack,
 } from '../lib/playQueue'
 import { clampSpeed, paceOf, paceStep, pitchHeldAt, pitchSwitch, type PaceSample, type PitchSwitch, type SpeedReading } from '../lib/playSpeed'
 import { reportedPosition, seekStep, type PendingSeek, type SeekEvent, type SeekReading } from '../lib/scrub'
@@ -79,12 +79,20 @@ import { ENGINE_OFF_MS, joinStallMs, knownFormatOut, splitAcrossJoin, streamable
 import {
   asksForMp4, isFlac, resampledFrom, resamples, wrappedAs, wrapsFlac, type MaxRate, type Wrapped,
 } from '../lib/streamWrap'
-import { readPlayerGapless, readPlayerMaxRate, readPlayerSpeed, writePlayerGapless, writePlayerMaxRate, writePlayerSpeed } from '../state/persisted'
+import {
+  TOP_UP_HEARD_S, backward, jumpedTo, movedKey, onward, pastCopies, startUpNext, toppedUp, withLast, withMore, withNext,
+  withRepeat, withShuffle, withoutAdded, withoutKey, type Paged, type Repeat, type UpNextQueue,
+} from '../lib/upNext'
+import {
+  readPlayerGapless, readPlayerMaxRate, readPlayerRepeat, readPlayerSpeed, writePlayerGapless, writePlayerMaxRate, writePlayerRepeat,
+  writePlayerSpeed,
+} from '../state/persisted'
 import { coverUrl, fragmentedUrl, scrobble, streamFormat, streamUrl } from './api'
 import { StreamSource, mediaSourceEngine, type StreamEvents, type StreamFailure } from './streamSource'
 
 export interface Player {
-  queue: PlayQueue
+  /** (2.0.0-player.57) the queue, with Up Next's account of it - lib/upNext.ts reads it, the engine carries it */
+  queue: UpNextQueue
   track: QueueTrack | null
   playing: boolean
   buffering: boolean
@@ -104,8 +112,9 @@ export interface Player {
   /** how the song playing came when it was asked for as FLAC in an MP4, for the readout; null when
    *  it wasn't (every song, outside Safari) - see lib/streamWrap */
   wrapped: Wrapped | null
-  /** `start` null with shuffle: no song in particular - see startQueue() */
-  playTracks(tracks: QueueTrack[], start: number | null, shuffle?: boolean): void
+  /** `start` null with shuffle: no song in particular - see startQueue(). `paged` (2.0.0-player.57, Part B): the
+   *  songs are the first page of a whole library's shuffle (lib/upNext's Paged), fed the rest by extendQueue */
+  playTracks(tracks: QueueTrack[], start: number | null, shuffle?: boolean, paged?: Paged): void
   toggle(): void
   next(): void
   previous(): void
@@ -128,6 +137,31 @@ export interface Player {
   setSpeed(speed: number): void
   /** what the element playing does with the speed, for Info > Debug */
   speedReading(): SpeedReading
+  /** (2.0.0-player.57) whether the queue playing is shuffled - the queue's, never kept on the device; false
+   *  with nothing queued */
+  shuffle: boolean
+  /** Repeat: 'off', 'all' (the list again from the top), 'one' (this song again) - kept on the device */
+  repeat: Repeat
+  /** shuffle the songs of the list not yet heard this time round (on), or go back to its own order from the
+   *  song playing's place in it (off); the song playing goes on (no new source, no seek), songs added keep
+   *  their order */
+  setShuffle(on: boolean): void
+  setRepeat(mode: Repeat): void
+  /** Play Next: these songs straight after the song playing (after Repeat One's copies). Play Last: after
+   *  the songs already added, still before the rest of the list. With nothing playing - nothing queued, or
+   *  a queue that has played out - either plays them from the first, as playTracks(tracks, 0) - so both are
+   *  called in the tap, songs in hand (the gesture rule). True when it started the music. */
+  playNext(tracks: QueueTrack[]): boolean
+  playLast(tracks: QueueTrack[]): boolean
+  /** a row of Up Next, by key: it plays now (even from pause); the rows above it in its own group go */
+  jumpTo(key: number): void
+  /** a row of Up Next to place `to` of its own group; one out of Up Next; every song added out (Clear) */
+  moveInQueue(key: number, to: number): void
+  removeFromQueue(key: number): void
+  clearPlayingNext(): void
+  /** (Part B) the library's shuffle's feed: its next page (`token` the shuffle it is for), or with `next` a
+   *  fresh order - app/useShuffleFeed.ts */
+  extendQueue(token: string, tracks: QueueTrack[], next?: Paged): void
 }
 
 /** Safari's AirPlay additions to the media element, which the DOM types don't carry. */
@@ -193,7 +227,7 @@ function createAudio(): AirPlayAudio {
 const session = (): MediaSession | null => ('mediaSession' in navigator ? navigator.mediaSession : null)
 
 export function usePlayer(): Player {
-  const [queue, setQueue] = useState<PlayQueue>(EMPTY_QUEUE)
+  const [queue, setQueue] = useState<UpNextQueue>(EMPTY_QUEUE)
   const [playing, setPlaying] = useState(false)
   const [buffering, setBuffering] = useState(false)
   const [duration, setDuration] = useState(0)
@@ -204,6 +238,8 @@ export function usePlayer(): Player {
   const [gaps, setGaps] = useState<GapReading[]>([])
   const [lastSeek, setLastSeek] = useState<SeekReading | null>(null)
   const [wrapped, setWrapped] = useState<Wrapped | null>(null)
+  //? Repeat (2.0.0-player.57), kept on the device like Gapless
+  const [repeat, setRepeatShown] = useState(readPlayerRepeat)
 
   //? Everything the element's events and the lock screen's handlers read. They are set up once,
   //? so they read these rather than closing over a render's state.
@@ -213,7 +249,13 @@ export function usePlayer(): Player {
     const listeners = new Set<(seconds: number) => void>()
     const speedListeners = new Set<(speed: number) => void>()
     const state = {
-      queue: EMPTY_QUEUE as PlayQueue,
+      //? (2.0.0-player.57) with Up Next's account of it, which every { ...queue, index } carries
+      queue: EMPTY_QUEUE as UpNextQueue,
+      //? Repeat, kept on the device; an Up Next change held for the next 'timeupdate' (edit()); and a count
+      //? of every move of the queue's song, by which a refused handover knows the queue hasn't moved since
+      repeat: readPlayerRepeat(),
+      heldEdit: null as ((queue: UpNextQueue) => UpNextQueue) | null,
+      moves: 0,
       //? Whether the listener means the music to be playing: set by anything that plays, cleared
       //? by a pause - asked for, or one nobody asked for, like a call coming in - and by the end
       //? of the queue. NOT audio.paused: a song that fails leaves the element paused while the
@@ -568,11 +610,12 @@ export function usePlayer(): Player {
      * would have to open, fetch and append before iOS suspends a page that isn't playing, so those go
      * the URL way and the stream waits for the next tap.
      */
-    function load(next: PlayQueue, autoplay: boolean, gesture = false) {
+    function load(next: UpNextQueue, autoplay: boolean, gesture = false) {
       const track = current(next)
       if (!track) return
 
       cancelRetry()
+      state.moves += 1
       state.queue = next
       state.retried = false
       state.resumeAt = 0
@@ -675,13 +718,14 @@ export function usePlayer(): Player {
      * Next or previous to a song already placed in the live stream: a seek in it, no new source. The
      * same state as a song change, but a seek on its way until the element says it has landed.
      */
-    function moveInStream(next: PlayQueue, autoplay: boolean): boolean {
+    function moveInStream(next: UpNextQueue, autoplay: boolean): boolean {
       const stream = liveStream()
       const song = stream?.song(next.index)
       const track = current(next)
       if (!stream || !song || !track || !state.gapless || stream.tracks !== next.tracks) return false
       if (!stream.seekTo(next.index, 0)) return false
       cancelRetry()
+      state.moves += 1
       state.queue = next
       state.retried = false
       state.resumeAt = 0
@@ -1212,7 +1256,7 @@ export function usePlayer(): Player {
      * Also says, for timing the change, the incoming element's readyState (for a handover of what
      * it held) and where its clock starts from.
      */
-    function handOver(next: PlayQueue, autoplay: boolean): { decision: HandoverDecision; readyState: number | null; from: number } {
+    function handOver(next: UpNextQueue, autoplay: boolean): { decision: HandoverDecision; readyState: number | null; from: number } {
       const incoming = other()
       const decision = handoverDecision({
         enabled: state.gapless, standby: state.standby, queue: next, index: next.index, autoplay, wireless: isWireless(),
@@ -1236,6 +1280,8 @@ export function usePlayer(): Player {
       outgoing.muted = true
       incoming.muted = false
 
+      state.moves += 1
+      const moved = state.moves
       state.queue = next
       state.retried = false
       state.resumeAt = 0
@@ -1248,7 +1294,7 @@ export function usePlayer(): Player {
       report(0)
       showOnLockScreen(track)
 
-      play(() => refusedHandover(next))
+      play(() => refusedHandover(moved))
       checkWrapped(track)
       //? the element that finished lets go of its song, and becomes the next song's standby
       empty(outgoing)
@@ -1258,9 +1304,13 @@ export function usePlayer(): Player {
     /**
      * iOS wouldn't start the standby. The song goes on the element that was playing, which a tap
      * unlocked long ago - the one-element way, straight away, so the music doesn't stop over it.
+     * (2.0.0-player.57) Only while the queue's song hasn't moved since the handover (`moved`, the count of
+     * moves then): an Up Next edit that landed meanwhile moves nothing, and the queue as it is now - the edit
+     * included - is what is loaded; the queue's object, which an edit replaces, would have left the music
+     * stopped, and its index and song would misfire on Next then Previous in that time.
      */
-    function refusedHandover(at: PlayQueue) {
-      if (state.queue !== at) return
+    function refusedHandover(moved: number) {
+      if (state.moves !== moved) return
       const refused = live()
       state.active = activeAfter(state.active, 'refused')
       refused.muted = true
@@ -1269,7 +1319,7 @@ export function usePlayer(): Player {
       if (state.change) {
         state.change = { ...state.change, how: { kind: 'same element', reason: 'refused' }, readyState: null, from: 0 }
       }
-      load(at, true)
+      load(state.queue, true)
     }
 
     /**
@@ -1290,12 +1340,103 @@ export function usePlayer(): Player {
       }
     }
 
+    /* ===== Up Next, shuffle and repeat (2.0.0-player.57) - see lib/upNext.ts ===== */
+
+    /** The stream's clock has already run into a later song that no 'timeupdate' has seen yet (up to 250 ms, more on a
+     *  locked iPhone): the queue is moved there first - crossInto() - so nothing acts on a song that has finished. */
+    function catchUp(at = performance.now()): boolean {
+      const stream = liveStream()
+      const audio = live()
+      if (!stream || audio.seeking || state.pendingSeek || state.seeked) return false
+      const song = stream.songAt(audio.currentTime)
+      if (!song || song.index <= state.queue.index) return false
+      crossInto(stream, song, at)
+      return true
+    }
+
+    /**
+     * Up Next changed what comes after the song playing - lib/upNext's edits and Repeat's top-ups, which keep
+     * every song up to it where it was. A stream on the element playing reads the new list from here on
+     * (StreamSource.replan); a standby or a warm-up got ready for a song no longer next lets go of it, as when the
+     * queue moves on. False when the stream can't take it just now (its playhead is already past the song the
+     * queue says is playing, a seek on its way): nothing changed, and the caller holds the change for the next
+     * update.
+     */
+    function replaceUpcoming(next: UpNextQueue): boolean {
+      if (next === state.queue) return true
+      //? lib/upNext keeps the song playing and everything before it; a queue that doesn't is a bug - played afresh
+      if (next.index !== state.queue.index || current(next)?.id !== current(state.queue)?.id) {
+        load(next, state.intendsToPlay)
+        return true
+      }
+      const stream = liveStream()
+      if (stream && !stream.replan(next.tracks, next.index)) return false
+      state.queue = next
+      setQueue(next)
+      fitStandby()
+      if (!live().paused) preloadSoon()
+      return true
+    }
+
+    /** A change, made now - or, if the stream can't take it this moment, held (state.heldEdit) and made at the next
+     *  'timeupdate', against the queue as it is then. A change held already goes first: none is lost. */
+    function apply(change: (queue: UpNextQueue) => UpNextQueue) {
+      const held = state.heldEdit
+      state.heldEdit = null
+      const all = held ? (queue: UpNextQueue) => change(held(queue)) : change
+      if (!replaceUpcoming(all(state.queue))) state.heldEdit = all
+    }
+
+    /** An Up Next action: the queue caught up with the clock, then the change made (apply()). Keys name the rows,
+     *  so a change made a moment later still names the same songs. */
+    function edit(change: (queue: UpNextQueue) => UpNextQueue) {
+      catchUp()
+      apply(change)
+    }
+
+    /** A change held for this 'timeupdate' (or join), made now if the stream can take it. */
+    function runHeld() {
+      const held = state.heldEdit
+      if (!held) return
+      state.heldEdit = null
+      if (!replaceUpcoming(held(state.queue))) state.heldEdit = held
+    }
+
+    /** A song heard for TOP_UP_HEARD_S (2 s), or half of a shorter one: with Repeat on, the list or the song again,
+     *  queued ahead of where any stream looks (toppedUp in lib/upNext). Only listening does it, so a queue whose
+     *  songs all fail still comes to an end. */
+    function topUp() {
+      if (state.repeat === 'off') return
+      const length = songLength()
+      const need = length > 0 ? Math.min(TOP_UP_HEARD_S, length / 2) : TOP_UP_HEARD_S
+      if (!(state.listen.heard >= need)) return
+      edit((queue) => toppedUp(queue, state.repeat))
+    }
+
+    /** Play Next or Play Last: with nothing playing - nothing queued, or a queue that has played out (Repeat
+     *  off, its last song ended) - the songs played from the first, as playTracks; else added. True when it
+     *  started the music. */
+    function addSongs(tracks: QueueTrack[], how: typeof withNext): boolean {
+      if (!tracks.length) return false
+      catchUp()
+      if (!current(state.queue) || (live().ended && onward(state.queue) === null)) {
+        actions.playTracks(tracks, 0)
+        return true
+      }
+      apply((queue) => how(queue, tracks))
+      return false
+    }
+
     const actions = {
-      playTracks(tracks: QueueTrack[], start: number | null, shuffle = false) {
+      playTracks(tracks: QueueTrack[], start: number | null, shuffle = false, paged?: Paged) {
         state.change = null
+        //? a new queue: a change held for the one before is moot
+        state.heldEdit = null
         //? before load() starts the song: the tap unlocks the second element as well
         unlockSpare()
-        load(startQueue(tracks, start, shuffle), true, true)
+        //? topped up before the stream starts (a tap, so it can't loop): a one-song list on Repeat All would have
+        //? its run's end decided before the song had been heard
+        load(toppedUp(startUpNext(tracks, start, shuffle, Math.random, paged), state.repeat), true, true)
       },
       toggle() {
         const audio = live()
@@ -1312,7 +1453,13 @@ export function usePlayer(): Player {
       //? next and previous play if the listener meant the music to be playing - which a song
       //? that just failed leaves audio.paused saying it isn't
       next() {
-        const index = nextIndex(state.queue)
+        //? Next pressed just after a join: the song after the one now playing (2.0.0-player.57)
+        catchUp()
+        //? Repeat All on the list's last song, begun too lately for topUp() (2 s heard): its next time round queued
+        //? first - a tap, so it can't loop on songs that fail
+        if (state.repeat === 'all' && onward(state.queue) === null) apply((queue) => toppedUp(queue, 'all'))
+        //? past Repeat One's copies: the next song that isn't this one
+        const index = onward(state.queue)
         if (index === null) return
         state.change = null
         unlockSpare()
@@ -1324,7 +1471,9 @@ export function usePlayer(): Player {
         load(next, state.intendsToPlay, true)
       },
       previous() {
-        const action = previousAction(state.queue, songPosition())
+        catchUp()
+        //? previousAction()'s rule, back past the run of Repeat One's copies (2.0.0-player.57)
+        const action = backward(state.queue, songPosition())
         state.change = null
         unlockSpare()
         if (action.kind === 'restart') {
@@ -1421,6 +1570,47 @@ export function usePlayer(): Player {
           measured: paceOf(state.pace),
         }
       },
+      /* ===== Up Next (2.0.0-player.57): every change through edit(), which the stream can follow ===== */
+      setShuffle(on: boolean) {
+        if (current(state.queue)) edit((queue) => toppedUp(withShuffle(queue, on), state.repeat))
+      },
+      setRepeat(mode: Repeat) {
+        if (mode === state.repeat) return
+        state.repeat = mode
+        writePlayerRepeat(mode)
+        setRepeatShown(mode)
+        if (current(state.queue)) edit((queue) => toppedUp(withRepeat(queue, mode), mode))
+      },
+      //? true when it started the music (nothing playing, or a queue that has played out) - QueueMenu's notice is
+      //? for the other case only
+      playNext(tracks: QueueTrack[]): boolean {
+        return addSongs(tracks, withNext)
+      },
+      playLast(tracks: QueueTrack[]): boolean {
+        return addSongs(tracks, withLast)
+      },
+      jumpTo(key: number) {
+        catchUp()
+        const edited = jumpedTo(state.queue, key)
+        //? a key gone from Up Next, or a seek on its way: nothing - a jump is a tap, done now or not at all
+        if (!edited || !replaceUpcoming(edited)) return
+        //? a row's tap plays it, paused or not - next() starts what the listener means to be playing
+        state.intendsToPlay = true
+        actions.next()
+      },
+      moveInQueue(key: number, to: number) {
+        edit((queue) => movedKey(queue, key, to))
+      },
+      removeFromQueue(key: number) {
+        edit((queue) => withoutKey(queue, key))
+      },
+      clearPlayingNext() {
+        edit((queue) => withoutAdded(queue))
+      },
+      //? (Part B) the library's shuffle's next page, or a fresh order - an edit like Play Last
+      extendQueue(token: string, tracks: QueueTrack[], next?: Paged) {
+        edit((queue) => withMore(queue, token, tracks, next))
+      },
     }
 
     function onTimeUpdate() {
@@ -1430,13 +1620,7 @@ export function usePlayer(): Player {
       stream?.tick()
       //? the clock ran into the next song of the stream: a song change, seen here - never while a seek
       //? is on its way, when the clock may still say where the element was
-      if (stream && !audio.seeking && !state.pendingSeek && !state.seeked) {
-        const song = stream.songAt(audio.currentTime)
-        if (song && song.index > state.queue.index) {
-          crossInto(stream, song, at)
-          return
-        }
-      }
+      if (catchUp(at)) return
       if (state.join && state.join.waitingAt === null) {
         //? an update after the join with no stall between: the join played through
         const reading = streamReading(state.join.stall)
@@ -1469,6 +1653,9 @@ export function usePlayer(): Player {
       state.listen = listen
       const track = current(state.queue)
       if (track && submit) scrobble(track.id, true, listen.startedAt)
+      //? (2.0.0-player.57) an Up Next change held for this update, then Repeat's top-up once the song has been heard
+      runHeld()
+      topUp()
     }
 
     /**
@@ -1505,6 +1692,7 @@ export function usePlayer(): Player {
       const next = { ...state.queue, index: song.index }
       const track = current(next)!
       cancelRetry()
+      state.moves += 1
       state.queue = next
       state.retried = false
       state.resumeAt = 0
@@ -1528,6 +1716,10 @@ export function usePlayer(): Player {
       fitStandby()
       const end = stream.runEnd()
       if (end !== null && song.index >= end) preloadNow()
+      //? (2.0.0-player.57) an Up Next change held for the join, and Repeat's top-up - the new listen starts with what
+      //? was heard of it already
+      runHeld()
+      topUp()
     }
 
     function onEnded() {
@@ -1542,6 +1734,10 @@ export function usePlayer(): Player {
       //? before anything moves on: where the clock was when the audio ran out judges the last seek
       const ended = live()
       readSeek({ kind: 'ended', position: songPosition(), at: performance.now(), rate: ended.playbackRate })
+      //? (2.0.0-player.57) Repeat on and nothing queued after a song that played to its end - sought there before
+      //? topUp()'s 2 s: the list or the song again, queued now. The queue moves on below either way (a new source, or
+      //? the standby), so it is set here, not through the stream
+      if (state.repeat !== 'off' && nextIndex(state.queue) === null) state.queue = toppedUp(state.queue, state.repeat)
       const index = nextIndex(state.queue)
       if (index === null) {
         state.change = null
@@ -1624,10 +1820,13 @@ export function usePlayer(): Player {
         return
       }
 
-      if (action.kind === 'skip') {
+      //? (2.0.0-player.57) past Repeat One's copies of it - asked for again once per copy otherwise; none after
+      //? them, and it stops as at the end of the queue (below)
+      const skipTo = action.kind === 'skip' ? pastCopies(state.queue, action.index) : null
+      if (skipTo !== null) {
         //? named before load() replaces the source, and with it the element's error
         const notice = skipNotice(failed?.title ?? 'a song', audio.error)
-        load({ ...state.queue, index: action.index }, true)
+        load({ ...state.queue, index: skipTo }, true)
         showBriefly(notice)
         return
       }
@@ -1855,6 +2054,9 @@ export function usePlayer(): Player {
   return {
     queue,
     track: current(queue),
+    //? (2.0.0-player.57) the queue's - Shuffle belongs to what is playing, Repeat to the device
+    shuffle: queue.upNext?.shuffle ?? false,
+    repeat,
     playing,
     buffering,
     duration,

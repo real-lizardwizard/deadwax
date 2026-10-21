@@ -14,6 +14,11 @@
  * PLAYED_KEPT of them let go of the albums that play FIRST, and Info then had nothing to say about
  * the song playing, nor the turntable which disc's art to show (review).
  *
+ * Since 2.0.0-player.57 a song or an album added to Up Next (Play Next, Play Last) brings its album in
+ * (`also`) WITHOUT letting go of the queue's: the floor is raised by one for each album not held, up to
+ * QUEUE_ALBUMS_KEPT, so Info, the turntable's disc art and Go to album know an added song's album as they
+ * know the queue's - remember() would have reset the floor, and could drop an artist Play's albums.
+ *
  * Pure - a small most-recent-first store - so ui/test/info.sim.cjs can hold it to its bounds.
  */
 
@@ -29,6 +34,9 @@ export interface PlayedAlbums<T extends { id: string }> {
   /** called in the tap that starts a queue of several albums, with each one's answer in the order
    *  they play: every one kept (up to QUEUE_ALBUMS_KEPT) until the next queue starts */
   rememberQueue(albums: readonly T[]): void
+  /** (2.0.0-player.57) called in the tap that adds songs to Up Next, with their album's answer: put in as the
+   *  newest, letting go of nothing held (up to QUEUE_ALBUMS_KEPT) */
+  also(album: T): void
   /** the answer for that album id, or null when it was never played from (or has been let go of) */
   get(id: string | null | undefined): T | null
 }
@@ -61,6 +69,12 @@ export function createPlayedAlbums<T extends { id: string }>(
       floor = Math.min(new Set(list.map((album) => album.id)).size, Math.max(1, queueKept))
       //? the first to play remembered last - the newest, so the last to be let go past the bound
       for (let index = list.length - 1; index >= 0; index--) put(list[index]!)
+      trim()
+    },
+    also(album) {
+      //? one more kept, for an album not held already - whatever was held stays, the queue's included
+      if (!albums.has(album.id)) floor = Math.min(Math.max(floor, albums.size) + 1, Math.max(1, queueKept))
+      put(album)
       trim()
     },
     get(id) {

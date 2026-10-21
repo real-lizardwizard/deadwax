@@ -113,9 +113,12 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   played**, **Artist** or **Title** - more loading as you scroll. **Artists** is every artist
   Navidrome has, by **Name** or **Most albums**, each opening [their page](#artist-pages); an
   artist who renamed is one row, under the name deadwax files them under (Ye, not Kanye West).
-  **Songs** is every song, a page at a time; a song opens its album, where you play it. The Songs
+  **Songs** is every song, a page at a time; a song opens its album, where you play it, and its
+  **•••** has [Play Next and Play Last](#up-next-shuffle-and-repeat). The Songs
   chip isn't there at all when Navidrome won't list songs that way (it is asked once, for a single
-  song). What you're looking at and the albums' order are remembered on that device, and each view
+  song). **Shuffle** at the top of Songs (with logins on, at the top of your albums - your library has no
+  Songs list) plays every song in your library once, in a random order, until all have played; Browse's
+  Songs has one for everything in the store - [shuffling the whole library](#shuffling-the-whole-library). What you're looking at and the albums' order are remembered on that device, and each view
   keeps its place when you switch between them. With logins on, the Library is **yours** and
   **Browse** is the whole store - [the player as you](#the-player-as-you-with-logins-on).
 - **An album**: its cover, **Play** and **Shuffle**, and its songs, under "Disc 1", "Disc 2"
@@ -125,7 +128,9 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   only when its files carry a disc number: Navidrome keeps a disc's title only for a numbered
   disc, and deadwax writes no disc number for a one-disc release. Files tagged by Picard ("1/1")
   have one; for others, set **Disc** to 1 along with **Disc title** in the tag editor. Tap a song
-  to play the album from there. Shuffle plays the album's songs in a random order. The back button
+  to play the album from there. Shuffle plays the album's songs in a random order. A song's **•••**, at the
+  end of its row, and the **•••** in the bar for the whole album (beside the pin) have **Play Next** and
+  **Play Last** ([Up Next](#up-next-shuffle-and-repeat)). The back button
   names the tab it goes back to. The artist's name under the title opens [their page](#artist-pages).
   Under it, **In your library** (with logins on, **In the store** for an album that isn't yours, and
   **Add to my library** under Play - [the player as you](#the-player-as-you-with-logins-on)), and an **Also: …** chip for each other pressing of the album you
@@ -251,7 +256,9 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   under it the artist and the album on one line ("Pink Floyd — Wish You Were Here"): tap that line
   to go to the album. Then the scrubber; previous, play/pause and next; and a row of buttons: at its
   left end, wherever the speed isn't 1x, [the speed's chip](#the-speed-fader) (`1.25x`; tap it for
-  1x), then an **AirPlay** button when there's a speaker on the network to send to, and **•••**.
+  1x), then an **AirPlay** button when there's a speaker on the network to send to, **Up next** (what
+  plays next, with Shuffle and Repeat - [below](#up-next-shuffle-and-repeat); purple while Shuffle or
+  Repeat is on) and **•••**.
   The button at its top right, a round record, shows it as [a turntable](#the-turntable) instead.
   Drag it down by its top half, or tap the arrow at its top, to close it (Escape closes it too). While
   it's open nothing behind it can be reached by the keyboard or VoiceOver; opening it moves to its
@@ -290,11 +297,14 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   and down move it. [Seeking](#seeking-and-where-safari-lands) says why a seek in Safari can land
   somewhere other than where you put it.
 - **Previous** restarts the song if you're more than three seconds in, and goes back a song if
-  you're not, as Apple Music does.
+  you're not, as Apple Music does. With Repeat One on, going back passes over the song's repeats to
+  the song before it.
 - **A song that won't play doesn't stop the album.** The player asks for it once more a moment
   later, and if that fails too, moves on to the next song, saying **Skipped "…"** and why for a
   few seconds: in the mini player where the artist goes, and above the song's title on the
-  now-playing screen. At the end of the queue it stops, with the reason on screen.
+  now-playing screen. At the end of the queue it stops (unless Repeat is on), with the reason on screen.
+  With Repeat on it is still asked once more and then skipped - past a repeating song's repeats - and a
+  list whose every song fails stops rather than going round for ever.
   [Troubleshooting](troubleshooting.md#a-song-in-the-player-wont-start-or-cant-be-skipped-through)
   goes through the reasons.
 - **The lock screen and Control Center** show the song, its artist, album and cover, with
@@ -306,6 +316,86 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
 - **The look** is deadwax's own, the same "touch of Windows 7" as its other screens: Noto Sans,
   with monospace for track numbers and times, square-ish corners, no blur. It's drawn from the
   same fonts deadwax serves itself, so it needs no internet.
+
+## Up Next, shuffle and repeat
+
+Since 2.0.0-player.57. **Up next** on the now-playing screen (beside •••) opens **Up Next**, a sheet over it,
+the way Info opens: what plays after the song playing, with the two settings an iPhone's Music app keeps
+there - so nothing else on the now-playing screen changes. On a desktop it is the player bar's **Up Next**,
+and opens as a panel beside the page, as Info does ([on a desktop](#on-a-desktop)).
+
+- **At its top**, the song playing - and with Repeat One on, "Repeat one: this song plays again until you
+  skip it." Under it two chips, **Shuffle** and **Repeat**, purple while on; a change is read out by
+  VoiceOver.
+- **Playing Next**: the songs you've added, in the order they'll play, with **Clear** to take them all out.
+  It's there only when you've added some.
+- **The rest of the album or list this time round** - headed "From Mezzanine" for one album's songs, "Still
+  to play" for several albums' - up to 100 of them, then "And 380 more songs." Under it, what comes after:
+  "Then Mezzanine again from the top." with Repeat All ("Then Mezzanine again, in a new order." with Shuffle
+  on too), or "Nothing after this song." at the last song with Repeat off.
+- **Tap a song** to play it now - from pause too. The songs above it in its own group go: tap one of the
+  album's and the album's songs before it are skipped (Playing Next stays, and plays after it); tap one in
+  Playing Next and only the songs added above it go. Previous then goes back to the song that was playing.
+- **Edit** (at the top left) turns the rows into ones you move and remove, as Home's Pinned does: **up** and
+  **down**, **✕** to take one out, and a grip at the right to drag it by (only the grip drags, so the list
+  still scrolls under your finger elsewhere). A song moves within its own group - Playing Next, or the
+  album's - and each change is made as you tap it, with nothing to save. **Done** ends Edit; a tap above the
+  sheet, or Escape, closes it.
+- It closes by itself once nothing is playing.
+
+**Play Next and Play Last.** Every song's **•••** - at the end of its row on an album page, on your library's
+songs in Search, and in the Library's Songs - and the **•••** in an album page's bar, for the whole album,
+open a short menu: **Play Next** puts the song (or the album) straight after the song playing; **Play Last**
+puts it after the songs you've already added, still ahead of the rest of the album or list, as Apple Music
+does. A line at the top of the screen says which ("Playing next: Roads", "Added to Up Next: Dummy"). With
+nothing playing - or once the queue has played to its end - either just plays it.
+
+**Shuffle**, turned on while a song plays, keeps that song going and shuffles every song of the album or list
+you haven't heard this time round - the ones before where you started included (an album started at song 5
+and shuffled at song 7 shuffles songs 1-4 and 8-12) - and a song you took out of Up Next stays out. Turned
+off, the album's own order carries on from the song playing's place in it, so a song you heard in the
+shuffle can come round again (Apple Music does the same). Either way the song playing goes on, untouched,
+and songs you added keep their order, ahead of the rest. An album's **Shuffle** button still starts a
+shuffled queue, which Up Next can then put back in order.
+
+**Repeat** is one chip going **Repeat** (off) → **Repeat all** → **Repeat one**:
+
+| | Next | Previous | a song's end | the end of the list |
+| --- | --- | --- | --- | --- |
+| **Off** | the next song; nothing on the last | past 3 seconds the song again, else the song before | the next song | it stops: "Nothing after this song." |
+| **All** | the next song - on the list's last, its first | as off; the song before can be the last of the time round before | the next song | never reached: the list again from the top, in its own order or, with Shuffle on, a new one that never starts with the song that just ended. Songs you added play once, not every time round |
+| **One** | the next song that isn't this one - and Repeat One repeats that one from then | past 3 seconds the song again, else the song before its repeats | the song again from its start | - |
+
+With [Gapless](#gapless-playback-experimental) on, FLAC played [in one stream](#one-stream-for-flac) loops
+sample to sample: Repeat All's wrap from the last song to the first, and Repeat One's song into itself, are
+joins like an album's, 0 ms in Debug. Anything else - an MP3, or Gapless off - starts the song again the way
+any next song starts. A song heard again because of Repeat counts as a play again each time
+([How plays are counted](#how-plays-are-counted)). The lock screen's previous and next follow Up Next and
+Repeat as the buttons do; iOS gives a web page no shuffle or repeat buttons of its own there. Next and
+Previous always act on the song you're hearing: pressed in the instant one song runs into the next in
+[one stream](#one-stream-for-flac), before the screen has caught up, Next goes to the song after the new one.
+
+**What is kept.** Repeat is remembered on the device, like Gapless. Shuffle belongs to what's playing (Play
+plays in order, Shuffle shuffles, and Up Next switches it), and the queue - Up Next with it - is gone when the
+page reloads or iOS closes the app, as it always was.
+
+### Shuffling the whole library
+
+**Shuffle** at the top of the Library's Songs (with logins on, at the top of your albums: every song of every
+album you've starred) plays your **whole** library - every song once, in a random order deadwax makes,
+nothing repeated until every one has played. Browse's Songs has the same for everything in the store. The
+button says **Getting ready…** while deadwax reads the list (a big library's first time can take several
+seconds; within ten minutes a new order is instant) - and above your albums, how many songs there are under
+it once it knows (on Songs, the list's own count at the top says it already). With no songs to shuffle - no
+albums starred yet - there's no button.
+The songs come to the phone 200 at a time as they're needed, so Up Next says the real count ("And 12,279
+more songs."). With **Repeat All**, the end of the whole order starts a fresh one - songs added to the
+library meanwhile are in it; with Repeat off the queue ends once every song has played. The order is a
+snapshot: a song deleted since is skipped when its turn comes, and one added since comes in the next
+shuffle. If deadwax restarts mid-shuffle, the shuffle starts over with a fresh order (it says so, once), so
+songs already heard can come again. Turning Repeat off (or to One) once the next order has started coming
+lets that order go, and the shuffle ends after the one playing. Up Next's Shuffle chip, and the desktop
+player bar's Shuffle, read on and can't be turned off for it - the order is the shuffle.
 
 ## Artist pages
 
@@ -582,12 +672,18 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
 - **A player bar** along the bottom instead of the mini player: the song's cover, title and "Artist
   — Album" (click that to go to the album), previous, a round play/pause and next, the scrubber with
   the time gone and the time left at its ends (click or drag along it; its dot shows when you point
-  at it), and at the right **AirPlay** when there's a speaker to send to, **Info**, and the
+  at it) - and since 2.0.0-player.57 **Shuffle** before previous and **Repeat** after next (one button
+  going off, all, one; both purple while on), as Music on a Mac has them - and at the right **AirPlay**
+  when there's a speaker to send to, **Up Next**, **Info**, and the
   [visualizer](#the-visualizer)'s button (five bars) - and before them, wherever the speed isn't 1x,
   [the speed's chip](#the-speed-fader) (`1.25x`; click it for 1x). With nothing playing it stays,
   saying so.
   There's no now-playing screen and no [turntable](#the-turntable) on a desktop - the bar is the
   player, and the visualizer is the desktop's full-screen view of it.
+- **Up Next** (since 2.0.0-player.57) opens beside the page as a panel, the same queue as on a phone -
+  [Up Next, shuffle and repeat](#up-next-shuffle-and-repeat) - one panel at a time with Info, Edit and the
+  rest. **Done**, the Up Next button again, or Escape while you're in it closes it; making the window
+  narrower than 1024 closes it too.
 - **Info** opens beside the page as a panel, with the same About and Debug as on a phone. **Done**,
   the Info button again, or Escape while you're in the panel closes it. Going to an album or an
   artist from the player - the bar's "Artist — Album", or Info's own cards - closes it too when it
@@ -1230,6 +1326,19 @@ pieces of a few seconds, keeping about 30 seconds ahead of what you're hearing.
 - **It needs room in the player's cache**, as Safari's MP4s do: see
   [`PLAYER_CACHE_MB`](configuration.md#paths). A song too big for what the cache's disk has free
   plays the other way, and the songs around it still stream.
+- **What Up Next does to the stream** (2.0.0-player.57): the stream follows the queue, not the album -
+  every next song in [Up Next](#up-next-shuffle-and-repeat)'s order that is FLAC of the same format joins
+  the one before it, so a shuffled album, a song added with Play Next, or Repeat's next time round still
+  plays straight through with nothing between songs (what you hear at each join is the two songs' own
+  edges). Play Next, Play Last, a move or a removal costs nothing for most of a song: the stream hasn't
+  fetched past the song playing yet. In a song's last minute or so it has the next song's start in hand,
+  and lets go of it - taking it back out of what the browser holds - and carries on with the song now
+  next. A song added that can't join (an MP3, another sample rate) ends the stream before it, exactly as a
+  mixed album does: it plays from the second player, and the stream starts again at your next tap. Repeat
+  All and Repeat One loop sample to sample in the stream; turned on in a song's last seconds, the loop
+  still joins at 0 ms if the next time round's start arrives before the end, and otherwise the next time
+  round starts the usual way, with no song skipped. Shuffle turned on or off mid-song never touches the
+  song playing.
 
 ### The second player, for everything else
 
@@ -1578,7 +1687,9 @@ played" and Navidrome's own Last.fm or ListenBrainz scrobbling carry on working.
   you skipped to while paused and started an hour later is a play from an hour later.
 - **Hearing a song again counts again.** **Previous** more than three seconds in, or play on a
   song that has ended, starts a new listen: "now playing" is sent again, and it can count as
-  another play. Pausing and carrying on is the same listen.
+  another play. Pausing and carrying on is the same listen. So does a song heard again because of
+  [Repeat](#up-next-shuffle-and-repeat) (since 2.0.0-player.57): each time round, and each repeat of a
+  song, is a listen of its own, counted by the same rule.
 - Plays go to the `NAVIDROME_USER` account with logins off, and on to Last.fm or ListenBrainz if that
   account has them linked in Navidrome. With logins on (since 2.0.0-player.52) they go to **your own**
   Navidrome account - the one you signed in with - and to your Last.fm or ListenBrainz
@@ -1830,7 +1941,10 @@ fixes that.
   sees FLAC songs only; its play/pause is its one control of the music (skip and seek from the player
   bar, after leaving it).
 - **The queue doesn't survive iOS closing the app.** Reopen it after iOS has cleared it from
-  memory and nothing is queued.
+  memory and nothing is queued - Up Next and its Shuffle with it; Repeat is kept.
+- **Up Next** (2.0.0-player.57) has no history of what played before the song playing (Previous walks it),
+  no "keep playing similar music" after the list, no ••• on album tiles (an album's ••• is on its page),
+  no long-press or right-click menu, and no way yet to save it as a playlist.
 - **Siri**, and a lower bit rate for mobile data.
 - **The rest of deadwax**: the main page's browser preferences (search, candidates, auto-grab, the
   interface) and its track table's columns stay there (it works on a phone too); editing an album, the
@@ -1958,4 +2072,14 @@ question the whole player existed to answer. Still to find out:
   may throw away the sound it has queued when the speed changes), the lock screen's scrubber at the
   speed, and AirPlay - WebKit hands an AirPlay speaker the same speed as the phone, but whether a
   speaker plays it, and its pitch, is the speaker's business. And the fader under a real finger,
-  beside the record and the arm.
+  beside the record and the arm;
+- **[Up Next, shuffle and repeat](#up-next-shuffle-and-repeat)** (2.0.0-player.57): all of it in the
+  [one stream](#one-stream-for-flac) on an iPhone, whose player is Apple's own - taking the next song's
+  start back out after a Play Next, and starting a stream that had ended again for Repeat; a Repeat All
+  loop left going for an hour (memory, and how Safari lets go of what is behind); Repeat One and Repeat All
+  with the phone locked, the loop's join in a pocket, and a Play Next made in the app before locking; the
+  lock screen's previous and next with Repeat One; Up Next's list scrolling and its grip dragging in the
+  home-screen app, and VoiceOver through Up Next, its Edit and the song menu; Repeat One the second-player
+  way (Gapless on, not FLAC), which hands the same song over each time (about 100 ms, as any handover) and
+  downloads it again each time; **a Play Next in a song's last seconds**: whether taking the next song's
+  start back out makes the phone drop a moment of the song playing's end; and all of it with AirPods.

@@ -218,8 +218,9 @@ box" finds Glory Box at once, from Dummy's tracklist, before MusicBrainz has bee
   the song, then **Dummy**, then **Portishead**. Then one of each kind in turn. An artist you have, typed
   alone ("portishead"), is them first, then their albums and songs - their self-titled album is by them, not
   an exact match. Each row says what it is first: "Artist · 3 albums in your library", "Album · Portishead ·
-  1994", "Song · Portishead · Dummy". A song of yours plays from its tap (▶ once its album is in hand); a
-  MusicBrainz song opens the album it's on, the song marked; everything else opens.
+  1994", "Song · Portishead · Dummy". A song of yours plays from its tap (▶ once its album is in hand), and
+  its **•••** has Play Next and Play Last (since 2.0.0-player.57 - [Up Next](player.md#up-next-shuffle-and-repeat));
+  a MusicBrainz song opens the album it's on, the song marked; everything else opens.
 - **Artists**, **Albums**, **Songs**: a few of each - on a phone your first 2 artists and MusicBrainz's 2,
   3 and 3 albums, 3 and 3 songs (on a desktop 3 and 3, 4 and 4, 4 and 4), so MusicBrainz's show even beside
   many of yours. **See all**, in each heading, shows that kind in full. A section with nothing to show is

@@ -22,6 +22,7 @@ import {
   type Candidate, type Frame, type Kind, type KindPool, type Marks, type Outcome, type KindArea, type Row, type SavedAnswer, type SavedFound, type View,
 } from '../lib/searchList'
 import { albumsToPrefetch, appendPage, groupHeld, morePageWords, morePages, notInLibrary, searchWords, songIndex } from '../lib/searchResults'
+import type { QueuePick } from '../lib/upNext'
 import {
   SONG_SEARCH_LIMIT, appendSongs, groupSongs, moreSongsWords, songAlbumHeldReleases, songAlbumHolding, type Song as FoundSong, type SongAlbum,
   type SongEvidence,
@@ -255,6 +256,7 @@ export function Search({
   onOpenArtist,
   onOpenMusicBrainzArtist,
   onGet,
+  onQueueMenu,
 }: {
   /** the tab has been shown at least once: what the library holds is asked then */
   shown: boolean
@@ -273,6 +275,8 @@ export function Search({
   onOpenMusicBrainzArtist: (artist: { mbid: string; name: string }) => void
   /** a row's Get: open the Sources sheet for its usual pressing, focus given back to `opener` */
   onGet: (request: Omit<GetRequest, 'key'>, opener: HTMLElement | null) => void
+  /** (2.0.0-player.57) a library song's •••: App's song menu, with the song - and its album, when in hand */
+  onQueueMenu?: ((event: MouseEvent, pick: QueuePick<AlbumWithSongs>) => void) | undefined
 }) {
   const actions = usePlayerActions()
   //? asked the first time the tab shows - not as the app starts, when it is mounted hidden
@@ -1687,12 +1691,20 @@ export function Search({
     }
   }
 
+  /** (2.0.0-player.57) A library song's •••: the song menu with the song in hand - its album's answer too when Search
+   *  holds it (for Info), else the song alone on a stand-in for its album. */
+  const songMenu = (song: Song, event: MouseEvent) => {
+    const album = song.albumId ? ready.get(song.albumId) : undefined
+    const stub: AlbumWithSongs = { id: song.albumId ?? '', name: song.album ?? '' }
+    onQueueMenu?.(event, { label: song.title, tracks: [toQueueTrack(song, album ?? stub)], albums: album ? [album] : [] })
+  }
+
   /** A MusicBrainz album's tap: the album you have when the library holds it, else the album you don't have. */
   const openAnyGroup = (group: ReleaseGroup) => (groupHeld(owned?.index ?? null, group.id) ? openGroup(group) : onOpenGroup(group))
 
   const context: RowContext = {
     marks, evidence, index: owned?.index ?? null, personal, ready, resolving, opening, openSongs, openFolds,
-    onPlay: playSong, onOpenAlbum, onOpenArtist, onOpenMusicBrainzArtist, onOpenGroup: openAnyGroup, onOpenSongAlbum: openSongAlbum,
+    onPlay: playSong, onSongMenu: songMenu, onOpenAlbum, onOpenArtist, onOpenMusicBrainzArtist, onOpenGroup: openAnyGroup, onOpenSongAlbum: openSongAlbum,
     onGetGroup: (group, event) => void getAlbum(group, event), onGetSong: (song, album, event) => void getSong(song, album, event),
     onToggleSong: (key) => toggle(setOpenSongs, key), onToggleFold: (key) => toggle(setOpenFolds, key),
   }

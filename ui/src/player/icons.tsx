@@ -72,6 +72,35 @@ export const ShuffleIcon = line(
   </>,
 )
 
+/** Up Next (2.0.0-player.57): lines of a list, the last one short beside a small play triangle - what plays next. */
+export const QueueIcon = line(
+  <>
+    <path d="M4 6.5h16M4 12h16M4 17.5h9" />
+    <path d="M16.5 15v5.5l4.5-2.75z" fill="currentColor" />
+  </>,
+)
+
+/** Repeat (2.0.0-player.57): two arrows chasing each other round a loop, as ShuffleIcon's line. */
+export const RepeatIcon = line(
+  <>
+    <path d="M17 3.5 20 6.5l-3 3" />
+    <path d="M4 11.5V10a3.5 3.5 0 0 1 3.5-3.5H20" />
+    <path d="M7 20.5 4 17.5l3-3" />
+    <path d="M20 12.5V14a3.5 3.5 0 0 1-3.5 3.5H4" />
+  </>,
+)
+
+/** Repeat One: the same loop, and a "1" inside it. */
+export const RepeatOneIcon = line(
+  <>
+    <path d="M17 3.5 20 6.5l-3 3" />
+    <path d="M4 11.5V10a3.5 3.5 0 0 1 3.5-3.5H20" />
+    <path d="M7 20.5 4 17.5l3-3" />
+    <path d="M20 12.5V14a3.5 3.5 0 0 1-3.5 3.5H4" />
+    <path d="M11.2 10.6l1.3-.9v4.6" stroke-width="1.8" />
+  </>,
+)
+
 export const ChevronDownIcon = line(<path d="M6 9.5l6 6 6-6" />)
 
 export const ChevronLeftIcon = line(<path d="M15 5l-7 7 7 7" />)

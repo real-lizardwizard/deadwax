@@ -1,6 +1,7 @@
 import { Cover } from './Cover'
 import { SpeedChip } from './SpeedChip'
-import { AirPlayIcon, InfoIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon, VisualizerIcon } from './icons'
+import { nextRepeat } from '../lib/upNext'
+import { AirPlayIcon, InfoIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon, QueueIcon, RepeatIcon, RepeatOneIcon, ShuffleIcon, VisualizerIcon } from './icons'
 import { Scrubber } from './NowPlaying'
 import type { Player } from './usePlayer'
 
@@ -23,9 +24,13 @@ import type { Player } from './usePlayer'
  *    wherever the speed isn't 1x - set on the phone's turntable, an iPad turned on its side would
  *    otherwise play it with nothing here saying so - and a tap on it back to 1x. The tools sit at the
  *    row's right end, so the chip coming and going moves none of them.
+ *  - (2.0.0-player.57, Up Next, shuffle and repeat) Shuffle before previous and Repeat after next, as Music on
+ *    a Mac has them - Repeat one button cycling off, all, one, and both tinted while on - and Up Next before
+ *    Info, which opens the queue as the side panel (app/UpNext.tsx), as Info's opens. During a whole library's
+ *    shuffle the Shuffle button reads on and is aria-disabled, as Up Next's chip is: that order is the shuffle.
  *
  * Its transport calls the player straight from the click - nothing awaited, the gesture rule
- * (ui/test/app-rules.sim.cjs allows this file toggle, next, previous and showAirPlay). With nothing
+ * (ui/test/app-rules.sim.cjs allows this file toggle, next, previous, showAirPlay, setShuffle and setRepeat). With nothing
  * playing it keeps its place and says so: a bar that came and went would move the page above it.
  */
 export function PlayerBar({
@@ -34,6 +39,8 @@ export function PlayerBar({
   onInfo,
   infoOpen,
   onVisualizer,
+  onUpNext,
+  upNextOpen = false,
 }: {
   player: Player
   /** "Artist — Album": the song's album, on the tab showing; null when the song names none */
@@ -44,6 +51,10 @@ export function PlayerBar({
   infoOpen: boolean
   /** the visualizer's click - the event, so App can take the button as what focus goes back to */
   onVisualizer: (event: MouseEvent) => void
+  /** (2.0.0-player.57) Up Next's click - the event, as Info's */
+  onUpNext?: ((event: MouseEvent) => void) | undefined
+  /** the Up Next panel is showing */
+  upNextOpen?: boolean
 }) {
   const track = player.track
   if (!track) {
@@ -54,6 +65,11 @@ export function PlayerBar({
     )
   }
 
+  //? a whole library's shuffle (Part B): its order IS the shuffle - Shuffle reads on and can't be turned off, as
+  //? Up Next's chip has it: aria-disabled (focus stays), named for why in Up Next's own words (upNextView: your
+  //? library, or everything - Browse's Songs), the click doing nothing
+  const pagedScope = player.queue.upNext?.paged?.scope
+  const paged = !!pagedScope
   //? "Artist — Album", as Now Playing has it; either alone when the other isn't known
   const byline = [track.artist, track.album].filter(Boolean).join(' — ')
 
@@ -77,6 +93,18 @@ export function PlayerBar({
 
       <div class="app-playbar-middle">
         <div class="app-playbar-transport">
+          <button
+            type="button"
+            class={`app-playbar-button app-playbar-shuffle${player.shuffle ? ' is-on' : ''}`}
+            onClick={() => {
+              if (!paged) player.setShuffle(!player.shuffle)
+            }}
+            aria-label={paged ? `Shuffle - shuffling ${pagedScope === 'store' ? 'everything' : 'your whole library'}` : 'Shuffle'}
+            aria-pressed={player.shuffle}
+            aria-disabled={paged}
+          >
+            <ShuffleIcon class="app-playbar-icon" />
+          </button>
           <button type="button" class="app-playbar-button" onClick={() => player.previous()} aria-label="Previous">
             <PreviousIcon class="app-playbar-icon" />
           </button>
@@ -91,6 +119,15 @@ export function PlayerBar({
           <button type="button" class="app-playbar-button" onClick={() => player.next()} aria-label="Next">
             <NextIcon class="app-playbar-icon" />
           </button>
+          <button
+            type="button"
+            class={`app-playbar-button app-playbar-repeat${player.repeat === 'off' ? '' : ' is-on'}`}
+            onClick={() => player.setRepeat(nextRepeat(player.repeat))}
+            aria-label={`Repeat: ${player.repeat}`}
+            aria-pressed={player.repeat !== 'off'}
+          >
+            {player.repeat === 'one' ? <RepeatOneIcon class="app-playbar-icon" /> : <RepeatIcon class="app-playbar-icon" />}
+          </button>
         </div>
         <Scrubber player={player} />
       </div>
@@ -102,6 +139,15 @@ export function PlayerBar({
             <AirPlayIcon class="app-playbar-icon" />
           </button>
         )}
+        <button
+          type="button"
+          class={`app-playbar-button${upNextOpen ? ' is-on' : ''}`}
+          onClick={onUpNext}
+          aria-label="Up Next"
+          aria-expanded={upNextOpen}
+        >
+          <QueueIcon class="app-playbar-icon" />
+        </button>
         <button
           type="button"
           class={`app-playbar-button${infoOpen ? ' is-on' : ''}`}

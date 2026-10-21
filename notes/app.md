@@ -444,3 +444,164 @@ knows what Navidrome lists, is notes/app-desktop.md's "Navidrome required (2.0.0
   "Not in Navidrome" section and Needs a look's line; player.md's "What you need", its gate words and the
   sidebar's Needs a look; troubleshooting.md's "An album says "Not in Navidrome"", the count's lag and the
   gate's new words.
+
+### Up Next, shuffle and repeat (2.0.0-player.57)
+
+James, 2026-10-20: **"i need shuffle, loop, and queue options across the board. in the player, browse, etc."** and
+**"i'd like to be able to see the queue somewhere in the player, but I don't want to disrupt the theme we have
+going"**. Apple Music is his reference: Up Next, Play Next / Play Last, shuffle, repeat off / all / one. He approved
+every choice of `uplan/slice-queue.md` the same day, Part B (the whole library shuffled, paged in) included. The
+engine files changed, as that spec said they would: `ui/src/player/usePlayer.ts`, `ui/src/player/streamSource.ts`, and
+`ui/test/player.sim.cjs` by additions only; `lib/{playQueue,gapless,scrub,streamWrap,streamPlan,fmp4}.ts` have no diff.
+
+- **The model, `lib/upNext.ts` (pure).** The engine's queue stays `{ tracks, index }`; Up Next's account rides beside it
+  (`UpNextQueue = PlayQueue & { upNext? }`), one `Mark` per entry - where it came from (`source`, the list playTracks was
+  given; `added`, Play Next or Play Last; `one`, a copy Repeat One put there), its place in the list (`at`) and which time
+  round (`pass`) - with the list itself (`source`), Shuffle, the next key, where playTracks started (`startedAt`) and the
+  list's songs taken out of a round (`left`). Every `{ ...queue, index }` in the engine already carries it. **The
+  invariant**: after the song playing, copies, then added songs, then the list's songs round by round; an edit never
+  touches `tracks[0..index]`, `marks[0..index]` or `index`, and hands back the same object when it changes nothing.
+  `upnext.sim.cjs` holds it over 2,000 seeded runs of every edit, top-up and forward move. (`jumpedTo` alone puts the row
+  first, ahead of the added songs, for the moment until the engine moves onto it; and Previous, walking BACK across a song
+  added during a later round, can leave the order after it as it was played - history order, which is right for Previous
+  then Next, and which Up Next then draws as far as its groups allow.)
+- **Repeat is the queue, unrolled.** The stream places songs at `last + 1` and can't go back to index 0, so Repeat All
+  appends the next time round once fewer than `REPEAT_AHEAD` (2) entries follow the song playing - in its order, or a
+  fresh shuffle that never starts with the song that ended the round before - and Repeat One puts copies of the song
+  after it. `topUp()` runs only once a song has been HEARD for `TOP_UP_HEARD_S` (2 s, or half a shorter one; a song whose
+  length is unknown needs the 2 s), at the end of every `timeupdate` and join - never in `beginListen()`, since WebKit sends
+  'playing' from inside play() before any sound and a list whose songs all fail would loop for ever. Next (`onward`),
+  Previous (`backward`, previousAction's rule but back past the run of copies) and a failure's skip (`pastCopies`) pass
+  the copies; `onEnded` and lib/gapless keep reading `index + 1`. *After review*: a song that is the list's last and was
+  begun under 2 s ago (two quick Nexts, or a row jumped to) had nothing after it yet - Next did nothing and a seek to its
+  end stopped the music under Repeat All. `next()` now tops up first when nothing follows and Repeat is All (a tap, so it
+  can't loop on failing songs), and `onEnded` when nothing follows and Repeat is on (the song played to its end, so it was
+  heard) - setting `state.queue` directly there, since the queue moves on to a new source or the standby straight after.
+- **One way in: `replaceUpcoming()`.** Every Up Next change goes through `edit()` - `catchUp()` first (onTimeUpdate's
+  crossing test, factored out unchanged: an edit made just after the clock crossed a join is made against the song now
+  playing). **Next, Previous and a row's tap catch up first too** (the spec's "every action"): pressed in the up-to-250 ms
+  (longer locked) before a 'timeupdate' sees a join, they act on the song the clock is in - Next goes to the song after the
+  one heard, where before it went to the song already playing (in one stream, a seek back to its start). That is a change
+  on the album-in-order path, chosen and pinned (player.sim "on the song the clock is in": Next, Previous, a row's tap, a
+  removal and a move each 0.2 s past an unseen join) - then `replaceUpcoming(next)`: the stream replanned (`StreamSource.replan`), `state.queue` set in the same
+  turn (so `stream.tracks === state.queue.tracks` keeps its meaning for `moveInStream`, `placed` and `streamFailed`),
+  `fitStandby()`, and `preloadSoon()` while playing. When the stream can't take it (its playhead already past the queue's
+  song, a seek on its way) the change is HELD (`state.heldEdit`) and made at the next 'timeupdate' or join, against the
+  queue as it is then. *Deviation from the spec, on purpose:* a change already held is composed with the next one rather
+  than replaced by it (Repeat's top-up four times a second would otherwise have thrown a held Play Next away), and
+  `load()` doesn't clear a held change - only `playTracks` does - so a Play Next held across a song change isn't lost
+  (pinned after review: two edits held through a seek under Repeat All both made at the very update that crosses the join
+  - crossInto's runHeld - and a held Play Next dropped by playing another album). A
+  jump (`jumpTo`) is never held: it is a tap, done now or not at all, and goes through `next()` (a seek in the stream when
+  it holds the song, a handover, or a new stream from it). `refusedHandover` now goes by a count of the queue's moves
+  (`state.moves`, bumped by load, moveInStream, crossInto and handOver, never by an edit): the queue's object (an edit
+  replaces it) left the music stopped, and its index and song would misfire on Next then Previous.
+- **Withdrawn from the spec's wording, `withRepeat` leaving All**: the spec says it drops the passes later than the one Up
+  Next shows; at a round's LAST song Up Next shows the next round, so that kept one more round after Repeat was turned off.
+  It drops every pass later than the song playing's own round instead - "Nothing after this song." there, as Repeat off
+  means.
+- **The controls.** Now Playing gains ONE button, Up next (`app-upnext-button`, QueueIcon), between AirPlay's place and •••,
+  tinted while Shuffle or Repeat is on and named for it ("Up next - Shuffle and Repeat all"); Shuffle and Repeat are in Up
+  Next, where the iPhone's Music app has them, so nothing else on the screen moves. Up Next (`app/UpNext.tsx`) is Info's
+  shell: a sheet over Now Playing (App's `over` gains 'upnext') and on a desktop the side panel (`lib/appFrame.ts`'s `Side`
+  gains 'upnext', `closesOnCrossing` returns `upNextPanel`, the one-panel rule both ways). It draws `upNextView`: the song
+  playing, the chips, Playing Next with Clear, the shown round's rows (`UP_NEXT_DRAWN` 100, then "And N more songs."), what
+  comes after. Its Edit is Home's Pinned (dropIndex and dragOffset imported from lib/pins). The desktop's player bar gains
+  Shuffle and Repeat beside the transport and Up Next in the tools. Every song row's ••• (`app-row-more`: album pages,
+  Search's library songs, the Library's Songs) and an album page's bar ••• (`app-album-more`) open the song menu
+  (`app/QueueMenu.tsx`, ActionMenu's sheet): Play Next / Play Last, `rememberAdded` first (player/api.ts over
+  lib/playedAlbums' new `also()`, which keeps an added song's album without letting go of the queue's), the app's one
+  notice only when the songs were queued (the player's action says whether it started the music instead - nothing playing,
+  or a queue played out).
+- **The look**: nearly all reused (Info, Pinned, ActionMenu, the chips, Search's rows); app.css's new section "Up Next,
+  shuffle and repeat (2.0.0-player.57)" adds only the two locks, the head's Edit, the chips' row, a group's gutter, Now
+  Playing's tint, the row ••• (on an album row its glyph's right edge where the time ended, the row's own hairline to the
+  edge) and the album bar's room between ••• and the pin (`--app-album-more-room`, so their 44px reaches meet and no
+  more); app-desktop.css's, inside its query, the bar's Shuffle and Repeat in the tools' grey and size, accent while on. No
+  existing rule's declarations changed (app.css's diff is insertions only). The section sits above the phone frame's
+  ("looking after deadwax from a phone"), which test_app_css holds to be the file's last.
+- **The gesture rule** (`ui/test/app-rules.sim.cjs`): the new actions found by name; `ALLOWED` gains QueueMenu (playNext,
+  playLast), UpNext (its six), PlayerBar (setShuffle, setRepeat), ShuffleSongs (playTracks) and useShuffleFeed
+  (extendQueue); ActionsContext isn't widened (App hands `player` to Up Next, the menu and the bar); the rows' ••• call
+  App's menu, never the player; lib/upNext is pure.
+- **Part B, the whole library shuffled.** `GET /deadwax/navidrome/shuffle?scope=yours|store` (search3's empty query as the
+  asker, SCAN_PAGE 2,000 at a time, each song once; `yours` filtered to the asker's starred albums from getAlbumList2;
+  `yours` with logins off or for break-glass is the store) keeps the list SHUFFLE_LIST_TTL_S (600 s) per (user, scope), one
+  build at a time, makes a permutation (`random.SystemRandom`) under a `secrets` token and answers its first SHUFFLE_PAGE
+  (200); `GET /shuffle/{token}?offset=N` pages it, claiming it, asking Navidrome nothing (another's or a gone token: 404
+  "gone"). Per user and scope the four unclaimed orders asked for most recently (SHUFFLE_UNCLAIMED_KEPT - one, until
+  the second review), and per user the two claimed most recently, each kept 24 h after it was
+  last asked for. *After review* (the order playing was thrown away by the next tap's ask, so "every song once" broke past
+  200 songs - its second page, ~150 songs in, was a 404 and the shuffle "started over" with songs heard again): an order is
+  claimed when it is HANDED to the player, not when it is first paged - `/shuffle?playing=<token>` (ShuffleSongs' ask after a
+  tap names the order the tap played, until one such ask gets through) claims it before the new order replaces the
+  unclaimed one, and `/shuffle?claim=true` (the feed's fresh orders, which go straight into the queue) makes the new order
+  claimed; and the unclaimed ones are kept per scope, so your albums' Shuffle and Browse's Songs' each keep their own.
+  *Second review*: at one unclaimed order per scope, another DEVICE's visit took the order a list held for its tap (one
+  person on a phone and a desktop - or everyone, as `local`, with logins off): the desktop's tap played its order, the
+  claim named it too late, and ~150 songs on its second page was a 404 and the shuffle "started over". Four kept, the
+  oldest going first, so a list's order outlives the visits of other devices meanwhile
+  (test_another_devices_visit_never_takes_the_order_this_devices_list_holds; at one it fails). Past
+  SHUFFLE_MAX (200,000) songs read: 413 in words. A full page bringing nothing new ends the read (a Navidrome ignoring the
+  offset can't loop it). `app/ShuffleSongs.tsx` (above your albums with logins on, above Songs otherwise and in Browse)
+  asks its first page as the list shows and plays it from the tap, then asks the next; `app/useShuffleFeed.ts` (called once
+  in App) appends the next page below FEED_BELOW (50) songs ahead, a fresh order as the next round at the end with Repeat
+  All (`startingElsewhere`: never starting with the song that ended), a fresh order as the rest of the round after a 404
+  (said once), a retry after 30 s. *After review*: Repeat turned off (or to One) once the next round was queued let go of
+  that round but left the shuffle on the NEXT round's order - so the feed went on paging a second shuffle; the state now
+  keeps the order of each earlier round still queued (`pagedRounds`), and `withRepeat` goes back to the round playing's,
+  whole, so the shuffle ends. A fresh round still on its way when Repeat goes off is let go (superseded), and one landing
+  anyway is dropped unless Repeat is still All (read through a ref). A fresh order with no songs (a library emptied
+  meanwhile) is appended as nothing - `withMore` hands the queue back - so the feed asks no more instead of asking again for
+  ever. ShuffleSongs draws its "12,480 songs" only above your albums (`count`; the Songs views' head counts the same songs),
+  and nothing at all for a scope with no songs (no dead pill over "0 songs"). The engine's only Part B lines: playTracks' `paged` and `extendQueue` (an edit, like
+  Play Last, through `withMore`). Cost for 30,000 songs, from Navidrome's answer shape, NOT measured: a build is 15 search3
+  calls, ~30-45 MB of JSON, expected 5-15 s on a NAS; the trimmed list ~15-25 MB per (user, scope) while kept; 4 bytes a
+  song per order; 200 songs (~70 KB) to the phone per page.
+- **Verified** - the sims: upnext.sim (the model by property and by example; Up Next and the menu rendered), shuffle.sim
+  (the button and the feed against a faked deadwax), player.sim's new sections (the engine as before with Up Next untouched
+  under all four page kinds - replan never called, lib/upNext asked once; Play Next mid-song and in a song's last seconds,
+  sample-exact, in one MediaSource; a song that can't join; remove, move, Clear, strikes and an in-flight append of a
+  let-go song; jump; Shuffle mid-song; Repeat All three rounds, turned on after the source ended, a single looping; Repeat
+  One every way; failures never looping; the standby following; a handover refused across an edit; an edit 0.2 s past an
+  unseen join, and held through a seek; Play Next after the queue played out; the lock screen; Repeat kept; a 450-song
+  library shuffle fed in three pages with a fresh order as the next round, in one stream), test_navidrome_shuffle.py, the
+  walk and the routes table; 21 mutations of lib/upNext, 21 of the engine, 12 of the server and 13 of the feed, the menus and the
+  frame each caught. In a real page (headless Chromium, plain MediaSource, `http://deadwax.test`): an album in order
+  joining at 0 ms in one stream; Play Next from a row's ••• - the notice, the panel's Playing Next - and its joins in and
+  out at 0 ms in the same MediaSource with no reload; Shuffle on and off mid-song with no emptied/loadstart/seek and the
+  album's order back from the song playing; Repeat All's wrap and Repeat One's loop at 0 ms in the same MediaSource; the
+  bar's five transport buttons at 1024; the row ••• at 375 and 320 (a full target, the title's ellipsis kept, the time
+  readable, the bar's ••• 14 px from the pin); Now Playing's icon row; Up Next's sheet and Edit at both widths. That Play
+  Next was made mid-song, BEFORE the next song was placed - it cut nothing, so it says nothing about an edit in a song's
+  last seconds (below).
+- **After review, the rest**: a desktop's Top results song TILE has no ••• (beside its cover and ▶ it left the title ~40 px:
+  "Gli…"; the same song's row in Songs has it - search.sim); Up Next's Edit sends focus to Done as the Edit button goes,
+  and a row's tap to the row after it (or Done), so focus is never dropped to the page where Escape can't reach the panel
+  (upnext.sim); the Up Next drawer (1024-1279) goes as the bar's album link or an artist opens a page, as Info's does
+  (`leaveInfoDrawer`); the desktop bar's Shuffle is aria-disabled and dimmed during a whole library's shuffle, as Up Next's
+  chip is; and the clean-up `replan` does of a let-go song's piece in flight or fetched-and-waiting, the half-a-short-song
+  rule (a 1.5 s single on Repeat One) and the player bar's three buttons and Up Next's drag are now pinned by sims. Not
+  pinned: the `rest` of a split piece (split only on a full SourceBuffer, which no new check drives).
+- **Second review**: (1) the server's unclaimed orders, four per user and scope (see Part B above), so another device's
+  visit never takes a list's order; (2) `appendFailed`'s guard is the queue's tracks alone - it had also asked whether the
+  song was still among the stream's `songs`, which a run ended before it (pieceFailed's `endAt`, an album in order, nothing
+  replanned) makes false, so a song whose append then failed was let off and streamed again on its next tap, unlike
+  before .57 (player.sim: "song 2 blamed all the same"); (3) the bar's disabled Shuffle is named by the shuffle's scope in
+  Up Next's words - "shuffling everything" from Browse's Songs, "shuffling your whole library" from your albums (upnext.sim).
+- **NOT verified - the iPhone's**: all of it on ManagedMediaSource (`replan` taking a placed song back out, an ended source
+  reopened by an append) and a Repeat All loop for an hour (memory, the timeline, Safari's eviction around the loop - the
+  stream keeps every placed song's entry, a few KB each, never pruned); Repeat One and Repeat All locked, the loop's join in
+  a pocket, a Play Next made before locking; the lock screen's previous and next with Repeat One; Up Next's scrolling and the
+  grip's drag in the home-screen app, and VoiceOver through Up Next, Edit and the menu; the URL way's Repeat One (about
+  100 ms a handover, and the song downloaded into memory again each loop); **an edit in a song's last seconds on WebKit** -
+  whether removing the next song's frames, already enqueued to the AVSampleBufferAudioRenderer, flushes and drops a moment
+  of the playing song's end (Plan B, `stream.lockedThrough()` keeping a song that starts within 5 s, is named and not
+  built); all of it on AirPods. **Not run in Chromium either** (the real page): a Play Next 1 s and 3 s before a join,
+  recorded through Web Audio - the Plan B gate, so that decision is open; an edit within 100 ms AFTER a join; Play Next of
+  an MP3 while streaming (it should be handed over); a reload keeping Repeat; a 24/96 album under 48 kHz with Up Next
+  edits; Part B against 3,000 stand-in songs (every song once, the build's time and size, a deadwax restart mid-shuffle).
+  Part B against a real Navidrome 0.64.2: search3 with songCount 2000 and offsets into the
+  tens of thousands, its time on James's NAS, and an order made while a scan runs. Not built (spec's "Left out"): history,
+  autoplay, keeping the queue across a reload, long-press menus and a ••• on album tiles, saving Up Next as a playlist, a •••
+  on Up Next's own rows, dragging between groups, crossfade.
