@@ -419,11 +419,11 @@ second until it answers, and Arriving says that what it shows is deadwax's last 
 
 ## With logins on: downloads per person
 
-Since 2.0.0-player.49. With [logins](configuration.md#logins-environment-only) on, a download is
-the person's who asked for it. With them off there's one user, and everything above is exactly as
-it was (but for a download moving to its next user by itself counting as **Already downloading**,
-above) - downloads somebody asked for while logins were on included: every one is listed, **Clear
-finished** forgets every finished one, and a Get of a pressing one of them is bringing in is
+With logins on ([sharing deadwax](sharing.md)), a download is the person's who asked for it. With
+logins off everyone shares one list, and everything above holds as written (but for a download
+moving to its next user by itself counting as **Already downloading**, above) - downloads somebody
+asked for while logins were on included: every one is listed, **Clear done** (the main page's
+**Clear finished**) forgets every finished one, and a Get of a pressing one of them is bringing in is
 refused ("already downloading from bob") rather than joined.
 
 - **Who sees what.** Requests, Home's **Arriving** and the count on the Requests tab hold the
@@ -481,11 +481,11 @@ refused ("already downloading from bob") rather than joined.
   become the people's who asked for it. Until it is, deadwax refuses everything but the health check
   and the pages, saying why (see [troubleshooting](troubleshooting.md#locked-out-nobody-can-sign-in)),
   and the settings tab won't switch organizing off while logins are on.
-- Downloads from before logins were switched on are the one user's from then, and the first admin to
-  sign in takes them over, with the pins and Getting albums settings - or, when an admin's session
-  outlived the restart that switched logins on (an upgrade from 2.0.0-player.48, or logins switched
-  off and on again), the first admin to use deadwax after it starts.
-- **What a download gives you** (since 2.0.0-player.51): it goes into [your library](player.md#your-library-with-logins-on) -
+- Downloads made while logins were off are taken over by the first admin to sign in, with the pins
+  and Getting albums settings - or, when an admin's session outlived the restart that switched logins
+  on (logins switched off and on again, say), by the first admin to use deadwax after it starts
+  ([what happens to what you had](sharing.md#what-happens-to-what-you-had)).
+- **What a download gives you**: it goes into [your library](player.md#your-library-with-logins-on) -
   your starred albums in Navidrome - when it ends, for everyone still waiting for it (not anyone who
   left it, nor the break-glass `admin`, which has no library), and its row in Requests says so:
   - **filed** - added: **In your library** (an admin's row of somebody else's: **Filed - in their library**);

@@ -1246,3 +1246,83 @@ read "1994 · Album · in your library" over "In the store, not in your library"
 nothing asked again; with `onAlbumsFiled(forgetYourAlbums)` back, Rescan cost one `starred` ask and new tiles.
 **NOT verified**: still a real Navidrome 0.64, and an iPhone; the read-back of an Amperfy unstar itself
 (SYNC_SECONDS, five minutes) stood in for by a Remove on another device - both leave the ledger the same.
+
+### The docs for sharing (2.0.0-player.60)
+
+Step 8 of the multi-user plan, the last: the docs. Steps 3-7 (.48 logins, .49 downloads per person, .51 personal
+libraries, .52 the player as you, .53 song search) and what followed (.55 search, .57 the queue, .58 playlists,
+.59 the Library) made deadwax something James shares (with Ethan), but its docs grew a sentence at a time - each
+step adding "since 2.0.0-player.N ..." to the paragraph it touched, until README's logins paragraph was ~300
+words chaining six "since" clauses - and nobody setting deadwax up to share it had one page to read. The spec
+is `deadwax-scratch/uplan/slice-docs-sharing.md`. DOCS ONLY: no code, behaviour or setting changed.
+
+- **`docs/sharing.md`, "Sharing deadwax"** - for someone who runs deadwax for themselves and now wants others
+  on it, in this order: what each person gets (their own Navidrome sign-in, requests and joined downloads,
+  library = their Navidrome favourites, plays and scrobbles, playlists - shared ones read-only - pins and
+  Getting albums settings; the player's other settings stay per device) and what stays shared (one store,
+  one slskd, looking after the library an admin's); before you start (a Navidrome account each, made there;
+  `local` and `admin` reserved; NAVIDROME_USER kept; organizing on; HTTPS before anything leaves the network);
+  turning logins on step by step (the four settings, the key - what losing it costs: sign-ins and starring
+  until each signs in again -, break-glass, TRUSTED_ORIGINS, the reload; the one "If you're upgrading" line,
+  for an app open from before .48); what happens to what you had (`adopt_local`, the seed and its wait for a
+  first scan, a newcomer's library and their old favourites read back seen, plays and playlists by
+  NAVIDROME_USER); adding a person and their first time; removing one, a forgotten password, the throttle,
+  Navidrome down; the admin/everyone table (test_logins.py's ROUTES and the app's admin-only parts); turning
+  logins off again (what is kept, what goes back to one); what it doesn't do. Each setting's full row stays
+  in configuration.md, linked, not repeated.
+- **Every one-user line rewritten** to be true and short and to point at sharing.md: README's logins
+  paragraph (cut to a few sentences, the "since" chain gone), getting-started's day-to-day line and its
+  "Turning logins on" (the compose lines, the two must-haves and a pointer - the anchor kept, as four pages
+  link it), configuration.md's Logins intro and its per-user settings line, player.md's pins line, Signing
+  in's two links and "Using it away from home", downloading.md's per-person intro and its take-over bullet.
+  "With logins off" lines that describe logins-off behaviour stay, worded so. The login steps' own "since
+  2.0.0-player.48/49/51/52" history went from the user docs (configuration, downloading, finding-music,
+  library, player, troubleshooting); a "since" about something that isn't logins (a download moving to its
+  next peer, searches waiting their turn) and troubleshooting's app-older-than-.48 entry (an upgrade
+  matters there) stay.
+- **Linked in**: README's docs list, docs/README.md's table, getting-started's section; CLAUDE.md's list of
+  the guide's pages names it.
+- **Changed for accuracy on the way**: configuration.md's `DEADWAX_SECRET_KEY` row said changing it "signs
+  everyone out within a few minutes"; since .52's review a session ends at its first request after the
+  restart (`auth._session` -> `_end_unopenable`, KEY_CHANGED), and the kept logins die with it - the row now
+  says so.
+
+**Verified**: 3255 Python tests (3253 passed, 2 skipped - no test added or changed), pyflakes, tsc, all 59 sims,
+the build; the engine files have no diff; every relative link and anchor in README.md and docs/*.md resolves
+(a throwaway checker, `deadwax-scratch/work/builder-docs60/links.py`). Every claim in sharing.md was read from
+the code (src/config.py, src/auth.py, src/users.py, src/store.py's adopt_local_now and ledger_unheld,
+src/stars.py, src/api/app.py's routers, routes/library.py's ADMIN, tests/test_logins.py's ROUTES, the app's
+labels). **NOT verified**: the page read by someone setting deadwax up for others for the first time.
+
+**After review** (each traced in the code before it was changed):
+
+- **An admin's ✕ isn't a leave.** sharing.md said everyone's ✕ on a shared download only takes it off their
+  own list; `routes/download.py` cancel_job calls `store.leave_job` only for a non-admin, and the app asks an
+  admin "Cancel this download for everyone?" (`lib/perPerson.ts` cancelWords). The bullet says so, and the
+  admin table gives leaving its own row: yes for everyone, no for admins.
+- **The secret key in one place.** Step 1 said keep the key in `.env` and step 2's compose block had
+  `DEADWAX_SECRET_KEY=...` in `environment:`, which beats `env_file:` - followed both, the container gets
+  `...`, `describe_secret_key` refuses it, and every request but the health check and the pages answers 503.
+  Step 1 now shows the `.env` line and warns against a second one; step 2's block leaves the key out.
+- **Getting albums after logins go off, and for a newcomer**, isn't simply the defaults: `adopt_local_now`
+  moves `local`'s whole user_prefs, `_seeded` included, so the next read carries this browser's main-page
+  Settings → Downloads over once (`useGetSettings.ts`, `seedFromPreferences`). Both lines say so.
+- **Private playlists**: hidden from everyone else *in deadwax* (routes/navidrome.py), but Navidrome lists
+  them to its own admins in Amperfy, as configuration.md's NAVIDROME_USER row says - now said here too.
+- **HTTPS**: deadwax doesn't serve it; the page now says that means a reverse proxy with a certificate in
+  front of port 8080 (or a VPN instead), pointing at step 3's TRUSTED_ORIGINS.
+- **Labels and wording**: "Clear finished" is the main page's; the app's is **Clear done** (Requests.tsx) -
+  sharing.md and downloading.md's logins-off line name both. The upgrade line again says to reload a tab
+  left open, as getting-started's did. player.md's first-admin bullet lost its "a session from before",
+  which referred to nothing once the version history went; downloading.md's "exactly as it was" became
+  "holds as written". README's "dont" (from before this change) is "don't".
+- **An account made again under the same name doesn't find its library.** sharing.md said it found "that
+  person's library, pins and settings waiting"; pins and Getting albums settings do (keyed on the lowercased
+  name), but the new account's first sign-in keeps its credential, the read-back runs (`stars.sync_user`),
+  and every `starred` entry - Navidrome album ids aren't per user, so `find_album` answers the same id - reads
+  `starred` false as the new account and is removed `unstarred` within about five minutes. The page says so,
+  that the albums stay in the store and Browse adds them back, and to change the password instead of
+  deleting the account for someone who may come back.
+- **getting-started's logins block** still had `DEADWAX_SECRET_KEY=...` under `environment:`, the trap the
+  first round took out of sharing.md's step 2; it now says the key goes in `.env` only and leaves a comment
+  in its place.

@@ -534,7 +534,7 @@ toolbar does beyond the review queue:
   matching "portishead"*). Before you start one, each says how many album folders it will take and
   what it writes - folders, as the line above counts them: an album you keep in two pressings is one
   album in the scan's count and two folders here.
-- **Held by nobody** - with logins on (since 2.0.0-player.51), under the runs: the albums nobody has in their
+- **Held by nobody** - with logins on, under the runs: the albums nobody has in their
   library (the first 20, then **Show all** - and **Show fewer**), and the flagged downloads with **Add for
   them** and **Put away** - see [who has an album](#who-has-an-album-with-logins-on).
 
@@ -549,7 +549,7 @@ copy of a rip log. It only ever deletes a folder that holds audio directly, insi
 and never the library folder itself. A deleted album leaves the **New** count and the review
 queue straight away.
 
-With logins on (since 2.0.0-player.51) the confirmation also says **whose libraries it is in** - "In
+With logins on the confirmation also says **whose libraries it is in** - "In
 ethan and sam's libraries: deleting it takes it out, and they'll see it was removed by the admin", or,
 when it is in yours too, "In your library and ethan's: deleting it takes it out, and ethan will see it
 was removed by the admin" - or that nobody has it. When deadwax can't read who has it (its database
@@ -560,7 +560,7 @@ delete it.
 
 ## Who has an album, with logins on
 
-Since 2.0.0-player.51, with logins on, every album in the store is in the libraries of the people who
+With logins on ([sharing deadwax](sharing.md)), every album in the store is in the libraries of the people who
 asked for it - their starred albums in Navidrome ([the phone player](player.md#your-library-with-logins-on)).
 deadwax keeps that true as you look after the library:
 

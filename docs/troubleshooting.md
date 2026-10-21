@@ -57,7 +57,7 @@ names the user it's coming from. Open **Downloads** (or the app's **Requests** t
 is there, and cancelling it (or letting it fail) lets **Find** search again. A download of only
 part of it, such as one disc's folder, doesn't stop the search: it's a note above the results.
 
-**"Already downloading for someone else"** (logins on, since 2.0.0-player.49) is a download somebody
+**"Already downloading for someone else"** (logins on) is a download somebody
 else asked for, so it isn't in your Requests and isn't yours to cancel: **Join this download** to
 wait for it too (see [downloading](downloading.md#with-logins-on-downloads-per-person)), or ask an
 admin, whose cancel is for everyone. If it's below your quality floor, getting a copy of your own
@@ -99,13 +99,13 @@ there to try another user, then Get again - with logins on, unless somebody else
 too: your cancel then only takes it off your list), and an album you have is in your library. **Clear done**
 removes the refused row. A download of only part of a pressing - one disc's folder - refuses nothing.
 
-With logins on (since 2.0.0-player.49), a download somebody else started isn't refused: your Get
+With logins on, a download somebody else started isn't refused: your Get
 joins it, and it shows in your Requests. "already downloading from bob" then means you're already
 waiting for that download yourself.
 
 ## I cancelled a download, and it's still downloading
 
-With logins on (since 2.0.0-player.49), somebody else asked for it too: your ✕ withdrew only your
+With logins on, somebody else asked for it too: your ✕ withdrew only your
 request - it said "Leave this download?" - and the download carries on for them. It's gone from your
 Requests; Get it again while it's still on its way and you're back in. The download itself stops
 when the last person waiting for it cancels, or when an admin cancels it - which is also the only
@@ -492,7 +492,7 @@ variable of its own; the log warns about this at start-up.
 
 ## Signing in
 
-With [logins](configuration.md#logins-environment-only) on (since 2.0.0-player.48). What each message
+With logins on ([sharing deadwax](sharing.md)). What each message
 on the sign-in screen means, and what to do about it:
 
 ### Locked out: nobody can sign in
@@ -503,7 +503,7 @@ on the sign-in screen means, and what to do about it:
   and lasts 12 hours. If it isn't set, set it in compose and recreate the container. Sessions already
   signed in carry on while Navidrome is down - only new sign-ins need it.
 - **"Logins are on, but ORGANIZE_MODE is 'dry_run', so nothing downloaded would ever be filed into
-  the library"** (or `'off'`, or "LIBRARY_PATH is not set", since 2.0.0-player.49): with logins on,
+  the library"** (or `'off'`, or "LIBRARY_PATH is not set"): with logins on,
   each download is the person's who asked for it once it's filed, so organizing has to be on -
   `ORGANIZE_MODE` `copy` or `move`, with `LIBRARY_PATH` and `SLSKD_DOWNLOAD_PATH` set. Until it is,
   everything but the health check and the pages answers 503 saying so, the break-glass sign-in
@@ -538,8 +538,8 @@ and open it again, or reload the tab.
 
 Every few minutes deadwax asks Navidrome whether the login you signed in with still stands. After you
 change your Navidrome password - or your account is deleted - that answer is no, and within about six
-minutes deadwax signs you out on every device. Since 2.0.0-player.52 the player asks Navidrome as you,
-so it is often sooner: the first thing the app asks of Navidrome with the old login - opening Browse or
+minutes deadwax signs you out on every device. The player asks Navidrome as you, so it is often
+sooner: the first thing the app asks of Navidrome with the old login - opening Browse or
 an album, a cover, the next song - is refused, and that session ends there and then (another device
 ends at its own first refusal, or at the six-minute check). Nothing more is asked with the old login,
 and until Navidrome has taken a login in the last few seconds the app's requests go to it one at a time,
@@ -559,7 +559,7 @@ you signed in").
 ### Your library says deadwax can't star albums for you
 
 With logins on, deadwax stars what goes into your library **as you**, with the login you last signed in
-with (since 2.0.0-player.51). After you change your Navidrome password that login stops working, and
+with. After you change your Navidrome password that login stops working, and
 **You → Your library** says so in red: "deadwax can't star albums for you: Navidrome no longer accepts
 the login you signed in with". Nothing is lost - what you get meanwhile is kept, waiting. Sign out
 (**You → About → Sign out**) and sign in with your new password: deadwax keeps the new login and stars
@@ -736,7 +736,7 @@ first time (an estimate: it hasn't been timed on one yet); within ten minutes of
 
 ## The app's Library looks empty
 
-With logins on (since 2.0.0-player.52) the **Library** tab is **your** library - your starred albums
+With logins on the **Library** tab is **your** library - your starred albums
 in Navidrome - not the whole store. An account that hasn't starred anything yet, and hasn't had
 anything filed for it, sees **Nothing in your library yet** - in any order, Recently played too - and
 the same under Artists: tap **Browse the store** (or a row of the Library's **Browse** group - on a desktop,
@@ -778,7 +778,7 @@ list). A library you've been listening through - everything played in the last m
 Navidrome has nothing to show yet. A Navidrome that doesn't send `played` never shows it: Info →
 Debug's **Navidrome sent** row lists the fields it sends for the album playing. The plays are the
 ones Navidrome counts for the account the player asks as - `NAVIDROME_USER` with logins off, your own
-with them on (since 2.0.0-player.52) - so plays made in another app under another Navidrome user don't
+with them on - so plays made in another app under another Navidrome user don't
 count.
 
 ## A pinned album says "Removed from the store", "Not on disk just now" or "Not in Navidrome yet"
@@ -796,7 +796,7 @@ count.
 
 ## An album in my library isn't starred in Amperfy, or "waiting to be starred"
 
-With logins on (since 2.0.0-player.51) your library is your starred albums in Navidrome, and **You →
+With logins on your library is your starred albums in Navidrome, and **You →
 Your library** says how many are still waiting to be starred, and why:
 
 - **"Navidrome hasn't got it yet"** - it was filed, and Navidrome hasn't scanned it. Navidrome's watcher
@@ -1115,8 +1115,7 @@ before you save. Saving the address it already is, or reverting it, doesn't need
   songs longer than 30 seconds count. Skipping ahead adds nothing, so a song you skipped through
   isn't a play.
 - **Plays go to the `NAVIDROME_USER` account with logins off**, and to your own - the account you
-  signed in with - with logins on (since 2.0.0-player.52; the break-glass `admin`'s go to
-  `NAVIDROME_USER`). Look at that account's play counts.
+  signed in with - with logins on (the break-glass `admin`'s go to `NAVIDROME_USER`). Look at that account's play counts.
 - **Behind a reverse proxy that rewrites the `Host` header**, deadwax takes the player's play
   reports for requests from another website and refuses them, and the phone doesn't say so. The
   main page's **Log** names each refusal. Pass the original `Host` through, or set

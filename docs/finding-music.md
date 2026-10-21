@@ -391,7 +391,7 @@ Navidrome**, as Home shows) sits once above the list, and MusicBrainz's rows sti
 it. If your library's search fails, it says why at the top, with **Try again** - which **Search**, or Navidrome
 coming back, does too: the list is drawn afresh with your library in it.
 
-**With logins on** (since 2.0.0-player.52) your library's rows are the **store's** - Navidrome's search finds
+**With logins on** your library's rows are the **store's** - Navidrome's search finds
 everything deadwax holds - so yours come first, then the store's, each saying which; an artist's count is
 yours when you have albums of theirs ("1 album in your library"), else the store's ("3 albums in the
 store"); and adding an album to your library on its page re-marks its row here in place. A row whose

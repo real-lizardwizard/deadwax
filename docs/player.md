@@ -195,7 +195,7 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   seconds to scan it, looked for again until it has), and otherwise by opening the album, where you
   play it. A row that can't be opened says why: Navidrome hasn't found the album yet, no folder in
   your library is tagged with its release, or Navidrome isn't set up or answering. With
-  [logins](#signing-in) on (since 2.0.0-player.49) they're **your** downloads - the ones you asked for
+  [logins](#signing-in) on they're **your** downloads - the ones you asked for
   or joined - and an admin's are everyone's, each saying who asked ("Asked by you and ethan"); a ✕ on
   one somebody else is waiting for too leaves it to them ("Leave it"), and an admin's cancels it for
   everyone. A pressing somebody else is already downloading offers **Join this download** where its
@@ -534,7 +534,7 @@ haven't heard for a while. In order:
   than 374 points, so each card has room to say what it needs): an artist's picture round, an
   album's cover square, its name over "Artist" or the album's artist. Tap a card to open the album or
   the artist's page. With nothing pinned yet it says how to pin something.
-- **New in your library** - with logins on (since 2.0.0-player.51): the albums added to [your
+- **New in your library** - with logins on: the albums added to [your
   library](#your-library-with-logins-on) since you last opened them - filed for you (or added for you
   by an admin after a look), or starred in Amperfy - once Navidrome has them. An album you add yourself
   with **Add to my library** isn't marked new: you were looking at it. Opening one, from here or
@@ -544,8 +544,8 @@ haven't heard for a while. In order:
   first, up to 20 - made from Navidrome's list of the albums played most recently (its first 500),
   by when each was last played. With fewer than four, or a Navidrome that doesn't say when an album
   was played, there's no such section at all. The plays are the ones Navidrome counts for the
-  account the player asks as - `NAVIDROME_USER` with logins off, your own with them on (since
-  2.0.0-player.52; [the player as you](#the-player-as-you-with-logins-on)).
+  account the player asks as - `NAVIDROME_USER` with logins off, your own with them on
+  ([the player as you](#the-player-as-you-with-logins-on)).
 
 Home waits a moment for your pins before it draws the shelves under them (a second and a half at
 most while Home is on screen - counted again if you leave it before then and come back, until your
@@ -593,8 +593,9 @@ way that differ only in how they were typed (accents, case, which dash) are one 
 
 **Where they're kept.** On deadwax, for you - not on the phone, and **never as stars in Navidrome**
 (stars belong to each Navidrome user and mean something else there). With logins off (the default)
-there is one user, so every device sees the same pins; with [logins](#signing-in) on, each person has
-their own, and the first admin to sign in takes over the ones pinned before. They're in deadwax's
+everyone using deadwax shares one set, on every device; with [logins](#signing-in) on, each person has
+their own, and the first admin to sign in takes over the ones pinned before
+([sharing deadwax](sharing.md#what-happens-to-what-you-had)). They're in deadwax's
 database (`DB_PATH`), in its `pins` table, through `GET` and `PUT /deadwax/me/pins` and
 `POST /deadwax/me/pins/toggle`. Home holds up to 50.
 
@@ -1834,7 +1835,7 @@ played" and Navidrome's own Last.fm or ListenBrainz scrobbling carry on working.
   [Repeat](#up-next-shuffle-and-repeat) (since 2.0.0-player.57): each time round, and each repeat of a
   song, is a listen of its own, counted by the same rule.
 - Plays go to the `NAVIDROME_USER` account with logins off, and on to Last.fm or ListenBrainz if that
-  account has them linked in Navidrome. With logins on (since 2.0.0-player.52) they go to **your own**
+  account has them linked in Navidrome. With logins on they go to **your own**
   Navidrome account - the one you signed in with - and to your Last.fm or ListenBrainz
   ([the player as you](#the-player-as-you-with-logins-on)).
 - A play that can't be reported doesn't interrupt the music, and nothing on the phone says so.
@@ -1873,7 +1874,7 @@ So leave that player's Transcoding and Max Bit Rate unset.
 
 ## Signing in
 
-With logins on ([turning them on](getting-started.md#turning-logins-on)), the app opens on a sign-in
+With logins on ([sharing deadwax](sharing.md) says how to turn them on), the app opens on a sign-in
 screen: your **Navidrome** user name and password. Nothing else of the app is drawn until you've signed
 in, and then you stay signed in on that device - the home-screen app included - for 30 days from when
 you last used it. Admins (deadwax's `DEADWAX_ADMINS`) see everything described here; anyone else sees no
@@ -1897,12 +1898,12 @@ in your pocket shows the sign-in as you pick it up - and a sign-in screen left s
 in somewhere else (another tab, say) goes. On a desktop with the visualizer in full screen, the sign-in
 takes the screen back first (the visualizer closes), since nothing else can show over full screen. An
 app left open while logins are switched on reloads itself into the sign-in screen
-([Turning logins on](getting-started.md#turning-logins-on)). What each message means:
+([turning logins on](sharing.md#turning-logins-on)). What each message means:
 [Troubleshooting → Signing in](troubleshooting.md#signing-in).
 
 ## Your library, with logins on
 
-Since 2.0.0-player.51. With logins on, **your library is your starred albums in Navidrome** - your
+With logins on, **your library is your starred albums in Navidrome** - your
 favourites, the same ones Amperfy (or any Subsonic app) shows as starred - and deadwax keeps it for you:
 
 - **What you get is starred for you.** A download you asked for (or joined) is added to your library
@@ -1941,13 +1942,13 @@ favourites, the same ones Amperfy (or any Subsonic app) shows as starred - and d
   page, where **Get** is) and **Put away**; getting it again puts it away by itself.
 - **New** marks: Home's **New in your library**, and a **New** badge on an album's tile in the Library,
   until you open it - from a tile, a link, or its address.
-- **The Library tab** is your starred albums since 2.0.0-player.52, with the whole store under
+- **The Library tab** is your starred albums, with the whole store under
   **Browse**, and "in your library" everywhere in the app means yours - [the player as
   you](#the-player-as-you-with-logins-on).
-- **The first admin** to sign in after this version (or to come back to deadwax with a session from
-  before it) has every album already in the store put into their library and starred for them, once:
-  it was all theirs before anyone else had a library. If deadwax hasn't scanned the library yet at that
-  moment - a new install, or one upgraded from a version whose saved scan it can't read - that waits for
+- **The first admin** to use deadwax once logins are on - at their sign-in, or at their first visit
+  if a session of theirs outlived the restart - has every album already in the store put into their
+  library and starred for them, once: it was all theirs before anyone else had a library. If deadwax
+  hasn't scanned the library yet at that moment - a new install, or one upgraded from a version whose saved scan it can't read - that waits for
   its first scan (searching, opening an album's page or **Library care → Rescan** starts one), so the
   albums it finds then are theirs too. The one exception is an album somebody else's download brought
   in: that is theirs. An album somebody else had starred in Amperfy, or added, goes into both libraries.
@@ -1962,7 +1963,7 @@ favourites, the same ones Amperfy (or any Subsonic app) shows as starred - and d
 
 ## The player as you, with logins on
 
-Since 2.0.0-player.52. With logins on, the player is **yours**: everything it asks Navidrome - your
+With logins on, the player is **yours**: everything it asks Navidrome - your
 albums, a search, a song, a cover, the audio itself, "now playing" and a play - is asked **as you**, with
 the login you signed in with. So your plays, play counts, **Recently played**, **Not played in a while**
 and your favourites are your own, as they are in Amperfy, and a play goes on to your Last.fm or
@@ -2014,7 +2015,7 @@ lists at all (**Not in Navidrome**). With logins off nothing here changes: one a
   the line after it says how: star it in Amperfy. It isn't listed as "removed by the admin" in You
   either - you removed it. If deadwax can't write the Remove down (its database refusing a write), it
   says so - Navidrome has unstarred it, and Remove again finishes it.
-- **Playlists are yours** (2.0.0-player.58): made as you in Navidrome, so they're yours in Amperfy too.
+- **Playlists are yours**: made as you in Navidrome, so they're yours in Amperfy too.
   Ethan sees only the ones you share (Edit → **Shared with everyone**), under **Shared with you** -
   playable, not changeable - and you see his the same way; neither sees the other's private ones
   ([Playlists](#playlists)).
@@ -2056,8 +2057,9 @@ lists at all (**Not in Navidrome**). With logins off nothing here changes: one a
 
 ## Using it away from home
 
-Unless you've turned logins on there's no login in deadwax, so don't open a port to the internet for
-it - and with them on, don't do it without HTTPS in front of deadwax. Reach it over a VPN
+With logins off - the default - anyone who can reach deadwax can use it, so don't open a port to the
+internet for it; with them on ([sharing deadwax](sharing.md)), don't do it without HTTPS in front of
+deadwax. Reach it over a VPN
 instead, such as **WireGuard** or **Tailscale**, and open `/player/` at deadwax's address on that
 network. Only deadwax needs to be reachable: the phone never talks to Navidrome.
 
@@ -2179,7 +2181,7 @@ question the whole player existed to answer. Still to find out:
   off on the phone - it's kept per device, so a home-screen app has its own), the count on the tab, Home's Arriving coming
   and going, a download started on the main page showing up when you come back to the app, what
   VoiceOver reads out as downloads change, and the covers fetched from the Cover Art Archive over
-  your VPN; with logins on (2.0.0-player.49), **Join this download** and the ✕'s "Leave it" under a
+  your VPN; with logins on, **Join this download** and the ✕'s "Leave it" under a
   real finger, and Requests on two phones signed in as two people showing each their own;
 - **Search** against your Navidrome: what its search finds for an artist, an album and a song
   (it hasn't been tried against a real Navidrome yet) - and so (2.0.0-player.55) the order it finds them in,

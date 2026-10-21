@@ -490,7 +490,7 @@ compile time.
   say so in the message rather than inventing a README edit for it.
 - **`docs/` is the user guide (v0.9.32), and it is kept current like the README.** One page per
   part of the app (getting started, configuration, finding music, downloading, organizing, the
-  library, the phone player since 1.0.3, matching, troubleshooting), written for someone seeing
+  library, the phone player since 1.0.3, sharing deadwax since 2.0.0-player.60, matching, troubleshooting), written for someone seeing
   deadwax for the first time and checked against the code rather than memory: every setting,
   default, label and limit in it was read from the source. A change a user would notice updates
   the page describing it in the same commit. **A new setting goes in configuration.md**, and a new failure a user could

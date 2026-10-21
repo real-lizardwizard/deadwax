@@ -123,8 +123,8 @@ Every setting is described in [Configuration](configuration.md).
    uncomment the three lines waiting for them in `docker-compose.example.yml` or `.env.example`) -
    [the phone player's setup](player.md#setting-it-up) has the details. Then open
    `http://your-server:8080/player/`: Home and the Library show your albums from Navidrome (with
-   logins on, the Library is each person's own and **Browse** is the store - [turning logins
-   on](#turning-logins-on)).
+   logins on, the Library is each person's own and **Browse** is the store - [sharing
+   deadwax](sharing.md)).
 
 **What the app shows without Navidrome.** Home's shelves, the Library tab, the albums and artists
 you have and Search's look in your library each say **Connect Navidrome** (or **Can't reach
@@ -144,7 +144,7 @@ scanned yet, unreadable, or outside Navidrome's music folder - is never out of r
 - **The image has a health check.** `/deadwax/health` answers 200 while the background download
   poller is running and 503 if it has stopped. Neither slskd nor MusicBrainz being down makes
   deadwax unhealthy, because restarting deadwax wouldn't fix them.
-- **There is no login unless you turn logins on** ([below](#turning-logins-on)). With them off - the
+- **There is no login unless you turn logins on** ([below](#turning-logins-on)). With logins off - the
   default - anyone who can reach the port can use it, so keep it on your own network or put it
   behind something that asks for a password.
 - **On your phone**, the main page works as it is, and `/player/` is the app for your library,
@@ -154,58 +154,32 @@ scanned yet, unreadable, or outside Navidrome's music folder - is never out of r
 
 ## Turning logins on
 
-Off by default. Turned on (since 2.0.0-player.48), everyone signs in with their **Navidrome**
-account - the same user name and password - and only the people you name are deadwax's admins: they edit the
-library, see the albums that need a look and the log, and change the server settings, while everyone
-else searches, gets albums and plays. Three settings, in the container's environment (compose's
-`environment:` block or `.env` - not the settings tab, which only shows them):
+To share deadwax with other people, turn logins on: everyone then signs in with their own
+**Navidrome** account and has their own requests, library, plays and playlists, over the one store,
+and only the people you name are admins. Three settings, in the container's environment (compose's
+`environment:` block or `.env` - not the settings tab, which only shows them). The secret key goes in
+`.env` only, as `DEADWAX_SECRET_KEY=` and a key made with `openssl rand -hex 32` - a line for it in
+`environment:` as well, even an empty one, beats `.env`
+([Sharing deadwax, step 1](sharing.md#turning-logins-on)):
 
 ```yaml
       - AUTH_MODE=on
       - DEADWAX_ADMINS=james                # your Navidrome user name; comma-separate several
-      - DEADWAX_SECRET_KEY=...              # openssl rand -hex 32
+      # DEADWAX_SECRET_KEY is in .env - not here as well
       # optional - signs in `admin` with no Navidrome, for when Navidrome is down:
       #- DEADWAX_ADMIN_PASSWORD=...
 ```
 
-`NAVIDROME_URL` has to be set too, since signing in asks Navidrome, and organizing has to be on -
-`ORGANIZE_MODE` `copy` or `move` (step 6 above), since with logins on each download is the person's
-who asked for it once it's filed (until then deadwax refuses everything, saying why). Recreate the
-container, open deadwax, and sign in.
+Navidrome has to be set up (step 7), since signing in asks it, and organizing has to be on -
+`ORGANIZE_MODE` `copy` or `move` (step 6) - or deadwax refuses everything, saying why. Recreate the
+container, open deadwax, and sign in. Put HTTPS in front of it before reaching it from outside your
+own network; plain http is fine there and over WireGuard.
 
-- **The first admin to sign in takes over** what was saved while logins were off - the pins on Home,
-  the Getting albums settings in You, and the downloads - in one step (an admin still signed in from
-  before a restart takes it over on their first visit). Anyone signing in after starts with their
-  own.
-- **Downloads are each person's own**: you see yours, join one somebody else has on its way, and
-  your cancel leaves it to them - see [Downloading](downloading.md#with-logins-on-downloads-per-person).
-- **Each person has a library**: their starred albums in Navidrome, so Amperfy shows the same. What they
-  get is starred for them, an album the store already holds is a tap from theirs, and starring or
-  unstarring in Amperfy is read back. The first admin to sign in has everything already in the store put
-  into their library, once (after deadwax's first scan of the library, if it hasn't scanned it yet);
-  everyone else starts with only the albums they'd already starred - see [your
-  library](player.md#your-library-with-logins-on).
-- **The player is each person's** (since 2.0.0-player.52): it plays as the account they signed in with,
-  so their plays, play counts and Last.fm scrobbles are their own; the **Library** tab is their library,
-  with **Browse** for the whole store, and **Add to my library** / **Remove from my library** on an
-  album's page - see [the player as you](player.md#the-player-as-you-with-logins-on). `NAVIDROME_USER`
-  stays set: deadwax still asks as it for what is nobody's in particular (it fetches songs into the
-  player's cache - so if Navidrome gives users libraries of their own, give this account every one),
-  and the break-glass `admin` plays as it.
-- **The app** (`/player/`, the home-screen app included) shows a sign-in screen; **You → About** has
-  **Sign out**. **The main page** says you're signed out and links to the app's sign-in, which brings
-  you back to it.
-- **The app left open while you switch logins on** - the home-screen app your phone kept in the
-  background, a tab - reloads itself into the sign-in screen as soon as deadwax turns down something
-  it asks for (it asks after your downloads as it comes back to the front, so by then at the latest).
-  That needs it to be running 2.0.0-player.48 or later already: if you upgrade and switch logins on in
-  the same go, close the home-screen app (swipe it away) and open it again, and reload any open tab -
-  until then everything in it fails with "Sign in to use deadwax."
-- **Don't reach deadwax from outside your network over plain http** once logins are on: put HTTPS in
-  front of it first. On your own network and over WireGuard, plain http is fine.
-
-Every setting, what it does and what it keeps: [Configuration → Logins](configuration.md#logins-environment-only).
-If you're locked out, see [Troubleshooting](troubleshooting.md#signing-in).
+**[Sharing deadwax](sharing.md) is the full story**: what each person gets and what stays shared,
+each setting, what happens to what you had (the first admin to sign in takes it over), adding and
+removing people, what admins can do that others can't, and turning logins off again. Every setting's
+row: [Configuration → Logins](configuration.md#logins-environment-only). If you're locked out, see
+[Troubleshooting](troubleshooting.md#signing-in).
 
 ## Coming from jimbrainz
 
