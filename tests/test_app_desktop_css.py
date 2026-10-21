@@ -973,3 +973,28 @@ def test_the_song_an_album_was_opened_from_is_marked_in_the_desktops_table():
     assert declarations(DESKTOP, ".app-desk .app-rg-row.is-song td:first-child", DESK)["box-shadow"] == "inset var(--app-song-bar) 0 0 var(--dw-accent)"
     title = declarations(DESKTOP, ".app-desk .app-rg-row.is-song .app-rg-title", DESK)
     assert (title["color"], title["font-weight"]) == ("var(--dw-accent)", "var(--dw-weight-semibold)")
+
+
+def test_playlists_on_a_desktop_hide_the_librarys_row_and_cap_the_list():
+    """(2.0.0-player.58) The sidebar's Playlists group is the desktop's way in, so the Library's Playlists row is a
+    phone's; the Playlists page's rows are the readable width Library > Artists' are - both inside the query."""
+    assert declarations(DESKTOP, ".app-desk .app-library-playlists", DESK)["display"] == "none"
+    assert declarations(DESKTOP, ".app-desk .app-playlists-list", DESK)["max-width"] == "var(--app-desk-content-max)"
+    assert declarations(DESKTOP, ".app-desk .app-library-playlists") == {}
+    assert all(context.startswith("@media") for context, selector, _ in rules(DESKTOP) if "playlist" in selector)
+
+
+def test_a_fingers_bar_holds_five_44px_tools_and_a_speeds_chip_at_1024_and_its_transport_between():
+    """(2.0.0-player.58, review) Add to a playlist made the tools five with AirPlay (an iPad's Safari): at 1024-1279
+    with a coarse pointer the bar's sides hold them at 44px, their gaps and a speed's chip - and the middle column
+    still holds the transport's five 44px buttons and their gaps at 1024. From 1280 the column's own 320px."""
+    px = lambda value: int(value.removesuffix("px"))
+    desk, coarse = media_tokens(DESKTOP, DESK), media_tokens(DESKTOP, COARSE)
+    side, gap = px(coarse["--app-desk-bar-side"]), px(desk["--app-desk-tools-gap"])
+    hit, chip = 44, 50
+    assert coarse["--app-desk-tool"] == "var(--pl-hit)"
+    assert side >= 5 * hit + 5 * gap + chip
+    middle = 1024 - 2 * side - 2 * px(desk["--app-desk-bar-pad"]) - 2 * px(desk["--app-desk-bar-gap"])
+    assert middle >= 5 * hit + 4 * px(desk["--app-desk-transport-gap"])
+    assert media_tokens(DESKTOP, COLUMN)["--app-desk-bar-side"] == "320px"
+    assert DESKTOP.index(":root { --app-desk-bar-side: 320px; }") > DESKTOP.index("--app-desk-bar-side: 304px")

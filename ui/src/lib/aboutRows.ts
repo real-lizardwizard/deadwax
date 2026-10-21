@@ -64,6 +64,8 @@ export interface AboutAlbumFields {
   coverArt?: string
   songCount?: number
   song?: readonly AboutSongFields[]
+  /** (2.0.0-player.58) a playlist's stub: `song` holds only the playlist's songs of the album */
+  partial?: boolean
   discTitles?: readonly DiscTitleEntry[]
   /** the album artist's Navidrome id: where the artist's card goes */
   artistId?: string
@@ -193,21 +195,24 @@ function discLine(song: AboutSongFields, album: AboutAlbumFields): string {
 export function aboutRows(track: QueueTrack, album: AboutAlbumFields | null, details: AboutDetails | null = null, personal = false): About {
   const songs = album?.song ?? []
   const song = songs.find((candidate) => candidate.id === track.id) ?? null
+  //? (2.0.0-player.58) a playlist's stub holds only the playlist's songs of the album: nothing of the album's is
+  //? counted from it - the song's own track number with no "of", no disc line, no format or count for the album
+  const all = album?.partial ? [] : songs
   //? the song as Navidrome has it now, else as it was when the album was played from
   const fresh = details?.song && details.song.id === track.id ? details.song : null
 
   const length = trackTime(song?.duration ?? track.duration)
   const played = playedLine(fresh ? fresh.playCount : song?.playCount)
-  const first = [song ? trackOf(song, songs) : '', length, played].filter(Boolean).join(' · ')
-  const lines = [first, song && album ? discLine(song, album) : ''].filter(Boolean)
+  const first = [song ? trackOf(song, all) : '', length, played].filter(Boolean).join(' · ')
+  const lines = [first, song && album && !album.partial ? discLine(song, album) : ''].filter(Boolean)
   const writers = writtenBy(fresh ?? song)
 
   const title = album?.name || track.album
-  const count = songs.length || whole(album?.songCount)
+  const count = all.length || whole(album?.songCount)
   const albumLine = [
     whole(album?.year) ? String(album!.year) : '',
     labelLine(album?.recordLabels),
-    sharedFormat(songs) ?? '',
+    sharedFormat(all) ?? '',
     count ? `${count} ${count === 1 ? 'song' : 'songs'}` : '',
   ].filter(Boolean).join(' · ')
   const present = details?.store?.present ?? []

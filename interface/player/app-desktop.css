@@ -2001,6 +2001,10 @@
         --app-desk-scrub-hit: var(--pl-hit);
         --app-desk-play: var(--pl-hit);
         --app-desk-tool: var(--pl-hit);
+        /* (2.0.0-player.58, review) the bar's sides at 1024-1279 hold five 44px tools - AirPlay, Up Next, Add to a
+           playlist, Info, the visualizer - their gaps and a speed's chip (5 x 44 + 5 x 6 + 50); 240px shrank each to
+           43px. The transport between them still has its 5 x 44 + 4 x 22 at 1024. From 1280 the column's 320px. */
+        --app-desk-bar-side: 304px;
         --app-desk-item: var(--pl-hit);
         --app-desk-row: var(--pl-hit);
         --app-desk-control: var(--pl-hit);
@@ -3389,4 +3393,17 @@
 
     /* a whole library's shuffle: on, and dimmed as Up Next's chip is - it can't be turned off (2.0.0-player.57 review) */
     .app-desk .app-playbar-transport .app-playbar-shuffle[aria-disabled='true'] { opacity: var(--app-pin-off); cursor: default; }
+}
+
+/* ===== playlists on a desktop (2.0.0-player.58) =====
+   The sidebar's Playlists group is the desktop's way in, so the Library's row is a phone's; the Playlists page's rows
+   the readable width Library > Artists' are; and in a drawer's grid (1024-1279px) a playlist's notes - why it has no
+   Edit, its description - take the place the album page's chips have. */
+@media (min-width: 1024px) {
+    .app-desk .app-library-playlists { display: none; }
+    .app-desk .app-playlists-list { max-width: var(--app-desk-content-max); }
+    .app-desk .app-playlist-notes { align-items: flex-start; text-align: left; }
+    .app-desk.has-drawer .pl-album-page:not(.app-rg) .app-playlist-notes { grid-column: 2; grid-row: 5; }
+    .app-desk .app-playlist-editing,
+    .app-desk .app-playlist-ask { max-width: var(--app-desk-content-max); }
 }

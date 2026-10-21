@@ -18,6 +18,10 @@ import { useSheet } from './useSheet'
  * started (the player says which) - the app's one notice says so ("Playing next: Roads"). When the music
  * started from it, the mini player says so.
  *
+ * (2.0.0-player.58) "Add to a playlist…", third: the same songs into one of your playlists - App's `onPlaylist`, which
+ * closes this menu and opens the picker (app/PlaylistPicker.tsx), focus coming back to the ••• as it closes. It
+ * plays nothing.
+ *
  * A sheet like the others (useSheet.ts): its own scroll lock, focus in to its first row and back to the •••
  * that opened it, Escape, a tap on the backdrop; inert while closed. The ONE file that calls playNext and
  * playLast (ui/test/app-rules.sim.cjs). A leaf: props only.
@@ -28,6 +32,7 @@ export function QueueMenu({
   opener,
   onClose,
   player,
+  onPlaylist = null,
 }: {
   open: boolean
   /** what it was opened with - one song or an album's songs, always in hand; kept as it slides away */
@@ -35,6 +40,8 @@ export function QueueMenu({
   opener?: { current: HTMLElement | null } | undefined
   onClose: () => void
   player: Pick<Player, 'playNext' | 'playLast'>
+  /** (2.0.0-player.58) Add to a playlist… with what it was opened with; null (or left out) for none */
+  onPlaylist?: ((pick: QueuePick<AlbumWithSongs>) => void) | null
 }) {
   const first = useRef<HTMLButtonElement>(null)
   useSheet({ open, onClose, lockClass: 'app-queue-menu-open', first, opener })
@@ -58,6 +65,17 @@ export function QueueMenu({
           <button type="button" class="app-menu-item" onClick={() => add('last')}>
             Play Last
           </button>
+          {onPlaylist && (
+            <button
+              type="button"
+              class="app-menu-item"
+              onClick={() => {
+                if (pick && pick.tracks.length) onPlaylist(pick)
+              }}
+            >
+              Add to a playlist…
+            </button>
+          )}
         </div>
         <button type="button" class="app-button app-menu-cancel" onClick={onClose}>
           Cancel

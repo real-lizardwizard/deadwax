@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'preact/hooks'
 
-import { SIDEBAR_CARE, SIDEBAR_LOG, SIDEBAR_QUEUE, SIDEBAR_SETTINGS, SIDEBAR_TOP, type SidebarId, type SidebarItem } from '../lib/appFrame'
+import { SIDEBAR_CARE, SIDEBAR_LOG, SIDEBAR_PLAYLISTS, SIDEBAR_QUEUE, SIDEBAR_SETTINGS, SIDEBAR_TOP, type SidebarId, type SidebarItem } from '../lib/appFrame'
 import { needsLookLabel } from '../lib/needsLook'
 import { badgeLabel, badgeText } from '../lib/requestsView'
 import { SEARCH_MAX_CHARS } from '../lib/searchQuery'
@@ -24,6 +24,12 @@ import { onSearchText, searchText, submitSearch, typeSearch } from './searchBox'
  * the first key goes in (`onSearch`); Enter asks both halves at once. It keeps saying what was
  * searched for while an album found by it is open, as DesktopRequest.dc.html draws it.
  *
+ * PLAYLISTS (2.0.0-player.58), after the Library's (and Browse's) groups and before Managing, as the Mac's Music app
+ * has them: All playlists - the Playlists page - then up to 20 playlists by name, yours and then shared with you,
+ * never the ones Navidrome made from files (lib/playlists.ts sidebarPlaylists, App's `playlists`); each opens its
+ * page (`onPlaylist`), and is the current one while its page is on top (`currentPlaylist`) - a playlist page whose
+ * playlist isn't listed makes All playlists current. While the list isn't known, or failed, All playlists alone.
+ *
  * MANAGING (shown unless deadwax says this user isn't an admin - `admin`: App asks /deadwax/me as
  * the desktop frame shows; with logins off, everyone is, as You's row, which asks the same): "Needs a
  * look" first (2.0.0-player.25), the review queue's page, with how many albums need one
@@ -46,6 +52,9 @@ export function Sidebar({
   arriving,
   admin = true,
   needsLook = null,
+  playlists = [],
+  currentPlaylist = null,
+  onPlaylist,
   onSelect,
   onSearch,
 }: {
@@ -63,6 +72,11 @@ export function Sidebar({
   admin?: boolean
   /** how many albums need a look (null: not known yet) - Needs a look's count */
   needsLook?: number | null
+  /** (2.0.0-player.58) the playlists the group lists, by name - yours, then shared with you (lib/playlists.ts sidebarPlaylists) */
+  playlists?: readonly { id: string; name: string }[]
+  /** the listed playlist whose page is on top of the tab showing - drawn current in place of All playlists */
+  currentPlaylist?: string | null
+  onPlaylist?: ((id: string) => void) | undefined
   onSelect: (item: SidebarId) => void
   /** something typed, or Enter: Search's results shown */
   onSearch: () => void
@@ -147,6 +161,38 @@ export function Sidebar({
           <ul class="app-side-list">{browse.map(item)}</ul>
         </section>
       )}
+
+      <section class="app-side-group" aria-labelledby="app-side-playlists">
+        <h2 id="app-side-playlists" class="app-side-label">
+          Playlists
+        </h2>
+        <ul class="app-side-list">
+          {current === 'playlists' && currentPlaylist !== null && playlists.some((one) => one.id === currentPlaylist)
+            ? (
+              <li key="playlists">
+                <button type="button" class="app-side-item" onClick={() => onSelect('playlists')}>
+                  <span class="app-side-item-label">{SIDEBAR_PLAYLISTS.label}</span>
+                </button>
+              </li>
+            )
+            : item(SIDEBAR_PLAYLISTS)}
+          {playlists.map((one) => {
+            const chosen = current === 'playlists' && one.id === currentPlaylist
+            return (
+              <li key={`playlist:${one.id}`}>
+                <button
+                  type="button"
+                  class={`app-side-item app-side-playlist${chosen ? ' is-current' : ''}`}
+                  {...(chosen ? { 'aria-current': 'page' as const } : {})}
+                  onClick={() => onPlaylist?.(one.id)}
+                >
+                  <span class="app-side-item-label">{one.name}</span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      </section>
 
       {admin && (
         <section class="app-side-group" aria-labelledby="app-side-managing">

@@ -412,8 +412,9 @@ export function NowPlaying({
             class="pl-icon-button"
             onClick={onMore}
             //? what the menu holds: "Go to album" only for a song that names its album, and the album's pin
-            //? (2.0.0-player.18) only when the menu will have one - App says so
-            aria-label={`More: info${track.albumId ? ', go to album' : ''}${track.albumId && pinnable ? ', pin' : ''}`}
+            //? (2.0.0-player.18) only when the menu will have one - App says so; (2.0.0-player.58) Add to a
+            //? playlist… always
+            aria-label={`More: info, add to a playlist${track.albumId ? ', go to album' : ''}${track.albumId && pinnable ? ', pin' : ''}`}
             aria-haspopup="dialog"
             aria-expanded={covered && !upNextOpen}
           >

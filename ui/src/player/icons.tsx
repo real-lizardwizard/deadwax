@@ -207,6 +207,18 @@ export function PinIcon({ class: cls }: IconProps) {
   )
 }
 
+/** (2.0.0-player.58) a playlist: three lines of a list and a note beside them - the line set's style */
+export const PlaylistIcon = line(
+  <>
+    <path d="M4 6.5h10M4 11.5h10M4 16.5h6" />
+    <path d="M17.5 17.5V8.5l3-1" />
+    <circle cx="15.8" cy="17.6" r="1.8" />
+  </>,
+)
+
+/** ...and adding to one: the list with a plus */
+export const PlaylistAddIcon = line(<path d="M4 6.5h11M4 11.5h11M4 16.5h7M17.5 13.5v7M14 17h7" />)
+
 /** Three lines - what a row in Home's Edit is dragged by. */
 export const GripIcon = thin(<path d="M5 8h14M5 12h14M5 16h14" />)
 

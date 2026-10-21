@@ -33,11 +33,16 @@ The user guide's page is `docs/player.md`.
   sent passed on (see "Windows cut straight from the FLAC") - and since 2.0.0-player.17
   artists (getArtists, nothing passed on), one artist (getArtist) and one song (getSong), each by an
   id at most 256 characters passed as Navidrome's `id` parameter (see "Artists, and the two
-  libraries joined"). The configured account MAY
+  libraries joined") - and since 2.0.0-player.58 the playlists: six routes over five Subsonic calls (getPlaylists,
+  getPlaylist, createPlaylist, updatePlaylist, deletePlaylist), every field declared and bounded on request models that
+  forbid extras, each write reading the playlist first and refusing one that isn't the asker's own, sent as a form
+  POST (see notes/playlists.md). The configured account MAY
   be Navidrome's admin and deadwax has no login, so a catch-all would hand out user management to
   anyone on the network - though the docs and the settings tab now say to use a non-admin account
-  of your own: none of the eleven calls
-  needs admin, nor does `getScanStatus` (only `startScan` is adminOnly, server/subsonic/api.go).
+  of your own: none of the player's calls
+  needs admin, nor does `getScanStatus` (only `startScan` is adminOnly, server/subsonic/api.go) - the
+  playlist writes included (2.0.0-player.58: deadwax writes only the asker's own playlist, which its owner
+  may change - Navidrome's 50 otherwise, which the routes say in the owner's words; see notes/playlists.md).
   `test_there_is_no_general_proxy` pins the list - adding a call means changing that test on
   purpose. The login is laid over the params LAST, so nothing sent can stand in for it.
   `getScanStatus` (the rename wait, below) goes through the client's plain `call()` and is NOT a

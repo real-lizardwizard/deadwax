@@ -232,6 +232,12 @@ console.log('\nAbout: the song')
   check('no track number: only the length', aboutRows(queueTrack({ id: 'x' }), { ...plain, song: [{ id: 'x', duration: 61 }] }).song.lines, ['1:01'])
   check('no length either: nothing made up', aboutRows(queueTrack({ id: 'x', duration: 0 }), { ...plain, song: [{ id: 'x' }] }).song.lines, [])
   check('the album not in hand: only what the queue knows', aboutRows(queueTrack(), null).song.lines, ['5:08'])
+  //? (2.0.0-player.58, review) a playlist's stub of the album (`partial`): only the playlist's songs of it - its own
+  //? track number, no "of 1", no disc line, and the album's card counts no songs and names no format from it
+  const stub = { id: 'dummy', name: 'Dummy', artist: 'Portishead', year: 1994, song: [song('t4', 2, 4)], partial: true }
+  const fromStub = aboutRows(queueTrack({ id: 't4', album: 'Dummy', albumId: 'dummy' }), stub)
+  check('played from a playlist: "Track 4", never "Track 4 of 1"; no disc line', fromStub.song.lines, [`Track 4 ${DOT} 5:00`])
+  check('...the album\'s card: its year, no "1 song", no format', fromStub.album.line, '1994')
 }
 
 console.log('\nAbout: the album and the artist')
@@ -702,6 +708,13 @@ console.log('\nthe ••• menu')
     [items().map(text)[2], items()[2].props['aria-disabled'], calls.length - asked], ['Pin album to Home', true, 0])
   draw(true, { pinned: false, onPin: null })
   check('an album that can\'t be pinned: no row for it', items().map(text), ['Info', 'Go to album'])
+  //? (2.0.0-player.58) Add to a playlist… - second, after Info, App's tap - with Go to album and the pin, and without them
+  draw(true, { pinned: false, onPin: () => calls.push('pin'), onPlaylist: () => calls.push('playlist') })
+  check('Add to a playlist…: second, after Info, then Go to album and the pin', items().map(text), ['Info', 'Add to a playlist…', 'Go to album', 'Pin album to Home'])
+  items()[1].props.onClick()
+  check('...its tap handed to App', calls.slice(-1), ['playlist'])
+  draw(true, { onAlbum: null, onPlaylist: () => calls.push('playlist') })
+  check('...and with no album to go to nor pin', items().map(text), ['Info', 'Add to a playlist…'])
   draw(false)
   check('closed again: its lock off, and deaf to Escape', [locks(), press('Escape').defaultPrevented], [[], false])
 }
@@ -729,10 +742,10 @@ console.log('\nNow Playing is a sheet too, and deaf under the others')
   draw(false)
   check('...and focus goes back to the mini player', [document.activeElement === opener, locks()], [true, []])
   check('the album line goes to the album', one(view, (node) => node.type === 'button' && byClass('pl-sheet-artist')(node)).props['aria-label'], 'Go to the album: Pink Floyd — Wish You Were Here')
-  check('the icon row: Up next and •••, with no speaker to send to (2.0.0-player.57: Up next always there)', view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['Up next', 'More: info, go to album, pin'])
+  check('the icon row: Up next and •••, with no speaker to send to (2.0.0-player.57: Up next always there)', view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['Up next', 'More: info, add to a playlist, go to album, pin'])
   view.render({ player, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum() {}, openAs: 'cover', pinnable: false })
   check('...an album the menu has no pin for (no release id, or deadwax can\'t keep pins): ••• doesn\'t promise one',
-    view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['Up next', 'More: info, go to album'])
+    view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['Up next', 'More: info, add to a playlist, go to album'])
   let albums = 0
   view.render({ player, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum: () => { albums += 1 }, openAs: 'cover' })
   one(view, (node) => node.type === 'button' && byClass('pl-sheet-artist')(node)).props.onClick()
@@ -744,7 +757,7 @@ console.log('\nNow Playing is a sheet too, and deaf under the others')
     [view.find((node) => node.type === 'button' && byClass('pl-sheet-artist')(node)).length, one(view, (node) => node.type === 'p' && byClass('pl-sheet-artist')(node)) && text(one(view, byClass('pl-sheet-byline')))],
     [0, 'Pink Floyd — Wish You Were Here'])
   check('...••• says the menu holds only Info, and AirPlay sits before it with a speaker there',
-    view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['AirPlay', 'Up next', 'More: info'])
+    view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['AirPlay', 'Up next', 'More: info, add to a playlist'])
   //? (2.0.0-player.57) Up next: named and tinted by what is on, opening Up Next from its tap, expanded while it is over
   let upNexts = 0
   view.render({ player: { ...player, shuffle: true, repeat: 'all' }, open: true, covered: true, opener: openerRef, onClose() {}, onMore() {}, onAlbum() {}, openAs: 'cover', onUpNext: () => { upNexts += 1 }, upNextOpen: true })

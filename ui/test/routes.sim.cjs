@@ -1155,5 +1155,42 @@ console.log('\nLibrary care: one page, a sibling of the other Managing pages (2.
   check('...a tap opens its page, on You, as Settings and Log do', F.sidebarMove('care', 'albums', true), { how: 'managing', tab: 'you', kind: 'care' })
 }
 
+console.log('\nplaylists: the Playlists page and a playlist\'s, pages of their own kinds (2.0.0-player.58)')
+{
+  check('the Playlists page: #/library/playlists/all - one page, any other id is it',
+    [R.parseHash('#/library/playlists/all'), R.parseHash('#/library/playlists/anything').canonical, R.parseHash('#/library/playlists').canonical],
+    [{ route: { tab: 'library', page: { kind: 'playlists', id: 'all' } }, canonical: '#/library/playlists/all' }, '#/library/playlists/all', '#/library'])
+  check('...the page App opens, labelled for the back button above it', R.PLAYLISTS_PAGE, { kind: 'playlists', id: 'all', label: 'Playlists' })
+  check('a playlist by Navidrome\'s id round-trips, a / in it escaped and kept',
+    [R.parseHash('#/library/playlist/6Wbm%2Fx').route.page, R.formatRoute({ tab: 'library', page: { kind: 'playlist', id: '6Wbm/x', label: 'Late night' } })],
+    [{ kind: 'playlist', id: '6Wbm/x' }, '#/library/playlist/6Wbm%2Fx'])
+  const late = { kind: 'playlist', id: 'pl-1', label: 'Late night' }
+  check('two playlists are two pages; a playlist isn\'t the Playlists page; its scroll under its address',
+    [R.samePage(late, { kind: 'playlist', id: 'pl-2' }), R.samePage(late, { kind: 'playlist', id: 'pl-1' }), R.samePage(late, R.PLAYLISTS_PAGE), R.scrollKey({ tab: 'library', page: late })],
+    [false, true, false, '#/library/playlist/pl-1'])
+  const nav = R.openPage(R.openPage(R.startNav({ tab: 'library', page: null }), R.PLAYLISTS_PAGE), late)
+  check('back from a playlist says "Playlists"; from an album opened over it, the playlist\'s name',
+    [R.backLabel(nav), R.backLabel(R.openPage(nav, { kind: 'album', id: 'al-1', label: 'Dummy' }))], ['Playlists', 'Late night'])
+  const b = makeBrowser('#/library')
+  b.load()
+  b.router.open(late)
+  b.router.become(late, { kind: 'playlist', id: 'pl-2', label: 'Road trip' })
+  check('the sidebar\'s picks replace one another (`become`): one entry, back still "Library"', [b.hashes(), R.backLabel(b.router.nav)],
+    [['#/library', '#/library/playlist/pl-2'], 'Library'])
+
+  check('the sidebar: All playlists is the Playlists group\'s first item', F.SIDEBAR_PLAYLISTS, { id: 'playlists', label: 'All playlists' })
+  check('...current while the Playlists page or a playlist is on top - before the Library\'s own view',
+    [F.sidebarCurrent('library', 'albums', true, R.PLAYLISTS_PAGE), F.sidebarCurrent('library', 'artists', true, late), F.sidebarCurrent('library', 'albums', true, { kind: 'album', id: 'x' }), F.sidebarCurrent('library', 'albums', true)],
+    ['playlists', 'playlists', 'albums', 'albums'])
+  check('...a tap opens the Playlists page (App\'s openPlaylistsPage)', F.sidebarMove('playlists', 'albums', true), { how: 'playlists' })
+  //? how App's openPlaylistsPage opens one (playlistsMove): review - All playlists from a playlist opened from the
+  //? Playlists page made two Playlists pages, one over the other
+  const album = { kind: 'album', id: 'al-1' }
+  check('openPlaylistsPage: on top already - stay; just under a playlist on top - back; a playlist page on top - become; else open',
+    [R.playlistsMove([R.PLAYLISTS_PAGE], R.PLAYLISTS_PAGE), R.playlistsMove([R.PLAYLISTS_PAGE, late], R.PLAYLISTS_PAGE), R.playlistsMove([late], R.PLAYLISTS_PAGE),
+      R.playlistsMove([R.PLAYLISTS_PAGE, late], { kind: 'playlist', id: 'pl-2' }), R.playlistsMove([], late), R.playlistsMove([late, album], R.PLAYLISTS_PAGE), R.playlistsMove([late, album], late)],
+    ['stay', 'back', 'become', 'become', 'open', 'open', 'open'])
+}
+
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')
 process.exit(failures ? 1 : 0)

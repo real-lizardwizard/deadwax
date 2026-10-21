@@ -78,34 +78,163 @@ class Player(Navidrome):
     getArtists, getArtist, getSong, getCoverArt, stream (a real FLAC, by range, as Go's ServeContent) and
     scrobble - each user's plays counted apart, as Navidrome counts them. `hidden` keeps songs from a user, as
     a Navidrome giving users their own libraries would: getSong and stream answer them 70.
+
+    And (2.0.0-player.58) Navidrome's playlists, faithful to its source as read at 0.64.2: getPlaylists (an admin's
+    every playlist; anyone else's own and the public ones, by name), getPlaylist (the same, error 70 otherwise),
+    createPlaylist (by name - new, owned by the asker as their name is stored - or by `playlistId`: the REPLACE,
+    every row deleted and the songs written from position 1; with no songId the songs untouched), updatePlaylist
+    (removals by position first, renumbered; then additions after the last row; then the name - '' read as absent -
+    the description and `public`), deletePlaylist - each write only by the owner or an admin (50 otherwise), and the
+    songs of a smart or a file-synced playlist never (50). Rows are numbered 1..n INCLUDING rows whose song is
+    `missing` (listed by nobody, still counted by the stored counter) and orphans (an id with no song - counted by
+    nothing); the counter getPlaylists answers is refreshed only by writes. Repeated values are kept and a form
+    body is read, merged with the query, as Navidrome's formPost does; every playlist call is kept with who made
+    it and whether it came as a form (`playlist_calls`).
     """
 
+    PLAYLIST_CALLS = frozenset({"getPlaylists", "getPlaylist", "createPlaylist", "updatePlaylist", "deletePlaylist"})
     PLAYER_CALLS = frozenset({"ping", "getAlbumList2", "getArtists", "getArtist", "getSong", "getCoverArt",
-                              "stream", "scrobble"})
+                              "stream", "scrobble"}) | PLAYLIST_CALLS
 
     def __init__(self):
         super().__init__()
         self.add("nd-dummy", "rel-dummy")
         self.add("nd-third", "rel-third", name="Third")
         self.songs = {SONG: {"id": SONG, "title": "Wandering Star", "albumId": "nd-dummy", "album": "Dummy",
-                             "artist": "Portishead", "contentType": "audio/flac", "suffix": "flac"}}
+                             "artist": "Portishead", "contentType": "audio/flac", "suffix": "flac", "duration": 290}}
         self.hidden: dict[str, set[str]] = {}
         self.plays: dict[tuple[str, str], int] = {}
         self.playing: dict[str, str] = {}
         self.file, self.serve = navidrome_file(FLAC)
+        #? the playlists: id -> its row (owner as stored, public, comment, smart, sync, rows of song ids, the counter)
+        self.playlists: dict[str, dict] = {}
+        self.admins: set[str] = set()
+        self.missing: set[str] = set()
+        #? a user's name as Navidrome stores it - what `owner` says
+        self.stored_names: dict[str, str] = {}
+        self.playlist_calls: list[dict] = []
+        self.ticks = 0
+        #? one playlist owned by each account the walk asks as - ethan, and the shared `demo` (logins off,
+        #? break-glass) - and a private one of james's nobody else may see
+        for owner in ("ethan", "demo", "james"):
+            self.playlist(f"pl-{owner}", f"{owner.title()}'s", owner, [SONG])
+
+    def playlist(self, playlist_id: str, name: str, owner: str, rows: list[str], public: bool = False,
+                 smart: bool = False, sync: bool = False, comment: str = "") -> dict:
+        """A playlist put in as Navidrome would hold it, its counter refreshed."""
+        held = {"id": playlist_id, "name": name, "owner": owner, "public": public, "comment": comment,
+                "smart": smart, "sync": sync, "rows": list(rows), "created": self.tick(), "changed": self.tick()}
+        self.refresh(held)
+        self.playlists[playlist_id] = held
+        return held
+
+    def tick(self) -> str:
+        self.ticks += 1
+        return f"2026-10-20T10:{self.ticks // 60:02d}:{self.ticks % 60:02d}.000Z"
+
+    def refresh(self, held: dict) -> None:
+        #? Navidrome's refreshCounters: the rows whose media file it has - missing ones included, orphans not
+        held["counter"] = sum(1 for song in held["rows"] if song in self.songs)
+        held["seconds"] = sum(self.songs[song].get("duration", 0) for song in held["rows"] if song in self.songs)
+
+    def listed(self, held: dict) -> list[dict]:
+        return [self.songs[song] for song in held["rows"] if song in self.songs and song not in self.missing]
+
+    def sees(self, user: str, held: dict) -> bool:
+        return user in self.admins or held["owner"].lower() == user or held["public"]
+
+    def shown(self, user: str, held: dict, entries: bool) -> dict:
+        songs = self.listed(held)
+        body = {"id": held["id"], "name": held["name"], "owner": held["owner"],
+                "songCount": len(songs) if entries else held["counter"],
+                "duration": sum(song.get("duration", 0) for song in songs) if entries else held["seconds"],
+                "created": held["created"], "changed": held["changed"],
+                "readonly": held["owner"].lower() != user or held["smart"] or held["sync"]}
+        if held["comment"]:
+            body["comment"] = held["comment"]
+        if held["public"]:
+            body["public"] = True
+        if held["rows"]:
+            body["coverArt"] = f"pl-{held['id']}_5f3a"
+        if entries:
+            body["entry"] = songs
+        return body
+
+    def playlist_call(self, endpoint: str, user: str, values: dict[str, list[str]]) -> httpx.Response:
+        one = lambda key: (values.get(key) or [None])[0]
+        held = self.playlists.get(one("playlistId") or one("id") or "")
+        if endpoint == "getPlaylists":
+            found = [self.shown(user, each, False) for each in sorted(self.playlists.values(), key=lambda each: each["name"].lower())
+                     if self.sees(user, each)]
+            return httpx.Response(200, json=ok(playlists={"playlist": found}) if found else ok())
+        if endpoint == "createPlaylist" and not one("playlistId"):
+            if not one("name"):
+                return httpx.Response(200, json=failed(10, "required parameter name is missing"))
+            made = self.playlist(f"pl-new-{len(self.playlists) + 1}", one("name"), self.stored_names.get(user, user), values.get("songId") or [])
+            return httpx.Response(200, json=ok(playlist=self.shown(user, made, True)))
+        if held is None or not self.sees(user, held):
+            return httpx.Response(200, json=failed(70, "playlist not found"))
+        if endpoint == "getPlaylist":
+            return httpx.Response(200, json=ok(playlist=self.shown(user, held, True)))
+        if user not in self.admins and held["owner"].lower() != user:
+            return httpx.Response(200, json=failed(50, "user not authorized"))
+        fixed = held["smart"] or held["sync"]
+        if endpoint == "deletePlaylist":
+            del self.playlists[held["id"]]
+            return httpx.Response(200, json=ok())
+        if endpoint == "createPlaylist":
+            if fixed:
+                return httpx.Response(200, json=failed(50, "playlist is not editable"))
+            #? "only update tracks if they were specified"
+            if values.get("songId"):
+                held["rows"] = list(values["songId"])
+                self.refresh(held)
+            held["changed"] = self.tick()
+            return httpx.Response(200, json=ok(playlist=self.shown(user, held, True)))
+        removals = [int(index) for index in values.get("songIndexToRemove") or []]
+        additions = values.get("songIdToAdd") or []
+        if (removals or additions) and fixed:
+            return httpx.Response(200, json=failed(50, "playlist is not editable"))
+        if removals:
+            gone = set(removals)
+            held["rows"] = [song for place, song in enumerate(held["rows"]) if place not in gone]
+        held["rows"].extend(additions)
+        if removals or additions:
+            self.refresh(held)
+        if one("name"):
+            held["name"] = one("name")
+        if "comment" in values:
+            held["comment"] = one("comment") or ""
+        if "public" in values:
+            held["public"] = one("public") in ("true", "on", "1")
+        held["changed"] = self.tick()
+        return httpx.Response(200, json=ok())
 
     def handle(self, request: httpx.Request) -> httpx.Response:
         endpoint = request.url.path.removeprefix("/rest/")
         if endpoint not in self.PLAYER_CALLS:
             return super().handle(request)
-        q = {key: values[0] for key, values in parse_qs(urlparse(str(request.url)).query).items()}
+        query = urlparse(str(request.url)).query
+        #? every value kept, repeated keys in order - and a form body merged in, as Navidrome's formPost reads one
+        values = parse_qs(query, keep_blank_values=True)
+        form = request.method == "POST" and request.headers.get("content-type", "").startswith("application/x-www-form-urlencoded")
+        if form:
+            for key, more in parse_qs(request.content.decode(), keep_blank_values=True).items():
+                values.setdefault(key, []).extend(more)
+        q = {key: listed[0] for key, listed in values.items()}
         user = q.get("u", "").lower()
         self.calls.append((user, endpoint, q))
+        if endpoint in self.PLAYLIST_CALLS:
+            self.playlist_calls.append({"user": user, "endpoint": endpoint, "form": form, "query": query, "values": values})
         if self.down:
             raise httpx.ConnectError("connection refused")
         token = hashlib.md5((self.passwords.get(user, "") + q.get("s", "")).encode()).hexdigest()
         if user not in self.passwords or q.get("t") != token:
             return httpx.Response(200, json=failed(40, "Wrong username or password"))
+        if (user, endpoint) in self.errors:
+            return self.errors[(user, endpoint)]
+        if endpoint in self.PLAYLIST_CALLS:
+            return self.playlist_call(endpoint, user, values)
         if q.get("id") in self.hidden.get(user, set()):
             return httpx.Response(200, json=failed(70, "Song not found"))
         stars = self.starred(user)
@@ -214,7 +343,17 @@ WALK = {
     #? (2.0.0-player.57) the Library's Shuffle: an order made as you, then its page - `{token}` the order just made
     "/shuffle": [("get", "/shuffle?scope=yours"), ("get", "/shuffle?scope=store")],
     "/shuffle/{token}": [("get", "/shuffle/{token}?offset=0")],
+    #? (2.0.0-player.58) the playlists - `{mine}` the asker's own playlist (the fake holds one for each), the edit's
+    #? body read fresh just before it posts (FRESH: its `base` the songs as they are), the delete last
+    "/playlists": [("get", "/playlists"), ("post", "/playlists", {"name": "Walked", "song_ids": [SONG]})],
+    "/playlists/{playlist_id}": [("get", "/playlists/{mine}")],
+    "/playlists/{playlist_id}/add": [("post", "/playlists/{mine}/add", {"song_ids": [SONG], "duplicates": "add"})],
+    "/playlists/{playlist_id}/edit": [("post", "/playlists/{mine}/edit", "FRESH")],
+    "/playlists/{playlist_id}/delete": [("post", "/playlists/{mine}/delete")],
 }
+
+#? whose playlist the walk's `{mine}` is, by who asks
+MINE = {"ethan": "pl-ethan", "demo": "pl-demo"}
 
 #? the routes that answer from deadwax's own memory and ask Navidrome nothing: a shuffle's next page
 ASKS_NAVIDROME_NOTHING = {"/shuffle/{token}?offset=0"}
@@ -224,21 +363,33 @@ ASKS_NAVIDROME_NOTHING = {"/shuffle/{token}?offset=0"}
 CACHE_CALL = ("demo", "stream")
 
 
-def walk(env, client: TestClient) -> dict[str, list[tuple[str, str]]]:
-    """Every player route asked once each way WALK says: the calls each answer made, by route and way."""
+def way_key(method: str, path: str) -> str:
+    """What the walk keeps a way's calls under: its path - and its method too for a way that isn't a GET, since
+    (2.0.0-player.58) `/playlists` is two ways, GET and POST, which a key by path alone would make one."""
+    return path if method == "get" else f"{method.upper()} {path}"
+
+
+def walk(env, client: TestClient, asker: str = "ethan") -> dict[str, list[tuple[str, str]]]:
+    """Every player route asked once each way WALK says: the calls each answer made, by route and way. `asker`
+    names whose playlist the playlist ways write to - the account the client asks Navidrome as."""
     made = {}
     token = None
     navidrome_routes.forget_shuffles()
     for route, ways in WALK.items():
-        for method, path in ways:
+        for method, path, *body in ways:
+            asked = path.replace("{token}", token or "").replace("{mine}", MINE[asker])
+            sent = body[0] if body else None
+            if sent == "FRESH":
+                now = [song["id"] for song in client.get(f"{PLAYER}/playlists/{MINE[asker]}").json()["songs"]]
+                sent = {"base": now, "song_ids": now[::-1], "name": "Walked again"}
             env.fake.forget()
             #? each way asks as if afresh - the access a way before it confirmed isn't carried over
             navidrome_routes.forget_access()
-            response = getattr(client, method)(f"{PLAYER}{path.replace('{token}', token or '')}")
+            response = getattr(client, method)(f"{PLAYER}{asked}", **({"json": sent} if sent is not None else {}))
             assert response.status_code in (200, 206), (path, response.status_code, response.text[:200])
             if route == "/shuffle":
                 token = response.json()["token"]
-            made[path] = env.fake.by()
+            made[way_key(method, path)] = env.fake.by()
     return made
 
 
@@ -265,7 +416,7 @@ def test_every_player_route_asks_navidrome_as_the_signed_in_user(player):
 
 def test_with_logins_off_every_call_is_the_shared_accounts_and_nothing_is_checked(player, monkeypatch):
     monkeypatch.setattr(Config, "AUTH_MODE", "off")
-    made = walk(player, TestClient(player.app))
+    made = walk(player, TestClient(player.app), "demo")
 
     assert {user for calls in made.values() for user, _ in calls} == {"demo"}
     assert all(endpoint != "getSong" for path, calls in made.items() if "/songs/" not in path for _, endpoint in calls)
@@ -273,7 +424,7 @@ def test_with_logins_off_every_call_is_the_shared_accounts_and_nothing_is_checke
 
 
 def test_the_break_glass_admin_plays_as_the_shared_account(player):
-    made = walk(player, signed_in(player, auth.BREAK_GLASS_USER))
+    made = walk(player, signed_in(player, auth.BREAK_GLASS_USER), "demo")
 
     assert {user for calls in made.values() for user, _ in calls} == {"demo"}
     assert ("demo", "getSong") not in made[f"/stream/{SONG}?format=raw&wrap=mp4"]

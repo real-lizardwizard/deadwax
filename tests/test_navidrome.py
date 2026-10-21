@@ -251,11 +251,21 @@ def test_there_is_no_general_proxy():
     of the asker's library, or of the store, once each in a random order, read with search3 and getAlbumList2 as the
     asker. Nothing the page sends reaches Navidrome but the scope, which picks the calls; the second asks Navidrome
     nothing, paging deadwax's own order - see test_navidrome_shuffle.py.
+
+    The six playlist routes joined it in 2.0.0-player.58, deliberately: Navidrome's own playlists, as the asker -
+    `/playlists` twice (GET lists them, POST makes one), `/playlists/{playlist_id}` (one, with its songs) and its
+    `/add`, `/edit` and `/delete`, all POSTs. Five Subsonic calls between them - getPlaylists, getPlaylist,
+    createPlaylist, updatePlaylist, deletePlaylist - each with parameters deadwax builds from declared, bounded
+    fields (the request models forbid any other), every write sent as a form. Each write reads the playlist first
+    and refuses one that isn't the asker's own (src/playlists.py), so even a shared admin account can't change -
+    nor list, nor open - anybody else's private playlist through deadwax - see test_playlists.py.
     """
     paths = sorted(route.path for route in navidrome_routes.router.routes)
 
     assert paths == [
         "/albums", "/albums/{album_id}", "/artists", "/artists/{artist_id}", "/cover/{cover_id}",
+        "/playlists", "/playlists", "/playlists/{playlist_id}", "/playlists/{playlist_id}/add",
+        "/playlists/{playlist_id}/delete", "/playlists/{playlist_id}/edit",
         "/scrobble/{song_id}", "/scrub/{song_id}", "/search", "/shuffle", "/shuffle/{token}", "/songs/{song_id}",
         "/status", "/stream/{song_id}",
     ]

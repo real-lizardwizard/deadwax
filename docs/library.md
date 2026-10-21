@@ -4,7 +4,8 @@ The **Library** tab shows what's in your music folder (`LIBRARY_PATH`): every al
 ones deadwax never downloaded. It flags what's wrong with them and lets you fix it.
 
 This page is about the main page's Library tab, the one for looking after the library. The phone
-app at `/player/` has a Library tab of its own, for listening - **Albums**, **Artists** and
+app at `/player/` has a Library tab of its own, for listening - **Playlists** (Navidrome's own, since
+2.0.0-player.58 - [the phone player guide](player.md#playlists)), **Albums**, **Artists** and
 **Songs** from Navidrome (since 2.0.0-player.46 deadwax needs Navidrome for the app's library, and an
 album folder Navidrome doesn't list is raised as [Not in Navidrome](#not-in-navidrome)), and an [artist page](player.md#artist-pages) with their albums from
 MusicBrainz and Play and Shuffle over the ones you have - which the [phone player

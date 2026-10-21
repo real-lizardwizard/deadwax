@@ -73,6 +73,9 @@ export interface Song {
   displayComposer?: string
   /** OpenSubsonic: everyone credited on it, by role - composers among them */
   contributors?: { role?: string; artist?: { name?: string } }[]
+  /** (2.0.0-player.58) its album's year, and its album's artist as one line - Navidrome sends both on every song */
+  year?: number
+  displayAlbumArtist?: string
 }
 
 /** One disc's own title - MusicBrainz's medium title, which deadwax writes as `discsubtitle` and
@@ -84,6 +87,9 @@ export interface DiscTitle {
 
 export interface AlbumWithSongs extends Album {
   song?: Song[]
+  /** (2.0.0-player.58) a playlist's stub of the album (lib/playlists.ts playlistAlbums): `song` holds only the
+   *  playlist's songs of it, so Info counts nothing from it and it never stands in for the album's own answer */
+  partial?: boolean
   /** OpenSubsonic, passed through untouched by deadwax's route: "Disc 4 · <title>" on the album page */
   discTitles?: DiscTitle[]
 }

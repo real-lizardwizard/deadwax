@@ -4,7 +4,8 @@ What the player at /player/ may ask Navidrome, and nothing else.
 Each route is one Subsonic call with its own parameters, rather than a proxy that passes on
 whatever it is sent - see src/api/navidrome_endpoint.py for why that line matters. Adding a
 call means adding a route here, on purpose. (The Library's Shuffle, 2.0.0-player.57, makes several:
-search3 and getAlbumList2 as the asker, deadwax's own order of what they list - see the end.)
+search3 and getAlbumList2 as the asker, deadwax's own order of what they list - see near the end. The
+playlists, 2.0.0-player.58, a fixed call or two each with declared, bounded input - see the end.)
 """
 
 import asyncio
@@ -14,16 +15,18 @@ import time
 from array import array
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Literal
+from typing import Annotated, Literal
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi import Path as PathParam
 from fastapi.responses import Response, StreamingResponse
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 from starlette.background import BackgroundTask
 
 from src import library_ledger, player_cache
-from src.api.navidrome_endpoint import NOT_CONFIGURED, NavidromeError, SignedOut, asks_as_shared, client_for
+from src import playlists as playlist_rules
+from src.api.navidrome_endpoint import NOT_CONFIGURED, NavidromeError, SignedOut, UserClient, asks_as_shared, client_for
 from src.config import Config
 from src.logger import logger
 from src.routes.download import ClientGone, unless_abandoned
@@ -781,3 +784,342 @@ async def shuffle_more(
         raise HTTPException(status_code=404, detail="gone")
     _claim(held, now)
     return {"total": len(held.order), "songs": _shuffle_page(held, offset)}
+
+
+# ---------------------------------------------------------------- playlists (2.0.0-player.58)
+#
+# Navidrome's own playlists, AS THE ASKER (client_for): six routes, five Subsonic calls - getPlaylists,
+# getPlaylist, createPlaylist, updatePlaylist, deletePlaylist - every parameter declared and bounded, never a
+# pass-through. Each write checks the owner FIRST (src/playlists.py), so a shared admin account - logins off, or
+# the break-glass admin - can't change anybody else's playlist through deadwax, and nobody's private playlist is
+# ever listed or opened but its owner's. Every write goes as a form POST (NavidromeClient.call's `form`); every
+# read stays a GET. notes/playlists.md has the reasoning, the replace's above all.
+
+SongId = Annotated[str, StringConstraints(min_length=1, max_length=ID_MAX)]
+PlaylistIdPath = Annotated[str, PathParam(min_length=1, max_length=ID_MAX)]
+
+
+def _named(text: str) -> str:
+    name = playlist_rules.clean_name(text)
+    if name is None:
+        raise ValueError(playlist_rules.BLANK_NAME if not text.strip() else playlist_rules.CONTROL_NAME)
+    if len(name) > playlist_rules.PLAYLIST_NAME_MAX:
+        raise ValueError(playlist_rules.NAME_TOO_LONG)
+    return name
+
+
+#? (review) The limits are the models' own validators, never Field's max_length, so each refusal is a ValueError in
+#? deadwax's words - which validation_words() hands the page as a plain `detail` (Field's own would be pydantic's
+#? "List should have at most 2000 items", and the page would say only "POST ... failed").
+def _at_most(words: str):
+    def check(cls, value: list[str] | None) -> list[str] | None:
+        if value is not None and len(value) > playlist_rules.PLAYLIST_SONGS_MAX:
+            raise ValueError(words)
+        return value
+    return check
+
+
+def validation_words(path: str, errors) -> str | None:
+    """A refusal of a playlist route's body in deadwax's words: the first of the models' own (a ValueError raised by
+    a validator here), for a path under /deadwax/navidrome/playlists - else None, and FastAPI answers as it always
+    does. src/api/app.py's handler asks it."""
+    if not path.startswith("/deadwax/navidrome/playlists"):
+        return None
+    for error in errors:
+        if error.get("type") == "value_error":
+            raised = (error.get("ctx") or {}).get("error")
+            if raised is not None and str(raised):
+                return str(raised)
+    return None
+
+
+class NewPlaylist(BaseModel):
+    """POST /playlists: a name (trimmed; blank or a control character refused), and the songs to start it with."""
+
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    song_ids: list[SongId] = Field(default_factory=list)
+
+    @field_validator("name")
+    @classmethod
+    def _name(cls, value: str) -> str:
+        return _named(value)
+
+    songs_bounded = field_validator("song_ids")(_at_most(playlist_rules.SONGS_TOO_MANY))
+
+
+class PlaylistAdd(BaseModel):
+    """POST /playlists/{id}/add: the songs, and what to do with ones the playlist has already."""
+
+    model_config = ConfigDict(extra="forbid")
+    song_ids: list[SongId] = Field(..., min_length=1)
+    duplicates: Literal["ask", "add", "skip"] = "ask"
+
+    songs_bounded = field_validator("song_ids")(_at_most(playlist_rules.SONGS_TOO_MANY))
+
+
+class PlaylistEdit(BaseModel):
+    """POST /playlists/{id}/edit: the songs as the page drew them when Edit began (`base`), the songs now, and only
+    the metadata that changed - None is unchanged; a blank name refused; '' clears the description. `tried` (review):
+    the songs a Done that FAILED sent, since Navidrome may have taken them before failing - the page sends it on the
+    next Done, so a retry isn't taken for a change made in another app."""
+
+    model_config = ConfigDict(extra="forbid")
+    base: list[SongId]
+    song_ids: list[SongId]
+    tried: list[SongId] | None = None
+    name: str | None = None
+    comment: str | None = None
+    public: bool | None = None
+
+    songs_bounded = field_validator("base", "song_ids", "tried")(_at_most(playlist_rules.TOO_LONG))
+
+    @field_validator("name")
+    @classmethod
+    def _name(cls, value: str | None) -> str | None:
+        return None if value is None else _named(value)
+
+    @field_validator("comment")
+    @classmethod
+    def _comment(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        comment = playlist_rules.clean_comment(value)
+        if comment is None:
+            raise ValueError(playlist_rules.CONTROL_COMMENT)
+        if len(comment) > playlist_rules.PLAYLIST_COMMENT_MAX:
+            raise ValueError(playlist_rules.COMMENT_TOO_LONG)
+        return comment
+
+
+def asked_as(client) -> str:
+    """The Navidrome account a call through `client` is made as: the signed-in user's name with logins on, else the
+    shared NAVIDROME_USER (logins off, the break-glass admin) - whose playlists are "mine"."""
+    if isinstance(client, UserClient):
+        return client.username or ""
+    return Config.NAVIDROME_USER or ""
+
+
+def _playlist_fail(error: NavidromeError) -> Exception:
+    """A Navidrome error in a playlist route's words: a session ended stays itself (the 401 that brings the sign-in
+    up), Navidrome's "not found" is GONE, its "not allowed" (not the owner, or songs that can't be edited - Navidrome
+    answers both with 50) the owner's, anything else as _fail says it."""
+    if isinstance(error, SignedOut) or error.status == 401:
+        return error
+    if error.code == 70:
+        return HTTPException(status_code=404, detail=playlist_rules.GONE)
+    if error.code == 50:
+        return HTTPException(status_code=403, detail=playlist_rules.NOT_THE_OWNER)
+    return _fail(error)
+
+
+async def _read_playlist(client, playlist_id: str) -> dict:
+    """getPlaylist's playlist, or a 404 GONE."""
+    try:
+        body = await client.call("getPlaylist", {"id": playlist_id})
+    except NavidromeError as e:
+        raise _playlist_fail(e)
+    found = body.get("playlist")
+    if not isinstance(found, dict):
+        raise HTTPException(status_code=404, detail=playlist_rules.GONE)
+    return found
+
+
+def _listed_playlists(body: dict) -> list[dict]:
+    """getPlaylists' playlists - none at all when Navidrome leaves the key out (it does with none yet)."""
+    found = (body.get("playlists") or {}).get("playlist") or []
+    return [playlist for playlist in found if isinstance(playlist, dict)]
+
+
+async def _read_with_counter(client, playlist_id: str) -> tuple[dict, int | None]:
+    """getPlaylist and getPlaylists together: the playlist, and its stored counter from the list (None when the list
+    lacks it)."""
+    async def listing():
+        try:
+            return await client.call("getPlaylists")
+        except NavidromeError as e:
+            raise _playlist_fail(e)
+
+    found, listed = await asyncio.gather(_read_playlist(client, playlist_id), listing())
+    entry = next((playlist for playlist in _listed_playlists(listed) if str(playlist.get("id")) == playlist_id), None)
+    return found, (None if entry is None else entry.get("songCount"))
+
+
+def _answer(found: dict, counter: int | None, asker: str) -> dict:
+    """A PlaylistWithSongs: `hidden` the counter less the songs listed for an EDITABLE playlist, 0 for any other
+    (getPlaylist re-evaluates a smart playlist as it answers, and the counter read beside it may be the old one)."""
+    listed = len(playlist_rules.songs_of(found))
+    hidden = playlist_rules.hidden_count(counter, listed) if counter is not None and playlist_rules.is_editable(found, asker) else 0
+    return playlist_rules.with_songs(found, asker, hidden)
+
+
+def _writable(found: dict, asker: str) -> None:
+    """Raise unless the asker may write it: never listed is GONE, somebody else's NOT_YOURS, mine but read-only
+    FROM_FILE - nothing written in any of them."""
+    if not playlist_rules.is_listed(found, asker):
+        raise HTTPException(status_code=404, detail=playlist_rules.GONE)
+    if not playlist_rules.is_mine(found, asker):
+        owner = found.get("owner") if isinstance(found.get("owner"), str) and found.get("owner") else "somebody else"
+        raise HTTPException(status_code=403, detail=playlist_rules.NOT_YOURS.format(owner=owner))
+    if not playlist_rules.is_editable(found, asker):
+        raise HTTPException(status_code=403, detail=playlist_rules.FROM_FILE)
+
+
+async def _write(client, endpoint: str, params: dict) -> dict:
+    try:
+        return await client.call(endpoint, params, form=True)
+    except NavidromeError as e:
+        raise _playlist_fail(e)
+
+
+@router.get("/playlists")
+async def playlists(request: Request):
+    """
+    The asker's playlists and everyone's shared ones - getPlaylists, in Navidrome's order (by name). Somebody else's
+    private playlist is left out, even when the account asked as is an admin and Navidrome lists it. Takes nothing.
+    """
+    client = client_for(request)
+    try:
+        body = await client.call("getPlaylists")
+    except NavidromeError as e:
+        raise _playlist_fail(e)
+    asker = asked_as(client)
+    return {"playlists": [playlist_rules.summary(playlist, asker) for playlist in _listed_playlists(body)
+                          if playlist_rules.is_listed(playlist, asker)]}
+
+
+@router.post("/playlists")
+async def create_playlist(made: NewPlaylist, request: Request):
+    """A new playlist of the asker's, with the songs given in their order (a song twice kept twice) - createPlaylist,
+    which answers the whole new playlist. Private, as Navidrome makes one."""
+    client = client_for(request)
+    body = await _write(client, "createPlaylist", {"name": made.name, "songId": list(made.song_ids) or None})
+    found = body.get("playlist")
+    if not isinstance(found, dict):
+        raise HTTPException(status_code=502, detail="Navidrome made the playlist but didn't say which it was")
+    return playlist_rules.with_songs(found, asked_as(client), 0)
+
+
+@router.get("/playlists/{playlist_id}")
+async def playlist(playlist_id: PlaylistIdPath, request: Request):
+    """One playlist with its songs - getPlaylist, and getPlaylists beside it for its stored counter (`hidden`, the
+    songs of it Navidrome isn't listing just now). Not the asker's and not shared: 404, as Navidrome's own "not
+    found"."""
+    client = client_for(request)
+    asker = asked_as(client)
+    found, counter = await _read_with_counter(client, playlist_id)
+    if not playlist_rules.is_listed(found, asker):
+        raise HTTPException(status_code=404, detail=playlist_rules.GONE)
+    return _answer(found, counter, asker)
+
+
+@router.post("/playlists/{playlist_id}/add")
+async def add_to_playlist(playlist_id: PlaylistIdPath, adding: PlaylistAdd, request: Request):
+    """
+    Songs added at the end - updatePlaylist's songIdToAdd, after every row Navidrome has, hidden ones included, so
+    nothing already there moves. Read first, as it is at the tap: some of the songs in it already, and `ask` (the
+    default) writes nothing and says how many (`done: false`); `skip` adds only the others, `add` every one.
+    """
+    client = client_for(request)
+    asker = asked_as(client)
+    found = await _read_playlist(client, playlist_id)
+    _writable(found, asker)
+    present = [str(song.get("id")) for song in playlist_rules.songs_of(found)]
+    asked = list(adding.song_ids)
+    to_add, already = playlist_rules.split_duplicates(present, asked, adding.duplicates)
+    if adding.duplicates == "ask" and already > 0:
+        return {"done": False, "already": already, "asked": len(asked)}
+    if not to_add:
+        return {"done": True, "added": 0, "already": already}
+    await _write(client, "updatePlaylist", {"playlistId": playlist_id, "songIdToAdd": to_add})
+    return {"done": True, "added": len(to_add), "already": already}
+
+
+@router.post("/playlists/{playlist_id}/edit")
+async def edit_playlist(playlist_id: PlaylistIdPath, edit: PlaylistEdit, request: Request):
+    """
+    Edit's Done: the songs removed and reordered, and the name, description and sharing - only what changed.
+
+    The songs are written as Navidrome's REPLACE (createPlaylist with the playlist's id and every song in the new
+    order), never by `songIndexToRemove`: Navidrome numbers a playlist's rows counting the ones whose file is missing,
+    which getPlaylist doesn't list, so removing by the place the page sees removes the wrong song once one is hidden.
+    The replace is exact; it drops the hidden rows, which the page says before Done. Emptying it is a replace with
+    one song (createPlaylist with no songId leaves the songs as they are), then that one removed.
+
+    `base` - the songs as drawn when Edit began - must be the songs as they are now, or nothing is written (409:
+    changed in another app meanwhile) - or, after a Done that failed (`tried`), where that one may have left them: the
+    songs it sent, or, emptying, the one song its first step leaves (any one of base's: the list that emptying began
+    from may itself have been left by a Done that failed before it). The new list must only remove and reorder the
+    songs as they are now (422). Everything written and only the read after it failing is a 502 saying it was saved.
+    """
+    client = client_for(request)
+    asker = asked_as(client)
+    found, _ = await _read_with_counter(client, playlist_id)
+    _writable(found, asker)
+    current = [str(song.get("id")) for song in playlist_rules.songs_of(found)]
+    if len(current) > playlist_rules.PLAYLIST_SONGS_MAX:
+        raise HTTPException(status_code=409, detail=playlist_rules.TOO_LONG)
+    base, wanted = list(edit.base), list(edit.song_ids)
+    #? (review) a Done that failed may have written its songs first: a retry finds them there, not base - which is
+    #? no change made in another app, and answering CHANGED would say the user's own save wasn't saved
+    left = [base]
+    if edit.tried is not None:
+        left.append(list(edit.tried))
+    #? emptying, after a Done that failed: its first step leaves one song of the list IT began from - which, every
+    #? list here being base with songs removed and reordered, is one of base's - so any one of base's is where an
+    #? emptying may have stopped, however many Dones failed before (review: base[:1] alone made a third Done a 409)
+    stopped_emptying = edit.tried == [] and len(current) == 1 and current[0] in base
+    if current not in left and not stopped_emptying:
+        raise HTTPException(status_code=409, detail=playlist_rules.CHANGED)
+    if not playlist_rules.is_rearrangement(current, wanted):
+        raise HTTPException(status_code=422, detail=playlist_rules.ONLY_REARRANGES)
+
+    songs_written = False
+    if wanted != current:
+        if wanted:
+            await _write(client, "createPlaylist", {"playlistId": playlist_id, "songId": wanted})
+        else:
+            #? current isn't empty here (an empty list and an empty playlist are equal): replaced by its first song -
+            #? every row deleted, hidden and orphaned ones too - then that one removed
+            await _write(client, "createPlaylist", {"playlistId": playlist_id, "songId": [current[0]]})
+            await _write(client, "updatePlaylist", {"playlistId": playlist_id, "songIndexToRemove": 0})
+        songs_written = True
+
+    said = playlist_rules.summary(found, asker)
+    changes = {}
+    if edit.name is not None and edit.name != said["name"]:
+        changes["name"] = edit.name
+    if edit.comment is not None and edit.comment != said["comment"]:
+        changes["comment"] = edit.comment
+    if edit.public is not None and edit.public != said["public"]:
+        changes["public"] = "true" if edit.public else "false"
+    if changes:
+        try:
+            await client.call("updatePlaylist", {"playlistId": playlist_id, **changes}, form=True)
+        except NavidromeError as e:
+            if songs_written and not (isinstance(e, SignedOut) or e.status == 401):
+                raise HTTPException(status_code=502, detail=playlist_rules.PART_SAVED.format(why=str(e)))
+            raise _playlist_fail(e)
+
+    try:
+        found, counter = await _read_with_counter(client, playlist_id)
+    except HTTPException as e:
+        #? (review) written, and only the read after failing: said so - never a bare 502 the page takes for nothing saved
+        if (songs_written or changes) and e.status_code != 404:
+            raise HTTPException(status_code=502, detail=playlist_rules.SAVED_UNREAD.format(why=e.detail))
+        raise
+    return _answer(found, counter, asker)
+
+
+@router.post("/playlists/{playlist_id}/delete")
+async def delete_playlist(playlist_id: PlaylistIdPath, request: Request):
+    """
+    The asker's playlist deleted - deletePlaylist, after it is read and found theirs. One Navidrome made from a file
+    is refused (FROM_FILE): it would come back at Navidrome's next scan of that folder, and the page offers no Delete
+    for it. There is no undo - Navidrome has none; the page's confirmation is the net.
+    """
+    client = client_for(request)
+    found = await _read_playlist(client, playlist_id)
+    _writable(found, asked_as(client))
+    await _write(client, "deletePlaylist", {"id": playlist_id})
+    return {"deleted": True}

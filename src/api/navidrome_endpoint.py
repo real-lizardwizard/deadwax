@@ -15,7 +15,9 @@ What passes through is a fixed list of calls in routes/navidrome.py, each with i
 parameters - never a general proxy. The account configured here may well be Navidrome's admin,
 and deadwax has no login of its own unless AUTH_MODE is on (2.0.0-player.48) - and even then
 every signed-in user would reach it - so a general proxy would hand them the means to create users
-or delete playlists on Navidrome.
+or delete anybody's playlists on Navidrome. The playlist routes (2.0.0-player.58) change only the asker's own
+playlists, the owner checked by deadwax before anything is written (src/playlists.py), so a shared admin account
+still can't touch anyone else's through deadwax.
 
 WHO IS ASKED AS (2.0.0-player.52, step 6 of the multi-user plan): with logins on, every player call is
 made AS THE SIGNED-IN USER - client_for(request) lays the login their session was signed in with over
@@ -185,11 +187,21 @@ class NavidromeClient:
             **auth_params(Config.NAVIDROME_USER or "", Config.NAVIDROME_PASSWORD or ""),
         }
 
-    async def call(self, endpoint: str, params: dict | None = None) -> dict:
-        """A JSON call - the answer's body, with its status checked."""
+    async def call(self, endpoint: str, params: dict | None = None, form: bool = False) -> dict:
+        """
+        A JSON call - the answer's body, with its status checked.
+
+        `form` (2.0.0-player.58, the playlist writes): POSTed as application/x-www-form-urlencoded, every parameter
+        and the login in the body - a list as its key repeated, in order - and nothing in the URL. Navidrome takes a
+        form body on every Subsonic endpoint (OpenSubsonic's formPost), and a 2,000-song playlist's songId pairs
+        (~60 KB) would be refused in a URL by a reverse proxy in front of it at its usual 8 KB request line.
+        """
         client = await self.get_client()
         try:
-            response = await client.get(f"/{endpoint}", params=self._params(params or {}))
+            if form:
+                response = await client.post(f"/{endpoint}", data=self._params(params or {}))
+            else:
+                response = await client.get(f"/{endpoint}", params=self._params(params or {}))
         except httpx.HTTPError as e:
             raise unreachable(e) from e
 
@@ -415,8 +427,8 @@ class UserClient(NavidromeClient):
                     return await self._answered(ask)
         return await self._answered(ask)
 
-    async def call(self, endpoint: str, params: dict | None = None) -> dict:
-        return await self._asked(lambda: super(UserClient, self).call(endpoint, params))
+    async def call(self, endpoint: str, params: dict | None = None, form: bool = False) -> dict:
+        return await self._asked(lambda: super(UserClient, self).call(endpoint, params, form))
 
     async def open(self, endpoint: str, params: dict, headers: dict | None = None) -> httpx.Response:
         return await self._asked(lambda: super(UserClient, self).open(endpoint, params, headers))
@@ -450,7 +462,7 @@ class _NoLogin(NavidromeClient):
             await asyncio.to_thread(auth.player_refused, self.login, self.why)
         raise SignedOut(self.why)
 
-    async def call(self, endpoint: str, params: dict | None = None) -> dict:
+    async def call(self, endpoint: str, params: dict | None = None, form: bool = False) -> dict:
         await self._refuse()
 
     async def open(self, endpoint: str, params: dict, headers: dict | None = None) -> httpx.Response:

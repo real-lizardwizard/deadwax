@@ -759,6 +759,17 @@ console.log('\nthe player bar\'s Shuffle, Repeat and Up Next, rendered (2.0.0-pl
   upNext.props.onClick('the click')
   const shown = find((node) => node.props?.['aria-label'] === 'Up Next', bar({ ...player }, { onUpNext() {}, upNextOpen: true }))[0]
   check('Up Next: its click to App with the event; pressed and expanded while the panel shows', [opened, upNext.props['aria-expanded'], shown.props['aria-expanded'], byClass('is-on')(shown)], [['the click'], false, true, true])
+  //? (2.0.0-player.58) Add to a playlist: in the tools, before Info, its click to App with the event - nothing of the player
+  const added = []
+  player.calls.length = 0
+  tree = bar({ ...player }, { onAddToPlaylist: (event) => added.push(event) })
+  const toPlaylist = find((node) => node.props?.['aria-label'] === 'Add to a playlist', tree)
+  const tools = find(byClass('app-playbar-tools'), tree)[0]
+  const named = find((node) => node.type === 'button', tools).map((node) => node.props['aria-label'])
+  toPlaylist[0]?.props.onClick('the click')
+  check('Add to a playlist: one button in the tools, before Info; its click to App with the event, the player untouched',
+    [toPlaylist.length, named.indexOf('Add to a playlist') === named.indexOf('Info') - 1, added, player.calls], [1, true, ['the click'], []])
+  check('...and none without the handler', find((node) => node.props?.['aria-label'] === 'Add to a playlist', bar({ ...player })).length, 0)
 }
 
 console.log('\nthe song menu: Play Next, Play Last - the albums remembered, then the player, then the notice only when queued')
@@ -784,6 +795,13 @@ console.log('\nthe song menu: Play Next, Play Last - the albums remembered, then
   render({ open: true, pick: { ...pick, label: 'Dummy' }, opener: { current: null }, onClose: () => { closed += 1 }, player })
   find(byClass('app-menu-item'), render({ open: true, pick: { ...pick, label: 'Dummy' }, opener: { current: null }, onClose: () => { closed += 1 }, player }))[1].props.onClick()
   check('Play Last that started the music (nothing was playing): no notice - the mini player says so', [W.calls, closed], [[['rememberAdded', ['dum']], ['playLast']], 2])
+  //? (2.0.0-player.58) Add to a playlist…, third: App's, handed what the menu was opened with - nothing of the player
+  W.calls.length = 0
+  const picked = []
+  const rows = find(byClass('app-menu-item'), render({ open: true, pick, opener: { current: null }, onClose: () => { closed += 1 }, player, onPlaylist: (what) => picked.push([what.label, what.tracks.map((t) => t.id)]) }))
+  check('with App\'s onPlaylist: Play Next, Play Last, Add to a playlist…', rows.map(words), ['Play Next', 'Play Last', 'Add to a playlist…'])
+  rows[2].props.onClick()
+  check('...its tap hands App the songs it was opened with, and calls nothing of the player', [picked, W.calls, asked.length], [[['Roads', ['roads']]], [], 2])
 }
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

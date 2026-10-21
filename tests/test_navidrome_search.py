@@ -212,9 +212,18 @@ def test_every_navidrome_route_asks_through_client_for(upstream, client, monkeyp
     for path in paths:
         client.get(path)
     client.post("/deadwax/navidrome/scrobble/so-1", headers={"origin": "http://testserver"})
+    #? 2.0.0-player.58: the playlists - two reads and four writes, each asking through the seam first
+    playlist_reads = ["/deadwax/navidrome/playlists", "/deadwax/navidrome/playlists/pl-1"]
+    for path in playlist_reads:
+        client.get(path)
+    playlist_writes = [("/deadwax/navidrome/playlists", {"name": "x"}), ("/deadwax/navidrome/playlists/pl-1/add", {"song_ids": ["so-1"]}),
+                       ("/deadwax/navidrome/playlists/pl-1/edit", {"base": [], "song_ids": []}), ("/deadwax/navidrome/playlists/pl-1/delete", None)]
+    for path, body in playlist_writes:
+        client.post(path, headers={"origin": "http://testserver"}, **({"json": body} if body is not None else {}))
 
     asked_routes = sorted(set(asked))
-    assert asked_routes == sorted({path.split("?")[0] for path in paths} | {"/deadwax/navidrome/scrobble/so-1"})
+    assert asked_routes == sorted({path.split("?")[0] for path in paths} | {"/deadwax/navidrome/scrobble/so-1"}
+                                  | set(playlist_reads) | {path for path, _ in playlist_writes})
     #? and the routes are exactly these and /scrub: a new one must be added here, asking through the
     #? seam too. /scrub (2.0.0-player.14, the turntable's window) answers from the shared MP4 cache,
     #? as the stream's wrap=mp4 does - one MP4 serves every phone - or since 2.0.0-player.23 from ranges
@@ -222,7 +231,7 @@ def test_every_navidrome_route_asks_through_client_for(upstream, client, monkeyp
     #? step 6 checks a user's access at the route. And /shuffle/{token} (2.0.0-player.57) asks Navidrome nothing: it
     #? pages deadwax's own order of what /shuffle read through the seam
     assert {"/scrub/{song_id}", "/shuffle/{token}"} <= {route.path for route in navidrome_routes.router.routes}
-    assert len({route.path for route in navidrome_routes.router.routes}) == 13
+    assert len({route.path for route in navidrome_routes.router.routes}) == 18
 
 
 def test_the_turntables_internal_call_asks_through_client_for(monkeypatch, tmp_path, configured):

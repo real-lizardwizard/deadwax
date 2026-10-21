@@ -8,6 +8,9 @@ import { useSheet } from './useSheet'
  * dimmed Now Playing, since the board draws the ••• button ("More: info, go to album, pin") and not
  * the menu itself.
  *
+ * Since 2.0.0-player.58, "Add to a playlist…" second, after Info: the song playing, into one of your playlists -
+ * App closes the menu and opens the picker (app/PlaylistPicker.tsx) over Now Playing, focus coming back to •••.
+ *
  * Only what does something today is in it. "Go to album" is left out - not greyed - for a song the
  * queue has no album id for, and the pin for an album that can't be pinned (no album, Navidrome
  * saying it has no release id, or deadwax unable to keep pins) - which App decides as the menu opens,
@@ -28,6 +31,7 @@ export function ActionMenu({
   onClose,
   onInfo,
   onAlbum,
+  onPlaylist = null,
   pinned = null,
   onPin = null,
 }: {
@@ -37,6 +41,8 @@ export function ActionMenu({
   onInfo: () => void
   /** null when the song playing names no album to go to */
   onAlbum: (() => void) | null
+  /** (2.0.0-player.58) Add to a playlist… - the song playing; null (or left out) for none */
+  onPlaylist?: (() => void) | null
   /** whether the playing song's album is pinned - null until that is known */
   pinned?: boolean | null
   /** pin or unpin it; null (or left out) when it can't be pinned */
@@ -53,6 +59,11 @@ export function ActionMenu({
           <button ref={first} type="button" class="app-menu-item" onClick={onInfo}>
             Info
           </button>
+          {onPlaylist && (
+            <button type="button" class="app-menu-item" onClick={onPlaylist}>
+              Add to a playlist…
+            </button>
+          )}
           {onAlbum && (
             <button type="button" class="app-menu-item" onClick={onAlbum}>
               Go to album

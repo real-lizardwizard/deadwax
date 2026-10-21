@@ -830,6 +830,64 @@ Home's **Edit** says **Not saved: …** under the list instead. The reasons:
   moved, so it can't be pinned. An album page shows no pin for such an album, and the ••• menu offers
   none when it knows; tag the album with its release (apply a release in the main page's editor).
 
+## A playlist says songs aren't in the library
+
+"2 songs in this playlist aren't in the library just now - deleted, or being moved": Navidrome still has
+those songs in the playlist, but no file for them - an album deleted, a folder moved and not yet scanned,
+an unmounted share. Navidrome doesn't list them, so deadwax can't name them. They come back by themselves
+once Navidrome finds the files again. In **Edit**, saving a change to the playlist's songs drops them for
+good (the page says so before **Done**); changing only its name, description or sharing keeps them. Only
+your own playlists say this - somebody else's shared one, or one Navidrome made from a file, plays without
+the line.
+
+## Done says the songs were saved, but…
+
+"The songs were saved, but Navidrome didn't take the name, description or sharing: …", or "Saved - but
+Navidrome didn't answer when deadwax asked for the playlist again: …": part of the save, or all of it,
+went through before Navidrome refused or stopped answering - a busy database ("database is locked"), a
+restart. **Edit** stays open with your changes: press **Done** again once Navidrome is answering and it
+finishes the rest (it knows the songs it sent may be there already, so it doesn't take them for a change
+made in another app). Or press **Cancel** and **Discard**: the playlist is asked for again and shows what
+was saved.
+
+## "deadwax adds up to 2,000 songs at a time"
+
+Adding a whole playlist (its **•••**) of more than 2,000 songs to another, or making a new one from it, is
+more than deadwax sends in one go - add an album or a few songs at a time, or use Amperfy or Navidrome. A
+name over 200 characters and a description over 1,000 are refused the same way, saying so.
+
+## Couldn't save: the playlist changed in another app
+
+"This playlist changed in another app while you were editing it - here it is now. Your changes weren't
+saved." While you were in **Edit**, the playlist's songs changed somewhere else - Amperfy, Navidrome's own
+page, or deadwax on another device. deadwax saves nothing then (it can't tell which order you meant), and
+shows the playlist as it is now: press **Edit** and make the change again.
+
+## No Edit on a playlist
+
+A playlist's page says why in Edit's place:
+
+- **"Only ethan can change this playlist."** It's somebody else's, shared with everyone. Play it, or add
+  its songs to one of yours.
+- **"Navidrome made this playlist from a file in the music folders…"** A smart playlist (`.nsp`) or one
+  imported from an `.m3u` - Navidrome keeps it in step with the file, so it can't be changed or deleted
+  here. These are under **From files**; the `.m3u` ones are often the sidecars that came with a Soulseek
+  download, which deadwax files beside the songs.
+- **"deadwax edits playlists of up to 2,000 songs…"** It plays here; change it in Amperfy or Navidrome.
+
+## The playlists I made in deadwax aren't in Amperfy
+
+With logins off, deadwax makes every playlist as `NAVIDROME_USER` - the one account it uses. Amperfy signed
+in as a different Navidrome account sees them only once they're shared (**Edit** → **Shared with
+everyone**). Turn [logins](configuration.md#logins-environment-only) on and each person's playlists are made as them, the
+same ones Amperfy shows. With logins on, Amperfy shows a new playlist after its next sync.
+
+## Amperfy can't save my change to Ethan's playlist
+
+It's Ethan's: a shared playlist can be played by everyone but changed only by its owner, and Navidrome
+refuses the change. Amperfy lets you try and doesn't say it was refused - its copy goes back to Navidrome's
+at its next sync. deadwax shows somebody else's playlist with no **Edit**.
+
 ## The app's Edit panel can't find the album's folder
 
 An album page's **Edit** (on a phone as on a desktop) finds the album's folder by its MusicBrainz release, or - for

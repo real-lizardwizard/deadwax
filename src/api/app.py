@@ -2,6 +2,8 @@ import re
 import asyncio
 from pathlib import Path
 from fastapi import Depends, FastAPI
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from contextlib import asynccontextmanager
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -329,6 +331,16 @@ def start() -> FastAPI:
     @app.exception_handler(SignedOut)
     async def signed_out(request, error: SignedOut):
         return JSONResponse(status_code=401, content={"detail": str(error)})
+
+    #? (2.0.0-player.58, review) a playlist route's body refused by its own validators: the refusal in deadwax's words
+    #? as a plain `detail` (routes/navidrome.py validation_words) - FastAPI's list of errors reached the page as
+    #? "POST ... failed". Every other route's 422 is FastAPI's own, as it always was.
+    @app.exception_handler(RequestValidationError)
+    async def refused_body(request, error: RequestValidationError):
+        words = navidrome.validation_words(request.url.path, error.errors())
+        if words is not None:
+            return JSONResponse(status_code=422, content={"detail": words})
+        return await request_validation_exception_handler(request, error)
 
     @app.get("/deadwax/health")
     async def health():

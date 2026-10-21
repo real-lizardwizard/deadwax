@@ -107,7 +107,8 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   a row you swipe along; and **Not played in a while**, the albums you last played longest ago (more
   than 30 days), when there are at least four. Tap an album to open it, an artist for their page.
   [Home and pins](#home-and-pins) has the details.
-- **Library**: **Albums**, **Artists** or **Songs**, chosen by the chips under the title, with a
+- **Library**: at its top, **Playlists** - Navidrome's playlists, yours and the ones shared with you
+  ([Playlists](#playlists)). Then **Albums**, **Artists** or **Songs**, chosen by the chips under the title, with a
   sort under them (tap it for the phone's own picker) and how many there are beside it once the
   whole list is in. **Albums** is a grid in one of four orders - **Recently added**, **Recently
   played**, **Artist** or **Title** - more loading as you scroll. **Artists** is every artist
@@ -130,7 +131,8 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   have one; for others, set **Disc** to 1 along with **Disc title** in the tag editor. Tap a song
   to play the album from there. Shuffle plays the album's songs in a random order. A song's **•••**, at the
   end of its row, and the **•••** in the bar for the whole album (beside the pin) have **Play Next** and
-  **Play Last** ([Up Next](#up-next-shuffle-and-repeat)). The back button
+  **Play Last** ([Up Next](#up-next-shuffle-and-repeat)) and, since 2.0.0-player.58, **Add to a playlist…**
+  ([Playlists](#playlists)). The back button
   names the tab it goes back to. The artist's name under the title opens [their page](#artist-pages).
   Under it, **In your library** (with logins on, **In the store** for an album that isn't yours, and
   **Add to my library** under Play - [the player as you](#the-player-as-you-with-logins-on)), and an **Also: …** chip for each other pressing of the album you
@@ -265,7 +267,8 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   close arrow, and closing it goes back to where you were. Until 2.0.0-player.10 it also showed two
   lines about how the song was sent and how the last song changes and seek went, and the Gapless
   switch: those are in [Info → Debug](#info--debug) and in **You** now.
-- **•••** on the now-playing screen opens a short menu: **Info**; **Go to album**, which closes
+- **•••** on the now-playing screen opens a short menu: **Info**; **Add to a playlist…**, for the song
+  playing ([Playlists](#playlists)); **Go to album**, which closes
   the now-playing screen and opens the song's album in the tab you're on, as if you'd tapped it
   there; and **Pin album to Home** (**Unpin album from Home** once it is), which pins the song's
   album, closes the menu and says at the top of the screen that it did (or why it couldn't). The
@@ -590,6 +593,79 @@ there is one user, so every device sees the same pins; with [logins](#signing-in
 their own, and the first admin to sign in takes over the ones pinned before. They're in deadwax's
 database (`DB_PATH`), in its `pins` table, through `GET` and `PUT /deadwax/me/pins` and
 `POST /deadwax/me/pins/toggle`. Home holds up to 50.
+
+## Playlists
+
+Since 2.0.0-player.58. deadwax's playlists **are Navidrome's own**, made as you - so Amperfy (or any
+other Subsonic app signed in as you) shows the same ones, and a playlist made or changed in either is the
+same playlist in the other. deadwax keeps none of its own.
+
+**Where they are.** On a phone, **Playlists** is the first row of the Library, above the chips. On a
+desktop it's the sidebar's **Playlists** group, under the Library's (and Browse's): **All playlists**, then
+up to 20 of them by name - yours, then the ones shared with you.
+
+**Whose.** The Playlists page lists three groups, each by name:
+
+- **Yours** - "12 songs · 48 min", and "Shared" on one you've shared;
+- **Shared with you** - other people's that they shared with everyone: "ethan · 20 songs · 1h 5m". You
+  can play them, and Play Next or add their songs to your own; only their owner can change them;
+- **From files** (folded: tap **From files (N)** to open it) - smart playlists and ones Navidrome made
+  from an `.m3u` file in the music folders. They play, but can't be changed or deleted here (Navidrome
+  would make one from a file again at its next scan). deadwax files the `.m3u` sidecars that come with a
+  Soulseek download into the album's folder, and Navidrome turns each into one of these, owned by its
+  first admin - so with logins off there may be many.
+
+Somebody else's private playlist is never shown, even when the Navidrome account deadwax uses is an admin
+there. With logins off every playlist is `NAVIDROME_USER`'s - everyone using deadwax shares them, as they
+share the one library - and so they are for the break-glass admin.
+
+**A playlist's page** is laid out as an album's: its cover (Navidrome's own 2x2 of four of its albums,
+which may take a moment to appear after the songs change), its name, whose it is ("Yours", "Yours ·
+Shared with everyone", "ethan's · Shared with you"), its description, the count and length, **Play** and
+**Shuffle**, and its songs, each with its own cover and "Artist · Album". Tap a song to play the playlist
+from there. A song's **•••** has Play Next, Play Last and Add to a playlist…, and the **•••** in the bar
+does the same for the whole playlist. If some of the songs of one of yours aren't in the library just now
+(deleted, or a folder being moved), it says how many - Navidrome doesn't list them, so they can't be shown
+by name, and they come back by themselves if the files do. (Somebody else's playlist and one from a file
+don't say.) A playlist deleted in another app says so. Info knows a little less about a song played from
+a playlist than from its album's page: its track number without "of", and no disc title, label or the
+album's song count - unless you've played that album from its own page, whose facts it keeps.
+
+**Adding songs.** **Add to a playlist…** is in a song's **•••** menu (on an album page, Search's songs, the
+Library's Songs and a playlist's page), an album's or a playlist's **•••** in its bar (all its songs),
+Now Playing's **•••** (the song playing) and, on a desktop, the player bar (the same). It opens a sheet:
+**New playlist…** first, then your playlists, the one you changed last on top. Tap one to add; a line
+at the top of the screen says what happened ("Added 11 songs to Late night"). If some of the songs are in
+it already, it asks first: one song - **Add it again** or **Cancel**; all of them - **Add them again** or
+**Cancel**; some - **Add them all** or **Skip those 2**. Songs are always added at the end.
+
+**Making one.** **New playlist** on the Playlists page (an empty one, opened at once), or **New playlist…**
+at the top of the sheet, which makes it with the songs you were adding. Type a name and press **Create**
+(or Enter). A new playlist is private: only you see it, until you share it.
+
+**Edit** (at the top right of one of yours - ready a moment after the page opens, once deadwax has the
+playlist as it is now; while Navidrome isn't answering, it waits): change its **Name** and **Description**, tick **Shared with
+everyone** (everyone with an account on your Navidrome can then find and play it - in deadwax, Navidrome
+and their other apps - and still only you can change it), and remove songs (✕) or put them in another
+order - **Move up** and **Move down**, or drag a song by its grip at the right (the page scrolls by
+itself as you drag near the top or bottom), with a finger or a mouse. Nothing is saved until **Done**,
+which saves it all at once; **Cancel** with changes asks first (**Discard** or **Keep editing**). Saving a
+change to the songs drops any songs that aren't in the library just now (the page says how many before you
+press Done); changing only the name, description or sharing never touches a song. If the playlist was
+changed in another app - Amperfy, or deadwax on another device - while you were editing, Done saves
+nothing and shows it as it is now, saying so. If Navidrome refuses the save, Edit stays open with the
+reason at the top, under Cancel and Done, and pressing **Done** again finishes it - even when part of it
+was saved already ("The songs were saved, but…", "Saved - but Navidrome didn't answer…"). Playlists of more
+than 2,000 songs play here but are edited in Amperfy or Navidrome.
+
+**Deleting**: **Delete playlist**, last in Edit, asks once more - it goes from Navidrome for good, from
+Amperfy and every other app too, and for everyone it's shared with; the songs stay in the library. There's
+no undo.
+
+**What Amperfy sees.** The same playlists, both ways. A playlist Amperfy makes is private, as deadwax's
+are. Amperfy lets you try to edit someone else's shared playlist, but Navidrome refuses the change - and
+Amperfy doesn't say so ([troubleshooting](troubleshooting.md#amperfy-cant-save-my-change-to-ethans-playlist)).
+
 ## Looking after deadwax from a phone
 
 Since 2.0.0-player.47 a phone has every page a desktop has for looking after deadwax - in any window
@@ -642,7 +718,8 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
   **Recently added**, **Albums**, **Artists** and **Songs** (Songs left out when Navidrome won't list
   songs, as on a phone; with logins on, the Library's three are yours and a **Browse** group under
   them has the store's Albums, Artists and Songs - [the player as you](#the-player-as-you-with-logins-on))
-  - then **Managing**: **Needs a look**, with how many albums need one, the
+  - then **Playlists** (since 2.0.0-player.58): **All playlists**, and up to 20 playlists by name, yours
+  then those shared with you, each opening its page ([Playlists](#playlists)) - then **Managing**: **Needs a look**, with how many albums need one, the
   library's review queue in the app, an album folder Navidrome doesn't list among them (**Not in
   Navidrome**; [the library guide](library.md#needs-a-look-in-the-app) has it),
   **Library care** - **Rescan** and the runs that fetch covers, CD art and lyrics for the albums
@@ -674,7 +751,8 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
   the time gone and the time left at its ends (click or drag along it; its dot shows when you point
   at it) - and since 2.0.0-player.57 **Shuffle** before previous and **Repeat** after next (one button
   going off, all, one; both purple while on), as Music on a Mac has them - and at the right **AirPlay**
-  when there's a speaker to send to, **Up Next**, **Info**, and the
+  when there's a speaker to send to, **Up Next**, **Add to a playlist** (since 2.0.0-player.58: the song
+  playing, into one of [your playlists](#playlists)), **Info**, and the
   [visualizer](#the-visualizer)'s button (five bars) - and before them, wherever the speed isn't 1x,
   [the speed's chip](#the-speed-fader) (`1.25x`; click it for 1x). With nothing playing it stays,
   saying so.
@@ -1870,6 +1948,10 @@ lists at all (**Not in Navidrome**). With logins off nothing here changes: one a
   the line after it says how: star it in Amperfy. It isn't listed as "removed by the admin" in You
   either - you removed it. If deadwax can't write the Remove down (its database refusing a write), it
   says so - Navidrome has unstarred it, and Remove again finishes it.
+- **Playlists are yours** (2.0.0-player.58): made as you in Navidrome, so they're yours in Amperfy too.
+  Ethan sees only the ones you share (Edit → **Shared with everyone**), under **Shared with you** -
+  playable, not changeable - and you see his the same way; neither sees the other's private ones
+  ([Playlists](#playlists)).
 - **Search** (one list since 2.0.0-player.55): in each section yours first, then the store's, then
   MusicBrainz's - each row of the store's saying **in your library** or **in the store** (nothing while
   that isn't known yet: such a row sits among yours and may say "in the store" there once known, rather
@@ -1945,6 +2027,10 @@ fixes that.
 - **Up Next** (2.0.0-player.57) has no history of what played before the song playing (Previous walks it),
   no "keep playing similar music" after the list, no ••• on album tiles (an album's ••• is on its page),
   no long-press or right-click menu, and no way yet to save it as a playlist.
+- **Playlists** (2.0.0-player.58) have no folders, no cover of your own (Navidrome's 2x2 only) and no
+  smart-playlist rules (Navidrome's own files make those); they aren't in Search or on Home; a playlist of
+  more than 2,000 songs plays but is edited elsewhere; and a song in a playlist twice shows the playing
+  bars on both rows.
 - **Siri**, and a lower bit rate for mobile data.
 - **The rest of deadwax**: the main page's browser preferences (search, candidates, auto-grab, the
   interface) and its track table's columns stay there (it works on a phone too); editing an album, the
@@ -1967,6 +2053,9 @@ question the whole player existed to answer. Still to find out:
 
 - whether the **lock-screen and Control Center controls** work;
 - whether **AirPlay** works;
+- **a playlist's Edit** (2.0.0-player.58) under a real finger: dragging a song by its grip, the page
+  scrolling by itself near the top and bottom; and the **New playlist** name field in the Add to a
+  playlist sheet with the keyboard up (the sheet sits at the bottom of the screen);
 - whether **the home-screen app works over plain `http`**, as it will over a VPN;
 - whether it keeps clear of the notch and the rounded corners **on its side**;
 - **the tab bar and the mini player above it** under a real finger, and whether they keep clear of

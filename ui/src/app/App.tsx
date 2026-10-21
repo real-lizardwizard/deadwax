@@ -2,11 +2,12 @@ import type { JSX } from 'preact'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { useDownloadJobs } from '../hooks/useDownloadJobs'
+import type { Playlist } from '../api/playlists'
 import type { ReleaseGroup } from '../api/types'
 import { me } from '../api/me'
 import { browseItems, closesOnCrossing, libraryItems, liesOver, makesRoom, sideOf, sidebarCurrent, sidebarMove, type ManagingKind, type SidebarId } from '../lib/appFrame'
 import { createRouter, type Router, type StorageLike } from '../lib/appHistory'
-import { CARE_PAGE, LOG_PAGE, QUEUE_ID, QUEUE_PAGE, SETTINGS_PAGE, TAB_LABELS, TABS, backLabel, currentRoute, scrollKey, type Nav, type Page, type PageKind, type Tab } from '../lib/appRoutes'
+import { CARE_PAGE, LOG_PAGE, PLAYLISTS_PAGE, QUEUE_ID, QUEUE_PAGE, SETTINGS_PAGE, TAB_LABELS, TABS, backLabel, currentRoute, playlistsMove, scrollKey, type Nav, type Page, type PageKind, type Tab } from '../lib/appRoutes'
 import { handleDownloadRequests } from '../lib/downloadRequests'
 import { movedTo, noteMove, type EditAlbum } from '../lib/albumEdit'
 import { announceAlbumsFiled } from '../lib/libraryEvents'
@@ -16,6 +17,7 @@ import { arrivingCards, asksAgain, requestsView, stallsOn, watchingOf, type Requ
 import { MB_PREFIX, artistPageId } from '../lib/artistPage'
 import { pinOf, type AlbumPinTarget } from '../lib/pins'
 import { newShelf } from '../lib/myLibrary'
+import { sidebarPlaylists, type PlaylistPick } from '../lib/playlists'
 import { songIds } from '../lib/songs'
 import type { Look } from '../lib/turntable'
 import type { QueuePick } from '../lib/upNext'
@@ -54,8 +56,12 @@ import { useFrame } from './useFrame'
 import { adminUntilAsked } from './session'
 import { useInfoDetails } from './useInfoDetails'
 import { PinNotice } from './PinNotice'
+import { PlaylistPage } from './PlaylistPage'
+import { PlaylistPicker } from './PlaylistPicker'
+import { PlaylistsPage } from './PlaylistsPage'
 import { QueueMenu } from './QueueMenu'
-import { setPinned, usePins } from './usePins'
+import { sayPins, setPinned, usePins } from './usePins'
+import { askPlaylists, playlistsNow, usePlaylists } from './usePlaylists'
 import { askQueueSummary, useQueueSummary } from './useQueueSummary'
 import { askMyLibrary, hasLibrary, seenAlbum, useMyLibrary } from './useMyLibrary'
 import { takeOpener } from './useSheet'
@@ -82,6 +88,9 @@ const MANAGING_KINDS: readonly PageKind[] = ['queue', 'care', 'settings', 'log']
 
 /** Nothing new in your library (logins off): one array for every render, so Home's element holds still. */
 const NOTHING_NEW: readonly Album[] = []
+
+/** (2.0.0-player.58) The sidebar's playlists while the list isn't known or the last ask failed: All playlists alone. */
+const NO_PLAYLISTS: readonly { id: string; name: string }[] = []
 
 /** Nothing arriving: one array for every render, so Home's element holds still while it stays so. */
 const NOTHING_ARRIVING: readonly RequestRow[] = []
@@ -262,6 +271,15 @@ function usePageShown(): boolean {
  * (QueueMenu.tsx: Play Next, Play Last) over everything - the page behind inert, a side panel too - with the songs
  * in hand, and the menu plays them in its tap. A whole library's shuffle (Part B) is fed its pages by
  * useShuffleFeed, called here once, as the player is.
+ *
+ * PLAYLISTS (2.0.0-player.58, app/PlaylistsPage.tsx, app/PlaylistPage.tsx, app/PlaylistPicker.tsx): Navidrome's own,
+ * as you. The Playlists page and a playlist's page are pages of their own kinds, pushed on the Library - from the
+ * phone Library's Playlists row, or the desktop sidebar's Playlists group, whose picks are siblings that replace one
+ * another (openPlaylistsPage, as the Managing pages do), never a pile. A playlist's page plays its songs in the tap,
+ * as an album's does. Add to a playlist - a song's or an album's ••• menu (QueueMenu), Now Playing's ••• menu, the
+ * desktop player bar - opens the picker over everything, the page behind inert (and a desktop's side panel, and Now
+ * Playing beneath it), focus coming back to what opened it. The one list of playlists is usePlaylists.ts's store,
+ * asked here for the sidebar as the desktop frame shows and the app comes back to the front.
  */
 export function App() {
   const player = usePlayer()
@@ -295,6 +313,8 @@ export function App() {
   const groupPreviews = useRef(new Map<string, ReleaseGroup>())
   //? the artists opened this session, as the row that opened them knew them: a page's hero at once
   const artistPreviews = useRef(new Map<string, ArtistPreview>())
+  //? (2.0.0-player.58) the playlists opened this session, as the row or form that opened them had them
+  const playlistPreviews = useRef(new Map<string, Playlist>())
   const router: Router = useMemo(
     () =>
       createRouter({
@@ -714,6 +734,26 @@ export function App() {
   }, [])
   const closeQueueMenu = useCallback(() => setQueueMenuOpen(false), [])
 
+  //? (2.0.0-player.58) Add to a playlist: the picker over everything, with the songs in hand - a new key each time, so
+  //? it starts afresh - giving focus back to what opened it: the song menu's •••, Now Playing's •••, the bar's button
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pick, setPick] = useState<PlaylistPick | null>(null)
+  const pickerOpener = useRef<HTMLElement | null>(null)
+  const picks = useRef(0)
+  const openPicker = (what: Omit<PlaylistPick, 'key'>, opener: HTMLElement | null) => {
+    if (!what.songs.length) return
+    pickerOpener.current = opener
+    picks.current += 1
+    setPick({ ...what, key: picks.current })
+    setPickerOpen(true)
+  }
+  const closePicker = useCallback(() => setPickerOpen(false), [])
+  //? the song menu's row: the menu closes and the picker opens with its songs, focus to come back to the •••
+  const queueToPlaylist = useCallback((what: QueuePick<AlbumWithSongs>) => {
+    setQueueMenuOpen(false)
+    openPicker({ label: what.label, songs: what.tracks.map((track) => ({ id: track.id, title: track.title, artist: track.artist })) }, queueMenuOpener.current)
+  }, [])
+
   //? The desktop's visualizer (2.0.0-player.20): the player bar's button opens it - its audio context
   //? made in this click, the gesture a browser lets it run from - and focus goes back to that button
   //? as it closes
@@ -854,6 +894,57 @@ export function App() {
     else router.open(page)
   }
   const openQueue = useCallback(() => openManagingPage(QUEUE_PAGE), [])
+
+  //? (2.0.0-player.58) The Playlists page or a playlist's, from the sidebar or the phone Library's row: on the Library
+  //? - its tab chosen when it isn't showing - then (lib/appRoutes.ts playlistsMove) nothing when that very page (kind
+  //? AND id) is on top; back to it when it is just under a playlists or playlist page on top (review); another
+  //? playlists or playlist page on top is REPLACED (the sidebar's picks are siblings, never a pile); anything else gets
+  //? it pushed. Never a pop and then a push
+  const openPlaylistsPage = (page: Page) => {
+    const stack = router.nav.stacks.library
+    const top = stack[stack.length - 1] ?? null
+    if (router.nav.tab !== 'library') router.tab('library')
+    const how = playlistsMove(stack, page)
+    if (how === 'stay') return
+    if (how === 'back') {
+      router.back()
+      return
+    }
+    scrolls.current.delete(scrollKey({ tab: 'library', page }))
+    if (how === 'become' && top) router.become(top, page)
+    else router.open(page)
+  }
+  const keepPlaylistPreview = (playlist: Playlist) => {
+    playlistPreviews.current.delete(playlist.id)
+    playlistPreviews.current.set(playlist.id, playlist)
+    if (playlistPreviews.current.size > PREVIEWS_KEPT) {
+      const [oldest] = playlistPreviews.current.keys()
+      if (oldest !== undefined) playlistPreviews.current.delete(oldest)
+    }
+  }
+  const openPlaylists = useCallback(() => openPlaylistsPage(PLAYLISTS_PAGE), [])
+  //? a row of the Playlists page, or a playlist just made: its page pushed over the one showing, as openAlbum does
+  const openPlaylist = useCallback((playlist: Playlist) => {
+    keepPlaylistPreview(playlist)
+    const page: Page = { kind: 'playlist', id: playlist.id, label: playlist.name }
+    const address = scrollKey({ tab: router.nav.tab, page })
+    if (address !== scrollKey(currentRoute(router.nav))) scrolls.current.delete(address)
+    router.open(page)
+  }, [])
+  //? one of the sidebar's playlists: by its id, drawn from the list's row
+  const openSidebarPlaylist = useCallback((id: string) => {
+    const listed = playlistsNow().list?.find((playlist) => playlist.id === id)
+    if (listed) keepPlaylistPreview(listed)
+    openPlaylistsPage({ kind: 'playlist', id, ...(listed ? { label: listed.name } : {}) })
+  }, [])
+  //? deleted on its page: said, and gone back from - the list is asked again by the delete itself. Only while that
+  //? page is still what shows (review): a delete answering after a tap on another tab, or another playlist chosen in
+  //? the sidebar, would have popped whatever page was on top then
+  const playlistDeleted = useCallback((name: string, id: string) => {
+    sayPins(`Deleted ${name}`)
+    const { page } = currentRoute(router.nav)
+    if (page?.kind === 'playlist' && page.id === id) router.back()
+  }, [])
   const openManaging = useCallback((kind: ManagingKind) => openManagingPage(kind === 'care' ? CARE_PAGE : kind === 'settings' ? SETTINGS_PAGE : LOG_PAGE), [])
   //? a facet chosen there: the page's address replaced, as a pressing chosen on a group page
   const pickFacet = useCallback((facet: string | null) => {
@@ -1051,6 +1142,10 @@ export function App() {
       openManaging(move.kind)
       return
     }
+    if (move.how === 'playlists') {
+      openPlaylistsPage(PLAYLISTS_PAGE)
+      return
+    }
     const away = router.nav.tab !== 'library' || router.nav.stacks.library.length > 0
     chooseLibrary(move.pick)
     if (!away) return
@@ -1186,7 +1281,7 @@ export function App() {
   const library = useMemo(
     () => (
       <NeedsNavidrome status={status} onRetry={checkNavidrome} title={TAB_LABELS.library}>
-        {librarySeen && <Library onOpen={openAlbum} onOpenArtist={openLibraryArtist} onSongMenu={openSongMenu} shown={libraryShown} />}
+        {librarySeen && <Library onOpen={openAlbum} onOpenArtist={openLibraryArtist} onOpenPlaylists={openPlaylists} onSongMenu={openSongMenu} shown={libraryShown} />}
       </NeedsNavidrome>
     ),
     [status, librarySeen, libraryShown],
@@ -1277,8 +1372,30 @@ export function App() {
     <LibraryCare admin={admin} live={managingLive(tab)} onBack={back} backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]} />
   )
 
+  //? (2.0.0-player.58) the Playlists page and a playlist's, inside the Navidrome gate as an album page is - told whether
+  //? they are what shows (their tab current, the app in front), and asking again as they come back to it
+  const playlistsView = (tab: Tab) => (
+    <NeedsNavidrome status={status} onRetry={checkNavidrome} title={TAB_LABELS[tab]}>
+      <PlaylistsPage onBack={back} backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]} shown={pageShown && nav.tab === tab} onOpenPlaylist={openPlaylist} />
+    </NeedsNavidrome>
+  )
+  const playlistView = (tab: Tab, page: Page, player: Player) => (
+    <NeedsNavidrome status={status} onRetry={checkNavidrome} title={TAB_LABELS[tab]}>
+      <PlaylistPage
+        id={page.id}
+        preview={playlistPreviews.current.get(page.id) ?? null}
+        player={player}
+        onBack={back}
+        backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]}
+        shown={pageShown && nav.tab === tab}
+        onDeleted={playlistDeleted}
+        onQueueMenu={openQueueMenu}
+      />
+    </NeedsNavidrome>
+  )
+
   const pageView = (tab: Tab, page: Page, player: Player) =>
-    page.kind === 'settings' ? settingsView(tab) : page.kind === 'log' ? logView(tab) : page.kind === 'care' ? careView(tab) : page.kind === 'queue' ? queueView(tab, page) : page.kind === 'artist' ? artistView(tab, page) : page.kind === 'group' ? (
+    page.kind === 'playlists' ? playlistsView(tab) : page.kind === 'playlist' ? playlistView(tab, page, player) : page.kind === 'settings' ? settingsView(tab) : page.kind === 'log' ? logView(tab) : page.kind === 'care' ? careView(tab) : page.kind === 'queue' ? queueView(tab, page) : page.kind === 'artist' ? artistView(tab, page) : page.kind === 'group' ? (
       <ReleaseGroupPage
         id={page.id}
         release={page.release ?? null}
@@ -1346,9 +1463,10 @@ export function App() {
   //? (2.0.0-player.20: and behind the desktop's visualizer, which covers the whole screen; 2.0.0-player.47:
   //? and behind a phone's Edit sheet)
   //? (2.0.0-player.57: and behind the song menu, on either frame)
-  const covered = (!desktop && (sheetOpen || sourcesOpen || artistOpen || editOpen)) || visualizerShown || queueMenuOpen
-  //? a desktop's side panels are inert under the visualizer, and under the song menu
-  const panelsCovered = visualizerShown || queueMenuOpen
+  //? (2.0.0-player.58: and behind the playlist picker, on either frame)
+  const covered = (!desktop && (sheetOpen || sourcesOpen || artistOpen || editOpen)) || visualizerShown || queueMenuOpen || pickerOpen
+  //? a desktop's side panels are inert under the visualizer, the song menu and the picker
+  const panelsCovered = visualizerShown || queueMenuOpen || pickerOpen
   //? the main area makes room for a desktop's panel only as a third column; a drawer lies over its edge
   //? (lib/appFrame.ts)
   const side = sideOf(frame, { sources: sourcesOpen, info: infoPanel, edit: editOpen, artist: artistOpen, upnext: upNextPanel })
@@ -1373,6 +1491,26 @@ export function App() {
     closeOver()
     void setPinned(menuPin, !menuPinned, true)
   } : null
+  //? (2.0.0-player.58) the song playing, into a playlist: from Now Playing's menu - which closes, the picker opening
+  //? over Now Playing, focus to come back to ••• - or the desktop bar's button
+  const playingPick = playing ? { label: playing.title, songs: [{ id: playing.id, title: playing.title, artist: playing.artist }] } : null
+  const playlistFromMenu = playingPick ? () => {
+    setOver('none')
+    openPicker(playingPick, moreOpener.current)
+  } : null
+  const playlistFromBar = (event: MouseEvent) => {
+    if (playingPick) openPicker(playingPick, takeOpener(event))
+  }
+
+  //? (2.0.0-player.58) the sidebar's Playlists group: the list asked as the desktop frame shows and the app comes back
+  //? to the front (not fresh - the Playlists page and the picker ask fresh); the listed playlist on top, current. While
+  //? the list isn't known, or the last ask failed (Navidrome away), the group is All playlists alone
+  const playlistsState = usePlaylists()
+  useEffect(() => {
+    if (desktop && pageShown) askPlaylists()
+  }, [desktop, pageShown])
+  const libraryTop = nav.stacks.library[nav.stacks.library.length - 1] ?? null
+  const currentPlaylist = nav.tab === 'library' && libraryTop?.kind === 'playlist' ? libraryTop.id : null
 
   return (
     <PlayerContext.Provider value={player}>
@@ -1390,6 +1528,9 @@ export function App() {
                 arriving={view.arriving.length}
                 admin={admin}
                 needsLook={needsLook}
+                playlists={playlistsState.problem ? NO_PLAYLISTS : sidebarPlaylists(playlistsState.list)}
+                currentPlaylist={currentPlaylist}
+                onPlaylist={openSidebarPlaylist}
                 onSelect={chooseFromSidebar}
                 onSearch={showSearch}
               />
@@ -1407,7 +1548,7 @@ export function App() {
 
             {/* the player: the mini player over the tab bar, or a desktop's player bar */}
             {desktop ? (
-              <PlayerBar player={player} onAlbum={toAlbum} onInfo={toggleInfo} infoOpen={infoPanel} onVisualizer={openVisualizer} onUpNext={toggleUpNext} upNextOpen={upNextPanel} />
+              <PlayerBar player={player} onAlbum={toAlbum} onInfo={toggleInfo} infoOpen={infoPanel} onVisualizer={openVisualizer} onUpNext={toggleUpNext} upNextOpen={upNextPanel} onAddToPlaylist={playlistFromBar} />
             ) : (
               <MiniPlayer player={player} onOpen={openSheet} />
             )}
@@ -1418,7 +1559,7 @@ export function App() {
           <NowPlaying
             player={player}
             open={sheetOpen}
-            covered={over !== 'none'}
+            covered={over !== 'none' || pickerOpen}
             opener={sheetOpener}
             onClose={closeSheet}
             onMore={openMenu}
@@ -1437,6 +1578,7 @@ export function App() {
             onClose={closeOver}
             onInfo={openInfo}
             onAlbum={toAlbum}
+            onPlaylist={playlistFromMenu}
             pinned={menuPinned}
             onPin={pinPlaying}
           />
@@ -1463,7 +1605,9 @@ export function App() {
           {/* the artist page's panel (2.0.0-player.45) - a side panel on a desktop, a sheet on a phone */}
           <ArtistPanel open={artistOpen} request={artistManage} opener={artistOpener} onClose={closeArtistManage} onSettled={artistSettled} panel={panel} covered={panelsCovered} />
           {/* (2.0.0-player.57) the song menu - a song's or an album's Play Next and Play Last - over everything */}
-          <QueueMenu open={queueMenuOpen} pick={queuePick} opener={queueMenuOpener} onClose={closeQueueMenu} player={player} />
+          <QueueMenu open={queueMenuOpen} pick={queuePick} opener={queueMenuOpener} onClose={closeQueueMenu} player={player} onPlaylist={queueToPlaylist} />
+          {/* (2.0.0-player.58) Add to a playlist - over everything, Now Playing and the song menu included */}
+          <PlaylistPicker open={pickerOpen} pick={pick} opener={pickerOpener} onClose={closePicker} />
           {/* what became of a pin, said over everything (2.0.0-player.18) */}
           <PinNotice />
           {/* the desktop's full-screen visualizer, over everything (2.0.0-player.20) */}

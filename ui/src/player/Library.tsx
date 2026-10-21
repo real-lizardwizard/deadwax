@@ -15,7 +15,7 @@ import { EMPTY_LIBRARY, NOTHING_OF_YOURS_PLAYED, yourEmptyNotice } from '../lib/
 import { readPlayerOrder, writePlayerOrder } from '../state/persisted'
 import { PAGE_SIZE, albumPage, dropPrefetch, librarySongs, prefetchAlbum, type Album, type AlbumOrder, type Artist, type Song } from './api'
 import { Cover } from './Cover'
-import { ChevronDownIcon } from './icons'
+import { ChevronDownIcon, ChevronRightIcon, PlaylistIcon } from './icons'
 
 const ORDERS: { id: AlbumOrder; label: string }[] = [
   { id: 'newest', label: 'Recently added' },
@@ -195,11 +195,18 @@ function AlbumsView({
  * (everything) - handed the ActionsContext object as one, so this file names no playback action. `shown`: the tab
  * is what shows, which is when a Shuffle asks for its first page.
  *
+ * PLAYLISTS (2.0.0-player.58): a Playlists row at the top, under the title and above the scope chips, on a phone -
+ * with logins on and off, in both scopes - opening the Playlists page (`onOpenPlaylists`). No count on it: one would
+ * make the Library ask Navidrome for playlists at its first show. A desktop's way in is the sidebar's Playlists group
+ * (app-desktop.css hides the row there).
+ *
  * Tiles and rows navigate; nothing here plays (see "The one app" in CLAUDE.md).
  */
-export function Library({ onOpen, onOpenArtist, onSongMenu, shown = true }: {
+export function Library({ onOpen, onOpenArtist, onOpenPlaylists, onSongMenu, shown = true }: {
   onOpen: (album: Album) => void
   onOpenArtist: (artist: Artist) => void
+  /** (2.0.0-player.58) the Playlists page */
+  onOpenPlaylists: () => void
   onSongMenu?: ((song: Song, event: MouseEvent) => void) | undefined
   shown?: boolean
 }) {
@@ -325,6 +332,15 @@ export function Library({ onOpen, onOpenArtist, onSongMenu, shown = true }: {
       <header class="pl-large-header">
         <h1 class="pl-large-title" ref={title} tabIndex={-1}>{desktop ? libraryTitle(drawn, personal) : 'Library'}</h1>
       </header>
+
+      {/* (2.0.0-player.58) the phone's way into the playlists - it navigates, and asks nothing */}
+      <div class="app-group app-library-playlists">
+        <button type="button" class="app-row app-link-row" onClick={onOpenPlaylists}>
+          <PlaylistIcon class="app-library-playlists-icon" />
+          <span class="app-row-label">Playlists</span>
+          <ChevronRightIcon class="app-chevron" />
+        </button>
+      </div>
 
       {/* (2.0.0-player.52) with a library of your own: yours, or the store - the one way to the whole store */}
       {personal && (

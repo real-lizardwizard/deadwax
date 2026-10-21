@@ -1904,3 +1904,50 @@ def test_up_next_and_the_song_menu_lock_the_page_and_reuse_infos_look():
     query = "@media (min-width: 1024px)"
     assert declarations(desk, ".app-desk .app-playbar-transport .app-playbar-button.is-on", query)["color"] == "var(--dw-accent)"
     assert all(context.startswith("@media") for context, selector, _ in rules(desk) if "app-playbar-shuffle" in selector or "app-playbar-repeat" in selector)
+
+
+def test_playlists_lock_the_page_scroll_their_picker_and_reach_a_finger():
+    """(2.0.0-player.58) The picker locks the page behind with a class of its own; its list scrolls inside the sheet,
+    saying its touches pan, in a layer that takes every touch; Edit's rows are Home's Pinned rows (their 44px buttons
+    and the grip that alone takes a drag); the bar's Edit / Done chip reaches 44px; the fields are 16px or more, so
+    iOS doesn't zoom; the Library's row is a grouped row; the two Deletes are the theme's danger colours."""
+    assert declarations(APP, "html.app-picker-open")["overflow"] == "hidden"
+    ui = Path(__file__).resolve().parent.parent / "ui" / "src"
+    picker = (ui / "app" / "PlaylistPicker.tsx").read_text()
+    assert "lockClass: 'app-picker-open'" in picker and "app-layer app-menu-layer app-playlist-layer" in picker
+    scroller = declarations(APP, ".app-playlist-picker-list")
+    assert (scroller["overflow-y"], scroller["touch-action"], scroller["overscroll-behavior"]) == ("auto", "pan-y", "contain")
+    assert declarations(APP, ".app-layer")["touch-action"] == "none"
+    page = (ui / "app" / "PlaylistPage.tsx").read_text()
+    assert 'class="app-pin-move app-pin-up"' in page and 'class="app-pin-grip"' in page
+    assert declarations(APP, ".app-pin-move")["width"] == "var(--pl-hit)" and declarations(APP, ".app-pin-grip")["touch-action"] == "none"
+    chip = declarations(APP, ".app-playlist-chip::before")
+    assert chip["inset"] == "calc(-1 * var(--app-pin-toggle-reach))" and declarations(APP, ".app-playlist-chip")["height"] == "var(--app-pin-toggle)"
+    for field in (".app-playlist-input", ".app-new-playlist-input"):
+        assert declarations(APP, field)["font-size"] == "var(--app-playlist-field-text)", field
+    assert ALL_TOKENS["--app-playlist-field-text"] == "var(--dw-text-body)" and px("--dw-text-body") >= 16
+    library = (ui / "player" / "Library.tsx").read_text()
+    assert '<div class="app-group app-library-playlists">' in library and 'class="app-row app-link-row" onClick={onOpenPlaylists}' in library
+    assert declarations(APP, ".app-confirm-buttons .app-button.is-danger")["background"] == "var(--dw-danger-bg)"
+    assert declarations(APP, ".app-text-button.is-danger")["color"] == "var(--dw-danger-text)"
+
+
+def test_playlists_words_are_on_cards_and_in_view():
+    """(2.0.0-player.58, review) The picker's heading, what it adds and its refusals are on a card (.app-group) of their
+    own - on the scrim the page showed through them; a playlist page's Done reason and Cancel question are a line of
+    its sticky bar, full width under its buttons - above the hero they were drawn off screen; From files' chevron
+    turns by a token."""
+    ui = Path(__file__).resolve().parent.parent / "ui" / "src"
+    picker = (ui / "app" / "PlaylistPicker.tsx").read_text()
+    head = picker.index('<div class="app-group app-playlist-picker-head">')
+    assert head < picker.index('class="app-playlist-picker-title"') < picker.index('class="app-playlist-picker-what"') < picker.index("app-playlist-picker-problem")
+    assert picker.index("app-playlist-picker-problem") < picker.index("app-playlist-question")
+    assert declarations(APP, ".app-group")["background"] == "var(--dw-card)"
+    assert declarations(APP, ".app-playlist-picker-head")["flex"] == "none"
+    page = (ui / "app" / "PlaylistPage.tsx").read_text()
+    bar = page[page.index('<header ref={bar}'):page.index("</header>")]
+    assert '<div class="app-playlist-ask">' in bar and "{editProblem &&" in bar and "asking === 'discard'" in bar
+    assert declarations((PLAYER / "player.css").read_text(), ".pl-nav-bar")["position"] == "sticky"
+    assert declarations(APP, ".app-playlist-bar")["flex-wrap"] == "wrap" and declarations(APP, ".app-playlist-ask")["flex"] == "0 0 100%"
+    assert declarations(APP, ".app-playlists-fold-icon.is-open")["transform"] == "rotate(var(--app-playlists-fold-turn))"
+    assert ALL_TOKENS["--app-playlists-fold-turn"] == "90deg"

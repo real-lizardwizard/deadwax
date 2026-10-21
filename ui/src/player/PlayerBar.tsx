@@ -1,7 +1,7 @@
 import { Cover } from './Cover'
 import { SpeedChip } from './SpeedChip'
 import { nextRepeat } from '../lib/upNext'
-import { AirPlayIcon, InfoIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon, QueueIcon, RepeatIcon, RepeatOneIcon, ShuffleIcon, VisualizerIcon } from './icons'
+import { AirPlayIcon, InfoIcon, NextIcon, PauseIcon, PlayIcon, PlaylistAddIcon, PreviousIcon, QueueIcon, RepeatIcon, RepeatOneIcon, ShuffleIcon, VisualizerIcon } from './icons'
 import { Scrubber } from './NowPlaying'
 import type { Player } from './usePlayer'
 
@@ -28,6 +28,8 @@ import type { Player } from './usePlayer'
  *    a Mac has them - Repeat one button cycling off, all, one, and both tinted while on - and Up Next before
  *    Info, which opens the queue as the side panel (app/UpNext.tsx), as Info's opens. During a whole library's
  *    shuffle the Shuffle button reads on and is aria-disabled, as Up Next's chip is: that order is the shuffle.
+ *  - (2.0.0-player.58) Add to a playlist, between Up Next and Info: App opens the picker (app/PlaylistPicker.tsx)
+ *    for the song playing from its click - no playback action.
  *
  * Its transport calls the player straight from the click - nothing awaited, the gesture rule
  * (ui/test/app-rules.sim.cjs allows this file toggle, next, previous, showAirPlay, setShuffle and setRepeat). With nothing
@@ -40,6 +42,7 @@ export function PlayerBar({
   infoOpen,
   onVisualizer,
   onUpNext,
+  onAddToPlaylist,
   upNextOpen = false,
 }: {
   player: Player
@@ -53,6 +56,9 @@ export function PlayerBar({
   onVisualizer: (event: MouseEvent) => void
   /** (2.0.0-player.57) Up Next's click - the event, as Info's */
   onUpNext?: ((event: MouseEvent) => void) | undefined
+  /** (2.0.0-player.58) Add to a playlist: the picker, for the song playing - the event, so App takes the button as
+   *  what the picker gives focus back to */
+  onAddToPlaylist?: ((event: MouseEvent) => void) | undefined
   /** the Up Next panel is showing */
   upNextOpen?: boolean
 }) {
@@ -148,6 +154,11 @@ export function PlayerBar({
         >
           <QueueIcon class="app-playbar-icon" />
         </button>
+        {onAddToPlaylist && (
+          <button type="button" class="app-playbar-button app-playbar-playlist" onClick={onAddToPlaylist} aria-label="Add to a playlist" aria-haspopup="dialog">
+            <PlaylistAddIcon class="app-playbar-icon" />
+          </button>
+        )}
         <button
           type="button"
           class={`app-playbar-button${infoOpen ? ' is-on' : ''}`}

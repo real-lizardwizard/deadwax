@@ -4785,6 +4785,318 @@ html.app-queue-menu-open { overflow: hidden; }
 
 .app-shuffle-button[aria-disabled='true'] { opacity: var(--app-pin-off); }
 
+/* ===== playlists (2.0.0-player.58) =====
+   Navidrome's own playlists, as you. Nearly all reused: the Playlists page's rows are Library > Artists' result
+   rows, a playlist's page is the album page (its hero, its rows - each with its own cover in the number's place -
+   and its •••), the picker is ActionMenu's sheet with a list that scrolls inside it, Edit's rows are Home's Pinned
+   rows, and the questions are buttons the app has. New here: the picker's lock and list, the playlists' covers and
+   empty squares, the Library's row, the bar's Edit / Done chip and Cancel, Edit's fields, and the red Delete. */
+:root {
+    --app-playlist-row-cover: 40px;       /* a song's own cover on a playlist's row, and a playlist's in the picker */
+    --app-playlist-art: 56px;             /* a playlist's mosaic on the Playlists page */
+    --app-playlist-art-icon: 24px;        /* the playlist glyph on an empty square */
+    --app-playlist-hero-icon: 64px;       /* ...and on an empty playlist's hero */
+    --app-picker-list-max: 50dvh;         /* the picker's list scrolls past this */
+    --app-playlist-edit-gap: 12px;        /* between Edit's fields, and before its rows */
+    --app-playlist-field-text: var(--dw-text-body); /* Edit's and the form's fields: 16px or more, so iOS doesn't zoom */
+    --app-playlists-fold-turn: 90deg;     /* From files' chevron, opened */
+}
+
+html.app-picker-open { overflow: hidden; }
+
+/* --- the Library's Playlists row, above the scope chips (a phone's - app-desktop.css hides it) --- */
+.app-library-playlists { margin: var(--pl-gap-sm) var(--pl-edge-right) var(--pl-gap-sm) var(--pl-edge-left); }
+.app-library-playlists .app-row { width: 100%; flex-wrap: nowrap; justify-content: flex-start; text-align: left; }
+.app-library-playlists .app-row-label { flex: 1; }
+.app-library-playlists-icon { flex: none; width: var(--app-playlist-art-icon); height: var(--app-playlist-art-icon); color: var(--dw-accent); }
+
+/* --- a playlist's cover, or the empty square with the glyph on it --- */
+.app-playlist-art,
+.app-playlist-pick-art {
+    display: grid;
+    flex: none;
+    place-items: center;
+    overflow: hidden;
+    border-radius: var(--dw-radius-cover);
+    background: var(--dw-empty-cover);
+    color: var(--dw-text-2);
+}
+
+.app-playlist-art { width: var(--app-playlist-art); height: var(--app-playlist-art); }
+.app-playlist-pick-art { width: var(--app-playlist-row-cover); height: var(--app-playlist-row-cover); }
+.app-playlist-pick-art.is-new { background: var(--dw-secondary-bg); color: var(--dw-accent); }
+
+.app-playlist-art-img,
+.app-playlist-pick-cover { width: 100%; height: 100%; object-fit: cover; }
+
+.app-playlist-art-icon { width: var(--app-playlist-art-icon); height: var(--app-playlist-art-icon); }
+
+/* --- the Playlists page --- */
+.app-playlists-list { padding: 0 var(--pl-edge-right) 0 var(--pl-edge-left); }
+.app-playlists-group { margin-top: var(--app-shelf-gap); }
+.app-playlists-heading { padding: 0 var(--pl-edge-right) 0 var(--pl-edge-left); }
+.app-playlists-new { flex: none; margin-left: auto; padding: 0 var(--pl-gap-sm); font-size: var(--dw-text-body); }
+.app-playlists-problem { padding: 0 var(--pl-edge-right) 0 var(--pl-edge-left); }
+.app-playlists-form { margin: var(--pl-gap-sm) var(--pl-edge-right) 0 var(--pl-edge-left); }
+.app-playlists-empty-lead { color: var(--dw-text); font-weight: var(--dw-weight-semibold); }
+.app-playlists-empty-new { margin-top: var(--pl-gap-sm); }
+
+/* From files (N): the heading is the fold, a finger tall, its chevron turning as it opens */
+.app-playlists-fold {
+    display: flex;
+    align-items: center;
+    gap: var(--app-heading-gap);
+    width: 100%;
+    min-height: var(--pl-hit);
+    color: inherit;
+    font: inherit;
+    text-align: left;
+}
+
+.app-playlists-fold:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring-inset);
+    border-radius: var(--dw-radius-control);
+}
+
+.app-playlists-fold-icon.is-open { transform: rotate(var(--app-playlists-fold-turn)); }
+
+/* --- a playlist's page: the album page's, its bar's right-hand group together --- */
+.app-playlist-bar .pl-back + .app-playlist-chip,
+.app-playlist-bar .app-playlist-cancel + .app-album-more,
+.app-playlist-bar .app-playlist-cancel + .app-playlist-chip { margin-left: auto; }
+.app-playlist-bar .app-album-more + .app-playlist-chip { margin-left: var(--app-album-more-room); }
+
+.app-playlist-cancel { flex: none; min-height: var(--pl-hit); padding: 0 var(--pl-gap-sm) 0 0; font-size: var(--dw-text-body); }
+.app-playlist-cancel[aria-disabled='true'] { opacity: var(--app-pin-off); }
+
+/* Edit / Done: the phone album bar's Edit chip, the pin's size, reaching 44px - on both frames */
+.app-playlist-chip {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    height: var(--app-pin-toggle);
+    padding: 0 var(--app-pin-toggle-pad);
+    border: var(--dw-hairline) solid var(--dw-secondary-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-secondary-bg);
+    box-shadow: var(--dw-highlight);
+    color: var(--dw-text-on-secondary);
+    font-size: var(--dw-text-footnote);
+    font-weight: var(--dw-weight-semibold);
+}
+
+.app-playlist-chip::before {
+    content: '';
+    position: absolute;
+    inset: calc(-1 * var(--app-pin-toggle-reach));
+}
+
+.app-playlist-chip:active:not([aria-disabled='true']) { background: var(--dw-secondary-bg-active); }
+.app-playlist-chip[aria-disabled='true'] { opacity: var(--app-pin-off); }
+
+.app-playlist-chip:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+}
+
+
+/* an empty playlist's hero: the square with the glyph */
+.app-playlist-hero-empty { display: grid; place-items: center; color: var(--dw-text-3); }
+.app-playlist-hero-icon { width: var(--app-playlist-hero-icon); height: var(--app-playlist-hero-icon); }
+
+.app-playlist-owner { color: var(--dw-text-2); }
+.app-playlist-notes { display: flex; flex-direction: column; gap: var(--pl-gap-xs); margin-top: var(--pl-gap-xs); }
+
+.app-playlist-comment {
+    margin: 0;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+    white-space: pre-line;
+}
+
+.app-playlist-line,
+.app-playlist-gone,
+.app-playlist-empty { padding: 0 var(--pl-edge-right) 0 var(--pl-edge-left); }
+
+/* a song's row: its own cover in the number's column, the playing bars over it */
+.app-playlist-track { grid-template-columns: var(--app-playlist-row-cover) minmax(0, 1fr) auto; }
+
+.app-playlist-track-art {
+    position: relative;
+    display: grid;
+    width: var(--app-playlist-row-cover);
+    height: var(--app-playlist-row-cover);
+}
+
+.app-playlist-track-cover {
+    width: 100%;
+    height: 100%;
+    border-radius: var(--dw-radius-cover);
+    background: var(--dw-empty-cover);
+    object-fit: cover;
+}
+
+.app-playlist-track-bars {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    border-radius: var(--dw-radius-cover);
+    background: var(--dw-scrim);
+}
+
+/* --- Edit: the fields, sharing, and Home's Pinned rows --- */
+.app-playlist-editing {
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-playlist-edit-gap);
+    padding: 0 var(--pl-edge-right) var(--app-shelf-gap) var(--pl-edge-left);
+}
+
+.app-playlist-field { display: flex; flex-direction: column; gap: var(--pl-gap-xs); }
+.app-playlist-field-label,
+.app-new-playlist-label { color: var(--dw-text-2); font-size: var(--dw-text-footnote); }
+
+.app-playlist-input,
+.app-new-playlist-input {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: var(--dw-row);
+    padding: var(--pl-gap-xs) var(--app-row-pad);
+    border: var(--dw-hairline) solid var(--dw-border-cover);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-well);
+    box-shadow: var(--dw-well-inset);
+    color: var(--dw-text);
+    font: inherit;
+    font-size: var(--app-playlist-field-text);
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.app-playlist-textarea { resize: vertical; }
+
+.app-playlist-input:focus-visible,
+.app-new-playlist-input:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+}
+
+.app-playlist-share-note { margin-top: calc(-1 * var(--pl-gap-xs)); }
+
+.app-playlist-edit {
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-pin-row-gap);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.app-playlist-delete { align-self: flex-start; padding: 0; }
+.app-text-button.is-danger { color: var(--dw-danger-text); }
+.app-playlist-delete[aria-disabled='true'] { opacity: var(--app-pin-off); }
+
+/* --- the questions asked in place: Delete's, Edit's Cancel, the picker's duplicates --- */
+.app-confirm-line { display: flex; flex-direction: column; gap: var(--pl-gap-sm); }
+/* Done's reason and Cancel's question: a line of the playlist page's bar, full width under its buttons - the bar is
+   sticky, so they are in view wherever the rows have got to (review: above the hero, they were drawn off screen) */
+.app-playlist-bar { flex-wrap: wrap; }
+.app-playlist-ask { display: flex; flex: 0 0 100%; flex-direction: column; gap: var(--pl-gap-sm); padding-bottom: var(--pl-gap-sm); }
+.app-playlist-bar-line { margin: 0; }
+
+.app-confirm-words,
+.app-playlist-question-words { margin: 0; font-size: var(--dw-text-body); line-height: var(--dw-leading-note); }
+
+.app-confirm-buttons { display: flex; flex-wrap: wrap; gap: var(--pl-gap-sm); }
+.app-confirm-buttons .app-button { flex: 1 1 auto; }
+
+.app-confirm-buttons .app-button.is-primary,
+.app-new-playlist-buttons .app-button.is-primary {
+    border-color: var(--dw-primary-border);
+    background: var(--dw-primary-bg);
+    box-shadow: var(--dw-primary-highlight);
+    color: var(--dw-text);
+}
+
+.app-confirm-buttons .app-button.is-danger {
+    border-color: var(--dw-danger-border);
+    background: var(--dw-danger-bg);
+    color: var(--dw-text);
+}
+
+.app-confirm-buttons .app-button[aria-disabled='true'],
+.app-new-playlist-buttons .app-button[aria-disabled='true'] { opacity: var(--app-pin-off); }
+
+/* --- New playlist's form --- */
+.app-new-playlist {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pl-gap-sm);
+    padding: var(--app-row-pad) var(--dw-gutter-grouped);
+}
+
+.app-new-playlist-field { display: flex; flex-direction: column; gap: var(--pl-gap-xs); }
+.app-new-playlist-buttons { display: flex; flex-wrap: wrap; gap: var(--pl-gap-sm); }
+.app-new-playlist-buttons .app-button { flex: 1 1 auto; }
+
+/* --- the picker: ActionMenu's sheet, its list scrolling inside it (the layer takes every touch) --- */
+.app-playlist-picker { max-height: calc(100% - var(--pl-safe-top) - var(--app-info-pad)); }
+
+/* the heading, what it adds and the words: a card, as the list and Cancel are - never text on the scrim */
+.app-playlist-picker-head {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: var(--pl-gap-xs);
+    padding: var(--app-row-pad) 0;
+}
+
+.app-playlist-picker-title {
+    margin: 0;
+    padding: 0 var(--dw-gutter-grouped);
+    font-size: var(--dw-text-heading);
+    font-weight: var(--dw-weight-semibold);
+    line-height: var(--dw-leading-heading);
+}
+
+.app-playlist-picker-what {
+    margin: 0;
+    padding: 0 var(--dw-gutter-grouped);
+    overflow: hidden;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-playlist-picker-list {
+    flex: 0 1 auto;
+    max-height: var(--app-picker-list-max);
+    overflow-y: auto;
+    touch-action: pan-y;
+    overscroll-behavior: contain;
+}
+
+.app-playlist-pick { gap: var(--app-result-gap); min-height: var(--app-result); }
+.app-playlist-pick + .app-playlist-pick,
+.app-new-playlist + .app-playlist-pick { border-top: var(--dw-hairline) solid var(--dw-border); }
+.app-playlist-pick-text { display: flex; flex: 1; flex-direction: column; gap: var(--app-result-lines); min-width: 0; }
+
+.app-playlist-pick-name,
+.app-playlist-pick-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-playlist-pick-line { color: var(--dw-text-2); font-size: var(--dw-text-footnote); }
+
+.app-playlist-picker-note { margin: 0; padding: var(--app-row-pad) var(--dw-gutter-grouped); color: var(--dw-text-2); font-size: var(--dw-text-footnote); }
+.app-playlist-picker-note .app-text-button { padding: 0; font-size: var(--dw-text-body); }
+.app-playlist-question { display: flex; flex-direction: column; gap: var(--pl-gap-sm); padding: var(--dw-gutter-grouped); }
+.app-playlist-picker-problem { padding: 0 var(--dw-gutter-grouped); }
+
 /* ===== looking after deadwax from a phone (2.0.0-player.47) =====
    The phone gets every managing page the desktop has: the Edit panel as a sheet over the whole screen
    (app/EditPanel.tsx - the main page's editors hosted in it as they are, styled here by their own ids

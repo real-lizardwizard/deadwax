@@ -143,8 +143,10 @@ export function isBrowse(pick: LibraryPick, personal: boolean): boolean {
 }
 
 /** The sidebar's items - `queue` is Managing's "Needs a look" (2.0.0-player.25), `care` its "Library
- *  care" (2.0.0-player.42), `settings` and `log` its "Settings" and "Log" (2.0.0-player.33) - an admin's. */
-export type SidebarId = 'home' | 'requests' | LibraryPick | 'queue' | 'care' | 'settings' | 'log' | 'you'
+ *  care" (2.0.0-player.42), `settings` and `log` its "Settings" and "Log" (2.0.0-player.33) - an admin's;
+ *  `playlists` (2.0.0-player.58) the Playlists group's "All playlists" (each playlist under it is a button of
+ *  its own, by id - Sidebar's `onPlaylist`). */
+export type SidebarId = 'home' | 'requests' | LibraryPick | 'playlists' | 'queue' | 'care' | 'settings' | 'log' | 'you'
 
 export interface SidebarItem {
   id: SidebarId
@@ -198,6 +200,10 @@ export function libraryTitle(pick: LibraryPick, personal = false): string {
   return (personal ? PERSONAL_TITLES : LIBRARY_TITLES)[pick]
 }
 
+/** The Playlists group's first item (2.0.0-player.58): the Playlists page - the playlists listed under it are buttons
+ *  of their own (Sidebar), up to lib/playlists.ts SIDEBAR_PLAYLISTS_MAX. */
+export const SIDEBAR_PLAYLISTS: SidebarItem = { id: 'playlists', label: 'All playlists' }
+
 /** Managing's own item (2.0.0-player.25): the review queue, above the link to the main page. */
 export const SIDEBAR_QUEUE: SidebarItem = { id: 'queue', label: 'Needs a look' }
 
@@ -239,6 +245,9 @@ export function shownPick(pick: LibraryPick, hasSongs: boolean | null, frame: Fr
  *  none: its place is the field, which says what it is searching for. Needs a look is its own item
  *  while its page is the one on top (`page`, the tab's top page), whatever tab it was pushed on. */
 export function sidebarCurrent(tab: Tab, pick: LibraryPick, hasSongs: boolean | null, page: Page | null = null, personal = false): SidebarId | null {
+  //? (2.0.0-player.58) the Playlists page and a playlist's - before the Library tab's own branch: App draws a listed
+  //? playlist's own row current in place of All playlists
+  if (page?.kind === 'playlists' || page?.kind === 'playlist') return 'playlists'
   if (page?.kind === 'queue') return 'queue'
   //? Library care (2.0.0-player.42), the same way
   if (page?.kind === 'care') return 'care'
@@ -266,8 +275,11 @@ export type SidebarMove =
   | { how: 'queue'; tab: 'you' }
   /** Library care, the server's settings, or the log: its page, on You (App's openManaging) */
   | { how: 'managing'; tab: 'you'; kind: ManagingKind }
+  /** (2.0.0-player.58) All playlists: the Playlists page, on the Library (App's openPlaylistsPage) */
+  | { how: 'playlists' }
 
 export function sidebarMove(item: SidebarId, pick: LibraryPick, hasSongs: boolean | null, personal = false): SidebarMove {
+  if (item === 'playlists') return { how: 'playlists' }
   if (item === 'queue') return { how: 'queue', tab: 'you' }
   if (item === 'care' || item === 'settings' || item === 'log') return { how: 'managing', tab: 'you', kind: item }
   if (item === 'home' || item === 'requests' || item === 'you') return { how: 'tab', tab: item }

@@ -334,6 +334,8 @@ const ALLOWED = {
   'app/ShuffleSongs.tsx': ['playTracks'],
   //? ...and its feed, which brings the rest of the order in as it plays - nothing that plays
   'app/useShuffleFeed.ts': ['extendQueue'],
+  //? playlists (2.0.0-player.58): a playlist's Play, Shuffle and a row's tap - its songs, all in hand
+  'app/PlaylistPage.tsx': ['playTracks'],
 }
 
 /** Which playback actions a file's code reaches: by name, as a member, or taken apart from one. */
@@ -403,6 +405,7 @@ console.log('\nthe playback actions only from the files allowed')
   check('where they are reached', Object.fromEntries(reached), {
     'app/ArtistPage.tsx': ['playTracks'],
     'app/GaplessChoice.tsx': ['setGapless'],
+    'app/PlaylistPage.tsx': ['playTracks'],
     'app/QueueMenu.tsx': ['playLast', 'playNext'],
     'app/Requests.tsx': ['playTracks'],
     'app/Search.tsx': ['playTracks'],
@@ -575,7 +578,7 @@ console.log('\nNow Playing covers everything behind it')
   //? too - outside that wrapper, each takes it as `covered`, as Now Playing takes what is over it
   //? (2.0.0-player.57: and under the song menu - `panelsCovered`, the visualizer or the menu)
   check('...and a desktop\'s Sources and Info panels, outside it, are inert under the visualizer',
-    [/<Sources\b[^\n]*\bcovered=\{panelsCovered\}[^\n]*\/>/.test(app) && /\n\s*const panelsCovered = visualizerShown \|\| queueMenuOpen\n/.test(app), /<InfoSheet\b[^>]*\bcovered=\{panelsCovered\}/.test(app),
+    [/<Sources\b[^\n]*\bcovered=\{panelsCovered\}[^\n]*\/>/.test(app) && /\n\s*const panelsCovered = visualizerShown \|\| queueMenuOpen \|\| pickerOpen\n/.test(app), /<InfoSheet\b[^>]*\bcovered=\{panelsCovered\}/.test(app),
       ...['app/Sources.tsx', 'app/InfoSheet.tsx'].flatMap((file) => [/aria-hidden=\{!open \|\| covered\} inert=\{!open \|\| covered\}/.test(code(read(file))),
         /useSheet\(\{ open, covered, onClose/.test(code(read(file)))])],
     [true, true, true, true, true, true])
@@ -611,6 +614,8 @@ console.log('\nevery sheet is a sheet by the one hook')
     //? Up Next (2.0.0-player.57) - over Now Playing on a phone, a side panel on a desktop - and the song menu
     'app/UpNext.tsx': 'app-upnext-open',
     'app/QueueMenu.tsx': 'app-queue-menu-open',
+    //? Add to a playlist (2.0.0-player.58) - over everything, on both frames
+    'app/PlaylistPicker.tsx': 'app-picker-open',
   }
   const texts = Object.fromEntries(Object.keys(SHEETS).map((file) => [file, code(read(file))]))
   check('each calls useSheet with a scroll lock of its own',
@@ -619,7 +624,7 @@ console.log('\nevery sheet is a sheet by the one hook')
   check('each is inert while closed', Object.values(texts).map((text) => /\binert=\{!open\b/.test(text)), Object.keys(SHEETS).map(() => true))
   check('Now Playing is inert under the menu or Info, and they are hidden from it', /aria-hidden=\{!open \|\| covered\}\s*inert=\{!open \|\| covered\}/.test(texts['player/NowPlaying.tsx']), true)
   check('the menu, Info, the sources and the artist page\'s close on their backdrop (a panel\'s is not drawn) - and Up Next and the song menu',
-    ['app/ActionMenu.tsx', 'app/InfoSheet.tsx', 'app/Sources.tsx', 'app/ArtistPanel.tsx', 'app/UpNext.tsx', 'app/QueueMenu.tsx'].map((file) => /<div class="app-backdrop" onClick=\{onClose\} \/>/.test(texts[file])), [true, true, true, true, true, true])
+    ['app/ActionMenu.tsx', 'app/InfoSheet.tsx', 'app/Sources.tsx', 'app/ArtistPanel.tsx', 'app/UpNext.tsx', 'app/QueueMenu.tsx', 'app/PlaylistPicker.tsx'].map((file) => /<div class="app-backdrop" onClick=\{onClose\} \/>/.test(texts[file])), [true, true, true, true, true, true, true])
   //? (2.0.0-player.47, review: beside a phone's Edit sheet - a phone on its side, an iPad upright - a stray
   //? tap on the backdrop threw away an edit half made)
   check('...the Edit sheet\'s takes a tap and closes nothing - it holds typed work; its close button and Escape close it',
@@ -652,7 +657,8 @@ console.log('\nevery sheet is a sheet by the one hook')
   check('never both over Now Playing, and neither without it - on a phone',
     [has('ActionMenu', /\bopen=\{sheetOpen && over === 'menu'\}/), has('InfoSheet', /\bopen=\{infoOpen\}/),
       /const infoOpen = desktop \? infoPanel : sheetOpen && over === 'info'/.test(app),
-      has('NowPlaying', /\bcovered=\{over !== 'none'\}/)], [true, true, true, true])
+      //? (2.0.0-player.58: and while the playlist picker is over it, opened from its menu)
+      has('NowPlaying', /\bcovered=\{over !== 'none' \|\| pickerOpen\}/)], [true, true, true, true])
   //? "Go to album", from the menu, the album line and Info's card alike: every sheet closes (with no
   //? focus sent back to ••• in a sheet that is going), and the album opens on the tab showing
   const going = /const goToAlbum = \(track[^)]*\) => \{([\s\S]*?)\n  \}/.exec(app)?.[1] ?? ''
@@ -1689,8 +1695,10 @@ console.log('\nthe desktop visualizer: a silent copy, never the player\'s elemen
     /useEffect\(\(\) => \(\) => \{\s*listener\.destroy\(\)\s*closeVisualizerAudio\(\)/.test(screen), true)
   check('its frame loop runs only while the page shows: hidden, it stops and the audio context is suspended',
     /if \(document\.visibilityState === 'hidden'\) \{\s*stop\(\)\s*suspendVisualizerAudio\(\)\s*\} else \{\s*resumeVisualizerAudio\(\)\s*start\(\)/.test(screen), true)
-  check('...and the only frame loops in the app are the deck\'s and the visualizer\'s',
-    files.filter((file) => APP_SIDE(file) && /requestAnimationFrame\(/.test(code(read(file)))).sort(), ['player/Visualizer.tsx', 'player/deck.ts'])
+  //? (2.0.0-player.58: and a playlist's Edit, scrolling the page while a dragged row is near an edge - only while a
+  //? drag is held, the frame called off as it ends - see the playlists' section below)
+  check('...and the only frame loops in the app are the deck\'s, the visualizer\'s and a playlist drag\'s',
+    files.filter((file) => APP_SIDE(file) && /requestAnimationFrame\(/.test(code(read(file)))).sort(), ['app/PlaylistPage.tsx', 'player/Visualizer.tsx', 'player/deck.ts'])
 }
 
 console.log('\nediting an album on a desktop: the Edit panel, a side panel by the same rule (2.0.0-player.21)')
@@ -2339,6 +2347,51 @@ console.log('\nUp Next, shuffle and repeat (2.0.0-player.57): each new action fr
   check('...its feed calls nothing of the player but extendQueue, and is called once - in App', [actionsIn(feed), (app.match(/\buseShuffleFeed\(/g) ?? []).length,
     files.filter((file) => file !== 'app/App.tsx' && file !== 'app/useShuffleFeed.ts' && /\buseShuffleFeed\(/.test(code(read(file))))], [['extendQueue'], 1, []])
   check('...and the Library hands its Shuffle the actions as one object, naming none', [/actions=\{actions\}/.test(code(read('player/Library.tsx'))), /const actions = usePlayerActions\(\)/.test(code(read('player/Library.tsx')))], [true, true])
+}
+
+console.log('\nplaylists (2.0.0-player.58): a playlist plays from its own page, in the tap; the picker over everything')
+{
+  const app = code(read('app/App.tsx'))
+  const page = code(read('app/PlaylistPage.tsx'))
+  const lib = code(read('lib/playlists.ts'))
+  check('a playlist page reads of the player only what an album page reads - playTracks, whether it plays, the song\'s id',
+    [[...new Set([...page.matchAll(/\bplayer\.(\w+)/g)].map((match) => match[1]))].sort(), [...page.matchAll(/\bplayer\.track\b(\?\.\w+)?/g)].map((match) => match[1])],
+    [['playTracks', 'playing', 'track'], ['?.id']])
+  check('...its play: nothing without songs, the albums remembered, then playTracks with the songs in hand - nothing else, nothing awaited',
+    [/const play = \(start: number \| null, shuffle = false\) => \{\s*if \(!tracks\.length\) return\s*rememberQueue\(remembered\(albums\)\)\s*player\.playTracks\(tracks, start, shuffle\)\s*\}/.test(page),
+      //? (review) what is remembered worked out in the tap, synchronously - an album's own answer held kept (lib/playlists.ts withHeld)
+      /const remembered = \(stubs: readonly AlbumWithSongs\[\]\) => withHeld\(stubs, playedAlbum\)\n/.test(page)], [true, true])
+  //? every play( in the file is a click's own: Play, Shuffle, a row
+  const calls = [...page.matchAll(/(?<![\w.])play\(/g)].length
+  const inClicks = [...page.matchAll(/onClick=\{\(\) => play\((0|null, true|index)\)\}/g)].map((match) => match[1])
+  check('...every call of it straight from a click: Play from the first, Shuffle, a row from itself', [calls, inClicks], [3, ['0', 'null, true', 'index']])
+  check('lib/playlists.ts is pure: types only imported, no fetch, no page, no storage, no Preact',
+    [/\bfetch\(|\bdocument\.|\bwindow\.|localStorage|from 'preact/.test(lib), [...lib.matchAll(/^import (?!type )/gm)].length], [false, 0])
+  check('the picker, the Playlists page, the list\'s store and the calls reach no playback action',
+    ['app/PlaylistPicker.tsx', 'app/PlaylistsPage.tsx', 'app/usePlaylists.ts', 'api/playlists.ts', 'app/NewPlaylistForm.tsx', 'app/ConfirmLine.tsx'].map((file) => actionsIn(code(read(file)))),
+    [[], [], [], [], [], []])
+  check('the picker is drawn once, by App, after Info and the song menu - so it is over them, and focus ends in it where one closes as it opens',
+    [files.filter((file) => /<PlaylistPicker\b/.test(code(read(file)))), app.indexOf('<PlaylistPicker') > app.indexOf('<InfoSheet'), app.indexOf('<PlaylistPicker') > app.indexOf('<QueueMenu')],
+    [['app/App.tsx'], true, true])
+  check('...and everything behind it inert: the page (on both frames), a desktop\'s side panels, Now Playing',
+    [/const covered = \(!desktop && \(sheetOpen \|\| sourcesOpen \|\| artistOpen \|\| editOpen\)\) \|\| visualizerShown \|\| queueMenuOpen \|\| pickerOpen\n/.test(app),
+      /\n\s*const panelsCovered = visualizerShown \|\| queueMenuOpen \|\| pickerOpen\n/.test(app), /<NowPlaying\b[^>]*\bcovered=\{over !== 'none' \|\| pickerOpen\}/.test(app)],
+    [true, true, true])
+  check('...opened from the song menu\'s row (the menu closing), Now Playing\'s menu and the player bar - none of them a playback action',
+    [/<QueueMenu\b[^\n]*\bonPlaylist=\{queueToPlaylist\}/.test(app), /<ActionMenu\b[^>]*\bonPlaylist=\{playlistFromMenu\}/.test(app), /<PlayerBar\b[^\n]*\bonAddToPlaylist=\{playlistFromBar\}/.test(app),
+      /const queueToPlaylist = useCallback\(\(what: QueuePick<AlbumWithSongs>\) => \{\s*setQueueMenuOpen\(false\)\s*openPicker\(/.test(app)],
+    [true, true, true, true])
+  check('the Library\'s Playlists row navigates - it names no action and asks nothing', [/<button type="button" class="app-row app-link-row" onClick=\{onOpenPlaylists\}>/.test(code(read('player/Library.tsx'))), /askPlaylists|usePlaylists/.test(code(read('player/Library.tsx')))], [true, false])
+  check('the handlers App hands into the pages memo are made once (useCallback, [])',
+    ['openPlaylist', 'openPlaylists', 'playlistDeleted', 'openQueueMenu'].map((name) => new RegExp(`const ${name} = useCallback\\([\\s\\S]*?\\n  \\}, \\[\\]\\)`).test(app)), [true, true, true, true])
+  check('the sidebar\'s group: yours then shared by name - All playlists alone while the list isn\'t known or the last ask failed; asked as the desktop shows and comes back',
+    [/<Sidebar\b[\s\S]*?\bplaylists=\{playlistsState\.problem \? NO_PLAYLISTS : sidebarPlaylists\(playlistsState\.list\)\}/.test(app),
+      /useEffect\(\(\) => \{\s*if \(desktop && pageShown\) askPlaylists\(\)\s*\}, \[desktop, pageShown\]\)/.test(app)], [true, true])
+  //? (review) a delete answering after a tap elsewhere popped whatever page showed then
+  check('a playlist deleted goes back only while its page is still the route showing',
+    /const playlistDeleted = useCallback\(\(name: string, id: string\) => \{\s*sayPins\(`Deleted \$\{name\}`\)\s*const \{ page \} = currentRoute\(router\.nav\)\s*if \(page\?\.kind === 'playlist' && page\.id === id\) router\.back\(\)\s*\}, \[\]\)/.test(app), true)
+  check('a playlist drag\'s frame loop runs only while a drag is held, and is called off as it ends',
+    [/if \(!dragging \|\| typeof requestAnimationFrame !== 'function'\) return/.test(page), /return \(\) => cancelAnimationFrame\(frame\)\s*\}, \[dragging\]\)/.test(page)], [true, true])
 }
 
 console.log('\nthe checks themselves')

@@ -26,6 +26,9 @@
  *                                                      as the queue page is
  *   #/<tab>/care/library                               Library care (2.0.0-player.42): Rescan and the
  *                                                      bulk runs - pushed on You, one page, as they are
+ *   #/<tab>/playlists/all                              the Playlists page (2.0.0-player.58) - pushed on the
+ *                                                      Library, one page whatever id the address gives
+ *   #/<tab>/playlist/<id>                              one playlist, by Navidrome's playlist id
  *
  * The player's old `#/album/<id>` links still open: they are the Library's album, and the address
  * is rewritten to `#/library/album/<id>` in place. An empty hash is Home.
@@ -61,11 +64,12 @@ export const TAB_LABELS: Readonly<Record<Tab, string>> = {
 
 /** What a page can be: an album in the library (Navidrome's id), a MusicBrainz release group -
  *  the album you don't have (2.0.0-player.13) - an artist (2.0.0-player.17), Needs a look, the
- *  review queue (2.0.0-player.25), the server's settings or the event log (2.0.0-player.33), or
- *  Library care (2.0.0-player.42). */
-export type PageKind = 'album' | 'group' | 'artist' | 'queue' | 'settings' | 'log' | 'care'
+ *  review queue (2.0.0-player.25), the server's settings or the event log (2.0.0-player.33),
+ *  Library care (2.0.0-player.42), or (2.0.0-player.58) the Playlists page and one playlist - page kinds
+ *  of their own, never one of the Library's views. */
+export type PageKind = 'album' | 'group' | 'artist' | 'queue' | 'settings' | 'log' | 'care' | 'playlists' | 'playlist'
 
-const PAGE_KINDS: readonly PageKind[] = ['album', 'group', 'artist', 'queue', 'settings', 'log', 'care']
+const PAGE_KINDS: readonly PageKind[] = ['album', 'group', 'artist', 'queue', 'settings', 'log', 'care', 'playlists', 'playlist']
 
 /** There is one queue page: its id is always this. */
 export const QUEUE_ID = 'all'
@@ -85,13 +89,18 @@ export const LOG_PAGE: Page = { kind: 'log', id: LOG_ID, label: 'Log' }
 export const CARE_ID = 'library'
 export const CARE_PAGE: Page = { kind: 'care', id: CARE_ID, label: 'Library care' }
 
+/** The Playlists page (2.0.0-player.58): one page, whatever id an address gives it. A playlist's own page is
+ *  `{ kind: 'playlist', id: <Navidrome's id>, label: <its name> }`, so a page pushed over it says the name. */
+export const PLAYLISTS_ID = 'all'
+export const PLAYLISTS_PAGE: Page = { kind: 'playlists', id: PLAYLISTS_ID, label: 'Playlists' }
+
 /** What a Managing page says, in place of itself, to someone deadwax says isn't its admin (2.0.0-player.47:
  *  the four pages are on both frames now - until then a phone's note stood here, pointing at the main
  *  page). With logins off everyone is the admin, so nobody sees it yet. */
 export const MANAGING_ADMINS_ONLY = "Only deadwax's admin can open this page."
 
 /** The Managing pages that are one page each, by kind: an address's id is made this one. */
-const ONE_PAGE: Partial<Record<PageKind, string>> = { settings: SETTINGS_ID, log: LOG_ID, care: CARE_ID }
+const ONE_PAGE: Partial<Record<PageKind, string>> = { settings: SETTINGS_ID, log: LOG_ID, care: CARE_ID, playlists: PLAYLISTS_ID }
 
 /** A page pushed on a tab. `label` names it on the back button of a page pushed over it - never
  *  part of the address, and never part of what makes two pages the same one. `release` is a group
@@ -197,6 +206,22 @@ export function parseHash(hash: string): { route: Route; canonical: string } {
 
 export const samePage = (a: Page | null | undefined, b: Page | null | undefined): boolean =>
   !!a && !!b && a.kind === b.kind && a.id === b.id
+
+/**
+ * (2.0.0-player.58) How the Playlists page or a playlist's is opened on the Library's stack (App's
+ * openPlaylistsPage, from the sidebar or the phone Library's row): `stay` when that very page is on top; `back` when
+ * a playlists or playlist page is on top and that very page is just under it (All playlists from a playlist opened
+ * from the Playlists page - review: replacing the top made two Playlists pages, one over the other); `become` - the
+ * top replaced - for another playlists or playlist page on top (the sidebar's picks are siblings, never a pile);
+ * else `open`, pushed.
+ */
+export function playlistsMove(stack: readonly Page[], page: Page): 'stay' | 'back' | 'become' | 'open' {
+  const top = stack[stack.length - 1] ?? null
+  if (samePage(top, page)) return 'stay'
+  const playlistOnTop = !!top && (top.kind === 'playlists' || top.kind === 'playlist')
+  if (playlistOnTop && samePage(stack[stack.length - 2], page)) return 'back'
+  return playlistOnTop ? 'become' : 'open'
+}
 
 /* ===== the stacks ===== */
 
