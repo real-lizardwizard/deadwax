@@ -414,16 +414,19 @@ async function run() {
   console.log('\nread off the source: the delete dialog names the holders, the Library marks what is new')
   {
     const dialog = fs.readFileSync(path.join(UI, 'src/components/DeleteAlbumDialog.tsx'), 'utf8')
-    const library = fs.readFileSync(path.join(UI, 'src/player/Library.tsx'), 'utf8')
+    //? (2.0.0-player.59) the one tile, app/AlbumTile.tsx, draws the mark; the sections and the root hand it the marks
+    const tile = fs.readFileSync(path.join(UI, 'src/app/AlbumTile.tsx'), 'utf8')
+    const marking = ['src/app/LibrarySection.tsx', 'src/app/LibraryHome.tsx'].map((file) => fs.readFileSync(path.join(UI, file), 'utf8'))
     check('the dialog: the summary\'s holders in its words, above the warning',
       [/\{summary && holdersText\(summary\) && \(\s*<p class="text yellow delete-warning delete-holders">\{holdersText\(summary\)\}<\/p>/.test(dialog),
         dialog.indexOf('delete-holders') < dialog.indexOf('This deletes the folder')], [true, true])
     const css = fs.readFileSync(path.join(UI, '../interface/player/app.css'), 'utf8')
     check('Your library\'s album names break anywhere - the waiting lines and the removed rows (review: a one-word title pushed the page sideways, or was cut off)',
       /\.app-mylib-waiting,\s*\.app-mylib-removed \.app-row-label \{ overflow-wrap: anywhere; \}/.test(css), true)
-    check('the Library tab: a tile new in your library marked New, said in full to a screen reader',
-      [/const marks = newMarks\(useMyLibrary\(\)\)/.test(library), /\{isNew\(marks, album\) && \(\s*<span class="pl-album-new">\s*New<span class="app-visually-hidden"> in your library<\/span>/.test(library)],
-      [true, true])
+    check('the Library tab: a tile new in your library marked New, said in full to a screen reader - the root\'s 12 too',
+      [...marking.map((code) => /const mine = useMyLibrary\(\)\s*const marks = useMemo\(\(\) => newMarks\(mine\), \[mine\]\)/.test(code) && /<AlbumTile key=\{album\.id\} album=\{album\} marks=\{marks\} onOpen=\{onOpen\} \/>/.test(code)),
+        /\{isNew\(marks, album\) && \(\s*<span class="pl-album-new">\s*New<span class="app-visually-hidden"> in your library<\/span>/.test(tile)],
+      [true, true, true])
   }
 
   finished = true

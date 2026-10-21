@@ -88,7 +88,8 @@ Navidrome fact below was read in Navidrome 0.64.2's source (ND), not run.
   hidden ones included (ND `playlist_track_repository.go` Add, max(id)+1), so nothing already there moves.
 - **The app.** Pages of their own kinds (`lib/appRoutes.ts` `playlists` - one page, `#/<tab>/playlists/all` - and
   `playlist` by Navidrome's id), never a Library view (.59 reworks those). On a phone a **Playlists** row at the top
-  of the Library (`player/Library.tsx`, before the scope chips - whose.sim's regex unmoved), no count (a count would
+  of the Library (`player/Library.tsx`, before the scope chips - whose.sim's regex unmoved; since 2.0.0-player.59 the
+  first row of the phone root's first group, app/LibraryHome.tsx - notes/app-library.md), no count (a count would
   make the Library ask Navidrome at its first show); on a desktop the sidebar's **Playlists** group after the
   Library's and Browse's, All playlists then up to 20 by name (`lib/appFrame.ts` SIDEBAR_PLAYLISTS, sidebarCurrent's
   branch ahead of the Library tab's, sidebarMove `{how: 'playlists'}`), its picks siblings that replace one another

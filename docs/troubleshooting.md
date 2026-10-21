@@ -707,7 +707,7 @@ needs to know which MusicBrainz artist it is.
 
 ## The app's Library has no Songs
 
-The **Songs** chip is left out when Navidrome answers an empty search with no songs, which is how
+The **Songs** row (on a desktop, the sidebar's item) is left out when Navidrome answers an empty search with no songs, which is how
 the app lists them; it asks once, as the app starts (once Navidrome answers) - reload the app to
 ask again. A Navidrome that answers an empty
 search with nothing (an older one, or one set up to) can't list songs this way, and the Library
@@ -739,8 +739,8 @@ first time (an estimate: it hasn't been timed on one yet); within ten minutes of
 With logins on (since 2.0.0-player.52) the **Library** tab is **your** library - your starred albums
 in Navidrome - not the whole store. An account that hasn't starred anything yet, and hasn't had
 anything filed for it, sees **Nothing in your library yet** - in any order, Recently played too - and
-the same under Artists: tap **Browse the store** (or **Browse** over the views - on a desktop, the
-sidebar's **Browse** group) for every album deadwax holds, and open one to **Add to my library**. A few
+the same under Artists: tap **Browse the store** (or a row of the Library's **Browse** group - on a desktop,
+the sidebar's **Browse** group) for every album deadwax holds, and open one to **Add to my library**. A few
 more things that make your library look short:
 
 - **An album waiting to be starred** isn't there yet: your Library lists what Navidrome has starred for
@@ -751,6 +751,24 @@ more things that make your library look short:
   it shows there - or have an admin match its release.
 - **The break-glass `admin`** has no library of its own: its Library is the whole store.
 - **Signed in on the main page only**: the main page's library tab is the store's, as it always was.
+
+## The Library shows the first 10000 albums
+
+The app's Library (since 2.0.0-player.59) has each list - your albums, or the store's - from deadwax in one
+answer, which reads Navidrome's albums 500 at a time and stops at 10,000 (twenty pages), so a page of it
+says **Showing the first 10000 albums - deadwax reads at most that many.** and counts 10000. The rest are
+still in Navidrome and in deadwax: **Search** finds them, and an artist's page lists all of theirs. For your
+albums it's the 10,000 you starred most recently; for the store's, the 10,000 Navidrome had most recently.
+
+## The Library's albums are in a different order since 2.0.0-player.59
+
+The app's Library now opens **Albums** by **Artist** (each artist's albums oldest first) on a device that never
+chose an order - **Recently added** has its own place, as the Library list's grid and its **See all**. A device
+that chose an order before keeps it. Choose another from the sort at the top of the page: it's remembered on
+that device, and so is the artists' order (which used to go back to Name each time). Names are sorted the way
+deadwax compares them - "The" at the front set aside, accents and case aside, digits and symbols under **#**
+after Z - in the store's lists too, so an album or two can sit where Navidrome's own web page wouldn't put it
+(Navidrome also sets aside "La", "El" and others, and puts compilations last).
 
 ## The app's Home has no "Not played in a while"
 

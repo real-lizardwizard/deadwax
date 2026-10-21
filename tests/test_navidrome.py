@@ -259,11 +259,16 @@ def test_there_is_no_general_proxy():
     fields (the request models forbid any other), every write sent as a form. Each write reads the playlist first
     and refuses one that isn't the asker's own (src/playlists.py), so even a shared admin account can't change -
     nor list, nor open - anybody else's private playlist through deadwax - see test_playlists.py.
+
+    `/album_index` joined it in 2.0.0-player.59, deliberately: the Library's whole album list in one answer - the
+    asker's starred albums or the store's - read as the asker with getAlbumList2, the call `/albums` already makes,
+    a page of 500 at a time. Its one parameter is the scope (a Literal), which picks the list type; nothing else the
+    page sends reaches Navidrome - see test_navidrome_album_index.py.
     """
     paths = sorted(route.path for route in navidrome_routes.router.routes)
 
     assert paths == [
-        "/albums", "/albums/{album_id}", "/artists", "/artists/{artist_id}", "/cover/{cover_id}",
+        "/album_index", "/albums", "/albums/{album_id}", "/artists", "/artists/{artist_id}", "/cover/{cover_id}",
         "/playlists", "/playlists", "/playlists/{playlist_id}", "/playlists/{playlist_id}/add",
         "/playlists/{playlist_id}/delete", "/playlists/{playlist_id}/edit",
         "/scrobble/{song_id}", "/scrub/{song_id}", "/search", "/shuffle", "/shuffle/{token}", "/songs/{song_id}",

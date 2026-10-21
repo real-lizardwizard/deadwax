@@ -5,7 +5,9 @@ Each route is one Subsonic call with its own parameters, rather than a proxy tha
 whatever it is sent - see src/api/navidrome_endpoint.py for why that line matters. Adding a
 call means adding a route here, on purpose. (The Library's Shuffle, 2.0.0-player.57, makes several:
 search3 and getAlbumList2 as the asker, deadwax's own order of what they list - see near the end. The
-playlists, 2.0.0-player.58, a fixed call or two each with declared, bounded input - see the end.)
+playlists, 2.0.0-player.58, a fixed call or two each with declared, bounded input - see the end. The Library's
+whole album list, 2.0.0-player.59's /album_index, getAlbumList2 a page at a time as the asker, its one parameter the
+scope, which picks the list type - see after /albums.)
 """
 
 import asyncio
@@ -26,6 +28,7 @@ from starlette.background import BackgroundTask
 
 from src import library_ledger, player_cache
 from src import playlists as playlist_rules
+from src.api.json_etag import json_with_etag
 from src.api.navidrome_endpoint import NOT_CONFIGURED, NavidromeError, SignedOut, UserClient, asks_as_shared, client_for
 from src.config import Config
 from src.logger import logger
@@ -270,6 +273,55 @@ async def albums(
         raise _fail(e)
 
     return {"albums": (body.get("albumList2") or {}).get("album") or []}
+
+
+#? (2.0.0-player.59) The Library's whole album list in one answer (see notes/app-library.md "A better Library"):
+#? Navidrome's pages of 500 read one after another here, on deadwax's side of the network, rather than from the
+#? phone - one round trip over WireGuard where there were six - trimmed to what the Library reads
+INDEX_PAGE = 500          # Navidrome's own ceiling on one page (album_lists.go: min(size, 500))
+INDEX_MAX = 10000         # twenty pages; beyond, the answer says `truncated` (the app's YOURS_MAX until now)
+INDEX_FIELDS = ("id", "name", "artist", "artistId", "coverArt", "year", "genre", "created", "played",
+                "playCount", "starred", "musicBrainzId", "songCount", "duration")
+AlbumScope = Literal["yours", "store"]
+#? yours: the asker's starred albums (getAlbumList2 `starred` - "your library"); the store: every album, newest
+#? first - an album filed while the pages are read pushes the rest one along, which repeats one (left out, by id)
+#? and never skips one, as an alphabetical list read by offset could
+SCOPE_LIST = {"yours": "starred", "store": "newest"}
+
+
+@router.get("/album_index")
+async def album_index(request: Request, scope: AlbumScope = Query(...)):
+    """
+    Every album of `scope` in one answer (2.0.0-player.59, the Library): `yours` the asker's starred albums, `store`
+    every album Navidrome has - getAlbumList2, the one Subsonic call it makes (already on the list for /albums), read
+    INDEX_PAGE at a time as the asker until a short page or INDEX_MAX. Each album once (by id - a page boundary can
+    repeat one), trimmed to INDEX_FIELDS, the values as Navidrome sent them, in Navidrome's order (starred_at desc,
+    created_at desc). `truncated` when the last page read was still full. Sent with an ETag (json_with_etag), so an
+    unchanged list is a 304. Nothing the page sends is passed on but the scope, which picks the list type; a page
+    that fails fails the whole answer (never a partial list), as _fail says it.
+    """
+    client = client_for(request)
+    albums: list[dict] = []
+    seen: set[str] = set()
+    truncated = False
+    offset = 0
+    while offset < INDEX_MAX:
+        try:
+            body = await client.call("getAlbumList2", {"type": SCOPE_LIST[scope], "size": INDEX_PAGE, "offset": offset})
+        except NavidromeError as e:
+            raise _fail(e)
+        page = (body.get("albumList2") or {}).get("album") or []
+        for entry in page:
+            if not isinstance(entry, dict) or not isinstance(entry.get("id"), str) or entry["id"] in seen:
+                continue
+            seen.add(entry["id"])
+            albums.append({name: entry[name] for name in INDEX_FIELDS if name in entry})
+        if len(page) < INDEX_PAGE:
+            break
+        offset += INDEX_PAGE
+    else:
+        truncated = True
+    return json_with_etag(request, {"albums": albums, "truncated": truncated})
 
 
 @router.get("/albums/{album_id}")

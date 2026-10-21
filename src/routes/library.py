@@ -1,6 +1,4 @@
 import asyncio
-import hashlib
-import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -33,6 +31,7 @@ from src.api.lrclib_endpoint import lrclib
 from src.lyrics import fetch_album_lyrics, read_track_lyrics
 from src.retag import (changes_player_ids, execute_retag, hold_back_rename, move_retagged, plan_cover_art,
                        plan_retag, save_cover_art)
+from src.api.json_etag import json_with_etag
 from src.api.navidrome_endpoint import NavidromeClient, NavidromeError, SignedOut, client_for, navidrome
 from src.scan_wait import (SCAN_CALL_TIMEOUT_SECONDS, SCAN_MAX_POLLS, SCAN_POLL_SECONDS,
                            SCAN_WAIT_CAP_SECONDS, ScanStatus, WaitState, begin, read_status,
@@ -224,27 +223,6 @@ async def _scan_with_queue(request: Request, force: bool, snapshot: bool = False
     return result
 
 
-def _json_with_etag(request: Request, payload: dict, headers: dict | None = None) -> Response:
-    """
-    JSON with an ETag, answered 304 when the browser already holds this exact body (v0.9.20).
-
-    For the library's big payloads, which are usually unchanged since the last visit: with
-    `no-cache` the browser revalidates every time and, on a 304, hands the page its cached copy -
-    no body crosses the network at all. The server still does the work (a warm scan is ~70ms on a
-    thousand albums); what is saved is the transfer, which on a phone over a LAN was the wait.
-
-    `headers` go on the 304 as well, and that is how anything that changes on every answer
-    reaches the page without changing the body: the browser freshens its stored copy's headers
-    from the 304 (RFC 9111 4.3.4). See _SCAN_HEADERS.
-    """
-    body = json.dumps(payload, separators=(",", ":"), default=str).encode()
-    etag = '"' + hashlib.blake2b(body, digest_size=12).hexdigest() + '"'
-    headers = {**(headers or {}), "ETag": etag, "Cache-Control": "no-cache"}
-    if request.headers.get("if-none-match") == etag:
-        return Response(status_code=304, headers=headers)
-    return Response(body, media_type="application/json", headers=headers)
-
-
 #? The parts of a scan that change on EVERY scan whatever the library holds - when it was read,
 #? how long it took, how much came from cache, whether it's the saved copy - sent as headers so
 #? the body only changes when the library does, and an unchanged library is a 304 (v0.9.20).
@@ -264,7 +242,7 @@ def _library_response(request: Request, result: dict) -> Response:
     headers = {name: header(key) for key, name in _SCAN_HEADERS.items()}
     body = {k: v for k, v in result.items() if k not in _SCAN_HEADERS}
     body["albums"] = compact_for_wire(result["albums"])
-    return _json_with_etag(request, body, headers)
+    return json_with_etag(request, body, headers)
 
 
 @router.get("/albums")
@@ -339,7 +317,7 @@ async def owned(request: Request, user: str = Depends(current_user)):
     """
     root = Config.LIBRARY_PATH or ""
     if not root:
-        return _json_with_etag(request, {"albums": [], "problem": "LIBRARY_PATH is not set"})
+        return json_with_etag(request, {"albums": [], "problem": "LIBRARY_PATH is not set"})
 
     await _ensure_cache_loaded(request)
 
@@ -353,7 +331,7 @@ async def owned(request: Request, user: str = Depends(current_user)):
     if yours is not None:
         for album in albums:
             album["yours"] = album.get("path") in yours
-    return _json_with_etag(request, {
+    return json_with_etag(request, {
         "albums": albums,
         #? no `stale`: nothing reads it, and it differed between a scan and a snapshot of the
         #? same albums, which made identical answers carry different ETags

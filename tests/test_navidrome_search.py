@@ -208,6 +208,8 @@ def test_every_navidrome_route_asks_through_client_for(upstream, client, monkeyp
         "/deadwax/navidrome/artists", "/deadwax/navidrome/artists/ar-1", "/deadwax/navidrome/songs/so-1",
         #? 2.0.0-player.57: the Library's Shuffle, its list read as the asker
         "/deadwax/navidrome/shuffle?scope=store",
+        #? 2.0.0-player.59: the Library's whole album list, read as the asker
+        "/deadwax/navidrome/album_index?scope=store",
     ]
     for path in paths:
         client.get(path)
@@ -231,7 +233,7 @@ def test_every_navidrome_route_asks_through_client_for(upstream, client, monkeyp
     #? step 6 checks a user's access at the route. And /shuffle/{token} (2.0.0-player.57) asks Navidrome nothing: it
     #? pages deadwax's own order of what /shuffle read through the seam
     assert {"/scrub/{song_id}", "/shuffle/{token}"} <= {route.path for route in navidrome_routes.router.routes}
-    assert len({route.path for route in navidrome_routes.router.routes}) == 18
+    assert len({route.path for route in navidrome_routes.router.routes}) == 19
 
 
 def test_the_turntables_internal_call_asks_through_client_for(monkeypatch, tmp_path, configured):

@@ -118,11 +118,11 @@ export function closesOnCrossing(to: Frame): { nowPlaying: boolean; infoPanel: b
 /* ===== the sidebar ===== */
 
 /**
- * What the Library shows: Navidrome's albums, artists or songs - and, on a desktop, "Recently added"
- * (the sidebar's first Library view, as the board lists it): the albums, newest first, as a view of
- * its own, so the Albums view keeps the order chosen for it. It is the desktop's alone - a phone has
- * three chips, and shows the albums for it - and isn't kept on the device (state/persisted.ts keeps
- * albums, artists or songs).
+ * What the Library shows: Navidrome's albums, artists or songs - and "Recently added" (the sidebar's
+ * first Library view, as the board lists it): the albums, newest first, as a view of its own, so the
+ * Albums view keeps the order chosen for it. It isn't kept on the device (state/persisted.ts keeps the
+ * rest). (2.0.0-player.59) Each is also a SECTION, a page of its own on a phone (lib/appRoutes.ts
+ * SECTION_IDS): the phone's Library root lists them as rows - Recently added as its grid's See all.
  *
  * YOUR LIBRARY AND BROWSE (2.0.0-player.52, step 6 of the multi-user plan): with logins on, for somebody
  * with a library of their own (`personal`), the Library is YOURS - 'albums' your starred albums, 'artists'
@@ -215,8 +215,9 @@ export const SIDEBAR_SETTINGS: SidebarItem = { id: 'settings', label: 'Settings'
 export const SIDEBAR_LOG: SidebarItem = { id: 'log', label: 'Log' }
 
 /** The Library's views the sidebar lists: Songs left out when Navidrome's empty search lists none,
- *  as the phone leaves out its chip (null: not known yet, so it stays). With a library of your own
- *  (2.0.0-player.52) the Library's are yours - Recently added, Albums, Artists - and Songs is Browse's. */
+ *  as the phone's root leaves out its row (null: not known yet, so it stays) - the phone's root lists these
+ *  too, Recently added aside (2.0.0-player.59). With a library of your own (2.0.0-player.52) the Library's
+ *  are yours - Recently added, Albums, Artists - and Songs is Browse's. */
 export function libraryItems(hasSongs: boolean | null, personal = false): SidebarItem[] {
   if (personal) return SIDEBAR_LIBRARY.filter((item) => item.id !== 'songs')
   return SIDEBAR_LIBRARY.filter((item) => item.id !== 'songs' || hasSongs !== false)
@@ -243,11 +244,17 @@ export function shownPick(pick: LibraryPick, hasSongs: boolean | null, frame: Fr
 
 /** The sidebar item for where the app is: its tab - and in the Library, the view showing. Search has
  *  none: its place is the field, which says what it is searching for. Needs a look is its own item
- *  while its page is the one on top (`page`, the tab's top page), whatever tab it was pushed on. */
-export function sidebarCurrent(tab: Tab, pick: LibraryPick, hasSongs: boolean | null, page: Page | null = null, personal = false): SidebarId | null {
+ *  while its page is the one on top (`page`, the tab's top page), whatever tab it was pushed on.
+ *  (2.0.0-player.59) `base`: the Library stack's first page - a section page there (pushed on a phone, then the
+ *  window widened, or reached by its address) names its own view, whatever is pushed over it, until it goes. */
+export function sidebarCurrent(
+  tab: Tab, pick: LibraryPick, hasSongs: boolean | null, page: Page | null = null, personal = false, base: Page | null = null,
+): SidebarId | null {
   //? (2.0.0-player.58) the Playlists page and a playlist's - before the Library tab's own branch: App draws a listed
   //? playlist's own row current in place of All playlists
   if (page?.kind === 'playlists' || page?.kind === 'playlist') return 'playlists'
+  //? (2.0.0-player.59) a section page at the Library stack's foot - after the playlists, so one over it names them
+  if (tab === 'library' && base?.kind === 'section') return shownPick(base.id as LibraryPick, hasSongs, 'desktop', personal)
   if (page?.kind === 'queue') return 'queue'
   //? Library care (2.0.0-player.42), the same way
   if (page?.kind === 'care') return 'care'
@@ -269,7 +276,9 @@ export type ManagingKind = 'care' | 'settings' | 'log'
  * So is the Library view that is showing. Another Library view is that view, at the Library's root.
  */
 export type SidebarMove =
-  | { how: 'tab'; tab: Tab }
+  /** `pick` (2.0.0-player.59): the Library root's view to set first - the section page's own, so popping to the root
+   *  draws the view the item named rather than the pick it was left on */
+  | { how: 'tab'; tab: Tab; pick?: LibraryPick }
   | { how: 'view'; tab: 'library'; pick: LibraryPick }
   /** Needs a look: its page, on You (App's openQueue) */
   | { how: 'queue'; tab: 'you' }
@@ -278,11 +287,22 @@ export type SidebarMove =
   /** (2.0.0-player.58) All playlists: the Playlists page, on the Library (App's openPlaylistsPage) */
   | { how: 'playlists' }
 
-export function sidebarMove(item: SidebarId, pick: LibraryPick, hasSongs: boolean | null, personal = false): SidebarMove {
+export function sidebarMove(
+  item: SidebarId, pick: LibraryPick, hasSongs: boolean | null, personal = false, base: Page | null = null,
+): SidebarMove {
   if (item === 'playlists') return { how: 'playlists' }
   if (item === 'queue') return { how: 'queue', tab: 'you' }
   if (item === 'care' || item === 'settings' || item === 'log') return { how: 'managing', tab: 'you', kind: item }
   if (item === 'home' || item === 'requests' || item === 'you') return { how: 'tab', tab: item }
+  //? (2.0.0-player.59) a section page at the Library stack's foot is the view the tab shows as it was left - so the
+  //? item it names is "the tab", and any other, the pick's own included, is that view at the Library's root. The
+  //? tab's button pops to the root when it is showing, so the root is given the section's view first (review of .59:
+  //? Artists clicked over Artists' section dropped to a root drawing Albums)
+  if (base?.kind === 'section') {
+    const section = shownPick(base.id as LibraryPick, hasSongs, 'desktop', personal)
+    if (item === section) return { how: 'tab', tab: 'library', pick: section }
+    return { how: 'view', tab: 'library', pick: item }
+  }
   if (item === shownPick(pick, hasSongs, 'desktop', personal)) return { how: 'tab', tab: 'library' }
   return { how: 'view', tab: 'library', pick: item }
 }

@@ -29,6 +29,10 @@
  *   #/<tab>/playlists/all                              the Playlists page (2.0.0-player.58) - pushed on the
  *                                                      Library, one page whatever id the address gives
  *   #/<tab>/playlist/<id>                              one playlist, by Navidrome's playlist id
+ *   #/library/section/<id>                             a section of the Library (2.0.0-player.59) - a phone's
+ *                                                      page from the Library's root: recent, albums, artists,
+ *                                                      songs, store or storeArtists (SECTION_IDS); on any other
+ *                                                      tab, or with another id, the tab's root
  *
  * The player's old `#/album/<id>` links still open: they are the Library's album, and the address
  * is rewritten to `#/library/album/<id>` in place. An empty hash is Home.
@@ -49,6 +53,8 @@
  * lib/appHistory.ts drives all of this against the real history.
  */
 
+import type { LibraryPick } from './appFrame'
+
 export type Tab = 'home' | 'library' | 'search' | 'requests' | 'you'
 
 /** The tab bar's order: You at the right end. */
@@ -65,11 +71,16 @@ export const TAB_LABELS: Readonly<Record<Tab, string>> = {
 /** What a page can be: an album in the library (Navidrome's id), a MusicBrainz release group -
  *  the album you don't have (2.0.0-player.13) - an artist (2.0.0-player.17), Needs a look, the
  *  review queue (2.0.0-player.25), the server's settings or the event log (2.0.0-player.33),
- *  Library care (2.0.0-player.42), or (2.0.0-player.58) the Playlists page and one playlist - page kinds
- *  of their own, never one of the Library's views. */
-export type PageKind = 'album' | 'group' | 'artist' | 'queue' | 'settings' | 'log' | 'care' | 'playlists' | 'playlist'
+ *  Library care (2.0.0-player.42), (2.0.0-player.58) the Playlists page and one playlist - page kinds
+ *  of their own, never one of the Library's views - or (2.0.0-player.59) a section of the Library, one of its
+ *  views as a page of its own: a phone's way to Albums, Artists and the rest from the Library's root. */
+export type PageKind = 'album' | 'group' | 'artist' | 'queue' | 'settings' | 'log' | 'care' | 'playlists' | 'playlist' | 'section'
 
-const PAGE_KINDS: readonly PageKind[] = ['album', 'group', 'artist', 'queue', 'settings', 'log', 'care', 'playlists', 'playlist']
+const PAGE_KINDS: readonly PageKind[] = ['album', 'group', 'artist', 'queue', 'settings', 'log', 'care', 'playlists', 'playlist', 'section']
+
+/** (2.0.0-player.59) A section's ids: exactly the Library's views (lib/appFrame.ts LibraryPick - routes.sim holds
+ *  the two equal). The Playlists page and a playlist's stay page kinds of their own. */
+export const SECTION_IDS: readonly LibraryPick[] = ['recent', 'albums', 'artists', 'songs', 'store', 'storeArtists']
 
 /** There is one queue page: its id is always this. */
 export const QUEUE_ID = 'all'
@@ -166,6 +177,8 @@ function pageFrom(parts: readonly string[], query: string): Page | null {
   //? the server's settings and the log: one page each, whatever the address said, with nothing more
   const only = ONE_PAGE[kind]
   if (only) return { kind, id: only }
+  //? a section is one of the Library's views, by its id - another id is no page, so the address is the tab's root
+  if (kind === 'section') return SECTION_IDS.includes(id as LibraryPick) ? { kind, id } : null
   if (kind === 'queue') {
     //? one queue page: whatever id the address gave, it is that one
     const facet = new URLSearchParams(query).get('facet')?.trim()
@@ -196,7 +209,9 @@ export function parseHash(hash: string): { route: Route; canonical: string } {
   if (parts[0] === 'album' && parts[1]) {
     route = { tab: 'library', page: { kind: 'album', id: decode(parts.slice(1).join('/')) } }
   } else if (isTab(parts[0])) {
-    route = { tab: parts[0], page: pageFrom(parts.slice(1), query) }
+    const page = pageFrom(parts.slice(1), query)
+    //? a section is the Library's: on any other tab the address is that tab's root
+    route = { tab: parts[0], page: page?.kind === 'section' && parts[0] !== 'library' ? null : page }
   } else {
     route = { tab: 'home', page: null }
   }

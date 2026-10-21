@@ -514,7 +514,8 @@ console.log('\nan album page is memoised on what it reads of the player')
     //? 2.0.0-player.33: and the visualizer, which the server settings' and the log's `live` read)
     //? 2.0.0-player.45: and the artist page's panel - open, its request - and an artist page's refresh)
     //? 2.0.0-player.47: and Now Playing, which a phone's Managing pages' `live` reads as the visualizer)
-    [/const playingId = player\.track\?\.id \?\? null/.test(app), /\[nav, status, playingId, player\.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes, visualizerShown, sheetOpen, artistOpen, artistManage, artistRefreshes\],\s*\)/.test(app), /\[nav, player, status\]/.test(app)], [true, true, false])
+    //? 2.0.0-player.59: and whether Navidrome lists songs, which a section page's shownPick reads)
+    [/const playingId = player\.track\?\.id \?\? null/.test(app), /\[nav, status, playingId, player\.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes, visualizerShown, sheetOpen, artistOpen, artistManage, artistRefreshes, hasSongs\],\s*\)/.test(app), /\[nav, player, status\]/.test(app)], [true, true, false])
   const page = code(read('player/AlbumPage.tsx'))
   check('...which is all an album page reads of it (read more there, and key the memo on it too)',
     [...new Set([...page.matchAll(/\bplayer\.(\w+)/g)].map((match) => match[1]))].sort(), ['playTracks', 'playing', 'track'])
@@ -1362,14 +1363,17 @@ console.log('\nArtists and the id bridge: Play from the tap with every album in 
     [/class=\{`app-artist-album\$\{opening === row\.key \? ' is-busy' : ''\}`\}/.test(page), /class=\{`app-result\$\{looking \? ' is-busy' : ''\}`\}/.test(code(read('app/SearchRows.tsx'))),
       /class=\{`app-done-open\$\{opening \? ' is-busy' : ''\}`\}/.test(code(read('app/JobCard.tsx')))],
     [true, true, true])
-  check('Library\'s rows navigate: nothing there reaches a playback action, as a tile', [actionsIn(code(read('player/Library.tsx'))), actionsIn(code(read('app/LibraryViews.tsx')))], [[], []])
+  //? (2.0.0-player.59) the Library's files now: its root on a phone, its sections, the shelf, the index and the tile
+  const LIBRARY_FILES = ['player/Library.tsx', 'app/LibraryViews.tsx', 'app/LibraryHome.tsx', 'app/LibrarySection.tsx', 'app/Shelf.tsx', 'app/ShelfIndex.tsx', 'app/AlbumTile.tsx']
+  check('Library\'s rows navigate: nothing there reaches a playback action, as a tile', LIBRARY_FILES.map((file) => [file, actionsIn(code(read(file)))]), LIBRARY_FILES.map((file) => [file, []]))
   const library = code(read('player/Library.tsx'))
-  check('Songs only where Navidrome\'s empty search lists songs: asked once, for one, the chip left out on an empty answer (and the albums shown)',
+  const home = code(read('app/LibraryHome.tsx'))
+  check('Songs only where Navidrome\'s empty search lists songs: asked once, for one, the row left out on an empty answer (and the albums shown)',
     //? (2.0.0-player.19: told to the Library's store, app/libraryPick.ts, which the desktop sidebar reads too)
     [/librarySongs\(0, 1, request\.signal\)\.then\(\s*\(songs\) => \{\s*if \(request\.current\(\)\) setLibrarySongs\(songs\.length > 0\)/.test(library),
-      //? (2.0.0-player.52) the chips are yours or Browse's with a library of your own; Songs falls back by shownPick
-      /const views = \(personal \? \(browsing \? BROWSE_VIEWS : YOUR_VIEWS\) : VIEWS\)\.filter\(\(entry\) => entry\.id !== 'songs' \|\| hasSongs !== false\)/.test(library),
-      /const showing: LibraryPick = shownPick\(pick, hasSongs, 'phone', personal\)/.test(library)],
+      //? (2.0.0-player.59) the phone root's rows are the sidebar's own lists - Recently added the grid under them
+      /const yours = libraryItems\(hasSongs, personal\)\.filter\(\(item\) => item\.id !== 'recent'\)/.test(home),
+      /const browse = browseItems\(hasSongs, personal\)/.test(home)],
     [true, true, true])
 }
 
@@ -1407,7 +1411,7 @@ console.log('\npins: deadwax\'s own, asked when asked, and nothing about them pl
     [home.indexOf('<Pinned ') < home.indexOf('<NewInYourLibrary ') && home.indexOf('<NewInYourLibrary ') < home.indexOf('{recent}'),
       /\{!!newAlbums\?\.length && <NewInYourLibrary albums=\{newAlbums\} onOpen=\{onOpen\} \/>\}/.test(home),
       /const libraryShown = pageShown && nav\.tab === 'library'/.test(app),
-      /useEffect\(\(\) => \{\s*if \(homeShown \|\| libraryShown\) askMyLibrary\(\)\s*\}, \[homeShown, libraryShown\]\)/.test(app),
+      /useEffect\(\(\) => \{\s*if \(homeShown \|\| libraryShown\) askMyLibrary\(\)[\s\S]{0,300}?\}, \[homeShown, libraryShown\]\)/.test(app),
       /const openAlbum = useCallback\(\(album: Album\) => \{\s*seenAlbum\(album\)/.test(app)],
     [true, true, true, true, true])
   check('...and the album page on top seen - reached by its address too - again as an answer lands (review)',
@@ -1545,11 +1549,14 @@ console.log('\nthe desktop frame: chosen below the engine, panels beside the pag
       /<Sidebar\b[\s\S]*?onSearch=\{showSearch\}/.test(app), /const showSearch = useCallback\(\(\) => \{\s*if \(router\.nav\.tab === 'search' && !router\.nav\.stacks\.search\.length\) return\s*router\.root\('search'\)/.test(app)],
     [true, true, true, true])
   const library = code(read('player/Library.tsx'))
-  check('the Library reads its view from the store the sidebar chooses from, titled by it on a desktop, Recently added the albums newest first',
+  const section = code(read('app/LibrarySection.tsx'))
+  check('the Library reads its view from the store the sidebar chooses from, a desktop drawing it inline titled by it, Recently added the albums newest first',
     //? (2.0.0-player.52) titled yours or the store's with a library of your own (lib/appFrame.ts libraryTitle)
-    [/const \{ pick, hasSongs \} = useLibraryPick\(\)/.test(library), /<h1 class="pl-large-title" ref=\{title\} tabIndex=\{-1\}>\{desktop \? libraryTitle\(drawn, personal\) : 'Library'\}<\/h1>/.test(library),
-      /<div hidden=\{drawn !== 'recent'\}>\s*<AlbumsView order="newest"/.test(library), /const choose = \(next: LibraryPick\) => \{\s*if \(next !== showing\) chooseLibrary\(next\)/.test(library)],
-    [true, true, true, true])
+    //? (2.0.0-player.59) the section drawn inline, its title the section's own; a phone chooses nothing in place
+    [/const \{ pick, hasSongs \} = useLibraryPick\(\)/.test(library), /const drawn: LibraryPick = shownPick\(pick, hasSongs, 'desktop', personal\)/.test(library),
+      /title=\{libraryTitle\(id, personal\)\}/.test(section), /const sort: AlbumSort = id === 'recent' \? 'newest' : sorts\.album/.test(section),
+      files.filter((file) => /\bchooseLibrary\(/.test(code(read(file)))).sort()],
+    [true, true, true, true, ['app/App.tsx', 'app/libraryPick.ts', 'player/Library.tsx']])
 }
 
 console.log('\nthe desktop visualizer: a silent copy, never the player\'s element; its toggle from the click')
@@ -1697,8 +1704,10 @@ console.log('\nthe desktop visualizer: a silent copy, never the player\'s elemen
     /if \(document\.visibilityState === 'hidden'\) \{\s*stop\(\)\s*suspendVisualizerAudio\(\)\s*\} else \{\s*resumeVisualizerAudio\(\)\s*start\(\)/.test(screen), true)
   //? (2.0.0-player.58: and a playlist's Edit, scrolling the page while a dragged row is near an edge - only while a
   //? drag is held, the frame called off as it ends - see the playlists' section below)
-  check('...and the only frame loops in the app are the deck\'s, the visualizer\'s and a playlist drag\'s',
-    files.filter((file) => APP_SIDE(file) && /requestAnimationFrame\(/.test(code(read(file)))).sort(), ['app/PlaylistPage.tsx', 'player/Visualizer.tsx', 'player/deck.ts'])
+  //? (2.0.0-player.59: and the Library's index - no loop: ONE frame asked per drag move, so a drag jumps at most once a
+  //? frame, called off as the strip goes - see the Library's section below)
+  check('...and the only frame loops in the app are the deck\'s, the visualizer\'s and a playlist drag\'s (and the index\'s one frame a move)',
+    files.filter((file) => APP_SIDE(file) && /requestAnimationFrame\(/.test(code(read(file)))).sort(), ['app/PlaylistPage.tsx', 'app/ShelfIndex.tsx', 'player/Visualizer.tsx', 'player/deck.ts'])
 }
 
 console.log('\nediting an album on a desktop: the Edit panel, a side panel by the same rule (2.0.0-player.21)')
@@ -1891,7 +1900,7 @@ console.log('\nNeeds a look: the review queue in the app, on a desktop (2.0.0-pl
     [true, true])
   check('the sidebar\'s item: Managing\'s first, an admin\'s, with the count',
     [/\{admin && \(\s*<section class="app-side-group" aria-labelledby="app-side-managing">[\s\S]*?<ul class="app-side-list">\s*\{item\(SIDEBAR_QUEUE\)\}/.test(side),
-      /<Sidebar\b[\s\S]*?needsLook=\{needsLook\}/.test(app), /sidebarCurrent\(nav\.tab, libraryView, hasSongs, topNow, hasLibrary\(\)\)/.test(app)],
+      /<Sidebar\b[\s\S]*?needsLook=\{needsLook\}/.test(app), /sidebarCurrent\(nav\.tab, libraryView, hasSongs, topNow, hasLibrary\(\), nav\.stacks\.library\[0\] \?\? null\)/.test(app)],
     [true, true, true])
   //? (2.0.0-player.47: on both frames - You is told no frame at all now)
   check('You\'s row: in Managing (an admin\'s), above the link to the main page - on a phone as on a desktop',
@@ -1943,7 +1952,7 @@ console.log('\nNeeds a look: the review queue in the app, on a desktop (2.0.0-pl
       (panel.match(/onApplied=\{written\(request, subject\)\}|onDone=\{written\(request, subject\)\}/g) ?? []).length],
     [2, true, true, true, true, 3])
   check('the pages memo is keyed on what the queue page reads (admin, the page shown, the panel and its request)',
-    [/\[nav, status, playingId, player\.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes, visualizerShown, sheetOpen, artistOpen, artistManage, artistRefreshes\]/.test(app),
+    [/\[nav, status, playingId, player\.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes, visualizerShown, sheetOpen, artistOpen, artistManage, artistRefreshes, hasSongs\]/.test(app),
       /page\.kind === 'queue' \? queueView\(tab, page\)/.test(app)],
     [true, true])
 }
@@ -2023,7 +2032,7 @@ console.log('\nServer settings and the log in the app, on a desktop (2.0.0-playe
       /const MANAGING_KINDS: readonly PageKind\[\] = \['queue', 'care', 'settings', 'log'\]/.test(app)],
     [true, true, true, true])
   check('the pages memo is keyed on what they read - the visualizer, and Now Playing, too',
-    [/page\.kind === 'settings' \? settingsView\(tab\) : page\.kind === 'log' \? logView\(tab\)/.test(app), /refreshes, visualizerShown, sheetOpen, artistOpen, artistManage, artistRefreshes\]/.test(app)], [true, true])
+    [/page\.kind === 'settings' \? settingsView\(tab\) : page\.kind === 'log' \? logView\(tab\)/.test(app), /refreshes, visualizerShown, sheetOpen, artistOpen, artistManage, artistRefreshes, hasSongs\]/.test(app)], [true, true])
 }
 
 console.log('\nthe artist page, as the main page had it (2.0.0-player.45)')
@@ -2346,7 +2355,9 @@ console.log('\nUp Next, shuffle and repeat (2.0.0-player.57): each new action fr
     [/const play = \(\) => \{\s*if \(!first \|\| !first\.songs\.length\) return\s*actions\.playTracks\(first\.songs\.map\(shuffledTrack\), 0, false, \{/.test(shuffle), /onClick=\{play\}/.test(shuffle)], [true, true])
   check('...its feed calls nothing of the player but extendQueue, and is called once - in App', [actionsIn(feed), (app.match(/\buseShuffleFeed\(/g) ?? []).length,
     files.filter((file) => file !== 'app/App.tsx' && file !== 'app/useShuffleFeed.ts' && /\buseShuffleFeed\(/.test(code(read(file))))], [['extendQueue'], 1, []])
-  check('...and the Library hands its Shuffle the actions as one object, naming none', [/actions=\{actions\}/.test(code(read('player/Library.tsx'))), /const actions = usePlayerActions\(\)/.test(code(read('player/Library.tsx')))], [true, true])
+  //? (2.0.0-player.59) the Shuffles are the root's and the sections' now
+  check('...and the Library hands its Shuffles the actions as one object, naming none',
+    ['app/LibraryHome.tsx', 'app/LibrarySection.tsx'].map((file) => [/actions=\{actions\}/.test(code(read(file))), /const actions = usePlayerActions\(\)/.test(code(read(file)))]), [[true, true], [true, true]])
 }
 
 console.log('\nplaylists (2.0.0-player.58): a playlist plays from its own page, in the tap; the picker over everything')
@@ -2381,7 +2392,10 @@ console.log('\nplaylists (2.0.0-player.58): a playlist plays from its own page, 
     [/<QueueMenu\b[^\n]*\bonPlaylist=\{queueToPlaylist\}/.test(app), /<ActionMenu\b[^>]*\bonPlaylist=\{playlistFromMenu\}/.test(app), /<PlayerBar\b[^\n]*\bonAddToPlaylist=\{playlistFromBar\}/.test(app),
       /const queueToPlaylist = useCallback\(\(what: QueuePick<AlbumWithSongs>\) => \{\s*setQueueMenuOpen\(false\)\s*openPicker\(/.test(app)],
     [true, true, true, true])
-  check('the Library\'s Playlists row navigates - it names no action and asks nothing', [/<button type="button" class="app-row app-link-row" onClick=\{onOpenPlaylists\}>/.test(code(read('player/Library.tsx'))), /askPlaylists|usePlaylists/.test(code(read('player/Library.tsx')))], [true, false])
+  //? (2.0.0-player.59) the first row of the phone root's first group
+  check('the Library\'s Playlists row navigates - it names no action and asks nothing',
+    [/<button type="button" class="app-row app-link-row app-library-row app-library-playlists" onClick=\{onOpenPlaylists\}>/.test(code(read('app/LibraryHome.tsx'))),
+      /askPlaylists|usePlaylists/.test(code(read('player/Library.tsx')) + code(read('app/LibraryHome.tsx')))], [true, false])
   check('the handlers App hands into the pages memo are made once (useCallback, [])',
     ['openPlaylist', 'openPlaylists', 'playlistDeleted', 'openQueueMenu'].map((name) => new RegExp(`const ${name} = useCallback\\([\\s\\S]*?\\n  \\}, \\[\\]\\)`).test(app)), [true, true, true, true])
   check('the sidebar\'s group: yours then shared by name - All playlists alone while the list isn\'t known or the last ask failed; asked as the desktop shows and comes back',
@@ -2553,6 +2567,90 @@ console.log('\nlooking after deadwax from a phone (2.0.0-player.47)')
     [/const asks = latestOnly\(\)/.test(checks), /const ticket = asks\.begin\(\)/.test(checks), /ask\(ticket\.signal\)/.test(checks),
       (checks.match(/if \(ticket\.current\(\)\) show\(/g) ?? []).length, /show\(\(now\) => \(quiet && now\?\.ok \? now : null\)\)/.test(checks)],
     [true, true, true, 2, true])
+}
+
+console.log('\na better Library (2.0.0-player.59): one list per scope, asked in one place; the section kept under a page')
+{
+  const app = code(read('app/App.tsx'))
+  const section = code(read('app/LibrarySection.tsx'))
+  const home = code(read('app/LibraryHome.tsx'))
+  const index = code(read('app/albumIndex.ts'))
+  const strip = code(read('app/ShelfIndex.tsx'))
+  check('the whole album list asked only through app/albumIndex.ts (its call made in api.ts)',
+    files.filter((file) => /\balbumIndexOf\(|album_index/.test(code(read(file)))).sort(), ['app/albumIndex.ts', 'player/api.ts'])
+  check('...and every reader that asks and then draws does so through latestOnly - the sections and the root',
+    [/const request = asks\.begin\(\)\s*setProblem\(null\)\s*albumIndex\(scope\)\.then\(\s*\(list\) => \{\s*if \(request\.current\(\)\) setIndex\(list\)/.test(section),
+      /const request = asks\.begin\(\)\s*setProblem\(null\)\s*const asking = personal\s*\? albumIndex\('yours'\)/.test(home),
+      /if \(!request\.current\(\)\) return\s*landedAt\.current = Date\.now\(\)\s*setRecent\(found\)/.test(home), /const asks = useMemo\(latestOnly, \[\]\)/.test(section), /const asks = useMemo\(latestOnly, \[\]\)/.test(home)],
+    [true, true, true, true, true])
+  check('the root never asks the store\'s whole list: with logins off its 12 are one getAlbumList2 newest of 12',
+    [/albumPage\('newest', 0, request\.signal, RECENT_ON_ROOT\)/.test(home), /export const RECENT_ON_ROOT = 12\b/.test(home), /albumIndex\('store'\)/.test(home)], [true, true, false])
+  check('a kept list draws at once, and a list asked again is swapped in - never emptied for the ask',
+    [/useState<AlbumIndex \| null>\(\(\) => keptIndex\(scope\)\)/.test(section), /setIndex\(null\)/.test(section), /useEffect\(\(\) => \{\s*if \(shown\) refreshIfOld\(scope\)\s*\}, \[shown\]\)/.test(section)],
+    [true, false, true])
+  check('...older than a minute as the Library shows, too (App), and refreshIfOld leaves a list on its way alone',
+    [/if \(!libraryShown\) return\s*refreshIfOld\('store'\)\s*if \(hasLibrary\(\)\) refreshIfOld\('yours'\)/.test(app),
+      /if \(state\.held && state\.held\.generation === state\.generation && state\.held\.pending\) return\s*if \(Date\.now\(\) - state\.kept\.at > INDEX_FRESH_MS\) forgetIndex\(scope\)/.test(index)], [true, true])
+  //? (review) neither was pinned: dropping the generation from the root's effect, or Your artists' refreshIfOld, survived every sim
+  check('(review) the root\'s Recently added follows the yours generation (an Add, a Remove, the count moving); Your artists asks yours again as it shows if over a minute old, and follows its generation',
+    [/const generation = useYourAlbumsGeneration\(\)/.test(home), /useEffect\(load, \[personal, personal \? generation : 0\]\)/.test(home),
+      /useEffect\(\(\) => \{\s*if \(!shown\) return\s*if \(yours\) refreshIfOld\('yours'\)\s*load\(\)\s*\}, \[shown, yours \? generation : 0\]\)/.test(section)],
+    [true, true, true])
+  check('App\'s pane keeps the Library stack\'s first page, a section, drawn and hidden under a page pushed over it - one sectionView for both slots',
+    [/\{base && <div key=\{pageKey\(tab, base\)\} hidden>\{sections\[tab\]\}<\/div>\}\s*\{top && <div key=\{pageKey\(tab, top\)\}>\{pages\[tab\]\}<\/div>\}/.test(app),
+      /return tab === 'library' && stack\.length > 1 && stack\[0\]!\.kind === 'section' \? stack\[0\]! : null/.test(app),
+      /page\.kind === 'section' \? sectionView\(tab, page, true\)/.test(app), /return \[tab, base \? sectionView\(tab, base, false\) : null\]/.test(app)],
+    [true, true, true, true])
+  check('a section is opened only by App\'s openSection, pushed from the root or replacing a section on top - never piled',
+    [/if \(top\?\.kind === 'section'\) router\.become\(top, page\)\s*else router\.open\(page\)/.test(app), /onOpenSection=\{openSection\}/.test(app)], [true, true])
+  //? the measurement's answer (notes/app-library.md): tiles made only in the blocks near the view
+  const shelf = code(read('app/Shelf.tsx'))
+  check('the shelf draws a block\'s tiles only while it is near the view - the observer changing nothing while the shelf is hidden, never letting go of a block holding the focus',
+    [/if \(element\.getClientRects\(\)\.length === 0\) return\s*const wanted = new Set\(keysNow\.current\)/.test(shelf),
+      /else if \(wanted\.has\(key\) && !entry\.target\.contains\(document\.activeElement\)\) \{\s*known\.current\.set\(key, entry\.boundingClientRect\.height\)/.test(shelf),
+      /\{on && body\(block\)\}/.test(shelf), /\}, \{ rootMargin: NEAR_MARGIN \}\)/.test(shelf), /const NEAR_MARGIN = '100% 0px'/.test(shelf)],
+    [true, true, true, true, true])
+  check('...every header always in the page, a jump re-aligned as the blocks near it are drawn until the page is touched',
+    [/\{block\.head !== null && \(\s*<h2 class="app-shelf-head" data-group=\{block\.group\}>/.test(shelf), /useLayoutEffect\(align, \[keys\]\)/.test(shelf),
+      /if \(!\(event\.target as Element \| null\)\?\.closest\?\.\('\.app-index'\)\) jumping\.current = null/.test(shelf)], [true, true, true])
+  check('Find is a search field, emptied by Escape', [/type="search"/.test(section), /if \(event\.key === 'Escape' && find\.value\) \{\s*event\.preventDefault\(\)\s*find\.change\(''\)\s*\}/.test(section)], [true, true])
+  //? (review) the orders remembered per device: choosing one writes it, under its own key
+  const persisted = read('state/persisted.ts')
+  check('choosing an album sort or an artists\' order writes it to the device, each under its own key',
+    [/chooseAlbum: \(next\) => \{\s*writePlayerOrder\(next\)\s*albumSortNow = next/.test(section), /chooseArtist: \(next\) => \{\s*writePlayerArtistOrder\(next\)\s*artistOrderNow = next/.test(section),
+      /sorts\.chooseAlbum\(albumSortFrom\(next\)\)/.test(section), /sorts\.chooseArtist\(artistOrderFrom\(next\)\)/.test(section),
+      /playerArtistOrder: 'deadwax-player-artist-order'/.test(persisted), /export function writePlayerArtistOrder\(order: string\): void \{\s*writeRaw\(STORAGE_KEYS\.playerArtistOrder, order\)/.test(persisted)],
+    [true, true, true, true, true, true])
+  //? (review) where the amendment puts .57's Shuffles, what the root's Recently added holds, the 10,000 notice
+  check('the Shuffles where the amendment puts them: the root\'s (yours), Your albums\' with its count (personal Albums only), Songs\' the scope it lists',
+    [/<\/header>[\s\S]{0,300}?<ShuffleSongs scope="yours" shown=\{shown\} actions=\{actions\} \/>\s*<div class="app-group app-library-group">/.test(home),
+      /\{personal && id === 'albums' && <ShuffleSongs scope="yours" shown=\{shown\} actions=\{actions\} count \/>\}/.test(section),
+      /<ShuffleSongs scope=\{personal \? 'store' : 'yours'\} shown=\{shown\} actions=\{actions\} \/>/.test(section),
+      (section.match(/<ShuffleSongs\b/g) ?? []).length, (home.match(/<ShuffleSongs\b/g) ?? []).length],
+    [true, true, true, 2, 1])
+  check('...the root\'s Recently added is your newest 12; the notice at 10,000',
+    [/albums: sortAlbums\(index\.albums, 'newest'\)\.slice\(0, RECENT_ON_ROOT\)/.test(home), /\{index\?\.truncated && <p class="pl-notice">\{TRUNCATED_NOTICE\}<\/p>\}/.test(section)], [true, true])
+  check('(review) the logins-off root\'s 12 asked again as the root shows, once over a minute old - their grid kept meanwhile',
+    [/useEffect\(\(\) => \{\s*if \(shown && !personal && landedAt\.current && Date\.now\(\) - landedAt\.current > INDEX_FRESH_MS\) load\(\)\s*\}, \[shown\]\)/.test(home),
+      /if \(!request\.current\(\)\) return\s*landedAt\.current = Date\.now\(\)\s*setRecent\(found\)/.test(home), /setRecent\(null\)/.test(home)], [true, true, false])
+  check('the index: one frame asked per drag move and called off as the strip goes - no loop; a drag never a scroll',
+    [(strip.match(/requestAnimationFrame\(/g) ?? []).length, /if \(frame\.current !== null\) return/.test(strip),
+      /useEffect\(\(\) => \(\) => \{\s*if \(frame\.current !== null && typeof cancelAnimationFrame === 'function'\) cancelAnimationFrame\(frame\.current\)/.test(strip),
+      /setPointerCapture\(event\.pointerId\)/.test(strip)], [1, true, true, true])
+  //? (review) a finger on A jumped to G: the strip is the view's height and centres its letters
+  check('(review) the index reads the finger over the DRAWN slots (first slot\'s top to the last\'s bottom), as they were at pointerdown - never the strip\'s own box',
+    [/const first = strip\.current\?\.firstElementChild\s*const end = strip\.current\?\.lastElementChild/.test(strip), /const height = end\.getBoundingClientRect\(\)\.bottom - top/.test(strip),
+      /const pointerDown = \(event: PointerEvent\) => \{\s*held\.current = extent\(\)\s*const at = under\(event\)/.test(strip),
+      /const box = held\.current\s*return box \? entryAt\(box\.slots, event\.clientY, box\.top, box\.height\) : null/.test(strip),
+      /strip\.current\.getBoundingClientRect|element\.getBoundingClientRect/.test(strip)],
+    [true, true, true, true, false])
+  check('...a pointer\'s jump is the jump: the click its press leaves is let go, one with no press (Enter, Space, a screen reader) jumps',
+    [/onClick=\{\(event\) => \{\s*if \(event\.detail > 0 && pressed\.current\) return\s*leapTo\(slot\.at\)/.test(strip), /dragging\.current = event\.pointerId\s*pressed\.current = true/.test(strip),
+      /onClick=\{\(\) => \{\s*(?:\/\/[^\n]*\n\s*)?pressed\.current = false\s*\}\}/.test(strip), /if \(event\.type === 'pointercancel'\) pressed\.current = false/.test(strip)],
+    [true, true, true, true])
+  check('...its keys: Up and Down between the entries drawn, Home and End to the ends',
+    [/event\.key === 'ArrowDown' \? kept\[Math\.min\(kept\.length - 1, place \+ 1\)\]\s*: event\.key === 'ArrowUp' \? kept\[Math\.max\(0, place - 1\)\]\s*: event\.key === 'Home' \? kept\[0\]\s*: event\.key === 'End' \? kept\[kept\.length - 1\]/.test(strip)],
+    [true])
 }
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

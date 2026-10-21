@@ -44,6 +44,7 @@ import type { ArtistCredit, ArtistFacts, ReleaseGroup } from '../api/types'
 import { heldInOrder } from './idBridge'
 import { foldName, ownedForGroup, ownedForRelease, type OwnedAlbum, type OwnedIndex } from './owned'
 import { groupKind, groupYear } from './searchResults'
+import { sortArtistsBy } from './shelves'
 import { IN_THE_STORE, IN_YOUR_LIBRARY, anyYours, heldPhrase } from './whose'
 
 /** (2.0.0-player.52) Whether a row's album is yours: an album of it you starred, or a folder of it your library
@@ -410,16 +411,13 @@ export const ARTIST_ORDERS: readonly { id: ArtistOrder; label: string }[] = [
 ]
 
 /**
- * Library > Artists in an order: Navidrome's own by name (a leading "The" set aside, as its index
- * files them), or by how many albums of theirs the library holds, most first - a tie in Navidrome's
- * order.
+ * Library > Artists in an order (lib/shelves.ts sortArtistsBy, 2.0.0-player.59): by name as deadwax folds it - a
+ * leading "The", accents and case set aside - with names no letter heads (digits, symbols, other scripts) after Z,
+ * so the Library's letter headers are contiguous; or by how many albums of theirs the library holds, most first. A
+ * tie in Navidrome's order either way.
  */
-export function sortArtists<A extends { albumCount?: number }>(artists: readonly A[], order: ArtistOrder): A[] {
-  if (order === 'name') return [...artists]
-  return artists
-    .map((artist, index) => ({ artist, index }))
-    .sort((a, b) => (b.artist.albumCount ?? 0) - (a.artist.albumCount ?? 0) || a.index - b.index)
-    .map(({ artist }) => artist)
+export function sortArtists<A extends { name: string; albumCount?: number }>(artists: readonly A[], order: ArtistOrder): A[] {
+  return sortArtistsBy(artists, order)
 }
 
 /** "114 albums", "1 artist" - the Library's count beside the sort, once the whole list is in. */

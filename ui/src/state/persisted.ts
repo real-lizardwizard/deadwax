@@ -37,8 +37,12 @@ export const STORAGE_KEYS = {
   librarySort: 'deadwax-library-sort',
   /** Which settings tab was open last (v0.9.15). The literal tab id, not JSON. */
   settingsTab: 'deadwax-settings-tab',
-  /** Which order the player's album grid is in - a Subsonic album list type. */
+  /** Which order the Library's albums are in (lib/shelves.ts ALBUM_SORTS): the four old Subsonic list types mean
+   *  what they did; since 2.0.0-player.59 three more, and anything else read as Artist, the default. */
   playerOrder: 'deadwax-player-order',
+  /** (2.0.0-player.59) Which order the Library's artists are in: 'albums' (Most albums), anything else Name. Per
+   *  device, like the albums' order. */
+  playerArtistOrder: 'deadwax-player-artist-order',
   /** What the app's Library tab shows (2.0.0-player.17): 'artists' or 'songs', anything else the
    *  albums (the default). Per device, like the order. */
   playerLibraryView: 'deadwax-player-library-view',
@@ -251,6 +255,17 @@ export function readPlayerOrder(): string | null {
 
 export function writePlayerOrder(order: string): void {
   writeRaw(STORAGE_KEYS.playerOrder, order)
+}
+
+/* ===== deadwax-player-artist-order ===== */
+
+/** A plain string, read by lib/shelves.ts artistOrderFrom. */
+export function readPlayerArtistOrder(): string | null {
+  return readRaw(STORAGE_KEYS.playerArtistOrder)
+}
+
+export function writePlayerArtistOrder(order: string): void {
+  writeRaw(STORAGE_KEYS.playerArtistOrder, order)
 }
 
 /* ===== deadwax-player-library-view ===== */

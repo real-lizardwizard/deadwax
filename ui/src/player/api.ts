@@ -42,8 +42,10 @@ export interface Album {
   /** when the asker starred it (ISO) - sent only if they have: with logins on deadwax asks as you
    *  (2.0.0-player.52), so it says the album is in YOUR library - your starred albums */
   starred?: string
-  /** when Navidrome first had it (ISO) - "Recently added", for your library's own order (lib/yourLibrary.ts) */
+  /** when Navidrome first had it (ISO) - "Recently added", the Library's own order (lib/shelves.ts) */
   created?: string
+  /** (2.0.0-player.59) how many times the asker has played it - sent once they have: the Library's Most played */
+  playCount?: number
 }
 
 export interface Song {
@@ -111,6 +113,19 @@ export async function albumPage(
     signal,
   )
   return page.albums
+}
+
+/** (2.0.0-player.59) The Library's whole list of one scope's albums - yours (your starred albums, asked as you) or
+ *  the store's - in one answer (src/routes/navidrome.py /album_index), in Navidrome's order, trimmed to what the
+ *  Library reads; `truncated` past the route's 10,000. Asked only through app/albumIndex.ts, which shares it. The
+ *  route sends an ETag, so an unchanged list is the browser's own copy after a 304. */
+export interface AlbumIndexAnswer {
+  albums: Album[]
+  truncated: boolean
+}
+
+export function albumIndexOf(scope: 'yours' | 'store', signal?: AbortSignal): Promise<AlbumIndexAnswer> {
+  return get<AlbumIndexAnswer>(`/navidrome/album_index?scope=${scope}`, signal)
 }
 
 /** An artist as Navidrome answers - search3, getArtists, getArtist: what the Search tab's top

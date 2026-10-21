@@ -5,9 +5,9 @@ import { useDownloadJobs } from '../hooks/useDownloadJobs'
 import type { Playlist } from '../api/playlists'
 import type { ReleaseGroup } from '../api/types'
 import { me } from '../api/me'
-import { browseItems, closesOnCrossing, libraryItems, liesOver, makesRoom, sideOf, sidebarCurrent, sidebarMove, type ManagingKind, type SidebarId } from '../lib/appFrame'
+import { browseItems, closesOnCrossing, libraryItems, libraryTitle, liesOver, makesRoom, shownPick, sideOf, sidebarCurrent, sidebarMove, type LibraryPick, type ManagingKind, type SidebarId } from '../lib/appFrame'
 import { createRouter, type Router, type StorageLike } from '../lib/appHistory'
-import { CARE_PAGE, LOG_PAGE, PLAYLISTS_PAGE, QUEUE_ID, QUEUE_PAGE, SETTINGS_PAGE, TAB_LABELS, TABS, backLabel, currentRoute, playlistsMove, scrollKey, type Nav, type Page, type PageKind, type Tab } from '../lib/appRoutes'
+import { CARE_PAGE, LOG_PAGE, PLAYLISTS_PAGE, QUEUE_ID, QUEUE_PAGE, SETTINGS_PAGE, TAB_LABELS, TABS, backLabel, currentRoute, playlistsMove, samePage, scrollKey, type Nav, type Page, type PageKind, type Tab } from '../lib/appRoutes'
 import { handleDownloadRequests } from '../lib/downloadRequests'
 import { movedTo, noteMove, type EditAlbum } from '../lib/albumEdit'
 import { announceAlbumsFiled } from '../lib/libraryEvents'
@@ -41,6 +41,8 @@ import { EditPanel, isFolderRequest, type AlbumChange, type EditRequest, type Fo
 import { Home } from './Home'
 import { InfoSheet } from './InfoSheet'
 import { LibraryCare } from './LibraryCare'
+import { LibrarySection } from './LibrarySection'
+import { refreshIfOld } from './albumIndex'
 import { chooseLibrary, libraryPick, librarySongs, useLibraryPick } from './libraryPick'
 import { NeedsALook } from './NeedsALook'
 import { NeedsNavidrome } from './NeedsNavidrome'
@@ -82,6 +84,13 @@ function sessionStore(): StorageLike | null {
 }
 
 const pageKey = (tab: Tab, page: Page) => `${tab}:${page.kind}:${page.id}`
+
+/** (2.0.0-player.59) The Library stack's first page when it is a section with a page pushed over it - kept drawn,
+ *  hidden, under that page (App's pane), so coming back to it builds nothing again. Only the Library's. */
+const sectionBase = (nav: Nav, tab: Tab): Page | null => {
+  const stack = nav.stacks[tab]
+  return tab === 'library' && stack.length > 1 && stack[0]!.kind === 'section' ? stack[0]! : null
+}
 
 /** The Managing pages, siblings in the sidebar: one opened over another replaces it. */
 const MANAGING_KINDS: readonly PageKind[] = ['queue', 'care', 'settings', 'log']
@@ -945,6 +954,22 @@ export function App() {
     const { page } = currentRoute(router.nav)
     if (page?.kind === 'playlist' && page.id === id) router.back()
   }, [])
+  //? (2.0.0-player.59) A section of the Library - a phone's root row, See all, Browse the store - as a page on the
+  //? Library: pushed from the root, or REPLACING a section page on top (`router.become`: Browse the store from an
+  //? empty section), so a section is never pushed on a section. A fresh open starts at its top
+  const openSection = useCallback((id: LibraryPick) => {
+    const page: Page = { kind: 'section', id, label: libraryTitle(id, hasLibrary()) }
+    if (router.nav.tab !== 'library') router.tab('library')
+    const stack = router.nav.stacks.library
+    const top = stack[stack.length - 1] ?? null
+    if (samePage(top, page)) return
+    const address = scrollKey({ tab: 'library', page })
+    if (address !== scrollKey(currentRoute(router.nav))) scrolls.current.delete(address)
+    if (top?.kind === 'section') router.become(top, page)
+    else router.open(page)
+  }, [])
+  //? an empty section's Browse the store: the store's section in its place
+  const browseStore = useCallback(() => openSection('store'), [])
   const openManaging = useCallback((kind: ManagingKind) => openManagingPage(kind === 'care' ? CARE_PAGE : kind === 'settings' ? SETTINGS_PAGE : LOG_PAGE), [])
   //? a facet chosen there: the page's address replaced, as a pressing chosen on a group page
   const pickFacet = useCallback((facet: string | null) => {
@@ -1129,8 +1154,10 @@ export function App() {
   //? the Library view showing; another Library view is that view at the Library's root - from another
   //? tab, or a page on the Library's, opened at its top (lib/appFrame.ts sidebarMove).
   const chooseFromSidebar = useCallback((item: SidebarId) => {
-    const move = sidebarMove(item, libraryPick(), librarySongs(), hasLibrary())
+    const move = sidebarMove(item, libraryPick(), librarySongs(), hasLibrary(), router.nav.stacks.library[0] ?? null)
     if (move.how === 'tab') {
+      //? (2.0.0-player.59) a section page's own item: the root it may pop to draws that section's view
+      if (move.pick) chooseLibrary(move.pick)
       chooseTab(move.tab)
       return
     }
@@ -1233,6 +1260,10 @@ export function App() {
   const libraryShown = pageShown && nav.tab === 'library'
   useEffect(() => {
     if (homeShown || libraryShown) askMyLibrary()
+    //? (2.0.0-player.59) and the Library's album lists asked again if over a minute old (app/albumIndex.ts)
+    if (!libraryShown) return
+    refreshIfOld('store')
+    if (hasLibrary()) refreshIfOld('yours')
   }, [homeShown, libraryShown])
   //? ...and the album page on top is seen - opened from a tile (openAlbum told it already), reached by its
   //? address or by going back to it - looked at again as an answer lands, so one opened before deadwax
@@ -1281,7 +1312,7 @@ export function App() {
   const library = useMemo(
     () => (
       <NeedsNavidrome status={status} onRetry={checkNavidrome} title={TAB_LABELS.library}>
-        {librarySeen && <Library onOpen={openAlbum} onOpenArtist={openLibraryArtist} onOpenPlaylists={openPlaylists} onSongMenu={openSongMenu} shown={libraryShown} />}
+        {librarySeen && <Library onOpen={openAlbum} onOpenArtist={openLibraryArtist} onOpenPlaylists={openPlaylists} onOpenSection={openSection} onSongMenu={openSongMenu} shown={libraryShown} />}
       </NeedsNavidrome>
     ),
     [status, librarySeen, libraryShown],
@@ -1394,8 +1425,33 @@ export function App() {
     </NeedsNavidrome>
   )
 
+  //? (2.0.0-player.59) a section of the Library as a page, inside the Navidrome gate as an album page is - drawn as
+  //? shownPick says (with logins off Browse's two are the albums and the artists; Songs falls back where Navidrome
+  //? lists none). ONE function for both of the pane's slots - the top, and the base kept under a page pushed over it -
+  //? so the two render the same tree and Preact keeps the section's instance (its tiles, its Find, its scroll) as an
+  //? album opens over it and Back comes to it. Its back label is the page under it: the tab's, at the stack's foot
+  const sectionView = (tab: Tab, page: Page, on: boolean) => {
+    const stack = nav.stacks[tab]
+    const at = stack.findIndex((each) => samePage(each, page))
+    const below = at > 0 ? stack[at - 1] : null
+    return (
+      <NeedsNavidrome status={status} onRetry={checkNavidrome} title={TAB_LABELS[tab]}>
+        <LibrarySection
+          id={shownPick(page.id as LibraryPick, hasSongs, 'desktop', hasLibrary())}
+          personal={hasLibrary()}
+          shown={on && pageShown && nav.tab === tab}
+          onOpen={openAlbum}
+          onOpenArtist={openLibraryArtist}
+          onSongMenu={openSongMenu}
+          onBrowse={browseStore}
+          page={{ onBack: back, backLabel: below?.label || TAB_LABELS[tab] }}
+        />
+      </NeedsNavidrome>
+    )
+  }
+
   const pageView = (tab: Tab, page: Page, player: Player) =>
-    page.kind === 'playlists' ? playlistsView(tab) : page.kind === 'playlist' ? playlistView(tab, page, player) : page.kind === 'settings' ? settingsView(tab) : page.kind === 'log' ? logView(tab) : page.kind === 'care' ? careView(tab) : page.kind === 'queue' ? queueView(tab, page) : page.kind === 'artist' ? artistView(tab, page) : page.kind === 'group' ? (
+    page.kind === 'section' ? sectionView(tab, page, true) : page.kind === 'playlists' ? playlistsView(tab) : page.kind === 'playlist' ? playlistView(tab, page, player) : page.kind === 'settings' ? settingsView(tab) : page.kind === 'log' ? logView(tab) : page.kind === 'care' ? careView(tab) : page.kind === 'queue' ? queueView(tab, page) : page.kind === 'artist' ? artistView(tab, page) : page.kind === 'group' ? (
       <ReleaseGroupPage
         id={page.id}
         release={page.release ?? null}
@@ -1448,7 +1504,20 @@ export function App() {
           return [tab, top ? pageView(tab, top, player) : null]
         }),
       ) as Record<Tab, JSX.Element | null>,
-    [nav, status, playingId, player.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes, visualizerShown, sheetOpen, artistOpen, artistManage, artistRefreshes],
+    [nav, status, playingId, player.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes, visualizerShown, sheetOpen, artistOpen, artistManage, artistRefreshes, hasSongs],
+  )
+  //? (2.0.0-player.59) the Library stack's first page, when it is a section with a page pushed over it: drawn and
+  //? hidden under that page, as the root is, by the same sectionView - so Back finds its tiles, its Find text and its
+  //? scroll, and asks nothing again
+  const sections = useMemo(
+    () =>
+      Object.fromEntries(
+        TABS.map((tab) => {
+          const base = sectionBase(nav, tab)
+          return [tab, base ? sectionView(tab, base, false) : null]
+        }),
+      ) as Record<Tab, JSX.Element | null>,
+    [nav, status, pageShown, hasSongs],
   )
 
   const playing = player.track
@@ -1521,7 +1590,7 @@ export function App() {
             {/* a desktop's sidebar, in the tab bar's place (2.0.0-player.19) - first, as it is on screen */}
             {desktop && (
               <Sidebar
-                current={sidebarCurrent(nav.tab, libraryView, hasSongs, topNow, hasLibrary())}
+                current={sidebarCurrent(nav.tab, libraryView, hasSongs, topNow, hasLibrary(), nav.stacks.library[0] ?? null)}
                 library={libraryItems(hasSongs, hasLibrary())}
                 browse={browseItems(hasSongs, hasLibrary())}
                 personal={hasLibrary()}
@@ -1538,9 +1607,11 @@ export function App() {
             {TABS.map((tab) => {
               const stack = nav.stacks[tab]
               const top = stack[stack.length - 1] ?? null
+              const base = sectionBase(nav, tab)
               return (
                 <div key={tab} class="app-pane" data-tab={tab} hidden={nav.tab !== tab}>
                   <div hidden={top !== null}>{roots[tab]}</div>
+                  {base && <div key={pageKey(tab, base)} hidden>{sections[tab]}</div>}
                   {top && <div key={pageKey(tab, top)}>{pages[tab]}</div>}
                 </div>
               )

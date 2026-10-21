@@ -283,7 +283,11 @@ console.log('\nthe lines')
 console.log('\nLibrary > Artists, and the count')
 {
   const artists = [{ name: 'Massive Attack', albumCount: 2 }, { name: 'Portishead', albumCount: 3 }, { name: 'The Beatles', albumCount: 3 }, { name: 'Tricky' }]
-  check('by name: Navidrome\'s own order, untouched', A.sortArtists(artists, 'name').map((a) => a.name), ['Massive Attack', 'Portishead', 'The Beatles', 'Tricky'])
+  //? (2.0.0-player.59, on purpose) by deadwax's own fold key, no longer Navidrome's order: "The Beatles" under B, and a
+  //? name no letter heads (digits, symbols, another script) after Z, so the Library's letter headers run unbroken
+  check('by name: folded, "The" set aside', A.sortArtists(artists, 'name').map((a) => a.name), ['The Beatles', 'Massive Attack', 'Portishead', 'Tricky'])
+  check('...names no letter heads after Z, a tie in Navidrome\'s order', A.sortArtists([{ name: '10cc' }, { name: 'Björk' }, { name: 'ABBA' }, { name: '坂本龍一' }, { name: 'abba' }], 'name').map((a) => a.name),
+    ['ABBA', 'abba', 'Björk', '10cc', '坂本龍一'])
   check('most albums first, a tie in Navidrome\'s order, none counted last', A.sortArtists(artists, 'albums').map((a) => a.name), ['Portishead', 'The Beatles', 'Massive Attack', 'Tricky'])
   check('...never the list it was handed, rearranged', artists.map((a) => a.name), ['Massive Attack', 'Portishead', 'The Beatles', 'Tricky'])
   check('the orders offered', A.ARTIST_ORDERS.map((o) => o.label), ['Name', 'Most albums'])

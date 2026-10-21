@@ -1,0 +1,441 @@
+/**
+ * The Library's shelves (2.0.0-player.59, a better Library) - pure, pinned by ui/test/shelves.sim.cjs: the seven album
+ * sorts and the two artist orders, the headers each groups by, the index down the right edge, Find's matching and
+ * words, and the blocks the shelf draws in. See "A better Library" in notes/app-library.md.
+ *
+ * SORTS. One list for your albums and the store's (one choice per device, deadwax-player-order, whose four old values
+ * mean what they did), sorted HERE, in the browser, the same way for both scopes - so the store's Artist order is
+ * deadwax's, no longer Navidrome's (compilations last, then title). Names compare by lib/owned.ts's foldName (accents,
+ * case, a leading "The", "&" folded), with the `#` bucket - a fold key not starting a-z: digits, symbols, non-Latin
+ * scripts, nothing at all - after Z, as Apple puts it. Ties keep the order the list came in (Navidrome's).
+ *
+ * KEYS ONCE. Every album's fold keys are made once per album object (a WeakMap) - about 3,000 foldName calls for a
+ * library of 3,000 where folding inside the comparator made about 70,000.
+ */
+
+import type { Album, Artist } from '../player/api'
+import type { ArtistOrder } from './artistPage'
+import { foldName } from './owned'
+
+export type AlbumSort = 'alphabeticalByArtist' | 'alphabeticalByName' | 'newest' | 'byYearDesc' | 'byYearAsc' | 'recent' | 'frequent'
+
+/** The album sorts, in the select's order: the four that existed keep the Subsonic ids a device saved. */
+export const ALBUM_SORTS: readonly { id: AlbumSort; label: string }[] = [
+  { id: 'alphabeticalByArtist', label: 'Artist' },
+  { id: 'alphabeticalByName', label: 'Title' },
+  { id: 'newest', label: 'Recently added' },
+  { id: 'byYearDesc', label: 'Year, newest first' },
+  { id: 'byYearAsc', label: 'Year, oldest first' },
+  { id: 'recent', label: 'Recently played' },
+  { id: 'frequent', label: 'Most played' },
+]
+
+/** Artist (each artist's albums oldest first): Recently added has its own place now - the root's grid and See all. */
+export const DEFAULT_ALBUM_SORT: AlbumSort = 'alphabeticalByArtist'
+
+export function isAlbumSort(value: unknown): value is AlbumSort {
+  return ALBUM_SORTS.some((sort) => sort.id === value)
+}
+
+/** A sort as a device saved it: one of the seven, anything else (nothing, an old or mistyped value) the default. */
+export function albumSortFrom(saved: string | null | undefined): AlbumSort {
+  return isAlbumSort(saved) ? saved : DEFAULT_ALBUM_SORT
+}
+
+/** An artist order as a device saved it (deadwax-player-artist-order): Name unless Most albums. */
+export function artistOrderFrom(saved: string | null | undefined): ArtistOrder {
+  return saved === 'albums' ? 'albums' : 'name'
+}
+
+/** A list cut into groups: each with its header's words (null for a sort without headers) and its items. */
+export interface Group<T> {
+  key: string
+  label: string | null
+  items: T[]
+}
+
+/** The `#` group: what no letter heads. */
+export const OTHER_INITIAL = '#'
+
+/** A fold key's group: its first letter a-z, as a capital; anything else `#`. */
+export function initialOf(foldKey: string): string {
+  const first = foldKey.charAt(0)
+  return first >= 'a' && first <= 'z' ? first.toUpperCase() : OTHER_INITIAL
+}
+
+const time = (value: unknown): number | null => {
+  //? only an ISO string is a date: the dev stand-in's float `created` is "Date unknown", never a guess
+  const parsed = typeof value === 'string' ? Date.parse(value) : NaN
+  return Number.isNaN(parsed) ? null : parsed
+}
+
+/** What a sort compares an album by, made once per album. */
+export interface AlbumKeys {
+  artist: string
+  title: string
+  initial: string
+  titleInitial: string
+  /** null: no year, or 0 */
+  year: number | null
+  created: number | null
+  played: number | null
+  plays: number
+}
+
+const keyed = new WeakMap<Album, AlbumKeys>()
+
+export function albumKeys(album: Album): AlbumKeys {
+  let keys = keyed.get(album)
+  if (!keys) {
+    const artist = foldName(album.artist)
+    const title = foldName(album.name)
+    keys = {
+      artist,
+      title,
+      initial: initialOf(artist),
+      titleInitial: initialOf(title),
+      year: typeof album.year === 'number' && album.year > 0 ? album.year : null,
+      created: time(album.created),
+      played: time(album.played),
+      plays: typeof album.playCount === 'number' && album.playCount > 0 ? album.playCount : 0,
+    }
+    keyed.set(album, keys)
+  }
+  return keys
+}
+
+const text = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
+//? letters first, then `#`; then the key itself
+const byName = (a: string, aInitial: string, b: string, bInitial: string) =>
+  (aInitial === OTHER_INITIAL ? 1 : 0) - (bInitial === OTHER_INITIAL ? 1 : 0) || text(a, b)
+//? a value that may be missing: the missing last, whichever way the rest go
+const missingLast = (a: number | null, b: number | null, descending: boolean) =>
+  a === null || b === null ? (a === b ? 0 : a === null ? 1 : -1) : descending ? b - a : a - b
+
+/** The albums in `sort` - a new list, the one handed in left as it is. Recently played and Most played leave out
+ *  what hasn't been played (as Navidrome's own `recent` does). */
+export function sortAlbums(albums: readonly Album[], sort: AlbumSort): Album[] {
+  const listed = albums.map((album, index) => ({ album, index, keys: albumKeys(album) }))
+  type Entry = (typeof listed)[number]
+  const compare: (a: Entry, b: Entry) => number =
+    sort === 'alphabeticalByArtist'
+      ? (a, b) => byName(a.keys.artist, a.keys.initial, b.keys.artist, b.keys.initial) || missingLast(a.keys.year, b.keys.year, false)
+        || text(a.keys.title, b.keys.title) || a.index - b.index
+      : sort === 'alphabeticalByName'
+        ? (a, b) => byName(a.keys.title, a.keys.titleInitial, b.keys.title, b.keys.titleInitial) || text(a.keys.artist, b.keys.artist) || a.index - b.index
+        : sort === 'newest'
+          ? (a, b) => missingLast(a.keys.created, b.keys.created, true) || a.index - b.index
+          : sort === 'byYearDesc' || sort === 'byYearAsc'
+            ? (a, b) => missingLast(a.keys.year, b.keys.year, sort === 'byYearDesc')
+              || byName(a.keys.artist, a.keys.initial, b.keys.artist, b.keys.initial) || text(a.keys.title, b.keys.title) || a.index - b.index
+            : sort === 'recent'
+              ? (a, b) => b.keys.played! - a.keys.played! || a.index - b.index
+              : (a, b) => b.keys.plays - a.keys.plays || missingLast(a.keys.played, b.keys.played, true) || a.index - b.index
+  const kept = sort === 'recent' ? listed.filter((entry) => entry.keys.played !== null)
+    : sort === 'frequent' ? listed.filter((entry) => entry.keys.plays > 0)
+      : listed
+  return kept.sort(compare).map((entry) => entry.album)
+}
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+export const DATE_UNKNOWN = 'Date unknown'
+export const NO_YEAR = 'No year'
+
+/** The month an album was added, in English from a fixed table (never toLocaleString): "October 2026". */
+export function monthLabel(created: unknown): string {
+  const at = time(created)
+  if (at === null) return DATE_UNKNOWN
+  const date = new Date(at)
+  return `${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`
+}
+
+/** Consecutive runs of the same key, each a group. */
+function runs<T>(items: readonly T[], key: (item: T) => string, label: (item: T) => string | null): Group<T>[] {
+  const groups: Group<T>[] = []
+  for (const item of items) {
+    const at = key(item)
+    const last = groups[groups.length - 1]
+    if (last && last.key === at) last.items.push(item)
+    else groups.push({ key: at, label: label(item), items: [item] })
+  }
+  return groups
+}
+
+/** Whether a sort draws headers: the letters, the years and the months; the played sorts are one running list. */
+export function albumSortHeads(sort: AlbumSort): boolean {
+  return sort !== 'recent' && sort !== 'frequent'
+}
+
+/** Sorted albums cut into their headers' groups: the artist's or the title's first letter, the year ("No year"
+ *  last), the month added ("Date unknown" last) - or one unlabelled group for Recently played and Most played. */
+export function groupAlbums(sorted: readonly Album[], sort: AlbumSort): Group<Album>[] {
+  if (!sorted.length) return []
+  if (!albumSortHeads(sort)) return [{ key: 'all', label: null, items: [...sorted] }]
+  if (sort === 'alphabeticalByArtist') return runs(sorted, (album) => albumKeys(album).initial, (album) => albumKeys(album).initial)
+  if (sort === 'alphabeticalByName') return runs(sorted, (album) => albumKeys(album).titleInitial, (album) => albumKeys(album).titleInitial)
+  if (sort === 'newest') {
+    return runs(sorted, (album) => monthLabel(album.created), (album) => monthLabel(album.created))
+  }
+  const year = (album: Album) => albumKeys(album).year
+  return runs(sorted, (album) => String(year(album) ?? 'none'), (album) => (year(album) === null ? NO_YEAR : String(year(album))))
+}
+
+/* ===== artists ===== */
+
+/** What an artist list holds: a name, and how many albums (Navidrome's Artist, and lib/artistPage.ts's callers). */
+export type ArtistLike = Pick<Artist, 'name' | 'albumCount'>
+
+const artistKeyed = new WeakMap<ArtistLike, { name: string; initial: string }>()
+
+function artistKeys(artist: ArtistLike): { name: string; initial: string } {
+  let keys = artistKeyed.get(artist)
+  if (!keys) {
+    const name = foldName(artist.name)
+    keys = { name, initial: initialOf(name) }
+    artistKeyed.set(artist, keys)
+  }
+  return keys
+}
+
+/** Artists in an order: Name by deadwax's own folding, `#` last (Navidrome strips articles foldName doesn't - "La
+ *  Dispute" is under D there, under L here - so the letter headers need deadwax's order); Most albums most first, a
+ *  tie in the order handed in. */
+export function sortArtistsBy<A extends ArtistLike>(artists: readonly A[], order: ArtistOrder): A[] {
+  const listed = artists.map((artist, index) => ({ artist, index }))
+  return order === 'name'
+    ? listed.sort((a, b) => {
+        const first = artistKeys(a.artist)
+        const second = artistKeys(b.artist)
+        return byName(first.name, first.initial, second.name, second.initial) || a.index - b.index
+      }).map(({ artist }) => artist)
+    : listed.sort((a, b) => (b.artist.albumCount ?? 0) - (a.artist.albumCount ?? 0) || a.index - b.index).map(({ artist }) => artist)
+}
+
+/** Sorted artists in their groups: by Name's first letter, or one unlabelled group for Most albums. */
+export function groupArtists<A extends ArtistLike>(sorted: readonly A[], order: ArtistOrder): Group<A>[] {
+  if (!sorted.length) return []
+  if (order !== 'name') return [{ key: 'all', label: null, items: [...sorted] }]
+  return runs(sorted, (artist) => artistKeys(artist).initial, (artist) => artistKeys(artist).initial)
+}
+
+/* ===== Find ===== */
+
+/**
+ * What Find matches against: foldName's folding (accents, case, "&", punctuation) but keeping what foldName drops for
+ * COMPARING - a bracketed aside ("(Deluxe Edition)") and a leading "The" - since those are words a person types to
+ * find an album. Made once per album, the first time Find runs.
+ */
+export function findText(name: string | null | undefined): string {
+  return String(name || '')
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[’‘`´]/g, "'")
+    .replace(/&/g, ' and ')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+}
+
+const findWords = (typed: string) => findText(typed).split(' ').filter(Boolean)
+const albumFound = new WeakMap<Album, string>()
+const artistFound = new WeakMap<ArtistLike, string>()
+
+/** The albums Find keeps: every word typed, in any order, inside the album's title and artist, folded. */
+export function filterAlbums(albums: readonly Album[], typed: string): Album[] {
+  const words = findWords(typed)
+  if (!words.length) return [...albums]
+  return albums.filter((album) => {
+    let found = albumFound.get(album)
+    if (found === undefined) {
+      found = `${findText(album.name)} ${findText(album.artist)}`
+      albumFound.set(album, found)
+    }
+    return words.every((word) => found!.includes(word))
+  })
+}
+
+/** The artists Find keeps, by name. */
+export function filterArtists<A extends ArtistLike>(artists: readonly A[], typed: string): A[] {
+  const words = findWords(typed)
+  if (!words.length) return [...artists]
+  return artists.filter((artist) => {
+    let found = artistFound.get(artist)
+    if (found === undefined) {
+      found = findText(artist.name)
+      artistFound.set(artist, found)
+    }
+    return words.every((word) => found!.includes(word))
+  })
+}
+
+/** Whether anything is typed into Find (spaces alone are nothing). */
+export function finding(typed: string): boolean {
+  return findWords(typed).length > 0
+}
+
+/** "12 of 3012 albums" - the count while Find narrows the list. */
+export function filteredCountText(shown: number, total: number, one: string, many: string): string {
+  return `${shown} of ${total} ${total === 1 ? one : many}`
+}
+
+/** "No albums match “dumy”." */
+export function noMatchText(kind: 'albums' | 'artists', typed: string): string {
+  return `No ${kind} match “${typed.trim()}”.`
+}
+
+/* ===== the index down the right edge ===== */
+
+/** An index needs a list this long, at least; a shorter one is a scroll away. */
+export const INDEX_MIN = 50
+
+export interface IndexEntry {
+  label: string
+  aria: string
+  /** the group it jumps to, by its place in the groups */
+  group: number
+}
+
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
+
+/** What index a sort draws: the 27 letters for the name sorts, the decades present for the year sorts, else none. */
+export function indexKind(sort: AlbumSort | ArtistOrder): 'letters' | 'decades' | null {
+  if (sort === 'alphabeticalByArtist' || sort === 'alphabeticalByName' || sort === 'name') return 'letters'
+  if (sort === 'byYearDesc' || sort === 'byYearAsc') return 'decades'
+  return null
+}
+
+/** Whether the index is drawn: a sort that has one, nothing typed into Find, and at least INDEX_MIN items. */
+export function showsIndex(sort: AlbumSort | ArtistOrder, count: number, typed: string): boolean {
+  return indexKind(sort) !== null && !finding(typed) && count >= INDEX_MIN
+}
+
+/**
+ * The index's entries. Letters: all 27, A-Z then #, each jumping to its own group - or, with none, the next group
+ * after it, or the last group when there is none after. Decades: one per decade present, in the sort's direction,
+ * labelled with its first year, jumping to its first group; "No year" gets none.
+ */
+export function indexEntries<T>(groups: readonly Group<T>[], sort: AlbumSort | ArtistOrder): IndexEntry[] {
+  const kind = indexKind(sort)
+  if (!kind || !groups.length) return []
+  if (kind === 'letters') {
+    const rank = (label: string | null) => (label === OTHER_INITIAL ? LETTERS.length : LETTERS.indexOf(label ?? ''))
+    return [...LETTERS, OTHER_INITIAL].map((label, at) => {
+      const found = groups.findIndex((group) => rank(group.label) >= at)
+      return {
+        label,
+        aria: label === OTHER_INITIAL ? 'Jump to numbers and symbols' : `Jump to ${label}`,
+        group: found === -1 ? groups.length - 1 : found,
+      }
+    })
+  }
+  const entries: IndexEntry[] = []
+  groups.forEach((group, at) => {
+    const year = Number(group.label)
+    if (!Number.isInteger(year) || group.label === NO_YEAR) return
+    const decade = String(Math.floor(year / 10) * 10)
+    if (entries[entries.length - 1]?.label === decade) return
+    entries.push({ label: decade, aria: `Jump to the ${decade}s`, group: at })
+  })
+  return entries
+}
+
+/** One place on the drawn strip: an entry, or a dot standing for those left out between two. */
+export type IndexSlot = { kind: 'entry'; entry: IndexEntry; at: number } | { kind: 'dot' }
+
+/**
+ * The entries as `slots` places can draw them: all, when they fit; else as many as fit with a dot between each two
+ * (aria-hidden, inert - Apple's "A • D • G"), the first and last always kept, the rest spread evenly. Which entry a
+ * finger is over is taken from the slot under it (entryAt): an entry's own, or - over a dot - one of the letters it
+ * stands for, so a letter left out is still reached by dragging.
+ */
+export function fitIndex(entries: readonly IndexEntry[], slots: number): IndexSlot[] {
+  const all = entries.map((entry, at): IndexSlot => ({ kind: 'entry', entry, at }))
+  if (entries.length <= Math.max(1, slots)) return all
+  const kept = Math.max(2, Math.floor((slots + 1) / 2))
+  const drawn: IndexSlot[] = []
+  let before = -1
+  for (let n = 0; n < kept; n++) {
+    const at = Math.round((n * (entries.length - 1)) / (kept - 1))
+    if (at === before) continue
+    if (before !== -1 && at - before > 1) drawn.push({ kind: 'dot' })
+    drawn.push({ kind: 'entry', entry: entries[at]!, at })
+    before = at
+  }
+  return drawn
+}
+
+/**
+ * The entry under a finger at `y`, the drawn slots spread evenly from `top` over `height` (every slot, dots too, is
+ * one height). The SLOT under the finger first: an entry's slot gives that entry, so a drawn letter always jumps to
+ * itself however the strip is thinned; a dot's slot spreads the entries it stands for over its own height, so a drag
+ * across it reaches each in turn. (Review of .59: taking the place over the full list instead agreed with fitIndex's
+ * spread only mid-strip - at 13 slots A went to B and # to Z.)
+ */
+export function entryAt(drawn: readonly IndexSlot[], y: number, top: number, height: number): number | null {
+  if (!drawn.length || height <= 0) return null
+  const place = ((y - top) / height) * drawn.length
+  const index = Math.min(drawn.length - 1, Math.max(0, Math.floor(place)))
+  const slot = drawn[index]!
+  if (slot.kind === 'entry') return slot.at
+  const before = drawn[index - 1]
+  const after = drawn[index + 1]
+  if (before?.kind !== 'entry' || after?.kind !== 'entry') {
+    //? fitIndex never draws a dot at an end or beside another dot; a hand-made list falls back to a neighbour
+    return before?.kind === 'entry' ? before.at : after?.kind === 'entry' ? after.at : null
+  }
+  const between = after.at - before.at - 1
+  if (between <= 0) return before.at
+  const within = Math.min(1, Math.max(0, place - index))
+  return before.at + 1 + Math.min(between - 1, Math.floor(within * between))
+}
+
+/* ===== blocks: what the shelf draws ===== */
+
+/** The most items in one block: 60 divides by 2, 3, 4, 5 and 6 columns, so a block never ends in a part row at the
+ *  widths the app draws (2 on a phone, 6 on a desktop, 3-5 beside a panel). */
+export const BLOCK_SIZE = 60
+
+export interface Block<T> {
+  key: string
+  /** the group's header, on its first block only */
+  head: string | null
+  group: number
+  items: T[]
+}
+
+/** Each group cut into blocks of at most `size` items, its header on the first. */
+export function blocks<T>(groups: readonly Group<T>[], size: number = BLOCK_SIZE): Block<T>[] {
+  const cut: Block<T>[] = []
+  groups.forEach((group, at) => {
+    for (let start = 0; start < group.items.length; start += size) {
+      cut.push({ key: `${group.key}:${start / size}`, head: start === 0 ? group.label : null, group: at, items: group.items.slice(start, start + size) })
+    }
+  })
+  return cut
+}
+
+/**
+ * Which blocks lie between `from` and `to` (px from the shelf's top), by their heights - the blocks the shelf draws
+ * before the page has said what is near the view (a new list, a new sort, Find typed into): `[start, end)`, at least
+ * one block when there are any. A block whose top is at `to` or below, or whose bottom is at `from` or above, is out.
+ */
+export function blocksNear(heights: readonly number[], from: number, to: number): [number, number] {
+  if (!heights.length) return [0, 0]
+  let top = 0
+  let start = -1
+  let end = 0
+  heights.forEach((height, at) => {
+    const bottom = top + height
+    if (bottom > from && top < to) {
+      if (start === -1) start = at
+      end = at + 1
+    }
+    top = bottom
+  })
+  if (start === -1) {
+    //? all of them above the window (scrolled past the end): the last; below it (the shelf not reached yet): the first
+    return from >= top ? [heights.length - 1, heights.length] : [0, 1]
+  }
+  return [start, end]
+}
+

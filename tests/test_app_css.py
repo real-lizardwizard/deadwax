@@ -1926,8 +1926,11 @@ def test_playlists_lock_the_page_scroll_their_picker_and_reach_a_finger():
     for field in (".app-playlist-input", ".app-new-playlist-input"):
         assert declarations(APP, field)["font-size"] == "var(--app-playlist-field-text)", field
     assert ALL_TOKENS["--app-playlist-field-text"] == "var(--dw-text-body)" and px("--dw-text-body") >= 16
-    library = (ui / "player" / "Library.tsx").read_text()
-    assert '<div class="app-group app-library-playlists">' in library and 'class="app-row app-link-row" onClick={onOpenPlaylists}' in library
+    #? (2.0.0-player.59, on purpose) the Library's row is the first row of the phone root's first group now
+    home = (ui / "app" / "LibraryHome.tsx").read_text()
+    group = home.index('<div class="app-group app-library-group">')
+    assert home.index('class="app-row app-link-row app-library-row app-library-playlists" onClick={onOpenPlaylists}') > group
+    assert home.index("app-library-playlists") < home.index("{yours.map(row)}")
     assert declarations(APP, ".app-confirm-buttons .app-button.is-danger")["background"] == "var(--dw-danger-bg)"
     assert declarations(APP, ".app-text-button.is-danger")["color"] == "var(--dw-danger-text)"
 
@@ -1951,3 +1954,45 @@ def test_playlists_words_are_on_cards_and_in_view():
     assert declarations(APP, ".app-playlist-bar")["flex-wrap"] == "wrap" and declarations(APP, ".app-playlist-ask")["flex"] == "0 0 100%"
     assert declarations(APP, ".app-playlists-fold-icon.is-open")["transform"] == "rotate(var(--app-playlists-fold-turn))"
     assert ALL_TOKENS["--app-playlists-fold-turn"] == "90deg"
+
+
+# ---------------------------------------------------------------- a better Library (2.0.0-player.59)
+
+def test_the_librarys_shelf_and_index_draw_from_tokens_and_hold_a_finger():
+    """The shelf: each block skipped while off screen (content-visibility: auto, its size held inline - its height, while
+    it is too far from the view to be drawn), its tiles still a .pl-grid; the index a column of its own, sticky under a section page's bar and as tall as the view between the
+    bars (the mini player's too), a drag on it never a scroll; Find Search's own field - 16px or more, so iOS doesn't
+    zoom; every value a token (test_the_apps_stylesheet_draws_only_from_tokens holds the whole sheet)."""
+    ui = Path(__file__).resolve().parent.parent / "ui" / "src"
+    assert declarations(APP, ".app-shelf-block")["content-visibility"] == "auto"
+    shelf = (ui / "app" / "Shelf.tsx").read_text()
+    assert '<div class="pl-grid">{block.items.map(item)}</div>' in shelf
+    #? a drawn block's size held inline for the browser's skipping; one not drawn (far from the view) its height
+    assert "style={on ? { containIntrinsicBlockSize: `auto ${estimates[at]}px` } : { height: `${known.current.get(block.key) ?? estimates[at]}px` }}" in shelf
+    strip = declarations(APP, ".app-index")
+    assert (strip["position"], strip["top"], strip["touch-action"], strip["height"]) == ("sticky", "var(--app-nav-clear)", "none", "var(--app-index-height)")
+    assert declarations(APP, ".app-shell.has-mini .app-index")["height"] == "var(--app-index-height-mini)"
+    assert ALL_TOKENS["--app-index-height"] == "calc(100dvh - var(--app-nav-clear) - var(--app-chrome-bottom))"
+    assert ALL_TOKENS["--app-index-height-mini"] == "calc(100dvh - var(--app-nav-clear) - var(--app-chrome-bottom-mini))"
+    assert declarations(APP, ".app-shelf-wrap.has-index")["grid-template-columns"] == "minmax(0, 1fr) var(--app-index-width)"
+    assert declarations(APP, ".app-index-entry")["min-height"] == declarations(APP, ".app-index-dot")["min-height"] == "var(--app-index-entry)"
+    assert declarations(APP, ".app-index-dot")["pointer-events"] == "none"
+    section = (ui / "app" / "LibrarySection.tsx").read_text()
+    assert '<label class="app-search-field app-library-find">' in section and 'type="search"\n              class="app-search-input"' in section
+    assert declarations(APP, ".app-search-input")["font-size"] == "var(--dw-text-body)" and px("--dw-text-body") >= 16
+    assert declarations(APP, ".app-library-find")["flex"] == "1 0 100%"
+
+
+def test_the_librarys_root_rows_are_yous_managing_rows():
+    """The phone root's rows are You's Managing pattern - a grouped card of link rows, each label then a chevron - laid
+    out a row's full width, the label taking what is left; Recently added's head Home's Arriving head."""
+    ui = Path(__file__).resolve().parent.parent / "ui" / "src"
+    home = (ui / "app" / "LibraryHome.tsx").read_text()
+    assert 'class="app-row app-link-row app-library-row" onClick={() => onOpenSection(item.id as LibraryPick)}' in home
+    assert '<ChevronRightIcon class="app-chevron" />' in home
+    assert '<div class="app-section-head app-library-recent-head">' in home and 'class="app-text-button app-see-all"' in home
+    row = declarations(APP, ".app-library-row")
+    assert (row["width"], row["flex-wrap"], row["justify-content"]) == ("100%", "nowrap", "flex-start")
+    assert declarations(APP, ".app-library-row .app-row-label")["flex"] == "1"
+    #? .58's wrapper and its rules went with the scope chips, on purpose
+    assert declarations(APP, ".app-library-playlists") == {} and declarations(APP, ".app-library-playlists .app-row") == {}

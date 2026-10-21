@@ -945,10 +945,10 @@ def test_beside_a_side_panel_top_results_take_as_many_columns_as_fit():
 
 
 def test_searchs_chips_show_on_a_desktop():
-    """The desktop hides the Library's own view chips (the sidebar lists its views) - never Search's: its box is the
-    sidebar's field, and the chips sit under the large title, outside the form it hides."""
-    assert ".app-search-kinds" not in DESKTOP
-    assert declarations(DESKTOP, ".app-desk .pl-library > .app-library-views", DESK)["display"] == "none"
+    """Search's chips are never hidden on a desktop: its box is the sidebar's field, and the chips sit under the large
+    title, outside the form it hides. (2.0.0-player.59, on purpose: the Library has no view chips any more - a phone's
+    root is rows, a desktop's views the sidebar's - so the rule that hid them went too.)"""
+    assert ".app-search-kinds" not in DESKTOP and ".app-library-views" not in DESKTOP
     assert declarations(DESKTOP, ".app-desk .app-search-form", DESK)["display"] == "none"
 
 
@@ -975,12 +975,12 @@ def test_the_song_an_album_was_opened_from_is_marked_in_the_desktops_table():
     assert (title["color"], title["font-weight"]) == ("var(--dw-accent)", "var(--dw-weight-semibold)")
 
 
-def test_playlists_on_a_desktop_hide_the_librarys_row_and_cap_the_list():
-    """(2.0.0-player.58) The sidebar's Playlists group is the desktop's way in, so the Library's Playlists row is a
-    phone's; the Playlists page's rows are the readable width Library > Artists' are - both inside the query."""
-    assert declarations(DESKTOP, ".app-desk .app-library-playlists", DESK)["display"] == "none"
+def test_playlists_on_a_desktop_cap_the_list():
+    """(2.0.0-player.58) The Playlists page's rows are the readable width Library > Artists' are, inside the query.
+    (2.0.0-player.59, on purpose: the rule hiding the Library's Playlists row went - the row is the phone root's, which
+    a desktop never draws.)"""
+    assert declarations(DESKTOP, ".app-desk .app-library-playlists", DESK) == {}
     assert declarations(DESKTOP, ".app-desk .app-playlists-list", DESK)["max-width"] == "var(--app-desk-content-max)"
-    assert declarations(DESKTOP, ".app-desk .app-library-playlists") == {}
     assert all(context.startswith("@media") for context, selector, _ in rules(DESKTOP) if "playlist" in selector)
 
 
@@ -998,3 +998,21 @@ def test_a_fingers_bar_holds_five_44px_tools_and_a_speeds_chip_at_1024_and_its_t
     assert middle >= 5 * hit + 4 * px(desk["--app-desk-transport-gap"])
     assert media_tokens(DESKTOP, COLUMN)["--app-desk-bar-side"] == "320px"
     assert DESKTOP.index(":root { --app-desk-bar-side: 320px; }") > DESKTOP.index("--app-desk-bar-side: 304px")
+
+
+def test_the_librarys_head_shelf_and_index_on_a_desktop():
+    """(2.0.0-player.59) Find, the sort and the count on the title's row - Find a token wide; six covers across still
+    (each block's grid is a .pl-grid); the index at the main area's right edge, as tall as the window above the bar,
+    hidden under a drawer - every rule inside the desktop's query."""
+    assert media_tokens(DESKTOP, DESK)["--app-desk-library-find"] == "240px"
+    assert media_tokens(DESKTOP, DESK)["--app-desk-index-height"] == "calc(100dvh - var(--app-desk-bar))"
+    assert declarations(DESKTOP, ".app-desk .app-library-find", DESK)["flex"] == "0 1 var(--app-desk-library-find)"
+    assert declarations(DESKTOP, ".app-desk .app-library-bar", DESK)["flex-wrap"] == "nowrap"
+    assert declarations(DESKTOP, ".app-desk .pl-library > .app-library-bar", DESK)["grid-column"] == "2"
+    assert declarations(DESKTOP, ".app-desk .pl-grid", DESK)["grid-template-columns"] == "repeat(var(--app-desk-columns), minmax(0, 1fr))"
+    index = declarations(DESKTOP, ".app-desk .app-index", DESK)
+    assert (index["top"], index["height"]) == ("0", "var(--app-desk-index-height)")
+    assert declarations(DESKTOP, ".app-desk.has-drawer .app-index", DESK)["display"] == "none"
+    assert declarations(DESKTOP, ".app-desk.has-drawer .app-shelf-wrap.has-index", DESK)["grid-template-columns"] == "minmax(0, 1fr)"
+    assert all(context.startswith("@media") for context, selector, _ in rules(DESKTOP) if "index" in selector or "library-find" in selector)
+

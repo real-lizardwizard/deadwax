@@ -15,7 +15,8 @@
  *    line, "The store also has another pressing", Info's count - each "in the store" for what isn't yours, and
  *    each as it was with logins off - except (2.0.0-player.55) Search's library rows, which say "in your library"
  *    with logins off too (libraryPlace): the half titles that said it are gone;
- *  - lib/yourLibrary.ts: your albums in the four orders, and your artists;
+ *  - lib/yourLibrary.ts and lib/shelves.ts: your albums in the orders that existed (2.0.0-player.59: shelves.sim
+ *    holds all seven), and your artists;
  *  - lib/appFrame.ts: the Library's views and Browse's with a library of your own, and with logins off exactly
  *    the views and titles it always had;
  *  - (second review) the WIRING, read off each component, element by element: every page takes `personal` from
@@ -23,7 +24,8 @@
  *    three views of yours and Browse's two, the sidebar's Browse group, Search's words, counts and places, the
  *    artist page's heading, rows, ticks and Play line, Info's - so a page quietly drawn as logins-off fails here;
  *  - your albums asked again after an Add or a Remove, and NOT after a filing (second review: it emptied the
- *    grid and lost its place for nothing) - run against the real module.
+ *    grid and lost its place for nothing) - run against the real module, which since 2.0.0-player.59 is
+ *    app/albumIndex.ts's `yours` list (one /album_index ask), the list it had kept to draw while a new one comes.
  *
  * Run it with:  node ui/test/whose.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
  */
@@ -37,7 +39,7 @@ const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-whose-'))
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
   'src/lib/whose.ts', 'src/lib/yourLibrary.ts', 'src/lib/searchResults.ts', 'src/lib/pressings.ts', 'src/lib/artistPage.ts',
   'src/lib/candidates.ts', 'src/lib/perPerson.ts', 'src/lib/appFrame.ts', 'src/lib/aboutRows.ts', 'src/lib/owned.ts',
-  'src/app/useYourAlbums.ts', '--rootDir', 'src', '--outDir', OUT, '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
+  'src/app/useYourAlbums.ts', 'src/app/albumIndex.ts', 'src/lib/shelves.ts', '--rootDir', 'src', '--outDir', OUT, '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
   '--lib', 'es2022,dom,dom.iterable',
 ], { cwd: UI, stdio: 'inherit' })
 
@@ -45,17 +47,22 @@ execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
 fs.mkdirSync(path.join(OUT, 'node_modules/preact'), { recursive: true })
 fs.writeFileSync(path.join(OUT, 'node_modules/preact/hooks.js'), `exports.useState = (v) => [v, () => {}]\nexports.useEffect = () => {}\n`)
 fs.writeFileSync(path.join(OUT, 'player/api.js'), `
-exports.albumPage = (order, offset, signal, size) => {
-  globalThis.__whose.asks.push([order, offset, size])
-  return Promise.resolve(offset === 0 ? globalThis.__whose.albums : [])
+exports.albumIndexOf = (scope) => {
+  globalThis.__whose.asks.push(scope)
+  const albums = globalThis.__whose.albums
+  //? each ask lands when the test says - the oldest first (land), or the newest (landNewest)
+  //? (review) failNext: the next ask fails as it lands (Navidrome briefly away)
+  const fail = globalThis.__whose.failNext
+  globalThis.__whose.failNext = false
+  return new Promise((resolve, reject) => { globalThis.__whose.lands.push(() => (fail ? reject(new Error('Navidrome is away')) : resolve({ albums, truncated: false }))) })
 }
 `)
-globalThis.__whose = { asks: [], albums: [] }
+globalThis.__whose = { asks: [], albums: [], lands: [], land: () => globalThis.__whose.lands.shift()(), landNewest: () => globalThis.__whose.lands.pop()() }
 
 const load = (file) => require(path.join(OUT, file))
 const W = load('lib/whose.js'), Y = load('lib/yourLibrary.js'), S = load('lib/searchResults.js'), P = load('lib/pressings.js')
 const A = load('lib/artistPage.js'), C = load('lib/candidates.js'), PP = load('lib/perPerson.js'), F = load('lib/appFrame.js')
-const O = load('lib/owned.js')
+const O = load('lib/owned.js'), SH = load('lib/shelves.js')
 const read = (file) => fs.readFileSync(path.join(UI, 'src', file), 'utf8')
 
 let failures = 0
@@ -312,7 +319,9 @@ console.log('\nyour library: your starred albums, in the order chosen')
     { id: 'c', name: 'Third', artist: 'Portishead', year: 2008, created: '2026-09-01T00:00:00Z', played: '2026-10-15T00:00:00Z' },
     { id: 'd', name: 'Abbey Road', artist: 'The Beatles', year: 1969 },
   ]
-  const order = (name) => Y.sortYourAlbums(albums, name).map((album) => album.id)
+  //? (2.0.0-player.59) the four orders that existed, now lib/shelves.ts sortAlbums - the same answers, Artist's year rule
+  //? included (the other three, and the headers, in shelves.sim)
+  const order = (name) => SH.sortAlbums(albums, name).map((album) => album.id)
   check('Recently added: newest first, the undated last', order('newest'), ['b', 'a', 'c', 'd'])
   check('Recently played: only what you played, latest first', order('recent'), ['c', 'a'])
   check('Artist: by name folded ("The Beatles" as Beatles), then year', order('alphabeticalByArtist'), ['d', 'b', 'c', 'a'])
@@ -324,19 +333,22 @@ console.log('\nyour library: your starred albums, in the order chosen')
     Y.yourArtists(artists, mine).map((artist) => [artist.name, artist.albumCount]), [['Portishead', 2], ['Tame Impala', 1]])
   check('an empty library says so, and what to do: browse the store, or search', [Y.EMPTY_LIBRARY, /Browse the store, or search/.test(Y.EMPTY_LIBRARY_HOW)],
     ['Nothing in your library yet.', true])
-  check('...in ANY order, Recently played too (review: the order is the device\'s, shared with Browse); "nothing played" only over albums',
-    [Y.yourEmptyNotice('recent', 0), Y.yourEmptyNotice('newest', 0), Y.yourEmptyNotice('alphabeticalByName', 0), Y.yourEmptyNotice('recent', 3), Y.yourEmptyNotice('recent', null)],
-    ['empty', 'empty', 'empty', 'unplayed', null])
-  const library = read('player/Library.tsx'), views = read('app/LibraryViews.tsx')
-  check('...the grid asks how many albums you have from the one list, through latestOnly, and draws the notice it says',
-    [/yourAlbums\(\)\.then\(/.test(library), /const counting = useMemo\(latestOnly, \[\]\)/.test(library), /const notice = emptyOfYours \? yourEmptyNotice\(order, yoursCount\) : null/.test(library),
-      /notice === 'empty' \? \(\s*<EmptyLibrary lead=\{EMPTY_LIBRARY\} onBrowse=\{onBrowse\} \/>/.test(library)], [true, true, true, true])
+  check('...in ANY order, Recently played too (review: the order is the device\'s, shared with Browse); "nothing played" only over albums - Most played too',
+    [Y.yourEmptyNotice('recent', 0), Y.yourEmptyNotice('newest', 0), Y.yourEmptyNotice('alphabeticalByName', 0), Y.yourEmptyNotice('recent', 3), Y.yourEmptyNotice('recent', null),
+      Y.yourEmptyNotice('frequent', 3), Y.yourEmptyNotice('byYearDesc', 3), Y.yourEmptyNotice('frequent', 0)],
+    ['empty', 'empty', 'empty', 'unplayed', null, 'unplayed', null, 'empty'])
+  //? (2.0.0-player.59) the sections (app/LibrarySection.tsx) and the root (app/LibraryHome.tsx) draw it now, from the whole list
+  const library = read('player/Library.tsx'), section = read('app/LibrarySection.tsx'), home = read('app/LibraryHome.tsx')
+  check('...a section counts your albums from the one list it has in hand, and draws the notice it says',
+    [/const notice = scope === 'yours' && albums && !sorted\.length \? yourEmptyNotice\(sort, albums\.length\) : null/.test(section),
+      /notice === 'empty' \? <EmptyLibrary lead=\{EMPTY_LIBRARY\} onBrowse=\{onBrowse\} \/>/.test(section),
+      /personal \? <EmptyLibrary lead=\{EMPTY_LIBRARY\} onBrowse=\{\(\) => onOpenSection\('store'\)\} \/>/.test(home)], [true, true, true])
   check('...and Your artists, empty, says how to fill it with Browse the store too',
-    [/yours \? <EmptyLibrary lead=\{NO_ARTISTS_OF_YOURS\} onBrowse=\{onBrowse\} \/>/.test(views), /yours=\{personal\} onBrowse=\{browse\}/.test(library)], [true, true])
-  check('Browse the store hands its focus on - Browse\'s chip where drawn, else the title - only when it was lost',
-    [/if \(active && active !== document\.body && !active\.closest\('\[hidden\]'\)\) return/.test(library),
-      /\(chip && chip\.getClientRects\(\)\.length > 0 \? chip : title\.current\)\?\.focus\(\{ preventScroll: true \}\)/.test(library),
-      /<h1 class="pl-large-title" ref=\{title\} tabIndex=\{-1\}>/.test(library)], [true, true, true])
+    [/yours \? <EmptyLibrary lead=\{NO_ARTISTS_OF_YOURS\} onBrowse=\{onBrowse\} \/>/.test(section), /onBrowse=\{browse\}/.test(library), /onBrowse=\{browseStore\}/.test(read('app/App.tsx'))], [true, true, true])
+  check('Browse the store hands its focus on - a page\'s title as it mounts, a desktop\'s store title - only when it was lost',
+    [/if \(active && active !== document\.body && !active\.closest\('\[hidden\]'\)\) return\s*page\.current\?\.querySelector<HTMLElement>\('\[data-section="store"\] \.pl-large-title'\)\?\.focus\(\{ preventScroll: true \}\)/.test(library),
+      /if \(!page\) return\s*const active = document\.activeElement as HTMLElement \| null\s*if \(active && active !== document\.body && !active\.closest\('\[hidden\]'\)\) return\s*title\.current\?\.focus\(\{ preventScroll: true \}\)/.test(section),
+      /<h1 class="pl-large-title" ref=\{titleRef\} tabIndex=\{-1\}>/.test(section)], [true, true, true])
 }
 
 console.log('\nthe Library\'s views: yours and Browse with a library of your own, as ever with logins off')
@@ -358,10 +370,12 @@ check('...and the sidebar moves to them, current when showing',
   [F.sidebarMove('store', 'albums', true, true), F.sidebarMove('store', 'store', true, true), F.sidebarCurrent('library', 'storeArtists', true, null, true)],
   [{ how: 'view', tab: 'library', pick: 'store' }, { how: 'tab', tab: 'library' }, 'storeArtists'])
 {
-  const library = read('player/Library.tsx')
-  check('the Library: a scope row of two chips with a library of your own only, and Browse\'s views drawn only then',
-    [/\{personal && \(\s*<div class="app-library-views app-library-scope" role="group" aria-label="Your library or the store">/.test(library),
-      /\{personal && \(visited\.has\('store'\) \|\| drawn === 'store'\) && \(/.test(library), /yours=\{personal\}/.test(library)], [true, true, true])
+  //? (2.0.0-player.59, on purpose) the phone's scope chips went: Browse is a group of rows on the root, the sidebar's own
+  const home = read('app/LibraryHome.tsx')
+  check('the Library: Browse\'s group on the root with a library of your own only - the sidebar\'s Browse items - and the Playlists row the first row of its first group',
+    [/const browse = browseItems\(hasSongs, personal\)/.test(home), /\{browse\.length > 0 && \(\s*<section class="app-library-browse"/.test(home),
+      home.indexOf('<div class="app-group app-library-group">') < home.indexOf('app-library-playlists') && home.indexOf('app-library-playlists') < home.indexOf('{yours.map(row)}'),
+      /app-library-views|app-library-scope/.test(home + read('player/Library.tsx'))], [true, true, true, false])
 }
 
 console.log('\nthe wiring: every page takes `personal` from hasLibrary() and hands it on (second review)')
@@ -376,22 +390,22 @@ console.log('\nthe wiring: every page takes `personal` from hasLibrary() and han
     [true, true, true])
   check('...and Add asks for the bridge\'s release - the one deadwax keeps your library by - and its album',
     /addToMyLibrary\(\{[^}]*\brelease_mbid: release,[^}]*release_group_mbid: store\?\.release_group_mbid \?\? null,\s*\}\)/.test(album), true)
-  const library = read('player/Library.tsx')
+  //? (2.0.0-player.59) one section component for every view, `personal` handed it by the Library (a desktop's) and App
+  //? (a page's), each view's scope decided there
+  const library = read('player/Library.tsx'), section = read('app/LibrarySection.tsx'), app = read('app/App.tsx')
   check('the Library: each of your three views yours, on its own - Albums, Recently added, Artists',
-    [/<AlbumsView order=\{order\} onOpen=\{onOpen\} onCount=\{onAlbumsCount\} yours=\{personal\} onBrowse=\{browse\} \/>/.test(library),
-      /<AlbumsView order="newest" onOpen=\{onOpen\} onCount=\{onRecentCount\} yours=\{personal\} onBrowse=\{browse\} \/>/.test(library),
-      /<ArtistsView order=\{artistOrder\} shown=\{drawn === 'artists'\} onOpenArtist=\{onOpenArtist\} onCount=\{onArtistsCount\} yours=\{personal\} onBrowse=\{browse\} \/>/.test(library)],
-    [true, true, true])
+    [/const scope: Scope = id === 'store' \|\| !personal \? 'store' : 'yours'/.test(section), /const yours = personal && id === 'artists'/.test(section),
+      /personal=\{personal\}/.test(library), /personal=\{hasLibrary\(\)\}/.test(app), /id=\{shownPick\(page\.id as LibraryPick, hasSongs, 'desktop', hasLibrary\(\)\)\}/.test(app)],
+    [true, true, true, true, true])
   check('...and Browse\'s two the store\'s: every album, and artists counted "in the store"',
-    [/<AlbumsView order=\{order\} onOpen=\{onOpen\} onCount=\{onStoreCount\} \/>/.test(library),
-      /<ArtistsView order=\{artistOrder\} shown=\{drawn === 'storeArtists'\} onOpenArtist=\{onOpenArtist\} onCount=\{onStoreArtistsCount\} inStore \/>/.test(library),
+    [/const inStore = personal && id === 'storeArtists'/.test(section), /<ArtistRow artist=\{artist\} inStore=\{inStore\} onOpenArtist=\{onOpenArtist\} \/>/.test(section),
       /\{albumCountLine\(artist\.albumCount, inStore \? IN_THE_STORE : undefined\) && \(\s*<span class="app-result-line">\{albumCountLine\(artist\.albumCount, inStore \? IN_THE_STORE : undefined\)\}<\/span>/.test(read('app/LibraryViews.tsx'))],
     [true, true, true])
-  const sidebar = read('app/Sidebar.tsx'), app = read('app/App.tsx')
+  const sidebar = read('app/Sidebar.tsx')
   check('a desktop\'s sidebar: a Browse group whenever App gives it Browse\'s views, and App gives them - and the Library\'s - by hasLibrary()',
     [/\{browse\.length > 0 && \(\s*<section class="app-side-group" aria-labelledby="app-side-browse">\s*<h2 id="app-side-browse" class="app-side-label">\s*Browse\s*<\/h2>\s*<ul class="app-side-list">\{browse\.map\(item\)\}<\/ul>/.test(sidebar),
       /library=\{libraryItems\(hasSongs, hasLibrary\(\)\)\}\s*browse=\{browseItems\(hasSongs, hasLibrary\(\)\)\}\s*personal=\{hasLibrary\(\)\}/.test(app),
-      /sidebarMove\(item, libraryPick\(\), librarySongs\(\), hasLibrary\(\)\)/.test(app), /aria-label=\{searchWords\(personal\)\.label\}/.test(sidebar)],
+      /sidebarMove\(item, libraryPick\(\), librarySongs\(\), hasLibrary\(\), router\.nav\.stacks\.library\[0\] \?\? null\)\s*if \(move\.how === 'tab'\) \{\s*(?:\/\/[^\n]*\n\s*)?if \(move\.pick\) chooseLibrary\(move\.pick\)\s*chooseTab\(move\.tab\)/.test(app), /aria-label=\{searchWords\(personal\)\.label\}/.test(sidebar)],
     [true, true, true, true])
   const search = read('app/Search.tsx')
   const list = read('lib/searchList.ts')
@@ -420,12 +434,14 @@ console.log('\nyour albums are asked again whenever they can have changed - and 
   const yours = read('app/useYourAlbums.ts')
   check('an Add and a Remove each forget them; a filing doesn\'t (it is starred later, the count moving then)',
     [/onAddedToLibrary\(forgetYourAlbums\)/.test(yours), /onRemovedFromLibrary\(forgetYourAlbums\)/.test(yours), /onAlbumsFiled/.test(yours)], [true, true, false])
-  check('...asked as you: getAlbumList2 starred through the player\'s route, a page of 500 at a time',
-    [/albumPage\('starred', offset, undefined, YOURS_PAGE\)/.test(yours), Y.YOURS_PAGE], [true, 500])
+  //? (2.0.0-player.59) the whole list in one ask - routes/navidrome.py reads Navidrome's pages of 500 as you
+  check('...asked as you: the album index\'s `yours`, through the player\'s route', [/albumIndex\('yours'\)/.test(yours), /album_index\?scope=\$\{scope\}/.test(read('player/api.ts'))], [true, true])
   const library = read('player/Library.tsx')
   check('...and your library\'s count moving (the worker, a star read back) forgets them too, in the Library',
     /if \(seenCount\.current !== null && seenCount\.current !== starredCount\) forgetYourAlbums\(\)/.test(library), true)
-  check('the grid of your albums is keyed on their generation, so it asks again', /yours \? `yours:\$\{order\}:\$\{generation\}` : order/.test(library), true)
+  const section = read('app/LibrarySection.tsx')
+  check('the grid of your albums is keyed on their generation, so it asks again',
+    [/const generation = scope === 'yours' \? yoursGeneration : storeGeneration/.test(section), /useEffect\(load, \[scope, generation\]\)/.test(section)], [true, true])
   const owned = read('app/useOwned.ts')
   check('the owned marks are asked again after an Add or a Remove - whose it is changed', [/onAddedToLibrary\(whose\)/.test(owned), /onRemovedFromLibrary\(whose\)/.test(owned)], [true, true])
   const album = read('player/AlbumPage.tsx')
@@ -437,23 +453,67 @@ console.log('\nyour albums are asked again whenever they can have changed - and 
 //? (anybody's download an admin watches, an Edit panel write, Rescan) leaving the list and its grid as they were
 async function yoursAskedAgain() {
   console.log('\nyour albums, the module itself: what asks them again')
-  const YA = load('app/useYourAlbums.js'), LE = load('lib/libraryEvents.js')
+  const YA = load('app/useYourAlbums.js'), LE = load('lib/libraryEvents.js'), AI = load('app/albumIndex.js')
   globalThis.__whose.albums = [{ id: 'b', name: 'Dummy', artist: 'Portishead', year: 1994, created: '2026-10-10T00:00:00Z' }]
   const asks = () => globalThis.__whose.asks.length
-  const first = await YA.yourAlbumsPage('newest', 0, 60)
-  await YA.yourAlbums()
-  check('asked once - getAlbumList2 starred, 500 at a time - and shared by every view', [asks(), globalThis.__whose.asks[0], first.map((album) => album.id)], [1, ['starred', 0, 500], ['b']])
+  //? an ask lands when the test says (the stub's `land`)
+  const landed = async (promise) => {
+    globalThis.__whose.land()
+    return promise
+  }
+  const asking = YA.yourAlbums()
+  const also = YA.yourAlbums()
+  check('nothing kept before the first list lands', AI.keptIndex('yours'), null)
+  const first = await landed(asking)
+  check('asked once - /album_index?scope=yours, the whole list - and shared by every view', [asks(), globalThis.__whose.asks[0], first.map((album) => album.id), (await also) === first],
+    [1, 'yours', ['b'], true])
   const generation = YA.useYourAlbumsGeneration()
   LE.announceAlbumsFiled()
-  await YA.yourAlbumsPage('newest', 0, 60)
+  await YA.yourAlbums()
   check('an album filed: nothing asked again, the generation the grid is keyed on unmoved - its tiles and its place kept',
     [asks(), YA.useYourAlbumsGeneration() === generation], [1, true])
   LE.announceAddedToLibrary()
-  await YA.yourAlbums()
-  check('an Add: asked again, under a new generation', [asks(), YA.useYourAlbumsGeneration() === generation + 1], [2, true])
+  globalThis.__whose.albums = [{ id: 'c', name: 'Third', artist: 'Portishead' }, ...globalThis.__whose.albums]
+  const again = YA.yourAlbums()
+  check('an Add: asked again, under a new generation - the list kept drawn meanwhile (never emptied for the ask)',
+    [asks(), YA.useYourAlbumsGeneration() === generation + 1, AI.keptIndex('yours').albums.map((album) => album.id)], [2, true, ['b']])
+  await landed(again)
+  check('...the new one swapped in as it lands', AI.keptIndex('yours').albums.map((album) => album.id), ['c', 'b'])
   LE.announceRemovedFromLibrary()
-  await YA.yourAlbums()
+  await landed(YA.yourAlbums())
   check('a Remove: asked again too', [asks(), YA.useYourAlbumsGeneration() === generation + 2], [3, true])
+  //? refreshIfOld: a list under a minute old stays; one older is asked again at the next look
+  AI.refreshIfOld('yours')
+  check('a list under a minute old is not asked again', [asks(), YA.useYourAlbumsGeneration() === generation + 2], [3, true])
+  AI.keptIndex('yours').at = Date.now() - AI.INDEX_FRESH_MS - 1
+  AI.refreshIfOld('yours')
+  const old = YA.yourAlbums()
+  check('...one older than INDEX_FRESH_MS is', [asks(), YA.useYourAlbumsGeneration() === generation + 3, AI.INDEX_FRESH_MS], [4, true, 60000])
+  AI.refreshIfOld('yours')
+  check('...and one on its way is left alone, whatever the age of the one in hand', [asks(), YA.useYourAlbumsGeneration() === generation + 3], [4, true])
+  await landed(old)
+  //? two asks out at once, the newer landing first: the older one, landing late, never replaces it
+  globalThis.__whose.albums = [{ id: 'older', name: 'Older' }]
+  AI.forgetIndex('yours')
+  const older = YA.yourAlbums()
+  AI.forgetIndex('yours')
+  globalThis.__whose.albums = [{ id: 'newer', name: 'Newer' }]
+  const newer = YA.yourAlbums()
+  globalThis.__whose.landNewest()
+  await newer
+  globalThis.__whose.land()
+  await older
+  check('an older ask landing after a newer one keeps nothing: the newer list is the one kept to draw', AI.keptIndex('yours').albums.map((album) => album.id), ['newer'])
+  //? (review) a failed ask isn't kept: the next look - the section's Try again - asks again, and gets the list
+  globalThis.__whose.failNext = true
+  const before = asks()
+  const failing = AI.albumIndex('store')
+  globalThis.__whose.land()
+  const failed = await failing.then(() => 'landed', (reason) => reason.message)
+  const retry = AI.albumIndex('store')
+  check('a failed ask rejects, and is let go: the next look asks again (Try again works)', [failed, asks() - before, globalThis.__whose.asks.slice(-2)], ['Navidrome is away', 2, ['store', 'store']])
+  globalThis.__whose.land()
+  check('...and that ask\'s list lands, and is kept', [(await retry).albums.map((album) => album.id), AI.keptIndex('store').albums.map((album) => album.id)], [['newer'], ['newer']])
 }
 
 yoursAskedAgain().catch((caught) => {

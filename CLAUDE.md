@@ -182,7 +182,8 @@ src/
                    lrclib_endpoint.py (LRCLIB), navidrome_endpoint.py (Subsonic, for
                    the player - holds the login; client_for(request) asks as the signed-in
                    user with logins on, SHARED_ACCOUNT_USES lists what asks as the shared one),
-                   app.py, same_origin.py (refuses
+                   app.py, json_etag.py (JSON with an ETag and the 304, shared by the library scan and
+                   /album_index), same_origin.py (refuses
                    writes another website asks for - see "The 1.0.1 fixes")
   routes/          search_musicbrainz, download, monitor_slskd, interface_logs (the event log's
                    stream, and since 2.0.0-player.33 /recent: the last 500 page-bound lines
@@ -194,7 +195,9 @@ src/
                    every song of your library once, in an order deadwax makes, paged - see
                    "Up Next, shuffle and repeat"; and since 2.0.0-player.58 the six /playlists
                    routes, as the asker, the owner checked before any write, writes as form
-                   POSTs - see notes/playlists.md),
+                   POSTs - see notes/playlists.md; and since 2.0.0-player.59 /album_index, the
+                   Library's whole album list of a scope in one answer with an ETag - see
+                   notes/app-library.md),
                    me, auth (sign-in and sign-out, the two routes needing no session),
                    store_album (the app's id bridge - see "Artists, and the two
                    libraries joined"), pins (/deadwax/me/pins - see "Pins, and a finished Home"),
@@ -258,10 +261,16 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    app/PlaylistPicker.tsx (Add to a playlist, from the ••• menus and the player
                    bar), app/usePlaylists.ts (the one list, and pages' kept answers), their rules
                    the pure lib/playlists.ts.
+                   The Library (2.0.0-player.59, notes/app-library.md): app/LibraryHome.tsx (a
+                   phone's root), app/LibrarySection.tsx (a section - a phone's page, a desktop's
+                   inline view) on app/Shelf.tsx (blocks, tiles made near the view) and
+                   app/ShelfIndex.tsx (the A-Z index), its rules the pure lib/shelves.ts (the
+                   sorts, headers, index, Find, blocks); app/albumIndex.ts is the one album list
+                   per scope (yours, the store's), app/useYourAlbums.ts its `yours` face.
                    ui/src/lab/ is the turntable's test bench at /player/lab/, a third page built
                    in a pass of its own: the real Turntable and deck over signals it makes, set
                    beside an ideal turntable - see notes/turntable-bench.md.
-tests/             3231 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             3255 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -302,6 +311,7 @@ section of that title in notes/: `grep -rn "### X" notes/` finds it.
 | the desktop frame, the Edit panel, Needs a look (and Not in Navidrome), server settings and the log, Library care - and all of them on a phone | `notes/app-desktop.md` |
 | logins and roles: signing in through Navidrome, sessions, admins, break-glass, the sign-in screen; downloads per person; personal libraries; the player as you (Library and Browse, Add and Remove) | `notes/logins.md` |
 | playlists: Navidrome's own, as you - whose, the routes and the replace, the picker, a playlist's page and its Edit | `notes/playlists.md` |
+| the app's Library: its root, sections, sorts, groups, the index, Find, the album index route, the shelf | `notes/app-library.md` |
 | the turntable: its look, momentum, the deck, the first fix (.11, .14, .16) | `notes/turntable.md` |
 | the turntable's sound following the hand (.24) | `notes/turntable-sound.md` |
 | the turntable's sound since: warble, echo, kernel, first turn, clock, recorder, limiter (.27-.35), less delay (.40) | `notes/turntable-fixes.md` |
@@ -508,7 +518,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 3231 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 3255 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see `notes/tooling.md`:
@@ -546,7 +556,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 3231 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 3255 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

@@ -323,3 +323,8 @@ fetched the album list TWICE (the snapshot, then the scan), each 4.3 MB, uncompr
   with its queue position; cancel found and cancelled all ten transfers; and the fake logged
   no full-list request at all. The test fakes for the poller and `/jobs` answer only for the
   users they're asked about, so a caller that forgets a peer fails.
+
+**The app's Library at 3,000 albums (2.0.0-player.59)**: drawing every tile, even with `content-visibility: auto`,
+took 2.8 s to open Albums and 0.4-0.9 s a sort or a Find keystroke on a 4x-throttled Chromium; drawing only the blocks
+near the view brought those to 66-148 ms. The numbers, and the windowing they called for, are in notes/app-library.md
+("A better Library").

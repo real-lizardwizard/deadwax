@@ -554,8 +554,6 @@
 
     .app-desk .pl-library > * { grid-column: 1 / -1; }
     .app-desk .pl-library > .pl-large-header { grid-column: 1; }
-    /* the views are the sidebar's */
-    .app-desk .pl-library > .app-library-views { display: none; }
 
     .app-desk .pl-library > .app-library-bar {
         grid-column: 2;
@@ -3396,14 +3394,30 @@
 }
 
 /* ===== playlists on a desktop (2.0.0-player.58) =====
-   The sidebar's Playlists group is the desktop's way in, so the Library's row is a phone's; the Playlists page's rows
-   the readable width Library > Artists' are; and in a drawer's grid (1024-1279px) a playlist's notes - why it has no
+   The sidebar's Playlists group is the desktop's way in (the Library's row is the phone root's, which a desktop never
+   draws); the Playlists page's rows the readable width Library > Artists' are; and in a drawer's grid (1024-1279px) a playlist's notes - why it has no
    Edit, its description - take the place the album page's chips have. */
 @media (min-width: 1024px) {
-    .app-desk .app-library-playlists { display: none; }
     .app-desk .app-playlists-list { max-width: var(--app-desk-content-max); }
     .app-desk .app-playlist-notes { align-items: flex-start; text-align: left; }
     .app-desk.has-drawer .pl-album-page:not(.app-rg) .app-playlist-notes { grid-column: 2; grid-row: 5; }
     .app-desk .app-playlist-editing,
     .app-desk .app-playlist-ask { max-width: var(--app-desk-content-max); }
+}
+
+/* ===== a better Library on a desktop (2.0.0-player.59) =====
+   The sidebar's pick drawn inline: Find, the sort and the count on the title's row, Find a token wide; the index in a
+   column of its own at the main area's right edge, as tall as the window above the player bar - hidden while a
+   drawer lies over the page (1024-1279px with a panel open), whose edge it would sit under. */
+@media (min-width: 1024px) {
+    :root {
+        --app-desk-library-find: 240px;
+        --app-desk-index-height: calc(100dvh - var(--app-desk-bar));
+    }
+
+    .app-desk .app-library-bar { flex-wrap: nowrap; }
+    .app-desk .app-library-find { flex: 0 1 var(--app-desk-library-find); height: var(--app-desk-control); }
+    .app-desk .app-index { top: 0; height: var(--app-desk-index-height); }
+    .app-desk.has-drawer .app-shelf-wrap.has-index { grid-template-columns: minmax(0, 1fr); }
+    .app-desk.has-drawer .app-index { display: none; }
 }

@@ -4,15 +4,16 @@ import type { LibraryPick } from '../lib/appFrame'
 import { readPlayerLibraryView, writePlayerLibraryView } from '../state/persisted'
 
 /**
- * What the Library tab shows - Albums, Artists, Songs, or on a desktop "Recently added" - as a small
- * store (2.0.0-player.19), since two places choose it: the Library's own chips on a phone, and the
- * desktop sidebar's Library views (app/Sidebar.tsx), which also says which one shows. And whether
- * Navidrome's empty search lists songs at all - the Library asks once - since both leave out Songs
- * when it lists none. A module, as useOwned.ts is: every root renders from one bundle.
+ * What the Library tab shows at a desktop's root - Recently added, Albums, Artists, Songs, and Browse's -
+ * as a small store (2.0.0-player.19), chosen by the desktop sidebar's Library views (app/Sidebar.tsx),
+ * which also says which one shows, and by a desktop's Browse the store. (Until 2.0.0-player.59 a phone
+ * chose it too, with its chips; a phone's Library is a list of rows now, each opening its section as a
+ * page - app/LibraryHome.tsx - so this is the desktop's alone.) And whether Navidrome's empty search lists
+ * songs at all - the Library asks once - since both frames leave out Songs when it lists none. A module,
+ * as useOwned.ts is: every root renders from one bundle.
  *
- * Albums, Artists and Songs are kept on the device (deadwax-player-library-view), as the chips'
- * choice always was; "Recently added" is the desktop sidebar's, never kept, so a phone opened later
- * finds the view it had.
+ * Albums, Artists, Songs and Browse's two are kept on the device (deadwax-player-library-view);
+ * "Recently added" is never kept.
  */
 
 let pick: LibraryPick | null = null
@@ -37,7 +38,7 @@ export function librarySongs(): boolean | null {
   return songs
 }
 
-/** Another view chosen - by a chip or the sidebar. */
+/** Another view chosen - by the sidebar, or a desktop's Browse the store. */
 export function chooseLibrary(next: LibraryPick): void {
   if (next === libraryPick()) return
   for (const listener of [...leaving]) listener()

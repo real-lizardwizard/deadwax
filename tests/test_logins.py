@@ -144,6 +144,7 @@ ROUTES = {
     ("GET", "/deadwax/settings/musicbrainz_cache"): "admin",
     ("POST", "/deadwax/settings/musicbrainz_cache/clear"): "admin",
     ("GET", "/deadwax/navidrome/status"): "user",
+    ("GET", "/deadwax/navidrome/album_index"): "user",
     ("GET", "/deadwax/navidrome/albums"): "user",
     ("GET", "/deadwax/navidrome/albums/{album_id}"): "user",
     ("GET", "/deadwax/navidrome/search"): "user",

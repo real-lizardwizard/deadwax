@@ -882,6 +882,9 @@ all of it against a real Navidrome 0.64.
 
 ### The player as you (2.0.0-player.52)
 
+(2.0.0-player.59: how the Library and Browse are drawn now - a phone's root of rows with Browse a second group, your
+albums and the store's each one `album_index` answer - is notes/app-library.md's "A better Library".)
+
 Step 6 of the multi-user plan (the Claude Doc's "The phone player"). The decisions of 2026-09-27 stand -
 one Navidrome library, your library = your starred albums, two-way with Amperfy - and with logins off
 nothing visible changes. The spec is `deadwax-scratch/uplan/slice-player-per-user.md`. The pieces:

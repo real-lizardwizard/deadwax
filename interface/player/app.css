@@ -3356,6 +3356,102 @@ button.app-result:active { background: var(--dw-pressed); }
 .pl-library .pl-large-title:focus { outline: none; }
 .app-library-list { padding: 0 var(--pl-edge-right) 0 var(--pl-edge-left); }
 
+/* ===== a better Library (2.0.0-player.59) =====
+   The phone's root as Apple's list (Playlists, Albums, Artists, Songs; Browse's group; Recently added), a section's
+   Find on the sort's bar, and the shelf: blocks under their headers, skipped by the browser while off screen
+   (content-visibility), with the index down the right edge - sticky beside the shelf, its height the view's
+   between the bars, a drag on it never a scroll. */
+:root {
+    --app-index-width: 22px;            /* the A-Z strip */
+    --app-index-width-years: 36px;      /* ...and the decades', "1990" wide */
+    --app-index-entry: 15px;            /* an entry's least height: 27 of them fit 405px; fewer, and it thins */
+    --app-index-text: var(--dw-text-tab);
+    --app-index-leading: var(--dw-leading-tight);
+    --app-index-height: calc(100dvh - var(--app-nav-clear) - var(--app-chrome-bottom));
+    --app-index-height-mini: calc(100dvh - var(--app-nav-clear) - var(--app-chrome-bottom-mini));
+    --app-shelf-head-pad: var(--pl-gap);           /* above a header, after the block before it */
+    --app-shelf-row-estimate: 230px;    /* a row of tiles before one is measured: a cover and two lines */
+    --app-shelf-list-row-estimate: 64px;            /* a list's row before one is measured */
+    --app-shelf-head-estimate: 44px;                /* a header before one is measured */
+    --app-library-group-gap: var(--app-section-gap);
+}
+
+/* the root: the rows a grouped list inside the page's edges, Browse's under its heading, Recently added under them */
+.app-library-home .app-shuffle-songs { margin-top: var(--pl-gap-sm); }
+.app-library-group { margin: var(--pl-gap-sm) var(--pl-edge-right) 0 var(--pl-edge-left); }
+.app-library-row { width: 100%; flex-wrap: nowrap; justify-content: flex-start; text-align: left; }
+.app-library-row .app-row-label { flex: 1; }
+.app-library-browse,
+.app-library-recent { margin-top: var(--app-library-group-gap); }
+.app-library-browse .app-section-title,
+.app-library-recent-head { padding: 0 var(--pl-edge-right) 0 var(--pl-edge-left); }
+.app-library-browse .app-library-group { margin-top: 0; }
+
+/* a section's bar: Find on a line of its own over the sort and the count (a desktop's puts them on the title's row) */
+.app-library-bar { flex-wrap: wrap; }
+.app-library-find { flex: 1 0 100%; min-width: 0; }
+.app-library-problem { padding-top: 0; }
+
+/* the shelf: a header per group, in the flow; each block skipped while far off screen, its size held inline */
+.app-shelf-block { content-visibility: auto; }
+.app-shelf-head {
+    margin: 0;
+    padding: var(--app-shelf-head-pad) var(--pl-edge-right) var(--pl-gap-xs) var(--pl-edge-left);
+    color: var(--dw-text-heading-color);
+    font-size: var(--dw-text-heading);
+    font-weight: var(--dw-weight-semibold);
+    line-height: var(--dw-leading-heading);
+}
+
+/* ...with the index beside it: a column of its own, so it never lies over a tile or a panel */
+.app-shelf-wrap.has-index {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--app-index-width);
+}
+
+.app-shelf-wrap.has-index.is-years { grid-template-columns: minmax(0, 1fr) var(--app-index-width-years); }
+.app-shelf-wrap.has-index .pl-grid,
+.app-shelf-wrap.has-index .app-library-list,
+.app-shelf-wrap.has-index .app-shelf-head { padding-right: 0; }
+
+.app-index {
+    position: sticky;
+    top: var(--app-nav-clear);
+    align-self: start;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    height: var(--app-index-height);
+    overflow: hidden;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.app-shell.has-mini .app-index { height: var(--app-index-height-mini); }
+
+.app-index-entry,
+.app-index-dot {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--app-index-entry);
+    padding: 0;
+    color: var(--dw-accent);
+    font-size: var(--app-index-text);
+    font-weight: var(--dw-weight-semibold);
+    line-height: var(--app-index-leading);
+}
+
+.app-index-dot { pointer-events: none; }
+
+.app-index-entry:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring-inset);
+    border-radius: var(--dw-radius-control);
+}
+
 /* Search's other artists: round, the size of an album's cover */
 .app-result-cover.is-round.is-small { width: var(--app-result-cover); height: var(--app-result-cover); }
 
@@ -4804,10 +4900,8 @@ html.app-queue-menu-open { overflow: hidden; }
 
 html.app-picker-open { overflow: hidden; }
 
-/* --- the Library's Playlists row, above the scope chips (a phone's - app-desktop.css hides it) --- */
-.app-library-playlists { margin: var(--pl-gap-sm) var(--pl-edge-right) var(--pl-gap-sm) var(--pl-edge-left); }
-.app-library-playlists .app-row { width: 100%; flex-wrap: nowrap; justify-content: flex-start; text-align: left; }
-.app-library-playlists .app-row-label { flex: 1; }
+/* --- the Library's Playlists row: since 2.0.0-player.59 the first row of the phone root's first group, laid out as
+   its other rows are (.app-library-row) - its glyph in the accent --- */
 .app-library-playlists-icon { flex: none; width: var(--app-playlist-art-icon); height: var(--app-playlist-art-icon); color: var(--dw-accent); }
 
 /* --- a playlist's cover, or the empty square with the glyph on it --- */

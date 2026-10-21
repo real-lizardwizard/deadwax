@@ -1192,5 +1192,55 @@ console.log('\nplaylists: the Playlists page and a playlist\'s, pages of their o
     ['stay', 'back', 'become', 'become', 'open', 'open', 'open'])
 }
 
+console.log('\na section of the Library (2.0.0-player.59): #/library/section/<id>, a phone\'s page from the root')
+{
+  //? exactly the Library's views - read off lib/appFrame.ts's LibraryPick type itself, so the two lists can't drift
+  const frame = fs.readFileSync(path.join(UI, 'src/lib/appFrame.ts'), 'utf8')
+  const picks = /export type LibraryPick = ([^\n]+)/.exec(frame)[1].split('|').map((part) => part.trim().replace(/'/g, ''))
+  check('the section ids are exactly the Library\'s views - never the Playlists pages, kinds of their own', [[...R.SECTION_IDS].sort(), R.SECTION_IDS.includes('playlists')], [[...picks].sort(), false])
+  for (const id of R.SECTION_IDS) {
+    const page = { kind: 'section', id }
+    const route = { tab: 'library', page }
+    check(`#/library/section/${id} written and read back, its scroll under its address`,
+      [R.formatRoute(route), R.parseHash(`#/library/section/${id}`), R.scrollKey(route)],
+      [`#/library/section/${id}`, { route, canonical: `#/library/section/${id}` }, `#/library/section/${id}`])
+  }
+  check('an id that isn\'t a view is no page: the Library\'s root, the address rewritten',
+    [R.parseHash('#/library/section/playlists'), R.parseHash('#/library/section/genres')],
+    [{ route: { tab: 'library', page: null }, canonical: '#/library' }, { route: { tab: 'library', page: null }, canonical: '#/library' }])
+  check('...and a section on any other tab is that tab\'s root',
+    [R.parseHash('#/home/section/albums'), R.parseHash('#/you/section/store')],
+    [{ route: { tab: 'home', page: null }, canonical: '#/home' }, { route: { tab: 'you', page: null }, canonical: '#/you' }])
+  const yours = { kind: 'section', id: 'albums', label: F.libraryTitle('albums', true) }
+  const nav = R.openPage(R.startNav({ tab: 'library', page: null }), yours)
+  const over = R.openPage(nav, { kind: 'album', id: 'al-1', label: 'Dummy' })
+  check('back labels: "Library" under a section; the section\'s title under an album opened over it', [R.backLabel(nav), R.backLabel(over)], ['Library', 'Your albums'])
+  check('a cold link to a section opens it on the Library, the root under it', R.startNav(R.parseHash('#/library/section/store').route).stacks.library, [{ kind: 'section', id: 'store' }])
+  check('Browse the store from an empty section replaces it (`becomeTop`) - a section never piled on a section',
+    R.becomeTop(nav, yours, { kind: 'section', id: 'store', label: 'Albums in the store' }).stacks.library, [{ kind: 'section', id: 'store', label: 'Albums in the store' }])
+  //? the sidebar names the section at the Library stack's foot while it is there - after the playlists' branch
+  const base = { kind: 'section', id: 'artists' }
+  check('sidebarCurrent: a section base names its view, whatever is over it - the pick aside',
+    [F.sidebarCurrent('library', 'albums', true, base, true, base), F.sidebarCurrent('library', 'albums', true, { kind: 'album', id: 'x' }, true, base),
+      F.sidebarCurrent('library', 'albums', true, null, false, { kind: 'section', id: 'storeArtists' }), F.sidebarCurrent('library', 'albums', false, null, false, { kind: 'section', id: 'songs' })],
+    ['artists', 'artists', 'artists', 'albums'])
+  check('...a playlists page over a section base still names Playlists; another tab, its own; no base, the pick',
+    [F.sidebarCurrent('library', 'albums', true, R.PLAYLISTS_PAGE, true, base), F.sidebarCurrent('home', 'albums', true, null, true, base), F.sidebarCurrent('library', 'store', true, null, true, null),
+      F.sidebarCurrent('library', 'store', true, null, true, { kind: 'album', id: 'x' })],
+    ['playlists', 'home', 'store', 'store'])
+  check('...and choosing an item from there: the one showing pops to the root, another is the root\'s view (sidebarMove, unchanged)',
+    [F.sidebarMove('albums', 'albums', true, true), F.sidebarMove('artists', 'albums', true, true)], [{ how: 'tab', tab: 'library' }, { how: 'view', tab: 'library', pick: 'artists' }])
+  check('...with a section at the Library stack\'s foot, ITS view is "the tab" and the pick is another view - Albums clicked from Home with Artists\' section left there opens Albums, not Artists',
+    [F.sidebarMove('albums', 'albums', true, true, base), F.sidebarMove('artists', 'albums', true, true, base), F.sidebarMove('albums', 'albums', true, true, { kind: 'album', id: 'x' }),
+      F.sidebarMove('home', 'albums', true, true, base)],
+    [{ how: 'view', tab: 'library', pick: 'albums' }, { how: 'tab', tab: 'library', pick: 'artists' }, { how: 'tab', tab: 'library' }, { how: 'tab', tab: 'home' }])
+  //? (review) Artists clicked with Artists' section showing popped to a root that drew the pick, Albums: the move now
+  //? carries the section's view for the root - and a hidden view's section (Songs with no songs) the view drawn for it
+  check('(review) ...the section\'s own item, clicked with the Library showing, gives the root ITS view: base Artists, pick Albums, Artists clicked - the root shows Artists',
+    [F.sidebarMove('artists', 'albums', true, true, base).pick, F.sidebarMove('store', 'albums', true, true, { kind: 'section', id: 'store' }).pick,
+      F.sidebarMove('albums', 'songs', false, false, { kind: 'section', id: 'songs' })],
+    ['artists', 'store', { how: 'tab', tab: 'library', pick: 'albums' }])
+}
+
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')
 process.exit(failures ? 1 : 0)

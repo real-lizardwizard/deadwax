@@ -107,21 +107,25 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   a row you swipe along; and **Not played in a while**, the albums you last played longest ago (more
   than 30 days), when there are at least four. Tap an album to open it, an artist for their page.
   [Home and pins](#home-and-pins) has the details.
-- **Library**: at its top, **Playlists** - Navidrome's playlists, yours and the ones shared with you
-  ([Playlists](#playlists)). Then **Albums**, **Artists** or **Songs**, chosen by the chips under the title, with a
-  sort under them (tap it for the phone's own picker) and how many there are beside it once the
-  whole list is in. **Albums** is a grid in one of four orders - **Recently added**, **Recently
-  played**, **Artist** or **Title** - more loading as you scroll. **Artists** is every artist
-  Navidrome has, by **Name** or **Most albums**, each opening [their page](#artist-pages); an
-  artist who renamed is one row, under the name deadwax files them under (Ye, not Kanye West).
-  **Songs** is every song, a page at a time; a song opens its album, where you play it, and its
-  **•••** has [Play Next and Play Last](#up-next-shuffle-and-repeat). The Songs
-  chip isn't there at all when Navidrome won't list songs that way (it is asked once, for a single
-  song). **Shuffle** at the top of Songs (with logins on, at the top of your albums - your library has no
-  Songs list) plays every song in your library once, in a random order, until all have played; Browse's
-  Songs has one for everything in the store - [shuffling the whole library](#shuffling-the-whole-library). What you're looking at and the albums' order are remembered on that device, and each view
-  keeps its place when you switch between them. With logins on, the Library is **yours** and
-  **Browse** is the whole store - [the player as you](#the-player-as-you-with-logins-on).
+- **Library** (laid out as Apple Music's since 2.0.0-player.59 - [the Library](#the-library) has the details): a
+  short list - **Shuffle** at its head, then **Playlists** (Navidrome's playlists, yours and the ones shared
+  with you - [Playlists](#playlists)), **Albums**, **Artists** and **Songs** - and **Recently added** under it,
+  the 12 newest albums with **See all**. Each row opens its own page: a title, a **Find** field that filters
+  it as you type, the sort (tap it for the phone's own picker) and how many there are, then the albums as a
+  grid or the artists as a list under headers - A, B, C… for a name order, years for Year, months for
+  Recently added - with an **A-Z index** down the right edge to jump (drag along it, too). **Albums** has
+  seven orders: **Artist** (the default - each artist's albums oldest first), **Title**, **Recently
+  added**, **Year, newest first**, **Year, oldest first**, **Recently played** and **Most played**.
+  **Artists** is every artist Navidrome has, by **Name** or **Most albums**, each opening
+  [their page](#artist-pages); an artist who renamed is one row, under the name deadwax files them under
+  (Ye, not Kanye West). **Songs** is every song, a page at a time; a song opens its album, where you play it,
+  and its **•••** has [Play Next and Play Last](#up-next-shuffle-and-repeat). The Songs row isn't there at
+  all when Navidrome won't list songs that way (it is asked once, for a single song). **Shuffle** plays every
+  song in your library once, in a random order, until all have played; Songs has one at its top too (with
+  logins on, so do your albums), and Browse's Songs one for everything in the store -
+  [shuffling the whole library](#shuffling-the-whole-library). Both orders are remembered on that device;
+  back from an album, a page is where you left it. With logins on, the Library is **yours** and **Browse**
+  is the whole store, a second group of rows - [the player as you](#the-player-as-you-with-logins-on).
 - **An album**: its cover, **Play** and **Shuffle**, and its songs, under "Disc 1", "Disc 2"
   headings for a set. A disc with a title of its own shows it beside its number: "Disc 4 · Live at
   Wembley". The titles are the ones deadwax writes into your files from MusicBrainz (or you set by
@@ -384,8 +388,8 @@ page reloads or iOS closes the app, as it always was.
 
 ### Shuffling the whole library
 
-**Shuffle** at the top of the Library's Songs (with logins on, at the top of your albums: every song of every
-album you've starred) plays your **whole** library - every song once, in a random order deadwax makes,
+**Shuffle** at the head of the Library's list (and at the top of its Songs; with logins on, at the top of your
+albums too: every song of every album you've starred) plays your **whole** library - every song once, in a random order deadwax makes,
 nothing repeated until every one has played. Browse's Songs has the same for everything in the store. The
 button says **Getting ready…** while deadwax reads the list (a big library's first time can take several
 seconds; within ten minutes a new order is instant) - and above your albums, how many songs there are under
@@ -594,13 +598,70 @@ their own, and the first admin to sign in takes over the ones pinned before. The
 database (`DB_PATH`), in its `pins` table, through `GET` and `PUT /deadwax/me/pins` and
 `POST /deadwax/me/pins/toggle`. Home holds up to 50.
 
+## The Library
+
+Since 2.0.0-player.59, laid out as Apple Music's Library is.
+
+**On a phone the Library is a short list**: **Shuffle** at its head ([shuffling the whole
+library](#shuffling-the-whole-library)), then **Playlists**, **Albums**, **Artists** and - with logins off -
+**Songs** (left out when Navidrome won't list songs). With logins on, a **Browse** group under them has the
+whole store's **Albums**, **Artists** and **Songs**. Under both, **Recently added**: the 12 newest albums,
+with **See all** for the rest. Each row opens its page - swipe from the edge or tap **‹ Library** to come
+back, and a tap on the Library tab goes back to the list (on the list, to its top).
+
+**A page** has its title, a **Find in albums** (or **Find in artists**) field, the sort and how many there are
+- "3012 albums", or "12 of 3012 albums" while Find narrows them - then the albums (always a grid) or the
+artists (always a list):
+
+| Albums' order | grouped under | index down the edge |
+| --- | --- | --- |
+| **Artist** (the default) - by the artist's name, each artist's albums oldest first | the name's first letter | A-Z and # |
+| **Title** | the title's first letter | A-Z and # |
+| **Recently added** - when the album came into Navidrome, newest first | the month ("October 2026") | none |
+| **Year, newest first** / **Year, oldest first** | the year (albums with none last, under "No year") | the decades |
+| **Recently played** - only what's been played | - | none |
+| **Most played** - only what's been played, most first | - | none |
+
+**Artists** are by **Name** (letters and the index) or **Most albums**. Names are compared without a leading
+"The", accents or case ("The Beatles" is under B, "Björk" beside "bjork"); a name that starts with a digit, a
+symbol or another script goes under **#**, after Z. One album order is used everywhere (your albums and the
+store's), and it and the artists' order are remembered on that device - a device that never chose an order
+opens on **Artist**, where before 2.0.0-player.59 it opened on Recently added (which now has its own place,
+the list's grid and **See all**).
+
+- **Find** filters the page as you type: every word you type must be in the album's title or artist (or the
+  artist's name), in any order, accents and case aside - "deluxe" finds a "(Deluxe Edition)". The headers
+  stay; the index goes while you're finding. **Esc** empties it, and leaving the page does too.
+- **The index** is drawn when the order has one and there are at least 50: tap a letter (or a decade) to
+  jump to its heading, or drag along it to run through them - the letter under your finger is the one it goes
+  to. A letter with nothing under it goes to the next
+  one that has something. On a small phone it shows every other letter with a dot between; dragging still
+  reaches all of them. With a keyboard it is one stop: Up and Down move along it, Home and End go to its
+  ends, Enter jumps.
+- **Back from an album** finds the page as you left it - its place, what you typed into Find - with nothing
+  drawn again. It asks deadwax again only if the list is more than a minute old (see **Up to date**), and
+  keeps showing the one it has meanwhile.
+- **Up to date**: the list is asked for again when you add or remove an album, when your library changes in
+  Amperfy (with logins on), and otherwise when you open the Library or a page of it more than a minute after
+  it was last asked - so **Recently played** and **Most played** can be up to a minute behind, and an album
+  deadwax has just filed shows the next time you look once Navidrome has scanned it.
+- **Big libraries**: each list comes from deadwax in one request (it reads Navidrome's pages of 500 itself),
+  and only the albums near what's on screen are drawn. deadwax lists at most 10,000 albums; past that the
+  page says "Showing the first 10000 albums" ([troubleshooting](troubleshooting.md#the-library-shows-the-first-10000-albums)).
+- **Songs** is in Navidrome's own order, with no Find or sort: Search finds songs.
+- **No genres**: deadwax doesn't write a genre into what it files, so a genre would be whatever each
+  download's files said - there's no grouping or filter by genre.
+
+**On a desktop** the sidebar is the list ([on a desktop](#on-a-desktop)), and the page for its choice is drawn
+in the main area, Find, the sort and the count on its title's row.
+
 ## Playlists
 
 Since 2.0.0-player.58. deadwax's playlists **are Navidrome's own**, made as you - so Amperfy (or any
 other Subsonic app signed in as you) shows the same ones, and a playlist made or changed in either is the
 same playlist in the other. deadwax keeps none of its own.
 
-**Where they are.** On a phone, **Playlists** is the first row of the Library, above the chips. On a
+**Where they are.** On a phone, **Playlists** is the first row of the Library's list. On a
 desktop it's the sidebar's **Playlists** group, under the Library's (and Browse's): **All playlists**, then
 up to 20 of them by name - yours, then the ones shared with you.
 
@@ -740,9 +801,13 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
   the large title (since 2.0.0-player.55) - and Enter asks at once. It keeps saying what you searched
   for while an album you found is open. (Search's own box isn't drawn on a desktop.)
 - **Recently added** in the sidebar is Navidrome's albums newest first, a view of its own beside
-  **Albums**, so Albums keeps the order you chose for it (Recently added, Recently played, Artist or
-  Title, from the button at the title's right). It's the desktop's alone: a phone shows the albums
-  there, and doesn't remember it.
+  **Albums**, so Albums keeps the order you chose for it (the seven of [the Library](#the-library), from the
+  button at the title's right). A phone has it as the Library's grid and its **See all**.
+- **The Library's views** are drawn in the main area as the sidebar picks them: the view's name, then on the
+  same row **Find**, the sort and the count; the albums or artists under their headers, with the index in a
+  narrow column at the main area's right edge (hidden while a side panel lies over the page's edge, between
+  1024 and 1279 pixels wide). A Library page opened on a phone, then the window widened, stays a page with
+  its back link, and the sidebar names it.
 - **The Library's albums and Home's Recently added** are a grid, six covers across - fewer while a
   panel is a column beside them (from 1280 pixels wide), so a cover stays a cover's size. Home's
   **Arriving** cards sit side by side.
@@ -1908,13 +1973,14 @@ sound), which songs sit beside a hi-res one, whether Navidrome has finished a sc
 lists at all (**Not in Navidrome**). With logins off nothing here changes: one account, everybody's.
 
 - **Library is your albums** - your starred albums in Navidrome, the same ones Amperfy shows as
-  starred - in the same four orders as ever (**Recently added**, **Recently played** - the ones you've
-  played - **Artist** and **Title**). **Artists** is the artists of your albums, counting your albums of
+  starred - in the Library's seven orders (**Recently played** and **Most played** are the ones you've
+  played, your own plays), and the root's **Recently added** is yours. **Artists** is the artists of your albums, counting your albums of
   theirs. **Browse** is the whole store: every album, every artist (counting the store's albums of
-  theirs: "2 albums in the store") and every song, as the Library always listed them. On a phone two
-  chips over the views choose **Your library** or **Browse**; on a desktop the sidebar lists both,
-  **Library** (Recently added, Albums, Artists - yours) and **Browse** (Albums, Artists, Songs). Songs is
-  Browse's: Navidrome lists songs from the whole store.
+  theirs: "2 albums in the store") and every song, as the Library always listed them. On a phone the
+  Library's list has both: its first group is yours (Playlists, Albums, Artists), and a **Browse** group under
+  it the store's (Albums, Artists, Songs); on a desktop the sidebar lists both, **Library** (Recently added,
+  Albums, Artists - yours) and **Browse** (Albums, Artists, Songs). Songs is Browse's: Navidrome lists songs
+  from the whole store.
 - **An empty library says so** - Ethan's, at first: "Nothing in your library yet", with **Browse the
   store** - in whichever order the albums are in (**Recently played** too: it says "Nothing in your
   library played yet" only over a library that has albums, none played), and under **Artists** as well;
@@ -2053,6 +2119,9 @@ question the whole player existed to answer. Still to find out:
 
 - whether the **lock-screen and Control Center controls** work;
 - whether **AirPlay** works;
+- **the Library's index** (2.0.0-player.59) under a real finger in the home-screen app - dragging down it
+  without the page scrolling - and whether a long list's page height settles without the view jumping as
+  you scroll back up (Safari draws the albums near the screen as you go);
 - **a playlist's Edit** (2.0.0-player.58) under a real finger: dragging a song by its grip, the page
   scrolling by itself near the top and bottom; and the **New playlist** name field in the Add to a
   playlist sheet with the keyboard up (the sheet sits at the bottom of the screen);

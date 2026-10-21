@@ -330,6 +330,8 @@ def ethans_client(env) -> tuple[navidrome_endpoint.UserClient, str]:
 WALK = {
     "/status": [("get", "/status")],
     "/albums": [("get", "/albums?order=starred"), ("get", "/albums?order=newest")],
+    #? (2.0.0-player.59) the Library's whole album list, both ways - yours and the store's
+    "/album_index": [("get", "/album_index?scope=yours"), ("get", "/album_index?scope=store")],
     "/albums/{album_id}": [("get", "/albums/nd-dummy")],
     "/search": [("get", "/search?q=dummy")],
     "/artists": [("get", "/artists")],
