@@ -515,7 +515,8 @@ console.log('\nan album page is memoised on what it reads of the player')
     //? 2.0.0-player.45: and the artist page's panel - open, its request - and an artist page's refresh)
     //? 2.0.0-player.47: and Now Playing, which a phone's Managing pages' `live` reads as the visualizer)
     //? 2.0.0-player.59: and whether Navidrome lists songs, which a section page's shownPick reads)
-    [/const playingId = player\.track\?\.id \?\? null/.test(app), /\[nav, status, playingId, player\.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes, visualizerShown, sheetOpen, artistOpen, artistManage, artistRefreshes, hasSongs\],\s*\)/.test(app), /\[nav, player, status\]/.test(app)], [true, true, false])
+    //? 2.0.0-player.61: the permissions in admin's place - an album page's Edit, the Managing pages read them)
+    [/const playingId = player\.track\?\.id \?\? null/.test(app), /\[nav, status, playingId, player\.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, perms, editOpen, edit, refreshes, visualizerShown, sheetOpen, artistOpen, artistManage, artistRefreshes, hasSongs\],\s*\)/.test(app), /\[nav, player, status\]/.test(app)], [true, true, false])
   const page = code(read('player/AlbumPage.tsx'))
   check('...which is all an album page reads of it (read more there, and key the memo on it too)',
     [...new Set([...page.matchAll(/\bplayer\.(\w+)/g)].map((match) => match[1]))].sort(), ['playTracks', 'playing', 'track'])
@@ -556,8 +557,9 @@ console.log('\na link out of the app opens beside it')
   check('...and there are links to look at (You, the desktop sidebar, the server settings\' line, Info > Debug\'s test bench, an artist\'s About, an album\'s Properties, the album you don\'t have)',
     //? (2.0.0-player.42: the Edit panel's went - "Choose the folder" took its place - and Library care's
     //? phone note came; 2.0.0-player.44: an album page's Properties, its release on musicbrainz.org;
-    //? 2.0.0-player.50: the album you don't have, its group and its pressing on musicbrainz.org)
-    [...new Set(out.map(([file]) => file))].sort(), ['app/AlbumProperties.tsx', 'app/ArtistPage.tsx', 'app/InfoSheet.tsx', 'app/ReleaseGroupPage.tsx', 'app/ServerSettings.tsx', 'app/Sidebar.tsx', 'app/You.tsx'])
+    //? 2.0.0-player.50: the album you don't have, its group and its pressing on musicbrainz.org;
+    //? 2.0.0-player.61: People's link to Sharing deadwax, where it says why it needs logins on)
+    [...new Set(out.map(([file]) => file))].sort(), ['app/AlbumProperties.tsx', 'app/ArtistPage.tsx', 'app/InfoSheet.tsx', 'app/People.tsx', 'app/ReleaseGroupPage.tsx', 'app/ServerSettings.tsx', 'app/Sidebar.tsx', 'app/You.tsx'])
 }
 
 console.log('\nNow Playing covers everything behind it')
@@ -1090,7 +1092,8 @@ console.log('\nsearch extras (2.0.0-player.50): More from MusicBrainz, the press
     [true, true, true])
   const page = code(read('app/ReleaseGroupPage.tsx'))
   check('the chosen pressing\'s facts drawn with the picker - under it on a phone, under Get and it on a desktop - and the store line still last',
-    [/\{!desktop && picker\}\s*\{!desktop && facts\}\s*\{download && \(/.test(page), /\{desktop && picker\}\s*\{desktop && facts\}\s*<div class="app-rg-store"/.test(page)],
+    //? (2.0.0-player.61: Get drawn only with Get albums - its words in its place without)
+    [/\{!desktop && picker\}\s*\{!desktop && facts\}\s*\{download && getsAlbums && \(/.test(page), /\{desktop && picker\}\s*\{desktop && facts\}\s*<div class="app-rg-store"/.test(page)],
     [true, true])
   check('"maybe in your library" from lib/owned.ts\'s name match, said only when nothing is held by an id',
     [/title: credited\?\.title \|\| releases\[0\]\?\.title \|\| title,\s*artists: \[creditName\(credited\?\.\['artist-credit'\]\), currentName\(credited\?\.\['artist-credit'\]\)\]/.test(page),
@@ -1249,7 +1252,8 @@ console.log('\nGet: the Sources sheet, a download from the tap, and Requests')
   const search = code(read('app/Search.tsx'))
   check('the page and Search open the sheet through App, the opener taken in the tap',
     [/<ReleaseGroupPage\b[\s\S]*?onGet=\{openSources\}/.test(app), /<Search\b[^>]*onGet=\{openSources\}/.test(app),
-      /const openSources = useCallback\(\(request: Omit<GetRequest, 'key'>, opener: HTMLElement \| null\) => \{\s*if \(nowPlayingOpen\.current\) return\s*sourcesOpener\.current = opener/.test(app),
+      //? (2.0.0-player.61) and only with Get albums - every Get that leads here is hidden without it
+      /const openSources = useCallback\(\(request: Omit<GetRequest, 'key'>, opener: HTMLElement \| null\) => \{\s*if \(nowPlayingOpen\.current\) return\s*if \(!getsAlbums\(accessNow\(\)\.permissions\)\) return\s*sourcesOpener\.current = opener/.test(app),
       /onGet\(\{[\s\S]*?\}, takeOpener\(event\)\)/.test(page), /const opener = takeOpener\(event\)\s*const request = getRequests\.begin\(\)/.test(search)],
     [true, true, true, true, true])
   check('a download asked for: the sheet goes, focus with nowhere to land, and Requests shows at its root',
@@ -1420,8 +1424,8 @@ console.log('\npins: deadwax\'s own, asked when asked, and nothing about them pl
     [true, true])
   check('...with logins off (no library) Home is handed nothing new at once - never left waiting out its spinner for an answer never asked',
     /const newAlbums = useMemo\(\(\) => \(!hasLibrary\(\) \? NOTHING_NEW : myLibrary \? newShelf\(myLibrary\) : null\), \[myLibrary\]\)/.test(app), true)
-  check('...and Library care draws Held by nobody only with logins on',
-    /\{sessionMe\(\)\?\.auth === 'on' && <HeldByNobody live=\{live\} \/>\}/.test(code(read('app/LibraryCare.tsx'))), true)
+  check('...and Library care draws Held by nobody only with logins on (2.0.0-player.61: and Look after the library)',
+    /\{sessionMe\(\)\?\.auth === 'on' && parts\.held && <HeldByNobody live=\{live\} \/>\}/.test(code(read('app/LibraryCare.tsx'))), true)
   check('...Pinned first, then Recently added, then Not played in a while, all inside the gate',
     /<NeedsNavidrome\b[^>]*>\s*<Shelves\b/.test(home) && home.indexOf('<Pinned ') < home.indexOf('{recent}') && home.indexOf('{recent}') < home.indexOf('{notPlayed}'), true)
   const notPlayed = home.slice(home.indexOf('function NotPlayedInAWhile('), home.indexOf('function Shelves('))
@@ -1519,11 +1523,12 @@ console.log('\nthe desktop frame: chosen below the engine, panels beside the pag
       /const goToAlbum = \(track[^)]*\) => \{\s*if \(!track\.albumId\) return\s*leaveInfoDrawer\(\)\s*moreOpener\.current = null/.test(app),
       /const toArtist = \(artist[^)]*\) => \{\s*leaveInfoDrawer\(\)\s*moreOpener\.current = null/.test(app)],
     [true, true, true])
-  //? (review) the sidebar's Managing reads deadwax's answer, as You's row does
+  //? (review) the sidebar's Managing reads deadwax's answer, as You's row does - (2.0.0-player.61) its permissions,
+  //? noted for every reader (app/access.ts), each item by its own (lib/permissions.ts managing)
   check('the sidebar\'s Managing follows /deadwax/me: asked as the desktop frame shows, through latestOnly(), and handed over',
     [/const meRequests = useMemo\(latestOnly, \[\]\)/.test(app),
-      /if \(!desktop\) return\s*const request = meRequests\.begin\(\)\s*me\(request\.signal\)\.then\(\s*\(who\) => \{\s*if \(request\.current\(\)\) setAdmin\(who\.admin\)/.test(app),
-      /<Sidebar\b[\s\S]*?admin=\{admin\}/.test(app), /\{admin && \(\s*<section class="app-side-group" aria-labelledby="app-side-managing">/.test(code(read('app/Sidebar.tsx')))],
+      /if \(!desktop\) return\s*const request = meRequests\.begin\(\)\s*me\(request\.signal\)\.then\(\s*\(who\) => \{\s*if \(request\.current\(\)\) noteAccess\(who\)/.test(app),
+      /<Sidebar\b[\s\S]*?managing=\{managingOf\(perms, access\.on\)\}/.test(app), /\{managing\.any && \(\s*<section class="app-side-group" aria-labelledby="app-side-managing">/.test(code(read('app/Sidebar.tsx')))],
     [true, true, true, true])
   //? the player bar's transport, straight from the click, nothing awaited
   const bar = code(read('player/PlayerBar.tsx'))
@@ -1720,9 +1725,10 @@ console.log('\nediting an album on a desktop: the Edit panel, a side panel by th
     [/\n\s*<EditPanel open=\{editOpen\} request=\{edit\} opener=\{editOpener\} onClose=\{closeEdit\} onChanged=\{albumChanged\} panel=\{panel\} covered=\{panelsCovered\} \/>\n/.test(app),
       /desktop && <EditPanel\b/.test(app), app.indexOf('<EditPanel') > app.indexOf('<InfoSheet'), files.filter((file) => file !== 'app/App.tsx' && /<EditPanel\b/.test(code(read(file))))],
     [true, false, true, []])
-  //? (2.0.0-player.47: an admin's on both frames - after Play and Shuffle on a desktop, in the bar beside the pin on a phone)
+  //? (2.0.0-player.47: an admin's on both frames - after Play and Shuffle on a desktop, in the bar beside the pin on a phone;
+  //? 2.0.0-player.61: with Edit albums or Look after the library - lib/permissions.ts albumEdit)
   check('Edit is on the album page for an admin, on both frames, and drawn only when handed - where the frame says',
-    [/onEdit=\{admin \? toggleEdit : undefined\}/.test(app), /editAt=\{desktop \? 'actions' : 'bar'\}/.test(app),
+    [/onEdit=\{albumEdit\(perms\)\.shown \? toggleEdit : undefined\}/.test(app), /editAt=\{desktop \? 'actions' : 'bar'\}/.test(app),
       /\{onEdit && editAt === 'actions' && \(\s*<button\b[^>]*class="pl-pill app-edit-toggle"\s*aria-pressed=\{editing\}/.test(page),
       /editing=\{editOpen && edit\?\.album\?\.id === page\.id\}/.test(app)],
     [true, true, true, true])
@@ -1741,6 +1747,12 @@ console.log('\nediting an album on a desktop: the Edit panel, a side panel by th
       /editOpener\.current = takeOpener\(event\)\s*editKeys\.current \+= 1\s*setEdit\(\{ album, key: editKeys\.current \}\)\s*setEditOpen\(true\)/.test(toggle),
       /sourcesOpener\.current = null\s*setSourcesOpen\(false\)\s*infoOpener\.current = null\s*setInfoPanel\(false\)/.test(toggle)],
     [true, true, true])
+  //? (2.0.0-player.61 second review: with Look after the library alone, Delete is the only tab - its Cancel closes)
+  const cancel = /const cancelDelete = useMemo\(\(\) => \(\) => \{([\s\S]*?)\n  \}, \[\]\)/.exec(panel)?.[1] ?? ''
+  check('Delete\'s Cancel goes back by the tabs shown now (lib/albumEdit cancelDeleteTo) - with none but Delete, it closes the panel',
+    [/tabsNow\.current = shownTabs/.test(panel), /const back = cancelDeleteTo\(tabsNow\.current\)/.test(cancel),
+      /if \(back === null\) \{\s*close\.current\(\)\s*return\s*\}\s*setTab\(back\)\s*focusNext\.current = toTab\(back\)/.test(cancel), /firstTab/.test(cancel)],
+    [true, true, true, false])
   //? (2.0.0-player.47: crossing leaves it open - a panel one side, a sheet the other, as the artist page's)
   check('crossing 1024px leaves it open, either way; its page stopping being the one showing closes it',
     [!/closes\.editPanel/.test(app),
@@ -1762,7 +1774,8 @@ console.log('\nediting an album on a desktop: the Edit panel, a side panel by th
       ['onClose={closeFromEditor}', 'onClose={closeTagEditor}', 'onCancel={cancelDelete}'].map((prop) => panel.includes(prop)),
       /const closeFromEditor = useMemo\(\(\) => \(\) => \{\s*const from = escapeFrom\(\)\s*if \(from !== 'page' && from !== 'inner'\) close\.current\(\)/.test(panel),
       /const closeTagEditor = useMemo\(\(\) => \(\) => \{\s*if \(escapeFrom\(\) === 'page'\) return\s*setEditingTags\(null\)/.test(panel),
-      /const cancelDelete = useMemo\(\(\) => \(\) => \{\s*if \(escapeFrom\(\) === 'page'\) return\s*setTab\('release'\)/.test(panel)],
+      //? (2.0.0-player.61: the first tab this person's permissions show - the release editor's, for an admin)
+      /const cancelDelete = useMemo\(\(\) => \(\) => \{\s*if \(escapeFrom\(\) === 'page'\) return\s*const back = cancelDeleteTo/.test(panel)],
     [true, true, true, [true, true, true], true, true, true])
   //? (2.0.0-player.44: the track inspector is a layer over the Tags tab too - below, "inside a track")
   check('(review) an Escape in the tag editor or the delete confirmation closes that layer alone: the panel covered under it, the release editor\'s close passing it over',
@@ -1779,7 +1792,7 @@ console.log('\nediting an album on a desktop: the Edit panel, a side panel by th
     [/useLayoutEffect\(\(\) => \{\s*const pick = focusNext\.current\s*if \(!pick\) return\s*focusNext\.current = null\s*const active = document\.activeElement\s*if \(active && active !== document\.body\) return\s*pick\(\)\?\.focus\(\{ preventScroll: true \}\)/.test(panel),
       //? (2.0.0-player.44: back to the track inspector's "Edit this track…" when it was opened from there)
       /setEditingTags\(null\)\s*const opener = \(\) => tagsPane\.current\?\.querySelector<HTMLElement>\('\.app-inspect-edit'\)\s*\?\? tagsPane\.current\?\.querySelector<HTMLElement>\('\.app-edit-tags-open'\)\s*focusNext\.current = opener\n/.test(panel),
-      /setTab\('release'\)\s*focusNext\.current = toTab\('release'\)/.test(panel),
+      /setTab\(back\)\s*focusNext\.current = toTab\(back\)/.test(panel),
       /setEditingTags\(\{ path, filenames \}\)\s*focusNext\.current = /.test(panel),
       /void library\.reload\(false\)\s*focusNext\.current = \(\) => scroller\.current/.test(panel),
       /chooseFolder\(path\)\s*focusNext\.current = toTab\(tab\)/.test(panel),
@@ -1867,12 +1880,13 @@ console.log('\nNeeds a look: the review queue in the app, on a desktop (2.0.0-pl
   check('no playback action from any of its files, nor a context',
     ['app/NeedsALook.tsx', 'app/useQueueSummary.ts', 'lib/needsLook.ts'].map((file) => [actionsIn(code(read(file))), /useContext|PlayerContext|ActionsContext/.test(code(read(file)))]),
     [[[], false], [[], false], [[], false]])
-  //? (2.0.0-player.47: told `admin`, never the frame - a phone draws the page as a desktop does)
+  //? (2.0.0-player.47: told `admin`, never the frame - a phone draws the page as a desktop does;
+  //? 2.0.0-player.61: `allowed` - Look after the library, which an admin has)
   check('the page reads the library through the main page\'s hook, only once it shows, for the admin - and nothing else of it',
-    [/const library = useLibrary\(admin && shown\)/.test(page), (page.match(/useLibrary\(/g) ?? []).length, /listAlbums|loadScan|queueSummary\(/.test(page), /\bdesktop\b/.test(page.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ''))],
+    [/const library = useLibrary\(allowed && shown\)/.test(page), (page.match(/useLibrary\(/g) ?? []).length, /listAlbums|loadScan|queueSummary\(/.test(page), /\bdesktop\b/.test(page.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ''))],
     [true, 1, false, false])
   check('...anyone else a note and nothing more: its return comes before any row is drawn',
-    [/if \(!admin\) \{\s*return \(/.test(page), page.indexOf('if (!admin)') < page.indexOf('app-queue-list')], [true, true])
+    [/if \(!allowed\) \{\s*return \(/.test(page), page.indexOf('if (!allowed)') < page.indexOf('app-queue-list')], [true, true])
   check('the list is queueAlbums, through lib/needsLook.ts, and its session the pure rules\'',
     [/from '\.\.\/lib\/needsLook'/.test(page), /export function facetAlbums[\s\S]*?queueAlbums\(albums, facet\)/.test(code(read('lib/needsLook.ts'))),
       /const begun = startSession\(albums, path, showing\)/.test(page), /const target = stepTarget\(was, index,/.test(page)],
@@ -1889,23 +1903,26 @@ console.log('\nNeeds a look: the review queue in the app, on a desktop (2.0.0-pl
   check('the count: one store - asked as the desktop frame shows for an admin and the page comes back, after every change the panel reports, by the page\'s reviews and on a filed album; no timer',
     //? (2.0.0-player.47: and on a phone as You's tab shows, where its row draws it - by ONE flag, true on a
     //? desktop all along, so a desktop moving to and from You asks nothing more: review)
-    [/const asksQueueSummary = desktop \|\| nav\.tab === 'you'\s*useEffect\(\(\) => \{\s*if \(asksQueueSummary && admin && pageShown\) askQueueSummary\(\)\s*\}, \[asksQueueSummary, admin, pageShown\]\)/.test(app),
+    //? (2.0.0-player.61: only with Look after the library - its permission's count; askQueueSummary itself asks nothing without it)
+    [/const asksQueueSummary = desktop \|\| nav\.tab === 'you'\s*\/\/[^\n]*\n\s*const summaryAllowed = summaryAsked\(perms\)\s*useEffect\(\(\) => \{\s*if \(asksQueueSummary && summaryAllowed && pageShown\) askQueueSummary\(\)\s*\}, \[asksQueueSummary, summaryAllowed, pageShown\]\)/.test(read('app/App.tsx')),
       /const albumChanged = useCallback\(\(change: AlbumChange\) => \{\s*\/\/[^\n]*\n\s*askQueueSummary\(\)/.test(read('app/App.tsx')),
       /onAlbumsFiled\(\(\) => askQueueSummary\(\)\)/.test(store), /if \(asking\) again = true\s*else ask\(\)/.test(store),
       files.filter((file) => APP_SIDE(file) && /askQueueSummary\(|\(askQueueSummary\)/.test(code(read(file)))).sort(),
       /setTimeout|setInterval/.test(store), (app.match(/useQueueSummary\(\)/g) ?? []).length],
     [true, true, true, true, ['app/App.tsx', 'app/NeedsALook.tsx', 'app/useQueueSummary.ts'], false, 1])
   check('...the page\'s own count standing in only while it shows with a real scan and no session',
-    [/setPageQueueCount\(admin && shown && real && !session && !ending \? summaryTotal\(library\.albums\) : null\)/.test(page), /return page \?\? server/.test(store)],
+    [/setPageQueueCount\(allowed && shown && real && !session && !ending \? summaryTotal\(library\.albums\) : null\)/.test(page), /return page \?\? server/.test(store)],
     [true, true])
   check('the sidebar\'s item: Managing\'s first, an admin\'s, with the count',
-    [/\{admin && \(\s*<section class="app-side-group" aria-labelledby="app-side-managing">[\s\S]*?<ul class="app-side-list">\s*\{item\(SIDEBAR_QUEUE\)\}/.test(side),
+    //? (2.0.0-player.61: each item by its permission, the group by any of them)
+    [/\{managing\.any && \(\s*<section class="app-side-group" aria-labelledby="app-side-managing">[\s\S]*?<ul class="app-side-list">\s*\{managing\.queue && item\(SIDEBAR_QUEUE\)\}/.test(side),
       /<Sidebar\b[\s\S]*?needsLook=\{needsLook\}/.test(app), /sidebarCurrent\(nav\.tab, libraryView, hasSongs, topNow, hasLibrary\(\), nav\.stacks\.library\[0\] \?\? null\)/.test(app)],
     [true, true, true])
   //? (2.0.0-player.47: on both frames - You is told no frame at all now)
   check('You\'s row: in Managing (an admin\'s), above the link to the main page - on a phone as on a desktop',
-    [/<div class="app-group">\s*<button\b[^>]*class="app-row app-link-row app-queue-link-row"/.test(you), you.indexOf('app-queue-link-row') < you.indexOf('Open the main page'),
-      /\{admin && \([\s\S]*?app-queue-link-row/.test(you), /onWindDown=\{chooseWindDown\}\s*needsLook=\{needsLook\}\s*onNeedsLook=\{openQueue\}/.test(app), /\bdesktop\b/.test(you.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ''))],
+    //? (2.0.0-player.61: each row by its permission - lib/permissions.ts managing)
+    [/<div class="app-group">\s*\{managing\.queue && \(\s*<button\b[^>]*class="app-row app-link-row app-queue-link-row"/.test(you), you.indexOf('app-queue-link-row') < you.indexOf('Open the main page'),
+      /\{managing\.any && \([\s\S]*?app-queue-link-row/.test(you), /onWindDown=\{chooseWindDown\}\s*needsLook=\{needsLook\}\s*onNeedsLook=\{openQueue\}/.test(app), /\bdesktop\b/.test(you.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ''))],
     [true, true, true, true, false])
   //? (2.0.0-player.33: through openManagingPage, which also replaces another Managing page on top)
   check('its page opened on You - the tab as left, the page pushed only when it isn\'t on top there',
@@ -1939,8 +1956,8 @@ console.log('\nNeeds a look: the review queue in the app, on a desktop (2.0.0-pl
       /const retry = \(\) => \{\s*if \(library\.loading\) return\s*retrying\.current = true/.test(page)],
     [true, true, true, true, false, 2, true])
   check('...the panel: a step through the queue hands focus on to the Release tab, never the page; listing the folder, it says it is finding it',
-    [/if \(isFolderRequest\(request\)\) \{\s*const active = document\.activeElement\s*if \(!active \|\| active === document\.body \|\| box\.current\?\.contains\(active\)\) focusNext\.current = toTab\('release'\)/.test(panel),
-      panel.indexOf("focusNext.current = toTab('release')") < panel.indexOf('setSubject(null)\n'),
+    [/if \(isFolderRequest\(request\)\) \{\s*const active = document\.activeElement\s*if \(!active \|\| active === document\.body \|\| box\.current\?\.contains\(active\)\) focusNext\.current = toTab\(firstTab\)/.test(panel),
+      panel.indexOf("focusNext.current = toTab(firstTab)") < panel.indexOf('setSubject(null)\n'),
       /listed: !!folders && folders\.paths\.length === 1 && library\.albums\.some\(\(album\) => album\.path === folders\.paths\[0\]\)/.test(panel)],
     [true, true, true])
   check('...and every way the panel reports on a folder: an ignore and an un-ignore told (no file written), tags/art/lyrics through wroteFolder, Next album after a delete',
@@ -1952,7 +1969,8 @@ console.log('\nNeeds a look: the review queue in the app, on a desktop (2.0.0-pl
       (panel.match(/onApplied=\{written\(request, subject\)\}|onDone=\{written\(request, subject\)\}/g) ?? []).length],
     [2, true, true, true, true, 3])
   check('the pages memo is keyed on what the queue page reads (admin, the page shown, the panel and its request)',
-    [/\[nav, status, playingId, player\.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes, visualizerShown, sheetOpen, artistOpen, artistManage, artistRefreshes, hasSongs\]/.test(app),
+    //? (2.0.0-player.61: the permissions in admin's place)
+    [/\[nav, status, playingId, player\.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, perms, editOpen, edit, refreshes, visualizerShown, sheetOpen, artistOpen, artistManage, artistRefreshes, hasSongs\]/.test(app),
       /page\.kind === 'queue' \? queueView\(tab, page\)/.test(app)],
     [true, true])
 }
@@ -1986,7 +2004,8 @@ console.log('\nServer settings and the log in the app, on a desktop (2.0.0-playe
   check('the log is the one file in the app that opens a stream', opening, ['app/EventLog.tsx'])
   check('...in an effect that opens nothing unless the page is what shows, keyed on exactly that, and closes it as that stops',
     //? (2.0.0-player.47: an admin's, on either frame)
-    [/useEffect\(\(\) => \{\s*if \(!admin \|\| !live\) return\b[\s\S]*?new EventSource\([\s\S]*?return \(\) => \{\s*closed = true\s*reads\.supersede\(\)\s*source\?\.close\(\)[\s\S]*?\}, \[admin, live\]\)/.test(log),
+    //? (2.0.0-player.61: Settings and the log's, `allowed`)
+    [/useEffect\(\(\) => \{\s*if \(!allowed \|\| !live\) return\b[\s\S]*?new EventSource\([\s\S]*?return \(\) => \{\s*closed = true\s*reads\.supersede\(\)\s*source\?\.close\(\)[\s\S]*?\}, \[allowed, live\]\)/.test(log),
       (log.match(/new EventSource\(/g) ?? []).length],
     [true, 1])
   check('...a history answering after it stopped showing opens nothing (`closed` asked first)',
@@ -1994,8 +2013,9 @@ console.log('\nServer settings and the log in the app, on a desktop (2.0.0-playe
   //? (2.0.0-player.47: an admin's on both frames - and a phone's Now Playing over the page is as the visualizer)
   check('App\'s `live`: the page\'s tab current, the app in front, neither the visualizer nor a phone\'s Now Playing over it; both an admin\'s, on either frame',
     [/const managingLive = \(tab: Tab\) => pageShown && nav\.tab === tab && !visualizerShown && !sheetOpen\n/.test(app),
-      /<ServerSettings admin=\{admin\} live=\{managingLive\(tab\)\}/.test(app),
-      /<EventLog admin=\{admin\} live=\{managingLive\(tab\)\}/.test(app)],
+      //? (2.0.0-player.61: by Settings and the log, which an admin has)
+      /<ServerSettings allowed=\{perms\.has\('server'\)\} live=\{managingLive\(tab\)\}/.test(app),
+      /<EventLog allowed=\{perms\.has\('server'\)\} live=\{managingLive\(tab\)\}/.test(app)],
     [true, true, true])
   check('the log\'s lines and the settings\' rows are text: nothing set as HTML in either',
     [/dangerouslySetInnerHTML|innerHTML|insertAdjacentHTML/.test(log), /dangerouslySetInnerHTML|innerHTML|insertAdjacentHTML/.test(settings),
@@ -2003,7 +2023,7 @@ console.log('\nServer settings and the log in the app, on a desktop (2.0.0-playe
     [false, false, true])
   check('the settings read through latestOnly, never over a draft, and a save calls a read still out off',
     [/const ticket = reads\.begin\(\)\s*setLoading\(true\)\s*getServerSettings\(ticket\.signal\)/.test(settings),
-      /if \(!admin \|\| !live \|\| Object\.keys\(kept\.drafts\)\.length\) return\s*read\(\)/.test(settings),
+      /if \(!allowed \|\| !live \|\| Object\.keys\(kept\.drafts\)\.length\) return\s*read\(\)/.test(settings),
       /const save = async \(\) => \{[\s\S]*?reads\.supersede\(\)[\s\S]*?saveServerSettings\(/.test(settings)],
     [true, true, true])
   //? App draws only a tab's top page: a page left for a sibling, Back or Go to album goes - and with it any
@@ -2018,18 +2038,21 @@ console.log('\nServer settings and the log in the app, on a desktop (2.0.0-playe
     [true, true, false])
   //? (2.0.0-player.42: Library care between Needs a look and them)
   check('the sidebar\'s Settings and Log: an admin\'s, after Needs a look and Library care, before the main page',
-    [/\{admin && \([\s\S]*?\{item\(SIDEBAR_QUEUE\)\}\s*\{item\(SIDEBAR_CARE\)\}\s*\{item\(SIDEBAR_SETTINGS\)\}\s*\{item\(SIDEBAR_LOG\)\}\s*<li>\s*<a/.test(sidebar)], [true])
+    //? (2.0.0-player.61: People between Library care and them; each by its permission)
+    [/\{managing\.any && \([\s\S]*?\{managing\.queue && item\(SIDEBAR_QUEUE\)\}\s*\{managing\.care && item\(SIDEBAR_CARE\)\}\s*\{managing\.people && item\(SIDEBAR_PEOPLE\)\}\s*\{managing\.settings && item\(SIDEBAR_SETTINGS\)\}\s*\{managing\.log && item\(SIDEBAR_LOG\)\}\s*<li>\s*<a/.test(sidebar)], [true])
   check('You\'s rows: opening the pages through App - on a phone as on a desktop (2.0.0-player.47)',
     //? (2.0.0-player.42: and Library care's)
-    [(you.match(/\n\s*<button type="button" class="app-row app-link-row app-queue-link-row" onClick=\{\(\) => onManaging\?\.\('(care|settings|log)'\)\}>/g) ?? []).length,
+    //? (2.0.0-player.61: and People's)
+    [(you.match(/\n\s*<button type="button" class="app-row app-link-row app-queue-link-row" onClick=\{\(\) => onManaging\?\.\('(care|people|settings|log)'\)\}>/g) ?? []).length,
       /onManaging=\{openManaging\}/.test(app), /move\.how === 'managing'\) \{\s*openManaging\(move\.kind\)/.test(app)],
-    [3, true, true])
+    [4, true, true])
   check('the Managing pages are siblings: each opened through one helper, one over another REPLACING it (never piled up)',
     [/const openQueue = useCallback\(\(\) => openManagingPage\(QUEUE_PAGE\), \[\]\)/.test(app),
       //? (2.0.0-player.42: Library care one of them)
-      /const openManaging = useCallback\(\(kind: ManagingKind\) => openManagingPage\(kind === 'care' \? CARE_PAGE : kind === 'settings' \? SETTINGS_PAGE : LOG_PAGE\), \[\]\)/.test(app),
+      //? (2.0.0-player.61: and People one of them)
+      /const openManaging = useCallback\(\(kind: ManagingKind\) => openManagingPage\(\s*kind === 'care' \? CARE_PAGE : kind === 'people' \? PEOPLE_PAGE : kind === 'settings' \? SETTINGS_PAGE : LOG_PAGE\), \[\]\)/.test(app),
       /if \(top\?\.kind === page\.kind\) return[\s\S]{0,120}if \(top && MANAGING_KINDS\.includes\(top\.kind\)\) router\.become\(top, page\)\s*else router\.open\(page\)/.test(app),
-      /const MANAGING_KINDS: readonly PageKind\[\] = \['queue', 'care', 'settings', 'log'\]/.test(app)],
+      /const MANAGING_KINDS: readonly PageKind\[\] = \['queue', 'care', 'people', 'settings', 'log'\]/.test(app)],
     [true, true, true, true])
   check('the pages memo is keyed on what they read - the visualizer, and Now Playing, too',
     [/page\.kind === 'settings' \? settingsView\(tab\) : page\.kind === 'log' \? logView\(tab\)/.test(app), /refreshes, visualizerShown, sheetOpen, artistOpen, artistManage, artistRefreshes, hasSongs\]/.test(app)], [true, true])
@@ -2101,12 +2124,14 @@ console.log('\nthe artist page, as the main page had it (2.0.0-player.45)')
   check('every fetch that draws goes through a latestOnly(): each preview and search sent with its ticket\'s signal',
     [asks.length, asks.every((match) => /ticket\.signal/.test(match[2]))], [4, true])
   check('the managing is an admin\'s: handed `admin` and the panel\'s opener by App, each control drawn only for an admin',
-    [/admin=\{admin\}\s*onManage=\{toggleArtistManage\}/.test(app), /const manages = admin && !!onManage/.test(page),
-      (page.match(/\{manages && (?:\(shownLibrary \|\| summariesFailed\) && )?\(/g) ?? []).length, (page.match(/manage\('(?:who|images|refile)', event\)/g) ?? []).length],
+    //? (2.0.0-player.61: by permission, read on the page - Artist images… and Which artist is this? Edit albums',
+    //? Move albums to … Look after the library's - lib/permissions.ts artistManaging)
+    [/onGet=\{openSources\}\s*onManage=\{toggleArtistManage\}/.test(app), /const may = artistManaging\(access\.permissions\)\s*const managesImages = may\.images && !!onManage\s*const managesWho = may\.whichArtist && !!onManage\s*const managesMove = may\.move && !!onManage/.test(page),
+      (page.match(/\{manages(?:Images|Who|Move) && (?:\(shownLibrary \|\| summariesFailed\) && )?\(/g) ?? []).length, (page.match(/manage\('(?:who|images|refile)', event\)/g) ?? []).length],
     [true, true, 4, 4])
   //? (2.0.0-player.47: and as anything else an admin's comes on top there - an album page, a Managing page, You)
   check('...and a phone asks /deadwax/me as an artist page - or an album page, a Managing page, You - comes on top there (the desktop frame asks as it shows)',
-    [/const adminsOnTop = nav\.tab === 'you' \|\| topNow\?\.kind === 'artist' \|\| topNow\?\.kind === 'album' \|\| \(!!topNow && MANAGING_KINDS\.includes\(topNow\.kind\)\)\s*useEffect\(\(\) => \{\s*if \(desktop \|\| !adminsOnTop\) return\s*const request = meRequests\.begin\(\)\s*me\(request\.signal\)\.then\(\s*\(who\) => \{\s*if \(request\.current\(\)\) setAdmin\(who\.admin\)/.test(app),
+    [/const adminsOnTop = nav\.tab === 'you' \|\| topNow\?\.kind === 'artist' \|\| topNow\?\.kind === 'album' \|\| \(!!topNow && MANAGING_KINDS\.includes\(topNow\.kind\)\)\s*useEffect\(\(\) => \{\s*if \(desktop \|\| !adminsOnTop\) return\s*const request = meRequests\.begin\(\)\s*me\(request\.signal\)\.then\(\s*\(who\) => \{\s*if \(request\.current\(\)\) noteAccess\(who\)/.test(app),
       /\}, \[desktop, adminsOnTop\]\)/.test(app)], [true, true])
   check('the page\'s summaries are asked through their own latestOnly()',
     [/const summaryRequests = useMemo\(latestOnly, \[\]\)/.test(page), /fetchArtist\(name, request\.signal\)/.test(page), /if \(!request\.current\(\)\) return\s*setSummaryAsking\(false\)[\s\S]{0,400}?const answered: Summaries/.test(page)],
@@ -2132,7 +2157,8 @@ console.log('\nLooking after the library in the app, on a desktop (2.0.0-player.
       /\bdesktop\b/.test(care.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ''))],
     [true, true, false, false])
   check('App draws it an admin\'s, on either frame, `live` as the other Managing pages\' - from the pages memo\'s one view',
-    [/<LibraryCare admin=\{admin\} live=\{managingLive\(tab\)\}/.test(app), /page\.kind === 'care' \? careView\(tab\)/.test(app)],
+    //? (2.0.0-player.61: handed its parts by permission - lib/permissions.ts careParts)
+    [/<LibraryCare parts=\{careParts\(perms\)\} live=\{managingLive\(tab\)\}/.test(app), /page\.kind === 'care' \? careView\(tab\)/.test(app)],
     [true, true])
   check('Rescan is the scan that ignores the cache - refused while one is out; the library\'s listeners told once it has answered',
     [/void library\.reload\(true\)\.then\(/.test(care), /if \(scanBusy \|\| library\.problem\) return/.test(care), /if \(albums\.length\) announceAlbumsFiled\(\)/.test(care)],
@@ -2194,8 +2220,9 @@ console.log('\nLooking after the library in the app, on a desktop (2.0.0-player.
     [true, 2, 0, true])
   //? (2.0.0-player.47: You's row on a phone too - straight after "Albums that need a look")
   check('the sidebar\'s Library care: an admin\'s, straight after Needs a look; You\'s row too, on both frames',
-    [/\{admin && \([\s\S]*?\{item\(SIDEBAR_QUEUE\)\}\s*\{item\(SIDEBAR_CARE\)\}/.test(code(read('app/Sidebar.tsx'))),
-      /<\/button>\s*<button type="button" class="app-row app-link-row app-queue-link-row" onClick=\{\(\) => onManaging\?\.\('care'\)\}>/.test(code(read('app/You.tsx')))],
+    //? (2.0.0-player.61: each by its permission)
+    [/\{managing\.any && \([\s\S]*?\{managing\.queue && item\(SIDEBAR_QUEUE\)\}\s*\{managing\.care && item\(SIDEBAR_CARE\)\}/.test(code(read('app/Sidebar.tsx'))),
+      /<\/button>\s*\)\}\s*\{managing\.care && \(\s*<button type="button" class="app-row app-link-row app-queue-link-row" onClick=\{\(\) => onManaging\?\.\('care'\)\}>/.test(code(read('app/You.tsx')))],
     [true, true])
   check('Needs a look warns when ignores can\'t be saved: the library\'s answer or the count\'s',
     [/\{ignoresUnsaved\(library, tracking\) && <p class="app-queue-warning">\{IGNORES_UNSAVED\}<\/p>\}/.test(queue), /const tracking = useQueueTracking\(\)/.test(queue)],
@@ -2525,12 +2552,15 @@ console.log('\nlooking after deadwax from a phone (2.0.0-player.47)')
   check('the four Managing pages know no frame - each told `admin`, and anyone else\'s note says so, with no link out',
     pages.map((file) => {
       const text = code(read(file))
-      return [/\bdesktop\b/.test(text.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, '')), /if \(!admin\) \{\s*return \(/.test(text), /\{MANAGING_ADMINS_ONLY\}/.test(text), /is-phone|_PHONE\b/.test(text)]
+      //? (2.0.0-player.61: told `allowed` - or, Library care, `admin` from its parts - by permission)
+      return [/\bdesktop\b/.test(text.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, '')), /if \(!(?:admin|allowed)\) \{\s*return \(/.test(text), /\{MANAGING_ADMINS_ONLY\}/.test(text), /is-phone|_PHONE\b/.test(text)]
     }),
     pages.map(() => [false, true, true, false]))
   check('...App hands each `admin` alone: Needs a look, Library care, the settings and the log',
-    [/<NeedsALook\s+admin=\{admin\}/.test(app), /<LibraryCare admin=\{admin\}/.test(app), /<ServerSettings admin=\{admin\}/.test(app), /<EventLog admin=\{admin\}/.test(app),
-      /desktop=\{desktop && admin\}/.test(app)],
+    //? (2.0.0-player.61: each its permission - Look after the library, Library care's parts, Settings and the log; People its own)
+    [/<NeedsALook\s+allowed=\{perms\.has\('library'\)\}/.test(app), /<LibraryCare parts=\{careParts\(perms\)\}/.test(app),
+      /<ServerSettings allowed=\{perms\.has\('server'\)\}/.test(app), /<EventLog allowed=\{perms\.has\('server'\)\}/.test(app),
+      /desktop=\{desktop && (?:admin|perms)/.test(app)],
     [true, true, true, true, false])
   //? a phone's sheet has no Shift: the Tags tab's note offers none
   const panel = code(read('app/EditPanel.tsx'))
@@ -2651,6 +2681,44 @@ console.log('\na better Library (2.0.0-player.59): one list per scope, asked in 
   check('...its keys: Up and Down between the entries drawn, Home and End to the ends',
     [/event\.key === 'ArrowDown' \? kept\[Math\.min\(kept\.length - 1, place \+ 1\)\]\s*: event\.key === 'ArrowUp' \? kept\[Math\.max\(0, place - 1\)\]\s*: event\.key === 'Home' \? kept\[0\]\s*: event\.key === 'End' \? kept\[kept\.length - 1\]/.test(strip)],
     [true])
+}
+
+console.log('\nPeople and permissions (2.0.0-player.61)')
+{
+  const PEOPLE_FILES = ['app/People.tsx', 'app/UnlockPeople.tsx', 'app/AddPerson.tsx', 'app/ResetPassword.tsx', 'app/RemovePerson.tsx',
+    'app/usePeople.ts', 'app/access.ts', 'api/people.ts', 'lib/people.ts', 'lib/permissions.ts']
+  check('People\'s files, the access store and the permissions\' rules reach no playback action, nor a context',
+    PEOPLE_FILES.map((file) => [actionsIn(code(read(file))), /useContext|PlayerContext|ActionsContext|usePlayer/.test(code(read(file)))]),
+    PEOPLE_FILES.map(() => [[], false]))
+  const app = code(read('app/App.tsx'))
+  const hook = code(read('app/usePeople.ts'))
+  const dialog = code(read('app/RemovePerson.tsx'))
+  check('People is a Managing page: its kind among the siblings, drawn from the pages memo, handed its permission and `live`',
+    [/page\.kind === 'people' \? peopleView\(tab\)/.test(app), /<People allowed=\{perms\.has\('people'\)\} live=\{managingLive\(tab\)\}/.test(app)], [true, true])
+  check('its state through latestOnly(), asked only as it shows and only with its permission',
+    [/const requests = useMemo\(latestOnly, \[\]\)/.test(hook), /getPeople\(request\.signal\)/.test(hook), /if \(!live \|\| !allowed\) return\s*ask\(\)/.test(hook)],
+    [true, true, true])
+  check('Remove\'s dialog: Escape cancels, Enter never confirms, focus kept inside, the button live only for the typed name',
+    [/if \(event\.key === 'Escape'\) \{/.test(dialog), /if \(event\.key === 'Enter'\) event\.preventDefault\(\)/.test(dialog),
+      /if \(event\.key !== 'Tab' \|\| !box\.current\) return/.test(dialog), /disabled=\{!ready \|\| busy\}/.test(dialog), /const ready = removeReady\(typed, person\.user\)/.test(dialog)],
+    [true, true, true, true, true])
+  const you = code(read('app/You.tsx'))
+  check('You\'s Managing rows each by its own permission - People\'s by People (and logins on)',
+    [['queue', 'onNeedsLook\\?\\.\\(\\)'], ['care', "onManaging\\?\\.\\('care'\\)"], ['people', "onManaging\\?\\.\\('people'\\)"], ['settings', "onManaging\\?\\.\\('settings'\\)"], ['log', "onManaging\\?\\.\\('log'\\)"]]
+      .map(([part, click]) => new RegExp(`\\{managing\\.${part} && \\(\\s*<button\\b[\\s\\S]{0,300}?${click}`).test(you)),
+    [true, true, true, true, true])
+  check('...and the managing words: by lib/permissions.ts managing, with logins on for People',
+    /const managing = managingOf\(access\.permissions, access\.on\)/.test(you), true)
+  check('...and nowhere a password kept past its answer: each form clears its password fields once answered',
+    [/setPassword\(''\)/.test(code(read('app/UnlockPeople.tsx'))), /setForm\(\{ user: '', name: '', password: '', again: '' \}\)/.test(code(read('app/AddPerson.tsx'))),
+      /setPassword\(''\)\s*setAgain\(''\)/.test(code(read('app/ResetPassword.tsx')))],
+    [true, true, true])
+  //? the app reads /me's permissions through one store: every reader redraws as an answer changes them
+  //? (review) the sign-in gate's answers too - a desktop asks /me nowhere else after App's first
+  check('/deadwax/me\'s permissions noted for every reader - App, You and the sign-in gate - and read through useAccess(), never per file',
+    [files.filter((file) => APP_SIDE(file) && /noteAccess\(/.test(code(read(file)))).sort(),
+      files.filter((file) => APP_SIDE(file) && /useAccess\(\)/.test(code(read(file)))).length >= 8],
+    [['app/App.tsx', 'app/You.tsx', 'app/access.ts', 'app/signInGate.tsx'], true])
 }
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

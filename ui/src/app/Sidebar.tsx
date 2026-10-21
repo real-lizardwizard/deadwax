@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'preact/hooks'
 
-import { SIDEBAR_CARE, SIDEBAR_LOG, SIDEBAR_PLAYLISTS, SIDEBAR_QUEUE, SIDEBAR_SETTINGS, SIDEBAR_TOP, type SidebarId, type SidebarItem } from '../lib/appFrame'
+import { SIDEBAR_CARE, SIDEBAR_LOG, SIDEBAR_PEOPLE, SIDEBAR_PLAYLISTS, SIDEBAR_QUEUE, SIDEBAR_SETTINGS, SIDEBAR_TOP, type SidebarId, type SidebarItem } from '../lib/appFrame'
 import { needsLookLabel } from '../lib/needsLook'
+import { managing as managingOf, ALL, type Managing } from '../lib/permissions'
 import { badgeLabel, badgeText } from '../lib/requestsView'
 import { SEARCH_MAX_CHARS } from '../lib/searchQuery'
 import { searchWords } from '../lib/searchResults'
@@ -30,11 +31,12 @@ import { onSearchText, searchText, submitSearch, typeSearch } from './searchBox'
  * page (`onPlaylist`), and is the current one while its page is on top (`currentPlaylist`) - a playlist page whose
  * playlist isn't listed makes All playlists current. While the list isn't known, or failed, All playlists alone.
  *
- * MANAGING (shown unless deadwax says this user isn't an admin - `admin`: App asks /deadwax/me as
- * the desktop frame shows; with logins off, everyone is, as You's row, which asks the same): "Needs a
- * look" first (2.0.0-player.25), the review queue's page, with how many albums need one
- * (`needsLook`, app/useQueueSummary.ts - no badge while that isn't known, never a 0 over an unknown);
- * then "Library care" (2.0.0-player.42), Rescan and the bulk runs; then "Settings" and "Log"
+ * MANAGING (2.0.0-player.61: each item by its permission - `managing`, lib/permissions.ts, from what App's
+ * /deadwax/me said as the desktop frame shows; with logins off, everyone has all of them, as You's rows, which
+ * ask the same - and the group gone with none): "Needs a look" first (2.0.0-player.25), the review queue's page,
+ * with how many albums need one (`needsLook`, app/useQueueSummary.ts - no badge while that isn't known, never a
+ * 0 over an unknown); then "Library care" (2.0.0-player.42), Rescan and the bulk runs; then "People"
+ * (2.0.0-player.61), Navidrome's accounts, a Navidrome admin's with logins on; then "Settings" and "Log"
  * (2.0.0-player.33), the server's settings and the event log as pages of the app - no unread count on
  * the Log, which would need its stream held open; then the link to the main page (James: "Managing
  * links to / for now"), which a desktop no longer needs for anything (an artist's pictures and re-filing
@@ -50,7 +52,7 @@ export function Sidebar({
   browse = [],
   personal = false,
   arriving,
-  admin = true,
+  managing = managingOf(ALL),
   needsLook = null,
   playlists = [],
   currentPlaylist = null,
@@ -68,8 +70,8 @@ export function Sidebar({
   personal?: boolean
   /** downloads on their way: Requests' count, as the phone tab's badge */
   arriving: number
-  /** deadwax's /me says this user is an admin (true until it has answered, as You's rows) */
-  admin?: boolean
+  /** (2.0.0-player.61) which Managing items this person's permissions open - lib/permissions.ts managing */
+  managing?: Managing
   /** how many albums need a look (null: not known yet) - Needs a look's count */
   needsLook?: number | null
   /** (2.0.0-player.58) the playlists the group lists, by name - yours, then shared with you (lib/playlists.ts sidebarPlaylists) */
@@ -194,16 +196,17 @@ export function Sidebar({
         </ul>
       </section>
 
-      {admin && (
+      {managing.any && (
         <section class="app-side-group" aria-labelledby="app-side-managing">
           <h2 id="app-side-managing" class="app-side-label">
             Managing
           </h2>
           <ul class="app-side-list">
-            {item(SIDEBAR_QUEUE)}
-            {item(SIDEBAR_CARE)}
-            {item(SIDEBAR_SETTINGS)}
-            {item(SIDEBAR_LOG)}
+            {managing.queue && item(SIDEBAR_QUEUE)}
+            {managing.care && item(SIDEBAR_CARE)}
+            {managing.people && item(SIDEBAR_PEOPLE)}
+            {managing.settings && item(SIDEBAR_SETTINGS)}
+            {managing.log && item(SIDEBAR_LOG)}
             <li>
               <a
                 class="app-side-item"

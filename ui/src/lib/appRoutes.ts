@@ -26,6 +26,8 @@
  *                                                      as the queue page is
  *   #/<tab>/care/library                               Library care (2.0.0-player.42): Rescan and the
  *                                                      bulk runs - pushed on You, one page, as they are
+ *   #/<tab>/people/all                                 People (2.0.0-player.61): Navidrome's accounts -
+ *                                                      pushed on You, one page, as they are
  *   #/<tab>/playlists/all                              the Playlists page (2.0.0-player.58) - pushed on the
  *                                                      Library, one page whatever id the address gives
  *   #/<tab>/playlist/<id>                              one playlist, by Navidrome's playlist id
@@ -74,9 +76,9 @@ export const TAB_LABELS: Readonly<Record<Tab, string>> = {
  *  Library care (2.0.0-player.42), (2.0.0-player.58) the Playlists page and one playlist - page kinds
  *  of their own, never one of the Library's views - or (2.0.0-player.59) a section of the Library, one of its
  *  views as a page of its own: a phone's way to Albums, Artists and the rest from the Library's root. */
-export type PageKind = 'album' | 'group' | 'artist' | 'queue' | 'settings' | 'log' | 'care' | 'playlists' | 'playlist' | 'section'
+export type PageKind = 'album' | 'group' | 'artist' | 'queue' | 'settings' | 'log' | 'care' | 'people' | 'playlists' | 'playlist' | 'section'
 
-const PAGE_KINDS: readonly PageKind[] = ['album', 'group', 'artist', 'queue', 'settings', 'log', 'care', 'playlists', 'playlist', 'section']
+const PAGE_KINDS: readonly PageKind[] = ['album', 'group', 'artist', 'queue', 'settings', 'log', 'care', 'people', 'playlists', 'playlist', 'section']
 
 /** (2.0.0-player.59) A section's ids: exactly the Library's views (lib/appFrame.ts LibraryPick - routes.sim holds
  *  the two equal). The Playlists page and a playlist's stay page kinds of their own. */
@@ -100,18 +102,22 @@ export const LOG_PAGE: Page = { kind: 'log', id: LOG_ID, label: 'Log' }
 export const CARE_ID = 'library'
 export const CARE_PAGE: Page = { kind: 'care', id: CARE_ID, label: 'Library care' }
 
+/** People (2.0.0-player.61): Navidrome's accounts - one page, whatever id an address gives it. */
+export const PEOPLE_ID = 'all'
+export const PEOPLE_PAGE: Page = { kind: 'people', id: PEOPLE_ID, label: 'People' }
+
 /** The Playlists page (2.0.0-player.58): one page, whatever id an address gives it. A playlist's own page is
  *  `{ kind: 'playlist', id: <Navidrome's id>, label: <its name> }`, so a page pushed over it says the name. */
 export const PLAYLISTS_ID = 'all'
 export const PLAYLISTS_PAGE: Page = { kind: 'playlists', id: PLAYLISTS_ID, label: 'Playlists' }
 
-/** What a Managing page says, in place of itself, to someone deadwax says isn't its admin (2.0.0-player.47:
- *  the four pages are on both frames now - until then a phone's note stood here, pointing at the main
- *  page). With logins off everyone is the admin, so nobody sees it yet. */
-export const MANAGING_ADMINS_ONLY = "Only deadwax's admin can open this page."
+/** What a Managing page says, in place of itself, to someone without its permission (2.0.0-player.47: the pages
+ *  are on both frames - until then a phone's note stood here, pointing at the main page; 2.0.0-player.61: per
+ *  page, by its permission - lib/permissions.ts). With logins off everyone is the admin, so nobody sees it. */
+export const MANAGING_ADMINS_ONLY = "You don't have permission for this page."
 
 /** The Managing pages that are one page each, by kind: an address's id is made this one. */
-const ONE_PAGE: Partial<Record<PageKind, string>> = { settings: SETTINGS_ID, log: LOG_ID, care: CARE_ID, playlists: PLAYLISTS_ID }
+const ONE_PAGE: Partial<Record<PageKind, string>> = { settings: SETTINGS_ID, log: LOG_ID, care: CARE_ID, people: PEOPLE_ID, playlists: PLAYLISTS_ID }
 
 /** A page pushed on a tab. `label` names it on the back button of a page pushed over it - never
  *  part of the address, and never part of what makes two pages the same one. `release` is a group

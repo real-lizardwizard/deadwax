@@ -1,10 +1,11 @@
 import asyncio
 import json
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
 from src.logger import LOG_BOOT, logger, recent_log, register_sse_client, unregister_sse_client
+from src.users import current_user, permissions
 
 router = APIRouter()
 
@@ -18,8 +19,29 @@ async def recent():
     return {"lines": lines, "last": last, "boot": LOG_BOOT}
 
 
+def still_allowed(request: Request, user: str) -> bool:
+    """
+    (2.0.0-player.61 review) Whether the person a stream was opened for may still read the log: their session still
+    stands, as the same person, with Settings and the log. The router's guard runs once, as the stream opens - and
+    since .61 a session, a role and a permission can all go while it stays open (a reset, a removal, a demotion in
+    Navidrome, an unticked box), so the stream asks again before every line and keepalive and closes once the
+    answer is no. SYNCHRONOUS (a session is read from SQLite at most every minute, a permissions table that failed
+    at most every minute): the stream asks it in a worker thread.
+    """
+    try:
+        return current_user(request) == user and "server" in permissions(request, user)
+    except HTTPException:
+        return False
+    except Exception as e:
+        #? a database that can't be read is no answer at all: closed, as every request would be refused (503)
+        logger.warning(f"the event stream couldn't check its reader is still let in, so it closed ({type(e).__name__})")
+        return False
+
+
 @router.get("/interface_logs")
 async def interface_logs(
+    request: Request,
+    user: str = Depends(current_user),
     #? the last line the page has: the kept lines after it are sent first (the app's Log page). The
     #? main page sends neither, and gets the stream as it always has: only what is logged from now
     after: int | None = Query(default=None, ge=0),
@@ -46,9 +68,13 @@ async def interface_logs(
                     #? can come again: anything above it is new, and the floor never needs moving
                     if seq is not None and seq <= sent:
                         continue
-                    yield f"data: {event}\n\n"
+                    chunk = f"data: {event}\n\n"
                 except asyncio.TimeoutError:
-                    yield ":\n\n"  # keepalive
+                    chunk = ":\n\n"  # keepalive
+                #? (2.0.0-player.61 review) asked again before anything more goes out - see still_allowed
+                if not await asyncio.to_thread(still_allowed, request, user):
+                    return
+                yield chunk
         finally:
             unregister_sse_client(client_queue)
 

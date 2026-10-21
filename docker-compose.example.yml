@@ -142,13 +142,13 @@ services:
       #- TRUSTED_ORIGINS=https://music.example.com
       #
       # Optional - logins (off unless AUTH_MODE=on). Everyone then signs in with their own
-      # Navidrome account (NAVIDROME_URL above is needed), and only the Navidrome users named in
-      # DEADWAX_ADMINS can edit the library, see the review queue and the log, or change settings.
+      # Navidrome account (NAVIDROME_URL above is needed). Navidrome's admins are deadwax's admins:
+      # only they - and anyone an admin gives a permission to, in You > People - can edit the
+      # library, see the review queue and the log, or change settings.
       # DEADWAX_SECRET_KEY encrypts the logins deadwax keeps - at least 32 characters, from
       # `openssl rand -hex 32` - and is better kept in .env. DEADWAX_ADMIN_PASSWORD, optional,
-      # signs in `admin` with no Navidrome, for when it is down. Environment only, all four.
+      # signs in `deadwax` with no Navidrome, for when it is down. Environment only, all three.
       #- AUTH_MODE=on
-      #- DEADWAX_ADMINS=your-navidrome-user
       #- DEADWAX_SECRET_KEY=
       #- DEADWAX_ADMIN_PASSWORD=
       #

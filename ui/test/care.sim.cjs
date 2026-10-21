@@ -164,11 +164,15 @@ const classed = (name, within) => find(byClass(name), within)
 const buttons = (within) => find((node) => node.type === 'button', within)
 const button = (label, within) => buttons(within).find((node) => words(node).trim() === label)
 
+//? (2.0.0-player.61) Library care is handed its parts by permission: `admin` here stands for an admin's - all of them -
+//? or anyone else's, none
+const PARTS = (admin) => ({ shown: admin, rescan: admin, held: admin, bulk: admin })
 function mount(component, props) {
   const render = hooks.root(component)
   const all = { ...props }
   const draw = (more = {}) => {
     Object.assign(all, more)
+    if ('admin' in all) all.parts = PARTS(!!all.admin)
     tree = expand(render(all))
     render.commit()
     tree = expand(render(all))

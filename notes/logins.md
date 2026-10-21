@@ -82,7 +82,9 @@ fails closed.
   `KEY_CHANGED`; Navidrome down ends NOTHING - it is proof of nothing.
 - **Admins** are `DEADWAX_ADMINS` (comma-separated, lowercased) plus the break-glass admin
   (`is_admin`). Navidrome's adminRole is never read (the tests' fake sets it for ethan to prove it).
-- **Break-glass**: `DEADWAX_ADMIN_PASSWORD` compared in constant time (SHA-256 digests through
+  **(superseded in 2.0.0-player.61 - Navidrome's admin flag is deadwax's role now; DEADWAX_ADMINS is
+  ignored. See "Managing accounts - People, and Navidrome's admins as deadwax's".)**
+- **Break-glass** (its name `deadwax` since 2.0.0-player.61 - `admin` until then): `DEADWAX_ADMIN_PASSWORD` compared in constant time (SHA-256 digests through
   `hmac.compare_digest`, so neither length nor prefix shows), then a cookie `"b." + Fernet token`
   (padding stripped, so the cookie isn't quoted) holding the fixed user, a nonce and an HMAC of the
   password - needing neither Navidrome nor the database. Fernet's own timestamp bounds it to 12 hours
@@ -108,7 +110,8 @@ fails closed.
   stored). The sign-in answers what `/deadwax/me` answers. Logged: who signed in, a refused name
   (truncated to 60 characters), who the re-check signed out - to the event log, an admin's.
 - **What a session's end cuts, and what it doesn't**: a response already streaming when its session
-  ends - the log's event stream, a song's one response - runs on; every request after is refused,
+  ends - a song's one response - runs on; every request after is refused (since 2.0.0-player.61's review the
+  log's event stream is not one of them: it asks again before each line and closes - see "Managing accounts"),
   the player's included. So the music does NOT wait under the sign-in screen: the song playing goes on
   only as far as the device has it (the audio element asks for more by range; the gapless stream
   fetches pieces of a few seconds, and its next piece's 401 is `classifyAnswer`'s "fatal", leaving the
@@ -131,7 +134,9 @@ fails closed.
   sign the browser into an account of its choosing). Logins close the DNS-rebinding gap it had (see "The
   1.0.1 fixes"): a rebound page is on the attacker's host name, which deadwax's cookie isn't for.
 
-**Who can do what** (the plan's table; Ethan is a user):
+**Who can do what** (the plan's table; Ethan is a user) - **(superseded in 2.0.0-player.61 - Navidrome's
+admin flag is deadwax's role now, and an admin can give an ordinary person permissions by category: the
+inventory in "Managing accounts - People, and Navidrome's admins as deadwax's")**:
 
 | action | user | admin |
 | --- | --- | --- |
@@ -1326,3 +1331,285 @@ labels). **NOT verified**: the page read by someone setting deadwax up for other
 - **getting-started's logins block** still had `DEADWAX_SECRET_KEY=...` under `environment:`, the trap the
   first round took out of sharing.md's step 2; it now says the key goes in `.env` only and leaves a comment
   in its place.
+
+### Managing accounts - People, and Navidrome's admins as deadwax's (2.0.0-player.61)
+
+James (2026-10-21): "Can we integrate creating new accounts from an admin account?" - all four: create an
+account, reset someone's password, remove an account, make someone an admin. Then, the same day, three
+decisions binding over everything: **changes are made as whoever is signed in** ("if I'm logged in, it uses my
+account, but if Ethan is logged in, it'll use his account" - never `NAVIDROME_USER`); **roles work as
+Navidrome's do** ("Admins have access to admin features, regular users don't" - so deadwax's admin role IS the
+person's own Navidrome admin flag, replacing `DEADWAX_ADMINS` and step 3's "Navidrome's own admin flag isn't
+used"); and **permissions** ("For each user, maybe 4 or 5 or so categories of checkboxes for permissions").
+James keeps two Navidrome accounts: `james` (ordinary, which he listens as) and `admin` (Navidrome's admin),
+which he signs in to deadwax as to manage - so **break-glass is renamed `deadwax`**, freeing `admin` to sign
+in as itself. He approved all 30 of the spec's choices ("Go"). One slice, in the order Part 1 (the role), Part
+3 (permissions and the guard), Part 2 (People) - one version, because each part rewrites the same guards,
+route table, walk tests, app gating and docs.
+
+**What Navidrome 0.64.2 offers** (read from its source at work/design57/navidrome/nd-v0.64.2, and deluan/rest
+at 47b21f30cc12 - never watched against a real Navidrome):
+
+- Subsonic can't manage accounts: `createUser`, `updateUser`, `deleteUser`, `changePassword` answer 501
+  (`server/subsonic/api.go:231`). It does say who is an admin: `getUser`'s `adminRole` is `IsAdmin`
+  (`server/subsonic/users.go:19`) - and deadwax asks `getUser` as each person at every sign-in and re-check.
+- The **native API** (its web UI's own, react-admin's JSON-server dialect, undocumented, unversioned) takes a
+  JWT in `X-ND-Authorization: Bearer`, and only `POST /auth/login` with a **password** mints one
+  (`server/auth.go:51-95`): `{id, name, username, isAdmin, token, subsonicSalt, subsonicToken}`. deadwax keeps
+  no password, and its kept Subsonic token can't sign in there - so **People is unlocked with the person's own
+  password**. `/auth/login` is limited to **5 requests per 20 s per client address, every request counted**
+  (`conf/configuration.go:1043-1044`, `server/middlewares.go:237`) - one budget for everyone at deadwax's
+  address. Every authenticated answer refreshes the JWT in its `X-ND-Authorization` header; a password write
+  bumps `token_epoch`, killing every JWT of the account; admin-ness is read from the database per request.
+- `/api/user` (`server/nativeapi/native_api.go:70`, rules in `persistence/user_repository.go`): list, create,
+  delete an admin's; get and put an admin's or the user's own. **A PUT replaces the whole record** (fields not
+  sent are blanked) and **a PUT to a missing id INSERTS** - so every change GETs first and PUTs the record back
+  whole. Names unique whatever their case; no name or password rule; every save of an admin gives it every
+  library; a new non-admin gets the `default_new_users` libraries; DELETE cascades (plays, stars, every
+  playlist they own, shares, scrobbler links). Nothing stops deleting or demoting yourself or the last admin.
+
+**Part 1 - deadwax's admins are Navidrome's admins.** `auth.check_login` returns `(name, admin)`, `admin`
+being `adminRole is True` (fail closed: missing, a string, null - not admin). The role is kept on the session
+row (`sessions.admin`, added by hand in `JobStore.init` with every `checked_at` set to 0 as it is made, so the
+first re-check pass - a minute after the start - reads everyone's flag), on each `_Held`, and in `auth._roles`
+(written whenever a row is read, at a sign-in, by the re-check and by People's `set_role`); `users.is_admin` is
+`local` with logins off, else break-glass or `auth.role(user)`. A sign-in creates its session with the flag and
+`set_role`s the person's other sessions into line; the re-check `set_role`s on a change and logs it ("ethan is
+now a Navidrome admin, so deadwax's admin too"); Navidrome not answering changes nothing. The take-over and the
+seed key on the flag (`if admin:` at a sign-in, `held.admin` in `user_for`) - so on James's install, where
+`james` took over `local` under `DEADWAX_ADMINS` at .48 and the store was seeded once, **`admin`'s first sign-in
+takes over nothing and is seeded nothing** (test_logins' upgraded-install test). `DEADWAX_ADMINS` left
+`Config`, `LOGIN_SETTINGS` (three now), `_logins_rows` and the compose example; still set, start-up logs
+`DEADWAX_ADMINS_IGNORED` once (error, the event log). **Break-glass is `deadwax`**, `RESERVED_NAMES = {"local",
+"deadwax"}`; an old break-glass cookie names `"u": "admin"`, which `break_glass_user` refuses, so it ends at its
+next request - a `b.` cookie never reaches the session table, so it can't be read as Navidrome's `admin`.
+
+**Part 3 - permissions.** An admin has every permission (`users.PERMISSIONS`); an ordinary person has `request`
+unless an admin took it away, plus what an admin ticked. The inventory - every route an admin alone could use
+until then falls in exactly one category:
+
+| key | shown as | default (ordinary user) | server: routes and checks | app: what shows |
+| --- | --- | --- | --- | --- |
+| `request` | **Get albums** - search Soulseek and download | **on** | `POST /deadwax/download/find_candidates`, `/enqueue`, `/jobs/{job_id}/join`, `/jobs/{job_id}/retry`, `/jobs/{job_id}/retry_same` | Get (an album page, Search's rows, Other pressings, the release-group page), the Sources sheet, Next peer, Ask again; without it: "Getting albums is off for you - ask an admin." in Get's place |
+| `edit` | **Edit albums** - tags, covers, CD art, lyrics, artist pictures, apply a release | off | `POST /deadwax/library/retag/preview`, `/retag/apply`, `/tags/preview`, `/tags/apply`, `/art/fetch`, `/lyrics/fetch`, `/disc_art/fetch`, `/artist/images/preview`, `/artist/images/apply`, `/artist/search` | the Edit panel's release editor, tag editor and Get cover / CD art / lyrics; Library care's bulk runs; the artist page's Artist images… and Which artist is this? |
+| `library` | **Look after the library** - delete albums, move an artist's albums, Needs a look, Library care, Held by nobody | off | `POST /deadwax/library/delete`, `GET /library/deletion_summary`, `POST /library/artist/refile/preview`, `/artist/refile/apply`, `POST /library/rescan`, `GET /library/queue/new_imports`, `GET /library/queue/summary`, `POST /library/queue/ignore`, `/queue/unignore`, `/queue/reviewed`, `GET /library/held`, `POST /library/held/flags/{flag_id}/add`, `/flags/{flag_id}/dismiss` | the Edit panel's Delete; Move albums to …; Needs a look and its count; Library care's Rescan and Held by nobody; the new-imports badge |
+| `downloads` | **Everyone's downloads** - see who asked for what, cancel or retry anyone's, clear everyone's finished | off | no route of its own. In download.py: `/jobs` lists everyone's (`everyone=`); `_job_for` reaches someone else's job (cancel, retry, retry_same); cancel cancels for everyone instead of leaving; `/jobs/clear` clears everyone's finished; `describe_job`'s view ("Asked by ethan") | Requests' everyone view, "Asked by", the cancel-for-everyone question |
+| `server` | **Settings and the log** | off | `GET`/`PUT /deadwax/settings` and `/settings/` (both), `GET /settings/musicbrainz_cache`, `POST /settings/musicbrainz_cache/clear`, `GET /interface_logs/recent`, `GET /interface_logs/interface_logs` | Server settings, Log |
+| `people` | **People** - accounts in Navidrome | **follows the Navidrome admin flag, not a checkbox** | every `/deadwax/people/*` route | People |
+
+`users.require(permission)` (cached per permission, so a route's guard can be named - `.permission`) replaces
+`require_admin`: 403 in `NEEDS`' words ("That needs Edit albums, which an admin hasn't given you. You're signed
+in as ethan." - People's own: "That's People, which only Navidrome's admins can use."). `users.can` is the
+same check inside download.py (its four `is_admin`s). `src/permissions.py` keeps the table (`permissions`:
+only the DIFFERENCES from the default, `PRIMARY KEY (user, permission)`, each row with the Navidrome account id
+it was given for, who changed it and when) in memory, loaded in the lifespan with logins on - and lazily, per
+database, by the first request - written database first then memory, so a change is in force at the person's
+next request. **Fail closed**: a table that can't be read gives ordinary people nothing, not even `request`,
+logged, and is read again at most every 60 s. **Bound to the account, not the name**: Subsonic's getUser gives
+no id, so at a sign-in of someone with a GRANT row deadwax spends one `/auth/login` as them (the password is in
+hand; `navidrome_admin.login`, through deadwax's 4-per-20-s gate) and keeps the id on the session
+(`sessions.navidrome_id`, `_Held`, `PlayerLogin`), throwing the JWT away. Another id: the grant rows are dropped
+and logged ("…it was removed and made again"). Can't ask: the id stays NULL and grants aren't honoured on that
+session (`/me`'s `permissions_unverified`, You's line); a restriction applies by name always. An admin's
+unlocked People list heals NULL ids (`store.heal_session_ids`, `auth.note_account_id`) - only of sessions begun
+since the account was made (its `createdAt`; none healed without a usable one) - and drops grants listed under
+another id. Promoting someone keeps their rows (irrelevant while admin, back if demoted). `/me` and the
+sign-in's answer gain `permissions` (in `PERMISSIONS` order) and `permissions_unverified`; logins off, `local`
+has them all (test_me's answer changed on purpose).
+
+**Part 2 - People** (`src/routes/people.py`, `src/people.py` pure, `src/api/navidrome_admin.py`): a Managing
+page after Library care (You's row, the sidebar's item, `#/you/people/all`), with logins on and a Navidrome
+sign-in only (logins off: GET says why, writes 409; break-glass: the line, writes 409). Locked until **Unlock**:
+the password is checked against the session's kept login first, in constant time (`auth.password_matches`),
+counted in the sign-in throttle (3 a minute), never put to Navidrome when wrong; then one `/auth/login` as the
+session's own name (as typed at its sign-in), the answer's `username` checked against it. A 401 after the local
+check ends the session (`LOGIN_GONE`); `isAdmin` false drops the role at once. The JWT is held PER SESSION in
+memory (`navidrome_admin._unlocked`), 15 minutes since last used, ended by Lock, the session's end
+(`auth._note_ended` calls `forget`), a restart, Navidrome's 401, and a NAVIDROME_URL that isn't the one it was
+got from (the base checked on every use); each answer's refreshed JWT replaces it. The native client is its own
+httpx client, no redirects followed, a fixed list of six operations, imported only by routes/people.py and
+auth.py (app.py closes it). Writes run one at a time (an asyncio.Lock per event loop), at most 10 per admin per
+minute (429 with Retry-After, nothing sent); each re-reads its target (`GET /api/user/{id}`, the page's `user`
+checked against it, `STALE` otherwise; a page-sent id matched against `^[A-Za-z0-9-]{1,64}$`) and checks the
+guards (`people.refusals`: logins off / break-glass; NAVIDROME_USER; yourself; the last Navidrome admin, against
+a fresh list - belt and braces, unreachable through People today; admins may change admins, as in Navidrome).
+**Create** sends exactly `{userName, name, email: "", isAdmin: false, password}` for a lowercased name matching
+`^[a-z0-9][a-z0-9._-]{0,31}$`, never reserved, never one deadwax still keeps anything for (`keeps_anything` -
+a new person must not inherit a library, pins or permissions), a display name 0-64 and a password 8-128, twice,
+not the name; then one getUser as the new account proves the password took. **Reset** PUTs the record exactly as
+GET answered it plus `password`, proves it took, then ends every session of theirs at once (memory and
+database: `auth.end_user_sessions`, `PASSWORD_RESET` told) and marks their kept login dead
+(`credential_dead_for`) - so neither the re-check, the player nor the star worker tries the old token from
+deadwax's address (Navidrome blocks a name after 5 failures in 20 s, right passwords included). **Make /
+unmake admin** PUTs the record with only `isAdmin` changed; the PUT's answer must show it (else `unknown_shape`,
+role unchanged), then `auth.set_role` - in force at their next request. **Remove** needs the name typed (the
+server checks `confirm == user`), GETs, DELETEs, then - never for a reserved name - ends their sessions in memory
+(`ACCOUNT_REMOVED`) and `store.forget_person` in ONE immediate transaction: sessions first (so
+`live_credentials` can't copy one back), user_credentials, library_membership, pins, user_prefs, job_requests,
+permissions. A download only they wanted carries on and files for nobody (`grant_for` finds no requester); the
+everyone view says "Nobody is waiting for this any more" (`lib/perPerson.ts NOBODY_TEXT`). A failed transaction
+after Navidrome's 200 is a 500 in words, the name then under **Known only to deadwax** (`known_users` minus the
+fresh list), whose **Forget** runs the same transaction - only for a name a FRESH list lacks, never reserved.
+**Permissions** (`POST /{id}/permissions`, five declared bools, all five required - one left out is the People
+422, never a restriction - no `people`) rewrites the rows to the
+differences, bound to the fresh record's id; refused for an admin, yourself, NAVIDROME_USER, a reserved name.
+Every request model is `extra="forbid"` with plain str/bool (every check in deadwax's words); a People 422
+answers `PEOPLE_FORM`, never FastAPI's list (which echoes `input` - a password). Refusals answer
+`{detail, kind, fix}` (`people.Refused`, app.py's handler); `kind: "locked"` brings the unlock form back
+(`api/http.ts`'s ApiError carries `kind`). Logged under the acting admin's name, never a password, JWT, token
+or body. **Every page refuses to be framed** (`RefuseFrames`, plain ASGI: `X-Frame-Options: DENY` and
+`frame-ancestors 'none'` on every text/html answer, added beside any policy already there - GuardMedia's sandbox
+on a media route stays - never in its place).
+
+**The app.** `app/access.ts` holds what `/me` last said (permissions, logins on, unverified) - the session's
+word until then (`session.permissionsUntilAsked`: the session's list, everything with logins off) - and
+`useAccess()` redraws every reader on a change, one object while nothing changed so App's pages memo holds;
+App, You and the sign-in gate note each `/me` answer (the gate's re-asks are a desktop's only ones after the first). `lib/permissions.ts` (pure, permissions.sim.cjs) decides each part:
+Managing's rows (`managing`, People only with logins on), Library care's parts (`careParts` - Rescan and Held by
+nobody `library`, the runs `edit`), the album page's Edit and its tabs (`albumEdit`, `albumEdit.ts editTabs`),
+the artist page's managing (`artistManaging`), Get (`gets` - Search's rows, the artist page's rows, the album
+you don't have, Next peer and Ask again; its words once in Get's place), the queue count (`asksQueueSummary` -
+`askQueueSummary` asks nothing without it). The managing pages are handed `allowed` (Library care its
+`parts`), and say `MANAGING_ADMINS_ONLY` ("You don't have permission for this page.") without it. People:
+`People.tsx` (the page, each row's actions with their refusals in words, Permissions' checkboxes with their
+warnings and **Save permissions**, Known only to deadwax with Forget), `UnlockPeople.tsx` (a hidden username
+field holding the session's name for password managers, `current-password`), `AddPerson.tsx`,
+`ResetPassword.tsx` (`new-password`, Show), `RemovePerson.tsx` (a real dialog: Escape cancels, Enter never
+confirms, focus kept inside, a sheet from a phone's foot clear of the home bar, live only for the exact name),
+`usePeople.ts` (through latestOnly), `api/people.ts`, `lib/people.ts` (pure, people.sim.cjs - the server's
+numbers, held to src/people.py by test_people). Every password field says, on plain http, that it crosses the
+network readable. Fields cleared on success, kept on a refusal; passwords dropped once answered. No
+`confirm()`; nothing in it plays (app-rules.sim.cjs). CSS: app.css's People section, tokens only, before the
+phone section.
+
+**Threats, and the answers** (the spec's 37, the review's checklist): anyone on the network managing accounts -
+logins on only, `require("people")`; a non-admin reaching People - `people` is the Navidrome flag, never a
+tick, and Navidrome refuses a non-admin's JWT anyway; acting as someone else in Navidrome - every call carries
+the signed-in person's own JWT from their own password, the name the session's, JWTs per session, the fake
+checking each JWT's subject; a role outliving Navidrome's - re-read every re-check, at once from People, and
+Navidrome re-checks per native call, unknown is not admin; a stale config granting a role - DEADWAX_ADMINS gone
+and said; losing every admin - break-glass needs neither Navidrome nor the database, and People can't demote or
+remove you or the last admin; deadwax cutting itself off - NAVIDROME_USER untouchable; an unattended unlocked
+device - per session, 15 minutes, Lock, a typed name for Remove, everything logged; password guessing through
+Unlock - checked locally first, counted in the throttle; exhausting the shared login budget - the local check,
+deadwax's 4-per-20-s gate, nothing retried, JWTs reused; a name blocked after a reset - sessions ended and the
+kept login killed at once; the admin flag set by accident - create always sends false, make/unmake its own
+confirmed step saying what it gives, a reset round-trips the flag; a partial PUT wiping an account, and a PUT
+re-creating a deleted one - GET first, whole record, stop on 404; a stale page acting on the wrong person - the
+name checked against the fresh record, ids against a pattern; name reuse inheriting what deadwax kept - Remove
+forgets it all, Create refuses leftovers, Forget for the rest; passwords on the wire (plain http) - said under
+every field; passwords in logs or answers - JSON bodies only, no pydantic constraint, the People 422 handler,
+httpx at WARNING, caplog-tested; the JWT leaking - memory only, never logged or answered, base checked, no
+redirects; what deadwax holds now - no new stored secret, an admin's password through memory once, a JWT per
+unlocked session for at most 15 idle minutes (48 h on Navidrome's side if stolen), and Navidrome's `admin`
+signing in means deadwax keeps an admin's Subsonic token (Subsonic can't manage accounts, 501); cross-site
+requests - the same-origin guard, SameSite=Strict, JSON POSTs; clickjacking - frames refused on every page,
+Remove's typed name; bulk damage - 10 writes a minute, one at a time; the native API changing - shape checks,
+one getUser to prove a password took, the PUT's answer to prove a flag took, `unknown_shape` in words, nothing
+else depending on it, a version note (`TESTED_NAVIDROME = '0.64'`); look-alike names - text, truncated to 64,
+deadwax-made ones `[a-z0-9._-]`; over-collection - no email or login times sent, nothing while locked; giving
+yourself a permission - only through People, never your own row, the target re-read; a remade account
+inheriting permissions - bound to the id; the app's hiding mistaken for protection - every category enforced
+per route, the walk proving it; one category opening another's routes - the walk's matrix; a permission
+outliving its removal - in force at the next request; the table unreadable - fail closed; near-admin categories
+given lightly - the warnings under those ticks; Get bypassed through the main page - enforced on the routes;
+who asked seen by others - only with Everyone's downloads; the sign-in's id read spending the budget - only for
+a person with a grant, through the gate, the grants waiting when it's full; an old `admin` break-glass cookie -
+refused by its own check, never in the session table.
+
+**After review (2.0.0-player.61)** - twenty findings, sixteen once duplicates are merged, all real; each fix has a test
+that fails without it:
+
+- **A session row under a reserved name never stands.** Before .61 `deadwax` was an ordinary name - the natural one
+  for NAVIDROME_USER's account - and its 30-day session rows would have read, after the rename, as the break-glass
+  admin's (`is_admin` matches the name). `auth._session` ends such a row at its first request (`RESERVED_SESSION`:
+  "deadwax keeps that user name for itself now..."), the re-check ends one without asking Navidrome, and the
+  upgrade's one-time step (`store._rename_break_glass`, run as `sessions` gains `admin`) deletes `local`'s and
+  `deadwax`'s sessions and kept logins. The same step moves what break-glass kept under `admin` - pins, Getting
+  albums settings, the downloads it asked for - to `deadwax`, so Navidrome's own `admin` takes over none of it, and
+  an open download break-glass asked for still files for nobody (a row `deadwax` already has wins). What an old
+  Navidrome account called `deadwax` kept otherwise (pins, a library) stays under the name and is break-glass's to
+  see; `known_users` hides reserved names, so it can't be Forgotten.
+- **NAVIDROME_URL is an admin's alone** (`settings.ADMINS_ONLY`): since .61 it is where every person's own login
+  goes and what says who the admins are, so someone given Settings and the log who pointed it elsewhere would have
+  collected every login (the re-check), made themselves an admin (the fake's adminRole) and caught an admin's
+  password at People's next unlock. The tab shows it locked for them in those words; a save that would change it,
+  a revert included, is a 400 in them; saving the address it already is passes. The rest stays theirs (SLSKD_URL
+  can't leak its key: moving it needs the key typed again). **NAVIDROME_USER and NAVIDROME_PASSWORD joined it
+  (second review)**: `people.refusals` answers SHARED_ACCOUNT for every change to NAVIDROME_USER's account, before
+  anything else, so a person with `server` who set it to their own account would have put themselves past People -
+  their grants untickable there until someone noticed the setting - and had the stream cache, the scan wait, the
+  Not-in-Navidrome listing and break-glass's player all asking as them. Same lock, same 400, their own words
+  (`_SHARED_ACCOUNT_LOCK`). Keeping `permissions` out of the SHARED_ACCOUNT guard instead was the alternative; the
+  lock also stops the second half, which that wouldn't.
+- **The log's open stream asks again before each line and keepalive** (`interface_logs.still_allowed`, in a
+  worker thread): same session, same person, `server` still theirs - and closes once not (an unticked box, a
+  reset or removal, a demotion).
+- **A role People set is never undone by an older answer**: a role clock (`auth.role_mark`, `set_role(since=)`,
+  writes one at a time under `_role_write`) - the re-check and a sign-in take a mark before asking Navidrome and
+  write nothing when the role was set after it (a sign-in's new session then takes the newer role); `_session`
+  takes one before reading its row and holds the map's newer word.
+- **The heal binds by time**: `heal_session_ids(user, id, made_at)` heals only sessions begun since the account was
+  made (`people.made_at`: Navidrome's `createdAt`, RFC 3339 up to nine digits, Go's zero time and anything else
+  None - nothing healed), so a remade account never gets an earlier one's session.
+- **Everyone's downloads is asked in a worker thread** in the async downloads routes (`download._everyone`): an
+  ordinary person's check can read the table from SQLite, never on the event loop.
+- **RefuseFrames adds, never replaces** (above).
+- **A write's dropped connection is an unknown outcome**: in `navidrome_admin._ask` only `ConnectError`,
+  `ConnectTimeout` and `PoolTimeout` (nothing sent) are `unreachable` for a write; any other transport failure is
+  `timed_out`, the route's unknown-outcome words (a reset's still ends nothing, as the spec has it).
+- **Create's read-back is best effort**: once the POST made the account, a failure of the GET that follows is a
+  warning beside `made` (`LIBRARIES_UNREAD`), never a refusal that would send the admin to try again into "already
+  an account".
+- **Permissions' five are required** (None, checked after `_login`, so logins off and break-glass are still said
+  first): a body leaving one out is `PEOPLE_FORM`, 422, nothing saved.
+- **Tests**: one write at a time through the routes themselves (two saves sent together over ASGI); the People
+  list dropping a remade account's grant; the fixed list held over every test in test_people.py (the `nd`
+  fixture's teardown checks every native request's shape).
+- **The app**: the sign-in gate notes every `/me` answer it has (`noteAccess`), so an admin's change reaches a
+  desktop - which asks `/me` nowhere else after App's first - at its next re-ask (back to the front, a song
+  failing, a sign-in again), not only at a reload or a visit to You (signin.sim.cjs).
+
+Not a change: a reset that times out still ends nothing (the spec's choice, James's "Go").
+
+**Second review (2.0.0-player.61)** - four findings, all real, each fixed or tested:
+
+- **NAVIDROME_USER and NAVIDROME_PASSWORD are an admin's too** (see the NAVIDROME_URL line above): someone with
+  `server` could have set deadwax's own account to theirs and so put themselves past People's SHARED_ACCOUNT
+  guard. Locked for them in `_SHARED_ACCOUNT_LOCK`'s words, a change refused (test_logins.py's NAVIDROME_URL test
+  covers all three).
+- **Delete's Cancel with Delete the only tab** (Look after the library without Edit albums): it went "back" to
+  `firstTab`, which was Delete itself, so the dialog stayed and Cancel and Escape looked dead. Now
+  `albumEdit.cancelDeleteTo(tabs)` - the first tab that isn't Delete, or null - and null closes the panel as its
+  close button does. The handler reads the tabs as they are now (`tabsNow`), not the first render's
+  (permissions.sim.cjs, app-rules.sim.cjs).
+- **Tests only**: Navidrome's /auth/login answering for another account (`not_you`) - no unlock held, no account
+  id read at a sign-in, the grant left unverified; and Navidrome's 403 to an admin already unlocked and since
+  demoted - from the list or a write - dropping deadwax's role at once (`/me` false at the next request, People
+  then refused), with no re-check run.
+
+**Verified**: 3364 Python tests (3362 passed, 2 skipped; tests/test_people.py new - 79 tests over a fake of Navidrome's native API and getUser
+shaped from its source, sharing its accounts, checking every JWT's subject, rotating refreshed JWTs, the
+whole-record PUT, the PUT-insert, the per-address login limiter and Subsonic's per-name limiter;
+tests/test_logins.py's walk - every route of each permission 403s in NEEDS' words to an ordinary person given
+every OTHER category and lets through one given only it, the admin and break-glass, over the app with every
+route's own work stubbed so the stream and the writers are walked too - and the role tests; Everyone's
+downloads and Get albums in tests/test_downloads_per_person.py), pyflakes, tsc, every sim
+(permissions.sim.cjs and people.sim.cjs new; routes, app-rules, signin, you, artist, care, needslook,
+settingslog, requests and mylibrary updated on purpose), the build; the engine files have no diff. 69 mutations
+each caught (the guard, each category's routes, the role read and re-read, the migration, the take-over, the
+old break-glass cookie, every permissions rule, the unlock's local check, gate, idle end and address, the
+refreshed JWT, each write's whole-record PUT and checks, every guard, the rate limit, the 422, the frames, and
+the app's managing parts, checkboxes, typed-name gate and notes), the review's 16 more - each fix above
+reverted alone - and the second review's 6 (the user and password locks, `cancelDeleteTo`, its close and its
+`tabsNow`, `not_you`, the 403's demotion). A smoke of the real page (an instance with
+logins on over tests/navidrome_native_fake.py served on a port of its own, headless Chromium as deadwax.test
+over plain http): `admin` signs in, People's unlock, a wrong password refused without a stand-in login, the
+list, Add a person, Permissions saved for james, Remove's dialog (focus in its field, live only for the name),
+nothing past the edge at 390 and 320, the sidebar's Managing with People; then james with Edit albums alone:
+Library care his only Managing row, `/me` ["request", "edit"] (his account's id read at his sign-in), a tag
+preview let through, a delete and the settings refused in NEEDS' words; no console errors.
+**NOT verified**: a real Navidrome 0.64.2's native API, its JWT refresh, its login limiter and `adminRole`
+(read, not watched); James's own upgrade (`james` becoming ordinary, `admin` signing in for the first time); the
+iPhone (the keyboard over People's fields, Remove's sheet, a password manager offering to save a password typed
+for someone else - the fields say `new-password`); a real page walk of People (the orchestrator's).

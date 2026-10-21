@@ -5,6 +5,7 @@ import type { MyLibrary } from '../api/types'
 import { latestOnly } from '../lib/latest'
 import { onAddedToLibrary, onAlbumsFiled, onRemovedFromLibrary } from '../lib/libraryEvents'
 import { isNew, newMarks } from '../lib/myLibrary'
+import { BREAK_GLASS_USER } from '../lib/signIn'
 import { sessionMe } from './session'
 
 /**
@@ -40,7 +41,7 @@ function tell(): void {
 /** Whether there is a library to ask about: logins on, signed in through Navidrome. */
 export function hasLibrary(): boolean {
   const me = sessionMe()
-  return me !== null && me.auth === 'on' && me.user !== 'admin'
+  return me !== null && me.auth === 'on' && me.user !== BREAK_GLASS_USER
 }
 
 /** Ask deadwax for your library now - nothing with logins off. */

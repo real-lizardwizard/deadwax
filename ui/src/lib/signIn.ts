@@ -5,8 +5,9 @@
 
 import { ApiError } from '../api/http'
 
-/** The break-glass admin's fixed name (src/auth.py BREAK_GLASS_USER): no Navidrome account signs in as it. */
-export const BREAK_GLASS_USER = 'admin'
+/** The break-glass admin's fixed name (src/auth.py BREAK_GLASS_USER): no Navidrome account signs in as it. `deadwax`
+ *  since 2.0.0-player.61 - `admin` until then, an ordinary Navidrome name now (Navidrome's own admin signs in as it). */
+export const BREAK_GLASS_USER = 'deadwax'
 
 /** What deadwax says to a request with no session at all - the screen's own lede says it already. */
 export const PLAIN_SIGN_IN = 'Sign in to use deadwax.'

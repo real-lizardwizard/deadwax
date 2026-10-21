@@ -173,7 +173,7 @@ export const SHARED_TEXT = 'Someone else asked for it too'
 
 /**
  * Who asked, on an admin's row: "Asked by ethan", "Asked by you and ethan", "Asked by you, ethan and
- * sam" (in the order they asked) - null for a row only you are waiting for. A user's row (the server
+ * sam" (in the order they asked) - null for a row only you are waiting for, NOBODY_TEXT for one nobody is. A user's row (the server
  * tells who else asked to an admin alone) says SHARED_TEXT when somebody else waits for it too - so a
  * Get that joined somebody's download, and a cancel that will only leave, aren't a surprise - and
  * nothing otherwise; any row with logins off, nothing.
@@ -181,9 +181,13 @@ export const SHARED_TEXT = 'Someone else asked for it too'
 export function askedByText(job: Pick<DownloadJob, 'mine' | 'shared' | 'requested_by'>): string | null {
   const others = job.requested_by
   if (others === undefined) return job.shared ? SHARED_TEXT : null
-  if (!others.length) return null
+  //? (2.0.0-player.61) nobody's: the one who asked was removed in People, or cleared it - it carries on, filed for nobody
+  if (!others.length) return job.mine ? null : NOBODY_TEXT
   return `Asked by ${listed(job.mine ? ['you', ...others] : others)}`
 }
+
+/** (2.0.0-player.61) What a row seeing everyone's says of a download nobody waits for any more. */
+export const NOBODY_TEXT = 'Nobody is waiting for this any more'
 
 /** What the ✕'s question says, and its answer's button - and whether the cancel only LEAVES (the ✕'s
  *  name, the overlay's "leaving…" and what a screen reader hears follow it). */

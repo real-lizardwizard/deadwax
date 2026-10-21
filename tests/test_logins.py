@@ -5,11 +5,19 @@ fake Navidrome that checks Subsonic token auth for two accounts, james and ethan
 
 What these hold:
 
-  - EVERY ROUTE IS DECIDED: the app's routes are exactly ROUTES' keys, each public, a user's or an
-    admin's; with logins on every route but the public ones answers 401 without a session, every
-    admin route answers 403 to a signed-in user (in words), and no user route asks for an admin. A
-    route added without deciding fails here.
-  - Off is today: no sign-in, /me the implicit admin, no mark on the pages, /docs there, login a 409.
+  - EVERY ROUTE IS DECIDED: the app's routes are exactly ROUTES' keys, each public, a user's or one
+    permission's (2.0.0-player.61: request, edit, library, server or people - src/users.py require);
+    with logins on every route but the public ones answers 401 without a session; THE WALK: every route
+    of permission P answers 403 in NEEDS' words to an ordinary person given every OTHER category, and
+    lets through one given only P (and an admin, and break-glass) - so granting one category never opens
+    another's routes; a `request` route 403s when Get albums is taken away. A route added without
+    deciding fails here.
+  - Admins are Navidrome's admins (2.0.0-player.61): getUser's adminRole at the sign-in and every
+    re-check (a change in Navidrome reaches deadwax at the next pass; Navidrome down keeps the role),
+    exactly true or not admin, every session of a person agreeing; the sessions table gains its role
+    column (every session made due for the re-check); DEADWAX_ADMINS is ignored and said so.
+  - Off is today: no sign-in, /me the implicit admin with every permission, no mark on the pages, /docs
+    there, login a 409.
   - Signing in is Navidrome's getUser with a token deadwax makes from a fresh salt - the name as typed,
     the identity lowercased (whatever case Navidrome answers with) - never the web login. A wrong password is a 401 that says so; Navidrome not
     answering a 503 that says so, and not counted; error 41 named. Reserved names never reach Navidrome,
@@ -28,11 +36,13 @@ What these hold:
     only with logins on, and it pauses a minute between passes.
   - AUTH_MODE as the app reads it (Config.logins_on) is on for a typo; a missing key said at start-up
     (by the lifespan itself).
-  - Break-glass: DEADWAX_ADMIN_PASSWORD signs in `admin` with neither Navidrome nor the database,
-    compared in constant time; ends with a new password, after 12 hours, and on sign-out.
+  - Break-glass: DEADWAX_ADMIN_PASSWORD signs in `deadwax` (2.0.0-player.61 - `admin` until then, an
+    ordinary Navidrome name now) with neither Navidrome nor the database, compared in constant time;
+    ends with a new password, after 12 hours, and on sign-out; an old `admin` break-glass cookie ends.
   - Fail closed: no key, or no database, is a 503 on every protected route; the health check stays 200.
-  - The first admin's sign-in takes over what `local` saved; a user's or break-glass's doesn't.
-  - The settings show the four read-only, secrets as set or not; a PUT of one is refused; /docs is off.
+  - The first Navidrome admin's sign-in takes over what `local` saved; a user's or break-glass's doesn't,
+    and a second admin's (an upgraded database) takes over nothing.
+  - The settings show the three read-only, secrets as set or not; a PUT of one is refused; /docs is off.
 """
 
 import asyncio
@@ -55,12 +65,14 @@ from starlette.routing import Mount
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src import __version__, auth  # noqa: E402
+from src import __version__, auth, permissions as granted  # noqa: E402
+from src.api import navidrome_admin  # noqa: E402
 from src.api.app import LOGINS_MARK, start  # noqa: E402
 from src.api.musicbrainz_endpoint import ResponseCache  # noqa: E402
-from src.config import Config, describe_auth_mode, parse_admins  # noqa: E402
+from src.config import DEADWAX_ADMINS_IGNORED, Config, describe_auth_mode  # noqa: E402
 from src.store import JobStore  # noqa: E402
-from src.users import ADMIN_ONLY, LOCAL_USER, current_user, is_admin, require_admin  # noqa: E402
+from src.users import (LOCAL_USER, NEEDS, NEEDS_PEOPLE, LABELS, PERMISSIONS, current_user, is_admin,  # noqa: E402
+                       require)
 
 SECRET = "0123456789abcdef0123456789abcdef-test-key"
 GLASS = "break-the-glass-please"
@@ -69,8 +81,12 @@ ME = "/deadwax/me"
 LOGIN = "/deadwax/auth/login"
 LOGOUT = "/deadwax/auth/logout"
 
-#? Every route the app has, and whose it is: `public` answers without a session, `user` needs one,
-#? `admin` needs an admin's. Adding a route means deciding here - the first test fails until then.
+#? Every route the app has, and whose it is: `public` answers without a session, `user` needs one, and
+#? (2.0.0-player.61, in place of `admin`) a permission's name needs that permission - `request` Get albums,
+#? `edit` Edit albums, `library` Look after the library, `server` Settings and the log, `people` People
+#? (src/users.py require; an admin has them all). Adding a route means deciding here - the first test fails
+#? until then. (`downloads`, Everyone's downloads, has no route of its own: the downloads routes check it
+#? inside - tests/test_downloads_per_person.py.)
 ROUTES = {
     ("GET", "/deadwax/health"): "public",
     ("POST", "/deadwax/auth/login"): "public",
@@ -81,8 +97,8 @@ ROUTES = {
     ("GET", "/player/lab/index.html"): "public",
     ("GET", "/"): "public",
     ("GET", "/index.html"): "public",
-    ("GET", "/deadwax/interface_logs/recent"): "admin",
-    ("GET", "/deadwax/interface_logs/interface_logs"): "admin",
+    ("GET", "/deadwax/interface_logs/recent"): "server",
+    ("GET", "/deadwax/interface_logs/interface_logs"): "server",
     ("GET", "/deadwax/search_musicbrainz/fully_search"): "user",
     ("GET", "/deadwax/search_musicbrainz/songs"): "user",
     #? (2.0.0-player.55) the app's Search's artists: a search, like /songs - MusicBrainz's data is nobody's own
@@ -97,52 +113,52 @@ ROUTES = {
     ("GET", "/deadwax/search_musicbrainz/ping"): "user",
     ("GET", "/deadwax/monitor_slskd/ping"): "user",
     ("POST", "/deadwax/download/store_state"): "user",
-    ("POST", "/deadwax/download/find_candidates"): "user",
-    ("POST", "/deadwax/download/enqueue"): "user",
+    ("POST", "/deadwax/download/find_candidates"): "request",
+    ("POST", "/deadwax/download/enqueue"): "request",
     #? a user's own downloads, an admin's everyone's (2.0.0-player.49, step 4 - tests/test_downloads_per_person.py)
     ("GET", "/deadwax/download/jobs"): "user",
     ("POST", "/deadwax/download/jobs/{job_id}/cancel"): "user",
-    ("POST", "/deadwax/download/jobs/{job_id}/retry"): "user",
-    ("POST", "/deadwax/download/jobs/{job_id}/retry_same"): "user",
+    ("POST", "/deadwax/download/jobs/{job_id}/retry"): "request",
+    ("POST", "/deadwax/download/jobs/{job_id}/retry_same"): "request",
     ("POST", "/deadwax/download/jobs/clear"): "user",
-    ("POST", "/deadwax/download/jobs/{job_id}/join"): "user",
+    ("POST", "/deadwax/download/jobs/{job_id}/join"): "request",
     ("GET", "/deadwax/library/albums"): "user",
     ("GET", "/deadwax/library/owned"): "user",
-    ("POST", "/deadwax/library/rescan"): "admin",
+    ("POST", "/deadwax/library/rescan"): "library",
     ("GET", "/deadwax/library/art"): "user",
     ("GET", "/deadwax/library/tracks"): "user",
-    ("POST", "/deadwax/library/retag/preview"): "admin",
-    ("POST", "/deadwax/library/retag/apply"): "admin",
-    ("POST", "/deadwax/library/art/fetch"): "admin",
-    ("POST", "/deadwax/library/lyrics/fetch"): "admin",
+    ("POST", "/deadwax/library/retag/preview"): "edit",
+    ("POST", "/deadwax/library/retag/apply"): "edit",
+    ("POST", "/deadwax/library/art/fetch"): "edit",
+    ("POST", "/deadwax/library/lyrics/fetch"): "edit",
     ("GET", "/deadwax/library/lyrics"): "user",
     ("GET", "/deadwax/library/tracks/picture"): "user",
     ("GET", "/deadwax/library/disc_art"): "user",
     ("GET", "/deadwax/library/disc_art/navidrome"): "user",
-    ("POST", "/deadwax/library/disc_art/fetch"): "admin",
-    ("POST", "/deadwax/library/tags/preview"): "admin",
-    ("POST", "/deadwax/library/tags/apply"): "admin",
-    ("GET", "/deadwax/library/queue/new_imports"): "admin",
-    ("GET", "/deadwax/library/queue/summary"): "admin",
-    ("POST", "/deadwax/library/queue/ignore"): "admin",
-    ("POST", "/deadwax/library/queue/unignore"): "admin",
-    ("POST", "/deadwax/library/queue/reviewed"): "admin",
-    ("POST", "/deadwax/library/delete"): "admin",
-    ("GET", "/deadwax/library/deletion_summary"): "admin",
+    ("POST", "/deadwax/library/disc_art/fetch"): "edit",
+    ("POST", "/deadwax/library/tags/preview"): "edit",
+    ("POST", "/deadwax/library/tags/apply"): "edit",
+    ("GET", "/deadwax/library/queue/new_imports"): "library",
+    ("GET", "/deadwax/library/queue/summary"): "library",
+    ("POST", "/deadwax/library/queue/ignore"): "library",
+    ("POST", "/deadwax/library/queue/unignore"): "library",
+    ("POST", "/deadwax/library/queue/reviewed"): "library",
+    ("POST", "/deadwax/library/delete"): "library",
+    ("GET", "/deadwax/library/deletion_summary"): "library",
     ("GET", "/deadwax/library/artist"): "user",
     ("GET", "/deadwax/library/artist/art"): "user",
-    ("POST", "/deadwax/library/artist/images/preview"): "admin",
-    ("POST", "/deadwax/library/artist/images/apply"): "admin",
-    ("POST", "/deadwax/library/artist/refile/preview"): "admin",
-    ("POST", "/deadwax/library/artist/refile/apply"): "admin",
-    ("POST", "/deadwax/library/artist/search"): "admin",
-    ("GET", "/deadwax/settings"): "admin",
-    ("GET", "/deadwax/settings/"): "admin",
-    ("PUT", "/deadwax/settings"): "admin",
-    ("PUT", "/deadwax/settings/"): "admin",
+    ("POST", "/deadwax/library/artist/images/preview"): "edit",
+    ("POST", "/deadwax/library/artist/images/apply"): "edit",
+    ("POST", "/deadwax/library/artist/refile/preview"): "library",
+    ("POST", "/deadwax/library/artist/refile/apply"): "library",
+    ("POST", "/deadwax/library/artist/search"): "edit",
+    ("GET", "/deadwax/settings"): "server",
+    ("GET", "/deadwax/settings/"): "server",
+    ("PUT", "/deadwax/settings"): "server",
+    ("PUT", "/deadwax/settings/"): "server",
     #? MusicBrainz's saved answers: their size, and Clear (2.0.0-player.54 - tests/test_musicbrainz_disk_cache.py)
-    ("GET", "/deadwax/settings/musicbrainz_cache"): "admin",
-    ("POST", "/deadwax/settings/musicbrainz_cache/clear"): "admin",
+    ("GET", "/deadwax/settings/musicbrainz_cache"): "server",
+    ("POST", "/deadwax/settings/musicbrainz_cache/clear"): "server",
     ("GET", "/deadwax/navidrome/status"): "user",
     ("GET", "/deadwax/navidrome/album_index"): "user",
     ("GET", "/deadwax/navidrome/albums"): "user",
@@ -181,9 +197,19 @@ ROUTES = {
     ("POST", "/deadwax/me/library/dismiss"): "user",
     #? (2.0.0-player.52, step 6) Remove from my library - tests/test_player_as_you.py
     ("POST", "/deadwax/me/library/remove"): "user",
-    ("GET", "/deadwax/library/held"): "admin",
-    ("POST", "/deadwax/library/held/flags/{flag_id}/add"): "admin",
-    ("POST", "/deadwax/library/held/flags/{flag_id}/dismiss"): "admin",
+    ("GET", "/deadwax/library/held"): "library",
+    ("POST", "/deadwax/library/held/flags/{flag_id}/add"): "library",
+    ("POST", "/deadwax/library/held/flags/{flag_id}/dismiss"): "library",
+    #? (2.0.0-player.61) People: Navidrome's accounts, as the signed-in Navidrome admin - tests/test_people.py
+    ("GET", "/deadwax/people"): "people",
+    ("POST", "/deadwax/people/unlock"): "people",
+    ("POST", "/deadwax/people/lock"): "people",
+    ("POST", "/deadwax/people/create"): "people",
+    ("POST", "/deadwax/people/{person_id}/password"): "people",
+    ("POST", "/deadwax/people/{person_id}/admin"): "people",
+    ("POST", "/deadwax/people/{person_id}/remove"): "people",
+    ("POST", "/deadwax/people/forget"): "people",
+    ("POST", "/deadwax/people/{person_id}/permissions"): "people",
 }
 
 
@@ -201,16 +227,26 @@ def failed(code: int, message: str) -> dict:
 
 class FakeNavidrome:
     """Navidrome's getUser as far as logins use it: token auth checked for real, accounts found whatever the
-    case - and named in the answer as STORED (`stored`: an account kept as 'James' answers 'James')."""
+    case - and named in the answer as STORED (`stored`: an account kept as 'James' answers 'James'). Since
+    2.0.0-player.61 its `adminRole` is each account's own Navidrome admin flag (`admins` - james, as on a
+    household where the owner is Navidrome's admin; a test flips it, or answers `role` instead: missing, a
+    string), and `/auth/login` answers as Navidrome's native sign-in does, with each account's id (`ids`) -
+    what a sign-in reads for someone an admin gave a permission to (`logins` counts them)."""
 
     def __init__(self):
         self.passwords = dict(PASSWORDS)
         self.stored: dict[str, str] = {}
+        self.admins: set[str] = {"james"}
+        self.ids: dict[str, str] = {name: f"id-{name}" for name in PASSWORDS}
+        self.role: dict[str, object] = {}   # an account's adminRole answered as this instead ("missing": none at all)
         self.seen: list[httpx.Request] = []
+        self.logins: list[str] = []
         self.down = False
         self.code: int | None = None   # answer every call with this Subsonic error instead
 
     def handle(self, request: httpx.Request) -> httpx.Response:
+        if request.url.path == navidrome_admin.LOGIN_PATH:
+            return self.login(request)
         self.seen.append(request)
         if self.down:
             raise httpx.ConnectError("connection refused")
@@ -225,11 +261,36 @@ class FakeNavidrome:
             return httpx.Response(200, json=failed(40, "Wrong username or password"))
         if asked.get("username", "").lower() != account:
             return httpx.Response(200, json=failed(50, "not allowed"))
-        #? Navidrome's own admin flag set for ethan - deadwax must never read it
-        return httpx.Response(200, json=ok(user={"username": self.stored.get(account, account), "adminRole": account == "ethan"}))
+        user = {"username": self.stored.get(account, account), "adminRole": account in self.admins}
+        if account in self.role:
+            if self.role[account] == "missing":
+                del user["adminRole"]
+            else:
+                user["adminRole"] = self.role[account]
+        return httpx.Response(200, json=ok(user=user))
+
+    def login(self, request: httpx.Request) -> httpx.Response:
+        """Navidrome's POST /auth/login (server/auth.go doLogin): a JSON body, 401 for a wrong login."""
+        if self.down:
+            raise httpx.ConnectError("connection refused")
+        body = json.loads(request.content)
+        account = next((name for name in self.passwords if name == str(body.get("username", "")).lower()), None)
+        self.logins.append(account or "?")
+        if account is None or body.get("password") != self.passwords[account]:
+            return httpx.Response(401, json={"error": "Invalid username or password"})
+        return httpx.Response(200, json={"id": self.ids[account], "name": account.title(), "username": account,
+                                         "isAdmin": account in self.admins, "token": f"jwt-{account}",
+                                         "subsonicSalt": "abc", "subsonicToken": "def"})
 
     def asks(self) -> int:
         return len(self.seen)
+
+
+def wire_native(handler, base: str = "http://navidrome:4533") -> None:
+    """Navidrome's native API (src/api/navidrome_admin.py) answered by `handler`."""
+    navidrome_admin._native.client = httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url=base,
+                                                       follow_redirects=False)
+    navidrome_admin._native.base = base
 
 
 def run(coroutine):
@@ -240,7 +301,6 @@ def run(coroutine):
 def on(monkeypatch, tmp_path):
     monkeypatch.setattr(Config, "AUTH_MODE", "on")
     monkeypatch.setattr(Config, "DEADWAX_SECRET_KEY", SECRET)
-    monkeypatch.setattr(Config, "DEADWAX_ADMINS", " James , someone-else ")
     monkeypatch.setattr(Config, "DEADWAX_ADMIN_PASSWORD", GLASS)
     monkeypatch.setattr(Config, "NAVIDROME_URL", "http://navidrome:4533")
     #? (2.0.0-player.49) logins need organizing on - copy or move, both folders set - or every route is a 503
@@ -249,10 +309,12 @@ def on(monkeypatch, tmp_path):
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path / "library"))
     monkeypatch.setattr(auth, "throttle", auth.Throttle())
     auth.forget_sessions()
+    granted.forget_all()
     fake = FakeNavidrome()
     auth.login_client.client = httpx.AsyncClient(transport=httpx.MockTransport(fake.handle),
                                                  base_url="http://navidrome:4533/rest")
     auth.login_client.base = "http://navidrome:4533/rest"
+    wire_native(fake.handle)
     store = JobStore(str(tmp_path / "state" / "deadwax.db"))
     store.init()
     app = start()
@@ -260,7 +322,9 @@ def on(monkeypatch, tmp_path):
     app.state.poller_task = SimpleNamespace(done=lambda: False)
     yield SimpleNamespace(app=app, store=store, fake=fake, client=TestClient(app), path=tmp_path / "state" / "deadwax.db")
     auth.forget_sessions()
+    granted.forget_all()
     run(auth.login_client.close_client())
+    run(navidrome_admin.close_client())
 
 
 def sign_in(client: TestClient, name: str, password: str, **headers) -> httpx.Response:
@@ -277,7 +341,8 @@ def signed_in(on, name: str) -> TestClient:
 
 def concrete(path: str) -> str:
     return path.replace("{job_id}", "1").replace("{album_id}", "al-1").replace("{artist_id}", "ar-1") \
-        .replace("{song_id}", "so-1").replace("{cover_id}", "co-1").replace("{flag_id}", "1")
+        .replace("{song_id}", "so-1").replace("{cover_id}", "co-1").replace("{flag_id}", "1") \
+        .replace("{token}", "tok-1").replace("{playlist_id}", "pl-1").replace("{person_id}", "id-ethan")
 
 
 def app_routes(app) -> set[tuple[str, str]]:
@@ -316,17 +381,106 @@ def test_every_route_but_the_public_ones_needs_a_session(on):
     assert refused == {}
 
 
-def test_every_admin_route_answers_a_user_403_in_words(on):
-    ethan = signed_in(on, "ethan")
+#? the five categories an admin can tick (src/permissions.py), and the routes' sides that are permissions
+CATEGORIES = granted.CATEGORIES
+SIDES = ("request", "edit", "library", "server", "people")
+#? what the walk's stub endpoints answer: the guard let the request through to the route itself
+REACHED = {"reached": True}
+
+
+def stubbed(on):
+    """The app with every route's own work replaced by a stub answering REACHED - so the walk sends every route
+    a request, the stream and the writers included, and sees only what its dependencies decide. The public
+    routes (the sign-in) are left as they are."""
+    import inspect
+    app = start()
+    app.state.store = on.store
+    app.state.poller_task = SimpleNamespace(done=lambda: False)
+    for route in app.routes:
+        #? never the public ones: the sign-in must sign in
+        if isinstance(route, APIRoute) and not any(ROUTES.get((method, route.path)) == "public" for method in route.methods):
+            if inspect.iscoroutinefunction(route.dependant.call):
+                async def stub(**_):
+                    return REACHED
+            else:
+                def stub(**_):
+                    return REACHED
+            route.dependant.call = stub
+    return app
+
+
+def give(on, user: str, wanted: dict[str, bool]) -> None:
+    """What an admin's Save in People writes for `user` (src/permissions.py set_for), bound to their account."""
+    granted.set_for(on.store, user, on.fake.ids[user], {category: wanted.get(category, False) for category in CATEGORIES},
+                    by="james")
+
+
+def answered_by_the_route(response) -> bool:
+    """Let through: the stub answered, or FastAPI refused the empty body the walk sends - never a 401/403."""
+    return response.status_code in (200, 422) and (response.status_code == 422 or response.json() == REACHED)
+
+
+def test_the_walk_every_permissions_routes_refuse_every_other_category_and_open_to_their_own(on):
+    """
+    The spec's walk (Part 3), route by route: for every route of permission P - 403 in NEEDS' words to an
+    ordinary person given every OTHER category (for `request`: everything else, Get albums taken away); let
+    through to one given only P (with the default Get albums). Granting P never opens another category's
+    route. An admin and break-glass are let through everywhere (People's own 409 for break-glass is
+    tests/test_people.py's: here the routes are stubs).
+    """
+    app = stubbed(on)
+    #? ethan, given something before he signs in: his account's id is read as he does, so grants are honoured
+    give(on, "ethan", {"request": True, "edit": True})
+    ethan = TestClient(app)
+    assert sign_in(ethan, "ethan", PASSWORDS["ethan"]).status_code == 200
+    assert on.fake.logins == ["ethan"]
+    james = TestClient(app)
+    assert sign_in(james, "james", PASSWORDS["james"]).status_code == 200
+    glass = TestClient(app)
+    assert sign_in(glass, auth.BREAK_GLASS_USER, GLASS).status_code == 200
+
+    #? the words themselves, as a person reads them
+    assert NEEDS.format(label=LABELS["edit"], user="ethan") == \
+        "That needs Edit albums, which an admin hasn't given you. You're signed in as ethan."
+    assert NEEDS_PEOPLE.format(user="ethan") == "That's People, which only Navidrome's admins can use. You're signed in as ethan."
+    checked = {side: 0 for side in SIDES}
+    for side in SIDES:
+        routes = [(method, path) for (method, path), wanted in sorted(ROUTES.items()) if wanted == side]
+        assert routes, side
+        #? every other category - and for `request` itself, Get albums taken away
+        give(on, "ethan", {category: category != side for category in CATEGORIES})
+        for method, path in routes:
+            response = ethan.request(method, concrete(path))
+            assert response.status_code == 403, (side, method, path, response.status_code)
+            words = NEEDS_PEOPLE.format(user="ethan") if side == "people" else NEEDS.format(label=LABELS[side], user="ethan")
+            assert response.json()["detail"] == words, (method, path)
+            checked[side] += 1
+        #? only this one (and the default Get albums) - People can't be given: it is a Navidrome admin's
+        if side != "people":
+            give(on, "ethan", {"request": True, side: True})
+            for method, path in routes:
+                assert answered_by_the_route(ethan.request(method, concrete(path))), (side, method, path)
+        for who in (james, glass):
+            for method, path in routes:
+                assert answered_by_the_route(who.request(method, concrete(path))), (side, method, path)
+    assert all(checked.values()), checked
+
+
+def test_an_ordinary_person_with_only_the_default_reaches_every_user_and_request_route(on):
+    """Upgrading takes nothing away: everyone not an admin has Get albums, and every user route is theirs."""
+    app = stubbed(on)
+    ethan = TestClient(app)
+    assert sign_in(ethan, "ethan", PASSWORDS["ethan"]).status_code == 200
     for (method, path), side in sorted(ROUTES.items()):
-        if side != "admin":
-            continue
-        response = ethan.request(method, concrete(path))
-        assert response.status_code == 403, (method, path, response.status_code)
-        assert response.json()["detail"] == ADMIN_ONLY.format(user="ethan")
+        if side in ("user", "request"):
+            assert answered_by_the_route(ethan.request(method, concrete(path))), (method, path)
+        elif side != "public":
+            assert ethan.request(method, concrete(path)).status_code == 403, (method, path)
 
 
-def test_no_user_route_asks_for_an_admin_and_every_admin_route_does(on):
+def test_every_route_asks_for_exactly_its_permission(on):
+    """Read from the routes themselves: a user's route asks for a session and no permission; a permission's for
+    exactly that one (src/users.py require, cached per permission); a public one for neither."""
     sides = {}
     for route in on.app.routes:
         if isinstance(route, APIRoute):
@@ -336,17 +490,20 @@ def test_no_user_route_asks_for_an_admin_and_every_admin_route_does(on):
         route = sides.get(key)
         if route is None:
             continue
-        if side == "admin":
-            assert require_admin in needs(route), key
+        asked = {getattr(call, "permission", None) for call in needs(route)} - {None}
+        if side == "public":
+            assert current_user not in needs(route) and not asked, key
         elif side == "user":
-            assert current_user in needs(route) and require_admin not in needs(route), key
+            assert current_user in needs(route) and not asked, key
         else:
-            assert current_user not in needs(route), key
+            assert current_user in needs(route) and asked == {side}, key
+            assert require(side) in needs(route), key
 
 
 def test_a_user_reaches_what_is_theirs(on):
     ethan = signed_in(on, "ethan")
-    assert ethan.get(ME).json() == {"user": "ethan", "admin": False, "auth": "on", "version": __version__}
+    assert ethan.get(ME).json() == {"user": "ethan", "admin": False, "auth": "on", "version": __version__,
+                                    "permissions": ["request"], "permissions_unverified": False}
     assert ethan.get("/deadwax/me/preferences").status_code == 200
     assert ethan.get("/deadwax/me/pins").status_code == 200
     assert ethan.get("/deadwax/download/jobs").status_code == 200
@@ -354,7 +511,8 @@ def test_a_user_reaches_what_is_theirs(on):
 
 def test_an_admin_reaches_the_admin_routes(on):
     james = signed_in(on, "james")
-    assert james.get(ME).json() == {"user": "james", "admin": True, "auth": "on", "version": __version__}
+    assert james.get(ME).json() == {"user": "james", "admin": True, "auth": "on", "version": __version__,
+                                    "permissions": list(PERMISSIONS), "permissions_unverified": False}
     assert james.get("/deadwax/settings").status_code == 200
     assert james.get("/deadwax/library/queue/new_imports").status_code == 200
 
@@ -365,7 +523,8 @@ def test_off_is_the_implicit_admin_with_no_sign_in(monkeypatch):
     monkeypatch.setattr(Config, "AUTH_MODE", None)
     client = TestClient(start())
     response = client.get(ME)
-    assert response.json() == {"user": LOCAL_USER, "admin": True, "auth": "off", "version": __version__}
+    assert response.json() == {"user": LOCAL_USER, "admin": True, "auth": "off", "version": __version__,
+                               "permissions": list(PERMISSIONS), "permissions_unverified": False}
     assert "set-cookie" not in response.headers
     assert client.post(LOGIN, json={"username": "james", "password": "x"}).status_code == 409
     assert current_user() == LOCAL_USER and is_admin(LOCAL_USER) and not is_admin("james")
@@ -409,13 +568,14 @@ def test_an_auth_mode_typo_leaves_deadwax_closed_and_says_so(on, monkeypatch, ca
     assert "reads it as on" in caplog.text and "logins are on" in caplog.text
 
 
-def test_the_admin_list_is_lowercased_and_trimmed():
-    assert parse_admins(" James ,, Ethan ") == {"james", "ethan"}
-    assert parse_admins(None) == frozenset()
-
-
 def test_the_implicit_user_is_a_name_nobody_signs_in_as():
     assert LOCAL_USER in auth.RESERVED_NAMES and auth.BREAK_GLASS_USER in auth.RESERVED_NAMES
+
+
+def test_break_glass_is_deadwax_now_and_admin_an_ordinary_name():
+    """(2.0.0-player.61) Navidrome's own `admin` account - a Navidrome admin, so deadwax's - signs in as itself."""
+    assert auth.BREAK_GLASS_USER == "deadwax"
+    assert auth.RESERVED_NAMES == {"local", "deadwax"}
 
 
 # ----------------------------------------------------------------- signing in
@@ -423,7 +583,8 @@ def test_the_implicit_user_is_a_name_nobody_signs_in_as():
 def test_signing_in_asks_navidromes_getuser_with_a_token_of_deadwaxs_own(on):
     response = sign_in(on.client, "Ethan", PASSWORDS["ethan"])
     assert response.status_code == 200
-    assert response.json() == {"user": "ethan", "admin": False, "auth": "on", "version": __version__}
+    assert response.json() == {"user": "ethan", "admin": False, "auth": "on", "version": __version__,
+                               "permissions": ["request"], "permissions_unverified": False}
 
     [asked] = on.fake.seen
     sent = query(asked)
@@ -439,8 +600,8 @@ def test_signing_in_asks_navidromes_getuser_with_a_token_of_deadwaxs_own(on):
 
 def test_the_identity_is_lowercased_whatever_case_navidrome_answers_with(on):
     """Navidrome finds an account whatever case it is typed in, and names it in its answer as STORED -
-    'James' here. The identity is still 'james': DEADWAX_ADMINS is lowercased, and the pins and
-    preferences are kept under it - trusting the answered name would have made James no admin."""
+    'James' here. The identity is still 'james': the pins, preferences, library and role are kept under
+    it - trusting the answered name would have split one person into two."""
     on.fake.stored["james"] = "James"
     response = sign_in(on.client, "JAMES", PASSWORDS["james"])
     assert response.status_code == 200
@@ -450,9 +611,16 @@ def test_the_identity_is_lowercased_whatever_case_navidrome_answers_with(on):
         assert connection.execute("SELECT user FROM sessions").fetchall() == [("james",)]
 
 
-def test_navidromes_own_admin_flag_is_never_used(on):
-    """The fake says ethan is a Navidrome admin; DEADWAX_ADMINS doesn't name him, so he isn't deadwax's."""
-    assert signed_in(on, "ethan").get(ME).json()["admin"] is False
+def test_navidromes_own_admin_flag_is_the_role(on):
+    """(2.0.0-player.61, inverted) Navidrome's flag IS deadwax's role: james is its admin, ethan isn't - and
+    made one in Navidrome, ethan's next sign-in is an admin's."""
+    assert signed_in(on, "james").get(ME).json()["admin"] is True
+    ethan = signed_in(on, "ethan")
+    assert ethan.get(ME).json()["admin"] is False
+    assert ethan.get("/deadwax/settings").status_code == 403
+    on.fake.admins.add("ethan")
+    again = signed_in(on, "ethan")
+    assert again.get(ME).json()["admin"] is True and again.get("/deadwax/settings").status_code == 200
 
 
 def test_a_wrong_password_is_said_plainly_and_sets_no_cookie(on):
@@ -597,7 +765,8 @@ def test_neither_the_password_nor_the_token_reaches_the_log(on, caplog):
 def test_report_logins_says_what_is_set_and_never_a_secret(on, caplog):
     caplog.set_level(logging.INFO)
     Config.report_logins()
-    assert "logins are on" in caplog.text and "james" in caplog.text
+    assert "logins are on" in caplog.text and "Navidrome's admins are deadwax's admins" in caplog.text
+    assert "break-glass admin: set" in caplog.text
     assert SECRET not in caplog.text and GLASS not in caplog.text
 
 
@@ -643,8 +812,8 @@ def test_three_wrong_passwords_a_minute_then_deadwax_holds_off(on, monkeypatch):
 
 def test_a_wrong_break_glass_password_is_throttled_too(on):
     for _ in range(3):
-        assert sign_in(on.client, "admin", "nope").status_code == 401
-    assert sign_in(on.client, "admin", GLASS).status_code == 429
+        assert sign_in(on.client, auth.BREAK_GLASS_USER, "nope").status_code == 401
+    assert sign_in(on.client, auth.BREAK_GLASS_USER, GLASS).status_code == 429
 
 
 def test_failing_other_names_never_frees_a_name_deadwax_is_holding_off(on, monkeypatch):
@@ -955,24 +1124,25 @@ def test_current_user_with_logins_on_and_no_request_is_signed_out(on):
 def test_break_glass_signs_in_the_fixed_admin_without_navidrome_or_the_database(on):
     on.fake.down = True
     glass = TestClient(on.app)
-    response = sign_in(glass, "Admin", GLASS)
+    response = sign_in(glass, "Deadwax", GLASS)
     assert response.status_code == 200
-    assert response.json() == {"user": "admin", "admin": True, "auth": "on", "version": __version__}
+    assert response.json() == {"user": "deadwax", "admin": True, "auth": "on", "version": __version__,
+                               "permissions": list(PERMISSIONS), "permissions_unverified": False}
     assert on.fake.asks() == 0
     raw = glass.cookies[auth.COOKIE]
     assert raw.startswith("b.") and "=" not in raw
     assert f"max-age={auth.BREAK_GLASS_SECONDS}" in [part.lower() for part in cookie_parts(response)]
 
     on.store.available = False
-    assert glass.get(ME).json()["user"] == "admin"
+    assert glass.get(ME).json()["user"] == "deadwax"
     assert glass.get("/deadwax/settings").status_code != 403
 
 
 def test_break_glass_refuses_a_wrong_password_and_needs_one_set(on, monkeypatch):
-    assert sign_in(on.client, "admin", "wrong").status_code == 401
+    assert sign_in(on.client, "deadwax", "wrong").status_code == 401
     monkeypatch.setattr(Config, "DEADWAX_ADMIN_PASSWORD", None)
-    assert sign_in(on.client, "admin", "").status_code == 400
-    assert sign_in(on.client, "admin", "anything").json()["detail"] == auth.WRONG_LOGIN
+    assert sign_in(on.client, "deadwax", "").status_code == 400
+    assert sign_in(on.client, "deadwax", "anything").json()["detail"] == auth.WRONG_LOGIN
     assert on.fake.asks() == 0
 
 
@@ -984,9 +1154,9 @@ def test_break_glass_is_compared_in_constant_time():
 
 
 def test_break_glass_ends_with_a_new_password_after_12_hours_and_on_sign_out(on, monkeypatch):
-    glass = signed_in(on, "admin")
+    glass = signed_in(on, "deadwax")
     raw = glass.cookies[auth.COOKIE]
-    assert auth.break_glass_user(raw) == "admin"
+    assert auth.break_glass_user(raw) == "deadwax"
     assert auth.break_glass_user(raw, now=time.time() + auth.BREAK_GLASS_SECONDS + 120) is None
 
     monkeypatch.setattr(Config, "DEADWAX_ADMIN_PASSWORD", "a-new-glass-password")
@@ -1079,7 +1249,7 @@ def test_the_first_admin_to_sign_in_takes_over_what_local_saved(on):
     run(on.store.write_pins(LOCAL_USER, [{"kind": "artist", "ref": "name:portishead", "label": "Portishead"}]))
 
     signed_in(on, "ethan")
-    signed_in(on, "admin")
+    signed_in(on, auth.BREAK_GLASS_USER)
     #? neither a user nor the break-glass admin takes anything
     assert run(on.store.user_preferences(LOCAL_USER)) == {"get_mode": "pick"}
 
@@ -1103,16 +1273,120 @@ def test_the_settings_show_logins_read_only_and_no_secret(on):
     assert SECRET not in response.text and GLASS not in response.text
     [group] = [group for group in response.json()["groups"] if group["id"] == "logins"]
     rows = {row["key"]: row for row in group["settings"]}
-    assert list(rows) == ["AUTH_MODE", "DEADWAX_ADMINS", "DEADWAX_SECRET_KEY", "DEADWAX_ADMIN_PASSWORD"]
+    assert list(rows) == ["AUTH_MODE", "DEADWAX_SECRET_KEY", "DEADWAX_ADMIN_PASSWORD"]
     for row in rows.values():
         assert row["editable"] is False and "environment" in row["locked_reason"]
     assert rows["DEADWAX_SECRET_KEY"]["value"] == rows["DEADWAX_ADMIN_PASSWORD"]["value"] == "set"
-    assert "james, someone-else" in rows["DEADWAX_ADMINS"]["effect"]
-    assert rows["AUTH_MODE"]["effect"].startswith("Logins are on")
+    assert rows["AUTH_MODE"]["effect"].startswith("Logins are on") and "Navidrome's admins" in rows["AUTH_MODE"]["effect"]
+    assert "as deadwax" in rows["DEADWAX_ADMIN_PASSWORD"]["effect"]
+
+
+def test_only_an_admin_can_move_navidrome_url_even_with_settings_and_the_log(on, monkeypatch):
+    """(review) NAVIDROME_URL is where every person's own login goes and what says who the admins are: someone given
+    Settings and the log who pointed it elsewhere would collect every login - and an admin's password at People's
+    next unlock - and make themselves an admin. Locked for them, in words; the rest of the settings stay theirs."""
+    from src.routes.settings import ADMINS_ONLY
+
+    granted.set_for(on.store, "ethan", "id-ethan", {"request": True, "edit": False, "library": False, "downloads": False,
+                                                   "server": True}, "james")
+    ethan = signed_in(on, "ethan")
+    assert "server" in ethan.get(ME).json()["permissions"]
+    rows = {row["key"]: row for group in ethan.get("/deadwax/settings").json()["groups"] for row in group["settings"]}
+    assert rows["NAVIDROME_URL"]["editable"] is False and rows["NAVIDROME_URL"]["locked_reason"] == ADMINS_ONLY["NAVIDROME_URL"]
+    assert rows["SLSKD_URL"]["editable"] is True
+    #? (second review) deadwax's own account too: set to ethan's own, People could no longer take ethan's grants away
+    monkeypatch.setattr(Config, "NAVIDROME_USER", "shared")
+    monkeypatch.setattr(Config, "NAVIDROME_PASSWORD", "shared-password")
+    for key in ("NAVIDROME_USER", "NAVIDROME_PASSWORD"):
+        assert rows[key]["editable"] is False and rows[key]["locked_reason"] == ADMINS_ONLY[key], key
+    for key, value in (("NAVIDROME_USER", "ethan"), ("NAVIDROME_USER", None), ("NAVIDROME_PASSWORD", "ethans-own")):
+        response = ethan.put("/deadwax/settings", json=[{"key": key, "value": value}])
+        assert response.status_code == 400 and ADMINS_ONLY[key] in response.json()["detail"], (key, value)
+    assert on.store.stored_settings() == {} and Config.NAVIDROME_USER == "shared"
+    for value in ("http://evil:4533", None):
+        response = ethan.put("/deadwax/settings", json=[{"key": "NAVIDROME_URL", "value": value},
+                                                       {"key": "NAVIDROME_PASSWORD", "value": "anything-at-all"}])
+        assert response.status_code == 400 and ADMINS_ONLY["NAVIDROME_URL"] in response.json()["detail"], value
+    assert on.store.stored_settings() == {} and Config.NAVIDROME_URL == "http://navidrome:4533"
+    #? saving the address it already is changes nothing, so isn't refused
+    same = ethan.put("/deadwax/settings", json=[{"key": "NAVIDROME_URL", "value": "http://navidrome:4533"}])
+    assert same.status_code == 200
+    #? an admin's tab shows it to change
+    james = signed_in(on, "james")
+    rows = {row["key"]: row for group in james.get("/deadwax/settings").json()["groups"] for row in group["settings"]}
+    for key in ADMINS_ONLY:
+        assert rows[key]["editable"] is True and rows[key]["locked_reason"] is None, key
+    run(on.store.clear_setting("NAVIDROME_URL"))
+    Config.apply_overrides(on.store.stored_settings())
+
+
+@pytest.mark.parametrize("lost", ["unticked", "signed out", "demoted"])
+def test_an_open_log_stream_closes_once_its_reader_may_no_longer_read_it(on, monkeypatch, lost):
+    """(review) The router's guard runs as the stream opens; since .61 a permission, a role and a session can all go
+    while it is open - so the stream asks again before each line, and the next line after is never sent."""
+    from starlette.requests import Request
+    from src.routes import interface_logs as route
+
+    every = {"request": True, "edit": False, "library": False, "downloads": False}
+    name = "ethan"
+    if lost == "demoted":
+        on.fake.admins.add(name)
+    else:
+        granted.set_for(on.store, name, "id-ethan", {**every, "server": True}, "james")
+    raw = signed_in(on, name).cookies[auth.COOKIE]
+
+    async def go():
+        queue = asyncio.Queue()
+        monkeypatch.setattr(route, "register_sse_client", lambda after, boot: (queue, [], 0))
+        request = Request({"type": "http", "method": "GET", "path": "/deadwax/interface_logs/interface_logs",
+                           "headers": [(b"cookie", f"{auth.COOKIE}={raw}".encode())], "query_string": b"", "app": on.app})
+        lines = (await route.interface_logs(request, user=name, after=None, boot=None)).body_iterator
+        assert await lines.__anext__() == ":\n\n"
+        queue.put_nowait((1, '"before"'))
+        assert "before" in await asyncio.wait_for(lines.__anext__(), 5)
+        if lost == "unticked":
+            await asyncio.to_thread(granted.set_for, on.store, name, "id-ethan", {**every, "server": False}, "james")
+        elif lost == "signed out":
+            await asyncio.to_thread(auth.end_user_sessions, on.store, name, auth.PASSWORD_RESET)
+        else:
+            await asyncio.to_thread(auth.set_role, on.store, name, False)
+        queue.put_nowait((2, '"after"'))
+        with pytest.raises(StopAsyncIteration):
+            await asyncio.wait_for(lines.__anext__(), 5)
+
+    run(go())
+
+
+def test_the_downloads_routes_never_read_the_permissions_table_on_the_event_loop(on, monkeypatch):
+    """(review) An ordinary person's Everyone's downloads check may read the table from SQLite (after a failed read,
+    once a minute) - which must happen in a worker thread, never on the loop every stream shares."""
+    ethan = signed_in(on, "ethan")
+    granted.forget_all()
+    real = on.store.permission_rows
+    on_the_loop = []
+
+    def watched():
+        try:
+            asyncio.get_running_loop()
+            on_the_loop.append(True)
+        except RuntimeError:
+            on_the_loop.append(False)
+        return real()
+
+    monkeypatch.setattr(on.store, "permission_rows", watched)
+    #? a stand-in that answers nothing, so the list is only the check: current_user and require run in threads anyway
+    monkeypatch.setattr(on.app.state, "slskd_client", SimpleNamespace(get_downloads=_nothing), raising=False)
+    assert ethan.get("/deadwax/download/jobs").status_code == 200
+    assert on_the_loop and not any(on_the_loop)
+
+
+async def _nothing(*args, **kwargs):
+    return []
 
 
 def test_a_login_setting_cant_be_saved_from_the_settings_tab(on):
     james = signed_in(on, "james")
+    #? DEADWAX_ADMINS, removed, is no setting at all now - refused as any unknown key is
     for key in ("AUTH_MODE", "DEADWAX_ADMINS", "DEADWAX_SECRET_KEY", "DEADWAX_ADMIN_PASSWORD"):
         response = james.put("/deadwax/settings", json=[{"key": key, "value": "off"}])
         assert response.status_code == 400, key
@@ -1137,11 +1411,332 @@ def test_the_off_settings_say_logins_are_off(monkeypatch):
 
 
 def test_is_admin_with_logins_on(on):
-    assert is_admin("james") and is_admin(auth.BREAK_GLASS_USER) and is_admin("someone-else")
-    assert not is_admin("ethan") and not is_admin(LOCAL_USER)
+    """A Navidrome admin as last read, and break-glass; anyone deadwax hasn't read - unknown - is not."""
+    assert not is_admin("james")
+    signed_in(on, "james")
+    assert is_admin("james") and is_admin(auth.BREAK_GLASS_USER)
+    signed_in(on, "ethan")
+    assert not is_admin("ethan") and not is_admin(LOCAL_USER) and not is_admin("someone-else")
 
 
 def test_the_sign_in_answer_is_what_me_answers(on):
     response = sign_in(on.client, "james", PASSWORDS["james"])
     assert response.json() == on.client.get(ME).json()
     assert json.dumps(response.json()).count("navidrome") == 0
+
+
+# ----------------------------------------------------------------- deadwax's admins are Navidrome's (2.0.0-player.61)
+
+def test_a_navidrome_admin_is_deadwaxs_admin_at_the_sign_in_and_an_ordinary_account_isnt(on):
+    james = TestClient(on.app)
+    answer = sign_in(james, "james", PASSWORDS["james"]).json()
+    assert answer["admin"] is True and answer["permissions"] == list(PERMISSIONS)
+    assert james.get(ME).json()["admin"] is True
+    assert james.get("/deadwax/settings").status_code == 200
+    ethan = TestClient(on.app)
+    assert sign_in(ethan, "ethan", PASSWORDS["ethan"]).json()["admin"] is False
+    assert ethan.get(ME).json()["admin"] is False
+    assert ethan.get("/deadwax/settings").status_code == 403
+    #? the role is on the session's row
+    with sqlite3.connect(on.path) as connection:
+        assert dict(connection.execute("SELECT user, admin FROM sessions").fetchall()) == {"james": 1, "ethan": 0}
+
+
+def due(on) -> float:
+    return time.time() + auth.RECHECK_SECONDS + 1
+
+
+def test_a_flag_changed_in_navidrome_is_the_role_from_the_next_recheck_and_navidrome_down_keeps_it(on, caplog):
+    caplog.set_level(logging.INFO)
+    ethan = signed_in(on, "ethan")
+    assert ethan.get("/deadwax/settings").status_code == 403
+    on.fake.admins.add("ethan")
+    run(auth.check_sessions(on.store, now=due(on)))
+    assert ethan.get(ME).json()["admin"] is True and ethan.get("/deadwax/settings").status_code == 200
+    assert "ethan is now a Navidrome admin, so deadwax's admin too" in caplog.text
+    #? Navidrome down: the last word stands
+    on.fake.down = True
+    on.store.session_checked(auth.id_hash(ethan.cookies[auth.COOKIE]), 0)
+    run(auth.check_sessions(on.store, now=due(on)))
+    assert ethan.get(ME).json()["admin"] is True
+    #? and taken away again
+    on.fake.down = False
+    on.fake.admins.discard("ethan")
+    on.store.session_checked(auth.id_hash(ethan.cookies[auth.COOKIE]), 0)
+    run(auth.check_sessions(on.store, now=due(on)))
+    assert ethan.get(ME).json()["admin"] is False and ethan.get("/deadwax/settings").status_code == 403
+    assert "ethan is no longer a Navidrome admin, so no longer deadwax's admin either" in caplog.text
+    #? the database has it too: a restart reads the same
+    auth.forget_sessions()
+    assert ethan.get(ME).json()["admin"] is False
+
+
+@pytest.mark.parametrize("answered", ["missing", "true", 1, None])
+def test_an_admin_role_that_isnt_exactly_true_is_not_admin(on, answered):
+    """Fail closed: an adminRole missing, a string, a number or null is an ordinary person's."""
+    on.fake.role["james"] = answered
+    james = signed_in(on, "james")
+    assert james.get(ME).json()["admin"] is False
+    assert james.get("/deadwax/settings").status_code == 403
+
+
+def test_every_session_of_one_person_agrees_after_a_sign_in_on_a_second_device(on):
+    phone = signed_in(on, "ethan")
+    assert phone.get(ME).json()["admin"] is False     # held in memory now
+    on.fake.admins.add("ethan")
+    laptop = signed_in(on, "ethan")
+    assert laptop.get(ME).json()["admin"] is True
+    #? the phone's session - held in memory - is an admin's at its next request, and in the database
+    assert phone.get(ME).json()["admin"] is True
+    with sqlite3.connect(on.path) as connection:
+        assert connection.execute("SELECT DISTINCT admin FROM sessions WHERE user = 'ethan'").fetchall() == [(1,)]
+
+
+OLD_SESSIONS = """CREATE TABLE sessions (id_hash TEXT PRIMARY KEY, user TEXT NOT NULL, credential TEXT NOT NULL,
+    created_at REAL NOT NULL, last_seen REAL NOT NULL, expires_at REAL NOT NULL, checked_at REAL NOT NULL)"""
+
+
+def an_upgraded_database(tmp_path, sessions=()) -> Path:
+    """A database as 2.0.0-player.60 left it: sessions with no role column, and the given rows in it."""
+    path = tmp_path / "upgraded" / "deadwax.db"
+    path.parent.mkdir(parents=True)
+    with sqlite3.connect(path) as connection:
+        connection.execute(OLD_SESSIONS)
+        for user, raw in sessions:
+            now = time.time()
+            connection.execute("INSERT INTO sessions VALUES (?, ?, ?, ?, ?, ?, ?)",
+                               (auth.id_hash(raw), user, auth.seal_credential(user, auth.subsonic_token(PASSWORDS[user], "salt"), "salt"),
+                                now, now, now + auth.SESSION_IDLE_SECONDS, now))
+    return path
+
+
+def test_the_sessions_table_gains_its_role_and_every_session_is_rechecked_first(on, tmp_path, caplog):
+    """The migration: `admin` and `navidrome_id` added by hand, every checked_at set to 0 so the first pass reads
+    everyone's flag - else a session from before read not-admin for up to its next check."""
+    path = an_upgraded_database(tmp_path, [("james", "s.james-from-before")])
+    store = JobStore(str(path))
+    store.init()
+    with sqlite3.connect(path) as connection:
+        columns = {row[1] for row in connection.execute("PRAGMA table_info(sessions)")}
+        assert {"admin", "navidrome_id"} <= columns
+        assert connection.execute("SELECT checked_at, admin FROM sessions").fetchall() == [(0, 0)]
+    on.app.state.store = store
+    client = TestClient(on.app)
+    client.cookies.set(auth.COOKIE, "s.james-from-before")
+    assert client.get(ME).json()["admin"] is False          # unknown until read: not an admin
+    caplog.set_level(logging.INFO)
+    counts = run(auth.check_sessions(store))                # the first pass - due at once
+    assert counts["checked"] == 1
+    assert client.get(ME).json()["admin"] is True
+    #? made again, an existing database is left as it is - the reset is once, as the column is made
+    store.session_checked(auth.id_hash("s.james-from-before"), 123.0)
+    store.init()
+    with sqlite3.connect(path) as connection:
+        assert connection.execute("SELECT checked_at FROM sessions").fetchall() == [(123.0,)]
+
+
+def test_the_take_over_and_the_seed_wait_for_a_navidrome_admin(on):
+    run(on.store.write_pins(LOCAL_USER, [{"kind": "artist", "ref": "name:portishead", "label": "Portishead"}]))
+    signed_in(on, "ethan")
+    assert [pin["ref"] for pin in run(on.store.pins(LOCAL_USER))] == ["name:portishead"]
+    assert not on.store.library_seeded()
+    on.fake.admins.add("ethan")
+    signed_in(on, "ethan")
+    assert [pin["ref"] for pin in run(on.store.pins("ethan"))] == ["name:portishead"]
+    assert run(on.store.pins(LOCAL_USER)) == []
+
+
+def test_the_leftovers_go_only_to_a_session_held_as_an_admins(on):
+    """_take_over_leftovers, keyed on the session's own role after a restart: an ordinary person's request takes
+    nothing, an admin's takes what `local` still holds."""
+    ethan, james = signed_in(on, "ethan"), signed_in(on, "james")
+    run(on.store.write_pins(LOCAL_USER, [{"kind": "artist", "ref": "name:tricky", "label": "Tricky"}]))
+    auth.forget_sessions()                                  # a restart
+    assert ethan.get(ME).status_code == 200
+    assert [pin["ref"] for pin in run(on.store.pins(LOCAL_USER))] == ["name:tricky"]
+    assert james.get(ME).status_code == 200
+    assert run(on.store.pins(LOCAL_USER)) == [] and [pin["ref"] for pin in run(on.store.pins("james"))] == ["name:tricky"]
+
+
+def test_a_second_navidrome_admins_first_sign_in_on_an_upgraded_install_takes_over_nothing(on):
+    """James's install: `james` took over what `local` saved (under DEADWAX_ADMINS, at .48) and the store was
+    seeded into his library, once ever. Upgraded, `james` is an ordinary user and Navidrome's `admin` - a person
+    like any other - signs in for the first time: it takes over nothing and is seeded nothing."""
+    run(on.store.write_pins(LOCAL_USER, [{"kind": "artist", "ref": "name:portishead", "label": "Portishead"}]))
+    run(on.store.set_user_preferences(LOCAL_USER, {"get_mode": "pick"}))
+    signed_in(on, "james")                                  # .48: the take-over, to james
+    with sqlite3.connect(on.path) as connection:
+        connection.execute("INSERT OR REPLACE INTO library_seed (id, user, seeded_at, albums) VALUES (1, 'james', 'then', 3)")
+    taken = (run(on.store.pins("james")), run(on.store.user_preferences("james")))
+    on.fake.admins = {"admin"}
+    on.fake.passwords["admin"] = "navidrome-admin-pw"
+    on.fake.ids["admin"] = "id-admin"
+    admin = TestClient(on.app)
+    answer = sign_in(admin, "admin", "navidrome-admin-pw").json()
+    assert answer["user"] == "admin" and answer["admin"] is True
+    assert run(on.store.pins("admin")) == [] and run(on.store.user_preferences("admin")) == {}
+    assert (run(on.store.pins("james")), run(on.store.user_preferences("james"))) == taken
+    with sqlite3.connect(on.path) as connection:
+        assert connection.execute("SELECT user, seeded_at FROM library_seed").fetchall() == [("james", "then")]
+        assert connection.execute("SELECT COUNT(*) FROM library_membership WHERE user = 'admin'").fetchone()[0] == 0
+    #? james, signed in again, is an ordinary user now
+    assert signed_in(on, "james").get(ME).json()["admin"] is False
+
+
+# ----------------------------------------------------------------- a role People set is never undone by an older answer
+
+def demoted_meanwhile(on, monkeypatch, name="ethan"):
+    """check_login answering as Navidrome did, and People's demotion of `name` landing just after - before the
+    caller (the re-check, a sign-in) has written what Navidrome said."""
+    real = auth.check_login
+
+    async def answered_then_demoted(username, token, salt):
+        answer = await real(username, token, salt)
+        on.fake.admins.discard(name)
+        await asyncio.to_thread(auth.set_role, on.store, name, False)
+        return answer
+
+    monkeypatch.setattr(auth, "check_login", answered_then_demoted)
+
+
+def test_the_recheck_never_undoes_a_role_people_set_while_navidrome_was_asked(on, monkeypatch):
+    """(review) The re-check's getUser said adminRole true; People demoted them before the re-check wrote it - the
+    demotion stands, in memory and in the database, rather than for ~5 minutes the other way."""
+    on.fake.admins.add("ethan")
+    ethan = signed_in(on, "ethan")
+    assert ethan.get(ME).json()["admin"] is True
+    demoted_meanwhile(on, monkeypatch)
+    run(auth.check_sessions(on.store, now=time.time() + auth.RECHECK_SECONDS + 1))
+    assert auth.role("ethan") is False and ethan.get(ME).json()["admin"] is False
+    with sqlite3.connect(on.path) as connection:
+        assert connection.execute("SELECT DISTINCT admin FROM sessions WHERE user = 'ethan'").fetchall() == [(0,)]
+
+
+def test_a_sign_in_never_undoes_a_role_people_set_while_navidrome_was_asked(on, monkeypatch):
+    on.fake.admins.add("ethan")
+    phone = signed_in(on, "ethan")
+    demoted_meanwhile(on, monkeypatch)
+    laptop = signed_in(on, "ethan")
+    assert laptop.get(ME).json()["admin"] is False and phone.get(ME).json()["admin"] is False
+    with sqlite3.connect(on.path) as connection:
+        assert connection.execute("SELECT DISTINCT admin FROM sessions WHERE user = 'ethan'").fetchall() == [(0,)]
+
+
+def test_a_session_row_read_as_a_role_changed_holds_the_new_role(on, monkeypatch):
+    """(review) _session read the row (admin) and People demoted them before it was held: the held session takes the
+    demotion, not the row it read a moment before."""
+    on.fake.admins.add("ethan")
+    ethan = signed_in(on, "ethan")
+    auth.forget_sessions()                                  # so the next request reads the row
+    real = on.store.session
+
+    def read_then_demoted(key):
+        row = real(key)
+        auth.set_role(on.store, "ethan", False)
+        return row
+
+    monkeypatch.setattr(on.store, "session", read_then_demoted)
+    assert ethan.get(ME).json()["admin"] is False
+    monkeypatch.setattr(on.store, "session", real)
+    assert auth.role("ethan") is False and ethan.get(ME).json()["admin"] is False
+    assert ethan.get("/deadwax/settings").status_code == 403
+
+
+def a_session_row(store, user: str, raw: str) -> None:
+    """A session row as 2.0.0-player.60 could have written it for `user` - an ordinary Navidrome account."""
+    now = time.time()
+    store.create_session(auth.id_hash(raw), user, auth.seal_credential(user, auth.subsonic_token("pw", "salt"), "salt"),
+                         now, now + auth.SESSION_IDLE_SECONDS)
+
+
+@pytest.mark.parametrize("name", sorted(auth.RESERVED_NAMES))
+def test_a_session_row_under_a_reserved_name_ends_and_is_never_break_glass(on, name):
+    """(review) Before .61 `deadwax` was an ordinary name - the natural one for NAVIDROME_USER's account - and its
+    session rows last 30 days of use. Read after the upgrade, such a row must never stand for the break-glass admin
+    (whose name it now is): it ends at its first request, in words, and is never an admin, nor asked about again."""
+    a_session_row(on.store, name, "s.from-before-the-rename")
+    stale = TestClient(on.app)
+    stale.cookies.set(auth.COOKIE, "s.from-before-the-rename")
+    response = stale.get(ME)
+    assert response.status_code == 401 and response.json()["detail"] == auth.RESERVED_SESSION
+    assert stale.get("/deadwax/settings").status_code == 401
+    assert on.store.session(auth.id_hash("s.from-before-the-rename")) is None
+    #? and the re-check never asks Navidrome as it
+    a_session_row(on.store, name, "s.another-from-before")
+    on.store.session_checked(auth.id_hash("s.another-from-before"), 0)
+    asked = on.fake.asks()
+    counts = run(auth.check_sessions(on.store, now=time.time() + auth.RECHECK_SECONDS + 1))
+    assert counts["ended"] == 1 and on.store.session(auth.id_hash("s.another-from-before")) is None
+    assert on.fake.asks() == asked
+
+
+def test_the_upgrade_ends_reserved_sessions_and_moves_break_glasss_rows_to_its_new_name(on, tmp_path):
+    """(review) The one-time step: a `deadwax` account's sessions and kept login from before go, and what break-glass
+    kept under `admin` - pins, Getting albums settings, the downloads it asked for - moves to `deadwax`, so
+    Navidrome's own `admin` account, signing in as itself for the first time, takes over none of it."""
+    path = tmp_path / "upgraded" / "deadwax.db"
+    store = JobStore(str(path))
+    store.init()
+    run(store.write_pins("admin", [{"kind": "artist", "ref": "name:tricky", "label": "Tricky"}]))
+    run(store.set_user_preferences("admin", {"get_mode": "pick"}))
+    job = run(store.create_job("bob", "d", [{"filename": "share\\Dummy\\01 Mysterons.flac", "size": 10}],
+                               {"artist": "Portishead", "album": "Dummy", "tracks": []}, user="admin"))
+    a_session_row(store, "deadwax", "s.deadwax-account")
+    store.keep_credential("deadwax", auth.seal_credential("deadwax", auth.subsonic_token("pw", "salt"), "salt"), time.time())
+    a_session_row(store, "james", "s.james-from-before")
+    with sqlite3.connect(path) as connection:
+        #? the sessions table as .60 had it: no role column
+        rows = connection.execute("SELECT id_hash, user, credential, created_at, last_seen, expires_at, checked_at "
+                                  "FROM sessions").fetchall()
+        connection.execute("DROP TABLE sessions")
+        connection.execute(OLD_SESSIONS)
+        connection.executemany("INSERT INTO sessions VALUES (?, ?, ?, ?, ?, ?, ?)", rows)
+    store.init()
+    with sqlite3.connect(path) as connection:
+        assert connection.execute("SELECT user FROM sessions").fetchall() == [("james",)]
+        assert connection.execute("SELECT COUNT(*) FROM user_credentials WHERE user = 'deadwax'").fetchone()[0] == 0
+        for table in ("pins", "user_prefs", "job_requests"):
+            assert connection.execute(f"SELECT DISTINCT user FROM {table}").fetchall() == [("deadwax",)], table
+    assert run(store.requesters(job)) == ["deadwax"]
+    assert run(store.pins("admin")) == [] and run(store.user_preferences("admin")) in ({}, None)
+
+
+def test_an_old_admin_break_glass_cookie_ends_and_is_never_navidromes_admin(on):
+    """A break-glass cookie made before the rename names `"u": "admin"`: break_glass_user refuses it, so it ends at
+    its next request - and as a `b.` cookie it never reaches the session table, where Navidrome's `admin` is."""
+    on.fake.admins.add("admin")
+    on.fake.passwords["admin"] = "navidrome-admin-pw"
+    on.fake.ids["admin"] = "id-admin"
+    signed_in_admin = TestClient(on.app)
+    assert sign_in(signed_in_admin, "admin", "navidrome-admin-pw").status_code == 200
+    payload = {"u": "admin", "n": "old-nonce", "m": auth._password_mark(GLASS)}
+    old = "b." + auth._fernet("break-glass").encrypt(json.dumps(payload).encode()).decode("ascii").rstrip("=")
+    stale = TestClient(on.app)
+    stale.cookies.set(auth.COOKIE, old)
+    response = stale.get(ME)
+    assert response.status_code == 401 and response.json()["detail"] == auth.BREAK_GLASS_ENDED
+    assert stale.get("/deadwax/settings").status_code == 401
+    assert auth.break_glass_user(old) is None
+
+
+def test_deadwax_admins_still_set_is_said_once_and_grants_nobody_anything(on, monkeypatch, caplog):
+    monkeypatch.setenv("DEADWAX_ADMINS", "ethan")
+    caplog.set_level(logging.INFO)
+    Config.report_logins()
+    said = [record.getMessage() for record in caplog.records if "DEADWAX_ADMINS" in record.getMessage()]
+    assert said == [DEADWAX_ADMINS_IGNORED] and "no longer reads it" in said[0]
+    assert [record.levelno for record in caplog.records if "DEADWAX_ADMINS" in record.getMessage()] == [logging.ERROR]
+    ethan = signed_in(on, "ethan")
+    assert ethan.get(ME).json()["admin"] is False and ethan.get("/deadwax/settings").status_code == 403
+    assert not hasattr(Config, "DEADWAX_ADMINS") and not hasattr(Config, "admins")
+    monkeypatch.delenv("DEADWAX_ADMINS")
+    caplog.clear()
+    Config.report_logins()
+    assert "DEADWAX_ADMINS" not in caplog.text
+
+
+def test_break_glass_is_still_an_admin_with_every_permission(on):
+    glass = signed_in(on, auth.BREAK_GLASS_USER)
+    body = glass.get(ME).json()
+    assert body["admin"] is True and body["permissions"] == list(PERMISSIONS)
+    assert glass.get("/deadwax/settings").status_code == 200

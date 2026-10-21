@@ -18,9 +18,16 @@ from src.store_index import (FILING_STATUSES, already_have, coming_now, describe
                              in_flight, is_whole, other_pressings, release_lock)
 from src import library_ledger
 from src.auth import BREAK_GLASS_USER
-from src.users import current_user, is_admin
+from src.users import can, current_user, require
 
 router = APIRouter()
+
+
+async def _everyone(request: Request, user: str | None) -> bool:
+    """Whether `user` may see and act on everyone's downloads (Everyone's downloads) - asked in a worker thread:
+    for an ordinary person the permissions table may be read from SQLite (once a minute at most, after a failed
+    read), which must never hold up the event loop and every stream on it (2.0.0-player.61 review)."""
+    return bool(user) and await asyncio.to_thread(can, request, user, "downloads")
 
 
 class Track(BaseModel):
@@ -304,7 +311,7 @@ async def _describe_in_flight(request: Request, job: dict, user: str | None = No
     with logins on (2.0.0-player.49), whether it's the asker's own, whether somebody else waits for it
     and what the copy is."""
     requesters = await request.app.state.store.requesters(job["id"]) if Config.logins_on() else None
-    described = describe_job(job, user, requesters, admin=bool(user) and is_admin(user))
+    described = describe_job(job, user, requesters, everyone=await _everyone(request, user))
     if job["status"] in OPEN_STATUSES:
         done = await _files_done(request.app.state.slskd_client, job)
         if done is not None:
@@ -374,6 +381,12 @@ async def _store_state(request: Request, body: "FindCandidatesRequest", user: st
     return state
 
 
+#? (2.0.0-player.61) Get albums: what starts a download - search Soulseek, enqueue, join one, the two retries -
+#? needs `request` (src/users.py require): on for everyone by default, so an admin can take it away for a
+#? listen-only account. The store's state, the list, cancelling and clearing your own need nothing more.
+GET_ALBUMS = [Depends(require("request"))]
+
+
 @router.post("/store_state")
 async def store_state(request: Request, body: FindCandidatesRequest, user: str = Depends(current_user)):
     """
@@ -388,7 +401,7 @@ async def store_state(request: Request, body: FindCandidatesRequest, user: str =
     return await _store_state(request, body, _asker(user))
 
 
-@router.post("/find_candidates")
+@router.post("/find_candidates", dependencies=GET_ALBUMS)
 async def find_candidates(request: Request, body: FindCandidatesRequest, user: str = Depends(current_user)):
     """
     Search Soulseek for the release the user picked and rank what comes back against it.
@@ -599,7 +612,7 @@ def _serialize_candidate(candidate: dict) -> dict:
     }
 
 
-@router.post("/enqueue")
+@router.post("/enqueue", dependencies=GET_ALBUMS)
 async def enqueue(request: Request, body: EnqueueRequest, user: str = Depends(current_user)):
     """
     Queue a download with slskd, and record the job - and who asked for it (2.0.0-player.49).
@@ -696,7 +709,8 @@ async def jobs(request: Request, user: str = Depends(current_user)):
     logins off the one user is `local`, the admin, and every download is theirs.
     """
     user = _asker(user)
-    admin = is_admin(user)
+    #? (2.0.0-player.61) everyone's downloads: an admin's, or anyone an admin gave Everyone's downloads
+    admin = await _everyone(request, user)
     logins = Config.logins_on()
     try:
         store = request.app.state.store
@@ -790,12 +804,13 @@ async def _first_queue_position(slskd_client, job: dict, transfers_by_user: dict
 
 async def _job_for(request: Request, job_id: int, user: str) -> dict:
     """
-    The download, if `user` may act on it - an admin any, anyone else one they're waiting for
-    (2.0.0-player.49) - else 404, as for no download at all: somebody else's isn't theirs to see.
+    The download, if `user` may act on it - with Everyone's downloads (an admin's, or given -
+    2.0.0-player.61) any, anyone else one they're waiting for (2.0.0-player.49) - else 404, as for no
+    download at all: somebody else's isn't theirs to see.
     """
     store = request.app.state.store
     job = await store.get_job(job_id)
-    if job is None or not (is_admin(user) or user in await store.requesters(job_id)):
+    if job is None or not (await _everyone(request, user) or user in await store.requesters(job_id)):
         raise HTTPException(status_code=404, detail="No such download job")
     return job
 
@@ -824,7 +839,7 @@ async def cancel_job(request: Request, job_id: int, user: str = Depends(current_
         job = await _job_for(request, job_id, user)
 
         async with release_lock(job_lock_key(job)):
-            if not is_admin(user):
+            if not await _everyone(request, user):
                 outcome = await store.leave_job(job_id, user)
                 if outcome == "none":
                     raise HTTPException(status_code=404, detail="No such download job")
@@ -900,7 +915,7 @@ async def _cancel_download(request: Request, job: dict) -> dict:
     }
 
 
-@router.post("/jobs/{job_id}/retry")
+@router.post("/jobs/{job_id}/retry", dependencies=GET_ALBUMS)
 async def retry_job(request: Request, job_id: int, user: str = Depends(current_user)):
     """
     Move a failed or cancelled download to the next peer from the list it was picked from
@@ -923,7 +938,7 @@ async def retry_job(request: Request, job_id: int, user: str = Depends(current_u
         raise HTTPException(status_code=500, detail=f"Error trying the next peer: {e}")
 
 
-@router.post("/jobs/{job_id}/retry_same")
+@router.post("/jobs/{job_id}/retry_same", dependencies=GET_ALBUMS)
 async def retry_job_same_peer(request: Request, job_id: int, user: str = Depends(current_user)):
     """
     Ask the same peer for a failed or cancelled download again (v1.0.7), for the files that
@@ -956,7 +971,8 @@ async def clear_jobs(request: Request, user: str = Depends(current_user)):
     logins were on too.
     """
     user = _asker(user)
-    admin = is_admin(user)
+    #? (2.0.0-player.61) everyone's downloads: an admin's, or anyone an admin gave Everyone's downloads
+    admin = await _everyone(request, user)
     logins = Config.logins_on()
     try:
         store = request.app.state.store
@@ -986,7 +1002,7 @@ async def clear_jobs(request: Request, user: str = Depends(current_user)):
 CLEARED_SINCE = "that download has been cleared from the list since - get it again"
 
 
-@router.post("/jobs/{job_id}/join")
+@router.post("/jobs/{job_id}/join", dependencies=GET_ALBUMS)
 async def join_job(request: Request, job_id: int, user: str = Depends(current_user)):
     """
     Join a download somebody else asked for (2.0.0-player.49): the whole pressing already on its

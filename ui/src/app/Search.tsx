@@ -8,6 +8,7 @@ import { navidromeAlbumFor } from '../api/store'
 import type { ArtistMatch, FullySearchResponse, Recording, ReleaseGroup, ReleaseGroupResponse, SongSearchResponse, ArtistSearchResponse } from '../api/types'
 import { heldReleases } from '../lib/idBridge'
 import { isAbort, latestOnly } from '../lib/latest'
+import { GET_OFF, gets } from '../lib/permissions'
 import { creditName } from '../lib/release'
 import {
   LIBRARY_SETTLE_MS, MUSICBRAINZ_SETTLE_MS, SEARCH_MAX_CHARS, artistNames, asksMusicBrainzBySettling, musicBrainzOnTyping, searchQuery,
@@ -38,6 +39,7 @@ import { keep, kept, songGet, usualGet } from './pressingLists'
 import { keptAnswer, keptOr } from './searchAnswers'
 import { onSearchSubmitted, onSearchTyped, shareSearchText } from './searchBox'
 import { head, sectionId, sectionRow, slot, topPlace, topRow, type RowContext, type SlotState } from './SearchRows'
+import { useAccess } from './access'
 import type { GetRequest } from './Sources'
 import { useFrame } from './useFrame'
 import { useGetSettings } from './useGetSettings'
@@ -278,6 +280,8 @@ export function Search({
   /** (2.0.0-player.57) a library song's •••: App's song menu, with the song - and its album, when in hand */
   onQueueMenu?: ((event: MouseEvent, pick: QueuePick<AlbumWithSongs>) => void) | undefined
 }) {
+  //? (2.0.0-player.61) Get albums: without it, no Get on a row (the server refuses one sent by hand anyway)
+  const getsAlbums = gets(useAccess().permissions)
   const actions = usePlayerActions()
   //? asked the first time the tab shows - not as the app starts, when it is mounted hidden
   const owned = useOwned(shown)
@@ -1703,7 +1707,7 @@ export function Search({
   const openAnyGroup = (group: ReleaseGroup) => (groupHeld(owned?.index ?? null, group.id) ? openGroup(group) : onOpenGroup(group))
 
   const context: RowContext = {
-    marks, evidence, index: owned?.index ?? null, personal, ready, resolving, opening, openSongs, openFolds,
+    marks, evidence, index: owned?.index ?? null, personal, ready, resolving, opening, openSongs, openFolds, gets: getsAlbums,
     onPlay: playSong, onSongMenu: songMenu, onOpenAlbum, onOpenArtist, onOpenMusicBrainzArtist, onOpenGroup: openAnyGroup, onOpenSongAlbum: openSongAlbum,
     onGetGroup: (group, event) => void getAlbum(group, event), onGetSong: (song, album, event) => void getSong(song, album, event),
     onToggleSong: (key) => toggle(setOpenSongs, key), onToggleFold: (key) => toggle(setOpenFolds, key),
@@ -1827,6 +1831,8 @@ export function Search({
     const nothing = drawn.sections !== null && !drawn.top.length && !sections.length && !drawn.allFailed && drawn.musicBrainz && !drawn.libraryProblem && !drawn.libraryLate
     return (
       <div class="app-search-list" data-text={drawn.text}>
+        {/* (2.0.0-player.61) without Get albums: no Get on any row, and why, once */}
+        {!getsAlbums && drawn.musicBrainz && <p class="app-footnote app-get-off">{GET_OFF}</p>}
         {lateSlot && slot(lateSlot, 'library-late')}
         {drawn.libraryProblem && (
           //? the library's problem, drawn as MusicBrainz's is: one look, and a 44px Try again
@@ -2029,6 +2035,7 @@ export function Search({
               : { state: 'said', words: libraryLateWords({}, personal, query).line }
     return (
       <div class="app-search-list" data-text={query}>
+        {!getsAlbums && <p class="app-footnote app-get-off">{GET_OFF}</p>}
         <section class="app-section app-search-section" aria-labelledby={sectionId(kind)} aria-busy={searching || (!!mine && mine.state === 'searching')}>
           {head(kind, null)}
           {lateSlot && slot(lateSlot, 'library-late')}

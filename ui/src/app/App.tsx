@@ -7,11 +7,12 @@ import type { ReleaseGroup } from '../api/types'
 import { me } from '../api/me'
 import { browseItems, closesOnCrossing, libraryItems, libraryTitle, liesOver, makesRoom, shownPick, sideOf, sidebarCurrent, sidebarMove, type LibraryPick, type ManagingKind, type SidebarId } from '../lib/appFrame'
 import { createRouter, type Router, type StorageLike } from '../lib/appHistory'
-import { CARE_PAGE, LOG_PAGE, PLAYLISTS_PAGE, QUEUE_ID, QUEUE_PAGE, SETTINGS_PAGE, TAB_LABELS, TABS, backLabel, currentRoute, playlistsMove, samePage, scrollKey, type Nav, type Page, type PageKind, type Tab } from '../lib/appRoutes'
+import { CARE_PAGE, LOG_PAGE, PEOPLE_PAGE, PLAYLISTS_PAGE, QUEUE_ID, QUEUE_PAGE, SETTINGS_PAGE, TAB_LABELS, TABS, backLabel, currentRoute, playlistsMove, samePage, scrollKey, type Nav, type Page, type PageKind, type Tab } from '../lib/appRoutes'
 import { handleDownloadRequests } from '../lib/downloadRequests'
 import { movedTo, noteMove, type EditAlbum } from '../lib/albumEdit'
 import { announceAlbumsFiled } from '../lib/libraryEvents'
 import { latestOnly } from '../lib/latest'
+import { albumEdit, asksQueueSummary as summaryAsked, careParts, gets as getsAlbums, managing as managingOf } from '../lib/permissions'
 import { navidromeChecks } from '../lib/navidromeCheck'
 import { arrivingCards, asksAgain, requestsView, stallsOn, watchingOf, type RequestRow } from '../lib/requestsView'
 import { MB_PREFIX, artistPageId } from '../lib/artistPage'
@@ -55,7 +56,8 @@ import { Sidebar } from './Sidebar'
 import { Sources, type GetRequest } from './Sources'
 import { TabBar } from './TabBar'
 import { useFrame } from './useFrame'
-import { adminUntilAsked } from './session'
+import { accessNow, noteAccess, useAccess } from './access'
+import { People } from './People'
 import { useInfoDetails } from './useInfoDetails'
 import { PinNotice } from './PinNotice'
 import { PlaylistPage } from './PlaylistPage'
@@ -93,7 +95,7 @@ const sectionBase = (nav: Nav, tab: Tab): Page | null => {
 }
 
 /** The Managing pages, siblings in the sidebar: one opened over another replaces it. */
-const MANAGING_KINDS: readonly PageKind[] = ['queue', 'care', 'settings', 'log']
+const MANAGING_KINDS: readonly PageKind[] = ['queue', 'care', 'people', 'settings', 'log']
 
 /** Nothing new in your library (logins off): one array for every render, so Home's element holds still. */
 const NOTHING_NEW: readonly Album[] = []
@@ -299,17 +301,19 @@ export function App() {
   const desktop = frame === 'desktop'
   //? what the Library shows, for the desktop sidebar (libraryPick.ts: the Library and the sidebar choose it)
   const { pick: libraryView, hasSongs } = useLibraryPick()
-  //? the sidebar's Managing shows unless deadwax says this user isn't an admin - with logins off, everyone
-  //? is (You's row asks the same). Asked as the desktop frame shows (a phone has no sidebar); a failed ask
-  //? leaves it as it was. With logins on (2.0.0-player.48) it starts from the session's word (session.ts)
-  const [admin, setAdmin] = useState(adminUntilAsked)
+  //? (2.0.0-player.61) what this person may do - the sidebar's Managing, an album's Edit, an artist's managing,
+  //? the Managing pages - by permission (lib/permissions.ts; an admin has every one, and with logins off everyone
+  //? is). Asked as the desktop frame shows (a phone has no sidebar); a failed ask leaves it as it was. With logins
+  //? on it starts from the session's word (session.ts), and each /me answer redraws every reader (access.ts)
+  const access = useAccess()
+  const perms = access.permissions
   const meRequests = useMemo(latestOnly, [])
   useEffect(() => {
     if (!desktop) return
     const request = meRequests.begin()
     me(request.signal).then(
       (who) => {
-        if (request.current()) setAdmin(who.admin)
+        if (request.current()) noteAccess(who)
       },
       () => {},
     )
@@ -520,9 +524,11 @@ export function App() {
   //? a Managing page) asks nothing more: it is true there all along
   const needsLook = useQueueSummary()
   const asksQueueSummary = desktop || nav.tab === 'you'
+  //? (2.0.0-player.61) only with Look after the library: the count is that permission's (a 403 otherwise)
+  const summaryAllowed = summaryAsked(perms)
   useEffect(() => {
-    if (asksQueueSummary && admin && pageShown) askQueueSummary()
-  }, [asksQueueSummary, admin, pageShown])
+    if (asksQueueSummary && summaryAllowed && pageShown) askQueueSummary()
+  }, [asksQueueSummary, summaryAllowed, pageShown])
 
   const openAlbum = useCallback((album: Album) => {
     //? (2.0.0-player.51) an album new in your library is new no longer once opened
@@ -631,6 +637,8 @@ export function App() {
   const gets = useRef(0)
   const openSources = useCallback((request: Omit<GetRequest, 'key'>, opener: HTMLElement | null) => {
     if (nowPlayingOpen.current) return
+    //? (2.0.0-player.61) Get is Get albums': every Get that leads here is hidden without it
+    if (!getsAlbums(accessNow().permissions)) return
     sourcesOpener.current = opener
     gets.current += 1
     setGetting({ ...request, key: gets.current })
@@ -970,7 +978,8 @@ export function App() {
   }, [])
   //? an empty section's Browse the store: the store's section in its place
   const browseStore = useCallback(() => openSection('store'), [])
-  const openManaging = useCallback((kind: ManagingKind) => openManagingPage(kind === 'care' ? CARE_PAGE : kind === 'settings' ? SETTINGS_PAGE : LOG_PAGE), [])
+  const openManaging = useCallback((kind: ManagingKind) => openManagingPage(
+    kind === 'care' ? CARE_PAGE : kind === 'people' ? PEOPLE_PAGE : kind === 'settings' ? SETTINGS_PAGE : LOG_PAGE), [])
   //? a facet chosen there: the page's address replaced, as a pressing chosen on a group page
   const pickFacet = useCallback((facet: string | null) => {
     router.update({ kind: 'queue', id: QUEUE_ID, ...(facet ? { facet } : {}) })
@@ -1061,7 +1070,7 @@ export function App() {
     const request = meRequests.begin()
     me(request.signal).then(
       (who) => {
-        if (request.current()) setAdmin(who.admin)
+        if (request.current()) noteAccess(who)
       },
       () => {},
     )
@@ -1356,7 +1365,6 @@ export function App() {
         onOpenAlbum={openAlbum}
         onOpenGroup={openGroup}
         onGet={openSources}
-        admin={admin}
         onManage={toggleArtistManage}
         managing={artistOpen && artistManage?.tab === tab && artistManage.page === page.id ? artistManage.mode : null}
         refresh={artistRefreshes.get(page.id) ?? 0}
@@ -1376,7 +1384,8 @@ export function App() {
   //? the panel has open for it (`editing`), and whether it is what shows
   const queueView = (tab: Tab, page: Page) => (
     <NeedsALook
-      admin={admin}
+      allowed={perms.has('library')}
+      canEdit={perms.has('edit')}
       shown={pageShown && nav.tab === tab}
       facet={page.facet ?? null}
       onFacet={pickFacet}
@@ -1393,14 +1402,18 @@ export function App() {
   //? desktop's visualizer not over it, nor a phone's Now Playing (the log holds its stream open only then)
   const managingLive = (tab: Tab) => pageShown && nav.tab === tab && !visualizerShown && !sheetOpen
   const settingsView = (tab: Tab) => (
-    <ServerSettings admin={admin} live={managingLive(tab)} onBack={back} backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]} />
+    <ServerSettings allowed={perms.has('server')} live={managingLive(tab)} onBack={back} backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]} />
   )
   const logView = (tab: Tab) => (
-    <EventLog admin={admin} live={managingLive(tab)} onBack={back} backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]} />
+    <EventLog allowed={perms.has('server')} live={managingLive(tab)} onBack={back} backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]} />
   )
-  //? Library care (2.0.0-player.42): Rescan and the bulk runs, an admin's, by the same rule
+  //? Library care (2.0.0-player.42): Rescan and the bulk runs - (2.0.0-player.61) each part by its permission
   const careView = (tab: Tab) => (
-    <LibraryCare admin={admin} live={managingLive(tab)} onBack={back} backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]} />
+    <LibraryCare parts={careParts(perms)} live={managingLive(tab)} onBack={back} backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]} />
+  )
+  //? People (2.0.0-player.61): Navidrome's accounts, a Navidrome admin's - by the same rule
+  const peopleView = (tab: Tab) => (
+    <People allowed={perms.has('people')} live={managingLive(tab)} onBack={back} backLabel={backLabel(nav, tab) ?? TAB_LABELS[tab]} />
   )
 
   //? (2.0.0-player.58) the Playlists page and a playlist's, inside the Navidrome gate as an album page is - told whether
@@ -1451,7 +1464,7 @@ export function App() {
   }
 
   const pageView = (tab: Tab, page: Page, player: Player) =>
-    page.kind === 'section' ? sectionView(tab, page, true) : page.kind === 'playlists' ? playlistsView(tab) : page.kind === 'playlist' ? playlistView(tab, page, player) : page.kind === 'settings' ? settingsView(tab) : page.kind === 'log' ? logView(tab) : page.kind === 'care' ? careView(tab) : page.kind === 'queue' ? queueView(tab, page) : page.kind === 'artist' ? artistView(tab, page) : page.kind === 'group' ? (
+    page.kind === 'section' ? sectionView(tab, page, true) : page.kind === 'playlists' ? playlistsView(tab) : page.kind === 'playlist' ? playlistView(tab, page, player) : page.kind === 'settings' ? settingsView(tab) : page.kind === 'log' ? logView(tab) : page.kind === 'care' ? careView(tab) : page.kind === 'people' ? peopleView(tab) : page.kind === 'queue' ? queueView(tab, page) : page.kind === 'artist' ? artistView(tab, page) : page.kind === 'group' ? (
       <ReleaseGroupPage
         id={page.id}
         release={page.release ?? null}
@@ -1479,7 +1492,7 @@ export function App() {
           onArtist={openAlbumArtist}
           onOpenAlbum={openAlbum}
           onOpenGroup={openHeldGroup}
-          onEdit={admin ? toggleEdit : undefined}
+          onEdit={albumEdit(perms).shown ? toggleEdit : undefined}
           editAt={desktop ? 'actions' : 'bar'}
           editing={editOpen && edit?.album?.id === page.id}
           refresh={refreshes.get(page.id) ?? 0}
@@ -1504,7 +1517,7 @@ export function App() {
           return [tab, top ? pageView(tab, top, player) : null]
         }),
       ) as Record<Tab, JSX.Element | null>,
-    [nav, status, playingId, player.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, admin, editOpen, edit, refreshes, visualizerShown, sheetOpen, artistOpen, artistManage, artistRefreshes, hasSongs],
+    [nav, status, playingId, player.playing, sourcesOpen, pageShown, desktop, sourcesGroup, sourcesPressing, perms, editOpen, edit, refreshes, visualizerShown, sheetOpen, artistOpen, artistManage, artistRefreshes, hasSongs],
   )
   //? (2.0.0-player.59) the Library stack's first page, when it is a section with a page pushed over it: drawn and
   //? hidden under that page, as the root is, by the same sectionView - so Back finds its tiles, its Find text and its
@@ -1595,7 +1608,7 @@ export function App() {
                 browse={browseItems(hasSongs, hasLibrary())}
                 personal={hasLibrary()}
                 arriving={view.arriving.length}
-                admin={admin}
+                managing={managingOf(perms, access.on)}
                 needsLook={needsLook}
                 playlists={playlistsState.problem ? NO_PLAYLISTS : sidebarPlaylists(playlistsState.list)}
                 currentPlaylist={currentPlaylist}

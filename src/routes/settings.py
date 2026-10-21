@@ -47,7 +47,7 @@ them. See ui/src/state/persisted.ts.
 import os
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from src import __version__, musicbrainz_cache, player_cache
@@ -62,6 +62,7 @@ from src.config import (COVER_ART_SIZES, DEFAULT_MUSICBRAINZ_CACHE_MB, DEFAULT_P
                         setting_source, shadowed_by_empty_env, without_login)
 from src.scan_wait import SCAN_WAIT_CAP_SECONDS
 from src.logger import logger
+from src.users import current_user, is_admin
 
 router = APIRouter()
 
@@ -289,36 +290,27 @@ def _navidrome_rows() -> list[dict]:
 
 def _logins_rows() -> list[dict]:
     """
-    Logins (2.0.0-player.48), READ-ONLY: all four are the environment's alone (Config.NOT_EDITABLE says
+    Logins (2.0.0-player.48), READ-ONLY: all three are the environment's alone (Config.NOT_EDITABLE says
     why on each row), so the rows say what is in force and what, if anything, stops it working. The
-    two secrets are reported as set or not, like every secret here - never their values.
+    two secrets are reported as set or not, like every secret here - never their values. (2.0.0-player.61)
+    No DEADWAX_ADMINS row: deadwax's admins are Navidrome's admins.
     """
     on, mode_problem = describe_auth_mode(Config.AUTH_MODE)
     key_problem = describe_secret_key(Config.DEADWAX_SECRET_KEY)
-    admins = sorted(Config.admins())
 
     return [
         _setting(
             "AUTH_MODE",
             Config.AUTH_MODE,
             effect=(
-                "Logins are on: everyone signs in with their Navidrome account, and only deadwax's admins "
-                "can edit the library, see the review queue and the log, or change these settings"
+                "Logins are on: everyone signs in with their Navidrome account, and only Navidrome's admins - "
+                "and anyone an admin gives a permission to in People - can edit the library, see the review "
+                "queue and the log, or change these settings"
                 if on else
                 "Logins are off: anyone who can reach deadwax can use it, as its one admin"
             ),
             status="error" if mode_problem else "ok",
             detail=f"AUTH_MODE {mode_problem}" if mode_problem else None,
-        ),
-        _setting(
-            "DEADWAX_ADMINS",
-            Config.DEADWAX_ADMINS,
-            effect=(
-                f"deadwax's admins, by Navidrome user name: {', '.join(admins)}" if admins else
-                "deadwax's admins, by Navidrome user name - nobody listed"
-            ) + ". Navidrome's own admin flag is never used",
-            status="error" if on and not admins else None,
-            detail="nobody signed in through Navidrome is an admin until this lists them" if on and not admins else None,
         ),
         _setting(
             "DEADWAX_SECRET_KEY",
@@ -337,8 +329,8 @@ def _logins_rows() -> list[dict]:
             Config.DEADWAX_ADMIN_PASSWORD,
             secret=True,
             effect=(
-                "The break-glass sign-in: as admin, with this password, for when Navidrome is down. It needs "
-                "neither Navidrome nor the database, and lasts 12 hours"
+                "The break-glass sign-in: as deadwax, with this password, for when Navidrome is down or nobody "
+                "is a Navidrome admin. It needs neither Navidrome nor the database, and lasts 12 hours"
             ),
         ),
     ]
@@ -782,8 +774,62 @@ def _lyrics_lead_row() -> dict:
     )
 
 
+#? (2.0.0-player.61 review) Settings only an admin may change - never a person an admin gave Settings and the log.
+#? NAVIDROME_URL is where every person's own Navidrome login goes (the sign-in, the re-check, the player) and, since
+#? deadwax's admins are Navidrome's, what says who they are - and where People's unlock sends an admin's password.
+#? Pointed elsewhere by anyone else, it would hand them every login and make them an admin. The tab shows it locked
+#? for them, in these words, and a save of it is refused in them.
+#? NAVIDROME_USER and NAVIDROME_PASSWORD (second review) are deadwax's own account: People refuses every change to it
+#? (people.refusals' SHARED_ACCOUNT), so anyone who set it to their own account would put themselves past People -
+#? their grants could no longer be taken away there - and have everything deadwax asks as itself asked as them.
+_SHARED_ACCOUNT_LOCK = (
+    "Only an admin can change this: it is deadwax's own Navidrome account, which People keeps out of reach, and "
+    "everything deadwax asks Navidrome as itself is asked as it"
+)
+ADMINS_ONLY = {
+    "NAVIDROME_URL": (
+        "Only an admin can change this: everyone's own Navidrome sign-in is sent to it, and its answers say who "
+        "deadwax's admins are"
+    ),
+    "NAVIDROME_USER": _SHARED_ACCOUNT_LOCK,
+    "NAVIDROME_PASSWORD": _SHARED_ACCOUNT_LOCK,
+}
+
+
+def _as_seen_by(answer: dict, user: str) -> dict:
+    """The settings as `user` may change them: ADMINS_ONLY locked, in its words, for anyone not an admin."""
+    if is_admin(user):
+        return answer
+    for group in answer.get("groups", []):
+        for row in group.get("settings", []):
+            if row.get("key") in ADMINS_ONLY:
+                row["editable"] = False
+                row["locked_reason"] = ADMINS_ONLY[row["key"]]
+    return answer
+
+
+def _admins_only(updates: list["SettingUpdate"], user: str) -> dict[str, str]:
+    """Each ADMINS_ONLY setting this batch would change, refused for someone not an admin - a revert included (it
+    changes the address as surely), saving the value it already has not."""
+    if is_admin(user):
+        return {}
+    refused = {}
+    for update in updates:
+        if update.key not in ADMINS_ONLY:
+            continue
+        after = update.value if update.value is not None else Config.ENV_VALUES.get(update.key)
+        if (after or "").strip() != (getattr(Config, update.key) or "").strip():
+            refused[update.key] = ADMINS_ONLY[update.key]
+    return refused
+
+
 @router.get("")
 @router.get("/")
+async def read_settings(user: str = Depends(current_user)):
+    """The settings tab's answer - settings() - as the person asking may change it."""
+    return _as_seen_by(await settings(), user)
+
+
 async def settings():
     """
     Everything the settings tab renders: the server configuration as this process actually
@@ -1228,7 +1274,7 @@ def _stops_organizing(updates: list[SettingUpdate]) -> dict[str, str]:
 
 @router.put("")
 @router.put("/")
-async def update_settings(updates: list[SettingUpdate], request: Request):
+async def update_settings(updates: list[SettingUpdate], request: Request, user: str = Depends(current_user)):
     """
     Save a batch of settings, apply them live, and report the result.
 
@@ -1259,6 +1305,10 @@ async def update_settings(updates: list[SettingUpdate], request: Request):
             problem = _validate(update.key, update.value)
             if problem:
                 problems[update.key] = problem
+
+    #? (2.0.0-player.61 review) an address only an admin may move - said before anything else about it
+    for key, reason in _admins_only(updates, user).items():
+        problems[key] = reason
 
     #? After validation, so an address that is unusable anyway is told that rather than this
     for key, reason in _moved_without_secret(updates).items():
@@ -1344,7 +1394,7 @@ async def update_settings(updates: list[SettingUpdate], request: Request):
         extra={"frontend": True},
     )
 
-    return await settings()
+    return _as_seen_by(await settings(), user)
 
 
 # ==============================================================================

@@ -54,7 +54,7 @@ export function forgetEventLogPage(): void {
  * again itself, the history first, every STREAM_RETRY_MS.
  *
  * THE STREAM IS HELD ONLY WHILE THIS PAGE IS WHAT SHOWS (`live`: its tab current, the page in front, the
- * desktop's visualizer or a phone's Now Playing not over it - App's word; and an admin) and closed
+ * desktop's visualizer or a phone's Now Playing not over it - App's word; and an admin's - since 2.0.0-player.61 anyone with Settings and the log) and closed
  * otherwise: the player fetches its audio from the same host over plain http/1.1, where a held
  * connection is one of the six a browser allows. Coming back,
  * the history is read again and the stream rejoined by number. So there is no unread badge anywhere - it
@@ -68,16 +68,17 @@ export function forgetEventLogPage(): void {
  *
  * ON A PHONE TOO (2.0.0-player.47): the same page, laid out for a phone by app.css - a line's time, level
  * and source over its words, which wrap - and its stream held by the same rule. Someone deadwax says isn't
- * its admin gets a short note instead, asking nothing.
+ * its admin - since 2.0.0-player.61 anyone without Settings and the log - gets a short note instead, asking nothing.
  */
 export function EventLog({
-  admin,
+  allowed,
   live,
   onBack,
   backLabel,
 }: {
-  /** deadwax's admin is the one looking (everyone, with logins off) - on either frame since 2.0.0-player.47 */
-  admin: boolean
+  /** (2.0.0-player.61) the one looking has this page's permission - an admin, or given it; everyone, with logins
+   *  off - on either frame since 2.0.0-player.47 */
+  allowed: boolean
   /** this page is what shows - its tab current, the app in front, nothing over it */
   live: boolean
   onBack: () => void
@@ -101,7 +102,7 @@ export function EventLog({
   const join = keep
 
   useEffect(() => {
-    if (!admin || !live) return
+    if (!allowed || !live) return
     let source: EventSource | null = null
     let closed = false
     let retry: ReturnType<typeof setTimeout> | null = null
@@ -169,7 +170,7 @@ export function EventLog({
       source = null
       if (retry) clearTimeout(retry)
     }
-  }, [admin, live])
+  }, [allowed, live])
 
   const header = (
     <>
@@ -185,7 +186,7 @@ export function EventLog({
     </>
   )
 
-  if (!admin) {
+  if (!allowed) {
     return (
       <section class="app-log is-refused app-needs">
         {header}

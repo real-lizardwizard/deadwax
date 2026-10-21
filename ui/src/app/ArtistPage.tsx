@@ -15,6 +15,7 @@ import {
 import { artistArtUrl } from '../lib/format'
 import { isAbort, latestOnly } from '../lib/latest'
 import { foldName } from '../lib/owned'
+import { GET_OFF, artistManaging, gets } from '../lib/permissions'
 import { pinOf, type ArtistPinTarget } from '../lib/pins'
 import { coverAddresses } from '../lib/pressings'
 import {
@@ -25,6 +26,7 @@ import { Cover } from '../player/Cover'
 import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, PlayIcon, ShuffleIcon } from '../player/icons'
 import { ArchiveCover } from './ArchiveCover'
 import type { ArtistManageMode, ArtistManageRequest } from './ArtistPanel'
+import { useAccess } from './access'
 import { usePlayerActions } from './context'
 import { PINS_UNSAVED, PinToggle } from './PinToggle'
 import { keep, kept as keptPressings, usualGet } from './pressingLists'
@@ -213,7 +215,6 @@ export function ArtistPage({
   onOpenAlbum,
   onOpenGroup,
   onGet,
-  admin = false,
   onManage,
   managing = null,
   refresh = 0,
@@ -232,8 +233,6 @@ export function ArtistPage({
   onOpenGroup: (group: ReleaseGroup) => void
   /** a row's Get: open the Sources sheet for its usual pressing, focus given back to `opener` */
   onGet: (request: Omit<GetRequest, 'key'>, opener: HTMLElement | null) => void
-  /** deadwax says this user is an admin - with logins off, everyone (App's /deadwax/me) */
-  admin?: boolean
   /** open the artist page's panel (2.0.0-player.45); `opener` the control it gives focus back to */
   onManage?: (request: Omit<ArtistManageRequest, 'key'>, opener: HTMLElement | null) => void
   /** what the panel is open for on this page, null while it isn't */
@@ -247,6 +246,9 @@ export function ArtistPage({
   onDrawn?: (all: boolean) => void
 }) {
   const actions = usePlayerActions()
+  //? (2.0.0-player.61) what this person may do: Get by Get albums, the managing by theirs
+  const access = useAccess()
+  const getsAlbums = gets(access.permissions)
   const { pins, known: pinsKnown, canSave } = usePins(true)
   const ref = useMemo(() => artistRef(id), [id])
   const kept = useMemo(() => keptArtist(id), [id])
@@ -806,7 +808,12 @@ export function ArtistPage({
       },
     }, takeOpener(event))
   }
-  const manages = admin && !!onManage
+  //? (2.0.0-player.61) each managing control by its permission (lib/permissions.ts artistManaging): Artist images…
+  //? and Which artist is this? Edit albums', Move albums to … Look after the library's - with logins off, all
+  const may = artistManaging(access.permissions)
+  const managesImages = may.images && !!onManage
+  const managesWho = may.whichArtist && !!onManage
+  const managesMove = may.move && !!onManage
 
   /** In your library: what the library last said of them - or, drawn last while it is still out, that
    *  it is looking, and once it has answered with nothing, so; couldn't be read, that (with Try again),
@@ -867,7 +874,7 @@ export function ArtistPage({
         <p class="app-search-empty">Nothing of theirs in {where}.</p>
       )}
       {/* couldn't be read: still drawn, stepped back, saying why (review) */}
-      {manages && (shownLibrary || summariesFailed) && (
+      {managesImages && (shownLibrary || summariesFailed) && (
         <div class="app-artist-manage">
           {/* aria-disabled, so it keeps focus and says why; a tap while it can't do anything is refused */}
           <button
@@ -966,6 +973,10 @@ export function ArtistPage({
               )}
             </div>
 
+            {/* (2.0.0-player.61) without Get albums: no Get on a row, and why, once */}
+            {drawRows && !getsAlbums && rows.some((row) => row.held === false && row.group) && (
+              <p class="app-footnote app-get-off">{GET_OFF}</p>
+            )}
             {drawRows && rows.length > 0 && (
               <ul class="app-artist-rows">
                 {rows.map((row) => (
@@ -989,7 +1000,7 @@ export function ArtistPage({
                         </span>
                       </span>
                     </button>
-                    {row.held === false && row.group && (
+                    {row.held === false && row.group && getsAlbums && (
                       <button
                         type="button"
                         class={`app-result-get${resolving === row.group.id ? ' is-busy' : ''}`}
@@ -1031,7 +1042,7 @@ export function ArtistPage({
                     : `Nothing of theirs in ${where}, and MusicBrainz doesn't know who this is.`}
                 </p>
                 {/* (2.0.0-player.45) the picker's MusicBrainz search, for a shared name or files that don't say */}
-                {manages && (
+                {managesWho && (
                   <button
                     type="button"
                     class="app-button app-artist-manage-button"
@@ -1061,7 +1072,7 @@ export function ArtistPage({
                   {byChoice && (
                     <p class="app-footnote app-artist-chosen">
                       You chose who this is, for this visit.{' '}
-                      {manages && (
+                      {managesWho && (
                         <button
                           ref={changeButton}
                           type="button"
@@ -1083,7 +1094,7 @@ export function ArtistPage({
                               <dt class="app-row-label">{ownName ? 'Also filed as' : 'Now'}</dt>
                               <dd class="app-row-value">{ownName ? listed(moveNames) : facts.name}</dd>
                               {/* the fix for an artist filed under an old name (v0.9.14) */}
-                              {manages && (
+                              {managesMove && (
                                 <div class="app-artist-now-move">
                                   <button
                                     type="button"

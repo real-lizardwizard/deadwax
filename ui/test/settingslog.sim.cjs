@@ -193,6 +193,8 @@ function mount(component, props) {
   const all = { admin: true, live: true, backLabel: 'You', onBack() {}, ...props }
   const draw = (more = {}) => {
     Object.assign(all, more)
+    //? (2.0.0-player.61) both pages are told `allowed` - Settings and the log, which an admin has
+    all.allowed = all.admin
     tree = expand(render(all))
     render.commit()
     tree = expand(render(all))

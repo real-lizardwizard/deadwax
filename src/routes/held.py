@@ -1,6 +1,6 @@
 """
 Held by nobody (2.0.0-player.51, step 5 of the multi-user plan) - the admin's, at /deadwax/library/held
-(included with require_admin: tests/test_logins.py's ROUTES):
+(included with require("library") since 2.0.0-player.61 - Look after the library: tests/test_logins.py's ROUTES):
 
   GET  ""                     every album in the store nobody holds - one copied in by hand or by another
                               tool belongs to nobody, and stays for anyone to add - and the downloads

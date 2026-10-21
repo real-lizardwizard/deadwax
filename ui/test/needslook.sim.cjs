@@ -304,6 +304,8 @@ function mount(props = {}) {
   }
   const draw = (more = {}) => {
     Object.assign(all, more)
+    //? (2.0.0-player.61) the page is told `allowed` - Look after the library, which an admin has
+    all.allowed = all.admin
     tree = render(all)
     render.commit()
     tree = render(all)

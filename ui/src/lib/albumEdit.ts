@@ -66,11 +66,25 @@ export const EDIT_TABS: readonly { id: EditTab; label: string }[] = [
   { id: 'delete', label: 'Delete' },
 ]
 
-/** The tab an arrow key moves to from `tab`: the next or the one before, round the ends. */
-export function tabAfter(tab: EditTab, step: number): EditTab {
-  const at = EDIT_TABS.findIndex((entry) => entry.id === tab)
-  const next = (((at + step) % EDIT_TABS.length) + EDIT_TABS.length) % EDIT_TABS.length
-  return EDIT_TABS[next]!.id
+/** (2.0.0-player.61) The tabs this person's permissions show (lib/permissions.ts albumEdit): the editors' with Edit
+ *  albums, Delete with Look after the library - in EDIT_TABS' order. */
+export function editTabs(editors: boolean, remove: boolean): readonly { id: EditTab; label: string }[] {
+  return EDIT_TABS.filter((entry) => (entry.id === 'delete' ? remove : editors))
+}
+
+/** Where Delete's Cancel (and its Escape) goes back to: the first tab shown that isn't Delete - or, when Delete is
+ *  the only tab (Look after the library without Edit albums, 2.0.0-player.61 second review), null: the panel
+ *  closes, as its close button closes it. Going "back" to Delete would leave the dialog up and Cancel dead. */
+export function cancelDeleteTo(tabs: readonly { id: EditTab }[]): EditTab | null {
+  return tabs.find((entry) => entry.id !== 'delete')?.id ?? null
+}
+
+/** The tab an arrow key moves to from `tab`: the next or the one before, round the ends - of the tabs shown. */
+export function tabAfter(tab: EditTab, step: number, tabs: readonly { id: EditTab }[] = EDIT_TABS): EditTab {
+  if (!tabs.length) return tab
+  const at = Math.max(0, tabs.findIndex((entry) => entry.id === tab))
+  const next = (((at + step) % tabs.length) + tabs.length) % tabs.length
+  return tabs[next]!.id
 }
 
 /** Navidrome's album, as the album page had it when Edit was pressed - what finds its folder when

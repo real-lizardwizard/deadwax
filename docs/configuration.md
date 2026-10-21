@@ -86,8 +86,8 @@ same music `LIBRARY_PATH` reads.
 
 | setting | default | what it does |
 | --- | --- | --- |
-| `NAVIDROME_URL` | | Navidrome's address **as seen from inside this container**, with the scheme: `http://navidrome:4533` for a container on the same Docker network. If Navidrome runs under a base path (`ND_BASEPATH`), include it, as in `http://navidrome:4533/music`; deadwax adds `/rest` itself. It can't hold a user name or password, a `?` or `#`, or a space, and the settings tab says which. One set in compose or `.env` that fails the same check is refused as well: deadwax sends Navidrome nothing at it (the player, the settings tab and the container's log all say why), and applying a release falls back on the fixed `RETAG_RENAME_WAIT`. **Changing it takes the password again**, typed in the same save, so the saved password is never sent to an address it wasn't entered for. Clearing or reverting it doesn't. |
-| `NAVIDROME_USER` | | the Navidrome account the player plays as. Its play counts are recorded there, and passed on to Last.fm or ListenBrainz if that account has them. It doesn't need to be an admin, and a non-admin account of your own is the one to use. With logins on each person's player plays as their own account instead, and this one is still needed: deadwax asks as it for what answers for nobody in particular (fetching a song once into the player's cache, whether Navidrome has finished a scan, which albums it lists), and the break-glass `admin` plays as it - [the player as you](player.md#the-player-as-you-with-logins-on). With Navidrome's per-user libraries, give it **every** library: a song in one it can't see won't play on an iPhone, through Gapless or on the turntable, and its folder counts as not in Navidrome. With logins off (and for the break-glass `admin`) the [playlists](player.md#playlists) made in deadwax are this account's - Amperfy signed in as anyone else sees them only once shared - which is one more reason it shouldn't be a Navidrome admin: deadwax shows nobody another user's private playlists either way, but an admin account in Amperfy would. (Playlists add no setting.) |
+| `NAVIDROME_URL` | | Navidrome's address **as seen from inside this container**, with the scheme: `http://navidrome:4533` for a container on the same Docker network. If Navidrome runs under a base path (`ND_BASEPATH`), include it, as in `http://navidrome:4533/music`; deadwax adds `/rest` itself. It can't hold a user name or password, a `?` or `#`, or a space, and the settings tab says which. One set in compose or `.env` that fails the same check is refused as well: deadwax sends Navidrome nothing at it (the player, the settings tab and the container's log all say why), and applying a release falls back on the fixed `RETAG_RENAME_WAIT`. **Changing it takes the password again**, typed in the same save, so the saved password is never sent to an address it wasn't entered for. Clearing or reverting it doesn't. With logins on, **only an admin can change it** in the settings tab, even someone given Settings and the log: everyone's own sign-in goes to it, and its answers say who deadwax's admins are. |
+| `NAVIDROME_USER` | | the Navidrome account the player plays as. Its play counts are recorded there, and passed on to Last.fm or ListenBrainz if that account has them. It doesn't need to be an admin, and a non-admin account of your own is the one to use. With logins on, **only an admin can change it** (or its password) in the settings tab, even someone given Settings and the log: People won't touch deadwax's own account, so pointed at someone's own it would put them out of People's reach. With logins on each person's player plays as their own account instead, and this one is still needed: deadwax asks as it for what answers for nobody in particular (fetching a song once into the player's cache, whether Navidrome has finished a scan, which albums it lists), and the break-glass `deadwax` plays as it - [the player as you](player.md#the-player-as-you-with-logins-on). With Navidrome's per-user libraries, give it **every** library: a song in one it can't see won't play on an iPhone, through Gapless or on the turntable, and its folder counts as not in Navidrome. With logins off (and for the break-glass `deadwax`) the [playlists](player.md#playlists) made in deadwax are this account's - Amperfy signed in as anyone else sees them only once shared - which is one more reason it shouldn't be a Navidrome admin: deadwax shows nobody another user's private playlists either way, but an admin account in Amperfy would. (Playlists add no setting.) |
 | `NAVIDROME_PASSWORD` | | that account's password. It stays in deadwax: the page only shows whether it's set, and the phone is never sent it or anything made from it. |
 
 ### MusicBrainz's saved answers (Settings → Connections)
@@ -222,8 +222,9 @@ can land seconds off.
 ### Logins (environment only)
 
 Off by default. With `AUTH_MODE=on`, everyone signs in with their **Navidrome** user name and
-password, and only deadwax's admins can change the library - [Sharing deadwax](sharing.md) walks
-through turning them on, what each person gets, and turning them off again. All four are read from the container's
+password, and only deadwax's admins - **Navidrome's admins** - and anyone an admin gives a permission to
+can change the library - [Sharing deadwax](sharing.md) walks
+through turning them on, what each person gets, and turning them off again. All three are read from the container's
 environment (compose's `environment:` block or `.env`) and nowhere else: the settings tab, and the
 app's **Managing → Settings**, show them under **Connections**, locked, saying so - a value saved
 there would beat your compose file, so a wrong one could lock everyone out with no way back from the
@@ -232,18 +233,21 @@ page that saved it. Change one in compose and restart deadwax.
 | setting | default | what it does |
 | --- | --- | --- |
 | `AUTH_MODE` | `off` | `off`: deadwax as it always was - no sign-in, and anyone who can reach the port can use it, as its one admin. `on`: everyone signs in. Anything else is read as `on`, so a typo never leaves deadwax open, and the log says so. With logins on, `/docs` and `/openapi.json` (the API's own pages) are switched off. |
-| `DEADWAX_ADMINS` | | who is deadwax's admin, by Navidrome user name, comma-separated (case doesn't matter): `james`, or `james,someone`. Navidrome's own admin setting isn't used: an admin here needn't be one there, and the other way round. |
+| `DEADWAX_ADMINS` | | **removed in 2.0.0-player.61** - ignored now, with a line in the log at start-up saying so. deadwax's admins are Navidrome's: an account that is a Navidrome admin is deadwax's admin, read as it signs in and every few minutes after. Take it out of compose. |
 | `DEADWAX_SECRET_KEY` | | **required with logins on**: at least 32 characters - make one with `openssl rand -hex 32`. Signing in keeps a token made from your Navidrome password in deadwax's database, `DB_PATH` (on Navidrome's API it is as good as the password, for as long as the password stands), encrypted with this key. Without it nobody can sign in: everything but the health check and the pages themselves answers 503, saying why, and the sign-in screen shows it. Changing it (deadwax reads it at a restart) signs everyone out, each at their next request, and deadwax can't star albums for anyone until they've signed in again. |
-| `DEADWAX_ADMIN_PASSWORD` | | optional: the **break-glass** sign-in. User name `admin`, this password - an admin who needs neither Navidrome nor the database, for when Navidrome is down or nobody else can sign in. It lasts 12 hours, and ends at once if this password changes. Unset, there is no such sign-in. Since `admin` is this sign-in's name, a Navidrome account called `admin` can't sign in to deadwax. |
+| `DEADWAX_ADMIN_PASSWORD` | | optional: the **break-glass** sign-in. User name `deadwax` (it was `admin` until 2.0.0-player.61), this password - an admin who needs neither Navidrome nor the database, for when Navidrome is down or nobody else can sign in (nobody being a Navidrome admin, say). It lasts 12 hours, and ends at once if this password changes. Unset, there is no such sign-in. Since `deadwax` is this sign-in's name, a Navidrome account called `deadwax` can't sign in to deadwax; Navidrome's own `admin` account signs in as itself, like anyone. |
 
-**Who can do what.** An admin can do everything. Anyone else signed in can search, find and get
-albums, play, pin to Home and choose their own Getting albums settings; editing the library (applying
-a release, tags, covers, lyrics, CD art, deleting, an artist's pictures and re-filing, rescans), the
-albums that need a look, the log and the server settings are an admin's - the app doesn't show them to
-anyone else, and deadwax refuses them (a 403 that says so) - [the full table](sharing.md#admins-and-everyone-else). **Downloads are each person's own**: you see the downloads you asked for, and join one somebody else already has
+**Who can do what.** An admin - a Navidrome admin - can do everything. Anyone else signed in can
+search, find and get albums, play, pin to Home and choose their own Getting albums settings; editing
+the library (applying a release, tags, covers, lyrics, CD art, an artist's pictures), deleting and
+re-filing, rescans, the albums that need a look, the log and the server settings are an admin's - unless
+an admin gives that person the permission for them, by category, in **You → Managing deadwax →
+People** - and Get albums can be taken away. **Permissions are kept in deadwax's database, per person,
+and set in People** - no setting of their own. The app doesn't show anyone what they can't use, and
+deadwax refuses it (a 403 that says what it needs) - [the full table](sharing.md#admins-permissions-and-everyone-else). **Downloads are each person's own**: you see the downloads you asked for, and join one somebody else already has
 on its way rather than fetching it twice; your cancel leaves a download others still want, and your
-Clear done clears it from your list - an admin sees, and cancels, everyone's. See
-[Downloading](downloading.md#with-logins-on-downloads-per-person).
+Clear done clears it from your list - an admin, or someone given Everyone's downloads, sees and
+cancels everyone's. See [Downloading](downloading.md#with-logins-on-downloads-per-person).
 
 **Organizing has to be on**: with logins on, `ORGANIZE_MODE` must be `copy` or
 `move`, with `LIBRARY_PATH` and `SLSKD_DOWNLOAD_PATH` set - a download is the person's who asked for it
@@ -337,7 +341,7 @@ Three settings in the app's **You → Getting albums** (since 2.0.0-player.15; F
 ([Get, and choosing a source](downloading.md#on-the-phone-get-and-choosing-a-source)). They are kept
 **on deadwax, per user** - not on the device - so they follow you from the phone to a browser and
 back. With logins off (the default) everyone using deadwax shares one set, on every device; with
-logins on each person has their own, and the first admin to sign in takes over the ones chosen before
+logins on each person has their own, and the first Navidrome admin to sign in takes over the ones chosen before
 ([sharing deadwax](sharing.md#what-happens-to-what-you-had)). Each is a list to tap in You: the choice shows at once and
 is saved behind it, and if deadwax can't keep it (its database isn't writable) it goes back to what
 deadwax has and You says so. Choices made quickly are saved one after another, in the order you made

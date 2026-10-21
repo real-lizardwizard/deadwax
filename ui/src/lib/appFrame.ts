@@ -146,7 +146,7 @@ export function isBrowse(pick: LibraryPick, personal: boolean): boolean {
  *  care" (2.0.0-player.42), `settings` and `log` its "Settings" and "Log" (2.0.0-player.33) - an admin's;
  *  `playlists` (2.0.0-player.58) the Playlists group's "All playlists" (each playlist under it is a button of
  *  its own, by id - Sidebar's `onPlaylist`). */
-export type SidebarId = 'home' | 'requests' | LibraryPick | 'playlists' | 'queue' | 'care' | 'settings' | 'log' | 'you'
+export type SidebarId = 'home' | 'requests' | LibraryPick | 'playlists' | 'queue' | 'care' | 'people' | 'settings' | 'log' | 'you'
 
 export interface SidebarItem {
   id: SidebarId
@@ -210,6 +210,9 @@ export const SIDEBAR_QUEUE: SidebarItem = { id: 'queue', label: 'Needs a look' }
 /** Managing's Library care (2.0.0-player.42), after Needs a look: Rescan and the bulk runs. */
 export const SIDEBAR_CARE: SidebarItem = { id: 'care', label: 'Library care' }
 
+/** Managing's People (2.0.0-player.61), after Library care: Navidrome's accounts. */
+export const SIDEBAR_PEOPLE: SidebarItem = { id: 'people', label: 'People' }
+
 /** Managing's server settings and event log (2.0.0-player.33), after Library care. */
 export const SIDEBAR_SETTINGS: SidebarItem = { id: 'settings', label: 'Settings' }
 export const SIDEBAR_LOG: SidebarItem = { id: 'log', label: 'Log' }
@@ -258,6 +261,8 @@ export function sidebarCurrent(
   if (page?.kind === 'queue') return 'queue'
   //? Library care (2.0.0-player.42), the same way
   if (page?.kind === 'care') return 'care'
+  //? People (2.0.0-player.61), the same way
+  if (page?.kind === 'people') return 'people'
   //? the server's settings and the log, the same way (2.0.0-player.33)
   if (page?.kind === 'settings') return 'settings'
   if (page?.kind === 'log') return 'log'
@@ -267,8 +272,8 @@ export function sidebarCurrent(
 }
 
 /** The Managing pages but Needs a look, which opens through its own move: Library care
- *  (2.0.0-player.42), the server's settings and the log (2.0.0-player.33). */
-export type ManagingKind = 'care' | 'settings' | 'log'
+ *  (2.0.0-player.42), People (2.0.0-player.61), the server's settings and the log (2.0.0-player.33). */
+export type ManagingKind = 'care' | 'people' | 'settings' | 'log'
 
 /**
  * What a sidebar item does, from where the app is. Home, Requests and You are their tabs' buttons -
@@ -282,7 +287,7 @@ export type SidebarMove =
   | { how: 'view'; tab: 'library'; pick: LibraryPick }
   /** Needs a look: its page, on You (App's openQueue) */
   | { how: 'queue'; tab: 'you' }
-  /** Library care, the server's settings, or the log: its page, on You (App's openManaging) */
+  /** Library care, People, the server's settings, or the log: its page, on You (App's openManaging) */
   | { how: 'managing'; tab: 'you'; kind: ManagingKind }
   /** (2.0.0-player.58) All playlists: the Playlists page, on the Library (App's openPlaylistsPage) */
   | { how: 'playlists' }
@@ -292,7 +297,7 @@ export function sidebarMove(
 ): SidebarMove {
   if (item === 'playlists') return { how: 'playlists' }
   if (item === 'queue') return { how: 'queue', tab: 'you' }
-  if (item === 'care' || item === 'settings' || item === 'log') return { how: 'managing', tab: 'you', kind: item }
+  if (item === 'care' || item === 'people' || item === 'settings' || item === 'log') return { how: 'managing', tab: 'you', kind: item }
   if (item === 'home' || item === 'requests' || item === 'you') return { how: 'tab', tab: item }
   //? (2.0.0-player.59) a section page at the Library stack's foot is the view the tab shows as it was left - so the
   //? item it names is "the tab", and any other, the pick's own included, is that view at the Library's root. The

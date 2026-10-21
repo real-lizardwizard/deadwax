@@ -984,6 +984,9 @@ console.log('\ndownloads per person (2.0.0-player.49): who asked, what a cancel 
     ['Asked by you, ethan and sam', 'Cancel this download for everyone? ethan asked for it too.'])
   const alone = view([job('queued', { mine: true, shared: false, requested_by: [] })]).sections.waiting[0]
   check('...and one only they asked for says nothing more', [alone.askedBy, alone.cancelWords.action], [null, 'Cancel download'])
+  //? (2.0.0-player.61) one nobody waits for - its one asker removed in People: it carries on, filed for nobody
+  const nobody = view([job('queued', { mine: false, shared: false, requested_by: [] })]).sections.waiting[0]
+  check('...and one nobody waits for any more says so', [nobody.askedBy, nobody.cancelWords.action], ['Nobody is waiting for this any more', 'Cancel download'])
 
   //? drawn: the line under the title, and the question's words
   const drawnWait = deep(H.root(Cards.WaitingCard)({ row: theirs, onCancel() {}, asking: true, onKeep() {}, onConfirm() {} }))

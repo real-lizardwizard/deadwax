@@ -6,6 +6,7 @@ import { me, type Me } from '../api/me'
 import { latestOnly } from '../lib/latest'
 import { afterSignIn, returnTarget, signInProblem } from '../lib/signIn'
 import { App } from './App'
+import { noteAccess } from './access'
 import { sessionMe, setSessionMe } from './session'
 import { SignIn } from './SignIn'
 
@@ -82,6 +83,10 @@ export function startWithLogins(host: HTMLElement): void {
   const signedIn = (who: Me) => {
     const before = sessionMe()?.user ?? null
     setSessionMe(who)
+    //? (2.0.0-player.61 review) every answer the gate has - coming back to the front, a song failing, a sign-in
+    //? again - is what the app draws by too (access.ts): an admin's change reaches a desktop, which asks /me
+    //? nowhere else, without a reload
+    noteAccess(who)
     const back = returnTarget(location.search)
     if (back) {
       location.replace(back)

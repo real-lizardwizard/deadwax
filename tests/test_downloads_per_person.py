@@ -48,7 +48,9 @@ from src.api.slskd_endpoint import SearchGate, SlskdClient
 from src.config import Config
 from src.store import JobStore, job_quality
 from src.users import LOCAL_USER
-from tests.test_logins import GLASS, LOGIN, PASSWORDS, SECRET, FakeNavidrome
+from tests.test_logins import GLASS, LOGIN, PASSWORDS, SECRET, FakeNavidrome, wire_native
+from src import permissions
+from src.api import navidrome_admin
 
 JOBS = "/deadwax/download/jobs"
 ENQUEUE = "/deadwax/download/enqueue"
@@ -100,7 +102,6 @@ class Slskd:
 def on(monkeypatch, tmp_path):
     monkeypatch.setattr(Config, "AUTH_MODE", "on")
     monkeypatch.setattr(Config, "DEADWAX_SECRET_KEY", SECRET)
-    monkeypatch.setattr(Config, "DEADWAX_ADMINS", "james")
     monkeypatch.setattr(Config, "DEADWAX_ADMIN_PASSWORD", GLASS)
     monkeypatch.setattr(Config, "NAVIDROME_URL", "http://navidrome:4533")
     monkeypatch.setattr(Config, "ORGANIZE_MODE", "copy")
@@ -110,21 +111,27 @@ def on(monkeypatch, tmp_path):
     monkeypatch.setattr(Config, "AUTO_RETRY_PEER", "off")
     monkeypatch.setattr(auth, "throttle", auth.Throttle())
     auth.forget_sessions()
+    permissions.forget_all()
     fake = FakeNavidrome()
     fake.passwords["sam"] = SAM_PASSWORD
+    fake.ids["sam"] = "id-sam"
     auth.login_client.client = httpx.AsyncClient(transport=httpx.MockTransport(fake.handle),
                                                  base_url="http://navidrome:4533/rest")
     auth.login_client.base = "http://navidrome:4533/rest"
+    #? (2.0.0-player.61) the sign-in reads the account id of someone an admin gave a permission to
+    wire_native(fake.handle)
     store = JobStore(str(tmp_path / "state" / "deadwax.db"))
     store.init()
     app = start()
     app.state.store = store
     app.state.slskd_client = Slskd()
     app.state.poller_task = SimpleNamespace(done=lambda: False)
-    yield SimpleNamespace(app=app, store=store, slskd=app.state.slskd_client, tmp=tmp_path,
+    yield SimpleNamespace(app=app, store=store, slskd=app.state.slskd_client, tmp=tmp_path, fake=fake,
                           path=tmp_path / "state" / "deadwax.db")
     auth.forget_sessions()
+    permissions.forget_all()
     run(auth.login_client.close_client())
+    run(navidrome_admin.close_client())
 
 
 def password_of(name: str) -> str:
@@ -829,6 +836,69 @@ def test_an_admin_may_retry_anybodys(on):
     run(on.store.update_status(job_id, "failed", "offline"))
     on.slskd.fail("bob")
     assert james.post(f"{JOBS}/{job_id}/retry_same").json()["retried"] is True
+
+
+# ----------------------------------------------------------------- Everyone's downloads, given (2.0.0-player.61)
+
+def given(on, name: str, **wanted) -> TestClient:
+    """`name` signed in after an admin gave them these permissions in People - bound to their account, so honoured."""
+    permissions.set_for(on.store, name, on.fake.ids[name], {"request": True, "edit": False, "library": False,
+                                                            "downloads": False, "server": False, **wanted}, "james")
+    return signed_in(on, name)
+
+
+def test_everyones_downloads_given_is_an_admins_view_of_them(on):
+    """An ordinary person given Everyone's downloads: everyone's rows saying who asked, another's job reached,
+    a cancel for everyone, a clear of everyone's finished - as an admin's. Without it, their own."""
+    ethan, sam = given(on, "ethan", downloads=True), signed_in(on, "sam")
+    theirs = get(sam, release={**RELEASE, "release_mbid": "rel-sams"})["job_id"]
+    shared = get(sam, release={**RELEASE, "release_mbid": "rel-shared"})["job_id"]
+    seen = rows(ethan)
+    assert set(seen) == {theirs, shared} and seen[theirs]["requested_by"] == ["sam"] and seen[theirs]["mine"] is False
+    #? cancel for everyone, not leave
+    answer = ethan.post(f"{JOBS}/{shared}/cancel").json()
+    assert answer["left"] is False and run(on.store.get_job(shared))["status"] == "cancelled"
+    #? clear everyone's finished - for himself alone, as an admin's clear is
+    run(on.store.update_status(theirs, "organized"))
+    assert ethan.post(f"{JOBS}/clear").json()["removed"] == 2
+    assert theirs in rows(sam)
+    #? taken away: his own again, the rest not found
+    permissions.set_for(on.store, "ethan", "id-ethan", {"request": True, "edit": False, "library": False,
+                                                        "downloads": False, "server": False}, "james")
+    other = get(sam, release={**RELEASE, "release_mbid": "rel-other"})["job_id"]
+    assert other not in rows(ethan) and "requested_by" not in str(rows(ethan))
+    assert ethan.post(f"{JOBS}/{other}/cancel").status_code == 404
+
+
+def test_retrying_someone_elses_download_needs_get_albums_too(on):
+    """Everyone's downloads reaches another's job; a retry starts a download, so it needs Get albums as well."""
+    sam = signed_in(on, "sam")
+    job_id = get(sam)["job_id"]
+    run(on.store.update_status(job_id, "failed", "offline"))
+    on.slskd.fail("bob")
+    ethan = given(on, "ethan", downloads=True, request=False)
+    for action in ("retry", "retry_same"):
+        answer = ethan.post(f"{JOBS}/{job_id}/{action}")
+        assert answer.status_code == 403 and "Get albums" in answer.json()["detail"], action
+    #? and seeing it is still his
+    assert job_id in rows(ethan)
+    permissions.set_for(on.store, "ethan", "id-ethan", {"request": True, "edit": False, "library": False,
+                                                        "downloads": True, "server": False}, "james")
+    assert ethan.post(f"{JOBS}/{job_id}/retry_same").json()["retried"] is True
+
+
+def test_get_albums_taken_away_refuses_every_start_but_leaves_your_own_list(on):
+    ethan = signed_in(on, "ethan")
+    job_id = get(ethan)["job_id"]
+    permissions.set_for(on.store, "ethan", "id-ethan", {"request": False, "edit": False, "library": False,
+                                                        "downloads": False, "server": False}, "james")
+    #? a restriction is by name: in force at once, no sign-in, no account id needed
+    answer = ethan.post(ENQUEUE, json=enqueue_body(release={**RELEASE, "release_mbid": "rel-new"}))
+    assert answer.status_code == 403 and answer.json()["detail"] == (
+        "That needs Get albums, which an admin hasn't given you. You're signed in as ethan.")
+    assert ethan.post("/deadwax/download/find_candidates", json={}).status_code == 403
+    assert ethan.post(f"{JOBS}/{job_id}/join").status_code == 403
+    assert job_id in rows(ethan) and ethan.post(f"{JOBS}/{job_id}/cancel").status_code == 200
 
 
 # ----------------------------------------------------------------- clear finished hides it for you

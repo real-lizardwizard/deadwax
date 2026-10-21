@@ -53,8 +53,33 @@ def test_the_rest_of_the_app_is_left_alone():
 
     for path in ("/deadwax/health", "/player/"):
         response = client.get(path)
-        assert "content-security-policy" not in response.headers
+        #? (2.0.0-player.61) a page carries one policy of its own - it refuses to be framed - never the sandbox
+        assert response.headers.get("content-security-policy") in (None, "frame-ancestors 'none'")
+        assert "sandbox" not in response.headers.get("content-security-policy", "")
         assert "cross-origin-resource-policy" not in response.headers
+    assert "content-security-policy" not in client.get("/deadwax/health").headers
+
+
+def test_a_media_route_answering_as_a_page_keeps_its_sandbox():
+    """(2.0.0-player.61 review) The sandbox is for the day a type slips through: a media route answering text/html
+    keeps it, with RefuseFrames' frame-ancestors beside it - never in its place."""
+    from fastapi.responses import HTMLResponse
+
+    app = start()
+
+    @app.get("/deadwax/navidrome/cover/slipped")
+    def slipped():
+        return HTMLResponse("<script>alert(1)</script>")
+
+    #? first, ahead of the cover route that would answer the path itself
+    app.router.routes.insert(0, app.router.routes.pop())
+
+    response = TestClient(app).get("/deadwax/navidrome/cover/slipped")
+
+    policies = response.headers.get_list("content-security-policy")
+    assert "default-src 'none'; sandbox" in policies
+    assert "frame-ancestors 'none'" in policies
+    assert response.headers["x-frame-options"] == "DENY"
 
 
 def test_exactly_the_media_routes_are_named():

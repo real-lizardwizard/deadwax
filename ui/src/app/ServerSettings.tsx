@@ -102,16 +102,18 @@ export function onServerSettingsSaved(listener: (keys: string[]) => void): () =>
  * rows wrapping, fields iOS won't zoom into, the save bar above the tab bar and the mini player, and
  * keyboard focus kept clear of it. The Navidrome gate's "Set up Navidrome" opens it at Connections
  * (showServerSettingsTab), and a save is told to App (onServerSettingsSaved), which asks Navidrome again.
- * Someone deadwax says isn't its admin gets a short note instead, asking nothing.
+ * Someone without Settings and the log (2.0.0-player.61 - an admin has it) gets a short note instead, asking
+ * nothing.
  */
 export function ServerSettings({
-  admin,
+  allowed,
   live,
   onBack,
   backLabel,
 }: {
-  /** deadwax's admin is the one looking (everyone, with logins off) - on either frame since 2.0.0-player.47 */
-  admin: boolean
+  /** (2.0.0-player.61) the one looking has this page's permission - an admin, or given it; everyone, with logins
+   *  off - on either frame since 2.0.0-player.47 */
+  allowed: boolean
   /** this page is what shows - its tab current, the app in front, nothing over it */
   live: boolean
   onBack: () => void
@@ -154,10 +156,10 @@ export function ServerSettings({
 
   useEffect(() => {
     //? a draft is never read over - one kept from before the page was last left included
-    if (!admin || !live || Object.keys(kept.drafts).length) return
+    if (!allowed || !live || Object.keys(kept.drafts).length) return
     read()
     return () => reads.supersede()
-  }, [admin, live])
+  }, [allowed, live])
 
   const settingsByKey = useMemo(() => {
     const map = new Map<string, ServerSetting>()
@@ -226,7 +228,7 @@ export function ServerSettings({
     </>
   )
 
-  if (!admin) {
+  if (!allowed) {
     return (
       <section class="app-settings is-refused app-needs">
         {header}

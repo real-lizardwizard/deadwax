@@ -266,13 +266,22 @@ CREATE TABLE IF NOT EXISTS sessions (
     -- as good as the password, so this file never holds one in the clear. `expires_at` slides forward
     -- as the session is used (SESSION_IDLE_SECONDS); `checked_at` is when Navidrome last said the
     -- login still stands (getUser, every few minutes - RECHECK_SECONDS).
+    --
+    -- (2.0.0-player.61) `admin` is Navidrome's admin flag for the session's user as last read (getUser's
+    -- adminRole, at the sign-in and every re-check) - deadwax's role; every session of one person agrees
+    -- (set_user_admin). `navidrome_id` is the Navidrome account's id, read at the sign-in only for someone
+    -- an admin gave a permission to (NULL otherwise, or when it couldn't be read): a grant is honoured only
+    -- for the account it was given to (src/permissions.py). Both added by hand to a table from before
+    -- (JobStore.init: SESSION_COLUMNS).
     id_hash     TEXT PRIMARY KEY,
     user        TEXT NOT NULL,
     credential  TEXT NOT NULL,
     created_at  REAL NOT NULL,
     last_seen   REAL NOT NULL,
     expires_at  REAL NOT NULL,
-    checked_at  REAL NOT NULL
+    checked_at  REAL NOT NULL,
+    admin       INTEGER NOT NULL DEFAULT 0,
+    navidrome_id TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user);
 
@@ -389,6 +398,21 @@ CREATE TABLE IF NOT EXISTS library_seed (
     albums     INTEGER
 );
 
+CREATE TABLE IF NOT EXISTS permissions (
+    -- (2.0.0-player.61) What an admin changed for an ordinary person, by category - only the differences from
+    -- the default (`request` on, the rest off), so a default changed later reaches everyone never changed.
+    -- Bound to the Navidrome account by its id: a grant is honoured only for a session that account's id was
+    -- read for (src/permissions.py). Written by People (src/routes/people.py), forgotten with the person
+    -- (forget_person).
+    user         TEXT NOT NULL,
+    navidrome_id TEXT NOT NULL,
+    permission   TEXT NOT NULL CHECK (permission IN ('request', 'edit', 'library', 'downloads', 'server')),
+    granted      INTEGER NOT NULL CHECK (granted IN (0, 1)),
+    changed_by   TEXT NOT NULL,
+    changed_at   TEXT NOT NULL,
+    PRIMARY KEY (user, permission)
+);
+
 CREATE TABLE IF NOT EXISTS store_index_scanned (
     -- (2.0.0-player.51) The library roots the store index has been filled from a full scan of, at
     -- least once (index_reconcile with albums, or the saved scan at start-up) - what tells seeding the
@@ -425,6 +449,47 @@ JOB_COLUMNS = {
     "album_id": "INTEGER",
     "library_grant": "TEXT",
 }
+
+#? (2.0.0-player.61) Columns added to `sessions` since it shipped (2.0.0-player.48), as JOB_COLUMNS are to jobs.
+#? Keep in step with SCHEMA.
+SESSION_COLUMNS = {
+    "admin": "INTEGER NOT NULL DEFAULT 0",
+    "navidrome_id": "TEXT",
+}
+
+#? (2.0.0-player.61) What a person is known to deadwax by - every table that keeps something under a user's
+#? name, which People's removal and Forget clear in one transaction (forget_person), sessions FIRST so
+#? live_credentials can't copy a session's login back in. The value: what of it is a "live" row, counted.
+PERSON_TABLES = ("sessions", "user_credentials", "library_membership", "pins", "user_prefs", "job_requests",
+                 "permissions")
+
+#? (2.0.0-player.61) The break-glass admin's name until then, and its name since (src/auth.py BREAK_GLASS_USER) - for
+#? the one-time step below. Literals: src/auth.py imports this module.
+OLD_BREAK_GLASS = "admin"
+NEW_BREAK_GLASS = "deadwax"
+#? what break-glass could keep under its name: pins, Getting albums settings, the downloads it asked for
+BREAK_GLASS_TABLES = ("pins", "user_prefs", "job_requests")
+
+
+def _rename_break_glass(connection) -> None:
+    """
+    (2.0.0-player.61 review) Once, in the upgrade's step (JobStore.init, as `sessions` gains `admin`): break-glass
+    was `admin` until now, and `deadwax` an ordinary Navidrome name.
+
+    - A session or a kept login under `deadwax` or `local` - a Navidrome account called `deadwax` signed in before
+      the name was reserved - is deleted: it must never stand for the break-glass admin (src/auth.py _session ends
+      one too), nor be starred as.
+    - What break-glass kept under `admin` (pins, Getting albums settings, the downloads it asked for) moves to
+      `deadwax`, so Navidrome's own `admin` account - which can sign in as itself now - takes over nothing of it, and
+      a download break-glass asked for still files for nobody. Where `deadwax` already has the same row (an old
+      account of that name), that one stays and break-glass's goes.
+    """
+    connection.execute("DELETE FROM sessions WHERE user IN (?, ?)", (LOCAL_USER, NEW_BREAK_GLASS))
+    connection.execute("DELETE FROM user_credentials WHERE user IN (?, ?)", (LOCAL_USER, NEW_BREAK_GLASS))
+    for table in BREAK_GLASS_TABLES:
+        connection.execute(f"UPDATE OR IGNORE {table} SET user = ? WHERE user = ?", (NEW_BREAK_GLASS, OLD_BREAK_GLASS))
+        connection.execute(f"DELETE FROM {table} WHERE user = ?", (OLD_BREAK_GLASS,))
+
 
 #? the parts of a candidate's quality a job keeps (quality_json), and nothing else it might be sent
 QUALITY_KEYS = ("formats", "bitrates", "bit_depths", "sample_rates", "variable_bitrate")
@@ -585,6 +650,16 @@ class JobStore:
                 for column, definition in JOB_COLUMNS.items():
                     if column not in existing:
                         connection.execute(f"ALTER TABLE jobs ADD COLUMN {column} {definition}")
+                had_sessions = {row["name"] for row in connection.execute("PRAGMA table_info(sessions)")}
+                for column, definition in SESSION_COLUMNS.items():
+                    if column not in had_sessions:
+                        connection.execute(f"ALTER TABLE sessions ADD COLUMN {column} {definition}")
+                if "admin" not in had_sessions:
+                    #? (2.0.0-player.61) Once, as the role column is made: every session is due for the re-check,
+                    #? so its first pass (a minute after the start) reads everyone's Navidrome admin flag -
+                    #? otherwise a session from before would read not-admin for up to its next check, ~6 minutes
+                    connection.execute("UPDATE sessions SET checked_at = 0")
+                    _rename_break_glass(connection)
                 if not had_requests:
                     #? Once, as the table is made: every download from before belongs to `local`, the one
                     #? user there was - asked for when it was made - and the first admin to sign in takes
@@ -1432,12 +1507,41 @@ class JobStore:
     # a database error rather than degrading: a session that can't be read must answer 503, never
     # "signed out" and never "signed in" (fail closed - src/auth.py says which).
 
-    def create_session(self, id_hash: str, user: str, credential: str, now: float, expires_at: float) -> None:
+    def create_session(self, id_hash: str, user: str, credential: str, now: float, expires_at: float,
+                       admin: bool = False, navidrome_id: str | None = None) -> None:
         with self._connect() as connection:
             connection.execute(
-                "INSERT INTO sessions (id_hash, user, credential, created_at, last_seen, expires_at, checked_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (id_hash, user, credential, now, now, expires_at, now))
+                "INSERT INTO sessions (id_hash, user, credential, created_at, last_seen, expires_at, checked_at, "
+                "admin, navidrome_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (id_hash, user, credential, now, now, expires_at, now, 1 if admin else 0, navidrome_id))
+
+    def set_user_admin(self, user: str, admin: bool) -> None:
+        """(2.0.0-player.61) Navidrome's admin flag for every session of `user` - so they all agree."""
+        with self._connect() as connection:
+            connection.execute("UPDATE sessions SET admin = ? WHERE user = ?", (1 if admin else 0, user))
+
+    def session_keys(self, user: str) -> list[str]:
+        """(2.0.0-player.61) The id hashes of every session of `user`."""
+        with self._connect() as connection:
+            return [row["id_hash"] for row in connection.execute("SELECT id_hash FROM sessions WHERE user = ?", (user,))]
+
+    def delete_user_sessions(self, user: str) -> None:
+        with self._connect() as connection:
+            connection.execute("DELETE FROM sessions WHERE user = ?", (user,))
+
+    def heal_session_ids(self, user: str, navidrome_id: str, made_at: float) -> list[str]:
+        """(2.0.0-player.61) Sessions of `user` whose sign-in couldn't read their account's id given it, from an
+        admin's People list - only those begun at or after `made_at`, when that account was made (epoch seconds):
+        a session from before is an earlier account's of the same name, removed and made again since, and is
+        never given the new one's id (review). The id hashes healed."""
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            keys = [row["id_hash"] for row in connection.execute(
+                "SELECT id_hash FROM sessions WHERE user = ? AND navidrome_id IS NULL AND created_at >= ?",
+                (user, made_at))]
+            connection.executemany("UPDATE sessions SET navidrome_id = ? WHERE id_hash = ?",
+                                   [(navidrome_id, key) for key in keys])
+        return keys
 
     def session(self, id_hash: str) -> dict | None:
         """The session with this id hash as stored, or None when there is none."""
@@ -2839,6 +2943,14 @@ class JobStore:
                 "UPDATE user_credentials SET dead_at = ?, dead_why = ? WHERE user = ? AND credential = ? AND dead_at IS NULL",
                 (now, why, user, sealed)).rowcount > 0
 
+    def credential_dead_for(self, user: str, why: str, now: float) -> bool:
+        """(2.0.0-player.61) `user`'s kept login no longer works, whichever it is - People reset their password,
+        so every login of theirs from before is dead in Navidrome."""
+        with self._connect() as connection:
+            return connection.execute(
+                "UPDATE user_credentials SET dead_at = ?, dead_why = ? WHERE user = ? AND dead_at IS NULL",
+                (now, why, user)).rowcount > 0
+
     def live_credentials(self) -> list[dict]:
         """
         Every user's live credential - the ones deadwax may star and read stars with. A user signed in
@@ -2852,6 +2964,134 @@ class JobStore:
                 "(SELECT MAX(created_at) FROM sessions t WHERE t.user = s.user)")
             return [dict(row) for row in connection.execute(
                 "SELECT * FROM user_credentials WHERE dead_at IS NULL ORDER BY user")]
+
+    # ----- people (2.0.0-player.61, People - src/routes/people.py; SYNCHRONOUS; they raise)
+
+    def people_facts(self, now: float | None = None) -> dict[str, dict]:
+        """
+        What deadwax knows of each person, in one read: their live sessions (`signed_in`), when they last
+        signed in (`last_sign_in`, the newest of their kept login's and their sessions' times - epoch
+        seconds) and how many albums are in their library (`library`, live entries). Keyed by user.
+        """
+        now = time.time() if now is None else now
+        facts: dict[str, dict] = {}
+
+        def of(user):
+            return facts.setdefault(user, {"signed_in": 0, "last_sign_in": None, "library": 0, "waiting_alone": 0})
+
+        def later(user, at):
+            if at is not None:
+                held = of(user)
+                held["last_sign_in"] = at if held["last_sign_in"] is None else max(held["last_sign_in"], at)
+
+        with self._connect() as connection:
+            for row in connection.execute(
+                    "SELECT user, SUM(CASE WHEN expires_at > ? THEN 1 ELSE 0 END) AS live, MAX(created_at) AS newest "
+                    "FROM sessions GROUP BY user", (now,)):
+                of(row["user"])["signed_in"] = row["live"] or 0
+                later(row["user"], row["newest"])
+            for row in connection.execute("SELECT user, updated_at FROM user_credentials"):
+                later(row["user"], row["updated_at"])
+            for row in connection.execute(
+                    f"SELECT user, COUNT(*) AS n FROM library_membership WHERE state IN ({', '.join('?' * len(LIVE_STATES))}) "
+                    "GROUP BY user", LIVE_STATES):
+                of(row["user"])["library"] = row["n"]
+            #? downloads still on their way that only they are waiting for - what People's Remove says carries on,
+            #? filed for nobody
+            for row in connection.execute(
+                    f"SELECT r.user, COUNT(*) AS n FROM job_requests r JOIN jobs j ON j.id = r.job_id "
+                    f"WHERE {ACTIVE_REQUEST} AND j.status IN ({', '.join('?' * len(OPEN_STATUSES))}) AND NOT EXISTS "
+                    f"(SELECT 1 FROM job_requests o WHERE o.job_id = r.job_id AND o.user != r.user AND "
+                    f"o.requested_at IS NOT NULL AND o.left_at IS NULL AND o.hidden_at IS NULL) GROUP BY r.user",
+                    OPEN_STATUSES):
+                of(row["user"])["waiting_alone"] = row["n"]
+        return facts
+
+    def known_users(self) -> dict[str, dict]:
+        """
+        Every name deadwax keeps anything for - sessions, a kept login, library entries, pins, Getting albums
+        settings, requests, permissions - with how much of each: what People's "Known only to deadwax" lists
+        for the names Navidrome has no account for. Never a reserved name (`local` is logins-off's user).
+        """
+        from src.auth import RESERVED_NAMES
+        found: dict[str, dict] = {}
+
+        def of(user):
+            return found.setdefault(user, {"user": user, "sessions": 0, "credential": False, "library": 0, "pins": 0,
+                                           "preferences": False, "requests": 0, "permissions": 0})
+
+        with self._connect() as connection:
+            for row in connection.execute("SELECT user, COUNT(*) AS n FROM sessions GROUP BY user"):
+                of(row["user"])["sessions"] = row["n"]
+            for row in connection.execute("SELECT user FROM user_credentials"):
+                of(row["user"])["credential"] = True
+            for row in connection.execute(
+                    f"SELECT user, COUNT(*) AS n FROM library_membership WHERE state IN ({', '.join('?' * len(LIVE_STATES))}) "
+                    "GROUP BY user", LIVE_STATES):
+                of(row["user"])["library"] = row["n"]
+            for row in connection.execute("SELECT user, COUNT(*) AS n FROM library_membership GROUP BY user"):
+                of(row["user"])
+            for row in connection.execute("SELECT user, COUNT(*) AS n FROM pins GROUP BY user"):
+                of(row["user"])["pins"] = row["n"]
+            for row in connection.execute("SELECT DISTINCT user FROM user_prefs"):
+                of(row["user"])["preferences"] = True
+            for row in connection.execute(f"SELECT r.user, COUNT(*) AS n FROM job_requests r WHERE {ACTIVE_REQUEST} "
+                                          "GROUP BY r.user"):
+                of(row["user"])["requests"] = row["n"]
+            for row in connection.execute("SELECT user FROM job_requests GROUP BY user"):
+                of(row["user"])
+            for row in connection.execute("SELECT user, COUNT(*) AS n FROM permissions GROUP BY user"):
+                of(row["user"])["permissions"] = row["n"]
+        return {user: facts for user, facts in found.items() if user not in RESERVED_NAMES}
+
+    def keeps_anything(self, user: str) -> bool:
+        """Whether deadwax keeps anything at all under `user` - People's Create refuses such a name, so a new
+        person never inherits someone else's library, pins or permissions."""
+        with self._connect() as connection:
+            return any(connection.execute(f"SELECT 1 FROM {table} WHERE user = ? LIMIT 1", (user,)).fetchone()
+                       for table in PERSON_TABLES)
+
+    def forget_person(self, user: str) -> dict[str, int]:
+        """
+        Everything deadwax keeps under `user`, gone - sessions first (so live_credentials can't copy one's login
+        back in), then their kept login, library, pins, Getting albums settings, requests and permissions - in
+        ONE immediate transaction: all of it or none. How many rows of each. Never for a reserved name
+        (ValueError): `local` is logins-off's user, and `deadwax` the break-glass admin's. The store's albums,
+        the jobs (a download only they wanted carries on and files for nobody) and library_flags' history stay.
+        """
+        from src.auth import RESERVED_NAMES
+        if not user or user in RESERVED_NAMES:
+            raise ValueError(f"'{user}' is a name deadwax keeps for itself - nothing kept for it is forgotten")
+        counts: dict[str, int] = {}
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            for table in PERSON_TABLES:
+                counts[table] = connection.execute(f"DELETE FROM {table} WHERE user = ?", (user,)).rowcount
+        return counts
+
+    # ----- permissions (2.0.0-player.61, src/permissions.py; SYNCHRONOUS; they raise)
+
+    def permission_rows(self) -> list[dict]:
+        with self._connect() as connection:
+            return [dict(row) for row in connection.execute(
+                "SELECT user, navidrome_id, permission, granted, changed_by, changed_at FROM permissions")]
+
+    def set_permissions(self, user: str, rows: list[tuple[str, bool, str]], by: str) -> None:
+        """`user`'s rows replaced by these (permission, granted, navidrome_id) - in one transaction."""
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute("DELETE FROM permissions WHERE user = ?", (user,))
+            now = _now()
+            for permission, granted, navidrome_id in rows:
+                connection.execute(
+                    "INSERT INTO permissions (user, navidrome_id, permission, granted, changed_by, changed_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?)", (user, navidrome_id, permission, 1 if granted else 0, by, now))
+
+    def drop_permissions(self, user: str, which: list[str]) -> int:
+        with self._connect() as connection:
+            return connection.execute(
+                f"DELETE FROM permissions WHERE user = ? AND permission IN ({', '.join('?' * len(which))})",
+                (user, *which)).rowcount
 
     # ----- the store seeded into the first admin's library, once ever (SYNCHRONOUS; raises)
 

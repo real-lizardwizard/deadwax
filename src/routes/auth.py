@@ -7,7 +7,8 @@ router is included with no dependency (src/api/app.py), and tests/test_logins.py
 names them. Both are writes, so the same-origin guard stands in front of them like every other POST: a
 page elsewhere can't sign the browser in to an account of its choosing.
 
-The answer to a sign-in is what `GET /deadwax/me` answers - {user, admin, auth, version} - and a cookie;
+The answer to a sign-in is what `GET /deadwax/me` answers - {user, admin, auth, version, permissions,
+permissions_unverified} (2.0.0-player.61: `admin` the Navidrome admin flag getUser has just said) - and a cookie;
 NEVER the Navidrome token, which stays in deadwax, encrypted. The cookie: `deadwax_session`, HttpOnly
 (no script on any page reads it), SameSite=Strict, Path=/, and Secure when the page came over HTTPS -
 itself, or through a proxy's X-Forwarded-Proto. Plain http on the LAN and WireGuard is how James reaches
@@ -22,7 +23,7 @@ from pydantic import BaseModel, Field
 
 from src import __version__, auth
 from src.config import Config
-from src.users import is_admin
+from src.users import PERMISSIONS, permissions, permissions_unverified
 
 router = APIRouter()
 
@@ -51,8 +52,16 @@ async def login(body: SignIn, request: Request):
         raise HTTPException(status_code=400, detail="Type your user name and your password.")
 
     store = getattr(request.app.state, "store", None)
-    user, value, max_age = await auth.sign_in(store, body.username, body.password)
-    response = JSONResponse({"user": user, "admin": is_admin(user), "auth": "on", "version": __version__})
+    user, value, max_age, admin = await auth.sign_in(store, body.username, body.password)
+    #? what the new session may do, as /me will answer it: its id as the sign-in read it (src/auth.py)
+    held = await asyncio.to_thread(auth.held_login, value, store)
+    if held is not None:
+        setattr(request.state, auth.LOGIN_STATE, held)
+    allowed = await asyncio.to_thread(permissions, request, user)
+    unverified = await asyncio.to_thread(permissions_unverified, request, user)
+    response = JSONResponse({"user": user, "admin": admin, "auth": "on", "version": __version__,
+                             "permissions": [name for name in PERMISSIONS if name in allowed],
+                             "permissions_unverified": unverified})
     _set_cookie(response, request, value, max_age)
     return response
 

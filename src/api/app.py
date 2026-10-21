@@ -10,10 +10,11 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.middleware.gzip import GZipMiddleware
 
 from src.routes import search_musicbrainz, interface_logs, monitor_slskd, download, library, settings, navidrome, me, pins, store_album
-from src.routes import auth as auth_routes, held, my_library
-from src import auth, stars
+from src.routes import auth as auth_routes, held, my_library, people
+from src import auth, permissions, stars
+from src.api import navidrome_admin
 from src.musicbrainz_cache import saved_answers
-from src.users import current_user, require_admin
+from src.users import current_user, require
 from src.logger import logger, cleanup_logging
 from src.poller import run_download_poller
 from src.store import JobStore
@@ -44,6 +45,10 @@ MEDIA_PREFIXES = ("/deadwax/navidrome/stream/", "/deadwax/navidrome/cover/", "/d
 def serves_media(path: str) -> bool:
     return path in MEDIA_PATHS or path.startswith(MEDIA_PREFIXES)
 
+
+#? (2.0.0-player.61) What a People request deadwax couldn't read is answered - in place of FastAPI's 422, which
+#? would echo what was sent
+PEOPLE_FORM = people.PEOPLE_FORM
 
 #? What a page's head carries when logins are on (2.0.0-player.48): ui/src/api/auth.ts reads it.
 LOGINS_MARK = '<meta name="deadwax-auth" content="on">'
@@ -105,6 +110,9 @@ async def lifespan(app: FastAPI):
     #? same terms: logins on, and a database to keep the ledger in
     library_worker = None
     if Config.logins_on() and app.state.store.available:
+        #? (2.0.0-player.61) what admins gave people, held in memory from the start (a failure is logged, and
+        #? read again by the first request a minute on - nobody but an admin can do anything meanwhile)
+        await asyncio.to_thread(permissions.load, app.state.store)
         session_checks = asyncio.create_task(auth.run_session_checks(app.state.store))
         library_worker = asyncio.create_task(stars.run_library_worker(app.state.store))
 
@@ -131,6 +139,7 @@ async def lifespan(app: FastAPI):
     await lrclib.close_client()
     await navidrome_client.close_client()
     await auth.login_client.close_client()
+    await navidrome_admin.close_client()
     await stars.star_client.close_client()
 
     cleanup_logging()
@@ -294,24 +303,64 @@ def start() -> FastAPI:
 
     app.add_middleware(GuardMedia)
 
+    class RefuseFrames:
+        """
+        (2.0.0-player.61) Every page refuses to be framed by another website: `X-Frame-Options: DENY` and
+        `Content-Security-Policy: frame-ancestors 'none'` on every text/html response - so People's buttons
+        (and the sign-in, and everything else) can't be laid under a page elsewhere that tricks a click
+        through to them. Plain ASGI, touching only the response's headers, like the layers around it.
+
+        ADDED BESIDE any policy already there, never in its place (review): a browser enforces every
+        Content-Security-Policy a response carries, so GuardMedia's `default-src 'none'; sandbox` on a media
+        route that ever answered as HTML still holds - this layer is outside it, and replacing it would have
+        let a stranger's bytes run as a page of deadwax's.
+        """
+
+        HEADERS = [(b"x-frame-options", b"DENY"), (b"content-security-policy", b"frame-ancestors 'none'")]
+
+        def __init__(self, inner):
+            self.inner = inner
+
+        async def __call__(self, scope, receive, send):
+            if scope["type"] != "http":
+                return await self.inner(scope, receive, send)
+
+            async def send_unframed(message):
+                if message["type"] == "http.response.start":
+                    headers = list(message.get("headers", []))
+                    kind = next((v for k, v in headers if k.lower() == b"content-type"), b"")
+                    if kind.lower().startswith(b"text/html"):
+                        #? only an earlier copy of exactly these goes; every other policy stays and is enforced too
+                        ours = set(self.HEADERS)
+                        kept = [(k, v) for k, v in headers
+                                if k.lower() != b"x-frame-options" and (k.lower(), v) not in ours]
+                        message = {**message, "headers": kept + self.HEADERS}
+                await send(message)
+
+            await self.inner(scope, receive, send_unframed)
+
+    app.add_middleware(RefuseFrames)
+
     #? Added last, so it is the OUTERMOST layer: a write another website asked for is refused
     #? before anything else runs. See src/api/same_origin.py.
     app.add_middleware(SameOriginWrites)
 
     logger.info("adding routers")
     #? (2.0.0-player.48) EVERY router is checked by a dependency: current_user - with logins off the
-    #? implicit admin, reading nothing; on, a session or 401 - and require_admin, 403 for a user who isn't an
-    #? admin, on the log and the server settings whole (and per route on the library's writers, in
-    #? routes/library.py). A dependency, never @app.middleware("http"), which hides disconnects. A router
-    #? added here without one is caught by tests/test_logins.py's walk of every route.
+    #? implicit admin, reading nothing; on, a session or 401 - and (2.0.0-player.61, in place of require_admin)
+    #? require(permission), 403 in words for someone without it: the log and the server settings whole are
+    #? `server`'s, Held by nobody `library`'s, People `people`'s (and per route the library's writers, in
+    #? routes/library.py, and the downloads routes that start one, in routes/download.py). A dependency, never
+    #? @app.middleware("http"), which hides disconnects. A router added here without one is caught by
+    #? tests/test_logins.py's walk of every route.
     signed_in = [Depends(current_user)]
-    admin = [Depends(require_admin)]
-    app.include_router(interface_logs.router, prefix="/deadwax/interface_logs", tags=["interface_logs"], dependencies=admin)
+    server = [Depends(require("server"))]
+    app.include_router(interface_logs.router, prefix="/deadwax/interface_logs", tags=["interface_logs"], dependencies=server)
     app.include_router(search_musicbrainz.router, prefix="/deadwax/search_musicbrainz", tags=["search_musicbrainz"], dependencies=signed_in)
     app.include_router(monitor_slskd.router, prefix="/deadwax/monitor_slskd", tags=["monitor_slskd"], dependencies=signed_in)
     app.include_router(download.router, prefix="/deadwax/download", tags=["download"], dependencies=signed_in)
     app.include_router(library.router, prefix="/deadwax/library", tags=["library"], dependencies=signed_in)
-    app.include_router(settings.router, prefix="/deadwax/settings", tags=["settings"], dependencies=admin)
+    app.include_router(settings.router, prefix="/deadwax/settings", tags=["settings"], dependencies=server)
     app.include_router(navidrome.router, prefix="/deadwax/navidrome", tags=["navidrome"], dependencies=signed_in)
     #? who the page is talking to - the implicit admin while logins are off, the signed-in user with them on
     app.include_router(me.router, prefix="/deadwax/me", tags=["me"], dependencies=signed_in)
@@ -319,7 +368,9 @@ def start() -> FastAPI:
     app.include_router(pins.router, prefix="/deadwax/me/pins", tags=["me"], dependencies=signed_in)
     #? (2.0.0-player.51) each user's own library - their starred albums - and the admin's "held by nobody"
     app.include_router(my_library.router, prefix="/deadwax/me/library", tags=["me"], dependencies=signed_in)
-    app.include_router(held.router, prefix="/deadwax/library/held", tags=["library"], dependencies=admin)
+    app.include_router(held.router, prefix="/deadwax/library/held", tags=["library"], dependencies=[Depends(require("library"))])
+    #? (2.0.0-player.61) People: Navidrome's accounts, managed as the signed-in Navidrome admin - see routes/people.py
+    app.include_router(people.router, prefix="/deadwax/people", tags=["people"], dependencies=[Depends(require("people"))])
     #? the id bridge (2.0.0-player.17): one album across the store index, MusicBrainz and Navidrome
     app.include_router(store_album.router, prefix="/deadwax/store", tags=["store"], dependencies=signed_in)
     #? signing in and out (2.0.0-player.48) - with no session, of course: see routes/auth.py
@@ -335,8 +386,18 @@ def start() -> FastAPI:
     #? (2.0.0-player.58, review) a playlist route's body refused by its own validators: the refusal in deadwax's words
     #? as a plain `detail` (routes/navidrome.py validation_words) - FastAPI's list of errors reached the page as
     #? "POST ... failed". Every other route's 422 is FastAPI's own, as it always was.
+    #? (2.0.0-player.61) a People route's refusal: its words, and what kind it is - `locked` brings the unlock back
+    @app.exception_handler(people.Refused)
+    async def people_refused(request, error: people.Refused):
+        return JSONResponse(status_code=error.status, content=people.answer(error),
+                            headers={"Retry-After": str(error.retry_after)} if error.retry_after else None)
+
     @app.exception_handler(RequestValidationError)
     async def refused_body(request, error: RequestValidationError):
+        #? (2.0.0-player.61) a People form deadwax can't read: never FastAPI's list, which echoes the `input` - a
+        #? password among it
+        if request.url.path.startswith("/deadwax/people"):
+            return JSONResponse(status_code=422, content={"detail": PEOPLE_FORM})
         words = navidrome.validation_words(request.url.path, error.errors())
         if words is not None:
             return JSONResponse(status_code=422, content={"detail": words})

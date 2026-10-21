@@ -9,6 +9,7 @@ import type { ReleaseGroup, ReleaseGroupResponse, StoreStateResponse } from '../
 import { storeNotes } from '../lib/candidates'
 import { joinDownload } from '../lib/downloadRequests'
 import { isAbort, latestOnly } from '../lib/latest'
+import { GET_OFF, gets } from '../lib/permissions'
 import { announceAddedToLibrary, onAddedToLibrary, onAlbumsFiled } from '../lib/libraryEvents'
 import { releaseUrl } from '../lib/albumProperties'
 import { describeGroupOwnership, ownedForGroup, type OwnedAlbum } from '../lib/owned'
@@ -28,6 +29,7 @@ import { PressingPicker } from './PressingPicker'
 import { keep, kept } from './pressingLists'
 import type { GetRequest } from './Sources'
 import { StoreState } from './StoreState'
+import { useAccess } from './access'
 import { useGetSettings } from './useGetSettings'
 import { takeOpener } from './useSheet'
 import { hasLibrary } from './useMyLibrary'
@@ -265,6 +267,8 @@ export function ReleaseGroupPage({
   /** ...and Get, pressed while that is the pressing shown, closes it */
   onCloseSources?: () => void
 }) {
+  //? (2.0.0-player.61) Get albums: without it, its words in Get's place (and no join)
+  const getsAlbums = gets(useAccess().permissions)
   //? the id as MusicBrainz writes it, or null for an address that isn't an album's
   const mbid = groupMbid(id)
   const [answer, setAnswer] = useState<ReleaseGroupResponse | null>(() => (mbid && kept(mbid)) || null)
@@ -508,18 +512,19 @@ export function ReleaseGroupPage({
         <div class="app-rg-actions">
           {!desktop && picker}
           {!desktop && facts}
-          {download && (
+          {download && getsAlbums && (
             //? a desktop's Get says whether the panel shows its sources: pressed, a click closes them
             <button ref={getButton} type="button" class="app-rg-get" onClick={get} {...(desktop ? { 'aria-pressed': sourcesHere } : {})}>
               <GetIcon class="app-rg-get-icon" />
               Get the album
             </button>
           )}
+          {download && !getsAlbums && <p class="app-footnote app-get-off">{GET_OFF}</p>}
           {/* a desktop's pressing dropdown sits inline after Get, as its board has it - its facts under both */}
           {desktop && picker}
           {desktop && facts}
           <div class="app-rg-store" aria-live="polite">
-            {known && <StoreState status={storeStatusFor(known, 'Requests', floor)} notes={storeNotes(known)} onJoin={join} onAdd={add} />}
+            {known && <StoreState status={storeStatusFor(known, 'Requests', floor)} notes={storeNotes(known)} {...(getsAlbums ? { onJoin: join } : {})} onAdd={add} />}
           </div>
         </div>
       </div>

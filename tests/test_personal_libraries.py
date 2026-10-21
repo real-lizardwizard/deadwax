@@ -105,6 +105,8 @@ class Navidrome:
         self.mbid_search = True
         #? (user, endpoint) -> the answer given instead: an error Navidrome answers one user with
         self.errors: dict[tuple[str, str], httpx.Response] = {}
+        #? (2.0.0-player.61) the accounts that are Navidrome admins - deadwax's admins
+        self.admins: set[str] = {"james"}
 
     def add(self, album_id: str, release: str, name: str = "Dummy", artist: str = "Portishead") -> None:
         self.albums[album_id] = {"id": album_id, "name": name, "artist": artist, "musicBrainzId": release}
@@ -129,7 +131,8 @@ class Navidrome:
         if (user, endpoint) in self.errors:
             return self.errors[(user, endpoint)]
         if endpoint == "getUser":
-            return httpx.Response(200, json=ok(user={"username": user, "adminRole": False}))
+            #? (2.0.0-player.61) Navidrome's admin flag is deadwax's role: james is this household's admin
+            return httpx.Response(200, json=ok(user={"username": user, "adminRole": user in self.admins}))
         if endpoint == "search3":
             asked = q.get("query", "")
             words = asked.lower().split()
@@ -189,7 +192,6 @@ def wire(fake: Navidrome) -> None:
 def on(monkeypatch, tmp_path):
     monkeypatch.setattr(Config, "AUTH_MODE", "on")
     monkeypatch.setattr(Config, "DEADWAX_SECRET_KEY", SECRET)
-    monkeypatch.setattr(Config, "DEADWAX_ADMINS", "james")
     monkeypatch.setattr(Config, "DEADWAX_ADMIN_PASSWORD", GLASS)
     monkeypatch.setattr(Config, "NAVIDROME_URL", NAVIDROME)
     #? the player's shared login - which no star is ever made with

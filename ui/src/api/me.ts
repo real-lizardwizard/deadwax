@@ -1,22 +1,29 @@
 /**
  * Who the page is talking to - `GET /deadwax/me` (src/routes/me.py). With logins off, the one
  * implicit admin, `local`; with them on (2.0.0-player.48), the signed-in user - or a 401, which brings
- * the sign-in screen (app/signInGate.tsx). The app shows or hides its admin-only rows, and Sign out,
- * from this rather than from assumptions.
+ * the sign-in screen (app/signInGate.tsx). The app shows or hides its managing rows (by `permissions`,
+ * 2.0.0-player.61), and Sign out, from this rather than from assumptions.
  */
 
 import type { GetSettings, GetSettingsAnswer } from '../lib/getSettings'
+import type { Permission } from '../lib/permissions'
 import type { PinKind, PinsAnswer, PinToggleBody } from '../lib/pins'
 import { get, post, put } from './http'
 import type { AddedToLibrary, FindCandidatesRequest, MyLibrary, RemovedFromLibrary } from './types'
 
 export interface Me {
   user: string
+  /** a Navidrome admin (2.0.0-player.61 - deadwax's admins are Navidrome's), break-glass, or `local` with logins off */
   admin: boolean
   /** 'off' while deadwax has no logins; 'on' with AUTH_MODE on (2.0.0-player.48) */
   auth: 'off' | 'on'
   /** src/__init__.py's __version__ - "2.0.0-player.12" */
   version: string
+  /** (2.0.0-player.61) what they may do, in src/users.py PERMISSIONS' order - every one for an admin */
+  permissions?: Permission[]
+  /** (2.0.0-player.61) an admin gave them something this session doesn't honour - their account couldn't be
+   *  checked with Navidrome as they signed in */
+  permissions_unverified?: boolean
 }
 
 export function me(signal?: AbortSignal): Promise<Me> {

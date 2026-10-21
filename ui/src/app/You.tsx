@@ -18,7 +18,8 @@ import { LookChoice } from './LookChoice'
 import { QualityChoice } from './QualityChoice'
 import { askGetSettings, chooseGetSettings, useGetSettings } from './useGetSettings'
 import { WindDownChoice } from './WindDownChoice'
-import { adminUntilAsked } from './session'
+import { managing as managingOf, UNVERIFIED } from '../lib/permissions'
+import { noteAccess, useAccess } from './access'
 import { SignOutRow } from './SignOutRow'
 import { YourLibrary } from './YourLibrary'
 
@@ -124,7 +125,7 @@ export function You({
   /** how many albums need a look (null: not known yet) */
   needsLook?: number | null
   onNeedsLook?: () => void
-  /** Library care, the server's settings, or the log: its page (2.0.0-player.33, .42) */
+  /** Library care, People, the server's settings, or the log: its page (2.0.0-player.33, .42, .61) */
   onManaging?: (kind: ManagingKind) => void
   /** (2.0.0-player.51) an album the admin deleted, requested again: its album page, where Get is */
   onRequestAgain?: (group: { id: string; title: string }) => void
@@ -146,7 +147,10 @@ export function You({
     setWhoFailed(null)
     fetchMe(request.signal).then(
       (answer) => {
-        if (request.current()) setWho(answer)
+        if (!request.current()) return
+        setWho(answer)
+        //? (2.0.0-player.61) what deadwax says this person may do - every reader of it redraws
+        noteAccess(answer)
       },
       (reason: unknown) => {
         //? what deadwax said before stays (the version didn't change); the failure is said under it
@@ -181,9 +185,10 @@ export function You({
     }
   }, [shown])
 
-  //? admin-only rows show unless deadwax has said this user isn't one - with logins off, everyone is; on,
-  //? the session's word until /me answers here (session.ts, 2.0.0-player.48)
-  const admin = who ? who.admin : adminUntilAsked()
+  //? (2.0.0-player.61) each Managing row by its permission - with logins off everyone has them all; on, the
+  //? session's word until /me answers (access.ts). People only with logins on
+  const access = useAccess()
+  const managing = managingOf(access.permissions, access.on)
   //? only what deadwax has said: nothing while it hasn't answered, "…" while it is being asked
   const identity = who ? (who.auth === 'off' ? 'Logins are off' : who.user) : whoFailed ? null : '…'
 
@@ -286,38 +291,54 @@ export function You({
         </ul>
       </section>
 
-      {admin && (
+      {access.unverified && <p class="app-footnote app-you-unverified">{UNVERIFIED}</p>}
+
+      {managing.any && (
         <section class="app-section" aria-labelledby="app-managing-title">
           <h2 id="app-managing-title" class="app-section-title">
             Managing deadwax
           </h2>
           <div class="app-group">
-            <button
-              type="button"
-              class="app-row app-link-row app-queue-link-row"
-              {...(needsLook ? { 'aria-label': needsLookLabel('Albums that need a look', needsLook) } : {})}
-              onClick={() => onNeedsLook?.()}
-            >
-              <span class="app-row-label">Albums that need a look</span>
-              {badgeText(needsLook ?? 0) && (
-                <span class="app-queue-badge app-mono" aria-hidden="true">
-                  {badgeText(needsLook ?? 0)}
-                </span>
-              )}
-              <ChevronRightIcon class="app-chevron" />
-            </button>
-            <button type="button" class="app-row app-link-row app-queue-link-row" onClick={() => onManaging?.('care')}>
-              <span class="app-row-label">Library care</span>
-              <ChevronRightIcon class="app-chevron" />
-            </button>
-            <button type="button" class="app-row app-link-row app-queue-link-row" onClick={() => onManaging?.('settings')}>
-              <span class="app-row-label">Server settings</span>
-              <ChevronRightIcon class="app-chevron" />
-            </button>
-            <button type="button" class="app-row app-link-row app-queue-link-row" onClick={() => onManaging?.('log')}>
-              <span class="app-row-label">Log</span>
-              <ChevronRightIcon class="app-chevron" />
-            </button>
+            {managing.queue && (
+              <button
+                type="button"
+                class="app-row app-link-row app-queue-link-row"
+                {...(needsLook ? { 'aria-label': needsLookLabel('Albums that need a look', needsLook) } : {})}
+                onClick={() => onNeedsLook?.()}
+              >
+                <span class="app-row-label">Albums that need a look</span>
+                {badgeText(needsLook ?? 0) && (
+                  <span class="app-queue-badge app-mono" aria-hidden="true">
+                    {badgeText(needsLook ?? 0)}
+                  </span>
+                )}
+                <ChevronRightIcon class="app-chevron" />
+              </button>
+            )}
+            {managing.care && (
+              <button type="button" class="app-row app-link-row app-queue-link-row" onClick={() => onManaging?.('care')}>
+                <span class="app-row-label">Library care</span>
+                <ChevronRightIcon class="app-chevron" />
+              </button>
+            )}
+            {managing.people && (
+              <button type="button" class="app-row app-link-row app-queue-link-row" onClick={() => onManaging?.('people')}>
+                <span class="app-row-label">People</span>
+                <ChevronRightIcon class="app-chevron" />
+              </button>
+            )}
+            {managing.settings && (
+              <button type="button" class="app-row app-link-row app-queue-link-row" onClick={() => onManaging?.('settings')}>
+                <span class="app-row-label">Server settings</span>
+                <ChevronRightIcon class="app-chevron" />
+              </button>
+            )}
+            {managing.log && (
+              <button type="button" class="app-row app-link-row app-queue-link-row" onClick={() => onManaging?.('log')}>
+                <span class="app-row-label">Log</span>
+                <ChevronRightIcon class="app-chevron" />
+              </button>
+            )}
             <a class="app-row app-link-row" href="/" target="_blank" rel="noopener">
               <span class="app-row-label">Open the main page</span>
               <ChevronRightIcon class="app-chevron" />

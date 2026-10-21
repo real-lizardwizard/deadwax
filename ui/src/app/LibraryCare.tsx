@@ -6,6 +6,7 @@ import {
   BULK_LABELS, BULK_TITLES, CARE_LINE, RESCAN_WORDS, narrowAlbums, planWords, scanAge, scanTotals, scopeLine,
 } from '../lib/libraryCare'
 import { MANAGING_ADMINS_ONLY } from '../lib/appRoutes'
+import type { CareParts } from '../lib/permissions'
 import { announceAlbumsFiled } from '../lib/libraryEvents'
 import { ChevronLeftIcon } from '../player/icons'
 import { caughtUp, libraryCareNow, setCareNarrow, startBulk, stopBulk, useLibraryCare } from './useLibraryCare'
@@ -50,22 +51,25 @@ const focusLost = (): boolean => {
  * has in their library, and the downloads flagged for a look - HeldByNobody.tsx, under the runs.
  *
  * ON A PHONE TOO (2.0.0-player.47): the same page and the same runs, laid out for a phone by app.css.
- * Someone deadwax says isn't its admin gets a short note instead, asking nothing.
+ * (2.0.0-player.61) Each part by its permission (lib/permissions.ts careParts): Rescan and Held by nobody are
+ * Look after the library's, the runs Edit albums' - an admin has both. Someone with neither gets a short note
+ * instead, asking nothing.
  */
 export function LibraryCare({
-  admin,
+  parts,
   live,
   onBack,
   backLabel,
 }: {
-  /** deadwax's admin is the one looking (everyone, with logins off) - on either frame since 2.0.0-player.47 */
-  admin: boolean
+  /** which parts this person's permissions open - everyone's all of them, with logins off */
+  parts: CareParts
   /** this page is what shows - its tab current, the app in front, nothing over it */
   live: boolean
   onBack: () => void
   backLabel: string
 }) {
-  //? read only once it shows - for anyone but the admin, nothing is asked at all
+  const admin = parts.shown
+  //? read only once it shows - for anyone without either permission, nothing is asked at all
   const library = useLibrary(admin && live)
   const care = useLibraryCare()
   const [rescanning, setRescanning] = useState(false)
@@ -196,7 +200,7 @@ export function LibraryCare({
           </div>
         ) : (
           <>
-            <section class="app-care-section" aria-labelledby="app-care-rescan">
+            {parts.rescan && <section class="app-care-section" aria-labelledby="app-care-rescan">
               <div class="app-care-head">
                 <h2 id="app-care-rescan" class="app-care-title">Rescan</h2>
                 <button
@@ -221,9 +225,9 @@ export function LibraryCare({
                 </p>
               )}
               <p class="app-care-note">{RESCAN_WORDS}</p>
-            </section>
+            </section>}
 
-            <section class="app-care-section" aria-labelledby="app-care-runs">
+            {parts.bulk && <section class="app-care-section" aria-labelledby="app-care-runs">
               <h2 id="app-care-runs" class="app-care-title">Covers, CD art and lyrics</h2>
               <label class="app-care-narrow">
                 <span class="app-care-label">Narrow to</span>
@@ -291,11 +295,11 @@ export function LibraryCare({
                   </section>
                 )
               })}
-            </section>
+            </section>}
           </>
         )}
         {/* (2.0.0-player.51) with logins on: what nobody has in their library, and the flagged downloads */}
-        {sessionMe()?.auth === 'on' && <HeldByNobody live={live} />}
+        {sessionMe()?.auth === 'on' && parts.held && <HeldByNobody live={live} />}
       </div>
     </section>
   )

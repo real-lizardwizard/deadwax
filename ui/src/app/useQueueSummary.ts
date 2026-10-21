@@ -2,6 +2,8 @@ import { useEffect, useState } from 'preact/hooks'
 
 import { queueSummary } from '../api/library'
 import { onAlbumsFiled } from '../lib/libraryEvents'
+import { asksQueueSummary } from '../lib/permissions'
+import { accessNow } from './access'
 
 /**
  * How many albums need a look (2.0.0-player.25): the count beside "Needs a look" in the desktop's
@@ -55,6 +57,8 @@ function ask(): void {
 
 /** Ask deadwax how many albums need a look - now, or straight after the ask already out. */
 export function askQueueSummary(): void {
+  //? (2.0.0-player.61) the count is Look after the library's: never asked without it (the server answers 403)
+  if (!asksQueueSummary(accessNow().permissions)) return
   if (!hearing) {
     hearing = true
     //? an album filed is a new import: the count moves

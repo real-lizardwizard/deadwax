@@ -5191,6 +5191,202 @@ html.app-picker-open { overflow: hidden; }
 .app-playlist-question { display: flex; flex-direction: column; gap: var(--pl-gap-sm); padding: var(--dw-gutter-grouped); }
 .app-playlist-picker-problem { padding: 0 var(--dw-gutter-grouped); }
 
+/* ===== People (2.0.0-player.61) =====
+   Navidrome's accounts, managed as the signed-in Navidrome admin: the unlock card, Add a person, a card per account
+   (its chips, what deadwax knows, its actions and Permissions), Known only to deadwax, and Remove's dialog - a
+   centred card on a desktop, a sheet from the foot on a phone, clear of the home bar. Both frames; the fields 17px
+   so iOS doesn't zoom. Also the "off for you" line Get albums' absence leaves, You's unverified line and Needs a
+   look's "needs Edit albums" line. */
+:root {
+    --app-people-gap: 12px;                       /* between a card's parts, and between cards */
+    --app-people-field-text: var(--dw-text-body); /* every field: 17px */
+    --app-people-dialog-max: 480px;               /* Remove's card on a desktop */
+    --app-people-dialog-height: 100dvh;           /* ...and how tall it may get, less the status bar */
+    --app-people-max: 760px;                      /* the page's column on a desktop: forms a line can be read across */
+    --app-people-chip-pad: 6px;                   /* a chip's sides */
+    --app-people-chip-gap: 6px;                   /* between the name, the user name and the chips */
+    --app-z-people-dialog: 37;                    /* over the page, Now Playing (20), Sources (25), Info (30) and the viewer (35), under the pin notice (40) */
+}
+
+.app-people-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-people-gap);
+    padding: 0 var(--pl-edge-right) var(--app-shelf-gap) var(--pl-edge-left);
+    min-width: 0;
+}
+
+.app-people-unlock,
+.app-people-add,
+.app-people-state,
+.app-people-row,
+.app-people-dialog {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pl-gap-sm);
+    min-width: 0;
+    padding: var(--dw-gutter-grouped);
+}
+
+.app-people-title { margin: 0; color: var(--dw-text); font-size: var(--dw-text-body); font-weight: var(--dw-weight-semibold); }
+.app-people-title.is-danger { color: var(--dw-danger-text); }
+.app-people-line { margin: 0; font-size: var(--dw-text-body); line-height: var(--dw-leading-note); overflow-wrap: anywhere; }
+.app-people-line.is-danger { color: var(--dw-danger-text); }
+.app-people-label { color: var(--dw-text-2); font-size: var(--dw-text-footnote); }
+
+.app-people-field { display: flex; flex-direction: column; gap: var(--pl-gap-xs); min-width: 0; }
+
+.app-people-input {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    min-height: var(--dw-row);
+    padding: var(--pl-gap-xs) var(--app-row-pad);
+    border: var(--dw-hairline) solid var(--dw-border-cover);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-well);
+    box-shadow: var(--dw-well-inset);
+    color: var(--dw-text);
+    font: inherit;
+    font-size: var(--app-people-field-text);
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.app-people-input:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+}
+
+/* the session's own name, there for a password manager - never seen, never reached */
+.app-people-hidden {
+    position: absolute;
+    width: var(--dw-hairline);
+    height: var(--dw-hairline);
+    overflow: hidden;
+    clip-path: inset(50%);
+    pointer-events: none;
+}
+
+.app-people-check {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--pl-gap-sm);
+    min-height: var(--dw-row);
+    padding: var(--pl-gap-xs) 0;
+    font-size: var(--dw-text-body);
+}
+
+.app-people-checkbox {
+    flex: none;
+    width: var(--app-people-field-text);
+    height: var(--app-people-field-text);
+    margin: var(--pl-gap-xs) 0 0;
+    accent-color: var(--dw-accent);
+}
+
+.app-people-permission.is-locked { color: var(--dw-text-2); }
+.app-people-permission-text { display: flex; flex-direction: column; gap: var(--pl-gap-xs); min-width: 0; }
+.app-people-permission-label { color: var(--dw-text); }
+.app-people-permission.is-locked .app-people-permission-label { color: var(--dw-text-2); }
+
+.app-people-permissions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pl-gap-xs);
+    min-width: 0;
+    margin: var(--pl-gap-sm) 0 0;
+    padding: var(--pl-gap-sm) 0 0;
+    border: 0;
+    border-top: var(--dw-hairline) solid var(--dw-row-border);
+}
+
+.app-people-buttons,
+.app-people-actions { display: flex; flex-wrap: wrap; gap: var(--pl-gap-sm); }
+.app-people-buttons .app-button,
+.app-people-actions .app-button { flex: 0 1 auto; }
+
+.app-people .app-button.is-primary,
+.app-people-dialog .app-button.is-primary {
+    border-color: var(--dw-primary-border);
+    background: var(--dw-primary-bg);
+    box-shadow: var(--dw-primary-highlight);
+    color: var(--dw-text);
+}
+
+.app-people .app-button.is-danger,
+.app-people-dialog .app-button.is-danger {
+    border-color: var(--dw-danger-border);
+    background: var(--dw-danger-bg);
+    color: var(--dw-text);
+}
+
+.app-people .app-button[aria-disabled='true'],
+.app-people-dialog .app-button:disabled { opacity: var(--app-pin-off); }
+
+.app-people-problem { margin: 0; color: var(--dw-danger-text); font-size: var(--dw-text-body); overflow-wrap: anywhere; }
+.app-people-done { margin: 0; color: var(--dw-text); font-size: var(--dw-text-body); overflow-wrap: anywhere; }
+.app-people-warning { margin: 0; color: var(--dw-amber-text); font-size: var(--dw-text-footnote); overflow-wrap: anywhere; }
+.app-people-typing:empty { display: none; }
+.app-people-reason { margin: 0; overflow-wrap: anywhere; }
+
+.app-people-lockline { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--pl-gap-sm); }
+.app-people-lockline .app-footnote { flex: 1 1 auto; min-width: 0; margin: 0; }
+
+.app-people-section { display: flex; flex-direction: column; gap: var(--pl-gap-sm); min-width: 0; }
+.app-people-list { display: flex; flex-direction: column; gap: var(--app-people-gap); margin: 0; padding: 0; list-style: none; }
+
+.app-people-who { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--app-people-chip-gap); min-width: 0; }
+.app-people-name { color: var(--dw-text); font-size: var(--dw-text-body); font-weight: var(--dw-weight-semibold); overflow-wrap: anywhere; }
+.app-people-user { color: var(--dw-text-2); font-size: var(--dw-text-footnote); overflow-wrap: anywhere; }
+
+.app-people-chip {
+    padding: 0 var(--app-people-chip-pad);
+    border: var(--dw-hairline) solid var(--dw-secondary-border);
+    border-radius: var(--dw-radius-control);
+    background: var(--dw-secondary-bg);
+    color: var(--dw-text-on-secondary);
+    font-size: var(--dw-text-footnote);
+}
+
+.app-people-fact { margin: 0; color: var(--dw-text-2); font-size: var(--dw-text-footnote); }
+.app-people-inline { display: flex; flex-direction: column; gap: var(--pl-gap-sm); min-width: 0; }
+
+/* Remove's dialog: over everything, the page behind dimmed */
+.app-people-dialog-layer {
+    position: fixed;
+    inset: 0;
+    z-index: var(--app-z-people-dialog);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    background: var(--dw-scrim);
+}
+
+.app-people-dialog {
+    box-sizing: border-box;
+    width: 100%;
+    max-height: calc(var(--app-people-dialog-height) - var(--pl-safe-top));
+    overflow-y: auto;
+    padding-bottom: calc(var(--dw-gutter-grouped) + var(--pl-safe-bottom));
+    padding-left: max(var(--dw-gutter-grouped), var(--pl-safe-left));
+    padding-right: max(var(--dw-gutter-grouped), var(--pl-safe-right));
+    border: var(--dw-hairline) solid var(--dw-border);
+    border-radius: var(--dw-radius-card) var(--dw-radius-card) 0 0;
+    background: var(--dw-card);
+    box-shadow: var(--dw-highlight);
+}
+
+.app-desk .app-people-body { max-width: var(--app-people-max); }
+.app-desk .app-people-dialog-layer { align-items: center; }
+.app-desk .app-people-dialog { max-width: var(--app-people-dialog-max); border-radius: var(--dw-radius-card); }
+
+/* Get albums taken away: its words where Get was (2.0.0-player.61) */
+.app-get-off { margin: 0; color: var(--dw-text-2); }
+.app-you-unverified { color: var(--dw-amber-text); }
+.app-queue-no-edit { color: var(--dw-text-2); }
+
+
 /* ===== looking after deadwax from a phone (2.0.0-player.47) =====
    The phone gets every managing page the desktop has: the Edit panel as a sheet over the whole screen
    (app/EditPanel.tsx - the main page's editors hosted in it as they are, styled here by their own ids

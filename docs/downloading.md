@@ -429,9 +429,10 @@ refused ("already downloading from bob") rather than joined.
 - **Who sees what.** Requests, Home's **Arriving** and the count on the Requests tab hold the
   downloads *you* asked for, and the ones you joined. An admin sees everyone's, each row saying who
   asked: **Asked by ethan**, or **Asked by you and ethan** for one you share (a row only you asked
-  for says nothing more). A user's row of a download somebody else is waiting for too says **Someone
-  else asked for it too** - never who. The main page's **Downloads** panel follows the same rules -
-  nobody but an admin sees somebody else's download there - with the same words beside the user.
+  for says nothing more; one nobody is waiting for any more - its asker removed in People - says **Nobody
+  is waiting for this any more**, and carries on, filed for nobody). A user's row of a download somebody
+  else is waiting for too says **Someone else asked for it too** - never who. The main page's **Downloads** panel follows the same rules -
+  nobody but an admin (or someone an admin gave **Everyone's downloads**, 2.0.0-player.61) sees somebody else's download there - with the same words beside the user.
   The event log stays an admin's; a download that fails says why on its own row, as it always has.
 - **Joining.** A pressing somebody else is already downloading whole isn't fetched a second time.
   The sources sheet, the line under **Get the album** and the main page's candidates panel say
@@ -459,7 +460,7 @@ refused ("already downloading from bob") rather than joined.
   share is no cancel away from another user: Get it again and you'd join it again. The
   download itself is cancelled - slskd told, and the half-finished files removed when
   `SLSKD_INCOMPLETE_PATH` is set - only when the last person waiting for it cancels (they then see it
-  cancelled, and can retry it), or when an admin cancels: an admin's ✕ is for everyone, and asks
+  cancelled, and can retry it), or when an admin (or someone given Everyone's downloads) cancels: their ✕ is for everyone, and asks
   "Cancel this download for everyone? ethan asked for it." with **Cancel for everyone**.
 - **Retrying.** **Next peer** and **Ask again** (the main page's **↻ next peer** and **↻ retry**) are
   anyone's who is waiting for the download, and an admin's: the one download moves, and everyone
@@ -487,7 +488,7 @@ refused ("already downloading from bob") rather than joined.
   ([what happens to what you had](sharing.md#what-happens-to-what-you-had)).
 - **What a download gives you**: it goes into [your library](player.md#your-library-with-logins-on) -
   your starred albums in Navidrome - when it ends, for everyone still waiting for it (not anyone who
-  left it, nor the break-glass `admin`, which has no library), and its row in Requests says so:
+  left it, nor the break-glass `deadwax`, which has no library), and its row in Requests says so:
   - **filed** - added: **In your library** (an admin's row of somebody else's: **Filed - in their library**);
   - **every file was already there**, in the folder of that same release - a second copy isn't filed
     beside the first, and it's added: **Already in the store, added to your library**;

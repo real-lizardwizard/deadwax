@@ -314,7 +314,7 @@ for the name, read from the folder by deadwax - and the MusicBrainz artist ids d
 doesn't say who they are. An album filed by another tool, without those ids, still shows there -
 just without MusicBrainz's albums beside it. Since 2.0.0-player.45 it has all of this page's too, on a
 phone and a desktop: In your library, MusicBrainz's facts in full (other names, dates, genres,
-links, the line-up), and for an admin **Artist images…**, **Move albums to …** and **Which artist is
+links, the line-up), and for an admin (or someone given Edit albums, or Look after the library for the move) **Artist images…**, **Move albums to …** and **Which artist is
 this?** ([Managing an artist](player.md#managing-an-artist)) - one page for every name the library
 files the artist under, so Ye's page moves Donda out of `Kanye West/`.
 
@@ -355,7 +355,7 @@ beside the page, and shows pressed while the panel is open; click it again to cl
 phone - any window narrower, an iPad held upright included - **Edit** is at the top of the page,
 beside the pin (since 2.0.0-player.47), and opens the same panel as a sheet over the whole screen,
 laid out for a phone: its fields big enough that iOS doesn't zoom into them, **Apply** kept at the
-sheet's foot as you scroll. It's there for an admin, which with logins off is everyone.
+sheet's foot as you scroll. It's there for an admin, which with logins off is everyone (and, since 2.0.0-player.61, for anyone an admin gives its permission to - [Sharing deadwax](sharing.md#admins-permissions-and-everyone-else)).
 
 The panel holds this page's own editors, not copies of them - so everything this page says about
 them is true there too:
@@ -380,7 +380,8 @@ them is true there too:
   and re-timing the lyrics already saved, are in the server settings - this page's Settings tab, or
   the app's **Managing → Settings**, under **Library** ([Configuration](configuration.md#in-the-app)).
 - **Delete** is [the delete confirmation](#deleting-an-album): what the folder holds, read as you
-  open the tab, and **delete permanently**. **Cancel** (or Escape) goes back to **Release**.
+  open the tab, and **delete permanently**. **Cancel** (or Escape) goes back to **Release** - or, for
+  someone given Look after the library but not Edit albums, whose panel has only **Delete**, closes it.
 
 **Which folder.** The album page knows the album by Navidrome's id; the editors work on a folder.
 deadwax finds it by the album's MusicBrainz release, as the store index has it (the same lookup that
@@ -461,7 +462,7 @@ choosing, dragging and sizing them - stay this page's.
 In the app at `/player/`, on a desktop (a window 1024 pixels wide or more), the sidebar's **Managing**
 starts with **Needs a look** (since 2.0.0-player.25), with how many albums need one beside it - and
 You's **Managing deadwax** has **Albums that need a look**, with the same count, on a phone too since
-2.0.0-player.47. It's there for an admin, which with logins off is everyone. It's this page's review queue (**Review N**), not a copy:
+2.0.0-player.47. It's there for an admin, which with logins off is everyone (and, since 2.0.0-player.61, for anyone an admin gives its permission to - [Sharing deadwax](sharing.md#admins-permissions-and-everyone-else)). It's this page's review queue (**Review N**), not a copy:
 
 - **The same albums, in the same order**: every album with an issue you haven't accepted, and every
   album deadwax filed that nobody has looked at yet - those first, then the worst first, then by
@@ -509,7 +510,7 @@ note here, pointing at this page.
 
 In the app at `/player/`, on a desktop (a window 1024 pixels wide or more), the sidebar's **Managing**
 has **Library care** after **Needs a look** (since 2.0.0-player.42), and You's **Managing deadwax** has
-the same row - on a phone too since 2.0.0-player.47, where the page is laid out for it. It's there for an admin, which with logins off is everyone. It holds what this page's
+the same row - on a phone too since 2.0.0-player.47, where the page is laid out for it. It's there for an admin, which with logins off is everyone (and, since 2.0.0-player.61, for anyone an admin gives its permission to - [Sharing deadwax](sharing.md#admins-permissions-and-everyone-else)). It holds what this page's
 toolbar does beyond the review queue:
 
 - **Rescan** - the same as here: every file read again, ignoring the saved scan. Under it, what the

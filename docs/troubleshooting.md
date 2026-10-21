@@ -499,7 +499,7 @@ on the sign-in screen means, and what to do about it:
 
 - **"Navidrome isn't answering, so deadwax can't check your password right now"**: signing in asks
   Navidrome, so with Navidrome down nobody can. That's what the **break-glass** sign-in is for: user
-  name `admin`, password `DEADWAX_ADMIN_PASSWORD`. It needs neither Navidrome nor deadwax's database,
+  name `deadwax` (it was `admin` until 2.0.0-player.61), password `DEADWAX_ADMIN_PASSWORD`. It needs neither Navidrome nor deadwax's database,
   and lasts 12 hours. If it isn't set, set it in compose and recreate the container. Sessions already
   signed in carry on while Navidrome is down - only new sign-ins need it.
 - **"Logins are on, but ORGANIZE_MODE is 'dry_run', so nothing downloaded would ever be filed into
@@ -523,7 +523,8 @@ on the sign-in screen means, and what to do about it:
   (their 30 days just stop moving on) - but a new sign-in answers this until it's fixed.
 - **You've lost the way in altogether**: set `AUTH_MODE=off` in compose and recreate the container -
   deadwax is then exactly as it was before logins. The pins and Getting albums settings the first
-  admin took over stay with that admin, for when logins are back on. Every download is listed, the
+  admin took over stay with that admin, for when logins are back on. Or sign in with the break-glass
+  `deadwax` - it is an admin whatever Navidrome says. Every download is listed, the
   ones people asked for while logins were on included, and **Clear finished** forgets every finished
   one, as it always did. What you get or pin meanwhile goes to the first admin back - at their next
   sign-in, or their first visit if they're still signed in.
@@ -533,6 +534,30 @@ on the sign-in screen means, and what to do about it:
 The app was open from before logins were switched on, running a version older than 2.0.0-player.48
 (one that is newer reloads itself and shows the sign-in). Close the home-screen app - swipe it away -
 and open it again, or reload the tab.
+
+### "The break-glass sign-in has ended"
+
+It lasts 12 hours, and ends at once when `DEADWAX_ADMIN_PASSWORD` changes. Since 2.0.0-player.61 its user
+name is `deadwax`: a break-glass sign-in made before the upgrade (as `admin`) ends at its next request -
+sign in again as `deadwax`.
+
+### "deadwax keeps that user name for itself now, so the sign-in it had has ended"
+
+You were signed in as a Navidrome account called `deadwax`, and since 2.0.0-player.61 that name is the
+break-glass sign-in's, so nobody signs in to deadwax as it any more (the upgrade signs such a sign-in out).
+Sign in with another Navidrome account - an admin can make you one in People, or in Navidrome's Users page.
+The account can stay `NAVIDROME_USER`: deadwax uses that one itself, and never signs anyone in as it.
+
+### "An admin reset your password - sign in with the new one."
+
+An admin reset your Navidrome password in People, which signs you out of deadwax on every device at once.
+Sign in with the new password they give you; Amperfy and any other app you use need it too. Your library,
+pins and settings are as they were.
+
+### "Your account was removed."
+
+An admin removed your Navidrome account in People. Nothing of yours is left in deadwax to sign in to;
+ask them.
 
 ### Signed out after changing your Navidrome password
 
@@ -571,26 +596,121 @@ has changed since you signed in"). Signing out by itself doesn't stop deadwax st
 Three wrong passwords for one user name within a minute, and deadwax stops asking Navidrome about that
 name until the minute is up - the message says how long. It's there so a mistyped password, or someone
 guessing, never gets the account locked in Navidrome itself (which blocks a user for a while after a run
-of failures). Other names aren't affected. The break-glass `admin` is held to the same.
+of failures). Other names aren't affected. The break-glass `deadwax` is held to the same.
 
 ### "That user name and password didn't work"
 
 It's your **Navidrome** user name and password - not anything set in deadwax (except the break-glass
-`admin`). Case doesn't matter in the name. Two names can't be used: `local` (what deadwax calls its one
-user with logins off) and `admin` (the break-glass sign-in's). An LDAP account can't sign in at all -
-Navidrome can't check it with a token, and deadwax says so.
+`deadwax`). Case doesn't matter in the name. Two names can't be used: `local` (what deadwax calls its one
+user with logins off) and `deadwax` (the break-glass sign-in's - `admin` until 2.0.0-player.61, an ordinary
+name now). An LDAP account can't sign in at all - Navidrome can't check it with a token, and deadwax says so.
 
 ### "Your sign-in ran out after 30 days without use"
 
 A session lasts 30 days from when you last used deadwax on that device; using it moves that on. Sign in
 again.
 
-### A button says "That's for deadwax's admin"
+### A button says "That needs Edit albums, which an admin hasn't given you"
 
-You're signed in as someone `DEADWAX_ADMINS` doesn't name. Editing the library, the albums that need a
-look, the log and the server settings are an admin's. If you should be one, add your Navidrome user name
-to `DEADWAX_ADMINS` and recreate the container. (The app doesn't show those to anyone else; the main page
-still does, until it retires, and refuses them with this.)
+(Or Look after the library, Settings and the log, Get albums - or "That's People, which only Navidrome's
+admins can use".) You're signed in as someone who isn't a Navidrome admin, and no admin has given you that
+permission. deadwax's admins are Navidrome's admins (since 2.0.0-player.61): if you should be one, make
+your account an admin in Navidrome's Users page - deadwax notices within about six minutes, or at once if
+another admin does it in People. Or ask an admin to tick just that permission for you in People (it's in
+force from your next tap). The app doesn't show what you can't use; the main page still does, until it
+retires, and refuses it with these words. A Managing page reached by its address says "You don't have
+permission for this page."
+
+### I lost Managing after upgrading
+
+From 2.0.0-player.61, `DEADWAX_ADMINS` is ignored - the log says so once at start-up - and deadwax's admins
+are Navidrome's. If your account isn't an admin in Navidrome, you're an ordinary user now (with Get albums,
+as before). Make your account a Navidrome admin in Navidrome's own Users page, or sign in as a Navidrome
+account that is one (sign out first: **You → About → Sign out**); meanwhile the break-glass `deadwax` gets
+you in. Then take `DEADWAX_ADMINS` out of compose. [Sharing deadwax](sharing.md) says what making an account
+a Navidrome admin gives it in Navidrome and Amperfy too.
+
+### NAVIDROME_URL, NAVIDROME_USER or NAVIDROME_PASSWORD says "Only an admin can change this"
+
+You were given **Settings and the log**, which lets you change the server settings - all but these three.
+Everyone's own Navidrome sign-in is sent to `NAVIDROME_URL`, and its answers say who deadwax's admins are;
+`NAVIDROME_USER` and its password are deadwax's own account, which People won't touch, so set to your own it
+would put you out of People's reach. Only an admin (a Navidrome admin, or the break-glass `deadwax`) can
+change them. Ask one.
+
+### The event log stops while it's open
+
+An open event log asks again before every line whether you may still read it: if an admin took away
+**Settings and the log**, you're no longer a Navidrome admin, or your sign-in ended (a password reset, your
+account removed), it closes then rather than at your next tap. The page then says why - the sign-in screen
+if you were signed out, or "That needs Settings and the log…" if it was taken away.
+
+### "Getting albums is off for you - ask an admin."
+
+An admin unticked **Get albums** for you in People: you can still play, browse and add what the store has
+to your library, but not search Soulseek or download. Only an admin can give it back.
+
+### "...the extra permissions an admin gave you are off until you sign in again"
+
+An admin gave you a permission, and deadwax checks it's still the same Navidrome account it was given to
+as you sign in - one Navidrome sign-in as you. That check couldn't be made this time (Navidrome was busy
+or not answering, or deadwax had just made several sign-ins), so the extra permissions are off on this
+device until you sign in again: **You → About → Sign out**, then sign in. A Get albums taken away still
+applies. An admin opening People also puts it right, from your next tap.
+
+### People asks for my password
+
+People changes Navidrome's accounts **as you**, and Navidrome only gives deadwax the key for that in
+exchange for your password - which deadwax doesn't keep from your sign-in. So People opens locked: type your
+Navidrome password to unlock it, on that device, for 15 minutes since you last use it (**Lock** ends it
+sooner). Signing out, a restart of deadwax, or a change to your password ends it too.
+
+### "That isn't the password you signed in to deadwax with"
+
+deadwax checks the password you typed into People against the login you signed in with, before Navidrome is
+asked anything. If you've changed your Navidrome password since you signed in, sign out and in again with
+the new one. Three wrong ones in a minute and deadwax holds off ("Too many tries"), as it does at the
+sign-in.
+
+### "Navidrome only takes a few sign-ins from deadwax every 20 seconds"
+
+Navidrome takes at most five of its own sign-ins per 20 seconds from one address, and every one from deadwax
+- every admin unlocking People, and some sign-ins - comes from deadwax's address. deadwax holds itself to
+four, and says so rather than have Navidrome refuse; nothing is retried by itself. Wait the seconds it
+says and try again.
+
+### "Navidrome says you're not one of its admins"
+
+People only works for a Navidrome admin, and Navidrome has just said your account isn't one (perhaps it was
+changed in Navidrome since you signed in): you're an ordinary user in deadwax from then on. An admin can make
+you one, in People or Navidrome's Users page.
+
+### People says "Navidrome answered in a way deadwax doesn't know"
+
+People uses the interface Navidrome's own web pages use, which isn't documented and can change between
+Navidrome versions - People was made for Navidrome 0.64, and says so when yours is another. Nothing else in
+deadwax depends on it. Change accounts in Navidrome's own Users page meanwhile. If it says a password
+"didn't take", set that person's password in Navidrome's Users page.
+
+### People says "Navidrome didn't answer in time, so deadwax can't tell whether …"
+
+The change was sent, and then nothing came back - Navidrome took too long, or the connection dropped
+partway (Navidrome restarting, a proxy closing it). It may have been made. Open People again and look:
+an account made or removed shows there (a removed one deadwax couldn't clear is under **Known only to
+deadwax** - Forget it), and for a password, try signing in as them. Nothing in deadwax was changed for it:
+after a reset like this they stay signed in until the next check finds the old password gone.
+
+### People made an account but "couldn't read the new account back"
+
+The account was made, and its password checked - only the look at which libraries Navidrome gives it
+didn't get an answer. Check in Navidrome's own Users page that they have a library, or they'll see nothing.
+
+### People can't make an account: "deadwax still keeps pins, settings or a library for an earlier …"
+
+deadwax still keeps something under that name - an account removed in Navidrome's own Users page, or a
+removal deadwax couldn't finish - and a new person must not inherit someone else's library, pins or
+permissions. Find the name under **Known only to deadwax** at the foot of People and **Forget** it, then
+make the account; or choose another name.
 
 ### The main page says "You're signed out"
 
@@ -749,7 +869,7 @@ more things that make your library look short:
 - **An album with no MusicBrainz release id** can't be added from its page (deadwax keeps your library
   by release, and the page says so). Star it in Amperfy - your Library is your Navidrome favourites, so
   it shows there - or have an admin match its release.
-- **The break-glass `admin`** has no library of its own: its Library is the whole store.
+- **The break-glass `deadwax`** has no library of its own: its Library is the whole store.
 - **Signed in on the main page only**: the main page's library tab is the store's, as it always was.
 
 ## The Library shows the first 10000 albums
@@ -1115,7 +1235,7 @@ before you save. Saving the address it already is, or reverting it, doesn't need
   songs longer than 30 seconds count. Skipping ahead adds nothing, so a song you skipped through
   isn't a play.
 - **Plays go to the `NAVIDROME_USER` account with logins off**, and to your own - the account you
-  signed in with - with logins on (the break-glass `admin`'s go to `NAVIDROME_USER`). Look at that account's play counts.
+  signed in with - with logins on (the break-glass `deadwax`'s go to `NAVIDROME_USER`). Look at that account's play counts.
 - **Behind a reverse proxy that rewrites the `Host` header**, deadwax takes the player's play
   reports for requests from another website and refuses them, and the phone doesn't say so. The
   main page's **Log** names each refusal. Pass the original `Host` through, or set

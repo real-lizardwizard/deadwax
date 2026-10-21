@@ -38,7 +38,7 @@ from src.scan_wait import (SCAN_CALL_TIMEOUT_SECONDS, SCAN_MAX_POLLS, SCAN_POLL_
                            scanned_since_hold, step)
 from src.store_index import index_folder, mark_deleted, reconcile_scan, reindex_merged, reindex_moved
 from src.track_tags import execute_tag_edits, plan_tag_edits
-from src.users import LOCAL_USER, current_user, require_admin
+from src.users import LOCAL_USER, current_user, require
 from src import library_ledger
 
 #? One client for the process, closed with the app in src/api/app.py. Cover art is fetched
@@ -52,12 +52,16 @@ artist_images_client = ArtistImagesClient()
 
 router = APIRouter()
 
-#? (2.0.0-player.48) The admin-only routes here: everything that edits the shared library - apply a
-#? release, edit tags, delete, covers, lyrics, CD art, an artist's pictures and re-filing, a rescan -
-#? and the review queue (Needs a look, the new-imports count). A signed-in user who isn't an admin is
-#? answered 403, in words (src/users.py require_admin); reading the library stays everyone's. The whole
-#? router is checked for a session in src/api/app.py; tests/test_logins.py names every route's side.
-ADMIN = [Depends(require_admin)]
+#? (2.0.0-player.48) The routes here an admin alone could use until 2.0.0-player.61, now each by its
+#? permission (src/users.py require - an admin has every one, and can give either to an ordinary person in
+#? People): EDIT - Edit albums - everything that rewrites an album's files and nothing that removes or moves
+#? one: apply a release, edit tags, covers, lyrics, CD art, an artist's pictures and the artist search the
+#? main page's picker asks; LIBRARY - Look after the library - deleting, re-filing an artist, a rescan, and
+#? the review queue (Needs a look, the new-imports count). Without it, 403 in words; reading the library
+#? stays everyone's. The whole router is checked for a session in src/api/app.py; tests/test_logins.py
+#? names every route's permission.
+EDIT = [Depends(require("edit"))]
+LIBRARY = [Depends(require("library"))]
 
 
 def _store(request: Request):
@@ -339,7 +343,7 @@ async def owned(request: Request, user: str = Depends(current_user)):
     })
 
 
-@router.post("/rescan", dependencies=ADMIN)
+@router.post("/rescan", dependencies=LIBRARY)
 async def rescan(request: Request):
     """
     Drop the per-folder cache and read everything again.
@@ -509,7 +513,7 @@ class RetagRequest(BaseModel):
     fetch_art: bool = False
 
 
-@router.post("/retag/preview", dependencies=ADMIN)
+@router.post("/retag/preview", dependencies=EDIT)
 async def retag_preview(body: RetagRequest):
     """
     What applying this release would change. Writes nothing.
@@ -543,7 +547,7 @@ async def retag_preview(body: RetagRequest):
         raise HTTPException(status_code=500, detail=f"Error planning the retag: {e}")
 
 
-@router.post("/retag/apply", dependencies=ADMIN)
+@router.post("/retag/apply", dependencies=EDIT)
 async def retag_apply(request: Request, body: RetagRequest):
     """
     Write the tags and re-file the folder.
@@ -927,7 +931,7 @@ class CoverArtRequest(BaseModel):
     release_mbid: str | None = None
 
 
-@router.post("/art/fetch", dependencies=ADMIN)
+@router.post("/art/fetch", dependencies=EDIT)
 async def fetch_cover_art(request: Request, body: CoverArtRequest):
     """
     Put a cover in an album's folder. Changes nothing else about it.
@@ -1003,7 +1007,7 @@ class LyricsRequest(BaseModel):
     retime: bool = False
 
 
-@router.post("/lyrics/fetch", dependencies=ADMIN)
+@router.post("/lyrics/fetch", dependencies=EDIT)
 async def fetch_lyrics(request: Request, body: LyricsRequest):
     """
     Look up lyrics on LRCLIB for every track of one album, and write each as a `.lrc` beside it.
@@ -1219,7 +1223,7 @@ class DiscArtRequest(BaseModel):
     album_path: str
 
 
-@router.post("/disc_art/fetch", dependencies=ADMIN)
+@router.post("/disc_art/fetch", dependencies=EDIT)
 async def fetch_disc_art(request: Request, body: DiscArtRequest):
     """
     Save a picture of the disc beside an album's tracks, as `disc.<ext>` or `disc<N>.<ext>`.
@@ -1292,7 +1296,7 @@ class TagEditRequest(BaseModel):
     edits: list[TagEdit] = Field(default_factory=list)
 
 
-@router.post("/tags/preview", dependencies=ADMIN)
+@router.post("/tags/preview", dependencies=EDIT)
 async def tags_preview(body: TagEditRequest):
     """
     What editing these tracks' tags by hand would change. Writes nothing.
@@ -1314,7 +1318,7 @@ async def tags_preview(body: TagEditRequest):
         raise HTTPException(status_code=500, detail=f"Error planning the edit: {e}")
 
 
-@router.post("/tags/apply", dependencies=ADMIN)
+@router.post("/tags/apply", dependencies=EDIT)
 async def tags_apply(request: Request, body: TagEditRequest):
     """
     Write the edited tags, and nothing else: no file is renamed and no folder moves.
@@ -1377,7 +1381,7 @@ class QueueRequest(BaseModel):
     issues: list[str] = Field(default_factory=list)
 
 
-@router.get("/queue/new_imports", dependencies=ADMIN)
+@router.get("/queue/new_imports", dependencies=LIBRARY)
 async def new_imports(request: Request):
     """
     Albums deadwax has filed that you haven't looked at yet.
@@ -1395,7 +1399,7 @@ async def new_imports(request: Request):
     return await store.new_import_summary()
 
 
-@router.get("/queue/summary", dependencies=ADMIN)
+@router.get("/queue/summary", dependencies=LIBRARY)
 async def queue_summary(request: Request):
     """
     How many albums need a look - the app's count beside "Needs a look" (2.0.0-player.25).
@@ -1458,7 +1462,7 @@ async def queue_summary(request: Request):
             "unscanned_imports": unscanned}
 
 
-@router.post("/queue/ignore", dependencies=ADMIN)
+@router.post("/queue/ignore", dependencies=LIBRARY)
 async def ignore_issues(request: Request, body: QueueRequest):
     """
     Accept an album as it is, so it stops appearing in the queue.
@@ -1483,7 +1487,7 @@ async def ignore_issues(request: Request, body: QueueRequest):
     return {"ignored": True, "album_path": body.album_path, "issues": sorted(set(body.issues))}
 
 
-@router.post("/queue/unignore", dependencies=ADMIN)
+@router.post("/queue/unignore", dependencies=LIBRARY)
 async def unignore(request: Request, body: QueueRequest):
     """Put an album back in the queue after it was ignored."""
     store = _store(request)
@@ -1495,7 +1499,7 @@ async def unignore(request: Request, body: QueueRequest):
     return {"ignored": False, "album_path": body.album_path}
 
 
-@router.post("/queue/reviewed", dependencies=ADMIN)
+@router.post("/queue/reviewed", dependencies=LIBRARY)
 async def reviewed(request: Request, body: QueueRequest):
     """
     Note that you've looked at an album, which is what clears it from the new-import prompt.
@@ -1519,8 +1523,8 @@ class DeleteRequest(BaseModel):
     album_path: str
 
 
-@router.post("/delete", dependencies=ADMIN)
-async def delete(request: Request, body: DeleteRequest, user: str = Depends(require_admin)):
+@router.post("/delete", dependencies=LIBRARY)
+async def delete(request: Request, body: DeleteRequest, user: str = Depends(require("library"))):
     """
     Remove an album folder and everything in it. Permanent.
 
@@ -1565,8 +1569,8 @@ async def delete(request: Request, body: DeleteRequest, user: str = Depends(requ
         raise HTTPException(status_code=500, detail=f"Error deleting the album: {e}")
 
 
-@router.get("/deletion_summary", dependencies=ADMIN)
-async def deletion_summary(request: Request, album: str, user: str = Depends(require_admin)):
+@router.get("/deletion_summary", dependencies=LIBRARY)
+async def deletion_summary(request: Request, album: str, user: str = Depends(require("library"))):
     """
     What deleting this album would remove. Touches nothing.
 
@@ -1770,7 +1774,7 @@ async def artist_art(artist: str, kind: str = "thumb"):
     return Response(content=data, media_type=mime, headers={"Cache-Control": "private, max-age=300"})
 
 
-@router.post("/artist/images/preview", dependencies=ADMIN)
+@router.post("/artist/images/preview", dependencies=EDIT)
 async def artist_images_preview(request: Request, body: ArtistImagesRequest):
     """
     Everything that could be written for this artist, and what writing it would do.
@@ -1848,7 +1852,7 @@ async def artist_images_preview(request: Request, body: ArtistImagesRequest):
     }
 
 
-@router.post("/artist/images/apply", dependencies=ADMIN)
+@router.post("/artist/images/apply", dependencies=EDIT)
 async def artist_images_apply(request: Request, body: ArtistImagesRequest):
     """
     Write the chosen images into the artist's folder.
@@ -1958,7 +1962,7 @@ async def _refile_plan(request: Request, body: ArtistRefileRequest) -> tuple[dic
     return await asyncio.to_thread(plan_artist_refile, Config.LIBRARY_PATH or "", albums, current, mbid), []
 
 
-@router.post("/artist/refile/preview", dependencies=ADMIN)
+@router.post("/artist/refile/preview", dependencies=LIBRARY)
 async def artist_refile_preview(request: Request, body: ArtistRefileRequest):
     """
     Which of this artist's albums would move under the name MusicBrainz uses now, and which
@@ -1968,7 +1972,7 @@ async def artist_refile_preview(request: Request, body: ArtistRefileRequest):
     return {**plan, "problems": plan["problems"] + problems}
 
 
-@router.post("/artist/refile/apply", dependencies=ADMIN)
+@router.post("/artist/refile/apply", dependencies=LIBRARY)
 async def artist_refile_apply(request: Request, body: ArtistRefileRequest):
     """
     Move them. The plan is recomputed here, never taken back from the page - a plan is a list of
@@ -2005,7 +2009,7 @@ async def artist_refile_apply(request: Request, body: ArtistRefileRequest):
     return {"plan": plan, "results": results}
 
 
-@router.post("/artist/search", dependencies=ADMIN)
+@router.post("/artist/search", dependencies=EDIT)
 async def artist_search(request: Request, body: ArtistSearchRequest):
     """
     Artists in MusicBrainz going by this name.

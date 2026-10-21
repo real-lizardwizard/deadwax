@@ -11,6 +11,7 @@ import {
   type Facet, type FolderChange, type LookSession, type RowMark,
 } from '../lib/needsLook'
 import { MANAGING_ADMINS_ONLY } from '../lib/appRoutes'
+import { NEEDS_EDIT } from '../lib/permissions'
 import { ChevronLeftIcon } from '../player/icons'
 import type { FolderRequest } from './EditPanel'
 import { askQueueSummary, setPageQueueCount, useQueueTracking } from './useQueueSummary'
@@ -79,10 +80,12 @@ const focusLost = (): boolean => {
  *
  * ON A PHONE TOO (2.0.0-player.47): the same page, laid out for a phone by app.css, its rows opening the
  * Edit panel as a sheet over the whole screen - the queue's stepping and every rule above as they are.
- * Someone deadwax says isn't its admin gets a short note instead, asking nothing (nobody, with logins off).
+ * Someone without Look after the library (2.0.0-player.61 - an admin has it) gets a short note instead, asking
+ * nothing (nobody, with logins off).
  */
 export function NeedsALook({
-  admin,
+  allowed,
+  canEdit = true,
   shown,
   facet,
   onFacet,
@@ -92,8 +95,11 @@ export function NeedsALook({
   onEdit,
   onCloseEdit,
 }: {
-  /** deadwax's admin is the one looking (everyone, with logins off) - on either frame since 2.0.0-player.47 */
-  admin: boolean
+  /** (2.0.0-player.61) the one looking has this page's permission - an admin, or given it; everyone, with logins
+   *  off - on either frame since 2.0.0-player.47 */
+  allowed: boolean
+  /** (2.0.0-player.61) Edit albums too: fixing an album opens the editors, and the page says so without it */
+  canEdit?: boolean
   /** its tab is the one showing, and the app is in front */
   shown: boolean
   /** the facet the address names (null: All) */
@@ -107,8 +113,8 @@ export function NeedsALook({
   onEdit: (request: Omit<FolderRequest, 'key'>, opener: HTMLElement | null | undefined) => void
   onCloseEdit: () => void
 }) {
-  //? read only once it shows - for anyone but the admin, nothing is asked at all
-  const library = useLibrary(admin && shown)
+  //? read only once it shows - for anyone without its permission, nothing is asked at all
+  const library = useLibrary(allowed && shown)
   const real = library.loaded && !library.stale && !library.error
   //? whether deadwax can keep ignores, as the count's route last said (null: not yet)
   const tracking = useQueueTracking()
@@ -291,21 +297,21 @@ export function NeedsALook({
   //? shown again after the first time, with nothing under way: the library read again underneath
   const wasShown = useRef(shown)
   useEffect(() => {
-    if (admin && shown && !wasShown.current && library.loaded && !sessionNow.current && !ending) void library.reload(false)
+    if (allowed && shown && !wasShown.current && library.loaded && !sessionNow.current && !ending) void library.reload(false)
     wasShown.current = shown
   }, [shown])
 
   //? while it shows with a real scan and no session, its count is the badge's
   useEffect(() => {
-    setPageQueueCount(admin && shown && real && !session && !ending ? summaryTotal(library.albums) : null)
-  }, [admin, shown, real, session, ending, library.albums])
+    setPageQueueCount(allowed && shown && real && !session && !ending ? summaryTotal(library.albums) : null)
+  }, [allowed, shown, real, session, ending, library.albums])
 
   //? a facet the address names that has emptied: the address says All again - only while this page
   //? is the one showing, since the router rewrites the top of the tab that shows (a read landing
   //? while another tab shows would rewrite nothing, and the address would keep the old facet)
   useEffect(() => {
-    if (admin && shown && real && !session && !ending && facet !== null && showing === null) onFacet(null)
-  }, [admin, shown, real, session, ending, facet, showing])
+    if (allowed && shown && real && !session && !ending && facet !== null && showing === null) onFacet(null)
+  }, [allowed, shown, real, session, ending, facet, showing])
 
   const header = (
     <>
@@ -321,7 +327,7 @@ export function NeedsALook({
     </>
   )
 
-  if (!admin) {
+  if (!allowed) {
     return (
       <section class="app-queue is-refused app-needs">
         {header}
@@ -350,6 +356,7 @@ export function NeedsALook({
       {header}
       <div ref={body} class="app-queue-body" tabIndex={-1}>
         <p class="app-queue-line">{NEEDS_LOOK_LINE}</p>
+        {!canEdit && <p class="app-queue-line app-queue-no-edit">{NEEDS_EDIT}</p>}
         {ignoresUnsaved(library, tracking) && <p class="app-queue-warning">{IGNORES_UNSAVED}</p>}
 
         {library.problem ? (

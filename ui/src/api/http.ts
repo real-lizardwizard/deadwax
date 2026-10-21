@@ -15,13 +15,16 @@ export class ApiError extends Error {
   readonly status: number
   readonly detail: string | null
   readonly busy: boolean
+  /** (2.0.0-player.61) what kind of refusal a People route said it was - `locked` brings its unlock form back */
+  readonly kind: string | null
 
-  constructor(status: number, detail: string | null, fallback: string, busy = false) {
+  constructor(status: number, detail: string | null, fallback: string, busy = false, kind: string | null = null) {
     super(detail || fallback)
     this.name = 'ApiError'
     this.status = status
     this.detail = detail
     this.busy = busy
+    this.kind = kind
   }
 }
 
@@ -45,13 +48,14 @@ export class MusicBrainzUnavailable extends ApiError {
   }
 }
 
-async function readBody(response: Response): Promise<{ detail: string | null; busy: boolean }> {
+async function readBody(response: Response): Promise<{ detail: string | null; busy: boolean; kind: string | null }> {
   try {
-    const body = (await response.json()) as { detail?: unknown; busy?: unknown }
-    return { detail: typeof body.detail === 'string' ? body.detail : null, busy: body.busy === true }
+    const body = (await response.json()) as { detail?: unknown; busy?: unknown; kind?: unknown }
+    return { detail: typeof body.detail === 'string' ? body.detail : null, busy: body.busy === true,
+             kind: typeof body.kind === 'string' ? body.kind : null }
   } catch {
     // an error response that isn't JSON is still an error; don't mask it with a parse failure
-    return { detail: null, busy: false }
+    return { detail: null, busy: false, kind: null }
   }
 }
 
@@ -88,12 +92,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${BASE}${path}`, init)
 
   if (!response.ok) {
-    const { detail, busy } = await readBody(response)
+    const { detail, busy, kind } = await readBody(response)
     noteSignedOut(path, response.status, detail, sentUnder)
     // deliberately not special-cased here: 503 only means "MusicBrainz is down" on the
     // MusicBrainz routes, and slskd answers 502 for its own refusals. Mapping status codes
     // to meanings is each module's job - see musicbrainz.ts.
-    throw new ApiError(response.status, detail, `${init?.method ?? 'GET'} ${path} failed`, busy)
+    throw new ApiError(response.status, detail, `${init?.method ?? 'GET'} ${path} failed`, busy, kind)
   }
 
   return (await response.json()) as T

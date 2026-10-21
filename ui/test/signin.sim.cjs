@@ -194,6 +194,7 @@ function pageshow(persisted) {
 const hooks = require(path.join(OUT, 'node_modules/preact/hooks.js'))
 const { startWithLogins } = require(path.join(OUT, 'app/signInGate.js'))
 const session = require(path.join(OUT, 'app/session.js'))
+const access = require(path.join(OUT, 'app/access.js'))
 const rules = require(path.join(OUT, 'lib/signIn.js'))
 const auth = require(path.join(OUT, 'api/auth.js'))
 const http = require(path.join(OUT, 'api/http.js'))
@@ -296,7 +297,8 @@ async function main() {
 
     page.screen()[0].props.onSignedIn(ME('ethan', false))
     check('signed in: the screen goes and the app is drawn, once', [page.screen().map(name), page.app().map(name)], [['SignIn', null], ['App']])
-    check('...knowing already this is no admin', [session.sessionMe()?.user, session.adminUntilAsked()], ['ethan', false])
+    //? (2.0.0-player.61) by its permissions - an answer from before them (no list) by its `admin`: none for a user
+    check('...knowing already this is no admin', [session.sessionMe()?.user, [...session.permissionsUntilAsked()]], ['ethan', []])
     check('...the page free again', classes.has('has-signin'), false)
 
     console.log('\nthe gate: a session ending mid-use - the sign-in over the app, the app kept under it')
@@ -355,7 +357,8 @@ async function main() {
   console.log('\nthe gate: signed in at launch')
   {
     const page = await gate(() => ({ status: 200, body: ME('james', true) }))
-    check('the app drawn at once, no sign-in screen, the session an admin\'s', [page.app().map(name), page.screen().map(name), session.adminUntilAsked()], [['App'], [], true])
+    check('the app drawn at once, no sign-in screen, the session an admin\'s', [page.app().map(name), page.screen().map(name), [...session.permissionsUntilAsked()]],
+      [['App'], [], ['request', 'edit', 'library', 'downloads', 'server', 'people']])
   }
 
   console.log('\nthe gate: the main page sent you')
@@ -389,6 +392,26 @@ async function main() {
     await settle()
     check('shown again from the back-forward cache, signed in by then: on to the main page, replacing it',
       [sent.at(-1).url, replaced, assigned, back.app().length], ['/deadwax/me', ['/'], [], 0])
+  }
+
+  console.log('\nthe gate: what it hears is what the app draws by (2.0.0-player.61 review)')
+  {
+    access.forgetAccess()
+    const withList = (list) => ({ ...ME('ethan', false), permissions: list, permissions_unverified: false })
+    await gate(() => ({ status: 200, body: withList(['request']) }))
+    //? App's own ask as the desktop frame shows - once; after it, nothing on a desktop asks /me but the gate
+    access.noteAccess(withList(['request']))
+    check('the first answer noted', [...access.accessNow().permissions], ['request'])
+    answer = () => ({ status: 200, body: withList(['request', 'edit']) })
+    pageListeners.visibilitychange[0]()
+    await settle()
+    check('an admin ticked Edit albums: the next re-ask (back to the front) is what the app draws by - no reload, no You',
+      [...access.accessNow().permissions], ['request', 'edit'])
+    answer = () => ({ status: 200, body: withList([]) })
+    pageError(new HTMLMediaElement())
+    await settle()
+    check('...and one taken away is gone at the re-ask a failing song makes', [...access.accessNow().permissions], [])
+    access.forgetAccess()
   }
 
   console.log('\nthe gate: a song that fails to load asks who is signed in')
@@ -532,6 +555,8 @@ async function main() {
     const managing = () => find(tree, (node) => node.type === 'section' && node.props?.['aria-labelledby'] === 'app-managing-title').length
     const signOut = () => find(tree, (node) => name(node) === 'SignOutRow')
 
+    //? (2.0.0-player.61) what the app draws by is the access store's - the session's word until /me answers
+    access.forgetAccess()
     session.setSessionMe(ME('ethan', false))
     const real = globalThis.fetch
     //? /me never answers here, so only the session can say
@@ -570,9 +595,11 @@ async function main() {
     check('a row saying Sign out, naming who', text(find(tree, (node) => node.type === 'button')[0]), 'Sign outethan')
     const footnote = (user) => text(find(hooks.root(SignOutRow)({ user }), byClass('app-footnote')).at(-1))
     check('...signed in with a Navidrome account - or, for the break-glass admin, with its password and its 12 hours',
-      [footnote('ethan'), footnote('admin')],
+      [footnote('ethan'), footnote('deadwax'), footnote('admin')],
       ["Signed in as ethan, with your Navidrome account. Signing out ends this device's session and stops what's playing.",
-        "Signed in as admin, with the break-glass password - it lasts 12 hours. Signing out ends this device's session and stops what's playing."])
+        "Signed in as deadwax, with the break-glass password - it lasts 12 hours. Signing out ends this device's session and stops what's playing.",
+        //? (2.0.0-player.61) break-glass is `deadwax` now: Navidrome's own `admin` is a person like any other
+        "Signed in as admin, with your Navidrome account. Signing out ends this device's session and stops what's playing."])
     reloads = 0
     sent.length = 0
     answer = () => ({ status: 200, body: { signed_out: true } })
@@ -696,7 +723,9 @@ async function main() {
     const main = read('player/main.tsx')
     check('player/main.tsx: without the mark the app is drawn at once, nothing asked first - and loaded again at its first 401',
       [/else if \(loginsOn\(\)\) startWithLogins\(host\)\s*else \{\s*render\(<App \/>, host\)\s*reloadWhenLoginsComeOn\(\)\s*\}/.test(main), /\bme\(|fetch\(/.test(main)], [true, false])
-    check('App\'s admin starts from the session\'s word (true with logins off)', /const \[admin, setAdmin\] = useState\(adminUntilAsked\)/.test(read('app/App.tsx')), true)
+    //? (2.0.0-player.61) its permissions, from the access store - the session's word until /me answers, everything with logins off
+    check('App\'s admin starts from the session\'s word (true with logins off)',
+      [/const access = useAccess\(\)\s*const perms = access\.permissions/.test(read('app/App.tsx')), /return signedIn \? permissionsOf\(signedIn\) : ALL/.test(read('app/session.ts'))], [true, true])
     const gateSource = read('app/signInGate.tsx')
     check('the gate never draws the app away: nothing rendered into its host but the app', [...gateSource.matchAll(/render\(([^,]+), host\)/g)].map((m) => m[1]), ['<App />'])
     check('...and reaches nothing of the player', /usePlayer|PlayerContext|ActionsContext|playTracks/.test(gateSource), false)

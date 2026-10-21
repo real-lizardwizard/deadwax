@@ -207,9 +207,12 @@ async function run() {
   {
     L.me = null
     store.askMyLibrary()
-    L.me = { user: 'admin', admin: true, auth: 'on', version: 'x' }
+    //? (2.0.0-player.61) the break-glass admin is `deadwax` now
+    L.me = { user: 'deadwax', admin: true, auth: 'on', version: 'x' }
     store.askMyLibrary()
     check('logins off, or the break-glass admin: nothing asked', [L.asks.length, store.hasLibrary()], [0, false])
+    L.me = { user: 'admin', admin: true, auth: 'on', version: 'x' }
+    check('...and Navidrome\'s own `admin` signed in has a library like anyone', store.hasLibrary(), true)
     L.me = { user: 'ethan', admin: false, auth: 'on', version: 'x' }
     store.askMyLibrary()
     store.askMyLibrary()

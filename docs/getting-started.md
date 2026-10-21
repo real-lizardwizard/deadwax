@@ -156,7 +156,8 @@ scanned yet, unreadable, or outside Navidrome's music folder - is never out of r
 
 To share deadwax with other people, turn logins on: everyone then signs in with their own
 **Navidrome** account and has their own requests, library, plays and playlists, over the one store,
-and only the people you name are admins. Three settings, in the container's environment (compose's
+and Navidrome's admins are deadwax's admins (an admin can give anyone else a part of that, in People). Up to
+three settings, in the container's environment (compose's
 `environment:` block or `.env` - not the settings tab, which only shows them). The secret key goes in
 `.env` only, as `DEADWAX_SECRET_KEY=` and a key made with `openssl rand -hex 32` - a line for it in
 `environment:` as well, even an empty one, beats `.env`
@@ -164,20 +165,22 @@ and only the people you name are admins. Three settings, in the container's envi
 
 ```yaml
       - AUTH_MODE=on
-      - DEADWAX_ADMINS=james                # your Navidrome user name; comma-separate several
       # DEADWAX_SECRET_KEY is in .env - not here as well
-      # optional - signs in `admin` with no Navidrome, for when Navidrome is down:
+      # optional - signs in `deadwax` with no Navidrome, for when Navidrome is down:
       #- DEADWAX_ADMIN_PASSWORD=...
 ```
 
-Navidrome has to be set up (step 7), since signing in asks it, and organizing has to be on -
+To manage deadwax you sign in as a **Navidrome admin** account - make yours one in Navidrome's own Users
+page if it isn't, or keep a separate admin account for managing. Navidrome has to be set up (step 7),
+since signing in asks it, and organizing has to be on -
 `ORGANIZE_MODE` `copy` or `move` (step 6) - or deadwax refuses everything, saying why. Recreate the
 container, open deadwax, and sign in. Put HTTPS in front of it before reaching it from outside your
 own network; plain http is fine there and over WireGuard.
 
 **[Sharing deadwax](sharing.md) is the full story**: what each person gets and what stays shared,
-each setting, what happens to what you had (the first admin to sign in takes it over), adding and
-removing people, what admins can do that others can't, and turning logins off again. Every setting's
+each setting, what happens to what you had (the first Navidrome admin to sign in takes it over), adding
+and removing people (People, in You), what admins can do that others can't and the permissions they can
+give, and turning logins off again. Every setting's
 row: [Configuration → Logins](configuration.md#logins-environment-only). If you're locked out, see
 [Troubleshooting](troubleshooting.md#signing-in).
 

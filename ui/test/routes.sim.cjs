@@ -70,6 +70,8 @@
  *    look; and the Edit panel's "Choose the folder" - offered wherever no folder was found (by release
  *    or by name), its list the scan's folders narrowed by typing (every word, accents and case aside),
  *    by path, the first 50 drawn and the rest counted, and what it says over them.
+ *  - People (2.0.0-player.61): `#/you/people/all`, one page as Library care is, a sibling made from and into
+ *    the others; its sidebar item, after Library care; and what a page says without its permission.
  *
  * A script for the same reason as the other sims: there is no JS test runner here.
  *
@@ -1153,6 +1155,34 @@ console.log('\nLibrary care: one page, a sibling of the other Managing pages (2.
   check('...current while its page is on top, whatever its tab', [F.sidebarCurrent('you', 'albums', true, R.CARE_PAGE), F.sidebarCurrent('home', 'albums', true, R.CARE_PAGE), F.sidebarCurrent('search', 'albums', true, R.CARE_PAGE)],
     ['care', 'care', 'care'])
   check('...a tap opens its page, on You, as Settings and Log do', F.sidebarMove('care', 'albums', true), { how: 'managing', tab: 'you', kind: 'care' })
+}
+
+console.log('\nPeople: one page, a sibling of the other Managing pages (2.0.0-player.61)')
+{
+  check('pushed on You: #/you/people/all', R.parseHash('#/you/people/all'),
+    { route: { tab: 'you', page: { kind: 'people', id: 'all' } }, canonical: '#/you/people/all' })
+  check('...one page: any other id is it, nothing more kept; with no id, the tab\'s root',
+    [R.parseHash('#/you/people/ethan?facet=x').canonical, R.parseHash('#/you/people').canonical], ['#/you/people/all', '#/you'])
+  check('the page App opens, labelled for the back button above it', R.PEOPLE_PAGE, { kind: 'people', id: 'all', label: 'People' })
+  check('not the same page as any other Managing page',
+    [R.samePage(R.PEOPLE_PAGE, R.CARE_PAGE), R.samePage(R.PEOPLE_PAGE, R.QUEUE_PAGE), R.samePage(R.PEOPLE_PAGE, R.SETTINGS_PAGE), R.samePage(R.PEOPLE_PAGE, R.LOG_PAGE)],
+    [false, false, false, false])
+  const nav = R.openPage(R.startNav({ tab: 'you', page: null }), R.PEOPLE_PAGE)
+  check('back from it says "You"', R.backLabel(nav), 'You')
+  const c = makeBrowser('#/you/people/all')
+  c.load()
+  check('a reload (or a link) opens it', c.router.nav.stacks.you, [{ kind: 'people', id: 'all' }])
+  const d = makeBrowser('#/you')
+  d.load()
+  d.router.open(R.CARE_PAGE)
+  d.router.become(R.CARE_PAGE, R.PEOPLE_PAGE)
+  check('made from Library care by `become`: the entry replaced, back still "You"', [d.hashes(), d.router.nav.stacks.you, R.backLabel(d.router.nav)],
+    [['#/you', '#/you/people/all'], [R.PEOPLE_PAGE], 'You'])
+  check('the sidebar: People is Managing\'s item', F.SIDEBAR_PEOPLE, { id: 'people', label: 'People' })
+  check('...current while its page is on top, whatever its tab', [F.sidebarCurrent('you', 'albums', true, R.PEOPLE_PAGE), F.sidebarCurrent('home', 'albums', true, R.PEOPLE_PAGE)],
+    ['people', 'people'])
+  check('...a tap opens its page, on You, as Library care does', F.sidebarMove('people', 'albums', true), { how: 'managing', tab: 'you', kind: 'people' })
+  check('a Managing page without its permission says so, per page', R.MANAGING_ADMINS_ONLY, "You don't have permission for this page.")
 }
 
 console.log('\nplaylists: the Playlists page and a playlist\'s, pages of their own kinds (2.0.0-player.58)')

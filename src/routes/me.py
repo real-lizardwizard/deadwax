@@ -2,8 +2,9 @@
 Who the page is talking to: `GET /deadwax/me`, and what they chose for themselves:
 `GET`/`PUT /deadwax/me/preferences` (2.0.0-player.15).
 
-The app at /player/ decides what to show from this, not from assumptions - admin-only rows (server
-settings, the review queue, the log, editing) show when `admin` is true, and Sign out only when
+The app at /player/ decides what to show from this, not from assumptions - the managing rows (server
+settings, the review queue, the log, editing) show by `permissions` (2.0.0-player.61: an admin has every
+one; ui/src/lib/permissions.ts), and Sign out only when
 logins are on. With logins off it is always the implicit admin, `local` (src/users.py), and the
 page says "logins are off"; with them on (2.0.0-player.48) the signed-in user - and with no session a
 401, as every route but the public ones answers (src/auth.py), which is how the app knows to sign in.
@@ -30,7 +31,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict
 
 from src import __version__
-from src.users import auth_mode, current_user, is_admin
+from src.users import PERMISSIONS, auth_mode, current_user, is_admin, permissions, permissions_unverified
 
 router = APIRouter()
 
@@ -112,8 +113,15 @@ async def _stored(request: Request, user: str) -> tuple[dict[str, str] | None, b
 
 
 @router.get("")
-async def me(user: str = Depends(current_user)):
-    return {"user": user, "admin": is_admin(user), "auth": auth_mode(), "version": __version__}
+def me(request: Request, user: str = Depends(current_user)):
+    """Who is asking, and (2.0.0-player.61) what they may do: `permissions`, the effective list in PERMISSIONS'
+    order - every one for an admin, and for `local` with logins off - and `permissions_unverified`, whether an
+    admin gave them something this session doesn't honour (their account couldn't be checked as they signed in).
+    SYNCHRONOUS: the permissions table is read from SQLite the first time, in FastAPI's thread pool."""
+    allowed = permissions(request, user)
+    return {"user": user, "admin": is_admin(user), "auth": auth_mode(), "version": __version__,
+            "permissions": [name for name in PERMISSIONS if name in allowed],
+            "permissions_unverified": permissions_unverified(request, user)}
 
 
 @router.get("/preferences")

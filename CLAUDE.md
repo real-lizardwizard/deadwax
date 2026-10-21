@@ -167,10 +167,19 @@ src/
                    and easy_file() to open a file with them - see "Disc titles".
   users.py         current_user(), the FastAPI dependency every router is checked by: the implicit
                    admin `local` while logins are off, the signed-in user (or 401) with them on;
-                   require_admin, the admin-only routes' 403. routes/me.py answers GET /deadwax/me.
+                   is_admin (Navidrome's admin flag since 2.0.0-player.61, and break-glass);
+                   permissions/can and require(permission), the 403 of a route a permission's
+                   (an admin has them all). routes/me.py answers GET /deadwax/me.
+  permissions.py   (2.0.0-player.61) what an admin ticked for an ordinary person, by category -
+                   the `permissions` table held in memory, bound to the Navidrome account's id,
+                   fail closed - see "Managing accounts - People, and Navidrome's admins as
+                   deadwax's".
+  people.py        PURE. People's rules: names, passwords, the guards (refusals) and each row.
   auth.py          logins (AUTH_MODE, 2.0.0-player.48): sign-in through Navidrome's getUser, the
-                   session cookie and table, the re-check, break-glass, the throttle - see
-                   "Logins and roles".
+                   session cookie and table, the re-check, break-glass (`deadwax` since .61), the
+                   throttle - see "Logins and roles"; and (2.0.0-player.61) the role, getUser's
+                   adminRole kept per session and per user (role, set_role), and ending a person's
+                   sessions (end_user_sessions) - see "Managing accounts".
   library_ledger.py  personal libraries (2.0.0-player.51): the rules - what each way a download ends
                    gives its requesters, the backoff, the words - and the grants a filing writes. See
                    "Personal libraries".
@@ -182,7 +191,8 @@ src/
                    lrclib_endpoint.py (LRCLIB), navidrome_endpoint.py (Subsonic, for
                    the player - holds the login; client_for(request) asks as the signed-in
                    user with logins on, SHARED_ACCOUNT_USES lists what asks as the shared one),
-                   app.py, json_etag.py (JSON with an ETag and the 304, shared by the library scan and
+                   navidrome_admin.py (2.0.0-player.61: Navidrome's NATIVE account API for People,
+                   as the signed-in admin with their own JWT, a fixed list of six), app.py, json_etag.py (JSON with an ETag and the 304, shared by the library scan and
                    /album_index), same_origin.py (refuses
                    writes another website asks for - see "The 1.0.1 fixes")
   routes/          search_musicbrainz, download, monitor_slskd, interface_logs (the event log's
@@ -201,8 +211,9 @@ src/
                    me, auth (sign-in and sign-out, the two routes needing no session),
                    store_album (the app's id bridge - see "Artists, and the two
                    libraries joined"), pins (/deadwax/me/pins - see "Pins, and a finished Home"),
-                   my_library (/deadwax/me/library) and held (/deadwax/library/held, an admin's) -
-                   see "Personal libraries";
+                   my_library (/deadwax/me/library) and held (/deadwax/library/held, Look after
+                   the library's) - see "Personal libraries"; people (/deadwax/people, People: a
+                   Navidrome admin's, unlocked with their own password - see "Managing accounts");
                    library's /queue/summary is the app's Needs-a-look count, from the saved
                    scan alone - see "Needs a look"
 interface/         vanilla JS/CSS. Still the served page; main.js is shrinking as panels
@@ -256,6 +267,10 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    app/YourLibrary.tsx (You), Home's New shelf and the Library's New marks;
                    app/HeldByNobody.tsx is Library care's; the words lib/myLibrary.ts - see
                    "Personal libraries".
+                   People and permissions (2.0.0-player.61, notes/logins.md "Managing accounts"):
+                   app/People.tsx (with UnlockPeople, AddPerson, ResetPassword, RemovePerson and
+                   usePeople), its rules lib/people.ts; what the app shows by permission
+                   lib/permissions.ts, read through app/access.ts's useAccess().
                    Playlists (2.0.0-player.58, notes/playlists.md): app/PlaylistsPage.tsx (the
                    list), app/PlaylistPage.tsx (one - plays in the tap, Edit, Delete),
                    app/PlaylistPicker.tsx (Add to a playlist, from the ••• menus and the player
@@ -270,7 +285,7 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    ui/src/lab/ is the turntable's test bench at /player/lab/, a third page built
                    in a pass of its own: the real Turntable and deck over signals it makes, set
                    beside an ideal turntable - see notes/turntable-bench.md.
-tests/             3255 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             3364 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -309,7 +324,7 @@ section of that title in notes/: `grep -rn "### X" notes/` finds it.
 | Requests, Search, the album you don't have, Sources and Get, song search, search like Apple Music | `notes/app-requests-search-get.md` |
 | artists, the id bridge, pins, Home | `notes/app-artists-pins.md` |
 | the desktop frame, the Edit panel, Needs a look (and Not in Navidrome), server settings and the log, Library care - and all of them on a phone | `notes/app-desktop.md` |
-| logins and roles: signing in through Navidrome, sessions, admins, break-glass, the sign-in screen; downloads per person; personal libraries; the player as you (Library and Browse, Add and Remove) | `notes/logins.md` |
+| logins and roles: signing in through Navidrome, sessions, admins, break-glass, the sign-in screen; downloads per person; personal libraries; the player as you (Library and Browse, Add and Remove); People, Navidrome's admins as deadwax's, permissions | `notes/logins.md` |
 | playlists: Navidrome's own, as you - whose, the routes and the replace, the picker, a playlist's page and its Edit | `notes/playlists.md` |
 | the app's Library: its root, sections, sorts, groups, the index, Find, the album index route, the shelf | `notes/app-library.md` |
 | the turntable: its look, momentum, the deck, the first fix (.11, .14, .16) | `notes/turntable.md` |
@@ -348,8 +363,8 @@ table above), never here. Add to this file only a rule that holds everywhere.
   in a rule is a bug. `app-desktop.css` rules live only inside its desktop media queries.
 - **Links out of the app open beside it** (`target="_blank" rel="noopener"`): following one in the page
   unloads the player.
-- **Every route is decided** - public, a user's or an admin's (`tests/test_logins.py` ROUTES): a router is
-  included with `current_user` or `require_admin` (src/users.py), never middleware.
+- **Every route is decided** - public, a user's or one permission's (`tests/test_logins.py` ROUTES): a router
+  is included with `current_user` or `require(permission)` (src/users.py), never middleware.
 - **The Navidrome routes are a fixed list** (`test_there_is_no_general_proxy`); middleware is plain
   ASGI only, never `@app.middleware("http")` (it hides disconnects).
 - **pydantic drops undeclared fields without a word**: a field the browser sends must be declared on
@@ -518,7 +533,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 3255 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 3364 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see `notes/tooling.md`:
@@ -556,7 +571,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 3255 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 3364 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

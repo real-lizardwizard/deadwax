@@ -12,17 +12,19 @@ import { TrackTagEditor } from '../components/TrackTagEditor'
 import { useLibrary } from '../hooks/useLibrary'
 import { useTrackDetails } from '../hooks/useTrackDetails'
 import {
-  EDIT_SETTLE_MS, EDIT_SLIDE_MS, EDIT_TABS, FOLLOW_LOOKS_MS, deletesAll, editFolders, editStatus, folderOnly, followRelease, followsTo, needsChoice,
-  tabAfter, trackLabel,
+  EDIT_SETTLE_MS, EDIT_SLIDE_MS, FOLLOW_LOOKS_MS, deletesAll, editFolders, editStatus, folderOnly, followRelease, followsTo, needsChoice,
+  cancelDeleteTo, editTabs, tabAfter, trackLabel,
   type EditAlbum, type EditTab,
 } from '../lib/albumEdit'
 import { panelIsModal, type PanelStyle } from '../lib/appFrame'
 import { albumArtUrl, discArtUrl, trackTime } from '../lib/format'
 import { isAbort, latestOnly } from '../lib/latest'
+import { albumEdit } from '../lib/permissions'
 import type { FolderChange } from '../lib/needsLook'
 import { tickTracks } from '../lib/tagEdit'
 import { revealBy } from '../lib/trackInspector'
 import { CloseIcon } from '../player/icons'
+import { useAccess } from './access'
 import { CoverViewer } from './CoverViewer'
 import { FolderPicker } from './FolderPicker'
 import { TrackInspector } from './TrackInspector'
@@ -244,7 +246,17 @@ export function EditPanel({
   const [subject, setSubject] = useState<LibraryAlbum | null>(null)
   //? a new editor for each album and folder: the release editor keeps itself across an apply
   const [session, setSession] = useState(0)
-  const [tab, setTab] = useState<EditTab>('release')
+  //? (2.0.0-player.61) the tabs this person may use: the editors with Edit albums, Delete with Look after the library
+  const allowed = albumEdit(useAccess().permissions)
+  const shownTabs = editTabs(allowed.editors, allowed.delete)
+  const firstTab: EditTab = shownTabs[0]?.id ?? 'release'
+  const [chosenTab, setTab] = useState<EditTab>(firstTab)
+  //? a tab a permission taken away hides: the first one left
+  const tab: EditTab = shownTabs.some((entry) => entry.id === chosenTab) ? chosenTab : firstTab
+  //? the tabs as they are now, for the handlers made once for the panel's life (cancelDelete) - a permission
+  //? taken or given while it is open changes them
+  const tabsNow = useRef(shownTabs)
+  tabsNow.current = shownTabs
   const [tagsSeen, setTagsSeen] = useState(false)
   const [ticked, setTicked] = useState<Ticked | null>(null)
   //? the tag editor's files, fixed as it opens (its preview is never recomputed against a selection
@@ -354,12 +366,12 @@ export function EditPanel({
     //? (2.0.0-player.25 review) - only when it was in the panel, or nowhere (a click in WebKit)
     if (isFolderRequest(request)) {
       const active = document.activeElement
-      if (!active || active === document.body || box.current?.contains(active)) focusNext.current = toTab('release')
+      if (!active || active === document.body || box.current?.contains(active)) focusNext.current = toTab(firstTab)
     }
     setAnswer(null)
     setSubject(null)
     setSession((n) => n + 1)
-    setTab('release')
+    setTab(firstTab)
     setTagsSeen(false)
     setTicked(null)
     setEditingTags(null)
@@ -405,10 +417,17 @@ export function EditPanel({
     //? scroll stayed on the taller inspector, "Edit this track…" focused out of sight above the panel's top)
     restoreView.current = { top: editorOver.current, show: opener }
   }, [])
+  //? back to the first editor's tab - or, with Delete the only tab (Look after the library alone), closed, as the
+  //? close button closes it (2.0.0-player.61 second review: "back" to Delete left the dialog up, Cancel dead)
   const cancelDelete = useMemo(() => () => {
     if (escapeFrom() === 'page') return
-    setTab('release')
-    focusNext.current = toTab('release')
+    const back = cancelDeleteTo(tabsNow.current)
+    if (back === null) {
+      close.current()
+      return
+    }
+    setTab(back)
+    focusNext.current = toTab(back)
   }, [])
 
   //? the lookup, and what comes after a write, are let go only as the panel goes - or the next one
@@ -629,7 +648,7 @@ export function EditPanel({
     const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
     if (!step) return
     event.preventDefault()
-    const next = tabAfter(tab, step)
+    const next = tabAfter(tab, step, shownTabs)
     choose(next)
     ;(event.currentTarget as HTMLElement).querySelector<HTMLElement>(`[data-tab="${next}"]`)?.focus()
   }
@@ -771,7 +790,7 @@ export function EditPanel({
         </header>
 
         <div ref={tablist} class="app-edit-tabs" role="tablist" aria-label="Edit album" onKeyDown={onTabKeyDown}>
-          {EDIT_TABS.map((entry) => {
+          {shownTabs.map((entry) => {
             const chosen = entry.id === tab
             return (
               <button

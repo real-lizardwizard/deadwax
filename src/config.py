@@ -348,8 +348,16 @@ def describe_contact(value: str | None) -> str | None:
     return None
 
 
-#? (2.0.0-player.48) The four settings logins are made of, all environment-only (see Config).
-LOGIN_SETTINGS = ("AUTH_MODE", "DEADWAX_ADMINS", "DEADWAX_SECRET_KEY", "DEADWAX_ADMIN_PASSWORD")
+#? (2.0.0-player.48) The settings logins are made of, all environment-only (see Config). Three since
+#? 2.0.0-player.61: DEADWAX_ADMINS went - deadwax's admins are Navidrome's admins (src/auth.py).
+LOGIN_SETTINGS = ("AUTH_MODE", "DEADWAX_SECRET_KEY", "DEADWAX_ADMIN_PASSWORD")
+
+#? (2.0.0-player.61) What start-up says when the removed DEADWAX_ADMINS is still in the environment.
+DEADWAX_ADMINS_IGNORED = (
+    "DEADWAX_ADMINS is set, but deadwax no longer reads it (since 2.0.0-player.61): deadwax's admins are "
+    "Navidrome's admins. Make your Navidrome account an admin in Navidrome's Users page, then take "
+    "DEADWAX_ADMINS out of compose."
+)
 
 #? Why the settings tab can't change any of them, in the words it renders under each.
 LOGINS_LOCKED = (
@@ -383,11 +391,6 @@ def describe_secret_key(value: str | None) -> str | None:
     if len(value) < AUTH_SECRET_MIN:
         return f"is shorter than {AUTH_SECRET_MIN} characters - make one with `openssl rand -hex 32`"
     return None
-
-
-def parse_admins(value: str | None) -> frozenset[str]:
-    """DEADWAX_ADMINS as the set of lowercased names it lists - blanks dropped."""
-    return frozenset(name.strip().lower() for name in (value or "").split(",") if name.strip())
 
 
 load_dotenv()
@@ -519,7 +522,7 @@ class Config:
 
     #? ===== logins (2.0.0-player.48, step 3 of the multi-user plan) ===============
     #?
-    #? ENVIRONMENT ONLY, all four, and never editable in the settings tab (NOT_EDITABLE below): a
+    #? ENVIRONMENT ONLY, all three, and never editable in the settings tab (NOT_EDITABLE below): a
     #? stored override beats compose, so a wrong value saved there could lock everyone out with no
     #? way back from the page that saved it. src/auth.py is what each of them drives.
     #?
@@ -527,15 +530,16 @@ class Config:
     #? anyone who can reach the port can use it. On, everyone signs in with their Navidrome account.
     #? Anything else is read as ON and said at start-up: a typo must never leave the door open.
     AUTH_MODE = _env("AUTH_MODE", "off")
-    #? Who is deadwax's admin, by Navidrome user name, comma-separated (lowercased). Navidrome's own
-    #? admin flag is never read: James's Navidrome account isn't a Navidrome admin, and needn't be.
-    DEADWAX_ADMINS = _env("DEADWAX_ADMINS")
+    #? (2.0.0-player.61) No DEADWAX_ADMINS any more: deadwax's admins are Navidrome's admins, read from
+    #? getUser's adminRole as each person signs in and at every re-check (src/auth.py). Still set, it is
+    #? ignored, and start-up says so (report_logins, DEADWAX_ADMINS_IGNORED).
     #? The key the saved Navidrome tokens are encrypted with and the break-glass cookie is sealed
     #? with: AUTH_SECRET_MIN characters at least (`openssl rand -hex 32`). Logins don't work without
     #? it - every protected route answers 503 and says why, rather than storing a token bare.
     DEADWAX_SECRET_KEY = _env("DEADWAX_SECRET_KEY")
-    #? Optional. A password that signs in deadwax's fixed break-glass admin, `admin`, with neither
-    #? Navidrome nor the database - for when Navidrome is down. Unset, there is no such login.
+    #? Optional. A password that signs in deadwax's fixed break-glass admin, `deadwax` (`admin` until
+    #? 2.0.0-player.61), with neither Navidrome nor the database - for when Navidrome is down, or nobody
+    #? is a Navidrome admin. Unset, there is no such login.
     DEADWAX_ADMIN_PASSWORD = _env("DEADWAX_ADMIN_PASSWORD")
 
     #? ===== which settings the settings tab may write ==========================
@@ -905,16 +909,14 @@ class Config:
         return describe_auth_mode(cls.AUTH_MODE)[0]
 
     @classmethod
-    def admins(cls) -> frozenset[str]:
-        """deadwax's admins by Navidrome user name, lowercased (DEADWAX_ADMINS)."""
-        return parse_admins(cls.DEADWAX_ADMINS)
-
-    @classmethod
     def report_logins(cls) -> None:
         """
         Say at start-up whether logins are on, and plainly what stops them working if anything
-        does. Never logs a secret - only whether one is set, and the admins' names.
+        does. Never logs a secret - only whether one is set. (2.0.0-player.61) And, once, that the
+        removed DEADWAX_ADMINS is ignored when it is still in the environment.
         """
+        if _env("DEADWAX_ADMINS"):
+            logger.error(DEADWAX_ADMINS_IGNORED, extra={"frontend": True})
         on, problem = describe_auth_mode(cls.AUTH_MODE)
         if problem:
             logger.error(f"AUTH_MODE {problem}", extra={"frontend": True})
@@ -937,13 +939,6 @@ class Config:
                 f"503 saying so (the app's sign-in screen shows it).",
                 extra={"frontend": True},
             )
-        admins = sorted(cls.admins())
-        if not admins:
-            logger.error(
-                "logins are on but DEADWAX_ADMINS names nobody, so nobody signed in through Navidrome "
-                "is deadwax's admin - list your Navidrome user name there",
-                extra={"frontend": True},
-            )
         if describe_navidrome_url(cls.NAVIDROME_URL) is not None:
             logger.error(
                 "logins are on but NAVIDROME_URL isn't usable, so nobody can sign in with their Navidrome "
@@ -951,9 +946,8 @@ class Config:
                 extra={"frontend": True},
             )
         logger.info(
-            f"logins are on: everyone signs in with their Navidrome account; admins: "
-            f"{', '.join(admins) or 'nobody'}; break-glass admin: "
-            f"{'set' if cls.DEADWAX_ADMIN_PASSWORD else 'not set'}"
+            f"logins are on: everyone signs in with their Navidrome account, and Navidrome's admins are "
+            f"deadwax's admins; break-glass admin: {'set' if cls.DEADWAX_ADMIN_PASSWORD else 'not set'}"
         )
 
     @classmethod

@@ -175,9 +175,12 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   version, and whether logins are on - with them on, who you're signed in as and **Sign out**, which
   ends this device's session (and stops what's playing) and goes back to the sign-in screen
   ([Signing in](#signing-in)). For an admin, **Managing deadwax**: **Albums that need a look**,
-  with how many, which opens **Needs a look**, then **Library care**, **Server settings** and **Log** -
-  on a phone as on a desktop since 2.0.0-player.47 ([below](#looking-after-deadwax-from-a-phone)) - and
-  **Open the main page**, which opens it beside the app.
+  with how many, which opens **Needs a look**, then **Library care**, **People** (with logins on),
+  **Server settings** and **Log** - on a phone as on a desktop since 2.0.0-player.47
+  ([below](#looking-after-deadwax-from-a-phone)) - and **Open the main page**, which opens it beside the
+  app. Someone an admin gave some of these to (2.0.0-player.61) sees only theirs: Albums that need a look
+  with Look after the library, Library care with it or Edit albums, Server settings and Log with
+  Settings and the log - People is a Navidrome admin's alone ([Sharing deadwax](sharing.md#admins-permissions-and-everyone-else)).
 - **Requests**: your downloads, under **Downloading** (a bar, "6 of 10 files · 1.8 MB/s", who it's
   from, and **✕** to cancel, which asks in the card first - **Keep it** or **Cancel download** -
   unless You's **Confirm before cancelling** is off),
@@ -481,8 +484,9 @@ looking, and fills in where it is:
 
 ### Managing an artist
 
-For an admin (everyone, while logins are off; with them on, the names in `DEADWAX_ADMINS`), on a phone
-and on a desktop:
+For an admin (everyone, while logins are off; with them on, Navidrome's admins), on a phone and on a
+desktop - and for someone an admin gave Edit albums (**Artist images…**, **Which artist is this?**) or
+Look after the library (**Move albums to …**):
 
 - **Artist images…** (under In your library) shows every picture of them found - Wikimedia Commons
   always, TheAudioDB and fanart.tv when deadwax's settings have their keys (under **Connections**;
@@ -758,6 +762,11 @@ everyone:
   time, level and where it came from over its words; it follows deadwax live while the page shows, and
   lets go while the now-playing screen is over it or you're elsewhere
   ([troubleshooting](troubleshooting.md#the-apps-log-is-missing-lines-says-the-stream-was-lost-or-starts-empty)).
+  **People** (with logins on, a Navidrome admin's) manages Navidrome's accounts as you: unlock it with
+  your own Navidrome password, then **Add a person**, and on each person's row **Reset password…**,
+  **Make admin** / **No longer admin**, **Remove…** and their **Permissions** - and, under the list,
+  **Known only to deadwax**, with **Forget** ([Sharing deadwax](sharing.md#adding-a-person)). Remove is a
+  real dialog - a sheet from the foot of a phone - asking you to type their user name.
 - **Setting Navidrome up from a phone**: on a first run, Home, the Library and Search say **Connect
   Navidrome**, with **Set up Navidrome**: it opens **Server settings** at **Connections**. Fill in
   `NAVIDROME_URL`, `NAVIDROME_USER` and `NAVIDROME_PASSWORD`, **Save changes**, and the app asks
@@ -1877,9 +1886,13 @@ So leave that player's Transcoding and Max Bit Rate unset.
 With logins on ([sharing deadwax](sharing.md) says how to turn them on), the app opens on a sign-in
 screen: your **Navidrome** user name and password. Nothing else of the app is drawn until you've signed
 in, and then you stay signed in on that device - the home-screen app included - for 30 days from when
-you last used it. Admins (deadwax's `DEADWAX_ADMINS`) see everything described here; anyone else sees no
-**Managing deadwax** in You or the sidebar, no **Edit** on an album and no managing on an artist's page,
-and can do everything else - search, **Get**, play, pin.
+you last used it. Admins - Navidrome's admins, since 2.0.0-player.61 - see everything described here;
+anyone else sees no **Managing deadwax** in You or the sidebar, no **Edit** on an album and no managing on
+an artist's page, and can do everything else - search, **Get**, play, pin - unless an admin gave them
+some of the managing (they see that part) or took Get albums away (Get then says "Getting albums is off
+for you - ask an admin."). A change an admin makes to what you may do is in force from your next tap; if
+deadwax couldn't check your account as you signed in, You says the extra permissions are off until you
+sign in again ([Sharing deadwax](sharing.md#admins-permissions-and-everyone-else)).
 
 If your session ends while you're using the app - you changed your Navidrome password, say, or your
 account was removed, which deadwax notices within about six minutes - the sign-in screen comes back
@@ -1955,7 +1968,7 @@ favourites, the same ones Amperfy (or any Subsonic app) shows as starred - and d
   Anyone else's library starts with only the albums they'd already starred. An album that arrives
   without anyone asking for it - copied in by hand, or by another program - is nobody's: it stays in the
   store for anyone to add, and an admin sees it under **Library care → Held by nobody**.
-- **The break-glass `admin`** has no Navidrome account, so no library: nothing it downloads goes into
+- **The break-glass `deadwax`** has no Navidrome account, so no library: nothing it downloads goes into
   one, its store line reads as it always did, and **Add to my library** isn't offered to it. Its player
   plays as the shared `NAVIDROME_USER` account ([below](#the-player-as-you-with-logins-on)).
 - **With logins off** nothing of this shows: there is one library, and everything in the store is in
@@ -2038,7 +2051,7 @@ lists at all (**Not in Navidrome**). With logins off nothing here changes: one a
   fetches each song as that account, so a song in a library it can't see is "not found" there too - it
   won't play on an iPhone or iPad, the turntable is silent for it, and Gapless plays it with a gap
   ([troubleshooting](troubleshooting.md#a-song-in-the-player-wont-start-or-cant-be-skipped-through)).
-- **The break-glass `admin`** has no Navidrome account, so its player plays as the shared
+- **The break-glass `deadwax`** has no Navidrome account, so its player plays as the shared
   `NAVIDROME_USER` account (its plays are that account's) and sees deadwax as it is with logins off:
   the Library is the store, "in your library" means the store, and Add and Remove aren't offered. It is
   there to get you in when your own login won't, and the shared account is the one deadwax was set up

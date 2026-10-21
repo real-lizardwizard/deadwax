@@ -47,7 +47,7 @@ export function SignOutRow({ user }: { user: string }) {
       </div>
       <p class="app-footnote">
         {user === BREAK_GLASS_USER
-          ? 'Signed in as admin, with the break-glass password - it lasts 12 hours. '
+          ? `Signed in as ${BREAK_GLASS_USER}, with the break-glass password - it lasts 12 hours. `
           : `Signed in as ${user}, with your Navidrome account. `}
         Signing out ends this device's session and stops what's playing.
       </p>

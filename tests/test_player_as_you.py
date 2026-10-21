@@ -108,7 +108,9 @@ class Player(Navidrome):
         self.file, self.serve = navidrome_file(FLAC)
         #? the playlists: id -> its row (owner as stored, public, comment, smart, sync, rows of song ids, the counter)
         self.playlists: dict[str, dict] = {}
-        self.admins: set[str] = set()
+        #? (2.0.0-player.61) james is Navidrome's admin, as the shared fake says - so he is deadwax's, and Navidrome
+        #? would hand him every playlist (deadwax shows him only his own and shared ones)
+        self.admins: set[str] = {"james"}
         self.missing: set[str] = set()
         #? a user's name as Navidrome stores it - what `owner` says
         self.stored_names: dict[str, str] = {}

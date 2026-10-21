@@ -60,6 +60,8 @@ export interface RowContext extends LineContext {
   onOpenGroup: (group: ReleaseGroup) => void
   /** an album a song is on: the album you have the song on, else the album you don't have with the song marked */
   onOpenSongAlbum: (song: FoundSong, album: SongAlbum) => void
+  /** (2.0.0-player.61) this person has Get albums: without it no row has Get (Search says why, once) */
+  gets: boolean
   onGetGroup: (group: ReleaseGroup, event: MouseEvent) => void
   onGetSong: (song: FoundSong, album: SongAlbum, event: MouseEvent) => void
   onToggleSong: (key: string) => void
@@ -149,8 +151,9 @@ function lookKey(row: Row, context: RowContext): string | null {
   return null
 }
 
-/** The trailing Get on a row MusicBrainz offers - none on anything held. */
+/** The trailing Get on a row MusicBrainz offers - none on anything held, nor for someone without Get albums. */
 function getChip(row: Row, context: RowContext) {
+  if (!context.gets) return null
   if (row.type === 'group') {
     if (groupHeld(context.index, row.group.id)) return null
     const asking = context.resolving === row.group.id

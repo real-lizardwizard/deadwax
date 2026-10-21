@@ -588,6 +588,8 @@ exports.previewArtistImages = (name, options, signal) => globalThis.__page.ask('
 exports.applyArtistImages = (name, choices, options) => globalThis.__page.ask('imagesApply', name, choices, options)
 exports.searchArtists = (query, signal) => globalThis.__page.ask('artistSearch', query, !!signal)
 `)
+//? (2.0.0-player.61) what this person may do - the page reads it from the access store: a mount's `admin` says which
+write('app/access.js', `exports.useAccess = () => ({ permissions: globalThis.__page.permissions, on: true, unverified: false })\n`)
 write('app/useOwned.js', `
 exports.ownedNow = () => globalThis.__page.owned
 exports.useOwned = () => globalThis.__page.owned
@@ -669,6 +671,8 @@ const playsWords = () => words(classed('app-artist-plays')[0])
 
 /** A page, mounted: draw it (effects and all), and again after answers land. */
 function mount(props = {}) {
+  //? (2.0.0-player.61) an admin has every permission; anyone else Get albums alone
+  W.permissions = new Set(props.admin === false ? ['request'] : ['request', 'edit', 'library', 'downloads', 'server', 'people'])
   const render = hooks.root(ArtistPage)
   const opened = [], groups = [], gets = []
   const all = {

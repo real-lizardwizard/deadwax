@@ -660,7 +660,8 @@ exports.readDownloadDefaults = () => globalThis.__getting.downloadDefaults
   console.log('\nManaging is an admin\'s: deadwax saying this user isn\'t one, none of it drawn')
   {
     const props = { shown: true, current: true, ...LOOK, needsLook: 2, onNeedsLook: () => {}, onManaging: () => {} }
-    meAnswers.push(answersWith({ ...ME, admin: false }))
+    //? (2.0.0-player.61) an ordinary person signed in: Get albums alone - no Managing permission at all
+    meAnswers.push(answersWith({ ...ME, user: 'ethan', admin: false, auth: 'on', permissions: ['request'] }))
     draw(props)
     checkAgain().props.onClick()
     await settle()

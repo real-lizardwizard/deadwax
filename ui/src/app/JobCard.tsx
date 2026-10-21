@@ -1,7 +1,9 @@
 import { useState } from 'preact/hooks'
 
+import { GET_OFF, gets } from '../lib/permissions'
 import type { RequestRow } from '../lib/requestsView'
 import { CloseIcon, PlayIcon } from '../player/icons'
+import { useAccess } from './access'
 
 /**
  * A download, drawn as the Requests board draws it (2.0.0-player.12): a card for one on its way or
@@ -170,8 +172,10 @@ export function AttentionCard({
   row: RequestRow
   onRetry: (row: RequestRow, samePeer: boolean) => void
 }) {
-  const nextPeer = row.nextPeer
-  const askAgain = row.askAgain
+  //? (2.0.0-player.61) Next peer and Ask again start a download: Get albums' - without it, its words in their place
+  const getsAlbums = gets(useAccess().permissions)
+  const nextPeer = getsAlbums ? row.nextPeer : null
+  const askAgain = getsAlbums ? row.askAgain : null
   return (
     <div class="app-card app-job is-attention">
       <div class="app-job-top">
@@ -182,6 +186,7 @@ export function AttentionCard({
           {row.askedBy && <span class="app-job-line">{row.askedBy}</span>}
           {row.reason && <span class="app-job-reason">{row.reason}</span>}
           {row.problem && <span class="app-job-reason">{row.problem}</span>}
+          {!getsAlbums && (row.nextPeer || row.askAgain) && <span class="app-job-line app-get-off">{GET_OFF}</span>}
         </div>
       </div>
       {(nextPeer || askAgain) && (

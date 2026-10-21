@@ -597,14 +597,15 @@ def job_formats(job: dict) -> list[str]:
 
 
 def describe_job(job: dict, user: str | None = None, requesters: list[str] | None = None,
-                 admin: bool = False) -> dict:
+                 everyone: bool = False) -> dict:
     """
     What Find says about a download already in flight - the panel adds how far it has got.
 
     With logins on (2.0.0-player.49, `requesters` given) also whether it is the asker's own (`yours`:
     their request on it is active), whether somebody else is waiting for it (`shared` - a user's
-    cancel then only withdraws their request, so another peer is no cancel away) and, for an `admin`,
-    who (`requested_by`, as /jobs says it) - and what the copy is: its formats, and the bitrates, bit
+    cancel then only withdraws their request, so another peer is no cancel away) and, for someone who sees
+    `everyone`'s downloads (an admin, or given Everyone's downloads - 2.0.0-player.61), who (`requested_by`,
+    as /jobs says it) - and what the copy is: its formats, and the bitrates, bit
     depths and sample rates its candidate showed, so someone else is told what they'd get by joining
     it. With logins off it is exactly what it was: there is one user, and every download is theirs.
     """
@@ -620,7 +621,7 @@ def describe_job(job: dict, user: str | None = None, requesters: list[str] | Non
         described.update({
             "yours": user in requesters,
             "shared": bool(others),
-            **({"requested_by": others} if admin else {}),
+            **({"requested_by": others} if everyone else {}),
             "formats": job_formats(job),
             **{key: quality[key] for key in ("bitrates", "bit_depths", "sample_rates", "variable_bitrate") if key in quality},
         })

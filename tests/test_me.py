@@ -16,7 +16,10 @@ def test_logins_off_means_the_one_implicit_admin():
     response = TestClient(start()).get("/deadwax/me")  # no `with`: no lifespan, nothing connects
 
     assert response.status_code == 200
-    assert response.json() == {"user": "local", "admin": True, "auth": "off", "version": __version__}
+    #? (2.0.0-player.61) and every permission - an intended change: the implicit admin has them all
+    assert response.json() == {"user": "local", "admin": True, "auth": "off", "version": __version__,
+                               "permissions": ["request", "edit", "library", "downloads", "server", "people"],
+                               "permissions_unverified": False}
 
 
 def test_the_user_comes_from_the_dependency_not_from_the_route():

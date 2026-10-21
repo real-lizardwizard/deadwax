@@ -37,12 +37,24 @@ roles"); notes/logins.md has the reasoning. In short:
   Error 40 - the password changed, or the account is gone - ends the session, and the next request
   answers 401 saying why. Navidrome not answering ends nothing: it is proof of nothing.
 
-  ADMINS are deadwax's own list, DEADWAX_ADMINS; Navidrome's admin flag is never read.
+  ADMINS ARE NAVIDROME'S ADMINS (2.0.0-player.61 - until then deadwax's own list, DEADWAX_ADMINS,
+  which is ignored now and said so at start-up): a person is deadwax's admin exactly when their own
+  Navidrome account is one, as getUser's `adminRole` last said. Read at the sign-in (check_login asks
+  getUser as them anyway), re-read at every re-check (so a change made in Navidrome reaches deadwax
+  within about six minutes), and set at once when People changes it (set_role). Navidrome not
+  answering changes nothing - the last word stands, as for the session itself. UNKNOWN IS NOT ADMIN:
+  a session with no flag yet, an `adminRole` missing or not a boolean, are an ordinary person's. The
+  role is kept on the session's row (`sessions.admin`), on each session held in memory, and in a map
+  by user (`_roles`) that src/users.py's is_admin reads.
 
-  BREAK-GLASS: DEADWAX_ADMIN_PASSWORD signs in the fixed admin `admin` with neither Navidrome nor
-  the database, for when Navidrome is down - a cookie sealed with DEADWAX_SECRET_KEY (Fernet, so it
-  is signed and dated), good for BREAK_GLASS_SECONDS, and bound to the password: changing the
-  password ends every one. The password is compared in constant time.
+  BREAK-GLASS: DEADWAX_ADMIN_PASSWORD signs in the fixed admin `deadwax` (since 2.0.0-player.61 - it
+  was `admin` until then, which is an ordinary Navidrome name now) with neither Navidrome nor the
+  database, for when Navidrome is down or nobody is a Navidrome admin - a cookie sealed with
+  DEADWAX_SECRET_KEY (Fernet, so it is signed and dated), good for BREAK_GLASS_SECONDS, and bound to
+  the password: changing the password ends every one. The password is compared in constant time. A
+  cookie made under the old name holds `"u": "admin"`, which break_glass_user refuses, so it ends at
+  its next request - and, a `b.` cookie, it never reaches the session table, so it can never be read
+  as Navidrome's `admin`.
 
   FAIL CLOSED: a database that can't be read answers 503 on every protected route, never "signed
   in" - and never "signed out" either, which would only send everyone to a sign-in that can't work.
@@ -67,7 +79,8 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from fastapi import HTTPException
 
-from src import __version__, library_ledger
+from src import __version__, library_ledger, permissions
+from src.api import navidrome_admin
 from src.api.navidrome_endpoint import API_VERSION, CLIENT_NAME, NavidromeError, subsonic_body, unusable_url
 from src.config import Config, describe_navidrome_url, describe_secret_key
 from src.logger import logger
@@ -77,9 +90,10 @@ from src.logger import logger
 COOKIE = "deadwax_session"
 
 #? The break-glass admin's fixed name (DEADWAX_ADMIN_PASSWORD). Nobody signs in AS this through
-#? Navidrome: the name is reserved, so a Navidrome account called `admin` can't become deadwax's admin
-#? by its name alone.
-BREAK_GLASS_USER = "admin"
+#? Navidrome: the name is reserved, so a Navidrome account called `deadwax` can't become deadwax's
+#? break-glass admin by its name alone. (2.0.0-player.61) It was `admin` until then - renamed so that
+#? Navidrome's own `admin` account, a Navidrome admin and so deadwax's, can sign in as itself.
+BREAK_GLASS_USER = "deadwax"
 
 #? Names nobody signs in as through Navidrome: the break-glass admin's, and src/users.py's LOCAL_USER,
 #? the implicit user of logins-off whose pins and preferences the first admin takes over.
@@ -124,6 +138,14 @@ BREAK_GLASS_ENDED = ("The break-glass sign-in has ended - it lasts 12 hours, and
 NO_DATABASE = ("deadwax can't read its database, so it can't check who you are - nothing is let in until "
                "it can. Check DB_PATH points at a writable volume.")
 WRONG_LOGIN = "That user name and password didn't work."
+#? (2.0.0-player.61) What the next request of a session People ended is told
+PASSWORD_RESET = "An admin reset your password - sign in with the new one."
+ACCOUNT_REMOVED = "Your account was removed."
+#? (2.0.0-player.61 review) a session kept under a name deadwax now keeps for itself - a Navidrome account called
+#? `deadwax` signed in before break-glass took that name. It ends at its first request, never standing for
+#? break-glass (JobStore.init also deletes such rows, once, as the upgrade's migration).
+RESERVED_SESSION = ("deadwax keeps that user name for itself now, so the sign-in it had has ended - sign in with "
+                    "another Navidrome account.")
 
 
 def unusable() -> str | None:
@@ -285,6 +307,11 @@ class _Held:
     #? (2.0.0-player.52) the sealed Navidrome login the session was signed in with - what the player asks
     #? Navidrome AS (PlayerLogin, src/api/navidrome_endpoint.py client_for)
     credential: str = ""
+    #? (2.0.0-player.61) Navidrome's admin flag for the session's user, as last read (sessions.admin) - and
+    #? the Navidrome account's id as read at the sign-in, for permissions bound to it (src/permissions.py):
+    #? None when it wasn't read (nobody had given them anything, or Navidrome couldn't be asked)
+    admin: bool = False
+    navidrome_id: str | None = None
 
 
 #? Guards everything below: current_user runs in FastAPI's thread pool, the sign-in and the re-check on
@@ -301,6 +328,22 @@ ENDED_KEPT = 1000
 #? first admin it sees with a session - _take_over_leftovers. Under _lock.
 _leftovers_looked = False
 
+#? (2.0.0-player.61) Navidrome's admin flag by user, as last read - written whenever a session row is read
+#? (_session, at most every CACHE_SECONDS), at a sign-in, by the re-check and by People (set_role). What
+#? src/users.py's is_admin reads: anyone it doesn't know is NOT an admin (fail closed). Bounded - a
+#? household's handful; past ROLES_KEPT it is emptied and filled again from the next reads.
+_roles: dict[str, bool] = {}
+ROLES_KEPT = 10000
+#? (2.0.0-player.61 review) WHEN each user's role was last set, on one clock that only goes forward (`now`, bumped
+#? by every set_role): an answer read before a change - a session row, a re-check's or a sign-in's getUser - is
+#? never let undo it (role_mark, set_role's `since`). `floor` is the clock when the map was last emptied: a user
+#? missing from it counts as changed then. Under _lock.
+_role_changes: dict[str, int] = {}
+_role_clock = {"now": 0, "floor": 0}
+#? set_role's write and its memory, one at a time, so two of them can't land in the database in one order and in
+#? memory in the other
+_role_write = threading.Lock()
+
 
 def forget_sessions() -> None:
     """Drop everything held in memory (tests; the database is untouched) - as a restart would."""
@@ -309,7 +352,11 @@ def forget_sessions() -> None:
         _held.clear()
         _ended.clear()
         _revoked_glass.clear()
+        _roles.clear()
+        _role_changes.clear()
+        _role_clock["floor"] = _role_clock["now"]
         _leftovers_looked = False
+    navidrome_admin.forget_all()
 
 
 def _note_ended(key: str, reason: str) -> None:
@@ -319,6 +366,100 @@ def _note_ended(key: str, reason: str) -> None:
         _ended.move_to_end(key)
         while len(_ended) > ENDED_KEPT:
             _ended.popitem(last=False)
+    #? (2.0.0-player.61) an unlocked People ends with the session it was unlocked in
+    navidrome_admin.forget(key)
+
+
+def _note_role(user: str, admin: bool) -> None:
+    """The map's word for `user` - under _lock, by the caller."""
+    if len(_roles) >= ROLES_KEPT and user not in _roles:
+        _roles.clear()
+    _roles[user] = bool(admin)
+
+
+def role_mark() -> int:
+    """(2.0.0-player.61 review) The role clock now - taken before Navidrome is asked (or a session row read), and
+    handed to set_role as `since`, so an answer older than People's change never undoes it."""
+    with _lock:
+        return _role_clock["now"]
+
+
+def _changed_since(user: str, mark: int) -> bool:
+    """Whether `user`'s role was set after `mark` - under _lock, by the caller."""
+    return _role_changes.get(user, _role_clock["floor"]) > mark
+
+
+def role(user: str) -> bool:
+    """(2.0.0-player.61) Whether `user` is a Navidrome admin, as deadwax last read it - False for anyone it
+    hasn't read (fail closed). What src/users.py's is_admin asks with logins on."""
+    with _lock:
+        return _roles.get(user, False)
+
+
+def set_role(store, user: str, admin: bool, since: int | None = None) -> bool:
+    """
+    (2.0.0-player.61) Navidrome's admin flag for `user` is `admin` now: in the database (every session of
+    theirs, so they all agree), then every session of theirs held in memory, then the map - so their next
+    request is answered in the new role. SYNCHRONOUS; raises on a database error, with nothing in memory
+    changed. The sign-in, the re-check and People call it.
+
+    With `since` (role_mark, taken before Navidrome was asked), NOTHING is written when the role was set after
+    it - People's change is newer than the answer, and stands (review: the re-check, or a sign-in, waiting on
+    the database between Navidrome's answer and this, put back a role People had just taken away). Whether it
+    wrote.
+    """
+    with _role_write:
+        if since is not None:
+            with _lock:
+                if _changed_since(user, since):
+                    return False
+        store.set_user_admin(user, bool(admin))
+        with _lock:
+            _role_clock["now"] += 1
+            _role_changes[user] = _role_clock["now"]
+            if len(_role_changes) > ROLES_KEPT:
+                _role_changes.clear()
+                _role_clock["floor"] = _role_clock["now"]
+            for held in _held.values():
+                if held.user == user:
+                    held.admin = bool(admin)
+            _note_role(user, admin)
+    return True
+
+
+def note_account_id(user: str, navidrome_id: str, keys: list[str]) -> None:
+    """(2.0.0-player.61) These sessions of `user` (id hashes), held in memory, whose sign-in couldn't read their
+    account's id given it - an admin's People list has just named it, and store.heal_session_ids healed exactly
+    these rows: the ones begun since that account was made (review - never one of an earlier account of the name)."""
+    wanted = set(keys)
+    with _lock:
+        for key, held in _held.items():
+            if key in wanted and held.user == user and held.navidrome_id is None:
+                held.navidrome_id = navidrome_id
+
+
+def end_held_sessions(user: str, keys: list[str], reason: str) -> int:
+    """(2.0.0-player.61) End these sessions of `user` in memory - and any other of theirs held there - with
+    `reason` told to the next request: what end_user_sessions and People's removal do before the database.
+    How many it ended."""
+    with _lock:
+        extra = [key for key, held in _held.items() if held.user == user]
+    ended = set(keys) | set(extra)
+    for key in ended:
+        _note_ended(key, reason)
+    return len(ended)
+
+
+def end_user_sessions(store, user: str, reason: str) -> int:
+    """
+    (2.0.0-player.61) End every session of `user` at once - in memory first, then the database - with
+    `reason` told to the next request of each (People's reset: PASSWORD_RESET). How many sessions there
+    were. SYNCHRONOUS; raises on a database error (the sessions are ended in memory by then).
+    """
+    keys = store.session_keys(user)
+    ended = end_held_sessions(user, keys, reason)
+    store.delete_user_sessions(user)
+    return ended
 
 
 def end_session(store, key: str, reason: str) -> None:
@@ -378,11 +519,19 @@ def _session(store, raw: str, now: float | None = None) -> tuple[str, _Held]:
             _touch(store, key, held, now)
         return key, held
 
+    #? (2.0.0-player.61 review) the role clock before the row is read: a role set while it was being read (People,
+    #? the re-check) is newer than the row's, and is the one held
+    mark = role_mark()
     row = store.session(key)
     if row is None:
         with _lock:
             _held.pop(key, None)
         raise signed_out(SIGNED_OUT)
+    if row["user"] in RESERVED_NAMES:
+        #? (2.0.0-player.61 review) a row can never stand for `local` or the break-glass admin, whose names are
+        #? checked only at a sign-in: one left from before a name was reserved ends here, as a session
+        _end_reserved(store, key, row)
+        raise signed_out(RESERVED_SESSION)
     if row["expires_at"] <= now:
         end_session(store, key, EXPIRED)
         raise signed_out(EXPIRED)
@@ -395,12 +544,31 @@ def _session(store, raw: str, now: float | None = None) -> tuple[str, _Held]:
     if unseal_credential(row.get("credential") or "") is None:
         _end_unopenable(store, key, row)
         raise signed_out(KEY_CHANGED)
-    held = _Held(row["user"], row["expires_at"], row["last_seen"], time.monotonic(), row.get("credential") or "")
+    held = _Held(row["user"], row["expires_at"], row["last_seen"], time.monotonic(), row.get("credential") or "",
+                 admin=bool(row.get("admin")), navidrome_id=row.get("navidrome_id") or None)
     with _lock:
+        if _changed_since(held.user, mark):
+            #? set since the row was read: the map has the newer word (unknown is not an admin)
+            held.admin = _roles.get(held.user, False)
         _held[key] = held
+        #? (2.0.0-player.61) the role as the database has it - what is_admin reads for this user
+        _note_role(held.user, held.admin)
     if now - held.touched >= TOUCH_SECONDS:
         _touch(store, key, held, now)
     return key, held
+
+
+def _end_reserved(store, key: str, row: dict) -> None:
+    """(2.0.0-player.61 review) A session row under a reserved name ends - RESERVED_SESSION told to the next request.
+    Best effort, as _end_unopenable: a database that refuses the delete leaves it ended in memory."""
+    _note_ended(key, RESERVED_SESSION)
+    try:
+        store.delete_session(key)
+    except Exception as e:
+        logger.warning(f"could not take a session kept under the reserved name {row.get('user')} out of the database "
+                       f"({type(e).__name__}: {e})")
+    logger.warning(f"ended a sign-in kept under '{row.get('user')}', a name deadwax keeps for itself now",
+                   extra={"frontend": True})
 
 
 def _end_unopenable(store, key: str, row: dict) -> None:
@@ -448,8 +616,9 @@ def user_for(request) -> str:
         logger.error(f"could not read a session from the database, so the request was refused ({type(e).__name__}: {e})")
         raise HTTPException(status_code=503, detail=NO_DATABASE) from e
     user = held.user
-    _remember_login(request, PlayerLogin(key, user, held.credential, store))
-    if user in Config.admins():
+    _remember_login(request, PlayerLogin(key, user, held.credential, store, held.navidrome_id))
+    #? (2.0.0-player.61) a Navidrome admin, as the session holds it - deadwax's admin
+    if held.admin:
         _take_over_leftovers(store, user)
     return user
 
@@ -468,6 +637,9 @@ class PlayerLogin:
     user: str
     sealed: str
     store: object = None
+    #? (2.0.0-player.61) the Navidrome account's id as read at the sign-in (sessions.navidrome_id) - None when
+    #? it wasn't: what src/permissions.py binds an admin's grants to
+    navidrome_id: str | None = None
 
 
 #? The break-glass admin's: no Navidrome account of its own, so the player asks as NAVIDROME_USER - the
@@ -484,6 +656,21 @@ def _remember_login(request, login) -> None:
     state = getattr(request, "state", None)
     if state is not None:
         setattr(state, LOGIN_STATE, login)
+
+
+def held_login(raw: str, store) -> "PlayerLogin | str | None":
+    """(2.0.0-player.61) What a cookie just made at a sign-in asks Navidrome as - read back from its row, for the
+    sign-in's own answer (its permissions, as /me will say them). SYNCHRONOUS; None when it can't be read."""
+    if raw.startswith("b."):
+        return SHARED_LOGIN
+    key = id_hash(raw)
+    try:
+        row = store.session(key)
+    except Exception:
+        return None
+    if row is None:
+        return None
+    return PlayerLogin(key, row["user"], row.get("credential") or "", store, row.get("navidrome_id") or None)
 
 
 def session_ended(key: str) -> str | None:
@@ -521,7 +708,8 @@ def player_refused(login: PlayerLogin, why: str = LOGIN_GONE) -> bool:
 
 def _take_over_leftovers(store, user: str) -> None:
     """
-    The first admin seen with a session after a start takes over what `local` still holds - the
+    The first admin seen with a session after a start (2.0.0-player.61: a Navidrome admin, as the session
+    holds it) takes over what `local` still holds - the
     downloads, pins and Getting albums settings saved while logins were off (store.adopt_local_now),
     as a sign-in does (sign_in). For an admin whose session outlived the restart that switched logins
     on - a session lasts 30 days from its last use - and who so may never sign in again: an upgrade
@@ -596,11 +784,13 @@ class LoginClient:
 login_client = LoginClient()
 
 
-async def check_login(username: str, token: str, salt: str) -> str | None:
+async def check_login(username: str, token: str, salt: str) -> tuple[str | None, bool]:
     """
     Ask Navidrome whether this token stands for `username` - getUser for the account's own name, signed
-    as that account. The user name Navidrome answered with (None if it named none); NavidromeError when
-    it refused (`code` 40: wrong password or no such account) or couldn't be asked (`unreachable`).
+    as that account. (The user name Navidrome answered with - None if it named none - and, since
+    2.0.0-player.61, whether the account is a Navidrome admin: `adminRole` exactly true, anything else -
+    missing, a string, null - not); NavidromeError when it refused (`code` 40: wrong password or no such
+    account) or couldn't be asked (`unreachable`).
     """
     client = await login_client.get_client()
     params = {"u": username, "t": token, "s": salt, "v": API_VERSION, "c": CLIENT_NAME, "f": "json",
@@ -620,7 +810,22 @@ async def check_login(username: str, token: str, salt: str) -> str | None:
     body = subsonic_body(payload)
     user = body.get("user")
     name = user.get("username") if isinstance(user, dict) else None
-    return name if isinstance(name, str) else None
+    #? (2.0.0-player.61) fail closed: only a real boolean true is an admin
+    admin = isinstance(user, dict) and user.get("adminRole") is True
+    return (name if isinstance(name, str) else None), admin
+
+
+def password_matches(sealed: str, password: str) -> bool:
+    """
+    (2.0.0-player.61) Whether `password` is the one this sealed login was made with - md5(password + its
+    salt) against its token, in constant time; False when it won't open. People's unlock asks this before
+    Navidrome is asked anything, so a typo costs nothing of the login budget deadwax shares.
+    """
+    opened = unseal_credential(sealed or "")
+    if opened is None:
+        return False
+    _name, token, salt = opened
+    return hmac.compare_digest(subsonic_token(password, salt).encode("ascii"), token.encode("ascii", "replace"))
 
 
 # ===== the throttle =================================================================================
@@ -708,7 +913,7 @@ throttle = Throttle()
 
 # ===== signing in ===================================================================================
 
-def _too_many(name: str, wait: float) -> HTTPException:
+def too_many(name: str, wait: float) -> HTTPException:
     seconds = max(1, int(wait + 0.999))
     return HTTPException(
         status_code=429,
@@ -718,24 +923,27 @@ def _too_many(name: str, wait: float) -> HTTPException:
     )
 
 
-async def sign_in(store, typed: str, password: str) -> tuple[str, str, int]:
+async def sign_in(store, typed: str, password: str) -> tuple[str, str, int, bool]:
     """
-    Sign `typed` in with `password`: (the user, the cookie's value, its max age) - or HTTPException
-    saying plainly why not: 401 a wrong password, 429 too many tries, 503 Navidrome not answering or
-    deadwax unable to keep the session, 502 anything else Navidrome said.
+    Sign `typed` in with `password`: (the user, the cookie's value, its max age, whether they are an
+    admin) - or HTTPException saying plainly why not: 401 a wrong password, 429 too many tries, 503
+    Navidrome not answering or deadwax unable to keep the session, 502 anything else Navidrome said.
 
     The break-glass name is checked against DEADWAX_ADMIN_PASSWORD alone and asks Navidrome nothing.
     Any other name is put to Navidrome's getUser with a token made here, from a fresh salt: the name
     as typed (Navidrome finds accounts whatever their case), the identity lowercased. Each name's tries
-    are in turn and counted (`throttle`); nothing is ever retried. An admin's first sign-in takes over
-    what `local` saved while logins were off (adopt_local) - for every admin who signs in, which after
-    the first finds nothing left to take.
+    are in turn and counted (`throttle`); nothing is ever retried. (2.0.0-player.61) The answer's
+    `adminRole` is the role: kept on the session, and every other session of theirs brought into line.
+    A Navidrome admin's first sign-in takes over what `local` saved while logins were off (adopt_local)
+    - for every admin who signs in, which after the first finds nothing left to take. And someone an
+    admin gave a permission to has their Navidrome account's id read once (_account_id), so the grant is
+    honoured only for the account it was given to.
     """
     name = typed.strip().lower()
     async with throttle.lock(name):
         wait = throttle.wait(name)
         if wait:
-            raise _too_many(name, wait)
+            raise too_many(name, wait)
 
         if name == BREAK_GLASS_USER:
             if not break_glass_matches(password):
@@ -745,7 +953,7 @@ async def sign_in(store, typed: str, password: str) -> tuple[str, str, int]:
                 raise HTTPException(status_code=401, detail=WRONG_LOGIN)
             throttle.succeeded(name)
             logger.info("signed in: the break-glass admin", extra={"frontend": True})
-            return BREAK_GLASS_USER, break_glass_cookie(), BREAK_GLASS_SECONDS
+            return BREAK_GLASS_USER, break_glass_cookie(), BREAK_GLASS_SECONDS, True
 
         if name in RESERVED_NAMES:
             raise HTTPException(status_code=400, detail=f"'{name}' is a name deadwax keeps for itself - nobody signs in as it.")
@@ -754,8 +962,11 @@ async def sign_in(store, typed: str, password: str) -> tuple[str, str, int]:
 
         salt = secrets.token_hex(16)
         token = subsonic_token(password, salt)
+        #? (2.0.0-player.61 review) before Navidrome is asked: a role People sets while this sign-in is on its way
+        #? is newer than getUser's answer
+        mark = role_mark()
         try:
-            answered = await check_login(typed.strip(), token, salt)
+            answered, admin = await check_login(typed.strip(), token, salt)
         except NavidromeError as e:
             if e.code == 40:
                 throttle.failed(name)
@@ -780,8 +991,16 @@ async def sign_in(store, typed: str, password: str) -> tuple[str, str, int]:
         #? sealed once: the session keeps it, and (2.0.0-player.51) so does the user - the same string, so
         #? the re-check refusing this session's login knows it is the user's latest one dying
         sealed = seal_credential(typed.strip(), token, salt)
+        #? (2.0.0-player.61) the Navidrome account's id, only for someone an admin gave a permission to
+        navidrome_id = await _account_id(store, user, typed.strip(), password)
         try:
-            await asyncio.to_thread(store.create_session, id_hash(raw), user, sealed, now, now + SESSION_IDLE_SECONDS)
+            await asyncio.to_thread(store.create_session, id_hash(raw), user, sealed, now, now + SESSION_IDLE_SECONDS,
+                                    admin, navidrome_id)
+            #? every other session of theirs (another device) brought into line, in the database and memory -
+            #? unless People changed their role since Navidrome answered: then the new session takes that one
+            if not await asyncio.to_thread(set_role, store, user, admin, mark):
+                admin = role(user)
+                await asyncio.to_thread(set_role, store, user, admin)
         except Exception as e:
             logger.error(f"could not keep {user}'s session ({type(e).__name__}: {e})", extra={"frontend": True})
             raise HTTPException(status_code=503, detail=NO_DATABASE) from e
@@ -789,16 +1008,52 @@ async def sign_in(store, typed: str, password: str) -> tuple[str, str, int]:
         #? hold the event loop - and every request and stream with it (review)
         await asyncio.to_thread(_keep_for_library, store, user, sealed, now)
 
-        if user in Config.admins():
+        #? (2.0.0-player.61) a Navidrome admin, as getUser has just said - the first one takes over what
+        #? `local` saved, and the store goes into their library once ever
+        if admin:
             taken = await store.adopt_local(user)
             if taken and any(taken):
                 pins, preferences, requests = taken
                 logger.info(f"{user} took over what deadwax saved before logins: {pins} pin(s), "
                             f"{preferences} preference(s) and {requests} download(s)", extra={"frontend": True})
             await asyncio.to_thread(_seed_library, store, user)
-        logger.info(f"signed in: {user}", extra={"frontend": True})
+        logger.info(f"signed in: {user}" + (" (a Navidrome admin)" if admin else ""), extra={"frontend": True})
         library_ledger.kick()
-        return user, raw, COOKIE_MAX_AGE
+        return user, raw, COOKIE_MAX_AGE, admin
+
+
+async def _account_id(store, user: str, typed: str, password: str) -> str | None:
+    """
+    (2.0.0-player.61) The Navidrome account's id for `user`, read once at a sign-in - only when an admin
+    has given them a permission (a grant row, src/permissions.py), whose rows hold the id of the account
+    they were given to. One `/auth/login` as them, through deadwax's own login gate
+    (src/api/navidrome_admin.py) - the password is in hand and getUser has just taken it - its JWT thrown
+    away. Another id than the grants': the account was removed and made again, so the grants are dropped
+    (logged). Anything that stops the ask - the gate full, Navidrome's 429, unreachable - leaves the id
+    unread: their grants are then not honoured on this session (fail closed), never the sign-in refused.
+    """
+    try:
+        if not await asyncio.to_thread(permissions.has_grants, store, user):
+            return None
+    except Exception as e:
+        logger.error(f"could not tell whether an admin gave {user} any permission ({type(e).__name__}: {e})")
+        return None
+    try:
+        found = await navidrome_admin.login(typed, password, expect=user)
+    except navidrome_admin.NativeError as e:
+        logger.warning(f"could not read {user}'s Navidrome account as they signed in ({e.kind}), so the permissions "
+                       f"an admin gave them are off until they sign in again", extra={"frontend": True})
+        return None
+    navidrome_id = found.navidrome_id
+    try:
+        dropped = await asyncio.to_thread(permissions.drop_other_accounts, store, user, navidrome_id)
+    except Exception as e:
+        logger.error(f"could not check {user}'s permissions against their account ({type(e).__name__}: {e})")
+        return None
+    if dropped:
+        logger.warning(f"{user}'s account isn't the one those permissions were given to - it was removed and made "
+                       f"again - so deadwax dropped them ({dropped})", extra={"frontend": True})
+    return navidrome_id
 
 
 def _keep_for_library(store, user: str, sealed: str, now: float) -> None:
@@ -860,7 +1115,8 @@ async def check_sessions(store, now: float | None = None) -> dict[str, int]:
     """
     One pass of the re-check: every live session Navidrome hasn't vouched for in RECHECK_SECONDS is put
     to getUser again with its own token - one per person a pass, so the re-check never makes a run of
-    failures for one account. Error 40 ends the session (the password changed, or the account is gone);
+    failures for one account - and (2.0.0-player.61) its answer's `adminRole` is the person's role from
+    then on (set_role, said in the log when it changed). Error 40 ends the session (the password changed, or the account is gone);
     a token that won't decrypt (another DEADWAX_SECRET_KEY) ends it too; anything else - Navidrome down,
     an address that won't do - ends nothing, and it is asked again next pass. Then expired sessions go.
     """
@@ -869,6 +1125,11 @@ async def check_sessions(store, now: float | None = None) -> dict[str, int]:
     due = await asyncio.to_thread(store.sessions_due, now - RECHECK_SECONDS, now)
     asked: set[str] = set()
     for row in due:
+        if row["user"] in RESERVED_NAMES:
+            #? (2.0.0-player.61 review) never asked as, never standing - as _session ends it
+            await asyncio.to_thread(_end_reserved, store, row["id_hash"], row)
+            counts["ended"] += 1
+            continue
         if row["user"] in asked:
             continue
         asked.add(row["user"])
@@ -879,8 +1140,10 @@ async def check_sessions(store, now: float | None = None) -> dict[str, int]:
             counts["ended"] += 1
             continue
         username, token, salt = credential
+        #? (2.0.0-player.61 review) before Navidrome is asked, so a role People sets meanwhile isn't undone
+        mark = role_mark()
         try:
-            await check_login(username, token, salt)
+            _answered, admin = await check_login(username, token, salt)
         except NavidromeError as e:
             if e.code == 40:
                 await asyncio.to_thread(end_session, store, row["id_hash"], LOGIN_GONE)
@@ -893,6 +1156,16 @@ async def check_sessions(store, now: float | None = None) -> dict[str, int]:
             continue
         await asyncio.to_thread(store.session_checked, row["id_hash"], time.time())
         counts["checked"] += 1
+        #? (2.0.0-player.61) Navidrome's admin flag as it says now: changed in Navidrome since, it is deadwax's
+        #? role from this person's next request
+        if admin != bool(row.get("admin")) or admin != role(row["user"]):
+            if not await asyncio.to_thread(set_role, store, row["user"], admin, mark):
+                #? People changed it while Navidrome was being asked: theirs is the newer word
+                continue
+            if admin != bool(row.get("admin")):
+                logger.info(f"{row['user']} is now a Navidrome admin, so deadwax's admin too" if admin else
+                            f"{row['user']} is no longer a Navidrome admin, so no longer deadwax's admin either",
+                            extra={"frontend": True})
 
     for key in await asyncio.to_thread(store.delete_expired_sessions, now):
         _note_ended(key, EXPIRED)
