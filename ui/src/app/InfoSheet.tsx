@@ -4,7 +4,7 @@ import { aboutRows, type About, type AboutAlbumFields, type AboutDetails } from 
 import type { LevelAnswer } from '../lib/loudness'
 import { panelIsModal, type PanelStyle } from '../lib/appFrame'
 import type { DeckReport } from '../lib/deckVoice'
-import { debugSections, type DebugSection, type RecordingState } from '../lib/debugRows'
+import { debugSections, infoTabs, playingRows, shownTab, PLAYING_TITLE, type DebugRow, type DebugSection, type InfoTab, type RecordingState } from '../lib/debugRows'
 import type { QueueTrack } from '../lib/playQueue'
 import { Cover } from '../player/Cover'
 import { ChevronRightIcon } from '../player/icons'
@@ -12,20 +12,15 @@ import type { Player } from '../player/usePlayer'
 import { hasLibrary } from './useMyLibrary'
 import { useSheet } from './useSheet'
 
-export type InfoTab = 'about' | 'debug'
-
 /** How often an open Debug reads the speed again (2.0.0-player.39): the song's measured pace moves as it
  *  plays, and none of the speed is React state. */
 export const SPEED_READ_MS = 1000
 
-export const INFO_TABS: readonly { id: InfoTab; label: string }[] = [
-  { id: 'about', label: 'About' },
-  { id: 'debug', label: 'Debug' },
-]
-
 /** What the sheet last drew, kept so it slides away still showing it. */
 interface Drawn {
   about: About | null
+  /** (2.0.0-player.63) About's Playing group */
+  playing: DebugRow[] | null
   debug: DebugSection[] | null
 }
 
@@ -44,6 +39,12 @@ interface Drawn {
  *   own sound (2.0.0-player.14: ready, or off and why), and the names of the fields Navidrome sent
  *   for the song and its album, to read off a phone.
  *
+ * DEBUG IS AN ADMIN'S (2.0.0-player.63, James: "only make the debug info available to an admin"): `admin` is
+ * /deadwax/me's (app/access.ts) - a Navidrome admin, break-glass, or everyone with logins off. Everyone else's
+ * Info is About alone, with no tab strip (lib/debugRows.ts infoTabs), and About ends, before the folder, with
+ * a "Playing" group of the three of Debug's rows a listener can use - Format, Gapless and Normalization - built
+ * by Debug's own functions (playingRows). The role going while Debug shows draws About (shownTab).
+ *
  * A sheet like the others (useSheet.ts): its own scroll lock, focus in to Done and back to the •••
  * button, Escape, a tap on the backdrop above it; inert while closed. Its body is the one part of
  * the player's sheets that SCROLLS, so it says so itself (`touch-action: pan-y` in app.css): the
@@ -54,7 +55,8 @@ interface Drawn {
  * away. The Speed row (2.0.0-player.39) reads what isn't React state - the speed and the song's measured
  * pace - so while Debug shows, it is read again as the speed changes (on a desktop the player bar's chip
  * is beside the panel) and every SPEED_READ_MS (the pace comes after a couple of seconds of playing, and
- * moves), and drawn again only when what it says has changed. `sentFormat` is asked only for Debug: it puts a question to the player's audio element.
+ * moves), and drawn again only when what it says has changed. `sentFormat` is asked only while Info is open,
+ * for Debug and for About's Normalization row: it puts a question to the player's audio element.
  * It stays mounted, and a closed sheet is only hidden, so its one scroller would keep its offset
  * from one opening to the next and from one tab to the other: it is put back at the top as Info
  * opens and as the tab changes - never as it closes, while it is still sliding away in sight.
@@ -75,6 +77,7 @@ export function InfoSheet({
   player,
   album,
   sentFormat,
+  admin,
   turntable = null,
   recording = null,
   onRecord = null,
@@ -95,6 +98,8 @@ export function InfoSheet({
   /** the album answer the queue was played from, as Navidrome sent it; null when not in hand */
   album: AboutAlbumFields | null
   sentFormat: (track: QueueTrack) => 'raw' | 'mp3' | null
+  /** (2.0.0-player.63) /deadwax/me's `admin` (app/access.ts): Debug is drawn only for an admin */
+  admin: boolean
   /** the turntable's sound (2.0.0-player.14), for Debug's "Turntable sound": null while none shows */
   turntable?: DeckReport | null
   /** a recording of it, running or made, and what starts one (2.0.0-player.32) */
@@ -117,9 +122,29 @@ export function InfoSheet({
   const done = useRef<HTMLButtonElement>(null)
   const scroller = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLDivElement>(null)
-  const [tab, setTab] = useState<InfoTab>('about')
-  const drawn = useRef<Drawn>({ about: null, debug: null })
+  const [picked, setTab] = useState<InfoTab>('about')
+  //? (2.0.0-player.63) the tabs this person has, and the one shown: About once the admin role goes
+  const tabs = infoTabs(admin)
+  const tab = shownTab(picked, admin)
+  const drawn = useRef<Drawn>({ about: null, playing: null, debug: null })
   useSheet({ open, covered, onClose, lockClass: 'app-info-open', first: done, opener, modal, area: box })
+
+  //? ...and forgotten: the role coming back opens on About, never on a Debug chosen before it went
+  useEffect(() => {
+    if (picked !== tab) setTab(tab)
+  }, [picked, tab])
+
+  //? (review of 2.0.0-player.63) the strip going while it has focus - the role taken away with a tab focused - would
+  //? drop focus to <body>, outside the sheet (and, on a desktop's panel, out of reach of its Escape): seen here, in
+  //? the render that removes it, while it is still in the page, and given to the list once it has gone
+  const strip = useRef<HTMLDivElement>(null)
+  const refocus = useRef(false)
+  if (tabs.length < 2 && strip.current?.contains(document.activeElement)) refocus.current = true
+  useLayoutEffect(() => {
+    if (!refocus.current) return
+    refocus.current = false
+    scroller.current?.focus({ preventScroll: true })
+  }, [tabs.length])
 
   //? the list from its top, whichever song and tab it opens on - Format and Sent as, not the end
   useLayoutEffect(() => {
@@ -148,12 +173,17 @@ export function InfoSheet({
   const track = player.track
   if (open && track) {
     if (tab === 'about') {
-      drawn.current = { about: aboutRows(track, album, details, hasLibrary()), debug: null }
+      drawn.current = {
+        about: aboutRows(track, album, details, hasLibrary()),
+        playing: playingRows({ track, wrapped: player.wrapped, gapless: player.gapless, format: sentFormat(track), level }),
+        debug: null,
+      }
     } else {
       const answer = album as Readonly<Record<string, unknown>> | null
       const song = album?.song?.find((candidate) => candidate.id === track.id) ?? null
       drawn.current = {
         about: null,
+        playing: null,
         debug: debugSections({
           track,
           gapless: player.gapless,
@@ -173,15 +203,15 @@ export function InfoSheet({
       }
     }
   }
-  const { about, debug } = drawn.current
+  const { about, playing, debug } = drawn.current
 
   //? a tab list's keys: the arrows move the choice, and the focus with it, between the two
   const onTabKeyDown = (event: KeyboardEvent) => {
     const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
     if (!step) return
     event.preventDefault()
-    const at = INFO_TABS.findIndex((entry) => entry.id === tab)
-    const other = INFO_TABS[(at + step + INFO_TABS.length) % INFO_TABS.length]!
+    const at = tabs.findIndex((entry) => entry.id === tab)
+    const other = tabs[(at + step + tabs.length) % tabs.length]!
     setTab(other.id)
     ;(event.currentTarget as HTMLElement).querySelector<HTMLElement>(`[data-tab="${other.id}"]`)?.focus()
   }
@@ -201,35 +231,39 @@ export function InfoSheet({
           </button>
         </header>
 
-        <div class="app-segmented" role="tablist" aria-label="Info" onKeyDown={onTabKeyDown}>
-          {INFO_TABS.map((entry) => {
-            const chosen = entry.id === tab
-            return (
-              <button
-                key={entry.id}
-                type="button"
-                role="tab"
-                id={`app-info-tab-${entry.id}`}
-                class={`app-segment${chosen ? ' is-on' : ''}`}
-                data-tab={entry.id}
-                aria-selected={chosen}
-                aria-controls="app-info-panel"
-                //? only the chosen one is a tab stop; the arrows reach the other
-                tabIndex={chosen ? 0 : -1}
-                onClick={() => setTab(entry.id)}
-              >
-                {entry.label}
-              </button>
-            )
-          })}
-        </div>
+        {/* (2.0.0-player.63) a strip only where there is a choice: an admin's About and Debug */}
+        {tabs.length > 1 && (
+          <div ref={strip} class="app-segmented" role="tablist" aria-label="Info" onKeyDown={onTabKeyDown}>
+            {tabs.map((entry) => {
+              const chosen = entry.id === tab
+              return (
+                <button
+                  key={entry.id}
+                  type="button"
+                  role="tab"
+                  id={`app-info-tab-${entry.id}`}
+                  class={`app-segment${chosen ? ' is-on' : ''}`}
+                  data-tab={entry.id}
+                  aria-selected={chosen}
+                  aria-controls="app-info-panel"
+                  //? only the chosen one is a tab stop; the arrows reach the other
+                  tabIndex={chosen ? 0 : -1}
+                  onClick={() => setTab(entry.id)}
+                >
+                  {entry.label}
+                </button>
+              )
+            })}
+          </div>
+        )}
 
+        {/* a tab's panel beside a strip; with none, a region named by the sheet's title */}
         <div
           ref={scroller}
           id="app-info-panel"
           class="app-info-scroll"
-          role="tabpanel"
-          aria-labelledby={`app-info-tab-${tab}`}
+          role={tabs.length > 1 ? 'tabpanel' : 'region'}
+          aria-labelledby={tabs.length > 1 ? `app-info-tab-${tab}` : 'app-info-title'}
           tabIndex={0}
         >
           {about && (
@@ -308,6 +342,16 @@ export function InfoSheet({
                 </section>
               )}
 
+              {/* (2.0.0-player.63) what a listener can use of Debug's rows, for everyone - in Debug's words */}
+              {playing && (
+                <section class="app-info-section" aria-labelledby="app-info-playing">
+                  <h3 id="app-info-playing" class="app-section-title">
+                    {PLAYING_TITLE}
+                  </h3>
+                  {infoRows(playing)}
+                </section>
+              )}
+
               {/* the album's folder, last: a path to copy (never inside the album's link, where it
                   couldn't be selected and was read out with every press), and a line landing late
                   here moves no card a finger is reaching for */}
@@ -333,37 +377,45 @@ export function InfoSheet({
               <h3 id={`app-info-debug-${index}`} class="app-section-title">
                 {section.title}
               </h3>
-              <dl class="app-group app-kv">
-                {section.rows.map((row) => (
-                  <div key={row.label} class="app-kv-row">
-                    <dt class="app-kv-label">{row.label}</dt>
-                    <dd class={`app-kv-value${row.mono ? ' app-mono' : ''}`}>{row.value}</dd>
-                    {row.note && <dd class="app-kv-note app-mono">{row.note}</dd>}
-                    {row.action && (
-                      <dd class="app-kv-action">
-                        {row.action.href && row.action.beside ? (
-                          //? a page of its own (2.0.0-player.36, the turntable's test bench): beside the app, never over it
-                          <a class="app-button app-info-action" href={row.action.href} target="_blank" rel="noopener">
-                            {row.action.label}
-                          </a>
-                        ) : row.action.href ? (
-                          <a class="app-button app-info-action" href={row.action.href} download={row.action.download}>
-                            {row.action.label}
-                          </a>
-                        ) : (
-                          <button type="button" class="app-button app-info-action" onClick={row.action.onClick}>
-                            {row.action.label}
-                          </button>
-                        )}
-                      </dd>
-                    )}
-                  </div>
-                ))}
-              </dl>
+              {infoRows(section.rows)}
             </section>
           ))}
         </div>
       </div>
     </div>
+  )
+}
+
+/** Labelled rows, as Debug draws them and About's Playing group (2.0.0-player.63) - a row's control too. Called,
+ *  not mounted, so the rows are the sheet's own elements. */
+function infoRows(rows: DebugRow[]) {
+  return (
+    <dl class="app-group app-kv">
+      {rows.map((row) => (
+        <div key={row.label} class="app-kv-row">
+          <dt class="app-kv-label">{row.label}</dt>
+          <dd class={`app-kv-value${row.mono ? ' app-mono' : ''}`}>{row.value}</dd>
+          {row.note && <dd class="app-kv-note app-mono">{row.note}</dd>}
+          {row.action && (
+            <dd class="app-kv-action">
+              {row.action.href && row.action.beside ? (
+                //? a page of its own (2.0.0-player.36, the turntable's test bench): beside the app, never over it
+                <a class="app-button app-info-action" href={row.action.href} target="_blank" rel="noopener">
+                  {row.action.label}
+                </a>
+              ) : row.action.href ? (
+                <a class="app-button app-info-action" href={row.action.href} download={row.action.download}>
+                  {row.action.label}
+                </a>
+              ) : (
+                <button type="button" class="app-button app-info-action" onClick={row.action.onClick}>
+                  {row.action.label}
+                </button>
+              )}
+            </dd>
+          )}
+        </div>
+      ))}
+    </dl>
   )
 }

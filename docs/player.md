@@ -281,8 +281,8 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   album, closes the menu and says at the top of the screen that it did (or why it couldn't). The
   menu shows what it showed as it opened: a song changing while it's up doesn't change the pin's
   album under your finger.
-- **Info** is a sheet over the now-playing screen, with two tabs. **About** is the song, the album
-  and the artist: the song's title and artist, "Track 3 of 6 · 5:08 · played 12 times" (counted on
+- **Info** is a sheet over the now-playing screen: **About**, and for an admin a second tab, **Debug**.
+  **About** is the song, the album and the artist: the song's title and artist, "Track 3 of 6 · 5:08 · played 12 times" (counted on
   its own disc; the plays as Navidrome counts them now), its disc's title when the album has disc
   titles ("Disc 2 · Unreleased Tracks", as the album page heads it), and **Written by** whoever
   Navidrome says wrote it; the album's cover, title, year, label, format and number of songs, then
@@ -293,14 +293,17 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   as on a compilation; tap it for their page. It's the song's own artist: a Portishead track on a
   compilation goes to Portishead, not Various Artists, and only an old credit of a renamed artist
   (Kanye West on a Ye album, one MusicBrainz artist under two names) goes to the page the album is
-  filed under. Last, **In your library → Folder** (headed **In the store** with logins on and a
+  filed under. Then **Playing**, three rows about how it's playing (since 2.0.0-player.63): **Format**,
+  the file as Navidrome read it (`FLAC, 24-bit, 192 kHz, stereo`); **Gapless**, `Off`, `On`, or `On, in
+  one stream`; and **Normalization**, the song's [level](#normalization) (`Album, -7.42 dB · the album at
+  -10.6 LUFS`, or `Off`) - the same words as the rows of those names in Debug. Last, **In your library → Folder** (headed **In the store** with logins on and a
   library of your own - the folder is the store's, whoever it's in the library of): where the album is on disk, a folder a line for
   a set kept one folder per disc - text you can select and copy. Info asks Navidrome, deadwax and
   MusicBrainz for these as it opens, so they appear a moment after it does (the song's and the
   pressing's together, so a card doesn't grow under your finger). Anything not sent is left out,
   never guessed. **Debug** is how the song is
-  being played, in labelled rows: see [Info → Debug](#info--debug). **Done**, Escape or a tap above
-  the sheet closes it.
+  being played, in labelled rows, and it is an admin's: see [Info → Debug](#info--debug). Everyone
+  else's Info is About alone, with no tabs above it. **Done**, Escape or a tap above the sheet closes it.
 - **The scrubber** is the whole bar: tap anywhere along it to jump there, or drag from anywhere on
   it and it follows your finger, seeking when you let go. It works from the keyboard too (arrows
   move 5 seconds, Page Up and Page Down 30, Home and End to the ends), and VoiceOver's swipe up
@@ -837,7 +840,7 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
   [Up Next, shuffle and repeat](#up-next-shuffle-and-repeat) - one panel at a time with Info, Edit and the
   rest. **Done**, the Up Next button again, or Escape while you're in it closes it; making the window
   narrower than 1024 closes it too.
-- **Info** opens beside the page as a panel, with the same About and Debug as on a phone. **Done**,
+- **Info** opens beside the page as a panel, with the same About - and, for an admin, Debug - as on a phone. **Done**,
   the Info button again, or Escape while you're in the panel closes it. Going to an album or an
   artist from the player - the bar's "Artist — Album", or Info's own cards - closes it too when it
   lies over the page (between 1024 and 1279 pixels wide); as a column beside the page it stays.
@@ -1255,9 +1258,9 @@ the page - over simple signals the page makes itself, and hear what it played be
 turntable turned exactly the same way. It is there for the question "is that digital sound deadwax's,
 or is it what turning a record at those speeds sounds like?".
 
-**Getting there**: on the now-playing screen, **•••** > **Info** > **Debug**, and **Open the test
+**Getting there**: on the now-playing screen, **•••** > **Info** > **Debug** (an admin's), and **Open the test
 bench** on the **Test bench** row, under **The turntable** - it opens in a tab of its own beside the
-app, so the song playing carries on. Or type the address: `/player/lab/` after deadwax's own (for
+app, so the song playing carries on. Or, for anyone, type the address: `/player/lab/` after deadwax's own (for
 example `http://192.168.1.10:8080/player/lab/`). It works on a phone and on a desktop, over plain
 `http://` as well as `https://`. Nothing it does is saved on the server or touches the library.
 
@@ -1528,6 +1531,21 @@ leaves a short gap (the second player has to start), just a shorter one.
 where it was, and anything got ready is let go of.
 
 ### Info → Debug
+
+**Debug is an admin's** (since 2.0.0-player.63): it shows for a Navidrome admin and the break-glass
+`deadwax` - and, with logins off, for everyone, as before. Everyone else's Info is
+[About](#what-it-does) alone, with no tab strip, and its **Playing** group holds the three rows
+of Debug a listener can use - Format, Gapless and Normalization - in the same words. A role given or taken
+away shows as Info opens, once it has asked deadwax who you are - a moment after it opens, so for that
+moment it can still look as it did; taken away while Debug is showing, Info shows About. So where this
+guide or [Troubleshooting](troubleshooting.md) says to read a row of Debug, that's an admin's to read, and
+where it's read matters. The rows about the song - **Navidrome sent**'s **Song**, **On other songs** and
+**Album** - say the same on any device, so an admin can read them on theirs, playing the same song. The
+rest describe the device and browser Info is open on (how the song is sent to it, its gaps and seeks, its
+speed, the turntable's sound and timing, a recording): on an admin's own phone they're that phone's, not
+yours. For those an admin reads Debug on your device - **You → About → Sign out**, they sign in there and
+do what went wrong again, then sign out and you sign back in. Nothing on the server is kept from anyone by
+this: Debug is drawn from what the page already has.
 
 How the song you're hearing was sent, and how the last song changes and your last seek went, are
 in **Info**: tap **•••** on the now-playing screen, then **Info**, then **Debug**. (Info opens on
@@ -1822,7 +1840,8 @@ of most of an hour in one file) isn't levelled: it's sent exactly as with Normal
 Last. What's already queued keeps the level it was queued at, so an album never changes level halfway
 (a library shuffle's later songs too). To compare Off with Automatic, change it and play the album again.
 
-**What deadwax did** is on Info → Debug's **Normalization** row (see [Info → Debug](#info--debug)), and
+**What deadwax did** is on Info → About's **Normalization** row, under **Playing**, for everyone, and on
+Info → Debug's for an admin (see [Info → Debug](#info--debug)), and
 deadwax's log says what it measured and made (`song 123 measured - -10.6 LUFS, peak -0.31 dBFS`, `song 123
 levelled (album, -7.42 dB), and put in a fragmented MP4 for the gapless player`).
 
@@ -1887,7 +1906,7 @@ on (the default), a FLAC song comes as deadwax's levelled 24-bit MP4 in every br
   constant 320 kbps MP3 landed within a hundredth of a second on every seek, and a V2 copy of the
   same song from a fraction of a second to 41 seconds out.
 
-**Info → Debug shows it on your phone** (tap **•••** on the now-playing screen, then **Info**, then
+**Info → Debug shows it on your phone** (an admin's - tap **•••** on the now-playing screen, then **Info**, then
 **Debug**; until 2.0.0-player.10 it was a line between the cover and the song's title). Its **Last
 seek** row is the last seek you made, with the bar or from the lock screen: *Asked 2:10, seeking…*
 while it's on its way, then *Asked 2:10, the player said 2:10*. If it never got there, because you

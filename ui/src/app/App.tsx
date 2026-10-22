@@ -1540,8 +1540,21 @@ export function App() {
   const infoOpen = desktop ? infoPanel : sheetOpen && over === 'info'
   //? what fills Info > About in, asked as it opens (2.0.0-player.17)
   const infoDetails = useInfoDetails(infoOpen, playing, playedFrom)
-  //? (2.0.0-player.62) and what deadwax says of the song's level, for Debug's Normalization row
+  //? (2.0.0-player.62) and what deadwax says of the song's level, for Debug's Normalization row - and (2.0.0-player.63)
+  //? About's, in its Playing group
   const infoLevel = useLevelAnswer(infoOpen, playing, player.maxRate)
+  //? (2.0.0-player.63) Info's Debug is an admin's: /deadwax/me asked again as Info opens, on either frame, so a role
+  //? given or taken away shows at the next open - through latestOnly(), a failed ask leaving it as it was
+  useEffect(() => {
+    if (!infoOpen) return
+    const request = meRequests.begin()
+    me(request.signal).then(
+      (who) => {
+        if (request.current()) noteAccess(who)
+      },
+      () => {},
+    )
+  }, [infoOpen])
   //? what is behind a sheet - Now Playing, or the Sources sheet - is inert while it shows; a desktop's
   //? side panel leaves the page beside it as it is
   //? (2.0.0-player.20: and behind the desktop's visualizer, which covers the whole screen; 2.0.0-player.47:
@@ -1676,6 +1689,7 @@ export function App() {
             player={player}
             album={playedFrom}
             sentFormat={sentFormat}
+            admin={access.admin}
             turntable={turntableSound}
             recording={turntableRecording}
             onRecord={recordTurntable}

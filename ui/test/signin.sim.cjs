@@ -412,6 +412,21 @@ async function main() {
     await settle()
     check('...and one taken away is gone at the re-ask a failing song makes', [...access.accessNow().permissions], [])
     access.forgetAccess()
+
+    //? (2.0.0-player.63) Info's Debug is an admin's: the store says who is one - from /me, and before /me the session
+    session.setSessionMe(ME('ethan', false))
+    check('Debug\'s role: an ordinary person\'s session, before /me answers here - not an admin', access.accessNow().admin, false)
+    session.setSessionMe(ME('james', true))
+    check('...a Navidrome admin\'s session - an admin', access.accessNow().admin, true)
+    session.setSessionMe(null)
+    check('...no session (logins off): everyone is the admin, as ever', access.accessNow().admin, true)
+    access.noteAccess({ ...ME('james', true), permissions: ['request', 'edit', 'library', 'downloads', 'server', 'people'] })
+    check('/me says an admin: an admin', access.accessNow().admin, true)
+    access.noteAccess({ ...ME('james', false), permissions: ['request', 'edit', 'library', 'downloads', 'server'] })
+    check('...the role taken away (every box ticked still): not one', access.accessNow().admin, false)
+    access.noteAccess({ user: 'local', auth: 'off', version: 'x' })
+    check('...logins off: the admin, by logins being off alone', access.accessNow().admin, true)
+    access.forgetAccess()
   }
 
   console.log('\nthe gate: a song that fails to load asks who is signed in')

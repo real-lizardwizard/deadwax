@@ -2779,5 +2779,32 @@ console.log('\nNormalization (2.0.0-player.62): every queued song through queued
       (read('app/GettingChoices.tsx').match(/app-choice-follows/g) ?? []).length], [true, true, false, 0])
 }
 
+console.log('\nInfo\'s Debug is an admin\'s (2.0.0-player.63): the role from /me, the tab strip by it')
+{
+  //? James: "only make the debug info available to an admin" - the app only hides, as the permissions do; Debug is
+  //? drawn from what the page already has, so there is no route of its own to refuse
+  const app = code(read('app/App.tsx'))
+  const info = code(read('app/InfoSheet.tsx'))
+  const access = code(read('app/access.ts'))
+  check('App hands Info /me\'s admin, through the one access store',
+    [/<InfoSheet\b[^>]*\badmin=\{access\.admin\}/.test(app.replace(/\n\s*/g, ' ')), /const access = useAccess\(\)/.test(app)], [true, true])
+  check('...and asks /me again as Info opens, on either frame, through latestOnly()',
+    /useEffect\(\(\) => \{\s*if \(!infoOpen\) return\s*const request = meRequests\.begin\(\)\s*me\(request\.signal\)\.then\(\s*\(who\) => \{\s*if \(request\.current\(\)\) noteAccess\(who\)\s*\},\s*\(\) => \{\},?\s*\)\s*\}, \[infoOpen\]\)/.test(app), true)
+  check('the store\'s admin is /me\'s - everyone with logins off, and no session is logins off - and a change of it redraws',
+    [/admin: me\.auth === 'off' \|\| me\.admin === true/.test(access), /admin: session \? session\.auth === 'off' \|\| session\.admin === true : true/.test(access),
+      /&& was\.admin === next\.admin\) return/.test(access)], [true, true, true])
+  check('Info draws its tabs by the role, its strip only with a choice, and Debug only for the tab shown',
+    [/const tabs = infoTabs\(admin\)\s*const tab = shownTab\(picked, admin\)/.test(info), /\{tabs\.length > 1 && \(\s*<div ref=\{strip\} class="app-segmented" role="tablist"/.test(info),
+      /if \(tab === 'about'\) \{[\s\S]*?\} else \{[\s\S]*?debug: debugSections\(\{/.test(info), /INFO_TABS/.test(info)], [true, true, true, false])
+  check('...a Debug chosen before the role went is forgotten', /useEffect\(\(\) => \{\s*if \(picked !== tab\) setTab\(tab\)\s*\}, \[picked, tab\]\)/.test(info), true)
+  //? (review of 2.0.0-player.63) the strip going with focus in it gives that focus to the list, not to <body>
+  check('...the strip going with focus inside it hands the focus to the list',
+    /if \(tabs\.length < 2 && strip\.current\?\.contains\(document\.activeElement\)\) refocus\.current = true\s*useLayoutEffect\(\(\) => \{\s*if \(!refocus\.current\) return\s*refocus\.current = false\s*scroller\.current\?\.focus\(\{ preventScroll: true \}\)\s*\}, \[tabs\.length\]\)/.test(info), true)
+  check('...About\'s Playing group from Debug\'s own rows', /playing: playingRows\(\{ track, wrapped: player\.wrapped, gapless: player\.gapless, format: sentFormat\(track\), level \}\)/.test(info), true)
+  check('nothing but Info draws Debug\'s sections or its test bench link',
+    [files.filter((file) => /\bdebugSections\(/.test(code(read(file)))).sort(), files.filter((file) => /\bbenchRow\(|BENCH_ADDRESS/.test(code(read(file)))).sort()],
+    [['app/InfoSheet.tsx', 'lib/debugRows.ts'], ['lib/debugRows.ts']])
+}
+
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')
 process.exit(failures ? 1 : 0)

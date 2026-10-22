@@ -25,8 +25,13 @@
  *    for the sheet on top only, and inert while closed. The menu doesn't give focus back when it
  *    closes because Info is opening; Info does, later.
  *  - Info's tabs: About first, Debug beside it, a tab list the arrows move round; Debug asks how
- *    the song was sent only when it is drawn; what was drawn stays drawn as the sheet slides away;
+ *    the song was sent only when it is drawn (and since 2.0.0-player.63 About, for its Playing group); what was drawn stays drawn as the sheet slides away;
  *    its list is back at the top as it opens and as the tab changes, and not as it closes.
+ *  - (2.0.0-player.63) Debug is an admin's: drawn with `admin`, About and Debug; without it, no tab strip and no
+ *    tab, About alone - the scroller then a region named by the sheet's title - and nothing of Debug. About ends
+ *    in "Playing" for everyone: Format, Gapless and Normalization in Debug's words (so About asks how the song
+ *    was sent, for Normalization). The role going while Debug shows draws About; given back, it opens on About;
+ *    and the strip going with focus inside it hands that focus to the list, never to <body> (review).
  *  - Now Playing is inert and deaf to Escape while the menu or Info is over it.
  *  - The menu's album pin (2.0.0-player.18): "Pin album to Home" or "Unpin album from Home" after Go
  *    to album, its tap handed to App; drawn but doing nothing until it is known whether the album is
@@ -115,6 +120,8 @@ class FakeElement {
   //? focus moves only when asked for - a tap doesn't, as in WebKit
   focus() { document.activeElement = this }
   querySelector() { return null }
+  //? (2.0.0-player.63, review) inside it: itself, or under it in the tree mount() last drew
+  contains(other) { for (let at = other; at; at = at.parent) if (at === this) return true; return false }
 }
 const listeners = new Map()
 const document = {
@@ -147,20 +154,23 @@ function mount(component, name) {
   const render = hooks.root(component)
   const elements = new Map()
   let tree = null
-  const walk = (node, where) => {
+  const walk = (node, where, parent = null) => {
     if (!node || typeof node !== 'object') return
-    if (Array.isArray(node)) { node.forEach((child, i) => walk(child, `${where}.${i}`)); return }
+    if (Array.isArray(node)) { node.forEach((child, i) => walk(child, `${where}.${i}`, parent)); return }
     if (typeof node.type === 'string') {
       const key = `${where}:${node.type}`
       if (!elements.has(key)) elements.set(key, new FakeElement(`${name} ${node.type} ${node.props.class ?? ''}`.trim()))
       node.element = elements.get(key)
+      node.element.parent = parent
       if (node.props.ref) node.props.ref.current = node.element
     }
-    walk(node.props?.children, `${where}/`)
+    walk(node.props?.children, `${where}/`, node.element ?? parent)
   }
   return {
     render(props) {
       tree = render(props)
+      //? an element left out of this draw is out of the page, and so outside everything (Preact's ref goes to null)
+      for (const element of elements.values()) element.parent = undefined
       walk(tree, '')
       render.commit()
       return tree
@@ -386,7 +396,7 @@ console.log('\nInfo: opens with focus in, closes with focus back - by Escape, Do
   const albumTaps = { count: 0, handler: () => { albumTaps.count += 1 } }
   const view = mount(InfoSheet, 'info')
   const draw = (open) => view.render({
-    open, opener: openerRef, onClose: () => { closes += 1 }, onAlbum: albumTaps.handler, player, album: EXPERIENCE,
+    admin: true, open, opener: openerRef, onClose: () => { closes += 1 }, onAlbum: albumTaps.handler, player, album: EXPERIENCE,
     sentFormat: () => { formats += 1; return 'raw' },
   })
   const layer = () => one(view, byClass('app-layer'))
@@ -437,18 +447,23 @@ console.log('\nInfo: opens with focus in, closes with focus back - by Escape, Do
   const tabs = () => view.find((node) => node.props?.role === 'tab')
   const list = () => one(view, (node) => node.props?.role === 'tablist')
   check('About, then Debug; About chosen, and the only tab stop', tabs().map((tab) => [text(tab), tab.props['aria-selected'], tab.props.tabIndex]), [['About', true, 0], ['Debug', false, -1]])
-  check('About draws the song, the album and the artist', view.find((node) => node.type === 'h3').map(text), ['The song', 'The album', 'The artist'])
+  //? (2.0.0-player.63) and the Playing group, for everyone - Debug's own Format, Gapless and Normalization rows
+  check('About draws the song, the album, the artist and what is playing', view.find((node) => node.type === 'h3').map(text), ['The song', 'The album', 'The artist', 'Playing'])
+  check('...Playing: Format, Gapless and Normalization, in Debug\'s words',
+    [view.find(byClass('app-kv-label')).map(text), view.find(byClass('app-kv-value')).map(text)],
+    [['Format', 'Gapless', 'Normalization'], ['FLAC, 16-bit, 44.1 kHz, stereo', 'On, in one stream', 'Off']])
   check('...the song\'s lines as About worked them out', view.find(byClass('app-info-line')).map(text).slice(0, 3), ['Pink Floyd', `Track 3 of 6 ${DOT} 5:08`, `Disc 2 ${DOT} Unreleased Tracks`])
   const card = one(view, (node) => node.type === 'button' && byClass('is-link')(node))
   const closesBefore = closes
   card.props.onClick()
   check('...the album\'s card goes to the album (App closes the sheets as it opens it)', [card.props.onClick === albumTaps.handler, albumTaps.count, closes - closesBefore], [true, 1, 0])
-  check('About never asks how the song was sent', formats, 0)
+  //? (2.0.0-player.63) for its Normalization row, which says an MP3 transcode isn't levelled
+  check('About asks how the song was sent - for Playing\'s Normalization row', formats > 0, true)
 
   //? 2.0.0-player.17: filled in, the artist's card goes to their page - App closes the sheets as it opens it
   const artistTaps = []
   view.render({
-    open: true, opener: openerRef, onClose: () => { closes += 1 }, onAlbum: albumTaps.handler, player, album: WITH_IDS,
+    admin: true, open: true, opener: openerRef, onClose: () => { closes += 1 }, onAlbum: albumTaps.handler, player, album: WITH_IDS,
     sentFormat: () => 'raw', details: DETAILS, onArtist: (artist) => artistTaps.push(artist),
   })
   const links = view.find((node) => node.type === 'button' && byClass('is-link')(node))
@@ -461,9 +476,11 @@ console.log('\nInfo: opens with focus in, closes with focus back - by Escape, Do
     [view.find(byClass('app-info-folder')).map((node) => [node.type, text(node), /app-mono/.test(node.props.class)]),
       links.flatMap((link) => view.find(byClass('app-info-folder')).filter((folder) => JSON.stringify(link).includes(JSON.stringify(folder.props.children)))).length,
       view.find((node) => node.type === 'h3').map(text)],
-    [[['dd', 'Pink Floyd/Wish You Were Here (1975) [Experience edition]', true]], 0, ['The song', 'The album', 'The artist', 'In your library']])
+    [[['dd', 'Pink Floyd/Wish You Were Here (1975) [Experience edition]', true]], 0, ['The song', 'The album', 'The artist', 'Playing', 'In your library']])
   draw(true)
 
+  //? (review of 2.0.0-player.63) About asks too now: only Debug's own asks counted from here
+  formats = 0
   tabs()[1].props.onClick()
   reopen()
   check('Debug chosen', tabs().map((tab) => [tab.props['aria-selected'], tab.props.tabIndex]), [[false, -1], [true, 0]])
@@ -482,7 +499,7 @@ console.log('\nInfo: opens with focus in, closes with focus back - by Escape, Do
   //? the turntable's sound (2.0.0-player.14), as App hands it from the deck's report
   const deckView = mount(InfoSheet, 'info with the turntable')
   const drawDeck = () => deckView.render({
-    open: true, opener: { current: null }, onClose() {}, onAlbum: null, player, album: EXPERIENCE, sentFormat: () => 'raw',
+    admin: true, open: true, opener: { current: null }, onClose() {}, onAlbum: null, player, album: EXPERIENCE, sentFormat: () => 'raw',
     turntable: { context: 'running', problem: null, voice: 'worklet', voiceWhy: null, window: { start: 42, end: 72, kind: 'FLAC', decodedAt: 48000, bytes: 3_400_000 },
       loading: false, refused: null, failed: null, fetched: 0, lastFetchAt: 0 },
   })
@@ -495,7 +512,7 @@ console.log('\nInfo: opens with focus in, closes with focus back - by Escape, Do
   const levelView = mount(InfoSheet, 'info with a level')
   const levelled = { ...player, track: { ...queueTrack(), level: 'album' } }
   const drawLevel = () => levelView.render({
-    open: true, opener: { current: null }, onClose() {}, onAlbum: null, player: levelled, album: EXPERIENCE, sentFormat: () => 'raw',
+    admin: true, open: true, opener: { current: null }, onClose() {}, onAlbum: null, player: levelled, album: EXPERIENCE, sentFormat: () => 'raw',
     level: { level: 'album', state: 'measured', gain_db: -7.42, wanted_db: -7.42, loudness_lufs: -10.6, peak_db: -0.5, held: false, songs: 6, measured_songs: 6, why: null },
   })
   drawLevel()
@@ -503,17 +520,17 @@ console.log('\nInfo: opens with focus in, closes with focus back - by Escape, Do
   drawLevel()
   const levelRow = levelView.find(byClass('app-kv-label')).findIndex((node) => text(node) === 'Normalization')
   check('Debug says the song\'s level from deadwax\'s answer, as App hands it', text(levelView.find(byClass('app-kv-value'))[levelRow]), `Album, -7.42 dB ${DOT} the album at -10.6 LUFS`)
-  levelView.render({ open: false, opener: { current: null }, onClose() {}, onAlbum: null, player: levelled, album: EXPERIENCE, sentFormat: () => 'raw' })
+  levelView.render({ admin: true, open: false, opener: { current: null }, onClose() {}, onAlbum: null, player: levelled, album: EXPERIENCE, sentFormat: () => 'raw' })
   //? the speed (2.0.0-player.39): read off the player's own speedReading as Debug draws, after Gapless
   const speedView = mount(InfoSheet, 'info with a speed')
   const fast = { ...player, speedReading: () => ({ speed: 1.25, rate: 1.25, pitch: 'moves', refused: null, measured: null }) }
-  const drawSpeed = () => speedView.render({ open: true, opener: { current: null }, onClose() {}, onAlbum: null, player: fast, album: EXPERIENCE, sentFormat: () => 'raw' })
+  const drawSpeed = () => speedView.render({ admin: true, open: true, opener: { current: null }, onClose() {}, onAlbum: null, player: fast, album: EXPERIENCE, sentFormat: () => 'raw' })
   drawSpeed()
   speedView.find((node) => node.props?.role === 'tab')[1].props.onClick()
   drawSpeed()
   const speedRow = speedView.find(byClass('app-kv-label')).findIndex((node) => text(node) === 'Speed')
   check('Debug says the speed from the player\'s own reading of it (2.0.0-player.39)', [speedRow, text(speedView.find(byClass('app-kv-value'))[speedRow])], [6, '1.25x, the pitch moving with it'])
-  speedView.render({ open: false, opener: { current: null }, onClose() {}, onAlbum: null, player: fast, album: EXPERIENCE, sentFormat: () => 'raw' })
+  speedView.render({ admin: true, open: false, opener: { current: null }, onClose() {}, onAlbum: null, player: fast, album: EXPERIENCE, sentFormat: () => 'raw' })
   //? ...and kept current while Debug shows (review of 2.0.0-player.39: on a desktop the panel isn't modal,
   //? and it read 1.50x beside a song the bar's chip had put back to 1x; the measured pace never came into
   //? a Debug opened early): listening for the speed, and read again every SPEED_READ_MS - a redraw asked
@@ -533,7 +550,7 @@ console.log('\nInfo: opens with focus in, closes with focus back - by Escape, Do
       onSpeed(listener) { heard.add(listener); return () => heard.delete(listener) },
     }
     const liveView = mount(InfoSheet, 'info with a live speed')
-    const draw = (open = true) => liveView.render({ open, opener: { current: null }, onClose() {}, onAlbum: null, player: live, album: EXPERIENCE, sentFormat: () => 'raw' })
+    const draw = (open = true) => liveView.render({ admin: true, open, opener: { current: null }, onClose() {}, onAlbum: null, player: live, album: EXPERIENCE, sentFormat: () => 'raw' })
     const row = () => {
       const at = liveView.find(byClass('app-kv-label')).findIndex((node) => text(node) === 'Speed')
       const value = liveView.find(byClass('app-kv-value'))[at]
@@ -571,7 +588,7 @@ console.log('\nInfo: opens with focus in, closes with focus back - by Escape, Do
     globalThis.clearInterval = realClearInterval
   }
   //? closed, so its lock and its Escape are no part of the checks after this
-  deckView.render({ open: false, opener: { current: null }, onClose() {}, onAlbum: null, player, album: EXPERIENCE, sentFormat: () => 'raw' })
+  deckView.render({ admin: true, open: false, opener: { current: null }, onClose() {}, onAlbum: null, player, album: EXPERIENCE, sentFormat: () => 'raw' })
 
   //? the arrows, as the browser sends them to the tab list: its element finds the tab of that data-tab
   const keyOn = (key) => {
@@ -624,7 +641,7 @@ console.log('\nInfo as a desktop\'s side panel (2.0.0-player.19): beside the pag
   let closes = 0
   const view = mount(InfoSheet, 'panel')
   const draw = (open) => view.render({
-    open, opener: openerRef, onClose: () => { closes += 1 }, onAlbum: null, player, album: EXPERIENCE, sentFormat: () => 'raw', panel: 'column',
+    admin: true, open, opener: openerRef, onClose: () => { closes += 1 }, onAlbum: null, player, album: EXPERIENCE, sentFormat: () => 'raw', panel: 'column',
   })
   document.activeElement = document.body
   draw(false)
@@ -649,7 +666,7 @@ console.log('\nInfo as a desktop\'s side panel (2.0.0-player.19): beside the pag
 console.log('\na panel that becomes a sheet while open, and back (review): focus in again, unless already in')
 {
   const view = mount(InfoSheet, 'crossing')
-  const drawAs = (panel, open = true) => view.render({ open, onClose() {}, onAlbum: null, player, album: EXPERIENCE, sentFormat: () => 'raw', panel })
+  const drawAs = (panel, open = true) => view.render({ admin: true, open, onClose() {}, onAlbum: null, player, album: EXPERIENCE, sentFormat: () => 'raw', panel })
   document.activeElement = document.body
   drawAs('drawer', false)
   drawAs('drawer')
@@ -671,6 +688,48 @@ console.log('\na panel that becomes a sheet while open, and back (review): focus
   drawAs('drawer')
   check('...widened again with focus inside it: left where it is', document.activeElement === tab.element, true)
   drawAs('drawer', false)
+}
+
+console.log('\nInfo for everyone else (2.0.0-player.63): About alone, with Playing; Debug an admin\'s')
+{
+  const view = mount(InfoSheet, 'roles')
+  const levelled = { ...player, track: { ...queueTrack(), level: 'album' } }
+  const answer = { level: 'album', state: 'measured', gain_db: -7.42, wanted_db: -7.42, loudness_lufs: -10.6, peak_db: -0.5, held: false, songs: 6, measured_songs: 6, why: null }
+  const draw = (admin, open = true) => view.render({ admin, open, opener: { current: null }, onClose() {}, onAlbum: null, player: levelled, album: EXPERIENCE, sentFormat: () => 'raw', level: answer })
+  const tabs = () => view.find((node) => node.props?.role === 'tab')
+  const titles = () => view.find((node) => node.type === 'h3').map(text)
+  const scroller = () => one(view, byClass('app-info-scroll'))
+  document.activeElement = document.body
+  draw(false, false)
+  draw(false)
+  check('not an admin: no tab strip and no tab - no empty Debug to tap', [view.find((node) => node.props?.role === 'tablist').length, tabs().length], [0, 0])
+  check('...About, ending in Playing', titles(), ['The song', 'The album', 'The artist', 'Playing'])
+  check('...Playing\'s rows: the file, Gapless, and the level as deadwax answered it',
+    [view.find(byClass('app-kv-label')).map(text), view.find(byClass('app-kv-value')).map(text)],
+    [['Format', 'Gapless', 'Normalization'], ['FLAC, 16-bit, 44.1 kHz, stereo', 'On, in one stream', `Album, -7.42 dB ${DOT} the album at -10.6 LUFS`]])
+  check('...nothing of Debug: none of its sections, no test bench, no recording',
+    [titles().filter((title) => ['The file', 'What this device is sent', 'Last song change and seek', 'The turntable', 'Navidrome sent'].includes(title)),
+      view.find((node) => node.type === 'a' && node.props?.href === '/player/lab/').length, view.find(byClass('app-info-action')).length], [[], 0, 0])
+  check('...the scroller a region named by the sheet\'s title, not a tab panel of no tab', [scroller().props.role, scroller().props['aria-labelledby']], ['region', 'app-info-title'])
+
+  draw(true)
+  check('an admin: About and Debug', tabs().map(text), ['About', 'Debug'])
+  tabs()[1].props.onClick()
+  draw(true)
+  check('...on Debug', [tabs()[1].props['aria-selected'], titles()[0]], [true, 'The file'])
+  draw(false)
+  check('the role gone while Debug shows: About, and no strip', [tabs().length, titles()], [0, ['The song', 'The album', 'The artist', 'Playing']])
+  draw(true)
+  check('...given back: About again, never the Debug chosen before it went', tabs().map((tab) => [text(tab), tab.props['aria-selected']]), [['About', true], ['Debug', false]])
+  //? (review of 2.0.0-player.63) the role taken away with a tab focused: focus to the list, never dropped to <body>
+  tabs()[0].element.focus()
+  draw(false)
+  check('the role gone with a tab focused: focus to the list, still inside Info', document.activeElement === scroller().element, true)
+  draw(true)
+  document.activeElement = document.body
+  draw(false)
+  check('...and focus elsewhere is left where it was', document.activeElement === document.body, true)
+  draw(true, false)
 }
 
 console.log('\nthe ••• menu')

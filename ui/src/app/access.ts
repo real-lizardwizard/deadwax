@@ -22,6 +22,9 @@ export interface Access {
   on: boolean
   /** /me's permissions_unverified */
   unverified: boolean
+  /** (2.0.0-player.63) /me's `admin`: a Navidrome admin, break-glass, or everyone with logins off - Info's Debug
+   *  is theirs alone */
+  admin: boolean
 }
 
 //? what /me last said here - null until it has: the session's word (session.ts) stands until then
@@ -29,7 +32,7 @@ let noted: Access | null = null
 const listeners = new Set<(access: Access) => void>()
 
 export function accessOf(me: Me): Access {
-  return { permissions: me.auth === 'off' ? ALL : permissionsOf(me), on: me.auth === 'on', unverified: !!me.permissions_unverified }
+  return { permissions: me.auth === 'off' ? ALL : permissionsOf(me), on: me.auth === 'on', unverified: !!me.permissions_unverified, admin: me.auth === 'off' || me.admin === true }
 }
 
 //? the session's word, made once per session object - so a reader's memo keyed on it holds still between renders
@@ -39,7 +42,11 @@ export function accessNow(): Access {
   if (noted) return noted
   const session = sessionMe()
   if (fromSession?.session !== session || fromSession === null) {
-    fromSession = { session, access: { permissions: permissionsUntilAsked(), on: session?.auth === 'on', unverified: !!session?.permissions_unverified } }
+    fromSession = {
+      session,
+      //? no session is logins off, when everyone is the admin
+      access: { permissions: permissionsUntilAsked(), on: session?.auth === 'on', unverified: !!session?.permissions_unverified, admin: session ? session.auth === 'off' || session.admin === true : true },
+    }
   }
   return fromSession.access
 }
@@ -49,7 +56,7 @@ export function noteAccess(me: Me): void {
   const next = accessOf(me)
   const was = accessNow()
   noted = next
-  if (samePermissions(was.permissions, next.permissions) && was.on === next.on && was.unverified === next.unverified) return
+  if (samePermissions(was.permissions, next.permissions) && was.on === next.on && was.unverified === next.unverified && was.admin === next.admin) return
   for (const listener of listeners) listener(next)
 }
 

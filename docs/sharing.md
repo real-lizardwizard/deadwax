@@ -274,6 +274,7 @@ else can do what the left column says, and an admin can give any of them more, b
 | **Everyone's downloads**: see who asked ("Asked by ethan"), cancel or retry anyone's, clear everyone's finished | no | **Everyone's downloads** | yes |
 | **Settings and the log**: the server settings and the event log | no | **Settings and the log** | yes |
 | **People**: make, reset and remove Navidrome accounts, make admins, give permissions | no | never - it comes with being a Navidrome admin | yes |
+| **Info → Debug** on the now-playing screen: how each song is sent, the last song changes and seek, the turntable's readouts and recording, the test bench link, the fields Navidrome sent | no - **Info** is **About** alone, with a **Playing** group (the file's format, Gapless, Normalization) | never - it comes with being an admin | yes |
 
 - **Giving permissions**: People → their row → **Permissions** → tick what to give → **Save
   permissions**. It's in force from their next tap - no sign-in. An admin's row is all ticked and
@@ -291,6 +292,11 @@ else can do what the left column says, and an admin can give any of them more, b
   as they sign in (one Navidrome sign-in as them, only for someone given something); if it can't, what
   was given is off until their next sign-in (a Get albums taken away still applies), and You says so.
 - Making someone an admin keeps what was ticked for them, for if they're ever made ordinary again.
+- **Debug is an admin's** (2.0.0-player.63): it was built for testing deadwax on a phone, and everyone
+  else's Info has no tabs - About alone, with a short **Playing** group of the three rows a listener can
+  use. Made an admin, or made ordinary, it shows as Info next opens, once it has asked who they are (a
+  moment after it opens). The turntable's test bench
+  at `/player/lab/` still opens by its address, as before - Debug was only its link.
 
 Retrying someone else's download needs both Everyone's downloads (to reach it) and Get albums (it
 starts a download). Library care shows with Edit albums or Look after the library - each part by its own.

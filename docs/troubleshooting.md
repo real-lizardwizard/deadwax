@@ -896,7 +896,7 @@ It shows only with at least four albums you last played more than 30 days ago, a
 Navidrome says when each album was last played (OpenSubsonic's `played`, on its "recently played"
 list). A library you've been listening through - everything played in the last month - or a fresh
 Navidrome has nothing to show yet. A Navidrome that doesn't send `played` never shows it: Info →
-Debug's **Navidrome sent** row lists the fields it sends for the album playing. The plays are the
+Debug's **Navidrome sent** row (an admin's - with logins on, ask one to look, playing the same album) lists the fields it sends for the album playing. The plays are the
 ones Navidrome counts for the account the player asks as - `NAVIDROME_USER` with logins off, your own
 with them on - so plays made in another app under another Navidrome user don't
 count.
@@ -1295,7 +1295,10 @@ for it again.
 
 They moved in 2.0.0-player.10, and nothing was taken away. The two lines that sat between the cover
 and the song's title (the last song changes, and *Last seek* ending with how the song came) are
-now in **Info → Debug**: tap **•••** on the now-playing screen, then **Info**, then **Debug**. They
+now in **Info → Debug**: tap **•••** on the now-playing screen, then **Info**, then **Debug**. Since
+2.0.0-player.63 Debug is an admin's: with logins on, everyone else's Info is About alone, whose **Playing**
+group still says the file's **Format**, **Gapless** and **Normalization** - for the rest, see
+[Info has no Debug tab](#info-has-no-debug-tab-or-it-went). They
 are labelled rows now rather than lines, so some of the wording moved. The last song change is the
 **Gap** row, in the old words less "Last song change" (up to four before it on an *Earlier* line,
 where the old line said "before:"), and the last seek the **Last seek** row, less "Last seek:". How
@@ -1304,6 +1307,27 @@ the song came, which ended the old seek line (`· FLAC in MP4, 192 kHz resampled
 own (`192 kHz to 48 kHz, 3 dB quieter`), and two rows that are new, **Why** and **Gapless**
 ([the phone player](player.md#info--debug) lists them all). The **Gapless** switch that sat beside
 the album's name is a checkbox in **You**, under **Playback**, and keeps the setting it had.
+
+## Info has no Debug tab, or it went
+
+Since 2.0.0-player.63 **Debug is an admin's**: a Navidrome admin's, the break-glass `deadwax`'s, and with
+logins off everyone's. Anyone else's **Info** is **About** alone, with no tabs above it, and About's
+**Playing** group says what a listener can use of it: the file's **Format**, **Gapless** and
+**Normalization**, in Debug's own words. Where this guide asks for another of Debug's rows, an admin
+reads it - and where they read it matters:
+
+- **Rows about the song** - **Navidrome sent**'s **Song**, **On other songs** and **Album** - say the same
+  on any device: ask an admin to look on theirs, playing the same song.
+- **Rows about the device** - the rest: **Sent as**, **Resampled**, **Why**, **Speed**, **Gap**,
+  **Last seek**, **Turntable sound**, **Turntable timing** and **Recording** - describe the device and browser Info is open on. On an admin's own phone they're that
+  phone's, not yours. For these, an admin reads Debug on your device: **You → About → Sign out**, let them
+  sign in there and do what went wrong again (the same song, the same turn of the record), read the row,
+  then sign out and sign back in as you.
+
+Made an admin and still no Debug? It shows as Info opens, once it has asked deadwax who you are - a
+moment after it opens, so for that moment Info can still look as it did. **Make admin** in People is in force at once; a role changed in Navidrome's own Users page,
+deadwax follows within about six minutes ([Sharing deadwax](sharing.md#when-something-changes)). The other
+way round, a Debug that was showing turns into About once deadwax says the role has gone.
 
 ## A song sounds too fast, too slow, too high or too low
 
@@ -1314,11 +1338,12 @@ a chip (`1.25x`) at the left end of the row of buttons under the cover's transpo
 turntable's own readout, under its fader; on a desktop, a chip in the player bar. The mini player
 above the tabs doesn't show it, so open the now-playing screen. **Tap the chip, or the readout, and
 it's back to exactly 1x.** Only a song that sounds wrong at 1x is something else - Info → Debug's **Speed** row
+(an admin's, and read on the device it's about - see [Info has no Debug tab](#info-has-no-debug-tab-or-it-went))
 says `Normal (1.00x)` then.
 
 A song at another speed that should be higher or lower and **keeps its own pitch** instead (sounds
 stretched, the way a podcast at 2x does) means the browser is holding the pitch: Debug's **Speed** row
-says `but the browser is holding the pitch`, or `this browser has no pitch switch`. Say which browser
+(an admin's, and read on the device it's about - see [Info has no Debug tab](#info-has-no-debug-tab-or-it-went)) says `but the browser is holding the pitch`, or `this browser has no pitch switch`. Say which browser
 it is.
 
 ### A browser won't play a speed
@@ -1326,7 +1351,7 @@ it is.
 Every speed from 0.25x to 2x is in the range Chrome, Edge and Firefox play (Firefox mutes outside
 1/8x to 8x; Chrome refuses a speed outside 0.0625x to 16x). On an iPhone and in Safari, Apple's player
 promises any song from 1x to 2x, and below 1x only a song it says it can play slowly - not yet seen on
-an iPhone either way. Info → Debug's **Speed** row says what happened:
+an iPhone either way. Info → Debug's **Speed** row (an admin's, and read on the device it's about - see [Info has no Debug tab](#info-has-no-debug-tab-or-it-went)) says what happened:
 
 - **`Asked for 0.25x; the browser refused it - …`**: the browser threw the speed back, in its own words.
   The song plays on at the speed it had; choose another.
@@ -1369,7 +1394,7 @@ Turning the record pauses the song and plays the record's own sound; letting go 
 to speed (0.4 s from still, up to about 0.8 s after a hard flick) and then starts the song again from
 there. How long that really takes, and whether the page kept up while your finger was down, is counted
 on your device: turn the record a few times, then open **•••** > **Info** > **Debug** and read
-**Turntable timing**.
+**Turntable timing** (an admin's, and read on the device it's about - see [Info has no Debug tab](#info-has-no-debug-tab-or-it-went)).
 
 - **`The song was back N s after the last let-go`**: the whole wait from lifting your finger to the
   song's own playback moving, with how much of it was the record's run back to speed. What is left is
@@ -1426,7 +1451,7 @@ everywhere before) instead of a twentieth. If you still hear it:
   song, it was the only such sound - whether it is the "digital sound" he hears is still for his ears
   to say. The sound now ends in a limiter that turns it down smoothly, 1.5 ms ahead of a peak, just
   enough to keep every sample half a decibel under full scale, and changes nothing at all where
-  nothing comes near it. **Info** > **Debug** > **Turntable timing** says how many peaks it has held
+  nothing comes near it. **Info** > **Debug** > **Turntable timing** (an admin's, and read on the device it's about - see [Info has no Debug tab](#info-has-no-debug-tab-or-it-went)) says how many peaks it has held
   since the turntable showed and the deepest it turned the sound down (`Peaks held under full scale:
   36 since it showed (65 samples), the deepest 1.4 dB`), brought up to date a moment after you let go
   (the sound runs an eighth of a second behind your hand, and a coast after it is counted too). A loud
@@ -1450,7 +1475,7 @@ everywhere before) instead of a twentieth. If you still hear it:
   the cost of some of the steadiness.
 
 **To tell whether it is deadwax at all**, use [the turntable's test bench](player.md#testing-the-turntable)
-(2.0.0-player.36, **Info** > **Debug** > **Open the test bench**): turn the real turntable over test
+(2.0.0-player.36, **Info** > **Debug** > **Open the test bench** for an admin, or `/player/lab/` typed after deadwax's address for anyone): turn the real turntable over test
 tones - or, since 2.0.0-player.37, over a song from your library, turned exactly as the app turns it -
 or have it turned for you at perfect speeds, and hear what it played (A) beside a perfect turntable
 turned the same way (B along deadwax's own path, C along a smooth one) - blind if you like. On a song you
@@ -1464,7 +1489,7 @@ numbers and recordings to send - keep the page in view and the screen awake whil
 a row were each real and each not the one being heard, and a recording from your own device is the
 way to find what is (the clipping above was found in one; since 2.0.0-player.35 a recording also holds
 each moment's loudest sample before the file's 16 bits cut it off, so it shows how far over anything
-went): open **•••** > **Info** > **Debug** with the turntable showing and its sound started (turn
+went): an admin opens **•••** > **Info** > **Debug** with the turntable showing and its sound started (turn
 the record once first), press **Record 20 s** on the **Recording** row, press **Done**, and turn the
 record as you normally would for the next 20 seconds. Open Info > Debug again: the row says
 `20 s recorded`, and **Save the recording** downloads one JSON file of about 5 MB - what the record's
@@ -1479,7 +1504,8 @@ plays the song at the speed of your hand, a flick coasts audibly, and a pause wi
 2.0.0-player.16 a press only takes hold of the record when it can make that sound: whenever it can't,
 turning it works as it did before - silently, the song playing on under your finger, and no momentum -
 rather than pausing the song over silence. When it's silent, **Info → Debug**'s **Turntable sound**
-row (**•••** on the now-playing screen, then **Info**, then **Debug**) says why, in the order to check:
+row (**•••** on the now-playing screen, then **Info**, then **Debug** - an admin's, and read on the device it's about: see
+[Info has no Debug tab](#info-has-no-debug-tab-or-it-went)) says why, in the order to check:
 
 - **`Off: waiting for a tap to start the sound`**: a phone only lets a page start sound from a tap,
   so the record's sound starts at the first tap on the record, the play/pause or skip buttons, the
@@ -1542,7 +1568,7 @@ the song at your hand's speed. What's left is by design:
   have always arrived before the sound gets there - and since 2.0.0-player.40 a turn that starts as your
   finger lands is timed from that moment, not from when it had gone the few pixels that tell a turn from
   a tap (before, those added 35-95 ms, the more the slower your hand) - as far back as about a tenth of a
-  second before the record is taken, so a start slower than that keeps the rest. Info > Debug > **Turntable timing**
+  second before the record is taken, so a start slower than that keeps the rest. Info > Debug > **Turntable timing** (an admin's, and read on the device it's about - see [Info has no Debug tab](#info-has-no-debug-tab-or-it-went))
   says what your device's audio adds on top - a Bluetooth headset's 150-250 ms most of all. Taking hold of a playing record, or pausing it with the wind-down, repeats the
   song's last eighth of a second as the record's sound takes over; letting go of a playing record at
   about its own speed skips it (the song plays on straight from where your hand let go, while the
@@ -1640,8 +1666,8 @@ the window instead, and works the same.
 ## With Gapless on, there's still a pause between songs, or the player reloads by itself
 
 [Gapless](player.md#gapless-playback-experimental) (in **You**, under **Playback**) is an
-experiment, and **Info → Debug** (**•••** on the now-playing screen, then **Info**, then **Debug**)
-says how each song change went, in its **Gap** row. Compare it with Gapless off on the same phone
+experiment, and **Info → Debug** (**•••** on the now-playing screen, then **Info**, then **Debug** - an
+admin's, and read on the device it's about: see [Info has no Debug tab](#info-has-no-debug-tab-or-it-went)) says how each song change went, in its **Gap** row. Compare it with Gapless off on the same phone
 and connection: the difference is what Gapless saves.
 
 FLAC songs are meant to play [in one stream](player.md#one-stream-for-flac), the Gap row reading
@@ -1735,7 +1761,7 @@ from the next thing you play): every song is then sent bit for bit as it was.
 
 With [Normalization](player.md#normalization) on, the first time deadwax levels an album it downloads and
 measures every FLAC song of it before the first one plays - a few seconds for a CD album, longer on a NAS
-or for hi-res. Info → Debug's **Normalization** row says `Measuring its album… (7 of 12 songs)` meanwhile.
+or for hi-res. Info's **Normalization** row (in About's **Playing**, and in Debug) says `Measuring its album… (7 of 12 songs)` meanwhile.
 It happens once an album: the measurements are kept in deadwax's database, and a download deadwax files
 is measured as it's filed. Opening the album's page before you tap Play starts the measuring early. If the
 waits are for songs you've played before, the player's cache is too small to keep their levelled copies
@@ -1744,7 +1770,7 @@ waits are for songs you've played before, the player's cache is too small to kee
 ## An MP3 is louder (or quieter) than the songs around it
 
 Only FLAC songs are levelled by [Normalization](player.md#normalization): re-encoding an MP3, AAC or Opus
-file to level it would cost quality, so they play as they are. Info → Debug's **Normalization** row says
+file to level it would cost quality, so they play as they are. Info's **Normalization** row (in About's **Playing**, and in Debug) says
 `Not levelled - MP3 songs play as they are`.
 
 ## A box set's first song was louder or quieter than the rest
@@ -1753,7 +1779,7 @@ The first time deadwax levels a big album, measuring all of it can take longer t
 is held for (20 for a hi-res song): that first song then plays as it is, that once - and any other song of
 the album that comes up while it's still being measured plays as it is too, straight away rather than after
 a wait of its own. The rest play at the album's level once the measuring is done (it carries on regardless).
-Info → Debug's **Normalization** row says `Played as it is this time - its album was still being measured`
+Info's **Normalization** row (in About's **Playing**, and in Debug) says `Played as it is this time - its album was still being measured`
 for such a song, and deadwax's log says `plays as it is this time - its album is still being measured`. Play
 the album again and every song is at the album's level.
 
@@ -1810,7 +1836,8 @@ that carries a table of where everything is, and its seeks land there exactly
 ([the phone player](player.md#seeking-and-where-safari-lands) says more). So a song that still
 seeks to the wrong place in Safari, or on the iPhone, but not in Chrome, is one that didn't come
 that way. **Info → Debug says which** (**•••** on the now-playing screen, then **Info**, then
-**Debug**): its **Sent as** row says how the song playing was sent. (Until 2.0.0-player.10 this was
+**Debug** - an admin's, and read on the device it's about: see
+[Info has no Debug tab](#info-has-no-debug-tab-or-it-went)): its **Sent as** row says how the song playing was sent. (Until 2.0.0-player.10 this was
 the end of the *Last seek* line between the cover and the song's title.)
 
 - **`FLAC in MP4, …`**: it came inside an MP4. A seek that still lands off is worth reporting,

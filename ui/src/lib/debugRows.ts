@@ -23,6 +23,10 @@
  * userRating, year...), so a missing name isn't a field it can't send: the names other songs of
  * the album carry and this one doesn't are named too.
  *
+ * AN ADMIN'S (2.0.0-player.63, James: "only make the debug info available to an admin"): Info draws the Debug
+ * tab only for an admin (infoTabs, shownTab), and everyone's About ends in "Playing" - three of these rows a
+ * listener can use, Format, Gapless and Normalization (playingRows), so they say Debug's words.
+ *
  * Pure, like the rest of lib/, so ui/test/debug.sim.cjs holds every row to its words.
  */
 
@@ -527,6 +531,39 @@ export function normalizationRow(input: Pick<DebugInput, 'track' | 'format' | 'l
   const answer = input.level && input.level.level === track.level ? input.level : null
   const value = describeLevel(track, input.format, answer)
   return { label: 'Normalization', value, ...(answer?.state === 'measured' ? { mono: true } : {}) }
+}
+
+/** Info's two tabs (2.0.0-player.10). */
+export type InfoTab = 'about' | 'debug'
+
+export const INFO_TABS: readonly { id: InfoTab; label: string }[] = [
+  { id: 'about', label: 'About' },
+  { id: 'debug', label: 'Debug' },
+]
+
+/**
+ * (2.0.0-player.63) The tabs Info draws for this person: About and Debug for an admin - a Navidrome admin,
+ * break-glass, or everyone with logins off (/deadwax/me's `admin`) - and About alone for everyone else, who
+ * then gets no tab strip at all. James: "only make the debug info available to an admin".
+ */
+export function infoTabs(admin: boolean): readonly { id: InfoTab; label: string }[] {
+  return admin ? INFO_TABS : INFO_TABS.filter((entry) => entry.id === 'about')
+}
+
+/** The tab Info shows: the one chosen, while it is one this person has - About once the admin role goes. */
+export function shownTab(tab: InfoTab, admin: boolean): InfoTab {
+  return infoTabs(admin).some((entry) => entry.id === tab) ? tab : 'about'
+}
+
+/** The title of About's group of the rows a listener can use (2.0.0-player.63). */
+export const PLAYING_TITLE = 'Playing'
+
+/**
+ * (2.0.0-player.63) About's "Playing" group, for everyone: the three of Debug's rows a listener can use - the
+ * file's Format, Gapless and Normalization - built by Debug's own functions, so the words are Debug's words.
+ */
+export function playingRows(input: Pick<DebugInput, 'track' | 'wrapped' | 'gapless' | 'format' | 'level'>): DebugRow[] {
+  return [formatRow(input.track), gaplessRow(input), normalizationRow(input)]
 }
 
 /** Info > Debug, top to bottom. */

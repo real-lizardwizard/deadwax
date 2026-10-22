@@ -35,6 +35,9 @@
  *    fields other songs of the album carry and this one doesn't (playCount and played are left
  *    out of a song never played); and "Not known" when the answer isn't in hand.
  *  - The headroom is src/resample.py's HEADROOM_DB and the setting's names are QualityChoice's.
+ *  - (2.0.0-player.63) Debug is an admin's: Info's tabs are About and Debug for an admin and About alone for
+ *    anyone else (infoTabs), About shown once the role goes (shownTab); and About's "Playing" group, everyone's,
+ *    is Debug's own Format, Gapless and Normalization rows (playingRows), every one still in Debug.
  *  - Normalization (2.0.0-player.62), after Resampled: Off for an entry with no level; not levelled for an
  *    MP3 (its kind upper-cased) or a transcode; deadwax's answer in each state - measured by album or by song,
  *    held by its peak, its album being measured (how far along), not measured yet, not levelled and why - and
@@ -460,6 +463,29 @@ console.log('\nNormalization (2.0.0-player.62)')
     [sentAs(answer()), sentAs(answer(), 'stream'), sentAs(answer({ state: 'unmeasured', gain_db: null })), sentAs(answer(), 'flac'),
       rows.sentAsRow({ track: track(), wrapped: { id: 's1', got: 'mp4', resampled: null, hiRes: null }, maxRate: '48000', format: 'raw', level: null }).value],
     ['FLAC in MP4, 24-bit, 44.1 kHz', 'In one stream, 24-bit, 44.1 kHz', 'FLAC in MP4, 16-bit, 44.1 kHz', 'FLAC, not in an MP4, 16-bit, 44.1 kHz', 'FLAC in MP4, 16-bit, 44.1 kHz'])
+}
+
+console.log('\nDebug is an admin\'s; About\'s Playing group is everyone\'s (2.0.0-player.63)')
+{
+  //? James: "only make the debug info available to an admin"
+  check('Info\'s tabs: About and Debug for an admin, About alone for everyone else',
+    [rows.infoTabs(true).map((tab) => tab.label), rows.infoTabs(false).map((tab) => tab.label)], [['About', 'Debug'], ['About']])
+  check('the tab shown: the one chosen for an admin; About for anyone else, Debug chosen or not - the role gone while it showed',
+    [rows.shownTab('debug', true), rows.shownTab('about', true), rows.shownTab('debug', false), rows.shownTab('about', false)], ['debug', 'about', 'about', 'about'])
+  const answer = { level: 'album', state: 'measured', gain_db: -7.42, wanted_db: -7.42, loudness_lufs: -10.6, peak_db: -0.5, held: false, songs: 12, measured_songs: 12, why: null }
+  const input = {
+    track: track({ ...HIRES, level: 'album' }), gapless: true, maxRate: '48000', gaps: [], lastSeek: null,
+    wrapped: { id: 's1', got: 'stream', resampled: { from: 192000, to: 48000 }, hiRes: null }, format: 'raw', song: null, album: null, level: answer,
+  }
+  check('About\'s group is titled Playing', rows.PLAYING_TITLE, 'Playing')
+  check('...its three rows: Format, Gapless and Normalization - Debug\'s very rows, in Debug\'s words',
+    rows.playingRows(input), [rows.formatRow(input.track), rows.gaplessRow(input), rows.normalizationRow(input)])
+  check('...said', rows.playingRows(input).map((row) => [row.label, row.value]),
+    [['Format', 'FLAC, 24-bit, 192 kHz, stereo'], ['Gapless', 'On, in one stream'], ['Normalization', `Album, -7.42 dB ${DOT} the album at -10.6 LUFS`]])
+  const debugged = rows.debugSections(input).flatMap((section) => section.rows)
+  check('...each one of Debug\'s rows too - Debug, an admin\'s, loses nothing',
+    rows.playingRows(input).map((row) => debugged.some((other) => JSON.stringify(other) === JSON.stringify(row))), [true, true, true])
+  check('...and Gapless off, a song not levelled', rows.playingRows({ ...input, gapless: false, track: track(), level: null }).map((row) => row.value).slice(1), ['Off', 'Off'])
 }
 
 console.log('\nheld to the code they describe')

@@ -605,3 +605,60 @@ engine files changed, as that spec said they would: `ui/src/player/usePlayer.ts`
   tens of thousands, its time on James's NAS, and an order made while a scan runs. Not built (spec's "Left out"): history,
   autoplay, keeping the queue across a reload, long-press menus and a ••• on album tiles, saving Up Next as a playlist, a •••
   on Up Next's own rows, dragging between groups, crossfade.
+
+### Debug for admins only (2.0.0-player.63)
+
+James (2026-10-22): "can we reduce the amount of debug info? or maybe only make the debug info available to an
+admin". Info's Debug (2.0.0-player.10 on) was built for James testing on his phone; with logins (.48) and
+permissions (.61) Ethan and everyone else saw it too.
+
+- **Debug is drawn only for an admin** - /deadwax/me's `admin`: a Navidrome admin as deadwax last read it,
+  break-glass, or everyone with logins off (today's behaviour, unchanged). `app/access.ts`'s store carries it
+  (`Access.admin`, from /me, and before /me from the session - no session meaning logins off, so an admin), and
+  a change of it alone redraws its readers. App hands `admin={access.admin}` to `InfoSheet`, which stays a leaf.
+- **Everyone else's Info is About alone, with no tab strip** - not a strip of one, and no empty Debug to tap.
+  The scroller is then `role="region"` named by the sheet's title, not a tab panel of a tab that isn't there.
+  The rules are pure, in `lib/debugRows.ts`: `infoTabs(admin)` and `shownTab(tab, admin)`; `INFO_TABS` and
+  `InfoTab` moved there from InfoSheet.tsx so debug.sim can hold them.
+- **About's "Playing" group, for everyone** (admins too), after the artist and before the folder (which stays
+  last, so a line landing late moves nothing a finger reaches for): Format, Gapless and Normalization -
+  `playingRows()`, Debug's own `formatRow`, `gaplessRow` and `normalizationRow`, so the words are Debug's and
+  the sims' (debug.sim holds the three to be exactly Debug's rows). Nothing else of Debug moved. About now asks
+  `sentFormat` (the player's own audio element's `canPlayType`, nothing set on it) for the Normalization row,
+  which says an MP3 transcode isn't levelled; still only while Info is open. `useLevelAnswer` already asked the
+  level whenever Info is open, whatever the tab, and its route is a user's (`tests/test_logins.py`).
+- **A role change**: App asks /me again as Info opens, on either frame (through the one `meRequests`
+  latestOnly, a failed ask leaving things as they were), so a role given or taken shows at the next open -
+  once that ask answers, a round trip after the sheet appears (review: for that moment a person just made
+  ordinary still sees the Debug they left it on, and a person just made an admin sees the strip arrive above
+  the list). Accepted, not held back: holding Debug until the ask answers would flash About at an admin on
+  every open, and Debug shows only this device's own readouts to someone who was an admin a moment before;
+  the docs say "a moment after it opens". The role going while Debug shows draws About at once (`shownTab`),
+  and an effect forgets the Debug chosen, so a role given back opens on About.
+- **Focus kept when the strip goes** (review): the role taken away with a tab focused unmounted the tablist
+  with the focus in it, dropping it to `<body>` - out of a phone's sheet, and on a desktop's panel out of
+  reach of its Escape. The render that removes the strip, while it is still in the page, notes that focus is
+  inside it (`strip.current.contains(document.activeElement)`), and a layout effect on `tabs.length` then
+  focuses the list (`#app-info-panel`, a tab stop, `preventScroll`). Focus anywhere else is left alone.
+- **Device rows are read on the device** (review): the docs no longer say "ask an admin to look" for a row
+  about the device - Sent as, Resampled, Why, Speed, Gap, Last seek, the turntable's sound, timing and
+  recording read the browser Info is open on, so an admin on their own phone reads their own. Troubleshooting's
+  "Info has no Debug tab, or it went" splits the rows about the song (Navidrome sent's three, readable on any
+  device) from those (an admin signs in on the person's device), and the entries point there.
+- **Debug itself loses nothing** for an admin: the five sections, the Record 20 s recording, the test bench
+  link, Navidrome's field names. The bench at `/player/lab/` is still reachable by its address.
+- **Nothing on the server changed**: no route exists only to feed Debug (its rows are drawn from what the page
+  already has; the turntable report and recording are the page's own; the level route also feeds About and
+  the stream), so none was added, removed or re-guarded. The app only hides, as with permissions.
+- **No other debug readouts**: the turntable (`player/Turntable.tsx`) and Now Playing draw none of their own -
+  the speed fader's readout and the visualizer's "feel" are controls and a feature, not debug - so nothing
+  else needed the rule.
+- Pinned: info.sim (no strip and no tab without `admin`, About's four headings and the three rows, nothing of
+  Debug, the region, the role going and coming back, focus handed to the list when the strip goes with it
+  inside and left alone otherwise; Debug's own `sentFormat` ask counted apart from About's, which since this
+  slice asks too), debug.sim (`infoTabs`, `shownTab`, `playingRows` equal
+  to Debug's rows and found among them), signin.sim (the store's `admin` from a session and from /me, logins
+  off), app-rules.sim (App's prop and its /me ask on open, access.ts's three admin rules, InfoSheet's gating
+  and its focus hand-off, nothing but Info drawing `debugSections` or the bench link).
+- **NOT verified - the iPhone's**: an ordinary account's Info on James's phone (About alone, Playing's rows),
+  and an admin's unchanged.
