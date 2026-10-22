@@ -282,7 +282,7 @@ export class VizListener {
     this.decodes.supersede()
     this.pending = { song: song.id, from, to: from + VIZ_WINDOW_S }
     try {
-      const got = await scrubWindow(song.id, from, VIZ_WINDOW_S, request.signal, song.maxRate)
+      const got = await scrubWindow(song.id, from, VIZ_WINDOW_S, request.signal, song.maxRate, song.level)
       if (!request.current()) return
       const start = got.first / got.rate
       const end = (got.first + got.samples) / got.rate

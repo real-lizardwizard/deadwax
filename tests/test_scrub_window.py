@@ -403,9 +403,10 @@ def test_navidrome_not_set_up_is_a_503(monkeypatch, client):
 
 def test_the_window_is_on_the_players_fixed_list_on_purpose():
     """The one route added in 2.0.0-player.14: it reads deadwax's own cache, and asks Navidrome
-    only the version check every MP4 answer makes - nothing passed on."""
+    only the version check every MP4 answer makes - nothing passed on. (2.0.0-player.62: and `level`,
+    the player's Normalization, as the stream route takes it.)"""
     assert "/scrub/{song_id}" in {route.path for route in navidrome_routes.router.routes}
-    assert navidrome_routes.SCRUB_PARAMETERS == frozenset({"at", "seconds", "max_rate"})
+    assert navidrome_routes.SCRUB_PARAMETERS == frozenset({"at", "seconds", "max_rate", "level"})
 
 
 def test_the_window_header_is_exact_against_a_hi_res_song(upstream, client, mp4_cache, monkeypatch):

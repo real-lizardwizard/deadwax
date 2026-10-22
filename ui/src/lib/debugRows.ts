@@ -28,6 +28,7 @@
 
 import type { DeckReport } from './deckVoice'
 import { describeGaps, type GapReading } from './gapless'
+import { describeLevel, levels, type LevelAnswer, type LevelledTrack } from './loudness'
 import { SPEED_NORMAL, speedLabel, type SpeedReading } from './playSpeed'
 import type { QueueTrack } from './playQueue'
 import { clock, describeSeek, type SeekReading } from './scrub'
@@ -96,6 +97,9 @@ export interface DebugInput {
   onRecord?: (() => void) | null
   /** what the element playing does with the speed (2.0.0-player.39, the player's speedReading) */
   speed?: SpeedReading | null
+  /** (2.0.0-player.62) what deadwax says of the song's level (app/useInfoDetails.ts useLevelAnswer): null while
+   *  it hasn't answered, and for a song asked for no level */
+  level?: LevelAnswer | null
 }
 
 /** A rate as every row says it: 192 kHz, 44.1 kHz. */
@@ -161,10 +165,11 @@ export function awaitingResample({ track, wrapped, maxRate, format }: Pick<Debug
 /**
  * How the song came. describeWrap()'s own words for a song asked for inside an MP4 ("FLAC in MP4",
  * "in one stream", "sent as FLAC, not in an MP4", "asked for FLAC in MP4"), with the depth and rate
- * it was SENT at: 24-bit at the new rate when deadwax resampled it, the file's own otherwise. For
+ * it was SENT at: 24-bit at the new rate when deadwax resampled it, 24-bit at the file's own rate when it
+ * levelled it (2.0.0-player.62 - its copy is 24-bit whatever the source), the file's own otherwise. For
  * any other song, the file as it is, or Navidrome's MP3 transcode.
  */
-export function sentAsRow(input: Pick<DebugInput, 'track' | 'wrapped' | 'maxRate' | 'format'>): DebugRow {
+export function sentAsRow(input: Pick<DebugInput, 'track' | 'wrapped' | 'maxRate' | 'format' | 'level'>): DebugRow {
   const { track, wrapped, format } = input
   const label = 'Sent as'
   const mine = wrappedFor(wrapped, track)
@@ -173,7 +178,8 @@ export function sentAsRow(input: Pick<DebugInput, 'track' | 'wrapped' | 'maxRate
     const words = describeWrap({ ...mine, resampled: null, hiRes: null }, track.id).replace(/^ · /, '').replace(/^sent as /, '')
     //? not answered yet: no depth or rate, since which it will be is what hasn't been said
     if (mine.got === null || awaitingResample(input)) return { label, value: upperFirst(words) }
-    const tail = mine.resampled ? depthAndRate(24, mine.resampled.to) : depthAndRate(track.bitDepth, track.sampleRate)
+    const tail = mine.resampled ? depthAndRate(24, mine.resampled.to)
+      : mine.got !== 'flac' && levelledNow(input) ? depthAndRate(24, track.sampleRate) : depthAndRate(track.bitDepth, track.sampleRate)
     return { label, value: upperFirst(words) + tail, mono: true }
   }
   if (format === 'mp3') return { label, value: 'MP3, transcoded by Navidrome' }
@@ -187,11 +193,23 @@ export function sentAsRow(input: Pick<DebugInput, 'track' | 'wrapped' | 'maxRate
 /** What Resampled says while deadwax hasn't answered. */
 export const NOT_KNOWN_YET = 'Not known yet'
 
-/** Whether deadwax resampled the song, from what to what, and how much quieter it made it. */
-export function resampledRow(input: Pick<DebugInput, 'track' | 'wrapped' | 'maxRate' | 'format'>): DebugRow {
+/**
+ * Whether the song playing is levelled by deadwax (2.0.0-player.62) - asked for with a level, a FLAC as it is,
+ * and deadwax not saying it played it unlevelled ('unmeasured', 'plain' - answered as it is this time - or
+ * 'not_levelled'). A levelled copy gets its level's gain INSTEAD of the resample's fixed 3 dB.
+ */
+function levelledNow(input: Pick<DebugInput, 'track' | 'format' | 'level'>): boolean {
+  const state = input.level?.state
+  return levels(input.track as LevelledTrack, input.format ?? 'raw') && state !== 'unmeasured' && state !== 'plain' && state !== 'not_levelled'
+}
+
+/** Whether deadwax resampled the song, from what to what, and how much quieter it made it - with
+ *  Normalization off; a levelled song's level is its own row's (2.0.0-player.62). */
+export function resampledRow(input: Pick<DebugInput, 'track' | 'wrapped' | 'maxRate' | 'format' | 'level'>): DebugRow {
   const resampled = wrappedFor(input.wrapped, input.track)?.resampled
   if (resampled) {
-    return { label: 'Resampled', value: `${khz(resampled.from)} to ${khz(resampled.to)}, ${RESAMPLE_HEADROOM_DB} dB quieter`, mono: true }
+    const quieter = levelledNow(input) ? '' : `, ${RESAMPLE_HEADROOM_DB} dB quieter`
+    return { label: 'Resampled', value: `${khz(resampled.from)} to ${khz(resampled.to)}${quieter}`, mono: true }
   }
   return { label: 'Resampled', value: awaitingResample(input) ? NOT_KNOWN_YET : 'No' }
 }
@@ -499,11 +517,23 @@ function otherSongsRow(song: Answer | null, album: Answer | null): DebugRow {
   return names.length ? { label, value: names.join(', '), mono: true } : { label, value: 'Nothing this song lacks' }
 }
 
+/**
+ * (2.0.0-player.62) The player's Normalization for the song playing: Off; not levelled, and why; the level,
+ * its gain and the loudness it came from (or the peak that held it); its album being measured; not measured
+ * yet - lib/loudness.ts describeLevel()'s words, from the entry's level and deadwax's answer.
+ */
+export function normalizationRow(input: Pick<DebugInput, 'track' | 'format' | 'level'>): DebugRow {
+  const track = input.track as LevelledTrack
+  const answer = input.level && input.level.level === track.level ? input.level : null
+  const value = describeLevel(track, input.format, answer)
+  return { label: 'Normalization', value, ...(answer?.state === 'measured' ? { mono: true } : {}) }
+}
+
 /** Info > Debug, top to bottom. */
 export function debugSections(input: DebugInput): DebugSection[] {
   return [
     { title: 'The file', rows: [formatRow(input.track)] },
-    { title: 'What this device is sent', rows: [sentAsRow(input), resampledRow(input), whyRow(input), gaplessRow(input), speedRow(input.speed)] },
+    { title: 'What this device is sent', rows: [sentAsRow(input), resampledRow(input), normalizationRow(input), whyRow(input), gaplessRow(input), speedRow(input.speed)] },
     { title: 'Last song change and seek', rows: [gapRow(input.gaps), seekRow(input.lastSeek)] },
     { title: 'The turntable', rows: [turntableRow(input.turntable), turntableTimingRow(input.turntable), recordingRow(input.recording, input.onRecord, input.turntable), benchRow()] },
     {

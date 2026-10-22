@@ -35,6 +35,11 @@
  *    fields other songs of the album carry and this one doesn't (playCount and played are left
  *    out of a song never played); and "Not known" when the answer isn't in hand.
  *  - The headroom is src/resample.py's HEADROOM_DB and the setting's names are QualityChoice's.
+ *  - Normalization (2.0.0-player.62), after Resampled: Off for an entry with no level; not levelled for an
+ *    MP3 (its kind upper-cased) or a transcode; deadwax's answer in each state - measured by album or by song,
+ *    held by its peak, its album being measured (how far along), not measured yet, not levelled and why - and
+ *    an answer about another level ignored. The Resampled row drops "3 dB quieter" for a levelled song, and
+ *    keeps it when deadwax says the song played unlevelled.
  *
  * Run it with:  node ui/test/debug.sim.cjs
  */
@@ -94,7 +99,8 @@ console.log('\nthe layout: five sections, their rows in order')
   check('rows', sections.map((section) => section.rows.map((row) => row.label)), [
     //? (2.0.0-player.36: and the turntable's test bench, after the recording; 2.0.0-player.39: the
     //? speed, after Gapless)
-    ['Format'], ['Sent as', 'Resampled', 'Why', 'Gapless', 'Speed'], ['Gap', 'Last seek'], ['Turntable sound', 'Turntable timing', 'Recording', 'Test bench'], ['Song', 'On other songs', 'Album'],
+    //? (2.0.0-player.62: and Normalization, after Resampled)
+    ['Format'], ['Sent as', 'Resampled', 'Normalization', 'Why', 'Gapless', 'Speed'], ['Gap', 'Last seek'], ['Turntable sound', 'Turntable timing', 'Recording', 'Test bench'], ['Song', 'On other songs', 'Album'],
   ])
 }
 
@@ -405,6 +411,55 @@ console.log('\n"Navidrome sent": the names of the fields, as they came')
     rows.isEmptyValue(false), rows.isEmptyValue('x'), rows.isEmptyValue([0]), rows.isEmptyValue({ a: 0 })], [true, true, true, true, true, false, false, false, false])
   check('an answer of empty fields only', table([{ title: 't', rows: [rows.debugSections(input({ song: { a: '' }, album: null }))[4].rows[0]] }]).Song,
     ['Nothing with a value', 'Empty: a'])
+}
+
+console.log('\nNormalization (2.0.0-player.62)')
+{
+  const answer = (overrides = {}) => ({
+    level: 'album', state: 'measured', gain_db: -7.42, wanted_db: -7.42, loudness_lufs: -10.58, peak_db: -0.3, held: false,
+    songs: 12, measured_songs: 12, why: null, ...overrides,
+  })
+  const row = (entry, level = null, format = 'raw') => rows.normalizationRow({ track: track(entry), format, level }).value
+  check('no level on the entry: Off', row({}), 'Off')
+  check('an MP3 asked with a level: not levelled, its kind upper-cased',
+    row({ suffix: 'mp3', contentType: 'audio/mpeg', level: 'album' }), 'Not levelled - MP3 songs play as they are')
+  check('...an Opus too, and a FLAC sent as a transcode',
+    [row({ suffix: 'opus', contentType: 'audio/ogg', level: 'track' }), row({ level: 'album' }, null, 'mp3')],
+    ['Not levelled - OPUS songs play as they are', 'Not levelled - FLAC songs play as they are'])
+  check('a level asked, deadwax not answered yet', row({ level: 'album' }), "Asked for; deadwax hasn't said yet")
+  check('measured by album: the gain, and the album\'s loudness', row({ level: 'album' }, answer()), `Album, -7.42 dB ${DOT} the album at -10.6 LUFS`)
+  check('...by song', row({ level: 'track' }, answer({ level: 'track', gain_db: -3.1, loudness_lufs: -14.92 })), `Song, -3.10 dB ${DOT} the song at -14.9 LUFS`)
+  check('...held by its peak, saying what it wanted', row({ level: 'track' }, answer({ level: 'track', gain_db: 1.2, wanted_db: 2.35, held: true })),
+    `Song, +1.20 dB ${DOT} held there by its peak (it wanted +2.35)`)
+  check('...silence', row({ level: 'track' }, answer({ level: 'track', gain_db: 0, wanted_db: 0, loudness_lufs: null })), `Song, +0.00 dB ${DOT} the song is silent`)
+  check('its album being measured, how far along', row({ level: 'album' }, answer({ state: 'measuring', gain_db: null, measured_songs: 7 })),
+    'Measuring its album… (7 of 12 songs)')
+  check('...a song alone', row({ level: 'track' }, answer({ level: 'track', state: 'measuring', gain_db: null })), 'Measuring the song…')
+  check('not measured yet: it played as it is this time', row({ level: 'album' }, answer({ state: 'unmeasured', gain_db: null })),
+    'Not measured yet - it played as it is this time')
+  check('answered as it is this time (its level not to be had in time): said so, whatever was measured since',
+    [row({ level: 'album' }, answer({ state: 'plain', gain_db: null })), row({ level: 'track' }, answer({ level: 'track', state: 'plain', gain_db: null }))],
+    ['Played as it is this time - its album was still being measured', 'Played as it is this time - its loudness was still being measured'])
+  check('...and Resampled keeps its 3 dB, Sent as its own depth, for that song',
+    [rows.resampledRow({ track: track({ ...HIRES, level: 'album' }), wrapped: { id: 's1', got: 'mp4', resampled: { from: 192000, to: 48000 }, hiRes: null }, maxRate: '48000', format: 'raw', level: answer({ state: 'plain', gain_db: null }) }).value,
+      rows.sentAsRow({ track: track({ level: 'album' }), wrapped: { id: 's1', got: 'mp4', resampled: null, hiRes: null }, maxRate: '48000', format: 'raw', level: answer({ state: 'plain', gain_db: null }) }).value],
+    ['192 kHz to 48 kHz, 3 dB quieter', 'FLAC in MP4, 16-bit, 44.1 kHz'])
+  check('deadwax won\'t level it, and why', row({ level: 'album' }, answer({ state: 'not_levelled', gain_db: null, why: "its file can't be read as FLAC by deadwax (20- or 32-bit)" })),
+    "Not levelled - its file can't be read as FLAC by deadwax (20- or 32-bit)")
+  check('an answer about the other level is not this song\'s', row({ level: 'track' }, answer()), "Asked for; deadwax hasn't said yet")
+  check('the gain in the data face once measured', [rows.normalizationRow({ track: track({ level: 'album' }), format: 'raw', level: answer() }).mono,
+    rows.normalizationRow({ track: track(), format: 'raw', level: null }).mono], [true, undefined])
+  const resampled = { id: 's1', got: 'mp4', resampled: { from: 192000, to: 48000 }, hiRes: null }
+  const resampledRow = (entry, level) => rows.resampledRow({ track: track({ ...HIRES, ...entry }), wrapped: resampled, maxRate: '48000', format: 'raw', level }).value
+  check('Resampled: a levelled song gets its level\'s gain instead of the 3 dB - and keeps the 3 dB when it played unlevelled',
+    [resampledRow({}, null), resampledRow({ level: 'album' }, null), resampledRow({ level: 'album' }, answer()),
+      resampledRow({ level: 'album' }, answer({ state: 'unmeasured', gain_db: null })), resampledRow({ level: 'album' }, answer({ state: 'not_levelled', gain_db: null }))],
+    ['192 kHz to 48 kHz, 3 dB quieter', '192 kHz to 48 kHz', '192 kHz to 48 kHz', '192 kHz to 48 kHz, 3 dB quieter', '192 kHz to 48 kHz, 3 dB quieter'])
+  const sentAs = (level, got = 'mp4') => rows.sentAsRow({ track: track({ level: 'album' }), wrapped: { id: 's1', got, resampled: null, hiRes: null }, maxRate: '48000', format: 'raw', level }).value
+  check('Sent as: a levelled CD song comes 24-bit, in deadwax\'s copy - its own depth when it played unlevelled, or came as the FLAC',
+    [sentAs(answer()), sentAs(answer(), 'stream'), sentAs(answer({ state: 'unmeasured', gain_db: null })), sentAs(answer(), 'flac'),
+      rows.sentAsRow({ track: track(), wrapped: { id: 's1', got: 'mp4', resampled: null, hiRes: null }, maxRate: '48000', format: 'raw', level: null }).value],
+    ['FLAC in MP4, 24-bit, 44.1 kHz', 'In one stream, 24-bit, 44.1 kHz', 'FLAC in MP4, 16-bit, 44.1 kHz', 'FLAC, not in an MP4, 16-bit, 44.1 kHz', 'FLAC in MP4, 16-bit, 44.1 kHz'])
 }
 
 console.log('\nheld to the code they describe')

@@ -134,7 +134,11 @@ src/
                    on one grid so joins stay exact; numpy/soxr/soundfile, imported lazily. See
                    "Maximum quality: hi-res resampled to 48 kHz".
   album_context.py which songs sit beside a song on its album, the grid phase, and their edges, from
-                   Navidrome - for resample.py.
+                   Navidrome - for resample.py; and copy_plan(), the plan of a copy resampled, levelled or both.
+  loudness.py      PURE but measure_file(). A song's loudness (BS.1770-4 / EBU R128, streamed, a histogram)
+                   and the gain that levels it under its peak - the player's Normalization (2.0.0-player.62);
+                   levels.py measures (on demand, at filing), keeps it in SQLite (`loudness`) and resolves
+                   each copy's gain, applied by resample.py. See "Normalization (2.0.0-player.62)".
   flac_mp4.py      PURE. A FLAC file as an MP4 of the very same frames, no ffmpeg - what makes
                    Safari's seeks land. See "FLAC in an MP4, for Safari". And as a FRAGMENTED
                    MP4, `fmp4_layout()`, for the gapless stream - see "One stream for FLAC".
@@ -232,7 +236,10 @@ interface/         vanilla JS/CSS. Still the served page; main.js is shrinking a
 ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    ui/src/player/ is the phone player, a second entry beside the main one;
                    player/streamSource.ts is its one-stream gapless engine, with the pure
-                   lib/streamPlan.ts and lib/fmp4.ts - see "One stream for FLAC". Since
+                   lib/streamPlan.ts and lib/fmp4.ts - see "One stream for FLAC". The level a queued song
+                   is played at rides on its entry: the pure lib/loudness.ts (the rule, the address's
+                   `&level=`), player/levelling.ts queued() at every play's tap, app/NormalizationChoice.tsx
+                   the setting - see "Normalization (2.0.0-player.62)". Since
                    2.0.0-player.9 its main.tsx renders ui/src/app/App.tsx, the ONE app: five tabs
                    with the player inside them - see "The one app". player/deck.ts is the
                    turntable's platter and its own sound (lib/platter.ts, lib/deckVoice.ts, and
@@ -285,7 +292,7 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    ui/src/lab/ is the turntable's test bench at /player/lab/, a third page built
                    in a pass of its own: the real Turntable and deck over signals it makes, set
                    beside an ideal turntable - see notes/turntable-bench.md.
-tests/             3364 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             3473 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -319,6 +326,7 @@ section of that title in notes/: `grep -rn "### X" notes/` finds it.
 | gapless and seeking | `notes/player-gapless-seeking.md` |
 | FLAC in an MP4 for Safari, the muxer, the player cache | `notes/player-flac-mp4.md` |
 | one stream for FLAC, hi-res resampled to 48 kHz | `notes/player-stream-hires.md` |
+| normalization: the level rule, the measurement, the levelled copy | `notes/player-normalization.md` |
 | the store index and the "already have it" checks | `notes/store-index.md` |
 | the one app: routes, the gesture rule, the restyle, Now Playing, Info | `notes/app.md` |
 | Requests, Search, the album you don't have, Sources and Get, song search, search like Apple Music | `notes/app-requests-search-get.md` |
@@ -533,7 +541,7 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 3364 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 3473 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see `notes/tooling.md`:
@@ -571,7 +579,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 3364 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 3473 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

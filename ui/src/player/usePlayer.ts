@@ -74,6 +74,7 @@ import {
   listenedStep, nextIndex, type PlayQueue, type QueueTrack,
 } from '../lib/playQueue'
 import { clampSpeed, paceOf, paceStep, pitchHeldAt, pitchSwitch, type PaceSample, type PitchSwitch, type SpeedReading } from '../lib/playSpeed'
+import { levels, unlevelled } from '../lib/loudness'
 import { reportedPosition, seekStep, type PendingSeek, type SeekEvent, type SeekReading } from '../lib/scrub'
 import { ENGINE_OFF_MS, joinStallMs, knownFormatOut, splitAcrossJoin, streamable as mayStream, type RunSong } from '../lib/streamPlan'
 import {
@@ -374,13 +375,17 @@ export function usePlayer(): Player {
     /** What `noStream` knows a song by: the copy asked for, and the setting of the stream it was
      *  kept out of - a stream's format rule depends on it (formatStreamable() in lib/streamPlan). */
     const formatKeyOf = (track: QueueTrack, cap: MaxRate) => `${variantOf(track, askedAt(track, cap))} under ${cap}`
+    //? (2.0.0-player.62) a levelled song deadwax will make: asked with its level, and not refused - a refused copy is
+    //? asked for as the file itself (addressAt), which deadwax levels no more than it resamples it
+    const levelledAt = (track: QueueTrack, cap: MaxRate) => levels(track, streamFormat(track, canPlay)) && !state.refused.has(variantOf(track, askedAt(track, cap)))
     /** Where a song's audio is for this page under `cap` - see streamUrl(). A song whose resampled
      *  copy deadwax refused is asked for as under "Original": in an MP4 of itself for Safari, as it is
      *  for Chromium. A song deadwax won't repackage as it is, as the file itself: asking for an MP4 of
      *  it would only have deadwax try again and give up. */
     const addressAt = (track: QueueTrack, cap: MaxRate) => {
       const asked = askedAt(track, cap)
-      return streamUrl(track, canPlay, pageWraps && !state.refused.has(variantOf(track, asked)), asked)
+      const plain = state.refused.has(variantOf(track, asked))
+      return streamUrl(plain ? unlevelled(track) : track, canPlay, pageWraps && !plain, asked)
     }
     /** Where a song's audio is, at the setting as it is now. */
     const addressOf = (track: QueueTrack) => addressAt(track, state.maxRate)
@@ -486,7 +491,7 @@ export function usePlayer(): Player {
       state.wrapCheck = null
       const format = streamFormat(track, canPlay)
       const resampled = resampledAt(track, askedAt(track, cap))
-      if (!asksForMp4(track, format, pageWraps, resampled)) {
+      if (!asksForMp4(track, format, pageWraps, resampled || levelledAt(track, cap))) {
         setWrapped(null)
         return
       }
@@ -705,7 +710,7 @@ export function usePlayer(): Player {
         //? a song whose resampled copy deadwax refused, as under "Original" - see askedAt()
         urlOf: (song) => fragmentedUrl(song, askedAt(song, cap)),
         streamable: (song) => streamable(song, cap),
-        resamples: (song) => resamples(song, askedAt(song, cap), 'raw'),
+        resamples: (song) => resamples(song, askedAt(song, cap), 'raw') || levelledAt(song, cap),
         intendsToPlay: () => state.intendsToPlay,
         maxRate: cap,
       }, streamEvents)
@@ -1076,7 +1081,7 @@ export function usePlayer(): Player {
       if (run && (run.runEnd === null || state.queue.index < run.runEnd)) return null
       const index = nextIndex(state.queue)
       const track = index === null ? undefined : state.queue.tracks[index]
-      return track && resampledAt(track, askedAt(track, state.maxRate)) ? addressOf(track) : null
+      return track && (resampledAt(track, askedAt(track, state.maxRate)) || levelledAt(track, state.maxRate)) ? addressOf(track) : null
     }
 
     /**

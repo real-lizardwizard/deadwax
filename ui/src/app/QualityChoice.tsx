@@ -5,7 +5,8 @@ import type { Player } from '../player/usePlayer'
 /**
  * The "Maximum quality" choices, in the words You shows. Only what the code does: a FLAC at 88.2,
  * 96, 176.4, 192, 352.8 or 384 kHz is resampled (resamples() in lib/streamWrap - a 128 kHz FLAC, 20
- * or 32 bits, ALAC or WAV is sent as it is under both), lowered by src/resample.py's HEADROOM_DB,
+ * or 32 bits, ALAC or WAV is sent as it is under both), lowered by src/resample.py's HEADROOM_DB -
+ * with Normalization off: levelled (2.0.0-player.62), a resampled song gets its level's gain instead -
  * and no song plays without a gap unless Gapless is on (the checkbox above this in You,
  * GaplessChoice.tsx) - it is off until turned on, and a stream never goes to AirPlay.
  * ui/test/settings.sim.cjs holds the words to this, and the name to that checkbox's own label.
@@ -22,7 +23,7 @@ export const QUALITIES: { rate: MaxRate; label: string; note: string }[] = [
     note:
       'FLAC songs at 88.2 to 384 kHz are resampled by deadwax to 48 kHz, or 44.1 kHz, and sent as lossless ' +
       '24-bit FLAC, so with Gapless on they play without a gap. Nothing below 20 kHz changes, except ' +
-      'that they are 3 dB quieter, so nothing can clip.',
+      'that with Normalization off they are 3 dB quieter, so nothing can clip.',
   },
   {
     rate: 'original',

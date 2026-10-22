@@ -7,6 +7,7 @@
  */
 
 import { fetchOk, get, post, url } from '../api/http'
+import { levelParam, levels, type Level, type LevelAnswer, type LevelledTrack } from '../lib/loudness'
 import { createPlayedAlbums } from '../lib/playedAlbums'
 import type { QueueTrack } from '../lib/playQueue'
 import { asksForMp4, resamples, type MaxRate } from '../lib/streamWrap'
@@ -440,25 +441,33 @@ export function playableType(track: Pick<QueueTrack, 'contentType' | 'suffix'>):
  * `maxRate` - the "Maximum quality" setting. At 48 kHz a hi-res FLAC (resamples() in lib/streamWrap)
  * is asked for resampled, `max_rate=48000`, which deadwax sends only repackaged: in an MP4 in any
  * browser. 'original', the default here, is every address exactly as it was before the setting.
+ *
+ * The entry's level (2.0.0-player.62, the player's Normalization - lib/loudness.ts): a FLAC queued with
+ * one is asked for levelled, `&level=album` or `&level=track` LAST, which deadwax too sends only in a
+ * container it made - so in an MP4 in any browser, as a resampled song is. An entry with no level (Off)
+ * has exactly the address it always had.
  */
 export function streamUrl(
-  track: QueueTrack, canPlay: (type: string) => boolean, pageWraps = false, maxRate: MaxRate = 'original',
+  track: LevelledTrack, canPlay: (type: string) => boolean, pageWraps = false, maxRate: MaxRate = 'original',
 ): string {
   const format = streamFormat(track, canPlay)
   const resampled = resamples(track, maxRate, format)
-  const wrap = asksForMp4(track, format, pageWraps, resampled) ? '&wrap=mp4' : ''
+  const levelled = levels(track, format)
+  //? deadwax sends a resampled or a levelled song only in a container it made - in any browser
+  const wrap = asksForMp4(track, format, pageWraps, resampled || levelled) ? '&wrap=mp4' : ''
   const rate = resampled ? '&max_rate=48000' : ''
-  return url(`/navidrome/stream/${encodeURIComponent(track.id)}?format=${format}${wrap}${rate}`)
+  return url(`/navidrome/stream/${encodeURIComponent(track.id)}?format=${format}${wrap}${rate}${levelParam(track, format)}`)
 }
 
 /**
  * A FLAC song as fragmented MP4 - the pieces the gapless switch's one stream is made of (see
  * player/streamSource.ts). Always the file as it is: there is no FLAC in a transcode to repackage.
- * Resampled, as streamUrl() says, when `maxRate` is 48 kHz and the song is hi-res.
+ * Resampled, as streamUrl() says, when `maxRate` is 48 kHz and the song is hi-res; levelled at the
+ * entry's level, last, as streamUrl() says.
  */
-export function fragmentedUrl(track: QueueTrack, maxRate: MaxRate = 'original'): string {
+export function fragmentedUrl(track: LevelledTrack, maxRate: MaxRate = 'original'): string {
   const rate = resamples(track, maxRate, 'raw') ? '&max_rate=48000' : ''
-  return url(`/navidrome/stream/${encodeURIComponent(track.id)}?format=raw&wrap=fmp4${rate}`)
+  return url(`/navidrome/stream/${encodeURIComponent(track.id)}?format=raw&wrap=fmp4${rate}${levelParam(track, 'raw')}`)
 }
 
 /** Which of the two streamUrl() asks for: the file as it is, or a transcode to MP3. */
@@ -494,18 +503,39 @@ export interface ScrubWindow {
  * `at` seconds, `seconds` long, cut by deadwax from its own MP4 of the song (src/flac_window.py) -
  * starting on a frame at or before `at`, and shorter than asked for a hi-res song. `maxRate` (48000)
  * when the song is played resampled, so the window is cut from that very copy - its rate, its level -
- * as streamUrl() and fragmentedUrl() ask for it. Throws ApiError: a 415 for a song that isn't a FLAC
- * (its detail says so), a 416 past the end, a 503 when deadwax can't just now. Never touches the
- * player's own audio.
+ * as streamUrl() and fragmentedUrl() ask for it - and `level` (2.0.0-player.62) when the song plays
+ * levelled, so the window is cut from its levelled copy: what it plays or shows is what is heard.
+ * Throws ApiError: a 415 for a song that isn't a FLAC (its detail says so), a 416 past the end, a 503
+ * when deadwax can't just now. Never touches the player's own audio.
  */
 export async function scrubWindow(
   id: string, at: number, seconds: number, signal?: AbortSignal, maxRate: number | null = null,
+  level: Level | null = null,
 ): Promise<ScrubWindow> {
   const cap = maxRate ? `&max_rate=${maxRate}` : ''
-  const response = await fetchOk(`/navidrome/scrub/${encodeURIComponent(id)}?at=${at}&seconds=${seconds}${cap}`, signal ? { signal } : undefined)
+  const levelled = level ? `&level=${level}` : ''
+  const response = await fetchOk(`/navidrome/scrub/${encodeURIComponent(id)}?at=${at}&seconds=${seconds}${cap}${levelled}`, signal ? { signal } : undefined)
   const [first, samples, rate] = (response.headers.get('x-deadwax-window') ?? '').split('/').map(Number)
   if (!(Number.isFinite(first) && Number.isFinite(samples) && (rate ?? 0) > 0)) throw new Error("deadwax didn't say where the window is")
   return { bytes: await response.arrayBuffer(), first: first!, samples: samples!, rate: rate! }
+}
+
+/**
+ * (2.0.0-player.62) What deadwax would level a song at, from what it has measured - Info's Normalization row
+ * (src/routes/navidrome.py /level). `maxRate` the cap the engine asked at, as scrubWindow() takes it.
+ */
+export function levelOf(id: string, level: Level, maxRate: number | null, signal?: AbortSignal): Promise<LevelAnswer> {
+  const cap = maxRate ? `&max_rate=${maxRate}` : ''
+  return get<LevelAnswer>(`/navidrome/level/${encodeURIComponent(id)}?level=${level}${cap}`, signal)
+}
+
+/**
+ * (2.0.0-player.62) "This album is about to be played": an album page with its songs in hand has deadwax measure
+ * them ahead, so the first levelled play waits less (Part A). Fire and forget - not a playback action, nothing
+ * awaits it, and a failure costs only the wait.
+ */
+export function warmLevels(albumId: string): void {
+  post(`/navidrome/level/album/${encodeURIComponent(albumId)}`).catch(() => {})
 }
 
 /** Fire and forget: a play that isn't counted is not worth interrupting the music over. */

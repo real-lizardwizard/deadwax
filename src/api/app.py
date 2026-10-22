@@ -11,7 +11,7 @@ from starlette.middleware.gzip import GZipMiddleware
 
 from src.routes import search_musicbrainz, interface_logs, monitor_slskd, download, library, settings, navidrome, me, pins, store_album
 from src.routes import auth as auth_routes, held, my_library, people
-from src import auth, permissions, stars
+from src import auth, permissions, player_cache, stars
 from src.api import navidrome_admin
 from src.musicbrainz_cache import saved_answers
 from src.users import current_user, require
@@ -96,6 +96,10 @@ async def lifespan(app: FastAPI):
     #? scan, so Find knows what the library holds before anyone opens its tab (step 2). After the
     #? overrides, since LIBRARY_PATH can be one; from the database alone, never the disk.
     await seed_from_saved_scan(app.state.store, Config.LIBRARY_PATH or "")
+
+    #? (2.0.0-player.62) what the player's Normalization measures is kept in the database, so a restart
+    #? measures nothing again (src/levels.py)
+    player_cache.cache.levels.store = app.state.store
 
     poller_task = asyncio.create_task(
         run_download_poller(app.state.slskd_client, app.state.store)

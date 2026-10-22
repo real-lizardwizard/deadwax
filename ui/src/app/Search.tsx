@@ -32,6 +32,7 @@ import {
   libraryArtists, prefetchAlbum, rememberPlayed, searchLibrary, toQueueTrack,
   type Album, type AlbumWithSongs, type Artist, type LibraryResults, type NavidromeStatus, type Song,
 } from '../player/api'
+import { queued } from '../player/levelling'
 import { SearchIcon } from '../player/icons'
 import { usePlayerActions } from './context'
 import { NeedsNavidrome } from './NeedsNavidrome'
@@ -1682,7 +1683,7 @@ export function Search({
     const at = album ? songIndex(album.song, song.id) : -1
     if (album && at >= 0) {
       rememberPlayed(album)
-      actions.playTracks(album.song!.map((each) => toQueueTrack(each, album)), at)
+      actions.playTracks(queued(album.song!.map((each) => toQueueTrack(each, album)), 'album'), at)
       return
     }
     if (song.albumId) {

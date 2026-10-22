@@ -106,6 +106,7 @@ import {
   type HandSample, type Plan,
 } from '../lib/platter'
 import { ApiError } from '../api/http'
+import type { Level } from '../lib/loudness'
 import { scrubWindow, type ScrubWindow } from './api'
 
 /** A press resting longer than a tap takes the record (and pauses a playing song), in ms. */
@@ -201,6 +202,9 @@ export interface DeckSong {
    *  for the song as it is - so the window is cut from the very copy the song plays from: its rate,
    *  its level */
   maxRate?: number | null
+  /** (2.0.0-player.62) the level the player asks for this song at (the player's Normalization), so the
+   *  window is cut from its levelled copy - null for a song played as it is */
+  level?: Level | null
 }
 
 /**
@@ -2324,7 +2328,7 @@ export class Deck {
       //? the test bench's own windows where it gives them (2.0.0-player.36); deadwax's otherwise
       const got = this.host.window
         ? await this.host.window(song, from, WINDOW_S, request.signal)
-        : await scrubWindow(id, from, WINDOW_S, request.signal, song.maxRate ?? null)
+        : await scrubWindow(id, from, WINDOW_S, request.signal, song.maxRate ?? null, song.level ?? null)
       if (!request.current()) return
       const start = got.first / got.rate
       const end = (got.first + got.samples) / got.rate

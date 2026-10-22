@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { isAbort, latestOnly } from '../lib/latest'
 import { shuffleStart, type ShuffleStart } from '../player/api'
+import { queued } from '../player/levelling'
 import { ShuffleIcon } from '../player/icons'
 import type { PlayerActions } from './context'
 import { shuffledTrack } from './useShuffleFeed'
@@ -82,7 +83,11 @@ export function ShuffleSongs({ scope, shown, actions, count = false }: {
   const ready = !!first && first.songs.length > 0
   const play = () => {
     if (!first || !first.songs.length) return
-    actions.playTracks(first.songs.map(shuffledTrack), 0, false, { token: first.token, total: first.total, fetched: first.songs.length, scope })
+    //? (2.0.0-player.62) songs, for the player's Normalization - and the level they got rides on the shuffle, so
+    //? its feed queues the rest of it at the same level (useShuffleFeed.ts)
+    const tracks = queued(first.songs.map(shuffledTrack), 'songs')
+    const level = tracks[0]?.level
+    actions.playTracks(tracks, 0, false, { token: first.token, total: first.total, fetched: first.songs.length, scope, ...(level ? { level } : {}) })
     //? a new order for the next tap - naming this one, so it is claimed before the new one replaces it
     played.current = first.token
     setFirst(null)

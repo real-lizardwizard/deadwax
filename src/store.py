@@ -420,6 +420,21 @@ CREATE TABLE IF NOT EXISTS store_index_scanned (
     root        TEXT PRIMARY KEY,
     scanned_at  TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS loudness (
+    -- (2.0.0-player.62) How loud each song is, as deadwax measured it for the player's Normalization
+    -- (src/loudness.py) - kept here, in /config, because measuring a library again is hours of a NAS's
+    -- CPU. Keyed by the AUDIO, not the file: 's:' + sha256 of the FLAC's STREAMINFO (its decoded audio's
+    -- MD5, rate, channels, bits and length), which a retag, a rename or a re-file leaves alone - or 'v:' +
+    -- the player cache's Version.key for a file whose MD5 is all zeros. About 1.5 KB a song.
+    audio_key   TEXT PRIMARY KEY,
+    algorithm   INTEGER NOT NULL,   -- loudness.ALGORITHM_VERSION: a row of another is measured again
+    peak        REAL NOT NULL,      -- the largest |sample|, 1.0 = full scale
+    histogram   BLOB NOT NULL,      -- (bin uint16, count uint32) little-endian pairs, ascending
+    blocks      INTEGER NOT NULL,
+    seconds     REAL NOT NULL,
+    measured_at TEXT NOT NULL
+);
 """
 
 #? (2.0.0-player.51) the states a library entry is held in - waiting or starred - beside `removed`
@@ -3200,6 +3215,55 @@ class JobStore:
             return flag
 
         return await self._ledger(write, f"close flag {flag_id}")
+
+    # ===== loudness (2.0.0-player.62) =========================================
+    #
+    # What deadwax measured of each song for the player's Normalization (src/levels.py). A failure
+    # here costs a measurement kept for next time, never the song: the caller keeps it in memory and
+    # carries on.
+
+    async def loudness_get(self, keys: list[str]) -> dict[str, dict]:
+        """The measurements kept under these audio keys, by key - those of the algorithm as it is now
+        (loudness.ALGORITHM_VERSION) or any other; the caller judges. {} on any failure."""
+        if not self.available or not keys:
+            return {}
+        wanted = sorted(set(keys))
+
+        def read():
+            found = {}
+            with self._connect() as connection:
+                for at in range(0, len(wanted), 500):
+                    chunk = wanted[at:at + 500]
+                    rows = connection.execute(
+                        f"SELECT * FROM loudness WHERE audio_key IN ({','.join('?' * len(chunk))})", chunk).fetchall()
+                    found.update({row["audio_key"]: dict(row) for row in rows})
+            return found
+
+        try:
+            return await asyncio.to_thread(read)
+        except Exception as e:
+            logger.error(f"failed to read the songs' loudness: {e}")
+            return {}
+
+    async def loudness_put(self, row: dict) -> bool:
+        """One song's measurement kept (replacing what was kept under its key). False on any failure."""
+        if not self.available:
+            return False
+
+        def write():
+            with self._connect() as connection:
+                connection.execute(
+                    "INSERT OR REPLACE INTO loudness (audio_key, algorithm, peak, histogram, blocks, seconds, measured_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (row["audio_key"], row["algorithm"], row["peak"], row["histogram"], row["blocks"], row["seconds"],
+                     row.get("measured_at") or _now()))
+            return True
+
+        try:
+            return await asyncio.to_thread(write)
+        except Exception as e:
+            logger.error(f"failed to keep a song's loudness: {e}")
+            return False
 
 
 #? slskd reports a stopped transfer as "Completed, <substate>". "Succeeded" is the only good

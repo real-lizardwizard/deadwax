@@ -979,7 +979,7 @@ console.log('\nwhat Info reads is taken in the tap, and asks the engine\'s eleme
   const page = code(read('player/AlbumPage.tsx'))
   const play = /const play = \([^)]*\) => \{([\s\S]*?)\n  \}/.exec(page)?.[1] ?? ''
   check('AlbumPage remembers the album, then plays, in the tap',
-    [/rememberPlayed\(album\)\s*player\.playTracks\(/.test(play), /\bawait\b|\.then\(/.test(play)], [true, false])
+    [/rememberPlayed\(album\)\s*player\.playTracks\(queued\(tracks, 'album'\), start, shuffle\)/.test(play), /\bawait\b|\.then\(/.test(play)], [true, false])
   //? "Sent as" asks the engine's own element what it can play: never a new one (iOS unlocks audio
   //? per element), and nothing set or started on it
   const api = code(read('player/api.ts'))
@@ -995,7 +995,7 @@ console.log('\nSearch: a song plays from the tap, with its album in hand; the ne
   const rows = code(read('app/SearchRows.tsx'))
   const play = /const playSong = \([^)]*\) => \{([\s\S]*?)\n  \}/.exec(search)?.[1] ?? ''
   check('a song\'s tap plays its album from that song only when the album\'s songs are in hand',
-    [/const album = song\.albumId \? ready\.get\(song\.albumId\) : undefined/.test(play), /if \(album && at >= 0\) \{\s*rememberPlayed\(album\)\s*actions\.playTracks\(album\.song!\.map\(\(each\) => toQueueTrack\(each, album\)\), at\)/.test(play)],
+    [/const album = song\.albumId \? ready\.get\(song\.albumId\) : undefined/.test(play), /if \(album && at >= 0\) \{\s*rememberPlayed\(album\)\s*actions\.playTracks\(queued\(album\.song!\.map\(\(each\) => toQueueTrack\(each, album\)\), 'album'\), at\)/.test(play)],
     [true, true])
   check('...nothing fetched or awaited in the tap - otherwise the album opens instead',
     [/\bawait\b|\.then\(|fetch|prefetchAlbum|searchLibrary/.test(play), /onOpenAlbum\(/.test(play)], [false, true])
@@ -1305,7 +1305,7 @@ console.log('\nArtists and the id bridge: Play from the tap with every album in 
   const page = code(read('app/ArtistPage.tsx'))
   const play = /const play = \(shuffle: boolean\) => \{([\s\S]*?)\n  \}/.exec(page)?.[1] ?? ''
   check('the artist\'s Play and Shuffle play straight from the tap: every album remembered at once, then playTracks - nothing fetched or awaited',
-    [/if \(!playable\) return/.test(play), /rememberQueue\(albums\)\s*actions\.playTracks\(tracks, shuffle \? null : 0, shuffle\)/.test(play),
+    [/if \(!playable\) return/.test(play), /rememberQueue\(albums\)\s*(\/\/\?[^\n]*\n\s*)?actions\.playTracks\(queued\(tracks, shuffle \? 'songs' : 'album'\), shuffle \? null : 0, shuffle\)/.test(play),
       /\bawait\b|\.then\(|fetch|prefetchAlbum|artistAlbums/.test(play)],
     [true, true, false])
   check('...disabled until every album they play has answered, the library has said which are copies of one, and one has its songs',
@@ -1331,7 +1331,7 @@ console.log('\nArtists and the id bridge: Play from the tap with every album in 
   const playRow = /const playRow = \(row: RequestRow\) => \{([\s\S]*?)\n  \}/.exec(requests)?.[1] ?? ''
   check('a Done row\'s ▶ plays its album only with its songs in hand - nothing awaited - and opens it otherwise',
     [/const album = row\.release \? ready\.get\(row\.release\)\?\.answer : undefined/.test(playRow),
-      /if \(album && album\.song\?\.length\) \{\s*rememberPlayed\(album\)\s*actions\.playTracks\(album\.song\.map\(\(song\) => toQueueTrack\(song, album\)\), 0\)\s*return\s*\}\s*openRow\(row\)/.test(playRow),
+      /if \(album && album\.song\?\.length\) \{\s*rememberPlayed\(album\)\s*actions\.playTracks\(queued\(album\.song\.map\(\(song\) => toQueueTrack\(song, album\)\), 'album'\), 0\)\s*return\s*\}\s*openRow\(row\)/.test(playRow),
       /\bawait\b|\.then\(|fetch|navidromeAlbumFor|prefetchAlbum/.test(playRow)],
     [true, true, false])
   check('...the first few asked for ahead (KEPT), only while the tab\'s root shows - never as the app starts - and looked for again when due',
@@ -1667,7 +1667,7 @@ console.log('\nthe desktop visualizer: a silent copy, never the player\'s elemen
       code('silent.gain.value = 0; silent.gain.setValueAtTime(1, 0)').match(GAIN_WRITES)],
     [1, ['.gain.value =', '.gain.setValueAtTime']])
   check('...its windows the turntable\'s (scrubWindow), only the newest asked and decoded',
-    [/await scrubWindow\(song\.id, from, VIZ_WINDOW_S, request\.signal, song\.maxRate\)/.test(audio), /const request = this\.requests\.begin\(\)/.test(audio),
+    [/await scrubWindow\(song\.id, from, VIZ_WINDOW_S, request\.signal, song\.maxRate, song\.level\)/.test(audio), /const request = this\.requests\.begin\(\)/.test(audio),
       /if \(!request\.current\(\)\) return/.test(audio), /const ticket = this\.decodes\.begin\(\)/.test(audio)],
     [true, true, true, true])
   check('the screen asks for the queue\'s next song too, so its first window is fetched ahead (lib/vizSync.ts prefetch)',
@@ -2359,7 +2359,7 @@ console.log('\nUp Next, shuffle and repeat (2.0.0-player.57): each new action fr
   const feed = code(read('app/useShuffleFeed.ts'))
   const add = /const add = \(how: 'next' \| 'last'\) => \{([\s\S]*?)\n  \}/.exec(menu)?.[1] ?? ''
   check('the song menu\'s rows: the albums remembered, then Play Next or Play Last with the songs in hand - nothing awaited first',
-    [/rememberAdded\(pick\.albums\)\s*const started = how === 'next' \? player\.playNext\(pick\.tracks\) : player\.playLast\(pick\.tracks\)/.test(add), /\bawait\b|\.then\(/.test(add.split('player.playNext')[0] ?? ''),
+    [/rememberAdded\(pick\.albums\)\s*(\/\/\?[^\n]*\n\s*)?const started = how === 'next' \? player\.playNext\(queued\(pick\.tracks, pick\.as \?\? 'songs'\)\) : player\.playLast\(queued\(pick\.tracks, pick\.as \?\? 'songs'\)\)/.test(add), /\bawait\b|\.then\(/.test(add.split('player.playNext')[0] ?? ''),
       /onClick=\{\(\) => add\('next'\)\}/.test(menu), /onClick=\{\(\) => add\('last'\)\}/.test(menu)], [true, false, true, true])
   check('...its notice only when the songs were queued, not when the music started from them', /onClose\(\)\s*if \(!started\) sayPins\(queuedWords\(how, pick\.label\)\)/.test(add), true)
   //? (review) through jump(), which says first where focus goes once the row has left the list - nothing awaited
@@ -2379,7 +2379,7 @@ console.log('\nUp Next, shuffle and repeat (2.0.0-player.57): each new action fr
     [/'playTracks' \| 'toggle' \| 'next' \| 'previous' \| 'seek' \| 'showAirPlay' \| 'setGapless' \| 'setMaxRate'\s*>/.test(code(read('app/context.ts'))),
       /<UpNext open=\{upNextOpen\}[^\n]*player=\{player\}/.test(app), /<QueueMenu open=\{queueMenuOpen\}[^\n]*player=\{player\}/.test(app)], [true, true, true])
   check('the Library\'s Shuffle: playTracks with the first page already in hand, nothing fetched or awaited before it',
-    [/const play = \(\) => \{\s*if \(!first \|\| !first\.songs\.length\) return\s*actions\.playTracks\(first\.songs\.map\(shuffledTrack\), 0, false, \{/.test(shuffle), /onClick=\{play\}/.test(shuffle)], [true, true])
+    [/const play = \(\) => \{\s*if \(!first \|\| !first\.songs\.length\) return\s*(\/\/\?[^\n]*\n\s*)*const tracks = queued\(first\.songs\.map\(shuffledTrack\), 'songs'\)\s*const level = tracks\[0\]\?\.level\s*actions\.playTracks\(tracks, 0, false, \{/.test(shuffle), /onClick=\{play\}/.test(shuffle)], [true, true])
   check('...its feed calls nothing of the player but extendQueue, and is called once - in App', [actionsIn(feed), (app.match(/\buseShuffleFeed\(/g) ?? []).length,
     files.filter((file) => file !== 'app/App.tsx' && file !== 'app/useShuffleFeed.ts' && /\buseShuffleFeed\(/.test(code(read(file))))], [['extendQueue'], 1, []])
   //? (2.0.0-player.59) the Shuffles are the root's and the sections' now
@@ -2396,7 +2396,7 @@ console.log('\nplaylists (2.0.0-player.58): a playlist plays from its own page, 
     [[...new Set([...page.matchAll(/\bplayer\.(\w+)/g)].map((match) => match[1]))].sort(), [...page.matchAll(/\bplayer\.track\b(\?\.\w+)?/g)].map((match) => match[1])],
     [['playTracks', 'playing', 'track'], ['?.id']])
   check('...its play: nothing without songs, the albums remembered, then playTracks with the songs in hand - nothing else, nothing awaited',
-    [/const play = \(start: number \| null, shuffle = false\) => \{\s*if \(!tracks\.length\) return\s*rememberQueue\(remembered\(albums\)\)\s*player\.playTracks\(tracks, start, shuffle\)\s*\}/.test(page),
+    [/const play = \(start: number \| null, shuffle = false\) => \{\s*if \(!tracks\.length\) return\s*rememberQueue\(remembered\(albums\)\)\s*player\.playTracks\(queued\(tracks, 'songs'\), start, shuffle\)\s*\}/.test(page),
       //? (review) what is remembered worked out in the tap, synchronously - an album's own answer held kept (lib/playlists.ts withHeld)
       /const remembered = \(stubs: readonly AlbumWithSongs\[\]\) => withHeld\(stubs, playedAlbum\)\n/.test(page)], [true, true])
   //? every play( in the file is a click's own: Play, Shuffle, a row
@@ -2719,6 +2719,64 @@ console.log('\nPeople and permissions (2.0.0-player.61)')
     [files.filter((file) => APP_SIDE(file) && /noteAccess\(/.test(code(read(file)))).sort(),
       files.filter((file) => APP_SIDE(file) && /useAccess\(\)/.test(code(read(file)))).length >= 8],
     [['app/App.tsx', 'app/You.tsx', 'app/access.ts', 'app/signInGate.tsx'], true])
+}
+
+console.log('\nNormalization (2.0.0-player.62): every queued song through queued(), in the tap; the rule pure')
+{
+  //? every playTracks, playNext and playLast call in the files allowed to reach them: its songs passed through
+  //? queued() (player/levelling.ts), which levels them as the setting says - one that forgot would play them as
+  //? under Off, never at a wrong level, but the setting would silently not apply there
+  const calls = files.filter((file) => APP_SIDE(file) && !ENGINE.has(file)).flatMap((file) => {
+    const text = code(read(file))
+    return [...text.matchAll(/\.(playTracks|playNext|playLast)\(/g)].map((match) => [file, match[1], /^queued\(/.test(text.slice(match.index + match[0].length))])
+  })
+  check('every call, by file - its songs through queued()', calls, [
+    ['app/ArtistPage.tsx', 'playTracks', true], ['app/PlaylistPage.tsx', 'playTracks', true],
+    ['app/QueueMenu.tsx', 'playNext', true], ['app/QueueMenu.tsx', 'playLast', true],
+    ['app/Requests.tsx', 'playTracks', true], ['app/Search.tsx', 'playTracks', true],
+    //? the Library's Shuffle queues them a line before - it reads the level they got for its paging (below)
+    ['app/ShuffleSongs.tsx', 'playTracks', false],
+    ['player/AlbumPage.tsx', 'playTracks', true],
+  ])
+  const shuffle = code(read('app/ShuffleSongs.tsx'))
+  check('...the Library\'s Shuffle too: queued as songs, then played - its level on the shuffle\'s paging, for the feed',
+    [/const tracks = queued\(first\.songs\.map\(shuffledTrack\), 'songs'\)/.test(shuffle), /actions\.playTracks\(tracks, 0, false, \{[^}]*\.\.\.\(level \? \{ level \} : \{\}\) \}\)/.test(shuffle)], [true, true])
+  const feed = code(read('app/useShuffleFeed.ts'))
+  check('...and its feed queues the rest of it at that same level - never the setting as it is now',
+    [(feed.match(/atLevel\(/g) ?? []).length, /const level = paged\?\.level/.test(feed), /readPlayerNormalization|queued\(/.test(feed)], [2, true, false])
+  check('an album page queues as an album, its own ••• too; a song\'s ••• as songs',
+    [/player\.playTracks\(queued\(tracks, 'album'\)/.test(code(read('player/AlbumPage.tsx'))),
+      /\{ label: album\.name, tracks, albums: \[album\], as: 'album' \}/.test(code(read('player/AlbumPage.tsx'))),
+      /\{ label: song\.title, tracks: \[toQueueTrack\(song, album\)\], albums: \[album\] \}/.test(code(read('player/AlbumPage.tsx')))], [true, true, true])
+  const levelling = code(read('player/levelling.ts'))
+  check('queued() reads the setting synchronously - a storage read, nothing awaited - and plays nothing',
+    [/return levelled\(tracks, readPlayerNormalization\(\), as\)/.test(levelling), /\bawait\b|\.then\(|fetch\(/.test(levelling), actionsIn(levelling)], [true, false, []])
+  const lib = code(read('lib/loudness.ts'))
+  check('lib/loudness.ts is pure: no fetch, no page, no storage, no Preact, no playback', [/\bfetch\(|\bdocument\.|\bwindow\.|localStorage|from 'preact/.test(lib), actionsIn(lib)], [false, []])
+  const engine = code(read('player/usePlayer.ts'))
+  check('the engine never reads the setting: the level rides on the entries it is handed',
+    [/readPlayerNormalization|playerNormalization/.test(engine), /import \{ levels, unlevelled \} from '\.\.\/lib\/loudness'/.test(engine)], [false, true])
+  const album = code(read('player/AlbumPage.tsx'))
+  check('the album page asks deadwax to measure its album as it opens - in an effect, never in a tap, not under Off',
+    [/useEffect\(\(\) => \{\s*if \(!album \|\| readPlayerNormalization\(\) === 'off'\) return\s*if \([^\n]*\) warmLevels\(album\.id\)\s*\}, \[album\?\.id\]\)/.test(album),
+      (album.match(/warmLevels\(/g) ?? []).length], [true, 1])
+  const api = code(read('player/api.ts'))
+  check('...fire and forget: a POST nothing awaits, its failure swallowed',
+    /export function warmLevels\(albumId: string\): void \{\s*post\(`\/navidrome\/level\/album\/\$\{encodeURIComponent\(albumId\)\}`\)\.catch\(\(\) => \{\}\)\s*\}/.test(api), true)
+  check('the visualizer\'s silent copy asks its windows at the level the song plays at, as the turntable does',
+    [/level: levels\(track, 'raw'\) \? track\.level \?\? null : null/.test(code(read('player/Visualizer.tsx'))),
+      /const level = levels\(playing, 'raw'\) \? \(playing as LevelledTrack\)\.level \?\? null : null/.test(code(read('player/Turntable.tsx')))], [true, true])
+  const info = code(read('app/useInfoDetails.ts'))
+  check('Info asks the level through latestOnly(), only while open, again while measuring',
+    [/const request = requests\.begin\(\)\s*levelOf\(songId, level, cap, request\.signal\)/.test(info), /if \(!open \|\| !songId \|\| !level \|\| !key\) return undefined/.test(info),
+      /if \(found\.state === 'measuring'\) timer = setTimeout\(ask, LEVEL_ASK_AGAIN_MS\)/.test(info)], [true, true, true])
+  //? (after review) the gap above Normalization is its own: a sibling rule on every .app-choice moved Getting albums'
+  //? three choices apart too
+  const youCss = fs.readFileSync(path.resolve(SRC, '../../interface/player/app.css'), 'utf8')
+  check('the gap above Normalization is named on it, and no rule spaces every choice after another',
+    [/<div class="app-choice app-choice-follows">\s*<h3 id="app-normalization-title"/.test(read('app/NormalizationChoice.tsx')),
+      /\.app-choice-follows \{ margin-top: var\(--app-shelf-gap\); \}/.test(youCss), /\.app-choice\s*\+\s*\.app-choice/.test(youCss),
+      (read('app/GettingChoices.tsx').match(/app-choice-follows/g) ?? []).length], [true, true, false, 0])
 }
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

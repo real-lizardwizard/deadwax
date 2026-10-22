@@ -15,6 +15,7 @@ import { GaplessChoice } from './GaplessChoice'
 import { ConfirmCancelChoice } from './ConfirmCancelChoice'
 import { GettingChoices } from './GettingChoices'
 import { LookChoice } from './LookChoice'
+import { NormalizationChoice } from './NormalizationChoice'
 import { QualityChoice } from './QualityChoice'
 import { askGetSettings, chooseGetSettings, useGetSettings } from './useGetSettings'
 import { WindDownChoice } from './WindDownChoice'
@@ -74,8 +75,9 @@ function fromNavidrome(status: NavidromeStatus): CheckState {
  *   2.0.0-player.10, where it was a switch), "Now Playing opens as" (LookChoice.tsx,
  *   2.0.0-player.11: the cover or the turntable - App keeps it, and hands it here), "Pause winds the
  *   record down" (WindDownChoice.tsx, 2.0.0-player.14: the turntable's pause - App keeps it too),
- *   and Maximum quality, moved here from the player's settings sheet with its words unchanged. All
- *   four are kept per device. Gapless is handed the player itself, whose `setGapless` it calls in the tap:
+ *   and Maximum quality, moved here from the player's settings sheet with its words unchanged - and
+ *   (2.0.0-player.62) Normalization after it (NormalizationChoice.tsx: Automatic, By song, By album, Off -
+ *   read at each play, never by the engine). All five are kept per device. Gapless is handed the player itself, whose `setGapless` it calls in the tap:
  *   this page names no playback action of its own (ui/test/app-rules.sim.cjs).
  * - Connections: the main page's three pings, asked the first time You shows (not at start-up: the
  *   MusicBrainz ping is a real request to a rate-limited service), and again on "Check again". Each
@@ -260,8 +262,14 @@ export function You({
           as a real deck does. Off, it stops at once. The cover's pause is always instant.
         </p>
         <QualityChoice player={{ maxRate: player.maxRate, setMaxRate: actions.setMaxRate }} />
+        <NormalizationChoice />
+        <p id="app-normalization-note" class="app-footnote app-choice-gap">
+          Used from the next thing you play. FLAC songs only - others play as they are. deadwax measures an
+          album the first time it levels it, which can make its first song wait a few seconds.
+        </p>
         <p class="app-footnote">
-          All four are kept on this device. Maximum quality is used from the next song.
+          All five are kept on this device. Maximum quality is used from the next song, Normalization from the
+          next thing you play.
         </p>
       </section>
 

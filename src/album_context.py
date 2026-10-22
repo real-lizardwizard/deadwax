@@ -158,8 +158,27 @@ class AlbumContexts:
         self._making: dict[tuple[str, int], asyncio.Task] = {}
         #? what was said lately, and until when, so a line isn't said on every request
         self._said: dict[tuple, float] = {}
+        #? (2.0.0-player.62) the cache's src/levels.Levels: the gain of a levelled copy - set by the cache
+        self.levels = None
 
     # ------------------------------------------------------------ the plan
+
+    async def copy_plan(self, version, max_rate: int | None, level: str | None,
+                        window: bool = False) -> resample.ResamplePlan | None:
+        """
+        (2.0.0-player.62) The plan of the copy deadwax makes of this version - resampled under
+        `max_rate` as plan() says, levelled at `level` ('album' or 'track') as src/levels.py says, both,
+        or neither (None: the song as it is). Without a level it is plan() exactly; with one, the resample's
+        plan (or None) with the level's gain set, a plan at the song's own rate when there is no resample,
+        or the resample's plan unchanged when the song can't be levelled or its level can't be had in time.
+        The gain is worked out once for everyone asking - single flight, shielded, as plan() is - since two
+        gains worked out side by side would be two files under one URL. A turntable's `window` is cut from
+        what the song was last answered as (src/levels.py levelled()). Raises CannotPlan as plan() does.
+        """
+        base = await self.plan(version, max_rate) if max_rate is not None else None
+        if level is None or self.levels is None:
+            return base
+        return await self.levels.levelled(version, base, max_rate, level, window)
 
     async def plan(self, version, max_rate: int) -> resample.ResamplePlan | None:
         """

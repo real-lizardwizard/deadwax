@@ -1589,8 +1589,12 @@ into the next doesn't wait: the next song's first stretch is fetched in the last
 one before. **It stops moving while the music plays on**: the browser may have suspended its sound
 with the page in the background; a click anywhere on the visualizer, or any key, starts it again.
 
-**The player's cache fills up after an evening with the visualizer open**: it shouldn't, since
-2.0.0-player.23. In a browser that plays the FLAC as it is (Chrome, Firefox or Edge with Gapless off),
+**The player's cache fills up after an evening with the visualizer open**: with
+[Normalization](player.md#normalization) on (the default) every FLAC song you play is kept there as its
+levelled copy anyway, and the visualizer's stretches are cut from that copy, adding nothing more; the
+cache fills with the songs played, as for an iPhone - raise [`PLAYER_CACHE_MB`](configuration.md#paths)
+if that's too few. With Normalization off it shouldn't, since 2.0.0-player.23: in a browser that plays the
+FLAC as it is (Chrome, Firefox or Edge with Gapless off),
 deadwax reads each stretch the visualizer shows straight out of the FLAC on Navidrome, a little at a
 time, and keeps nothing of it in the player's cache (until then each song shown had a copy made and
 kept there, counted against [`PLAYER_CACHE_MB`](configuration.md#paths), pushing an iPhone's songs
@@ -1703,7 +1707,9 @@ Both come from [Maximum quality](player.md#maximum-quality-hi-res-at-48-khz)'s d
   [`PLAYER_CACHE_MB`](configuration.md#paths).
 - **Quieter than before, or than "Original"**: every resampled song is lowered by 3 dB, the same for
   all of them, so that nothing clips and the joins stay exact. Turn the volume up a notch. Nothing
-  else about the sound changes.
+  else about the sound changes. (With [Normalization](player.md#normalization) on, a resampled song is
+  levelled instead, and the 3 dB is part of its level - see
+  [Everything is quieter since the update](#everything-is-quieter-since-the-update).)
 - **deadwax's log says** `was lowered a further 0.40 dB so nothing clips`: that song was mastered so
   loud that even 3 dB wasn't room enough (rare: measured only on masters clipped very hard). It's
   lowered by exactly enough, and its joins with the songs beside it step in level by that much.
@@ -1716,6 +1722,57 @@ Both come from [Maximum quality](player.md#maximum-quality-hi-res-at-48-khz)'s d
   `requirements.txt`. Hi-res songs are then sent as they are.
 - **Hi-res songs stall under "Original"**: an iPhone holds only a few seconds of 24/192 at a time,
   so a weak connection can run it dry. Go back to **Up to 48 kHz**.
+
+## Everything is quieter since the update
+
+That's [Normalization](player.md#normalization) (2.0.0-player.62), on **Automatic** by default: deadwax
+now brings every FLAC song to one loudness (-18 LUFS, as ReplayGain 2.0 does), and most music is mastered
+louder than that, so it comes out 6 to 12 dB quieter. Turn the volume up - nothing else about the sound
+changes, and nothing clips. To hear it exactly as before, choose **Off** in You → Playback (it takes effect
+from the next thing you play): every song is then sent bit for bit as it was.
+
+## The first song of an album takes a while to start
+
+With [Normalization](player.md#normalization) on, the first time deadwax levels an album it downloads and
+measures every FLAC song of it before the first one plays - a few seconds for a CD album, longer on a NAS
+or for hi-res. Info → Debug's **Normalization** row says `Measuring its album… (7 of 12 songs)` meanwhile.
+It happens once an album: the measurements are kept in deadwax's database, and a download deadwax files
+is measured as it's filed. Opening the album's page before you tap Play starts the measuring early. If the
+waits are for songs you've played before, the player's cache is too small to keep their levelled copies
+(each about 1.5 times a CD song's file): raise [`PLAYER_CACHE_MB`](configuration.md#paths).
+
+## An MP3 is louder (or quieter) than the songs around it
+
+Only FLAC songs are levelled by [Normalization](player.md#normalization): re-encoding an MP3, AAC or Opus
+file to level it would cost quality, so they play as they are. Info → Debug's **Normalization** row says
+`Not levelled - MP3 songs play as they are`.
+
+## A box set's first song was louder or quieter than the rest
+
+The first time deadwax levels a big album, measuring all of it can take longer than the 50 seconds a song
+is held for (20 for a hi-res song): that first song then plays as it is, that once - and any other song of
+the album that comes up while it's still being measured plays as it is too, straight away rather than after
+a wait of its own. The rest play at the album's level once the measuring is done (it carries on regardless).
+Info → Debug's **Normalization** row says `Played as it is this time - its album was still being measured`
+for such a song, and deadwax's log says `plays as it is this time - its album is still being measured`. Play
+the album again and every song is at the album's level.
+
+## With Normalization on, songs are skipped one after another
+
+If the browser can't play deadwax's levelled copy of a song - a 24-bit FLAC in an MP4, which is how every FLAC
+song comes with [Normalization](player.md#normalization) on (the default) - the player passes it over for the
+next song, as it does any song that won't play, when Gapless is off. (In the gapless stream it plays the song as
+the file is instead.) It shows as every FLAC song of an album being skipped while MP3s play. Choose **Off** in You
+→ Playback, then reload the page: every song is then sent as it always was. And please report it, with the
+phone's model and iOS version - it's the one thing about Normalization that couldn't be checked before it
+shipped.
+
+## A song still won't stream, or seeks land off in Safari, after switching Normalization off
+
+A song whose levelled copy was refused once - deadwax wouldn't make it (a damaged file, say), or the
+browser couldn't decode it - is played as the file itself, without its level, for the rest of the
+page's life: with Normalization **Off** too, it's then sent as the bare FLAC (no MP4, so Safari's seeks in it can
+land seconds off) and kept out of the gapless stream. Reload the page and it's asked for as before.
 
 ## After a long pause, play on the lock screen does nothing until the app is opened
 

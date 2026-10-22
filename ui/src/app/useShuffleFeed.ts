@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { ApiError } from '../api/http'
 import { isAbort, latestOnly } from '../lib/latest'
 import type { QueueTrack } from '../lib/playQueue'
+import { atLevel } from '../lib/loudness'
 import type { UpNextQueue } from '../lib/upNext'
 import { shufflePage, shuffleStart, toQueueTrack, type Song } from '../player/api'
 import type { Player } from '../player/usePlayer'
@@ -72,6 +73,8 @@ export function useShuffleFeed(player: Pick<Player, 'queue' | 'repeat' | 'extend
   const fetched = paged?.fetched ?? 0
   const total = paged?.total ?? 0
   const scope = paged?.scope ?? 'store'
+  //? (2.0.0-player.62) the level the shuffle was queued at: the rest of it is queued at it too (none under Off)
+  const level = paged?.level
   const whole = !!paged && fetched >= total
   const wanted = !!paged && low && (!whole || player.repeat === 'all')
   const ending = queue.tracks[queue.tracks.length - 1]?.id ?? null
@@ -103,14 +106,15 @@ export function useShuffleFeed(player: Pick<Player, 'queue' | 'repeat' | 'extend
           asking.current = null
           return
         }
-        extend(token, startingElsewhere(first.songs.map(shuffledTrack), ending), { token: first.token, total: first.total, fetched: 0, scope })
+        extend(token, atLevel(startingElsewhere(first.songs.map(shuffledTrack), ending), level),
+          { token: first.token, total: first.total, fetched: 0, scope, ...(level ? { level } : {}) })
         if (startedOver && first.songs.length) sayPins(SHUFFLE_STARTED_OVER)
       })
     const asked = whole
       ? fresh(false)
       : shufflePage(token, fetched, request.signal).then(
         (page) => {
-          if (request.current()) extend(token, page.songs.map(shuffledTrack))
+          if (request.current()) extend(token, atLevel(page.songs.map(shuffledTrack), level))
         },
         (reason: unknown) => {
           if (reason instanceof ApiError && reason.status === 404 && request.current()) return fresh(true)

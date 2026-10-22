@@ -104,6 +104,18 @@ it in, the window is the 503).
 A window is read from an MP4 a box at a time and then only the audio it covers, and never kept: the
 page asks on a grid, and the phone keeps each answer a few minutes (WINDOW_CACHE).
 
+NORMALIZATION (`level=album` or `level=track`, 2.0.0-player.62): the player's Normalization has deadwax
+level a FLAC song - by its album's loudness or its own - in the very copy it makes for the player, which is
+one more variant of the song exactly as a resampled one is: its plan (AlbumContexts.copy_plan(), the gain
+from src/levels.py) carries the level and its gain, so its key does; its make is the resample's (the gain
+applied on the way into a 24-bit FLAC, under the resample gate, with or without a resample - src/resample.py);
+its answers say `X-Deadwax-Level: album -7.42` on every answer (200, 206, 416); and what a URL was answered as
+is kept by (song, cap, level). The MP4 of a levelled song is made from its fragmented MP4 as a resampled one's
+is, and its windows are cut from its levelled copy. A song that can't be levelled - not FLAC, 20 or 32 bits,
+no cache folder, the libraries missing - is answered exactly as without `level`; one whose level can't be had
+within src/levels.py's LEVEL_WAIT_SECONDS is answered as the song as it is that once, its URL then carrying on
+from that file. Without `level`, nothing here runs that didn't before it existed.
+
 WHERE: PLAYER_CACHE_PATH (asked for, so the cache can live on an SSD), or the container's
 temporary space when that is empty - never the config volume, which is what people back up. Either way deadwax keeps to a folder of its own inside it, `deadwax-player`,
 which it makes private (0700) and checks is still its own (a real folder, not a link, its owner,
@@ -160,6 +172,7 @@ from starlette.background import BackgroundTask
 
 from src import flac_ranges, resample
 from src.album_context import AlbumContexts, CannotPlan
+from src.levels import Levels
 from src.api.navidrome_endpoint import NavidromeError, navidrome
 from src.config import Config, player_cache_bytes
 from src.flac_mp4 import CannotRepackage, fmp4_layout, mp4_layout
@@ -315,18 +328,40 @@ class Version:
         return hashlib.sha256(material.encode("utf-8")).hexdigest()
 
 
-def _answer_key(song_id: str, max_rate: int | None) -> str | tuple[str, int]:
+def _answer_key(song_id: str, max_rate: int | None, level: str | None = None) -> str | tuple:
     """
     What a URL is remembered by - what "one URL, one container" is about: the song id, or the song
-    id and the cap for a URL asking for the song resampled. Two URLs of one song never share what
-    they were answered as, and a URL whose cap didn't apply still has its own.
+    id and the cap for a URL asking for the song resampled - and (2.0.0-player.62) the song id, the
+    cap and the level for a URL asking for it levelled. Two URLs of one song never share what they
+    were answered as, and a URL whose cap or level didn't apply still has its own.
     """
+    if level is not None:
+        return (song_id, max_rate, level)
     return song_id if max_rate is None else (song_id, max_rate)
 
 
 def _resampled_header(plan: "resample.ResamplePlan | None") -> dict[str, str] | None:
-    """What a resampled song's answers carry, and nothing for any other."""
-    return {"x-deadwax-resampled": plan.header} if plan is not None else None
+    """What the answers of a copy deadwax made carry - X-Deadwax-Resampled for a resampled one,
+    X-Deadwax-Level for a levelled one (2.0.0-player.62) - and nothing for any other."""
+    if plan is None:
+        return None
+    headers = {}
+    if plan.resampled:
+        headers["x-deadwax-resampled"] = plan.header
+    if plan.level_header is not None:
+        headers["x-deadwax-level"] = plan.level_header
+    return headers
+
+
+def _copy_words(plan: "resample.ResamplePlan") -> str:
+    """What a copy deadwax makes does to the song, for the log: "resampled to 48 kHz", "levelled", or
+    both."""
+    words = []
+    if plan.resampled:
+        words.append(f"resampled to {resample.khz(plan.out_rate)}")
+    if plan.gain_db is not None:
+        words.append("levelled")
+    return " and ".join(words)
 
 
 def _total(content_range: str | None) -> int | None:
@@ -855,12 +890,12 @@ class Mp4Cache:
         #? monotonic clock, and for a resampled MP4 the key and headers of the file it was served
         #? from) - what it was last answered as, the URL answered longest ago first. The MP4 path's
         #? alone: the gapless player is never sent FLAC, so it neither reads nor writes this
-        self._answered: dict[str | tuple[str, int], tuple[str, float, tuple[str, dict | None] | None]] = {}
+        self._answered: dict[str | tuple, tuple[str, float, tuple[str, dict | None] | None]] = {}
         #? URL -> (the version of the song it was last served, {the key of a fragmented MP4 of that
         #? version it was served as: the headers its answers carry}, the file served last at the end),
         #? the URL served longest ago first - what an If-Range naming one of those files is answered
         #? from without asking Navidrome
-        self._pinned: dict[str | tuple[str, int], tuple[Version | None, dict[str, dict | None]]] = {}
+        self._pinned: dict[str | tuple, tuple[Version | None, dict[str, dict | None]]] = {}
         #? a resampled song's cache key (each container's own, by the plan it was asked for) -> (until,
         #? on the monotonic clock; the plan it was really made by) - a make that lost a side of its
         #? plan in the last LOST_SECONDS (_make)
@@ -888,6 +923,10 @@ class Mp4Cache:
         #? what is known of the albums of songs resampled: their grids, their songs' STREAMINFO. On
         #? this cache's clock, so its memories expire with the versions'
         self.albums = AlbumContexts(self._version, lambda: self.clock(), VERSION_SECONDS)
+        #? (2.0.0-player.62) how loud each song is, and the gains its levelled copies are made at - the
+        #? plan of a levelled copy asks it (AlbumContexts.copy_plan)
+        self.levels = Levels(self)
+        self.albums.levels = self.levels
         #? whether it has been said that the audio libraries are missing
         self._said_libraries = False
         #? version key -> its FLAC's head, as windows cut straight from the FLAC read it, and the
@@ -949,7 +988,22 @@ class Mp4Cache:
                            f"quality says")
         return missing is None
 
-    async def answer(self, song_id: str, request: Request, max_rate: int | None = None) -> Response | None:
+    def _levelling(self) -> bool:
+        """Whether songs can be levelled here (2.0.0-player.62): numpy and soundfile are there. Said once
+        when not - and a request asking for it is then answered as if it hadn't."""
+        return self.levels.levelling()
+
+    async def _plan(self, version: Version, max_rate: int | None, level: str | None,
+                    window: bool = False) -> resample.ResamplePlan | None:
+        """The plan of the copy asked for: resampled under `max_rate` (AlbumContexts.plan, as before
+        there were levels) - or, with a `level`, levelled too (copy_plan; a turntable's `window` as the
+        song was last answered). Raises CannotPlan."""
+        if level is not None:
+            return await self.albums.copy_plan(version, max_rate, level, window)
+        return await self.albums.plan(version, max_rate)
+
+    async def answer(self, song_id: str, request: Request, max_rate: int | None = None,
+                     level: str | None = None) -> Response | None:
         """
         The song as an MP4, with the request's byte range - or None, and the caller sends the FLAC
         as it is - or a 503, for a request carrying on from an MP4 that can't be had just now (see
@@ -958,13 +1012,16 @@ class Mp4Cache:
 
         `max_rate` (48000): resampled when it is above that, and answered exactly as without it when
         it isn't. A resampled song that can't be had goes as any song's MP4 does: the FLAC as it is.
+        `level` ('album' or 'track', 2.0.0-player.62): levelled, the same way - see the module's docstring.
 
         Cancelling it (the route does when the phone hangs up) takes this request off the make it
         waits for, and a make nobody waits for any more stops.
         """
         if max_rate is not None and not self._resampling():
             max_rate = None
-        url = _answer_key(song_id, max_rate)
+        if level is not None and not self._levelling():
+            level = None
+        url = _answer_key(song_id, max_rate, level)
         header = request.headers.get("range")
         last = self._answered.get(url)
         #? Chromium starts every play with `bytes=0-`, which reads as carrying on - Safari's rest
@@ -979,7 +1036,7 @@ class Mp4Cache:
         folder = await self._folder()
         if folder is None:
             return self._instead(url, carrying_on, "the player's cache has nowhere to go")
-        if carrying_on and max_rate is not None:
+        if carrying_on and (max_rate is not None or level is not None):
             served = await self._served_answer(url, folder, request, last)
             if served is not None:
                 return served
@@ -990,11 +1047,12 @@ class Mp4Cache:
         if version is None:
             return self._as_flac(url)
         plan = None
-        if max_rate is not None:
+        if max_rate is not None or level is not None:
             try:
-                plan = await self.albums.plan(version, max_rate)
+                plan = await self._plan(version, max_rate, level)
             except CannotPlan as e:
-                return self._instead(url, carrying_on, f"its file couldn't be looked at to resample it ({e})")
+                return self._instead(url, carrying_on, f"its file couldn't be looked at to "
+                                                       f"{'level' if level is not None else 'resample'} it ({e})")
         if self._held_size(version, plan) > self.wrap_max_bytes:
             self._refuse(version, self._too_big(version, plan), warn=False, plan=plan)
             return self._as_flac(url)
@@ -1015,7 +1073,9 @@ class Mp4Cache:
             except OSError as e:
                 logger.warning(f"player: the MP4 of song {song_id} couldn't be opened ({e})")
                 break
-            self._mark(url, MP4, (key, extra) if plan is not None else None)
+            #? a levelled URL remembers the file it was served even when it was the song as it is (its
+            #? level not to be had in time): what carries on from it is that file, never a levelled one
+            self._mark(url, MP4, (key, extra) if plan is not None or level is not None else None)
             return response
         return self._instead(url, carrying_on, "its MP4 couldn't be made again just now")
 
@@ -1046,7 +1106,8 @@ class Mp4Cache:
         self._mark(url, MP4, (key, extra))
         return response
 
-    async def answer_fragmented(self, song_id: str, request: Request, max_rate: int | None = None) -> Response:
+    async def answer_fragmented(self, song_id: str, request: Request, max_rate: int | None = None,
+                                level: str | None = None) -> Response:
         """
         The song as a fragmented MP4 for the gapless player, with the request's byte range - always
         an answer of its own, never the FLAC, which a MediaSource can't take (see the module's
@@ -1054,14 +1115,17 @@ class Mp4Cache:
         doesn't have, a login it refuses, a Navidrome that isn't there.
 
         `max_rate` (48000): resampled when it is above that, and answered exactly as without it when
-        it isn't. A resampled song that can't be made is a 415 like any other.
+        it isn't. A resampled song that can't be made is a 415 like any other. `level`
+        (2.0.0-player.62): levelled, the same way.
 
         Cancelling it (the route does when the phone hangs up) takes this request off the make it
         waits for, and a make nobody waits for any more stops - as for the MP4.
         """
         if max_rate is not None and not self._resampling():
             max_rate = None
-        url = _answer_key(song_id, max_rate)
+        if level is not None and not self._levelling():
+            level = None
+        url = _answer_key(song_id, max_rate, level)
         folder = await self._folder()
         if folder is None:
             return _unavailable(SERVER, "the player's cache can't be used on this server just now")
@@ -1077,12 +1141,12 @@ class Mp4Cache:
         if version is None:
             return _refusal(self._why_not.get(song_id) or "it isn't a FLAC file")
         plan = None
-        if max_rate is not None:
+        if max_rate is not None or level is not None:
             try:
-                plan = await self.albums.plan(version, max_rate)
+                plan = await self._plan(version, max_rate, level)
             except CannotPlan as e:
-                logger.warning(f"player: song {song_id}'s file couldn't be looked at to resample it ({e}); "
-                               f"{FMP4_WRAP.instead}")
+                logger.warning(f"player: song {song_id}'s file couldn't be looked at to "
+                               f"{'level' if level is not None else 'resample'} it ({e}); {FMP4_WRAP.instead}")
                 return _unavailable(SONG, "its file couldn't be looked at just now")
         if self._held_size(version, plan) > self.wrap_max_bytes:
             return _refusal(self._refuse(version, self._too_big(version, plan), warn=False, wrap=FMP4_WRAP,
@@ -1118,7 +1182,8 @@ class Mp4Cache:
                                       "made are done")
         return _unavailable(SONG, "its fragmented MP4 couldn't be made just now")
 
-    async def answer_window(self, song_id: str, at: float, seconds: float, max_rate: int | None = None) -> Response:
+    async def answer_window(self, song_id: str, at: float, seconds: float, max_rate: int | None = None,
+                            level: str | None = None) -> Response:
         """
         A stretch of the song - from `at` seconds, for `seconds` - as a FLAC file of its own, for the
         phone turntable's sound (2.0.0-player.14; src/flac_window.py cuts it) and since 2.0.0-player.20
@@ -1130,7 +1195,8 @@ class Mp4Cache:
         (2.0.0-player.23, _from_flac), with nothing made or kept; and only where that can't be done,
         the plain MP4 made as Safari's would be (single flight, the cap, the refusals all its own) and
         the window cut from that, as before. A song played resampled has its window cut from its
-        resampled MP4, made when there is none, exactly as before.
+        resampled MP4, made when there is none, exactly as before - and a song played levelled
+        (`level`, 2.0.0-player.62) from its levelled copy, the same way.
 
         Always an answer of its own, never the song: the window as audio/flac, with
         `X-Deadwax-Window: <first sample>/<samples>/<rate>` saying exactly where in the song it sits;
@@ -1140,6 +1206,8 @@ class Mp4Cache:
         """
         if max_rate is not None and not self._resampling():
             max_rate = None
+        if level is not None and not self._levelling():
+            level = None
         folder = await self._folder()
         try:
             version = await self._version(song_id)
@@ -1155,13 +1223,14 @@ class Mp4Cache:
                 return cut
             return _unavailable(SERVER, "the player's cache can't be used on this server just now")
         plan = None
-        if max_rate is not None:
+        if max_rate is not None or level is not None:
             try:
-                plan = await self.albums.plan(version, max_rate)
+                plan = await self._plan(version, max_rate, level, window=True)
             except CannotPlan:
                 return _unavailable(SONG, "its file couldn't be looked at just now")
         for _ in range(2):
-            source = await self._window_source(version, folder, plan, _answer_key(song_id, max_rate), at, seconds)
+            source = await self._window_source(version, folder, plan, _answer_key(song_id, max_rate, level), at,
+                                               seconds)
             if isinstance(source, Response):
                 #? cut straight from the FLAC: the window, or its 416 or 503
                 return source
@@ -1435,7 +1504,8 @@ class Mp4Cache:
 
     def _too_big(self, version: Version, plan: resample.ResamplePlan | None = None) -> str:
         if plan is not None:
-            return (f"resampled it would be about {self._held_size(version, plan) >> 20} MiB, more than the "
+            done = "resampled" if plan.gain_db is None else _copy_words(plan)
+            return (f"{done} it would be about {self._held_size(version, plan) >> 20} MiB, more than the "
                     f"{self.wrap_max_bytes >> 20} MiB a song is held in memory to repackage")
         return (f"it is {version.size >> 20} MiB, more than the {self.wrap_max_bytes >> 20} MiB a song is "
                 f"held in memory to repackage")
@@ -1559,12 +1629,11 @@ class Mp4Cache:
             del self._refused[next(iter(self._refused))]
         say = logger.warning if warn else logger.info
         if plan is not None and wrap is MP4_WRAP:
-            say(f"player: song {version.song_id} is sent as the FLAC it is, not resampled to "
-                f"{resample.khz(plan.out_rate)} in an MP4 - {reason}")
+            say(f"player: song {version.song_id} is sent as the FLAC it is, not {_copy_words(plan)} in an MP4 - "
+                f"{reason}")
         elif plan is not None:
-            say(f"player: song {version.song_id} isn't streamed by the gapless player resampled to "
-                f"{resample.khz(plan.out_rate)} - it can't be put in {wrap.noun}: {reason}. The player plays it "
-                f"the ordinary way")
+            say(f"player: song {version.song_id} isn't streamed by the gapless player {_copy_words(plan)} - it "
+                f"can't be put in {wrap.noun}: {reason}. The player plays it the ordinary way")
         elif wrap is MP4_WRAP:
             say(f"player: song {version.song_id} is sent to Safari as FLAC, not in an MP4 - {reason}. "
                 f"It plays, but Safari's seeks in it can land seconds off")
@@ -1701,7 +1770,8 @@ class Mp4Cache:
                         got = await self._from_twin(version, path, had, kept, resampled)
                         if got is not None:
                             return got
-            room = await self._room(folder, version.size, kept, what, wrap)
+            #? a levelled copy of a 16-bit song comes out bigger than its source (24-bit): room for that
+            room = await self._room(folder, max(version.size, kept), kept, what, wrap)
             if not room:
                 return room
 
@@ -1725,6 +1795,16 @@ class Mp4Cache:
             size, took = written
             if plan is None:
                 logger.info(f"player: {what} put in {wrap.made} ({size >> 10} KiB, repackaged in {took:.0f} ms)")
+            elif plan.gain_db is not None:
+                resampled_from = (f"resampled from {resample.khz(plan.source_rate)} to {resample.khz(plan.out_rate)} "
+                                  f"and " if plan.resampled else "")
+                logger.info(f"player: {what} {resampled_from}levelled ({plan.level}, {plan.gain_db:+.2f} dB), and put "
+                            f"in {wrap.made} ({size >> 10} KiB, made in {made.seconds * 1000:.0f} ms, repackaged in "
+                            f"{took:.0f} ms)")
+                if made.beyond_db is not None:
+                    logger.warning(f"player: {what} was lowered a further {made.beyond_db:.2f} dB so nothing clips - "
+                                   f"past its level's gain, which its measurement said was enough; its joins with the "
+                                   f"songs beside it step in level by that much")
             else:
                 logger.info(f"player: {what} resampled from {resample.khz(plan.source_rate)} to "
                             f"{resample.khz(plan.out_rate)}, {round(made.lowered_db, 2):g} dB down, and put in "
@@ -1805,9 +1885,14 @@ class Mp4Cache:
                 return None
         finally:
             await asyncio.to_thread(twin.close)
-        logger.info(f"player: {what} put in {MP4_WRAP.made}, resampled from {resample.khz(plan.source_rate)} to "
-                    f"{resample.khz(plan.out_rate)}, out of the fragmented MP4 of it the gapless player has - no "
-                    f"download, no resample ({size >> 10} KiB, repackaged in {took:.0f} ms)")
+        if plan.gain_db is None:
+            logger.info(f"player: {what} put in {MP4_WRAP.made}, resampled from {resample.khz(plan.source_rate)} to "
+                        f"{resample.khz(plan.out_rate)}, out of the fragmented MP4 of it the gapless player has - no "
+                        f"download, no resample ({size >> 10} KiB, repackaged in {took:.0f} ms)")
+        else:
+            logger.info(f"player: {what} put in {MP4_WRAP.made}, {_copy_words(plan)} ({plan.level}, "
+                        f"{plan.gain_db:+.2f} dB), out of the fragmented MP4 of it the gapless player has - no "
+                        f"download, nothing made again ({size >> 10} KiB, repackaged in {took:.0f} ms)")
         self._used[path.name] = self.wall_clock()
         await asyncio.to_thread(self._evict, folder, path.name, max(0, size - kept))
         return path
@@ -1895,6 +1980,11 @@ class Mp4Cache:
         if plan is None:
             return version.size
         estimate = plan.estimated_bytes(version.size)
+        if not plan.resampled:
+            #? (2.0.0-player.62) levelled at the song's own rate: 24-bit whatever the source, so a CD song's
+            #? copy comes out bigger than it (measured 1.57 times, the estimate 1.5) - what it is over is
+            #? trimmed after, as for any make (_evict)
+            return estimate
         return min(version.size, estimate * 5 // 4 if plan.bits < resample.OUTPUT_BITS else estimate)
 
     @staticmethod

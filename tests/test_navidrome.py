@@ -264,12 +264,19 @@ def test_there_is_no_general_proxy():
     asker's starred albums or the store's - read as the asker with getAlbumList2, the call `/albums` already makes,
     a page of 500 at a time. Its one parameter is the scope (a Literal), which picks the list type; nothing else the
     page sends reaches Navidrome - see test_navidrome_album_index.py.
+
+    `/level/{song_id}` and `/level/album/{album_id}` joined it in 2.0.0-player.62, deliberately: the player's
+    Normalization - deadwax's OWN answers, not relays. The first says what deadwax would level a song at, from
+    what it has measured, asking Navidrome only what the stream's copy asks (its version, STREAMINFO, the album
+    listing - internal calls through the client); its parameters a Literal level and the stream's own cap. The
+    second (a POST) starts measuring an album's songs in the background, after one getAlbum AS THE ASKER for the
+    id it was given, bounded. Neither passes anything the page sent on - see test_normalization.py.
     """
     paths = sorted(route.path for route in navidrome_routes.router.routes)
 
     assert paths == [
         "/album_index", "/albums", "/albums/{album_id}", "/artists", "/artists/{artist_id}", "/cover/{cover_id}",
-        "/playlists", "/playlists", "/playlists/{playlist_id}", "/playlists/{playlist_id}/add",
+        "/level/album/{album_id}", "/level/{song_id}", "/playlists", "/playlists", "/playlists/{playlist_id}", "/playlists/{playlist_id}/add",
         "/playlists/{playlist_id}/delete", "/playlists/{playlist_id}/edit",
         "/scrobble/{song_id}", "/scrub/{song_id}", "/search", "/shuffle", "/shuffle/{token}", "/songs/{song_id}",
         "/status", "/stream/{song_id}",

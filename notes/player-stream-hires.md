@@ -243,7 +243,11 @@ review_confirmed.md); what matters is below.
   phone's own float volume stage does when it converts hi-res itself. A song past even 3 dB gets a
   second pass, lowered exactly enough, and a WARNING naming the step at its joins. The headroom is in
   the cache key. Don't "tidy" it back to a per-song gain, and say so to James if he asks why 48 kHz
-  is quieter: match levels before comparing.
+  is quieter: match levels before comparing. (2.0.0-player.62: with the player's Normalization on - the
+  default - a resampled song gets its LEVEL's gain instead, with HEADROOM_DB reserved inside the level's
+  peak limit - for the whole album when any of its songs is one deadwax resamples at 48 kHz, under either
+  setting (`_album_reserve()`); under Off this is exactly as here. See
+  notes/player-normalization.md.)
 - **The joins: context and one grid.** Resampling a song on its own treats the silence around it as
   music - measured -24 to -6 dB error at every join of continuous music. So each song is resampled
   with the last 16384 input samples of the album's song before and the first 16384 of the song after

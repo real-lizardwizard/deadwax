@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'preact/hooks'
 
 import type { FormatPreference } from '../api/types'
+import { DEFAULT_NORMALIZATION, type Normalization } from '../lib/loudness'
 import { isSpeed, roundSpeed, SPEED_NORMAL } from '../lib/playSpeed'
 import type { MaxRate } from '../lib/streamWrap'
 import type { Look } from '../lib/turntable'
@@ -51,6 +52,10 @@ export const STORAGE_KEYS = {
   /** The player's "Maximum quality": '48000' (the default, and anything unknown) or 'original'.
    *  The player's own, like its gapless switch. */
   playerMaxRate: 'deadwax-player-max-rate',
+  /** The player's Normalization (2.0.0-player.62): 'song', 'album' or 'off'; anything else - nothing stored, a
+   *  mistyped value, storage that can't be read - is 'auto', what James asked for as the default. Per device,
+   *  like Maximum quality: a desktop on speakers and a phone on AirPods can want different things. */
+  playerNormalization: 'deadwax-player-normalization',
   /** "Now Playing opens as" (2.0.0-player.11): 'turntable', or anything else for the cover (the
    *  default). Per device, like the two above. */
   playerOpensAs: 'deadwax-player-opens-as',
@@ -330,6 +335,23 @@ export function readPlayerMaxRate(): MaxRate {
 
 export function writePlayerMaxRate(rate: MaxRate): void {
   writeRaw(STORAGE_KEYS.playerMaxRate, rate)
+}
+
+/* ===== deadwax-player-normalization ===== */
+
+/**
+ * The player's Normalization (2.0.0-player.62), per device like Maximum quality. By song, By album or Off only
+ * when it says exactly that: anything else - nothing stored, an old or mistyped value, storage that can't be
+ * read - is Automatic, the default James asked for (an album levelled as an album, everything else song by
+ * song). Read at each play (player/levelling.ts), never by the engine.
+ */
+export function readPlayerNormalization(): Normalization {
+  const saved = readRaw(STORAGE_KEYS.playerNormalization)
+  return saved === 'song' || saved === 'album' || saved === 'off' ? saved : DEFAULT_NORMALIZATION
+}
+
+export function writePlayerNormalization(setting: Normalization): void {
+  writeRaw(STORAGE_KEYS.playerNormalization, setting)
 }
 
 /* ===== deadwax-player-opens-as ===== */

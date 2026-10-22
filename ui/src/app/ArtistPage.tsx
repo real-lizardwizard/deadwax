@@ -22,6 +22,7 @@ import {
   artistAlbums, artistIndexAge, libraryArtists, prefetchAlbum, rememberQueue, toQueueTrack,
   type Album, type AlbumWithSongs, type ArtistWithAlbums,
 } from '../player/api'
+import { queued } from '../player/levelling'
 import { Cover } from '../player/Cover'
 import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, PlayIcon, ShuffleIcon } from '../player/icons'
 import { ArchiveCover } from './ArchiveCover'
@@ -614,7 +615,8 @@ export function ArtistPage({
     const tracks = albums.flatMap((album) => (album.song ?? []).map((song) => toQueueTrack(song, album)))
     if (!tracks.length) return
     rememberQueue(albums)
-    actions.playTracks(tracks, shuffle ? null : 0, shuffle)
+    //? (2.0.0-player.62) Play is their albums in order, each an album played as one; Shuffle mixes songs
+    actions.playTracks(queued(tracks, shuffle ? 'songs' : 'album'), shuffle ? null : 0, shuffle)
   }
 
   const name = artist?.name ?? facts?.name ?? preview?.name ?? ''

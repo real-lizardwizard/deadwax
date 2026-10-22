@@ -29,6 +29,7 @@
  * Pure: nothing here fetches, touches the page or imports Preact (app-rules.sim.cjs holds that).
  */
 
+import type { Level, QueuedAs } from './loudness'
 import { EMPTY_QUEUE, current, nextIndex, previousAction, type PlayQueue, type PreviousAction, type QueueTrack } from './playQueue'
 
 export type Repeat = 'off' | 'all' | 'one'
@@ -62,6 +63,9 @@ export interface Paged {
   total: number
   fetched: number
   scope: 'yours' | 'store'
+  /** (2.0.0-player.62) the level the shuffle was queued at (lib/loudness.ts) - its later pages are queued at it
+   *  too (app/useShuffleFeed.ts), so a change of setting never levels a shuffle two ways. None under Off. */
+  level?: Level
 }
 
 export interface UpNextState {
@@ -91,6 +95,9 @@ export interface QueuePick<Album = { id: string }> {
   label: string
   tracks: QueueTrack[]
   albums: Album[]
+  /** (2.0.0-player.62) how its songs are queued for the player's Normalization: 'album' for an album's own •••
+   *  (the whole album), songs otherwise - lib/loudness.ts levelFor() */
+  as?: QueuedAs
 }
 
 /** Songs a Repeat keeps queued past the song playing - well ahead of the stream's look for the next one. */

@@ -354,6 +354,9 @@ WALK = {
     "/playlists/{playlist_id}/add": [("post", "/playlists/{mine}/add", {"song_ids": [SONG], "duplicates": "add"})],
     "/playlists/{playlist_id}/edit": [("post", "/playlists/{mine}/edit", "FRESH")],
     "/playlists/{playlist_id}/delete": [("post", "/playlists/{mine}/delete")],
+    #? (2.0.0-player.62) Normalization: Info's level of a song, and an album page's "measure this album" (a 202)
+    "/level/{song_id}": [("get", f"/level/{SONG}?level=track")],
+    "/level/album/{album_id}": [("post", "/level/album/nd-dummy")],
 }
 
 #? whose playlist the walk's `{mine}` is, by who asks
@@ -365,6 +368,11 @@ ASKS_NAVIDROME_NOTHING = {"/shuffle/{token}?offset=0"}
 #? what the stream cache asks Navidrome as the shared account while answering: its version check, its download
 #? and the turntable's ranges - every one a `stream` of the file as it is
 CACHE_CALL = ("demo", "stream")
+
+#? (2.0.0-player.62) what the player's Normalization asks as the shared account once the asker's access is confirmed:
+#? an album's listing and its songs (src/levels.py - measured once for every phone), beside the cache's own reads
+LEVEL_CALLS = {CACHE_CALL, ("demo", "getAlbum"), ("demo", "getSong")}
+LEVEL_WAYS = {f"/level/{SONG}?level=track", "POST /level/album/nd-dummy"}
 
 
 def way_key(method: str, path: str) -> str:
@@ -390,7 +398,7 @@ def walk(env, client: TestClient, asker: str = "ethan") -> dict[str, list[tuple[
             #? each way asks as if afresh - the access a way before it confirmed isn't carried over
             navidrome_routes.forget_access()
             response = getattr(client, method)(f"{PLAYER}{asked}", **({"json": sent} if sent is not None else {}))
-            assert response.status_code in (200, 206), (path, response.status_code, response.text[:200])
+            assert response.status_code in (200, 202, 206), (path, response.status_code, response.text[:200])
             if route == "/shuffle":
                 token = response.json()["token"]
             made[way_key(method, path)] = env.fake.by()
@@ -406,8 +414,11 @@ def test_every_player_route_asks_navidrome_as_the_signed_in_user(player):
 
     for path, calls in made.items():
         assert calls or path in ASKS_NAVIDROME_NOTHING, f"{path} asked Navidrome nothing"
-        theirs = [call for call in calls if call != CACHE_CALL]
+        theirs = [call for call in calls if call != CACHE_CALL and not (path in LEVEL_WAYS and call in LEVEL_CALLS)]
         assert (theirs or path in ASKS_NAVIDROME_NOTHING) and all(user == "ethan" for user, _ in theirs), (path, calls)
+    #? Normalization's reads as the shared account only after ethan's access is confirmed: his getSong, his getAlbum
+    assert made[f"/level/{SONG}?level=track"][0] == ("ethan", "getSong"), made[f"/level/{SONG}?level=track"]
+    assert made["POST /level/album/nd-dummy"][0] == ("ethan", "getAlbum"), made["POST /level/album/nd-dummy"]
     #? the stream cache's make alone asks as the shared account - and only after ethan's access is confirmed
     for path in (f"/stream/{SONG}?format=raw&wrap=mp4", f"/stream/{SONG}?format=raw&wrap=fmp4", f"/scrub/{SONG}?at=0&seconds=1"):
         assert made[path][0] == ("ethan", "getSong"), (path, made[path])

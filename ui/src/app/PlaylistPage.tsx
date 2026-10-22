@@ -13,6 +13,7 @@ import {
 import type { QueuePick } from '../lib/upNext'
 import { Cover } from '../player/Cover'
 import { playedAlbum, rememberQueue, toQueueTrack, type AlbumWithSongs } from '../player/api'
+import { queued } from '../player/levelling'
 import { CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronUpIcon, CloseIcon, GripIcon, MoreIcon, PlayIcon, PlayingBars, PlaylistIcon, ShuffleIcon } from '../player/icons'
 import type { Player } from '../player/usePlayer'
 import { ConfirmLine } from './ConfirmLine'
@@ -182,7 +183,7 @@ export function PlaylistPage({
   const play = (start: number | null, shuffle = false) => {
     if (!tracks.length) return
     rememberQueue(remembered(albums))
-    player.playTracks(tracks, start, shuffle)
+    player.playTracks(queued(tracks, 'songs'), start, shuffle)
   }
 
   const songMenu = (event: MouseEvent, index: number) => {

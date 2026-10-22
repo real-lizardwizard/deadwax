@@ -475,6 +475,9 @@ async def stream(
     #? a Literal[48000] refuses every request. DECLARED, like everything the page sends - a
     #? parameter left out is ignored without a word, and the song would come back as it is
     max_rate: Literal["48000"] | None = None,
+    #? (2.0.0-player.62) the player's Normalization: DECLARED, like max_rate - left out, it would be dropped
+    #? without a word and the song come back as it is
+    level: Literal["album", "track"] | None = None,
 ):
     """
     A song's audio, with the page's byte range and conditions passed through.
@@ -502,6 +505,11 @@ async def stream(
     answered exactly as without it - the same bytes, the same ETag. It is a variant of its own: the
     same song asked for without it is another file, answered on its own.
 
+    `level=album` or `level=track` (2.0.0-player.62), with `format=raw` and a `wrap` only, as for
+    `max_rate`: the player's Normalization - a FLAC song levelled by deadwax to its album's loudness or its
+    own, in the copy it makes, 24-bit, never clipped (src/levels.py, src/loudness.py), its answers saying
+    `X-Deadwax-Level: album -7.42`. A song that can't be levelled is answered exactly as without it.
+
     `format=raw` is the file as it is, which is the only kind Navidrome can answer a byte range
     for, and the player asks for it for every file the phone can play. It is asked for by name
     because Navidrome answers `raw` before it looks at anything set for this client on its
@@ -517,6 +525,9 @@ async def stream(
         #? a transcode has no FLAC to resample, and the FLAC relayed as it is can't be either
         raise HTTPException(status_code=400, detail="max_rate needs format=raw and wrap=mp4 or wrap=fmp4: only "
                                                     "the file as it is, repackaged by deadwax, can be resampled")
+    if level is not None and (format != "raw" or wrap is None):
+        raise HTTPException(status_code=400, detail="level needs format=raw and wrap=mp4 or wrap=fmp4: only a copy "
+                                                    "deadwax makes can be levelled")
 
     if wrap == "fmp4":
         if format != "raw":
@@ -528,7 +539,7 @@ async def stream(
             #? (2.0.0-player.52) the cache's copy only for a user Navidrome would give the song to
             await _theirs(request, song_id)
             #? as for the MP4: the phone hanging up is looked for, and cancels the answer
-            return await unless_abandoned(request, player_cache.cache.answer_fragmented(song_id, request, rate))
+            return await unless_abandoned(request, player_cache.cache.answer_fragmented(song_id, request, rate, level))
         except ClientGone:
             return Response(status_code=204)
         except NavidromeError as e:
@@ -540,7 +551,7 @@ async def stream(
             #? uvicorn never cancels a handler whose phone has gone, so this looks every half second
             #? and cancels the answer itself - which takes the request off the MP4 it waits for, and a
             #? make nobody waits for stops, its download from Navidrome included
-            wrapped = await unless_abandoned(request, player_cache.cache.answer(song_id, request, rate))
+            wrapped = await unless_abandoned(request, player_cache.cache.answer(song_id, request, rate, level))
         except ClientGone:
             return Response(status_code=204)
         except NavidromeError as e:
@@ -569,8 +580,8 @@ SCRUB_MAX_AT = 86400.0
 SCRUB_SECONDS = 30.0
 SCRUB_MIN_SECONDS = 1.0
 SCRUB_MAX_SECONDS = 60.0
-#? the only parameters it takes - anything else is refused, not ignored
-SCRUB_PARAMETERS = frozenset({"at", "seconds", "max_rate"})
+#? the only parameters it takes - anything else is refused, not ignored (`level` since 2.0.0-player.62)
+SCRUB_PARAMETERS = frozenset({"at", "seconds", "max_rate", "level"})
 
 
 @router.get("/scrub/{song_id}")
@@ -580,6 +591,7 @@ async def scrub(
     at: float = Query(..., ge=0, le=SCRUB_MAX_AT),
     seconds: float = Query(SCRUB_SECONDS, ge=SCRUB_MIN_SECONDS, le=SCRUB_MAX_SECONDS),
     max_rate: Literal["48000"] | None = None,
+    level: Literal["album", "track"] | None = None,
 ):
     """
     A stretch of a FLAC song - from `at` seconds, for `seconds` - as a FLAC file of its own, which the
@@ -595,29 +607,74 @@ async def scrub(
     where that can't be done): the frames that cover the stretch, untouched, renumbered from 0 under a
     STREAMINFO of their own, the same bytes either way. Nothing the page sends is passed on.
     `max_rate=48000`, as the stream route takes it, when the page plays the song resampled: the window
-    is cut from that very copy, so it sounds as the song does - its rate, its level. The answer says
-    exactly where in the song it sits, `X-Deadwax-Window: <first sample>/<samples>/<rate>`, since it
-    starts on a frame (or a fragment of about a second) at or before `at` and a hi-res song's window
+    is cut from that very copy, so it sounds as the song does - its rate, its level. And `level`
+    (2.0.0-player.62), as the stream route takes it, when the page plays the song levelled: cut from
+    the levelled copy, so the record sounds at the level the song plays at. The answer says exactly
+    where in the song it sits, `X-Deadwax-Window: <first sample>/<samples>/<rate>`, since it starts on a frame (or a fragment of about a second) at or before `at` and a hi-res song's window
     is shorter than asked (WINDOW_MAX_BYTES). A song that isn't a FLAC is a 415 saying so - the
     turntable is silent for it - a start past the end a 416, Navidrome breaking off a 503, and a cache
     that can't be used a 503 when the window can't be cut from the FLAC either.
 
-    Only `at`, `seconds` and `max_rate`: anything else is refused (422), as everything out of their
-    bounds is, and any cap but 48000.
+    Only `at`, `seconds`, `max_rate` and `level`: anything else is refused (422), as everything out of
+    their bounds is, any cap but 48000 and any level but album and track.
     """
     unknown = set(request.query_params) - SCRUB_PARAMETERS
     if unknown:
-        raise HTTPException(status_code=422, detail="the turntable's window takes only at, seconds and max_rate")
+        raise HTTPException(status_code=422, detail="the turntable's window takes only at, seconds, max_rate and level")
     try:
         rate = int(max_rate) if max_rate else None
         #? (2.0.0-player.52) cut from the cache's copy, or from the FLAC as the shared account - only for a
         #? user Navidrome would give the song to
         await _theirs(request, song_id)
-        return await unless_abandoned(request, player_cache.cache.answer_window(song_id, at, seconds, rate))
+        return await unless_abandoned(request, player_cache.cache.answer_window(song_id, at, seconds, rate, level))
     except ClientGone:
         return Response(status_code=204)
     except NavidromeError as e:
         raise _fail(e)
+
+
+@router.get("/level/{song_id}")
+async def level_of(
+    request: Request,
+    song_id: str = PathParam(..., min_length=1, max_length=ID_MAX),
+    level: Literal["album", "track"] = Query(...),
+    max_rate: Literal["48000"] | None = None,
+):
+    """
+    (2.0.0-player.62) What deadwax would level this song at, asked at `level` under that cap - Info's
+    Normalization row: from what it has measured already, at once, never measuring and never making
+    anything (src/levels.py describe()). `state` is measured, measuring, unmeasured, plain (answered as it
+    is this time, its level not to be had in time) or not_levelled (with `why`); measured carries the gain and
+    what it came from. deadwax's own answer, not a relay - for a song Navidrome would give this user (as the
+    stream's copy is). The cap is dropped where the stream drops it (without the resample's libraries).
+    """
+    try:
+        await _theirs(request, song_id)
+        cap = int(max_rate) if max_rate and player_cache.cache._resampling() else None
+        return await player_cache.cache.levels.describe(song_id, level, cap)
+    except NavidromeError as e:
+        raise _fail(e)
+    except httpx.TransportError:
+        raise HTTPException(status_code=503, detail="Navidrome broke off saying which file it has")
+
+
+@router.post("/level/album/{album_id}", status_code=202)
+async def level_album(request: Request, album_id: str = PathParam(..., min_length=1, max_length=ID_MAX)):
+    """
+    (2.0.0-player.62) "This album is about to be played" - its album page opened: deadwax measures its
+    songs not yet measured, in the background (not waited for), unless it is measuring another album, and
+    then this is dropped (`busy`): a play measures on demand anyway. The album is looked up AS THE ASKER
+    (Navidrome answers only for an album that user may see), then measured as the shared account, as every
+    other read the player cache makes.
+    """
+    cache = player_cache.cache
+    if not cache.levels.levelling() or await cache._folder() is None:
+        return {"state": "not_levelled"}
+    try:
+        await client_for(request).call("getAlbum", {"id": album_id})
+    except NavidromeError as e:
+        raise _fail(e)
+    return {"state": cache.levels.warm(album_id)}
 
 
 @router.post("/scrobble/{song_id}")

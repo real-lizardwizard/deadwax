@@ -3,7 +3,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/ho
 
 import { isAbort, latestOnly } from '../lib/latest'
 import { feelWords, musicFeel, newFeel } from '../lib/musicFeel'
-import { nextIndex, type QueueTrack } from '../lib/playQueue'
+import { nextIndex } from '../lib/playQueue'
+import { levels, type LevelledTrack } from '../lib/loudness'
 import { isFlac, resamples, type MaxRate } from '../lib/streamWrap'
 import { playingDisc } from '../lib/turntable'
 import {
@@ -691,9 +692,12 @@ function VisualizerScreen({ player, opener, onClose }: { player: Player; opener:
 }
 
 /** What the silent copy needs to know of a song: its id and length, whether it is a FLAC, and the
- *  cap the player asks for it at (so the window is cut from the very copy it plays). */
-function syncSong(track: QueueTrack, length: number, maxRate: MaxRate): SyncSong {
-  return { id: track.id, length: length || 0, flac: isFlac(track), maxRate: resamples(track, maxRate, 'raw') ? 48000 : null }
+ *  cap and the level the player asks for it at (so the window is cut from the very copy it plays). */
+function syncSong(track: LevelledTrack, length: number, maxRate: MaxRate): SyncSong {
+  return {
+    id: track.id, length: length || 0, flac: isFlac(track), maxRate: resamples(track, maxRate, 'raw') ? 48000 : null,
+    level: levels(track, 'raw') ? track.level ?? null : null,
+  }
 }
 
 /** A picture fetched and decoded; null when there is none (a 404 - for CD art, deadwax has none). */

@@ -44,6 +44,17 @@ numpy, soxr and soundfile are imported inside the functions that use them, never
 deadwax without them (run from source, say) starts as ever and sends every song as it is -
 `missing_libraries()` says which are missing. Everything the tests pin about grids and counts is
 plain Python.
+
+LEVELLED (2.0.0-player.62, the player's Normalization - src/loudness.py measures, src/levels.py decides
+the gain): the copy deadwax makes can carry a gain as well as, or instead of, a resample. ResamplePlan is
+the plan of any copy deadwax makes of a song - resampled, levelled, or both - its `gain_db` the level's.
+A levelled copy that isn't resampled skips soxr altogether (`_level_pass()`): each block read as float64,
+multiplied by the gain and quantised by the very code the resample's pass uses (`_quantise()`) - 24-bit,
+undithered, deterministic. Resampled AND levelled, the resample's pass runs with the level's gain in
+place of HEADROOM_DB's - quantised once - and the gain already keeps the resample's 3 dB of room inside
+its limit. Either way an over (which the gain's peak limit makes impossible unless a measurement was
+wrong) is done again lowered by exactly enough, as the resample's always was. Without a level, nothing
+here is any different from before it.
 """
 
 import io
@@ -90,6 +101,13 @@ RESAMPLED_DEPTHS = frozenset({16, 24})
 #? What the output always is: 24-bit, whatever the source, so the rounding after resampling is
 #? 144 dB down rather than 96.
 OUTPUT_BITS = 24
+
+#? (2.0.0-player.62) Part of every levelled copy's cache key (ResamplePlan.material()), beside the level
+#? and its gain. Bump it whenever what a levelled copy holds changes - the rounding, the depth.
+LEVEL_FORMAT_VERSION = 1
+
+#? The levels a copy can be made at: the song's own gain, or its album's.
+LEVELS = ("album", "track")
 
 #? How much of each neighbour is taken as context, in input samples. The VHQ filter reaches +-548
 #? input samples at 4:1 and +-1120 at 8:1 (to -200 dB); measured, 1024 samples of context left an
@@ -209,9 +227,14 @@ class Neighbour:
 
 @dataclass(frozen=True)
 class ResamplePlan:
-    """Everything that decides a resampled song's bytes, but its own file."""
+    """
+    Everything that decides the bytes of a copy deadwax makes of a song, but its own file - resampled,
+    levelled (2.0.0-player.62), or both. Kept under this name: the player cache's plumbing takes it
+    everywhere. A levelled copy that isn't resampled has `out_rate == source_rate` (a ratio of 1), phase
+    0, no neighbours, and `max_rate` as it was asked (None or 48000).
+    """
 
-    max_rate: int
+    max_rate: int | None
     source_rate: int
     out_rate: int
     channels: int
@@ -220,6 +243,10 @@ class ResamplePlan:
     phase: int = 0
     before: Neighbour | None = None
     after: Neighbour | None = None
+    #? (2.0.0-player.62) the level ('album' or 'track') and its gain in dB, already rounded down to the
+    #? hundredth (src/loudness.py gain_for()) - None for a copy that is only resampled
+    level: str | None = None
+    gain_db: float | None = None
 
     @property
     def ratio(self) -> int:
@@ -231,17 +258,36 @@ class ResamplePlan:
         return f"{self.source_rate}-{self.out_rate}"
 
     @property
+    def resampled(self) -> bool:
+        """Whether the copy is resampled - a levelled one need not be."""
+        return self.out_rate != self.source_rate
+
+    @property
+    def level_header(self) -> str | None:
+        """What a levelled copy's answers say in X-Deadwax-Level: the level and its gain, `album -7.42` -
+        None for a copy that isn't levelled."""
+        if self.gain_db is None:
+            return None
+        return f"{self.level} {self.gain_db:+.2f}"
+
+    @property
     def samples_out(self) -> int:
         return output_count(self.total_samples, self.phase, self.ratio)
 
     def material(self) -> list:
         """What goes in the cache key besides the song's own version: the neighbours by identity, so
         a new context is a new file - and the cap, the rate, the grid, the context length and the
-        headroom."""
+        headroom. A levelled copy's (2.0.0-player.62) adds the level's format version, the level and
+        its gain BY VALUE, so a copy is never served for another gain: a re-measure, an album that
+        gained a song, a new algorithm all make a new file. Exactly the list it always was without a
+        level, so every resampled file kept from before keeps its key."""
         def who(neighbour: Neighbour | None):
             return [neighbour.song_id, neighbour.version_key] if neighbour else None
-        return [RESAMPLE_FORMAT_VERSION, self.max_rate, self.out_rate, self.phase, CONTEXT_SAMPLES,
-                HEADROOM_DB, who(self.before), who(self.after)]
+        material = [RESAMPLE_FORMAT_VERSION, self.max_rate, self.out_rate, self.phase, CONTEXT_SAMPLES,
+                    HEADROOM_DB, who(self.before), who(self.after)]
+        if self.gain_db is not None:
+            material += [LEVEL_FORMAT_VERSION, self.level, f"{self.gain_db:+.2f}"]
+        return material
 
     def estimated_bytes(self, size: int) -> int:
         """About how big the resampled FLAC of a `size`-byte source comes out: the source scaled by
@@ -259,10 +305,11 @@ class Resampled:
     #? the loudest resampled sample before any lowering, in dBFS
     peak_db: float
     #? how far the song was lowered in all, in dB: HEADROOM_DB, like every resampled song - or more,
-    #? for one that would have clipped even so
+    #? for one that would have clipped even so. A levelled copy's (2.0.0-player.62) is the level's gain
+    #? turned round (a gain of -7.42 dB is 7.42 lower; a negative number, a song brought UP)
     lowered_db: float
-    #? how much of that was beyond the headroom, in dB - None for all but a song clipped very hard
-    #? when it was made, whose joins with the songs beside it step in level by as much
+    #? how much of that was beyond the headroom (or the level's gain), in dB - None for all but a song
+    #? clipped very hard when it was made, whose joins with the songs beside it step in level by as much
     beyond_db: float | None
     seconds: float
 
@@ -285,6 +332,10 @@ def resample_file(source: Path, target: Path, *, plan: ResamplePlan, before=None
 
     Every song comes out lowered by HEADROOM_DB, and one that would pass full scale even so is
     resampled a second time, lowered further by exactly enough (Resampled.beyond_db).
+
+    A levelled plan (2.0.0-player.62, `plan.gain_db`) is multiplied by the level's gain in place of
+    HEADROOM_DB's - and, with a ratio of 1, isn't resampled at all (_level_pass()): only the gain and
+    the same 24-bit rounding. An over is done again lowered by exactly enough, the same way.
     """
     import numpy as np
     import soundfile as sf
@@ -313,21 +364,28 @@ def resample_file(source: Path, target: Path, *, plan: ResamplePlan, before=None
 
     pre = _fit(np, before, channels, "pre")
     post = _fit(np, after, channels, "post")
-    gain = 10 ** (-HEADROOM_DB / 20)
-    high, low, over = _pass(source, target, plan, pre, post, gain, stop)
+    #? (2.0.0-player.62) a levelled copy: the level's gain in place of the headroom's, and with a ratio
+    #? of 1 no resample at all
+    levelled = plan.gain_db is not None
+    run = _pass if plan.ratio > 1 else _level_pass
+    if plan.ratio == 1 and not levelled:
+        raise CannotResample("a copy at its own rate with no level to apply would be the song itself")
+    first = 10 ** (plan.gain_db / 20) if levelled else 10 ** (-HEADROOM_DB / 20)
+    gain = first
+    high, low, over = run(source, target, plan, pre, post, gain, stop)
     peak = max(high, -low)
-    lowered, beyond = HEADROOM_DB, None
+    lowered, beyond = (-plan.gain_db if levelled else HEADROOM_DB), None
     if over:
         #? Past full scale even with the headroom - a master clipped very hard. Lower the whole song
         #? by exactly enough that its loudest sample lands on full scale, and resample again: the
         #? first pass kept nothing but its peaks. It is lowered more than the songs beside it, so
         #? their joins step in level by the difference, which the caller says.
         gain = min(_TOP / (high * _FULL) if high > 0 else 1.0, _BOTTOM / (low * _FULL) if low < 0 else 1.0)
-        again = _pass(source, target, plan, pre, post, gain, stop)
+        again = run(source, target, plan, pre, post, gain, stop)
         if again != (high, low, False):
             raise CannotResample("the second pass didn't resample exactly as the first did")
         lowered = -20 * math.log10(gain)
-        beyond = lowered - HEADROOM_DB
+        beyond = lowered - (-plan.gain_db if levelled else HEADROOM_DB)
     return Resampled(samples_in=plan.total_samples, samples_out=plan.samples_out,
                      peak_db=20 * math.log10(peak) if peak > 0 else -math.inf, lowered_db=lowered,
                      beyond_db=beyond, seconds=time.monotonic() - began)
@@ -395,12 +453,9 @@ def _pass(source: Path, target: Path, plan: ResamplePlan, pre, post, gain: float
             return
         high = max(high, float(y.max()))
         low = min(low, float(y.min()))
-        q = np.rint(y * scale)
-        over = over or bool(q.max() > _TOP or q.min() < _BOTTOM)
-        #? only ever acts on a first pass that is about to be done again, lowered further: without it
-        #? a value past 24 bits would overflow the shift below
-        np.clip(q, _BOTTOM, _TOP, out=q)
-        out.write(q.astype(np.int32) << 8)
+        q, past = _quantise(np, y, scale)
+        over = over or past
+        out.write(q)
         written += len(y)
 
     with sf.SoundFile(str(source)) as song, _flac_output(target, plan.out_rate, channels) as out:
@@ -427,6 +482,60 @@ def _pass(source: Path, target: Path, plan: ResamplePlan, pre, post, gain: float
         emit(out, stream.resample_chunk(np.ascontiguousarray(tail), last=True))
     if written != want:
         raise CannotResample(f"{written} samples came out where the grid has {want}")
+    return high, low, over
+
+
+def _quantise(np, y, scale: float):
+    """
+    Samples (floats, 1.0 = full scale) as the 24-bit FLAC takes them: multiplied by `scale` (24-bit full
+    scale times the gain), rounded to the nearest - undithered, so the same song makes the same bytes -
+    and shifted into libsndfile's 32-bit words. And whether any of them, rounded, fell outside 24 bits:
+    clipped here, on a pass about to be done again. The resample's pass and the level's both write
+    through this, so a resampled song's bytes are what they always were.
+    """
+    q = np.rint(y * scale)
+    over = bool(q.max() > _TOP or q.min() < _BOTTOM)
+    #? only ever acts on a first pass that is about to be done again, lowered further: without it
+    #? a value past 24 bits would overflow the shift below
+    np.clip(q, _BOTTOM, _TOP, out=q)
+    return q.astype(np.int32) << 8, over
+
+
+def _level_pass(source: Path, target: Path, plan: ResamplePlan, pre, post, gain: float,
+                stop) -> tuple[float, float, bool]:
+    """
+    (2.0.0-player.62) One pass of a levelled copy at the song's own rate: each block read as float64,
+    multiplied by `gain` and quantised (_quantise()), and written - no resample, so no context
+    (`pre` and `post` are unused, and a gain has no memory: the songs of an album levelled at one gain
+    concatenate to the album levelled, sample for sample). The loudest and quietest values before the
+    gain, and whether any came out past 24 bits - as _pass() answers.
+    """
+    import numpy as np
+    import soundfile as sf
+
+    scale = _FULL * gain
+    high = low = 0.0
+    over = False
+    with sf.SoundFile(str(source)) as song, _flac_output(target, plan.out_rate, plan.channels) as out:
+        #? exactly the samples STREAMINFO counts: a tag after the audio must not add any
+        left = plan.total_samples
+        while left:
+            if stop is not None and stop.is_set():
+                raise Stopped()
+            try:
+                block = song.read(min(BLOCK_FRAMES, left), dtype="float64", always_2d=True)
+            except RuntimeError as e:
+                raise CannotResample(f"libsndfile couldn't decode all of it: {e}") from e
+            if not len(block):
+                raise CannotResample(f"the song ended {left} samples short of what its STREAMINFO says")
+            left -= len(block)
+            high = max(high, float(block.max()))
+            low = min(low, float(block.min()))
+            q, past = _quantise(np, block, scale)
+            over = over or past
+            out.write(q)
+        if stop is not None and stop.is_set():
+            raise Stopped()
     return high, low, over
 
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { eventTime, pointerSamples } from '../lib/deckClock'
 import { clock, keyTarget } from '../lib/scrub'
+import { levels, type LevelledTrack } from '../lib/loudness'
 import { isFlac, resamples } from '../lib/streamWrap'
 import {
   ARM, ARM_PARTS, PLATTER, RECORD, STAGE, across, armAngle, armMove, armStart, dragEnd, dragFor, moved, needleAt,
@@ -199,8 +200,10 @@ export function Turntable({
         if (!playing) return null
         //? the cap the player asks for this song at, so its window is cut from the very copy it plays
         const maxRate = resamples(playing, now.maxRate ?? 'original', 'raw') ? 48000 : null
+        //? (2.0.0-player.62) and at the level it plays at, so the record sounds as the song does
+        const level = levels(playing, 'raw') ? (playing as LevelledTrack).level ?? null : null
         //? a song the test bench made has windows whatever it is: the bench makes them
-        return { id: playing.id, length: now.duration || 0, flac: !!windows.current || isFlac(playing), kind: kindOf(playing), maxRate }
+        return { id: playing.id, length: now.duration || 0, flac: !!windows.current || isFlac(playing), kind: kindOf(playing), maxRate, level }
       },
       playing: () => latest.current.playing,
       position: () => latest.current.position(),

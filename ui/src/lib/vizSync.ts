@@ -37,6 +37,8 @@
  *    changes (`reanchor`). What it shows follows - a song at 2x reads twice the tempo, which is right.
  */
 
+import type { Level } from './loudness'
+
 /** How much of the song a window holds, how far before the playhead it starts and on what grid -
  *  the turntable's WINDOW_S and grid, with a shorter back margin: nothing here goes backwards. */
 export const VIZ_WINDOW_S = 40
@@ -59,6 +61,9 @@ export interface SyncSong {
   /** the cap the player asks for this song at (48000 for a hi-res song under "Up to 48 kHz"), so the
    *  window is cut from the very copy it plays - as the turntable asks */
   maxRate: number | null
+  /** (2.0.0-player.62) the level it is played at (the player's Normalization), null for none - the window is
+   *  cut from its levelled copy, so what is shown is what is heard */
+  level: Level | null
 }
 
 /** A window decoded and in hand: which song, where in it (s), and which window it is. */

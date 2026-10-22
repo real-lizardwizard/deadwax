@@ -4,9 +4,11 @@ import { getArtistFacts } from '../api/musicbrainz'
 import { storeAlbum } from '../api/store'
 import { cardArtist, sameName, type AboutAlbumFields, type AboutDetails } from '../lib/aboutRows'
 import { artistMbid } from '../lib/artistPage'
-import { latestOnly } from '../lib/latest'
+import { isAbort, latestOnly } from '../lib/latest'
+import { levels, type LevelAnswer, type LevelledTrack } from '../lib/loudness'
 import type { QueueTrack } from '../lib/playQueue'
-import { artistAlbums, songDetails, type ArtistWithAlbums } from '../player/api'
+import { resamples, type MaxRate } from '../lib/streamWrap'
+import { artistAlbums, levelOf, sentFormat, songDetails, type ArtistWithAlbums } from '../player/api'
 import { ownedNow } from './useOwned'
 
 /** How long Info holds the song's and the store's answers back for the other: about as long as it
@@ -126,4 +128,52 @@ export function useInfoDetails(open: boolean, track: QueueTrack | null, album: A
   }, [open, songId, albumId, songArtistId, albumArtistId])
 
   return details && details.songId === songId ? details.details : null
+}
+
+/** How often Info asks again while deadwax is measuring the song's album (2.0.0-player.62). */
+export const LEVEL_ASK_AGAIN_MS = 5000
+
+/**
+ * (2.0.0-player.62) What deadwax says of the playing song's level, for Info > Debug's Normalization row: asked
+ * while Info is open, for a song queued with a level that deadwax is asked to level (a FLAC sent as it is -
+ * levels() in lib/loudness.ts), at the cap the player asks it at; again every LEVEL_ASK_AGAIN_MS while its
+ * album is being measured. Only the newest answer draws (latestOnly). Null for any other song, and until
+ * deadwax has answered.
+ */
+export function useLevelAnswer(open: boolean, track: QueueTrack | null, maxRate: MaxRate): LevelAnswer | null {
+  const [answer, setAnswer] = useState<{ key: string; answer: LevelAnswer } | null>(null)
+  const requests = useMemo(latestOnly, [])
+  const entry = track as LevelledTrack | null
+  //? asked of the player's element only while Info is open - a question to the DOM, not for every render
+  const level = open && entry?.level && levels(entry, sentFormat(entry) ?? 'raw') ? entry.level : null
+  const cap = track && resamples(track, maxRate, 'raw') ? 48000 : null
+  const songId = track?.id ?? null
+  const key = songId && level ? `${songId}@${level}@${cap ?? 'original'}` : null
+
+  useEffect(() => {
+    if (!open || !songId || !level || !key) return undefined
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const ask = () => {
+      const request = requests.begin()
+      levelOf(songId, level, cap, request.signal).then(
+        (found) => {
+          if (!request.current()) return
+          setAnswer({ key, answer: found })
+          if (found.state === 'measuring') timer = setTimeout(ask, LEVEL_ASK_AGAIN_MS)
+        },
+        (reason: unknown) => {
+          if (!request.current() || isAbort(reason)) return
+          //? not drawn: the row says deadwax hasn't said - and asked again a while later
+          timer = setTimeout(ask, LEVEL_ASK_AGAIN_MS)
+        },
+      )
+    }
+    ask()
+    return () => {
+      if (timer !== undefined) clearTimeout(timer)
+      requests.supersede()
+    }
+  }, [open, key])
+
+  return answer && answer.key === key ? answer.answer : null
 }

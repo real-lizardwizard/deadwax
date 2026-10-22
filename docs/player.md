@@ -168,8 +168,8 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   by), kept for you on deadwax rather than on the device (see [configuration](configuration.md#your-settings-in-the-app-per-user-on-deadwax)),
   then **Confirm before cancelling**, which is this device's;
   **Gapless** ([below](#gapless-playback-experimental)), **Now Playing opens as** and
-  **Pause winds the record down** ([the turntable](#the-turntable)) and **Maximum quality**
-  ([below](#maximum-quality-hi-res-at-48-khz)) under **Playback**;
+  **Pause winds the record down** ([the turntable](#the-turntable)), **Maximum quality**
+  ([below](#maximum-quality-hi-res-at-48-khz)) and **Normalization** ([below](#normalization)) under **Playback**;
   **Connections**, whether deadwax can reach MusicBrainz, slskd and Navidrome, checked the first
   time you open You and again with **Check again** (which asks for the version again too); the
   version, and whether logins are on - with them on, who you're signed in as and **Sign out**, which
@@ -965,8 +965,10 @@ What that copy costs while the visualizer shows: 40 seconds of the song fetched 
 and one stretch of each next song. deadwax cuts each stretch from the copy of the song that
 [the player's cache](configuration.md#paths) keeps where there is one (the MP4 Safari plays, or the
 gapless stream's - a Mac's Safari, the gapless stream and a resampled hi-res song have it made
-already), which costs Navidrome nothing but a quick check of which file it has. A browser that plays
-the FLAC as it is - Chrome, Firefox or Edge with Gapless off, the default - has no such copy, and
+already - and, with [Normalization](#normalization) on, the default, every levelled FLAC song in any
+browser: its stretches are cut from that levelled copy, so they sound as the song does), which costs
+Navidrome nothing but a quick check of which file it has. A browser that plays the FLAC as it is -
+Chrome, Firefox or Edge with Gapless off and Normalization off - has no such copy, and
 since 2.0.0-player.23 deadwax reads each stretch straight out of the FLAC on Navidrome instead: the
 start and the last few hundred bytes of the file once a song, then about the stretch's own size (a
 little more while it finds its place in a long song with no seek table) - never the whole song, and
@@ -1540,8 +1542,9 @@ the resampling on a **Resampled** row of its own. Debug has five parts:
 | part | row | what it says |
 | --- | --- | --- |
 | The file | **Format** | the file as Navidrome read it: `FLAC, 24-bit, 192 kHz, stereo`. A part Navidrome didn't give is left out |
-| What this device is sent | **Sent as** | how the song comes: `FLAC in MP4, 16-bit, 44.1 kHz`, `In one stream, 24-bit, 48 kHz`, `FLAC, as the file is`, `MP3, transcoded by Navidrome`. [Seeking](#seeking-and-where-safari-lands) says what the MP4s are for |
-| | **Resampled** | `192 kHz to 48 kHz, 3 dB quieter` when deadwax resampled the song for [Maximum quality](#maximum-quality-hi-res-at-48-khz), `Not known yet` while it hasn't said, otherwise `No` |
+| What this device is sent | **Sent as** | how the song comes: `FLAC in MP4, 24-bit, 44.1 kHz` (a CD song [levelled](#normalization), the default; `16-bit` with Normalization off), `In one stream, 24-bit, 48 kHz`, `FLAC, as the file is`, `MP3, transcoded by Navidrome`. [Seeking](#seeking-and-where-safari-lands) says what the MP4s are for |
+| | **Resampled** | `192 kHz to 48 kHz, 3 dB quieter` when deadwax resampled the song for [Maximum quality](#maximum-quality-hi-res-at-48-khz), `Not known yet` while it hasn't said, otherwise `No`. A song [levelled](#normalization) is resampled at its level's gain instead of 3 dB quieter, so the row says only `192 kHz to 48 kHz` |
+| | **Normalization** | the song's level (since 2.0.0-player.62 - see [Normalization](#normalization)): `Album, -7.42 dB · the album at -10.6 LUFS`, `Song, -3.10 dB · the song at -14.9 LUFS`, `Song, +1.20 dB · held there by its peak (it wanted +2.35)`; `Measuring its album… (7 of 12 songs)` while deadwax measures it (asked again every 5 seconds); `Played as it is this time - its album was still being measured` when deadwax couldn't wait for it (Sent as and Resampled then say what came: the file's own depth, `3 dB quieter`); `Not measured yet - it played as it is this time`; `Not levelled - MP3 songs play as they are` (or why deadwax won't level it); `Off` for a song played with Normalization off |
 | | **Why** | why it came that way: `Maximum quality: Up to 48 kHz`, `48 kHz and below is never resampled`, `Only FLAC is resampled`, `Maximum quality: Original`, and so on |
 | | **Gapless** | `Off`, `On`, or `On, in one stream` while this song is playing in [the stream](#one-stream-for-flac) |
 | | **Speed** | [the speed](#the-speed-fader) (since 2.0.0-player.39): `Normal (1.00x) - the song as it is, nothing changed`, `1.25x, the pitch moving with it`, or what the browser did instead - `but the browser is holding the pitch`, `the browser refused it - …` in its own words, `the browser plays it at 1.00x`. Under it, once the song has played a few seconds, how fast it really moved: `The song moved at 1.24x over the last few seconds of playing` (lower than the speed across a moment it waited for the network; begun again from a change of speed). The row keeps up while Debug is open - a change of speed, from the desktop's player bar beside it, shows at once, and the measure as it comes and moves |
@@ -1678,7 +1681,7 @@ was behind a gear beside the Library title.) Like Gapless above it, it's kept on
 - **Up to 48 kHz** (the default): FLAC songs at 88.2, 96, 176.4, 192, 352.8 or 384 kHz, 16 or 24
   bits, are resampled by deadwax to 48 kHz (44.1 kHz for the 88.2 kHz family) and sent as lossless
   24-bit FLAC. They then join the gapless stream like any CD-quality album, which a 24/192 album
-  couldn't before. Every other song is sent exactly as before, bit for bit.
+  couldn't before. Every other song is sent exactly as it would be without the setting.
 - **Original**: songs above 48 kHz are sent as they are. With Gapless on, FLAC ones join
   the stream too, as they are. An iPhone can only hold about 5 MB of a stream at a time, which is
   8 seconds or so of 24/192, so the stream runs only 4 or 5 seconds ahead of you: a weak connection
@@ -1703,8 +1706,9 @@ The one place 192 kHz might reach your ears is a USB DAC running at the song's o
 Safari on an iPhone ever asks for that isn't known (WebKit never asks the phone for a sample rate),
 so "Original" stays, if you have one to try it with.
 
-**Resampled songs are 3 dB quieter.** Taking out the ultrasonics can push a loud master's peaks
-past full scale. Measured on masters clipped hard when they were made, it was up to 2.9 dB over.
+**Resampled songs are 3 dB quieter** - with [Normalization](#normalization) off. (Levelled, a
+resampled song gets its level's gain instead, with the same room for the resample kept inside it.)
+Taking out the ultrasonics can push a loud master's peaks past full scale. Measured on masters clipped hard when they were made, it was up to 2.9 dB over.
 So every resampled song is lowered by the same 3 dB. That leaves room so nothing clips, and because
 every song of an album gets the same gain, the joins stay exact. It's a change of level only, the
 same as a notch down on the volume. Turn it up, and when you compare "Up to 48 kHz" with "Original",
@@ -1732,6 +1736,96 @@ next song's copy a few seconds into each song. Once made, a song is kept in the 
 **Changing the setting** takes effect from the next song started or got ready. A stream that is
 playing carries on as it began.
 
+## Normalization
+
+**Normalization** is in **You**, under **Playback**, after Maximum quality (since 2.0.0-player.62). It
+brings your music to one loudness, so a quiet album and a loud one play at the same level and you don't
+reach for the volume between them. Like the other Playback settings it's kept on the device, so a phone
+on AirPods and a desktop on speakers can each have their own. Four choices:
+
+- **Automatic** (the default): an album you play keeps one level for the whole album, so its quiet
+  songs stay quiet beside its loud ones. Anything else - a playlist, a shuffle, a song you add with
+  Play Next - is levelled song by song.
+- **By song**: every song brought to the same loudness, even inside an album.
+- **By album**: every song at its album's level, even when it plays on its own or in a playlist.
+- **Off**: every song sent exactly as before this setting: the file itself, bit for bit, unless
+  Maximum quality resamples it.
+
+What Automatic counts as playing an album:
+
+| what you do | Automatic levels it |
+| --- | --- |
+| Play, Shuffle or a song's row on an album's page | by album |
+| an album's **•••** → Play Next or Play Last (the whole album) | by album |
+| a song of yours in Search (it plays its album from that song) | by album |
+| ▶ on a finished download in Requests | by album |
+| Play on an artist's page (their albums, one after another) | by album |
+| Shuffle on an artist's page | by song |
+| a playlist's Play, Shuffle or a row | by song |
+| the Library's Shuffle | by song |
+| a song's **•••** → Play Next or Play Last | by song |
+
+"By album" is always the song's own album - all of its discs - whatever else is in the queue.
+
+**It changes how things sound after an upgrade.** Automatic is the default, so from the first thing you
+play after upgrading, most music comes out quieter: a modern master is usually brought down 6 to 12 dB.
+Turn the volume up. **Off** puts it back exactly as it was.
+
+**Off is bit-perfect.** deadwax sends exactly what it sent before this setting existed: the same
+addresses, the same bytes.
+
+**Only FLAC is levelled.** MP3, AAC, Opus and other lossy files play as they are (re-encoding them would
+cost quality), so an MP3 can be louder or quieter than the songs around it. Info says so.
+
+**How it's levelled, and why nothing else changes.** deadwax measures each song itself, the way
+ReplayGain 2.0 does (EBU R128 loudness, brought to -18 LUFS), and ignores any ReplayGain tags your files
+carry - they come tagged every which way from Soulseek, or not at all - so every album is levelled by
+one ruler. The gain is applied by deadwax, in the copy of a FLAC song it already makes for the player:
+an iPhone doesn't let a web page change a song's volume, and routing the song through the browser's
+audio processing would stop it playing with the screen locked. That copy is 24-bit FLAC, rounded once
+and not dithered, 144 dB below full scale - 48 dB under a CD's own noise floor - so nothing you could
+hear is lost, and a song that needs no change comes out as its own samples. **Nothing clips**: the gain
+stops where the song's loudest sample (the album's, levelled by album) reaches full scale, so a quiet
+song is brought up only that far. An album levelled by album has one gain for all its songs, so songs
+that run into each other still join exactly, in [one stream](#one-stream-for-flac) too. A levelled song
+always comes in deadwax's MP4 (in Chrome too, as a resampled song does), so Info's **Sent as** row says
+`FLAC in MP4, 24-bit`.
+
+**With Maximum quality.** A hi-res song that is resampled and levelled is lowered by its level's gain
+instead of the fixed 3 dB, rounded once. The room the resample needs is kept inside the gain's limit.
+Levelled by album, that room is kept for the whole album whenever any of its songs is one deadwax
+resamples at 48 kHz, so the album keeps one gain - under **Original** too, where it can leave an album
+whose loudest moment holds its gain back up to 3 dB quieter than it could be.
+
+**The first play of an album waits while deadwax measures it.** The first time deadwax levels an album,
+it downloads every FLAC song of it from Navidrome and measures them before the first one plays: about
+3 seconds of measuring for a 12-song CD album on a desktop PC, perhaps 10 to 15 on a NAS, longer for hi-res.
+Opening the album's page starts it, so it's usually done by the time you tap Play. If it takes more
+than 50 seconds (a big box set; 20 for a hi-res song, whose copy takes longer to make), that song plays as
+it is that once - and so does any other song of the album that comes up while it's still being measured,
+straight away, without a wait of its own. Info's **Normalization** row says so (`Played as it is this
+time`), and the turntable plays it as it is too. Once the album is measured, its songs play levelled. An
+album is measured once: the measurements are kept, and a download deadwax files is measured as it's
+filed (not in dry run). After that, a song waits only while its levelled copy is made, a second or so,
+and with Gapless off or while AirPlaying the next song's copy is asked for a few seconds into each song.
+
+**Nothing is written to your files.** The measurements live in deadwax's database, kept by each FLAC
+file's audio, so retagging or moving a file keeps them.
+
+**The cache.** Levelled copies are 24-bit, so a CD song's copy takes about 1.5 times its file in the
+player's cache ([`PLAYER_CACHE_MB`](configuration.md#paths)). A CD song so long that its copy would be
+over the 512 MB deadwax holds in memory to make one (a FLAC of about 340 MB or more: a live set or a mix
+of most of an hour in one file) isn't levelled: it's sent exactly as with Normalization off, and Info's
+**Normalization** row says why.
+
+**Changing the setting** takes effect from the next thing you play - a Play, a tap, a Play Next or Play
+Last. What's already queued keeps the level it was queued at, so an album never changes level halfway
+(a library shuffle's later songs too). To compare Off with Automatic, change it and play the album again.
+
+**What deadwax did** is on Info → Debug's **Normalization** row (see [Info → Debug](#info--debug)), and
+deadwax's log says what it measured and made (`song 123 measured - -10.6 LUFS, peak -0.31 dBFS`, `song 123
+levelled (album, -7.42 dB), and put in a fragmented MP4 for the gapless player`).
+
 ## Seeking, and where Safari lands
 
 The scrubber seeks where you let go, and shows that time until the player has got there, however
@@ -1758,7 +1852,8 @@ Safari, it asks deadwax for each FLAC song inside an MP4, and deadwax repackages
 FLAC audio, bit for bit, in a different container**. Nothing is transcoded and nothing is lost, and
 the files in your library aren't touched. Measured the same way, through deadwax: every seek into
 the MP4 landed within a hundredth of a second, where the same song as FLAC landed up to 40 seconds
-out. Other browsers get the FLAC as it is, as before.
+out. Other browsers get the FLAC as it is, as before - with [Normalization](#normalization) off; with it
+on (the default), a FLAC song comes as deadwax's levelled 24-bit MP4 in every browser.
 
 - **The first time a song plays, it starts a moment later.** deadwax has to fetch the whole file
   from Navidrome and repackage it before it can send the first byte: under a quarter of a second
@@ -1807,7 +1902,8 @@ Safari:
 | `Asked for FLAC in MP4` | for a moment, while the player checks what came |
 
 In other browsers a FLAC reads `FLAC, as the file is`, since they get every file as it is (a hi-res
-song resampled for Maximum quality comes in an MP4 in any browser). So does a FLAC in a Safari too
+song resampled for Maximum quality, and a song levelled by [Normalization](#normalization) - every FLAC
+song, by default - comes in an MP4 in any browser, reading `FLAC in MP4, 24-bit`). So does a FLAC in a Safari too
 old to play one in an MP4, and a song that isn't a FLAC reads the same way, `MP3, as the file is`
 (an MP3's seeks can still land off; see above).
 
@@ -2131,6 +2227,14 @@ the way Navidrome's own code does. Since then it has been used on a real iPhone,
 Navidrome, and it **keeps playing with the screen locked** and **moves to the next song by
 itself while locked**, which is what iOS has historically been fussy about for web apps and the
 question the whole player existed to answer. Still to find out:
+
+- **[Normalization](#normalization)'s 24-bit copies of ordinary CD songs** (2.0.0-player.62): with it on (the
+  default), the iPhone plays deadwax's 24-bit FLAC in an MP4 - and in the gapless stream's fragmented MP4 -
+  for nearly every song, where before only hi-res songs were sent that way. If one won't play in the
+  gapless stream, the player falls back to the file as it is for that song; **with Gapless off it can't -
+  the song is skipped**, like any song that won't play - and **Off** is the way out (see
+  [troubleshooting](troubleshooting.md)). And how long an album's first
+  play waits for its measuring on the NAS, over WireGuard; and whether -18 LUFS is loud enough on AirPods;
 
 - whether the **lock-screen and Control Center controls** work;
 - whether **AirPlay** works;

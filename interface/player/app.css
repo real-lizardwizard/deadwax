@@ -762,6 +762,9 @@ html:has(.app-shell.has-mini) { scroll-padding-bottom: var(--app-chrome-bottom-m
 
 /* the note under one choice, before the next choice's title */
 .app-choice-gap { margin-bottom: var(--app-shelf-gap); }
+/* (2.0.0-player.62) the one choice straight after another with no note between: Normalization, after Maximum
+   quality - named on it, so no other run of choices (Getting albums' three) moves */
+.app-choice-follows { margin-top: var(--app-shelf-gap); }
 
 /* ===== what opens over Now Playing: its menu, and Info ===== */
 

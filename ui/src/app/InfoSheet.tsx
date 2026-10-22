@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
 
 import { aboutRows, type About, type AboutAlbumFields, type AboutDetails } from '../lib/aboutRows'
+import type { LevelAnswer } from '../lib/loudness'
 import { panelIsModal, type PanelStyle } from '../lib/appFrame'
 import type { DeckReport } from '../lib/deckVoice'
 import { debugSections, type DebugSection, type RecordingState } from '../lib/debugRows'
@@ -78,6 +79,7 @@ export function InfoSheet({
   recording = null,
   onRecord = null,
   details = null,
+  level = null,
   onArtist = null,
   panel = 'sheet',
   covered = false,
@@ -100,6 +102,9 @@ export function InfoSheet({
   onRecord?: (() => void) | null
   /** what App asked for as Info opened (2.0.0-player.17): null until it answers */
   details?: AboutDetails | null
+  /** (2.0.0-player.62) what deadwax says of the song's level, for Debug's Normalization row (App asks,
+   *  useLevelAnswer): null until it answers, and for a song asked for no level */
+  level?: LevelAnswer | null
   /** close everything and open the artist's page, by Navidrome's id for them; null for none */
   onArtist?: ((artist: { id: string; name: string }) => void) | null
   /** how it is drawn: a sheet over Now Playing (a phone), or a desktop's side panel */
@@ -163,6 +168,7 @@ export function InfoSheet({
           recording,
           onRecord,
           speed: player.speedReading?.() ?? null,
+          level,
         }),
       }
     }

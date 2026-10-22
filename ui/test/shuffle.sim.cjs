@@ -96,6 +96,10 @@ function answer(name, value) {
 }
 const settle = async () => { for (let i = 0; i < 6; i++) await new Promise((resolve) => setImmediate(resolve)) }
 
+//? (2.0.0-player.62) this device's storage, as the player's Normalization is read from it at the tap
+const stored = new Map()
+globalThis.localStorage = { getItem: (key) => (stored.has(key) ? stored.get(key) : null), setItem: (key, value) => stored.set(key, String(value)), removeItem: (key) => stored.delete(key) }
+
 //? timers the checks run by hand: the feed's retry
 const timers = []
 globalThis.setTimeout = (fn, ms) => { timers.push({ fn, ms }); return timers.length }
@@ -166,7 +170,10 @@ const songs = (from, count, prefix = 's') => Array.from({ length: count }, (_, i
     button().props.onClick()
     check('the tap: that page, from its first song, in its order, as a library\'s shuffle - then a new order asked for the next tap',
       [played.map(([tracks, start, shuffle, paged]) => [tracks.length, tracks[0].id, tracks[199].id, start, shuffle, paged]), S.asks],
-      [[[200, 's1', 's200', 0, false, { token: 't1', total: 450, fetched: 200, scope: 'yours' }]], [['start', 'yours', { playing: 't1' }]]])
+      [[[200, 's1', 's200', 0, false, { token: 't1', total: 450, fetched: 200, scope: 'yours', level: 'track' }]], [['start', 'yours', { playing: 't1' }]]])
+    //? (2.0.0-player.62) Normalization, Automatic on a fresh device: a shuffle is songs, each levelled on its own
+    check('...its songs queued as songs: each at its own level, and that level on the shuffle, for its feed',
+      [...new Set(played[0][0].map((track) => track.level))], ['track'])
     answer('start', new Error('Navidrome answered 500'))
     await settle()
     tree = draw(true)
@@ -208,6 +215,64 @@ const songs = (from, count, prefix = 's') => Array.from({ length: count }, (_, i
     answer('start', { token: 'c2', total: 0, songs: [] })
     await settle()
     check('a scope with no songs at all (no starred albums yet): nothing drawn - not a dead "Shuffle" over "0 songs"', drawEmpty(), null)
+  }
+
+  console.log('\nthe shuffle\'s level (2.0.0-player.62): queued at the tap, its feed at the same level')
+  {
+    //? Off: nothing levelled, nothing said on the shuffle - the queue exactly what it was before the setting
+    stored.set('deadwax-player-normalization', 'off')
+    S.asks.length = 0
+    const played = []
+    const render = hooks.root(ShuffleSongs)
+    const draw = () => { const tree = render({ scope: 'store', shown: true, actions: { playTracks: (...args) => played.push(args) } }); render.commit(); return tree }
+    let tree = draw()
+    answer('start', { token: 'o1', total: 3, songs: songs(1, 3) })
+    await settle()
+    tree = draw()
+    find(byClass('app-shuffle-button'), tree)[0].props.onClick()
+    check('under Off: no level on the songs, none on the shuffle', [played[0][0].map((track) => 'level' in track), played[0][3]],
+      [[false, false, false], { token: 'o1', total: 3, fetched: 3, scope: 'store' }])
+    answer('start', { token: 'o2', total: 3, songs: songs(1, 3) })
+    await settle()
+    //? By album: each song at its own album's level, the shuffle too
+    stored.set('deadwax-player-normalization', 'album')
+    tree = draw()
+    find(byClass('app-shuffle-button'), tree)[0].props.onClick()
+    check('under By album: album, on each song and on the shuffle', [[...new Set(played[1][0].map((track) => track.level))], played[1][3].level], [['album'], 'album'])
+    stored.delete('deadwax-player-normalization')
+    S.open.length = 0
+
+    //? the feed: the rest of the order queued at the level the shuffle has - whatever the setting says now
+    const tracks = (list, level) => list.map((song) => ({ id: song.id, title: song.title, artist: '', album: 'A', albumId: 'al', coverArt: null, duration: 1, contentType: 'audio/flac', suffix: 'flac', sampleRate: 0, bitDepth: 0, channels: 0, ...(level ? { level } : {}) }))
+    for (const level of ['track', undefined]) {
+      S.asks.length = 0
+      stored.set('deadwax-player-normalization', 'album')
+      const order = songs(1, 260)
+      const extended = []
+      const player = {
+        queue: U.startUpNext(tracks(order.slice(0, 200), level), 0, false, Math.random, { token: 'f1', total: 260, fetched: 200, scope: 'store', ...(level ? { level } : {}) }),
+        repeat: 'all',
+        extendQueue(token, more, next) {
+          extended.push([more.map((track) => track.level ?? null), next ?? null])
+          player.queue = U.withMore(player.queue, token, more, next)
+        },
+      }
+      const feed = hooks.root(() => F.useShuffleFeed({ ...player }))
+      const turn = async () => { feed(); feed.commit(); await settle() }
+      player.queue = { ...player.queue, index: 190 }
+      await turn()
+      answer('page', { total: 260, songs: order.slice(200) })
+      await turn()
+      player.queue = { ...player.queue, index: 255 }
+      await turn()
+      answer('start', { token: 'f2', total: 2, songs: songs(900, 2) })
+      await turn()
+      check(`a ${level ?? 'Off'} shuffle's next page and next round queued at ${level ?? 'no level'} - never the setting's album`,
+        extended.map(([levels, next]) => [[...new Set(levels)], next && next.level !== undefined ? next.level : null]),
+        [[[level ?? null], null], [[level ?? null], level ?? null]])
+      stored.delete('deadwax-player-normalization')
+      S.open.length = 0
+    }
   }
 
   console.log('\nthe feed: the rest of the order, as the queue nears the end of what it has')

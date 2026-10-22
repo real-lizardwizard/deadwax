@@ -256,8 +256,9 @@ async function main() {
     visit(node.props?.children)
   }
   visit(playback)
-  check('all four in the Playback section: Gapless, then Now Playing opens as, then Pause winds the record down - beside it - then Maximum quality',
-    inPlayback, ['GaplessChoice', 'LookChoice', 'WindDownChoice', 'QualityChoice'])
+  check('all five in the Playback section: Gapless, then Now Playing opens as, then Pause winds the record down - beside it - then Maximum quality, then Normalization (2.0.0-player.62)',
+    inPlayback, ['GaplessChoice', 'LookChoice', 'WindDownChoice', 'QualityChoice', 'NormalizationChoice'])
+  check('...Normalization handed nothing of the player: its choice its own, read at each play', Object.keys(named('NormalizationChoice')[0]?.props ?? { missing: 1 }), [])
   check('Gapless is handed the player itself', named('GaplessChoice')[0]?.props.player === globalThis.__you.player, true)
   const look = named('LookChoice')[0]
   look?.props.onChange('cover')
@@ -265,11 +266,12 @@ async function main() {
   const winds = named('WindDownChoice')[0]
   winds?.props.onChange(false)
   check('Pause winds the record down is handed App\'s setting, and App\'s way to change it', [winds?.props.on, chosenWindDowns], [true, [false]])
-  check('the notes: what Gapless does, where the button is, what winding down does, and where all four are kept', notes, [
+  check('the notes: what Gapless does, where the button is, what winding down does, what Normalization does, and where all five are kept', notes, [
     'An experiment: it shortens the pause between songs, and FLAC songs played one after another can join in one stream, with none at all.',
     'The button at the top right of Now Playing switches between them until it closes.',
     "The turntable only: pausing from it slows the record's sound to a stop over about a second, as a real deck does. Off, it stops at once. The cover's pause is always instant.",
-    'All four are kept on this device. Maximum quality is used from the next song.',
+    'Used from the next thing you play. FLAC songs only - others play as they are. deadwax measures an album the first time it levels it, which can make its first song wait a few seconds.',
+    'All five are kept on this device. Maximum quality is used from the next song, Normalization from the next thing you play.',
   ])
   check('...the wind-down\'s note is what its checkbox is described by: the one note by that id',
     find((node) => node.props?.id === 'app-wind-down-note').map(text).length, 1)

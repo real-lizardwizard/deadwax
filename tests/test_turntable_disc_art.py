@@ -362,10 +362,11 @@ def test_it_is_a_library_route_and_the_navidrome_list_is_unchanged():
     #? window of a song in 2.0.0-player.14 (test_scrub_window.py), and the artists and a song in
     #? 2.0.0-player.17 (test_navidrome_artists.py), the Library's Shuffle in 2.0.0-player.57
     #? (test_navidrome_shuffle.py), the playlists in 2.0.0-player.58 (test_playlists.py), and the Library's whole album
-    #? list in 2.0.0-player.59 (test_navidrome_album_index.py); this route never did
+    #? list in 2.0.0-player.59 (test_navidrome_album_index.py), Normalization's two in 2.0.0-player.62
+    #? (test_normalization.py); this route never did
     assert sorted(route.path for route in navidrome_routes.router.routes) == [
         "/album_index", "/albums", "/albums/{album_id}", "/artists", "/artists/{artist_id}", "/cover/{cover_id}",
-        "/playlists", "/playlists", "/playlists/{playlist_id}", "/playlists/{playlist_id}/add",
+        "/level/album/{album_id}", "/level/{song_id}", "/playlists", "/playlists", "/playlists/{playlist_id}", "/playlists/{playlist_id}/add",
         "/playlists/{playlist_id}/delete", "/playlists/{playlist_id}/edit",
         "/scrobble/{song_id}", "/scrub/{song_id}", "/search", "/shuffle", "/shuffle/{token}", "/songs/{song_id}",
         "/status", "/stream/{song_id}",

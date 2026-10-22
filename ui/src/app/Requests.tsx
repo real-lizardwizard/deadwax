@@ -8,6 +8,7 @@ import {
   SECTIONS, SECTION_TITLES, changes, doneLooks, type RequestRow, type RequestsView, type Section,
 } from '../lib/requestsView'
 import { prefetchAlbum, rememberPlayed, toQueueTrack, type Album, type AlbumWithSongs } from '../player/api'
+import { queued } from '../player/levelling'
 import { readConfirmCancel } from '../state/persisted'
 import { usePlayerActions } from './context'
 import { AttentionCard, DoneRow, DownloadingCard, WaitingCard } from './JobCard'
@@ -275,7 +276,7 @@ export function Requests({
     const album = row.release ? ready.get(row.release)?.answer : undefined
     if (album && album.song?.length) {
       rememberPlayed(album)
-      actions.playTracks(album.song.map((song) => toQueueTrack(song, album)), 0)
+      actions.playTracks(queued(album.song.map((song) => toQueueTrack(song, album)), 'album'), 0)
       return
     }
     openRow(row)

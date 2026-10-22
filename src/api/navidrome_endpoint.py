@@ -293,12 +293,15 @@ navidrome = NavidromeClient()
 #?   src/routes/library.py    the apply's getScanStatus: whether Navidrome has finished a scan, a question
 #?                            about the server
 #?   src/navidrome_listing.py "Not in Navidrome": which album folders Navidrome lists at all
+#?   src/levels.py            (2.0.0-player.62) the player's Normalization: an album's songs measured ONCE for
+#?                            every phone (the album's listing, each song's version and STREAMINFO, its download)
+#?                            - the routes check the asker may have the song, or the album, first
 #?   src/routes/settings.py   drops the client when NAVIDROME_URL changes (asks nothing)
 #?   src/api/app.py           closes it at shutdown (asks nothing)
 #? A file added here is a decision, like a route added to routes/navidrome.py.
 SHARED_ACCOUNT_USES = (
     "src/player_cache.py", "src/album_context.py", "src/routes/library.py", "src/navidrome_listing.py",
-    "src/routes/settings.py", "src/api/app.py",
+    "src/routes/settings.py", "src/api/app.py", "src/levels.py",
 )
 
 

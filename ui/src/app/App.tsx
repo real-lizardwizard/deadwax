@@ -58,7 +58,7 @@ import { TabBar } from './TabBar'
 import { useFrame } from './useFrame'
 import { accessNow, noteAccess, useAccess } from './access'
 import { People } from './People'
-import { useInfoDetails } from './useInfoDetails'
+import { useInfoDetails, useLevelAnswer } from './useInfoDetails'
 import { PinNotice } from './PinNotice'
 import { PlaylistPage } from './PlaylistPage'
 import { PlaylistPicker } from './PlaylistPicker'
@@ -1540,6 +1540,8 @@ export function App() {
   const infoOpen = desktop ? infoPanel : sheetOpen && over === 'info'
   //? what fills Info > About in, asked as it opens (2.0.0-player.17)
   const infoDetails = useInfoDetails(infoOpen, playing, playedFrom)
+  //? (2.0.0-player.62) and what deadwax says of the song's level, for Debug's Normalization row
+  const infoLevel = useLevelAnswer(infoOpen, playing, player.maxRate)
   //? what is behind a sheet - Now Playing, or the Sources sheet - is inert while it shows; a desktop's
   //? side panel leaves the page beside it as it is
   //? (2.0.0-player.20: and behind the desktop's visualizer, which covers the whole screen; 2.0.0-player.47:
@@ -1678,6 +1680,7 @@ export function App() {
             recording={turntableRecording}
             onRecord={recordTurntable}
             details={infoDetails}
+            level={infoLevel}
             onArtist={toArtist}
             panel={panel}
             covered={panelsCovered}

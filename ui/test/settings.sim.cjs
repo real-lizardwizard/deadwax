@@ -32,6 +32,11 @@
  *    page's own setting in this browser (deadwax-preferences' confirmCancel): off if that said off,
  *    else marked 'default', which reads as on and stores no choice; never read from the main page
  *    again. Requests reads it at the ✕'s tap; its own tap tells You, and calls no player action.
+ *  - "Normalization" (app/NormalizationChoice.tsx, 2.0.0-player.62) is a radio group the same way - Automatic,
+ *    By song, By album, Off, word for word - its state its own, kept on its own key, per device, read back as
+ *    one of the other three only when it says exactly that: anything else, nothing stored, or storage that
+ *    can't be read is Automatic. It calls nothing of the player. Maximum quality's note says its 3 dB is with
+ *    Normalization off.
  *
  * A script for the same reason as the other sims: there is no JS test runner here.
  *
@@ -47,6 +52,7 @@ const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-settings-'))
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
   'src/app/QualityChoice.tsx', 'src/app/GaplessChoice.tsx', 'src/app/LookChoice.tsx', 'src/app/WindDownChoice.tsx', 'src/app/ConfirmCancelChoice.tsx', 'src/state/persisted.ts',
+  'src/app/NormalizationChoice.tsx',
   '--rootDir', 'src', '--outDir', OUT,
   '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
   '--lib', 'es2022,dom,dom.iterable', '--jsx', 'react-jsx', '--jsxImportSource', 'preact',
@@ -133,6 +139,7 @@ const { GaplessChoice } = require(path.join(OUT, 'app/GaplessChoice.js'))
 const { LookChoice, LOOKS } = require(path.join(OUT, 'app/LookChoice.js'))
 const { WindDownChoice } = require(path.join(OUT, 'app/WindDownChoice.js'))
 const { ConfirmCancelChoice } = require(path.join(OUT, 'app/ConfirmCancelChoice.js'))
+const { NormalizationChoice, NORMALIZATIONS } = require(path.join(OUT, 'app/NormalizationChoice.js'))
 const persisted = require(path.join(OUT, 'state/persisted.js'))
 
 //? each element of a tree, found by where it sits, keeps one FakeElement across renders; a ref names it
@@ -179,7 +186,7 @@ function keyOn(view, group, key) {
   let prevented = false
   const currentTarget = {
     querySelector(selector) {
-      const [, name, value] = /\[(data-rate|data-look)="([^"]+)"\]/.exec(selector) ?? []
+      const [, name, value] = /\[(data-rate|data-look|data-level)="([^"]+)"\]/.exec(selector) ?? []
       const [radio] = view.find((node) => node.props?.role === 'radio' && node.props[name] === value)
       return radio?.element ?? null
     },
@@ -438,8 +445,8 @@ console.log('\nthe "Maximum quality" notes say what the code does')
   check('"Up to 48 kHz", word for word',
     up.note,
     'FLAC songs at 88.2 to 384 kHz are resampled by deadwax to 48 kHz, or 44.1 kHz, and sent as lossless 24-bit FLAC, ' +
-    'so with Gapless on they play without a gap. Nothing below 20 kHz changes, except that they are 3 dB ' +
-    'quieter, so nothing can clip.')
+    'so with Gapless on they play without a gap. Nothing below 20 kHz changes, except that with Normalization off ' +
+    'they are 3 dB quieter, so nothing can clip.')
   check('"Original", word for word',
     original.note,
     'Songs above 48 kHz are sent as they are. With Gapless on, FLAC songs play without a gap too, but an ' +
@@ -451,6 +458,80 @@ console.log('\nthe "Maximum quality" notes say what the code does')
   check('...and never called a switch, now that it is a checkbox', QUALITIES.some((q) => /switch/i.test(q.note)), false)
   const emDash = String.fromCharCode(0x2014)
   check('no em dashes, and deadwax never sentence-cased', QUALITIES.some((q) => q.note.includes(emDash) || q.note.includes('Deadwax')), false)
+}
+
+console.log('\n"Normalization" is a radio group of its own, kept on this device (2.0.0-player.62)')
+{
+  const KEY = 'deadwax-player-normalization'
+  check('the key it is kept on', persisted.STORAGE_KEYS.playerNormalization, KEY)
+  check('four choices, Automatic first, word for word', NORMALIZATIONS.map((each) => [each.value, each.label, each.note]), [
+    ['auto', 'Automatic', 'An album you play keeps one level for the whole album, so its quiet songs stay quiet beside its loud ones. ' +
+      'Anything else - a playlist, a shuffle, a song you add with Play Next - is levelled song by song.'],
+    ['song', 'By song', 'Every song brought to the same loudness, even inside an album.'],
+    ['album', 'By album', "Every song at its album's level, even when it plays on its own or in a playlist."],
+    ['off', 'Off', 'Every song sent exactly as before this setting: the file itself, bit for bit, unless Maximum quality resamples it.'],
+  ])
+  const emDash = String.fromCharCode(0x2014)
+  check('...no em dashes, and deadwax never sentence-cased', NORMALIZATIONS.some((each) => each.note.includes(emDash) || each.note.includes('Deadwax')), false)
+  //? what it reads back: one of the other three only when it says exactly that
+  stored.clear()
+  const readings = [persisted.readPlayerNormalization()]
+  for (const value of ['song', 'album', 'off', 'auto', 'Song', 'track', '']) {
+    stored.set(KEY, value)
+    readings.push(persisted.readPlayerNormalization())
+  }
+  refusing = true
+  readings.push(persisted.readPlayerNormalization())
+  refusing = false
+  check('Automatic by default: nothing stored, anything unknown, storage that can\'t be read', readings,
+    ['auto', 'song', 'album', 'off', 'auto', 'auto', 'auto', 'auto', 'auto'])
+
+  stored.clear()
+  const view = mount(NormalizationChoice, 'normalization')
+  const render = () => view.render({})
+  render()
+  //? found again after each render: its key handler is the render's own, as Preact binds it
+  const group = () => view.find((node) => node.props?.role === 'radiogroup')[0]
+  const [title] = view.find((node) => node.type === 'h3')
+  const radios = () => view.find((node) => node.props?.role === 'radio')
+  check('a radio group labelled by its heading', [!!group(), group()?.props['aria-labelledby'] === title?.props.id, title?.props.children], [true, true, 'Normalization'])
+  check('four radios, Automatic chosen on a fresh device, each named and described by its own words',
+    radios().map((r) => [r.props['data-level'], r.props['aria-checked'], r.props['aria-labelledby'], r.props['aria-describedby']]), [
+      ['auto', true, 'app-normalization-auto-label', 'app-normalization-auto-note'], ['song', false, 'app-normalization-song-label', 'app-normalization-song-note'],
+      ['album', false, 'app-normalization-album-label', 'app-normalization-album-note'], ['off', false, 'app-normalization-off-label', 'app-normalization-off-note']])
+  check('only the chosen one is a tab stop', radios().map((r) => r.props.tabIndex), [0, -1, -1, -1])
+  check('...and nothing stored until one is chosen', stored.has(KEY), false)
+
+  radios()[3].props.onClick()
+  render()
+  check('a tap on Off picks it, and keeps it on this device', [radios().map((r) => r.props['aria-checked']), stored.get(KEY)], [[false, false, false, true], 'off'])
+  check('...the tab stop moves with it', radios().map((r) => r.props.tabIndex), [-1, -1, -1, 0])
+  document.activeElement = document.body
+  let prevented = keyOn(view, group(), 'ArrowDown')
+  render()
+  check('ArrowDown from the last wraps to the first, and takes the focus with it', [prevented, stored.get(KEY), document.activeElement === radios()[0].element], [true, 'auto', true])
+  keyOn(view, group(), 'ArrowUp')
+  render()
+  check('ArrowUp wraps back', [stored.get(KEY), document.activeElement === radios()[3].element], ['off', true])
+  keyOn(view, group(), 'ArrowLeft')
+  render()
+  keyOn(view, group(), 'ArrowLeft')
+  render()
+  check('ArrowLeft moves back, twice: By song', [stored.get(KEY), radios().map((r) => r.props['aria-checked'])], ['song', [false, true, false, false]])
+  keyOn(view, group(), 'ArrowRight')
+  render()
+  check('ArrowRight moves on: By album', stored.get(KEY), 'album')
+  const focused = document.activeElement
+  prevented = keyOn(view, group(), 'Enter')
+  render()
+  check('any other key is left alone', [prevented, stored.get(KEY), document.activeElement === focused], [false, 'album', true])
+  check('read again on a fresh mount: the choice kept', (() => {
+    const again = mount(NormalizationChoice, 'normalization again')
+    again.render({})
+    return again.find((node) => node.props?.role === 'radio' && node.props['aria-checked']).map((r) => r.props['data-level'])
+  })(), ['album'])
+  const source = fs.readFileSync(path.join(UI, 'src/app/NormalizationChoice.tsx'), 'utf8')
+  check('it calls nothing of the player: its own state, written to this device', [/\bplayer\.|usePlayer|type Player\b/.test(source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')), /useState<Normalization>\(readPlayerNormalization\)/.test(source)], [false, true])
 }
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

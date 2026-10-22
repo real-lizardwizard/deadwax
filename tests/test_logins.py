@@ -170,6 +170,9 @@ ROUTES = {
     ("GET", "/deadwax/navidrome/cover/{cover_id}"): "user",
     ("GET", "/deadwax/navidrome/stream/{song_id}"): "user",
     ("GET", "/deadwax/navidrome/scrub/{song_id}"): "user",
+    #? (2.0.0-player.62) Normalization: Info's level of a song, and an album page's "measure this album"
+    ("GET", "/deadwax/navidrome/level/{song_id}"): "user",
+    ("POST", "/deadwax/navidrome/level/album/{album_id}"): "user",
     ("POST", "/deadwax/navidrome/scrobble/{song_id}"): "user",
     #? (2.0.0-player.57) the Library's Shuffle: an order of the asker's library (or the store), and its pages - theirs
     ("GET", "/deadwax/navidrome/shuffle"): "user",
@@ -416,8 +419,9 @@ def give(on, user: str, wanted: dict[str, bool]) -> None:
 
 
 def answered_by_the_route(response) -> bool:
-    """Let through: the stub answered, or FastAPI refused the empty body the walk sends - never a 401/403."""
-    return response.status_code in (200, 422) and (response.status_code == 422 or response.json() == REACHED)
+    """Let through: the stub answered - with the route's own success status, a 202 for one that only starts
+    work (2.0.0-player.62's /level/album) - or FastAPI refused the empty body the walk sends - never a 401/403."""
+    return response.status_code in (200, 202, 422) and (response.status_code == 422 or response.json() == REACHED)
 
 
 def test_the_walk_every_permissions_routes_refuse_every_other_category_and_open_to_their_own(on):

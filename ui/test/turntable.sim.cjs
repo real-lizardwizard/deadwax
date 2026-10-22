@@ -1042,6 +1042,18 @@ async function liveChecks() {
   draw()
   await settle()
   check('...played as it is ("Original"): asked as it is', /\/scrub\/hires-as-is\?at=\d+&seconds=40$/.test(windowsAsked.at(-1)), true)
+  //? (2.0.0-player.62) a song queued with a level (the player's Normalization): its window at that level too, after the
+  //? cap - cut from the levelled copy the song plays from, so the record sounds as the song does
+  player.maxRate = '48000'
+  player.track = { ...player.track, id: 'hires-levelled', level: 'album' }
+  draw()
+  await settle()
+  check('a song played levelled: its window asked at its level, last', /\/scrub\/hires-levelled\?at=\d+&seconds=40&max_rate=48000&level=album$/.test(windowsAsked.at(-1)), true)
+  player.maxRate = 'original'
+  player.track = { ...player.track, id: 'cd-levelled', sampleRate: 44100, bitDepth: 16, level: 'track' }
+  draw()
+  await settle()
+  check('...a CD song by song: its level alone', /\/scrub\/cd-levelled\?at=\d+&seconds=40&level=track$/.test(windowsAsked.at(-1)), true)
 
   view.unmount()
   check('gone: the audio context closed', contexts[0].calls.at(-1), 'close')

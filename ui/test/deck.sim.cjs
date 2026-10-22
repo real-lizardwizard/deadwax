@@ -1735,6 +1735,10 @@ async function main() {
     check('a hi-res song played resampled: its window asked at the same cap, so it is cut from the copy the song plays from',
       asked.at(-1), '/deadwax/navidrome/scrub/hires?at=56&seconds=40&max_rate=48000')
     capped.deck.destroy()
+    //? (2.0.0-player.62) and a song played levelled: at its level, after the cap - cut from its levelled copy
+    const levelled = await fresh({ song: () => ({ id: 'cd', length: 425, flac: true, kind: 'FLAC', maxRate: null, level: 'track' }) })
+    check('a song played levelled: its window asked at its level', asked.at(-1), '/deadwax/navidrome/scrub/cd?at=56&seconds=40&level=track')
+    levelled.deck.destroy()
   }
 
   console.log('\na flick back past the window\'s start: the window it runs into is asked for at the release')

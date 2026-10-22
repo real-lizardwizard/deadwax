@@ -62,6 +62,13 @@
  * the pitch moving or held, a rate refused (Chromium's range, net.rateRange), a browser not playing the
  * speed (net.ignoresRate) seen in the measured pace, the prefixed switches and none.
  *
+ * And the player's Normalization (2.0.0-player.62, at the end): an entry with no level asks exactly what the engine
+ * of 2.0.0-player.61 asked, address for address in order, in five sessions recorded from it (DEADWAX_RECORD_OFF=1
+ * prints them again); a levelled album's level on every address - the element's, the readout's probe, the warm-up
+ * ahead with the switch off, the standby's download and every piece of a stream in both MediaSources, its joins
+ * exact; a levelled first song's head given the minute a resampled one gets; and a levelled copy refused or that
+ * won't decode asked for as the file itself, without its level, from then on.
+ *
  * A script for the same reason as the other sims: there is no JS test runner here. It compiles
  * usePlayer.ts and what it imports with the repo's TypeScript into a temporary folder, beside a
  * ten-line preact/hooks that renders by calling the hook again.
@@ -5461,6 +5468,230 @@ async function outcome(promise, ms = 1_000) {
     check('a 1.5 s single on Repeat One: still going round 12 s on, every loop a join in the one stream - never its end',
       [p.player.playing, p.player.queue.index >= 6, joins.length >= 5 && joins.every((join) => join === '0 stream'), mediaSources.length, e0.stalls.length, e0.ended], [true, true, true, 1, 0, false])
   }
+
+  /* ======================================================================== */
+  //? (2.0.0-player.62) Normalization: the level rides on the queue entry (lib/loudness.ts), and every address the
+  //? engine builds from an entry carries it - streamUrl() and fragmentedUrl() add `&level=` LAST. The engine's own
+  //? change is seven lines of usePlayer.ts: a levelled copy is one deadwax makes whole before its first byte, like a
+  //? resampled one - warmed ahead with the switch off, its head given the long wait, probed for the readout, and
+  //? asked for as the file itself (no level) once it is refused. What these hold, against the fake deadwax above
+  //? (which answers a levelled address as the song itself: what is pinned is what the page ASKS for).
+
+  //? every address the page asks for - fetches (scrobbles aside: their times are the wall clock's) and what is given
+  //? to an element - with the Range of a fetch, in order
+  const asking = []
+  const fetchBefore = globalThis.fetch
+  define('fetch', (address, init = {}) => {
+    if (!String(address).includes('/scrobble/')) asking.push(['fetch', String(address), headerIn(init.headers, 'Range') ?? null])
+    return fetchBefore(address, init)
+  })
+  const srcBefore = Object.getOwnPropertyDescriptor(FakeAudio.prototype, 'src')
+  Object.defineProperty(FakeAudio.prototype, 'src', {
+    configurable: true,
+    get: srcBefore.get,
+    set(value) { asking.push([`element ${this.n}`, String(value).startsWith('blob:') ? 'blob:' : String(value), null]); srcBefore.set.call(this, value) },
+  })
+  const levelledTracks = (list, level = 'album') => list.map((track) => ({ ...track, level }))
+  const cd = (ids) => tracks(ids, {}, Object.fromEntries(ids.map((id) => [id, { sampleRate: 44100, bitDepth: 16, channels: 2 }])))
+
+  console.log('\nNormalization: Off - an entry with no level asks exactly what it asked before (2.0.0-player.62)')
+  {
+    //? Five sessions, each address in order, recorded from the engine of 2.0.0-player.61 (git 3458dbf) running these
+    //? very scenarios - DEADWAX_RECORD_OFF=1 prints them instead of checking, to record them again
+    const sessions = {}
+    const record = async (name, options, list, ms) => {
+      asking.length = 0
+      const p = options.stream ? streamPage(options.stream) : page(options)
+      tap(() => p.player.playTracks(list(), 0))
+      await run(ms)
+      sessions[name] = asking.map((entry) => entry.join(' '))
+    }
+    await record('Chromium, one element', { durations: { 1: 6, 2: 6, 3: 6 }, userAgent: ARC, maxTouchPoints: 0 }, () => cd(['1', '2', '3']), 14_000)
+    await record('iPhone, one element', { durations: { 1: 6, 2: 6, 3: 6 }, userAgent: IPHONE, maxTouchPoints: 5 }, () => cd(['1', '2', '3']), 14_000)
+    await record('iPhone, Gapless (a stream)', { stream: { durations: { 1: 6, 2: 6, 3: 6 } } }, () => cd(['1', '2', '3']), 14_000)
+    await record('Chromium, Gapless (a stream)', { stream: { mse: 'plain', userAgent: ARC, maxTouchPoints: 0, durations: { 1: 6, 2: 6, 3: 6 } } }, () => cd(['1', '2', '3']), 14_000)
+    await record('iPhone, hi-res under 48 kHz, one element', { durations: { 1: { duration: 6, rate: 192000 }, 2: { duration: 6, rate: 192000 } }, userAgent: IPHONE, maxTouchPoints: 5 },
+      () => hiresTracks(['1', '2']), 10_000)
+    if (process.env.DEADWAX_RECORD_OFF) {
+      console.log(`RECORDED ${JSON.stringify(sessions)}`)
+      process.exit(0)
+    }
+    const BEFORE = {
+      "Chromium, one element": [
+        "element 0 /deadwax/navidrome/stream/1?format=raw ",
+        "element 0 /deadwax/navidrome/stream/2?format=raw ",
+        "element 0 /deadwax/navidrome/stream/3?format=raw ",
+      ],
+      "iPhone, one element": [
+        "element 0 /deadwax/navidrome/stream/1?format=raw&wrap=mp4 ",
+        "fetch /deadwax/navidrome/stream/1?format=raw&wrap=mp4 bytes=0-1",
+        "element 0 /deadwax/navidrome/stream/2?format=raw&wrap=mp4 ",
+        "fetch /deadwax/navidrome/stream/2?format=raw&wrap=mp4 bytes=0-1",
+        "element 0 /deadwax/navidrome/stream/3?format=raw&wrap=mp4 ",
+        "fetch /deadwax/navidrome/stream/3?format=raw&wrap=mp4 bytes=0-1",
+      ],
+      "iPhone, Gapless (a stream)": [
+        "fetch /deadwax/navidrome/stream/1?format=raw&wrap=fmp4 bytes=0-262143",
+        "fetch /deadwax/navidrome/stream/2?format=raw&wrap=fmp4 bytes=0-262143",
+        "fetch /deadwax/navidrome/stream/1?format=raw&wrap=fmp4 bytes=229610-715292",
+        "fetch /deadwax/navidrome/stream/3?format=raw&wrap=fmp4 bytes=0-262143",
+        "fetch /deadwax/navidrome/stream/2?format=raw&wrap=fmp4 bytes=229610-715292",
+        "fetch /deadwax/navidrome/stream/3?format=raw&wrap=fmp4 bytes=229610-715292",
+      ],
+      "Chromium, Gapless (a stream)": [
+        "element 0 blob: ",
+        "fetch /deadwax/navidrome/stream/1?format=raw&wrap=fmp4 bytes=0-262143",
+        "fetch /deadwax/navidrome/stream/2?format=raw&wrap=fmp4 bytes=0-262143",
+        "fetch /deadwax/navidrome/stream/1?format=raw&wrap=fmp4 bytes=229610-715292",
+        "fetch /deadwax/navidrome/stream/3?format=raw&wrap=fmp4 bytes=0-262143",
+        "fetch /deadwax/navidrome/stream/2?format=raw&wrap=fmp4 bytes=229610-715292",
+        "fetch /deadwax/navidrome/stream/3?format=raw&wrap=fmp4 bytes=229610-715292",
+      ],
+      "iPhone, hi-res under 48 kHz, one element": [
+        "element 0 /deadwax/navidrome/stream/1?format=raw&wrap=mp4&max_rate=48000 ",
+        "fetch /deadwax/navidrome/stream/1?format=raw&wrap=mp4&max_rate=48000 bytes=0-1",
+        "fetch /deadwax/navidrome/stream/2?format=raw&wrap=mp4&max_rate=48000 bytes=0-1",
+        "element 0 /deadwax/navidrome/stream/2?format=raw&wrap=mp4&max_rate=48000 ",
+        "fetch /deadwax/navidrome/stream/2?format=raw&wrap=mp4&max_rate=48000 bytes=0-1",
+      ],
+    }
+    for (const name of Object.keys(BEFORE)) check(`${name}: every address, in order, as 2.0.0-player.61 asked`, sessions[name], BEFORE[name])
+  }
+
+  console.log('\nNormalization: a levelled album the URL way - its level on every address, its next song warmed ahead')
+  for (const [name, options, wrap] of [['Chromium', { userAgent: ARC, maxTouchPoints: 0 }, '&wrap=mp4'], ['iPhone', { userAgent: IPHONE, maxTouchPoints: 5 }, '&wrap=mp4']]) {
+    asking.length = 0
+    const p = page({ ...options, durations: { 1: 8, 2: 8, 3: 8 } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(levelledTracks(cd(['1', '2', '3'])), 0))
+    await run(1_000)
+    check(`${name}: the element asks song 1 in deadwax's MP4, its level last - Chromium too`, e0.getAttribute('src'), `/deadwax/navidrome/stream/1?format=raw${wrap}&level=album`)
+    check(`${name}: ...and the readout's probe asks the same address, two bytes`, asking.filter(([kind, , range]) => kind === 'fetch' && range === 'bytes=0-1').map(([, address]) => address).slice(0, 1),
+      [`/deadwax/navidrome/stream/1?format=raw${wrap}&level=album`])
+    check(`${name}: ...which says what came: FLAC in MP4`, p.seekLine(), 'No seek yet · FLAC in MP4')
+    //? (3) with the switch off nothing else gets the next song ready: its levelled copy is asked for ahead, from 3 s in
+    await run(2_500)
+    const warmed = asking.filter(([kind, address, range]) => kind === 'fetch' && range === 'bytes=0-1' && /\/stream\/2\?/.test(address))
+    check(`${name}: the next song's levelled copy asked for ahead, two bytes, held - as a resampled one's is`, warmed.map(([, address]) => address),
+      [`/deadwax/navidrome/stream/2?format=raw${wrap}&level=album`])
+    await run(9_000)
+    check(`${name}: song 2 plays from the address it was warmed at`, [p.player.track?.id, e0.getAttribute('src'), p.player.playing], ['2', `/deadwax/navidrome/stream/2?format=raw${wrap}&level=album`, true])
+  }
+  {
+    //? and under Off, as before: Chromium asks the file itself, nothing ahead
+    asking.length = 0
+    const p = page({ userAgent: ARC, maxTouchPoints: 0, durations: { 1: 8, 2: 8 } })
+    tap(() => p.player.playTracks(cd(['1', '2']), 0))
+    await run(4_000)
+    check('Off in Chromium: the file itself, no probe, nothing asked ahead', asking.map((entry) => entry.slice(0, 2)), [['element 0', '/deadwax/navidrome/stream/1?format=raw']])
+  }
+
+  console.log('\nNormalization: a levelled album with Gapless - the standby, and one stream in both MediaSources')
+  {
+    //? Gapless on with no MediaSource: the standby downloads the next song at its level
+    asking.length = 0
+    const p = page({ gapless: true, userAgent: ARC, maxTouchPoints: 0, durations: { 1: 6, 2: 6 } })
+    tap(() => p.player.playTracks(levelledTracks(cd(['1', '2'])), 0))
+    await run(8_000)
+    check('the standby downloads song 2 levelled, whole, as the element will play it',
+      asking.filter(([kind, address, range]) => kind === 'fetch' && /\/stream\/2\?/.test(address) && range === null).map(([, address]) => address),
+      ['/deadwax/navidrome/stream/2?format=raw&wrap=mp4&level=album'])
+    check('...and plays it', [p.player.track?.id, p.player.playing], ['2', true])
+  }
+  for (const [name, options] of [['iPhone (ManagedMediaSource)', {}], ['Chromium (MediaSource)', { mse: 'plain', userAgent: ARC, maxTouchPoints: 0 }]]) {
+    asking.length = 0
+    const p = streamPage({ ...options, durations: { 1: 6, 2: 6, 3: 6 } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(levelledTracks(cd(['1', '2', '3'])), 0))
+    await follow(p, 22_000)
+    const pieces = asking.filter(([kind, address]) => kind === 'fetch' && /wrap=fmp4/.test(address))
+    check(`${name}: every piece of the stream asks its song at the album's level`,
+      [pieces.length >= 3, [...new Set(pieces.map(([, address]) => address))].sort()],
+      [true, ['1', '2', '3'].map((id) => `/deadwax/navidrome/stream/${id}?format=raw&wrap=fmp4&level=album`)])
+    check(`${name}: ...one stream, its joins exact - nothing given to the element but the stream`,
+      [mediaSources.length, joinsRead(p), e0.stalls.length, asking.filter(([kind, address]) => kind.startsWith('element') && address !== 'blob:').length],
+      [1, ['0 stream', '0 stream'], 0, 0])
+  }
+
+  console.log('\nNormalization: a levelled first song\'s head may wait for its album to be measured')
+  for (const level of ['album', null]) {
+    //? deadwax measures an album the first time it levels it: the head can wait tens of seconds (LEVEL_WAIT_SECONDS is
+    //? 50, under the stream's minute) - the long wait a resampled head gets, where any other head is given up on after
+    //? about 25 s of nothing (the scenario of "a minute: after about 25 s of nothing it plays the URL way" above)
+    const p = streamPage({ durations: { 1: 60, 2: 5 } })
+    const [e0] = elements
+    net.headerDelay['1'] = 40_000
+    const list = cd(['1', '2'])
+    tap(() => p.player.playTracks(level ? levelledTracks(list, level) : list, 0))
+    await run(100)
+    delete net.headerDelay['1']
+    await run(32_000)
+    const urlWay = () => /\/stream\/1\?/.test(e0.getAttribute('src') ?? '')
+    if (level) {
+      check('a levelled first song, 32 s in with its head still on its way: the stream waits on - not the URL way', [e0.srcObject === mediaSources[0], urlWay()], [true, false])
+      await run(10_000)
+      check('...its head in at 40 s: it plays, in the stream', [e0.srcObject === mediaSources[0], e0.playingNow, urlWay()], [true, true, false])
+    } else {
+      check('...where an unlevelled one has gone the URL way by then', [e0.srcObject === null, urlWay(), e0.playingNow], [true, true, true])
+    }
+  }
+
+  console.log('\nNormalization: a levelled copy refused or undecodable - the file itself, without its level')
+  {
+    //? deadwax won't make song 2's levelled copy (a 415): the run stops before it, and it is asked for as the file
+    //? itself - no level, no wrap in Chromium - and plays
+    asking.length = 0
+    const p = streamPage({ mse: 'plain', userAgent: ARC, maxTouchPoints: 0, durations: { 1: 6, 2: 6 } })
+    const [e0] = elements
+    net.fmp4Answer['2'] = { status: 415, times: 999 }
+    tap(() => p.player.playTracks(levelledTracks(cd(['1', '2'])), 0))
+    await run(12_000)
+    //? (the standby gets it ready as the run ends - downloaded into memory, Chromium's way - and takes over)
+    const playing = elements.find((element) => element.playingNow)
+    check('song 2 refused: asked for as the file itself, and playing from it', [p.player.track?.id, p.player.playing, blobs.get(playing?.getAttribute('src') ?? '') ?? null,
+      asking.filter(([, address]) => /\/stream\/2\?/.test(address) && !/fmp4/.test(address)).map(([, address]) => address)],
+    ['2', true, '2', ['/deadwax/navidrome/stream/2?format=raw']])
+    check('...its levelled stream copy asked for once - its refusal - and never again',
+      asking.filter(([, address]) => /\/stream\/2\?/.test(address) && /fmp4/.test(address)).map(([, address]) => address), ['/deadwax/navidrome/stream/2?format=raw&wrap=fmp4&level=album'])
+  }
+  {
+    //? a levelled copy the stream couldn't decode: refused for the page - the song carries on from where it was (the
+    //? way out of a stream builds its own address: deadwax's MP4 of the same copy, at the same level), and the next
+    //? time it is asked for it is the file itself
+    const p = streamPage({ mse: 'plain', userAgent: ARC, maxTouchPoints: 0, durations: { 1: 8, 2: 8 } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(levelledTracks(cd(['1', '2'])), 0))
+    await run(2_000)
+    e0.fail(3)
+    await run(600)
+    check('a decode error in a levelled stream: song 1 out of the stream, from where it was, at its level', [e0.srcObject, e0.getAttribute('src'), p.player.playing],
+      [null, '/deadwax/navidrome/stream/1?format=raw&wrap=mp4&level=album', true])
+    tap(() => p.player.playTracks(levelledTracks(cd(['1', '2'])), 0))
+    await run(600)
+    check('...played again: the file itself, no level, no wrap, never streamed', [e0.getAttribute('src'), mediaSources.length, p.player.playing], ['/deadwax/navidrome/stream/1?format=raw', 1, true])
+  }
+
+  {
+    //? (after review) A KNOWN LIMIT, pinned so it is seen when it changes: the one-element way (Gapless off - the
+    //? iPhone's default) has no fallback for a levelled copy the browser can't decode. The engine's seven lines don't
+    //? reach onFailure(), which skips a song that won't decode (afterFailure() in lib/playQueue) as it always has -
+    //? so the song is passed over, never asked for as the file itself. Off is the way out
+    //? (notes/player-normalization.md, docs/troubleshooting.md). Widening the engine change to record the refusal
+    //? there would flip this check.
+    asking.length = 0
+    const p = page({ userAgent: IPHONE, maxTouchPoints: 5, durations: { 1: 8, 2: 8 } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(levelledTracks(cd(['1', '2'])), 0))
+    await run(1_000)
+    e0.fail(3)
+    await run(1_000)
+    check('KNOWN LIMIT - one element, a levelled copy that won\'t decode: passed over for the next song, never asked as the file itself',
+      [p.player.track?.id, e0.getAttribute('src'), asking.some(([, address]) => address === '/deadwax/navidrome/stream/1?format=raw&wrap=mp4')],
+      ['2', '/deadwax/navidrome/stream/2?format=raw&wrap=mp4&level=album', false])
+  }
+
+  Object.defineProperty(FakeAudio.prototype, 'src', srcBefore)
+  define('fetch', fetchBefore)
 
   StreamSource.prototype.replan = realReplan
   StreamSource.prototype.attach = realStreamAttach

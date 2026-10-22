@@ -16,6 +16,7 @@ from pathlib import Path
 
 from src.config import Config
 from src.library import note_library_changed
+from src.levels import measure_filed
 from src.library_ledger import grant_job
 from src.logger import logger
 from src.lyrics import fetch_album_lyrics
@@ -253,6 +254,9 @@ async def _organize_if_enabled(job: dict, store) -> None:
             #? naming an album it can't show you is worse than no badge
             if results.get("tracks_organized"):
                 await _enrol_for_review(job, results, store)
+                #? (2.0.0-player.62) its FLAC songs measured for the player's Normalization, in the
+                #? background, so the album's first levelled play waits only for its make
+                _measure_later(results, store)
         elif results.get("skipped") and not results.get("dry_run") and plan.get("album_dir"):
             #? nothing filed, everything already there: the folder it was all in, for the grant below
             album_id = await index_folder(store, Config.LIBRARY_PATH, plan.get("album_dir"))
@@ -318,6 +322,38 @@ async def _organize_if_enabled(job: dict, store) -> None:
 #? Lyrics lookups in flight. asyncio holds only a WEAK reference to a task, so one nobody keeps
 #? can be collected half way through - the set is what keeps them alive until they finish.
 _lyrics_tasks: set[asyncio.Task] = set()
+
+#? (2.0.0-player.62) Measurements of filed songs in flight, kept the same way.
+_measure_tasks: set[asyncio.Task] = set()
+
+
+def _filed_flacs(results: dict) -> list[str]:
+    """The FLAC songs a filing placed (or found already there), as the paths they are at now."""
+    plan = results.get("plan") or {}
+    paths = []
+    for operation in plan.get("operations") or []:
+        target = str(operation.get("target") or "")
+        if operation.get("companion") or operation.get("duplicate_of") or not target.lower().endswith(".flac"):
+            continue
+        if Path(target).is_file():
+            paths.append(target)
+    return paths
+
+
+def _measure_later(results: dict, store):
+    """
+    (2.0.0-player.62, Normalization's Part B) The FLAC songs just filed measured for the player's
+    Normalization from their local files - a TASK, like the lyrics: on a low-priority thread of its own
+    (src/levels.py measure_filed), never holding up the poller. Reads the files and writes only deadwax's
+    database: not a writer to the library. Never raises.
+    """
+    paths = _filed_flacs(results)
+    if not paths:
+        return None
+    task = asyncio.create_task(measure_filed(store, paths))
+    _measure_tasks.add(task)
+    task.add_done_callback(_measure_tasks.discard)
+    return task
 
 
 def _filed_path(results: dict) -> str | None:

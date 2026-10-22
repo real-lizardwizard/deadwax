@@ -2,6 +2,7 @@ import { useRef } from 'preact/hooks'
 
 import { queuedWords, type QueuePick } from '../lib/upNext'
 import { rememberAdded, type AlbumWithSongs } from '../player/api'
+import { queued } from '../player/levelling'
 import type { Player } from '../player/usePlayer'
 import { sayPins } from './usePins'
 import { useSheet } from './useSheet'
@@ -49,7 +50,8 @@ export function QueueMenu({
   const add = (how: 'next' | 'last') => {
     if (!pick || !pick.tracks.length) return
     rememberAdded(pick.albums)
-    const started = how === 'next' ? player.playNext(pick.tracks) : player.playLast(pick.tracks)
+    //? (2.0.0-player.62) an album's own ••• queues it as an album, anything else as songs (Normalization)
+    const started = how === 'next' ? player.playNext(queued(pick.tracks, pick.as ?? 'songs')) : player.playLast(queued(pick.tracks, pick.as ?? 'songs'))
     onClose()
     if (!started) sayPins(queuedWords(how, pick.label))
   }
