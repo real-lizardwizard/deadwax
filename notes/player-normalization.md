@@ -277,3 +277,13 @@ Five findings, confirmed by skeptics:
 24-bit FLAC in MP4 and fragmented MP4 on the iPhone for ordinary CD songs (now nearly every song); how long a first
 play waits on the NAS over WireGuard, and whether the album page's warm-up hides it; whether -18 LUFS is loud enough
 on AirPods; the lock screen and AirPlay with levelled copies (nothing in them changed).
+
+#### Later: the 3 dB under Original (James, 2026-10-23)
+
+Asked whether a peak-held album with a hi-res song in it may be levelled up to 3 dB quieter under "Original" (the
+album-wide resample reserve above), James: "3db quieter is not ideal but it will work. Let's note that for later
+development." So it stays for now. The fix when it's taken up: the page sends the cap (`max_rate`) with every levelled
+FLAC under "Up to 48 kHz" - not only with a song it resamples - so the album's reserve can follow the device's actual
+setting and drop under "Original". That changes stream addresses `ui/test/player.sim.cjs` pins, so it is an engine
+change of its own (an address change in `streamWrap`/`api.ts`'s builders and the sim's recorded addresses), to be
+asked for as one.
