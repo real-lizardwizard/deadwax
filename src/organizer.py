@@ -203,6 +203,11 @@ def find_local_file(download_root: str, remote_filename: str, remote_directory: 
     return max(matches, key=agreement)
 
 
+#? (2.0.0-player.65, the 2.0.0 release review) what a writer of a picture or a .lrc says of a name in the album's
+#? folder that is a symlink: writing to it would write wherever it points, outside the folder - the library too
+LINK_REFUSED = "is a link to somewhere else, which deadwax won't write through"
+
+
 def is_within(child: Path, parent: Path) -> bool:
     """
     True only if `child` really sits underneath `parent`.

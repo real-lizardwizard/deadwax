@@ -309,6 +309,11 @@ function pageWords() {
   check('...and with nothing to do, that', [L.planWords('covers', 0, ''), L.planWords('disc', 0, 'x'), L.planWords('lyrics', 0, '')],
     ['No album with a release is missing its cover in the whole library.', "Every album with a release has CD art of deadwax's own among the folders matching “x”.", 'Every album has some lyrics in the whole library.'])
   check('the buttons are the main page\'s words', B.BULK_KINDS.map((kind) => L.BULK_LABELS[kind]), ['Get covers', 'Get CD art', 'Get lyrics'])
+  //? (2.0.0-player.65, the 2.0.0 release review) the page's line names only the parts drawn for this person
+  check('what the page is for names only what it draws: both, the runs alone (Edit albums), Rescan alone (Look after the library)',
+    [L.careLine({ rescan: true, bulk: true }) === L.CARE_LINE, /Rescan/.test(L.careLine({ rescan: false, bulk: true })),
+      /runs|covers|lyrics/.test(L.careLine({ rescan: true, bulk: false })), /^Rescan/.test(L.careLine({ rescan: true, bulk: false }))],
+    [true, false, false, true])
   const editions = [album('Portishead/Third (2008)'), album('Portishead/Third (2008) [Deluxe]', { album: 'Third' }), album('Air/Moon Safari (1998)', { total_size: 0, track_count: 1 })]
   check('the scan as the main page\'s status bar counts it: an album held in two pressings once, tracks, size',
     [L.scanTotals(editions), L.scanTotals([album('A/B (2000)', { total_size: 0, track_count: 1 })]), L.scanTotals([])], ['2 albums · 21 tracks · 200 MB', '1 album · 1 track', '0 albums · 0 tracks'])
@@ -440,6 +445,22 @@ async function page() {
     //? the page knows no frame: what was a desktop's is drawn for the admin, whatever App might hand it
     refused.draw({ admin: true, desktop: false })
     check('...the admin, told nothing of the frame: the library read, Rescan drawn', [C.enabled.at(-1), !!button('Rescan')], [true, true])
+  }
+
+  console.log('\nthe page: its line names only what it draws (2.0.0-player.65)')
+  {
+    reset()
+    S.forgetLibraryCare()
+    libraryOf([album('A/B (2000)')])
+    const editOnly = mount(LibraryCare, { parts: { shown: true, rescan: false, held: false, bulk: true }, live: true, backLabel: 'You', onBack() {} })
+    editOnly.draw()
+    check('Edit albums alone: the runs, no Rescan - and the line says only the runs',
+      [!!button('Rescan'), classed('app-care-run').length > 0, words(classed('app-care-line')[0]), /Rescan/.test(words(classed('app-care-line')[0]))],
+      [false, true, L.careLine({ rescan: false, bulk: true }), false])
+    const libraryOnly = mount(LibraryCare, { parts: { shown: true, rescan: true, held: true, bulk: false }, live: true, backLabel: 'You', onBack() {} })
+    libraryOnly.draw()
+    check('...Look after the library alone: Rescan, and the line names it alone',
+      [!!button('Rescan'), words(classed('app-care-line')[0])], [true, L.careLine({ rescan: true, bulk: false })])
   }
 
   console.log('\nthe page: its states')

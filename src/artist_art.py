@@ -19,7 +19,7 @@ from src.artists import ARTIST_ART_KINDS, ARTIST_ART_STEMS
 from src.library import IMAGE_EXTENSIONS
 from src.logger import logger
 from src.matching import AUDIO_EXTENSIONS, file_extension
-from src.organizer import is_within
+from src.organizer import LINK_REFUSED, is_within
 
 
 def _empty(artist_path: str, problem: str) -> dict:
@@ -184,6 +184,11 @@ def execute_artist_art(plan: dict, images: dict, mode: str = "dry_run") -> dict:
 
         data, mime = image
         name = f"{entry['stem']}.{extension_for(mime)}"
+
+        #? (2.0.0-player.65) an artist.jpg that is a symlink would be written wherever it points
+        if (directory / name).is_symlink():
+            problems.append(f"{name} {LINK_REFUSED}")
+            continue
 
         if dry_run:
             written.append(name)

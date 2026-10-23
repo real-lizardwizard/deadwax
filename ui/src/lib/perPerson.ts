@@ -86,6 +86,18 @@ export const joinNote = (place: 'Downloads' | 'Requests') =>
   `Join it to have it in your ${place} too - one download, everyone who asked waiting for it.`
 
 /**
+ * (2.0.0-player.65, the 2.0.0 release review) A store line drawn with no Join under it - for someone without Get
+ * albums, whose page gives no `onJoin`: the line saying what Join does goes too, and so does the job Join would
+ * join, so it never says "Join it" above no button. Anything else is the line as it was.
+ */
+export function withoutJoin(status: StoreStatus): StoreStatus {
+  if (status.joinJobId === undefined) return status
+  const { joinJobId: _join, ...rest } = status
+  const notes = new Set([joinNote('Downloads'), joinNote('Requests')])
+  return { ...rest, lines: status.lines.filter((line) => !notes.has(line)) }
+}
+
+/**
  * Whether a cancel of this download - a row of /jobs, or Find's download in flight - only withdraws
  * your request: somebody else waits for it too (`shared`) and you're no admin (an admin's rows carry
  * `requested_by`; an admin's cancel is for everyone). Never with logins off (no `shared` at all).

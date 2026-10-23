@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
 import { useLibrary } from '../hooks/useLibrary'
 import { BULK_KINDS, bulkSummary, bulkTargets, type BulkKind } from '../lib/bulkTargets'
 import {
-  BULK_LABELS, BULK_TITLES, CARE_LINE, RESCAN_WORDS, narrowAlbums, planWords, scanAge, scanTotals, scopeLine,
+  BULK_LABELS, BULK_TITLES, RESCAN_WORDS, careLine, narrowAlbums, planWords, scanAge, scanTotals, scopeLine,
 } from '../lib/libraryCare'
 import { MANAGING_ADMINS_ONLY } from '../lib/appRoutes'
 import type { CareParts } from '../lib/permissions'
@@ -185,7 +185,7 @@ export function LibraryCare({
     <section class="app-care">
       {header}
       <div class="app-care-body">
-        <p class="app-care-line">{CARE_LINE}</p>
+        <p class="app-care-line">{careLine(parts)}</p>
 
         {library.problem ? (
           <p class="app-care-state">{library.problem}</p>

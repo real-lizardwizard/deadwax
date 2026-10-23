@@ -300,6 +300,24 @@ def test_an_album_levelled_joins_sample_for_sample(upstream, client, mp4_cache, 
         assert np.array_equal(joined, levelled(np, whole, gains.pop()))
 
 
+def test_the_log_says_a_levelled_copy_was_made_for_normalization(upstream, client, mp4_cache, store, tmp_path, caplog):
+    """(2.0.0-player.65, the 2.0.0 release review) every levelled copy was logged as put in "an MP4 for Safari" - made
+    for Normalization, in whichever browser asked. Said as that now, for both containers."""
+    np, sf, _ = libs()
+    _, files = cd_album(np, sf, tmp_path)
+    state, _ = upstream
+    serving(state, files)
+    caplog.set_level(logging.INFO)
+
+    for wrap in ("mp4", "fmp4"):
+        assert client.get(url("song-1", wrap)).status_code == 200
+
+    lines = said(caplog, "levelled (album")
+    assert len(lines) == 2 and all("for Normalization" in line and "for Safari" not in line for line in lines)
+    assert any("in an MP4 for Normalization" in line for line in lines)
+    assert any("in a fragmented MP4 for Normalization" in line for line in lines)
+
+
 def test_levelled_and_resampled_is_quantised_once(upstream, client, mp4_cache, store, tmp_path):
     """
     A 24/192 album under Up to 48 kHz, levelled by album: one header pair on every song - the resample and

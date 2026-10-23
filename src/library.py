@@ -29,6 +29,7 @@ from pathlib import Path
 from src.logger import logger
 from src.artists import ARTIST_ART_STEMS
 from src.matching import AUDIO_EXTENSIONS, file_extension
+from src.organizer import is_within
 from src.lyrics import has_lyrics_file, lyrics_filename
 from src.tagkeys import easy_file
 
@@ -337,6 +338,13 @@ def load_artist_art(directory: Path, kind: str) -> tuple[bytes, str] | None:
     if not name:
         return None
 
+    #? (2.0.0-player.65, the 2.0.0 release review) the listing's is_file() follows a symlink, so an artist.jpg
+    #? that is a link out of the folder would serve whatever it points at: the file itself must resolve inside its
+    #? folder, as /disc_art's must
+    if not is_within(directory / name, directory):
+        logger.warning(f"refused an artist image resolving outside its folder: {directory.name!r} / {name!r}")
+        return None
+
     try:
         mime = MIME_BY_EXTENSION.get(file_extension(name), "image/jpeg")
         return (directory / name).read_bytes(), mime
@@ -389,6 +397,11 @@ def load_album_art(directory: Path) -> tuple[bytes, str] | None:
         return None
 
     cover = find_cover_file(entries)
+    #? (2.0.0-player.65, the 2.0.0 release review) a cover.jpg that is a symlink out of the album is passed over -
+    #? the embedded art then answers - rather than serving whatever it points at, as /disc_art refuses one
+    if cover is not None and not is_within(cover, directory):
+        logger.warning(f"refused a cover resolving outside its album: {directory.name!r} / {cover.name!r}")
+        cover = None
     if cover is not None:
         try:
             mime = MIME_BY_EXTENSION.get(file_extension(cover.name), "image/jpeg")

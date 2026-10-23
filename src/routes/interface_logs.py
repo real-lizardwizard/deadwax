@@ -84,5 +84,9 @@ async def interface_logs(
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
+            #? (2.0.0-player.65, the 2.0.0 release review) nginx buffers a proxied response by default, so behind
+            #? it the Log sat on "Connecting..." - nothing reached the page until a buffer filled. This header is
+            #? nginx's own way for a response to ask not to be (proxy_buffering off does it for everything)
+            "X-Accel-Buffering": "no",
         },
     )

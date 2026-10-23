@@ -2,6 +2,7 @@ import { useRef, useState } from 'preact/hooks'
 
 import type { StoreStatus } from '../lib/candidates'
 import { ADDED_WORDS } from '../lib/myLibrary'
+import { withoutJoin } from '../lib/perPerson'
 
 /**
  * What the library and the downloads already have of a pressing (step 2's store, 2.0.0-player.7),
@@ -41,6 +42,8 @@ export function StoreState({
   onAdd?: () => Promise<unknown>
 }) {
   if (!status && !notes.length) return null
+  //? (2.0.0-player.65) no Join to draw - someone without Get albums: no "Join it" either (withoutJoin)
+  if (status && !onJoin) status = withoutJoin(status)
   return (
     <div class="app-store">
       {status && (

@@ -424,6 +424,98 @@ def test_the_row_says_what_its_filing_gave_with_logins_on_only(on, monkeypatch):
 
 # ================================================================ starred as you
 
+def test_an_album_already_starred_is_never_starred_again(on):
+    """(2.0.0-player.65, the 2.0.0 release review) `star` on an album already starred sets Navidrome's starred date to
+    now. Granted between two read-backs - a first scan landing just after a sign-in - an album you starred years ago
+    was starred again. It is asked first now: already starred, it is only confirmed."""
+    album = held(on)
+    on.fake.add("nd-dummy", "rel-dummy")
+    signed_in(on, "ethan")
+    work(on)  # the first read-back: nothing held yet
+    on.fake.starred("ethan").add("nd-dummy")
+    grant(on, ["ethan"], album)
+    on.fake.calls.clear()
+
+    done = work(on, sync=False)
+
+    assert done["starred"] == 1 and entries(on, "ethan")[album]["state"] == "starred"
+    assert on.fake.asked("star") == []
+
+
+def test_an_untagged_album_you_starred_is_confirmed_not_left_waiting(on):
+    """(2.0.0-player.65, the release review's nit) deadwax can't find an album with no release id in Navidrome to star
+    it, so one in the first admin's seed waited for ever - even one starred in Amperfy. Matched by album artist and
+    name to the one starred album Navidrome reads no release id from, it is confirmed; unstarred, removed."""
+    album = held(on, tagged=False)
+    on.fake.add("nd-dummy", "")
+    on.fake.starred("ethan").add("nd-dummy")
+    signed_in(on, "ethan")
+    grant(on, ["ethan"], album)
+
+    work(on)
+
+    entry = entries(on, "ethan")[album]
+    assert (entry["state"], entry["navidrome_id"], entry["problem"]) == ("starred", "nd-dummy", None)
+    assert on.fake.asked("star") == []
+
+    #? still starred: the read-back says so, and nothing more is asked
+    on.fake.calls.clear()
+    work(on)
+    assert entries(on, "ethan")[album]["state"] == "starred" and on.fake.asked("getAlbum") == []
+
+    on.fake.starred("ethan").discard("nd-dummy")
+    work(on)
+    assert entries(on, "ethan")[album]["state"] == "removed"
+
+
+def test_an_untagged_album_not_starred_or_matched_twice_still_waits_saying_why(on):
+    album = held(on, tagged=False)
+    signed_in(on, "ethan")
+    grant(on, ["ethan"], album)
+    work(on)
+    assert (entries(on, "ethan")[album]["state"], entries(on, "ethan")[album]["problem"]) == (
+        "waiting", library_ledger.NO_RELEASE)
+
+    #? two starred untagged albums by that name and artist: which one is it? Neither is taken
+    on.fake.add("nd-a", "")
+    on.fake.add("nd-b", "")
+    on.fake.starred("ethan").update({"nd-a", "nd-b"})
+    work(on)
+    assert entries(on, "ethan")[album]["state"] == "waiting"
+
+
+def test_two_untagged_pressings_of_one_name_are_never_both_confirmed_from_one_star(on):
+    """(the 2.0.0-player.65 review) Two untagged folders of one album in the store - Dummy (1994), Dummy (1994)
+    [Deluxe] - matched the one untagged album starred in Amperfy by the same name: both were confirmed, one you never
+    starred among them, and unstarring the one removed both. Which one it is can't be told, so neither is taken."""
+    standard = held(on, tagged=False)
+    deluxe = held(on, "Portishead/Dummy (1994) [Deluxe]", tagged=False)
+    on.fake.add("nd-dummy", "")
+    on.fake.starred("ethan").add("nd-dummy")
+    signed_in(on, "ethan")
+    grant(on, ["ethan"], standard)
+    grant(on, ["ethan"], deluxe)
+
+    work(on)
+
+    assert [entries(on, "ethan")[album]["state"] for album in (standard, deluxe)] == ["waiting", "waiting"]
+
+
+def test_an_untagged_album_gone_from_navidrome_keeps_its_star(on):
+    """Gone (error 70) - between scans, say - is a star lost, not one taken away: it isn't removed."""
+    album = held(on, tagged=False)
+    on.fake.add("nd-dummy", "")
+    on.fake.starred("ethan").add("nd-dummy")
+    signed_in(on, "ethan")
+    grant(on, ["ethan"], album)
+    work(on)
+
+    del on.fake.albums["nd-dummy"]
+    work(on)
+
+    assert entries(on, "ethan")[album]["state"] == "starred"
+
+
 def test_an_album_is_starred_as_its_user_found_by_release_and_confirmed(on):
     album = held(on)
     on.fake.add("nd-dummy", "rel-dummy")
@@ -436,9 +528,10 @@ def test_an_album_is_starred_as_its_user_found_by_release_and_confirmed(on):
     entry = entries(on, "ethan")[album]
     assert (entry["state"], entry["navidrome_id"], entry["problem"]) == ("starred", "nd-dummy", None)
     assert on.fake.starred("ethan") == {"nd-dummy"}
-    #? found by its release id, starred, then confirmed - every call as ethan, none with the shared login
+    #? found by its release id, asked whether it is starred already (2.0.0-player.65), starred, then confirmed -
+    #? every call as ethan, none with the shared login
     asked = [(user, endpoint) for user, endpoint, _ in on.fake.calls if endpoint in ("search3", "star", "getAlbum")]
-    assert asked == [("ethan", "search3"), ("ethan", "star"), ("ethan", "getAlbum")]
+    assert asked == [("ethan", "search3"), ("ethan", "getAlbum"), ("ethan", "star"), ("ethan", "getAlbum")]
     assert on.fake.asked("search3")[0][1]["query"] == "rel-dummy"
     assert "demo" not in {user for user, _, _ in on.fake.calls}
 

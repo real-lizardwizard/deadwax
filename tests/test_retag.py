@@ -277,6 +277,40 @@ def test_apply_writes_the_cover_it_is_given(tmp_path):
     assert (moved / "cover.png").read_bytes() == b"\x89PNG downloaded art"
 
 
+def test_apply_never_writes_the_cover_through_a_link(tmp_path):
+    """(2.0.0-player.65, the 2.0.0 release review) a cover.png that is a symlink out of the album would have been
+    written wherever it pointed: the tags are written, the cover isn't, and the problem says why."""
+    from src.organizer import LINK_REFUSED
+
+    seed(tmp_path)
+    outside = tmp_path.parent / f"{tmp_path.name}-outside.png"
+    outside.write_bytes(b"not deadwax's")
+    (tmp_path / "Tame Impala" / "The Slow Rush (2020)" / "cover.png").symlink_to(outside)
+    plan = plan_retag("Tame Impala/The Slow Rush (2020)", RELEASE, str(tmp_path), want_art=True)
+    results = execute_retag(plan, RELEASE, "apply", (b"\x89PNG downloaded art", "image/png"))
+
+    assert results["art_written"] is None
+    assert f"tags were written but the cover art wasn't saved: cover.png {LINK_REFUSED}" in results["problems"]
+    assert outside.read_bytes() == b"not deadwax's"
+
+
+def test_a_dry_run_says_the_cover_through_a_link_would_be_refused_as_the_apply_does(tmp_path):
+    """A dry run runs the identical plan and only declines to act: it named cover.png as written where the apply
+    refuses it (the 2.0.0-player.65 review)."""
+    from src.organizer import LINK_REFUSED
+
+    seed(tmp_path)
+    outside = tmp_path.parent / f"{tmp_path.name}-outside.png"
+    outside.write_bytes(b"not deadwax's")
+    (tmp_path / "Tame Impala" / "The Slow Rush (2020)" / "cover.png").symlink_to(outside)
+    plan = plan_retag("Tame Impala/The Slow Rush (2020)", RELEASE, str(tmp_path), want_art=True)
+    results = execute_retag(plan, RELEASE, "dry_run", (b"\x89PNG downloaded art", "image/png"))
+
+    assert results["art_written"] is None
+    assert f"tags would be written but the cover art wouldn't be saved: cover.png {LINK_REFUSED}" in results["problems"]
+    assert outside.read_bytes() == b"not deadwax's"
+
+
 def test_dry_run_names_the_cover_without_writing_it(tmp_path):
     directory = seed(tmp_path)
     plan = plan_retag("Tame Impala/The Slow Rush (2020)", RELEASE, str(tmp_path), want_art=True)

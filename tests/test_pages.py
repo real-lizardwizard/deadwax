@@ -212,3 +212,56 @@ def test_the_font_is_kept_for_good_and_the_icons_for_a_day(client):
     assert client.get("/player/icon.svg").headers["cache-control"] == "public, max-age=86400"
     #? the manifest is the app's scope and name: still asked about
     assert client.get("/player/manifest.json").headers["cache-control"] == "no-cache"
+
+
+# ----------------------------------------------------------------- redirects (2.0.0-player.65, the 2.0.0 release review)
+
+@pytest.mark.parametrize("path, location", [
+    ("/player", "/player/"),
+    ("/player?from=home", "/player/?from=home"),
+    ("/player/lab", "/player/lab/"),
+])
+def test_a_slash_redirect_is_relative_so_a_tls_proxy_keeps_its_https(path, location):
+    """Behind a proxy that ends TLS deadwax is spoken to over plain http, and Starlette wrote its slash redirect's
+    Location from that - http://music.example.com/player/, where nothing answers. Relative, the browser stays on
+    https. (Not FORWARDED_ALLOW_IPS=*, which would have uvicorn trust anyone's X-Forwarded-For.)"""
+    behind = TestClient(start(), base_url="http://music.example.com")
+    response = behind.get(path, follow_redirects=False, headers={"x-forwarded-proto": "https"})
+    assert response.status_code == 307 and response.headers["location"] == location
+
+
+@pytest.mark.parametrize("path", [
+    "/%2Fevil.example%2F..%2Fplayer",
+    "/%2F%2Fevil.example%2F..%2Fplayer",
+    "/%2F%5Cevil.example%2F..%2Fplayer",
+])
+def test_a_slash_redirect_never_names_another_host(path):
+    """(the .65 review) The static mount writes its slash redirect from the DECODED path, so %2F in a link to deadwax
+    came back as http://host//evil.example/../player/ - and relative, //evil.example/../player/, which a browser
+    reads as protocol-relative: an open redirect to any host. Collapsed to one slash it resolves on deadwax's."""
+    behind = TestClient(start(), base_url="http://music.example.com")
+    response = behind.get(path, follow_redirects=False)
+    assert 300 <= response.status_code < 400
+    location = response.headers["location"]
+    assert location.startswith("/") and not location.startswith(("//", "/\\")), location
+    assert urljoin("https://music.example.com/x", location).startswith("https://music.example.com/"), location
+
+
+def test_a_location_with_leading_slashes_keeps_only_one():
+    from src.api.app import relative_location
+
+    host = "music.example.com"
+    assert relative_location("http://music.example.com//evil.example/../player/", host) == "/evil.example/../player/"
+    assert relative_location("http://music.example.com/\\evil.example/", host) == "/evil.example/"
+    assert relative_location("http://music.example.com///a?b=c", host) == "/a?b=c"
+
+
+def test_only_a_redirect_to_deadwax_itself_is_made_relative():
+    from src.api.app import relative_location
+
+    host = "music.example.com"
+    assert relative_location("http://music.example.com/player/#now", host) == "/player/#now"
+    assert relative_location("http://MUSIC.example.com", host) == "/"
+    for elsewhere in ("https://navidrome.example.com/app/", "/already/relative", "mailto:james@example.com"):
+        assert relative_location(elsewhere, host) == elsewhere
+    assert relative_location("http://music.example.com/player/", "") == "http://music.example.com/player/"

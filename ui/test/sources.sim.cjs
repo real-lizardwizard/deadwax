@@ -679,6 +679,13 @@ async function main() {
     check('a download somebody else asked for: Join, for it, keyed on it', [join?.props.jobId, join?.key], [7, 7])
     tree = StoreState({ status, notes: [] })
     check('...none where the page gives no way to join', find((node) => node.type === JoinDownload).length, 0)
+    //? (2.0.0-player.65, the release review's nit) ...and no "Join it" above no button, for someone without Get albums
+    const theirs = { kind: 'downloading', title: 'Already downloading for someone else',
+      lines: ['From bob · FLAC · queued', 'Join it to have it in your Requests too - one download, everyone who asked waiting for it.'], joinJobId: 7 }
+    tree = StoreState({ status: theirs, notes: [] })
+    check('...nor the line saying what Join does', classed('app-store-line').map(text), ['From bob · FLAC · queued'])
+    tree = StoreState({ status: theirs, notes: [], onJoin })
+    check('...which stays where Join is drawn', classed('app-store-line').length, 2)
     tree = StoreState({ status: { ...status, joinJobId: undefined }, notes: [], onJoin })
     check('...nor for a download of your own', find((node) => node.type === JoinDownload).length, 0)
 

@@ -117,6 +117,17 @@ export function scanAge(
 export const CARE_LINE = 'Rescan, and the runs that fetch covers, CD art and lyrics for the albums missing them - '
   + "one album at a time, through the same steps as an album's own Get buttons, each with Stop."
 
+/** (2.0.0-player.65, the 2.0.0 release review) What the page says it is for, naming only the parts it draws for this
+ *  person (permissions.ts careParts): the runs alone for Edit albums, Rescan alone for Look after the library. */
+export function careLine(parts: { rescan: boolean; bulk: boolean }): string {
+  if (parts.rescan && parts.bulk) return CARE_LINE
+  if (parts.bulk) {
+    return "The runs that fetch covers, CD art and lyrics for the albums missing them - one album at a time, through the "
+      + "same steps as an album's own Get buttons, each with Stop."
+  }
+  return 'Rescan, which reads every file of the library again.'
+}
+
 /** Why Rescan is there. */
 export const RESCAN_WORDS = "deadwax notices a changed album by its folder's date, and a tag edited in place by another "
   + "program doesn't change it - so after a retag elsewhere, Rescan reads every file again. Albums filed from a "

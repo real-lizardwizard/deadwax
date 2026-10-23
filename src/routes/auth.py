@@ -28,6 +28,12 @@ from src.users import PERMISSIONS, permissions, permissions_unverified
 router = APIRouter()
 
 
+#? (2.0.0-player.65, the 2.0.0 release review) what a sign-in deadwax couldn't read is answered - in place of
+#? FastAPI's 422, which echoes what was sent, the password among it (src/api/app.py's refused_body, as for People)
+SIGN_IN_FORM = ("deadwax couldn't read that sign-in - a user name is at most 200 characters and a password at most "
+                "1000. Check what you typed and try again.")
+
+
 class SignIn(BaseModel):
     """A sign-in. Both bounded: nothing longer is anybody's user name or password."""
     username: str = Field(default="", max_length=200)
@@ -52,7 +58,10 @@ async def login(body: SignIn, request: Request):
         raise HTTPException(status_code=400, detail="Type your user name and your password.")
 
     store = getattr(request.app.state, "store", None)
-    user, value, max_age, admin = await auth.sign_in(store, body.username, body.password)
+    #? (2.0.0-player.65) the client's address, which the break-glass name's tries are counted under (beside the
+    #? name): the connection's peer - a reverse proxy's own address behind one, unless uvicorn is told to trust it
+    address = request.client.host if request.client else None
+    user, value, max_age, admin = await auth.sign_in(store, body.username, body.password, address)
     #? what the new session may do, as /me will answer it: its id as the sign-in read it (src/auth.py)
     held = await asyncio.to_thread(auth.held_login, value, store)
     if held is not None:

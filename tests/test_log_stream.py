@@ -57,6 +57,8 @@ def test_the_log_stream_opens_at_once_through_every_middleware():
     headers = dict(sent[0]["headers"])
     assert headers[b"content-type"].startswith(b"text/event-stream")
     assert b"content-encoding" not in headers, "an event stream must never be gzipped"
+    #? (2.0.0-player.65) nor buffered by nginx in front of it: the Log stayed on "Connecting..." behind one
+    assert headers[b"x-accel-buffering"] == b"no"
     assert sent[1]["body"] == b":\n\n"
 
 

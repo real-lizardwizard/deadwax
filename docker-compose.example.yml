@@ -61,8 +61,8 @@ services:
       # below. The folder must be writable by PUID/PGID (deadwax makes it if it isn't there, and
       # touches nothing else in it). It is only a cache: leave it out of your backups, and deleting
       # it is always safe - it costs nothing but speed. MUSICBRAINZ_CACHE_MB is the most it holds (0
-      # to 1048576; 200 is about 4,000 artists looked up with an album each), the answers used
-      # longest ago going first; 0 turns saving off.
+      # to 1048576; 200 is about 1,100 artists explored - searched, their page, an album opened and
+      # one of its songs searched), the answers used longest ago going first; 0 turns saving off.
       #- MUSICBRAINZ_CACHE_PATH=/cache
       #- MUSICBRAINZ_CACHE_MB=200
 
@@ -119,7 +119,7 @@ services:
       # 0 renames straight away.
       #- RETAG_RENAME_WAIT=20
       #
-      # Navidrome - needed for the app's library (since 2.0.0-player.45, no longer optional):
+      # Navidrome - needed for the app's library (since 2.0.0-player.46, no longer optional):
       # the app at /player/ shows and plays your library from Navidrome, and without these its
       # Library, album pages and Home's shelves say "Connect Navidrome". Navidrome must read the
       # same music folder mounted at /music below. Set them here, in .env, or in deadwax's
@@ -144,13 +144,16 @@ services:
       # Optional - logins (off unless AUTH_MODE=on). Everyone then signs in with their own
       # Navidrome account (NAVIDROME_URL above is needed). Navidrome's admins are deadwax's admins:
       # only they - and anyone an admin gives a permission to, in You > People - can edit the
-      # library, see the review queue and the log, or change settings.
+      # library, see the review queue and the log, or change settings. Logins need organizing on
+      # as well: ORGANIZE_MODE copy or move (below), with SLSKD_DOWNLOAD_PATH and LIBRARY_PATH
+      # (above) - without it everything answers 503 and says why. Environment only, all three.
+      #
       # DEADWAX_SECRET_KEY encrypts the logins deadwax keeps - at least 32 characters, from
-      # `openssl rand -hex 32` - and is better kept in .env. DEADWAX_ADMIN_PASSWORD, optional,
-      # signs in `deadwax` with no Navidrome, for when it is down. Environment only, all three.
+      # `openssl rand -hex 32`. Put it in .env (see .env.example), NOT here: a line for it here
+      # beats .env even when it's empty, and then nobody can sign in. DEADWAX_ADMIN_PASSWORD,
+      # optional, signs in `deadwax` with no Navidrome, for when it is down - make it long and
+      # random (`openssl rand -base64 18`), and keep it in .env too.
       #- AUTH_MODE=on
-      #- DEADWAX_SECRET_KEY=
-      #- DEADWAX_ADMIN_PASSWORD=
       #
       # off | dry_run | copy | move. Starts at dry_run on purpose - organizing is the only
       # thing here that writes to your filesystem, so check the event log looks right before

@@ -446,6 +446,49 @@ async function settingsPage() {
     opened.unmount()
   }
 
+  console.log('\nserver settings: a locked override offers no revert; a secret reverted at another address says so (2.0.0-player.65)')
+  {
+    reset()
+    const page = mount(ServerSettings)
+    page.draw()
+    const read = SETTINGS()
+    read.groups[0].settings = [
+      setting('SLSKD_URL', { value: 'http://slskd-box:5030', overridden: true, env_value: 'http://slskd:5030', editable: false, locked_reason: 'Only an admin can change this.' }),
+      setting('NAVIDROME_URL', { value: 'http://elsewhere:4533', overridden: true, env_value: 'http://navidrome:4533' }),
+      setting('NAVIDROME_PASSWORD', { secret: true, value: 'set', overridden: true, env_set: true }),
+    ]
+    W.reads[0].resolve(read)
+    await settle()
+    page.draw()
+    tab('connections').props.onClick()
+    page.draw()
+    const revert = (key) => find((node) => node.type === 'button' && words(node).startsWith('Revert to the environment'), row(key))[0]
+    check('a locked row overridden: its reason, and no revert - the save would refuse it',
+      [words(row('SLSKD_URL')).includes('Only an admin can change this.'), !!revert('SLSKD_URL')], [true, false])
+    check('...an editable one overridden still offers it', !!revert('NAVIDROME_URL'), true)
+    const reverted = "Reverting brings back the environment's password"
+    check('no note before anything is drafted', words(row('NAVIDROME_PASSWORD')).includes(reverted), false)
+    revert('NAVIDROME_PASSWORD').props.onClick()
+    page.draw()
+    check('the password reverted while the saved address is another: said beside the field, before the save refuses it',
+      [words(row('NAVIDROME_PASSWORD')).includes('Will revert to the environment on save.'), words(row('NAVIDROME_PASSWORD')).includes(reverted)], [true, true])
+    revert('NAVIDROME_URL').props.onClick()
+    page.draw()
+    check('...the address reverted in the same save: the note goes', words(row('NAVIDROME_PASSWORD')).includes(reverted), false)
+    page.unmount()
+
+    //? the rule, as the note reads it
+    const server = (url, secret) => ({ groups: [{ settings: [setting('SLSKD_URL', url), setting('SLSKD_APIKEY', { secret: true, value: 'set', overridden: true, ...secret })] }] })
+    const saved = { value: 'http://slskd-box:5030', overridden: true, env_value: 'http://slskd:5030' }
+    const note = "Reverting brings back the environment's API key, which was given for the environment's address - type the key again, or revert SLSKD_URL in the same save."
+    check('the key reverted at a saved address that is another: the note', SV.retypeSecretNote('SLSKD_APIKEY', server(saved, { env_set: true }), { SLSKD_APIKEY: null }), note)
+    check('...at a new address typed now, the address never saved: the note', SV.retypeSecretNote('SLSKD_APIKEY', server({ value: 'http://slskd:5030' }, { env_set: true }), { SLSKD_APIKEY: null, SLSKD_URL: 'http://slskd-box:5030' }), note)
+    check('...at the environment\'s address: none', SV.retypeSecretNote('SLSKD_APIKEY', server({ value: 'http://slskd:5030' }, { env_set: true }), { SLSKD_APIKEY: null }), null)
+    check('...a saved address that is the environment\'s own: none', SV.retypeSecretNote('SLSKD_APIKEY', server({ ...saved, value: 'http://slskd:5030' }, { env_set: true }), { SLSKD_APIKEY: null }), null)
+    check('...the address reverted too: none', SV.retypeSecretNote('SLSKD_APIKEY', server(saved, { env_set: true }), { SLSKD_APIKEY: null, SLSKD_URL: null }), null)
+    check('...no key in the environment, so nothing to bring back: none', SV.retypeSecretNote('SLSKD_APIKEY', server(saved, { env_set: false }), { SLSKD_APIKEY: null }), null)
+  }
+
   console.log('\nserver settings: read when it shows, its groups drawn from the main page\'s parts')
   reset()
   const page = mount(ServerSettings, { live: false })

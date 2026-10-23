@@ -1798,9 +1798,11 @@ class Mp4Cache:
             elif plan.gain_db is not None:
                 resampled_from = (f"resampled from {resample.khz(plan.source_rate)} to {resample.khz(plan.out_rate)} "
                                   f"and " if plan.resampled else "")
+                #? (2.0.0-player.65, the 2.0.0 release review) said as what it is for - Normalization, in any
+                #? browser - not as `wrap.made`, whose "an MP4 for Safari" read as if only Safari got one
                 logger.info(f"player: {what} {resampled_from}levelled ({plan.level}, {plan.gain_db:+.2f} dB), and put "
-                            f"in {wrap.made} ({size >> 10} KiB, made in {made.seconds * 1000:.0f} ms, repackaged in "
-                            f"{took:.0f} ms)")
+                            f"in {wrap.noun} for Normalization ({size >> 10} KiB, made in {made.seconds * 1000:.0f} ms, "
+                            f"repackaged in {took:.0f} ms)")
                 if made.beyond_db is not None:
                     logger.warning(f"player: {what} was lowered a further {made.beyond_db:.2f} dB so nothing clips - "
                                    f"past its level's gain, which its measurement said was enough; its joins with the "

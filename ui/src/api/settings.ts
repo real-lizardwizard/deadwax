@@ -51,6 +51,11 @@ export interface ServerSetting {
   /** What reverting would restore. Always null for secrets. */
   env_value: string | null
   /**
+   * For a secret, whether compose or .env holds one (never what it is): what a revert would bring
+   * back. Null for everything else. (2.0.0-player.65)
+   */
+  env_set?: boolean | null
+  /**
    * value -> label, for a setting that only takes certain values. Drawn as a dropdown: a text
    * box would accept anything and then fail on save.
    */

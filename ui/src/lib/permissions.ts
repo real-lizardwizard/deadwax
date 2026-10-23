@@ -48,7 +48,8 @@ export const PEOPLE_LINE = 'People - Navidrome admins only'
 export const ADMINS_EVERYTHING = 'Admins can do everything.'
 
 /** What ticking (or unticking) adds under the box - the near-admin ones said plainly. */
-export const WARN_SERVER = 'Settings can point deadwax at other folders, slskd and Navidrome - give it only to someone you\'d trust as an admin.'
+//? (2.0.0-player.65) not slskd or Navidrome: their rows stay an admin's (ADMINS_ONLY in src/routes/settings.py)
+export const WARN_SERVER = 'Settings can point deadwax at other folders and change how it downloads and files - give it only to someone you\'d trust as an admin.'
 export const WARN_LIBRARY = 'This includes deleting albums from disk, which can\'t be undone.'
 export const WARN_NO_REQUEST = 'They can still play, browse and add what the store has.'
 

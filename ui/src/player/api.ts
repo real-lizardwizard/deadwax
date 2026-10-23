@@ -598,8 +598,14 @@ export function levelOf(id: string, level: Level, maxRate: number | null, signal
  * awaits it, and a failure costs only the wait.
  */
 export function warmLevels(albumId: string): void {
-  post(`/navidrome/level/album/${encodeURIComponent(albumId)}`).catch(() => {})
+  //? (2.0.0-player.65) never twice at once: an album page and a play of the same album, or two taps
+  if (warming.has(albumId)) return
+  warming.add(albumId)
+  post(`/navidrome/level/album/${encodeURIComponent(albumId)}`).catch(() => {}).finally(() => warming.delete(albumId))
 }
+
+/** The albums whose warmLevels() is on its way. */
+const warming = new Set<string>()
 
 /** Fire and forget: a play that isn't counted is not worth interrupting the music over. */
 export function scrobble(id: string, submission: boolean, time?: number): void {

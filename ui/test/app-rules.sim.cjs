@@ -1340,7 +1340,7 @@ console.log('\nArtists and the id bridge: Play from the tap with every album in 
   const playRow = /const playRow = \(row: RequestRow\) => \{([\s\S]*?)\n  \}/.exec(requests)?.[1] ?? ''
   check('a Done row\'s ▶ plays its album only with its songs in hand - nothing awaited - and opens it otherwise',
     [/const album = row\.release \? ready\.get\(row\.release\)\?\.answer : undefined/.test(playRow),
-      /if \(album && album\.song\?\.length\) \{\s*rememberPlayed\(album\)\s*actions\.playTracks\(queued\(album\.song\.map\(\(song\) => toQueueTrack\(song, album\)\), 'album'\), 0\)\s*return\s*\}\s*openRow\(row\)/.test(playRow),
+      /if \(album && album\.song\?\.length\) \{\s*rememberPlayed\(album\)\s*actions\.playTracks\(queued\(album\.song\.map\(\(song\) => toQueueTrack\(song, album\)\), 'album'\), 0\)\s*warmAlbum\(album\)\s*return\s*\}\s*openRow\(row\)/.test(playRow),
       /\bawait\b|\.then\(|fetch|navidromeAlbumFor|prefetchAlbum/.test(playRow)],
     [true, true, false])
   check('...the first few asked for ahead (KEPT), only while the tab\'s root shows - never as the app starts - and looked for again when due',
@@ -2766,12 +2766,30 @@ console.log('\nNormalization (2.0.0-player.62): every queued song through queued
   check('the engine never reads the setting: the level rides on the entries it is handed',
     [/readPlayerNormalization|playerNormalization/.test(engine), /import \{ levels, unlevelled \} from '\.\.\/lib\/loudness'/.test(engine)], [false, true])
   const album = code(read('player/AlbumPage.tsx'))
-  check('the album page asks deadwax to measure its album as it opens - in an effect, never in a tap, not under Off',
-    [/useEffect\(\(\) => \{\s*if \(!album \|\| readPlayerNormalization\(\) === 'off'\) return\s*if \([^\n]*\) warmLevels\(album\.id\)\s*\}, \[album\?\.id\]\)/.test(album),
-      (album.match(/warmLevels\(/g) ?? []).length], [true, 1])
+  check('the album page asks deadwax to measure its album as it opens - in an effect, never in a tap',
+    [/useEffect\(\(\) => \{\s*if \(album\) warmAlbum\(album\)\s*\}, \[album\?\.id\]\)/.test(album),
+      (album.match(/warmAlbum\(/g) ?? []).length, /warmLevels\(/.test(album)], [true, 1, false])
   const api = code(read('player/api.ts'))
-  check('...fire and forget: a POST nothing awaits, its failure swallowed',
-    /export function warmLevels\(albumId: string\): void \{\s*post\(`\/navidrome\/level\/album\/\$\{encodeURIComponent\(albumId\)\}`\)\.catch\(\(\) => \{\}\)\s*\}/.test(api), true)
+  check('...fire and forget: a POST nothing awaits, its failure swallowed - and (2.0.0-player.65) never twice at once',
+    /export function warmLevels\(albumId: string\): void \{\s*if \(warming\.has\(albumId\)\) return\s*warming\.add\(albumId\)\s*post\(`\/navidrome\/level\/album\/\$\{encodeURIComponent\(albumId\)\}`\)\.catch\(\(\) => \{\}\)\.finally\(\(\) => warming\.delete\(albumId\)\)\s*\}/.test(api), true)
+  check('...warmAlbum: not under Off, only an album with a FLAC song, and the setting read synchronously',
+    [/export function warmAlbum\(album: Pick<AlbumWithSongs, 'id' \| 'song'>\): void \{\s*if \(readPlayerNormalization\(\) === 'off'\) return\s*if \(\(album\.song \?\? \[\]\)\.some\(\(song\) => isFlac\([^\n]*\)\)\) \{\s*warmLevels\(album\.id\)\s*\}\s*\}/.test(levelling),
+      /export function warmAlbum[\s\S]*?\n\}/.exec(levelling)?.[0].match(/\bawait\b|\.then\(/) ?? null], [true, null])
+  //? (2.0.0-player.65, the 2.0.0 release review) the first play of an album played from Search, Requests or an artist's
+  //? Play waited to measure it: those warm it too - right AFTER the tap's playTracks, nothing awaited, so the play is
+  //? never held up by it; an artist's Shuffle (by song) warms nothing
+  const after = (source, name) => {
+    const body = new RegExp(`const ${name} = \\([^)]*\\) => \\{([\\s\\S]*?)\\n  \\}`).exec(source)?.[1] ?? ''
+    const played = body.indexOf('actions.playTracks(')
+    const warmed = body.indexOf('warmAlbum(')
+    return [played >= 0 && warmed > played, (body.match(/warmAlbum\(/g) ?? []).length, /\bawait\b|\.then\(/.test(body)]
+  }
+  check('Search\'s song tap, Requests\' Done ▶ and an artist\'s Play warm the album played - after the play, nothing awaited',
+    [after(code(read('app/Search.tsx')), 'playSong'), after(code(read('app/Requests.tsx')), 'playRow'),
+      after(code(read('app/ArtistPage.tsx')), 'play')],
+    [[true, 1, false], [true, 1, false], [true, 1, false]])
+  check('...an artist\'s Play warms its first album, and Shuffle none',
+    /actions\.playTracks\(queued\(tracks, shuffle \? 'songs' : 'album'\), shuffle \? null : 0, shuffle\)\s*(?:\/\/\?[^\n]*\n\s*)*if \(!shuffle && albums\[0\]\) warmAlbum\(albums\[0\]\)/.test(code(read('app/ArtistPage.tsx'))), true)
   check('the visualizer\'s silent copy asks its windows at the level the song plays at, as the turntable does',
     [/level: levels\(track, 'raw'\) \? track\.level \?\? null : null/.test(code(read('player/Visualizer.tsx'))),
       /const level = levels\(playing, 'raw'\) \? \(playing as LevelledTrack\)\.level \?\? null : null/.test(code(read('player/Turntable.tsx')))], [true, true])

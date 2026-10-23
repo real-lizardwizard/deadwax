@@ -103,8 +103,12 @@ deadwax too, in **People**. Then, for each person:
   a VPN such as WireGuard or Tailscale. Anywhere else, put HTTPS in front of deadwax first: over plain
   http a password and a session can be read on the way. deadwax doesn't serve HTTPS itself - that
   means a reverse proxy with a certificate (Caddy, nginx, Traefik, Nginx Proxy Manager…) in front of
-  its port 8080; step 3 of [turning logins on](#turning-logins-on) has the one setting it may need. A
-  VPN on each person's phone avoids needing HTTPS at all.
+  its port 8080; step 3 of [turning logins on](#turning-logins-on) has the one setting it may need, and
+  a sample nginx block. A VPN on each person's phone avoids needing HTTPS at all.
+- **No frames.** deadwax refuses to be shown inside another site's page - an `<iframe>`, a dashboard's
+  web tile (Homarr, Heimdall, Home Assistant's webpage card…), even one on the same host - so a page
+  elsewhere can't lay deadwax's buttons under its own and trick a click through. Such a tile goes
+  blank; make it a link that opens deadwax in its own tab instead. There's no setting to allow it.
 
 ## Turning logins on
 
@@ -151,14 +155,42 @@ beat compose, so a wrong one could lock everyone out with no way back from the p
    - `DEADWAX_ADMIN_PASSWORD` - optional, the **break-glass** sign-in: user name `deadwax` and this
      password sign in an admin without asking Navidrome or reading deadwax's database - for when
      Navidrome is down, or nobody who can sign in is a Navidrome admin. It lasts 12 hours, and ends at
-     once if the password changes. It has no Navidrome account behind it, so no library of its own,
+     once if the password changes. Make it long and random (`openssl rand -base64 18`): the name is public,
+     and wrong guesses are held off per address (three a minute from each, the right password included once
+     an address is held off) - so a stranger's guesses keep only the stranger out, and you still get in from
+     another address. Behind a reverse proxy every sign-in may come from the proxy's own address, and then
+     a stranger's guesses through the proxy hold you off through it too: sign in at deadwax's address on
+     your network instead. Someone with many addresses still gets many guesses, so its length is what keeps
+     them out. Shorter than 16 characters, the log at start-up and its
+     row in the settings tab say so (it still works). It has no Navidrome account behind it, so no library of its own,
      its player plays as `NAVIDROME_USER`, it keeps no play queue (nothing is put back or saved for it), and it
      can't use **People** (which asks Navidrome as you).
 3. **Behind a reverse proxy**, if it rewrites the `Host` header (nginx does, unless told
    `proxy_set_header Host $http_host`), also set `TRUSTED_ORIGINS` to the address you open deadwax
    at, such as `https://music.example.com` - otherwise every change, plays included, looks like it
    came from another website and is refused. The session cookie is marked Secure when deadwax is
-   reached over HTTPS, directly or through a proxy that sends `X-Forwarded-Proto`.
+   reached over HTTPS, directly or through a proxy that sends `X-Forwarded-Proto`. Reach one host name
+   over HTTPS or over plain http, not both: a browser that signed in over HTTPS won't let the http
+   address sign in until that cookie is gone ([troubleshooting](troubleshooting.md#signed-in-over-https-and-now-the-http-address-wont-sign-in)).
+   A sample nginx block that does all of this - and keeps the Log's live lines and the player's audio
+   flowing, which nginx otherwise holds back in its buffers:
+
+   ```nginx
+   server {
+       listen 443 ssl;
+       server_name music.example.com;
+       # ssl_certificate and ssl_certificate_key: your certificate
+
+       location / {
+           proxy_pass http://192.168.1.20:8080;     # deadwax's port on your server
+           proxy_http_version 1.1;
+           proxy_set_header Host $http_host;        # the address you opened, port and all - no TRUSTED_ORIGINS needed
+           proxy_set_header X-Forwarded-Proto $scheme;   # so the session cookie is marked Secure
+           proxy_buffering off;                     # the Log's live lines and the audio arrive as they're sent
+           proxy_read_timeout 1h;                   # an open Log, a long apply, a paused song
+       }
+   }
+   ```
 4. **Recreate the container** and open deadwax. The app shows a sign-in screen; sign in with your
    Navidrome user name and password. An app already open on a phone, or in a tab, reloads itself into
    the sign-in screen the next time it asks deadwax for something. The main page has no sign-in of its
@@ -178,17 +210,23 @@ You were deadwax's one user until now (deadwax calls that user `local`). When lo
   had already set wins over the old. If an admin is still signed in from earlier - a session lasts 30
   days and outlives a restart - it's taken over on their first visit instead.
 - **The store goes into the first Navidrome admin's library**, once ever: every album already in it is
-  put in that admin's library and starred for them in Navidrome. That's yours - it was all yours before
-  anyone else had a library. The one exception is an album somebody else's download brought in,
-  which is theirs. If deadwax hasn't scanned the library yet (a new install), this waits for its first
-  scan - searching, opening an album's page, or **Library care → Rescan** starts one. Both wait for a
+  put in that admin's library and **starred for them in Navidrome** - so their Navidrome favourites, and
+  Amperfy's, fill with the whole store. There's no undo for all of them at once: unstar them in Amperfy,
+  or **Remove from my library** in deadwax, one album at a time. So sign in first with the account you
+  listen on (made a Navidrome admin), not a separate managing account. An album already starred is only
+  checked, never starred again, so the date Navidrome shows for it stays. That's yours - it was all yours
+  before anyone else had a library. The one exception is an album somebody else's download brought in,
+  which is theirs. If deadwax hasn't scanned the library yet (a new install, or an upgrade from a
+  version whose saved scan it can't read), this waits for its first scan - which deadwax starts by
+  itself, in the background, as it starts (a search or **Library care → Rescan** starts one too). Both wait for a
   **Navidrome admin's** sign-in: on an install where nobody signing in is one, the store goes into
   nobody's library until someone is made one. Once done, neither happens again for a second admin - an
   admin who signs in later starts as anyone new does.
 - **Everyone else starts with an empty library**, apart from albums they had already starred in
   Navidrome that the store holds: those are read back and added (without a **New** mark - they were
   theirs already).
-- **Plays, playlists and favourites** are Navidrome's, and stay where they are. With logins off, the
+- **Plays, playlists and favourites** are Navidrome's, and stay where they are - the first admin's
+  favourites gaining the store's albums, above, is the one thing added to them. With logins off, the
   player played as `NAVIDROME_USER`; with logins on, it plays as whoever is signed in. So if
   `NAVIDROME_USER` is your own account, your play counts and playlists carry on as yours; if it was a
   separate account, what it played and made stays that account's.
@@ -255,7 +293,9 @@ admin's job, tick it under their **Permissions** instead ([below](#admins-permis
 - **Wrong passwords**: after three wrong passwords for one user name within a minute, deadwax stops
   asking Navidrome about that name for the rest of the minute - "Too many tries for … - wait N seconds
   and try again" - so a mistyped password, or someone guessing, never gets the account locked in
-  Navidrome itself. Other names aren't held up.
+  Navidrome itself. Other names aren't held up. The break-glass `deadwax` is counted per address instead:
+  an address held off waits out the minute even with the right password, and other addresses can still
+  sign in with it.
 - **Navidrome down**: nobody new can sign in, since signing in asks Navidrome - except with the
   break-glass `deadwax`. Everyone already signed in stays signed in, but the player plays from
   Navidrome, so Home and the Library say they can't reach it; searching, **Get** and Requests still
@@ -284,12 +324,13 @@ else can do what the left column says, and an admin can give any of them more, b
 - **Giving permissions**: People → their row → **Permissions** → tick what to give → **Save
   permissions**. It's in force from their next tap - no sign-in. An admin's row is all ticked and
   can't be changed ("Admins can do everything."); so is your own, `NAVIDROME_USER`'s and a reserved
-  name's. Settings and the log can point deadwax at other folders and slskd, and Look after the library
-  deletes albums for good - give those only to someone you'd trust as an admin. **`NAVIDROME_URL`,
-  `NAVIDROME_USER` and `NAVIDROME_PASSWORD` stay an admin's** even then: everyone's own Navidrome sign-in
-  goes to the address, and it says who the admins are; the account is deadwax's own, which People won't
-  touch - set to someone's own account, it would put them out of People's reach. For anyone else they show
-  locked ("Only an admin can change this").
+  name's. Settings and the log can point deadwax at other folders and change how it downloads and files,
+  and Look after the library deletes albums for good - give those only to someone you'd trust as an admin. **`NAVIDROME_URL`,
+  `NAVIDROME_USER`, `NAVIDROME_PASSWORD`, `SLSKD_URL` and `SLSKD_APIKEY` stay an admin's** even then:
+  everyone's own Navidrome sign-in goes to the address, and it says who the admins are; the account is
+  deadwax's own, which People won't touch - set to someone's own account, it would put them out of People's
+  reach; and slskd's API key, which goes to slskd's address, is full control of slskd. For anyone else they
+  show locked ("Only an admin can change this").
 - **A listen-only account**: untick **Get albums** for them. They can still play, browse and add what
   the store has; Get becomes "Getting albums is off for you - ask an admin."
 - **Bound to the account**: a permission is given to that Navidrome account, not just the name - an

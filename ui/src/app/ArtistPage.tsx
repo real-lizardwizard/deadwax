@@ -22,7 +22,7 @@ import {
   artistAlbums, artistIndexAge, libraryArtists, prefetchAlbum, rememberQueue, toQueueTrack,
   type Album, type AlbumWithSongs, type ArtistWithAlbums,
 } from '../player/api'
-import { queued } from '../player/levelling'
+import { queued, warmAlbum } from '../player/levelling'
 import { Cover } from '../player/Cover'
 import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, PlayIcon, ShuffleIcon } from '../player/icons'
 import { ArchiveCover } from './ArchiveCover'
@@ -617,6 +617,9 @@ export function ArtistPage({
     rememberQueue(albums)
     //? (2.0.0-player.62) Play is their albums in order, each an album played as one; Shuffle mixes songs
     actions.playTracks(queued(tracks, shuffle ? 'songs' : 'album'), shuffle ? null : 0, shuffle)
+    //? (2.0.0-player.65) Play's first album measured for Normalization, after the play (deadwax measures one album
+    //? at a time; the next is asked for as it comes up). Shuffle levels song by song, so warms nothing
+    if (!shuffle && albums[0]) warmAlbum(albums[0])
   }
 
   const name = artist?.name ?? facts?.name ?? preview?.name ?? ''

@@ -483,6 +483,19 @@ already there under the new name (or another of their albums moving there), or a
 read ("'03 Three.flac' can't be read, so its tags can't be written": a file cut short or damaged, or
 one the user deadwax runs as can't read - check its permissions, or replace it, and move again).
 
+## Stopping or redeploying deadwax takes a few seconds
+
+With a song playing, or the Log open, a stop waits up to 5 seconds for those to finish, then closes them and
+shuts down cleanly (MusicBrainz's saved answers written, every connection closed) - well inside the 10 seconds
+Docker gives a container before killing it. The container's log then says "Cancel N running task(s), timeout
+graceful shutdown exceeded" and shows an "Exception in ASGI application" traceback for each one it closed: that
+is the stop closing them, not a fault.
+
+The one exception is a library scan still reading files - the one deadwax makes by itself on the first start
+after an upgrade (a big library takes minutes), or a **Rescan**: a scan can't be stopped part-way, so the stop
+waits for it and Docker kills deadwax at 10 seconds. Nothing is lost: what the scan read isn't saved until it
+finishes, and the scan at start-up runs again at the next start.
+
 ## Settings I changed in compose don't take effect
 
 A value saved in the settings tab **overrides** compose and `.env`, and the row says so. Press
@@ -500,7 +513,7 @@ on the sign-in screen means, and what to do about it:
 - **"Navidrome isn't answering, so deadwax can't check your password right now"**: signing in asks
   Navidrome, so with Navidrome down nobody can. That's what the **break-glass** sign-in is for: user
   name `deadwax` (it was `admin` until 2.0.0-player.61), password `DEADWAX_ADMIN_PASSWORD`. It needs neither Navidrome nor deadwax's database,
-  and lasts 12 hours. If it isn't set, set it in compose and recreate the container. Sessions already
+  and lasts 12 hours. If it isn't set, set it in `.env` (or compose) and recreate the container. Sessions already
   signed in carry on while Navidrome is down - only new sign-ins need it.
 - **"Logins are on, but ORGANIZE_MODE is 'dry_run', so nothing downloaded would ever be filed into
   the library"** (or `'off'`, or "LIBRARY_PATH is not set"): with logins on,
@@ -515,7 +528,9 @@ on the sign-in screen means, and what to do about it:
 - **"Logins are on, but DEADWAX_SECRET_KEY isn't set"** (or "is shorter than 32 characters"): logins
   don't work without the key: the pages load, but everything they ask deadwax for (the health check
   aside) answers 503 until it's set, and the sign-in screen says so. Make one with
-  `openssl rand -hex 32`, put it in compose and recreate the container.
+  `openssl rand -hex 32`, put it in `.env` as `DEADWAX_SECRET_KEY=<the key>` and recreate the
+  container. If it's in `.env` already, look for a `DEADWAX_SECRET_KEY` line under compose's
+  `environment:` too - uncommented, even an empty one, it beats `.env` - and delete it.
 - **"deadwax can't read its database, so it can't check who you are"**: nothing is let in while the
   database can't be read - check `DB_PATH` is on a volume the container can write. The health check
   stays healthy, since restarting doesn't fix a missing volume. The break-glass sign-in still works.
@@ -596,7 +611,19 @@ has changed since you signed in"). Signing out by itself doesn't stop deadwax st
 Three wrong passwords for one user name within a minute, and deadwax stops asking Navidrome about that
 name until the minute is up - the message says how long. It's there so a mistyped password, or someone
 guessing, never gets the account locked in Navidrome itself (which blocks a user for a while after a run
-of failures). Other names aren't affected. The break-glass `deadwax` is held to the same.
+of failures). Other names aren't affected. The break-glass `deadwax` is held off per address instead: three
+wrong passwords from one address and that address waits out the minute, even with the right password, while
+other addresses can still sign in. So if someone else's guesses are holding you off, sign in from another
+address - behind a reverse proxy every sign-in may come from the proxy's own address, so use deadwax's address
+on your network rather than the proxy's.
+
+### "DEADWAX_ADMIN_PASSWORD is shorter than 16 characters"
+
+The log says it once at start-up, with logins on, and the break-glass row in the settings tab shows it.
+The password still works - it's the way in when Navidrome is down, so deadwax never refuses it - but the
+user name `deadwax` is public and wrong guesses are only held off per address, so someone with many
+addresses gets many guesses: its length is what keeps strangers out. Make a long random one with `openssl rand -base64 18`,
+set it in `.env` (or compose), and recreate the container.
 
 ### "That user name and password didn't work"
 
@@ -630,12 +657,13 @@ account that is one (sign out first: **You → About → Sign out**); meanwhile 
 you in. Then take `DEADWAX_ADMINS` out of compose. [Sharing deadwax](sharing.md) says what making an account
 a Navidrome admin gives it in Navidrome and Amperfy too.
 
-### NAVIDROME_URL, NAVIDROME_USER or NAVIDROME_PASSWORD says "Only an admin can change this"
+### NAVIDROME_URL, NAVIDROME_USER, NAVIDROME_PASSWORD, SLSKD_URL or SLSKD_APIKEY says "Only an admin can change this"
 
-You were given **Settings and the log**, which lets you change the server settings - all but these three.
+You were given **Settings and the log**, which lets you change the server settings - all but these five.
 Everyone's own Navidrome sign-in is sent to `NAVIDROME_URL`, and its answers say who deadwax's admins are;
 `NAVIDROME_USER` and its password are deadwax's own account, which People won't touch, so set to your own it
-would put you out of People's reach. Only an admin (a Navidrome admin, or the break-glass `deadwax`) can
+would put you out of People's reach; and slskd's API key, sent to `SLSKD_URL` with every request, is full
+control of slskd. Only an admin (a Navidrome admin, or the break-glass `deadwax`) can
 change them. Ask one.
 
 ### The event log stops while it's open
@@ -712,11 +740,32 @@ removal deadwax couldn't finish - and a new person must not inherit someone else
 permissions. Find the name under **Known only to deadwax** at the foot of People and **Forget** it, then
 make the account; or choose another name.
 
+### Signed in over HTTPS, and now the http address won't sign in
+
+The sign-in seems to work, then deadwax says "Sign in to use deadwax." again - or the sign-in screen just
+comes back. You signed in at the same host name over HTTPS before (through a reverse proxy, say), and
+that session's cookie is marked Secure. A browser won't let a plain http page replace a Secure cookie, so
+every http sign-in's cookie is thrown away while the old one lasts. Either:
+
+- **Use one address**: keep to the HTTPS one (recommended away from home), or the http one - not both
+  for the same host name. Two names work fine (`https://music.example.com` outside, `http://nas.lan:8080`
+  at home).
+- **Or clear the cookie**: sign out at the HTTPS address (**You → About → Sign out**), or delete the
+  site's cookies for that host in the browser's settings (on an iPhone, Settings → Safari → Advanced →
+  Website Data). Then sign in over http again.
+
 ### The main page says "You're signed out"
 
 Logins are on and this browser isn't signed in. **Sign in** opens the app's sign-in screen and brings you
 back to the main page once you have. Signed in somewhere else in the meantime - another tab - or come
 back to this page with **Back**? The page asks again as it comes back, and starts again signed in.
+
+## deadwax is blank inside a dashboard tile or another page
+
+deadwax refuses to be shown inside another site's page (`X-Frame-Options: DENY` and `frame-ancestors
+'none'`), so a page elsewhere can't lay its buttons under deadwax's and trick a click through - and a
+dashboard's web tile or `<iframe>` showing deadwax goes blank, even one on the same host. There's no
+setting to allow it: make the tile a link that opens deadwax in a tab of its own.
 
 ## Saving or pressing a button says "Refused: it came from another website"
 
@@ -927,8 +976,11 @@ Your library** says how many are still waiting to be starred, and why:
   the folder's files don't carry the release id Navidrome is asked for. **Needs a look** raises a folder
   Navidrome doesn't list as **Not in Navidrome**.
 - **"It has no MusicBrainz release id"** - deadwax finds an album in Navidrome by its release id, so an
-  untagged album can't be starred. An admin can apply a release to it (its Edit panel's **Release**);
-  it is starred once it has one.
+  untagged album can't be starred by deadwax. An admin can apply a release to it (its Edit panel's
+  **Release**); it is starred once it has one. Or star it yourself in Amperfy: deadwax then matches it
+  by its album artist and name (when exactly one starred album without a release id has them, and only
+  one of your waiting albums without one does - two pressings of one album by the same name both stay
+  waiting, since which you starred can't be told) and counts it as starred within five minutes.
 - **"Its folder isn't there just now"** - the album's folder is missing (an unmounted share, say).
   deadwax asks again once it's back.
 - **"Navidrome isn't answering"** - deadwax asks again by itself.
@@ -938,9 +990,15 @@ Your library** says how many are still waiting to be starred, and why:
 
 **The first admin's library is empty after signing in** (a new install, or an upgrade from a version
 whose saved scan deadwax can't read): the albums already in the store go into it after deadwax's first
-scan of the library, which the event log says ("deadwax hasn't scanned the library yet…"). Search for
-something, open an album's page, or press **Library care → Rescan**: once the scan is done, the event log
-says how many albums went into the library, and deadwax stars them.
+scan of the library, which the event log says ("deadwax hasn't scanned the library yet…"). deadwax starts
+that scan by itself, in the background, as it starts ("reading every album's tags once now"); on a big
+library it takes a few minutes. Once it's done, the event log says how many albums went into the library,
+and deadwax stars them. If the log says the scan at start-up failed, search for something or press
+**Library care → Rescan** to scan again.
+
+**An album page says "deadwax hasn't found this album's folder in the store"** just after the upgrade:
+the same first scan hasn't finished yet - album pages can offer **Add** once it has. Give it a few
+minutes (the event log says when it's done), or press **Library care → Rescan**.
 
 An album you **unstar** in Amperfy is taken out of your library at deadwax's next look (every five
 minutes) - deadwax never stars it back. An album you star there is added the same way, if the store
@@ -1164,6 +1222,11 @@ shown twice.
   few seconds. When deadwax answers again the lines logged meanwhile are filled in, as long as they are
   among the last 500. If deadwax restarted, its earlier lines are gone from what it kept, but the ones
   already on screen stay.
+- **It stays on "Connecting…" behind nginx**: nginx holds a proxied answer in its buffers until they
+  fill, and a live log is a trickle. deadwax asks nginx not to buffer the Log (`X-Accel-Buffering: no`),
+  which nginx honours unless told to ignore it; a proxy that doesn't know the header needs buffering
+  turned off for deadwax - in nginx, `proxy_buffering off;`, as in [Sharing deadwax's sample
+  block](sharing.md#turning-logins-on).
 - **"deadwax couldn't send the lines it kept"**: the page couldn't read the history as it opened, so it
   shows only what deadwax logs from then on. The next time it opens (leave the page and come back) it
   reads the history again and fills in the earlier lines it missed.
@@ -1222,6 +1285,14 @@ Every request deadwax sends Navidrome carries a login made from the password, so
 the saved password to a new address until the password has been typed for it. Change
 `NAVIDROME_URL` and type `NAVIDROME_PASSWORD` too, then save both at once. Saving the address it
 already is, clearing it, or reverting it doesn't need the password.
+
+## Saving settings says "type the Navidrome password again - the environment's password was given for the environment's address"
+
+You reverted `NAVIDROME_PASSWORD` to the one in compose or `.env` while `NAVIDROME_URL` is an address
+saved in the settings tab. That password was given for the address in compose or `.env`, so deadwax won't
+put it back to be sent to another one. Type the password for the address you saved, or revert `NAVIDROME_URL` in the same
+save to go back to both of compose's or `.env`'s. The same goes for `SLSKD_APIKEY` and `SLSKD_URL` ("type
+the slskd API key again - the environment's key was given for the environment's address").
 
 ## Saving settings says "type the slskd API key again with the new address"
 
@@ -1818,13 +1889,17 @@ With [Normalization](player.md#normalization) on, the first time deadwax levels 
 measures every FLAC song of it before the first one plays - a few seconds for a CD album, longer on a NAS
 or for hi-res. Info's **Normalization** row (in About's **Playing**, and in Debug) says `Measuring its album… (7 of 12 songs)` meanwhile.
 It happens once an album: the measurements are kept in deadwax's database, and a download deadwax files
-is measured as it's filed. Opening the album's page before you tap Play starts the measuring early. If the
+is measured as it's filed. Opening the album's page before you tap Play starts the measuring early; a play
+from Search, Requests or an artist's **Play** starts it as you tap, so the first play of an album from there
+is the one most likely to wait. If the
 waits are for songs you've played before, the player's cache is too small to keep their levelled copies
 (each about 1.5 times a CD song's file): raise [`PLAYER_CACHE_MB`](configuration.md#paths).
 
 ## An MP3 is louder (or quieter) than the songs around it
 
-Only FLAC songs are levelled by [Normalization](player.md#normalization): re-encoding an MP3, AAC or Opus
+Only FLAC songs are levelled by [Normalization](player.md#normalization) - and not every FLAC: a 20- or
+32-bit one, one with more than two channels, and every song while the player's cache can't be used play as
+they are too (Info's **Normalization** row says which). Re-encoding an MP3, AAC or Opus
 file to level it would cost quality, so they play as they are. Info's **Normalization** row (in About's **Playing**, and in Debug) says
 `Not levelled - MP3 songs play as they are`.
 

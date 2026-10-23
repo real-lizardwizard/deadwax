@@ -54,7 +54,7 @@ from src import __version__, musicbrainz_cache, player_cache
 from src.api.musicbrainz_endpoint import MusicBrainzClient
 from src.config import (COVER_ART_SIZES, DEFAULT_MUSICBRAINZ_CACHE_MB, DEFAULT_PLAYER_CACHE_MB, LYRICS_LEAD_LIMIT_MS,
                         MUSICBRAINZ_CACHE_FILE, MUSICBRAINZ_CACHE_MB_RANGE, PLAYER_CACHE_MB_RANGE,
-                        RENAME_WAIT_RANGE, SEARCH_TIMEOUT_RANGE, Config, describe_auth_mode, describe_secret_key,
+                        RENAME_WAIT_RANGE, SEARCH_TIMEOUT_RANGE, Config, describe_admin_password, describe_auth_mode, describe_secret_key,
                         build_user_agent, is_the_database, musicbrainz_cache_file, musicbrainz_cache_megabytes,
                         musicbrainz_cache_path, parse_musicbrainz_cache_mb, parse_player_cache_mb,
                         parse_rename_wait, parse_search_timeout,
@@ -230,6 +230,10 @@ def _setting(
         "env_value": (
             None if secret else (shown(Config.ENV_VALUES.get(key)) if key in Config.OVERRIDDEN else None)
         ),
+        #? (2.0.0-player.65) for a secret, whether compose or .env holds one - never what: what a revert of it would
+        #? bring back, for the tab to say beside the field that a revert at another address is refused
+        #? (_moved_without_secret) before the save does
+        "env_set": bool(_environments(key)) if secret else None,
         "choices": choices,
     }
 
@@ -297,6 +301,7 @@ def _logins_rows() -> list[dict]:
     """
     on, mode_problem = describe_auth_mode(Config.AUTH_MODE)
     key_problem = describe_secret_key(Config.DEADWAX_SECRET_KEY)
+    short = describe_admin_password(Config.DEADWAX_ADMIN_PASSWORD)
 
     return [
         _setting(
@@ -332,6 +337,9 @@ def _logins_rows() -> list[dict]:
                 "The break-glass sign-in: as deadwax, with this password, for when Navidrome is down or nobody "
                 "is a Navidrome admin. It needs neither Navidrome nor the database, and lasts 12 hours"
             ),
+            #? (2.0.0-player.65) a short one said - never refused: it is the way in during an emergency
+            status="error" if on and short else None,
+            detail=f"DEADWAX_ADMIN_PASSWORD {short}" if on and short else None,
         ),
     ]
 
@@ -793,6 +801,13 @@ ADMINS_ONLY = {
     ),
     "NAVIDROME_USER": _SHARED_ACCOUNT_LOCK,
     "NAVIDROME_PASSWORD": _SHARED_ACCOUNT_LOCK,
+    #? (2.0.0-player.65, the 2.0.0 release review) slskd's address and key: the key is full control of slskd -
+    #? its searches, downloads, shares and settings - so Settings and the log mustn't hand it out
+    "SLSKD_URL": (
+        "Only an admin can change this: every request to it carries slskd's API key, which is full control of "
+        "slskd"
+    ),
+    "SLSKD_APIKEY": "Only an admin can change this: it is slskd's API key, which is full control of slskd",
 }
 
 
@@ -1205,21 +1220,47 @@ SECRET_FOR_ADDRESS = {
 }
 
 
+#? (2.0.0-player.65, the 2.0.0 release review) a secret put back to the environment's, which the environment gave
+#? for its own address only -> what a save doing that while the address is elsewhere is told
+ENVIRONMENTS_SECRET_ELSEWHERE = {
+    "NAVIDROME_PASSWORD": (
+        "type the Navidrome password again - the environment's password was given for the environment's "
+        "address, and NAVIDROME_URL would be another one (or revert NAVIDROME_URL in the same save)"
+    ),
+    "SLSKD_APIKEY": (
+        "type the slskd API key again - the environment's key was given for the environment's address, and "
+        "SLSKD_URL would be another one (or revert SLSKD_URL in the same save)"
+    ),
+}
+
+
+def _environments(key: str) -> str:
+    """What the environment (compose or .env) says for `key` - before any save, what Config holds."""
+    value = Config.ENV_VALUES.get(key, getattr(Config, key)) if Config.ENV_VALUES else getattr(Config, key)
+    return (value or "").strip()
+
+
 def _moved_without_secret(updates: list[SettingUpdate]) -> dict[str, str]:
     """
-    Each address this batch may not point somewhere new, with why. Empty when it may.
+    Each address (or secret) this batch may not leave as it would, with why. Empty when it may.
 
     Every request to NAVIDROME_URL carries a token made from the saved password, and Navidrome
     accepts the same token and salt again for as long as the password stands; every request to
-    SLSKD_URL carries the API key itself, which is full control of slskd. deadwax has no login, so
-    anyone who can reach it could re-point either address with curl and collect the secret on the
-    next ping (the 1.0.3 audit did it to Navidrome). A new address therefore takes its secret
-    again, in the same save.
+    SLSKD_URL carries the API key itself, which is full control of slskd. With logins off anyone who
+    can reach deadwax can save a setting, so they could re-point either address with curl and
+    collect the secret on the next ping (the 1.0.3 audit did it to Navidrome). A new address
+    therefore takes its secret again, in the same save.
 
     Not a change, and so allowed: saving the address it already is, clearing it (nothing is sent
     anywhere - an empty SLSKD_URL is refused anyway, as not set), and reverting it (that address
     is the environment's, which is the admin's). Nor when no secret is set yet, from here or the
     environment - there is nothing to send. Reverting or blanking the secret is not typing it.
+
+    (2.0.0-player.65, the 2.0.0 release review) The other half, over two saves: a new address saved
+    with any key at all, then the key alone reverted, put the environment's key back while the
+    address stayed new - and sent it there. So a revert of the secret is refused while the address
+    in force after the batch, saved before or in it, is not the environment's. Blanking it stays
+    allowed: an empty secret is nothing to send.
     """
     wanted = {update.key: update.value for update in updates}
     refused = {}
@@ -1231,6 +1272,16 @@ def _moved_without_secret(updates: list[SettingUpdate]) -> dict[str, str]:
         if (wanted.get(secret) or "").strip():
             continue
         refused[address] = reason
+
+    for address, (secret, _) in SECRET_FOR_ADDRESS.items():
+        if secret not in wanted or wanted[secret] is not None or not _environments(secret):
+            continue
+        if address in wanted:
+            after = _environments(address) if wanted[address] is None else (wanted[address] or "").strip()
+        else:
+            after = (getattr(Config, address) or "").strip()
+        if after and after != _environments(address):
+            refused.setdefault(secret, ENVIRONMENTS_SECRET_ELSEWHERE[secret])
 
     return refused
 

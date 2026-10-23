@@ -123,6 +123,80 @@ def test_saving_the_address_it_already_is_is_not_a_change(app, store):
     assert save(app, SLSKD_URL=ENV_URL).status_code == 200
 
 
+# ----- the environment's key, over two saves (2.0.0-player.65, the 2.0.0 release review) -----
+
+ELSEWHERE = "SLSKD_APIKEY: type the slskd API key again - the environment's key was given for the environment's address"
+
+
+def test_a_new_address_then_the_key_alone_reverted_is_refused(app, store):
+    """The two saves the review made: a new address with any key at all, then the key reverted - which put the
+    environment's key back while the address stayed new, and sent it there on the next ping."""
+    assert save(app, SLSKD_URL="http://collector.example:9999", SLSKD_APIKEY="junk").status_code == 200
+
+    response = save(app, SLSKD_APIKEY=None)
+
+    assert response.status_code == 400
+    assert response.json()["detail"].startswith(ELSEWHERE)
+    assert (Config.SLSKD_URL, Config.SLSKD_APIKEY) == ("http://collector.example:9999", "junk")
+    assert store.stored_settings() == {"SLSKD_URL": "http://collector.example:9999", "SLSKD_APIKEY": "junk"}
+
+
+def test_the_key_reverted_first_then_a_new_address_is_refused(app, store):
+    """The reverse order: the key typed and put back while the address is the environment's is fine - and the
+    address moved after it, alone or with the key reverted again, is still refused."""
+    assert save(app, SLSKD_APIKEY="junk").status_code == 200
+    assert save(app, SLSKD_APIKEY=None).status_code == 200
+    assert Config.SLSKD_APIKEY == ENV_KEY
+
+    alone = save(app, SLSKD_URL="http://collector.example:9999")
+    with_revert = save(app, SLSKD_URL="http://collector.example:9999", SLSKD_APIKEY=None)
+
+    assert alone.status_code == 400 and MOVED in alone.json()["detail"]
+    assert with_revert.status_code == 400 and MOVED in with_revert.json()["detail"]
+    assert ELSEWHERE in with_revert.json()["detail"]
+    assert Config.SLSKD_URL == ENV_URL and store.stored_settings() == {}
+
+
+def test_the_key_reverted_with_the_address_reverted_too_is_allowed(app, store):
+    """Both back to the environment's: its key goes to its own address."""
+    assert save(app, SLSKD_URL="http://slskd-box:5030", SLSKD_APIKEY=NEW_KEY).status_code == 200
+
+    response = save(app, SLSKD_URL=None, SLSKD_APIKEY=None)
+
+    assert response.status_code == 200
+    assert (Config.SLSKD_URL, Config.SLSKD_APIKEY) == (ENV_URL, ENV_KEY)
+    assert store.stored_settings() == {}
+
+
+def test_the_key_reverted_at_a_saved_address_that_is_the_environments_is_allowed(app, store):
+    assert save(app, SLSKD_URL=ENV_URL, SLSKD_APIKEY=NEW_KEY).status_code == 200
+    assert save(app, SLSKD_APIKEY=None).status_code == 200
+    assert Config.SLSKD_APIKEY == ENV_KEY
+
+
+def test_the_key_reverted_at_a_new_address_is_allowed_when_the_environment_holds_none(app, store, monkeypatch):
+    """With no key in compose or .env the revert only unsets the typed one: nothing is sent to the new address, so
+    nothing is refused - the rule the settings tab's note (env_set) mirrors."""
+    monkeypatch.setattr(Config, "SLSKD_APIKEY", "")
+    assert save(app, SLSKD_URL="http://slskd-box:5030", SLSKD_APIKEY=NEW_KEY).status_code == 200
+
+    response = save(app, SLSKD_APIKEY=None)
+
+    assert response.status_code == 200, response.text
+    assert (Config.SLSKD_URL, Config.SLSKD_APIKEY) == ("http://slskd-box:5030", "")
+    assert store.stored_settings() == {"SLSKD_URL": "http://slskd-box:5030"}
+
+
+def test_blanking_the_key_at_a_new_address_sends_nothing(app, store):
+    """A blank key is nothing to send - the environment's isn't put back by it - so it isn't refused."""
+    assert save(app, SLSKD_URL="http://slskd-box:5030", SLSKD_APIKEY=NEW_KEY).status_code == 200
+
+    response = save(app, SLSKD_APIKEY="")
+
+    assert response.status_code == 200
+    assert Config.SLSKD_APIKEY == "" and Config.SLSKD_URL == "http://slskd-box:5030"
+
+
 def test_clearing_the_address_is_refused_as_unset_not_as_moved(app, store):
     """slskd is required, so an empty address was never allowed - and nothing is sent to one."""
     response = save(app, SLSKD_URL="")
@@ -251,6 +325,19 @@ def test_the_environments_address_is_masked_in_what_reverting_would_restore(app,
 
     assert "hunter" not in response.text
     assert find(response.json(), "SLSKD_URL")["env_value"] == "http://•••@slskd:5030"
+
+
+def test_a_secrets_row_says_whether_the_environment_holds_one_and_nothing_more(app, monkeypatch):
+    """(2.0.0-player.65) What a revert of the key would bring back, for the tab's note beside the field: a yes or no,
+    never the key - and nothing on a row that isn't a secret."""
+    assert save(app, SLSKD_URL="http://slskd-box:5030", SLSKD_APIKEY=NEW_KEY).status_code == 200
+    response = app.get("/deadwax/settings")
+    assert ENV_KEY not in response.text and NEW_KEY not in response.text
+    assert find(response.json(), "SLSKD_APIKEY")["env_set"] is True
+    assert find(response.json(), "SLSKD_URL")["env_set"] is None
+
+    monkeypatch.setattr(Config, "ENV_VALUES", {**Config.ENV_VALUES, "SLSKD_APIKEY": ""})
+    assert find(app.get("/deadwax/settings").json(), "SLSKD_APIKEY")["env_set"] is False
 
 
 def test_the_start_up_check_never_logs_a_login_in_the_address(env, monkeypatch, caplog):

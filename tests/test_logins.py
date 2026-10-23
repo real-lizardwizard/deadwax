@@ -821,7 +821,100 @@ def test_three_wrong_passwords_a_minute_then_deadwax_holds_off(on, monkeypatch):
 def test_a_wrong_break_glass_password_is_throttled_too(on):
     for _ in range(3):
         assert sign_in(on.client, auth.BREAK_GLASS_USER, "nope").status_code == 401
-    assert sign_in(on.client, auth.BREAK_GLASS_USER, GLASS).status_code == 429
+    held = sign_in(on.client, auth.BREAK_GLASS_USER, "nope again")
+    assert held.status_code == 429 and "Too many tries for deadwax" in held.json()["detail"]
+
+
+@pytest.mark.parametrize("body", [
+    {"username": "james", "password": "p" * 1001 + "-the-password"},
+    {"username": "j" * 201, "password": "the-password-itself"},
+    {"username": "james", "password": ["the-password-itself"]},
+])
+def test_a_sign_in_deadwax_cant_read_never_echoes_the_password(on, body):
+    """(2.0.0-player.65, the 2.0.0 release review) FastAPI's 422 lists every field it refused with its `input` - an
+    over-long password came straight back in the answer. It is the People form's handling now: words, nothing sent."""
+    from src.routes.auth import SIGN_IN_FORM
+
+    response = on.client.post(LOGIN, json=body)
+    assert response.status_code == 422 and response.json() == {"detail": SIGN_IN_FORM}
+    assert "the-password" not in response.text
+
+
+STRANGER, OWNER = ("203.0.113.9", 40000), ("192.168.3.20", 40000)
+
+
+def test_a_held_off_address_learns_nothing_from_the_right_break_glass_password(on):
+    """(2.0.0-player.65, the 2.0.0 release review) The slice's first version checked the break-glass password BEFORE
+    the throttle's wait, so the right one answered 200 while every wrong one answered 429: an oracle, and guesses at
+    the public name `deadwax` went unslowed. The wait comes first again - held off, the right password is a 429 too,
+    word for word the wrong one's, and the count isn't cleared."""
+    stranger = TestClient(on.app, client=STRANGER)
+    for _ in range(3):
+        assert sign_in(stranger, auth.BREAK_GLASS_USER, "a stranger's guess").status_code == 401
+    wrong = sign_in(stranger, auth.BREAK_GLASS_USER, "another guess")
+    right = sign_in(stranger, auth.BREAK_GLASS_USER, GLASS)
+    assert wrong.status_code == right.status_code == 429
+    assert right.json()["detail"] == wrong.json()["detail"] and auth.COOKIE not in right.cookies
+    assert auth.throttle.wait(auth.break_glass_key(STRANGER[0])) > 0
+
+
+def test_a_strangers_guesses_never_keep_the_owner_out_from_another_address(on):
+    """(2.0.0-player.65) The name is public, so counted per name alone anyone's three wrong guesses a minute kept the
+    way in shut - in the emergency it is for. Counted per name and address, the stranger's are the stranger's: the
+    owner from another address signs in, and the stranger is still held off."""
+    stranger, owner = TestClient(on.app, client=STRANGER), TestClient(on.app, client=OWNER)
+    for _ in range(5):
+        sign_in(stranger, auth.BREAK_GLASS_USER, "a stranger's guess")
+    assert sign_in(stranger, auth.BREAK_GLASS_USER, GLASS).status_code == 429
+
+    assert sign_in(owner, auth.BREAK_GLASS_USER, GLASS).status_code == 200
+    assert auth.throttle.wait(auth.break_glass_key(OWNER[0])) == 0
+    assert sign_in(stranger, auth.BREAK_GLASS_USER, GLASS).status_code == 429
+
+
+def test_ordinary_names_are_still_counted_per_name_whatever_the_address(on):
+    """Only break-glass is counted per address: a Navidrome account's three wrong passwords from anywhere hold off
+    that name from everywhere, before Navidrome is asked (so it never locks the account) - as before 2.0.0-player.65.
+    And a name typed to look like break-glass's key is an ordinary name, never sharing its count."""
+    stranger, owner = TestClient(on.app, client=STRANGER), TestClient(on.app, client=OWNER)
+    for _ in range(3):
+        assert sign_in(stranger, "ethan", "nope").status_code == 401
+    asked = on.fake.asks()
+    assert sign_in(owner, "ethan", PASSWORDS["ethan"]).status_code == 429
+    assert on.fake.asks() == asked
+
+    for _ in range(3):
+        sign_in(stranger, f"deadwax@{OWNER[0]}", "nope")
+        sign_in(stranger, OWNER[0], "nope")
+    assert sign_in(owner, auth.BREAK_GLASS_USER, GLASS).status_code == 200
+
+
+def test_break_glass_counts_an_ipv6_connection_as_its_64():
+    """A connection is usually handed a whole IPv6 /64 - counted per address, a guesser would have billions."""
+    key = auth.break_glass_key
+    assert key("2001:db8:1:2::1") == key("2001:db8:1:2:ffff:ffff:ffff:ffff") == (auth.BREAK_GLASS_USER, "2001:db8:1:2::/64")
+    assert key("2001:db8:1:3::1") != key("2001:db8:1:2::1")
+    assert key("::ffff:203.0.113.9") == key("203.0.113.9") == (auth.BREAK_GLASS_USER, "203.0.113.9")
+    assert key(None) == key("") == (auth.BREAK_GLASS_USER, "")
+
+
+@pytest.mark.parametrize("password, warned", [("short-one", True), ("x" * 15, True), ("x" * 16, False)])
+def test_a_short_break_glass_password_is_warned_about_never_refused(on, monkeypatch, caplog, password, warned):
+    """(2.0.0-player.65) shorter than 16 characters: one line at start-up and its row in the settings tab say so -
+    and it still signs in, since it is the way in during an emergency. Neither ever quotes it."""
+    import logging
+    monkeypatch.setattr(Config, "DEADWAX_ADMIN_PASSWORD", password)
+    with caplog.at_level(logging.WARNING, logger="deadwax"):
+        Config.report_logins()
+    said = [r.getMessage() for r in caplog.records if "DEADWAX_ADMIN_PASSWORD is shorter than 16" in r.getMessage()]
+    assert len(said) == (1 if warned else 0) and all(password not in line for line in said)
+
+    james = signed_in(on, "james")
+    [group] = [group for group in james.get("/deadwax/settings").json()["groups"] if group["id"] == "logins"]
+    row = {row["key"]: row for row in group["settings"]}["DEADWAX_ADMIN_PASSWORD"]
+    assert (row["status"] == "error") is warned
+    assert (row["detail"] or "").startswith("DEADWAX_ADMIN_PASSWORD is shorter than 16 characters") is warned
+    assert sign_in(TestClient(on.app), auth.BREAK_GLASS_USER, password).status_code == 200
 
 
 def test_failing_other_names_never_frees_a_name_deadwax_is_holding_off(on, monkeypatch):
@@ -1301,13 +1394,19 @@ def test_only_an_admin_can_move_navidrome_url_even_with_settings_and_the_log(on,
     assert "server" in ethan.get(ME).json()["permissions"]
     rows = {row["key"]: row for group in ethan.get("/deadwax/settings").json()["groups"] for row in group["settings"]}
     assert rows["NAVIDROME_URL"]["editable"] is False and rows["NAVIDROME_URL"]["locked_reason"] == ADMINS_ONLY["NAVIDROME_URL"]
-    assert rows["SLSKD_URL"]["editable"] is True
+    assert rows["MUSICBRAINZ_EMAIL"]["editable"] is True and rows["MUSICBRAINZ_EMAIL"]["locked_reason"] is None
+    #? (2.0.0-player.65) slskd's address and key too: the key is full control of slskd
+    for key in ("SLSKD_URL", "SLSKD_APIKEY"):
+        assert rows[key]["editable"] is False and rows[key]["locked_reason"] == ADMINS_ONLY[key], key
     #? (second review) deadwax's own account too: set to ethan's own, People could no longer take ethan's grants away
     monkeypatch.setattr(Config, "NAVIDROME_USER", "shared")
     monkeypatch.setattr(Config, "NAVIDROME_PASSWORD", "shared-password")
     for key in ("NAVIDROME_USER", "NAVIDROME_PASSWORD"):
         assert rows[key]["editable"] is False and rows[key]["locked_reason"] == ADMINS_ONLY[key], key
-    for key, value in (("NAVIDROME_USER", "ethan"), ("NAVIDROME_USER", None), ("NAVIDROME_PASSWORD", "ethans-own")):
+    monkeypatch.setattr(Config, "SLSKD_URL", "http://slskd:5030")
+    monkeypatch.setattr(Config, "SLSKD_APIKEY", "env-apikey")
+    for key, value in (("NAVIDROME_USER", "ethan"), ("NAVIDROME_USER", None), ("NAVIDROME_PASSWORD", "ethans-own"),
+                       ("SLSKD_URL", "http://evil:5030"), ("SLSKD_APIKEY", "ethans-key")):
         response = ethan.put("/deadwax/settings", json=[{"key": key, "value": value}])
         assert response.status_code == 400 and ADMINS_ONLY[key] in response.json()["detail"], (key, value)
     assert on.store.stored_settings() == {} and Config.NAVIDROME_USER == "shared"
@@ -1325,6 +1424,58 @@ def test_only_an_admin_can_move_navidrome_url_even_with_settings_and_the_log(on,
     for key in ADMINS_ONLY:
         assert rows[key]["editable"] is True and rows[key]["locked_reason"] is None, key
     run(on.store.clear_setting("NAVIDROME_URL"))
+    Config.apply_overrides(on.store.stored_settings())
+
+
+@pytest.mark.parametrize("address, secret, environments", [
+    ("SLSKD_URL", "SLSKD_APIKEY", ("http://slskd:5030", "env-apikey-3e9a")),
+    ("NAVIDROME_URL", "NAVIDROME_PASSWORD", ("http://navidrome:4533", "env-password-8c1f")),
+])
+def test_even_an_admin_cannot_send_the_environments_secret_to_a_new_address_over_two_saves(
+        on, monkeypatch, address, secret, environments):
+    """(2.0.0-player.65, the 2.0.0 release review) A new address saved with any secret at all, then the secret alone
+    reverted, put the environment's secret back at the new address. With logins on only an admin can save either -
+    and an admin's saves are held to it too, so a stolen session or a page they were tricked into can't do it."""
+    monkeypatch.setattr(Config, address, environments[0])
+    monkeypatch.setattr(Config, secret, environments[1])
+    monkeypatch.setattr(Config, "OVERRIDDEN", set())
+    monkeypatch.setattr(Config, "ENV_VALUES", {})
+    from src.api.slskd_endpoint import SlskdClient
+    on.app.state.slskd_client = SlskdClient()  # the lifespan's job, which doesn't run here
+    james = signed_in(on, "james")
+    first = james.put("/deadwax/settings", json=[{"key": address, "value": "http://collector:9999"},
+                                                 {"key": secret, "value": "junk"}])
+    assert first.status_code == 200
+    second = james.put("/deadwax/settings", json=[{"key": secret, "value": None}])
+    assert second.status_code == 400 and f"{secret}: type the" in second.json()["detail"]
+    assert getattr(Config, secret) == "junk" and getattr(Config, address) == "http://collector:9999"
+    run(on.store.clear_setting(address))
+    run(on.store.clear_setting(secret))
+    Config.apply_overrides(on.store.stored_settings())
+
+
+@pytest.mark.parametrize("address, secret, environments", [
+    ("SLSKD_URL", "SLSKD_APIKEY", ("http://slskd:5030", "env-apikey-3e9a")),
+    ("NAVIDROME_URL", "NAVIDROME_PASSWORD", ("http://navidrome:4533", "env-password-8c1f")),
+])
+def test_even_an_admin_cannot_send_the_environments_secret_to_a_new_address_the_other_way_round(
+        on, monkeypatch, address, secret, environments):
+    """The reverse order, as an admin with logins on: a secret typed and then reverted at the environment's address is
+    fine - the environment's pair - and the address moved alone after it takes the secret again."""
+    monkeypatch.setattr(Config, address, environments[0])
+    monkeypatch.setattr(Config, secret, environments[1])
+    monkeypatch.setattr(Config, "OVERRIDDEN", set())
+    monkeypatch.setattr(Config, "ENV_VALUES", {})
+    from src.api.slskd_endpoint import SlskdClient
+    on.app.state.slskd_client = SlskdClient()  # the lifespan's job, which doesn't run here
+    james = signed_in(on, "james")
+    assert james.put("/deadwax/settings", json=[{"key": secret, "value": "junk"}]).status_code == 200
+    assert james.put("/deadwax/settings", json=[{"key": secret, "value": None}]).status_code == 200
+    assert getattr(Config, secret) == environments[1]
+    moved = james.put("/deadwax/settings", json=[{"key": address, "value": "http://collector:9999"}])
+    assert moved.status_code == 400 and f"{address}: type the" in moved.json()["detail"]
+    assert "again with the new address" in moved.json()["detail"]
+    assert getattr(Config, address) == environments[0]
     Config.apply_overrides(on.store.stored_settings())
 
 
@@ -1748,3 +1899,27 @@ def test_break_glass_is_still_an_admin_with_every_permission(on):
     body = glass.get(ME).json()
     assert body["admin"] is True and body["permissions"] == list(PERMISSIONS)
     assert glass.get("/deadwax/settings").status_code == 200
+
+
+# ----------------------------------------------------------------- the example files (2.0.0-player.65)
+
+def test_the_example_files_logins_lines_lock_nobody_out():
+    """(2.0.0-player.65, the 2.0.0 release review) The compose example offered `#- DEADWAX_SECRET_KEY=` to uncomment:
+    an empty line under environment: beats .env, and then nobody can sign in. It names no such line now, says logins
+    need ORGANIZE_MODE copy or move, and points at .env - which carries the three login lines, commented out."""
+    repo = Path(__file__).resolve().parent.parent
+    compose = (repo / "docker-compose.example.yml").read_text()
+    env = (repo / ".env.example").read_text()
+    lines = [line.strip() for line in compose.splitlines()]
+    assert not any(line.lstrip("#").strip().startswith("- DEADWAX_SECRET_KEY") for line in lines)
+    assert not any(line.lstrip("#").strip().startswith("- DEADWAX_ADMIN_PASSWORD") for line in lines)
+    assert "#- AUTH_MODE=on" in lines
+    block = compose[compose.index("Optional - logins"):compose.index("#- AUTH_MODE=on")]
+    assert "ORGANIZE_MODE copy or move" in block and ".env" in block
+    for line in ("#AUTH_MODE=on", "#DEADWAX_SECRET_KEY=", "#DEADWAX_ADMIN_PASSWORD="):
+        assert line in env.splitlines(), line
+    assert "ORGANIZE_MODE copy or move" in env
+    #? the figures they quote: Navidrome needed since .46, MusicBrainz's 200 MB about 1,100 artists (measured in .56)
+    for text in (compose, env):
+        assert "2.0.0-player.45, no longer optional" not in text and "2.0.0-player.46, no longer optional" in text
+        assert "4,000 artists" not in text and "1,100 artists" in text

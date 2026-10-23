@@ -8,7 +8,7 @@ import {
   SECTIONS, SECTION_TITLES, changes, doneLooks, type RequestRow, type RequestsView, type Section,
 } from '../lib/requestsView'
 import { prefetchAlbum, rememberPlayed, toQueueTrack, type Album, type AlbumWithSongs } from '../player/api'
-import { queued } from '../player/levelling'
+import { queued, warmAlbum } from '../player/levelling'
 import { readConfirmCancel } from '../state/persisted'
 import { usePlayerActions } from './context'
 import { AttentionCard, DoneRow, DownloadingCard, WaitingCard } from './JobCard'
@@ -277,6 +277,8 @@ export function Requests({
     if (album && album.song?.length) {
       rememberPlayed(album)
       actions.playTracks(queued(album.song.map((song) => toQueueTrack(song, album)), 'album'), 0)
+      //? (2.0.0-player.65) its album measured for Normalization, as its album page would have - after the play
+      warmAlbum(album)
       return
     }
     openRow(row)

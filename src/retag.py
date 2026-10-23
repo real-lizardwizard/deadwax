@@ -31,7 +31,7 @@ from src.library import find_cover_file
 from src.matching import AUDIO_EXTENSIONS, file_extension, match_tracks_to_files
 from src.tagkeys import easy_file
 from src.api.coverart_endpoint import extension_for
-from src.organizer import (build_album_dirname, country_in_folder, filed_artist, is_within,
+from src.organizer import (LINK_REFUSED, build_album_dirname, country_in_folder, filed_artist, is_within,
                            read_album_mbid, sanitize_filename, tag_values, write_tags)
 
 
@@ -179,6 +179,9 @@ def save_cover_art(album_path: str, library_root: str, art: tuple[bytes, str]) -
         return {"written": None, "problem": "that album is not inside the library"}
 
     name = f"cover.{extension_for(art[1])}"
+    #? (2.0.0-player.65) a cover.jpg that is a symlink would be written wherever it points
+    if (directory / name).is_symlink():
+        return {"written": None, "problem": f"{name} {LINK_REFUSED}"}
 
     try:
         (directory / name).write_bytes(art[0])
@@ -555,7 +558,14 @@ def execute_retag(
     if art_action and (art is not None or results["dry_run"]):
         name = f"cover.{extension_for(art[1])}" if art else "cover.jpg"
 
-        if results["dry_run"]:
+        if (source / name).is_symlink():
+            #? (2.0.0-player.65) never written through: it would land wherever the link points - and a dry run says
+            #? so too, since it runs the identical plan and only declines to act
+            said = ("tags would be written but the cover art wouldn't be saved" if results["dry_run"]
+                    else "tags were written but the cover art wasn't saved")
+            results["problems"].append(f"{said}: {name} {LINK_REFUSED}")
+
+        elif results["dry_run"]:
             results["art_written"] = name
 
         else:

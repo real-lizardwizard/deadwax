@@ -87,16 +87,21 @@ function isTab(value: string | null): value is SettingsTab {
  * refuses that save - the saved secret is never sent somewhere it wasn't typed for - and saying so
  * beside the field beats a refusal in the save bar. The rule itself is the server's:
  * SECRET_FOR_ADDRESS and _moved_without_secret in src/routes/settings.py. Navidrome since v1.0.3,
- * slskd since v1.0.5.
+ * slskd since v1.0.5. And since 2.0.0-player.65 the other half: the secret reverted (to the
+ * environment's) while the address after the save isn't the environment's - said as `reverted`.
  */
-const RETYPE_WITH_ADDRESS: Record<string, { address: string; note: string }> = {
+const RETYPE_WITH_ADDRESS: Record<string, { address: string; note: string; reverted: string }> = {
   NAVIDROME_PASSWORD: {
     address: 'NAVIDROME_URL',
     note: "Type the password again to go with the new address - deadwax won't send the saved one to an address it wasn't entered for.",
+    reverted:
+      "Reverting brings back the environment's password, which was given for the environment's address - type the password again, or revert NAVIDROME_URL in the same save.",
   },
   SLSKD_APIKEY: {
     address: 'SLSKD_URL',
     note: "Type the API key again to go with the new address - deadwax won't send the saved one to an address it wasn't entered for.",
+    reverted:
+      "Reverting brings back the environment's API key, which was given for the environment's address - type the key again, or revert SLSKD_URL in the same save.",
   },
 }
 
@@ -112,6 +117,17 @@ export function retypeSecretNote(
   const current = settings.find((setting) => setting.key === rule.address)?.value ?? ''
   const secret = settings.find((setting) => setting.key === key)
   const url = draftEnv[rule.address]
+
+  //? (2.0.0-player.65) the other half, over two saves: the secret reverted while the address in force after the save
+  //? - saved before, or typed now - isn't the environment's. Reverting brings back the environment's secret, which
+  //? the server won't send to another address (ENVIRONMENTS_SECRET_ELSEWHERE in src/routes/settings.py)
+  if (draftEnv[key] === null) {
+    const row = settings.find((setting) => setting.key === rule.address)
+    if (!secret?.env_set || url === null) return null
+    const environments = (row?.overridden ? row.env_value : row?.value) ?? ''
+    const after = typeof url === 'string' ? url.trim() : current.trim()
+    return after && after !== environments.trim() ? rule.reverted : null
+  }
 
   if (typeof url !== 'string' || !url.trim() || url.trim() === current.trim()) return null
   if (!secret?.value) return null
@@ -412,7 +428,8 @@ export function SettingRow({
         deletes the stored row rather than writing the environment's value back, so the
         setting follows the compose file again from then on.
       */}
-      {setting.overridden && !reverting ? (
+      {/* (2.0.0-player.65) only where it can be saved: a locked row's revert is refused by the save */}
+      {setting.overridden && setting.editable && !reverting ? (
         <button type="button" class="settings-env-revert" onClick={() => onRevert(setting.key)}>
           Revert to the environment{setting.env_value ? ` (${setting.env_value})` : ''}
         </button>

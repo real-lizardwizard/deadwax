@@ -251,6 +251,111 @@ def test_the_scopes_songs_are_reused_for_a_while_then_read_again(shuffling, monk
     assert answer["total"] == 451  # a song added since is in the next shuffle
 
 
+# ---------------------------------------------------------------- memory (2.0.0-player.65, the 2.0.0 release review)
+
+def test_orders_over_lists_built_again_hold_one_copy_of_each_song(shuffling, monkeypatch):
+    """Each order held its own copy of the list it was made from, built again every ten minutes - about 20 MB a copy
+    at 20,000 songs, ten orders a person, kept a day while idle. An order holds the songs' ids now - the very strings
+    the one table keys them under - and a page answers the table's songs."""
+    james = signed_in(shuffling, "james")
+    first = james.get(f"{SHUFFLE}?scope=store").json()["token"]
+    monkeypatch.setattr(navidrome_routes, "SHUFFLE_LIST_TTL_S", 0)
+    second = james.get(f"{SHUFFLE}?scope=store").json()["token"]
+    assert len(shuffling.fake.asked("search3")) == 2, "the list was read again"
+
+    orders = [navidrome_routes._shuffle_orders[token] for token in (first, second)]
+    table = navidrome_routes._shuffle_songs_by_id
+    assert len(table) == 450
+    for held in orders:
+        assert len(held.ids) == 450 and all(type(song_id) is str for song_id in held.ids)
+        assert all(song_id is table[song_id]["id"] for song_id in held.ids), "the table's own strings"
+    page = navidrome_routes._shuffle_page(orders[0], 0)
+    assert all(song is table[song["id"]] for song in page)
+
+
+def test_a_song_changed_since_is_paged_as_navidrome_now_has_it(shuffling, monkeypatch):
+    james = signed_in(shuffling, "james")
+    token = james.get(f"{SHUFFLE}?scope=store").json()["token"]
+    monkeypatch.setattr(navidrome_routes, "SHUFFLE_LIST_TTL_S", 0)
+    shuffling.fake.library[0] = {**shuffling.fake.library[0], "title": "Retitled"}
+    james.get(f"{SHUFFLE}?scope=store")
+
+    songs = [song for offset in (0, 200, 400) for song in james.get(f"{SHUFFLE}/{token}?offset={offset}").json()["songs"]]
+    assert len(songs) == 450 and {song["title"] for song in songs if song["id"] == "so-0"} == {"Retitled"}
+
+
+def test_a_sweep_forgets_old_orders_and_lists_and_every_song_nothing_names(shuffling):
+    james = signed_in(shuffling, "james")
+    old = james.get(f"{SHUFFLE}?scope=store").json()["token"]
+    navidrome_routes._shuffle_orders[old].used -= navidrome_routes.SHUFFLE_ORDER_TTL_S + 1
+    now = navidrome_routes.time.monotonic()
+    key = next(iter(navidrome_routes._shuffle_lists))
+
+    #? the list is fresh: its songs stay, though the order went
+    navidrome_routes._sweep_shuffles(now)
+    assert old not in navidrome_routes._shuffle_orders and len(navidrome_routes._shuffle_songs_by_id) == 450
+
+    built, ids = navidrome_routes._shuffle_lists[key]
+    navidrome_routes._shuffle_lists[key] = (built - navidrome_routes.SHUFFLE_LIST_TTL_S, ids)
+    navidrome_routes._sweep_shuffles(now)
+    assert navidrome_routes._shuffle_lists == {} and navidrome_routes._shuffle_songs_by_id == {}
+
+
+def test_a_live_order_keeps_its_songs_through_a_sweep(shuffling):
+    james = signed_in(shuffling, "james")
+    token = james.get(f"{SHUFFLE}?scope=store").json()["token"]
+    navidrome_routes._shuffle_lists.clear()
+
+    navidrome_routes._sweep_shuffles(navidrome_routes.time.monotonic())
+
+    assert len(navidrome_routes._shuffle_songs_by_id) == 450
+    assert len(james.get(f"{SHUFFLE}/{token}?offset=400").json()["songs"]) == 50
+
+
+def test_a_sweep_between_two_pages_of_a_build_drops_none_of_its_songs(shuffling, monkeypatch):
+    """The lifespan's sweep runs between any two awaits - so between two search3 pages of a build. It keeps only songs a
+    list or order names, and a build's list is stored at its end: with the songs put in the table page by page, the ones
+    read before the sweep were gone, and the order's pages came back short or empty while its total said all of them
+    (the 2.0.0-player.65 review). The table takes a build's songs as its list is stored, with nothing awaited between."""
+    monkeypatch.setattr(navidrome_routes, "SCAN_PAGE", 100)
+    real = shuffling.fake.handle
+    swept = []
+
+    def sweeping(request):
+        if "search3" in str(request.url) and parse_qs(urlparse(str(request.url)).query).get("songOffset") == ["200"]:
+            navidrome_routes._sweep_shuffles(navidrome_routes.time.monotonic())
+            swept.append(len(navidrome_routes._shuffle_songs_by_id))
+        return real(request)
+
+    navidrome.client = httpx.AsyncClient(transport=httpx.MockTransport(sweeping), base_url=f"{NAVIDROME}/rest")
+    _, ids, total = whole(signed_in(shuffling, "james"))
+
+    assert swept == [0], "the sweep ran mid-build, with nothing yet in the table"
+    assert total == 450 and len(ids) == len(set(ids)) == 450
+    assert len(navidrome_routes._shuffle_songs_by_id) == 450
+
+
+def test_the_sweep_runs_on_a_timer_and_a_failure_never_stops_it(monkeypatch):
+    calls = []
+
+    def sweep(now):
+        calls.append(now)
+        if len(calls) == 1:
+            raise RuntimeError("once")
+
+    monkeypatch.setattr(navidrome_routes, "_sweep_shuffles", sweep)
+
+    async def go():
+        task = asyncio.create_task(navidrome_routes.run_shuffle_sweeps(every=0.01))
+        await asyncio.sleep(0.1)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    asyncio.run(go())
+    assert len(calls) >= 3
+
+
 def test_each_users_list_is_their_own(shuffling):
     shuffling.fake.starred("ethan").add("al-3")
     shuffling.fake.starred("james").add("al-1")

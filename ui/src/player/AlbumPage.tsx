@@ -22,12 +22,10 @@ import { announceAddedToLibrary, announceRemovedFromLibrary } from '../lib/libra
 import { pinOf, type AlbumPinTarget } from '../lib/pins'
 import type { QueuePick } from '../lib/upNext'
 import { ADD_FROM_PAGE, albumMine } from '../lib/whose'
-import { isFlac } from '../lib/streamWrap'
-import { readPlayerNormalization } from '../state/persisted'
-import { album as fetchAlbum, coverFullUrl, coverUrl, prefetchAlbum, rememberPlayed, toQueueTrack, warmLevels, type Album, type AlbumWithSongs } from './api'
+import { album as fetchAlbum, coverFullUrl, coverUrl, prefetchAlbum, rememberPlayed, toQueueTrack, type Album, type AlbumWithSongs } from './api'
 import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, MoreIcon, PlayIcon, PlayingBars, ShuffleIcon } from './icons'
 import { Cover } from './Cover'
-import { queued } from './levelling'
+import { queued, warmAlbum } from './levelling'
 import type { Player } from './usePlayer'
 
 /**
@@ -215,8 +213,7 @@ export function AlbumPage({
   //? is asked to measure them ahead (fire and forget - not a playback action), so a first levelled play waits less.
   //? Not under Off, and not for an album with no FLAC song, which nothing levels
   useEffect(() => {
-    if (!album || readPlayerNormalization() === 'off') return
-    if ((album.song ?? []).some((song) => isFlac({ suffix: song.suffix ?? null, contentType: song.contentType ?? null }))) warmLevels(album.id)
+    if (album) warmAlbum(album)
   }, [album?.id])
 
   const shown: Album | null = album ?? (preview?.id === id ? preview : null)

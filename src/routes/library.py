@@ -91,6 +91,11 @@ async def _ensure_cache_loaded(request: Request) -> None:
     it is the difference between the first visit after a restart re-reading every tag in the
     library and merely statting every folder.
     """
+    await _load_saved_scan(_store(request))
+
+
+async def _load_saved_scan(store) -> None:
+    """_ensure_cache_loaded's work, given the store - the start-up scan has no request (2.0.0-player.65)."""
     global _cache_loaded_for
     root = Config.LIBRARY_PATH or ""
 
@@ -101,7 +106,6 @@ async def _ensure_cache_loaded(request: Request) -> None:
         if _cache_loaded_for == root:
             return
 
-        store = _store(request)
         if store is not None:
             taken = seed_cache(await store.load_library_cache(root, SCAN_FORMAT))
             if taken:
@@ -110,7 +114,7 @@ async def _ensure_cache_loaded(request: Request) -> None:
         _cache_loaded_for = root
 
 
-async def _persist_cache(request: Request, scan: dict | None = None) -> None:
+async def _persist_cache(request: Request, scan: dict | None = None, walked: str | None = None) -> None:
     """
     Save what the scan cache learned, so a restart picks up from it instead of from nothing.
 
@@ -121,15 +125,29 @@ async def _persist_cache(request: Request, scan: dict | None = None) -> None:
     After a real scan it also brings the store index in line (step 2 - src/store_index.py):
     every album recorded, and what the scan no longer found marked missing. `scan` is only ever
     a real scan - a snapshot never comes through here, and must not: it is the last scan, not
-    the disk.
+    the disk. `walked` is the root that scan walked.
     """
+    await _save_scan(_store(request), scan, walked)
+
+
+async def _save_scan(store, scan: dict | None = None, walked: str | None = None) -> bool:
+    """_persist_cache's work, given the store - the start-up scan has no request (2.0.0-player.65).
+
+    `walked`, the root a scan walked: when LIBRARY_PATH has changed since (saved in the settings tab while the walk
+    ran - minutes, on a big library's first start after an upgrade), nothing of it is saved. Saved under the new
+    root, the old library's paths would have been its index, its real albums marked missing, and the new root
+    counted as scanned (the 2.0.0-player.65 review). False when it is set aside so."""
     upserts, removals = drain_cache_changes()
-    store = _store(request)
 
     if store is None:
-        return
+        return True
 
     root = Config.LIBRARY_PATH or ""
+
+    if walked is not None and walked != root:
+        logger.info("library: LIBRARY_PATH changed while the library was being read - that scan is set aside",
+                    extra={"frontend": True})
+        return False
 
     if upserts or removals:
         await store.save_library_cache(root, upserts, removals, SCAN_FORMAT)
@@ -141,6 +159,39 @@ async def _persist_cache(request: Request, scan: dict | None = None) -> None:
         #? from when the walk began: a writer's update since is newer than anything it saw
         began = (scan.get("scanned_at") or 0) - (scan.get("scan_seconds") or 0)
         await reconcile_scan(store, root, scan["albums"], since=began if began > 0 else None)
+    return True
+
+
+async def scan_at_start(store) -> None:
+    """
+    (2.0.0-player.65, the 2.0.0 release review) The library walked once, in the background, as deadwax starts - when
+    the store index has never been filled from a scan of LIBRARY_PATH (store_index_scanned). An upgrade whose saved
+    scan is of an older SCAN_FORMAT seeds nothing from it (seed_from_saved_scan), so until something scanned, album
+    pages couldn't offer Add, Find couldn't see the library, and the first admin's library waited. Through the same
+    machinery as every scan - scan_library (its lock: never two walks at once; a request's scan meanwhile waits for
+    this one and reads it from the cache) and _save_scan (the saved scan, the index, store_index_scanned) - once per
+    start, from the lifespan. Never raises: a scan that fails here is the next request's to make.
+    """
+    root = Config.LIBRARY_PATH or ""
+    if not root or store is None or not getattr(store, "available", False) or await store.index_scanned(root):
+        return
+    logger.info("library: deadwax hasn't scanned LIBRARY_PATH since this version's first start, so it is reading "
+                "every album's tags once now, in the background", extra={"frontend": True})
+    try:
+        await _load_saved_scan(store)
+        result = await asyncio.to_thread(scan_library, root, False)
+        saved = await _save_scan(store, result, root)
+    except Exception as e:
+        logger.error(f"library: the scan at start-up failed ({e}) - the library's next scan tries again",
+                     extra={"frontend": True})
+        return
+    if not saved:
+        return
+    if result.get("problem"):
+        logger.warning(f"library scan: {result['problem']}", extra={"frontend": True})
+    else:
+        logger.info(f"library: {result['album_count']} album(s) by {result['artist_count']} artist(s) scanned at "
+                    f"start-up in {result['scan_seconds']}s", extra={"frontend": True})
 
 
 def _follow_verdict(source: str, target: str) -> None:
@@ -192,7 +243,7 @@ async def _scan_with_queue(request: Request, force: bool, snapshot: bool = False
             asyncio.to_thread(scan_library, root, force),
             navidrome_listing.ask(0 if force else LISTING_FRESH_SECONDS, rescan=force),
         )
-        await _persist_cache(request, result)
+        await _persist_cache(request, result, root)
 
     reviews = await store.album_reviews() if store else {}
 
@@ -328,7 +379,7 @@ async def owned(request: Request, user: str = Depends(current_user)):
     result = None if library_is_behind() else await asyncio.to_thread(snapshot_library, root)
     if result is None:
         result = await asyncio.to_thread(scan_library, root, False)
-        await _persist_cache(request, result)
+        await _persist_cache(request, result, root)
 
     albums = [{field: album.get(field) for field in OWNED_FIELDS} for album in result["albums"]]
     yours = await library_ledger.yours_paths(_store(request), root, user)

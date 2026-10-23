@@ -136,6 +136,8 @@ exports.dropPrefetch = () => {}
 exports.prefetchAlbum = (id, keep, fresh) => globalThis.__requests.songs(id, !!fresh)
 exports.rememberPlayed = (album) => globalThis.__requests.remembered.push(album.id)
 exports.toQueueTrack = (song, album) => ({ id: song.id, albumId: album.id })
+//? (2.0.0-player.65) an album warmed for Normalization, counted - and in order with the plays
+exports.warmLevels = (id) => { globalThis.__requests.warmed.push(id); globalThis.__requests.order.push('warm') }
 `)
 globalThis.__requests = {
   plays: [],
@@ -144,7 +146,9 @@ globalThis.__requests = {
   songAsks: [],
   songAnswers: [],
   remembered: [],
-  actions: { playTracks: (...args) => globalThis.__requests.plays.push(args) },
+  warmed: [],
+  order: [],
+  actions: { playTracks: (...args) => { globalThis.__requests.plays.push(args); globalThis.__requests.order.push('play') } },
   bridge(release) {
     globalThis.__requests.asked.push(release)
     return new Promise((resolve, reject) => globalThis.__requests.answers.push({ resolve, reject, release }))
@@ -305,6 +309,24 @@ console.log('\nDone rows open, and play, their album (2.0.0-player.17)')
       [['nd-heligoland'], [[['s1', 's2'], 0]], 1])
     openButtons(draw())[0].props.onClick()
     check('a tap opens it at once, asking nothing', [opened.length, R.asked.length], [2, 1])
+    check('...an album with no FLAC song is warmed for nothing - nothing levels it', R.warmed, [])
+
+    //? (2.0.0-player.65, the 2.0.0 release review) a FLAC album played from its ▶: warmed for Normalization, after the play
+    const RF = '44444444-4444-4444-8444-444444444444'
+    const flac = H.root(Requests)
+    const drawFlac = () => deep(flac(props({ view: view([job('organized', { outcome: 'filed', release_mbid: RF })]), onOpenAlbum: () => {} })))
+    all(drawFlac(), (n) => n.props.class === 'app-done-play')[0].props.onClick()
+    bridgeSays('nd-dummy')
+    await tick()
+    R.songAnswers.shift().resolve({ id: 'nd-dummy', name: 'Dummy', song: [{ id: 'f1', suffix: 'flac' }, { id: 'f2', suffix: 'flac' }] })
+    await tick()
+    R.order.length = 0
+    all(drawFlac(), (n) => n.props.class === 'app-done-play')[0].props.onClick()
+    check('a FLAC album\'s ▶ warms its measuring - once, right after the play', [R.warmed, R.order], [['nd-dummy'], ['play', 'warm']])
+    localStorage.setItem('deadwax-player-normalization', 'off')
+    all(drawFlac(), (n) => n.props.class === 'app-done-play')[0].props.onClick()
+    check('...and under Off, nothing', R.warmed, ['nd-dummy'])
+    localStorage.removeItem('deadwax-player-normalization')
 
     const R2 = '22222222-2222-4222-8222-222222222222'
     const lost = H.root(Requests)
@@ -1015,6 +1037,14 @@ console.log('\ndownloads per person (2.0.0-player.49): who asked, what a cancel 
       lines: ['From bob · FLAC 16/44.1 · queued', 'Join it to have it in your Requests too - one download, everyone who asked waiting for it.'], joinJobId: 9 })
   check('...the main page\'s names its own place, Downloads', P.storeStatusFor(answerWith(theirsInFlight()))?.lines[1],
     'Join it to have it in your Downloads too - one download, everyone who asked waiting for it.')
+  //? (2.0.0-player.65, the release review's nit) drawn with no Join - someone without Get albums: no "Join it" either
+  const noJoin = P.withoutJoin(P.storeStatusFor(answerWith(theirsInFlight()), 'Requests', '24bit'))
+  check('...drawn with no Join under it: the line saying what Join does goes, and the job it would join; the rest stays',
+    [noJoin.lines, 'joinJobId' in noJoin, noJoin.title],
+    [['From bob · FLAC 16/44.1 · queued', "It's below your quality floor (24-bit), and getting a copy of your own isn't offered yet."], false,
+      'Already downloading for someone else'])
+  check('...a line with no Join in it is left as it is', P.withoutJoin(P.storeStatusFor(answerWith(theirsInFlight({ yours: true })), 'Requests')),
+    P.storeStatusFor(answerWith(theirsInFlight({ yours: true })), 'Requests'))
   check('the copy: lossless by depth and rate, never a bitrate; lossy by its bitrate - a source card\'s Quality',
     [P.copyText(theirsInFlight({ bitrates: [902] })), P.copyText(theirsInFlight({ formats: ['flac'], bit_depths: [24], sample_rates: [96000], bitrates: [2800, 3100] })),
       P.copyText(theirsInFlight({ formats: ['mp3'], bitrates: [320], bit_depths: [], sample_rates: [44100] })), P.copyText(theirsInFlight({ formats: [] }))],

@@ -227,9 +227,11 @@ def parse_player_cache_mb(value: str | None) -> int | None:
 
 
 #? (2.0.0-player.54) MusicBrainz's answers kept on disk - src/musicbrainz_cache.py. The file's name, and
-#? MUSICBRAINZ_CACHE_MB's default and bounds: 200 MB holds about 4,000 artists looked up with an album
-#? each (about 45 KB compressed apiece, measured against real answers on 2026-10-15); 0 turns the disk
-#? layer off, leaving the hour in memory there always was; a terabyte is past any sensible disk.
+#? MUSICBRAINZ_CACHE_MB's default and bounds: 200 MB holds about 1,100 artists explored the app's way -
+#? searched, their page, an album opened and one of its songs searched - at about 160 KB apiece with
+#? Search's index (measured on five artists in 2.0.0-player.56; about 45 KB apiece before it, against
+#? real answers on 2026-10-15); 0 turns the disk layer off, leaving the hour in memory there always was;
+#? a terabyte is past any sensible disk.
 MUSICBRAINZ_CACHE_FILE = "musicbrainz-cache.db"
 DEFAULT_MUSICBRAINZ_CACHE_MB = 200
 MUSICBRAINZ_CACHE_MB_RANGE = (0, 1 << 20)
@@ -391,6 +393,21 @@ def describe_secret_key(value: str | None) -> str | None:
     if len(value) < AUTH_SECRET_MIN:
         return f"is shorter than {AUTH_SECRET_MIN} characters - make one with `openssl rand -hex 32`"
     return None
+
+
+#? (2.0.0-player.65, the 2.0.0 release review) The break-glass name `deadwax` is public, and its wrong guesses are
+#? held off per client address (auth.break_glass_key) - three a minute from each - so a guesser with many addresses
+#? still gets many guesses: the password's length is what keeps them out. Shorter than this is warned about, at
+#? start-up and on its row in the settings tab, but never refused: it is the way in during an emergency.
+ADMIN_PASSWORD_ADVISED = 16
+
+
+def describe_admin_password(value: str | None) -> str | None:
+    """Why DEADWAX_ADMIN_PASSWORD is too easy to guess, or None if it isn't (or isn't set). Never quotes it."""
+    if not value or len(value) >= ADMIN_PASSWORD_ADVISED:
+        return None
+    return (f"is shorter than {ADMIN_PASSWORD_ADVISED} characters - the name `deadwax` is public, and wrong guesses "
+            f"are only held off per address, so make it long and random: `openssl rand -base64 18`")
 
 
 load_dotenv()
@@ -939,6 +956,9 @@ class Config:
                 f"503 saying so (the app's sign-in screen shows it).",
                 extra={"frontend": True},
             )
+        short = describe_admin_password(cls.DEADWAX_ADMIN_PASSWORD)
+        if short:
+            logger.warning(f"DEADWAX_ADMIN_PASSWORD {short}", extra={"frontend": True})
         if describe_navidrome_url(cls.NAVIDROME_URL) is not None:
             logger.error(
                 "logins are on but NAVIDROME_URL isn't usable, so nobody can sign in with their Navidrome "

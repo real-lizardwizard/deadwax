@@ -32,7 +32,7 @@ import {
   libraryArtists, prefetchAlbum, rememberPlayed, searchLibrary, toQueueTrack,
   type Album, type AlbumWithSongs, type Artist, type LibraryResults, type NavidromeStatus, type Song,
 } from '../player/api'
-import { queued } from '../player/levelling'
+import { queued, warmAlbum } from '../player/levelling'
 import { SearchIcon } from '../player/icons'
 import { usePlayerActions } from './context'
 import { NeedsNavidrome } from './NeedsNavidrome'
@@ -1684,6 +1684,8 @@ export function Search({
     if (album && at >= 0) {
       rememberPlayed(album)
       actions.playTracks(queued(album.song!.map((each) => toQueueTrack(each, album)), 'album'), at)
+      //? (2.0.0-player.65) its album measured for Normalization, as its album page would have - after the play
+      warmAlbum(album)
       return
     }
     if (song.albumId) {

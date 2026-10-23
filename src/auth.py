@@ -24,7 +24,8 @@ roles"); notes/logins.md has the reasoning. In short:
 
   NOTHING RETRIES A SIGN-IN, and sign-ins are throttled per name (Throttle): Navidrome blocks an
   account for a while after a run of failures, and a bot hammering deadwax must not be able to get
-  James blocked through it. The re-check asks Navidrome about each person at most once a pass.
+  James blocked through it. The re-check asks Navidrome about each person at most once a pass. The
+  break-glass name alone is throttled per name AND client address (break_glass_key), since it is public.
 
   A SESSION is a random id (secrets.token_urlsafe) in an HttpOnly, SameSite=Strict cookie named
   `deadwax_session` (Navidrome's own is `jwt`), Secure when the page came over HTTPS. The database
@@ -68,10 +69,11 @@ import hmac
 import json
 import secrets
 import threading
+import ipaddress
 import time
 from collections import OrderedDict, deque
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, Hashable
 
 import httpx
 from cryptography.fernet import Fernet, InvalidToken
@@ -847,11 +849,13 @@ class Throttle:
     def __init__(self, failures: int = THROTTLE_FAILURES, window: float = THROTTLE_WINDOW,
                  clock: Callable[[], float] = time.monotonic, cap: int = 10000):
         self.failures, self.window, self.clock, self.cap = failures, window, clock, cap
-        #? by the time of each name's LAST failure, oldest first (failed() moves a name to the end)
-        self._failed: "OrderedDict[str, deque[float]]" = OrderedDict()
-        self._locks: dict[str, asyncio.Lock] = {}
+        #? by the time of each name's LAST failure, oldest first (failed() moves a name to the end). A key is a
+        #? lowercased name - or, for break-glass alone, break_glass_key's (name, address) tuple, which no typed
+        #? name (a string) can ever equal
+        self._failed: "OrderedDict[Hashable, deque[float]]" = OrderedDict()
+        self._locks: dict[Hashable, asyncio.Lock] = {}
 
-    def wait(self, name: str) -> float:
+    def wait(self, name: Hashable) -> float:
         """Seconds until `name` may try again - 0 when it may now."""
         times = self._failed.get(name)
         if not times:
@@ -866,14 +870,14 @@ class Throttle:
             return 0.0
         return max(0.0, self.window - (now - times[0]))
 
-    def failed(self, name: str) -> None:
+    def failed(self, name: Hashable) -> None:
         now = self.clock()
         self._failed.setdefault(name, deque()).append(now)
         self._failed.move_to_end(name)
         if len(self._failed) > self.cap:
             self._make_room(now, keep=name)
 
-    def _make_room(self, now: float, keep: str) -> None:
+    def _make_room(self, now: float, keep: Hashable) -> None:
         """Down to nine tenths of the cap where it can (so, while there is room to make, it runs once in a
         while rather than on every failure): first every name whose last failure has left the window -
         the front of the order - then names under the limit, oldest first. Never a name held off, and
@@ -895,10 +899,10 @@ class Throttle:
             if len(times) < self.failures:
                 del self._failed[other]
 
-    def succeeded(self, name: str) -> None:
+    def succeeded(self, name: Hashable) -> None:
         self._failed.pop(name, None)
 
-    def lock(self, name: str) -> asyncio.Lock:
+    def lock(self, name: Hashable) -> asyncio.Lock:
         held = self._locks.get(name)
         if held is None:
             if len(self._locks) >= self.cap:
@@ -909,6 +913,28 @@ class Throttle:
 
 
 throttle = Throttle()
+
+
+def break_glass_key(address: str | None) -> tuple[str, str]:
+    """
+    (2.0.0-player.65) What the break-glass name's tries are counted under: the name and the client's address, so a
+    stranger's wrong guesses hold off only the stranger's address, and the owner signing in from another still gets
+    in. A tuple, so no name anyone types - always a string - shares its count: `deadwax@<an address>` typed as a name
+    is an ordinary name, counted as itself. An IPv6 address counts as its /64 (one connection is usually handed a
+    whole /64, so counting each address would give a guesser billions of them); an IPv4-mapped one as its IPv4.
+    Behind a reverse proxy every sign-in may come from the proxy's address, and then this is the name's count alone,
+    as every other name's is.
+    """
+    text = (address or "").strip()
+    try:
+        ip = ipaddress.ip_address(text)
+    except ValueError:
+        return (BREAK_GLASS_USER, text.lower())
+    if isinstance(ip, ipaddress.IPv6Address):
+        if ip.ipv4_mapped is not None:
+            return (BREAK_GLASS_USER, str(ip.ipv4_mapped))
+        return (BREAK_GLASS_USER, str(ipaddress.IPv6Network((ip, 64), strict=False)))
+    return (BREAK_GLASS_USER, str(ip))
 
 
 # ===== signing in ===================================================================================
@@ -923,13 +949,14 @@ def too_many(name: str, wait: float) -> HTTPException:
     )
 
 
-async def sign_in(store, typed: str, password: str) -> tuple[str, str, int, bool]:
+async def sign_in(store, typed: str, password: str, address: str | None = None) -> tuple[str, str, int, bool]:
     """
     Sign `typed` in with `password`: (the user, the cookie's value, its max age, whether they are an
     admin) - or HTTPException saying plainly why not: 401 a wrong password, 429 too many tries, 503
     Navidrome not answering or deadwax unable to keep the session, 502 anything else Navidrome said.
 
-    The break-glass name is checked against DEADWAX_ADMIN_PASSWORD alone and asks Navidrome nothing.
+    The break-glass name is checked against DEADWAX_ADMIN_PASSWORD alone and asks Navidrome nothing; its tries
+    are counted per name and `address` (the client's, break_glass_key), every other name's per name.
     Any other name is put to Navidrome's getUser with a token made here, from a fresh salt: the name
     as typed (Navidrome finds accounts whatever their case), the identity lowercased. Each name's tries
     are in turn and counted (`throttle`); nothing is ever retried. (2.0.0-player.61) The answer's
@@ -940,18 +967,26 @@ async def sign_in(store, typed: str, password: str) -> tuple[str, str, int, bool
     honoured only for the account it was given to.
     """
     name = typed.strip().lower()
-    async with throttle.lock(name):
-        wait = throttle.wait(name)
+    #? (2.0.0-player.65, the 2.0.0 release review) the break-glass name is public, so counted per name alone anyone's
+    #? three wrong guesses a minute kept the way in shut in an emergency. Its tries are counted per name AND address
+    #? now: a stranger's guesses hold off the stranger's address, and the owner from another still gets in. The wait
+    #? comes BEFORE the password, as for every name - the slice's first version checked the password first, so the
+    #? right one answered 200 while every wrong one answered 429: the throttle told a guesser which was right and
+    #? slowed nothing. Held off, an address learns nothing about any password. (Behind a reverse proxy, where every
+    #? sign-in may share the proxy's address, it is the name's count alone again.)
+    key = break_glass_key(address) if name == BREAK_GLASS_USER else name
+    async with throttle.lock(key):
+        wait = throttle.wait(key)
         if wait:
             raise too_many(name, wait)
 
         if name == BREAK_GLASS_USER:
             if not break_glass_matches(password):
-                throttle.failed(name)
+                throttle.failed(key)
                 logger.warning("a break-glass sign-in was refused: wrong password, or DEADWAX_ADMIN_PASSWORD isn't set",
                                extra={"frontend": True})
                 raise HTTPException(status_code=401, detail=WRONG_LOGIN)
-            throttle.succeeded(name)
+            throttle.succeeded(key)
             logger.info("signed in: the break-glass admin", extra={"frontend": True})
             return BREAK_GLASS_USER, break_glass_cookie(), BREAK_GLASS_SECONDS, True
 
@@ -1086,8 +1121,8 @@ def _seed_library(store, user: str) -> None:
         return
     if seeded == store.SEED_HELD_OVER:
         logger.info(f"deadwax hasn't scanned the library yet, so the albums already in the store go into {user}'s "
-                    f"library after its first scan - searching or opening an album's page starts one, as Library "
-                    f"care's Rescan does", extra={"frontend": True})
+                    f"library after its first scan, which deadwax makes by itself as it starts (Library care's Rescan "
+                    f"makes one too)", extra={"frontend": True})
         return
     if seeded is not None:
         logger.info(f"put {seeded} album(s) already in the store into {user}'s library - deadwax stars each for them "

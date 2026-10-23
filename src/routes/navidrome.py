@@ -16,7 +16,6 @@ import asyncio
 import random
 import secrets
 import time
-from array import array
 from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Annotated, Literal
@@ -720,6 +719,9 @@ SHUFFLE_ORDER_TTL_S = 24 * 3600
 #? player: paged, named as `playing`, or made with `claim`)
 SHUFFLE_UNCLAIMED_KEPT = 4
 SHUFFLE_CLAIMED_KEPT = 2
+#? (2.0.0-player.65) how often the lifespan's sweep forgets what has aged out - orders a day untouched, lists past
+#? their ten minutes, and every song no list or order names any more - so an idle deadwax lets them go too
+SHUFFLE_SWEEP_S = 600
 #? a token as secrets.token_urlsafe(16) makes it (22 characters), bounded like an id
 SHUFFLE_TOKEN = r"^[A-Za-z0-9_-]{1,64}$"
 #? what the queue takes of each song, in Navidrome's own names, so the page's toQueueTrack reads it as it is
@@ -730,22 +732,28 @@ SHUFFLE_TOO_BIG = "Your library is too big to shuffle here"
 
 @dataclass
 class ShuffleOrder:
-    """One order of a scope's songs, as a permutation of them: whose it is, the scope it was asked for under, when it
+    """One order of a scope's songs, as their ids in that order: whose it is, the scope it was asked for under, when it
     was last asked for, and whether it has been handed to the player (claimed) - a visit to the list makes one it may
-    never play."""
+    never play. (2.0.0-player.65) Ids only - each the one string _shuffle_songs_by_id keys the song under - so an order
+    costs a pointer a song (160 KB at 20,000), never a copy of the songs."""
 
     user: str
     scope: str
-    songs: list[dict]
-    order: array
+    ids: tuple[str, ...]
     used: float
     claimed: bool = False
 
 
-#? (user, scope) -> (when built, the songs); one build at a time per (user, scope); token -> its order
-_shuffle_lists: dict[tuple[str, str], tuple[float, list[dict]]] = {}
+#? (user, scope) -> (when built, its songs' ids); one build at a time per (user, scope); token -> its order
+_shuffle_lists: dict[tuple[str, str], tuple[float, tuple[str, ...]]] = {}
 _shuffle_builds: dict[tuple[str, str], asyncio.Lock] = {}
 _shuffle_orders: dict[str, ShuffleOrder] = {}
+#? (2.0.0-player.65, the 2.0.0 release review) each song a list or order names, once, as the newest build read it: what
+#? a page answers. Before, every order held the list it was made from, and the list was built again every ten minutes -
+#? about 20 MB a copy at 20,000 songs, ten orders a person, kept for a day while idle. One table, whoever's lists: the
+#? fields kept (SHUFFLE_FIELDS) are the song's own, the same whoever asks - and each order names only songs its own
+#? user's build read
+_shuffle_songs_by_id: dict[str, dict] = {}
 
 
 def forget_shuffles() -> None:
@@ -753,11 +761,51 @@ def forget_shuffles() -> None:
     _shuffle_lists.clear()
     _shuffle_builds.clear()
     _shuffle_orders.clear()
+    _shuffle_songs_by_id.clear()
 
 
-async def _shuffle_songs(request: Request, user: str, scope: str) -> list[dict]:
+def _kept_song(song: dict) -> str:
+    """The song in the table - the dict already there when it is the same, so a list built again shares it - and the
+    id string the table keys it under, for the list to hold."""
+    entry = {name: song[name] for name in SHUFFLE_FIELDS if name in song}
+    held = _shuffle_songs_by_id.get(entry["id"])
+    if held is not None and held == entry:
+        return held["id"]
+    _shuffle_songs_by_id[entry["id"]] = entry
+    return entry["id"]
+
+
+def _sweep_shuffles(now: float) -> None:
+    """What has aged out forgotten: orders SHUFFLE_ORDER_TTL_S untouched, lists past SHUFFLE_LIST_TTL_S, and then every
+    song no list or order left names. The lifespan's, every SHUFFLE_SWEEP_S (a shuffle and a page forget old orders
+    themselves, as they always did); between sweeps the table only grows by songs a build read that differ from
+    the ones it holds, since an unchanged song's dict is shared."""
+    _forget_old_orders(now)
+    for key, (built, _) in list(_shuffle_lists.items()):
+        if now - built >= SHUFFLE_LIST_TTL_S:
+            del _shuffle_lists[key]
+    named: set[str] = set()
+    for _, ids in _shuffle_lists.values():
+        named.update(ids)
+    for held in _shuffle_orders.values():
+        named.update(held.ids)
+    for song_id in [song_id for song_id in _shuffle_songs_by_id if song_id not in named]:
+        del _shuffle_songs_by_id[song_id]
+
+
+async def run_shuffle_sweeps(every: float = SHUFFLE_SWEEP_S) -> None:
+    """The lifespan's sweep (2.0.0-player.65): an idle deadwax forgets old orders too, not only at the next shuffle."""
+    while True:
+        await asyncio.sleep(every)
+        try:
+            _sweep_shuffles(time.monotonic())
+        except Exception as e:  # noqa: BLE001 - a sweep that fails is tried again next time; nothing else stops
+            logger.warning(f"the Library's Shuffle couldn't forget what it holds: {e}")
+
+
+async def _shuffle_songs(request: Request, user: str, scope: str) -> tuple[str, ...]:
     """
-    Every song of `scope`, as the asker sees them: `store` all of Navidrome's, read with search3's empty query a
+    Every song of `scope` - their ids, the songs themselves kept once in _shuffle_songs_by_id - as the asker sees them: `store` all of Navidrome's, read with search3's empty query a
     SCAN_PAGE at a time (in Navidrome's natural order, by rowid - persistence/sql_search.go, read at 0.64.2), each
     song once (a scan between pages can move a rowid); `yours` only those of the albums the asker starred
     (getAlbumList2 starred, STARRED_PAGE at a time). Kept SHUFFLE_LIST_TTL_S per (user, scope); one build at a time.
@@ -784,6 +832,9 @@ async def _shuffle_songs(request: Request, user: str, scope: str) -> list[dict]:
                 if len(page) < STARRED_PAGE:
                     break
                 offset += STARRED_PAGE
+        #? the songs as read, kept here until the end: the table takes them in the same step the list is stored, with
+        #? nothing awaited between, so a sweep between two pages - which keeps only what a list or order names - never
+        #? drops a song this build has read and its list will name
         songs: list[dict] = []
         seen: set[str] = set()
         offset = 0
@@ -805,8 +856,9 @@ async def _shuffle_songs(request: Request, user: str, scope: str) -> list[dict]:
             if len(page) < SCAN_PAGE or len(seen) == before:
                 break
             offset += SCAN_PAGE
-        _shuffle_lists[key] = (time.monotonic(), songs)
-        return songs
+        ids = tuple(_kept_song(song) for song in songs)
+        _shuffle_lists[key] = (time.monotonic(), ids)
+        return ids
 
 
 def _keep_orders(user: str, claimed: bool, kept: int, scope: str | None = None) -> None:
@@ -825,7 +877,10 @@ def _forget_old_orders(now: float) -> None:
 
 
 def _shuffle_page(held: ShuffleOrder, offset: int) -> list[dict]:
-    return [held.songs[at] for at in held.order[offset:offset + SHUFFLE_PAGE]]
+    #? every id an order names is in the table: only a sweep removes one, and only once nothing names it - and a build
+    #? puts its songs in the table only as its list is stored, so no sweep lands between the two
+    return [_shuffle_songs_by_id[song_id] for song_id in held.ids[offset:offset + SHUFFLE_PAGE]
+            if song_id in _shuffle_songs_by_id]
 
 
 def _claim(held: ShuffleOrder, now: float) -> None:
@@ -861,7 +916,7 @@ async def shuffle(
         songs = await _shuffle_songs(request, user, asked)
     except NavidromeError as e:
         raise _fail(e)
-    order = array("I", range(len(songs)))
+    order = list(songs)
     random.SystemRandom().shuffle(order)
     now = time.monotonic()
     _forget_old_orders(now)
@@ -869,13 +924,13 @@ async def shuffle(
     if played is not None and played.user == user:
         _claim(played, now)
     token = secrets.token_urlsafe(16)
-    held = ShuffleOrder(user=user, scope=scope, songs=songs, order=order, used=now)
+    held = ShuffleOrder(user=user, scope=scope, ids=tuple(order), used=now)
     _shuffle_orders[token] = held
     if claim:
         _claim(held, now)
     else:
         _keep_orders(user, claimed=False, kept=SHUFFLE_UNCLAIMED_KEPT, scope=scope)
-    return {"token": token, "total": len(order), "songs": _shuffle_page(held, 0)}
+    return {"token": token, "total": len(held.ids), "songs": _shuffle_page(held, 0)}
 
 
 @router.get("/shuffle/{token}")
@@ -896,7 +951,7 @@ async def shuffle_more(
     if held is None or held.user != user:
         raise HTTPException(status_code=404, detail="gone")
     _claim(held, now)
-    return {"total": len(held.order), "songs": _shuffle_page(held, offset)}
+    return {"total": len(held.ids), "songs": _shuffle_page(held, offset)}
 
 
 # ---------------------------------------------------------------- playlists (2.0.0-player.58)

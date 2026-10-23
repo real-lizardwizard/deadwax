@@ -29,6 +29,7 @@ hundred small calls in a row, a few seconds on a LAN.
 
 import asyncio
 import time
+from collections import Counter
 
 import httpx
 
@@ -159,8 +160,13 @@ async def star_entry(store, as_user: AsUser, entry: dict, now: float | None = No
         album_id = await find_album(as_user, release, entry.get("album"))
         if album_id is None:
             return await _wait(store, entry, rules.NOT_IN_NAVIDROME, now)
-        await as_user.call("star", {"albumId": album_id})
+        #? (2.0.0-player.65, the 2.0.0 release review) asked first: `star` on an album already starred sets
+        #? Navidrome's starred date to now - an album you starred years ago would read as starred today. A
+        #? first scan landing within a sync of a sign-in made the ledger's grants before the read-back saw them
         album = (await as_user.call("getAlbum", {"id": album_id})).get("album")
+        if not (isinstance(album, dict) and album.get("starred")):
+            await as_user.call("star", {"albumId": album_id})
+            album = (await as_user.call("getAlbum", {"id": album_id})).get("album")
     except NavidromeError as e:
         if e.unreachable:
             #? said on the entry, not counted against it: Navidrome being away is nobody's backoff
@@ -219,19 +225,41 @@ async def sync_user(store, as_user: AsUser, now: float | None = None, first: boo
         #? stop everyone's pass on one user's read (review), never say "Navidrome isn't answering"
         raise SyncRefused(str(e)) from e
     starred: dict[str, dict] = {}
+    #? (2.0.0-player.65) starred albums Navidrome reads no release id from, by (album artist, name) - None where
+    #? two share them: what an untagged entry is matched to (deadwax can't star one, but you can, in Amperfy)
+    untagged: dict[tuple[str, str], dict | None] = {}
+    starred_ids: set[str] = set()
     for album in (body.get("starred2") or {}).get("album") or []:
-        release = album.get("musicBrainzId") if isinstance(album, dict) else None
-        if isinstance(release, str) and release.strip() and album.get("id"):
+        if not isinstance(album, dict) or not album.get("id"):
+            continue
+        starred_ids.add(str(album["id"]))
+        release = album.get("musicBrainzId")
+        if isinstance(release, str) and release.strip():
             starred.setdefault(release.strip().lower(), album)
+        else:
+            key = _named(album.get("artist"), album.get("name"))
+            untagged[key] = None if key in untagged else album
 
     entries = await store.ledger_entries(user)
     if entries is None:
         return counts
 
+    #? an untagged entry is matched only by a name no other of this user's untagged entries has: two pressings
+    #? of one album in the store (Album (2001), Album (2001) [Deluxe]) would both be confirmed from one star
+    #? (the 2.0.0-player.65 review) - then neither is, and both wait
+    names = Counter(_named(entry.get("artist"), entry.get("album")) for entry in entries
+                    if entry["state"] in ("waiting", "starred") and not (entry.get("release_mbid") or "").strip())
+    for key, count in names.items():
+        if count > 1:
+            untagged[key] = None
+
     held: set[str] = set()
     for entry in entries:
         release = (entry.get("release_mbid") or "").strip().lower()
-        if entry["state"] not in ("waiting", "starred") or not release:
+        if entry["state"] in ("waiting", "starred") and not release:
+            await _untagged(store, as_user, entry, untagged, starred_ids, counts)
+            continue
+        if entry["state"] not in ("waiting", "starred"):
             continue
         held.add(release)
         album = starred.get(release)
@@ -273,6 +301,42 @@ async def sync_user(store, as_user: AsUser, now: float | None = None, first: boo
     if index_known:
         await store.ledger_synced(user, now)
     return counts
+
+
+def _named(artist, name) -> tuple[str, str]:
+    """An album as an untagged one is matched: album artist and name, case and spacing folded."""
+    def fold(text) -> str:
+        return " ".join(text.split()).casefold() if isinstance(text, str) else ""
+    return fold(artist), fold(name)
+
+
+async def _untagged(store, as_user: AsUser, entry: dict, untagged: dict, starred_ids: set[str], counts: dict) -> None:
+    """
+    (2.0.0-player.65, the 2.0.0 release review) An entry whose album has no release id: deadwax can't find it in
+    Navidrome to star it, so it waited for ever - even one already starred (the first admin's seed takes in every
+    album of the store, untagged ones too, and a store from Soulseek holds many). Starred by you, it is matched to
+    the one starred album Navidrome reads no release id from with its album artist and name, and confirmed. Once
+    starred: kept while that album stays starred; unstarred (getAlbum says so) it is removed, as a tagged one is;
+    gone from Navidrome (error 70), or being applied to, it is left as it is - a star lost isn't one taken away.
+    """
+    user = as_user.user
+    if entry["state"] == "waiting":
+        album = untagged.get(_named(entry.get("artist"), entry.get("album")))
+        if album is not None and await store.ledger_starred(user, entry["album_id"], str(album["id"])):
+            counts["confirmed"] += 1
+        return
+    navidrome_id = entry.get("navidrome_id")
+    if not navidrome_id or navidrome_id in starred_ids or entry.get("album_state") != "present" \
+            or rules.retagging(entry.get("path")):
+        return
+    try:
+        album = (await as_user.call("getAlbum", {"id": navidrome_id})).get("album")
+    except NavidromeError as e:
+        _fail(e)
+        return
+    if isinstance(album, dict) and not album.get("starred") \
+            and await store.ledger_remove(user, entry["album_id"], "unstarred", navidrome_id):
+        counts["removed"] += 1
 
 
 _last_sync: dict[str, float] = {}

@@ -47,7 +47,7 @@ from pathlib import Path
 
 from src.logger import logger
 from src.matching import AUDIO_EXTENSIONS, file_extension
-from src.organizer import is_within
+from src.organizer import LINK_REFUSED, is_within
 
 LYRICS_EXTENSION = ".lrc"
 
@@ -539,8 +539,12 @@ def execute_lyrics(
             continue
 
         target = directory / lyrics_filename(filename)
-
         if has_lyrics_file(filename, names) and not replace:
+            continue
+
+        #? (2.0.0-player.65) a .lrc that is a symlink would be written wherever it points
+        if target.is_symlink():
+            problems.append(f"{target.name} {LINK_REFUSED}")
             continue
 
         try:

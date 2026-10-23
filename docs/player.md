@@ -1855,7 +1855,15 @@ Turn the volume up. **Off** puts it back exactly as it was.
 addresses, the same bytes.
 
 **Only FLAC is levelled.** MP3, AAC, Opus and other lossy files play as they are (re-encoding them would
-cost quality), so an MP3 can be louder or quieter than the songs around it. Info says so.
+cost quality), so an MP3 can be louder or quieter than the songs around it. Info says so. Nor is every
+FLAC: these play exactly as with Normalization off, and Info's **Normalization** row says why -
+
+- a **20- or 32-bit** FLAC (the library deadwax reads songs with can't open those; 16- and 24-bit are fine,
+  at any sample rate);
+- a FLAC with **more than two channels** (a 5.1 or quad mix - only mono and stereo are levelled);
+- **every song, while the player's cache can't be used** - its folder can't be made or written
+  (`PLAYER_CACHE_PATH`, or the container's temporary space), since the levelled copy lives there;
+- a CD song too long to make a copy of in memory (below, under **The cache**).
 
 **How it's levelled, and why nothing else changes.** deadwax measures each song itself, the way
 ReplayGain 2.0 does (EBU R128 loudness, brought to -18 LUFS), and ignores any ReplayGain tags your files
@@ -1880,7 +1888,9 @@ whose loudest moment holds its gain back up to 3 dB quieter than it could be.
 **The first play of an album waits while deadwax measures it.** The first time deadwax levels an album,
 it downloads every FLAC song of it from Navidrome and measures them before the first one plays: about
 3 seconds of measuring for a 12-song CD album on a desktop PC, perhaps 10 to 15 on a NAS, longer for hi-res.
-Opening the album's page starts it, so it's usually done by the time you tap Play. If it takes more
+Opening the album's page starts it, so it's usually done by the time you tap Play; playing an album
+straight from Search (a song of yours), from Requests (a finished download's ▶) or with an artist's
+**Play** (their first album) starts it as you tap, so a song played from those can wait for it. If it takes more
 than 50 seconds (a big box set; 20 for a hi-res song, whose copy takes longer to make), that song plays as
 it is that once - and so does any other song of the album that comes up while it's still being measured,
 straight away, without a wait of its own. Info's **Normalization** row says so (`Played as it is this
@@ -1905,7 +1915,7 @@ Last. What's already queued keeps the level it was queued at, so an album never 
 **What deadwax did** is on Info → About's **Normalization** row, under **Playing**, for everyone, and on
 Info → Debug's for an admin (see [Info → Debug](#info--debug)), and
 deadwax's log says what it measured and made (`song 123 measured - -10.6 LUFS, peak -0.31 dBFS`, `song 123
-levelled (album, -7.42 dB), and put in a fragmented MP4 for the gapless player`).
+levelled (album, -7.42 dB), and put in a fragmented MP4 for Normalization`).
 
 ## Seeking, and where Safari lands
 
@@ -2142,7 +2152,8 @@ favourites, the same ones Amperfy (or any Subsonic app) shows as starred - and d
   if a session of theirs outlived the restart - has every album already in the store put into their
   library and starred for them, once: it was all theirs before anyone else had a library. If deadwax
   hasn't scanned the library yet at that moment - a new install, or one upgraded from a version whose saved scan it can't read - that waits for
-  its first scan (searching, opening an album's page or **Library care → Rescan** starts one), so the
+  its first scan (deadwax starts one by itself, in the background, as it starts; a search or **Library care →
+  Rescan** starts one too), so the
   albums it finds then are theirs too. The one exception is an album somebody else's download brought
   in: that is theirs. An album somebody else had starred in Amperfy, or added, goes into both libraries.
   Anyone else's library starts with only the albums they'd already starred. An album that arrives

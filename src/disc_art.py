@@ -36,7 +36,7 @@ from pathlib import Path
 
 from src.logger import logger
 from src.matching import AUDIO_EXTENSIONS, file_extension
-from src.organizer import is_within
+from src.organizer import LINK_REFUSED, is_within
 
 DISC_ART_STEM = "disc"
 
@@ -259,6 +259,11 @@ def save_disc_art(album_path: str, library_root: str, files: list[tuple[str, byt
 
         target = directory / name
         if target.exists() and not replace:
+            continue
+        #? (2.0.0-player.65) a disc.png that is a symlink would be written wherever it points - a dangling one too,
+        #? which exists() can't see
+        if target.is_symlink():
+            problems.append(f"{name} {LINK_REFUSED}")
             continue
 
         try:

@@ -11,8 +11,23 @@
 
 import { levelled, type LevelledTrack, type QueuedAs } from '../lib/loudness'
 import type { QueueTrack } from '../lib/playQueue'
+import { isFlac } from '../lib/streamWrap'
 import { readPlayerNormalization } from '../state/persisted'
+import { warmLevels, type AlbumWithSongs } from './api'
 
 export function queued<T extends QueueTrack>(tracks: T[], as: QueuedAs): Array<T & LevelledTrack> {
   return levelled(tracks, readPlayerNormalization(), as)
+}
+
+/**
+ * (2.0.0-player.65, the 2.0.0 release review) An album about to be played, warmed - its album page as it opens, and
+ * a play from Search, Requests or an artist's Play right after its tap's playTracks (never before it, and nothing
+ * awaited: the tap is the player's). Not under Off, and not for an album with no FLAC song, which nothing levels.
+ * The setting is read as queued() reads it: a storage read, synchronous.
+ */
+export function warmAlbum(album: Pick<AlbumWithSongs, 'id' | 'song'>): void {
+  if (readPlayerNormalization() === 'off') return
+  if ((album.song ?? []).some((song) => isFlac({ suffix: song.suffix ?? null, contentType: song.contentType ?? null }))) {
+    warmLevels(album.id)
+  }
 }

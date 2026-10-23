@@ -161,6 +161,59 @@ def test_saving_the_address_it_already_is_is_not_a_change(app, store):
     assert save(app, NAVIDROME_URL="http://navidrome:4533").status_code == 200
 
 
+ELSEWHERE = ("NAVIDROME_PASSWORD: type the Navidrome password again - the environment's password was given for the "
+             "environment's address")
+
+
+def test_a_new_address_then_the_password_alone_reverted_is_refused(app, store):
+    """(2.0.0-player.65, the 2.0.0 release review) a new address with any password at all, then the password
+    reverted, put the environment's password back while the address stayed new - and sent its token there."""
+    assert save(app, NAVIDROME_URL="http://collector.example:9999", NAVIDROME_PASSWORD="junk").status_code == 200
+
+    response = save(app, NAVIDROME_PASSWORD=None)
+
+    assert response.status_code == 400 and response.json()["detail"].startswith(ELSEWHERE)
+    assert (Config.NAVIDROME_URL, Config.NAVIDROME_PASSWORD) == ("http://collector.example:9999", "junk")
+
+
+def test_the_password_reverted_first_then_a_new_address_is_refused(app, store):
+    assert save(app, NAVIDROME_PASSWORD="junk").status_code == 200
+    assert save(app, NAVIDROME_PASSWORD=None).status_code == 200
+    assert Config.NAVIDROME_PASSWORD == ENV_PASSWORD
+
+    alone = save(app, NAVIDROME_URL="http://collector.example:9999")
+    with_revert = save(app, NAVIDROME_URL="http://collector.example:9999", NAVIDROME_PASSWORD=None)
+
+    assert alone.status_code == 400 and MOVED in alone.json()["detail"]
+    assert with_revert.status_code == 400 and ELSEWHERE in with_revert.json()["detail"]
+    assert Config.NAVIDROME_URL == "http://navidrome:4533" and store.stored_settings() == {}
+
+
+def test_the_password_reverted_with_the_address_reverted_too_is_allowed(app, store):
+    assert save(app, NAVIDROME_URL="http://music-box:4533", NAVIDROME_PASSWORD=NEW_PASSWORD).status_code == 200
+    assert save(app, NAVIDROME_URL=None, NAVIDROME_PASSWORD=None).status_code == 200
+    assert (Config.NAVIDROME_URL, Config.NAVIDROME_PASSWORD) == ("http://navidrome:4533", ENV_PASSWORD)
+
+
+def test_the_password_reverted_at_a_new_address_is_allowed_when_the_environment_holds_none(app, store, monkeypatch):
+    """With no password in compose or .env the revert only unsets the typed one, so no token goes to the new
+    address - nothing is refused (the rule the settings tab's note, env_set, mirrors)."""
+    monkeypatch.setattr(Config, "NAVIDROME_PASSWORD", "")
+    assert save(app, NAVIDROME_URL="http://music-box:4533", NAVIDROME_PASSWORD=NEW_PASSWORD).status_code == 200
+
+    response = save(app, NAVIDROME_PASSWORD=None)
+
+    assert response.status_code == 200, response.text
+    assert (Config.NAVIDROME_URL, Config.NAVIDROME_PASSWORD) == ("http://music-box:4533", "")
+    assert store.stored_settings() == {"NAVIDROME_URL": "http://music-box:4533"}
+
+
+def test_the_password_reverted_with_the_address_cleared_sends_nothing_anywhere(app, store):
+    """An empty address is no address: nothing is sent, so the environment's password may come back with it."""
+    assert save(app, NAVIDROME_URL="", NAVIDROME_PASSWORD=None).status_code == 200
+    assert not Config.navidrome_configured()
+
+
 def test_clearing_the_address_sends_nothing_anywhere(app, store):
     response = save(app, NAVIDROME_URL="")
     assert response.status_code == 200

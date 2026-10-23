@@ -1,6 +1,7 @@
 import re
 import asyncio
 from pathlib import Path
+from urllib.parse import urlsplit
 from fastapi import Depends, FastAPI
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
@@ -44,6 +45,32 @@ MEDIA_PREFIXES = ("/deadwax/navidrome/stream/", "/deadwax/navidrome/cover/", "/d
 
 def serves_media(path: str) -> bool:
     return path in MEDIA_PATHS or path.startswith(MEDIA_PREFIXES)
+
+
+def relative_location(location: str, host: str) -> str:
+    """
+    (2.0.0-player.65, the 2.0.0 release review) A redirect deadwax made to itself, as a relative reference - its path,
+    query and fragment, with no scheme or host. Starlette writes the Location of its slash redirects (`/player` ->
+    `/player/`, by the static mount and the router alike) from the request as deadwax received it - plain http behind
+    a proxy that ends TLS - so the browser was sent to http:// and, with no http listener, nowhere. Relative, it stays
+    on whatever scheme and host the browser is on. A Location naming another host (none is made today) is left as
+    it is.
+
+    The path never starts with two slashes (or a slash and a backslash): a browser reads `//host/...` as
+    protocol-relative, ANOTHER host. Starlette's static mount writes its slash redirect from the decoded path, so
+    `/%2Fevil.example%2F..%2Fplayer` came back as `http://host//evil.example/../player/` - on deadwax's host while
+    absolute, but `//evil.example/../player/` once made relative, an open redirect (the .65 review). Every leading
+    slash collapses to one, which the browser resolves on deadwax's own host.
+    """
+    parts = urlsplit(location)
+    if parts.scheme not in ("http", "https") or not host or parts.netloc.lower() != host.lower():
+        return location
+    relative = "/" + parts.path.lstrip("/\\")
+    if parts.query:
+        relative += f"?{parts.query}"
+    if parts.fragment:
+        relative += f"#{parts.fragment}"
+    return relative
 
 
 #? (2.0.0-player.61) What a People request deadwax couldn't read is answered - in place of FastAPI's 422, which
@@ -96,6 +123,12 @@ async def lifespan(app: FastAPI):
     #? scan, so Find knows what the library holds before anyone opens its tab (step 2). After the
     #? overrides, since LIBRARY_PATH can be one; from the database alone, never the disk.
     await seed_from_saved_scan(app.state.store, Config.LIBRARY_PATH or "")
+    #? (2.0.0-player.65) ...and when even that left it never filled from a scan of LIBRARY_PATH (an upgrade whose
+    #? saved scan is of an older format), the library is walked once, in the background, so album pages can offer
+    #? Add without anyone opening the library first
+    library_scan = asyncio.create_task(library.scan_at_start(app.state.store))
+    #? (2.0.0-player.65) the Library's Shuffle forgets what has aged out on a timer, not only when asked again
+    shuffle_sweeps = asyncio.create_task(navidrome.run_shuffle_sweeps())
 
     #? (2.0.0-player.62) what the player's Normalization measures is kept in the database, so a restart
     #? measures nothing again (src/levels.py)
@@ -123,7 +156,7 @@ async def lifespan(app: FastAPI):
     yield
     logger.info("Shutting down API server...")
 
-    for task in (poller_task, session_checks, library_worker):
+    for task in (poller_task, session_checks, library_worker, library_scan, shuffle_sweeps):
         if task is None:
             continue
         task.cancel()
@@ -345,6 +378,34 @@ def start() -> FastAPI:
 
     app.add_middleware(RefuseFrames)
 
+    class RelativeRedirects:
+        """
+        (2.0.0-player.65) Every redirect deadwax makes to itself goes out with a relative Location
+        (relative_location), so behind a proxy that ends TLS `/player` lands on https://.../player/ rather than
+        on an http:// address nothing answers. Plain ASGI, touching only the response's headers, like the layers
+        around it - and not FORWARDED_ALLOW_IPS=*, which would have uvicorn trust anyone's X-Forwarded-For.
+        """
+
+        def __init__(self, inner):
+            self.inner = inner
+
+        async def __call__(self, scope, receive, send):
+            if scope["type"] != "http":
+                return await self.inner(scope, receive, send)
+            host = next((value for name, value in scope.get("headers", []) if name == b"host"), b"").decode("latin-1")
+
+            async def send_relative(message):
+                if message["type"] == "http.response.start" and 300 <= message.get("status", 200) < 400:
+                    headers = [(name, relative_location(value.decode("latin-1"), host).encode("latin-1"))
+                               if name.lower() == b"location" else (name, value)
+                               for name, value in message.get("headers", [])]
+                    message = {**message, "headers": headers}
+                await send(message)
+
+            await self.inner(scope, receive, send_relative)
+
+    app.add_middleware(RelativeRedirects)
+
     #? Added last, so it is the OUTERMOST layer: a write another website asked for is refused
     #? before anything else runs. See src/api/same_origin.py.
     app.add_middleware(SameOriginWrites)
@@ -402,6 +463,9 @@ def start() -> FastAPI:
         #? password among it
         if request.url.path.startswith("/deadwax/people"):
             return JSONResponse(status_code=422, content={"detail": PEOPLE_FORM})
+        #? (2.0.0-player.65, the 2.0.0 release review) nor a sign-in's: an over-long one echoed the password
+        if request.url.path.startswith("/deadwax/auth"):
+            return JSONResponse(status_code=422, content={"detail": auth_routes.SIGN_IN_FORM})
         words = navidrome.validation_words(request.url.path, error.errors())
         if words is not None:
             return JSONResponse(status_code=422, content={"detail": words})

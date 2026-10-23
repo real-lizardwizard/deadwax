@@ -108,7 +108,7 @@ check('ticking Settings and the log, and Look after the library, says what they 
   [risky[4].warning, risky[2].warning, risky[0].warning, risky[1].warning, risky[3].warning],
   [P.WARN_SERVER, P.WARN_LIBRARY, P.WARN_NO_REQUEST, null, null])
 check('...the words', [P.WARN_SERVER, P.WARN_LIBRARY, P.WARN_NO_REQUEST],
-  ["Settings can point deadwax at other folders, slskd and Navidrome - give it only to someone you'd trust as an admin.",
+  ["Settings can point deadwax at other folders and change how it downloads and files - give it only to someone you'd trust as an admin.",
     "This includes deleting albums from disk, which can't be undone.", 'They can still play, browse and add what the store has.'])
 const admin = P.checkboxes(true, 'Admins have every permission - that changes with Make admin.', null)
 check('a Navidrome admin\'s: all ticked, all locked, no warnings - "Admins can do everything."',

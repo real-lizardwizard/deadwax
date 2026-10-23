@@ -46,7 +46,8 @@ fails closed.
   isn't counted against the name. `NavidromeError` gained `code` (Subsonic's) for this.
 - **The throttle** (`auth.Throttle`): 3 wrong passwords per lowercased name in any 60 s, then 429 with
   Retry-After and Navidrome not asked; each name's tries in turn (an `asyncio.Lock` per name), so ten at
-  once are ten counted; a success clears it; the break-glass name too. Navidrome blocks a user for 20 s
+  once are ten counted; a success clears it; the break-glass name too - counted per name AND client address
+  since 2.0.0-player.65 (`break_glass_key`, see notes/fixes-2.0.md's "Break-glass"), the wait still first. Navidrome blocks a user for 20 s
   after 5 failures; 3 a minute plus the re-check's one a pass never reach it. Nothing ever retries.
   The record is bounded (`cap`, 10000 names) but a name HELD OFF is never what makes room
   (`_make_room`): first what has left the window, then names under the limit, oldest first, never the
