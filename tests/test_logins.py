@@ -1920,13 +1920,24 @@ def test_the_example_files_logins_lines_lock_nobody_out():
     lines = [line.strip() for line in compose.splitlines()]
     assert not any(line.lstrip("#").strip().startswith("- DEADWAX_SECRET_KEY") for line in lines)
     assert not any(line.lstrip("#").strip().startswith("- DEADWAX_ADMIN_PASSWORD") for line in lines)
-    assert "#- AUTH_MODE=on" in lines
-    block = compose[compose.index("Optional - logins"):compose.index("#- AUTH_MODE=on")]
-    assert "ORGANIZE_MODE copy or move" in block and ".env" in block
+    auth_line = next(line for line in lines if line.startswith("#- AUTH_MODE=on"))
+    assert "ORGANIZE_MODE copy or move" in auth_line and ".env" in auth_line
     for line in ("#AUTH_MODE=on", "#DEADWAX_SECRET_KEY=", "#DEADWAX_ADMIN_PASSWORD="):
         assert line in env.splitlines(), line
     assert "ORGANIZE_MODE copy or move" in env
-    #? the figures they quote: Navidrome needed since .46, MusicBrainz's 200 MB about 1,100 artists (measured in .56)
+    #? the figures they quote: MusicBrainz's 200 MB about 1,100 artists (measured in .56); and (2.0.0-player.68) no
+    #? prerelease history - a reader comes from 1.1.8 and never ran those versions
     for text in (compose, env):
-        assert "2.0.0-player.45, no longer optional" not in text and "2.0.0-player.46, no longer optional" in text
+        assert "2.0.0-player" not in text
         assert "4,000 artists" not in text and "1,100 artists" in text
+
+
+def test_the_compose_example_has_no_line_that_is_only_a_comment():
+    """(2.0.0-player.68) James: "I would like to avoid having lines that are just comments". Each comment sits on the
+    line of the setting, mount or key it explains; the only lines starting with # are settings left commented out."""
+    repo = Path(__file__).resolve().parent.parent
+    for number, line in enumerate((repo / "docker-compose.example.yml").read_text().splitlines(), 1):
+        text = line.strip()
+        assert text, f"line {number} is blank"
+        if text.startswith("#"):
+            assert text.startswith("#- "), f"line {number} is only a comment: {text}"

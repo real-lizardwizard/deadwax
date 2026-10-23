@@ -1524,13 +1524,14 @@ def test_the_example_compose_file_and_env_name_both_settings():
     from src.config import DEFAULT_MUSICBRAINZ_CACHE_MB
 
     compose = [line.strip() for line in (REPO / "docker-compose.example.yml").read_text().splitlines()]
-    player = compose.index("#- PLAYER_CACHE_PATH=/cache")
-    beside = compose[player:player + 16]
+    settings = [line.split("  #")[0].strip() for line in compose]
+    player = settings.index("#- PLAYER_CACHE_PATH=/cache")
+    beside = settings[player:player + 4]
     assert "#- MUSICBRAINZ_CACHE_PATH=/cache" in beside
     assert f"#- MUSICBRAINZ_CACHE_MB={DEFAULT_MUSICBRAINZ_CACHE_MB}" in beside
-    mount = compose.index("#- /path/to/fast/disk/deadwax-cache:/cache")
-    said = " ".join(compose[mount - 3:mount])
-    assert "PLAYER_CACHE_PATH" in said and "MUSICBRAINZ_CACHE_PATH" in said
+    #? (2.0.0-player.68) the compose example's comments sit on their own setting's line, never on a line of their own
+    mount = next(line for line in compose if line.startswith("#- /path/to/fast/disk/deadwax-cache:/cache"))
+    assert "PLAYER_CACHE_PATH" in mount and "MUSICBRAINZ_CACHE_PATH" in mount
 
     env = [line.strip() for line in (REPO / ".env.example").read_text().splitlines()]
     assert "#PLAYER_CACHE_PATH=" in env

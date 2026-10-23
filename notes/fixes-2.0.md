@@ -219,3 +219,14 @@ The slice's review found these, each confirmed by a skeptic; all fixed in the sa
   came (all four new redirect tests fail) and without the backslash (the pure case fails); the `_environments(secret)`
   condition dropped (both new settings tests fail); each file restored and compared with `cmp`. NOT verified: the
   `%2F` form through James's real proxy (nginx's `proxy_pass` with no URI passes it through, per the reviewer).
+
+### The compose example without comment-only lines (2.0.0-player.68)
+
+James (2026-10-23): "let's tighten up the comments in the docker compose, I would like to avoid having lines that are
+just comments". Every explanation now sits on the line of the setting, mount or key it explains, cut to what someone
+filling the file in needs there; the longer explanations already live in docs/configuration.md, which the
+`environment:` line points to. The only lines starting with `#` are settings left commented out - they must stay
+commented, not set to their defaults, because a line under `environment:` beats `.env` even when its value is empty.
+`test_the_compose_example_has_no_line_that_is_only_a_comment` keeps it that way; the two tests that read the old
+comment blocks read the setting lines now. The prerelease history ("since 2.0.0-player.46") left the compose example
+and `.env.example`. `.env.example` keeps its comment lines: it is a file of comments by nature.
