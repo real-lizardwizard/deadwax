@@ -144,7 +144,10 @@ def commons_title(url: str) -> str | None:
     path = parsed.path
     for prefix in ("/wiki/File:", "/wiki/Special:FilePath/"):
         if path.startswith(prefix):
-            title = path[len(prefix):]
+            #? (1.1.9) the path is still percent-encoded as MusicBrainz stores it ("Pink_Floyd%2C_1971_%28HQ%29.jpg"),
+            #? and commons_file_url() quotes the title again - so it went out as %252C...%2528 and Commons answered
+            #? 404. Decoded here, it is quoted exactly once.
+            title = unquote(path[len(prefix):])
             return title or None
 
     return None
