@@ -14,24 +14,25 @@ import type { Player } from '../player/usePlayer'
  * Moved here from the player's settings sheet (player/Settings.tsx, deleted in 2.0.0-player.9)
  * word for word: the words, the storage key (usePlayer's deadwax-player-max-rate, per device) and
  * the keyboard handling are all as they were - until 2.0.0-player.10, when Gapless stopped being a
- * switch and the two notes stopped calling it one ("with Gapless on").
+ * switch and the two notes stopped calling it one ("with Gapless on"), and 2.0.2, when both notes were
+ * written again for the person choosing (what each does for them, and when to pick it).
  */
 export const QUALITIES: { rate: MaxRate; label: string; note: string }[] = [
   {
     rate: '48000',
     label: 'Up to 48 kHz',
     note:
-      'FLAC songs at 88.2 to 384 kHz are resampled by deadwax to 48 kHz, or 44.1 kHz, and sent as lossless ' +
-      '24-bit FLAC, so with Gapless on they play without a gap. Nothing below 20 kHz changes, except ' +
-      'that with Normalization off they are 3 dB quieter, so nothing can clip.',
+      'Hi-res FLAC songs (88.2 to 384 kHz) are converted by deadwax to 48 or 44.1 kHz, still lossless ' +
+      '24-bit FLAC, so they are lighter to stream and with Gapless on they play without a gap. Nothing in the ' +
+      'range you can hear changes, except that with Normalization off they play 3 dB quieter, so nothing can clip.',
   },
   {
     rate: 'original',
     label: 'Original',
     note:
-      'Songs above 48 kHz are sent as they are. With Gapless on, FLAC songs play without a gap too, ' +
-      'but an iPhone can only hold a few seconds of them ahead, so a weak connection can make them stall. The ' +
-      'iPhone converts them to 44.1 or 48 kHz itself, unless a USB DAC takes them at their own rate.',
+      'Hi-res songs are sent at their own rate, in case a USB DAC can play them at it; otherwise an iPhone ' +
+      'converts them to 44.1 or 48 kHz itself. With Gapless on, FLAC songs play without a gap too, but an iPhone ' +
+      'holds only a few seconds of them ahead, so a weak connection can make them stall.',
   },
 ]
 

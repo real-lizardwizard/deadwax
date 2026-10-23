@@ -198,7 +198,7 @@ can land seconds off.
 
 | setting | default | what it does |
 | --- | --- | --- |
-| `AUTO_RETRY_PEER` | `off` | `on` moves a failed download to the next peer from the list you picked it from, by itself. It's off by default because the next peer down may be a different pressing or a worse rip. **Try next peer** on a failed download works either way. |
+| `AUTO_RETRY_PEER` | `off` | `on` moves a failed download to the next peer from the list you picked it from, by itself. It's off by default because the next peer down may be a different pressing or a worse rip. **Next peer** on a failed download, in Requests, works either way. |
 
 ### Cover art
 
@@ -290,8 +290,8 @@ home-screen app keeps its storage apart from Safari's, so set them in the app it
 | setting | default | where it is | what it does |
 | --- | --- | --- | --- |
 | Maximum quality | Up to 48 kHz | **You** → Playback | whether hi-res FLAC songs are resampled to 48 kHz (or 44.1 kHz) or sent as they are - see [Maximum quality](player.md#maximum-quality-hi-res-at-48-khz). |
-| Normalization | Automatic | **You** → Playback | whether deadwax levels FLAC songs to one loudness - **Automatic** (an album you play at one level for the whole album, anything else song by song), **By song**, **By album**, or **Off** (every song sent bit for bit as before) - see [Normalization](player.md#normalization). Kept as `deadwax-player-normalization`, `song`, `album` or `off`: anything else stored there - nothing, a mistyped value, storage that can't be read - is Automatic. Used from the next thing you play. |
-| Gapless | off | **You** → Playback | joins songs into one stream, or gets the next song ready on a second player - see [Gapless playback](player.md#gapless-playback-experimental). A checkbox. |
+| Normalization | Automatic | **You** → Playback | whether deadwax levels FLAC songs to one loudness - **Automatic** (an album you play at one level for the whole album, anything else song by song), **By song**, **By album**, or **Off** (no levelling: every song played exactly as the file is, bit for bit, unless Maximum quality converts it) - see [Normalization](player.md#normalization). Kept as `deadwax-player-normalization`, `song`, `album` or `off`: anything else stored there - nothing, a mistyped value, storage that can't be read - is Automatic. Used from the next thing you play. |
+| Gapless | off | **You** → Playback | joins songs into one stream, or gets the next song ready on a second player - see [Gapless playback](player.md#gapless-playback). A checkbox. |
 | Now Playing opens as | Cover | **You** → Playback | whether the now-playing screen opens as the cover or as [the turntable](player.md#the-turntable). The button at the screen's top right switches between them for as long as it's open, without changing this. The phone layout's only: [on a desktop](player.md#on-a-desktop) there's no now-playing screen, so it changes nothing there. |
 | Pause winds the record down | on | **You** → Playback | whether pausing from [the turntable](player.md#the-turntable) slows the song's sound to a stop with the record over about a second (on), or stops it at once. The turntable's only: the cover's pause, the lock screen's and a song ending are always instant - and on a desktop, which has no turntable, it changes nothing. A checkbox. |
 | Speed | 1x | the turntable's **speed fader**, beside the platter (and the chip that shows a speed that isn't 1x, on the cover and the desktop's player bar, which puts it back to 1x) | how fast the song plays, from 0.25x to 2x, its pitch moving with it - a record deck's speed, not a time-stretch - see [the speed fader](player.md#the-speed-fader). Kept as `deadwax-player-speed`, a number from 0.25 to 2 in hundredths: anything else stored there - nothing, a word, a number out of range - plays at 1x. It holds for every song after, until you change it. |

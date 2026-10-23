@@ -444,20 +444,36 @@ console.log('\nthe "Maximum quality" notes say what the code does')
   check('two choices, 48 kHz first', QUALITIES.map((q) => [q.rate, q.label]), [['48000', 'Up to 48 kHz'], ['original', 'Original']])
   check('"Up to 48 kHz", word for word',
     up.note,
-    'FLAC songs at 88.2 to 384 kHz are resampled by deadwax to 48 kHz, or 44.1 kHz, and sent as lossless 24-bit FLAC, ' +
-    'so with Gapless on they play without a gap. Nothing below 20 kHz changes, except that with Normalization off ' +
-    'they are 3 dB quieter, so nothing can clip.')
+    'Hi-res FLAC songs (88.2 to 384 kHz) are converted by deadwax to 48 or 44.1 kHz, still lossless 24-bit FLAC, ' +
+    'so they are lighter to stream and with Gapless on they play without a gap. Nothing in the range you can hear ' +
+    'changes, except that with Normalization off they play 3 dB quieter, so nothing can clip.')
   check('"Original", word for word',
     original.note,
-    'Songs above 48 kHz are sent as they are. With Gapless on, FLAC songs play without a gap too, but an ' +
-    'iPhone can only hold a few seconds of them ahead, so a weak connection can make them stall. The iPhone converts ' +
-    'them to 44.1 or 48 kHz itself, unless a USB DAC takes them at their own rate.')
+    'Hi-res songs are sent at their own rate, in case a USB DAC can play them at it; otherwise an iPhone converts ' +
+    'them to 44.1 or 48 kHz itself. With Gapless on, FLAC songs play without a gap too, but an iPhone holds only a ' +
+    'few seconds of them ahead, so a weak connection can make them stall.')
+  //? (2.0.2, after review) Normalization levels a hi-res song under Original too, so it isn't sent "exactly" as it
+  //? is; and whether an iPhone ever runs a USB DAC at a song's own rate isn't known (docs/player.md), so Original
+  //? is never sold as the DAC's choice
+  check('...Original never says it sends songs exactly as they are, nor that it is the choice for a USB DAC',
+    [/exactly/.test(original.note), /choice for a USB DAC/.test(original.note)], [false, false])
   check('as much quieter as the server lowers them (HEADROOM_DB in src/resample.py)',
     [Number.isFinite(headroom), new RegExp(`\\b${headroom} dB quieter\\b`).test(up.note)], [true, true])
   check('the checkbox named by its own label, in both', [gaplessLabel, QUALITIES.every((q) => q.note.includes(`ith ${gaplessLabel} on`))], ['Gapless', true])
   check('...and never called a switch, now that it is a checkbox', QUALITIES.some((q) => /switch/i.test(q.note)), false)
   const emDash = String.fromCharCode(0x2014)
   check('no em dashes, and deadwax never sentence-cased', QUALITIES.some((q) => q.note.includes(emDash) || q.note.includes('Deadwax')), false)
+}
+
+console.log('\nthe choices\' words are for the person choosing (2.0.1)')
+{
+  //? James: "I need the descriptions to be more user oriented and not testing oriented. Like where gapless says
+  //? 'an experiment' is unacceptable" - every label and note these choices draw says what it does for you
+  const TESTING = /experiment|\btrial|\bverified\b|\btest(s|ed|ing)?\b|2\.0\.0-player|\bplayer\.\d/i
+  const said = [...QUALITIES.flatMap((q) => [q.label, q.note]), ...NORMALIZATIONS.flatMap((n) => [n.label, n.note]), ...LOOKS.map((l) => l.label)]
+  check('no label or note of Maximum quality, Normalization or Now Playing opens as reads as a test note', said.filter((one) => TESTING.test(one)), [])
+  check('...Off for Normalization still says it is bit for bit, and no longer measures itself against "before this setting"',
+    [/bit for bit/.test(NORMALIZATIONS.at(-1).note), /before this setting/.test(NORMALIZATIONS.at(-1).note)], [true, false])
 }
 
 console.log('\n"Normalization" is a radio group of its own, kept on this device (2.0.0-player.62)')
@@ -467,9 +483,9 @@ console.log('\n"Normalization" is a radio group of its own, kept on this device 
   check('four choices, Automatic first, word for word', NORMALIZATIONS.map((each) => [each.value, each.label, each.note]), [
     ['auto', 'Automatic', 'An album you play keeps one level for the whole album, so its quiet songs stay quiet beside its loud ones. ' +
       'Anything else - a playlist, a shuffle, a song you add with Play Next - is levelled song by song.'],
-    ['song', 'By song', 'Every song brought to the same loudness, even inside an album.'],
+    ['song', 'By song', 'Every song brought to the same loudness, even the quiet and loud songs of one album.'],
     ['album', 'By album', "Every song at its album's level, even when it plays on its own or in a playlist."],
-    ['off', 'Off', 'Every song sent exactly as before this setting: the file itself, bit for bit, unless Maximum quality resamples it.'],
+    ['off', 'Off', 'No levelling: every song plays exactly as the file is, bit for bit, unless Maximum quality converts it.'],
   ])
   const emDash = String.fromCharCode(0x2014)
   check('...no em dashes, and deadwax never sentence-cased', NORMALIZATIONS.some((each) => each.note.includes(emDash) || each.note.includes('Deadwax')), false)

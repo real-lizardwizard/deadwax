@@ -966,3 +966,68 @@ surviving checks). **Checked in a real page** (my own instance, stand-ins): `/`,
 sign-in at `/player/`, then Home), with no request for `/scripts/`, main.css or deadwax-ui.js and nothing in the
 console. **NOT verified - James's**: the home-screen icon on his iPhone, an old bookmark or icon for `/`, and an
 old `/` tab reloaded.
+
+### Settings described for the person using them (2.0.1)
+
+James, 2026-10-23, right after 2.0.0: "let's clean up the settings. I need the descriptions to be more user
+oriented and not testing oriented. Like where gapless says 'an experiment' is unacceptable." The words had been
+written while each feature was on trial on his phone, so some said how a thing was built or how it compared
+with before rather than what it does for you. Words only: no behaviour, default, setting name, value or route
+changed, and the engine files have no diff.
+
+**You.** Every note says what the setting does and when you'd change it. Gapless: "Plays one song straight into
+the next. In Safari and Chrome, FLAC albums play through with no pause at all, as they were recorded; other songs
+change with a much shorter pause. It downloads the next song ahead, which uses more data, and on a slow
+connection that can stop helping: turn it off if song changes are no quicker" - the guide's own advice (Gapless
+never stops the music; on a slow connection it costs data and stops helping), and the one stream's browsers
+(it is still off by default - the words don't tell anyone to leave it on). Getting albums' note now says what
+both "When I tap Get" choices mean (Pick the best shows the sources instead when nothing matches well, or when you
+already have the album or are getting it - autoPickBlocked's other cases, so no "only"); Now Playing opens as, Pause winds the record down and Normalization's notes
+were tightened, the first two ending "For phones: a big screen has no Now Playing view" / "... has no turntable"
+(You shows them on a desktop too, where they change nothing; "big screen", not "desktop", because app-rules.sim
+holds You.tsx free of the word - You is told no frame); the closing line no longer counts the settings ("All five"). Maximum quality's two notes keep
+every fact the sim holds them to (88.2 to 384 kHz, 48 or 44.1 kHz, lossless 24-bit, "with Gapless on", 3 dB
+quieter with Normalization off - HEADROOM_DB) in plainer words. Original says hi-res songs are sent "at their own rate, in case a USB DAC can play them at
+it" - not "exactly as they are" (Normalization, on by default, levels them under Original too) and not "the
+choice for a USB DAC" (whether an iPhone ever runs one at a song's own rate isn't known: player.md's Maximum
+quality and Known gaps); settings.sim holds both out.
+Normalization's Off no longer measures itself against "before this setting": "No levelling: every song plays
+exactly as the file is, bit for bit, unless Maximum quality converts it."
+
+**Server settings.** For an admin running a home server: the intro line says a saved change takes effect at once
+and is used instead of the compose file's value until reverted; SLSKD_URL, SLSKD_APIKEY, the picture keys,
+MUSICBRAINZ_EMAIL, the three Navidrome rows, DEADWAX_SECRET_KEY, DEADWAX_ADMIN_PASSWORD, LIBRARY_PATH,
+SLSKD_INCOMPLETE_PATH, DB_PATH (and its locked reason), the player cache's two rows (no longer "for Safari"
+alone: the cache holds what iPhones and Safari seek in, Gapless's stream and the resampled and levelled copies
+too), the shared-account lock ("deadwax's own Navidrome account, which deadwax uses for its own work and for
+anything that isn't one person's" - with logins on each person plays as their own, as the row beside it says),
+PLAYER_CACHE_MB's "a few GB suits it better" (said only at the default or under it, never to an admin who gave
+the cache more), the organizing verdict's blockers and the group's note (ORGANIZE_MODE "is set to Off" / "Dry
+run", the dropdown's words, not `'dry_run'`; organizing is "the only setting here that files or moves your
+music", since the caches write files too), and the notes of When a download fails ("the sources", the app's word, not "the
+candidates list"), Cover art (Get cover and the Edit panel, not "the metadata editor") and Lyrics (an album's Get
+lyrics). AUTO_RETRY_PEER's off line named a button the app doesn't have ("Try next peer"); it is **Next peer**,
+in Requests - configuration.md and .env.example's AUTO_RETRY_PEER comment ("in the downloads panel" too) said
+the same and are fixed with it. ORGANIZE_MODE's dropdown names its modes Off,
+Dry run, Copy and Move (ORGANIZE_MODE_CHOICES; the values stay `off`/`dry_run`/`copy`/`move`, and the Organize
+modes list under the group still shows them as compose takes them). The rows are still titled by their
+environment names: an admin types those into compose, so they are words a person acts on.
+
+**Docs.** player.md's "Gapless playback (experimental)" is "Gapless playback" (its anchor `#gapless-playback`,
+every link to it changed), the README's "Gapless, as an experiment" and troubleshooting's "is an experiment" went,
+and player.md's and configuration.md's Normalization Off and By song match the app (Off keeps "unless Maximum
+quality converts it" in both, and player.md's "Off is bit-perfect" no longer measures itself against "before
+this setting existed" - nor says the file is sent "exactly as it is", which a 24/192 FLAC resampled under the
+default Up to 48 kHz is not: it is the file itself "unless Maximum quality converts it"). player.md's "What still needs
+trying on a real iPhone" is a section of the guide, not a setting's words, and is left.
+
+**Pinned**: tests/test_settings_words.py - no word "experiment", "trial", "test", "verified" or a build number
+in the settings route's answer (a plain install, a filled-in one, a broken one reaching every "unrecognised"
+branch, as an admin sees it and as someone given Settings and the log does), in the tables the rows are drawn
+from, in any string literal of src/routes/settings.py but its docstrings, or in the comment-stripped source of
+You's and Server settings' files; ORGANIZE_MODE's labels are words over the same values, and the blockers and
+the group note use them; PLAYER_CACHE_MB's advice only at or under the default; the shared-account lock never
+says everything goes through deadwax's account; configuration.md's Normalization Off and player.md's "Off is
+bit-perfect" keep Maximum quality's exception; .env.example names Next peer in Requests, never "Try next peer". you.sim scans
+everything You draws (About's version taken out) and pins the new notes word for word; settings.sim scans the
+choices' labels and notes and pins Maximum quality's and Normalization's word for word.

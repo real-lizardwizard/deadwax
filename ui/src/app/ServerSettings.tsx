@@ -255,8 +255,8 @@ export function ServerSettings({
       {header}
       <div class="app-settings-body">
         <p class="app-settings-line">
-          What deadwax itself runs with, from your compose file or <code>.env</code>. Changing one here stores an override
-          that wins over the environment and applies without a restart. Your own choices - what Get does, the quality
+          How deadwax runs, as your compose file or <code>.env</code> sets it. A change saved here takes effect at once, with
+          no restart, and is used instead of what the file says until you revert it. Your own choices - what Get does, the quality
           floor, Format and whether cancelling asks first - are in You, under Getting albums.
         </p>
 

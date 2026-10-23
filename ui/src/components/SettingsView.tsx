@@ -222,7 +222,7 @@ export function OrganizeModes({ modes }: { modes: ServerSettings['organize_modes
   return (
     <Section
       title="Organize modes"
-      note="What ORGANIZE_MODE can be set to, least to most destructive."
+      note="What each ORGANIZE_MODE does with a finished download, from the safest to the one that moves files."
     >
       <div class="settings-env-list">
         {Object.entries(modes).map(([mode, description]) => (

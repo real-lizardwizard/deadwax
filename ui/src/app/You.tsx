@@ -73,7 +73,7 @@ function fromNavidrome(status: NavidromeStatus): CheckState {
  *   2.0.0-player.10, where it was a switch), "Now Playing opens as" (LookChoice.tsx,
  *   2.0.0-player.11: the cover or the turntable - App keeps it, and hands it here), "Pause winds the
  *   record down" (WindDownChoice.tsx, 2.0.0-player.14: the turntable's pause - App keeps it too),
- *   and Maximum quality, moved here from the player's settings sheet with its words unchanged - and
+ *   and Maximum quality, moved here from the player's settings sheet - and
  *   (2.0.0-player.62) Normalization after it (NormalizationChoice.tsx: Automatic, By song, By album, Off -
  *   read at each play, never by the engine). All five are kept per device. Gapless is handed the player itself, whose `setGapless` it calls in the tap:
  *   this page names no playback action of its own (ui/test/app-rules.sim.cjs).
@@ -94,6 +94,11 @@ function fromNavidrome(status: NavidromeStatus): CheckState {
  *   library (your starred albums in Navidrome) holds, what still waits to be starred and why ("sign in
  *   again" when Navidrome no longer takes your login), and what the admin deleted, to request again or
  *   put away. Nothing with logins off.
+ *
+ * THE WORDS (2.0.2, James: "I need the descriptions to be more user oriented and not testing oriented"):
+ * every note under a choice says what it does for the person and when they'd pick it - never how it was
+ * built or tried. tests/test_settings_words.py and you.sim scan for test-note words; you.sim and settings.sim
+ * pin the words themselves.
  *
  * It works with Navidrome unset or down: nothing here waits on it. A page, so it reads the player
  * from context; `shown` is App's word that the tab has been opened at least once, `current` that it
@@ -211,11 +216,11 @@ export function You({
         </h2>
         <GettingChoices settings={getting.settings} onChoose={(values) => void chooseGetSettings(values)} />
         <p id="app-get-note" class="app-footnote">
-          With “Pick the best source for me”, Get takes the best match that passes your quality floor,
-          and shows you the sources when nothing matches well. The floor is also what the sources
-          start filtered by. Format changes how sources are scored: Prefer lossless ranks lossless
-          folders higher, and Lossless only leaves out folders with no lossless file. All three are
-          kept for you on deadwax, not on this device.
+          “Show me the sources” lets you choose each download yourself. “Pick the best source for me”
+          downloads the best match that meets your quality floor, and shows you the sources instead when
+          nothing matches well, or when you already have the album or are getting it. The quality floor is also what the sources start filtered to. Format:
+          Prefer lossless ranks lossless downloads higher, and Lossless only leaves out anything without
+          a lossless file. All three are kept for you on deadwax, so they follow you to every device.
         </p>
         {/* what went wrong keeping those three, right under them and their note - never under this
             device's own setting below, which deadwax's database has no part in */}
@@ -245,27 +250,31 @@ export function You({
         </h2>
         <GaplessChoice player={player} />
         <p id="app-gapless-note" class="app-footnote app-choice-gap">
-          An experiment: it shortens the pause between songs, and FLAC songs played one after
-          another can join in one stream, with none at all.
+          Plays one song straight into the next. In Safari and Chrome, FLAC albums play through with no
+          pause at all, as they were recorded; other songs change with a much shorter pause. It
+          downloads the next song ahead, which uses more data, and on a slow connection that can stop
+          helping: turn it off if song changes are no quicker.
         </p>
         <LookChoice look={opensAs} onChange={onOpensAs} />
         <p id="app-look-note" class="app-footnote app-choice-gap">
-          The button at the top right of Now Playing switches between them until it closes.
+          What you see first when you open Now Playing. The button at its top right switches between
+          the two while it's open. For phones: a big screen has no Now Playing view.
         </p>
         <WindDownChoice on={windDown} onChange={onWindDown} />
         <p id="app-wind-down-note" class="app-footnote app-choice-gap">
-          The turntable only: pausing from it slows the record's sound to a stop over about a second,
-          as a real deck does. Off, it stops at once. The cover's pause is always instant.
+          On the turntable, pausing slows the music to a stop over about a second, as a real record
+          deck does. Turn it off to stop at once. Pausing from the cover always stops at once. For
+          phones: a big screen has no turntable.
         </p>
         <QualityChoice player={{ maxRate: player.maxRate, setMaxRate: actions.setMaxRate }} />
         <NormalizationChoice />
         <p id="app-normalization-note" class="app-footnote app-choice-gap">
-          Used from the next thing you play. FLAC songs only - others play as they are. deadwax measures an
-          album the first time it levels it, which can make its first song wait a few seconds.
+          Evens out FLAC songs only - other files play as they are. The first time an album is levelled,
+          deadwax measures it, so its first song can take a few seconds to start.
         </p>
         <p class="app-footnote">
-          All five are kept on this device. Maximum quality is used from the next song, Normalization from the
-          next thing you play.
+          These are kept on this device. Maximum quality changes from the next song, and Normalization from
+          the next thing you play.
         </p>
       </section>
 

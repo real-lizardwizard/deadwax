@@ -463,7 +463,7 @@ class Config:
     #? on | off. When a download fails, move it to the next peer from the list it was picked
     #? from, by itself (v0.9.12). Off by default: the next peer down is ranked against the same
     #? release but may be a different pressing or a worse rip, and that is a choice somebody
-    #? should see being made. "Try next peer" on a failed download works either way.
+    #? should see being made. "Next peer" on a failed download, in Requests, works either way.
     AUTO_RETRY_PEER = _env("AUTO_RETRY_PEER", "off")
 
     #? Seconds slskd listens for answers to a Soulseek search (v0.9.16). Peers answer over
@@ -622,9 +622,8 @@ class Config:
     #? Why each of these cannot be edited here, in words the settings tab renders verbatim.
     NOT_EDITABLE = {
         "DB_PATH": (
-            "This is the database the overrides are stored in, so changing it here would "
-            "move the file out from under the setting that changed it. Set it in your "
-            "compose file."
+            "Set it in your compose file: the changes saved on this page are kept in this "
+            "database, so it can't be moved from here."
         ),
         #? (2.0.0-player.48) logins: the environment's alone - see AUTH_MODE above
         **{name: LOGINS_LOCKED for name in LOGIN_SETTINGS},

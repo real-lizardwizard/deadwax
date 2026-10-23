@@ -164,7 +164,7 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
   source for me**), the **Quality floor** (Any, 320 kbps, Lossless, 24-bit) and **Format** (Any, Prefer lossless, Lossless only - what a Get's sources are scored
   by), kept for you on deadwax rather than on the device (see [configuration](configuration.md#your-settings-in-the-app-per-user-on-deadwax)),
   then **Confirm before cancelling**, which is this device's;
-  **Gapless** ([below](#gapless-playback-experimental)), **Now Playing opens as** and
+  **Gapless** ([below](#gapless-playback)), **Now Playing opens as** and
   **Pause winds the record down** ([the turntable](#the-turntable)), **Maximum quality**
   ([below](#maximum-quality-hi-res-at-48-khz)) and **Normalization** ([below](#normalization)) under **Playback**;
   **Connections**, whether deadwax can reach MusicBrainz, slskd and Navidrome, checked the first
@@ -371,7 +371,7 @@ shuffled queue, which Up Next can then put back in order.
 | **All** | the next song - on the list's last, its first | as off; the song before can be the last of the time round before | the next song | never reached: the list again from the top, in its own order or, with Shuffle on, a new one that never starts with the song that just ended. Songs you added play once, not every time round |
 | **One** | the next song that isn't this one - and Repeat One repeats that one from then | past 3 seconds the song again, else the song before its repeats | the song again from its start | - |
 
-With [Gapless](#gapless-playback-experimental) on, FLAC played [in one stream](#one-stream-for-flac) loops
+With [Gapless](#gapless-playback) on, FLAC played [in one stream](#one-stream-for-flac) loops
 sample to sample: Repeat All's wrap from the last song to the first, and Repeat One's song into itself, are
 joins like an album's, 0 ms in Debug. Anything else - an MP3, or Gapless off - starts the song again the way
 any next song starts. A song heard again because of Repeat counts as a play again each time
@@ -1468,7 +1468,7 @@ numbers off an iPhone over plain `http://`.
 well as heard; it moves only while the record sounds. And **How the sound is running** at the foot
 of the page shows Info > Debug's two turntable rows.
 
-## Gapless playback (experimental)
+## Gapless playback
 
 Between two songs there's normally a short pause, about a second on an iPhone over a VPN: when
 one song ends, the phone has to ask deadwax for the next one and start it from nothing. **Gapless**, a checkbox in **You** under **Playback**, closes that gap. It's **off** by default.
@@ -1803,10 +1803,10 @@ on AirPods and a desktop on speakers can each have their own. Four choices:
 - **Automatic** (the default): an album you play keeps one level for the whole album, so its quiet
   songs stay quiet beside its loud ones. Anything else - a playlist, a shuffle, a song you add with
   Play Next - is levelled song by song.
-- **By song**: every song brought to the same loudness, even inside an album.
+- **By song**: every song brought to the same loudness, even the quiet and loud songs of one album.
 - **By album**: every song at its album's level, even when it plays on its own or in a playlist.
-- **Off**: every song sent exactly as before this setting: the file itself, bit for bit, unless
-  Maximum quality resamples it.
+- **Off**: no levelling: every song plays exactly as the file is, bit for bit, unless Maximum
+  quality converts it.
 
 What Automatic counts as playing an album:
 
@@ -1828,8 +1828,8 @@ What Automatic counts as playing an album:
 play after upgrading, most music comes out quieter: a modern master is usually brought down 6 to 12 dB.
 Turn the volume up. **Off** puts it back exactly as it was.
 
-**Off is bit-perfect.** deadwax sends exactly what it sent before this setting existed: the same
-addresses, the same bytes.
+**Off is bit-perfect.** deadwax sends exactly what it sends with no levelling at all: the same addresses
+and the same bytes - the file itself, unless Maximum quality converts it.
 
 **Only FLAC is levelled.** MP3, AAC, Opus and other lossy files play as they are (re-encoding them would
 cost quality), so an MP3 can be louder or quieter than the songs around it. Info says so. Nor is every
@@ -2251,7 +2251,7 @@ fixes that.
 ## Known gaps
 
 - **Gapless playback**: there's a short gap between songs, unless you tick the
-  [experimental Gapless setting](#gapless-playback-experimental) in You.
+  [Gapless](#gapless-playback) in You.
 - **Hi-res through a USB DAC**: whether Safari ever runs a DAC at a song's own rate is unknown.
 - **Play from the lock screen after a long pause** may do nothing until the app is opened: iOS
   puts a web page that isn't playing to sleep. See

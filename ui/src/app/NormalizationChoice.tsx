@@ -23,7 +23,7 @@ export const NORMALIZATIONS: { value: Normalization; label: string; note: string
   {
     value: 'song',
     label: 'By song',
-    note: 'Every song brought to the same loudness, even inside an album.',
+    note: 'Every song brought to the same loudness, even the quiet and loud songs of one album.',
   },
   {
     value: 'album',
@@ -33,7 +33,7 @@ export const NORMALIZATIONS: { value: Normalization; label: string; note: string
   {
     value: 'off',
     label: 'Off',
-    note: 'Every song sent exactly as before this setting: the file itself, bit for bit, unless Maximum quality resamples it.',
+    note: 'No levelling: every song plays exactly as the file is, bit for bit, unless Maximum quality converts it.',
   },
 ]
 

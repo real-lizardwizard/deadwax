@@ -76,6 +76,10 @@ ORGANIZE_MODES = {
     "move": "Move into the library",
 }
 
+#? What ORGANIZE_MODE's dropdown names each mode (2.0.2): the values stay ORGANIZE_MODES' own, what compose takes,
+#? and the Organize modes list under the group names them by those.
+ORGANIZE_MODE_CHOICES = {"off": "Off", "dry_run": "Dry run", "copy": "Copy", "move": "Move"}
+
 #? What COUNTRY_IN_FOLDER can be set to, as the dropdown names them.
 COUNTRY_CHOICES = {
     "off": "Leave the country out of folder names",
@@ -255,10 +259,9 @@ def _navidrome_rows() -> list[dict]:
             "NAVIDROME_URL",
             url,
             effect=(
-                "The Navidrome the player at /player/ plays from. deadwax passes the player's "
-                "requests on to it, so this is Navidrome's address as seen from inside THIS "
-                "container, with its base path if it has one - and the phone only ever needs to "
-                "reach deadwax. Changing it takes the password again, typed with it"
+                "Your Navidrome's address as deadwax's container reaches it, with its base path if it has "
+                "one. The app plays and shows your library from it, through deadwax, so your phone only "
+                "needs to reach deadwax. Changing the address means typing the password again with it"
             ),
             status="error" if url_problem or (partial and not url) else None,
             detail=f"unusable: {url_problem}" if url_problem else (missing if partial and not url else None),
@@ -268,12 +271,11 @@ def _navidrome_rows() -> list[dict]:
             "NAVIDROME_USER",
             Config.NAVIDROME_USER,
             effect=(
-                "The Navidrome account the player plays as with logins off. Its play counts (and "
-                "Last.fm or ListenBrainz scrobbles, if that account has them) are recorded there. With "
-                "logins on each person plays as their own account, and this one still fetches songs "
-                "into the player's cache, answers what is nobody's in particular, and plays for the "
-                "break-glass admin - so with Navidrome's per-user libraries it needs every library. It "
-                "doesn't need to be an admin - a non-admin account of your own is the one to use"
+                "deadwax's own Navidrome account. With logins off everyone plays as it, so its play counts "
+                "(and Last.fm or ListenBrainz scrobbles, if it has them) are recorded there. With logins on "
+                "each person plays as their own account, and deadwax still uses this one for its own work "
+                "and for the break-glass sign-in, so give it every library. It doesn't need to be an admin - "
+                "a non-admin account of your own is the one to use"
             ),
             status="error" if partial and not Config.NAVIDROME_USER else None,
             detail=missing if partial and not Config.NAVIDROME_USER else None,
@@ -283,7 +285,7 @@ def _navidrome_rows() -> list[dict]:
             Config.NAVIDROME_PASSWORD,
             secret=True,
             effect=(
-                "That account's password. It stays in deadwax: the phone is never sent it, or "
+                "That account's password. It never leaves deadwax: no phone or browser is sent it, or "
                 "anything made from it"
             ),
             status="error" if partial and not Config.NAVIDROME_PASSWORD else None,
@@ -323,8 +325,8 @@ def _logins_rows() -> list[dict]:
             secret=True,
             required=on,
             effect=(
-                "Encrypts the Navidrome login each signed-in person's session keeps in deadwax's database, "
-                "and seals the break-glass sign-in. Logins don't work without it"
+                "Keeps sign-ins safe: it encrypts the Navidrome login deadwax saves for each person who signs "
+                "in, and protects the break-glass sign-in. Logins don't work without it"
             ),
             status="error" if on and key_problem else None,
             detail=f"DEADWAX_SECRET_KEY {key_problem}" if on and key_problem else None,
@@ -334,8 +336,9 @@ def _logins_rows() -> list[dict]:
             Config.DEADWAX_ADMIN_PASSWORD,
             secret=True,
             effect=(
-                "The break-glass sign-in: as deadwax, with this password, for when Navidrome is down or nobody "
-                "is a Navidrome admin. It needs neither Navidrome nor the database, and lasts 12 hours"
+                "The break-glass sign-in, a way in for when Navidrome is down or nobody is a Navidrome admin: "
+                "sign in as deadwax with this password. It works without Navidrome, and lasts 12 hours. "
+                "Unset, there is no such sign-in"
             ),
             #? (2.0.0-player.65) a short one said - never refused: it is the way in during an emergency
             status="error" if on and short else None,
@@ -346,8 +349,8 @@ def _logins_rows() -> list[dict]:
 
 #? What the player's cache is, for both of its rows.
 PLAYER_CACHE_IS = (
-    "Only a cache: safe to delete at any time, and a song that isn't in it is made again from "
-    "Navidrome the next time Safari plays it, which only makes that first play start a moment later"
+    "Only a cache: safe to delete at any time. A song that isn't in it is prepared again the next "
+    "time it plays, which only makes it start a moment later"
 )
 
 
@@ -372,14 +375,15 @@ def _player_cache_rows() -> list[dict]:
     where = f" ({folder})" if folder is not None else ""
     if configured:
         path_effect = (
-            f"Where the player keeps FLAC songs repackaged as MP4s for Safari and iPhones, whose "
-            f"seeks land only in an MP4 - in a folder of its own inside this one{where}, which "
-            f"deadwax makes private and touches nothing else beside. Best on a fast disk (an SSD). "
-            f"{PLAYER_CACHE_IS}"
+            f"Where the player keeps the copies of songs it prepares from Navidrome's files - so "
+            f"iPhones and Safari seek exactly, Gapless joins songs, and hi-res or levelled songs play "
+            f"as you chose - in a private folder of its own inside this one{where}. deadwax touches "
+            f"nothing else there. Best on a fast disk (an SSD). {PLAYER_CACHE_IS}"
         )
     else:
         path_effect = (
-            f"Unset: the player keeps FLAC songs repackaged as MP4s for Safari and iPhones in the "
+            f"Unset: the player keeps the copies of songs it prepares - so iPhones and Safari seek "
+            f"exactly, Gapless joins songs, and hi-res or levelled songs play as you chose - in the "
             f"container's temporary space{where}, which starts empty with every new container. Set "
             f"it to a folder mounted from a fast disk (an SSD) to keep them there; deadwax makes a "
             f"private folder of its own inside it. {PLAYER_CACHE_IS}"
@@ -388,11 +392,14 @@ def _player_cache_rows() -> list[dict]:
     megabytes = parse_player_cache_mb(Config.PLAYER_CACHE_MB)
     low, high = PLAYER_CACHE_MB_RANGE
     used = megabytes or DEFAULT_PLAYER_CACHE_MB
+    #? (2.0.2, after review) the advice only where it holds: at the default or under it, never to an admin who
+    #? has already given the cache more
+    advice = ", so a few GB suits it better" if used <= DEFAULT_PLAYER_CACHE_MB else ""
     size_effect = (
         f"The player's cache holds at most {used} MB of songs, the ones played longest ago cleared "
-        f"first (a CD-quality song is 20-60 MB). A song being made has a second copy of itself on "
-        f"disk until it is done. When the disk runs short, older songs are cleared to make room, and "
-        f"if there still isn't enough Safari is sent the FLAC instead"
+        f"first (a CD-quality song is 20-60 MB{advice}). When the disk runs short, older songs "
+        f"are cleared to make room, and if there still isn't enough, the song plays from its "
+        f"original file instead"
     )
     if megabytes is None:
         size_effect = f"unrecognised, so {DEFAULT_PLAYER_CACHE_MB} is used. {size_effect}"
@@ -552,9 +559,9 @@ def _musicbrainz_rows() -> list[dict]:
             #? not required while an old user agent is supplying the contact - nothing is broken
             required=source != "MUSICBRAINZ_USERAGENT",
             effect=(
-                "Your email address. MusicBrainz asks every app for a way to reach whoever is "
-                "making its requests, and rate limits the ones without - deadwax writes the "
-                f"rest of the user agent itself, so it always names the version running. {sent}"
+                "Your email address, sent with every MusicBrainz request: MusicBrainz asks for a way to "
+                "reach whoever is asking, and slows down apps that give none. deadwax adds its own name "
+                f"and version. {sent}"
             ),
             status="error" if email_problem else None,
             detail=f"MUSICBRAINZ_EMAIL {email_problem}" if email_problem else None,
@@ -639,7 +646,7 @@ def _auto_retry_row() -> dict:
             "A download that fails moves to the next peer from the list you picked it from, "
             "up to three asks each time, skipping any peer already tried"
             if value == "on"
-            else "A failed download waits for you - 'Try next peer' on its row moves it on. The "
+            else "A failed download waits for you - Next peer, on it in Requests, moves it on. The "
                  "next peer down may be a different pressing or a worse rip, which is why this "
                  "is off unless you turn it on"
         ),
@@ -791,8 +798,8 @@ def _lyrics_lead_row() -> dict:
 #? (people.refusals' SHARED_ACCOUNT), so anyone who set it to their own account would put themselves past People -
 #? their grants could no longer be taken away there - and have everything deadwax asks as itself asked as them.
 _SHARED_ACCOUNT_LOCK = (
-    "Only an admin can change this: it is deadwax's own Navidrome account, which People keeps out of reach, and "
-    "everything deadwax asks Navidrome as itself is asked as it"
+    "Only an admin can change this: it is deadwax's own Navidrome account, which deadwax uses for its own work "
+    "and for anything that isn't one person's"
 )
 ADMINS_ONLY = {
     "NAVIDROME_URL": (
@@ -873,10 +880,10 @@ async def settings():
     elif library_status == "error":
         organizing_blockers.append("LIBRARY_PATH is not usable")
     if organize_mode == "off":
-        organizing_blockers.append("ORGANIZE_MODE is 'off'")
+        organizing_blockers.append("ORGANIZE_MODE is set to Off")
     elif organize_mode == "dry_run":
         organizing_blockers.append(
-            "ORGANIZE_MODE is 'dry_run', so organizing reports what it would do and writes nothing"
+            "ORGANIZE_MODE is set to Dry run, so organizing reports what it would do and writes nothing"
         )
 
     return {
@@ -897,9 +904,8 @@ async def settings():
                         Config.SLSKD_URL,
                         required=True,
                         effect=(
-                            "The slskd instance searches and downloads go through. Every request "
-                            "to it carries the API key, so changing it takes the key again, "
-                            "typed with it"
+                            "Your slskd, which searches Soulseek and downloads for deadwax. Changing "
+                            "the address means typing the API key again with it"
                         ),
                         status="error" if url_problem else "ok",
                         detail=(
@@ -917,16 +923,16 @@ async def settings():
                         Config.SLSKD_APIKEY,
                         required=True,
                         secret=True,
-                        effect="Authenticates against slskd; downloads fail without it",
+                        effect="slskd's API key. Searches and downloads don't work without it",
                     ),
                     _setting(
                         "THEAUDIODB_KEY",
                         Config.THEAUDIODB_KEY,
                         secret=True,
                         effect=(
-                            "One of the two sources of artist banners, logos and backgrounds. "
-                            "Without either, an artist still gets a photo from Wikimedia "
-                            "Commons where there is one"
+                            "Optional: banners, logos and backgrounds for artist pages, from "
+                            "TheAudioDB. Without this or a fanart.tv key, an artist still gets a "
+                            "photo from Wikimedia Commons where there is one"
                         ),
                     ),
                     _setting(
@@ -934,9 +940,9 @@ async def settings():
                         Config.FANARTTV_KEY,
                         secret=True,
                         effect=(
-                            "The other, and the one whose artwork is voted on by the people "
-                            "using it. fanart.tv issues this key per application, so it has to "
-                            "be registered by you at fanart.tv rather than shipped with deadwax"
+                            "Optional: artist pictures and CD art from fanart.tv, voted on by the "
+                            "people using it. fanart.tv gives each app its own key, so get one of "
+                            "your own there - deadwax can't come with one"
                         ),
                     ),
                     _setting(
@@ -944,9 +950,8 @@ async def settings():
                         Config.FANARTTV_PERSONAL_KEY,
                         secret=True,
                         effect=(
-                            "Optional, and only alongside the key above: your own fanart.tv "
-                            "account key, which shows images added in the last week rather than "
-                            "waiting for them"
+                            "Optional, and only with the key above: your own fanart.tv account "
+                            "key, so images added in the last week show too"
                         ),
                     ),
                     *_musicbrainz_rows(),
@@ -986,9 +991,9 @@ async def settings():
                         "LIBRARY_PATH",
                         Config.LIBRARY_PATH,
                         effect=(
-                            "Where organized music is filed, and what Needs a look, Library care, the "
-                            "Edit panel and the \"already have it\" checks read. The Library tab shows "
-                            "what Navidrome has scanned"
+                            "Your music library: where finished downloads are filed, and what Needs a "
+                            "look, Library care, the Edit panel and the \"already have it\" checks read. "
+                            "Point Navidrome at the same music - the Library tab shows what it has scanned"
                         ),
                         status=library_status,
                         detail=library_detail,
@@ -997,11 +1002,10 @@ async def settings():
                         "SLSKD_INCOMPLETE_PATH",
                         Config.SLSKD_INCOMPLETE_PATH,
                         effect=(
-                            "The slskd partial-download folder. Optional: set it and cancelling "
-                            "a download also deletes its half-finished file, and the empty "
-                            "folders slskd leaves behind there are cleared every ten minutes. "
-                            "Leave it unset and slskd keeps the partial so a retry can resume "
-                            "from it"
+                            "Optional: slskd's folder for unfinished downloads. Set it, and "
+                            "cancelling a download also deletes its half-finished file, and the "
+                            "empty folders slskd leaves there are cleared every ten minutes. Unset, "
+                            "slskd keeps the partial file so a retry can carry on from it"
                         ),
                         status=incomplete_status,
                         detail=incomplete_detail,
@@ -1010,8 +1014,9 @@ async def settings():
                         "DB_PATH",
                         Config.DB_PATH,
                         effect=(
-                            "The sqlite file holding job state and the metadata queue. Needs "
-                            "to be on a persistent volume or you lose it on every restart"
+                            "deadwax's database: downloads, everyone's choices and libraries, sign-ins, "
+                            "and the changes saved on this page. Keep it on a persistent volume, or it "
+                            "is lost whenever the container is recreated"
                         ),
                     ),
                     *_player_cache_rows(),
@@ -1021,15 +1026,15 @@ async def settings():
                 "id": "organizing",
                 "label": "Organizing",
                 "note": (
-                    "Organizing is the only thing here that writes to your filesystem, which "
-                    "is why it starts in dry_run."
+                    "Organizing is the only setting here that files or moves your music, which "
+                    "is why it starts in Dry run."
                 ),
                 "settings": [
                     _setting(
                         "ORGANIZE_MODE",
                         organize_mode,
                         effect=ORGANIZE_MODES.get(
-                            organize_mode, "unrecognised - the organizer falls back to dry_run"
+                            organize_mode, "unrecognised - the organizer falls back to Dry run"
                         ),
                         status="ok" if organize_known else "error",
                         detail=(
@@ -1037,7 +1042,7 @@ async def settings():
                             if organize_known
                             else f"expected one of {', '.join(ORGANIZE_MODES)}"
                         ),
-                        choices={mode: mode for mode in ORGANIZE_MODES},
+                        choices=ORGANIZE_MODE_CHOICES,
                     ),
                     _country_row(),
                     _album_folder_row(),
@@ -1055,9 +1060,9 @@ async def settings():
                 "id": "downloads",
                 "label": "When a download fails",
                 "note": (
-                    "A download keeps the rest of the candidates list it was picked from, as "
-                    "it was shown - your filters and sort - so a failed one can move to the "
-                    "next peer instead of starting the search again."
+                    "A download keeps the rest of the sources it was picked from, as they were "
+                    "shown - your filters and sort - so a failed one can move to the next peer "
+                    "without searching again."
                 ),
                 "settings": [_auto_retry_row()],
             },
@@ -1065,9 +1070,9 @@ async def settings():
                 "id": "cover-art",
                 "label": "Cover art",
                 "note": (
-                    "What 'Get cover' and the metadata editor save into an album's folder, from "
-                    "the Cover Art Archive. Covers already on disk are kept - replace one from "
-                    "the metadata editor, where you can compare the two first."
+                    "The size of cover Get cover and the Edit panel save into an album's folder, "
+                    "from the Cover Art Archive. A cover already on disk is kept - replace it from "
+                    "the album's Edit panel, where you can compare the two first."
                 ),
                 "settings": [_cover_art_row()],
             },
@@ -1077,9 +1082,9 @@ async def settings():
                 "note": (
                     "From LRCLIB, saved as a .lrc file beside each track - synced where LRCLIB "
                     "has timings, which Navidrome, Jellyfin and Kodi all read. A .lrc already "
-                    "there is never replaced. 'Get lyrics' in the library works whatever this "
-                    "is set to. A new lead applies to lyrics fetched from then on; re-time the "
-                    "ones already saved below."
+                    "there is never replaced. An album's Get lyrics works whatever this is set "
+                    "to. A new lead applies to lyrics fetched from then on; re-time the ones "
+                    "already saved below."
                 ),
                 "settings": [_lyrics_row(), _lyrics_lead_row()],
             },

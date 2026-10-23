@@ -1728,8 +1728,8 @@ the window instead, and works the same.
 
 ## With Gapless on, there's still a pause between songs, or the player reloads by itself
 
-[Gapless](player.md#gapless-playback-experimental) (in **You**, under **Playback**) is an
-experiment, and **Info → Debug** (**•••** on the now-playing screen, then **Info**, then **Debug** - an
+[Gapless](player.md#gapless-playback) (in **You**, under **Playback**) depends on the
+device and the connection, and **Info → Debug** (**•••** on the now-playing screen, then **Info**, then **Debug** - an
 admin's, and read on the device it's about: see [Info has no Debug tab](#info-has-no-debug-tab-or-it-went)) says how each song change went, in its **Gap** row. Compare it with Gapless off on the same phone
 and connection: the difference is what Gapless saves.
 

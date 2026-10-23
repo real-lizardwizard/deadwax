@@ -146,7 +146,7 @@ def test_dry_run_is_reported_as_a_blocker_even_when_everything_else_is_right(
     organizing = call_settings()["organizing"]
 
     assert organizing["enabled"] is False
-    assert any("dry_run" in blocker for blocker in organizing["blockers"])
+    assert any("Dry run" in blocker for blocker in organizing["blockers"])
 
 
 def test_every_missing_prerequisite_is_listed_not_just_the_first(monkeypatch):
@@ -163,7 +163,7 @@ def test_every_missing_prerequisite_is_listed_not_just_the_first(monkeypatch):
     assert len(blockers) == 3
     assert any("SLSKD_DOWNLOAD_PATH" in b for b in blockers)
     assert any("LIBRARY_PATH" in b for b in blockers)
-    assert any("off" in b for b in blockers)
+    assert any("set to Off" in b for b in blockers)
 
 
 def test_a_fully_configured_move_setup_reports_organizing_as_active(monkeypatch, tmp_path):

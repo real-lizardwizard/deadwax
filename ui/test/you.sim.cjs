@@ -265,18 +265,25 @@ async function main() {
   const winds = named('WindDownChoice')[0]
   winds?.props.onChange(false)
   check('Pause winds the record down is handed App\'s setting, and App\'s way to change it', [winds?.props.on, chosenWindDowns], [true, [false]])
-  check('the notes: what Gapless does, where the button is, what winding down does, what Normalization does, and where all five are kept', notes, [
-    'An experiment: it shortens the pause between songs, and FLAC songs played one after another can join in one stream, with none at all.',
-    'The button at the top right of Now Playing switches between them until it closes.',
-    "The turntable only: pausing from it slows the record's sound to a stop over about a second, as a real deck does. Off, it stops at once. The cover's pause is always instant.",
-    'Used from the next thing you play. FLAC songs only - others play as they are. deadwax measures an album the first time it levels it, which can make its first song wait a few seconds.',
-    'All five are kept on this device. Maximum quality is used from the next song, Normalization from the next thing you play.',
+  check('the notes: what Gapless does, where the button is, what winding down does, what Normalization does, and that they are kept on this device', notes, [
+    'Plays one song straight into the next. In Safari and Chrome, FLAC albums play through with no pause at all, as they were recorded; other songs change with a much shorter pause. It downloads the next song ahead, which uses more data, and on a slow connection that can stop helping: turn it off if song changes are no quicker.',
+    "What you see first when you open Now Playing. The button at its top right switches between the two while it's open. For phones: a big screen has no Now Playing view.",
+    'On the turntable, pausing slows the music to a stop over about a second, as a real record deck does. Turn it off to stop at once. Pausing from the cover always stops at once. For phones: a big screen has no turntable.',
+    'Evens out FLAC songs only - other files play as they are. The first time an album is levelled, deadwax measures it, so its first song can take a few seconds to start.',
+    'These are kept on this device. Maximum quality changes from the next song, and Normalization from the next thing you play.',
   ])
+  //? (2.0.1) James: "I need the descriptions to be more user oriented and not testing oriented" - every word You
+  //? draws, its notes and headings included, says what a setting does, never how it was tried
+  check('nothing You draws reads as a test note: no "experiment", "trial", "test", "verified" or build number (2.0.1)',
+    //? About's Version row is the one place a build number belongs: what deadwax answered, taken out
+    text(tree).replace(ME.version, '').match(/experiment|\btrial|\bverified\b|\btest(s|ed|ing)?\b|2\.0\.0-player|\bplayer\.\d/gi), null)
+  check('...and the scan reads what it is for: the drawn words, the Playback notes among them',
+    [text(tree).includes(notes[0]), notes.length], [true, 5])
   check('...the wind-down\'s note is what its checkbox is described by: the one note by that id',
     find((node) => node.props?.id === 'app-wind-down-note').map(text).length, 1)
   check('...the first is what the checkbox is described by', find((node) => node.props?.id === 'app-gapless-note').map(text).length, 1)
   check('...the second what the looks are: the one note by that id, the button\'s',
-    find((node) => node.props?.id === 'app-look-note').map(text), ['The button at the top right of Now Playing switches between them until it closes.'])
+    find((node) => node.props?.id === 'app-look-note').map(text), ["What you see first when you open Now Playing. The button at its top right switches between the two while it's open. For phones: a big screen has no Now Playing view."])
 
   console.log('\nGetting albums: first, kept on deadwax, chosen only once deadwax has answered')
   {
@@ -295,7 +302,7 @@ async function main() {
     check('...and a choice goes to the store, which saves it on deadwax', globalThis.__you.chosen, [{ get_mode: 'pick' }])
     check('the note says what picking does, what the floor does, what Format does, and where all three are kept',
       find((node) => node.props?.id === 'app-get-note').map(text),
-      ['With “Pick the best source for me”, Get takes the best match that passes your quality floor, and shows you the sources when nothing matches well. The floor is also what the sources start filtered by. Format changes how sources are scored: Prefer lossless ranks lossless folders higher, and Lossless only leaves out folders with no lossless file. All three are kept for you on deadwax, not on this device.'])
+      ['“Show me the sources” lets you choose each download yourself. “Pick the best source for me” downloads the best match that meets your quality floor, and shows you the sources instead when nothing matches well, or when you already have the album or are getting it. The quality floor is also what the sources start filtered to. Format: Prefer lossless ranks lossless downloads higher, and Lossless only leaves out anything without a lossless file. All three are kept for you on deadwax, so they follow you to every device.'])
     const confirm = named('ConfirmCancelChoice')[0]
     check('under them, "Confirm before cancelling" - this device\'s, on as it ships - and its note says so',
       [!!confirm, confirm?.props.on, find((node) => node.props?.id === 'app-confirm-cancel-note').map(text)],
