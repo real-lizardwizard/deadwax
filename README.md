@@ -97,15 +97,15 @@ It's the same app under a new name, and 0.7.0 is the first release under it. Poi
 
 | tag | what it is |
 | --- | --- |
-| `:latest` | **the current release** — slskd direct, no Lidarr. 1.0.0 onward, and what the settings above describe. |
-| `:1.0.0` etc | pinned releases of that same line (0.6.20 and older are under the old `jimbrainz` image name) |
+| `:latest` | **the current release**, 2.0.0 onward: the app, slskd direct, no Lidarr, and what the settings above describe. |
+| `:2.0.0`, `:1.1.8` etc | pinned releases of that same line (0.6.20 and older are under the old `jimbrainz` image name) |
 | `:experimental` | `main`, rebuilt on every push. Ahead of `:latest` until the next release is tagged, and moves under you. |
-| `:player` | the `player-spike` branch: the phone player and the multi-user work on trial, on their way to 2.0.0. Versioned `2.0.0-player.N` (`1.1.0-player.N` before 2.0.0-player.7), rebuilt on every push, and moves under you. |
+| `:player` | the 2.0.0 pre-releases, no longer updated: move to `:latest` or `:2.0.0`. |
 | `:0.2.1` and older | the original Lidarr-based line (git tag `v0.2.1`). Does **not** understand the settings above. |
 
 > **If you were already pulling `:latest` from before 0.3.0, read this.** Up to 0.2.1 that tag was the Lidarr-based version. From **0.3.0 onward it is this slskd-direct rewrite**, which has no Lidarr support at all and takes different settings. Pulling `:latest` will replace one with the other. Pin **`:0.2.1`** if you want the Lidarr version to keep working.
 
-The example compose file points at `:latest`, which moves only when a release is tagged. Pin a version (`:1.0.4`) to hold still for good, or use `:experimental` to follow development as it happens.
+The example compose file points at `:latest`, which moves only when a release is tagged. Pin a version (`:2.0.0`) to hold still for good, or use `:experimental` to follow development as it happens.
 
 ### Running
 run docker compose from the same folder as your cloned repo / docker-compose file:<br><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`docker-compose up -d`<br><br>this by default starts the container on localhost:8080, or whatever port you configured it to.
