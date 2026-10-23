@@ -15,8 +15,7 @@ interface RetimeRun extends RetimeTotals {
 
 /*
  * The run is kept in this module, not in the component (2.0.0-player.42), so it outlives what draws
- * it: the main page's settings tab draws nothing while another tab shows, and the app's Server settings
- * page goes whenever another page takes its place - and a run over a whole library takes minutes. Kept
+ * it: the app's Server settings page goes whenever another page takes its place - and a run over a whole library takes minutes. Kept
  * here, it goes on and its Stop still works when you come back; one that ENDED while nothing drew it
  * says how it ended when you do.
  *

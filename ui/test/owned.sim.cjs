@@ -1,11 +1,13 @@
 /**
- * Which search results are already in the library - BOTH copies of the rules, held to one answer.
+ * Which search results are already in the library: ui/src/lib/owned.ts, which leaves held albums out
+ * of the app's "Not in your library yet" (2.0.0-player.13), against every case in
+ * tests/fixtures/pressings/owned.json.
  *
- * interface/scripts/owned.mjs marks the main page's search; ui/src/lib/owned.ts (2.0.0-player.13)
- * leaves held albums out of the app's "Not in your library yet". The image's UI stage copies only
- * ui/, so the app can't import the .mjs, and the two live side by side until the main page
- * retires. Every case is in tests/fixtures/pressings/owned.json and is run against each copy, so
- * an edit to one that the other doesn't share fails here, by name.
+ * Until 2.0.0-player.66 the main page's interface/scripts/owned.mjs was run against the same cases,
+ * the two copies held to one answer. That page retired; what the .mjs answered beyond the cases - the
+ * functions it exported, every name in the fixture folded, the tooltip for both Dummys - was generated
+ * from it once, before it was deleted, and is kept in the fixture's `frozen`, so owned.ts still answers
+ * as the two did together.
  *
  * The cases that matter are the ones a wrong answer would hide: a pressing claimed by the wrong id,
  * an untagged folder claimed over a tagged one, a folder named the way the sleeve credited the
@@ -16,11 +18,9 @@
 
 const { execFileSync } = require('child_process')
 const fs = require('fs'), os = require('os'), path = require('path')
-const { pathToFileURL } = require('url')
 
 const UI = path.resolve(__dirname, '..')
 const FIXTURE = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../tests/fixtures/pressings/owned.json'), 'utf8'))
-const MJS = pathToFileURL(path.resolve(__dirname, '../../interface/scripts/owned.mjs')).href
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-owned-'))
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
@@ -58,25 +58,24 @@ function run(O, index, { fn, args }) {
   }
 }
 
-;(async () => {
-  const copies = [['owned.mjs', await import(MJS)], ['owned.ts', require(path.join(OUT, 'owned.js'))]]
+;(() => {
+  const O = require(path.join(OUT, 'owned.js'))
+  console.log('\nowned.ts')
+  const index = O.buildOwnedIndex(FIXTURE.albums)
+  for (const item of FIXTURE.cases) check(item.label, run(O, index, item), item.expected)
+  check('no index answers nothing', O.ownedForGroup(null, { groupId: 'dummy' }), { held: [], guessed: [] })
+  check('...and holds no pressing', O.ownedForRelease(null, 'x'), [])
 
-  for (const [name, O] of copies) {
-    console.log(`\n${name}`)
-    const index = O.buildOwnedIndex(FIXTURE.albums)
-    for (const item of FIXTURE.cases) check(item.label, run(O, index, item), item.expected)
-    check('no index answers nothing', O.ownedForGroup(null, { groupId: 'dummy' }), { held: [], guessed: [] })
-    check('...and holds no pressing', O.ownedForRelease(null, 'x'), [])
-  }
-
-  console.log('\nthe two copies')
-  const exported = (O) => Object.keys(O).filter((key) => typeof O[key] === 'function').sort()
-  check('export the same functions', exported(copies[1][1]), exported(copies[0][1]))
+  console.log('\nas the main page\'s copy answered (frozen from owned.mjs before it retired)')
+  const { frozen } = FIXTURE
+  const exported = Object.keys(O).filter((key) => typeof O[key] === 'function').sort()
+  check('exports the functions the .mjs did', exported, frozen.exported)
   //? one more pass over names nobody wrote a case for: every album's own name, both ways
   const names = FIXTURE.albums.flatMap((album) => [album.artist, album.album, album.path])
-  check('fold every name in the fixture alike', names.map(copies[1][1].foldName), names.map(copies[0][1].foldName))
-  const tooltip = (O) => O.describeGroupOwnership(O.ownedForGroup(O.buildOwnedIndex(FIXTURE.albums), FIXTURE.cases[6].args[0])).title
-  check('word a tooltip alike', tooltip(copies[1][1]), tooltip(copies[0][1]))
+  check('...the names are the fixture\'s own', frozen.folded.map(([name]) => name), names)
+  check('folds every name in the fixture as the .mjs did', names.map(O.foldName), frozen.folded.map(([, folded]) => folded))
+  const group = FIXTURE.cases.find((item) => item.label === frozen.tooltip.case).args[0]
+  check('words the tooltip as the .mjs did', O.describeGroupOwnership(O.ownedForGroup(O.buildOwnedIndex(FIXTURE.albums), group)).title, frozen.tooltip.title)
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed')
   process.exit(failures ? 1 : 0)

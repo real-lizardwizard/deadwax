@@ -1,32 +1,20 @@
-import type { ComponentChildren } from 'preact'
-import { useEffect, useMemo, useState } from 'preact/hooks'
+/**
+ * The server settings' parts: the rows, groups, verdict, drafts and tab marks the app's Server settings
+ * page (app/ServerSettings.tsx, 2.0.0-player.33) is drawn from, with the rules beside them - which tab a
+ * group sits on, the drafts, the note asking for a secret again. This file held the main page's whole
+ * settings tab (v0.5.1, tabs since v0.9.15) until the main page retired in 2.0.0-player.66; the name is
+ * kept, so the imports and sims that name it hold, and what is left is what the app draws.
+ */
 
-import {
-  getServerSettings, saveServerSettings,
-  type ServerSetting, type ServerSettings, type SettingGroup as ServerSettingsGroup, type SettingUpdate,
-} from '../api/settings'
-import type { FormatPreference } from '../api/types'
-import { SORT_LABELS } from '../lib/candidates'
-import { LoadingPanel } from './Loading'
-import { MusicBrainzAnswers } from './MusicBrainzAnswers'
-import { RetimeLyrics } from './RetimeLyrics'
-import { SAVED_ANSWERS_GROUP, SAVED_ANSWERS_PATH, savedAnswersKey } from '../lib/musicbrainzAnswers'
-import {
-  readSettingsTab, useDownloadDefaults, usePreferences, writeSettingsTab,
-  type DownloadDefaults, type Preferences,
-} from '../state/persisted'
+import type { ComponentChildren } from 'preact'
+
+import type { ServerSetting, ServerSettings, SettingGroup as ServerSettingsGroup } from '../api/settings'
+import { SAVED_ANSWERS_GROUP } from '../lib/musicbrainzAnswers'
 
 /* ===== tabs (v0.9.15) ===== */
 
-export type SettingsTab = 'search' | 'downloads' | 'library' | 'connections' | 'interface'
-
-const SETTINGS_TABS: readonly { id: SettingsTab; label: string; hint: string }[] = [
-  { id: 'search', label: 'Search', hint: 'Where a new MusicBrainz search starts' },
-  { id: 'downloads', label: 'Downloads', hint: 'Choosing and fetching from Soulseek' },
-  { id: 'library', label: 'Library', hint: 'Paths, organizing, covers and lyrics' },
-  { id: 'connections', label: 'Connections', hint: 'slskd, MusicBrainz, Navidrome and the picture sources' },
-  { id: 'interface', label: 'Interface', hint: 'This browser' },
-]
+/** Server settings' three tabs (lib/serverSettings.ts's SERVER_TABS lists them). */
+export type SettingsTab = 'downloads' | 'library' | 'connections'
 
 /**
  * Which tab a server group belongs on. The server names its groups; a group this doesn't know
@@ -40,16 +28,6 @@ export function tabForGroup(groupId: string): SettingsTab {
   return 'library'
 }
 
-/** Which tab each preference sits on - for marking a tab that holds an unsaved edit. */
-const PREFERENCE_TAB: Readonly<Record<string, SettingsTab>> = {
-  searchLimit: 'search', searchStudioOnly: 'search', searchSort: 'search',
-  confirmCancel: 'downloads', logOpenOnStart: 'interface',
-}
-
-function prefTab(key: string): SettingsTab {
-  return PREFERENCE_TAB[key] ?? (key.startsWith('candidate') ? 'downloads' : 'interface')
-}
-
 /**
  * A mark per tab: 'attention' when a server setting on it needs it (or, for Library, when
  * organizing is blocked), else 'unsaved' when it holds an edit, else nothing.
@@ -57,8 +35,6 @@ function prefTab(key: string): SettingsTab {
 export function tabMarks(
   server: ServerSettings | null,
   draftEnv: Record<string, unknown>,
-  draftPrefs: Record<string, unknown>,
-  draftDefaults: Record<string, unknown>,
 ): Partial<Record<SettingsTab, 'attention' | 'unsaved'>> {
   const marks: Partial<Record<SettingsTab, 'attention' | 'unsaved'>> = {}
   const groupOf = new Map<string, string>()
@@ -72,13 +48,7 @@ export function tabMarks(
 
   const unsaved = (tab: SettingsTab) => { if (!marks[tab]) marks[tab] = 'unsaved' }
   for (const key of Object.keys(draftEnv)) unsaved(tabForGroup(groupOf.get(key) ?? ''))
-  for (const key of Object.keys(draftPrefs)) unsaved(prefTab(key))
-  if (Object.keys(draftDefaults).length) unsaved('downloads')
   return marks
-}
-
-function isTab(value: string | null): value is SettingsTab {
-  return SETTINGS_TABS.some((entry) => entry.id === value)
 }
 
 /**
@@ -135,32 +105,6 @@ export function retypeSecretNote(
   return rule.note
 }
 
-/**
- * The settings tab.
- *
- * EVERYTHING HERE IS A DRAFT UNTIL YOU PRESS SAVE.
- *
- * The two halves still have different natures - preferences live in this browser, server
- * settings live in the database and are laid over the environment - but they are edited
- * through one model and committed by one button. That is deliberate. Two halves with two
- * different save semantics on one screen is how you end up unsure whether the thing you just
- * changed took, which was the actual complaint about the previous version: preferences saved
- * instantly and silently, so there was no evidence anything had happened.
- *
- * SERVER SETTINGS ARE EDITABLE, with two exceptions that are shown and explained rather than
- * hidden - DB_PATH is the database the overrides live in, and PUID/PGID are consumed by the
- * entrypoint before Python starts. Saving one stores an OVERRIDE that wins over the
- * environment, applies live without a restart, and is announced as an override with a revert
- * control. See the long note at the top of src/routes/settings.py for why the override has to
- * win rather than the environment.
- */
-
-const FORMAT_PREFERENCES: { id: FormatPreference; name: string; note: string }[] = [
-  { id: 'any', name: 'Any format', note: 'Rank on everything else; format is not considered' },
-  { id: 'prefer_lossless', name: 'Prefer lossless', note: 'FLAC scores higher, MP3 still eligible' },
-  { id: 'lossless_only', name: 'Lossless only', note: 'Lossy candidates are excluded outright' },
-]
-
 /* ============================================================================
  * Small shared pieces
  * ==========================================================================*/
@@ -171,8 +115,8 @@ export function Section({
   children,
 }: {
   title: string
-  note?: preact.ComponentChildren
-  children: preact.ComponentChildren
+  note?: ComponentChildren
+  children: ComponentChildren
 }) {
   return (
     <section class="settings-section">
@@ -183,59 +127,15 @@ export function Section({
   )
 }
 
-/** A labelled row. The label is the hit target, so the whole row is clickable. */
-function Row({
-  label,
-  hint,
-  control,
-  htmlFor,
-}: {
-  label: string
-  hint?: string
-  control: preact.ComponentChildren
-  htmlFor?: string
-}) {
-  return (
-    <div class="settings-row">
-      <div class="settings-row-text">
-        <label class="settings-row-label" for={htmlFor}>
-          {label}
-        </label>
-        {hint ? <span class="settings-row-hint">{hint}</span> : null}
-      </div>
-      <div class="settings-row-control">{control}</div>
-    </div>
-  )
-}
-
-/**
- * A plain checkbox. It was a sliding switch; James asked for checkboxes "to keep with the
- * nostalgic theme", and the switch was the one control on the page that said phone rather than
- * desktop. The row puts it BEFORE its label (see .settings-row:has(.settings-check)), where a
- * desktop checkbox lives, rather than off at the far edge where the switch sat.
- */
-function Checkbox({
-  id,
-  checked,
-  onChange,
-}: {
-  id: string
-  checked: boolean
-  onChange: (next: boolean) => void
-}) {
-  return (
-    <input
-      id={id}
-      type="checkbox"
-      class="settings-check"
-      checked={checked}
-      onChange={(e) => onChange((e.currentTarget as HTMLInputElement).checked)}
-    />
-  )
-}
-
 /* ============================================================================
- * Server configuration - now editable
+ * Server configuration - editable (v0.5.1)
+ *
+ * SERVER SETTINGS ARE EDITABLE, with two exceptions that are shown and explained rather than
+ * hidden - DB_PATH is the database the overrides live in, and PUID/PGID are consumed by the
+ * entrypoint before Python starts. Saving one stores an OVERRIDE that wins over the
+ * environment, applies live without a restart, and is announced as an override with a revert
+ * control. See the long note at the top of src/routes/settings.py for why the override has to
+ * win rather than the environment.
  * ==========================================================================*/
 
 /**
@@ -258,9 +158,9 @@ export function editedEnvDraft(
 /**
  * A server group's rows (exported for the app's Server settings page, 2.0.0-player.33): every
  * setting, its draft, and the note another row's edit asks of it. `children` follow the rows inside
- * the group - Re-time saved lyrics, under the lyrics group, on the settings tab and (since
- * 2.0.0-player.42) the app's page alike (components/RetimeLyrics.tsx); and since 2.0.0-player.54
- * Clear MusicBrainz's saved answers under theirs (components/MusicBrainzAnswers.tsx), on both too.
+ * the group - Re-time saved lyrics, under the lyrics group (components/RetimeLyrics.tsx, since
+ * 2.0.0-player.42), and since 2.0.0-player.54 Clear MusicBrainz's saved answers under theirs
+ * (components/MusicBrainzAnswers.tsx).
  */
 export function ServerGroup({
   group,
@@ -440,531 +340,6 @@ export function SettingRow({
       {note ? <div class="settings-env-detail">{note}</div> : null}
 
       {setting.detail && !edited ? <div class="settings-env-detail">{setting.detail}</div> : null}
-    </div>
-  )
-}
-
-/* ============================================================================
- * The tab
- * ==========================================================================*/
-
-export function SettingsView({ active }: { active: boolean }) {
-  const [defaults, commitDefaults] = useDownloadDefaults()
-  const [prefs, commitPrefs, resetPrefs] = usePreferences()
-
-  const [server, setServer] = useState<ServerSettings | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-
-  /*
-   * The drafts. Held separately from the committed values rather than as a copy of them, so
-   * "has anything changed" is a comparison rather than a flag somebody has to remember to
-   * set - a dirty flag maintained by hand is a dirty flag that eventually lies.
-   */
-  const [draftPrefs, setDraftPrefs] = useState<Partial<Preferences>>({})
-  const [draftDefaults, setDraftDefaults] = useState<Partial<DownloadDefaults>>({})
-  const [draftEnv, setDraftEnv] = useState<Record<string, string | null>>({})
-
-  //? remembered per browser, validated on read - a stale or hand-edited value opens Search
-  const [tab, setTab] = useState<SettingsTab>(() => {
-    const saved = readSettingsTab()
-    return isTab(saved) ? saved : 'search'
-  })
-  const chooseTab = (next: SettingsTab) => {
-    setTab(next)
-    writeSettingsTab(next)
-  }
-
-  const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
-  const [justSaved, setJustSaved] = useState(false)
-
-  //? What the controls should show: the draft where there is one, the committed value where
-  //? there isn't. One expression, so a control can never render a value the draft disagrees
-  //? with.
-  const shownPrefs = { ...prefs, ...draftPrefs }
-  const shownDefaults = { ...defaults, ...draftDefaults }
-
-  const dirtyCount =
-    Object.keys(draftPrefs).length + Object.keys(draftDefaults).length + Object.keys(draftEnv).length
-
-  const settingsByKey = useMemo(() => {
-    const map = new Map<string, ServerSetting>()
-    for (const group of server?.groups ?? []) {
-      for (const setting of group.settings) map.set(setting.key, setting)
-    }
-    return map
-  }, [server])
-
-  /*
-   * Fetched when the tab is opened, not on mount: this walks the filesystem to check every
-   * configured path, and the settings tab is the least-visited of the three. Refetched on
-   * each open so a volume you just fixed shows as fixed without a reload.
-   */
-  useEffect(() => {
-    if (!active) return
-
-    let cancelled = false
-    setLoading(true)
-
-    getServerSettings()
-      .then((data) => {
-        if (cancelled) return
-        setServer(data)
-        setError(null)
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Could not read settings')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [active])
-
-  /** Record a preference edit, dropping it from the draft if it matches the committed value. */
-  function editPref<K extends keyof Preferences>(key: K, value: Preferences[K]) {
-    setJustSaved(false)
-    setDraftPrefs((current) => {
-      const next = { ...current, [key]: value }
-      //? Setting something back to what it already was is not a change. Without this, undoing
-      //? an edit by hand leaves the save button lit with nothing to save.
-      if (prefs[key] === value) delete next[key]
-      return next
-    })
-  }
-
-  function editDefault<K extends keyof DownloadDefaults>(key: K, value: DownloadDefaults[K]) {
-    setJustSaved(false)
-    setDraftDefaults((current) => {
-      const next = { ...current, [key]: value }
-      if (defaults[key] === value) delete next[key]
-      return next
-    })
-  }
-
-  function editEnv(key: string, value: string) {
-    setJustSaved(false)
-    //? Secrets have no readable current value, so any typing is a change by definition.
-    setDraftEnv((current) => editedEnvDraft(current, key, value, settingsByKey.get(key)))
-  }
-
-  function revertEnv(key: string) {
-    setJustSaved(false)
-    setDraftEnv((current) => ({ ...current, [key]: null }))
-  }
-
-  function discard() {
-    setDraftPrefs({})
-    setDraftDefaults({})
-    setDraftEnv({})
-    setSaveError(null)
-  }
-
-  async function save() {
-    setSaving(true)
-    setSaveError(null)
-
-    try {
-      /*
-       * Server settings first, and only commit the local half if they succeed. The server can
-       * refuse the batch (an invalid URL, an unwritable database); committing preferences
-       * anyway would leave the screen showing a save that half happened.
-       */
-      const updates: SettingUpdate[] = Object.entries(draftEnv).map(([key, value]) => ({ key, value }))
-
-      if (updates.length) {
-        const fresh = await saveServerSettings(updates)
-        setServer(fresh)
-      }
-
-      if (Object.keys(draftPrefs).length) commitPrefs(draftPrefs)
-      if (Object.keys(draftDefaults).length) commitDefaults(draftDefaults)
-
-      setDraftPrefs({})
-      setDraftDefaults({})
-      setDraftEnv({})
-      setJustSaved(true)
-    } catch (e: unknown) {
-      setSaveError(e instanceof Error ? e.message : 'Could not save')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  if (!active) return null
-
-  const serverGroups = (tab: SettingsTab) =>
-    (server?.groups ?? []).filter((group) => tabForGroup(group.id) === tab)
-
-  const renderGroup = (group: ServerSettingsGroup) => (
-    <ServerGroup key={group.id} group={group} server={server} draftEnv={draftEnv} onEdit={editEnv} onRevert={revertEnv}>
-      {group.id === 'lyrics' && (
-        <RetimeLyrics unsaved={draftEnv['LYRICS_LEAD_MS'] !== undefined} />
-      )}
-      {group.id === SAVED_ANSWERS_GROUP && (
-        <MusicBrainzAnswers key={savedAnswersKey(group)} unsaved={draftEnv[SAVED_ANSWERS_PATH] !== undefined} />
-      )}
-    </ServerGroup>
-  )
-
-  //? the server half of a tab: its groups once they have loaded, or why they haven't
-  const serverPart = (tab: SettingsTab, children?: ComponentChildren) => (
-    <>
-      {loading && !server ? <LoadingPanel label="Reading configuration" /> : null}
-      {error ? (
-        <div class="settings-error">
-          <h4 class="text red">Could not read the server configuration</h4>
-          <p class="text default-muted">{error}</p>
-        </div>
-      ) : null}
-      {server ? (
-        <>
-          {children}
-          {serverGroups(tab).map(renderGroup)}
-        </>
-      ) : null}
-    </>
-  )
-
-  const marks = tabMarks(server, draftEnv, draftPrefs, draftDefaults)
-
-  return (
-    <div id="settings-content">
-      {/*
-        Tabs (v0.9.15, asked for: "some tabs for settings organization instead of a long list").
-        Outside the scroller, like the save bar, so they never scroll away. A tab says when it
-        holds an unsaved change or a setting that needs attention, so neither hides behind one
-        you aren't looking at; the save bar still saves every tab at once.
-      */}
-      <div class="settings-tabs" role="tablist" aria-label="Settings">
-        {SETTINGS_TABS.map((entry) => (
-          <button
-            key={entry.id}
-            type="button"
-            role="tab"
-            id={`settings-tab-${entry.id}`}
-            aria-selected={tab === entry.id}
-            class={`view-tab settings-tab${tab === entry.id ? ' active' : ''}`}
-            title={entry.hint}
-            onClick={() => chooseTab(entry.id)}
-          >
-            {entry.label}
-            {marks[entry.id] === 'attention' && <span class="settings-tab-mark is-attention" title="A setting here needs attention" />}
-            {marks[entry.id] === 'unsaved' && <span class="settings-tab-mark" title="Unsaved changes here" />}
-          </button>
-        ))}
-      </div>
-
-      <div class="settings-scroll scrollable" role="tabpanel" aria-labelledby={`settings-tab-${tab}`}>
-        {tab === 'search' && (
-          <>
-        <Section
-          title="Search"
-          note="Starting values for a new search. Both can still be changed per-search without changing the default."
-        >
-          <Row
-            label="Results per search"
-            hint="How many release groups MusicBrainz is asked for. It caps a page at 100."
-            htmlFor="pref-search-limit"
-            control={
-              <div class="settings-number">
-                <input
-                  id="pref-search-limit"
-                  type="number"
-                  min={1}
-                  max={100}
-                  value={shownPrefs.searchLimit}
-                  onInput={(e) =>
-                    editPref('searchLimit', Number((e.currentTarget as HTMLInputElement).value))
-                  }
-                />
-              </div>
-            }
-          />
-
-          <Row
-            label="Studio albums only, by default"
-            hint="Excludes live albums, compilations, interviews and demos from the query — which is what makes it worth doing, since MusicBrainz spends the limit on whatever matches"
-            htmlFor="pref-studio-only"
-            control={
-              <Checkbox
-                id="pref-studio-only"
-                checked={shownPrefs.searchStudioOnly}
-                onChange={(v) => editPref('searchStudioOnly', v)}
-              />
-            }
-          />
-        </Section>
-          </>
-        )}
-
-        {tab === 'downloads' && (
-          <>
-        <Section
-          title="Downloads"
-          note="Applied when deadwax ranks Soulseek candidates and when you grab one."
-        >
-          <div class="settings-radio-group" role="radiogroup" aria-label="Format preference">
-            {FORMAT_PREFERENCES.map((format) => (
-              <label
-                key={format.id}
-                class={`settings-radio${
-                  shownDefaults.formatPreference === format.id ? ' active' : ''
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="format-preference"
-                  value={format.id}
-                  checked={shownDefaults.formatPreference === format.id}
-                  onChange={() => editDefault('formatPreference', format.id)}
-                />
-                <span class="settings-radio-name">{format.name}</span>
-                <span class="settings-radio-note">{format.note}</span>
-              </label>
-            ))}
-          </div>
-
-          <Row
-            label="Auto-grab best match"
-            hint="Queue the top candidate as soon as a Find answers, when it scores 75 or more through the filters below - under that, the panel opens for you to choose"
-            htmlFor="pref-auto-grab"
-            control={
-              <Checkbox
-                id="pref-auto-grab"
-                checked={shownDefaults.autoGrab}
-                onChange={(v) => editDefault('autoGrab', v)}
-              />
-            }
-          />
-
-          <Row
-            label="Confirm before cancelling"
-            hint="Ask first when cancelling a transfer that's already running"
-            htmlFor="pref-confirm-cancel"
-            control={
-              <Checkbox
-                id="pref-confirm-cancel"
-                checked={shownPrefs.confirmCancel}
-                onChange={(v) => editPref('confirmCancel', v)}
-              />
-            }
-          />
-        </Section>
-        <Section
-          title="Soulseek candidates"
-          note="Where the filters in the candidates panel start. Changing them there is temporary; changing them here is the default."
-        >
-          <Row
-            label="Minimum score"
-            hint="Hide candidates ranking below this. Zero shows everything."
-            htmlFor="pref-min-score"
-            control={
-              <div class="settings-slider">
-                <input
-                  id="pref-min-score"
-                  type="range"
-                  min={0}
-                  max={100}
-                  step={5}
-                  value={shownPrefs.candidateMinScore}
-                  onInput={(e) =>
-                    editPref(
-                      'candidateMinScore',
-                      Number((e.currentTarget as HTMLInputElement).value),
-                    )
-                  }
-                />
-                <span class="settings-slider-value">{shownPrefs.candidateMinScore}</span>
-              </div>
-            }
-          />
-
-          <Row
-            label="Free slot only"
-            hint="Only peers who can start sending now, rather than queueing you"
-            htmlFor="pref-free-slot"
-            control={
-              <Checkbox
-                id="pref-free-slot"
-                checked={shownPrefs.candidateFreeSlotOnly}
-                onChange={(v) => editPref('candidateFreeSlotOnly', v)}
-              />
-            }
-          />
-
-          <Row
-            label="Complete albums only"
-            hint="Candidates holding at least as many tracks as the release you picked"
-            htmlFor="pref-complete-only"
-            control={
-              <Checkbox
-                id="pref-complete-only"
-                checked={shownPrefs.candidateCompleteOnly}
-                onChange={(v) => editPref('candidateCompleteOnly', v)}
-              />
-            }
-          />
-
-          <Row
-            label="Bitrate at least"
-            hint="Where the Quality filter's bitrate floor starts. Judged by a folder's worst file; lossless always passes"
-            htmlFor="pref-min-bitrate"
-            control={
-              <select
-                id="pref-min-bitrate"
-                class="settings-select"
-                value={shownPrefs.candidateMinBitrate}
-                onChange={(e) => editPref('candidateMinBitrate', Number((e.currentTarget as HTMLSelectElement).value))}
-              >
-                {[0, 128, 192, 256, 320].map((n) => <option key={n} value={n}>{n ? `${n} kbps` : 'any'}</option>)}
-              </select>
-            }
-          />
-
-          <Row
-            label="Bit depth at least"
-            hint="Where the bit-depth floor starts. Many clients don't report bit depth, and a folder that didn't say is left out"
-            htmlFor="pref-min-depth"
-            control={
-              <select
-                id="pref-min-depth"
-                class="settings-select"
-                value={shownPrefs.candidateMinBitDepth}
-                onChange={(e) => editPref('candidateMinBitDepth', Number((e.currentTarget as HTMLSelectElement).value))}
-              >
-                {[0, 16, 24].map((n) => <option key={n} value={n}>{n ? `${n}-bit` : 'any'}</option>)}
-              </select>
-            }
-          />
-
-          <Row
-            label="Order candidates by"
-            hint="How the list starts sorted. Best match is deadwax's ranking against the release you picked"
-            htmlFor="pref-candidate-sort"
-            control={
-              <select
-                id="pref-candidate-sort"
-                class="settings-select"
-                value={shownPrefs.candidateSort}
-                onChange={(e) => editPref('candidateSort', (e.currentTarget as HTMLSelectElement).value)}
-              >
-                {Object.entries(SORT_LABELS).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-              </select>
-            }
-          />
-        </Section>
-            {serverPart('downloads')}
-          </>
-        )}
-
-        {tab === 'library' && (
-          <>
-            <p class="settings-section-note">
-              These come from your compose file or <code>.env</code>. Changing one here stores an
-              override that wins over the environment and applies without a restart — the row
-              says so, and can be reverted.
-            </p>
-            {serverPart('library', server && <OrganizingVerdict organizing={server.organizing} />)}
-            {server ? <OrganizeModes modes={server.organize_modes} /> : null}
-          </>
-        )}
-
-        {tab === 'connections' && (
-          <>
-            <p class="settings-section-note">
-              Where deadwax finds slskd and MusicBrainz, and the keys for the picture sources. Set
-              in your compose file or <code>.env</code>, and overridable here without a restart.
-              Two settings can't be changed here at all, and say why.
-            </p>
-            {serverPart('connections')}
-          </>
-        )}
-
-        {tab === 'interface' && (
-          <>
-        <Section title="Interface">
-          <Row
-            label="Open the log on start"
-            hint="Useful while you're still confirming a new install is behaving"
-            htmlFor="pref-log-open"
-            control={
-              <Checkbox
-                id="pref-log-open"
-                checked={shownPrefs.logOpenOnStart}
-                onChange={(v) => editPref('logOpenOnStart', v)}
-              />
-            }
-          />
-
-          <Row
-            label="Reset preferences"
-            hint="Puts everything above back to its default. Applies immediately, and does not touch server configuration."
-            control={
-              <button
-                type="button"
-                class="settings-reset-button"
-                onClick={() => {
-                  resetPrefs()
-                  setDraftPrefs({})
-                }}
-              >
-                Reset
-              </button>
-            }
-          />
-        </Section>
-            {server ? (
-              <div class="settings-version">
-                deadwax <code>v{server.version}</code>
-              </div>
-            ) : null}
-          </>
-        )}
-      </div>
-
-      {/*
-        The save bar, docked outside the scroller so it cannot scroll away from you while
-        there are unsaved changes. It appears only when there is something to save: a save
-        button that is permanently present and permanently disabled is furniture, and gives no
-        signal at the moment it actually matters.
-      */}
-      {(dirtyCount > 0 || saveError || justSaved) && (
-        <div class={`settings-savebar${saveError ? ' has-error' : ''}`} role="status">
-          <span class="settings-savebar-text">
-            {saveError
-              ? saveError
-              : justSaved
-                ? 'Saved.'
-                : `${dirtyCount} unsaved change${dirtyCount === 1 ? '' : 's'}`}
-          </span>
-
-          {dirtyCount > 0 && (
-            <>
-              <button
-                type="button"
-                class="settings-savebar-discard"
-                onClick={discard}
-                disabled={saving}
-              >
-                Discard
-              </button>
-              <button
-                type="button"
-                class="settings-savebar-save"
-                onClick={save}
-                disabled={saving}
-              >
-                {saving ? 'Saving…' : 'Save changes'}
-              </button>
-            </>
-          )}
-        </div>
-      )}
     </div>
   )
 }

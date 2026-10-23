@@ -369,7 +369,7 @@ class MusicBrainzClient:
         if not user_agent:
             logger.error(
                 "MUSICBRAINZ_EMAIL is not set - MusicBrainz asks for a contact address with "
-                "every request. Set it in the settings tab.",
+                "every request. Set it in Server settings (Connections).",
                 extra={"frontend": True, "src": "musicbrainz"},
             )
             raise ValueError("MUSICBRAINZ_EMAIL is not configured")
@@ -679,7 +679,7 @@ class MusicBrainzClient:
                     continue
 
                 if status == 403: 
-                    logger.error("MusicBrainz refused the request - usually the user agent. Check MUSICBRAINZ_EMAIL in the settings tab", extra=loud)
+                    logger.error("MusicBrainz refused the request - usually the user agent. Check MUSICBRAINZ_EMAIL in Server settings (Connections)", extra=loud)
                     logger.error(f"Response text: {exc.response.text}")
                     ping_error_obj["error"] =  "musicbrainz ping failed with 403 forbidden error, connection was made but user agent / ip not accepted"
                     ping_error_obj["status"] =  "failed"
@@ -725,7 +725,7 @@ class MusicBrainzClient:
                 (logger.info if refreshing else logger.error)(f"HTTP {status}: {exc.response.text[:200]}")
             
             except ValueError:
-                ping_error_obj["error"] =  "MUSICBRAINZ_EMAIL is not set - add your email in the settings tab"
+                ping_error_obj["error"] =  "MUSICBRAINZ_EMAIL is not set - add your email in Server settings (Connections)"
                 ping_error_obj["status"] =  "failed"
                 ping_error_obj["code"] = "VALUE_ERROR"
                 break

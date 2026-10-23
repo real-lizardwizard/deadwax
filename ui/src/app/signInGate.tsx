@@ -4,7 +4,7 @@ import { onSignedOut } from '../api/auth'
 import { ApiError, newSession } from '../api/http'
 import { me, type Me } from '../api/me'
 import { latestOnly } from '../lib/latest'
-import { afterSignIn, returnTarget, signInProblem } from '../lib/signIn'
+import { afterSignIn, signInProblem } from '../lib/signIn'
 import { App } from './App'
 import { noteAccess } from './access'
 import { sessionMe, setSessionMe } from './session'
@@ -38,9 +38,8 @@ import { SignIn } from './SignIn'
  *   element shows (leaveFullScreen).
  * - Nothing here plays anything: the sign-in screen's one button signs in, and the app's own buttons are
  *   where playback starts, in their taps - as ever.
- * - `/player/?return=/` (the main page's "Sign in", components/SignedOutNotice.tsx) goes back to the main
- *   page once signed in - and to nowhere else (lib/signIn.ts returnTarget) - REPLACING this page in the
- *   history, so Back from the main page doesn't land on a sign-in that is already done.
+ * - A query on the page's address is nobody's instruction: the main page's `?return=/` hand-back went when
+ *   it retired (2.0.0-player.66), and a sign-in carries on, or starts again, as afterSignIn says.
  */
 /**
  * Leave full screen, if anything is in it, and call `left` once the browser has. The desktop visualizer
@@ -87,11 +86,6 @@ export function startWithLogins(host: HTMLElement): void {
     //? again - is what the app draws by too (access.ts): an admin's change reaches a desktop, which asks /me
     //? nowhere else, without a reload
     noteAccess(who)
-    const back = returnTarget(location.search)
-    if (back) {
-      location.replace(back)
-      return
-    }
     if (appShown && afterSignIn(before, who.user) === 'start-again') {
       location.reload()
       return

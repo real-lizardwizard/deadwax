@@ -116,9 +116,8 @@ check('a fielded query too', read('portishead third', 'primarytype:"Album"')[1],
 check('an artist alone too', read('portishead', studio)[1], `(artist:"Portishead") AND ${studio}`)
 check('several primary types OR together in their own brackets', Q.typeFilter({ primary: ['Album', 'EP'] }), '(primarytype:"Album" OR primarytype:"EP")')
 check('no filter, no brackets', [Q.typeFilter({}), Q.withTypeFilter('dummy', '')], ['', 'dummy'])
-check('the main page\'s list of noisy types', Q.NOISY_SECONDARY_TYPES, ['Live', 'Compilation', 'Interview', 'Demo', 'Remix', 'DJ-mix'])
-const mainJs = fs.readFileSync(path.resolve(__dirname, '../../interface/scripts/main.js'), 'utf8')
-check('...is the one main.js excludes', /const NOISY_SECONDARY_TYPES = \['Live', 'Compilation', 'Interview', 'Demo', 'Remix', 'DJ-mix'\];/.test(mainJs), true)
+//? the main page's list, as its main.js had it until it retired (2.0.0-player.66): a literal now
+check('the list of noisy types, as the main page excluded them', Q.NOISY_SECONDARY_TYPES, ['Live', 'Compilation', 'Interview', 'Demo', 'Remix', 'DJ-mix'])
 
 console.log('\npacing')
 check('MusicBrainz waits for three characters before asking unasked', ['ab', ' ab ', 'abc'].map(Q.asksMusicBrainzBySettling), [false, false, true])

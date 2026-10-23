@@ -65,8 +65,8 @@ const focusLost = (): boolean => {
 
 /**
  * The artist page's panel (2.0.0-player.45): the main page's artist dialogs - its images picker
- * (ArtistImagePicker) and its re-filing (ArtistRefileDialog), both in components/ArtistDetails.tsx and
- * left as they are - drawn for the app, through the same routes, plus "Which artist is this?" (the
+ * (ArtistImagePicker) and its re-filing (ArtistRefileDialog), both in its ArtistDetails.tsx, which went
+ * with it in 2.0.0-player.66 - drawn for the app, through the same routes, plus "Which artist is this?" (the
  * picker's MusicBrainz artist search) on its own. By the frame's panel rule (lib/appFrame.ts): a SIDE
  * PANEL on a desktop - a third column from 1280px, a drawer below it, not modal, one at a time (App) -
  * and on a phone a sheet over the whole screen, the page behind inert. useSheet does the rest: focus in
@@ -307,12 +307,12 @@ export function RefileBody({ request, live, onClose, onSettle }: {
 }
 
 /**
- * Artist images… - the main page's ArtistImagePicker: every picture of them its sources have, slot by
+ * Artist images… - as ArtistImagePicker had it on the old page: every picture of them its sources have, slot by
  * slot (square, banner, background, logo, wide, clear art) with where each is from; the file already
  * on disk, or that nothing was found; a tap to choose one, again to leave that slot as it is; "Use
  * another picture" putting any picture found in any slot; the notes on the keys not set; and Save,
  * with "Replace pictures that are already there". Who they are can be changed here too (the search),
- * for the pictures alone - as on the main page. While another artist's pictures are being looked for,
+ * for the pictures alone - as it could there. While another artist's pictures are being looked for,
  * or the look failed, Save can't be pressed: what it would write is the last artist's, rejected or no
  * longer on screen (review) - and Try again looks again for the artist last asked about.
  */

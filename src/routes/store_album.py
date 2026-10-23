@@ -11,7 +11,7 @@ share). So this answers, for one release:
     track count; two or more for a set kept one folder per disc. Only folders still there: one that
     has gone becomes a `missing` tombstone, as Find's checks mark one. Tombstones are never listed,
     and a disc folder merged into its release's is not (its row is `merged`; the release's own row
-    is the one listed). Since 2.0.0-player.44 each also says what the main page's details pane says
+    is the one listed). Since 2.0.0-player.44 each also says what the main page's details pane said
     of the folder - an album page's Properties: `size` and `original_year` from the saved scan (None
     and '' while the scan holds no copy of it), and `first_seen` and `imported` (deadwax filed it)
     from its review row (None and False when it has none) - read without touching the disk.
@@ -248,7 +248,7 @@ def _row(row: dict) -> dict:
 
 async def _facts(request: Request, store, root: str, rows: list[dict]) -> dict[str, dict]:
     """
-    What the main page's details pane says of each folder that the store's row doesn't hold (2.0.0-player.44):
+    What the main page's details pane said of each folder that the store's row doesn't hold (2.0.0-player.44):
     its size and original year, as the saved scan read them, and when it was first seen and whether deadwax
     filed it, from its review row. Keyed on the path; nothing read from the disk. A store that can't say
     leaves those two out - the page draws only what it is told.

@@ -42,8 +42,8 @@ def still_allowed(request: Request, user: str) -> bool:
 async def interface_logs(
     request: Request,
     user: str = Depends(current_user),
-    #? the last line the page has: the kept lines after it are sent first (the app's Log page). The
-    #? main page sends neither, and gets the stream as it always has: only what is logged from now
+    #? the last line the page has: the kept lines after it are sent first (the app's Log page). A
+    #? request with neither (the main page's, until it retired) gets only what is logged from now
     after: int | None = Query(default=None, ge=0),
     boot: str | None = Query(default=None, max_length=64),
 ):

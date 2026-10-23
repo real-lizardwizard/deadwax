@@ -29,7 +29,7 @@ let reasonLists = 0
  *  - WHY IT SCORED WHAT IT DID (2.0.0-player.41) - the README's promise, "ranked candidates with
  *    visible reasoning": the edition words found in the folder's name (REMASTER, DELUXE...) in their
  *    colours, and the score's signals as chips - Titles, Count, Lengths, Edition, Format, Peer, each
- *    with its value and its band's colour - as the main page's candidates panel shows them. Last on
+ *    with its value and its band's colour - as the main page's candidates panel showed them. Last on
  *    the card, so opening them moves nothing above. On a desktop's panel they are always shown
  *    (`reasons` 'shown'); on a phone, where 390px can't hold six chips beside the facts, they are
  *    behind a tap on the score ('tap'): the score is then a button - aria-expanded, a chevron that

@@ -5,22 +5,21 @@
  * the real page against live MusicBrainz (tests/fixtures/payloads/find-buttons.json): eight cases,
  * every body deep-equal, every panel label too.
  *
- * Used by the app's Get (the album you don't have, and the Get chip on a Search row) and - through
- * the bridge (ui/src/main.tsx sets `buildDownloadRelease`) - by interface/scripts/main.js, whose
- * row Find and card Find called buildExpectedFromRelease and buildExpectedFromReleaseGroup until
- * now. Those two are deleted: two builders were two answers waiting to drift apart, and "anything
- * added to a download's payload has to be added in BOTH builders" was a rule kept by hand. Anything
- * added to a download's payload goes HERE, now, and nowhere else.
+ * Used by the app's Get (the album you don't have, and the Get chip on a Search row) - and, until the
+ * main page retired in 2.0.0-player.66, by its row Find and card Find through the bridge, which had
+ * called main.js's own buildExpectedFromRelease and buildExpectedFromReleaseGroup until this was
+ * written: two builders were two answers waiting to drift apart. Anything added to a download's
+ * payload goes HERE, and nowhere else.
  *
- * The artist has two roles, and they are not interchangeable (lib/release.ts, credits.mjs):
+ * The artist has two roles, and they are not interchangeable (lib/release.ts):
  *  - `artist` is AS CREDITED on the album - the group's credit - which is what a stranger typed
  *    into their Soulseek folder, so it is what is searched for and what the matcher scores against.
  *  - `album_artist` is who the album is BY in their CURRENT names - the folder it is filed under
  *    and the albumartist tag - from the PRESSING's own credit, so the name and `artist_mbids` (the
  *    same credit's ids) can't disagree. Ye's Donda is searched as "Kanye West" and filed under Ye.
  *
- * Kept exactly as main.js had it, quirks included, because the main page still sends what this
- * builds and the orchestrator diffs its bodies before and after: a credit that names nobody is
+ * Kept exactly as main.js had it, quirks included - the fixture is what the main page sent, and the
+ * jobs already filed were filed by it: a credit that names nobody is
  * "N/A" (getArtistNames' word), the country is the raw ISO code ("XE", not the flag's "eu" - the
  * editions code recognises and drops the worldwide ones), a year is four digits or null (never
  * "N/A", or an undated album files as "Album (N/A)"), and the album's own year is the group's
@@ -45,7 +44,7 @@ export interface GroupContext {
   releaseGroupId: string | null
 }
 
-/** A credit as credited, or "N/A" for one that names nobody - getArtistNames() in credits.mjs. */
+/** A credit as credited, or "N/A" for one that names nobody - as getArtistNames() in the main page's credits.mjs had it. */
 function credited(credit: ArtistCredit[] | undefined): string {
   return creditName(credit) || 'N/A'
 }
@@ -155,7 +154,7 @@ export function groupFallback(context: GroupContext): DownloadRelease {
   }
 }
 
-/** "Portishead - Dummy", "Kanye West - Donda [DELUXE]" - what the main page's candidates panel heads itself with. */
+/** "Portishead - Dummy", "Kanye West - Donda [DELUXE]" - what Sources heads itself with (the main page's candidates panel's heading). */
 export function downloadLabel(release: DownloadRelease): string {
   const tags = release.edition_tags.length ? ` [${release.edition_tags.join(', ')}]` : ''
   return `${release.artist} - ${release.album}${tags}`
@@ -163,8 +162,8 @@ export function downloadLabel(release: DownloadRelease): string {
 
 /**
  * A download of `release` - a pressing of `group` - or, with no pressing, of the album as a whole;
- * with the label a panel heads it with. What the main page's two Find buttons call (the bridge's
- * `buildDownloadRelease`): the row passes its own pressing, the card representativeRelease()'s.
+ * with the label a panel heads it with - a pressing's own, or representativeRelease()'s for the album
+ * (as the main page's row and card Finds passed them, until it retired).
  */
 export function buildDownloadRelease(
   group: Pick<ReleaseGroup, 'id' | 'title' | 'first-release-date' | 'artist-credit'>,

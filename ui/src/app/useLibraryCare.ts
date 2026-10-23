@@ -13,17 +13,17 @@ import { announceAlbumsFiled } from '../lib/libraryEvents'
  * App draws only the page on top of each tab, so Library care goes whenever another page takes its
  * place - the sidebar's Log or Settings, Back, Go to album - and a run of a whole library takes
  * minutes. Kept here, a run goes on while you look at the Log, its Stop still works when you come
- * back, and each run's result stays on screen until the next of its kind, as the main page keeps it.
+ * back, and each run's result stays on screen until the next of its kind, as the main page kept it.
  * The words typed to narrow the runs are kept with them.
  *
  * Each run is lib/bulkTargets.ts's runBulk over the albums the page hands it, one at a time, through
- * the route a single click uses (Get cover, Get CD art, Get lyrics - the same calls the main page's
- * runs and the Edit panel's buttons make): never a loop on the server. Each kind runs on its own, as on
- * the main page; one of a kind at a time (asked again while running, it does nothing), each through a
+ * the route a single click uses (Get cover, Get CD art, Get lyrics - the same calls the Edit panel's
+ * buttons make, as the main page's runs did): never a loop on the server. Each kind runs on its own, as
+ * on the main page; one of a kind at a time (asked again while running, it does nothing), each through a
  * latestOnly() of its own so nothing from an older run is ever drawn over a newer one's. Once a run has
  * written anything the library's listeners are told (announceAlbumsFiled - the page's own scan, the
  * Edit panel's, Needs a look's and its count, the owned marks), once, at its end, as the main page
- * reloads once at its end - and its kind is `behind`: the scan the page holds still lists what the run
+ * reloaded once at its end - and its kind is `behind`: the scan the page holds still lists what the run
  * just did as missing, so the page holds that kind's button back until a read of the library begun
  * after the run ended has landed (app/LibraryCare.tsx), rather than offer the same albums again.
  */
@@ -51,7 +51,7 @@ function keep(change: Partial<CareState>): void {
 }
 
 /** A cover or CD art: written, none to find (a 404 - a fact about the release), or failed (worth
- *  another go) - told apart as the main page tells them. */
+ *  another go) - told apart as the main page told them. */
 const pictureStep = (route: (path: string) => Promise<unknown>) => async (album: LibraryAlbum): Promise<BulkOutcome> => {
   try {
     await route(album.path)

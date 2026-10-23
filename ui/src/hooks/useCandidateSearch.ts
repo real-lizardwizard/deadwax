@@ -10,10 +10,9 @@ import { candidateQuality } from '../lib/perPerson'
 
 /**
  * One Soulseek search for a release, and a download from it - the app's Sources sheet's
- * (2.0.0-player.15). The main page's candidates panel (components/CandidatesPanel.tsx) does the
- * same orchestration and is left exactly as it is - so the main page, and merges from main into it,
- * stay safe; the copy goes when the main page does. Every rule it relies on is in the shared, tested
- * lib/candidates.ts and lib/latest.ts:
+ * (2.0.0-player.15). The main page's candidates panel did the same orchestration, left exactly as it
+ * was while both pages lived; it went when the main page retired (2.0.0-player.66). Every rule this
+ * relies on is in the tested lib/candidates.ts and lib/latest.ts:
  *
  *  - ONE search value, which only the newest search becomes (latestOnly, v0.9.2): a slow answer for
  *    the album you left never draws under the album you went to, and the search it superseded is

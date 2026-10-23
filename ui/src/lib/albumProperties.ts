@@ -4,7 +4,7 @@ import { formatSize } from './format'
 /**
  * An album page's Properties (2.0.0-player.44) - pure, pinned by inspector.sim.cjs.
  *
- * What the main page's details pane says of an album that the app's album page didn't (the parity audit's
+ * What the main page's details pane said of an album that the app's album page didn't (the parity audit's
  * gaps): its year against this pressing's, its size, its release linked to musicbrainz.org, and when
  * deadwax first saw it - and whether deadwax filed it. On both frames, for everyone, from the id bridge
  * the page asks already (GET /store/album by Navidrome's id): its `present` rows carry what the saved scan

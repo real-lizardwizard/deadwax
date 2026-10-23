@@ -1842,17 +1842,12 @@ def test_a_folder_that_cant_be_made_is_said_for_as_long_as_it_lasts(app, tmp_pat
 def test_clears_refusal_is_styled_by_aria_disabled_on_every_page():
     """Review: Clear refuses with aria-disabled, never `disabled` (it refuses itself on its own press, and a
     focused button made disabled drops the focus to the page) - so each page fades it by that, where a rule
-    on :disabled would never apply, and the main page takes away its hover and press."""
-    from tests.test_app_css import declarations, tokens
+    on :disabled would never apply."""
+    from tests.test_app_css import declarations
 
-    main = (REPO / "interface/styles/main.css").read_text()
     phone = (REPO / "interface/player/app.css").read_text()
     desk = (REPO / "interface/player/app-desktop.css").read_text()
     refused = "[aria-disabled='true']"
-    assert declarations(main, f".settings-answers .win-button{refused}") == \
-        {"cursor": "not-allowed", "opacity": "var(--disabled-opacity)"}
-    assert declarations(main, f".settings-answers .win-button{refused}:hover")["background"] == "var(--gloss-button)"
-    assert tokens((REPO / "interface/styles/theme.css").read_text())["--disabled-opacity"] == "0.45"
     assert declarations(phone, f".app-shell:not(.app-desk) .app-settings .settings-answers .win-button{refused}") == \
         {"opacity": "var(--app-job-busy)"}
     assert declarations(desk, f".app-desk .app-settings .settings-answers .win-button{refused}", "@media (min-width: 1024px)") == \

@@ -2,10 +2,10 @@
  * Looking after the library in the app, on a desktop (2.0.0-player.42) - the Library care page's
  * words and its narrowing, pure, pinned by ui/test/care.sim.cjs. The page is app/LibraryCare.tsx; the
  * runs it starts are app/useLibraryCare.ts's; which albums each run takes, and its words once it has
- * finished, are lib/bulkTargets.ts's (shared with the main page's Library tab).
+ * finished, are lib/bulkTargets.ts's (shared with the main page's Library tab until it retired).
  *
- * THE SCAN, said as the main page's status bar says it: its albums (an album held in several
- * pressings once, as the main page counts it), tracks and size; and how old it is - "Saved scan from
+ * THE SCAN, said as the main page's status bar said it: its albums (an album held in several
+ * pressings once, as the main page counted it), tracks and size; and how old it is - "Saved scan from
  * 3 h ago" while the saved scan is what's in hand, "Scanned 2 min ago in 4s" once the disk has been
  * read. Rescan reads every file again: deadwax notices a changed album by its folder's date, which a
  * tag edited in place by another program doesn't move.
@@ -91,7 +91,7 @@ export const BULK_TITLES: Readonly<Record<BulkKind, string>> = {
   lyrics: 'Lyrics',
 }
 
-/** What the scan holds, as the main page's status bar counts it: albums (several pressings of one
+/** What the scan holds, as the main page's status bar counted it: albums (several pressings of one
  *  album once), tracks, and size. */
 export function scanTotals(albums: readonly LibraryAlbum[]): string {
   const groups = groupAlbums(albums).length
@@ -100,7 +100,7 @@ export function scanTotals(albums: readonly LibraryAlbum[]): string {
   return [`${groups} album${groups === 1 ? '' : 's'}`, `${tracks} track${tracks === 1 ? '' : 's'}`, size].filter(Boolean).join(' · ')
 }
 
-/** How old the scan in hand is, as the main page's status bar says it - or what is under way. */
+/** How old the scan in hand is, as the main page's status bar said it - or what is under way. */
 export function scanAge(
   scan: { loaded: boolean; stale: boolean; loading: boolean; scannedAt: number | null; scanSeconds: number },
   rescanning: boolean,

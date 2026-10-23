@@ -2,8 +2,8 @@
  * The app's one search box as a MusicBrainz query (2.0.0-player.13). Pure, pinned by
  * ui/test/searchQuery.sim.cjs.
  *
- * James: "One search box: library first, then MusicBrainz". The main page has two boxes, artist
- * and title, and builds a fielded query from them (main.js handleSearch); the app has one, so it
+ * James: "One search box: library first, then MusicBrainz". The main page had two boxes, artist
+ * and title, and built a fielded query from them (main.js handleSearch); the app has one, so it
  * has to tell the two apart itself. It does that with what the library already knows - the names
  * of the artists you have - and nothing cleverer:
  *
@@ -13,8 +13,8 @@
  *    the artist's name then or now. "portishead third" is Third by Portishead; so is "third
  *    portishead". The longest name that fits wins ("Pink Floyd" over a "Pink" you also have).
  *  - The box IS an artist you have: `artist:"A"`.
- *  - Anything else goes as free text, as the main page sends a title typed alone.
- *  - `va` (and "various artists") is Various Artists, as the main page's artist box reads it.
+ *  - Anything else goes as free text, as the main page sent a title typed alone.
+ *  - `va` (and "various artists") is Various Artists, as the main page's artist box read it.
  *
  * A dash, colon or slash between the artist and the title ("portishead - third") is dropped.
  *
@@ -65,7 +65,7 @@ export function quoteTerm(text: string): string {
   return `"${text.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
 }
 
-/** Secondary types "studio only" leaves out, BY NAME - the main page's list (main.js). */
+/** Secondary types "studio only" leaves out, BY NAME - the main page's list (main.js, as it was). */
 export const NOISY_SECONDARY_TYPES = ['Live', 'Compilation', 'Interview', 'Demo', 'Remix', 'DJ-mix'] as const
 
 /**

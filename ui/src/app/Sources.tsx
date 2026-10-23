@@ -48,7 +48,7 @@ let queryForms = 0
 /**
  * The desktop panel's Signals chip (2.0.0-player.19), as DesktopRequest.dc.html draws it beside the
  * phone's three: the least each of the score's six signals may be, as the main page's candidates
- * panel has them - a slider each, 0 for any, with a count on the chip of how many are set so a
+ * panel had them - a slider each, 0 for any, with a count on the chip of how many are set so a
  * minimum is never a filter on out of sight. A tap outside closes it, as does Escape - taken here,
  * so it doesn't close the panel too.
  */

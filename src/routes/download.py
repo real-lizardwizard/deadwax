@@ -262,7 +262,7 @@ async def unless_abandoned(request: Request, work, check_every: float | None = N
     """
     Await `work`, cancelling it if the client goes away first (raising ClientGone).
 
-    The browser aborts a Soulseek search the page no longer wants (latest.mjs, v0.9.2), but
+    The browser aborts a Soulseek search the page no longer wants (lib/latest.ts, v0.9.2), but
     uvicorn does not cancel a handler when its client disconnects - so the search ran on in
     slskd to its full timeout, was scored, and was returned into a closed connection. This
     notices the disconnect and cancels the work, which stops the searches (search_all).

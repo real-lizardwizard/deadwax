@@ -1,5 +1,7 @@
 # The library, the editors and the files deadwax writes
 
+The main page these describe retired in 2.0.0-player.66 (see "The main page retired" in notes/app.md); the reasoning is kept as history.
+
 The library explorer and its scan, disc numbers and titles, the editors, artist pages, CD art and lyrics.
 
 Moved verbatim from CLAUDE.md (2026-10-07), where it was loaded into every session; read it when your work touches this area. Sections refer to each other by title: `grep -rn "### <title>" notes/` finds one.

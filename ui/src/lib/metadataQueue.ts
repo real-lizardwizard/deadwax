@@ -72,11 +72,3 @@ export function queueAlbums(albums: readonly LibraryAlbum[], issue?: string | nu
 export function issueLabel(code: string, types: Record<string, MetadataIssueType>): string {
   return types[code]?.label ?? code
 }
-
-/** Every issue spelled out, for a title attribute — one per line. */
-export function describeIssues(
-  codes: readonly string[],
-  types: Record<string, MetadataIssueType>,
-): string {
-  return codes.map((code) => types[code]?.hint ?? code).join('\n\n')
-}

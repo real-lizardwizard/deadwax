@@ -95,8 +95,11 @@ ROUTES = {
     ("GET", "/player/index.html"): "public",
     ("GET", "/player/lab/"): "public",
     ("GET", "/player/lab/index.html"): "public",
+    #? (2.0.0-player.66) the main page's addresses: a 307 to the app, GET and HEAD, public as the page was
     ("GET", "/"): "public",
+    ("HEAD", "/"): "public",
     ("GET", "/index.html"): "public",
+    ("HEAD", "/index.html"): "public",
     ("GET", "/deadwax/interface_logs/recent"): "server",
     ("GET", "/deadwax/interface_logs/interface_logs"): "server",
     ("GET", "/deadwax/search_musicbrainz/fully_search"): "user",
@@ -542,14 +545,18 @@ def test_off_leaves_the_pages_unmarked_and_the_api_pages_there(monkeypatch):
     monkeypatch.setattr(Config, "AUTH_MODE", "off")
     client = TestClient(start())
     assert LOGINS_MARK not in client.get("/player/").text
-    assert LOGINS_MARK not in client.get("/").text
+    #? (2.0.0-player.66) `/` is no page: a redirect to the app, whose page carries the mark or not
+    assert client.get("/", follow_redirects=False).status_code == 307
     assert client.get("/openapi.json").status_code == 200
 
 
 def test_on_marks_the_pages_and_takes_the_api_pages_away(on):
     assert LOGINS_MARK in on.client.get("/player/").text
-    assert LOGINS_MARK in on.client.get("/").text
-    assert LOGINS_MARK in on.client.get("/index.html").text
+    assert LOGINS_MARK in on.client.get("/player/index.html").text
+    #? (2.0.0-player.66) the main page's addresses mark nothing: they send the browser to the app, signed in or not
+    for path in ("/", "/index.html"):
+        moved = on.client.get(path, follow_redirects=False)
+        assert moved.status_code == 307 and moved.headers["location"] == "/player/", path
     for path in ("/docs", "/redoc", "/openapi.json"):
         assert on.client.get(path).status_code == 404, path
     #? the static files stay public

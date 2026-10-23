@@ -387,7 +387,7 @@ and "show the bonus track differences on an album that has them".
 - **Two copies of tracklistDiff and owned, held to one answer.** The Docker UI stage copies only
   `ui/`, so the app can't import `interface/scripts/*.mjs`: `lib/tracklistDiff.ts` and
   `lib/owned.ts` are PORTS (same functions, same thresholds, same answers), and the `.mjs` stay for
-  the main page until it retires. `tracklist.sim.cjs` and `owned.sim.cjs` run BOTH copies against
+  the main page until it retired in .66. `tracklist.sim.cjs` and `owned.sim.cjs` run BOTH copies against
   shared fixtures in `tests/fixtures/pressings/`: The Slow Rush, Dummy and Third as MusicBrainz
   answered on 2026-09-30 (`/release?release-group=…&inc=media+recordings+labels+artist-credits`,
   trimmed to the fields read), each with what the `.mjs` answered recorded beside it (the base, the
@@ -978,7 +978,7 @@ keys read and write as before.
   opens); Complete albums only, Min score, a sample-rate floor and more results from MusicBrainz (the
   audit's "should" rows - another slice: built in 2.0.0-player.50 but Min score, left to the desktop's
   Signals - see "Search extras"); the main page's own Format and Confirm before cancelling
-  following the app's (the main page keeps its copies until it retires, configuration.md says so).
+  following the app's (the main page kept its copies until it retired in .66, configuration.md says so).
 
 ### Search extras (2.0.0-player.50)
 
@@ -1096,7 +1096,7 @@ floor on a desktop; the size range dropped and README.md:123 corrected; Min scor
   goes by it.
 - **The size range is dropped**: README.md:123 and docs/downloading.md no longer promise it (the board left it
   out of the app, "Not built, on purpose" in "Sources and Get"); downloading.md says the main page's Quality
-  dropdown still has one, until it retires. Min score stays the desktop's Signals.
+  dropdown still had one, until it retired in .66. Min score stays the desktop's Signals.
 - **Style** (tokens only): app.css's own section, "search extras", with its own `:root` - `--app-search-more-gap`,
   `--app-rg-facts-lines`, `--app-rg-facts-gap`, `--app-rg-maybe-pad`, `--app-rg-links-*`, `--app-rg-link-reach`,
   `--app-picker-filter-gap`, `--app-picker-filter-z`, `--app-picker-filter-block`; app-desktop.css a block of

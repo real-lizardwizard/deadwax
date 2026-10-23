@@ -83,9 +83,8 @@
  * download, only where the page gives a way to join and the download isn't yours; the tap asks at
  * once and waits (aria-disabled), a second tap asks nothing; a refusal in deadwax's words in an
  * alert, with Join back; joined, the button gives way to saying so, handing its focus to the box
- * (never to the page) - unless focus had moved on. The main page's box (components/StoreStatusBox.tsx)
- * drawn too: Join, waiting aria-disabled (never disabled), refused in an alert, joined - its focus
- * handed to the box - and no Join for a download of your own. A Get - a card's, and a pick for you -
+ * (never to the page) - unless focus had moved on. (The main page's box, components/StoreStatusBox.tsx,
+ * was drawn here too until it retired with that page in 2.0.0-player.66.) A Get - a card's, and a pick for you -
  * sends its folder's quality, and each runner-up's, as candidateQuality puts it.
  *
  * And personal libraries (2.0.0-player.51): a pressing the store holds whole that isn't yours (`yours`
@@ -93,8 +92,7 @@
  * and offers Add to my library - yours, or logins off, is "Already in your library" word for word; a part
  * the store holds that isn't yours is "The store has". AddToLibrary drawn: only where offered and the page
  * gives a way; the tap asks at once and waits (aria-disabled), a second tap asks nothing; refused in an
- * alert with Add back; added, said, its focus handed to the box. The main page's box: Add for the release
- * the Find was for, waiting, added - and none with no release to send.
+ * alert with Add back; added, said, its focus handed to the box.
  *
  * Run it with:  node ui/test/sources.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
  */
@@ -106,7 +104,7 @@ const UI = path.resolve(__dirname, '..')
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-sources-'))
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
-  'src/app/Sources.tsx', 'src/components/StoreStatusBox.tsx', '--rootDir', 'src', '--outDir', OUT,
+  'src/app/Sources.tsx', '--rootDir', 'src', '--outDir', OUT,
   '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
   '--lib', 'es2022,dom,dom.iterable', '--jsx', 'react-jsx', '--jsxImportSource', 'preact',
 ], { cwd: UI, stdio: 'inherit' })
@@ -200,7 +198,6 @@ const hooks = require(path.join(OUT, 'node_modules/preact/hooks.js'))
 const { Sources, SignalsChip, RateChip } = require(path.join(OUT, 'app/Sources.js'))
 const { SourceCard } = require(path.join(OUT, 'app/SourceCard.js'))
 const { JoinDownload, StoreState } = require(path.join(OUT, 'app/StoreState.js'))
-const { StoreStatusBox } = require(path.join(OUT, 'components/StoreStatusBox.js'))
 
 let tree = null
 function find(test, within = tree) {
@@ -732,47 +729,7 @@ async function main() {
     delete globalThis.document
   }
 
-  console.log('\nthe main page\'s store box (components/StoreStatusBox.tsx): Join, waiting, joined, refused')
-  {
-    const answers = []
-    const realJoin = globalThis.__sources.join
-    globalThis.__sources.join = (jobId) => new Promise((resolve, reject) => { answers.push({ jobId, resolve, reject }) })
-    const status = { kind: 'downloading', title: 'Already downloading for someone else', lines: ['From bob · FLAC 16/44.1 · queued',
-      'Join it to have it in your Downloads too - one download, everyone who asked waiting for it.'], joinJobId: 5 }
-    const draw = hooks.root(StoreStatusBox)
-    tree = draw({ status })
-    const button = () => find((node) => node.type === 'button')[0]
-    check('the title, the lines, and Join', [text(find((node) => node.type === 'h4')[0]), find((node) => node.type === 'p').map(text), text(button()), button().props['aria-disabled']],
-      ['Already downloading for someone else', status.lines, 'Join this download', false])
-    check('...a box that can hold the focus Join gives up', find((node) => byClass('candidates-store')(node))[0].props.tabIndex, -1)
-    button().props.onClick()
-    tree = draw({ status })
-    check('the tap asks at once; the button waits, aria-disabled - still focusable, never disabled',
-      [answers.map((a) => a.jobId), text(button()), button().props['aria-disabled'], button().props.disabled], [[5], 'Joining…', true, undefined])
-    button().props.onClick()
-    check('...a second tap asks nothing more', answers.length, 1)
-    answers[0].reject(new Error('that download has been cancelled since - get it again to see where it stands'))
-    await settle()
-    tree = draw({ status })
-    check('refused: deadwax\'s words in an alert, and Join back', [find((node) => node.props?.role === 'alert').map(text), text(button())],
-      [['that download has been cancelled since - get it again to see where it stands'], 'Join this download'])
-    const focused = []
-    const fakeButton = { closest: (selector) => (selector === '.candidates-store' ? { focus: () => focused.push('box') } : null) }
-    globalThis.document = { body: {}, activeElement: fakeButton }
-    button().props.onClick()
-    button().props.ref.current = fakeButton
-    answers[1].resolve(true)
-    await settle()
-    tree = draw({ status })
-    check('joined: "Joined - it\'s in Downloads.", the button gone - its focus handed to the box',
-      [find((node) => node.type === 'button').length, find((node) => node.props?.role === 'status').map(text), focused], [0, ["Joined - it's in Downloads."], ['box']])
-    delete globalThis.document
-    tree = draw({ status: { ...status, joinJobId: undefined } })
-    check('a download of your own: no Join', find((node) => node.type === 'button').length, 0)
-    globalThis.__sources.join = realJoin
-  }
-
-  console.log('\nAdd to my library (2.0.0-player.51): the store line\'s case, the app\'s button, the main page\'s box')
+  console.log('\nAdd to my library (2.0.0-player.51): the store line\'s case, and the app\'s button')
   {
     const { storeStatusFor } = require(path.join(OUT, 'lib/perPerson.js'))
     const { storeNotes } = require(path.join(OUT, 'lib/candidates.js'))
@@ -844,26 +801,6 @@ async function main() {
     check('added: said, the button gone, its focus handed to the box', [find((node) => node.type === 'button').length, find((node) => node.props?.role === 'status').map(text), focused],
       [0, ["Added - it's in your library, and deadwax stars it for you in Navidrome."], ['box']])
     delete globalThis.document
-
-    const draw = hooks.root(StoreStatusBox)
-    const release = { artist: 'Portishead', album: 'Third', release_mbid: 'rel-third' }
-    tree = draw({ status: notYours, release })
-    const mainButton = () => find((node) => node.type === 'button')[0]
-    check('the main page\'s box: Add, for the release the Find was for', text(mainButton()), 'Add to my library')
-    mainButton().props.onClick()
-    tree = draw({ status: notYours, release })
-    check('...asked at once, waiting aria-disabled', [adds.map((a) => a.release.release_mbid), text(mainButton()), mainButton().props['aria-disabled']], [['rel-third'], 'Adding…', true])
-    adds[0].resolve({ added: true })
-    await settle()
-    tree = draw({ status: notYours, release })
-    check('...added, said', [find((node) => node.type === 'button').length, find((node) => node.props?.role === 'status').map(text)],
-      [0, ["Added - it's in your library, and deadwax stars it for you in Navidrome."]])
-    //? (review) the main page doesn't ask the store again either: the box says it's yours itself, as the panel does
-    check('...and the box above it says it is yours now: "Already in your library", the add note gone',
-      [find((node) => node.type === 'h4').map(text), find((node) => node.type === 'p' && node.props?.role === undefined).map(text)],
-      [['Already in your library'], ['Portishead/Third (2008)', '11 of 11 tracks · FLAC']])
-    tree = hooks.root(StoreStatusBox)({ status: notYours })
-    check('...and no Add with no release to send', find((node) => node.type === 'button').length, 0)
   }
 
   console.log('\na card, drawn: Speed leading, the facts, the missing line')

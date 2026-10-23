@@ -1,58 +1,7 @@
 import type { LibraryAlbum } from '../api/types'
 import { outstandingIssues } from './metadataQueue'
 
-/**
- * One album, with every edition of it you hold.
- *
- * Mirrors how the search view is organised - there a release *group* is the album and the
- * releases under it are its editions, and the same shape belongs here. Listing every edition
- * as a peer meant three separate "The Slow Rush" rows, which reads as three albums rather
- * than one album you happen to have three pressings of.
- */
-/**
- * What an album's folders are, in words: "3 editions", or - when some are the discs of one
- * release stored one folder per disc (v0.9.13) - "2 disc folders" / "2 editions · 1 split".
- * The count of editions comes from the scan, which counts a split release once.
- */
-export function folderSummary(editions: readonly { split_discs?: boolean; edition_count: number }[]): {
-  label: string
-  title: string
-} {
-  const folders = editions.length
-  const split = editions.filter((e) => e.split_discs).length
-  const releases = editions[0]?.edition_count ?? folders
-  if (!split) {
-    return { label: `${folders} editions`, title: `${folders} versions of this album are in your library` }
-  }
-  const title = `${split} of these folders hold different discs of one release - the metadata `
-    + 'editor merges them when you apply that release to each'
-  return releases <= 1
-    ? { label: `${folders} disc folders`, title }
-    : { label: `${releases} editions · split discs`, title }
-}
-
-/**
- * What one folder is called among its album's others: its edition, or - for a disc of a release
- * stored one folder per disc - which discs it holds (v0.9.13), after the edition when it has one.
- * A folder of ONE disc that has a title says it too (v1.1.0): "Disc 4 · Live at Wembley 1974" -
- * such a folder has no disc headings of its own, so this is the only place it would show.
- */
-export function editionName(album: {
-  edition: string
-  disc_label?: string | null
-  discs?: number[]
-  disc_titles?: Record<string, string>
-}): string {
-  if (album.disc_label) {
-    const [only, ...rest] = album.discs ?? []
-    const title = only !== undefined && !rest.length ? album.disc_titles?.[String(only)] : ''
-    const label = title ? `${album.disc_label} · ${title}` : album.disc_label
-    return album.edition ? `${album.edition} · ${label}` : label
-  }
-  return album.edition || 'Standard'
-}
-
-export interface AlbumGroup {
+interface AlbumGroup {
   key: string
   artist: string
   album: string

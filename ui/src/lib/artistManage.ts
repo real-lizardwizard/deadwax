@@ -1,13 +1,13 @@
 /**
  * The artist page, as the main page had it (2.0.0-player.45) - pure, pinned by ui/test/artist.sim.cjs.
  *
- * The app's artist page (app/ArtistPage.tsx) gains what the main page's (components/ArtistDetails.tsx)
- * always showed: who MusicBrainz says they are in full - their other names, when they began and
+ * The app's artist page (app/ArtistPage.tsx) gains what the main page's (its ArtistDetails.tsx, retired
+ * with it in 2.0.0-player.66) always showed: who MusicBrainz says they are in full - their other names, when they began and
  * ended, their genres, links and line-up - what the library holds of them, and, for an admin, the two
  * writers that page drove: their pictures (src/artist_art.py, the fifth) and moving their albums under
  * the name MusicBrainz uses now (src/artist_refile.py, the eighth). Both through the routes the main
- * page uses, every one of which takes the LIBRARY'S name for the artist - the album artist the scan
- * read, which is how the main page's tree groups albums.
+ * page used, every one of which takes the LIBRARY'S name for the artist - the album artist the scan
+ * read, which is how the main page's tree grouped albums.
  *
  * WHICH NAMES. The app's page is one per artist (Navidrome's, or MusicBrainz's by id), while the
  * library may file them under several names - Ye's page holds Donda, filed as "Kanye West", and BULLY,
@@ -133,7 +133,7 @@ export interface ImagesFolder {
 /**
  * The folder Artist images… writes into: the current name's when the library files them under it,
  * else the only name's. Under several names and none of them current, none - they're moved first;
- * a name whose albums share no folder says why (the summary's own words, as the main page's button).
+ * a name whose albums share no folder says why (the summary's own words, as the main page's button said them).
  */
 export function imagesFolder(
   names: readonly string[], current: string | null | undefined, summaries: ReadonlyMap<string, Pick<ArtistSummary, 'path' | 'folder_problem'> | null>,

@@ -3,40 +3,22 @@
   deadwax design tokens
   ============================================================================
 
-  This file is the ONLY place raw values are allowed to live. main.css and the
-  Preact components in ui/ both consume these names, so changing a value here
-  restyles the whole application at once - which is exactly what makes a shared
-  token layer worth having while the frontend is still half vanilla and half
-  Preact. A colour typed literally into a rule is a bug in this codebase.
+  The app's token layer: the ONLY place raw values are allowed to live. The app's
+  page and the turntable's test bench both LINK this file first (it is not
+  @import-ed), then their own sheets - interface/player/player.css, app.css,
+  app-desktop.css, and the bench's lab.css - which draw from section 10's --dw-*
+  tokens. Sections 1 to 9 hold what those alias: the face, the weights, the
+  line heights, the accent's lighter purple and the motion, so changing a value
+  here restyles the whole app at once. A colour typed literally into a rule is a
+  bug in this codebase.
 
-  NOTE: this file is @import-ed from main.css, so the browser caches it
-  SEPARATELY. Editing the palette and reloading will show the OLD colours until
-  you bust it explicitly (or hard-refresh). This has cost time before.
-
-  ---------------------------------------------------------------------------
-  What changed in the v0.5 overhaul, and why
-  ---------------------------------------------------------------------------
-
-  * The 30 bundled OTF faces are gone. Only 7 of them ever loaded, and the other
-    23 were ~1.2MB of declarations no rule referenced. The whole family has been
-    replaced by the platform's own UI and monospace stacks: nothing to download,
-    nothing to FOUT, and it renders in the face the user's OS already draws every
-    other application in. The .otf files themselves were deleted in v0.6.7: they
-    were Berkeley Mono, a commercial font this repo had no licence to redistribute.
-    Since v0.6.7 the interface face is a bundled Noto Sans - see section 1.
-
-  * The wordmark is figlet-style ASCII art, so it now sets --font-mono. It used
-    to inherit a PROPORTIONAL face, which is the wrong tool for art whose whole
-    construction assumes every glyph is the same width.
-
-  * Glow is off by default. The --*-glow-* tokens still exist and are still
-    referenced by ~23 text-shadow rules across main.css; they now resolve to
-    `transparent`, which switches every one of those off without editing them.
-    Set them back to a colour to bring the CRT look back wholesale.
-
-  * Sizes, spaces, radii, shadows and motion are scales now, not opinions. The
-    old sheet had ~15 unrelated `em` font sizes, 10 button heights and 10
-    paddings. Scales are below; use a step, never a fresh number.
+  Until 2.0.0-player.66 this file served the old main page too, whose main.css
+  read most of what sections 1-9 then held (its retro palette, its spacing,
+  radius, elevation and z-index scales, its Windows 7 gloss and its neutralised
+  glows). They went with that page, so those sections are short, and 3, 4, 6, 8
+  and 9 are gone; the numbers are kept, since the notes and the app's sheets
+  name "section 10". tests/test_app_css.py keeps a token nothing reads from
+  coming back.
 */
 
 
@@ -48,7 +30,7 @@
   Noto Sans, bundled - chosen in v0.6.7 from six candidates set side by side.
 
   SELF-HOSTED, not a CDN: these files live in styles/font/noto-sans/ and are served by
-  deadwax itself, so the interface keeps working on a box with no internet access at all,
+  deadwax itself, so the app keeps working on a box with no internet access at all,
   which is the reason a webfont CDN was never an option here. OFL.txt sits beside them.
 
   One variable-weight file (300-700) per script, split by unicode-range exactly as Google
@@ -136,37 +118,22 @@
     unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
 }
 
+/*
+  The families and weights. Noto Sans first, on every device - not "Segoe UI first", which
+  would make Windows look different from what was chosen. The system stack behind it is a
+  FALLBACK: it draws whatever Noto Sans doesn't cover, and everything during the moment
+  before the Latin file arrives (font-display: swap), which from the app's own server is
+  brief. The data face is monospace: track numbers, durations, byte counts and rates read
+  in columns, and columns only line up in a monospace.
+*/
 :root {
-    /*
-      Noto Sans first, on every device - not "Segoe UI first", which would make Windows look
-      different from what was chosen. The system stack behind it is now a FALLBACK: it
-      draws whatever Noto Sans doesn't cover, and everything during the moment before the
-      Latin file arrives (font-display: swap), which from the app's own server is brief.
-    */
     --font-family:
         "Noto Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
         "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-
-    /*
-      Data face. Track numbers, durations, byte counts, MBIDs, paths, queue
-      positions and transfer rates all read in columns, and columns only line up
-      in a monospace. This is the "monospace data" half of the visual identity.
-    */
     --font-mono:
         ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
         "Liberation Mono", "Courier New", monospace;
 
-    /*
-      Legacy aliases. main.css references these ~85 times and the Preact
-      components inherit from them; pointing all three at the UI stack restyles
-      every one of those rules at once. Prefer --font-family / --font-mono in
-      anything new - these exist so the overhaul didn't need to be an 85-line
-      find-and-replace with 85 chances to typo.
-    */
-    --font-family-semi: var(--font-family);
-    --font-family-condensed: var(--font-family);
-
-    --font-retina: 300;
     --font-regular: 400;
     --font-medium: 500;
     --font-bold: 600;      /* 700 was heavy-handed at these sizes; 600 reads as emphasis */
@@ -175,82 +142,13 @@
 
 
 /* ==========================================================================
-   2. TYPE SCALE
+   2. LINE HEIGHTS
    ========================================================================== */
 
 :root {
-    /*
-      Six steps, in REM rather than EM. The old sheet was all `em`, which meant
-      sizes COMPOUNDED through nesting and the whole thing could not be rescaled
-      from one place - setting a base size on body shrank the headings with it.
-      rem is measured from the root, so a step means the same thing wherever it
-      is used and the entire interface can be scaled by one declaration.
-
-      The values are small because this is a dense data tool, not a landing page:
-      the job is fitting a release grid on screen, not making an impression.
-    */
-    --text-2xs:  0.6875rem;  /* 11px - chips, counts, column heads */
-    --text-xs:   0.75rem;    /* 12px - secondary metadata */
-    --text-sm:   0.8125rem;  /* 13px - table and list body, the workhorse */
-    --text-base: 0.875rem;   /* 14px - primary UI text, buttons, inputs */
-    --text-lg:   1rem;       /* 16px - panel and section headings */
-    --text-xl:   1.25rem;    /* 20px - view titles */
-
-    /* Line heights: tight for tabular rows, relaxed for prose. */
+    /* tight for rows of data, a little more for anything read as prose */
     --leading-tight:  1.25;
     --leading-normal: 1.45;
-    --leading-relaxed: 1.6;
-
-    /*
-      Small text in a UI face needs a little tracking to stay legible; large text
-      needs a little negative tracking to stop looking loose. Both are subtle on
-      purpose.
-    */
-    --tracking-wide: 0.04em;
-    --tracking-tight: -0.01em;
-}
-
-
-/* ==========================================================================
-   3. SPACING
-   ========================================================================== */
-
-:root {
-    /*
-      8pt grid with 4px half-steps at the small end, where dense UI actually
-      lives. Ten distinct paddings were measured in the old sheet; these seven
-      steps cover every one of those cases.
-    */
-    --space-1: 4px;
-    --space-2: 8px;
-    --space-3: 12px;
-    --space-4: 16px;
-    --space-5: 24px;
-    --space-6: 32px;
-    --space-7: 48px;
-
-    /* Control heights. There were TEN button heights; there are three. */
-    --control-sm: 24px;
-    --control-md: 30px;
-    --control-lg: 36px;
-}
-
-
-/* ==========================================================================
-   4. RADII
-   ========================================================================== */
-
-:root {
-    /*
-      Pulled in for the Windows 7 touch (section 9). Aero's controls are nearly square - a 3px
-      button, a 6px window - and the rounder modern values were most of what made the interface
-      read as a web app rather than a desktop one. Pills stay pills.
-    */
-    --radius-sm:   2px;   /* chips, badges, inline controls */
-    --radius-md:   3px;   /* buttons, inputs, table rows */
-    --radius-lg:   4px;   /* cards, result boxes */
-    --radius-xl:   6px;   /* dropdowns, dialogs, overlay panels */
-    --radius-full: 999px; /* pills and circular badges */
 }
 
 
@@ -259,108 +157,8 @@
    ========================================================================== */
 
 :root {
-    /*
-      The backgrounds keep a faint violet cast so the purple accent reads as
-      part of the same family rather than something floating on neutral grey -
-      that idea from the original palette was right and is kept. What changed is
-      the SATURATION: the old #0e0b16 was purple enough to tint white text, and
-      every surface above it had to fight that. These are near-neutral with just
-      enough violet to feel intentional.
-    */
-    --background-color:       #0d0d12;  /* the page */
-    --background-color-light: #16161d;  /* panels, cards, raised surfaces */
-    --background-color-input: #0a0a0e;  /* inset: inputs, wells, scroll areas */
-    --surface-raised:         #1c1c25;  /* hover state for a surface, menus */
-    --surface-overlay:        #1a1a22;  /* dropdowns and dialogs */
-
-    /*
-      Borders do the work glow used to do. A 1px hairline separates surfaces
-      far more clearly than a blur, costs nothing to composite, and does not
-      smear at small text sizes.
-    */
-    --border-subtle:    #23232e;  /* default hairline between surfaces */
-    --border-default:   #2e2e3c;  /* a control's own edge */
-    --border-strong:    #3d3d4e;  /* hover / emphasis */
-    --border-accent:    #a855f755; /* focused or selected */
-    --background-color-decor: var(--border-subtle);  /* legacy alias */
-
-    /* --- accent ------------------------------------------------------- */
-    --accent:        #a855f7;
+    /* the brand's lighter purple: the app's accent (section 10's --dw-accent) */
     --accent-hover:  #c084fc;
-    --accent-muted:  #a855f71f;  /* tinted fills: selected rows, active chips */
-    --accent-ring:   #a855f766;  /* focus rings */
-
-    /* --- text --------------------------------------------------------- */
-    --white-text:           #e8e6ef;  /* primary */
-    --white-secondary-text: #8b8798;  /* secondary / body default */
-    --white-tertiary-text:  #6b6878;  /* de-emphasised metadata */
-    --muted-text:           #4e4b5c;  /* disabled, placeholder, dividers */
-    /* a control that can't be used just now: a button :disabled, or aria-disabled where the focus on it
-       must stay (2.0.0-player.54, Clear MusicBrainz's saved answers) - one value for both */
-    --disabled-opacity:     0.45;
-
-    /*
-      The "main" family was the purple text colour used for labels, headings and
-      chrome throughout. Keeping the names means every existing rule keeps
-      working; the values are pulled back so purple marks what MATTERS instead
-      of colouring most of the page.
-    */
-    --main-text:           #b794f6;
-    --main-secondary-text: #9a7fd1;
-    --main-muted-text:     #6f6489;
-    --main-hover-text:     #d6bcfa;
-
-    /* --- status ------------------------------------------------------- */
-    /* Modern, slightly desaturated so they sit on a dark surface without
-       vibrating. Green = done/connected, yellow = pending, red = failed. */
-    --green-text:           #34d399;
-    --green-secondary-text: #10b981;
-    --red-text:             #f87171;
-    --red-secondary-text:   #ef4444;
-    --yellow-text:          #fbbf24;
-    --yellow-secondary-text: #d97706;
-    /* tinted fills for chips, like --accent-muted: the text colour at 12% */
-    --green-muted:          #34d3991f;
-    --red-muted:            #f871711f;
-    --yellow-muted:         #fbbf241f;
-
-    /*
-      Glow tokens, retained and neutralised.
-
-      ~23 text-shadow rules and the .glow box-shadow reference these. Resolving
-      them to `transparent` turns the CRT bloom off everywhere WITHOUT touching
-      those rules, so the effect is one edit to restore and one edit to remove.
-      That is the whole reason they weren't deleted.
-    */
-    --main-glow-text:           transparent;
-    --main-secondary-glow-text: transparent;
-    --green-glow-text:          transparent;
-    --red-glow-text:            transparent;
-    --yellow-glow-text:         transparent;
-    --white-glow-text:          transparent;
-
-    /* Kept: used by the connection indicators, not by the removed CRT layer. */
-    --crt-red:   #f87171;
-    --crt-green: #34d399;
-    --crt-blue:  #60a5fa;
-}
-
-
-/* ==========================================================================
-   6. ELEVATION
-   ========================================================================== */
-
-:root {
-    /*
-      Shadows on a near-black background have to be nearly opaque to register at
-      all - a 10%-black shadow over #0d0d12 is invisible. These are heavy on
-      purpose, and each pairs a tight contact shadow with a wider ambient one,
-      which is what makes a panel read as floating rather than as a grey box.
-    */
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.35);
-    --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.45), 0 12px 32px rgba(0, 0, 0, 0.45);
-    --shadow-xl: 0 8px 16px rgba(0, 0, 0, 0.5), 0 24px 56px rgba(0, 0, 0, 0.5);
 }
 
 
@@ -372,43 +170,29 @@
     /*
       One motion system, so nothing has to invent a duration. The rule of thumb
       the durations encode: the closer a change is to the pointer, the faster it
-      must be. A button reacting to hover at 200ms feels laggy; a panel sliding
-      in at 80ms feels like a glitch.
+      must be.
     */
-    --duration-instant: 80ms;   /* hover/active on something under the cursor */
     --duration-fast:    140ms;  /* toggles, chips, focus rings */
-    --duration-base:    200ms;  /* dropdowns, expanding rows */
-    --duration-slow:    280ms;  /* overlays and dialogs entering */
+    --duration-slow:    280ms;  /* overlays and sheets entering */
 
     /*
       Decelerating easing. Motion that starts fast and settles reads as
       responsive because the first frame moves the furthest - the eye reads the
-      change as already done. `ease-in-out` on UI does the opposite and is why
-      so much of it feels sluggish.
+      change as already done.
     */
     --ease-out:   cubic-bezier(0.16, 1, 0.3, 1);
-    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
     --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);  /* slight overshoot */
-
-    /* Composite shorthands for the two most common cases. */
-    --transition-colors:
-        color var(--duration-fast) var(--ease-out),
-        background-color var(--duration-fast) var(--ease-out),
-        border-color var(--duration-fast) var(--ease-out);
-    --transition-transform: transform var(--duration-fast) var(--ease-out);
 }
 
 /*
   Honour the OS setting. Anyone who has asked for less motion gets none of the
   above - durations collapse to ~0 rather than the animations being redefined,
-  so this single block covers every transition in both halves of the app,
-  including ones written after this comment.
+  so this single block covers every transition in the app, including ones
+  written after this comment.
 */
 @media (prefers-reduced-motion: reduce) {
     :root {
-        --duration-instant: 1ms;
         --duration-fast:    1ms;
-        --duration-base:    1ms;
         --duration-slow:    1ms;
     }
 
@@ -418,82 +202,6 @@
         transition-duration: 1ms !important;
         scroll-behavior: auto !important;
     }
-}
-
-
-/* ==========================================================================
-   8. Z-INDEX
-   ========================================================================== */
-
-:root {
-    /*
-      Named so a new overlay doesn't get a hopeful 9999. The old sheet had
-      z-indexes scattered from -2 to 1000 with no stated order.
-    */
-    --z-base:     0;
-    --z-sticky:   10;
-    --z-dropdown: 100;
-    --z-overlay:  200;
-    --z-dialog:   300;
-    --z-toast:    400;
-}
-
-
-/* ==========================================================================
-   9. A TOUCH OF WINDOWS 7
-   ========================================================================== */
-
-:root {
-    /*
-      Asked for with the library explorer: "a little less modernised, with a touch more of a
-      Windows 7 feel". A TOUCH - the dark palette and the purple accent stay, because they are
-      the identity. What comes back is Aero's shapes: squarer corners (section 4), glossy
-      two-tone fills with a hard midline, a one-pixel highlight along the top edge of anything
-      raised, gradient bars for toolbars and captions, and Explorer's selection - a translucent
-      gradient inside a thin rounded border - in place of flat fills.
-
-      All of it is tokens, so the look can be dialled back from here without touching a rule,
-      the same arrangement as the glow tokens above. A full light-and-blue Aero palette would be
-      a different theme, not a touch, and is deliberately not attempted.
-    */
-    --gloss-button:        linear-gradient(to bottom, #2e2e3c 0%, #272733 47%, #1e1e28 53%, #23232e 100%);
-    --gloss-button-hover:  linear-gradient(to bottom, #3b3150 0%, #332a47 47%, #291f3b 53%, #2f2542 100%);
-    --gloss-button-active: linear-gradient(to bottom, #1c1826 0%, #221c30 100%);
-    --gloss-danger-hover:  linear-gradient(to bottom, #d9786a 0%, #c4513d 47%, #a8321f 53%, #bb4630 100%);
-    --gloss-bar:           linear-gradient(to bottom, #1f1f29 0%, #191921 100%);
-    --gloss-caption:       linear-gradient(to bottom, #2a2738 0%, #201e2c 50%, #1b1a25 100%);
-    --gloss-header:        linear-gradient(to bottom, #22222c 0%, #1b1b23 100%);
-    /* laid OVER a solid accent fill, which is what turns Search and Apply into glass */
-    --gloss-overlay:       linear-gradient(to bottom, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.07) 48%,
-                                           rgba(0, 0, 0, 0.07) 52%, rgba(0, 0, 0, 0) 100%);
-    --gloss-scroll-thumb:       linear-gradient(to right, #3c3c4c 0%, #333341 50%, #2b2b37 50%, #30303d 100%);
-    --gloss-scroll-thumb-hover: linear-gradient(to right, #4a3e63 0%, #3f3556 50%, #352c49 50%, #3a3050 100%);
-
-    --bevel:         inset 0 1px 0 rgba(255, 255, 255, 0.07);
-    --bevel-strong:  inset 0 1px 0 rgba(255, 255, 255, 0.18);
-    --bevel-pressed: inset 0 1px 2px rgba(0, 0, 0, 0.55);
-    --inset-well:    inset 0 1px 2px rgba(0, 0, 0, 0.45);
-
-    --selection-fill:   linear-gradient(to bottom, rgba(168, 85, 247, 0.32) 0%, rgba(168, 85, 247, 0.18) 100%);
-    --selection-border: rgba(192, 132, 252, 0.6);
-    /* "hot-tracking": what a row does under the pointer before it is chosen */
-    --hot-fill:         linear-gradient(to bottom, rgba(168, 85, 247, 0.14) 0%, rgba(168, 85, 247, 0.06) 100%);
-    --hot-border:       rgba(192, 132, 252, 0.28);
-    /* a selection in a list that doesn't have focus goes grey, as it does in Explorer */
-    --inactive-selection-fill:   linear-gradient(to bottom, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
-    --inactive-selection-border: rgba(255, 255, 255, 0.16);
-
-    /* behind a full-screen viewer */
-    --scrim: rgba(4, 4, 8, 0.8);
-
-    /* how far each level of the library tree steps in */
-    --tree-indent: 18px;
-
-    /* the checkbox: a square in a sunken well, a gloss under the pointer, a drawn tick */
-    --check-border:     #5a5a6e;
-    --check-fill:       linear-gradient(to bottom, #1b1b24 0%, #2a2a36 100%);
-    --check-fill-hover: linear-gradient(to bottom, #2a2240 0%, #3a2f55 100%);
-    --check-mark:       var(--main-hover-text);
 }
 
 
@@ -509,8 +217,7 @@
       corners, rectangular buttons with a faint gradient, thin sunken bars, sentence-case labels,
       a flat tab bar, and nothing bigger than a 0 1px 2px shadow - no blur, no glow, no pills.
 
-      Everything is a --dw-* token here, and NOTHING in main.css reads one, so the main page does
-      not change by a pixel. What already exists above is aliased, not repeated: the face is the
+      Everything is a --dw-* token here. What already exists above is aliased, not repeated: the face is the
       self-hosted Noto Sans (never the boards' Google Fonts link - deadwax runs offline), the
       accent is the brand's lighter purple, and the durations are section 7's, so reduced motion
       still collapses them. player.css keeps its --pl-* layer for mechanics (safe areas, hit sizes,
@@ -614,7 +321,6 @@
     --dw-shadow:      0 1px 2px rgba(0, 0, 0, 0.5);
 
     /* --- layout (phone) ----------------------------------------------- */
-    --dw-gutter:         20px;
     --dw-gutter-grouped: 16px;   /* a grouped list's rows and headings */
     --dw-row:            44px;   /* a settings row - also the smallest tap target */
     --dw-tab-item:       49px;   /* a tab button's height */

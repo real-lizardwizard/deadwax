@@ -58,10 +58,8 @@ function fromNavidrome(status: NavidromeStatus): CheckState {
  * You: how Get works for you, what this device plays like, whether deadwax can reach what it needs,
  * and what version it is - and the way to the app's own Managing pages: the albums that need a look,
  * Library care, the server's settings and the log (below) - on a phone as on a desktop since
- * 2.0.0-player.47 (until then a phone's Managing said all of it was the main page's). Nothing of
- * looking after deadwax is left on the main page (an artist's pictures and re-filing are the artist
- * page's since 2.0.0-player.45, the bulk runs Library care's since .42), and the footnote says so; the
- * link to it stays until it retires.
+ * 2.0.0-player.47 (until then a phone's Managing said all of it was the main page's). The row and the
+ * footnote pointing at the main page went when it retired (2.0.0-player.66): everything is here.
  *
  * - Getting albums (2.0.0-player.15, GettingChoices.tsx): "When I tap Get" (Show me the sources, the
  *   default, or Pick the best source for me), the quality floor and Format (2.0.0-player.41) - kept per USER on the server
@@ -79,15 +77,13 @@ function fromNavidrome(status: NavidromeStatus): CheckState {
  *   (2.0.0-player.62) Normalization after it (NormalizationChoice.tsx: Automatic, By song, By album, Off -
  *   read at each play, never by the engine). All five are kept per device. Gapless is handed the player itself, whose `setGapless` it calls in the tap:
  *   this page names no playback action of its own (ui/test/app-rules.sim.cjs).
- * - Connections: the main page's three pings, asked the first time You shows (not at start-up: the
+ * - Connections: the three pings the main page had, asked the first time You shows (not at start-up: the
  *   MusicBrainz ping is a real request to a rate-limited service), and again on "Check again". Each
  *   row is its own live region, read whole ("slskd, Connected"): the three answers land in any
  *   order, and a bare "Connected" says nothing about which service it is.
  * - About: from `GET /deadwax/me` - the version, and logins (on: who, and Sign out). Asked with the pings, and
  *   again on "Check again": deadwax restarting under Komodo while You first opened must not leave
  *   "unknown" there until the app is killed.
- * - The link to the main page opens it BESIDE the app (a new tab in a browser), so the music playing
- *   here carries on: in the same page it would unload the player, its queue and all.
  * - "Albums that need a look" above it (2.0.0-player.25), with how many - the review queue's page,
  *   Needs a look (`onNeedsLook`: App opens it on this tab). Under it (2.0.0-player.33) "Server
  *   settings" and "Log", the app's own pages of them (`onManaging`: App opens them on this tab), and
@@ -347,14 +343,7 @@ export function You({
                 <ChevronRightIcon class="app-chevron" />
               </button>
             )}
-            <a class="app-row app-link-row" href="/" target="_blank" rel="noopener">
-              <span class="app-row-label">Open the main page</span>
-              <ChevronRightIcon class="app-chevron" />
-            </a>
           </div>
-          <p class="app-footnote">
-            Everything here is in the app now; the main page stays until it retires.
-          </p>
         </section>
       )}
 

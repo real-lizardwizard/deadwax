@@ -1,5 +1,7 @@
 /**
- * The Soulseek candidates panel's logic (ui/src/lib/candidates.ts), ported from main.js in v0.9.10.
+ * The Soulseek candidates' logic (ui/src/lib/candidates.ts), ported from main.js in v0.9.10 for the main
+ * page's candidates panel, and the app's Sources' since (that panel's own words - its rows' quality, format
+ * and speed text, its badges - went with the main page in 2.0.0-player.66).
  *
  * The cases here are the ones a wrong answer would hide: a filter that lets through what it should
  * refuse (an unjudgeable signal passing a minimum), a Re-search that silently narrows a search to one
@@ -77,7 +79,6 @@ check('...but not one with no tracklist to be complete against', C.passesFilters
 check('a format chip keeps folders offering that format', C.passesFilters(candidate({ formats: ['mp3'] }), filters({ formats: new Set(['flac']) })), false);
 check('a signal minimum is a minimum', C.passesFilters(candidate(), filters({ minSignals: { ...C.noSignalMinimums(), peer: 25 } })), false);
 check('an UNJUDGED signal cannot satisfy a minimum', C.passesFilters(candidate(), filters({ minSignals: { ...C.noSignalMinimums(), duration_match: 5 } })), false);
-check('the badge counts the minimums set', C.activeSignalCount(filters({ minSignals: { ...C.noSignalMinimums(), peer: 10, edition: 5 } })), 2);
 
 console.log('\nquality (v0.9.11)');
 const mp3 = (bitrates, extra = {}) => candidate({ formats: ['mp3'], bitrates, bit_depths: [], sample_rates: [], ...extra });
@@ -90,7 +91,6 @@ check('an UNREPORTED depth never passes "24-bit"', C.passesFilters(flac(), quali
 check('a sample-rate floor', [flac({ sample_rates: [96000] }), flac({ sample_rates: [44100] })].map((c) => C.passesFilters(c, quality({ minSampleRate: 88200 }))), [true, false]);
 const mb = 1024 * 1024;
 check('album size range', [100, 300, 900].map((m) => C.passesFilters(candidate({ total_size: m * mb }), quality({ minSizeMb: 200, maxSizeMb: 800 }))), [false, true, false]);
-check('the badge counts what is on', C.activeQualityCount({ ...C.NO_QUALITY_FILTERS, minBitDepth: 24, maxSizeMb: 800 }), 2);
 
 console.log('\nsorting');
 const pool = [
@@ -103,12 +103,6 @@ check('best match keeps the server order', C.sortCandidates(pool, 'score').map((
 check('highest quality: lossless first, then depth and rate; unreported sorts below reported', C.sortCandidates(pool, 'quality').map((c) => c.username), ['hires', 'cd', 'silent', 'lossy320']);
 check('largest and smallest', [C.sortCandidates(pool, 'size_desc')[0].username, C.sortCandidates(pool, 'size_asc')[0].username], ['hires', 'lossy320']);
 check('sorting copies - the result is never reordered in place', pool[0].username, 'lossy320');
-
-console.log('\nwhat a row says about quality');
-check('depth and rate as reported', C.depthRateText(flac({ bit_depths: [24], sample_rates: [96000] })), ' 24-bit 96kHz');
-check('mixed folders as ranges', C.depthRateText(flac({ bit_depths: [16, 24], sample_rates: [44100, 96000] })), ' 16-24-bit 44.1-96kHz');
-check('nothing reported, nothing said', C.depthRateText(flac()), '');
-check('VBR is said', C.bitrateText([245], true), ' VBR 245kbps');
 
 console.log('\nauto-grab (v0.9.16)');
 {
@@ -128,15 +122,7 @@ check('an edited one is, trimmed', C.queryOverride('  Ye Donda 2021 ', 'Ye Donda
 check('an emptied one is not', C.queryOverride('   ', 'Ye Donda'), '');
 
 console.log('\nthe row');
-check('formats of a result, sorted and once each', C.resultFormats([candidate({ formats: ['mp3', 'flac'] }), candidate()]), ['flac', 'mp3']);
-check('bitrate range', [C.bitrateText([320]), C.bitrateText([256, 320, 192]), C.bitrateText([])], [' 320kbps', ' 192-320kbps', '']);
-check('tracks against a tracklist, files without', [C.trackSummary(candidate()), C.trackSummary(candidate({ expected_tracks: 0 }))], ['11/11 tracks', '11 files']);
 check('score colour bands', [C.scoreClass(75), C.scoreClass(40), C.scoreClass(39)], ['good', 'mid', 'bad']);
-check('the advertised speed says whose average it is', C.peerSpeedLabel(1048576), 'peer avg 1.0 MB/s');
-check('...and never reads as a broken string', C.peerSpeedLabel(0), 'peer avg unknown');
-check('no measurement renders as nothing', C.measuredSpeed(candidate()), null);
-check('one transfer is not hedged', C.measuredSpeed(candidate({ measured_speed: 800 * 1024, measured_samples: 1 })).text, 'you got 800 KB/s');
-check('an average is', C.measuredSpeed(candidate({ measured_speed: 800 * 1024, measured_samples: 4 })).text, 'you got ~800 KB/s');
 
 console.log('\nthe Lossless chip (2.0.0-player.15): every file lossless, and unknown never passes');
 {

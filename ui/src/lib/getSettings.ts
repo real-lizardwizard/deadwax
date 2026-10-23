@@ -11,7 +11,7 @@
  *    and what the Sources sheet's chips start as - so a floor is never a filter silently on: it is a
  *    chip, drawn pressed, that a tap turns off.
  *  - FORMAT (2.0.0-player.41, the main page's Settings -> Downloads "Format", carried into the app):
- *    Any, Prefer lossless (the default, as the main page's), Lossless only - sent with every Get as
+ *    Any, Prefer lossless (the default, as the main page's was), Lossless only - sent with every Get as
  *    the find route's `format_preference`, so it changes the SCORE (src/matching.py score_format: a
  *    folder with no lossless file scores 0.45 on format under Prefer lossless, 1 under Any) and Lossless
  *    only leaves such folders out of the answer altogether. Separate from the floor, which filters
@@ -102,14 +102,14 @@ export function readGetSettings(answer: Partial<GetSettingsAnswer> | null | unde
 }
 
 /**
- * What a user's first read carries over from what the main page's Settings -> Downloads already
- * says on this browser (`deadwax-preferences`): a 24-bit bit-depth floor is 24-bit; a 16-bit one -
+ * What a user's first read carries over from what the main page's Settings -> Downloads left on
+ * this browser (`deadwax-preferences`), where it was used before it retired in 2.0.0-player.66: a 24-bit bit-depth floor is 24-bit; a 16-bit one -
  * reported only by lossless files - is Lossless; a 320 kbps bitrate floor is 320. Anything lower is
  * Any - the default, so NOTHING is carried over: the defaults are never saved as if chosen (an
  * absent setting is its default, so a default changed later still reaches this user). And Format
  * (2.0.0-player.41), from `deadwax-download-defaults`' formatPreference - again only when it isn't
  * Prefer lossless, the default. "When I tap Get" is never carried over: the main page's auto-grab
- * doesn't make Get pick (James wants Get to show the sources unless he says otherwise). Saved even
+ * didn't make Get pick (James wants Get to show the sources unless he says otherwise). Saved even
  * when empty: the save is what marks the user seeded (routes/me.py SEEDED), so this happens once.
  *
  * `keys`, when given, is what is left to carry over (the server's `unseeded`): a user seeded before
@@ -187,7 +187,7 @@ export function sourceChips(floor: QualityFloor, filters: SourceFilters): { key:
 
 /**
  * The chips as lib/candidates.ts's filters - what passesFilters, the cards and a pick all go by. And
- * on a desktop (2.0.0-player.19) the Signals chip's per-signal minimums, as the main page's panel has
+ * on a desktop (2.0.0-player.19) the Signals chip's per-signal minimums, as the main page's panel had
  * them (DesktopRequest.dc.html draws the chip; the phone's sheet has none, so none apply there) - and
  * its sample-rate floor (2.0.0-player.50, Hz, 0 for any), likewise a desktop's alone. Complete albums
  * only is the app's every-track rule (`everyTrack`), never the main page's `completeOnly`.

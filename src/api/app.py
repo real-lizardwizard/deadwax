@@ -7,7 +7,7 @@ from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from contextlib import asynccontextmanager
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from starlette.middleware.gzip import GZipMiddleware
 
 from src.routes import search_musicbrainz, interface_logs, monitor_slskd, download, library, settings, navidrome, me, pins, store_album
@@ -204,13 +204,17 @@ def start() -> FastAPI:
     DAY_PREFIXES = ("/player/icon",)
 
     #? Everything whose URL stays the same while its contents change: the hand-written
-    #? interface files, and the Vite entry bundle - deliberately unhashed so the static
-    #? index.html can name it (see ui/vite.config.ts), which is exactly what makes it mutable.
+    #? interface files, and the Vite entry bundle - deliberately unhashed so the app's page
+    #? can name it (see ui/vite.config.ts), which is exactly what makes it mutable.
     #? The player's page and manifest belong here for the same reason: an installed web app
     #? revalidates on launch like any page, and a cached page is an old app.
     #? what the app's page names with a stamp (see stamped_page): its own stylesheets and its bundle
     STAMPED_PREFIXES = ("/player/", "/dist/", "/styles/")
-    REVALIDATE_PREFIXES = ("/scripts/", "/styles/", "/assets/", "/dist/", "/player/")
+    #? (2.0.0-player.66) /scripts/ and /assets/ went with the main page
+    REVALIDATE_PREFIXES = ("/styles/", "/dist/", "/player/")
+    #? `/` and `/index.html`: the main page's addresses, a redirect to the app since 2.0.0-player.66 - asked about
+    #? every time, so a browser that cached the old page meets the redirect
+    REVALIDATE_PATHS = ("/", "/index.html")
 
     class RevalidateInterfaceAssets:
         """
@@ -250,7 +254,7 @@ def start() -> FastAPI:
                 policy = b"public, max-age=31536000, immutable"
             elif path.startswith(DAY_PREFIXES):
                 policy = b"public, max-age=86400"
-            elif path == "/" or path.startswith(REVALIDATE_PREFIXES):
+            elif path in REVALIDATE_PATHS or path.startswith(REVALIDATE_PREFIXES):
                 policy = b"no-cache"
             else:
                 return await self.inner(scope, receive, send)
@@ -542,24 +546,20 @@ def start() -> FastAPI:
     async def serve_lab_by_name():
         return stamped_page("player/lab/index.html")
 
-    if logins:
-        #? the main page, with the mark (see with_logins_mark): before the mount, which would otherwise
-        #? answer "/" itself. Off, the mount serves it exactly as it always has.
-        @app.get("/")
-        async def serve_main_page_with_logins():
-            return Response(with_logins_mark((interface_path / "index.html").read_text(encoding="utf-8")),
-                            media_type="text/html")
+    #? (2.0.0-player.66) The main page retired: `/` and `/index.html` send the browser to the app, from the server - a
+    #? 307, which needs no script, answers HEAD, and is never kept for good (a 301 or 308 would be, and `/` could never
+    #? be given back); `no-cache` above, so a browser holding the old page asks again and meets it. The query is
+    #? dropped (`?return=/` was the old page's own); a `#fragment` never reaches the server - the browser carries it
+    #? across a redirect itself, and the app reads it (an app route opens; anything else is Home). The Location is
+    #? relative, and RelativeRedirects would make it so behind a TLS proxy anyway. Before the mount, which would
+    #? otherwise answer `/` itself - public, as the page was (tests/test_logins.py's ROUTES).
+    async def to_the_app():
+        return RedirectResponse("/player/", status_code=307)
 
-        @app.get("/index.html")
-        async def serve_main_page_by_name_with_logins():
-            return Response(with_logins_mark((interface_path / "index.html").read_text(encoding="utf-8")),
-                            media_type="text/html")
+    for retired in ("/", "/index.html"):
+        app.api_route(retired, methods=["GET", "HEAD"], include_in_schema=False)(to_the_app)
 
     app.mount("/", StaticFiles(directory=interface_path, html=True), name="interface")
-    logger.info("adding root endpoint to serve index.html")
-    @app.get("/")
-    async def serve_index():
-        return FileResponse(interface_path / "index.html")
 
     logger.info("API server started")
     return app

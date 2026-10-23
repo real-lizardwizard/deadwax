@@ -1,7 +1,7 @@
 /**
  * Looking after the library in the app (2.0.0-player.42): the pure rules - lib/bulkTargets.ts (which
  * albums each bulk run takes, how a run goes, what a finished one says - shared with the main page's
- * Library tab), lib/libraryCare.ts (the Library care page's words and its narrowing) and
+ * Library tab until it retired in 2.0.0-player.66), lib/libraryCare.ts (the Library care page's words and its narrowing) and
  * lib/typedMatch.ts (typing to narrow a list of folders) - and the parts themselves, compiled with the
  * repo's TypeScript and rendered by the small stand-in for Preact the other page sims use: the runs'
  * store (app/useLibraryCare.ts, the REAL module against a faked deadwax), the page
@@ -12,8 +12,8 @@
  *
  *  - THE TARGETS: covers - a release and no cover; CD art - a release and none of deadwax's own disc*
  *    images (a download's cd.jpg doesn't count); lyrics - no lyrics at all. Held to the main page's own
- *    inline rules as they were before the move, over a library of every combination: the same albums,
- *    in the same order - the main page's Library tab is unchanged by taking them from here.
+ *    inline rules as they were before the move (kept here word for word, literals since the page
+ *    retired), over a library of every combination: the same albums, in the same order.
  *  - A RUN: one album at a time - the next asked only once the last has answered; Stop asked before
  *    each, landing after the album being fetched; what each came to counted apart (a 404 none to find,
  *    anything else failed; lyrics in tracks, a lookup that failed outright its album's tracks); and the
@@ -202,17 +202,17 @@ console.log('\nwhich albums each run takes')
   const OWN_DISC = album('Radiohead/In Rainbows (2007)', { disc_art: ['Disc1.JPG', 'disc2.jpg'] })
   const EMBEDDED = album('Air/Moon Safari (1998)', { art: 'embedded', disc_art: ['disc.png'] })
   const LIBRARY = [NOTHING, COVERLESS, SCAN_ONLY, OWN_DISC, EMBEDDED]
-  check('covers: a release and no cover (an embedded one is a cover; no release, nothing to ask)', paths(B.coverTargets(LIBRARY)), ['Portishead/Dummy (1994)'])
+  check('covers: a release and no cover (an embedded one is a cover; no release, nothing to ask)', paths(B.bulkTargets('covers', LIBRARY)), ['Portishead/Dummy (1994)'])
   check('CD art: a release and none of deadwax\'s own disc* images - a download\'s cd.jpg doesn\'t count, case aside',
-    paths(B.discTargets(LIBRARY)), ['Portishead/Dummy (1994)', 'Portishead/Third (2008)'])
-  check('lyrics: no lyrics at all - one track with some keeps it out', paths(B.lyricsTargets(LIBRARY)), ['Bare/Rip (2001)'])
-  check('bulkTargets by kind, in the order both pages draw them', [B.BULK_KINDS, ...B.BULK_KINDS.map((kind) => paths(B.bulkTargets(kind, LIBRARY)))],
+    paths(B.bulkTargets('disc', LIBRARY)), ['Portishead/Dummy (1994)', 'Portishead/Third (2008)'])
+  check('lyrics: no lyrics at all - one track with some keeps it out', paths(B.bulkTargets('lyrics', LIBRARY)), ['Bare/Rip (2001)'])
+  check('bulkTargets by kind, in the order the page draws them', [B.BULK_KINDS, ...B.BULK_KINDS.map((kind) => paths(B.bulkTargets(kind, LIBRARY)))],
     [['covers', 'disc', 'lyrics'], ['Portishead/Dummy (1994)'], ['Portishead/Dummy (1994)', 'Portishead/Third (2008)'], ['Bare/Rip (2001)']])
   check('hasOwnDiscArt: disc*, any case - never cd*', [B.hasOwnDiscArt({ disc_art: ['DISC.jpg'] }), B.hasOwnDiscArt({ disc_art: ['cd1.jpg'] }), B.hasOwnDiscArt({}), B.hasOwnDiscArt({ disc_art: [] })],
     [true, false, false, false])
 
-  //? the main page's own rules as they stood in LibraryView.tsx before the move, word for word: the
-  //? lib's targets are those, in the same order, over every combination - the main page is unchanged
+  //? the main page's own rules as they stood in LibraryView.tsx before the move, word for word (a
+  //? literal since that page retired): the lib's targets are those, in the same order, over every combination
   const BEFORE = {
     covers: (albums) => albums.filter((one) => !one.art && one.release_mbid),
     lyrics: (albums) => albums.filter((one) => !one.lyrics_count),
@@ -321,7 +321,7 @@ function pageWords() {
   //? two pressings are two of them)
   const bare = editions.map((one) => ({ ...one, lyrics_count: 0 }))
   check('...while a run counts what it takes - album folders - so the two never read as two counts of albums',
-    [L.scanTotals(bare).split(' · ')[0], L.planWords('lyrics', B.lyricsTargets(bare).length, '').split(' with ')[0], L.scopeLine(3, 3, '')],
+    [L.scanTotals(bare).split(' · ')[0], L.planWords('lyrics', B.bulkTargets('lyrics', bare).length, '').split(' with ')[0], L.scopeLine(3, 3, '')],
     ['2 albums', '3 album folders', 'The runs act on the whole library: 3 album folders.'])
   const now = 1_700_000_000_000
   const scan = (more) => ({ loaded: true, stale: false, loading: false, scannedAt: now / 1000 - 180, scanSeconds: 4, ...more })

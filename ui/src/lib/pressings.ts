@@ -13,7 +13,7 @@
  *  - "THE USUAL TRACKLIST" is chooseBase()'s: the most common, by titles in order. A pressing has it
  *    when nothing is added, left out, renamed or another version - a few seconds' difference in
  *    a length is MusicBrainz rounding or a pressing's own timing, and doesn't count (so the app,
- *    unlike the main page's "N lengths" chip, never marks one). Its TITLES are chooseBase's; its
+ *    unlike the main page's "N lengths" chip did, never marks one). Its TITLES are chooseBase's; its
  *    LENGTHS are the default pressing's (one of those holding it), so the pressing the page opens
  *    on is always the usual tracklist itself, whatever order MusicBrainz listed the pressings in.
  *    chooseBase lends the lengths of whichever such pressing came FIRST, and with a single mix
@@ -469,7 +469,7 @@ export function metaLine(header: { year: string; kind: string }, held: boolean |
  * What the meta line says of the library (2.0.0-player.50): 'held' by an id - the group's or a
  * pressing's; 'maybe' when nothing is held by id but a folder with NO MusicBrainz ids has the album's
  * name and an artist's it could be filed under (lib/owned.ts's name match) - which can't say it is this
- * album, so it is said as a maybe, dashed as the main page's card says it; 'not'; or null until the
+ * album, so it is said as a maybe, dashed as the main page's card said it; 'not'; or null until the
  * library has answered.
  */
 export function holdingOf(holding: { held: readonly unknown[]; guessed: readonly unknown[] } | null): 'held' | 'maybe' | 'not' | null {
@@ -481,7 +481,7 @@ export function holdingOf(holding: { held: readonly unknown[]; guessed: readonly
  * The release group a Get on this page builds its download from (2.0.0-player.15, through
  * lib/releasePayload.ts) - the group Search handed over, else the one the pressings carry - so the
  * album is searched under its credit and filed under its current name and its own year, exactly as
- * the main page's Find on the same pressing would. Where MusicBrainz gave no credit for the group (a
+ * the main page's Find on the same pressing did. Where MusicBrainz gave no credit for the group (a
  * cold link whose pressings carry a bare group), the chosen pressing's credit stands in; with no
  * group at all, its title and the earliest date any pressing came out (first-release-date's meaning).
  */

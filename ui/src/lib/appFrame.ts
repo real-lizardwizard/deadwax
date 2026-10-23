@@ -204,7 +204,7 @@ export function libraryTitle(pick: LibraryPick, personal = false): string {
  *  of their own (Sidebar), up to lib/playlists.ts SIDEBAR_PLAYLISTS_MAX. */
 export const SIDEBAR_PLAYLISTS: SidebarItem = { id: 'playlists', label: 'All playlists' }
 
-/** Managing's own item (2.0.0-player.25): the review queue, above the link to the main page. */
+/** Managing's own item (2.0.0-player.25): the review queue, first in Managing. */
 export const SIDEBAR_QUEUE: SidebarItem = { id: 'queue', label: 'Needs a look' }
 
 /** Managing's Library care (2.0.0-player.42), after Needs a look: Rescan and the bulk runs. */

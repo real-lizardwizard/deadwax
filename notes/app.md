@@ -859,3 +859,110 @@ permissions (.61) Ethan and everyone else saw it too.
   and its focus hand-off, nothing but Info drawing `debugSections` or the bench link).
 - **NOT verified - the iPhone's**: an ordinary account's Info on James's phone (About alone, Playing's rows),
   and an admin's unchanged.
+
+### The main page retired (2.0.0-player.66)
+
+James (2026-10-23): "the old page will be removed with 2.0.0". The app at `/player/` does what the main page at
+`/` did - his parity audit's 158 capabilities, re-checked against ce501b4 - so the main page went in one commit.
+The last version that has it is tagged `last-main-page` (ce501b4; not a `v*` tag, so it publishes nothing).
+
+**What went.** `interface/index.html`, `interface/scripts/` (main.js, resize.js, init.js and the four `.mjs`
+twins), `interface/styles/main.css`, `interface/assets/` (two LidBrainz icons and two logos); `ui/src/main.tsx`
+and `ui/src/bridge.ts` (`window.deadwax` is gone - "an empty bridge means the migration is done"); the thirteen
+files only it reached (LibraryView, LibraryTree, LibraryDetails, ArtistDetails, CandidatesPanel, DownloadsPanel,
+DownloadJobRow, StoreStatusBox, SignedOutNotice, Tabs, useNewImports, useTrackFields and lib/treeWindow.ts), and the exports in kept files that only they used (the column half of trackFields, the
+tree half of libraryTree - it keeps `discTitle` - the row text of candidates and jobs, LibraryParts' AlbumArt,
+IssueChips, ArtistIcon and CoverGrid, persisted.ts's layout keys, `newImports`, `describeIssues`,
+`returnTarget`); `SettingsView` the component, its file keeping the server settings' parts the app draws
+(`tabMarks` lost its third, main-page-only argument); the dev harness (`ui/index.html`, `npm run dev`, vite's
+proxy) rather than pointing it at the app; `sort.sim` with `sort.mjs`. `docs/FRONTEND-MIGRATION.md` moved word
+for word to `notes/frontend-migration.md`. The app's own ways back to the main page went too: You's row and
+footnote, the desktop sidebar's "Open the main page", the sign-in's `?return=/` hand-back.
+
+**What stayed.** Every backend route, `GET /deadwax/library/queue/new_imports` included though nothing calls it
+now. The editors the Edit panel hosts (MetadataEditor, TrackTagEditor, DeleteAlbumDialog, ArtViewer, the Get
+buttons), unchanged: their computed styles were compared element by element with ce501b4's in the Edit panel at
+1440 and 390 (metadata 580 elements, tags 104, delete 13: none differs). The app's one-time carry-over of the
+main page's Format, quality floor and Confirm before cancelling from its old browser keys (`readPreferences`,
+`readDownloadDefaults`), which never clears them.
+
+**`/` is a 307 to `/player/`, from the server.** `app.py` routes GET and HEAD of `/` and `/index.html`, before
+the static mount, to `RedirectResponse("/player/", status_code=307)`; `RevalidateInterfaceAssets` sends both
+`no-cache` (`REVALIDATE_PATHS`), and `RelativeRedirects` (2.0.0-player.65) has nothing to do since the Location
+is already relative - pinned behind a TLS proxy anyway. Not the plan's HTML redirect page: a 307 needs no script
+and draws nothing, works for HEAD, and is never permanent - a 301 or 308 is kept by the browser for good, and
+`/` could never be given back. A browser holding the old page revalidates it (it was always `no-cache`), gets
+the 307 and follows it. The query is dropped (`/?return=/` lands on `/player/`); the browser carries any
+`#fragment` itself. The two routes are public (tests/test_logins.py ROUTES, GET and HEAD), and the logins mark
+goes only on the app's page now.
+
+**Old links: nothing to map.** The main page never had hash routes - no `location.hash`, `hashchange` or
+`history.*State` in `interface/scripts/` in any commit, its tabs lived in `main.tsx` state - so a fragment that
+rides the 307 is the app's `parseHash`'s to read: an app route (`#/library`, the player's old `#/album/<id>`)
+opens; anything else opens Home. **Home-screen icons**: the main page had no manifest, no
+`apple-mobile-web-app-capable` and no apple-touch-icon, so an icon for `/` was a Safari web clip; on iOS 26,
+where every home-screen site opens as a web app, its scope is `/`, and `/player/` is inside it, so the 307
+stays in scope. The installed app's manifest (`/player/`, its start_url and scope) is byte for byte ce501b4's.
+
+**The token trim.** With main.css gone, 109 of theme.css's 260 tokens were read by nothing - liveness counted
+transitively, a token alive only if a live token or a rule in player/*.css, player/lab/*.css or ui/src reads it.
+They went in this commit; sections 3, 4, 6, 8 and 9 emptied and were dropped, keeping the other numbers so
+"section 10" still means the app's `--dw-*`. `tests/test_app_css.py`'s
+`test_every_token_theme_css_defines_is_read` keeps a dead one out (it fails on `--accent-muted` put back).
+
+**Frozen twin expectations.** owned, tracklist, latest and credits sims held the TypeScript copy to the
+main page's `.mjs` twin. With the twin gone, its answers were frozen into the fixtures first, from the twin
+itself: `tests/fixtures/pressings/owned.json`'s `frozen` (the exported names, the folded pairs, the tooltip)
+and each pressings fixture's `expected.pairs` (a count and a sha256 of every pair's answer) and
+`expected.picks`; tracklist.sim's thresholds and exported names are literals. The sims keep every case,
+against the TypeScript alone.
+
+**Gaps James accepted.** "yeah I like those recommendations" (2026-10-23): G1 built (below); dropped - bitrate
+floors under 320 (the app's are Any, 320 kbps, Lossless, 24-bit), MusicBrainz's "% match" on a search result,
+format chips built from the formats found (the README and downloading.md no longer promise them); and the small
+losses: the server settings' last tab not remembered, an artist's albums not orderable newest first, the
+candidates' starting filters and sort not saved defaults, the library's total length, "N tracks carry their
+own picture" said per track only, the Library's Artist and Title orders not reversible, "Open the log on start"
+and "Reset preferences".
+
+**G1, Needs a look's Ignored chip.** "It's fine as it is" ignores every outstanding issue, `not_in_navidrome`
+included; the folder then leaves Needs a look, and Edit opens only from an album page (which Navidrome must
+list) or a Needs a look row - so a folder Navidrome doesn't list, once accepted, was out of reach; on the main
+page the tree still listed it. Now `facets()` ends with **Ignored N** (title "Albums whose issues you accepted
+as they are") when any album has an issue found and every one of them ignored (`isIgnoredOnly`); its rows,
+artist then album, carry a quiet "Ignored" mark (its title naming what was accepted) and open Edit like any
+row, where un-ignore already is. The mark is drawn under that chip only: a new import whose every issue was
+accepted outside a session (nothing marked it reviewed) is still in All, being new, and is drawn there as
+before - New alone (review: it said New and Ignored at first). A view, not a count: All and the badge still
+count outstanding issues and new imports only ("never count different things"). Same saved scan, no new
+request. Pinned in needslook.sim.
+
+**A checkout built before .66 keeps `interface/dist/deadwax-ui.js`** (and its map and `assets/`): `interface/dist`
+is gitignored, so a pull doesn't delete it, and StaticFiles serves it until `npm run build` empties the folder
+(`emptyOutDir` on the app's pass). Nothing loads it, so it is harmless; but it is why test_pages' 404 check
+asks only for tracked files (review). CI and the image build from nothing.
+
+**The server's own words.** Its messages and log lines said "the settings tab" (MUSICBRAINZ_EMAIL unset, Navidrome
+not set up or its address unusable, the start-up and override lines, the CD-art fanart.tv hint), and
+LIBRARY_PATH's row said it is "what the library tab reads": the app's page is Server settings, and its Library
+tab is Navidrome's. They now say Server settings (Connections where the setting is), and the row names what
+reads the folder, as configuration.md does (review). test_pages fails on "settings tab" in any string under
+src/ but docstrings and the SQL schema; test_settings pins the row.
+
+**Docs.** The guide describes only the app: finding-music, downloading and library rewritten, player.md
+retitled "The app" (its file name kept for the links), troubleshooting gains "An old bookmark or home-screen
+icon opens the app" and loses the main page's entries, getting-started's "Coming from 1.x" names
+`last-main-page`, and the prerelease history ("since 2.0.0-player.N") came out of the README and docs - the
+README's `:player` rows and compose pin are the merge commit's. All twelve screenshots were recaptured from the
+app (notes/screenshots.md).
+
+**Pinned**: test_pages.py (the 307 for GET and HEAD, logins off and on, `/?return=/`, no-cache, following it
+gives the app, relative behind TLS, the files gone and their addresses 404, nothing reaching for the bridge;
+vite's inputs are the app and the bench alone), test_logins.py, test_health.py, test_app_css.py; app-rules.sim
+("the main page retired": no `href="/"` and no "main page" in the app's code, no `window.deadwax`, one app
+entry), signin.sim (`?return=/` drawn as any load), you.sim, needslook.sim, libraryscan.sim (tree.sim's
+surviving checks). **Checked in a real page** (my own instance, stand-ins): `/`, `/index.html`, `/#/library`,
+`/#/album/<id>`, `/#settings` and `/?return=/` land in the app at 1440 and 390, with logins off and on (the
+sign-in at `/player/`, then Home), with no request for `/scripts/`, main.css or deadwax-ui.js and nothing in the
+console. **NOT verified - James's**: the home-screen icon on his iPhone, an old bookmark or icon for `/`, and an
+old `/` tab reloaded.

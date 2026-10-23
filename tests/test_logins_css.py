@@ -93,6 +93,6 @@ def test_the_app_page_links_it_only_with_logins_on_after_app_css(monkeypatch):
     client = TestClient(start())
     page = client.get("/player/").text
     assert page.index('href="/player/app.css') < page.index('href="/player/signin.css?v=')
-    #? the main page and the test bench don't draw the sign-in screen, so don't load its sheet
-    assert "signin.css" not in client.get("/").text and "signin.css" not in client.get("/player/lab/").text
+    #? the test bench doesn't draw the sign-in screen, so doesn't load its sheet (`/` is the app since 2.0.0-player.66)
+    assert "signin.css" not in client.get("/player/lab/").text
     assert SIGNIN_SHEET == '<link rel="stylesheet" href="/player/signin.css">'

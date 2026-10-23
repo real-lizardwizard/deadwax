@@ -34,14 +34,6 @@ export function reasonShown(detail: string | null | undefined): string | null {
 }
 
 /**
- * Where a sign-in hands over to: the main page, when it sent you here to sign in (`/player/?return=/`)
- * - and nowhere else, so the address can't be made to send anybody off the site.
- */
-export function returnTarget(search: string): '/' | null {
-  return new URLSearchParams(search).get('return') === '/' ? '/' : null
-}
-
-/**
  * A sign-in made over the running app - its session had ended - carries on when it is the same person
  * (the app under it was never drawn away), and starts the app again for someone else: what is in hand - the
  * pins, Getting albums, the queue - was the other person's.

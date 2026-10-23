@@ -23,7 +23,7 @@ import type { LogLine, RecentLog } from '../api/logs'
 export const LOG_KEPT = 500
 
 export interface LogState {
-  /** newest first, as the main page draws its log */
+  /** newest first, as the main page drew its log */
   lines: readonly LogLine[]
   /** the run the newest number is of (null: none heard yet) */
   boot: string | null
@@ -92,7 +92,7 @@ export function levelOf(type: string): 'error' | 'warning' | 'info' {
   return 'info'
 }
 
-/** The time a line was logged, as the main page draws it: HH:MM:SS, this device's clock. */
+/** The time a line was logged, as the main page drew it: HH:MM:SS, this device's clock. */
 export function lineTime(line: LogLine): string {
   if (typeof line.time !== 'number' || !Number.isFinite(line.time)) return ''
   return new Date(line.time * 1000).toTimeString().slice(0, 8)

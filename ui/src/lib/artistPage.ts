@@ -15,7 +15,7 @@
  *    one /library/owned's albums by that id are filed under, by name; else, only for an artist
  *    Navidrome has no id for, the one name MusicBrainz gives - believed only when exactly one artist
  *    answers to it (two bands share a name more often than you'd think; CLAUDE.md's rule for the
- *    main page's artist page too).
+ *    main page's artist page, as it was).
  *
  * THE ROWS (`artistRows`): the artist's albums from MusicBrainz's browse - complete, not a search's
  * best matches - with what the library holds of each, and every album Navidrome has of theirs that

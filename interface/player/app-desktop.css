@@ -20,8 +20,8 @@
   Since 2.0.0-player.21 the Edit panel (DesktopManage.dc.html) is a third side panel, and the main
   page's editors drawn inside it - the metadata editor, the tag editor, the delete confirmation and the
   cover viewer - are styled here, keyed on their own ids and classes under `.app-desk .app-edit`: they
-  are the main page's components, reused as they are, and that page's main.css and resize.js are not
-  on this one. A side panel neither moves nor resizes.
+  are the main page's components, reused as they are, and that page's main.css and resize.js were never
+  on this one (both went with it in 2.0.0-player.66). A side panel neither moves nor resizes.
 */
 
 @media (min-width: 1024px) {
@@ -2568,6 +2568,13 @@
         color: var(--dw-accent-text);
     }
 
+    /* (2.0.0-player.66) an album whose every issue was accepted: a quiet word, not a warning */
+    .app-desk .app-queue-chip.is-ignored {
+        border-color: var(--dw-border);
+        background: transparent;
+        color: var(--dw-text-2);
+    }
+
     .app-desk .app-queue-mark {
         border-color: var(--dw-badge-green-border);
         background: var(--dw-badge-green-bg);
@@ -2619,7 +2626,7 @@
    pages under You with their title and a line saying what they are, kept to the readable width the
    queue page keeps (and clear of a drawer). The settings are the main page's settings tab's own rows
    (components/SettingsView.tsx), styled here by their own class names, as the Edit panel styles the
-   editors - this page loads no main.css: the server's groups under the Edit panel's underline tabs,
+   editors (the main page's main.css was never loaded here): the server's groups under the Edit panel's underline tabs,
    each group a card of rows, a row's key monospace, where its value came from a small chip, an edited
    row marked amber at its edge, an error said in the failure text, a field STYLE.md's well. The page
    is at least the window's height (less the player bar), and the save bar at its foot, sticky above
@@ -3170,7 +3177,7 @@
     .app-desk .app-edit .app-edit-pick-input:focus-visible,
     .app-desk .app-edit .app-edit-choice:focus-visible { outline-offset: var(--app-ring-inset); }
 
-    /* --- Needs a look: ignores that can't be saved, said as the main page says it, in amber --- */
+    /* --- Needs a look: ignores that can't be saved, said as the main page said it, in amber --- */
 
     .app-desk .app-queue-warning {
         margin: 0;

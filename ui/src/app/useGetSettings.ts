@@ -24,11 +24,11 @@ import { readDownloadDefaults, readPreferences } from '../state/persisted'
  *    Until the first answer is in, the settings are the defaults, and a Get shows the sources: the
  *    safe way round, since picking for you is the one that acts without asking.
  *  - SEEDED ONCE: a user nothing was ever saved for (`seeded` false), on a database that can keep
- *    it, gets what this browser's main page already says carried over (deadwax-preferences' quality
+ *    it, gets what this browser's main page left carried over (deadwax-preferences' quality
  *    floors, and deadwax-download-defaults' Format - lib/getSettings.ts seedFromPreferences) - only
  *    what differs from the defaults, and saved even when that is nothing, since the save is what
- *    marks them seeded. From then on the server's are the settings, and the main page keeps its own
- *    copies. A setting added in a later version is seeded once in the same way, alone (the server's
+ *    marks them seeded. From then on the server's are the settings (the main page kept its own copies
+ *    until it retired in 2.0.0-player.66). A setting added in a later version is seeded once in the same way, alone (the server's
  *    `unseeded`): Format, for a user seeded at 2.0.0-player.15 - never the floor again over a choice
  *    made in the app since.
  *  - A CHOICE shows at once and is saved behind it. What shows is the server's last word with every

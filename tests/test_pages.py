@@ -9,7 +9,9 @@ home-screen app is scoped: the manifest's start_url and scope must stay there, o
 treating the installed icon as that app. And the app's own stylesheets are revalidated and gzipped,
 like the page around it - since 2.0.0-player.19 the desktop frame's too, linked last. And since
 2.0.0-player.36 the turntable's test bench at /player/lab/, a page of its own, built in a pass of its own
-so the app's bundle is what it would be without it - its page stamped as the app's is.
+so the app's bundle is what it would be without it - its page stamped as the app's is. And since
+2.0.0-player.66 the main page is gone: `/` and `/index.html` answer a 307 to the app, and what the old
+page alone loaded is neither in the repo nor served.
 """
 
 import json
@@ -29,7 +31,6 @@ UI = REPO / "ui"
 
 #? each hand-written page, and the address it is served at
 PAGES = {
-    "/": INTERFACE / "index.html",
     "/player/": INTERFACE / "player" / "index.html",
     #? the turntable's test bench (2.0.0-player.36)
     "/player/lab/": INTERFACE / "player" / "lab" / "index.html",
@@ -75,7 +76,8 @@ def stylesheets(page: Path) -> list[str]:
 
 def test_the_build_makes_both_entries_and_their_sources_exist():
     inputs = vite_inputs()
-    assert inputs.keys() >= {"deadwax-ui", "deadwax-player", "deadwax-lab"}
+    #? (2.0.0-player.66) the app and the bench, and nothing else: the main page's deadwax-ui went with it
+    assert inputs.keys() == {"deadwax-player", "deadwax-lab"}
     for name, source in inputs.items():
         assert (UI / source).is_file(), f"vite entry {name} names {source}, which isn't there"
 
@@ -147,9 +149,9 @@ def test_the_apps_stylesheet_is_revalidated_and_gzipped(client, sheet):
 
 def test_no_page_or_stylesheet_loads_a_font_from_the_internet():
     """The canvas boards link Noto Sans from Google Fonts; deadwax self-hosts it and runs offline."""
-    shipped = [INTERFACE / "index.html", INTERFACE / "player" / "index.html", *INTERFACE.glob("player/*.css"),
+    shipped = [INTERFACE / "player" / "index.html", *INTERFACE.glob("player/*.css"),
                INTERFACE / "player" / "lab" / "index.html", *INTERFACE.glob("player/lab/*.css"),
-               INTERFACE / "styles" / "theme.css", INTERFACE / "styles" / "main.css"]
+               INTERFACE / "styles" / "theme.css"]
     for path in shipped:
         text = path.read_text()
         assert "fonts.googleapis.com" not in text and "fonts.gstatic.com" not in text, path
@@ -265,3 +267,79 @@ def test_only_a_redirect_to_deadwax_itself_is_made_relative():
     for elsewhere in ("https://navidrome.example.com/app/", "/already/relative", "mailto:james@example.com"):
         assert relative_location(elsewhere, host) == elsewhere
     assert relative_location("http://music.example.com/player/", "") == "http://music.example.com/player/"
+
+
+# ----------------------------------------------------------------- the main page retired (2.0.0-player.66)
+
+@pytest.mark.parametrize("logins", [False, True], ids=["logins off", "logins on"])
+@pytest.mark.parametrize("method", ["GET", "HEAD"])
+@pytest.mark.parametrize("path", ["/", "/index.html", "/?return=/", "/index.html?return=%2F&x=1"])
+def test_the_main_pages_addresses_send_the_browser_to_the_app(monkeypatch, logins, method, path):
+    """A bookmark, a typed address, an old tab reloaded or an old home-screen icon: `/` answers a 307 to the app -
+    no script, HEAD too, never kept for good (a 301 or 308 would be) - asked about every time, so a browser that
+    cached the old page meets it. Public, logins on or off. The query goes; a #fragment never reaches the server
+    (the browser carries it across the redirect, and the app's parseHash reads it)."""
+    from src.config import Config
+
+    monkeypatch.setattr(Config, "AUTH_MODE", "on" if logins else "off")
+    assert Config.logins_on() is logins
+    response = TestClient(start()).request(method, path, follow_redirects=False)
+    assert response.status_code == 307
+    assert response.headers["location"] == "/player/"
+    assert response.headers["cache-control"] == "no-cache"
+    assert response.content == b""
+
+
+def test_following_the_redirect_gives_the_apps_page(client):
+    response = client.get("/")
+    assert response.status_code == 200
+    assert str(response.url).endswith("/player/")
+    assert "/dist/deadwax-player.js" in response.text
+    assert response.text == client.get("/player/").text
+
+
+def test_behind_a_tls_proxy_the_redirect_stays_relative():
+    """Through RelativeRedirects (2.0.0-player.65), as every redirect deadwax makes to itself: https stays https."""
+    behind = TestClient(start(), base_url="http://music.example.com")
+    response = behind.get("/", follow_redirects=False, headers={"x-forwarded-proto": "https"})
+    assert response.status_code == 307 and response.headers["location"] == "/player/"
+
+
+def test_the_main_pages_files_are_gone():
+    gone = [INTERFACE / "index.html", INTERFACE / "scripts", INTERFACE / "assets", INTERFACE / "styles" / "main.css",
+            UI / "src" / "main.tsx", UI / "src" / "bridge.ts", UI / "index.html"]
+    assert [str(path.relative_to(REPO)) for path in gone if path.exists()] == []
+
+
+@pytest.mark.parametrize("path", ["/scripts/main.js", "/styles/main.css", "/assets/icon.svg"])
+def test_what_only_the_main_page_loaded_is_not_served(client, path):
+    """Tracked files only. /dist/deadwax-ui.js isn't asked: interface/dist is gitignored, so a checkout built
+    before .66 keeps its old bundle until `npm run build` empties the folder, and StaticFiles would serve it.
+    That the bundle is no longer BUILT is pinned by the vite-inputs test above (and app-rules.sim)."""
+    assert client.get(path).status_code == 404
+
+
+def test_nothing_in_the_app_reaches_for_the_bridge():
+    """window.deadwax was where the main page's two halves met; it went with them. A cast on the way,
+    `(window as any).deadwax`, counts too."""
+    named = [str(file.relative_to(UI)) for file in (UI / "src").rglob("*.ts*")
+             if re.search(r"window\b[^\n;]{0,24}\.deadwax\b|\bbridge\(", file.read_text())]
+    assert named == []
+
+
+def test_no_message_the_server_sends_names_the_main_pages_settings_tab():
+    """(2.0.0-player.66) The settings tab was the main page's; the app's page is Server settings. Every string
+    the server can send or log - not a docstring, not a comment - says so; the SQL schema's own comments aside."""
+    import ast
+    stale = re.compile(r"settings tab", re.I)
+    named = []
+    for file in sorted((REPO / "src").rglob("*.py")):
+        tree = ast.parse(file.read_text())
+        docstrings = {id(node.body[0].value) for node in ast.walk(tree)
+                      if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+                      and node.body and isinstance(node.body[0], ast.Expr)
+                      and isinstance(node.body[0].value, ast.Constant)}
+        named += [f"{file.relative_to(REPO)}:{node.lineno}" for node in ast.walk(tree)
+                  if isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in docstrings
+                  and "CREATE TABLE" not in node.value and stale.search(node.value)]
+    assert named == []

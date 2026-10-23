@@ -398,7 +398,7 @@ def test_navidrome_not_set_up_is_a_503(monkeypatch, client):
 
     response = client.get(SCRUB, params={"at": 1.0})
 
-    assert response.status_code == 503 and "settings tab" in response.json()["detail"]
+    assert response.status_code == 503 and "Server settings (Connections)" in response.json()["detail"]
 
 
 def test_the_window_is_on_the_players_fixed_list_on_purpose():

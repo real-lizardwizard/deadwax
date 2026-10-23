@@ -1,8 +1,8 @@
 /**
  * The deadwax backend, in types.
  *
- * Derived from the server's own definitions, NOT from the current JS - the vanilla frontend
- * reads some fields loosely and omits others entirely, so copying it would enshrine its
+ * Derived from the server's own definitions, NOT from the main page's JS - the vanilla frontend
+ * read some fields loosely and omits others entirely, so copying it would enshrine its
  * guesses. Canonical sources:
  *
  *   src/routes/download.py     pydantic request models + the /jobs response assembly
@@ -108,7 +108,7 @@ export interface DownloadJob {
 
   /*
    * For the app's Requests tab (2.0.0-player.12). Optional only because the main page's own
-   * fixtures predate them: deadwax sends every one on every row.
+   * fixtures predated them: deadwax sends every one on every row.
    */
   /** The pressing it is for - the cover comes from the Cover Art Archive by it. */
   release_mbid?: string | null
@@ -257,8 +257,8 @@ export interface MissingTrack {
 
 /**
  * The release a download is FOR (2.0.0-player.15): what a Find or a Get searches Soulseek for, and
- * what the job files the download as - built in ONE place, lib/releasePayload.ts, for the app and
- * for the main page's two Find buttons alike (which reach it through the bridge). Every field is
+ * what the job files the download as - built in ONE place, lib/releasePayload.ts, for the app's Get
+ * (and for the main page's two Find buttons, through the bridge, until it retired in 2.0.0-player.66). Every field is
  * one the server declares (FindCandidatesRequest and EnqueueRelease in src/routes/download.py) -
  * pydantic drops an undeclared field without a word, the trap that file describes six times over.
  */
@@ -646,7 +646,7 @@ export interface StoreRow {
 }
 
 /**
- * What the main page's details pane says of a folder that its store row doesn't hold (2.0.0-player.44) -
+ * What the main page's details pane said of a folder that its store row doesn't hold (2.0.0-player.44) -
  * an album page's Properties. On the bridge's `present` rows only, read without touching the disk, and
  * left out altogether when the store couldn't say.
  */
@@ -990,20 +990,6 @@ export interface TrackLyrics {
 }
 
 /**
- * GET /library/queue/new_imports — albums deadwax filed that you haven't looked at.
- *
- * The only part of the queue answerable without a scan, which is why it's a separate endpoint:
- * the library isn't read until its tab is opened, so a prompt that needed a scan would either
- * be missing when it mattered or would tax every page load.
- */
-export interface NewImportsResponse {
-  count: number
-  /** Capped by the server — this names what's waiting, it isn't a second album list. */
-  albums: { album_path: string; artist: string; album: string; first_seen: string }[]
-  tracking_enabled: boolean
-}
-
-/**
  * GET /deadwax/library/queue/summary (2.0.0-player.25): how many albums need a look - the app's count
  * beside "Needs a look". Read off the SAVED scan, never the disk: `total` is the albums
  * lib/metadataQueue.ts queueAlbums(albums, null) lists over that scan (an outstanding issue, or a new
@@ -1337,7 +1323,7 @@ export interface ArtistMember {
 }
 
 /** Who an artist is, as artists.artist_facts shapes MusicBrainz's answer - the main page's artist page
- *  (in its images preview) and, since 2.0.0-player.45 in full, GET /search_musicbrainz/artist: the
+ *  (in its images preview, until it retired) and, since 2.0.0-player.45 in full, GET /search_musicbrainz/artist: the
  *  app's artist page and Info's artist card (2.0.0-player.17 sent it less its links and members). */
 export interface ArtistFacts {
   mbid?: string | null

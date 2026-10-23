@@ -21,10 +21,10 @@ const EDITION_KEYWORDS: ReadonlyArray<[RegExp, string]> = [
 /**
  * Edition markers detected from a release's own text.
  *
- * Mirrors getEditionTags() in interface/scripts/main.js and EDITION_PATTERNS in
- * src/matching.py — the same vocabulary in three places because the frontend tags the
- * release, the backend tags the candidate folder, and then they get compared. Changing one
- * without the others silently weakens the edition signal.
+ * Mirrors EDITION_PATTERNS in src/matching.py (and the main page's getEditionTags() in main.js,
+ * until it retired in 2.0.0-player.66) — the same vocabulary in two places because the frontend
+ * tags the release, the backend tags the candidate folder, and then they get compared. Changing one
+ * without the other silently weakens the edition signal.
  */
 export function detectEditionTags(release: Release): string[] {
   const haystack = `${release.disambiguation ?? ''} ${release.title ?? ''}`.toLowerCase()
@@ -65,9 +65,9 @@ export function detectEditionTags(release: Release): string[] {
  * everywhere - invents punctuation MusicBrainz did not use and turns a duet into what reads
  * as two separate acts.
  *
- * One rule for both halves of the browser: lib/releasePayload.ts builds a download's artist with
- * it (what is searched for and tagged), and the metadata editor its own; getArtistNames() in
- * interface/scripts/credits.mjs is the main page's copy, which only draws the card's credit.
+ * One rule in the browser: lib/releasePayload.ts builds a download's artist with it (what is
+ * searched for and tagged), and the metadata editor its own. (The main page's copy, getArtistNames()
+ * in credits.mjs, drew its cards' credits until it retired in 2.0.0-player.66.)
  */
 export function creditName(credit: ArtistCredit[] | undefined): string {
   return (credit ?? [])
@@ -86,9 +86,9 @@ export function creditName(credit: ArtistCredit[] | undefined): string {
  * split and a feature stays a feature - only the names are brought up to date.
  *
  * Names a download's folder (through lib/releasePayload.ts, since 2.0.0-player.15) and seeds the
- * editor's - one function, so the two can't part. getCurrentArtistNames() in
- * interface/scripts/credits.mjs is the main page's copy, which only feeds the card's "in your
- * library" match; ui/test/credits.sim.cjs holds the two to one answer.
+ * editor's - one function, so the two can't part. (The main page's copy, getCurrentArtistNames() in
+ * credits.mjs, fed its cards' "in your library" match until it retired in 2.0.0-player.66.)
+ * ui/test/credits.sim.cjs holds it to its cases.
  */
 export function currentName(credit: ArtistCredit[] | undefined): string {
   return (credit ?? [])
@@ -140,7 +140,7 @@ const VIDEO_FORMATS = new Set([
  * Marked `video` so the "already have it" checks leave it out (store_index.audio_tracks). The ONE
  * rule since 2.0.0-player.15 - for the editor (flattenTracks) and a download (lib/releasePayload.ts);
  * credits.mjs's twin went with main.js's two builders, and ui/test/credits.sim.cjs asks this one its
- * cases and checks no copy is left there.
+ * cases.
  */
 export function isVideoTrack(
   medium: { format?: string | null } | undefined,

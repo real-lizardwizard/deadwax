@@ -1,13 +1,14 @@
 /**
- * Which albums are already in the library - the TypeScript twin of interface/scripts/owned.mjs
+ * Which albums are already in the library - the TypeScript port of the main page's owned.mjs
  * (2.0.0-player.13), for the app's Search: a MusicBrainz album the library holds is left out of
  * "Not in your library yet", since the library half already shows it.
  *
- * A PORT, not a new answer: the image's UI stage copies only ui/, so the app can't import the .mjs
- * the main page's search marks come from. ui/test/owned.sim.cjs runs both against the same cases
- * (tests/fixtures/pressings/owned.json), so the two can never disagree about what is held.
+ * A PORT, not a new answer: the image's UI stage copied only ui/, so the app couldn't import the .mjs
+ * the main page's search marks came from, and ui/test/owned.sim.cjs ran both against the same cases
+ * (tests/fixtures/pressings/owned.json). That page retired in 2.0.0-player.66; the sim holds this one
+ * to the cases and to what the .mjs answered, kept in the fixture.
  *
- * THREE ways an album on disk can match, surest first (the .mjs says why at length):
+ * THREE ways an album on disk can match, surest first:
  *   1. by RELEASE id - this exact pressing;
  *   2. by RELEASE-GROUP id - some pressing of this album;
  *   3. by NAME, only for a folder with no MusicBrainz ids at all - said as "maybe", and never for a

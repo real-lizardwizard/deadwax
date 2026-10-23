@@ -1,10 +1,10 @@
 /**
- * Display formatting. Behaviour matches the vanilla helpers in interface/scripts/main.js
- * exactly - these render into the same panels, and a unit that changes mid-migration reads
- * as a bug.
+ * Display formatting. Behaviour matched the main page's helpers in main.js exactly while the two
+ * rendered into the same panels (a unit that changed mid-migration read as a bug); that page
+ * retired in 2.0.0-player.66, and these are the app's.
  */
 
-/** Bytes per second. Returns 'unknown' for 0/falsy, same as the vanilla helper. */
+/** Bytes per second. Returns 'unknown' for 0/falsy. */
 export function formatSpeed(bytesPerSecond: number | null | undefined): string {
   if (!bytesPerSecond) return 'unknown'
 

@@ -1,9 +1,8 @@
 /**
- * The bulk runs - Get covers · N, Get CD art · N, Get lyrics · N - pure, so both pages that run them
- * say the same thing about the same library: the main page's Library tab (components/LibraryView.tsx,
- * over the albums in view) and the app's Library care page on a desktop (app/LibraryCare.tsx,
- * 2.0.0-player.42, over the whole library or the albums a few typed words narrow it to). Pinned by
- * ui/test/care.sim.cjs.
+ * The bulk runs - Get covers · N, Get CD art · N, Get lyrics · N - pure: the app's Library care page
+ * (app/LibraryCare.tsx, 2.0.0-player.42, over the whole library or the albums a few typed words narrow
+ * it to). The main page's Library tab ran them by these rules too, over the albums in view, until it
+ * retired in 2.0.0-player.66. Pinned by ui/test/care.sim.cjs.
  *
  * WHICH ALBUMS a run takes (`bulkTargets`), album folders as the scan lists them:
  *  - COVERS: a release id and no cover - the Archive is asked by the release the tags name, so an
@@ -23,7 +22,7 @@
  * counted apart (`addOutcome`): for covers and CD art, written, none to find (a 404 - a fact about the
  * release) and failed (anything else - worth trying again); for lyrics, in TRACKS, saved, not on
  * LRCLIB or instrumental, and failed. The words for a finished run are the main page's
- * (`bulkSummary`).
+ * status bar's, as it had them (`bulkSummary`).
  */
 
 /** What a bulk run reads of an album in the library's scan (api/types.ts LibraryAlbum). */
@@ -38,7 +37,7 @@ export interface BulkAlbum {
 
 export type BulkKind = 'covers' | 'disc' | 'lyrics'
 
-/** The three runs, in the order both pages draw them. */
+/** The three runs, in the order Library care draws them. */
 export const BULK_KINDS: readonly BulkKind[] = ['covers', 'disc', 'lyrics']
 
 /** Whether the album has CD art deadwax saved - a `disc*` image beside its tracks. */
@@ -47,17 +46,17 @@ export function hasOwnDiscArt(album: Pick<BulkAlbum, 'disc_art'>): boolean {
 }
 
 /** Albums a cover could be fetched for: a release to ask the Archive about, and no cover yet. */
-export function coverTargets<T extends BulkAlbum>(albums: readonly T[]): T[] {
+function coverTargets<T extends BulkAlbum>(albums: readonly T[]): T[] {
   return albums.filter((album) => !album.art && album.release_mbid)
 }
 
 /** Albums CD art could be fetched for: a release, and none of deadwax's own `disc*` images. */
-export function discTargets<T extends BulkAlbum>(albums: readonly T[]): T[] {
+function discTargets<T extends BulkAlbum>(albums: readonly T[]): T[] {
   return albums.filter((album) => album.release_mbid && !hasOwnDiscArt(album))
 }
 
 /** Albums with no lyrics on disk at all. */
-export function lyricsTargets<T extends BulkAlbum>(albums: readonly T[]): T[] {
+function lyricsTargets<T extends BulkAlbum>(albums: readonly T[]): T[] {
   return albums.filter((album) => !album.lyrics_count)
 }
 
@@ -133,7 +132,7 @@ export async function runBulk<T>(
 const plural = (count: number, one: string, many = `${one}s`) => (count === 1 ? one : many)
 
 /**
- * What a finished run did, in the main page's words (its status bar's). "None on the Archive" is kept
+ * What a finished run did, in the main page's words (its status bar's, as it had them). "None on the Archive" is kept
  * apart from "failed": the first is a fact about the release, the second worth trying again - and the
  * same split for lyrics, where "not on LRCLIB" is final.
  */

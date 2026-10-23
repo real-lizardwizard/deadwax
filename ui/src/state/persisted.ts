@@ -1,5 +1,3 @@
-import { useCallback, useState } from 'preact/hooks'
-
 import type { FormatPreference } from '../api/types'
 import { DEFAULT_NORMALIZATION, type Normalization } from '../lib/loudness'
 import { isSpeed, roundSpeed, SPEED_NORMAL } from '../lib/playSpeed'
@@ -11,33 +9,22 @@ import type { AmbientChoice, Colours, Effect } from '../lib/visualizer'
 /**
  * localStorage-backed state.
  *
- * These keys are already set in users' browsers by the vanilla app. Changing a key name or a
- * value shape silently resets everyone's preferences, so treat them as a compatibility
- * surface: read defensively, keep the serialization identical, and reconcile unknown values
- * rather than discarding the whole blob.
+ * These keys are already set in users' browsers - the two oldest by the main page, which retired in
+ * 2.0.0-player.66 and whose values the app still carries over once. Changing a key name or a value
+ * shape silently resets everyone's preferences, so treat them as a compatibility surface: read
+ * defensively, keep the serialization identical, and reconcile unknown values rather than
+ * discarding the whole blob.
  */
 export const STORAGE_KEYS = {
   downloadDefaults: 'deadwax-download-defaults',
   /**
-   * Preferences owned by the settings tab that aren't download defaults.
-   *
-   * A NEW key rather than more fields on deadwax-download-defaults, because that blob is
-   * read and rewritten wholesale by the vanilla app too - anything it doesn't know about
-   * would survive only until the next time main.js saved. New key, one writer.
+   * The main page's settings tab's preferences that weren't download defaults (its own key since
+   * v0.5.1). Nothing writes it since that page retired (2.0.0-player.66): the app reads it only to
+   * carry Confirm before cancelling over, once. (The main page's library and settings-tab keys -
+   * deadwax-library-fields, -pane-width, -sort, deadwax-settings-tab - went with it, and are left as
+   * they are in a browser that has them: nothing reads them.)
    */
   preferences: 'deadwax-preferences',
-  /**
-   * Which fields the library's track viewer shows. Its own key, written only by the viewer's
-   * field menu - the same one-writer rule as `preferences` above, which the settings tab
-   * rewrites wholesale from its own copy.
-   */
-  libraryFields: 'deadwax-library-fields',
-  /** Where the library's splitter sits: the tree pane's width in px. */
-  libraryPaneWidth: 'deadwax-library-pane-width',
-  /** How the library tree is arranged, and which way round. */
-  librarySort: 'deadwax-library-sort',
-  /** Which settings tab was open last (v0.9.15). The literal tab id, not JSON. */
-  settingsTab: 'deadwax-settings-tab',
   /** Which order the Library's albums are in (lib/shelves.ts ALBUM_SORTS): the four old Subsonic list types mean
    *  what they did; since 2.0.0-player.59 three more, and anything else read as Artist, the default. */
   playerOrder: 'deadwax-player-order',
@@ -121,7 +108,7 @@ function readJson<T>(key: string): T | null {
 
 /* ===== deadwax-download-defaults ===== */
 
-export interface DownloadDefaults {
+interface DownloadDefaults {
   formatPreference: FormatPreference
   autoGrab: boolean
 }
@@ -134,9 +121,9 @@ const DOWNLOAD_DEFAULTS_FALLBACK: DownloadDefaults = {
 const FORMAT_PREFERENCES: readonly FormatPreference[] = ['any', 'prefer_lossless', 'lossless_only']
 
 /**
- * A one-off read for code that isn't a component - the candidates panel reads it per search,
- * so a preference changed in the settings tab applies to the very next one (as main.js's
- * getSettings() did). An unknown format falls back rather than being sent.
+ * The main page's download defaults, as that page left them in this browser (it retired in
+ * 2.0.0-player.66) - read only to carry Format over once (app/useGetSettings.ts). An unknown format
+ * falls back rather than being carried.
  */
 export function readDownloadDefaults(): DownloadDefaults {
   const saved = readJson<Partial<DownloadDefaults>>(STORAGE_KEYS.downloadDefaults) ?? {}
@@ -146,112 +133,6 @@ export function readDownloadDefaults(): DownloadDefaults {
       : DOWNLOAD_DEFAULTS_FALLBACK.formatPreference,
     autoGrab: saved.autoGrab === true,
   }
-}
-
-/**
- * Merged over the fallback rather than replacing it: the vanilla app persists whatever
- * partial object it happens to hold, so a stored blob may be missing either field.
- */
-export function useDownloadDefaults(): [
-  DownloadDefaults,
-  (partial: Partial<DownloadDefaults>) => void,
-] {
-  const [value, setValue] = useState<DownloadDefaults>(() => ({
-    ...DOWNLOAD_DEFAULTS_FALLBACK,
-    ...(readJson<Partial<DownloadDefaults>>(STORAGE_KEYS.downloadDefaults) ?? {}),
-  }))
-
-  const update = useCallback((partial: Partial<DownloadDefaults>) => {
-    setValue((current) => {
-      const next = { ...current, ...partial }
-      writeRaw(STORAGE_KEYS.downloadDefaults, JSON.stringify(next))
-      return next
-    })
-  }, [])
-
-  return [value, update]
-}
-
-/* ===== deadwax-library-fields ===== */
-
-/**
- * The viewer's field choices. `seen` is every field id that existed when this was written, so
- * a field added by a LATER version can tell "you turned me off" (in seen, not in visible) from
- * "you have never been asked about me" (not in seen) - and take its own default in the second
- * case rather than silently staying hidden forever.
- */
-export interface LibraryFieldState {
-  visible: string[]
-  seen: string[]
-  /**
-   * Every column in the order you arranged them, the title and hidden fields included, so a
-   * field hidden and shown again comes back where you put it. Absent until you move one, so a
-   * later version's default order still reaches everyone who never did.
-   */
-  order?: string[]
-  /** Columns you have dragged to a width, in px. A column not in here keeps its own size. */
-  widths?: Record<string, number>
-}
-
-export function readLibraryFields(): LibraryFieldState | null {
-  const saved = readJson<Partial<LibraryFieldState>>(STORAGE_KEYS.libraryFields)
-  if (!saved || !Array.isArray(saved.visible) || !Array.isArray(saved.seen)) return null
-
-  const strings = (list: unknown[]) => list.filter((v): v is string => typeof v === 'string')
-
-  //? JSON a user can edit: a width that isn't a positive number is dropped rather than trusted
-  const widths: Record<string, number> = {}
-  if (saved.widths && typeof saved.widths === 'object') {
-    for (const [id, width] of Object.entries(saved.widths as Record<string, unknown>)) {
-      if (typeof width === 'number' && Number.isFinite(width) && width > 0) widths[id] = width
-    }
-  }
-
-  return {
-    visible: strings(saved.visible),
-    seen: strings(saved.seen),
-    order: Array.isArray(saved.order) ? strings(saved.order) : [],
-    widths,
-  }
-}
-
-export function writeLibraryFields(state: LibraryFieldState): void {
-  writeRaw(STORAGE_KEYS.libraryFields, JSON.stringify(state))
-}
-
-/* ===== deadwax-library-pane-width ===== */
-
-export function readLibraryPaneWidth(): number | null {
-  const n = Number(readRaw(STORAGE_KEYS.libraryPaneWidth))
-  return Number.isFinite(n) && n > 0 ? n : null
-}
-
-export function writeLibraryPaneWidth(width: number): void {
-  writeRaw(STORAGE_KEYS.libraryPaneWidth, String(Math.round(width)))
-}
-
-/* ===== deadwax-library-sort ===== */
-
-/**
- * Returned as plain strings on purpose: this is JSON a user can edit and an older version may
- * have written, so the library view validates both against the sorts that exist today.
- */
-export function readLibrarySort(): { sort: string; direction: string } | null {
-  const saved = readJson<{ sort?: unknown; direction?: unknown }>(STORAGE_KEYS.librarySort)
-  if (!saved || typeof saved.sort !== 'string' || typeof saved.direction !== 'string') return null
-  return { sort: saved.sort, direction: saved.direction }
-}
-
-export function writeLibrarySort(value: { sort: string; direction: string }): void {
-  writeRaw(STORAGE_KEYS.librarySort, JSON.stringify(value))
-}
-
-export function readSettingsTab(): string | null {
-  return readRaw(STORAGE_KEYS.settingsTab)
-}
-
-export function writeSettingsTab(tab: string): void {
-  writeRaw(STORAGE_KEYS.settingsTab, tab)
 }
 
 /* ===== deadwax-player-order ===== */
@@ -298,7 +179,7 @@ export function writePlayerLibraryView(view: LibraryView): void {
 
 /**
  * The player's own, like its order: a home-screen app keeps its storage apart from Safari's, so a
- * switch in the settings tab would never reach it. Off unless it says 'on' - an experiment is
+ * switch in the main page's settings tab (as it was) would never have reached it. Off unless it says 'on' - an experiment is
  * never on by accident.
  */
 export function readPlayerGapless(): boolean {
@@ -461,9 +342,9 @@ export function readPlayerDevice(): string {
  * else - nothing stored, an old or mistyped value, storage that can't be read - is the board's own
  * opening: Ambient, from the cover, the Mandala.
  *
- * The lists are lib/visualizer.ts's, spelled out here rather than imported: this module is shared by
- * the main page's bundle, which has no visualizer to carry (ui/test/visualizer.sim.cjs holds every
- * effect and style offered to reading back as itself).
+ * The lists are lib/visualizer.ts's, spelled out here rather than imported: this module was shared by
+ * the main page's bundle until it retired (2.0.0-player.66), which had no visualizer to carry
+ * (ui/test/visualizer.sim.cjs holds every effect and style offered to reading back as itself).
  */
 const VIZ_EFFECTS: readonly Effect[] = ['bars', 'scope', 'halo', 'ambient']
 const VIZ_COLOURS: readonly Colours[] = ['cover', 'purple']
@@ -499,22 +380,18 @@ export function writeVizStyle(choice: AmbientChoice): void {
 /* ===== deadwax-preferences ===== */
 
 /**
- * Everything the settings tab owns that the server doesn't.
- *
- * These are all genuinely wired to behaviour - nothing here is a switch that does nothing.
- * Where a preference sets the STARTING value of a control (the search limit, the candidate
- * filters), it is applied when that control initialises and the control stays free to be
- * changed for one search without changing the default. A default you can't temporarily
- * override is an annoyance, not a preference.
+ * Everything the main page's settings tab owned that the server doesn't, as it stored it - the shape
+ * of the blob readPreferences reads to carry two of them over once. That page retired in
+ * 2.0.0-player.66; the rest are read by nothing.
  */
-export interface Preferences {
+interface Preferences {
   /* --- search --- */
   /** Initial value of the limit stepper. MusicBrainz caps a page at 100. */
   searchLimit: number
   /** Start every search with the "studio only" release-type filter applied. */
   searchStudioOnly: boolean
   /**
-   * How the results list is ordered. One of the ids in interface/scripts/sort.js.
+   * How the results list was ordered: one of the ids the retired page's sort.mjs knew.
    *
    * Chronological by default: "sorted by year" is ambiguous, and the reading that matters is
    * reading an artist's output in the order they made it.
@@ -556,10 +433,9 @@ export const PREFERENCE_FALLBACK: Preferences = {
 }
 
 /**
- * Read preferences without a hook, for the vanilla half.
- *
- * main.js needs these at module scope to seed the limit stepper and the candidate filters,
- * and it cannot call a Preact hook. Exported through window.deadwax - see bridge.ts.
+ * The main page's preferences, as that page left them in this browser (it retired in
+ * 2.0.0-player.66) - read only to carry the quality floor and Confirm before cancelling over, once
+ * (app/useGetSettings.ts, readConfirmCancel above). Nothing writes them now.
  *
  * Every field is validated rather than trusted: this is JSON from localStorage, which a user
  * can edit, an older version may have written, and a newer version may not recognise. A
@@ -604,23 +480,4 @@ export function readPreferences(): Preferences {
     logOpenOnStart: bool(stored.logOpenOnStart, PREFERENCE_FALLBACK.logOpenOnStart),
     confirmCancel: bool(stored.confirmCancel, PREFERENCE_FALLBACK.confirmCancel),
   }
-}
-
-export function usePreferences(): [Preferences, (partial: Partial<Preferences>) => void, () => void] {
-  const [value, setValue] = useState<Preferences>(readPreferences)
-
-  const update = useCallback((partial: Partial<Preferences>) => {
-    setValue((current) => {
-      const next = { ...current, ...partial }
-      writeRaw(STORAGE_KEYS.preferences, JSON.stringify(next))
-      return next
-    })
-  }, [])
-
-  const reset = useCallback(() => {
-    writeRaw(STORAGE_KEYS.preferences, JSON.stringify(PREFERENCE_FALLBACK))
-    setValue(PREFERENCE_FALLBACK)
-  }, [])
-
-  return [value, update, reset]
 }

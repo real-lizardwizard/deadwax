@@ -7,8 +7,8 @@ import { CheckIcon } from '../player/icons'
  * Settings -> Downloads) was what the app read until now - in this browser's storage, which a
  * home-screen app never had - so it is carried over once, the first time this device reads it.
  *
- * Kept on this device (deadwax-player-confirm-cancel, readConfirmCancel in state/persisted), like the
- * main page's. Requests reads it at the tap. Changing it starts nothing, so it is no gesture and names
+ * Kept on this device (deadwax-player-confirm-cancel, readConfirmCancel in state/persisted), as the
+ * main page's was. Requests reads it at the tap. Changing it starts nothing, so it is no gesture and names
  * no playback action.
  *
  * A leaf: the setting and the way to change it come as props, so the sim renders it alone.

@@ -523,7 +523,7 @@ export function AlbumPage({
         </p>
       )}
 
-      {/* what the main page's details pane says of the album (2.0.0-player.44), once the bridge has answered */}
+      {/* what the main page's details pane said of the album (2.0.0-player.44), once the bridge has answered */}
       <AlbumProperties rows={albumProperties(store, storeFailed, releaseSaid)} />
 
       <CoverViewer images={viewing} onClose={() => setViewing(null)} opener={viewOpener} />

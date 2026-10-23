@@ -76,3 +76,34 @@ apply would. A library generated afresh needs the same, or the shot shows bare "
 - **No third-party packages were available** — there is no network here to install from, so
   the driver hand-rolls the WebSocket client CDP needs. Only what is required: masked text
   frames out, unmasked in, with 64-bit lengths because a screenshot's base64 is megabytes.
+
+**2.0.0-player.66 recaptured all twelve from the app**, under the same file names (the main page they showed
+retired - see "The main page retired" in notes/app.md): 1440x900 desktop and 390x844 phone (`mobile.png`,
+`mobile-library.png`), at 2x, headless Chromium driven over CDP through a pipe (no WebSocket client needed),
+`--host-resolver-rules="MAP deadwax.test 127.0.0.1"` so the page is a plain-http non-local name, and an
+iPhone or Mac user agent. What it took:
+
+- **The library was generated** as before, but from `tests/fixtures/payloads/find-buttons.json`'s releases
+  (Dummy, the Wish You Were Here Experience edition, Third) - MusicBrainz as it answered when recorded - filed
+  and tagged through `build_target_path()` and `write_tags()`, quiet sine FLACs of each track's length (numpy
+  and soundfile, no ffmpeg), covers from the Archive; plus an untagged "Old Rips/Portishead - Third" for the
+  editor shot, so nothing had to be staged and undone.
+- **Stand-ins for Navidrome and slskd**: the app needs Navidrome, so the dev stand-in Navidrome ran on its own
+  port over that library, taught to answer `ar-` cover ids with the artist's own `artist.*`; the sources shot
+  used a stand-in slskd answering every search with a preset of realistically named Dummy folders, and the
+  Requests shot seeded jobs straight into `jobs`.
+- **The pressings shot opens the 2017 vinyl** (`?release=84ee55c7…`) with the Pressing list open: the usual
+  pressing of Dummy was already held, so Get offered no sources on it.
+- **The artist shots use Pink Floyd**: Portishead's albums sat in two folders, which greys Artist images out. The
+  page shows no picture of its own, and Artist images a broken Square image candidate: a saved logo looked odd
+  and was deleted before the final shot, and neither photo could be saved. The MusicBrainz one is 602 px wide,
+  so its thumbnail is the original, which Wikimedia refuses to a bot's user agent (403, logged as such). The
+  Wikidata one is **a deadwax bug, not Wikimedia** (found by the .66 review): `commons_title()` (src/artists.py)
+  returns the URL's path still percent-encoded, and `commons_file_url()` quotes it again, so a file name with
+  a comma or brackets - `Pink_Floyd,_1971_(HQ).jpg` - is asked for as `Pink_Floyd%252C_1971_%2528HQ%2529.jpg`,
+  which Commons answers 404 (the singly-encoded address answers 200). main has it too (1.1.8), so it is fixed on
+  main first, then merged, and `artist.png` and `artist-images.png` recaptured after. A recapture attempt in
+  the .66 review went no further: headless Chromium on tokay-gecko loaded `data:` pages but never got an http
+  response, from deadwax or anywhere (`--dump-dom` hung too), with or without the sandbox.
+- Each shot's run checked the page asked for no `/scripts/`, main.css or deadwax-ui.js and logged nothing to
+  the console. The stand-ins' address (`127.0.0.1:5045`) shows in the Connections shot as SLSKD_URL.

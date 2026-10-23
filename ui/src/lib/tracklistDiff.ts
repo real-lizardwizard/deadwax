@@ -1,16 +1,15 @@
 /**
  * One tracklist for a release group, and what each pressing changes about it - the TypeScript
- * twin of interface/scripts/tracklistDiff.mjs (2.0.0-player.13), for the app's album-you-don't-
+ * port of the main page's tracklistDiff.mjs (2.0.0-player.13), for the app's album-you-don't-
  * have page: its pressing dropdown defaults to the pressing representativeRelease() picks, and each
  * pressing says how it differs from the group's most common tracklist.
  *
- * A PORT, not a new answer. The Docker image's UI stage copies only ui/, so the app can't import
- * the .mjs the main page uses; and the main page can't import this. Both stay until the main page
- * retires, and ui/test/tracklist.sim.cjs runs BOTH against the same real MusicBrainz groups in
- * tests/fixtures/pressings/*.json, so the two can never pick a different pressing or call a
- * different track a bonus. Change one, change the other, and the sim says whether they agree.
+ * A PORT, not a new answer. The Docker image's UI stage copied only ui/, so the app couldn't import
+ * the .mjs the main page used, nor that page this; both stood until the main page retired in
+ * 2.0.0-player.66, ui/test/tracklist.sim.cjs running BOTH against the same real MusicBrainz groups in
+ * tests/fixtures/pressings/*.json. The sim holds this one to what the .mjs answered, kept there.
  *
- * The reasoning lives in the .mjs and in CLAUDE.md's "One tracklist per release group": the base
+ * The reasoning is in notes/search.md's "One tracklist per release group": the base
  * is the MOST COMMON tracklist (not the first release), tracks pair by folded title along the
  * longest common run, and a length difference is rounding, a length change, or another version.
  */
@@ -310,7 +309,7 @@ export function isSameTracklist(diff: TracklistDiff): boolean {
     && !diff.versions.length && !diff.lengths.length
 }
 
-/** The chips a release's row carries on the main page, most telling first. */
+/** The chips a pressing's differences come to (as a release's row carried them on the main page), most telling first. */
 export function summarizeDiff(diff: TracklistDiff): { kind: ChipKind; label: string }[] {
   if (isSameTracklist(diff)) return [{ kind: 'same', label: 'Same tracklist' }]
 

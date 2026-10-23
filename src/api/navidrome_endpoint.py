@@ -66,7 +66,7 @@ NOT_NAVIDROME = "is NAVIDROME_URL the address of Navidrome itself?"
 
 NOT_CONFIGURED = (
     "Navidrome isn't set up - fill in NAVIDROME_URL, NAVIDROME_USER and NAVIDROME_PASSWORD in "
-    "the settings tab"
+    "Server settings (Connections)"
 )
 
 #? Subsonic's own error codes, in words that say what to do. Anything else is quoted as sent.
@@ -103,8 +103,8 @@ class NavidromeError(Exception):
 
 def unusable_url(problem: str) -> str:
     """What the player and the apply are told when NAVIDROME_URL fails describe_navidrome_url()."""
-    return (f"NAVIDROME_URL is unusable ({problem}), so deadwax sends nothing to it - fix it in the "
-            f"settings tab (Connections), or in your compose file")
+    return (f"NAVIDROME_URL is unusable ({problem}), so deadwax sends nothing to it - fix it in "
+            f"Server settings (Connections), or in your compose file")
 
 
 def unreachable(error: httpx.HTTPError) -> NavidromeError:

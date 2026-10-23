@@ -8,12 +8,12 @@ const message = (reason: unknown) => (reason instanceof Error ? reason.message :
 
 /**
  * "Clear MusicBrainz's saved answers" (2.0.0-player.54), under MUSICBRAINZ_CACHE_PATH and
- * MUSICBRAINZ_CACHE_MB - on the main page's settings tab and the app's Server settings page alike, both
- * under Connections - with the file's size and how many answers it holds beside it.
+ * MUSICBRAINZ_CACHE_MB - on Server settings' Connections (and on the main page's settings tab too, until it
+ * retired in 2.0.0-player.66) - with the file's size and how many answers it holds beside it.
  *
  * Read as it is drawn, through latestOnly(); again each time its page comes back into view (`live`
  * turning true - the app keeps a tab's page drawn but hidden while another tab shows, and the file goes
- * on filling meanwhile; the main page's tab is drawn afresh each time it opens, so it leaves `live`
+ * on filling meanwhile; the main page's tab was drawn afresh each time it opened, so it left `live`
  * out); and again whenever the two settings' saved values change (its parent keys it on them -
  * lib/musicbrainzAnswers.ts savedAnswersKey). Coming back while a Clear is on its way reads nothing: the
  * Clear answers with the file as it is - and going out of view never calls it off, only being let go.

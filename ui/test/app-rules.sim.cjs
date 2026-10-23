@@ -563,12 +563,13 @@ console.log('\na link out of the app opens beside it')
   //? (2.0.0-player.47: the four phone notes went - Needs a look, Library care, the settings and the log are
   //? drawn on a phone - and so did the gate's link to the main page's settings tab: "Set up Navidrome" opens
   //? the app's own Settings at Connections)
-  check('...and there are links to look at (You, the desktop sidebar, the server settings\' line, Info > Debug\'s test bench, an artist\'s About, an album\'s Properties, the album you don\'t have)',
+  check('...and there are links to look at (Info > Debug\'s test bench, an artist\'s About, People\'s Sharing link, an album\'s Properties, the album you don\'t have)',
     //? (2.0.0-player.42: the Edit panel's went - "Choose the folder" took its place - and Library care's
     //? phone note came; 2.0.0-player.44: an album page's Properties, its release on musicbrainz.org;
     //? 2.0.0-player.50: the album you don't have, its group and its pressing on musicbrainz.org;
-    //? 2.0.0-player.61: People's link to Sharing deadwax, where it says why it needs logins on)
-    [...new Set(out.map(([file]) => file))].sort(), ['app/AlbumProperties.tsx', 'app/ArtistPage.tsx', 'app/InfoSheet.tsx', 'app/People.tsx', 'app/ReleaseGroupPage.tsx', 'app/ServerSettings.tsx', 'app/Sidebar.tsx', 'app/You.tsx'])
+    //? 2.0.0-player.61: People's link to Sharing deadwax, where it says why it needs logins on;
+    //? 2.0.0-player.66: You's, the sidebar's and the server settings' line's links to the main page went with it)
+    [...new Set(out.map(([file]) => file))].sort(), ['app/AlbumProperties.tsx', 'app/ArtistPage.tsx', 'app/InfoSheet.tsx', 'app/People.tsx', 'app/ReleaseGroupPage.tsx'])
 }
 
 console.log('\nNow Playing covers everything behind it')
@@ -1928,9 +1929,9 @@ console.log('\nNeeds a look: the review queue in the app, on a desktop (2.0.0-pl
       /<Sidebar\b[\s\S]*?needsLook=\{needsLook\}/.test(app), /sidebarCurrent\(nav\.tab, libraryView, hasSongs, topNow, hasLibrary\(\), nav\.stacks\.library\[0\] \?\? null\)/.test(app)],
     [true, true, true])
   //? (2.0.0-player.47: on both frames - You is told no frame at all now)
-  check('You\'s row: in Managing (an admin\'s), above the link to the main page - on a phone as on a desktop',
+  check('You\'s row: in Managing (an admin\'s) - on a phone as on a desktop; no link to the main page left (2.0.0-player.66)',
     //? (2.0.0-player.61: each row by its permission - lib/permissions.ts managing)
-    [/<div class="app-group">\s*\{managing\.queue && \(\s*<button\b[^>]*class="app-row app-link-row app-queue-link-row"/.test(you), you.indexOf('app-queue-link-row') < you.indexOf('Open the main page'),
+    [/<div class="app-group">\s*\{managing\.queue && \(\s*<button\b[^>]*class="app-row app-link-row app-queue-link-row"/.test(you), !/Open the main page/.test(you),
       /\{managing\.any && \([\s\S]*?app-queue-link-row/.test(you), /onWindDown=\{chooseWindDown\}\s*needsLook=\{needsLook\}\s*onNeedsLook=\{openQueue\}/.test(app), /\bdesktop\b/.test(you.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, ''))],
     [true, true, true, true, false])
   //? (2.0.0-player.33: through openManagingPage, which also replaces another Managing page on top)
@@ -2042,13 +2043,13 @@ console.log('\nServer settings and the log in the app, on a desktop (2.0.0-playe
       /useState<Record<string, string \| null>>|useState<SettingsTab>|useState<Settings \| null>/.test(settings),
       /^let kept: LogState = emptyLog\(\)$/m.test(log), /const log = kept\b/.test(log), /useState<LogState>/.test(log)],
     [true, true, false, true, true, false])
-  check('...drawn from the main page\'s settings tab\'s own parts, not copies',
+  check('...drawn from the settings tab\'s own parts (components/SettingsView.tsx), not copies',
     [/from '\.\.\/components\/SettingsView'/.test(settings), /<ServerGroup\b/.test(settings), /\bfunction SettingRow\b|settings-env-head/.test(settings)],
     [true, true, false])
   //? (2.0.0-player.42: Library care between Needs a look and them)
-  check('the sidebar\'s Settings and Log: an admin\'s, after Needs a look and Library care, before the main page',
+  check('the sidebar\'s Settings and Log: an admin\'s, after Needs a look and Library care, last in Managing (the main page\'s link went in 2.0.0-player.66)',
     //? (2.0.0-player.61: People between Library care and them; each by its permission)
-    [/\{managing\.any && \([\s\S]*?\{managing\.queue && item\(SIDEBAR_QUEUE\)\}\s*\{managing\.care && item\(SIDEBAR_CARE\)\}\s*\{managing\.people && item\(SIDEBAR_PEOPLE\)\}\s*\{managing\.settings && item\(SIDEBAR_SETTINGS\)\}\s*\{managing\.log && item\(SIDEBAR_LOG\)\}\s*<li>\s*<a/.test(sidebar)], [true])
+    [/\{managing\.any && \([\s\S]*?\{managing\.queue && item\(SIDEBAR_QUEUE\)\}\s*\{managing\.care && item\(SIDEBAR_CARE\)\}\s*\{managing\.people && item\(SIDEBAR_PEOPLE\)\}\s*\{managing\.settings && item\(SIDEBAR_SETTINGS\)\}\s*\{managing\.log && item\(SIDEBAR_LOG\)\}\s*<\/ul>/.test(sidebar)], [true])
   check('You\'s rows: opening the pages through App - on a phone as on a desktop (2.0.0-player.47)',
     //? (2.0.0-player.42: and Library care's)
     //? (2.0.0-player.61: and People's)
@@ -2153,8 +2154,6 @@ console.log('\nLooking after the library in the app, on a desktop (2.0.0-player.
   const store = code(read('app/useLibraryCare.ts'))
   const targets = code(read('lib/bulkTargets.ts'))
   const retime = code(read('components/RetimeLyrics.tsx'))
-  const main = code(read('components/LibraryView.tsx'))
-  const tab = code(read('components/SettingsView.tsx'))
   const server = code(read('app/ServerSettings.tsx'))
   const panel = code(read('app/EditPanel.tsx'))
   const queue = code(read('app/NeedsALook.tsx'))
@@ -2203,19 +2202,14 @@ console.log('\nLooking after the library in the app, on a desktop (2.0.0-player.
   check('...focus moving on from a run\'s button asked once the turn is over, never during the blur of its removal',
     [/const leftRun = \(kind: BulkKind\) => \(event: FocusEvent\) => \{\s*const button = event\.currentTarget as HTMLElement\s*void Promise\.resolve\(\)\.then\(\(\) => \{\s*if \(focusedRun\.current === kind && button\.isConnected\) focusedRun\.current = null/.test(care)],
     [true])
-  check('the targets are lib/bulkTargets.ts\'s, on BOTH pages - the main page\'s Library tab keeps no copy of its own',
-    [/coverTargets\(visibleGroups\.flatMap/.test(main), /lyricsTargets\(visibleGroups\.flatMap/.test(main), /discTargets\(visibleGroups\.flatMap/.test(main),
-      /!album\.art && album\.release_mbid|startsWith\('disc'\)|!album\.lyrics_count/.test(main)],
-    [true, true, true, false])
-  check('Re-time saved lyrics: one component both settings pages draw beside the lead, refused while the lead is a draft',
-    [/import \{ RetimeLyrics \} from '\.\/RetimeLyrics'/.test(tab), /\bfunction RetimeLyrics\b/.test(tab), /import \{ RetimeLyrics \} from '\.\.\/components\/RetimeLyrics'/.test(server),
-      (tab.match(/\{group\.id === 'lyrics' && \(?\s*<RetimeLyrics unsaved=\{draftEnv\['LYRICS_LEAD_MS'\] !== undefined\} \/>/g) ?? []).length,
+  check('Re-time saved lyrics: one component, drawn by Server settings beside the lead, refused while the lead is a draft',
+    [/import \{ RetimeLyrics \} from '\.\.\/components\/RetimeLyrics'/.test(server),
       (server.match(/\{group\.id === 'lyrics' && <RetimeLyrics unsaved=\{draftEnv\['LYRICS_LEAD_MS'\] !== undefined\} \/>\}/g) ?? []).length],
-    [true, false, true, 1, 1])
+    [true, 1])
   check('...reading a REAL scan (never the saved one), its run in its module, through a latestOnly()',
     [/albums = \(await libraryApi\.listAlbums\(\)\)\.albums/.test(retime), /snapshot/.test(retime.replace(/\/\/.*$/gm, '')), /^let run: RetimeRun \| null = null$/m.test(retime), /const ticket = runs\.begin\(\)/.test(retime), /useState<RetimeRun/.test(retime)],
     [true, false, true, true, false])
-  //? (review: kept in the module, an ended run's words outlived every later visit to the main page's tab)
+  //? (review: kept in the module, an ended run's words outlived every later visit to the settings page)
   check('...how a run ended said once: let go as the last thing drawing it goes, and as a new lead is typed',
     [/listeners\.delete\(listener\)\s*if \(!listeners\.size && run && !run\.running\) run = null/.test(retime),
       /useEffect\(\(\) => \{\s*if \(!unsaved \|\| !run\) return\s*if \(run\.running\) leadMoved = true\s*else run = null\s*\}\)/.test(retime)],
@@ -2242,11 +2236,11 @@ console.log('\nLooking after the library in the app, on a desktop (2.0.0-player.
   const lyricsNote = (read('app/EditPanel.tsx').match(/<h3 id="app-edit-lyrics"[\s\S]*?<\/section>/) ?? [''])[0]
   check('the Edit panel\'s Lyrics tab: re-timing named where it is - Managing\'s Settings, under Library - never the main page',
     [/re-timing the lyrics already saved, are in Managing's Settings, under Library\./.test(lyricsNote), /main page/i.test(lyricsNote)], [true, false])
-  //? and the sidebar's link to the main page names nothing left only there (2.0.0-player.45: an artist's
-  //? pictures and re-filing came to the artist page), as You's footnote says (you.sim)
-  const mainLink = (read('app/Sidebar.tsx').match(/<a\s+class="app-side-item"\s+href="\/"[\s\S]*?>/) ?? [''])[0]
-  check('the sidebar\'s "Open the main page": its title says everything is in the app now - not the bulk runs, Rescan, re-timing, artist images or re-filing',
-    [/title="The main page, until it retires - everything here is in the app now"/.test(mainLink), /bulk|covers|CD art|lyrics|rescan|re-tim|artist images|re-fil/i.test(mainLink)], [true, false])
+  //? (2.0.0-player.66) the main page retired: Managing lists only its pages - its "Open the main page" went, and
+  //? so did You's row and footnote (read raw, comments and all: no link to `/` in any form)
+  check('Managing has no link to `/` - the sidebar\'s nor You\'s',
+    [/href="\/"/.test(read('app/Sidebar.tsx')), /href="\/"/.test(read('app/You.tsx')), /Open the main page/.test(code(read('app/Sidebar.tsx')) + code(read('app/You.tsx')))],
+    [false, false, false])
   check('the Edit panel: no link to the main page left - "Choose the folder" over the scan, the folder chosen its subject for that Edit',
     [linksOut(panel).length, /status\.choose && !pickingNow/.test(panel), /chosenPath \? folderOnly\(chosenPath\)/.test(panel),
       /setChosen\(\{ key: request\.key, path \}\)\s*setPicking\(null\)\s*chooseFolder\(path\)\s*focusNext\.current = toTab\(tab\)/.test(panel),
@@ -2442,6 +2436,22 @@ console.log('\nplaylists (2.0.0-player.58): a playlist plays from its own page, 
     /const playlistDeleted = useCallback\(\(name: string, id: string\) => \{\s*sayPins\(`Deleted \$\{name\}`\)\s*const \{ page \} = currentRoute\(router\.nav\)\s*if \(page\?\.kind === 'playlist' && page\.id === id\) router\.back\(\)\s*\}, \[\]\)/.test(app), true)
   check('a playlist drag\'s frame loop runs only while a drag is held, and is called off as it ends',
     [/if \(!dragging \|\| typeof requestAnimationFrame !== 'function'\) return/.test(page), /return \(\) => cancelAnimationFrame\(frame\)\s*\}, \[dragging\]\)/.test(page)], [true, true])
+}
+
+console.log('\nthe main page retired (2.0.0-player.66): nothing of the app points at it, or reaches for its half')
+{
+  const every = sources()
+  const drawn = every.filter((file) => /^(app|player|components)\//.test(file))
+  check('no link to `/` anywhere in ui/src (`/` is a redirect to the app now)', every.filter((file) => /href=["'{`]*\/["'`]/.test(code(read(file)))), [])
+  check('no "main page" in the words, titles or labels of any app/, player/ or components/ file (comments aside)',
+    drawn.filter((file) => /main page/i.test(code(read(file)))), [])
+  check('no window.deadwax, nor a bridge() to reach it - the two halves met there, and are one now',
+    every.filter((file) => /window\b[^\n;]{0,24}\.deadwax\b|\bbridge\(/.test(code(read(file)))), [])
+  const vite = fs.readFileSync(path.join(SRC, '..', 'vite.config.ts'), 'utf8')
+  check('vite.config\'s APP_INPUTS names only deadwax-player (the bench is its own pass)',
+    [...((vite.match(/const APP_INPUTS = \{([^}]*)\}/) ?? ['', ''])[1].matchAll(/'([\w-]+)':/g))].map((match) => match[1]), ['deadwax-player'])
+  check('...and the checks see what they look for', [/href=["'{`]*\/["'`]/.test('<a href="/">'), /main page/i.test(code("const words = 'the main page'")), /main page/i.test(code('// the main page'))],
+    [true, true, false])
 }
 
 console.log('\nthe checks themselves')

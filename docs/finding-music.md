@@ -1,141 +1,30 @@
 # Finding music
 
-The **Search** tab looks up albums on MusicBrainz and lists every pressing of each. You choose
-the exact one you want, and that's what the download is matched against and tagged as.
+The **Search** tab looks up artists, albums and songs - your library first, then MusicBrainz - and
+opens any album MusicBrainz knows, with every pressing of it, so you choose the exact one you want.
+That pressing is what **Get** downloads, what the sources found on Soulseek are matched against, and
+what the album is tagged as when it's filed ([Downloading](downloading.md)).
 
-This page is about the main page's Search tab first. The [phone app](player.md) has a Search tab
-of its own - one box, one list of artists, albums and songs, yours first and then MusicBrainz's - and a
-page for an album you don't have: see [On the phone](#on-the-phone-the-apps-search-tab).
+It is **one list, as Apple Music shows one**: **Top results** first - the best artist, album or song,
+yours or not - then **Artists**, **Albums** and **Songs**, each with **yours first, then
+MusicBrainz's**. Chips over the list narrow it to one kind. An album MusicBrainz offers has **Get** at
+the end of its row, and opens as [the album you don't have](#the-album-you-dont-have), with **Get the
+album** under its **Pressing** button; **Requests** then follows the download.
 
-## Searching
+On a desktop (a window 1024 pixels wide or more) the box is the sidebar's **search field**: typing there
+shows these results in the main area, the chips under the large title, and Enter asks at once, as
+**Search** on the keyboard does. Top results are tiles there, three across - two across beside a side
+panel (Sources from a Get, or Info), so each keeps room for its title. An album you don't have shows its
+tracklist as a table, with an **Against the usual tracklist** column whenever any pressing differs - see
+[the app on a desktop](player.md#on-a-desktop).
 
-Fill in either box or both:
+An artist's name opens [their page](player.md#artist-pages): their albums as MusicBrainz lists them,
+every one, oldest first, with what you have marked and a **Get** on the rest - **Studio only** narrows
+it to their studio albums and EPs.
 
-- **Release title**: the album's name.
-- **Artist name**: who it's by. With both filled in, the search asks for that album by that
-  artist, which is far more precise than typing both into one box.
+![Dance Gavin Dance's page: their albums from MusicBrainz, oldest first](../assets/images/discography.png)
 
-Then press **Search**, or Enter in either box.
-
-- **Type** narrows what's asked for: albums, singles, EPs, or other, and **studio albums only**,
-  which leaves out live albums, compilations, interviews, demos, remixes and DJ mixes. It
-  narrows the *question* rather than hiding answers. MusicBrainz returns a limited number of
-  results, so for a prolific artist most of them would otherwise be live albums and
-  compilations. When a type filter is on, the button, the results summary and its tooltip all
-  say so.
-- **Limit** is how many albums to ask for (1-100). The default is set in Settings → Search.
-
-## The results
-
-Each result is a card for one album (a *release group*):
-
-- the **cover**, **title** and **year**, and the **type** (Album, Single, Live, Compilation…);
-- the **artist**. Tap or click the name to browse the artist's whole discography (below);
-  the **↗** beside it opens the artist on MusicBrainz;
-- a **match** percentage, MusicBrainz's own relevance score for your search. Green is a strong
-  match; a faded card is a weaker one;
-- **In your library** when you already hold some pressing of it, with a count of editions, or
-  **Maybe in your library** (dashed) when a folder of that name exists but carries no MusicBrainz
-  ids to prove it;
-- **Find**, which searches Soulseek for the album as a whole (see below).
-
-**Sort** orders the cards: year (oldest or newest first), best match, title or artist. Albums
-with no known date go to the end whichever way the list runs.
-
-## An artist's discography
-
-A search can't answer "everything this artist released, in order": MusicBrainz answers in
-relevance order and spends the limit on whatever matched, which for a well-known artist is
-mostly bootlegs. So clicking an **artist's name** *browses* instead. It lists every album
-credited to them, in the order **Sort** says (oldest first by default), with **studio albums
-only** on to start with. **Back** returns to your search.
-
-A browse stops at 500 albums, and says so if it did, so an enormous catalogue ("Various
-Artists") isn't presented as complete.
-
-![Dance Gavin Dance's eleven studio albums, oldest first](../assets/images/discography.png)
-
-## Every pressing of an album
-
-Under each card is a list of its **releases**: every pressing MusicBrainz knows of. The best
-match comes with them already fetched, marked **Specific releases (N)**; for the others, press
-**Fetch releases**. MusicBrainz can take a few seconds, sometimes much longer on a bad day, and
-the button shows it's working.
-
-The list is a table on a desktop and one block per pressing on a phone. Its columns:
-**Edition**, **Title**, **Format**, **Tracks**, **Status**, **Country**, **Date**, **Label**,
-**Catalog#**, **Barcode**, **Quality**, **Language/Script** and **Disambiguation**. **Columns**
-chooses which are shown. On a desktop, drag a column's header to move it and its edge to
-resize it; the layout is remembered.
-
-### What's different about each pressing
-
-Above the list is **the tracklist most of the pressings share**, and each pressing then says
-only what *it* changes:
-
-- **The tracklist above**: this pressing is the shared one.
-- **+1 track** / **−1 track**: bonus tracks, or missing ones.
-- **1 other version**: a track that's a different recording (much longer or shorter), such as
-  a single mix.
-- **3 lengths**: tracks whose lengths differ slightly; rounding within 2 seconds doesn't count.
-- An **edition** label, such as *ANNIVERSARY*, *REMASTER* or *DELUXE*, when the release names one.
-
-Click (or tap) a pressing to see its changes in full, and click **Show this release's full
-tracklist** for the whole thing, sides and discs included.
-
-![Dummy's twenty pressings under the tracklist twelve of them share, the 2017 vinyl opened to show what it changes](../assets/images/search.png)
-
-### Pressings you already have
-
-A pressing whose MusicBrainz id matches an album in your library is marked **In your library**,
-with a purple edge. The marks update by themselves when a download is filed while you're
-looking.
-
-**Find** on a pressing you already have complete, or one that's already downloading in full,
-says so instead of searching Soulseek. See [when you already have it](downloading.md#when-you-already-have-it).
-
-## The filter column
-
-On the left (behind **Show** on a phone), the filter column is built from whatever release
-lists are open: every edition, format, status, country, label and so on that appears, with
-counts. Click a value once to show **only** pressings with it, again to **exclude** it, and a
-third time to clear it. The text box filters on anything in a row. **Clear** resets everything.
-The results summary says how many pressings are shown out of how many were listed.
-
-## Find: starting a download
-
-There are two **Find** buttons, and the difference matters:
-
-- **Find on a pressing's row** (recommended) searches Soulseek for that exact release, and ranks
-  every folder found against **its real tracklist**: titles, count and lengths. When the
-  download is filed, each track gets that release's title, number, disc and ids.
-- **Find on the album card** is for when you don't mind which pressing. It picks one for you:
-  a pressing with the album's most common tracklist, preferring an official CD or digital
-  release, then the earliest. It then searches exactly as that pressing's own Find would. If the
-  card hasn't listed its pressings yet, the button shows a sweep while it asks MusicBrainz, and
-  if MusicBrainz can't answer, it falls back to searching for the album as a whole.
-
-Either opens the **candidates panel**; see [Downloading](downloading.md). If the pressing is
-already in your library, or already downloading in full, the panel says so and doesn't search.
-
-## On the phone: the app's Search tab
-
-The [phone app](player.md) at `/player/` has its own **Search** tab (since 2.0.0-player.13). Since
-2.0.0-player.55 it is **one list, as Apple Music shows one**: **Top results** first - the best artist,
-album or song, yours or not - then **Artists**, **Albums** and **Songs**, each with **yours first, then
-MusicBrainz's**. Chips over the list narrow it to one kind. It finds albums you don't have to get too:
-**Get** on an album or a song MusicBrainz offers, or **Get the album** on an album's page, opens the sources
-found on Soulseek to choose from - see [Get, and choosing a source](downloading.md#on-the-phone-get-and-choosing-a-source) -
-and the app's Requests tab follows the download from there.
-
-On a desktop (since 2.0.0-player.19; a window 1024 pixels wide or more) the box is the sidebar's
-**search field**: typing there shows these results in the main area, the chips under the large title, and
-Enter asks at once, as **Search** on the keyboard does. Top results are tiles there, three across - two across
-beside a side panel (Sources from a Get, or Info), so each keeps room for its title. An album
-you don't have shows its tracklist as a table, with an **Against the usual tracklist** column whenever any
-pressing differs - see [the phone player guide](player.md#on-a-desktop).
-
-### The box
+## The box
 
 Type an artist, an album, a song, or an artist and an album or song ("portishead third", "roads
 portishead"), up to 200 characters.
@@ -154,17 +43,16 @@ portishead"), up to 200 characters.
 Only the newest search is ever shown: an answer that arrives after you've typed something else is dropped.
 
 A search MusicBrainz was asked before is answered at once from deadwax's
-[saved answers](configuration.md#musicbrainzs-saved-answers-settings--connections) (since
-2.0.0-player.54), after a restart too - and since 2.0.0-player.56 everything in them is searched under any
+[saved answers](configuration.md#musicbrainzs-saved-answers-settings--connections), after a restart too - and everything in them is searched under any
 words, [below](#what-deadwax-has-saved). And the app itself keeps the last 24 MusicBrainz answers it was
 given while the page is open, so words you searched a moment ago - "portishead third" cut back to
 "portishead", Back, a chip there and back - are drawn whole the moment your library answers, with nothing
 asked at all.
 
-### What deadwax has saved
+## What deadwax has saved
 
 Everything MusicBrainz has answered deadwax - every search, artist page and discography, and every album page
-with all its pressings' tracklists - is kept on disk, and since 2.0.0-player.56 Search looks through all of it
+with all its pressings' tracklists - is kept on disk, and Search looks through all of it
 **under any words**, not only the words asked before: search "portishead" and open Dummy, and later "glory
 box" finds Glory Box at once, from Dummy's tracklist, before MusicBrainz has been asked - after a restart too.
 
@@ -207,7 +95,7 @@ box" finds Glory Box at once, from Dummy's tracklist, before MusicBrainz has bee
   after a month), so an artist renamed since, or an album added since, shows as it was until MusicBrainz's
   own answer arrives - see [troubleshooting](troubleshooting.md#search-shows-an-old-name-or-misses-something-new).
 
-### One list
+## One list
 
 - **Top results**: three rows on a phone, six tiles on a desktop. The best match comes first: an **exact
   match** - an artist named what you typed, an album or song titled it (case, accents, brackets and a
@@ -219,18 +107,17 @@ box" finds Glory Box at once, from Dummy's tracklist, before MusicBrainz has bee
   alone ("portishead"), is them first, then their albums and songs - their self-titled album is by them, not
   an exact match. Each row says what it is first: "Artist · 3 albums in your library", "Album · Portishead ·
   1994", "Song · Portishead · Dummy". A song of yours plays from its tap (▶ once its album is in hand), and
-  its **•••** has Play Next and Play Last (since 2.0.0-player.57 - [Up Next](player.md#up-next-shuffle-and-repeat));
+  its **•••** has Play Next and Play Last ([Up Next](player.md#up-next-shuffle-and-repeat));
   a MusicBrainz song opens the album it's on, the song marked; everything else opens.
 - **Artists**, **Albums**, **Songs**: a few of each - on a phone your first 2 artists and MusicBrainz's 2,
   3 and 3 albums, 3 and 3 songs (on a desktop 3 and 3, 4 and 4, 4 and 4), so MusicBrainz's show even beside
   many of yours. **See all**, in each heading, shows that kind in full. A section with nothing to show is
   left out.
 - **Every row of yours says where it is**: "in your library" at the end of its line (with logins on, "in
-  your library" or "in the store", or nothing while that isn't known yet). It's said even with logins off
-  now, since the "In your library" heading over your half went with the halves.
+  your library" or "in the store", or nothing while that isn't known yet).
 
-**Artists**: yours, with how many of their albums you have, then MusicBrainz's - for the first time any
-user can look an artist up on MusicBrainz from the app. Each MusicBrainz artist says who it is: "as Kanye
+**Artists**: yours, with how many of their albums you have, then MusicBrainz's, so anyone can look an
+artist up on MusicBrainz. Each MusicBrainz artist says who it is: "as Kanye
 West" when it was found by a name it used to go by, then MusicBrainz's note, its type and country ("as
 Kanye West · formerly Kanye West · Person · US"). A MusicBrainz artist your library has is shown once, as
 yours - by MusicBrainz's id, or by name when only one MusicBrainz artist goes by it - so "kanye west" shows
@@ -259,12 +146,12 @@ an interview, compilations and singles, with no Dummy and no Third - and says so
 asks for everything, unfiltered. Various Artists ("va") is never filtered: its records are compilations by
 nature.
 
-### Songs
+## Songs
 
 Your songs first - each plays straight away, from that song through the rest of its album, once its album
 is in hand (as the answer arrives, the albums of the songs in Top results and then of the first songs are
 fetched, five different ones; a song whose album has arrived shows ▶) - then the **songs MusicBrainz has**
-(since 2.0.0-player.53), for people who know a song but not the album it's on. A MusicBrainz song you have
+, for people who know a song but not the album it's on. A MusicBrainz song you have
 in your library by the same title and artist is left out - yours shows instead (its other albums are on
 the artist's page).
 
@@ -320,7 +207,7 @@ finds nothing it's asked again as the words you typed taken as **one title**. **
 have are matched against song titles only**, so a famous title alone mostly finds covers: "hey jude"
 alone finds tribute bands and string quartets, and no Beatles in its first pages - type the artist too.
 
-### The chips and See all
+## The chips and See all
 
 **All** (pressed as you start typing) is the list above. **Artists**, **Albums** and **Songs** each show that
 kind **in full**, with no Top results: first your library's (its own search for that kind - 50 artists,
@@ -347,7 +234,7 @@ it.*
 from a keyboard, focus goes to the chip. The chip you chose stays while you type other words, goes back to
 All when you empty the box, and isn't in the address - so Back doesn't undo it; the All chip does.
 
-### Nothing moves under your finger
+## Nothing moves under your finger
 
 Your library answers in a fraction of a second, MusicBrainz a second or three later - and sometimes not at
 all - so the list is drawn in steps that never move each other: **every row and button drawn for a search
@@ -370,7 +257,7 @@ place already drawn for it, one fixed height.**
   top: *Searching your library…*, then **3 in your library - Show them** - or, if Navidrome turns out not to
   be reachable, *Your library can't be searched just now.* (never that it found nothing).
 
-### MusicBrainz busy or away
+## MusicBrainz busy or away
 
 When MusicBrainz is shedding searches (it often does, for a few minutes) a kind's place says *MusicBrainz is
 busy just now - try again in a moment.*; when it isn't answering at all, *MusicBrainz isn't answering.* -
@@ -382,7 +269,7 @@ something of your library is drawn above). Under rows
 Enter in the desktop's field) does what Try again does. If MusicBrainz can't read
 what you typed as a search, it says *MusicBrainz couldn't read that search - try other words*, with no Try
 again (the same words would be refused again). A search gives up after three tries: about eight seconds
-when MusicBrainz is turning searches away (half a minute before 2.0.0-player.55); longer when it doesn't
+when MusicBrainz is turning searches away; longer when it doesn't
 answer at all, as each try waits up to half a minute for an answer. If nothing at all was found, *No results for "…"* and *Check the spelling or try
 a new search.* - never when MusicBrainz wasn't asked yet.
 
@@ -398,7 +285,7 @@ store"); and adding an album to your library on its page re-marks its row here i
 whose-it-is isn't known yet sits among yours and may say "in the store" there once known, rather than move.
 See [the player as you](player.md#the-player-as-you-with-logins-on).
 
-### How the box is read
+## How the box is read
 
 - **It starts or ends with an artist you have** (any folder in your library, by name, ignoring case,
   accents, a leading "The" and "&" against "and"): the rest is the title, and MusicBrainz is asked for that
@@ -408,17 +295,17 @@ See [the player as you](player.md#the-player-as-you-with-logins-on).
   ("portishead - third").
 - **It is an artist you have**: their studio albums and EPs in All (everything under the Albums chip), and
   MusicBrainz's artists of that name.
-- **va**, or "various artists", is Various Artists, as the main page's artist box reads it.
+- **va**, or "various artists", is Various Artists.
 - **Anything else** goes to MusicBrainz as you typed it, for albums, artists and songs.
 
 If reading it as an artist and a title finds nothing (an artist's name that happens to begin a title),
 it's asked again as the words you typed. *Everything MusicBrainz found is in your library already* means
 just that.
 
-### The album you don't have
+## The album you don't have
 
 It opens like an album you have: back, the cover in the middle (the Cover Art Archive's, for the
-pressing shown, else for the album), the title, the artist (since 2.0.0-player.17 a link to
+pressing shown, else for the album), the title, the artist (a link to
 [their page](player.md#artist-pages) when the album is credited to one artist; a collaboration's
 names stay plain), and "2008 · Album ·
 not in your library" - "in your library" if you have some pressing of it after all (with logins on, "in
@@ -428,22 +315,24 @@ the pressing, so it never says "in your library" over **In the store, not in you
 **Pressing** list marks each pressing **In your library** or **In the store**). That last part
 appears once deadwax has said what you have, never before, so it can't claim you don't have an
 album you do; and it counts a folder tagged with any of the album's pressings, the .m4a albums
-above included. Since 2.0.0-player.50, when nothing is tagged as the album but a folder **with no
+above included. When nothing is tagged as the album but a folder **with no
 MusicBrainz ids at all** has its name and its artist's (as credited, or the name they go by now), it
-says **maybe in your library**, in a dashed box, as the main page's card does (with logins on,
+says **maybe in your library**, in a dashed box (with logins on,
 **maybe in the store** when that folder isn't in your library) - the name can't tell which album that
 folder is, let alone which pressing. Point at it (on a computer) for the folder;
-matching its release in the metadata editor settles it. Opened from a saved link or after a reload it
+matching its release in **Edit → Release** settles it ([the library](library.md#editing-an-album)). Opened from a saved link or after a reload it
 says the same, since the album's
 title, kind and year come with its pressings. A link whose address isn't a MusicBrainz album says
 *That isn't a link to an album on MusicBrainz.* Under it is the **Pressing** button, where an album you have has Play and
 Shuffle; then **Get the album**, the page's one purple button, which gets **the pressing chosen**
-([Get, and choosing a source](downloading.md#on-the-phone-get-and-choosing-a-source)); under it,
+([Get, and choosing a source](downloading.md#choosing-a-source)); under it,
 what you already have of that pressing, if anything ("Already in your library", "Already
 downloading", "You have 9 of 10 tracks of this pressing…", "You also have another pressing…" - or,
 with logins on, "The store also has another pressing…" for one that isn't yours -
 asked of deadwax without searching Soulseek, for the pressing chosen, and again as you come back to
 the page); and then **that pressing's tracklist**.
+
+![Dummy, an album you don't have, on its 2017 vinyl: the Pressing list open, each pressing saying what it changes about the tracklist twelve of its twenty share](../assets/images/search.png)
 
 It needs only MusicBrainz, so it works with Navidrome down. To work out the differences it fetches
 **every pressing's tracklist** at once, which for an album with a lot of pressings can take
@@ -456,9 +345,9 @@ for a worldwide release; "Europe" for MusicBrainz's European ones) and its Music
 disambiguation, or else its label - "CD · 2020 · AU · Caroline International". It starts on **the
 usual pressing**: one with the album's most common tracklist, an official release over a promo or
 bootleg, a CD or digital release over vinyl, one with no disambiguation, then the earliest. That's
-the pressing a card's **Find** on the main page downloads as, and the one a row's **Get** gets.
+the pressing a row's **Get** gets.
 
-Under it (since 2.0.0-player.50) is what else tells that pressing apart, as MusicBrainz gives it: its
+Under it is what else tells that pressing apart, as MusicBrainz gives it: its
 **status** (Official, Promotion, Bootleg), its **full date** when MusicBrainz has more than the year,
 its **labels** when the button shows a disambiguation in their place (and any after the first one it
 shows), its **catalogue number** and its **barcode**, and "Worldwide" for a release whose country the
@@ -478,7 +367,7 @@ player (it's never taller than that, and scrolls inside itself past that):
 - **No tracklist on MusicBrainz** for one nobody has entered the tracks of;
 - then **N more pressings with the usual tracklist**, folded away - tap it to show them.
 
-Each pressing in the list says its facts under its label (since 2.0.0-player.50), the same ones as the
+Each pressing in the list says its facts under its label, the same ones as the
 line under the button. An album with **more than 30 pressings** has a **filter** at the top of the list:
 type a country's code as the list shows it, a format, a label, a catalogue number or a word of a note
 ("jp cd", "uicb 1004", "promotion", "bonus") and only the pressings holding every word show, folded ones
@@ -489,7 +378,7 @@ not in the filter (on a phone the keyboard would cover the list); from the filte
 the first pressing, the arrows never leave the pressing they move to under the filter, and closing the
 list, however you close it, empties it.
 
-Since 2.0.0-player.41 every pressing you already have says **In your library** under its note, in
+Every pressing you already have says **In your library** under its note, in
 green, and is never folded away - judged by the pressing's MusicBrainz id in your folders' tags, once
 deadwax has said what you have.
 
@@ -511,23 +400,22 @@ tracklist as the usual one*, or, in amber, *This pressing adds 1 track* (or *lea
 - **Renamed**, in amber, *Usually "…"*: a new title at about the same length.
 - **Not on this pressing**, after the list: the usual tracks this one leaves out.
 
-"The usual tracklist" is the titles in order, as on the main page, at the lengths of the pressing
-the page starts on - so that pressing is always the usual one, whatever order MusicBrainz lists
-them in. A pressing whose tracks are a few seconds longer or shorter (MusicBrainz's rounding, or
-that pressing's own timing) still has it. The thresholds are the main page's own ([What's
-different about each pressing](#whats-different-about-each-pressing)) - 15 seconds (or 8% of the
-track, if that's more) for another version, within 5 seconds for a rename - but the app doesn't
-mark a small length change at all, where the main page shows it as an "N lengths" chip: such a
-pressing reads *Same tracklist as the usual one* here.
+"The usual tracklist" is the titles in order - the most common tracklist among the pressings, with a
+curly and a straight apostrophe, case and punctuation counting as the same - at the lengths of the
+pressing the page starts on, so that pressing is always the usual one, whatever order MusicBrainz lists
+them in. A pressing whose tracks are a few seconds longer or shorter (MusicBrainz's rounding, or that
+pressing's own timing) still has it: a small length change isn't marked at all, and such a pressing
+reads *Same tracklist as the usual one*. Another version is 15 seconds (or 8% of the track, if that's
+more) longer or shorter; a rename is a new title within 5 seconds of the old one's length.
 
-At the foot of the page (since 2.0.0-player.50), after the words **On MusicBrainz**, **The album ↗** and
+At the foot of the page, after the words **On MusicBrainz**, **The album ↗** and
 **This pressing ↗** open the album's page and the chosen pressing's on musicbrainz.org, beside the app -
 in a new tab, so the music keeps playing.
 
 
-#### Opened from a song
+### Opened from a song
 
-An album opened from [a song](#songs) (since 2.0.0-player.53) opens on a pressing that
+An album opened from [a song](#songs) opens on a pressing that
 has it: the usual one when that has the song, and otherwise the most usual of the pressings that do -
 Tame Impala's "Patience" is a bonus track on The Slow Rush's Japanese CD alone, so The Slow Rush opens on
 that CD (Get the album then gets it). The song is **marked** in the tracklist - tinted, barred and in the
@@ -535,9 +423,10 @@ accent, and a screen reader says "the song you searched for" - and the page scro
 song MusicBrainz keeps as another recording on the usual pressing (Borderline's single mix) is found by
 its title there. Choose another pressing and that's the one shown from then on, the song marked wherever
 it is on it. The address keeps the song (`?song=`), so a reload or a link opens it the same way.
-### Another pressing of an album you have
 
-Since 2.0.0-player.41 an album you have - its own page in the app, played from your library - ends
+## Another pressing of an album you have
+
+An album you have - its own page in the app, played from your library - ends
 its row of chips under the meta line with **Other pressings ›** (after **In your library** and any
 **Also: …** chips for other pressings you hold). It opens [the album you don't
 have](#the-album-you-dont-have) for that album: every pressing MusicBrainz lists, the ones you have

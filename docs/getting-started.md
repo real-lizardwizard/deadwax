@@ -13,11 +13,10 @@ spent getting three folder paths to agree.
 - **An email address** to give MusicBrainz as a contact. They ask every app for one, and rate
   limit the ones that don't send it.
 - **A folder for your music library.** An empty one is fine, and so is an existing library:
-  the library tab reads whatever is there.
+  deadwax reads whatever is there.
 - **[Navidrome](https://www.navidrome.org)**, reading the same music folder, and an account on it
-  of your own (not an admin one). The app at `/player/` - [the phone player](player.md), and on a
-  computer the same app laid out for a desktop - shows and plays your library from Navidrome, so it
-  needs one for the library. Searching, getting albums and following downloads work without it.
+  of your own (not an admin one). [The app](player.md) - on a phone, and on a computer laid out for a
+  desktop - shows and plays your library from Navidrome, so it needs one for the library. Searching, getting albums and following downloads work without it.
 
 ## The three folders
 
@@ -98,31 +97,31 @@ Every setting is described in [Configuration](configuration.md).
 
 ## The first run
 
-1. **Start it** and open `http://your-server:8080`.
-2. **Check the two connection pills** at the top: MusicBrainz and slskd. Green means connected.
-   A red one names the problem, such as `NOT_LOGGED_IN` when slskd is running but not signed in
-   to Soulseek, or `CONNECTION_ERROR` when it can't be reached at all. On a phone the pills
-   only appear when something is wrong.
-3. **Open Settings → Library.** Every configured path is shown as the container sees it,
+1. **Start it** and open `http://your-server:8080` - that opens the app, at `/player/`.
+2. **Check You → Connections**: MusicBrainz, slskd and Navidrome. **Connected** means connected;
+   otherwise it names the problem, such as `NOT_LOGGED_IN` when slskd is running but not signed in
+   to Soulseek, or `CONNECTION_ERROR` when it can't be reached at all.
+3. **Open Settings → Library** - the desktop sidebar's **Settings**, or **You → Server settings** on
+   a phone. Every configured path is shown as the container sees it,
    checked for whether it exists and can be read and written. There's also a plain statement
    of whether organizing is ready, listing everything that's stopping it. If a path is wrong,
    this is where it shows.
-4. **Download something small.** Search for an album, pick a pressing, press **Find**, then
-   **Download** on a good candidate. [Finding music](finding-music.md) and
+4. **Download something small.** Search for an album, open it, pick a pressing, press **Get the
+   album**, then **Get** on a good source. [Finding music](finding-music.md) and
    [Downloading](downloading.md) walk through it.
-5. **Watch the log** (the **Log** button, top right). Organizing starts in **dry run**, so when
+5. **Watch the log** (the sidebar's **Log**, or **You → Log**). Organizing starts in **dry run**, so when
    the download finishes the log says where each file *would* have been filed, and nothing is
    written. Check the paths look right.
 6. **Switch organizing on.** In Settings → Library → Organizing, set `ORGANIZE_MODE` to `copy`
    (files are copied into the library and slskd's copies stay) or `move` (they're moved, and
-   slskd's emptied folder is cleaned up). A setting saved in the settings tab takes effect
+   slskd's emptied folder is cleaned up). A setting saved in Server settings takes effect
    straight away, with no restart.
 7. **Set up Navidrome.** Point Navidrome at the same music folder you mounted at `/music`, then fill
    in `NAVIDROME_URL` (Navidrome's address as this container sees it, such as
    `http://navidrome:4533`), `NAVIDROME_USER` and `NAVIDROME_PASSWORD` in Settings → Connections (or
    uncomment the three lines waiting for them in `docker-compose.example.yml` or `.env.example`) -
-   [the phone player's setup](player.md#setting-it-up) has the details. Then open
-   `http://your-server:8080/player/`: Home and the Library show your albums from Navidrome (with
+   [the app's setup](player.md#setting-it-up) has the details. Then Home and the Library show your
+   albums from Navidrome (with
    logins on, the Library is each person's own and **Browse** is the store - [sharing
    deadwax](sharing.md)).
 
@@ -131,14 +130,14 @@ you have and Search's look in your library each say **Connect Navidrome** (or **
 Navidrome**, with the reason and **Try again**) and how to set it up, in place of your albums. The
 rest works without it: Search's MusicBrainz rows, an album you don't have and its **Get**,
 **Requests**, Home's arriving downloads and **You**. An album folder Navidrome doesn't list - not
-scanned yet, unreadable, or outside Navidrome's music folder - is never out of reach: on a desktop,
-**Needs a look** raises it as **Not in Navidrome** (see [the library](library.md#not-in-navidrome)).
+scanned yet, unreadable, or outside Navidrome's music folder - is never out of reach: **Needs a
+look** raises it as **Not in Navidrome** (see [the library](library.md#not-in-navidrome)).
 
 ## Running it day to day
 
-- **The settings tab overrides compose.** A value saved there is stored in deadwax's database
-  and wins over your compose file and `.env`, and the row says it's overriding. **Revert**
-  deletes the override, so the compose value applies again.
+- **Server settings overrides compose.** A value saved there is stored in deadwax's database
+  and wins over your compose file and `.env`, and the row says it's overriding. **Revert to the
+  environment** deletes the override, so the compose value applies again.
 - **Updating** is pulling the new image and recreating the container. The database in `/config`
   carries everything over.
 - **The image has a health check.** `/deadwax/health` answers 200 while the background download
@@ -147,10 +146,9 @@ scanned yet, unreadable, or outside Navidrome's music folder - is never out of r
 - **There is no login unless you turn logins on** ([below](#turning-logins-on)). With logins off - the
   default - anyone who can reach the port can use it, so keep it on your own network or put it
   behind something that asks for a password.
-- **On your phone**, the main page works as it is, and `/player/` is the app for your library,
-  played from Navidrome, that you can add to an iPhone's home screen. To use either
-  away from home, reach deadwax over a VPN such as WireGuard or Tailscale rather than an open
-  port. See [the phone player](player.md).
+- **On your phone**, the app is the same app, laid out for it, and you can add it to an iPhone's
+  home screen. To use it away from home, reach deadwax over a VPN such as WireGuard or Tailscale
+  rather than an open port. See [the app](player.md).
 
 ## Turning logins on
 
@@ -158,7 +156,7 @@ To share deadwax with other people, turn logins on: everyone then signs in with 
 **Navidrome** account and has their own requests, library, plays and playlists, over the one store,
 and Navidrome's admins are deadwax's admins (an admin can give anyone else a part of that, in People). Up to
 three settings, in the container's environment (compose's
-`environment:` block or `.env` - not the settings tab, which only shows them). The secret key goes in
+`environment:` block or `.env` - not Server settings, which only shows them). The secret key goes in
 `.env` only, as `DEADWAX_SECRET_KEY=` and a key made with `openssl rand -hex 32` - a line for it in
 `environment:` as well, even an empty one, beats `.env`
 ([Sharing deadwax, step 1](sharing.md#turning-logins-on)):
@@ -183,6 +181,19 @@ and removing people (People, in You), what admins can do that others can't and t
 give, and turning logins off again. Every setting's
 row: [Configuration → Logins](configuration.md#logins-environment-only). If you're locked out, see
 [Troubleshooting](troubleshooting.md#signing-in).
+
+## Coming from 1.x
+
+**Your library now comes from Navidrome.** 1.x browsed `LIBRARY_PATH` itself; the app's Library
+tab, album and artist pages, Home's shelves and the player show what Navidrome lists, and say
+**Connect Navidrome** until it's set up ([setting it up](player.md#setting-it-up)). Search's
+MusicBrainz results, Get, Requests, Needs a look and Library care work without it.
+
+The old page at `/` retired in 2.0.0: `/` opens the app. With Navidrome set up, everything it did is
+in the app - a bookmark or a home-screen icon for `/` lands there - and a browser that used the old page has its
+Format, quality floor and Confirm before cancelling carried over the first time it opens the app
+([configuration](configuration.md#your-settings-in-the-app-per-user-on-deadwax)). The last version
+with that page is the git tag `last-main-page`.
 
 ## Coming from jimbrainz
 

@@ -1,5 +1,5 @@
 {
- "about": "Dummy by Portishead, release group 48140466-cff6-3222-bd55-63c27e43190d, as MusicBrainz answered /release?release-group=...&inc=media+recordings+labels+artist-credits on 2026-09-30 - trimmed to the fields deadwax reads. Twenty pressings: twelve with the eleven-track tracklist, the ten-track CDs without \"It's a Fire\", the vinyl ~10s short on every track (Biscuit 30s - another version), and two with a twelfth track. 'expected' is what interface/scripts/tracklistDiff.mjs answered; ui/test/tracklist.sim.cjs holds it and the TypeScript port (ui/src/lib/tracklistDiff.ts) to it.",
+ "about": "Dummy by Portishead, release group 48140466-cff6-3222-bd55-63c27e43190d, as MusicBrainz answered /release?release-group=...&inc=media+recordings+labels+artist-credits on 2026-09-30 - trimmed to the fields deadwax reads. Twenty pressings: twelve with the eleven-track tracklist, the ten-track CDs without \"It's a Fire\", the vinyl ~10s short on every track (Biscuit 30s - another version), and two with a twelfth track. 'expected' is what the main page's interface/scripts/tracklistDiff.mjs answered, before it retired in 2.0.0-player.66; ui/test/tracklist.sim.cjs holds the app's copy (ui/src/lib/tracklistDiff.ts) to it. 'expected.pairs' and 'expected.picks' were generated from the .mjs once, before it was deleted: a digest of its diff for every pair of pressings both ways round, and the base and representative pressing it picked with each pressing put first.",
  "group": {
   "id": "48140466-cff6-3222-bd55-63c27e43190d",
   "title": "Dummy",
@@ -3874,6 +3874,92 @@
     ],
     "same": 9
    }
-  }
+  },
+  "pairs": {
+   "count": 400,
+   "sha256": "898eaf4f9355d26a49d2a5ee92ee0d51b9cba66df3e3d82edb512754786e5d3a"
+  },
+  "picks": [
+   [
+    0,
+    "76df3287-6cda-33eb-8e9a-044b5e15ffdd"
+   ],
+   [
+    0,
+    "76df3287-6cda-33eb-8e9a-044b5e15ffdd"
+   ],
+   [
+    1,
+    "76df3287-6cda-33eb-8e9a-044b5e15ffdd"
+   ],
+   [
+    0,
+    "76df3287-6cda-33eb-8e9a-044b5e15ffdd"
+   ],
+   [
+    1,
+    "76df3287-6cda-33eb-8e9a-044b5e15ffdd"
+   ],
+   [
+    0,
+    "76df3287-6cda-33eb-8e9a-044b5e15ffdd"
+   ],
+   [
+    0,
+    "76df3287-6cda-33eb-8e9a-044b5e15ffdd"
+   ],
+   [
+    1,
+    "76df3287-6cda-33eb-8e9a-044b5e15ffdd"
+   ],
+   [
+    1,
+    "76df3287-6cda-33eb-8e9a-044b5e15ffdd"
+   ],
+   [
+    0,
+    "76df3287-6cda-33eb-8e9a-044b5e15ffdd"
+   ],
+   [
+    0,
+    "76df3287-6cda-33eb-8e9a-044b5e15ffdd"
+   ],
+   [
+    1,
+    "76df3287-6cda-33eb-8e9a-044b5e15ffdd"
+   ],
+   [
+    0,
+    "76df3287-6cda-33eb-8e9a-044b5e15ffdd"
+   ],
+   [
+    0,
+    "76df3287-6cda-33eb-8e9a-044b5e15ffdd"
+   ],
+   [
+    0,
+    "76df3287-6cda-33eb-8e9a-044b5e15ffdd"
+   ],
+   [
+    0,
+    "76df3287-6cda-33eb-8e9a-044b5e15ffdd"
+   ],
+   [
+    1,
+    "76df3287-6cda-33eb-8e9a-044b5e15ffdd"
+   ],
+   [
+    0,
+    "76df3287-6cda-33eb-8e9a-044b5e15ffdd"
+   ],
+   [
+    1,
+    "76df3287-6cda-33eb-8e9a-044b5e15ffdd"
+   ],
+   [
+    1,
+    "76df3287-6cda-33eb-8e9a-044b5e15ffdd"
+   ]
+  ]
  }
 }

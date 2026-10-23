@@ -38,11 +38,8 @@ import { onSearchText, searchText, submitSearch, typeSearch } from './searchBox'
  * 0 over an unknown); then "Library care" (2.0.0-player.42), Rescan and the bulk runs; then "People"
  * (2.0.0-player.61), Navidrome's accounts, a Navidrome admin's with logins on; then "Settings" and "Log"
  * (2.0.0-player.33), the server's settings and the event log as pages of the app - no unread count on
- * the Log, which would need its stream held open; then the link to the main page (James: "Managing
- * links to / for now"), which a desktop no longer needs for anything (an artist's pictures and re-filing
- * are the artist page's since 2.0.0-player.45) and which goes when the main page retires. It opens
- * BESIDE the app, as
- * every link out does - in the same tab it would unload the player.
+ * the Log, which would need its stream held open. Managing lists only its pages: the link to the main page
+ * that closed it (James: "Managing links to / for now") went when that page retired in 2.0.0-player.66.
  *
  * A leaf: props, and the search box's store.
  */
@@ -207,17 +204,6 @@ export function Sidebar({
             {managing.people && item(SIDEBAR_PEOPLE)}
             {managing.settings && item(SIDEBAR_SETTINGS)}
             {managing.log && item(SIDEBAR_LOG)}
-            <li>
-              <a
-                class="app-side-item"
-                href="/"
-                target="_blank"
-                rel="noopener"
-                title="The main page, until it retires - everything here is in the app now"
-              >
-                <span class="app-side-item-label">Open the main page</span>
-              </a>
-            </li>
           </ul>
         </section>
       )}

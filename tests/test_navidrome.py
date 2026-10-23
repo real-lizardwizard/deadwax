@@ -307,7 +307,7 @@ def test_not_configured_says_what_to_fill_in(monkeypatch, client):
 
     response = client.get("/deadwax/navidrome/albums")
     assert response.status_code == 503
-    assert "settings tab" in response.json()["detail"]
+    assert "Server settings (Connections)" in response.json()["detail"]
 
 
 def test_a_refused_login_names_the_settings_to_check(upstream, client):

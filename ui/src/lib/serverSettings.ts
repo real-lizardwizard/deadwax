@@ -1,15 +1,15 @@
 /**
  * The app's Server settings page (2.0.0-player.33, app/ServerSettings.tsx) - its pure parts, pinned
  * by ui/test/settingslog.sim.cjs. The rules of the settings themselves (which tab a group sits on,
- * the drafts, the note asking for a secret again) are the main page's settings tab's, imported from
- * components/SettingsView.tsx, never copied.
+ * the drafts, the note asking for a secret again) are the main page's settings tab's (it retired in
+ * 2.0.0-player.66), imported from components/SettingsView.tsx, never copied.
  */
 
 import type { SettingsTab } from '../components/SettingsView'
 
 /** The settings tab's three SERVER tabs (the app's page has no browser preferences) - Library first,
  *  holding the most (paths, organizing, covers, lyrics) and the organizing verdict. The main page
- *  lists them Downloads, Library, Connections, after its Search tab; the app's page has no Search. */
+ *  listed them Downloads, Library, Connections, after its Search tab; the app's page has no Search. */
 export const SERVER_TABS: readonly { id: SettingsTab; label: string; hint: string }[] = [
   { id: 'library', label: 'Library', hint: 'Paths, organizing, covers and lyrics' },
   { id: 'downloads', label: 'Downloads', hint: 'Choosing and fetching from Soulseek' },

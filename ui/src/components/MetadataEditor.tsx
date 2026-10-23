@@ -1095,7 +1095,7 @@ export function MetadataEditor(
               //? what gets saved is COVER_ART_SIZE, which may not be the full-size image shown here
               title: 'Write the right-hand cover into the album folder and change nothing else'
                 + (plan?.art.size && plan.art.size !== 'full'
-                  ? ` - saved at ${plan.art.size} × ${plan.art.size}, as the settings tab has it`
+                  ? ` - saved at ${plan.art.size} × ${plan.art.size}, as Server settings has it`
                   : ''),
               busy: savingArt,
               //? only once the right-hand cover has actually loaded - see ArtViewer

@@ -12,7 +12,7 @@ import { CANCEL_WORDS, askedByText, cancelWords, type CancelWords } from './perP
  *
  * The input is exactly what useDownloadJobs gives - the polled jobs with the overlays laid on
  * (lib/downloadOverlay.ts), the downloads still asking slskd, the derived speeds - so every state
- * the main page's downloads panel shows has its words here too: asking slskd…, refused,
+ * the main page's downloads panel showed has its words here too: asking slskd…, refused,
  * cancelling… (leaving… for a cancel that only withdraws your request - 2.0.0-player.49), trying next
  * peer…, asking again…, try N, organizing.
  *

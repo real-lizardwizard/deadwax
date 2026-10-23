@@ -1,5 +1,5 @@
 {
- "about": "Third by Portishead, release group 163339ab-813b-3d29-bba8-e1d5acf63cab, as MusicBrainz answered /release?release-group=...&inc=media+recordings+labels+artist-credits on 2026-09-30 - trimmed to the fields deadwax reads. Seventeen pressings, thirteen alike - the board's \"every pressing alike\" as it really is - with three digital releases adding a track and a USB-and-vinyl box listing the album twice. 'expected' is what interface/scripts/tracklistDiff.mjs answered; ui/test/tracklist.sim.cjs holds it and the TypeScript port (ui/src/lib/tracklistDiff.ts) to it.",
+ "about": "Third by Portishead, release group 163339ab-813b-3d29-bba8-e1d5acf63cab, as MusicBrainz answered /release?release-group=...&inc=media+recordings+labels+artist-credits on 2026-09-30 - trimmed to the fields deadwax reads. Seventeen pressings, thirteen alike - the board's \"every pressing alike\" as it really is - with three digital releases adding a track and a USB-and-vinyl box listing the album twice. 'expected' is what the main page's interface/scripts/tracklistDiff.mjs answered, before it retired in 2.0.0-player.66; ui/test/tracklist.sim.cjs holds the app's copy (ui/src/lib/tracklistDiff.ts) to it. 'expected.pairs' and 'expected.picks' were generated from the .mjs once, before it was deleted: a digest of its diff for every pair of pressings both ways round, and the base and representative pressing it picked with each pressing put first.",
  "group": {
   "id": "163339ab-813b-3d29-bba8-e1d5acf63cab",
   "title": "Third",
@@ -3225,6 +3225,80 @@
     "lengths": [],
     "same": 11
    }
-  }
+  },
+  "pairs": {
+   "count": 289,
+   "sha256": "74242c2cd03ea3975411b302844682a545e3ce976b63a2378dafaa2d6b05b8a6"
+  },
+  "picks": [
+   [
+    0,
+    "930345b1-a970-3495-a1dd-55147bea7741"
+   ],
+   [
+    0,
+    "930345b1-a970-3495-a1dd-55147bea7741"
+   ],
+   [
+    1,
+    "930345b1-a970-3495-a1dd-55147bea7741"
+   ],
+   [
+    0,
+    "930345b1-a970-3495-a1dd-55147bea7741"
+   ],
+   [
+    1,
+    "930345b1-a970-3495-a1dd-55147bea7741"
+   ],
+   [
+    0,
+    "930345b1-a970-3495-a1dd-55147bea7741"
+   ],
+   [
+    1,
+    "930345b1-a970-3495-a1dd-55147bea7741"
+   ],
+   [
+    0,
+    "930345b1-a970-3495-a1dd-55147bea7741"
+   ],
+   [
+    0,
+    "930345b1-a970-3495-a1dd-55147bea7741"
+   ],
+   [
+    1,
+    "930345b1-a970-3495-a1dd-55147bea7741"
+   ],
+   [
+    0,
+    "930345b1-a970-3495-a1dd-55147bea7741"
+   ],
+   [
+    0,
+    "930345b1-a970-3495-a1dd-55147bea7741"
+   ],
+   [
+    0,
+    "930345b1-a970-3495-a1dd-55147bea7741"
+   ],
+   [
+    0,
+    "930345b1-a970-3495-a1dd-55147bea7741"
+   ],
+   [
+    0,
+    "930345b1-a970-3495-a1dd-55147bea7741"
+   ],
+   [
+    0,
+    "930345b1-a970-3495-a1dd-55147bea7741"
+   ],
+   [
+    0,
+    "930345b1-a970-3495-a1dd-55147bea7741"
+   ]
+  ]
  }
 }

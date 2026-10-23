@@ -21,9 +21,8 @@
  *    ordinary album's folder.
  *
  * Every body must come out DEEP-EQUAL (key order aside), and every label equal - a row from (its
- * release, the group's context), a card through representativeRelease(pressings). The orchestrator
- * re-captures the changed old page and diffs it with the same file, so main.js's Finds are held to
- * this as well as the app's Get.
+ * release, the group's context), a card through representativeRelease(pressings). The main page that
+ * recorded it retired in 2.0.0-player.66; the file stays the app's Get's expectation.
  *
  * In all eight the pressing is credited as its group is and each track as its recording, so they
  * can't tell which credit a field is taken from; one synthetic release where every one differs
@@ -167,15 +166,6 @@ console.log('\nmain.js\'s quirks, kept')
   check('a track keeps its OWN credit and ids, over its recording\'s', [own.tracks[0].artist, own.tracks[0].artist_mbids], ['Kanye West', ['ye']])
   check('the pressing\'s year is its first release event\'s, over its own date', own.year, '2005')
   check('a track\'s place on its disc is MusicBrainz\'s number, not its index', [own.tracks[0].position, own.tracks[0].disc_position], [1, 7])
-}
-
-console.log('\nmain.js reaches the builder through the bridge, and has no builder of its own')
-{
-  const main = fs.readFileSync(path.resolve(UI, '../interface/scripts/main.js'), 'utf8')
-  check('its two builders are gone', [/function buildExpectedFromRelease\b/.test(main), /function buildExpectedFromReleaseGroup\b/.test(main)], [false, false])
-  check('...and both Finds call the bridge\'s', (main.match(/window\.deadwax\?\.buildDownloadRelease\?\.\(/g) ?? []).length, 1)
-  const entry = fs.readFileSync(path.resolve(UI, 'src/main.tsx'), 'utf8')
-  check('the main page\'s bundle sets it', /bridge\(\)\.buildDownloadRelease = buildDownloadRelease/.test(entry), true)
 }
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

@@ -358,7 +358,8 @@ async def owned(request: Request, user: str = Depends(current_user)):
 
     For the search view, which marks the release groups and the pressings you already hold
     (v0.9.1, asked for: "a way to see which editions are already in my library when I'm
-    searching for new ones"). The matching is done there, in interface/scripts/owned.mjs.
+    searching for new ones"). The matching is done there, in ui/src/lib/owned.ts
+    (the main page's owned.mjs until it retired in 2.0.0-player.66).
 
     (2.0.0-player.52) With logins on, each album also says whether it is in the asker's OWN library -
     `yours`, from their ledger (library_ledger.yours_paths) - so the app says "in your library" of what is
@@ -1312,7 +1313,7 @@ async def fetch_disc_art(request: Request, body: DiscArtRequest):
             status_code=404,
             detail="no CD art on the Cover Art Archive for this release"
                    + (", or on fanart.tv for the album" if (Config.FANARTTV_KEY or "").strip()
-                      else " - a fanart.tv key in the settings tab adds another source"),
+                      else " - a fanart.tv key in Server settings adds another source"),
         )
 
     files = []

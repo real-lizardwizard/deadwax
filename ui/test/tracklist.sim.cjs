@@ -1,29 +1,30 @@
 /**
- * One base tracklist per release group, and what each pressing changes about it - BOTH copies of
- * the rules, held to one answer.
+ * One base tracklist per release group, and what each pressing changes about it:
+ * ui/src/lib/tracklistDiff.ts (2.0.0-player.13), which draws the app's album-you-don't-have page and
+ * picks its default pressing.
  *
- * interface/scripts/tracklistDiff.mjs draws the main page's release grid; ui/src/lib/tracklistDiff.ts
- * (2.0.0-player.13) draws the app's album-you-don't-have page and picks its default pressing. The
- * image's UI stage copies only ui/, so the app can't import the .mjs, and the two live side by side
- * until the main page retires. Every check below runs against each copy.
+ * Until 2.0.0-player.66 every check here ran against the main page's interface/scripts/tracklistDiff.mjs
+ * too, the two copies held to one answer. That page retired; what the .mjs answered is kept - in each
+ * real group's `expected`, and (generated from it once, before it was deleted) its exports and
+ * thresholds below, a digest of its diff for every pair of real pressings both ways round, and the
+ * base and pressing it picked with each pressing put first.
  *
  * Two kinds of case. Hand-made tracklists for the rules one at a time - vinyl lengths that disagree
  * with the CDs, curly and straight apostrophes in one title, a bonus track in the middle, a single
  * mix 37 seconds longer. And real MusicBrainz groups - The Slow Rush, Dummy, Third - as MusicBrainz
  * answered them, in tests/fixtures/pressings/*.json, with what the .mjs answered recorded beside
- * them: the base, the pressing that stands for the album, and every pressing's differences. A copy
+ * them: the base, the pressing that stands for the album, and every pressing's differences. A change
  * that picks another pressing or calls another track a bonus fails there, by release.
  *
  * Run it with:  node ui/test/tracklist.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
  */
 
 const { execFileSync } = require('child_process')
+const crypto = require('crypto')
 const fs = require('fs'), os = require('os'), path = require('path')
-const { pathToFileURL } = require('url')
 
 const UI = path.resolve(__dirname, '..')
 const FIXTURES = path.resolve(__dirname, '../../tests/fixtures/pressings')
-const MJS = pathToFileURL(path.resolve(__dirname, '../../interface/scripts/tracklistDiff.mjs')).href
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-tracklist-'))
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
@@ -63,7 +64,7 @@ const SLOW_RUSH = [['One More Year', 322], ['Instant Destiny', 193], ['Borderlin
   ['Posthumous Forgiveness', 366], ['Breathe Deeper', 372], ['Tomorrow’s Dust', 326], ['On Track', 301],
   ['Lost in Yesterday', 249], ['Is It True', 238], ['It Might Be Time', 272], ['Glimmer', 128], ['One More Hour', 433]];
 
-/** The rules one at a time, through one copy. */
+/** The rules one at a time. */
 function suite(T) {
   console.log('titles');
   check('a curly apostrophe is a straight one', T.foldTitle('It’s a Fire') === T.foldTitle("It's a Fire"), true);
@@ -154,8 +155,8 @@ function suite(T) {
   check('an empty group: nothing', T.representativeRelease([]), null);
 
   //? the two rules the real groups never test (review): a tie for the most common tracklist, and a
-  //? plain format against no disambiguation - a copy that drifts on either picks another pressing
-  //? than the main page's card Find downloads, with every real-group check still green
+  //? plain format against no disambiguation - a change to either picks another pressing than Get
+  //? downloads, with every real-group check still green
   console.log('\nties, and format against disambiguation');
   const ten = release('ten', DUMMY_10), eleven = release('eleven', withFire("'"));
   check('a tie for the most common tracklist goes to the one given first, either way round',
@@ -171,7 +172,7 @@ function suite(T) {
     ]).id, 'cd-remaster');
 }
 
-/** Real groups as MusicBrainz answered them, through one copy, against what the .mjs answered. */
+/** Real groups as MusicBrainz answered them, against what the main page's .mjs answered. */
 function real(T) {
   for (const [name, { releases, expected }] of GROUPS) {
     console.log(`\n${name} (${releases.length} pressings, as MusicBrainz has them)`);
@@ -202,41 +203,33 @@ function real(T) {
   check('Third: thirteen of seventeen alike', [third.expected.base.count, third.expected.base.total], [13, 17]);
 }
 
-(async () => {
-  const copies = [['tracklistDiff.mjs', await import(MJS)], ['tracklistDiff.ts', require(path.join(OUT, 'tracklistDiff.js'))]];
-  for (const [name, T] of copies) {
-    console.log(`\n======== ${name}`);
-    suite(T);
-    real(T);
-  }
+//? generated from interface/scripts/tracklistDiff.mjs once, before it retired with the main page (2.0.0-player.66)
+const MJS_EXPORTED = ["chooseBase", "diffTracklists", "foldTitle", "formatSeconds", "isOtherVersion", "isSameTracklist", "releaseTracks", "representativeRelease", "summarizeDiff", "tracklistKey"];
+const MJS_THRESHOLDS = {"LENGTH_TOLERANCE_S": 2, "OTHER_VERSION_S": 15, "OTHER_VERSION_SHARE": 0.08};
 
-  console.log('\n======== the two copies');
-  const exported = (T) => Object.keys(T).filter((key) => typeof T[key] === 'function').sort();
-  check('export the same functions', exported(copies[1][1]), exported(copies[0][1]));
-  check('...and the same thresholds', ['LENGTH_TOLERANCE_S', 'OTHER_VERSION_S', 'OTHER_VERSION_SHARE'].map((key) => copies[1][1][key]),
-    ['LENGTH_TOLERANCE_S', 'OTHER_VERSION_S', 'OTHER_VERSION_SHARE'].map((key) => copies[0][1][key]));
-  //? every pair of pressings in every group, both ways round - not only against the base
-  let pairs = 0, disagree = 0;
-  for (const [, { releases }] of GROUPS) {
-    for (const one of releases) for (const other of releases) {
-      pairs++;
-      const answer = (T) => JSON.stringify(T.diffTracklists(T.releaseTracks(one), T.releaseTracks(other)));
-      if (answer(copies[0][1]) !== answer(copies[1][1])) disagree++;
-    }
-  }
-  check(`the two diff every pair of real pressings alike (${pairs} pairs)`, disagree, 0);
-  //? and pick alike: the base and the pressing that stands for the album, with every pressing of every
-  //? real group put first in turn - the default pressing the app opens on is the one Find downloads
-  let orders = 0, pickDiffer = 0;
-  for (const [, { releases }] of GROUPS) {
-    for (const first of releases) {
-      orders++;
+(() => {
+  const T = require(path.join(OUT, 'tracklistDiff.js'));
+  console.log('\n======== tracklistDiff.ts');
+  suite(T);
+  real(T);
+
+  console.log('\n======== as the main page\'s copy answered (frozen from tracklistDiff.mjs before it retired)');
+  check('exports the functions the .mjs did', Object.keys(T).filter((key) => typeof T[key] === 'function').sort(), MJS_EXPORTED);
+  check('...and its thresholds', Object.fromEntries(Object.keys(MJS_THRESHOLDS).map((key) => [key, T[key]])), MJS_THRESHOLDS);
+  for (const [name, { releases, expected }] of GROUPS) {
+    //? every pair of pressings, both ways round - not only against the base
+    const answers = [];
+    for (const one of releases) for (const other of releases) answers.push(JSON.stringify(T.diffTracklists(T.releaseTracks(one), T.releaseTracks(other))));
+    check(`${name}: every pair of pressings diffed as the .mjs did (${answers.length} pairs)`,
+      { count: answers.length, sha256: crypto.createHash('sha256').update(answers.join('\n')).digest('hex') }, expected.pairs);
+    //? the base and the pressing that stands for the album, every pressing put first in turn - the
+    //? default pressing the app opens on is the one Get downloads
+    const picks = releases.map((first) => {
       const order = [first, ...releases.filter((other) => other !== first)];
-      const pick = (T) => JSON.stringify([T.chooseBase(order).index, T.representativeRelease(order).id]);
-      if (pick(copies[0][1]) !== pick(copies[1][1])) pickDiffer++;
-    }
+      return [T.chooseBase(order).index, T.representativeRelease(order).id];
+    });
+    check(`${name}: ...and picked the same base and pressing whichever came first (${picks.length} orders)`, picks, expected.picks);
   }
-  check(`...and pick the same base and pressing whichever comes first (${orders} orders)`, pickDiffer, 0);
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed');
   process.exit(failures ? 1 : 0);

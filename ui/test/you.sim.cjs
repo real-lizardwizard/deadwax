@@ -15,12 +15,11 @@
  *    answered.
  *  - Each connection row is a live region of its own, read whole, so VoiceOver hears "slskd,
  *    NOT_LOGGED_IN", not a bare word with no service - and the list itself is not one.
- *  - The link to the main page opens beside the app.
  *  - "Albums that need a look" in Managing (2.0.0-player.25), with its count (none drawn while it isn't
- *    known), above that link and going to the queue's page. Under it (2.0.0-player.42) "Library care",
- *    then (.33) "Server settings" and "Log", each opening its page; the footnote says everything is in the
- *    app now (2.0.0-player.45). A desktop's alone until 2.0.0-player.47 - the same rows on a phone since,
- *    You no longer told the frame at all.
+ *    known), going to the queue's page. Under it (2.0.0-player.42) "Library care", then (.33) "Server
+ *    settings" and "Log", each opening its page - and nothing after them: the link to the main page and
+ *    the footnote about it went when it retired (2.0.0-player.66). A desktop's alone until
+ *    2.0.0-player.47 - the same rows on a phone since, You no longer told the frame at all.
  *  - Playback holds Gapless, then "Now Playing opens as" (2.0.0-player.11), then Maximum quality:
  *    Gapless is handed the player itself - the object whose setGapless its tap calls - the look
  *    the setting App keeps and App's way to change it, and the notes say where the button that
@@ -597,9 +596,8 @@ exports.readDownloadDefaults = () => globalThis.__getting.downloadDefaults
     server.hold = false
   }
 
-  console.log('\nthe main page opens beside the app')
-  const link = find((node) => node.type === 'a')[0]
-  check('the Managing row links to / in a new tab, rel="noopener"', [link?.props.href, link?.props.target, link?.props.rel], ['/', '_blank', 'noopener'])
+  console.log('\nthe main page retired (2.0.0-player.66): no link to it')
+  check('You has no link to / - nor any link at all', find((node) => node.type === 'a').map((node) => node.props.href), [])
 
   console.log('\nNeeds a look (2.0.0-player.25): a row in Managing - a phone\'s too since 2.0.0-player.47')
   {
@@ -627,11 +625,11 @@ exports.readDownloadDefaults = () => globalThis.__getting.downloadDefaults
     const opened = []
     draw({ shown: true, current: true, ...LOOK, needsLook: 3, onNeedsLook: () => opened.push(true) })
     const order = find(byClass('app-link-row')).map(text)
-    //? (2.0.0-player.33) Server settings and Log between it and the link to the main page - and (.42)
-    //? Library care first of them
-    check('"Albums that need a look" with its count, above the link to the main page',
-      [text(within(row(), byClass('app-row-label'))[0]), text(within(row(), byClass('app-queue-badge'))[0]), row().props['aria-label'], order[0].startsWith('Albums that need a look'), order[4]],
-      ['Albums that need a look', '3', 'Albums that need a look, 3 albums', true, 'Open the main page'])
+    //? (2.0.0-player.33) Server settings and Log after it - and (.42) Library care first of them; the link to the
+    //? main page that came last went in 2.0.0-player.66
+    check('"Albums that need a look" with its count, first in Managing - and nothing after Log',
+      [text(within(row(), byClass('app-row-label'))[0]), text(within(row(), byClass('app-queue-badge'))[0]), row().props['aria-label'], order[0].startsWith('Albums that need a look'), order.length],
+      ['Albums that need a look', '3', 'Albums that need a look, 3 albums', true, 4])
     row().props.onClick()
     check('...a tap goes to its page', opened, [true])
     check('...and the main page\'s footnote no longer says the queue is there', footnotes().some((words) => words.includes('albums that need a look')), false)
@@ -645,8 +643,8 @@ exports.readDownloadDefaults = () => globalThis.__getting.downloadDefaults
     const footnotes = () => find(byClass('app-footnote')).map(text)
     const opened = []
     draw({ shown: true, current: true, ...LOOK, needsLook: 2, onNeedsLook: () => {}, onManaging: (kind) => opened.push(kind) })
-    check('under "Albums that need a look", Library care, Server settings then Log, then the main page', rows().map((words) => words.replace(/\d+$/, '')),
-      ['Albums that need a look', 'Library care', 'Server settings', 'Log', 'Open the main page'])
+    check('under "Albums that need a look", Library care, Server settings then Log - and no main page after them (2.0.0-player.66)', rows().map((words) => words.replace(/\d+$/, '')),
+      ['Albums that need a look', 'Library care', 'Server settings', 'Log'])
     const button = (words) => find((node) => node.type === 'button' && text(node) === words)[0]
     button('Library care').props.onClick()
     button('Server settings').props.onClick()
@@ -655,8 +653,8 @@ exports.readDownloadDefaults = () => globalThis.__getting.downloadDefaults
     check('...and the footnote no longer says settings and the log are on the main page', footnotes().some((words) => /settings|the log/i.test(words)), false)
     //? (2.0.0-player.42) nor the bulk runs, and (2.0.0-player.45) nor an artist's pictures and re-filing: nothing
     //? a desktop needs is left only on the main page
-    check('...nor anything else - the footnote says everything is in the app now', [footnotes().some((words) => /bulk|artist images|re-filing/i.test(words)), footnotes().some((words) => words.includes('Everything here is in the app now; the main page stays until it retires.'))],
-      [false, true])
+    check('...nor anything else - and the footnote about the main page went with it (2.0.0-player.66)', [footnotes().some((words) => /bulk|artist images|re-filing/i.test(words)), footnotes().some((words) => /main page/i.test(words))],
+      [false, false])
   }
 
   console.log('\nManaging is an admin\'s: deadwax saying this user isn\'t one, none of it drawn')

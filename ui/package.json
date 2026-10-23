@@ -7,7 +7,6 @@
     "node": "^20.19.0 || >=22.12.0"
   },
   "scripts": {
-    "dev": "vite",
     "build": "tsc --noEmit && vite build && vite build --mode lab",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview"

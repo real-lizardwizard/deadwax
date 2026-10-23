@@ -49,7 +49,7 @@ const without = <V,>(map: ReadonlyMap<string, V>, key: string): Map<string, V> =
  *
  * Cancelling asks first, IN the card - "Keep it" or "Cancel download" - unless "Confirm before
  * cancelling" is turned off on this device (You > Getting albums since 2.0.0-player.41, carried
- * over once from the main page's preference of that name; read at the tap): a cancel
+ * over once from the main page's preference of that name, where a browser held it; read at the tap): a cancel
  * gives up the place in the peer's queue, and with SLSKD_INCOMPLETE_PATH set deletes the
  * part-downloaded file. Never window.confirm(), which would hold the page that plays the music
  * (JobCard.tsx says why). One card asks at a time.

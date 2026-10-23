@@ -58,29 +58,30 @@ export function onServerSettingsSaved(listener: (keys: string[]) => void): () =>
 }
 
 /**
- * The server's settings in the app (2.0.0-player.33; a phone's too since 2.0.0-player.47) - the SERVER half of the main
- * page's settings tab (components/SettingsView.tsx), drawn from that tab's own parts: every group
+ * The server's settings in the app (2.0.0-player.33; a phone's too since 2.0.0-player.47) - what was the SERVER half of
+ * the main page's settings tab, drawn from its parts (components/SettingsView.tsx, all that is left of that tab since
+ * the main page retired in 2.0.0-player.66): every group
  * GET /deadwax/settings returns, each row with its value and where it came from, its status, a
  * secret masked, choices as a dropdown, what can't be edited said, the organizing verdict, revert
  * deleting the override, the note asking for a secret again beside an address change. Pushed on You
  * (`#/you/settings/server`). There is no board for it; the desktop sidebar's Managing names it.
  *
- * Its groups sit under the settings tab's own three server tabs - Library, Downloads, Connections
- * (tabForGroup: a group it doesn't know goes under Library, so nothing is unreachable) - drawn as
- * the Edit panel's underline tabs. EVERY EDIT IS A DRAFT until Save, kept across the tabs (a tab
- * holding one is marked, as on the main page), and ONE save bar saves them all at once: the server
+ * Its groups sit under three tabs - Library, Downloads, Connections (tabForGroup: a group it doesn't
+ * know goes under Library, so nothing is unreachable) - drawn as the Edit panel's underline tabs.
+ * EVERY EDIT IS A DRAFT until Save, kept across the tabs (a tab holding one is marked), and ONE save
+ * bar saves them all at once: the server
  * takes the whole batch or none of it, and a refusal is said in the bar with every draft still there.
  * Save is the screen's one solid purple button.
  *
- * NOT here, on purpose: the main page's browser preferences (search, candidates, auto-grab, the
- * interface) - they are that page's, kept in that browser. One line says so, with the main page beside
- * the app. RE-TIME SAVED LYRICS is here since 2.0.0-player.42, beside LYRICS_LEAD_MS as on the main
- * page (components/RetimeLyrics.tsx, the tab's own, moved where both can draw it): refused while the
- * lead has a draft - it re-times to the SAVED lead - reading a real scan, its run kept in its module so
- * it goes on (and can be stopped) when this page goes. CLEAR MUSICBRAINZ'S SAVED ANSWERS is here since
- * 2.0.0-player.54, under their two settings on Connections, as on the main page
- * (components/MusicBrainzAnswers.tsx): the file's size and count beside it - read again each time the page
- * comes back into view, drafts or not - refused while the path is a draft.
+ * NOT here, on purpose: each person's own choices - what Get does, the quality floor, Format and whether
+ * cancelling asks first. They are in You, under Getting albums, and one line says so (2.0.0-player.66: it
+ * pointed at the main page's browser preferences until that page retired). RE-TIME SAVED LYRICS is here
+ * since 2.0.0-player.42, beside LYRICS_LEAD_MS (components/RetimeLyrics.tsx): refused while the lead has a
+ * draft - it re-times to the SAVED lead - reading a real scan, its run kept in its module so it goes on
+ * (and can be stopped) when this page goes. CLEAR MUSICBRAINZ'S SAVED ANSWERS is here since
+ * 2.0.0-player.54, under their two settings on Connections (components/MusicBrainzAnswers.tsx): the file's
+ * size and count beside it - read again each time the page comes back into view, drafts or not - refused
+ * while the path is a draft.
  *
  * Read the first time the page shows, and again each time it comes back into view WITH NO UNSAVED
  * DRAFT - a volume just fixed shows as fixed, and a draft is never read over; never at start-up. Each
@@ -95,8 +96,7 @@ export function onServerSettingsSaved(listener: (keys: string[]) => void): () =>
  * the page goes whenever another takes its place - the sidebar's Log or Needs a look (its siblings,
  * which replace it), Back, Go to album from the player bar. Its drafts are unsaved work the bar has
  * counted ("2 unsaved changes"), so they are kept in this module, with the refusal, the tab and the
- * settings they were made against, until Save or Discard - as the main page keeps its own for the
- * page's life. Coming back with a draft reads nothing over it; with none, it reads again.
+ * settings they were made against, until Save or Discard. Coming back with a draft reads nothing over it; with none, it reads again.
  *
  * ON A PHONE TOO (2.0.0-player.47): the same page, laid out for 320-390px by app.css - the tabs fitting,
  * rows wrapping, fields iOS won't zoom into, the save bar above the tab bar and the mini player, and
@@ -239,7 +239,7 @@ export function ServerSettings({
     )
   }
 
-  const marks = tabMarks(server, draftEnv, {}, {})
+  const marks = tabMarks(server, draftEnv)
   const groups = (server?.groups ?? []).filter((group) => tabForGroup(group.id) === tab)
   const onTabKey = (event: KeyboardEvent) => {
     const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
@@ -256,11 +256,8 @@ export function ServerSettings({
       <div class="app-settings-body">
         <p class="app-settings-line">
           What deadwax itself runs with, from your compose file or <code>.env</code>. Changing one here stores an override
-          that wins over the environment and applies without a restart. This browser's preferences are on{' '}
-          <a class="app-queue-link" href="/" target="_blank" rel="noopener">
-            the main page
-          </a>
-          .
+          that wins over the environment and applies without a restart. Your own choices - what Get does, the quality
+          floor, Format and whether cancelling asks first - are in You, under Getting albums.
         </p>
 
         {!server && error ? (
@@ -304,7 +301,7 @@ export function ServerSettings({
               {tab === 'library' && <OrganizingVerdict organizing={server.organizing} />}
               {groups.map((group) => (
                 <ServerGroup key={group.id} group={group} server={server} draftEnv={draftEnv} onEdit={edit} onRevert={revert}>
-                  {/* beside the lead, as on the main page's tab - refused while the lead is a draft */}
+                  {/* beside the lead - refused while the lead is a draft */}
                   {group.id === 'lyrics' && <RetimeLyrics unsaved={draftEnv['LYRICS_LEAD_MS'] !== undefined} />}
                   {/* (2.0.0-player.54) Clear MusicBrainz's saved answers, under their two settings - read again
                       as a save changes either, and as the page comes back into view (it stays drawn while

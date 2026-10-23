@@ -354,7 +354,7 @@ def test_empty_responses_produce_no_candidates():
 def test_instrumental_is_detected_in_a_soulseek_folder_name():
     """
     The other half of the instrumental fix. This vocabulary tags the FOLDER a peer is
-    offering; EDITION_KEYWORDS in interface/scripts/main.js tags the RELEASE you picked, and
+    offering; EDITION_KEYWORDS in ui/src/lib/release.ts tags the RELEASE you picked, and
     the two are scored against each other. A marker present in only one of them is worse than
     one present in neither - the release would carry a tag no folder could ever match.
     """

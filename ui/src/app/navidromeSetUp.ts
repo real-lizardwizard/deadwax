@@ -1,7 +1,7 @@
 /**
  * "Set up Navidrome" (2.0.0-player.47): the Navidrome gate's way to the app's own Server settings, opened
  * at Connections - on every frame, a phone's included, so a first run from a phone can set Navidrome up
- * without the main page. A module, as searchBox.ts is: the gate (NeedsNavidrome.tsx) is drawn by Home,
+ * in the app. A module, as searchBox.ts is: the gate (NeedsNavidrome.tsx) is drawn by Home,
  * Search, the Library and the album and artist pages, and App - which is what opens pages - says what the
  * button does, so none of them is handed it. Until App has said, the button does nothing.
  */

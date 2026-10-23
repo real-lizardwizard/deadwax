@@ -1,5 +1,7 @@
 # The 1.0.1 fixes and their review (1.0.2)
 
+The main page these describe retired in 2.0.0-player.66 (see "The main page retired" in notes/app.md); the reasoning is kept as history.
+
 Step 0 of the multi-user plan: the same-origin guard, held releases, a card's Find, the two-step apply.
 
 Moved verbatim from CLAUDE.md (2026-10-07), where it was loaded into every session; read it when your work touches this area. Sections refer to each other by title: `grep -rn "### <title>" notes/` finds one.

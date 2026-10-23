@@ -220,7 +220,7 @@
     --app-source-facts-pad: 2px;
     --app-source-lines: 2px;         /* a fact's label to its value */
     /* why a source scored what it did (2.0.0-player.41): the edition words in its folder's name and
-       the score's signals, as the main page's candidates panel shows them - last on the card */
+       the score's signals, as the main page's candidates panel showed them - last on the card */
     --app-source-score-pad: 6px;     /* a phone's score is a button: the number and a chevron... */
     --app-source-score-inner: 2px;
     --app-source-score-icon: 12px;
@@ -230,7 +230,7 @@
     --app-source-signal: 22px;       /* a signal's chip, as the tracklist's Bonus chip is drawn */
     --app-source-signal-pad: 7px;
     --app-source-signal-inner: 4px;  /* its word to its number */
-    --app-source-tag-pad: 6px;       /* an edition word's sides, as the main page's tag has them */
+    --app-source-tag-pad: 6px;       /* an edition word's sides, as the main page's tag had them */
     /* Search again, when folders were found (2.0.0-player.41): the query opens under it */
     --app-sources-again-pad: 0;      /* the query form under it starts at once, no state's gap above */
     /* the artist page (2.0.0-player.17), as Artist.dc.html draws it */
@@ -2670,7 +2670,7 @@ button.app-result:active { background: var(--dw-pressed); }
     list-style: none;
 }
 
-/* an edition word found in the folder's name, in its colour as the main page draws it */
+/* an edition word found in the folder's name, in its colour as the main page drew it */
 .app-source-tag {
     padding: 0 var(--app-source-tag-pad);
     border: var(--dw-hairline) solid var(--dw-secondary-border);
@@ -2712,7 +2712,7 @@ button.app-result:active { background: var(--dw-pressed); }
 /* ===== search extras, as the main page had them (2.0.0-player.50) =====
    More from MusicBrainz under Search's rows; each pressing's facts in the dropdown and under the
    picker, and the dropdown's filter for an album of many pressings; "maybe in your library", dashed as
-   the main page's card says it; the album's and the pressing's pages on musicbrainz.org; and the
+   the main page's card said it; the album's and the pressing's pages on musicbrainz.org; and the
    desktop panel's sample-rate chip, which holds the sort's own covering picker. */
 :root {
     --app-search-more-gap: 12px;     /* Search's rows to More from MusicBrainz */
@@ -2805,7 +2805,7 @@ button.app-result:active { background: var(--dw-pressed); }
 }
 
 /* "maybe in your library": a folder of the album's name with no MusicBrainz ids - said, but dashed, as
-   the main page's card says it; an inline box, so the meta line keeps its height */
+   the main page's card said it; an inline box, so the meta line keeps its height */
 .app-rg-maybe {
     padding: 0 var(--app-rg-maybe-pad);
     border: var(--dw-hairline) dashed var(--dw-text-3);
@@ -4565,7 +4565,7 @@ html.app-viewer-open { overflow: hidden; }
     font-weight: var(--dw-weight-semibold);
 }
 
-/* "synced", as the main page marks it */
+/* "synced", as the main page marked it */
 .app-inspect-mark {
     padding: 0 var(--app-inspect-mark-pad);
     border: var(--dw-hairline) solid var(--dw-badge-green-border);
@@ -6434,6 +6434,13 @@ html.app-edit-open { overflow: hidden; }
     border-color: var(--dw-badge-purple-border);
     background: var(--dw-badge-purple-bg);
     color: var(--dw-accent-text);
+}
+
+/* (2.0.0-player.66) an album whose every issue was accepted: a quiet word, not a warning */
+.app-shell:not(.app-desk) .app-queue-chip.is-ignored {
+    border-color: var(--dw-border);
+    background: transparent;
+    color: var(--dw-text-2);
 }
 
 .app-shell:not(.app-desk) .app-queue-mark {

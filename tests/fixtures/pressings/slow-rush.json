@@ -1,5 +1,5 @@
 {
- "about": "The Slow Rush by Tame Impala, release group c6fc678e-e987-45c5-811c-e2bd09c8b902, as MusicBrainz answered /release?release-group=...&inc=media+recordings+labels+artist-credits on 2026-09-30 - trimmed to the fields deadwax reads. Ten pressings, nine sharing one tracklist: the Japanese CD adds \"Patience\", and one digital release has the single mix of \"Borderline\" (4:34, against the album's 3:58). 'expected' is what interface/scripts/tracklistDiff.mjs answered; ui/test/tracklist.sim.cjs holds it and the TypeScript port (ui/src/lib/tracklistDiff.ts) to it.",
+ "about": "The Slow Rush by Tame Impala, release group c6fc678e-e987-45c5-811c-e2bd09c8b902, as MusicBrainz answered /release?release-group=...&inc=media+recordings+labels+artist-credits on 2026-09-30 - trimmed to the fields deadwax reads. Ten pressings, nine sharing one tracklist: the Japanese CD adds \"Patience\", and one digital release has the single mix of \"Borderline\" (4:34, against the album's 3:58). 'expected' is what the main page's interface/scripts/tracklistDiff.mjs answered, before it retired in 2.0.0-player.66; ui/test/tracklist.sim.cjs holds the app's copy (ui/src/lib/tracklistDiff.ts) to it. 'expected.pairs' and 'expected.picks' were generated from the .mjs once, before it was deleted: a digest of its diff for every pair of pressings both ways round, and the base and representative pressing it picked with each pressing put first.",
  "group": {
   "id": "c6fc678e-e987-45c5-811c-e2bd09c8b902",
   "title": "The Slow Rush",
@@ -2857,6 +2857,52 @@
     "lengths": [],
     "same": 12
    }
-  }
+  },
+  "pairs": {
+   "count": 100,
+   "sha256": "1b0bea590b838389bd5f8dab78e12c7c824afd41488a659c13c095971ef3d861"
+  },
+  "picks": [
+   [
+    0,
+    "1cf564b9-4e24-4362-89fb-1aa702ff60f2"
+   ],
+   [
+    0,
+    "1cf564b9-4e24-4362-89fb-1aa702ff60f2"
+   ],
+   [
+    0,
+    "1cf564b9-4e24-4362-89fb-1aa702ff60f2"
+   ],
+   [
+    1,
+    "1cf564b9-4e24-4362-89fb-1aa702ff60f2"
+   ],
+   [
+    0,
+    "1cf564b9-4e24-4362-89fb-1aa702ff60f2"
+   ],
+   [
+    0,
+    "1cf564b9-4e24-4362-89fb-1aa702ff60f2"
+   ],
+   [
+    0,
+    "1cf564b9-4e24-4362-89fb-1aa702ff60f2"
+   ],
+   [
+    0,
+    "1cf564b9-4e24-4362-89fb-1aa702ff60f2"
+   ],
+   [
+    0,
+    "1cf564b9-4e24-4362-89fb-1aa702ff60f2"
+   ],
+   [
+    0,
+    "1cf564b9-4e24-4362-89fb-1aa702ff60f2"
+   ]
+  ]
  }
 }

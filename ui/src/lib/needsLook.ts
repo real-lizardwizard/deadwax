@@ -2,17 +2,21 @@
  * Needs a look (2.0.0-player.25): the review queue in the app, on a desktop - pure, pinned by
  * ui/test/needslook.sim.cjs. The page is app/NeedsALook.tsx; the editors are the Edit panel's
  * (app/EditPanel.tsx), opened on a FOLDER. What is here is the main page's review queue
- * (components/LibraryView.tsx's startReview, step, leaveQueue), its rules carried over exactly:
+ * (its LibraryView.tsx's startReview, step, leaveQueue, retired with it in 2.0.0-player.66), its rules
+ * carried over exactly:
  *
  *  - THE LIST is lib/metadataQueue.ts's queueAlbums(albums, facet) - the SAME function, so the same
- *    albums in the same order as the main page: new imports first, worst first, then alphabetical.
+ *    albums in the same order as the main page had them: new imports first, worst first, then alphabetical.
  *    "Needs a look" is an outstanding issue OR a new import (an album deadwax filed that nobody has
  *    looked at), never only one of them - the badge and the queue never count different things.
  *    The badge's count (GET /library/queue/summary) is that same list's length over the saved scan
  *    (`summaryTotal` is the page's side of it).
  *  - THE FACETS: All, Newly added (only when there is one), then one per kind of issue that has an
  *    album, with counts (`facets`) - each narrowing the list (`facetAlbums`), and a facet that has
- *    emptied falls back to All (`facetShown`).
+ *    emptied falls back to All (`facetShown`). Last, Ignored (2.0.0-player.66, only when there is one):
+ *    the albums whose every issue was accepted as it is - out of the queue, and with no other way back
+ *    to the Edit panel for a folder Navidrome doesn't list. A view, not a count: All and the badge
+ *    count outstanding issues and new imports only (`isIgnoredOnly`).
  *  - THE SESSION, started by clicking a row: the list as shown THEN, fixed - its paths, in that
  *    order, the clicked row current (`startSession`). Nothing moves under the pointer while it lasts:
  *    an album fixed, ignored or deleted stays in its row, saying which (`rowChanged`, `markFor`); a
@@ -28,6 +32,22 @@ import { isNewImport, issueLabel, outstandingIssues, queueAlbums } from './metad
 
 /** The facet for new imports - not an issue code (the scan's codes are snake_case words, never this). */
 export const NEW_FACET = 'new'
+
+/** The facet for albums whose issues were all accepted as they are (2.0.0-player.66) - not an issue code either. */
+export const IGNORED_FACET = 'ignored'
+
+/** The Ignored chip's title. */
+const IGNORED_HINT = 'Albums whose issues you accepted as they are'
+
+/**
+ * An album out of the queue because every issue found on it was accepted ("It's fine as it is"): one
+ * found issue at least is ignored, and none is outstanding (2.0.0-player.66). What the Ignored facet
+ * lists - the one way back to such an album's Edit panel, where Un-ignore is, when Navidrome doesn't
+ * list it (no album page to open it from).
+ */
+export function isIgnoredOnly(album: LibraryAlbum): boolean {
+  return album.issues.some((code) => album.ignored_issues.includes(code)) && !outstandingIssues(album).length
+}
 
 /** A facet chip: what it narrows to (null: All), its words and how many albums it has. */
 export interface Facet {
@@ -45,7 +65,8 @@ export function summaryTotal(albums: readonly LibraryAlbum[]): number {
 
 /**
  * The facet chips: All N; Newly added N, only when there is one; then one per kind of issue that has
- * an album outstanding, the most albums first (then by label, so the order holds still between scans).
+ * an album outstanding, the most albums first (then by label, so the order holds still between scans);
+ * last, Ignored N, only when there is one (2.0.0-player.66) - never counted in All.
  */
 export function facets(albums: readonly LibraryAlbum[], issueTypes: Record<string, MetadataIssueType>): Facet[] {
   const waiting = queueAlbums(albums, null)
@@ -62,17 +83,23 @@ export function facets(albums: readonly LibraryAlbum[], issueTypes: Record<strin
       ...(issueTypes[code]?.hint ? { hint: issueTypes[code]!.hint } : {}),
     }))
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+  const ignored = albums.filter(isIgnoredOnly).length
   return [
     { id: null, label: 'All', count: waiting.length },
     ...(fresh ? [{ id: NEW_FACET, label: 'Newly added', count: fresh }] : []),
     ...issues,
+    ...(ignored ? [{ id: IGNORED_FACET, label: 'Ignored', count: ignored, hint: IGNORED_HINT }] : []),
   ]
 }
 
 /** The albums a facet lists, in queueAlbums' order: the queue narrowed to one kind of issue, or to
- *  the new imports (which queueAlbums puts first anyway). */
+ *  the new imports (which queueAlbums puts first anyway) - or the albums whose issues were all
+ *  accepted, alphabetical (artist, then album), as queueAlbums orders albums of one severity. */
 export function facetAlbums(albums: readonly LibraryAlbum[], facet: string | null): LibraryAlbum[] {
   if (facet === NEW_FACET) return queueAlbums(albums, null).filter(isNewImport)
+  if (facet === IGNORED_FACET) {
+    return albums.filter(isIgnoredOnly).sort((a, b) => a.artist.localeCompare(b.artist) || a.album.localeCompare(b.album))
+  }
   return queueAlbums(albums, facet)
 }
 
@@ -207,7 +234,7 @@ export const IGNORES_UNSAVED = "Ignores can't be saved: deadwax couldn't open it
   + "accept with \u201cIt's fine as it is\u201d will come back."
 
 /**
- * Whether to warn that ignores can't be saved (2.0.0-player.42), as the main page's queue warns: the
+ * Whether to warn that ignores can't be saved (2.0.0-player.42), as the main page's queue warned: the
  * library's own answer says review tracking is off (`review_tracking_enabled`, once a read has landed),
  * or the count's route does (`tracking_enabled` - null until it has answered). Either one is enough:
  * both are deadwax saying it has no job store, and an "It's fine as it is" that silently comes back

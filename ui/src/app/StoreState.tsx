@@ -6,7 +6,7 @@ import { withoutJoin } from '../lib/perPerson'
 
 /**
  * What the library and the downloads already have of a pressing (step 2's store, 2.0.0-player.7),
- * in the app's look (2.0.0-player.15): the main page's candidates panel draws these as
+ * in the app's look (2.0.0-player.15): the main page's candidates panel drew these as
  * `.candidates-store` and `.candidates-notes`, and the app draws the same words - lib/candidates.ts
  * storeStatus and storeNotes, pinned by candidates.sim.cjs - as a card and a list of notes.
  *
@@ -77,7 +77,7 @@ export function StoreState({
  * Where the focus a Join button had goes as the button gives way: the store box around it, which a
  * page keeps drawn through its next look (the album page's line becoming yours) - never the page
  * itself, where a keyboard or VoiceOver would start again from the top. Only when the button has it,
- * or nothing does. Shared with the main page's box (components/StoreStatusBox.tsx).
+ * or nothing does. (Shared with the main page's box until it retired in 2.0.0-player.66.)
  */
 export function keepJoinFocus(button: HTMLElement | null, box: string): void {
   if (typeof document === 'undefined' || !button) return

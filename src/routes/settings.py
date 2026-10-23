@@ -985,7 +985,11 @@ async def settings():
                     _setting(
                         "LIBRARY_PATH",
                         Config.LIBRARY_PATH,
-                        effect="Where organized music is filed, and what the library tab reads",
+                        effect=(
+                            "Where organized music is filed, and what Needs a look, Library care, the "
+                            "Edit panel and the \"already have it\" checks read. The Library tab shows "
+                            "what Navidrome has scanned"
+                        ),
                         status=library_status,
                         detail=library_detail,
                     ),

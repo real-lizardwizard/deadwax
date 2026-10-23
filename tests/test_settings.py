@@ -508,3 +508,11 @@ def test_the_country_setting_takes_on_or_off():
     assert _validate("COUNTRY_IN_FOLDER", "off") is None
     assert _validate("COUNTRY_IN_FOLDER", "on") is None
     assert _validate("COUNTRY_IN_FOLDER", "sometimes") is not None
+
+
+def test_library_paths_row_says_what_reads_it_now_the_library_tab_is_navidromes():
+    """(2.0.0-player.66) The Library tab shows what Navidrome lists; LIBRARY_PATH is read by Needs a look,
+    Library care, the Edit panel and the "already have it" checks - as configuration.md says."""
+    effect = find(call_settings(), "LIBRARY_PATH")["effect"]
+    assert "Needs a look, Library care, the Edit panel" in effect
+    assert "what the library tab reads" not in effect and "Navidrome" in effect

@@ -106,7 +106,7 @@ class SSEHandler(logging.Handler):
 
         with _lock:
             _seq += 1
-            #? the main page reads event_type, event_content and src, and ignores the rest
+            #? event_type, event_content and src were the main page's (it ignored the rest); the app's Log reads them too
             event.update(seq=_seq, time=record.created, boot=LOG_BOOT)
             _history.append(event)
             #? handed over inside the lock, so the streams get lines in the order they were numbered

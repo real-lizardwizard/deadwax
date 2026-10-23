@@ -8,27 +8,13 @@ music folder you already have.
 Everything here is about **logins**. They're off until you turn them on, and turning them off
 again puts deadwax back the way it was.
 
-> **Upgrading to 2.0.0-player.61 with logins already on?** Read this first.
->
-> - **`DEADWAX_ADMINS` is ignored now** (the log says so once at start-up). deadwax's admins are
->   **Navidrome's admins**: an account that is an admin in Navidrome is deadwax's admin, and nobody
->   else is. If the account you sign in with isn't a Navidrome admin, you lose Managing (editing albums,
->   Needs a look, Library care, the settings, the log) within about a minute of the upgrade. Before
->   upgrading, either make your Navidrome account an admin in Navidrome's own **Users** page, or sign
->   in to deadwax as a Navidrome account that already is one (Navidrome's own `admin`, for instance) when
->   you want to manage. Then take `DEADWAX_ADMINS` out of compose.
-> - Making an account a Navidrome admin gives it more than deadwax's Managing: in Navidrome its **Users**,
->   **libraries** and settings pages, **every library**, and in Amperfy (or any Subsonic app signed in as
->   it) **everyone's playlists, private ones included**.
-> - **Break-glass now signs in as `deadwax`**, not `admin` - same `DEADWAX_ADMIN_PASSWORD`. A break-glass
->   sign-in from before the upgrade ends at its next request; sign in again as `deadwax`. Navidrome's own
->   `admin` account can sign in to deadwax as itself now. What break-glass kept before (its pins, its Getting
->   albums settings, the downloads it asked for) moves to `deadwax` with it - Navidrome's `admin` takes none of it.
-> - **A Navidrome account called `deadwax`** (the name is deadwax's own now) can't sign in to deadwax any more,
->   and anyone signed in as it is signed out at the upgrade. It can still be `NAVIDROME_USER` - that account is
->   only ever used by deadwax itself.
-> - Everyone who isn't a Navidrome admin keeps what they had: **Get albums**, and nothing more until an
->   admin gives it in [People](#admins-permissions-and-everyone-else).
+**If you ran a 2.0.0 pre-release (`:player`) with logins on**: deadwax's admins are **Navidrome's
+admins** - `DEADWAX_ADMINS` is ignored (the log says so once at start-up), so take it out of compose, and
+make your own account an admin in Navidrome's **Users** page if it isn't one, or you lose Managing.
+Break-glass signs in as **`deadwax`**, not `admin` (the same `DEADWAX_ADMIN_PASSWORD`; what it kept moves
+with it), so a Navidrome account called `deadwax` can't sign in to deadwax, while Navidrome's own `admin`
+signs in as itself. Close a home-screen app left open from an early pre-release and open it again. Coming
+from 1.x, none of this applies: logins are new.
 
 ## What sharing gives each person
 
@@ -91,7 +77,7 @@ deadwax too, in **People**. Then, for each person:
   deadwax keeps them for itself: `local` and `deadwax`. An account Navidrome can't check with a token
   (an LDAP one) can't sign in.
 - **Navidrome set up in deadwax**: `NAVIDROME_URL`, `NAVIDROME_USER` and `NAVIDROME_PASSWORD`
-  ([the phone player's setup](player.md#setting-it-up)). Signing in asks Navidrome at `NAVIDROME_URL`.
+  ([the app's setup](player.md#setting-it-up)). Signing in asks Navidrome at `NAVIDROME_URL`.
   Keep `NAVIDROME_USER` set once logins are on: deadwax still uses that account for what belongs to
   nobody in particular, such as fetching a song once into the player's cache for every phone. If your
   Navidrome gives users libraries of their own, give that account every one.
@@ -113,7 +99,7 @@ deadwax too, in **People**. Then, for each person:
 ## Turning logins on
 
 The three login settings are read from the container's environment - compose's `environment:`
-block, or `.env` - and nowhere else. The settings tab shows them, locked: a value saved there would
+block, or `.env` - and nowhere else. Server settings shows them, locked: a value saved there would
 beat compose, so a wrong one could lock everyone out with no way back from the page that saved it.
 
 1. **Make a secret key.** On any machine with OpenSSL:
@@ -146,8 +132,10 @@ beat compose, so a wrong one could lock everyone out with no way back from the p
    - `AUTH_MODE` - `off` (the default) or `on`. Anything else is read as **on**, so a typo never leaves
      deadwax open; the log says so.
    - There is no setting for who the admins are: **Navidrome's admins are deadwax's admins**, read as
-     each person signs in and every few minutes after. (`DEADWAX_ADMINS`, which named them until
-     2.0.0-player.61, is ignored, and the log says so.)
+     each person signs in and every few minutes after. Making an account a Navidrome admin gives it more
+     than deadwax's Managing: in Navidrome its **Users**, **libraries** and settings pages, **every
+     library**, and in Amperfy (or any Subsonic app signed in as it) **everyone's playlists, private ones
+     included**.
    - `DEADWAX_SECRET_KEY` - the key. **Losing it costs nothing but sign-ins**: make a new one, and
      everyone is signed out at their next request after the restart and signs in again. Until each
      person does, deadwax can't star new albums for them - those wait, and are starred once they've
@@ -162,7 +150,7 @@ beat compose, so a wrong one could lock everyone out with no way back from the p
      a stranger's guesses through the proxy hold you off through it too: sign in at deadwax's address on
      your network instead. Someone with many addresses still gets many guesses, so its length is what keeps
      them out. Shorter than 16 characters, the log at start-up and its
-     row in the settings tab say so (it still works). It has no Navidrome account behind it, so no library of its own,
+     row in Server settings say so (it still works). It has no Navidrome account behind it, so no library of its own,
      its player plays as `NAVIDROME_USER`, it keeps no play queue (nothing is put back or saved for it), and it
      can't use **People** (which asks Navidrome as you).
 3. **Behind a reverse proxy**, if it rewrites the `Host` header (nginx does, unless told
@@ -193,13 +181,12 @@ beat compose, so a wrong one could lock everyone out with no way back from the p
    ```
 4. **Recreate the container** and open deadwax. The app shows a sign-in screen; sign in with your
    Navidrome user name and password. An app already open on a phone, or in a tab, reloads itself into
-   the sign-in screen the next time it asks deadwax for something. The main page has no sign-in of its
-   own: it says you're signed out, and its **Sign in** goes to the app's and back.
+   the sign-in screen the next time it asks deadwax for something.
 
 Each setting's full row is in [Configuration → Logins](configuration.md#logins-environment-only).
-**If you're upgrading** at the same time and had the home-screen app open from a version before
-2.0.0-player.48, close it (swipe it away) and open it again, and reload any tab left open - an older app can't tell that logins
-came on, and everything in it fails with "Sign in to use deadwax." until you do.
+**If you're upgrading** at the same time and had the home-screen app open from before the upgrade,
+close it (swipe it away) and open it again, and reload any tab left open - an older app can't tell that
+logins came on, and everything in it fails with "Sign in to use deadwax." until you do.
 
 ## What happens to what you had
 
@@ -257,8 +244,8 @@ says so under each password field.
 
 **The first time**, they see the app without any managing: no **Managing deadwax** in You, no
 **Edit** on an album. Their Library says **Nothing in your library yet.**, with **Browse the store**,
-where the whole store is. Home has no pins yet; their Getting albums settings are the defaults, or what that browser's
-main-page **Settings → Downloads** already says, carried over once. From
+where the whole store is. Home has no pins yet; their Getting albums settings are the defaults, or what the old page at `/` had
+left in that browser, carried over once ([configuration](configuration.md#your-settings-in-the-app-per-user-on-deadwax)). From
 there they search, **Get** what they want, or add what the store already has. They stay signed in on
 that device for 30 days from the last time they used it; **You → About → Sign out** signs them out.
 
@@ -338,7 +325,7 @@ else can do what the left column says, and an admin can give any of them more, b
   as they sign in (one Navidrome sign-in as them, only for someone given something); if it can't, what
   was given is off until their next sign-in (a Get albums taken away still applies), and You says so.
 - Making someone an admin keeps what was ticked for them, for if they're ever made ordinary again.
-- **Debug is an admin's** (2.0.0-player.63): it was built for testing deadwax on a phone, and everyone
+- **Debug is an admin's**: it was built for testing deadwax on a phone, and everyone
   else's Info has no tabs - About alone, with a short **Playing** group of the three rows a listener can
   use. Made an admin, or made ordinary, it shows as Info next opens, once it has asked who they are (a
   moment after it opens). The turntable's test bench
@@ -350,8 +337,7 @@ starts a download). Library care shows with Edit albums or Look after the librar
 The app doesn't show anyone what they can't use - Managing in You and the sidebar shows a row per
 permission, an album's **Edit** its editors or its Delete, an artist's page its managing - and deadwax
 refuses it if asked anyway ("That needs Edit albums, which an admin hasn't given you."). Everyone can
-still look at everything in the store: albums, their tracks, covers, lyrics and artists. Until the main
-page retires it still shows its editing buttons to everyone, and refuses them the same way. A download
+still look at everything in the store: albums, their tracks, covers, lyrics and artists. A download
 that fails says why on the asker's own row in Requests; the event log, which also records who signed
 in and every change made in People, is Settings and the log's.
 
@@ -363,11 +349,11 @@ something else that asks for a password.
 
 - **Kept**: everything in deadwax's database - permissions too. The pins and Getting albums settings
   the first admin took over stay with that admin, for when logins are back - so with logins off, Home starts with no
-  pins, and Getting albums starts again from its defaults (or what the browser's main-page
-  **Settings → Downloads** says, carried over once, as on a first visit). Each person's library, pins and kept login stay too,
+  pins, and Getting albums starts again from its defaults (or what the old page at `/` had left in
+  that browser, carried over once, as on a first visit). Each person's library, pins and kept login stay too,
   untouched, and the stars in Navidrome stay as they are (deadwax unstars nothing).
 - **Back to one**: there's one library again - the whole store - and "in your library" means the
-  store. Every download is listed, and **Clear done** in Requests (the main page's **Clear finished**)
+  store. Every download is listed, and **Clear done** in Requests
   forgets every finished one. The player
   plays as `NAVIDROME_USER` again, so plays, playlists and the play queue are that account's, shared by
   everyone.

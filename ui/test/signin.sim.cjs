@@ -1,8 +1,7 @@
 /**
- * Logins in the app and on the main page (2.0.0-player.48): the sign-in gate (app/signInGate.tsx), the
- * sign-in screen (app/SignIn.tsx), You's Sign out (app/SignOutRow.tsx) and its admin rows from the
- * session (app/session.ts), the main page's signed-out notice (components/SignedOutNotice.tsx), and the
- * rules under them (lib/signIn.ts, api/auth.ts, api/http.ts's 401) - compiled with the repo's TypeScript
+ * Logins in the app (2.0.0-player.48): the sign-in gate (app/signInGate.tsx), the sign-in screen
+ * (app/SignIn.tsx), You's Sign out (app/SignOutRow.tsx) and its admin rows from the session
+ * (app/session.ts), and the rules under them (lib/signIn.ts, api/auth.ts, api/http.ts's 401) - compiled with the repo's TypeScript
  * and run against deadwax faked AT FETCH (the real api/http.ts, api/me.ts and api/auth.ts in between),
  * a small stand-in for Preact (JSX as objects, hooks with a cursor, `render` recorded) and a stand-in
  * page (a host element, a layer, <html>'s classes, the address).
@@ -22,8 +21,9 @@
  *    cache - the sign-in screen showing included, which a 200 then takes away. deadwax not answering
  *    at launch is said on the sign-in screen; over the running app (no 401) it leaves the app alone.
  *    The sign-in coming up leaves full screen (the visualizer's), and focuses the name field once the
- *    browser has. `?return=/` goes back to the main page once signed in - replacing the sign-in in the
- *    history - and nowhere else.
+ *    browser has. A query on the address sends nobody anywhere: `?return=/`, the retired main page's
+ *    hand-back (2.0.0-player.66), is drawn as any other load - signed in or signing in, the app, no
+ *    location.replace.
  *  - THE SCREEN: a user name and a password field, labelled, with the autocomplete words password
  *    managers read and no capitals or corrections on the name; read from the fields as sent (a password
  *    manager's fill needn't say so); deadwax's own words when a sign-in fails (a wrong password, too
@@ -34,10 +34,6 @@
  *  - SIGN OUT: in You only with logins on, naming who - the break-glass admin as such; it signs out,
  *    then starts the app again; deadwax not answering said, and nothing started again. Admin rows from
  *    the session's word until /me answers.
- *  - THE MAIN PAGE: on any 401 a notice over the page, the page behind inert, a link to the app's
- *    sign-in that comes back (`/player/?return=/`); /me asked once as it loads only with logins on, and
- *    again while the notice shows as the page comes back (Back, the front) - signed in by then, the
- *    page starts again.
  *  - Off is today: player/main.tsx draws the app at once with no ask when the page has no mark - and
  *    reloads it at its first 401 (logins switched on under it), once, not again within a minute (noted
  *    for the tab; reloading regardless where the browser keeps nothing).
@@ -53,7 +49,7 @@ const SRC = path.join(UI, 'src')
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-signin-'))
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
-  'src/app/signInGate.tsx', 'src/app/You.tsx', 'src/components/SignedOutNotice.tsx',
+  'src/app/signInGate.tsx', 'src/app/You.tsx',
   '--rootDir', 'src', '--outDir', OUT,
   '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
   '--lib', 'es2022,dom,dom.iterable', '--jsx', 'react-jsx', '--jsxImportSource', 'preact',
@@ -136,7 +132,6 @@ let appended = []
 let assigned = []
 let replaced = []
 let reloads = 0
-let mainContainer = null
 const element = (tag) => ({ tag, id: '', inert: false, attrs: {}, isConnected: true, focused: [], focus(options) { this.focused.push(options) }, setAttribute(k, v) { this.attrs[k] = v }, removeAttribute(k) { delete this.attrs[k] }, querySelector: () => null })
 //? what api/http.ts's caller can't fake: a media element, for the gate's "a song failed" (instanceof)
 globalThis.HTMLMediaElement = class HTMLMediaElement {}
@@ -156,7 +151,7 @@ globalThis.document = {
   exitFullscreen() { this.exited += 1; return Promise.resolve() },
   activeElement: null,
   querySelector: () => null,
-  getElementById: (id) => (id === 'main-container' ? mainContainer : null),
+  getElementById: () => null,
 }
 globalThis.location = { search: '', assign: (to) => assigned.push(to), replace: (to) => replaced.push(to), reload: () => { reloads += 1 } }
 //? the window's events (api/http.ts dispatches, api/auth.ts listens): a fresh target per case, so a gate
@@ -201,7 +196,6 @@ const http = require(path.join(OUT, 'api/http.js'))
 const { You } = require(path.join(OUT, 'app/You.js'))
 const { SignIn } = require(path.join(OUT, 'app/SignIn.js'))
 const { SignOutRow } = require(path.join(OUT, 'app/SignOutRow.js'))
-const notice = require(path.join(OUT, 'components/SignedOutNotice.js'))
 
 const name = (vnode) => (vnode && typeof vnode.type === 'function' ? vnode.type.name : vnode === null ? null : String(vnode?.type))
 function text(node) {
@@ -261,8 +255,7 @@ async function main() {
       "deadwax didn't answer - check you can reach it (on your network, or over WireGuard) and try again.")
     check('the plain "sign in" isn\'t said again above the form; why it ended is',
       [rules.reasonShown('Sign in to use deadwax.'), rules.reasonShown(null), rules.reasonShown(' Navidrome no longer accepts it ')], [null, null, 'Navidrome no longer accepts it'])
-    check('?return=/ goes back to the main page - and nothing else does',
-      ['?return=/', '?return=%2F', '?return=//evil.example', '?return=https://evil.example/', '?return=/settings', ''].map(rules.returnTarget), ['/', '/', null, null, null, null])
+    check('the main page\'s hand-back went with it (2.0.0-player.66): no returnTarget', 'returnTarget' in rules, false)
     check('the same person carries on, someone else starts again, a first sign-in carries on',
       [rules.afterSignIn('ethan', 'ethan'), rules.afterSignIn('james', 'ethan'), rules.afterSignIn(null, 'ethan')], ['carry-on', 'start-again', 'carry-on'])
   }
@@ -361,16 +354,16 @@ async function main() {
       [['App'], [], ['request', 'edit', 'library', 'downloads', 'server', 'people']])
   }
 
-  console.log('\nthe gate: the main page sent you')
+  console.log('\nthe gate: ?return=/ (the retired main page\'s hand-back) is drawn as any other load')
   {
     const signedIn = await gate(() => ({ status: 200, body: ME('james', true) }), '?return=/')
-    check('already signed in: straight back to the main page, the app not drawn', [replaced, signedIn.app().length], [['/'], 0])
+    check('already signed in: the app drawn here, nothing replaced', [replaced, assigned, signedIn.app().map(name)], [[], [], ['App']])
     const signedOut = await gate(signedOutAnswer('Sign in to use deadwax.'), '?return=/')
     signedOut.screen()[0].props.onSignedIn(ME('ethan', false))
-    check('signed in from the screen: back to the main page - REPLACING the sign-in, so Back skips it', [replaced, assigned, signedOut.app().length], [['/'], [], 0])
+    check('signed in from the screen: the app drawn here, nothing replaced', [replaced, assigned, signedOut.app().map(name)], [[], [], ['App']])
     const elsewhere = await gate(signedOutAnswer('Sign in to use deadwax.'), '?return=https://evil.example/')
     elsewhere.screen()[0].props.onSignedIn(ME('ethan', false))
-    check('...and anywhere else is ignored: the app drawn here', [replaced, assigned, elsewhere.app().map(name)], [[], [], ['App']])
+    check('...and no other query sends anyone anywhere either', [replaced, assigned, elsewhere.app().map(name)], [[], [], ['App']])
   }
 
   console.log('\nthe gate: a sign-in left showing after signing in elsewhere')
@@ -390,8 +383,8 @@ async function main() {
     check('a page loaded afresh asks nothing more of pageshow', sent.length, asked)
     pageshow(true)
     await settle()
-    check('shown again from the back-forward cache, signed in by then: on to the main page, replacing it',
-      [sent.at(-1).url, replaced, assigned, back.app().length], ['/deadwax/me', ['/'], [], 0])
+    check('shown again from the back-forward cache, signed in by then (?return=/ on the address): the app, nothing replaced',
+      [sent.at(-1).url, replaced, assigned, back.app().map(name)], ['/deadwax/me', [], [], ['App']])
   }
 
   console.log('\nthe gate: what it hears is what the app draws by (2.0.0-player.61 review)')
@@ -632,62 +625,6 @@ async function main() {
     tree = again({ user: 'ethan' })
     check('...no answer at all: said, and nothing started again', [find(tree, byClass('app-error')).map(text), reloads],
       [["deadwax didn't answer, so you're still signed in - try again."], 2])
-  }
-
-  console.log('\nthe main page signed out')
-  {
-    const tree = notice.SignedOutNotice({ reason: 'Sign in to use deadwax.' })
-    const link = find(tree, (node) => node.type === 'a')[0]
-    check('a plain message, and a link to the app\'s sign-in that comes back here', [text(find(tree, byClass('signed-out-title'))[0]), link.props.href, text(link)],
-      ['You\'re signed out', '/player/?return=/', 'Sign in'])
-    check('...the plain "sign in" put in its own words; why it ended said as deadwax said it',
-      [text(find(tree, byClass('signed-out-text'))[0]), text(find(notice.SignedOutNotice({ reason: 'Your sign-in ran out.' }), byClass('signed-out-text'))[0])],
-      ['deadwax has logins on, so sign in to use it.', 'Your sign-in ran out.'])
-
-    freshWindow()
-    rendered.length = 0
-    appended = []
-    sent.length = 0
-    mainContainer = element('div')
-    notice.watchSignedOut()
-    check('logins off (no mark): nothing asked', sent.length, 0)
-    answer = () => ({ status: 401, body: { detail: 'Sign in to use deadwax.' } })
-    await http.get('/download/jobs').catch(() => {})
-    await http.get('/download/jobs').catch(() => {})
-    check('a 401: the notice drawn once, over a page made inert', [rendered.map(([, vnode]) => name(vnode)), appended.length, 'inert' in mainContainer.attrs], [['SignedOutNotice'], 1, true])
-
-    freshWindow()
-    sent.length = 0
-    const marked = document.querySelector
-    document.querySelector = (selector) => (selector === 'meta[name="deadwax-auth"]' ? { getAttribute: () => 'on' } : null)
-    answer = () => ({ status: 200, body: ME('james', true) })
-    reloads = 0
-    notice.watchSignedOut()
-    await settle()
-    pageshow(true)
-    await settle()
-    check('logins on: /me asked once as the page loads - and, signed in, not again as it is shown again', [sent.map((request) => request.url), reloads], [['/deadwax/me'], 0])
-
-    freshWindow()
-    sent.length = 0
-    rendered.length = 0
-    appended = []
-    pageListeners = {}
-    pageOptions = {}
-    mainContainer = element('div')
-    answer = () => ({ status: 401, body: { detail: 'Sign in to use deadwax.' } })
-    notice.watchSignedOut()
-    await settle()
-    check('logins on, signed out as it loads: the notice', [rendered.map(([, vnode]) => name(vnode)), 'inert' in mainContainer.attrs], [['SignedOutNotice'], true])
-    answer = () => ({ status: 200, body: ME('james', true) })
-    pageshow(true)
-    await settle()
-    check('...shown again from the back-forward cache (Back, after signing in), signed in by then: the page starts again',
-      [sent.at(-1).url, reloads], ['/deadwax/me', 1])
-    pageListeners.visibilitychange?.[0]?.()
-    await settle()
-    check('...and coming back to the front, the same', reloads, 2)
-    document.querySelector = marked
   }
 
   console.log('\nthe app drawn with logins off, and logins switched on under it')

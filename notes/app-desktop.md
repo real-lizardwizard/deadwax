@@ -1578,7 +1578,7 @@ Needs a look - the edits to the shared files here are kept small for that merge)
   gone. The routes were always both frames'; You's Managing rows - Albums that need a look with its
   count, Library care, Server settings, Log - are drawn on both (You takes no `desktop` any more), and
   open the pages as siblings through `openManagingPage`; the footnote is the desktop's ("Everything here
-  is in the app now; the main page stays until it retires.") on both.
+  is in the app now; the main page stays until it retires.") on both (until it retired in .66).
 - **What App asks on a phone**: `/deadwax/me` as an album page, an artist page, a Managing page or You's
   tab comes on top (`adminsOnTop`, which was `artistOnTop`); the review count as You's tab shows
   (`asksQueueSummary && admin && pageShown`, the one flag `desktop || nav.tab === 'you'`), where its row

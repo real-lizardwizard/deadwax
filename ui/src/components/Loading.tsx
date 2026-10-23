@@ -9,8 +9,9 @@
  * cheaper, because the old one swapped the `content` property twelve times a second and
  * each swap was a layout plus a paint.
  *
- * The animation lives in main.css (`.loading-blocks` / `.loading-panel`) alongside
- * everything else that owns the look. The class names are unchanged.
+ * The animation lived in the main page's main.css (`.loading-blocks` / `.loading-panel`); since that
+ * page retired (2.0.0-player.66) the app's sheets draw it where it shows (app-desktop.css's Edit
+ * panel). The class names are unchanged.
  */
 
 /** Inline, next to a label. Use when there's already something on screen. */

@@ -1,22 +1,22 @@
-# The phone player
+# The app
 
-There's a second page in deadwax, at **`/player/`**: a music player for your library, made to be
-added to an iPhone's home screen and opened like an app. It plays from
-**[Navidrome](https://www.navidrome.org)**, through deadwax, which keeps Navidrome's login and
-passes on the player's requests, so the phone never holds Navidrome's password and only ever
-needs to reach deadwax.
+deadwax is one app, at **`/player/`** - `http://your-server:8080/` opens it too - made to be added to
+an iPhone's home screen and opened like an app, and laid out for a desktop in a wide window. This is
+its guide. It plays your library from **[Navidrome](https://www.navidrome.org)**, through deadwax,
+which keeps Navidrome's login and passes on the player's requests, so the phone never holds
+Navidrome's password and only ever needs to reach deadwax.
 
-It's growing into one app for everything deadwax does: five tabs along the bottom (**Home**,
-**Library**, **Search**, **Requests** and **You**), with the player inside them. **Requests** shows
-your downloads as they arrive (since 2.0.0-player.12), and **Search** finds artists, albums and songs -
-yours first in each, then MusicBrainz's, in one list as Apple Music shows it (since 2.0.0-player.55) - and
-shows an album you don't have with each of its pressings' tracklists (since 2.0.0-player.13) - and **Get** fetches it: the sources found on Soulseek, to choose from
-(since 2.0.0-player.15). **Home** has the albums and artists you [pin](#home-and-pins) to it, and
-what you haven't played in a while (since 2.0.0-player.18). On a computer's screen - a window 1024
-pixels wide or more - the same app has [a desktop's layout](#on-a-desktop) (since 2.0.0-player.19): a
-sidebar instead of the tabs, a player bar along the bottom, and the sources beside an album rather
-than over it - and, from the player bar, [a full-screen visualizer](#the-visualizer) (since
-2.0.0-player.20).
+It has five tabs along the bottom (**Home**, **Library**, **Search**, **Requests** and **You**), with
+the player inside them. **Search** finds artists, albums and songs - yours first in each, then
+MusicBrainz's, in one list as Apple Music shows it - and shows an album you don't have with each of
+its pressings' tracklists, and **Get** fetches it: the sources found on Soulseek, to choose from
+([finding music](finding-music.md), [downloading](downloading.md)). **Requests** shows your downloads
+as they arrive. **Home** has the albums and artists you [pin](#home-and-pins) to it, and what you
+haven't played in a while. **You** has your settings and, for an admin, everything for looking after
+deadwax ([the library](library.md), [configuration](configuration.md)). On a computer's screen - a
+window 1024 pixels wide or more - the same app has [a desktop's layout](#on-a-desktop): a sidebar
+instead of the tabs, a player bar along the bottom, and the sources beside an album rather than over
+it - and, from the player bar, [a full-screen visualizer](#the-visualizer).
 
 It's early. Playing on a locked iPhone, and moving to the next song by itself there, have been
 seen working on a real iPhone; other things haven't been confirmed yet.
@@ -26,7 +26,7 @@ seen working on a real iPhone; other things haven't been confirmed yet.
 
 - **Navidrome**, reading your music library. The player plays whatever Navidrome has, so point
   Navidrome at the same folder deadwax files albums into. deadwax needs it for the app's library
-  (since 2.0.0-player.46): an album folder Navidrome doesn't list is raised on a desktop's **Needs a
+: an album folder Navidrome doesn't list is raised on a desktop's **Needs a
   look** as [Not in Navidrome](library.md#not-in-navidrome), so nothing on disk is out of reach.
 - **An account on Navidrome for the player to use.** Use one of your own, and not an admin
   account: nothing the player asks Navidrome for needs one. With logins off, plays are counted on
@@ -44,7 +44,7 @@ Three settings, all blank by default, in **Settings → Connections** (or in you
 | `NAVIDROME_USER` | the Navidrome account the player plays as (with logins on, each person plays as their own, and this one is still needed - [the player as you](#the-player-as-you-with-logins-on)) |
 | `NAVIDROME_PASSWORD` | that account's password |
 
-The player stays off until all three are set, and the settings tab marks whichever is missing.
+The player stays off until all three are set, and Server settings marks whichever is missing.
 
 **The address is the one deadwax uses, not the one your phone uses.** It's deadwax that asks
 Navidrome for everything, so the phone never needs to reach Navidrome at all. If Navidrome is another
@@ -56,15 +56,15 @@ itself.
   it: `http://navidrome:4533/music`. Leave off the `/rest` that Navidrome's API lives under, which
   deadwax adds by itself, and the `/app` you may see in your browser's address bar.
 - **The address can't carry anything else**: no user name or password in it (those have their
-  own settings), no `?` or `#`, and no spaces. The settings tab refuses one that does, and says
-  why. One set in your compose file or `.env` never goes through the tab, so deadwax checks it
+  own settings), no `?` or `#`, and no spaces. Server settings refuses one that does, and says
+  why. One set in your compose file or `.env` never goes through Server settings, so deadwax checks it
   before sending anything: if it fails, nothing is sent to it, and the player shows **Can't reach
   Navidrome** with what's wrong with the address.
 - **Changing the address needs the password again, typed in the same save.** Every request
   deadwax sends Navidrome carries a login made from the password, so deadwax won't send the
-  saved one to an address it wasn't typed for. In the settings tab, fill in both, then save.
+  saved one to an address it wasn't typed for. In Server settings, fill in both, then save.
   Clearing the address, or reverting it to your compose file's, doesn't need the password.
-- **The password stays in deadwax.** The settings tab only shows that it's set, and the phone is
+- **The password stays in deadwax.** Server settings only shows that it's set, and the phone is
   never sent it, or anything made from it.
 
 Then open `http://your-server:8080/player/`. If something's wrong, Home and the Library tab say
@@ -74,8 +74,8 @@ Navidrome** with the reason and a **Try again** button. The tab bar and You work
 Navidrome, so You's **Connections** can say what deadwax can and can't reach. [Troubleshooting](troubleshooting.md#the-player-says-connect-navidrome-or-cant-reach-navidrome)
 goes through each one.
 
-Setting Navidrome up also changes one thing on the main page: applying a release in the
-metadata editor asks Navidrome when it has scanned the new tags before renaming the folder,
+Setting Navidrome up also changes how an album is re-filed: applying a release in the Edit
+panel asks Navidrome when it has scanned the new tags before renaming the folder,
 instead of waiting a fixed time, and leaves the folder where it is if no scan comes or Navidrome
 can't be reached. See [`RETAG_RENAME_WAIT`](configuration.md#organizing).
 
@@ -86,9 +86,8 @@ can't be reached. See [`RETAG_RENAME_WAIT`](configuration.md#organizing).
 3. It gets its own icon (a record, with the dead wax ring picked out in purple) and opens full
    screen, without Safari's toolbars.
 
-An icon added before the tabs came (2.0.0-player.9) should keep working: the app grew in place at
-`/player/`, so there's nothing to add again, and its settings stay under the same names. That
-hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone)).
+The app stays at `/player/`, and its icon opens it there. An icon or a bookmark for deadwax's own
+address (`http://your-server:8080/`) opens the app too: that address sends the browser to `/player/`.
 
 ## What it does
 
@@ -107,7 +106,7 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   a row you swipe along; and **Not played in a while**, the albums you last played longest ago (more
   than 30 days), when there are at least four. Tap an album to open it, an artist for their page.
   [Home and pins](#home-and-pins) has the details.
-- **Library** (laid out as Apple Music's since 2.0.0-player.59 - [the Library](#the-library) has the details): a
+- **Library** (laid out as Apple Music's - [the Library](#the-library) has the details): a
   short list - **Shuffle** at its head, then **Playlists** (Navidrome's playlists, yours and the ones shared
   with you - [Playlists](#playlists)), **Albums**, **Artists** and **Songs** - and **Recently added** under it,
   the 12 newest albums with **See all**. Each row opens its own page: a title, a **Find** field that filters
@@ -129,20 +128,19 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
 - **An album**: its cover, **Play** and **Shuffle**, and its songs, under "Disc 1", "Disc 2"
   headings for a set. A disc with a title of its own shows it beside its number: "Disc 4 · Live at
   Wembley". The titles are the ones deadwax writes into your files from MusicBrainz (or you set by
-  hand in the main page's tag editor), as Navidrome reads them. A one-disc album shows its title
+  hand in the Edit panel's Tags), as Navidrome reads them. A one-disc album shows its title
   only when its files carry a disc number: Navidrome keeps a disc's title only for a numbered
   disc, and deadwax writes no disc number for a one-disc release. Files tagged by Picard ("1/1")
   have one; for others, set **Disc** to 1 along with **Disc title** in the tag editor. Tap a song
   to play the album from there. Shuffle plays the album's songs in a random order. A song's **•••**, at the
   end of its row, and the **•••** in the bar for the whole album (beside the pin) have **Play Next** and
-  **Play Last** ([Up Next](#up-next-shuffle-and-repeat)) and, since 2.0.0-player.58, **Add to a playlist…**
+  **Play Last** ([Up Next](#up-next-shuffle-and-repeat)) and **Add to a playlist…**
   ([Playlists](#playlists)). The back button
   names the tab it goes back to. The artist's name under the title opens [their page](#artist-pages).
   Under it, **In your library** (with logins on, **In the store** for an album that isn't yours, and
   **Add to my library** under Play - [the player as you](#the-player-as-you-with-logins-on)), and an **Also: …** chip for each other pressing of the album you
   have that Navidrome has found ("Also: 20th Anniversary Reissue 180gram", or the year when a
-  pressing has no edition of its own) - tap it for that pressing's page - and, since
-  2.0.0-player.41, **Other pressings ›**: every pressing of the album as MusicBrainz lists them, the
+  pressing has no edition of its own) - tap it for that pressing's page - and **Other pressings ›**: every pressing of the album as MusicBrainz lists them, the
   ones you have marked **In your library**, with **Get the album** for another - the deluxe beside the
   standard ([finding music](finding-music.md#another-pressing-of-an-album-you-have)). The row shows
   once deadwax has said what you hold, in a place kept for it, so nothing in it moves as it fills.
@@ -150,8 +148,8 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   **Pressings**, and In your library keeps only its tick, to leave the Also chip room - with logins on,
   **In the store**, which has no tick to keep, gives way whole there (a screen reader still hears it). The pin at the top right pins the album to Home ([Home and pins](#home-and-pins)).
   Beside it, for an admin (everyone, with logins off), **Edit** opens the album's editors in a sheet over
-  the whole screen (since 2.0.0-player.47 - [below](#looking-after-deadwax-from-a-phone)).
-  Since 2.0.0-player.44, tap the **cover** to see it full size - Navidrome's own picture, unresized - in
+  the whole screen ([below](#looking-after-deadwax-from-a-phone)), as a panel beside the page on a desktop.
+  Tap the **cover** to see it full size - Navidrome's own picture, unresized - in
   [the cover viewer](library.md#the-cover-viewer): tap to zoom in where you touch, pinch, drag to move,
   ✕ or **Close** to put it away (going back puts it away too, as it goes back). And at the foot of the page, under the songs, **Properties**: the
   album's **Year** - "1994 (this pressing 2014)" when this pressing's year isn't the album's own -
@@ -163,8 +161,7 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
 - **A mini player** along the bottom, just above the tabs, while something is playing, with
   play/pause and next. Tap it to open the now-playing screen, from any tab.
 - **You**: **Getting albums** - **When I tap Get** (**Show me the sources**, or **Pick the best
-  source for me**), the **Quality floor** (Any, 320 kbps, Lossless, 24-bit) and, since
-  2.0.0-player.41, **Format** (Any, Prefer lossless, Lossless only - what a Get's sources are scored
+  source for me**), the **Quality floor** (Any, 320 kbps, Lossless, 24-bit) and **Format** (Any, Prefer lossless, Lossless only - what a Get's sources are scored
   by), kept for you on deadwax rather than on the device (see [configuration](configuration.md#your-settings-in-the-app-per-user-on-deadwax)),
   then **Confirm before cancelling**, which is this device's;
   **Gapless** ([below](#gapless-playback-experimental)), **Now Playing opens as** and
@@ -176,9 +173,8 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   ends this device's session (and stops what's playing) and goes back to the sign-in screen
   ([Signing in](#signing-in)). For an admin, **Managing deadwax**: **Albums that need a look**,
   with how many, which opens **Needs a look**, then **Library care**, **People** (with logins on),
-  **Server settings** and **Log** - on a phone as on a desktop since 2.0.0-player.47
-  ([below](#looking-after-deadwax-from-a-phone)) - and **Open the main page**, which opens it beside the
-  app. Someone an admin gave some of these to (2.0.0-player.61) sees only theirs: Albums that need a look
+  **Server settings** and **Log** - on a phone as on a desktop
+  ([below](#looking-after-deadwax-from-a-phone)). Someone an admin gave some of these to sees only theirs: Albums that need a look
   with Look after the library, Library care with it or Edit albums, Server settings and Log with
   Settings and the log - People is a Navidrome admin's alone ([Sharing deadwax](sharing.md#admins-permissions-and-everyone-else)).
 - **Requests**: your downloads, under **Downloading** (a bar, "6 of 10 files · 1.8 MB/s", who it's
@@ -191,7 +187,7 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   requested yet". With VoiceOver, what changes is read out: a retry starting or refused, a
   download moving to another heading. The tab carries a count of what's on its way. Covers come
   from the Cover Art Archive, so a phone with no internet shows plain squares. A **Get** lands here,
-  showing from the tap. [Downloading](downloading.md#on-the-phone-the-requests-tab) has every state
+  showing from the tap. [Downloading](downloading.md#requests) has every state
   and what each button does. A **Done** download whose album is in your library opens it with a
   tap, and one it filed has a round **▶** that plays it - at once for the five newest, whose songs
   are fetched while Requests shows (an album filed while you watch once Navidrome has had a few
@@ -204,7 +200,7 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   everyone. A pressing somebody else is already downloading offers **Join this download** where its
   sources would be, and under **Get the album**. [Downloading](downloading.md#with-logins-on-downloads-per-person)
   has the rules.
-- **Search**: one box, then one list as Apple Music shows it (since 2.0.0-player.55): **Top results** - the
+- **Search**: one box, then one list as Apple Music shows it: **Top results** - the
   best artist, album or song, yours or not, each saying what it is ("Song · Portishead · Dummy"), three on a
   phone and six tiles on a desktop - then **Artists**, **Albums** and **Songs**, each with yours first, then
   MusicBrainz's, a few of each with **See all** in its heading. The chips **All**, **Artists**, **Albums**
@@ -214,7 +210,7 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   by its MusicBrainz id, even with Navidrome down - an album opens it, and a song of yours plays from there
   through its album once that album has been fetched (a ▶ at its right says so - the albums of the songs in
   Top results and then of the first songs are fetched as the answer arrives), and otherwise opens its album.
-  MusicBrainz's songs (since 2.0.0-player.53) are every take of one song one row ("Portishead · 4:56 ·
+  MusicBrainz's songs are every take of one song one row ("Portishead · 4:56 ·
   Dummy · in your library"); in Songs a tap opens the albums it's on - albums and EPs, then singles, then the
   compilations, live albums, soundtracks and broadcasts behind one line that opens - and an album to open it
   on a pressing that has the song, the song marked and scrolled to (one you have the song on opens the album
@@ -236,31 +232,28 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   "maybe in your library", dashed, when only a folder with no MusicBrainz ids has its name ("maybe in the
   store" with logins on, when that folder isn't in your library); and the album and the pressing on
   musicbrainz.org at its foot. MusicBrainz isn't asked for anything until you search, and the album page
-  works with Navidrome down. **What deadwax has saved** of MusicBrainz's answers (since 2.0.0-player.56) is
+  works with Navidrome down. **What deadwax has saved** of MusicBrainz's answers is
   searched too, under any words, the moment your library is: its rows lead each kind's MusicBrainz rows,
   marked **saved** - search "portishead", open Dummy, and "glory box" later finds Glory Box at once, after a
   restart, with MusicBrainz away - and MusicBrainz's own answer adds what isn't there yet below them. When
   MusicBrainz is away the saved rows stay, with a line saying these are what deadwax has saved.
-  [Finding music](finding-music.md#on-the-phone-the-apps-search-tab) has how the box is read, how Top
+  [Finding music](finding-music.md) has how the box is read, how Top
   results are chosen, [what's saved](finding-music.md#what-deadwax-has-saved) and what every note means.
 - **Get**: **Get the album** on the album you don't have - under the Pressing button, with a line
   under it saying what you already have of that pressing, if anything - gets the pressing chosen;
   **Get** at the end of an album MusicBrainz offers in Search gets its usual pressing, and at the end of a
-  MusicBrainz song (since 2.0.0-player.55) the album it names, on a pressing that has the song. Each opens
+  MusicBrainz song the album it names, on a pressing that has the song. Each opens
   **Choose a source**, a sheet of the folders found on Soulseek, one card each: the score, the
   folder and who it's from, then **Speed** first and large (what you got from that user before, in
   green, or their own average, or none reported), Tracks, Quality, Size and when it **Starts**, and
-  what it's missing in amber - and, behind a tap on the score (since 2.0.0-player.41), why it scored
+  what it's missing in amber - and, behind a tap on the score, why it scored
   what it did: the score's six parts as chips and the edition words in the folder's name.
   **Lossless**, **24-bit**, **Free slot**, **Complete albums only** and the sort narrow the list,
   and **Search again** under it opens the query to edit. The search is scored by You's **Format**.
   A card's **Get** queues it and switches to Requests, where it already shows. With **Pick the best
   source for me** in You, Get queues the best match itself when one scores 75 or more under your
   quality floor (never for the album as a whole, with no tracklist to judge by).
-  [Downloading](downloading.md#on-the-phone-get-and-choosing-a-source) has every state of the sheet.
-- **Links to the main page** (You's, and the Navidrome message's) open it beside the player, in a
-  new tab, so the music keeps playing. From the home-screen app it opens outside the app, in Safari
-  or a browser view over it.
+  [Downloading](downloading.md#choosing-a-source) has every state of the sheet.
 - **Now playing**: a large cover (a grey square for an album without one), the song's title, and
   under it the artist and the album on one line ("Pink Floyd — Wish You Were Here"): tap that line
   to go to the album. Then the scrubber; previous, play/pause and next; and a row of buttons: at its
@@ -271,9 +264,8 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   The button at its top right, a round record, shows it as [a turntable](#the-turntable) instead.
   Drag it down by its top half, or tap the arrow at its top, to close it (Escape closes it too). While
   it's open nothing behind it can be reached by the keyboard or VoiceOver; opening it moves to its
-  close arrow, and closing it goes back to where you were. Until 2.0.0-player.10 it also showed two
-  lines about how the song was sent and how the last song changes and seek went, and the Gapless
-  switch: those are in [Info → Debug](#info--debug) and in **You** now.
+  close arrow, and closing it goes back to where you were. How the song was sent and how the last
+  song changes and seek went are in [Info → Debug](#info--debug), and the Gapless checkbox in **You**.
 - **•••** on the now-playing screen opens a short menu: **Info**; **Add to a playlist…**, for the song
   playing ([Playlists](#playlists)); **Go to album**, which closes
   the now-playing screen and opens the song's album in the tab you're on, as if you'd tapped it
@@ -293,7 +285,7 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
   as on a compilation; tap it for their page. It's the song's own artist: a Portishead track on a
   compilation goes to Portishead, not Various Artists, and only an old credit of a renamed artist
   (Kanye West on a Ye album, one MusicBrainz artist under two names) goes to the page the album is
-  filed under. Then **Playing**, three rows about how it's playing (since 2.0.0-player.63): **Format**,
+  filed under. Then **Playing**, three rows about how it's playing: **Format**,
   the file as Navidrome read it (`FLAC, 24-bit, 192 kHz, stereo`); **Gapless**, `Off`, `On`, or `On, in
   one stream`; and **Normalization**, the song's [level](#normalization) (`Album, -7.42 dB · the album at
   -10.6 LUFS`, or `Off`) - the same words as the rows of those names in Debug. Last, **In your library → Folder** (headed **In the store** with logins on and a
@@ -332,7 +324,7 @@ hasn't been checked on a phone yet ([below](#not-yet-verified-on-a-real-iphone))
 
 ## Up Next, shuffle and repeat
 
-Since 2.0.0-player.57. **Up next** on the now-playing screen (beside •••) opens **Up Next**, a sheet over it,
+**Up next** on the now-playing screen (beside •••) opens **Up Next**, a sheet over it,
 the way Info opens: what plays after the song playing, with the two settings an iPhone's Music app keeps
 there - so nothing else on the now-playing screen changes. On a desktop it is the player bar's **Up Next**,
 and opens as a panel beside the page, as Info does ([on a desktop](#on-a-desktop)).
@@ -389,7 +381,7 @@ Previous always act on the song you're hearing: pressed in the instant one song 
 [one stream](#one-stream-for-flac), before the screen has caught up, Next goes to the song after the new one.
 
 **What is kept.** Repeat is remembered on the device, like Gapless. Shuffle belongs to what's playing (Play
-plays in order, Shuffle shuffles, and Up Next switches it), and since 2.0.0-player.64 the queue - Up Next with it -
+plays in order, Shuffle shuffles, and Up Next switches it), and the queue - Up Next with it -
 comes back when the app is opened again, paused where it stopped
 ([picking up where you left off](#picking-up-where-you-left-off)).
 
@@ -414,7 +406,7 @@ player bar's Shuffle, read on and can't be turned off for it - the order is the 
 
 ## Picking up where you left off
 
-Since 2.0.0-player.64. Close the app - iOS clearing it from memory, a reload, the browser quit - and open it
+Close the app - iOS clearing it from memory, a reload, the browser quit - and open it
 again, and what was playing is back: the song, the second it stopped at, and Up Next as it was (Playing Next,
 Shuffle, the rest of the album or list, a whole library's shuffle). It comes back **paused**: the mini player,
 and a desktop's player bar, show the song with the scrubber where it stopped, and nothing is loaded or played
@@ -474,8 +466,8 @@ only for something that has played - and then the song as usual. A play counts f
 
 ## Artist pages
 
-An artist's page (since 2.0.0-player.17) opens from Search (Top results and the Artists section - an artist
-only MusicBrainz knows by its MusicBrainz id, since 2.0.0-player.55), **Library → Artists**, the artist's name on an album you have and on the album you don't
+An artist's page opens from Search (Top results and the Artists section - an artist
+only MusicBrainz knows by its MusicBrainz id), **Library → Artists**, the artist's name on an album you have and on the album you don't
 have, and Info's artist card.
 
 - **At the top**, their picture - their background (`fanart.*`) where it's in their folder, else the
@@ -521,7 +513,7 @@ have, and Info's artist card.
   what you have); one opened from your library needs Navidrome, like an album you have. If deadwax
   couldn't ask Navidrome for them, the page says why, with **Try again**.
 
-Under the albums (since 2.0.0-player.45, as the main page's artist page has them), once the albums are
+Under the albums, once the albums are
 drawn and MusicBrainz and your library have answered - or after three seconds - and all at once, so
 nothing above them moves as they come. If your library still hasn't answered by then (its first look
 after deadwax restarts can take a while), **In your library** comes last instead of first, saying it's
@@ -531,7 +523,7 @@ looking, and fills in where it is:
   and the folder they share - or the folders, and why there isn't one (their albums filed under two
   names, say, or in two places). It's every name your library files their albums under: Ye's page
   counts Donda, filed as "Kanye West", and BULLY, filed as "Ye". It goes by the album artist your
-  files carry, as the main page does, so two artists your files give the same name (two bands called
+  files carry, so two artists your files give the same name (two bands called
   Nirvana) are counted together. If deadwax couldn't read your library for them just then, it says so,
   with **Try again** - over what it said before, when it had said anything - rather than claiming
   there's nothing of theirs. With logins on it's headed **In the store** and counts what the store holds
@@ -645,7 +637,7 @@ place; after an unpin, on the next row's **✕**. **Done** goes back to the card
 
 **What a pin follows.** An album is pinned by deadwax's own record of it in your library - the same
 one that knows you already have an album when you Get it - so it keeps opening the album after you
-re-file it, apply another release to it, or merge a disc folder into it in the main page's editor.
+re-file it, apply another release to it, or merge a disc folder into it in the Edit panel.
 An album pinned before deadwax has looked at your library is pinned by its MusicBrainz release, and
 moves onto that record as soon as deadwax has one. An artist is pinned by their MusicBrainz id, and
 their card opens their page by it (so it still opens after their albums are re-filed under a new
@@ -653,11 +645,11 @@ name), or - when nobody can say one - by their name and Navidrome's id for them.
 way that differ only in how they were typed (accents, case, which dash) are one pin: "Björk" and
 "Bjork" show as pinned on both pages. A card can say why it won't open, in two lines under its title:
 
-- **Removed from the store** - the album was deleted in deadwax (from the main page). If you get it
+- **Removed from the store** - the album was deleted in deadwax (**Edit → Delete**). If you get it
   again, the pin opens the new copy.
 - **Not on disk just now** - its folder isn't where deadwax last saw it: usually a share that isn't
-  mounted. It comes back once the folder is back and deadwax has looked at your library again (the
-  main page's library tab scans as it opens; **Rescan** scans at once).
+  mounted. It comes back once the folder is back and deadwax has looked at your library again
+  (**Library care → Rescan** scans at once).
 - **Not in Navidrome yet** - deadwax has it, but Navidrome doesn't (yet): it may still be scanning.
 
 **Where they're kept.** On deadwax, for you - not on the phone, and **never as stars in Navidrome**
@@ -670,7 +662,7 @@ database (`DB_PATH`), in its `pins` table, through `GET` and `PUT /deadwax/me/pi
 
 ## The Library
 
-Since 2.0.0-player.59, laid out as Apple Music's Library is.
+Laid out as Apple Music's Library is.
 
 **On a phone the Library is a short list**: **Shuffle** at its head ([shuffling the whole
 library](#shuffling-the-whole-library)), then **Playlists**, **Albums**, **Artists** and - with logins off -
@@ -696,8 +688,7 @@ artists (always a list):
 "The", accents or case ("The Beatles" is under B, "Björk" beside "bjork"); a name that starts with a digit, a
 symbol or another script goes under **#**, after Z. One album order is used everywhere (your albums and the
 store's), and it and the artists' order are remembered on that device - a device that never chose an order
-opens on **Artist**, where before 2.0.0-player.59 it opened on Recently added (which now has its own place,
-the list's grid and **See all**).
+opens on **Artist** (Recently added has its own place: the list's grid and **See all**).
 
 - **Find** filters the page as you type: every word you type must be in the album's title or artist (or the
   artist's name), in any order, accents and case aside - "deluxe" finds a "(Deluxe Edition)". The headers
@@ -727,7 +718,7 @@ in the main area, Find, the sort and the count on its title's row.
 
 ## Playlists
 
-Since 2.0.0-player.58. deadwax's playlists **are Navidrome's own**, made as you - so Amperfy (or any
+deadwax's playlists **are Navidrome's own**, made as you - so Amperfy (or any
 other Subsonic app signed in as you) shows the same ones, and a playlist made or changed in either is the
 same playlist in the other. deadwax keeps none of its own.
 
@@ -799,17 +790,17 @@ Amperfy doesn't say so ([troubleshooting](troubleshooting.md#amperfy-cant-save-m
 
 ## Looking after deadwax from a phone
 
-Since 2.0.0-player.47 a phone has every page a desktop has for looking after deadwax - in any window
+A phone has every page a desktop has for looking after deadwax - in any window
 narrower than 1024 pixels, so an iPad held upright too. They're for an admin, which with logins off is
 everyone:
 
 - **Editing an album**: an album's page has **Edit** at the top, beside the pin. It opens **Edit album**
   as a sheet over the whole screen - the same five tabs as a desktop's panel, **Release**, **Tags**,
-  **Artwork**, **Lyrics** and **Delete**, the main page's own editors laid out for a phone (fields big
+  **Artwork**, **Lyrics** and **Delete**, laid out for a phone (fields big
   enough that iOS doesn't zoom into them, **Apply** kept at the foot of the sheet, in reach above the
   home indicator, as you scroll the preview). It finds the album's folder, follows the album to its new
   id after you apply another release and goes back from a deleted album exactly as on a desktop -
-  [the library guide](library.md#editing-an-album-in-the-app) has all of it. Ticking a run of tracks
+  [the library guide](library.md#editing-an-album) has all of it. Ticking a run of tracks
   with Shift is a keyboard's; tick each one. The page behind waits while the sheet is open. The close
   button closes it - a tap on the dimmed page beside it doesn't (it shows there on a phone on its side
   or an iPad), so a stray one can't throw away an edit you've half made; inside the tag editor, a track or the delete confirmation, their own **Cancel**,
@@ -819,9 +810,9 @@ everyone:
   albums whose tags, folder or cover want attention and the ones deadwax filed that you haven't looked
   at, with a chip per kind of issue. Tap one and the Edit sheet opens on it, saying where it is in the
   list (*1 of 17*), with **◁**, **skip ▷** and, after **Apply**, **Next album ▷** to work through them
-  ([the library guide](library.md#needs-a-look-in-the-app)). **Library care** has **Rescan** and the runs
-  that fetch covers, CD art and lyrics, each with its **Stop** ([the library guide](library.md#library-care-in-the-app)).
-  **Server settings** is the server half of the main page's settings tab - three tabs, every change a
+  ([the library guide](library.md#needs-a-look)). **Library care** has **Rescan** and the runs
+  that fetch covers, CD art and lyrics, each with its **Stop** ([the library guide](library.md#library-care)).
+  **Server settings** is every server setting - three tabs, every change a
   draft until **Save changes** in the bar along the bottom, above the tab bar and the player
   ([configuration](configuration.md#in-the-app)). **Log** is deadwax's event log, newest first, each line's
   time, level and where it came from over its words; it follows deadwax live while the page shows, and
@@ -842,7 +833,7 @@ everyone:
 ## On a desktop
 
 Open `/player/` in a window **1024 pixels wide or more** - a computer's browser, or an iPad on its
-side - and the same app is laid out for a desktop (since 2.0.0-player.19). It's the same app, not
+side - and the same app is laid out for a desktop. It's the same app, not
 a second one: the same pages, the same addresses (a link or a bookmark opens the same thing at
 either size), the same settings. Make the window narrower than 1024 and it's the phone's layout
 again - and the other way round - without the music stopping: only what's around the pages
@@ -854,26 +845,24 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
   **Recently added**, **Albums**, **Artists** and **Songs** (Songs left out when Navidrome won't list
   songs, as on a phone; with logins on, the Library's three are yours and a **Browse** group under
   them has the store's Albums, Artists and Songs - [the player as you](#the-player-as-you-with-logins-on))
-  - then **Playlists** (since 2.0.0-player.58): **All playlists**, and up to 20 playlists by name, yours
+  - then **Playlists**: **All playlists**, and up to 20 playlists by name, yours
   then those shared with you, each opening its page ([Playlists](#playlists)) - then **Managing**: **Needs a look**, with how many albums need one, the
   library's review queue in the app, an album folder Navidrome doesn't list among them (**Not in
-  Navidrome**; [the library guide](library.md#needs-a-look-in-the-app) has it),
+  Navidrome**; [the library guide](library.md#needs-a-look) has it),
   **Library care** - **Rescan** and the runs that fetch covers, CD art and lyrics for the albums
-  missing them ([the library guide](library.md#library-care-in-the-app)) - **Settings**, the server's settings - the main page's settings tab's server half, its three pages
-  and its one save ([Configuration](configuration.md#in-the-app) has it) - and **Log**,
+  missing them ([the library guide](library.md#library-care)) - **Settings**, the server's settings, its
+  three pages and its one save ([Configuration](configuration.md#in-the-app) has it) - and **Log**,
   deadwax's event log: the last 500 lines since it started, then new ones as they come, while the page
-  shows ([troubleshooting](troubleshooting.md#the-apps-log-is-missing-lines-says-the-stream-was-lost-or-starts-empty)),
-  and **Open the main page**, which opens the main page in a new tab (a desktop needs nothing that is
-  only there now: an album is edited from its own page, below, the bulk runs are **Library care**'s, and
-  an artist's pictures and **Move albums to …** are on the artist's page, [above](#managing-an-artist)), and
-  **You** at the foot. Where you are is highlighted. Home, Requests and You work as the phone's tabs
+  shows ([troubleshooting](troubleshooting.md#the-apps-log-is-missing-lines-says-the-stream-was-lost-or-starts-empty))
+  - and **You** at the foot. An album is edited from its own page (below), and an artist's pictures and
+  **Move albums to …** are on the artist's page ([above](#managing-an-artist)). Where you are is highlighted. Home, Requests and You work as the phone's tabs
   do: a click shows it as you left it, and a click on the one showing goes back to its first page
   (and, there, to the top). So does the Library view showing. Another Library view shows that view -
   where you left it when you were already on the Library's first page, and at its top from anywhere
   else.
 - **The search field** is Search's box: type in it and Search's results show in the main area - one list,
   Top results as tiles three across (two across beside a side panel), then Artists, Albums and Songs, yours first in each, with the chips under
-  the large title (since 2.0.0-player.55) - and Enter asks at once. It keeps saying what you searched
+  the large title - and Enter asks at once. It keeps saying what you searched
   for while an album you found is open. (Search's own box isn't drawn on a desktop.)
 - **Recently added** in the sidebar is Navidrome's albums newest first, a view of its own beside
   **Albums**, so Albums keeps the order you chose for it (the seven of [the Library](#the-library), from the
@@ -889,16 +878,16 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
 - **A player bar** along the bottom instead of the mini player: the song's cover, title and "Artist
   — Album" (click that to go to the album), previous, a round play/pause and next, the scrubber with
   the time gone and the time left at its ends (click or drag along it; its dot shows when you point
-  at it) - and since 2.0.0-player.57 **Shuffle** before previous and **Repeat** after next (one button
+  at it) - and **Shuffle** before previous and **Repeat** after next (one button
   going off, all, one; both purple while on), as Music on a Mac has them - and at the right **AirPlay**
-  when there's a speaker to send to, **Up Next**, **Add to a playlist** (since 2.0.0-player.58: the song
+  when there's a speaker to send to, **Up Next**, **Add to a playlist** (the song
   playing, into one of [your playlists](#playlists)), **Info**, and the
   [visualizer](#the-visualizer)'s button (five bars) - and before them, wherever the speed isn't 1x,
   [the speed's chip](#the-speed-fader) (`1.25x`; click it for 1x). With nothing playing it stays,
   saying so.
   There's no now-playing screen and no [turntable](#the-turntable) on a desktop - the bar is the
   player, and the visualizer is the desktop's full-screen view of it.
-- **Up Next** (since 2.0.0-player.57) opens beside the page as a panel, the same queue as on a phone -
+- **Up Next** opens beside the page as a panel, the same queue as on a phone -
   [Up Next, shuffle and repeat](#up-next-shuffle-and-repeat) - one panel at a time with Info, Edit and the
   rest. **Done**, the Up Next button again, or Escape while you're in it closes it; making the window
   narrower than 1024 closes it too.
@@ -909,14 +898,14 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
 - **An album** has its cover beside its title, **Play**, **Shuffle** and **Edit** in a row, and its
   songs in a list as on a phone. Between 1024 and 1279 pixels wide, while a panel lies over the page,
   the row moves under the cover, so the panel - the Edit panel included - leaves it in view.
-- **Edit** (since 2.0.0-player.21, for an admin - everyone, with logins off) opens the **Edit album**
-  panel beside the page, and shows pressed while it's open: underline tabs for **Release** (the main
-  page's metadata editor: pick the pressing, read the preview, **Apply**), **Tags** (the album's
+- **Edit** (for an admin - everyone, with logins off) opens the **Edit album**
+  panel beside the page, and shows pressed while it's open: underline tabs for **Release** (the
+  metadata editor: pick the pressing, read the preview, **Apply**), **Tags** (the album's
   tracks with tick boxes, and the tag editor for the ticked ones - a track's name opens what's inside
   it: every field, the pictures in the file, its lyrics and all its tags, with **Previous**, **Next**
-  and **Edit this track…**, since 2.0.0-player.44), **Artwork** (**Get cover**, **Get CD art**, the
-  cover and CD art opening full size), **Lyrics** (**Get lyrics**) and **Delete**. They're the main page's own editors, so they
-  work as [the library guide](library.md#editing-an-album-in-the-app) says - which also says how the
+  and **Edit this track…**), **Artwork** (**Get cover**, **Get CD art**, the
+  cover and CD art opening full size), **Lyrics** (**Get lyrics**) and **Delete**. They
+  work as [the library guide](library.md#editing-an-album) says - which also says how the
   panel finds the album's folder, and what happens after an edit: the page asks Navidrome again,
   and after you apply a different release it follows the album to the new id Navidrome gives it.
   The panel closes when you go to another page; the close button, Edit again, or Escape while
@@ -938,10 +927,10 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
   then Speed first, Tracks, Quality, Size and Starts in a row, and the score's parts as chips, always
   showing - with **Search again** under them, and **Lossless**, **24-bit**,
   **Free slot**, **Signals**, **Complete albums only**, a sample-rate floor (any, 44.1, 48, 88.2 or
-  96 kHz and up, by the folder's worst file - since 2.0.0-player.50) and the sort. **Signals** sets
+  96 kHz and up, by the folder's worst file) and the sort. **Signals** sets
   the least each part of the match score
   may be - **Titles**, **Count**, **Lengths**, **Edition**, **Format** and **Peer**, a slider each -
-  as the main page's candidates panel does, and its chip counts how many are set. Signals and the
+  and its chip counts how many are set. Signals and the
   sample-rate floor are the panel's alone: narrow the window to a phone's with the panel open and
   they stop filtering (neither
   chip is drawn on a phone), until it's wide again. The page stays usable beside the panel:
@@ -962,7 +951,7 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
 
 ### The visualizer
 
-Since 2.0.0-player.20 the desktop layout has a full-screen visualizer: the music drawn as it plays,
+The desktop layout has a full-screen visualizer: the music drawn as it plays,
 in place of the phone's turntable. Click the **five bars** at the right end of the player bar. It
 takes the whole screen (or, where the browser won't allow that, the whole window), and **Leave full
 screen**, **Escape**, or leaving full screen any other way closes it, back to where you were. The
@@ -1023,8 +1012,7 @@ it, and plays it silently, at volume zero, in time with the song, to measure it.
 exactly as it always does, and nothing of the copy is ever heard. The next song's first stretch is
 fetched in the last few seconds of the one before, so one song flows into the next without the
 visualizer standing still (one you skip to, or jump to, can be still for a moment). It all works
-over a plain `http://` address. At [another speed](#the-speed-fader) the copy plays at that speed too
-(since 2.0.0-player.39), so it stays in time with the song, and a song at 2x reads twice the tempo.
+over a plain `http://` address. At [another speed](#the-speed-fader) the copy plays at that speed too, so it stays in time with the song, and a song at 2x reads twice the tempo.
 
 What that copy costs while the visualizer shows: 40 seconds of the song fetched for every 32 played,
 and one stretch of each next song. deadwax cuts each stretch from the copy of the song that
@@ -1034,11 +1022,10 @@ already - and, with [Normalization](#normalization) on, the default, every level
 browser: its stretches are cut from that levelled copy, so they sound as the song does), which costs
 Navidrome nothing but a quick check of which file it has. A browser that plays the FLAC as it is -
 Chrome, Firefox or Edge with Gapless off and Normalization off - has no such copy, and
-since 2.0.0-player.23 deadwax reads each stretch straight out of the FLAC on Navidrome instead: the
+deadwax reads each stretch straight out of the FLAC on Navidrome instead: the
 start and the last few hundred bytes of the file once a song, then about the stretch's own size (a
 little more while it finds its place in a long song with no seek table) - never the whole song, and
-nothing made or kept in the cache, so the visualizer doesn't push anyone's songs out of it. (Until then the
-first stretch of each song had deadwax fetch the whole song again and keep a copy of it in the cache.)
+nothing made or kept in the cache, so the visualizer doesn't push anyone's songs out of it.
 The stretch is the same, byte for byte, either way - the song's own audio, untouched.
 
 **"This song can't be seen".** Only FLAC songs have that copy, and a song the visualizer can't hear
@@ -1063,14 +1050,14 @@ opens as is **Now Playing opens as**, in **You** under **Playback**: **Cover**, 
 **Turntable**. Like the others there, it's kept on that device. The button never changes the
 setting: close the screen and open it again, and it's back to what You says.
 
-Since 2.0.0-player.14 the record has **momentum** and **its own sound**: flick it and it keeps
+The record has **momentum** and **its own sound**: flick it and it keeps
 turning; the sound follows your hand, faster and slower and backwards; and pausing from the turntable
 winds the sound down with the record. The two come together: where the record can't make its sound
 (below), turning it works as it did before, silently and with no momentum. All of it is described
 below.
 
-- **The record's face is the album's CD art**: the `disc.jpg` (or `.png`) that the main page's
-  **Get CD art** saves beside the tracks - see [the library](library.md#covers-cd-art-and-lyrics).
+- **The record's face is the album's CD art**: the `disc.jpg` (or `.png`) that **Get CD art**
+  saves beside the tracks - see [the library](library.md#artwork-covers-and-cd-art).
   For a set, it's the playing song's disc's own (`disc2.jpg` for a song on disc 2), or, where the
   disc has none of its own, a `disc.jpg` that stands for every disc. With no CD art, it's a plain
   black record with the album's cover as its label. A `cd.jpg` that came with a download isn't
@@ -1104,13 +1091,10 @@ below.
     while your finger rests. Turn it at the record's own speed at 1x - a turn every 1.8 seconds - and you
     hear the song as it plays (a turn of your hand is always 1.8 seconds of the song, so with the speed
     fader at 2x, where the record turns every 0.9 seconds, a turn every 1.8 seconds plays it at half
-    the speed it was playing) (since 2.0.0-player.24; before, it warbled out of all recognition - see
-    below). A press that stays put for a moment takes hold too, and a quick tap is
-    still a tap. A turn that starts the moment your finger lands is heard from that moment (since
-    2.0.0-player.40): the record isn't taken until your finger has gone a few pixels - it might yet be
+    the speed it was playing). A press that stays put for a moment takes hold too, and a quick tap is
+    still a tap. A turn that starts the moment your finger lands is heard from that moment: the record isn't taken until your finger has gone a few pixels - it might yet be
     a tap - but once it has, it is taken from where it was as your finger went down, and its sound
-    follows every touch since, so those few pixels no longer add to the delay (before, they added about
-    35 ms with your hand at the record's own speed, 70 at half of it and 95 at a quarter). It can reach
+    follows every touch since, so those few pixels add nothing to the delay. It can reach
     back only about a tenth of a second, though, counted from when the page hears your finger move: a
     start slow enough to still be inside those pixels by then is heard from a tenth of a second before
     the record is taken, not from the press - the slower your hand, the more of the old delay it keeps,
@@ -1139,8 +1123,7 @@ below.
     it has started before, tapping the mini player to open the screen). It stops whenever the screen
     closes or the phone locks. And it needs the stretch of the song where the record is (below) to
     have arrived - a moment after that first tap while the song plays; for a paused song, the first
-    press asks for it. Until then (since 2.0.0-player.16 - before, a turn could pause the song and
-    play nothing), turning the record works as it did before 2.0.0-player.14: silently, the song
+    press asks for it. Until then, turning the record is silent: the song
     playing on while you hold it (the record itself stops turning under your finger), moved on or
     back by as much as you turned it when you let go, and no momentum. Letting go of the record
     counts as a tap, so the next turn has its sound once its stretch is in. A record still coasting
@@ -1152,20 +1135,20 @@ below.
     48 kHz copy, so the record sounds just as loud as the song - and sends as a small FLAC file of its
     own while the turntable shows and the song plays, once a tap has started the sound. An iPhone has
     asked for that copy already, to play the song; a phone that plays the FLAC as it is gets its
-    stretches read straight out of the FLAC (since 2.0.0-player.23 - nothing made or kept), and a
+    stretches read straight out of the FLAC (nothing made or kept), and a
     resampled song has its copy made the first time. That
     costs about a third more data than the song itself while the turntable shows and the song plays
     (about half as much again for a hi-res song played as it is, whose stretches are shorter), and
-    nothing at all on the cover, or before the first tap. An MP3 or any other kind of file turns as
-    before 2.0.0-player.14: silently, and with no momentum.
+    nothing at all on the cover, or before the first tap. An MP3 or any other kind of file turns
+    silently, and with no momentum.
   - **It's about an eighth of a second behind your hand**, always the same: the record's sound
     follows every touch your phone reports, each at the moment it was made, and plays the path they
-    trace 120 ms later - and 1.5 ms more since 2.0.0-player.35, for the limiter below. Over plain
+    trace 120 ms later - and 1.5 ms more, for the limiter below. Over plain
     `http://`, where the sound is made on the page's main thread, it is later by two of the blocks it is
     made in: about 143 ms in all where the computer's audio says it works 512 frames or fewer at a time
     (Chrome on a Mac), and about 164 ms where it works more at a time, or can't say - Safari, on a Mac
     and on every iPhone, whose browsers all report the same 128 frames whatever the hardware does
-    - since 2.0.0-player.40, which made the blocks half as long where the audio allows it; it was about
+    - which made the blocks half as long where the audio allows it; it was about
     165 everywhere before. That is late enough that the touches either side of each moment have
     arrived, so it never has to guess where your hand is going. What your device's own audio adds after
     that - a Bluetooth headset's 150-250 ms included, which no page can shorten - is on top, and Info >
@@ -1175,11 +1158,11 @@ below.
     motor's run back to speed and the wind-down are timed the same smooth way, and are as far behind
     too; the song itself, and where it's moved to when you let go, are just as before. A busy moment
     that loses a few of your touches doesn't stop the sound.
-    Since 2.0.0-player.29 a slowed or sped-up record is the song and nothing else: the sound between
+    A slowed or sped-up record is the song and nothing else: the sound between
     the song's own samples is worked out through a proper filter, where the short curve used before
     left a thin, fizzy copy of the high notes on top of a slowed song and folded them back over a
     sped-up one.
-    Since 2.0.0-player.35 it **never clips**. On a loud song the record's sound went over full scale
+    It **never clips**. On a loud song the record's sound went over full scale
     on the drum hits - working out the sound between the song's own samples brings back the peaks the
     song has between them, and the sound's filter for the deepest bass adds to them - and the browser
     cut off whatever was over. A recording from James's own Mac (Info > Debug > **Record 20 s**,
@@ -1192,11 +1175,9 @@ below.
     nothing comes near full scale it changes nothing at all, not one bit; on a loud song it turns the
     loudest moments down by a decibel or so - **Turntable timing** in Info > Debug says how many peaks
     it has held and the deepest it went.
-    (2.0.0-player.24 played 50 ms behind and read each touch's speed from the newest edge of a short
-    curve whenever your hand's speed was changing - which carried the jitter straight into the pitch:
-    a fast flutter, "like a dragonfly sound on top of the music". 2.0.0-player.27 traded 70 ms more
-    delay for a steady pitch; if the record now feels late under your finger, say so - the two pull
-    against each other.)
+    (The eighth of a second is what a steady pitch costs: following your hand more closely carries
+    the jitter of its touches straight into the pitch, as a fast flutter. If the record feels late
+    under your finger, say so - the two pull against each other.)
     Taking hold of a playing record, or pausing it with a
     wind-down, plays the song's last eighth of a second again as the record's sound starts; and
     letting go of a playing record at about its own speed - when the song plays on straight from your
@@ -1206,7 +1187,7 @@ below.
     with the record standing still - so the first grab of a paused record after you open the screen, or
     come back to the app, is timed as smoothly as any other, and nothing it learns mid-turn moves the
     timing until you let go.
-  - **Over plain `http://` too** (since 2.0.0-player.16): a browser gives the part that best plays
+  - **Over plain `http://` too**: a browser gives the part that best plays
     this sound - an AudioWorklet, on an audio thread of its own - only to a page on HTTPS (or on the
     computer itself, `localhost`). Opened at a plain `http://` address on your network, deadwax plays
     the record's sound on the page's main thread instead, with the very same code, so it sounds the
@@ -1214,7 +1195,7 @@ below.
     computer's audio works in 512 frames or fewer at a time, about 0.164 s elsewhere, where it's about
     0.12 s - 121.5 ms - on HTTPS); on HTTPS it gets its own thread, which is steadier if the page is
     busy. Its blocks are 512 frames long only where the browser says its audio renders that few at a
-    time (since 2.0.0-player.40 - Chrome and other browsers built on it say it truly; Safari, and every
+    time (Chrome and other browsers built on it say it truly; Safari, and every
     browser on an iPhone, always says 128, so there they stay 1024), and deadwax goes back to 1024 - at the record's next silent moment,
     for the rest of the visit - if they then come two at a time all the same, or if the page once
     doesn't finish one in time while the record's sound is heard: a block of 512 has half the time a
@@ -1263,7 +1244,7 @@ There's no hint on how to use it: the record and the arm are the instructions.
 
 ## The speed fader
 
-Since 2.0.0-player.39 the song can play from **a quarter of its speed to twice it**, and **its pitch
+The song can play from **a quarter of its speed to twice it**, and **its pitch
 moves with it** - a record deck's pitch control, not a time-stretch: faster is higher, slower is lower;
 2x is an octave up, 0.5x an octave down. It's the player's speed, not the turntable's, but it's set on
 the turntable.
@@ -1314,7 +1295,7 @@ the turntable.
 
 ## Testing the turntable
 
-The turntable has a **test bench** (2.0.0-player.36): a page of its own where you turn the real
+The turntable has a **test bench**: a page of its own where you turn the real
 turntable - the same record, the same momentum and the same sound your phone runs, nothing re-made for
 the page - over simple signals the page makes itself, and hear what it played beside an ideal
 turntable turned exactly the same way. It is there for the question "is that digital sound deadwax's,
@@ -1355,7 +1336,7 @@ minutes long, 12 dB under full scale unless it says otherwise:
 - **A song from your library** - a song from Navidrome, the whole of it, played exactly as the app
   plays it: see below.
 
-**A song from your library** (2.0.0-player.37) puts music you know on the bench. Choose it, and a
+**A song from your library** puts music you know on the bench. Choose it, and a
 search box appears: type a song, an artist or an album - `eye in the sky`, say, for The Alan Parsons
 Project's "Eye in the Sky" - and tap the song among what Navidrome finds. Each shows its artist and
 album, its length and its format as Info shows it ("FLAC, 16-bit, 44.1 kHz, stereo"). That song is
@@ -1492,8 +1473,7 @@ of the page shows Info > Debug's two turntable rows.
 Between two songs there's normally a short pause, about a second on an iPhone over a VPN: when
 one song ends, the phone has to ask deadwax for the next one and start it from nothing. **Gapless**, a checkbox in **You** under **Playback**, closes that gap. It's **off** by default.
 It's kept on the device, and a home-screen app keeps its settings apart from Safari's, so turn it
-on in the app itself. (Until 2.0.0-player.10 it was a switch on the now-playing screen, beside the
-album's name; it keeps the setting it had there.)
+on in the app itself.
 
 With it on, the player works one of two ways, song by song: FLAC songs played one after another
 go into **one stream**, and everything else is got ready on a **second player**.
@@ -1546,7 +1526,7 @@ pieces of a few seconds, keeping about 30 seconds ahead of what you're hearing.
 - **It needs room in the player's cache**, as Safari's MP4s do: see
   [`PLAYER_CACHE_MB`](configuration.md#paths). A song too big for what the cache's disk has free
   plays the other way, and the songs around it still stream.
-- **What Up Next does to the stream** (2.0.0-player.57): the stream follows the queue, not the album -
+- **What Up Next does to the stream**: the stream follows the queue, not the album -
   every next song in [Up Next](#up-next-shuffle-and-repeat)'s order that is FLAC of the same format joins
   the one before it, so a shuffled album, a song added with Play Next, or Repeat's next time round still
   plays straight through with nothing between songs (what you hear at each join is the two songs' own
@@ -1563,7 +1543,7 @@ pieces of a few seconds, keeping about 30 seconds ahead of what you're hearing.
 ### The second player, for everything else
 
 For songs the stream doesn't take, and in browsers without it, the next song is got ready on a
-second audio player while this one plays. This was the only way before 1.1.0-player.5. It still
+second audio player while this one plays. It still
 leaves a short gap (the second player has to start), just a shorter one.
 
 - **The next song is got ready while this one plays.** A few seconds into each song, the player
@@ -1594,7 +1574,7 @@ where it was, and anything got ready is let go of.
 
 ### Info → Debug
 
-**Debug is an admin's** (since 2.0.0-player.63): it shows for a Navidrome admin and the break-glass
+**Debug is an admin's**: it shows for a Navidrome admin and the break-glass
 `deadwax` - and, with logins off, for everyone, as before. Everyone else's Info is
 [About](#what-it-does) alone, with no tab strip, and its **Playing** group holds the three rows
 of Debug a listener can use - Format, Gapless and Normalization - in the same words. A role given or taken
@@ -1611,9 +1591,7 @@ this: Debug is drawn from what the page already has.
 
 How the song you're hearing was sent, and how the last song changes and your last seek went, are
 in **Info**: tap **•••** on the now-playing screen, then **Info**, then **Debug**. (Info opens on
-the tab you last left it on, scrolled to the top.) Until 2.0.0-player.10 the gap and seek parts
-were two lines on the now-playing screen, between the cover and the song's title; they moved here
-so that screen shows the song, and they say the same things as labelled rows. The **Gap** and
+the tab you last left it on, scrolled to the top.) The **Gap** and
 **Last seek** rows keep the old lines' words, less their openings (`Last song change`,
 `Last seek:`), and the older changes are on an *Earlier* line. The end of the old seek line, how
 the song was sent (`· FLAC in MP4, 192 kHz resampled to 48 kHz`), is now the **Sent as** row, with
@@ -1624,16 +1602,16 @@ the resampling on a **Resampled** row of its own. Debug has five parts:
 | The file | **Format** | the file as Navidrome read it: `FLAC, 24-bit, 192 kHz, stereo`. A part Navidrome didn't give is left out |
 | What this device is sent | **Sent as** | how the song comes: `FLAC in MP4, 24-bit, 44.1 kHz` (a CD song [levelled](#normalization), the default; `16-bit` with Normalization off), `In one stream, 24-bit, 48 kHz`, `FLAC, as the file is`, `MP3, transcoded by Navidrome`. [Seeking](#seeking-and-where-safari-lands) says what the MP4s are for |
 | | **Resampled** | `192 kHz to 48 kHz, 3 dB quieter` when deadwax resampled the song for [Maximum quality](#maximum-quality-hi-res-at-48-khz), `Not known yet` while it hasn't said, otherwise `No`. A song [levelled](#normalization) is resampled at its level's gain instead of 3 dB quieter, so the row says only `192 kHz to 48 kHz` |
-| | **Normalization** | the song's level (since 2.0.0-player.62 - see [Normalization](#normalization)): `Album, -7.42 dB · the album at -10.6 LUFS`, `Song, -3.10 dB · the song at -14.9 LUFS`, `Song, +1.20 dB · held there by its peak (it wanted +2.35)`; `Measuring its album… (7 of 12 songs)` while deadwax measures it (asked again every 5 seconds); `Played as it is this time - its album was still being measured` when deadwax couldn't wait for it (Sent as and Resampled then say what came: the file's own depth, `3 dB quieter`); `Not measured yet - it played as it is this time`; `Not levelled - MP3 songs play as they are` (or why deadwax won't level it); `Off` for a song played with Normalization off |
+| | **Normalization** | the song's level (see [Normalization](#normalization)): `Album, -7.42 dB · the album at -10.6 LUFS`, `Song, -3.10 dB · the song at -14.9 LUFS`, `Song, +1.20 dB · held there by its peak (it wanted +2.35)`; `Measuring its album… (7 of 12 songs)` while deadwax measures it (asked again every 5 seconds); `Played as it is this time - its album was still being measured` when deadwax couldn't wait for it (Sent as and Resampled then say what came: the file's own depth, `3 dB quieter`); `Not measured yet - it played as it is this time`; `Not levelled - MP3 songs play as they are` (or why deadwax won't level it); `Off` for a song played with Normalization off |
 | | **Why** | why it came that way: `Maximum quality: Up to 48 kHz`, `48 kHz and below is never resampled`, `Only FLAC is resampled`, `Maximum quality: Original`, and so on |
 | | **Gapless** | `Off`, `On`, or `On, in one stream` while this song is playing in [the stream](#one-stream-for-flac) |
-| | **Speed** | [the speed](#the-speed-fader) (since 2.0.0-player.39): `Normal (1.00x) - the song as it is, nothing changed`, `1.25x, the pitch moving with it`, or what the browser did instead - `but the browser is holding the pitch`, `the browser refused it - …` in its own words, `the browser plays it at 1.00x`. Under it, once the song has played a few seconds, how fast it really moved: `The song moved at 1.24x over the last few seconds of playing` (lower than the speed across a moment it waited for the network; begun again from a change of speed). The row keeps up while Debug is open - a change of speed, from the desktop's player bar beside it, shows at once, and the measure as it comes and moves |
+| | **Speed** | [the speed](#the-speed-fader): `Normal (1.00x) - the song as it is, nothing changed`, `1.25x, the pitch moving with it`, or what the browser did instead - `but the browser is holding the pitch`, `the browser refused it - …` in its own words, `the browser plays it at 1.00x`. Under it, once the song has played a few seconds, how fast it really moved: `The song moved at 1.24x over the last few seconds of playing` (lower than the speed across a moment it waited for the network; begun again from a change of speed). The row keeps up while Debug is open - a change of speed, from the desktop's player bar beside it, shows at once, and the measure as it comes and moves |
 | Last song change and seek | **Gap** | the last song change: how long it took and how it was made (below), with up to four before it on an *Earlier* line |
 | | **Last seek** | where your last seek went: see [Seeking](#seeking-and-where-safari-lands) |
 | The turntable | **Turntable sound** | whether [the turntable](#the-turntable)'s own sound is ready: `Ready: 0:42-1:22, FLAC, decoded at 48 kHz` (the stretch of the song it holds), or off and why (below), with which part plays it (its own audio thread, or the page's main thread and why), how far the phone's audio clock moves at a time, and what its stretches have cost since the turntable showed and when the last of them came (`6.8 MB fetched since the turntable showed, the last window 1:01 in` - divide one by the other for a rate) |
-| The turntable | **Turntable timing** | how the turntable is keeping up on this phone, counted since it last showed (2.0.0-player.28): `The song was back 1.24 s after the last let-go - 0.40 s of it the record's run back to speed`, and under it whether the sound - when it is made on the page's main thread - had gaps (`12 of 3400 blocks late, the worst by 38 ms`), how the picture kept up under your finger (`310 frames, 4 late, the longest gap 118 ms`), any let-go after which the song didn't start, and any time the browser interrupted the sound - and, since 2.0.0-player.35, how many peaks the record's sound held under full scale and the deepest it turned the sound down to do it (`Peaks held under full scale: 36 since it showed (65 samples), the deepest 1.4 dB`: each of those went past half a decibel under full scale and was turned down; on a loud song about a third of them went over full scale too, where the browser would have cut them off - counted up to a quarter of a second or so after you let go, once the sound, an eighth of a second behind your hand, has caught up, coasts included) - and, since 2.0.0-player.40, how far behind your hand the record's sound is by design and what this device's own audio says it adds after that (`The record's sound: 142.8 ms behind the hand by design (blocks of 512 on the main thread), then what this device's audio adds - it says base 2.7 ms, output 8.0 ms, 12.3 ms from render to speaker`: the browser's own figures, each only where it gives them - the output figures include a Bluetooth headset's delay where the browser knows it, and an older Safari may give only the first). The blocks-late count works in Chrome since 2.0.0-player.40 too: until then it compared the audio clock with a time Chrome makes from that same clock, and could never count one. If the turntable feels like it hangs, these numbers say where |
-| The turntable | **Recording** | a 20-second recording of the record's own sound, as a file to send with a bug report (2.0.0-player.32). **Record 20 s** starts it (the turntable showing, and its sound started - turn the record once first); close Info and turn the record as you would; when the row says `20 s recorded`, **Save the recording** downloads one JSON file (about 5 MB for 20 s) holding what the record's sound actually played on your device, every touch as it came, and what the sound made of it - exactly what's needed to hear and replay a sound no lab has reproduced; since 2.0.0-player.35 it also holds each moment's loudest sample as it was before the file's 16 bits cut it off, so it shows how far over anything went. Nothing is sent anywhere by itself |
-| The turntable | **Test bench** | a link, **Open the test bench**, that opens the turntable's test bench at `/player/lab/` in a tab of its own beside the app, so the song playing carries on (2.0.0-player.36) - see [Testing the turntable](#testing-the-turntable) |
+| The turntable | **Turntable timing** | how the turntable is keeping up on this phone, counted since it last showed: `The song was back 1.24 s after the last let-go - 0.40 s of it the record's run back to speed`, and under it whether the sound - when it is made on the page's main thread - had gaps (`12 of 3400 blocks late, the worst by 38 ms`), how the picture kept up under your finger (`310 frames, 4 late, the longest gap 118 ms`), any let-go after which the song didn't start, and any time the browser interrupted the sound - and how many peaks the record's sound held under full scale and the deepest it turned the sound down to do it (`Peaks held under full scale: 36 since it showed (65 samples), the deepest 1.4 dB`: each of those went past half a decibel under full scale and was turned down; on a loud song about a third of them went over full scale too, where the browser would have cut them off - counted up to a quarter of a second or so after you let go, once the sound, an eighth of a second behind your hand, has caught up, coasts included) - and how far behind your hand the record's sound is by design and what this device's own audio says it adds after that (`The record's sound: 142.8 ms behind the hand by design (blocks of 512 on the main thread), then what this device's audio adds - it says base 2.7 ms, output 8.0 ms, 12.3 ms from render to speaker`: the browser's own figures, each only where it gives them - the output figures include a Bluetooth headset's delay where the browser knows it, and an older Safari may give only the first). The blocks-late count works in Chrome too. If the turntable feels like it hangs, these numbers say where |
+| The turntable | **Recording** | a 20-second recording of the record's own sound, as a file to send with a bug report. **Record 20 s** starts it (the turntable showing, and its sound started - turn the record once first); close Info and turn the record as you would; when the row says `20 s recorded`, **Save the recording** downloads one JSON file (about 5 MB for 20 s) holding what the record's sound actually played on your device, every touch as it came, and what the sound made of it - exactly what's needed to hear and replay a sound no lab has reproduced; it also holds each moment's loudest sample as it was before the file's 16 bits cut it off, so it shows how far over anything went. Nothing is sent anywhere by itself |
+| The turntable | **Test bench** | a link, **Open the test bench**, that opens the turntable's test bench at `/player/lab/` in a tab of its own beside the app, so the song playing carries on - see [Testing the turntable](#testing-the-turntable) |
 | Navidrome sent | **Song**, **On other songs**, **Album** | the names of the fields Navidrome sent for the song and for its album, without their values; those it sent empty on an *Empty* line; and the fields other songs of the album carry that this one doesn't |
 
 The **Gap** row is timed with Gapless off as well, the same way, so you can compare the two.
@@ -1675,8 +1653,8 @@ Anything longer than 30 seconds isn't counted either. If it says Gapless isn't h
 says what each answer means.
 
 **Turntable sound** says what your phone made of the record's own sound - which only your phone can
-say, since an iPhone decodes it its own way. Whenever it says **Off**, a press on the record works as
-it did before 2.0.0-player.14: silently, the song playing on under your finger.
+say, since an iPhone decodes it its own way. Whenever it says **Off**, a press on the record is
+silent, the song playing on under your finger.
 
 | it says | meaning |
 | --- | --- |
@@ -1693,11 +1671,10 @@ it did before 2.0.0-player.14: silently, the song playing on under your finger.
 | `Off: its window is loading - …` | the stretch is on its way |
 | `Off: no window yet - …` | the song is paused and the record hasn't been pressed: nothing is fetched until it plays, or until the record is pressed |
 
-The line under it says which part plays the sound (since 2.0.0-player.16): `On its own audio thread
+The line under it says which part plays the sound: `On its own audio thread
 (an AudioWorklet)`, or `On the main thread - this page isn't on HTTPS, so the browser has no
 AudioWorklet` when deadwax is opened at a plain `http://` address (or `… the AudioWorklet wouldn't
-load (…)`, in the browser's words, when it refused it) - then, once it has seen it move (since
-2.0.0-player.24), how far the phone's audio clock moves at a time, `Its clock moves 21.3 ms at a time`
+load (…)`, in the browser's words, when it refused it) - then, once it has seen it move, how far the phone's audio clock moves at a time, `Its clock moves 21.3 ms at a time`
 (the audio's own render: about 21 ms on an iPhone, 6 on a desktop browser; deadwax times the record's
 sound smoothly across those steps) - then what its stretches have cost.
 
@@ -1755,8 +1732,8 @@ second player's song changes took about 98 ms there against about 145 ms with Ga
 
 ## Maximum quality: hi-res at 48 kHz
 
-**Maximum quality** is in **You**, under **Playback**, with two choices. (Before 2.0.0-player.9 it
-was behind a gear beside the Library title.) Like Gapless above it, it's kept on the device.
+**Maximum quality** is in **You**, under **Playback**, with two choices. Like Gapless above it, it's
+kept on the device.
 
 - **Up to 48 kHz** (the default): FLAC songs at 88.2, 96, 176.4, 192, 352.8 or 384 kHz, 16 or 24
   bits, are resampled by deadwax to 48 kHz (44.1 kHz for the 88.2 kHz family) and sent as lossless
@@ -1818,7 +1795,7 @@ playing carries on as it began.
 
 ## Normalization
 
-**Normalization** is in **You**, under **Playback**, after Maximum quality (since 2.0.0-player.62). It
+**Normalization** is in **You**, under **Playback**, after Maximum quality. It
 brings your music to one loudness, so a quiet album and a loud one play at the same level and you don't
 reach for the volume between them. Like the other Playback settings it's kept on the device, so a phone
 on AirPods and a desktop on speakers can each have their own. Four choices:
@@ -1979,7 +1956,7 @@ on (the default), a FLAC song comes as deadwax's levelled 24-bit MP4 in every br
   same song from a fraction of a second to 41 seconds out.
 
 **Info → Debug shows it on your phone** (an admin's - tap **•••** on the now-playing screen, then **Info**, then
-**Debug**; until 2.0.0-player.10 it was a line between the cover and the song's title). Its **Last
+**Debug**). Its **Last
 seek** row is the last seek you made, with the bar or from the lock screen: *Asked 2:10, seeking…*
 while it's on its way, then *Asked 2:10, the player said 2:10*. If it never got there, because you
 pressed Previous or Next first or the song failed under it, it says *Asked 2:10, interrupted*, and
@@ -2028,9 +2005,9 @@ played" and Navidrome's own Last.fm or ListenBrainz scrobbling carry on working.
 - **Hearing a song again counts again.** **Previous** more than three seconds in, or play on a
   song that has ended, starts a new listen: "now playing" is sent again, and it can count as
   another play. Pausing and carrying on is the same listen. So does a song heard again because of
-  [Repeat](#up-next-shuffle-and-repeat) (since 2.0.0-player.57): each time round, and each repeat of a
+  [Repeat](#up-next-shuffle-and-repeat): each time round, and each repeat of a
   song, is a listen of its own, counted by the same rule.
-- **A queue [picked up](#picking-up-where-you-left-off)** (since 2.0.0-player.64) starts a new listen at your
+- **A queue [picked up](#picking-up-where-you-left-off)** starts a new listen at your
   tap: what was heard before the app closed isn't carried over. A song put back at 3:00 of 4:00 and heard to its
   end is a minute heard - not a play, since that's under half of it.
 - Plays go to the `NAVIDROME_USER` account with logins off, and on to Last.fm or ListenBrainz if that
@@ -2076,7 +2053,7 @@ So leave that player's Transcoding and Max Bit Rate unset.
 With logins on ([sharing deadwax](sharing.md) says how to turn them on), the app opens on a sign-in
 screen: your **Navidrome** user name and password. Nothing else of the app is drawn until you've signed
 in, and then you stay signed in on that device - the home-screen app included - for 30 days from when
-you last used it. Admins - Navidrome's admins, since 2.0.0-player.61 - see everything described here;
+you last used it. Admins - Navidrome's admins - see everything described here;
 anyone else sees no **Managing deadwax** in You or the sidebar, no **Edit** on an album and no managing on
 an artist's page, and can do everything else - search, **Get**, play, pin - unless an admin gave them
 some of the managing (they see that part) or took Get albums away (Get then says "Getting albums is off
@@ -2118,8 +2095,8 @@ favourites, the same ones Amperfy (or any Subsonic app) shows as starred - and d
   session's is) so an album filed at 3am is starred all the same. Signing out leaves it; signing in
   again replaces it.
 - **Add to my library.** An album the store already holds that isn't in your library says **In the
-  store, not in your library** under **Get the album** (and in the Sources sheet, and the main page's
-  candidates panel) with **Add to my library**: it goes into your library and is starred for you, and
+  store, not in your library** under **Get the album** (and in the Sources sheet) with **Add to my
+  library**: it goes into your library and is starred for you, and
   nothing is downloaded. It's offered for a pressing the store holds whole; of a part the store holds
   the line says **The store has 9 of 11 tracks of this pressing**, and a download fills it in, as before.
   **Already in your library** now means yours.
@@ -2131,9 +2108,9 @@ favourites, the same ones Amperfy (or any Subsonic app) shows as starred - and d
   Home stay deadwax's own. A star and an unstar made in two places within a few minutes end up as
   whichever deadwax reads last. The albums you'd already starred before deadwax first read your stars
   back are added to your library too, but not marked new - they were yours already. That first read
-  waits for deadwax to have scanned the library once (a new install hasn't until someone searches,
-  opens an album's page or runs **Library care → Rescan**): until then every read counts as the first,
-  so a star you make before that isn't marked new either.
+  waits for deadwax to have scanned the library once (it does so by itself as it starts, the first
+  time): until then every read counts as the first, so a star you make before that isn't marked new
+  either.
 - **You → Your library** says how many albums your library holds and how many are still waiting to be
   starred, and why - a few albums named for each reason, then how many more: "Navidrome hasn't got it
   yet", "It has no MusicBrainz release id" (an admin can apply a release to it), "Its folder isn't there
@@ -2223,13 +2200,13 @@ lists at all (**Not in Navidrome**). With logins off nothing here changes: one a
   Ethan sees only the ones you share (Edit → **Shared with everyone**), under **Shared with you** -
   playable, not changeable - and you see his the same way; neither sees the other's private ones
   ([Playlists](#playlists)).
-- **Search** (one list since 2.0.0-player.55): in each section yours first, then the store's, then
+- **Search** (one list): in each section yours first, then the store's, then
   MusicBrainz's - each row of the store's saying **in your library** or **in the store** (nothing while
   that isn't known yet: such a row sits among yours and may say "in the store" there once known, rather
   than move), an artist's count your own when you have albums of theirs ("1 album in your library"), else
   the store's; an album you add on its page says **in your library** in its row when you come back. With
   logins off every row of yours says **in your library** now too, since the half titles that said it went.
-  MusicBrainz's songs (since 2.0.0-player.53) say **in your library** or **in the store** of a song, and of
+  MusicBrainz's songs say **in your library** or **in the store** of a song, and of
   each album it's on, the same way - and **a pressing in your library** (or **a pressing in the store**) of
   an album held as a pressing nothing yet says has the song or hasn't.
 - **Home**: Recently added and Not played in a while are asked as you (so "not played" is what *you*
@@ -2287,34 +2264,29 @@ fixes that.
   section isn't shown.
 - **An album with no MusicBrainz release id can't be pinned** (its pin isn't shown): nothing would
   find it again once it moved.
-- **On a desktop**, the sidebar's **Managing** has **Needs a look**, **Library care**, **Settings** and **Log**, and otherwise opens the main page;
-  between 1024 and 1279 pixels wide a panel lies over the right of the page, the end of a long
+- **On a desktop**, between 1024 and 1279 pixels wide a panel lies over the right of the page, the end of a long
   tracklist under it. The Edit panel edits one album, from its page or from **Needs a look**; the bulk
   runs are **Library care**'s; an artist's pictures and **Move albums to …** are on the artist's page, on
-  a phone too; the browser preferences of its settings tab stay the main page's. The [visualizer](#the-visualizer)
+  a phone too. The [visualizer](#the-visualizer)
   sees FLAC songs only; its play/pause is its one control of the music (skip and seek from the player
   bar, after leaving it).
 - **[Picking up where you left off](#picking-up-where-you-left-off)** comes back from the last save - up to 30
   seconds early for an app iOS closed in a pocket - keeps 2,000 songs at most, and from another app's queue
   only the songs, as a plain list. Amperfy keeps its own queue, which deadwax can't see.
-- **Up Next** (2.0.0-player.57) has no history of what played before the song playing (Previous walks it),
+- **Up Next** has no history of what played before the song playing (Previous walks it),
   no "keep playing similar music" after the list, no ••• on album tiles (an album's ••• is on its page),
   no long-press or right-click menu, and no way yet to save it as a playlist.
-- **Playlists** (2.0.0-player.58) have no folders, no cover of your own (Navidrome's 2x2 only) and no
+- **Playlists** have no folders, no cover of your own (Navidrome's 2x2 only) and no
   smart-playlist rules (Navidrome's own files make those); they aren't in Search or on Home; a playlist of
   more than 2,000 songs plays but is edited elsewhere; and a song in a playlist twice shows the playing
   bars on both rows.
 - **Siri**, and a lower bit rate for mobile data.
-- **The rest of deadwax**: the main page's browser preferences (search, candidates, auto-grab, the
-  interface) and its track table's columns stay there (it works on a phone too); editing an album, the
-  albums that need a look, Library care, the server settings and the log are the app's, on a phone as
-  on a desktop, since 2.0.0-player.47.
 - **On its side**, the now-playing screen shrinks the cover to fit above the controls, which
   leaves it small. There's no landscape layout with the cover beside the controls yet.
-- **A saved link to an album can stop working** after you re-apply its release in the metadata
-  editor, since Navidrome may give it a new id. The page says Navidrome has nothing by that id;
-  go back to the Library and open it again. (Applied from the app's own **Edit** panel, the page
-  follows the album to its new id; a link saved before still names the old one.)
+- **A saved link to an album can stop working** after you apply another release to it, since
+  Navidrome may give it a new id. The page says Navidrome has nothing by that id; go back to the
+  Library and open it again. (The page you applied it from follows the album to its new id; a link
+  saved before still names the old one.)
 
 ## Not yet verified on a real iPhone
 
@@ -2324,7 +2296,7 @@ Navidrome, and it **keeps playing with the screen locked** and **moves to the ne
 itself while locked**, which is what iOS has historically been fussy about for web apps and the
 question the whole player existed to answer. Still to find out:
 
-- **[Normalization](#normalization)'s 24-bit copies of ordinary CD songs** (2.0.0-player.62): with it on (the
+- **[Normalization](#normalization)'s 24-bit copies of ordinary CD songs**: with it on (the
   default), the iPhone plays deadwax's 24-bit FLAC in an MP4 - and in the gapless stream's fragmented MP4 -
   for nearly every song, where before only hi-res songs were sent that way. If one won't play in the
   gapless stream, the player falls back to the file as it is for that song; **with Gapless off it can't -
@@ -2332,7 +2304,7 @@ question the whole player existed to answer. Still to find out:
   [troubleshooting](troubleshooting.md)). And how long an album's first
   play waits for its measuring on the NAS, over WireGuard; and whether -18 LUFS is loud enough on AirPods;
 
-- **[picking up where you left off](#picking-up-where-you-left-off)** (2.0.0-player.64): whether iOS closing the
+- **[picking up where you left off](#picking-up-where-you-left-off)**: whether iOS closing the
   home-screen app lets its last save out as it goes to the background, or the last 30-second save is what comes
   back - and whether those saves go out from a locked phone in a pocket; the lock screen after opening it again
   (nothing until the first play, then the song put back with its cover, its second and previous/next), and
@@ -2342,10 +2314,10 @@ question the whole player existed to answer. Still to find out:
   take the computer's queue); and how long its ask takes over WireGuard before the mini player shows the song;
 - whether the **lock-screen and Control Center controls** work;
 - whether **AirPlay** works;
-- **the Library's index** (2.0.0-player.59) under a real finger in the home-screen app - dragging down it
+- **the Library's index** under a real finger in the home-screen app - dragging down it
   without the page scrolling - and whether a long list's page height settles without the view jumping as
   you scroll back up (Safari draws the albums near the screen as you go);
-- **a playlist's Edit** (2.0.0-player.58) under a real finger: dragging a song by its grip, the page
+- **a playlist's Edit** under a real finger: dragging a song by its grip, the page
   scrolling by itself near the top and bottom; and the **New playlist** name field in the Add to a
   playlist sheet with the keyboard up (the sheet sits at the bottom of the screen);
 - whether **the home-screen app works over plain `http`**, as it will over a VPN;
@@ -2355,8 +2327,6 @@ question the whole player existed to answer. Still to find out:
   label);
 - whether **an icon added before the tabs** opens the new app with its settings (Maximum quality,
   Gapless, the Library's order) as they were;
-- how the home-screen app opens **a link to the main page** - in Safari, or a browser view over
-  the app - and whether the music carries on underneath;
 - whether **Navidrome sends each disc's title** for your albums (the album page's "Disc 4 · ..."
   headings, and Info → About's disc line);
 - **what Navidrome sends** for a song and an album: [Info → Debug](#info--debug)'s **Navidrome
@@ -2365,7 +2335,7 @@ question the whole player existed to answer. Still to find out:
 - **the turntable** under a real finger: turning the record and dragging the arm without the
   screen moving or closing, a tap on the record pausing, and whether it turns smoothly and stops
   while the phone is locked;
-- **the turntable's own sound** (2.0.0-player.14): turning the record and hearing it, forwards and
+- **the turntable's own sound**: turning the record and hearing it, forwards and
   backwards; holding it still (silent); flicking it while the song plays (it whirs, comes back to
   speed, and the song carries on from there - the song is started again after your tap, which iOS is
   expected to allow; if it says "Tap play to start" instead, it didn't, and the record should then
@@ -2377,8 +2347,7 @@ question the whole player existed to answer. Still to find out:
   on silent before); then locking the phone mid-song after turning the record - the music should keep
   playing and the lock screen's next should work - and all of it on AirPods. If anything is silent,
   [Info → Debug](#info--debug)'s **Turntable sound** row says why;
-- **the turntable's sound over plain `http://`** (2.0.0-player.16 - the fix for "the audio doesn't
-  follow the turntable when scrubbing"): opened at your usual `http://` address, Debug's **Turntable
+- **the turntable's sound over plain `http://`**: opened at your usual `http://` address, Debug's **Turntable
   sound** should say `Ready: …` with `On the main thread - this page isn't on HTTPS …` under it,
   and turning the record should be heard forwards and backwards, silent held still, with no quick
   rise in pitch as you grab a playing record or pause from it; a press in the
@@ -2386,26 +2355,25 @@ question the whole player existed to answer. Still to find out:
   silent shouldn't mute it (deadwax now asks iOS to treat the page as playing music from the first
   tap on the turntable until it goes); and, after turning the record, locking the phone mid-song should still leave the
   music playing, with the lock screen's controls and AirPods working;
-- **the turntable's sound following your hand** (2.0.0-player.24 - the fix for "it doesn't sound
-  like anything"): turning the record steadily at about its own speed should sound like the song,
+- **the turntable's sound following your hand**: turning the record steadily at about its own speed should sound like the song,
   at about half speed like the song an octave down, backwards like it backwards, on HTTPS and over
-  plain `http://` alike; the sound should feel a hair behind your finger (an eighth of a second since 2.0.0-player.27, a
+  plain `http://` alike; the sound should feel a hair behind your finger (an eighth of a second, a
   little more over `http://`) and never lurch - the very first turn of a paused record after opening
   the screen included; stopping your finger should stop it within a moment, and starting again should
   carry on from there. Debug's **Turntable sound** line says how far your phone's audio clock moves at
   a time (`Its clock moves … ms at a time`) - tell us what it says;
-- **the turntable's sound never clipping** (2.0.0-player.35): scrubbing a loud song should have no
+- **the turntable's sound never clipping**: scrubbing a loud song should have no
   crackle on its drum hits, slowed, sped up or at its own speed; Debug's **Turntable timing** should
   count the peaks it held (`Peaks held under full scale: …`), and a recording made then should have no
   moment over half a decibel under full scale;
 - **Requests** on the phone: the ✕ asking in the card (unless You's **Confirm before cancelling** is
   off on the phone - it's kept per device, so a home-screen app has its own), the count on the tab, Home's Arriving coming
-  and going, a download started on the main page showing up when you come back to the app, what
+  and going, a download started on another device showing up when you come back to the app, what
   VoiceOver reads out as downloads change, and the covers fetched from the Cover Art Archive over
   your VPN; with logins on, **Join this download** and the ✕'s "Leave it" under a
   real finger, and Requests on two phones signed in as two people showing each their own;
 - **Search** against your Navidrome: what its search finds for an artist, an album and a song
-  (it hasn't been tried against a real Navidrome yet) - and so (2.0.0-player.55) the order it finds them in,
+  (it hasn't been tried against a real Navidrome yet) - and so the order it finds them in,
   which decides which of yours lead Top results and the sections (the test stand-in sorts by name, a real
   Navidrome by relevance), whether it sends each artist's MusicBrainz id (MusicBrainz's artists are matched
   to yours by it), and how long its whole list of artists takes on a big library; a song's tap starting its
@@ -2413,18 +2381,17 @@ question the whole player existed to answer. Still to find out:
   over your VPN, and MusicBrainz's artist search with accents ("bjork" for Björk - every try of it was
   turned away as MusicBrainz shedding searches); the list's places filling under a thumb, and what
   VoiceOver reads of its one live region, its section headings and its chips;
-- **Artists and the id bridge** (2.0.0-player.17) against your Navidrome: whether it sends each
+- **Artists and the id bridge** against your Navidrome: whether it sends each
   artist's MusicBrainz id (the artist page's albums from MusicBrainz depend on it, or on the ids
   deadwax wrote into your files), whether its search finds an album by its MusicBrainz release id
   (deadwax asks that first, then by the album's title), what its empty search lists for **Songs**,
   whether it sends a song's play count and writers and an album's label (Info → About), and an
   artist's picture as the page's hero;
-- **Pins and Home** (2.0.0-player.18): whether your Navidrome sends `played` on its "recently
+- **Pins and Home**: whether your Navidrome sends `played` on its "recently
   played" list (Home's **Not played in a while** shows only if it does), dragging a row in **Edit**
   by its grip under a real finger without the page scrolling, the pin on an album page, an artist
-  page and in the ••• menu, and a pinned album still opening after you re-file it in the main page's
-  editor;
-- **Get** (2.0.0-player.15) against your slskd and real Soulseek folders: the sources sheet
+  page and in the ••• menu, and a pinned album still opening after you re-file it in the Edit panel;
+- **Get** against your slskd and real Soulseek folders: the sources sheet
   scrolling under a finger without the page behind it moving, a tap above it closing it, the sort's
   picker (iOS's own wheel), the cards' words for real folders and users, a download showing in
   Requests from the tap, and **Pick the best source for me**;
@@ -2445,7 +2412,7 @@ question the whole player existed to answer. Still to find out:
 - hi-res songs resampled to 48 kHz, and above all a 24/192 album's joins, and how long the first
   song waits on your NAS; and 24/192 streamed as it is under "Original" (whether an iPhone keeps up
   with it, and plays FLAC at that rate in a stream at all);
-- **[the speed fader](#the-speed-fader)** (2.0.0-player.39): whether the pitch really moves with the
+- **[the speed fader](#the-speed-fader)**: whether the pitch really moves with the
   speed on the phone (it should sound like a record played fast or slow, never the same pitch
   stretched), whether 0.25x and 0.5x play at all (Apple promises 1x to 2x for any song, and below 1x
   only for a song it says can play slowly - Debug's **Speed** row says how fast the song really moved),
@@ -2454,7 +2421,7 @@ question the whole player existed to answer. Still to find out:
   speed, and AirPlay - WebKit hands an AirPlay speaker the same speed as the phone, but whether a
   speaker plays it, and its pitch, is the speaker's business. And the fader under a real finger,
   beside the record and the arm;
-- **[Up Next, shuffle and repeat](#up-next-shuffle-and-repeat)** (2.0.0-player.57): all of it in the
+- **[Up Next, shuffle and repeat](#up-next-shuffle-and-repeat)**: all of it in the
   [one stream](#one-stream-for-flac) on an iPhone, whose player is Apple's own - taking the next song's
   start back out after a Play Next, and starting a stream that had ended again for Repeat; a Repeat All
   loop left going for an hour (memory, and how Safari lets go of what is behind); Repeat One and Repeat All

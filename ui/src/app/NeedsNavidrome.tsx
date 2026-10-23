@@ -20,8 +20,8 @@ export const NAVIDROME_UNREACHED = 'Your library comes from Navidrome, so it sho
  * do about it - the titles the player always used, which troubleshooting.md quotes.
  *
  * NAVIDROME IS REQUIRED FOR THE LIBRARY (2.0.0-player.46): the app's library is what Navidrome lists,
- * so the words under the reason say so, and how to set it up - "in deadwax's settings", true of the
- * main page's settings tab the link opens today and of wherever the settings live next. A folder on
+ * so the words under the reason say so, and how to set it up - "in deadwax's settings", true of
+ * Server settings, where the button opens (it was true of the main page's settings tab too). A folder on
  * disk that Navidrome doesn't list is never out of reach: Needs a look raises it ("Not in Navidrome").
  *
  * A leaf: the status and the retry come from App, which asks Navidrome once for every gate. Not set

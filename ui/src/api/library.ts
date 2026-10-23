@@ -2,7 +2,7 @@ import { fetchOk, get, post } from './http'
 import type {
   ArtistImagesPreview, ArtistImagesResult, ArtistSearchResult, ArtistSummary, DeleteResult,
   DeletionSummary, HeldByNobody,
-  LibraryAlbum, LibraryResponse, LyricsSummary, NewImportsResponse, OwnedResponse, QueueSummaryResponse, RetagPlan,
+  LibraryAlbum, LibraryResponse, LyricsSummary, OwnedResponse, QueueSummaryResponse, RetagPlan,
   RetagRelease, RetagResponse, TagEditPlan, TagEditResponse, TrackDetailsResponse, TrackLyrics,
   TrackTagEdit,
 } from './types'
@@ -155,7 +155,7 @@ export function applyTagEdits(albumPath: string, edits: TrackTagEdit[]): Promise
 
 /**
  * Every album in the library, reduced to which album and edition it is (2.0.0-player.13 gave the
- * app this call; the main page's search has always made it). The app's Search leaves the albums
+ * app this call; the main page's search always made it). The app's Search leaves the albums
  * the library holds out of "Not in your library yet" with it (lib/owned.ts).
  *
  * NOT cheap the first time after deadwax restarts: that answer is a real scan, which walks the whole
@@ -169,16 +169,6 @@ export function owned(signal?: AbortSignal): Promise<OwnedResponse> {
 }
 
 /* ===== the metadata queue ===== */
-
-/**
- * Albums deadwax has filed that you haven't looked at yet.
- *
- * Cheap on purpose — one indexed table read, no filesystem. Safe to call on page load, which
- * `listAlbums` deliberately is not.
- */
-export function newImports(): Promise<NewImportsResponse> {
-  return get<NewImportsResponse>('/library/queue/new_imports')
-}
 
 /**
  * How many albums need a look (2.0.0-player.25) - the app's count beside "Needs a look". Answered

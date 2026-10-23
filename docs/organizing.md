@@ -61,12 +61,12 @@ The album folder is named from `ALBUM_FOLDER_TEMPLATE`, by default
 
 A token that comes out empty takes its brackets with it: an album with no edition is just
 `Dummy (1994)`, not `Dummy (1994) []`. A template can't contain `/` (it names the album folder
-only), and it has to include `{album}`. The settings tab refuses one that breaks those rules,
+only), and it has to include `{album}`. Server settings refuses one that breaks those rules,
 and shows what two example albums would be called.
 
 **Changing the template moves nothing already filed.** Albums filed under the old one show as
-*folder off-convention* in the library, and move when you next apply a release to them in the
-metadata editor.
+*folder off-convention* in **Needs a look**, and move when you next apply a release to them
+(**Edit → Release**).
 
 **Why `{year}` is the album's year:** a 2011 remaster of a 1975 record files under
 `Wish You Were Here (1975) [2011 remaster]`, next to the original, rather than in a different
@@ -111,8 +111,8 @@ without a word.
 - **Covers and other sidecars** (images, `.cue`, `.log`, `.nfo`, `.txt`, `.m3u`, `.sfv`) that
   are in slskd's download folder next to the tracks come along into the library. Only audio is
   downloaded from Soulseek, so these are there only if slskd happened to fetch them. An album
-  that arrives without a cover shows up in the library's review queue, and **Get cover** fetches
-  one from the Cover Art Archive (see [The library](library.md#covers-cd-art-and-lyrics)).
+  that arrives without a cover shows up in **Needs a look**, and **Get cover** fetches
+  one from the Cover Art Archive (see [The library](library.md#artwork-covers-and-cd-art)).
 - **Lyrics** are looked up on [LRCLIB](https://lrclib.net) for each track once the album is
   filed (unless `FETCH_LYRICS` is off), and saved as a `.lrc` file with the track's own name,
   beside it. Synced lyrics are saved when LRCLIB has them, plain ones otherwise; an
@@ -140,10 +140,8 @@ changed in the last ten minutes, and never a partial file or the folders holding
 Filing a download - and the lyrics fetched with it, unless `FETCH_LYRICS` is off - is all deadwax
 writes into your library on its own. Correcting an album afterwards - applying the release it really
 is, editing tags by hand, fetching a missing cover, CD art or lyrics later, deleting it - is something
-you ask for, previewed first where it can be: in the main page's Library tab
-([the library guide](library.md#the-metadata-editor)), or, in the app at `/player/`, from an album's
-own page with **Edit** (on a desktop since 2.0.0-player.21, on a phone since 2.0.0-player.47 -
-[editing an album in the app](library.md#editing-an-album-in-the-app)). Both are the same editors with the same rules: a
+you ask for, previewed first where it can be, from an album's own page with **Edit**, on a phone or
+a desktop, or from **Needs a look** ([editing an album](library.md#editing-an-album)). A
 re-applied release files the album where a fresh download of it would go - this page's template,
 its edition, the artist's current name - and a rename that comes with new tags waits for Navidrome
 to see the tags first.

@@ -6,7 +6,7 @@ import { useLibrary } from '../hooks/useLibrary'
 import { albumArtUrl } from '../lib/format'
 import { isNewImport, issueLabel, outstandingIssues } from '../lib/metadataQueue'
 import {
-  IGNORES_UNSAVED, MARK_WORDS, NEEDS_LOOK_LINE, facetAlbums, facetShown, facets, ignoresUnsaved, leavingAtEnd,
+  IGNORED_FACET, IGNORES_UNSAVED, MARK_WORDS, NEEDS_LOOK_LINE, facetAlbums, facetShown, facets, ignoresUnsaved, isIgnoredOnly, leavingAtEnd,
   navidromeNote, rowChanged, startSession, stepTarget, summaryTotal,
   type Facet, type FolderChange, type LookSession, type RowMark,
 } from '../lib/needsLook'
@@ -45,11 +45,11 @@ const focusLost = (): boolean => {
 }
 
 /**
- * Needs a look (2.0.0-player.25): the review queue in the app - the main page's queue
- * (components/LibraryView.tsx's review, which is left as it is) with the app's Edit panel for its
+ * Needs a look (2.0.0-player.25): the review queue in the app - the main page's queue (its
+ * LibraryView.tsx's review, retired with it in 2.0.0-player.66) with the app's Edit panel for its
  * editor. There is no board for this screen; it is built from STYLE.md and the desktop frame's parts.
  *
- * THE LIST is the main page's: lib/metadataQueue.ts's queueAlbums over the main page's own hook
+ * THE LIST is the main page's: lib/metadataQueue.ts's queueAlbums over the hook its library used
  * (hooks/useLibrary.ts - the saved scan drawn at once, a real scan underneath), read only once this
  * page first shows (and again, quietly, as it shows again later), never at start-up. Facet chips
  * narrow it - All, Newly added, one per kind of issue (lib/needsLook.ts) - the facet in the address,
@@ -62,14 +62,14 @@ const focusLost = (): boolean => {
  * while it lasts - an album fixed, ignored or deleted stays in its row saying which, followed by its
  * path through a rename - and stepping away from an album (Next, Previous, another row, the panel
  * closing, the page left) marks it reviewed, which is what clears a new import, and asks the count
- * again. An album gone when stepped to ends the session, as the main page's does. When the session
+ * again. An album gone when stepped to ends the session, as the main page's did. When the session
  * ends - the panel closes (App closes it as this page stops being on top), the facet changes, the
  * page goes - its rows stay until a fresh scan has landed, and the list is worked out again from it.
  *
  * Its count: while it shows with a REAL scan in hand, and no session, its All count stands in for the
  * server's (useQueueSummary.ts's setPageQueueCount) - one function over the same albums.
  *
- * IGNORES THAT CAN'T BE SAVED are warned of (2.0.0-player.42), as the main page's queue warns: when the
+ * IGNORES THAT CAN'T BE SAVED are warned of (2.0.0-player.42), as the main page's queue warned: when the
  * library's answer or the count's says deadwax has no job store, an "It's fine as it is" comes back.
  *
  * NOT IN NAVIDROME (2.0.0-player.46) is an issue like any other - its chip, its facet and the Edit panel
@@ -82,6 +82,10 @@ const focusLost = (): boolean => {
  * Edit panel as a sheet over the whole screen - the queue's stepping and every rule above as they are.
  * Someone without Look after the library (2.0.0-player.61 - an admin has it) gets a short note instead, asking
  * nothing (nobody, with logins off).
+ *
+ * IGNORED (2.0.0-player.66): the last chip lists the albums whose every issue was accepted as it is - out
+ * of the queue, so with no other way back to the Edit panel (and its Un-ignore) for a folder Navidrome
+ * doesn't list. Each row opens Edit like any other, with a quiet "Ignored" word; its count is never All's.
  */
 export function NeedsALook({
   allowed,
@@ -452,6 +456,16 @@ export function NeedsALook({
                                   {issueLabel(code, library.issueTypes)}
                                 </span>
                               ))}
+                              {/* (2.0.0-player.66) every issue accepted: a quiet word, the issues it accepted in its title -
+                                  under the Ignored chip only, so All's rows (a new import whose issues were all accepted) are as they were */}
+                              {pressed === IGNORED_FACET && isIgnoredOnly(album) && (
+                                <span
+                                  class="app-queue-chip is-ignored"
+                                  title={`Accepted as it is: ${album.issues.filter((code) => album.ignored_issues.includes(code)).map((code) => issueLabel(code, library.issueTypes)).join(', ')}`}
+                                >
+                                  Ignored
+                                </span>
+                              )}
                             </>
                           )}
                         </span>

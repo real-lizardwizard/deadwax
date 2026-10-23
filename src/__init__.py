@@ -9,9 +9,9 @@ describes, so the history reads as a progression rather than as a pile of work w
 attached at the end. Bumping it is NOT the same as tagging: a pushed `v*` tag publishes an
 image and moves `:latest`, so bump as you go and tag when you mean to ship.
 
-Keep it in step with the newest tag when you do ship. The settings tab renders it, so a stale
+Keep it in step with the newest tag when you do ship. The app's You → About shows it, so a stale
 value here is a wrong answer to "what version are you running", which is the first question
 asked about any bug report.
 """
 
-__version__ = "2.0.0-player.65"
+__version__ = "2.0.0-player.66"

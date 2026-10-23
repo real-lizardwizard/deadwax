@@ -28,8 +28,8 @@ export function requestDownload(body: EnqueueRequest): Promise<EnqueueResponse> 
 }
 
 /*
- * Joining a download somebody else asked for (2.0.0-player.49) - from the Sources sheet, the album
- * page's line, or the main page's candidates panel - is no enqueue, so it lays no pending row down;
+ * Joining a download somebody else asked for (2.0.0-player.49) - from the Sources sheet or the album
+ * page's line (and the main page's candidates panel, until it retired) - is no enqueue, so it lays no pending row down;
  * instead every downloads list in the page is told to ask again, so the joined download is in
  * Requests (and the panel) by the time it shows. useDownloadJobs listens (onDownloadsChanged).
  */

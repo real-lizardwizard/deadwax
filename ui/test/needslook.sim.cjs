@@ -39,6 +39,9 @@
  *    any other - its chip and facet in the server's words, the facet to the address, the Edit panel on
  *    its folder; and the gate's words (app/NeedsNavidrome.tsx, compiled with the page): deadwax needs
  *    Navidrome for the library, set up in deadwax's settings.
+ *  - IGNORED (2.0.0-player.66): the last chip, only when an album has an accepted issue and none
+ *    outstanding, counting only those, never in All's count or the badge's; its rows drawn as the others
+ *    with a quiet "Ignored" word; a row opens Edit, and an Un-ignore brings the album back to All.
  *  - THE COUNT'S STORE: the real app/useQueueSummary.ts against a faked deadwax - one request out and
  *    exactly one more, a failure keeping the last number (null with none), the page's count first;
  *    whether ignores can be kept, and useQueueTracking's caller told to draw again as an answer lands
@@ -107,10 +110,10 @@ console.log('\nthe list and its facets')
   const chips = N.facets(LIBRARY, TYPES)
   check('the chips: All, Newly added, then each issue with albums - the most first, then by label',
     chips.map((chip) => [chip.id, chip.label, chip.count]),
-    [[null, 'All', 4], ['new', 'Newly added', 2], ['misfiled', 'folder off-convention', 2], ['no_art', 'no cover', 2], ['no_release', 'no release', 1]])
-  check('...each issue chip carrying its hint, for its title', chips.slice(2).map((chip) => chip.hint), [TYPES.misfiled.hint, TYPES.no_art.hint, TYPES.no_release.hint])
+    [[null, 'All', 4], ['new', 'Newly added', 2], ['misfiled', 'folder off-convention', 2], ['no_art', 'no cover', 2], ['no_release', 'no release', 1], ['ignored', 'Ignored', 1]])
+  check('...each issue chip carrying its hint, for its title', chips.slice(2, 5).map((chip) => chip.hint), [TYPES.misfiled.hint, TYPES.no_art.hint, TYPES.no_release.hint])
   check('Newly added only when there is one', N.facets([RIP, COVERLESS], TYPES).map((chip) => chip.id), [null, 'no_art', 'misfiled', 'no_release'])
-  check('an ignored issue is not a chip, nor counted', N.facets([IGNORED], TYPES), [{ id: null, label: 'All', count: 0 }])
+  check('an ignored issue is not an issue chip, nor counted in All', N.facets([IGNORED], TYPES).map((chip) => [chip.id, chip.count]), [[null, 0], ['ignored', 1]])
   check('Newly added lists the new imports, in the list\'s order', paths(N.facetAlbums(LIBRARY, N.NEW_FACET)), ['Ye/BULLY (2025)', 'Tame Impala/Currents (2015)'])
   check('an issue lists the albums with it outstanding, as queueAlbums does', paths(N.facetAlbums(LIBRARY, 'no_art')), paths(Q.queueAlbums(LIBRARY, 'no_art')))
   check('the page\'s All count is the badge\'s count over the same albums', [N.summaryTotal(LIBRARY), chips[0].count, Q.queueAlbums(LIBRARY, null).length], [4, 4, 4])
@@ -119,6 +122,29 @@ console.log('\nthe list and its facets')
     ['no_art', null, null, null])
   check('a count for VoiceOver', [N.needsLookLabel('Needs a look', 3), N.needsLookLabel('Needs a look', 1), N.needsLookLabel('Needs a look', 0), N.needsLookLabel('Needs a look', null)],
     ['Needs a look, 3 albums', 'Needs a look, 1 album', 'Needs a look', 'Needs a look'])
+}
+
+console.log('\nIgnored (2.0.0-player.66): the albums whose every issue was accepted, as a view')
+{
+  //? accepted, but something else outstanding: in the queue, not Ignored
+  const HALF = album('Bootlegs/Live 1999', { ...issues(['no_release', 'no_art']), ignored_issues: ['no_art'] })
+  //? the issue it accepted has gone since (a cover found): nothing accepted is found on it now
+  const STALE = album('Bootlegs/Live 1997', { ignored_issues: ['no_art'] })
+  //? Not in Navidrome accepted with "It's fine as it is": the folder G1 was about
+  const UNLISTED = album('Aphex Twin/Unlisted (1999)', { ...issues(['not_in_navidrome', 'no_art']), ignored_issues: ['not_in_navidrome', 'no_art'], needs_attention: false, severity: 0 })
+  check('nothing ignored: no Ignored chip', N.facets([RIP, COVERLESS, NEW_CLEAN, CLEAN], TYPES).some((chip) => chip.id === N.IGNORED_FACET), false)
+  const chips = N.facets([...LIBRARY, HALF, STALE, UNLISTED], TYPES)
+  check('Ignored is the last chip, its title the spec\'s words', [chips.at(-1).id, chips.at(-1).label, chips.at(-1).hint],
+    ['ignored', 'Ignored', 'Albums whose issues you accepted as they are'])
+  check('...counting only albums with an accepted issue and nothing outstanding (not HALF, not STALE)',
+    [chips.at(-1).count, [IGNORED, HALF, STALE, UNLISTED, CLEAN].map(N.isIgnoredOnly)], [2, [true, false, false, true, false]])
+  check('...never in All\'s count nor the badge\'s: both count HALF (outstanding), neither IGNORED nor UNLISTED',
+    [chips[0].count, N.summaryTotal([...LIBRARY, HALF, STALE, UNLISTED])], [5, 5])
+  check('...its list alphabetical, artist then album', paths(N.facetAlbums([...LIBRARY, HALF, STALE, UNLISTED], N.IGNORED_FACET)),
+    ['Aphex Twin/Unlisted (1999)', 'Bootlegs/Live 1998'])
+  check('...a facet the address can name while it has albums; falling back to All once it has none',
+    [N.facetShown(chips, N.IGNORED_FACET), N.facetShown(N.facets([RIP], TYPES), N.IGNORED_FACET)], ['ignored', null])
+  check('...not an issue code the scan can send', [N.IGNORED_FACET in TYPES, /^[a-z]+$/.test(N.IGNORED_FACET), N.IGNORED_FACET !== N.NEW_FACET], [false, true, true])
 }
 
 console.log('\nNot in Navidrome (2.0.0-player.46): what the page says about the check, once')
@@ -370,7 +396,9 @@ async function page() {
     const one = mount()
     one.draw()
     check('the rows in queueAlbums\' order', rowAlbums(), ['BULLY (2025)', 'Currents (2015)', 'Third rip', 'Dummy (1994)'])
-    check('the facets, All pressed', facetChips(), [['All 4', true], ['Newly added 2', false], ['folder off-convention 2', false], ['no cover 2', false], ['no release 1', false]])
+    check('the facets, All pressed', facetChips(), [['All 4', true], ['Newly added 2', false], ['folder off-convention 2', false], ['no cover 2', false], ['no release 1', false], ['Ignored 1', false]])
+    check('...Ignored titled with what it lists', classed('app-queue-facet').at(-1).props.title, 'Albums whose issues you accepted as they are')
+    check('...and no Ignored row in All - the album is out of the queue', rowAlbums().includes('Live 1998'), false)
     const rip = rowButtons()[2]
     check('a row: New for a new import, its outstanding issues as chips, each titled with its hint, the plain tile with no cover',
       [find(byClass('app-queue-chip'), rowButtons()[0]).map(words), find(byClass('app-queue-chip'), rip).map((chip) => [words(chip), chip.props.title]), find(byClass('is-empty'), rip).length],
@@ -414,6 +442,57 @@ async function page() {
     check('a real scan, no session: the page\'s count', W.counts.at(-1), 4)
     gone.unmount()
     check('...the page gone (back) with no session: the count the server\'s again', W.counts.at(-1), null)
+  }
+
+  console.log('\nthe page: Ignored (2.0.0-player.66) - a row opens Edit, where Un-ignore brings it back to All')
+  {
+    reset()
+    libraryOf(LIBRARY)
+    const one = mount({ facet: 'ignored' })
+    one.draw()
+    check('the Ignored facet: its album, the chip pressed', [rowAlbums(), facetChips().at(-1)], [['Live 1998'], ['Ignored 1', true]])
+    const word = find(byClass('is-ignored'), rowButtons()[0])
+    check('...drawn as the others are, with a quiet Ignored word titled with what was accepted, and no issue chip',
+      [word.map(words), word[0].props.title, find(byClass('app-queue-chip'), rowButtons()[0]).length], [['Ignored'], 'Accepted as it is: no release', 1])
+    check('...the count still All\'s, not Ignored\'s', W.counts.at(-1), 4)
+    click(rowButtons()[0])
+    one.draw()
+    const opened = one.edits[0]
+    check('a row clicked: the Edit panel on its folder, like any row', [opened.request.folder, opened.request.reread, opened.request.queue.total], [IGNORED.path, true, 1])
+    //? Un-ignore in the panel: the issue outstanding again
+    const back = { ...IGNORED, ignored_issues: [], needs_attention: true, severity: 3 }
+    opened.request.onChange({ from: IGNORED.path, album: back, deleted: false, wrote: true })
+    one.draw()
+    check('...Un-ignore: the row in its place, its issue a chip again, the quiet word gone', [rowAlbums(), find(byClass('app-queue-chip'), rowButtons()[0]).map(words)],
+      [['Live 1998'], ['no release']])
+    one.draw({ editing: null })
+    await settle()
+    libraryOf(LIBRARY.map((one) => (one === IGNORED ? back : one)))
+    W.reloads.shift().resolve([])
+    await settle()
+    one.draw()
+    one.draw({ facet: one.facetsAsked.at(-1) ?? one.all.facet })
+    check('...the session over and the scan in: Ignored emptied, so All - the album back in it, the address told',
+      [facetChips()[0], rowAlbums().includes('Live 1998'), facetChips().some(([label]) => label.startsWith('Ignored')), one.facetsAsked.at(-1)],
+      [['All 5', true], true, false, null])
+    check('...and the badge counts it again', W.counts.at(-1), 5)
+  }
+  {
+    //? a new import whose every issue was accepted (Edit's "It's fine as it is" outside a session): in All
+    //? because it is new, drawn there as before - New, no Ignored word; the word only under Ignored
+    reset()
+    const NEW_ACCEPTED = album('Ye/Vultures (2024)', { ...issues(['no_art']), ignored_issues: ['no_art'], needs_attention: false, severity: 0, imported: true })
+    libraryOf([...LIBRARY, NEW_ACCEPTED])
+    const all = mount()
+    all.draw()
+    const row = rowButtons()[rowAlbums().indexOf('Vultures (2024)')]
+    check('a new import with every issue accepted, in All: New, and no Ignored word', [find(byClass('app-queue-chip'), row).map(words), find(byClass('is-ignored'), row).length], [['New'], 0])
+    all.unmount()
+    reset()
+    libraryOf([...LIBRARY, NEW_ACCEPTED])
+    const ign = mount({ facet: 'ignored' })
+    ign.draw()
+    check('...under Ignored: the quiet word', find(byClass('is-ignored'), rowButtons()[rowAlbums().indexOf('Vultures (2024)')]).map(words), ['Ignored'])
   }
 
   console.log('\nthe page: a session')
@@ -590,7 +669,7 @@ async function page() {
     libraryOf(LIBRARY.map((album) => ({ ...album, issues: album.issues.filter((code) => code !== 'no_art') })))
     one.draw()
     check('the chips as the session began, its facet pressed - none vanishing, none shifting, no count moving',
-      facetChips(), [['All 4', false], ['Newly added 2', false], ['folder off-convention 2', false], ['no cover 2', true], ['no release 1', false]])
+      facetChips(), [['All 4', false], ['Newly added 2', false], ['folder off-convention 2', false], ['no cover 2', true], ['no release 1', false], ['Ignored 1', false]])
     one.draw({ editing: null })
     await settle()
     check('...and while its rows are held, still', facetChips()[3], ['no cover 2', true])

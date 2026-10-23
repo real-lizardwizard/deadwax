@@ -675,7 +675,7 @@ class Config:
 
         if cls.OVERRIDDEN:
             logger.info(
-                f"applied {len(cls.OVERRIDDEN)} setting(s) from the settings tab: "
+                f"applied {len(cls.OVERRIDDEN)} setting(s) saved in Server settings: "
                 f"{', '.join(sorted(cls.OVERRIDDEN))}"
             )
 
@@ -762,7 +762,7 @@ class Config:
         else:
             logger.error(
                 "MUSICBRAINZ_EMAIL is not set. MusicBrainz asks every app for a contact address "
-                "and rate limits requests without one - set it in the settings tab, or in your "
+                "and rate limits requests without one - set it in Server settings (Connections), or in your "
                 "compose file.",
                 extra={"frontend": True},
             )
@@ -798,8 +798,8 @@ class Config:
                 f"{' and '.join(missing)} {'is' if len(missing) == 1 else 'are'} not set, so the app at "
                 f"/player/ says Connect Navidrome where the library would be - it needs all three "
                 f"NAVIDROME_ settings, and only "
-                f"{' and '.join(given)} {'is' if len(given) == 1 else 'are'} there. Set the rest in the "
-                f"settings tab (Connections), or in your compose file.",
+                f"{' and '.join(given)} {'is' if len(given) == 1 else 'are'} there. Set the rest in "
+                f"Server settings (Connections), or in your compose file.",
                 extra={"frontend": True},
             )
             return
@@ -818,7 +818,7 @@ class Config:
             return
 
         source = (
-            "the settings tab" if "NAVIDROME_URL" in cls.OVERRIDDEN
+            "Server settings" if "NAVIDROME_URL" in cls.OVERRIDDEN
             else setting_source("NAVIDROME_URL") or "the environment"
         )
         logger.info(
@@ -1002,7 +1002,7 @@ class Config:
         """
         if cls.ORGANIZE_MODE not in ("copy", "move"):
             where = (
-                "it's saved in the settings tab, which beats the environment: switch logins off "
+                "it's saved in Server settings, which beats the environment: switch logins off "
                 "(AUTH_MODE=off), set Organize mode there to copy or move, and switch them on again"
                 if "ORGANIZE_MODE" in cls.OVERRIDDEN
                 else "set ORGANIZE_MODE=copy or move in the container's environment and restart deadwax"
@@ -1016,7 +1016,7 @@ class Config:
                     f"downloaded would ever be filed into the library - and with logins on each download is the "
                     f"person's who asked for it, which needs it filed. Until organizing is on nobody can use "
                     f"deadwax: set {' and '.join(missing)} and restart deadwax (or set "
-                    f"{'it' if len(missing) == 1 else 'them'} in the settings tab with logins off).")
+                    f"{'it' if len(missing) == 1 else 'them'} in Server settings with logins off).")
         return None
 
 

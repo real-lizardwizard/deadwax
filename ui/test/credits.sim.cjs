@@ -1,21 +1,18 @@
 /**
  * Artist credits, and the two names that come out of one.
  *
- * A script for the same reason as the other sims: there is no JS test runner here. The rule for an
- * album's current-name credit lives twice in the browser. ui/src/lib/release.ts's currentName()
- * names a download's FOLDER (through lib/releasePayload.ts, the one payload builder, since
- * 2.0.0-player.15) and seeds the metadata editor's - one function, so a download and a correction
- * can't part. interface/scripts/credits.mjs's getCurrentArtistNames() is the main page's copy, which
- * since 2.0.0-player.15 only DRAWS: it is a name the card's "in your library" match tries, so a
- * drift would mark a card wrong. Every case below is still asked of BOTH, and a disagreement fails
- * even where each answer looks reasonable.
+ * A script for the same reason as the other sims: there is no JS test runner here.
+ * ui/src/lib/release.ts's currentName() names a download's FOLDER (through lib/releasePayload.ts, the
+ * one payload builder, since 2.0.0-player.15) and seeds the metadata editor's - one function, so a
+ * download and a correction can't part. Until 2.0.0-player.66 the main page's
+ * interface/scripts/credits.mjs had a copy too, and every case was asked of both; that page retired,
+ * and each case keeps its expected answer against release.ts.
  *
  * Run it with:  node ui/test/credits.sim.cjs
  */
 
 const { execFileSync } = require('child_process');
 const fs = require('fs'), os = require('os'), path = require('path');
-const { pathToFileURL } = require('url');
 
 const UI = path.resolve(__dirname, '..');
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-credits-'));
@@ -27,7 +24,6 @@ execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
 
 //? under lib/ because the type-only imports pull src/api into the program, which roots it at src/
 const release = require(path.join(OUT, 'lib/release.js'));
-const MODULE = pathToFileURL(path.resolve(UI, '../interface/scripts/credits.mjs')).href;
 
 let failures = 0;
 function check(label, actual, expected) {
@@ -49,11 +45,8 @@ const WATCH_THE_THRONE = [
 const NO_ARTIST_OBJECT = [{ name: 'Somebody', joinphrase: '' }];
 
 (async () => {
-  const credits = await import(MODULE);
-
-  //? every case, asked of both copies, which must agree
+  //? every case, of a download's folder and the editor's alike
   function both(label, credit, expected) {
-    check(`${label} (the main page's card, credits.mjs)`, credits.getCurrentArtistNames(credit), expected);
     check(`${label} (a download and the editor, release.ts)`, release.currentName(credit), expected);
   }
 
@@ -70,11 +63,8 @@ const NO_ARTIST_OBJECT = [{ name: 'Somebody', joinphrase: '' }];
        undefined, '');
 
   console.log('\nthe credit itself is untouched - it is what Soulseek folders are called');
-  check('the download still searches Soulseek for "Kanye West"', credits.getArtistNames(DONDA), 'Kanye West');
-  check('...and the editor agrees on the credit too', release.creditName(DONDA), 'Kanye West');
+  check('the download still searches Soulseek for "Kanye West" - and the editor agrees on the credit', release.creditName(DONDA), 'Kanye West');
   check('the ids are the same whichever name is used', release.creditIds(WATCH_THE_THRONE), ['jz', YE_ID]);
-  //? only the payload builders took ids, and they are one, in TypeScript, since 2.0.0-player.15
-  check('...and credits.mjs keeps no copy of that rule - nothing on the main page reads one', 'getArtistIds' in credits, false);
 
   console.log('\nthe editor can still find an album filed under the current name');
   const query = release.fieldedAlbumQuery('Donda', 'Ye');
@@ -88,7 +78,7 @@ const NO_ARTIST_OBJECT = [{ name: 'Somebody', joinphrase: '' }];
   console.log('\na track that never arrives as audio - one rule, for a download and the editor alike');
   //? what the "already have it" checks leave out (store_index.audio_tracks). Since 2.0.0-player.15 a
   //? download's payload is built by lib/releasePayload.ts, which marks tracks with release.ts's
-  //? isVideoTrack, as the editor's does - credits.mjs's twin went with main.js's two builders
+  //? isVideoTrack, as the editor's does
   const VIDEO_CASES = [
     ['a CD track', { format: 'CD' }, { recording: { video: false } }, false],
     ['a track on a DVD-Video', { format: 'DVD-Video' }, { recording: {} }, true],
@@ -99,7 +89,6 @@ const NO_ARTIST_OBJECT = [{ name: 'Somebody', joinphrase: '' }];
     ['Blu-spec CD is a CD, whatever its name', { format: 'Blu-spec CD' }, {}, false],
     ['no medium format and no recording', {}, undefined, false],
   ];
-  check('credits.mjs keeps no copy of it - one rule, not two', 'isVideoTrack' in credits, false);
   for (const [label, medium, track, expected] of VIDEO_CASES) {
     check(label, release.isVideoTrack(medium, track), expected);
   }

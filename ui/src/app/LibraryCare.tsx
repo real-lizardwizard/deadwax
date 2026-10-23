@@ -27,7 +27,7 @@ const focusLost = (): boolean => {
  * a sibling of Needs a look, Settings and Log (App's openManagingPage).
  *
  *  - RESCAN: the scan that ignores the cache (useLibrary's reload(true), POST /library/rescan), with
- *    what the scan holds and how old it is, said as the main page's status bar says them - and what it
+ *    what the scan holds and how old it is, said as the main page's status bar said them - and what it
  *    is for: deadwax notices a changed album by its folder's date, which a retag by another program
  *    doesn't move. The library's listeners are told once it has answered (the count, the owned marks,
  *    the Edit panel's and Needs a look's scans).
@@ -42,7 +42,7 @@ const focusLost = (): boolean => {
  *    something leaves its kind behind the disk: the library is read again at once, and that kind's
  *    button waits for that read - never drawn again over the albums the run just did.
  *
- * The library through the main page's own hook (hooks/useLibrary.ts: the saved scan drawn at once, a
+ * The library through the hook the main page's library used (hooks/useLibrary.ts: the saved scan drawn at once, a
  * real scan underneath), read only once the page first shows - and again, quietly, as it shows again
  * later with nothing under way. A control that goes as a run ends hands focus to what
  * the run says, never to the page.
@@ -88,7 +88,7 @@ export function LibraryCare({
 
   //? a run that wrote something leaves its kind behind the disk (the store says so as it ends): the
   //? scan in hand still lists what it just did as missing, and pressing its button again would ask for
-  //? all of it again. So the library is read again at once, as the main page reads it after a run, and
+  //? all of it again. So the library is read again at once, as the main page read it after a run, and
   //? that kind's button is held back until a read begun after the run ended has landed - each write
   //? dropped its folder from the server's cache, so that read lists the albums as they are now. A page
   //? drawn fresh begins every read after a run that ended while it was away: nothing is behind for it.
@@ -163,7 +163,7 @@ export function LibraryCare({
 
   const real = library.loaded && !library.stale
   //? Rescan refused while ours is out, or a plain read over a real scan is - and offered while the saved
-  //? scan is on screen with the first real one under way, as the main page offers it (useLibrary draws
+  //? scan is on screen with the first real one under way, as the main page offered it (useLibrary draws
   //? only the newest answer, so the rescan simply wins)
   const scanBusy = rescanning || (library.loading && !library.stale)
   const rescan = () => {

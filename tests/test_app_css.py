@@ -246,6 +246,48 @@ PLAYER_CSS = (PLAYER / "player.css").read_text()
 THEME_CSS = THEME.read_text()
 ALL_TOKENS = {**tokens(THEME_CSS), **tokens(PLAYER_CSS), **tokens(APP)}
 
+
+def theme_tokens_nothing_reads(theme: str, readers: str) -> list[str]:
+    """(2.0.0-player.66) The custom properties `theme` defines (in any block, @-rules included) that nothing reads:
+    a token is live when `readers` - every app and bench stylesheet and every ui/src file - names it, when one of
+    theme.css's own rules does (a declaration of an ordinary property), or when a live token's value does. Read
+    transitively, so a token only a dead token reads is dead too."""
+    theme = re.sub(r"/\*.*?\*/", "", theme, flags=re.S)
+    defined: dict[str, list[str]] = {}
+    for where, selector, values in rules(theme):
+        for name, value in values.items():
+            if name.startswith("--"):
+                defined.setdefault(name, []).append(value)
+    named = lambda text: set(re.findall(r"--[\w-]+", text))  # noqa: E731
+    own = " ".join(value for _, _, values in rules(theme) for name, value in values.items() if not name.startswith("--"))
+    live: set[str] = set()
+    waiting = [name for name in named(readers) | named(own) if name in defined]
+    while waiting:
+        name = waiting.pop()
+        if name in live:
+            continue
+        live.add(name)
+        waiting += [found for value in defined[name] for found in named(value) if found in defined]
+    return sorted(set(defined) - live)
+
+
+def test_every_token_theme_css_defines_is_read():
+    """(2.0.0-player.66) The main page's main.css read 109 of theme.css's tokens that nothing else did - its retro
+    palette, its scales, its gloss and its glows - and they went with it. A token nothing reads is a value nobody
+    restyles anything with, and only says something false about the app's look: this keeps one from coming back."""
+    ui = Path(__file__).resolve().parent.parent / "ui" / "src"
+    readers = "\n".join([
+        *(path.read_text() for path in sorted(PLAYER.glob("*.css"))),
+        *(path.read_text() for path in sorted((PLAYER / "lab").glob("*.css"))),
+        *(path.read_text() for path in sorted(ui.rglob("*.ts*"))),
+    ])
+    assert theme_tokens_nothing_reads(THEME_CSS, readers) == []
+    #? the rule itself, on a sheet made up for it: an unread token, one read only by it, and one a rule reads
+    made_up = ":root { --unread: 1px; --only-dead: 2px; --dead-reader: var(--only-dead); --used: 3px; }\n" \
+              "@media (min-width: 1024px) { :root { --wide-only: 4px; } }\nbody { margin: var(--used); }"
+    assert theme_tokens_nothing_reads(made_up, "") == ["--dead-reader", "--only-dead", "--unread", "--wide-only"]
+    assert theme_tokens_nothing_reads(made_up, "var(--dead-reader) --wide-only") == ["--unread"]
+
 #? a number with a unit - anything but 0 - is a raw size or time
 RAW_LENGTH = re.compile(r"(?<![\w-])(?!0(?:px|em|rem|ms|s)?\b)\d*\.?\d+(px|em|rem|ms|s|vh|vw|dvh|pt)\b")
 #? these take a bare number or a function, which is a value to restyle, never structure

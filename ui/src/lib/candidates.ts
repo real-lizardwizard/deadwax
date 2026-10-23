@@ -2,8 +2,9 @@ import type { Candidate, DownloadInFlight, FindCandidatesResponse, FormatPrefere
 import { formatSpeed } from './format'
 
 /**
- * The candidates panel's logic, with no DOM - ported from interface/scripts/main.js in v0.9.10
- * so ui/test/candidates.sim.cjs can hold it. The panel itself is components/CandidatesPanel.tsx.
+ * The candidates' logic, with no DOM - ported from the main page's main.js in v0.9.10 so
+ * ui/test/candidates.sim.cjs can hold it. The main page's candidates panel drew it until that page
+ * retired in 2.0.0-player.66; the app's Sources (app/Sources.tsx, app/SourceCard.tsx) draws it now.
  */
 
 export const SIGNAL_LABELS: Readonly<Record<string, string>> = {
@@ -29,15 +30,15 @@ export interface CandidateFilters {
   /**
    * Every file lossless (2.0.0-player.15) - the app's Lossless chip, and its "Lossless" quality
    * floor. Judged by the folder's formats, so UNKNOWN never passes: a folder whose formats nobody
-   * could tell is not a lossless one. Optional, so the main page's panel, which has no such chip,
-   * builds its filters as it always did.
+   * could tell is not a lossless one. Optional (the main page's panel, which had no such
+   * chip, built its filters without it).
    */
   lossless?: boolean
   /**
    * Every track of the pressing present (2.0.0-player.50) - the app's Complete albums only chip,
    * judged as a source card counts its Tracks (everyTrackPresent): no AUDIO track missing, so a CD+DVD
-   * shared whole ("14 of 14") passes. `completeOnly` is the main page's own, counted against every
-   * track, a DVD's film included, and left as it is. Optional, as `lossless` is.
+   * shared whole ("14 of 14") passes. `completeOnly` was the main page's own, counted against every
+   * track, a DVD's film included, and is left as it was. Optional, as `lossless` is.
    */
   everyTrack?: boolean
 }
@@ -46,9 +47,9 @@ export interface CandidateFilters {
  * Whether a folder holds every track of the pressing (2.0.0-player.50), as its card's Tracks counts them
  * (tracksText) and its Missing line names them: nothing missing of the release's AUDIO tracks - a video
  * track is never missing from a folder of audio. An answer without `audio_expected` counts matched
- * against expected, as the main page does. With no tracklist to count against (the album as a whole,
+ * against expected, as the main page did. With no tracklist to count against (the album as a whole,
  * when MusicBrainz couldn't list its pressings) there is nothing to be complete against, and the folder
- * passes, as the main page's Complete albums only lets it.
+ * passes, as the main page's Complete albums only let it.
  */
 export function everyTrackPresent(candidate: Candidate): boolean {
   if (!candidate.expected_tracks) return true
@@ -68,7 +69,7 @@ export function everyTrackPresent(candidate: Candidate): boolean {
  * any lossless file is above any lossy bitrate you could ask for, and hiding every unreported
  * FLAC behind "at least 320" would be absurd.
  */
-export interface QualityFilters {
+interface QualityFilters {
   /** kbps */
   minBitrate: number
   /** bits */
@@ -112,11 +113,6 @@ export function passesQuality(candidate: Candidate, quality: QualityFilters): bo
   if (quality.minSizeMb && candidate.total_size < quality.minSizeMb * MB) return false
   if (quality.maxSizeMb && candidate.total_size > quality.maxSizeMb * MB) return false
   return true
-}
-
-/** How many quality filters are on - the badge on the Quality button. */
-export function activeQualityCount(quality: QualityFilters): number {
-  return Object.values(quality).filter(Boolean).length
 }
 
 export function noSignalMinimums(): Record<string, number> {
@@ -189,34 +185,8 @@ export function sortCandidates(candidates: readonly Candidate[], sort: Candidate
   })
 }
 
-/**
- * " 24-bit 96kHz", " 16-24-bit 44.1-96kHz", or '' - what the client reported, appended after the
- * format like the bitrate. Nothing is guessed: a lossless file that didn't say says nothing.
- */
-export function depthRateText(candidate: Candidate): string {
-  const range = (values: readonly number[] | undefined, format: (n: number) => string) => {
-    if (!values?.length) return ''
-    const low = Math.min(...values)
-    const high = Math.max(...values)
-    return low === high ? format(low) : `${format(low).replace(/[a-zA-Z-]+$/, '')}-${format(high)}`
-  }
-  const depth = range(candidate.bit_depths, (n) => `${n}-bit`)
-  const rate = range(candidate.sample_rates, (n) => `${trimRate(n / 1000)}kHz`)
-  return [depth, rate].filter(Boolean).map((part) => ` ${part}`).join('')
-}
-
 function trimRate(khz: number): string {
   return Number.isInteger(khz) ? String(khz) : khz.toFixed(1)
-}
-
-/** How many per-signal minimums are set - the badge on the Signals button. */
-export function activeSignalCount(filters: CandidateFilters): number {
-  return Object.values(filters.minSignals).filter(Boolean).length
-}
-
-/** The formats a result offers, for its chips. */
-export function resultFormats(candidates: readonly Candidate[]): string[] {
-  return [...new Set(candidates.flatMap((c) => c.formats))].filter(Boolean).sort()
 }
 
 /**
@@ -233,80 +203,16 @@ export function scoreClass(percent: number): 'good' | 'mid' | 'bad' {
   return percent >= 75 ? 'good' : percent >= 40 ? 'mid' : 'bad'
 }
 
-/** "10/10 tracks" against a tracklist, "12 files" without one. */
-export function trackSummary(candidate: Candidate): string {
-  return candidate.expected_tracks
-    ? `${candidate.matched_tracks}/${candidate.expected_tracks} tracks`
-    : `${candidate.audio_file_count} files`
-}
-
-/** " 320kbps", " 256-320kbps", " VBR 245kbps", or '' - appended to the formats. */
-export function bitrateText(bitrates: readonly number[] | undefined, variable = false): string {
-  if (!bitrates?.length) return ''
-  const low = Math.min(...bitrates)
-  const high = Math.max(...bitrates)
-  return ` ${variable ? 'VBR ' : ''}${low === high ? low : `${low}-${high}`}kbps`
-}
-
-/*
- * How a peer's advertised speed is labelled - a correctness question, not a cosmetic one. It
- * used to read "▼ 1.2 MB/s", and a download arrow is a promise about YOUR transfer that this
- * number cannot keep: it is the peer's average upload speed across their whole history, to
- * everyone. See the note in CLAUDE.md; do not "simplify" it back to a bare rate.
- */
-export const PEER_SPEED_HINT =
-  "The peer's average upload speed across all their transfers, as reported by Soulseek. "
-  + 'Not a prediction of your download rate: it is shared between everyone they are '
-  + 'uploading to and averaged over their whole history. The slot and queue beside it are '
-  + 'better guides to what you will actually get.'
-
-export function peerSpeedLabel(bytesPerSecond: number): string {
-  //? 'peer avg unknown' reads like a broken string; say the thing that is unknown instead
-  return bytesPerSecond ? `peer avg ${formatSpeed(bytesPerSecond)}` : 'peer avg unknown'
-}
-
-/**
- * What this peer ACTUALLY gave us, where it has been measured - {text, title}, or null for the
- * ordinary case of a peer never downloaded from, which renders as nothing at all.
- */
-export function measuredSpeed(candidate: Candidate): { text: string; title: string } | null {
-  if (!candidate.measured_speed) return null
-
-  const samples = candidate.measured_samples || 1
-  const when = measuredDate(candidate.measured_at)
-  //? One transfer is an anecdote and more than one is closer to a figure, so the tilde
-  //? appears only once there is an average to hedge.
-  const value = `${samples > 1 ? '~' : ''}${formatSpeed(candidate.measured_speed)}`
-  const hint = samples > 1
-    ? `Measured by deadwax over ${samples} transfers from this peer${when}. `
-    : `Measured by deadwax on one transfer from this peer${when}. `
-
-  return {
-    text: `you got ${value}`,
-    title: hint
-      + 'This is what actually arrived while bytes were moving, with queue time excluded - '
-      + "unlike the advertised average beside it, which is the peer's own figure for all "
-      + 'their uploads to everyone.',
-  }
-}
-
-function measuredDate(iso: string | undefined): string {
-  if (!iso) return ''
-  const at = new Date(iso)
-  return Number.isNaN(at.getTime()) ? '' : `, most recently ${at.toLocaleDateString()}`
-}
-
 /** A candidate's identity within one result - a peer's folder. */
 export function candidateKey(candidate: Candidate): string {
   return `${candidate.username}\n${candidate.directory}`
 }
 
 /**
- * Colour class for an edition tag. A copy of EDITION_TAG_COLORS in interface/scripts/main.js,
- * which still colours the releases grid; display only, so a drift is cosmetic - but keep them
- * in step until the grid is ported and that copy goes.
+ * Colour class for an edition tag - EDITION_TAG_COLORS as main.js had it for the main page's
+ * releases grid, which retired with that page in 2.0.0-player.66. Display only.
  */
-export const EDITION_TAG_COLORS: Readonly<Record<string, string>> = {
+const EDITION_TAG_COLORS: Readonly<Record<string, string>> = {
   REMASTER: 'yellow',
   'SUPER DELUXE': 'red',
   DELUXE: 'main',
@@ -345,7 +251,7 @@ export interface SpeedFact {
 export function speedFact(candidate: Candidate): SpeedFact {
   const bar = (rate: number) => Math.min(100, Math.round((rate / SPEED_BAR_FULL) * 100))
   if (candidate.measured_speed) {
-    //? one transfer is an anecdote; more than one is an average, and says so (measuredSpeed's rule)
+    //? one transfer is an anecdote, said as measured; more than one is an average, said with a ~
     const hedge = (candidate.measured_samples || 1) > 1 ? '~' : ''
     return { kind: 'measured', text: `${hedge}${formatSpeed(candidate.measured_speed)}`, note: 'what you got from them', percent: bar(candidate.measured_speed) }
   }
@@ -435,7 +341,7 @@ export function signalChips(candidate: Pick<Candidate, 'signals'>): SignalChip[]
 
 /**
  * The edition words found in a folder's name (the server's detected_edition_tags: "REMASTER",
- * "DELUXE" ...), each with its colour as the main page's panel gives it (EDITION_TAG_COLORS), in the
+ * "DELUXE" ...), each with its colour as the main page's panel gave it (EDITION_TAG_COLORS), in the
  * app's own few: the yellows amber, the reds red, the purples purple, green green, the whites plain.
  */
 export type EditionTone = 'amber' | 'red' | 'purple' | 'green' | 'plain'
@@ -657,7 +563,7 @@ export interface StoreStatus {
 /**
  * The status in place of the results, when there is one - downloading first, since a job in
  * flight is what the server checks first too - or null for an ordinary result. `cancelIn` is where
- * a download is cancelled: the main page's Downloads panel, or the app's Requests tab.
+ * a download is cancelled: the app's Requests tab (the main page's Downloads panel, until it retired).
  */
 /** The store line's title for a pressing held whole (and, logins on, in your library). */
 export const HELD_TITLE = 'Already in your library'

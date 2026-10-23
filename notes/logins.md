@@ -207,7 +207,7 @@ music, unlike a session that ends. Its footnote names the Navidrome account - or
 **The main page** (`components/SignedOutNotice.tsx`, from `ui/src/main.tsx`): any 401 - and, with the
 mark, `/deadwax/me` asked once as it loads, since main.js's own fetches don't go through http.ts - draws
 a plain notice over the page (`#main-container` inert) with **Sign in** to `/player/?return=/`. No login
-of its own: it retires. The downloads panel's failing poll isn't logged as an error once the notice is up.
+of its own: it retires (it retired in .66). The downloads panel's failing poll isn't logged as an error once the notice is up.
 While the notice shows, `/me` is asked again as the page comes back to the front or out of the
 back-forward cache; a 200 reloads the page (its panels gave up while signed out) - so Back after the
 round trip, or a sign-in in another tab, doesn't leave "You're signed out" over someone who isn't.
@@ -1005,7 +1005,7 @@ below are this step's history.)
   held; the tick only for yours), its "In the store" facts and Play's "the 2 albums in the store", Info's
   folder heading and artist count, "The store also has another pressing". The album page says "In the store"
   while whose it is can't be told - true of any album Navidrome has. **Left as it was on purpose**: the main
-  page (its search marks and library tab mean the store; it retires).
+  page (its search marks and library tab mean the store; it retires - until it retired in .66).
 - **Add and Remove, on the album page** (where an album's actions live; Browse's tiles open it), under Play
   in a line of their own (`.app-album-mine`, outside the hero's grid). **Add to my library** for one in the
   store not yours: step 5's route with a Find body built from the bridge (the release, its folder's artist

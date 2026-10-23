@@ -158,8 +158,8 @@ function DeskTracklist({
  * ("Already in your library", "Already downloading", "You have 9 of 10 tracks", "You also have
  * another pressing"). Get downloads the CHOSEN pressing (James: the dropdown decides what Get and the
  * sources are for): it opens the Sources sheet for that pressing, built by the one payload builder
- * (lib/releasePayload.ts) from the album's group, so the main page's Find on the same pressing sends
- * the same. It shows once a pressing is chosen - before that there is nothing it could get.
+ * (lib/releasePayload.ts) from the album's group, so it sends what the main page's Find on the same
+ * pressing sent. It shows once a pressing is chosen - before that there is nothing it could get.
  *
  * What is already here sits UNDER Get, not between the pressing and it (review): its answer lands
  * after Get is drawn, and is a few lines tall, so above Get it moved the button under a finger
@@ -219,7 +219,7 @@ function DeskTracklist({
  * picker - status, full date, labels, catalogue number, barcode, as MusicBrainz gives them, one line of
  * fixed height (two on a phone) so choosing another pressing moves nothing under it - with every
  * pressing's in the dropdown, and a filter there for an album of many pressings (PressingPicker);
- * "MAYBE IN YOUR LIBRARY", dashed as the main page's card says it, when no folder holds the album by an
+ * "MAYBE IN YOUR LIBRARY", dashed as the main page's card said it, when no folder holds the album by an
  * id but one with no MusicBrainz ids has its name (lib/owned.ts's name match - its folders in the
  * tooltip); and its page and the chosen pressing's on musicbrainz.org, at the foot, opening beside the
  * app.
@@ -335,7 +335,7 @@ export function ReleaseGroupPage({
   //? until the library has answered, and the meta line then says neither. And, held by no id, a folder
   //? with no MusicBrainz ids that has the album's name and an artist's it could be filed under - the
   //? credit, or the name they go by now - said as a MAYBE (2.0.0-player.50), as the main page's card
-  //? says it: the name can't tell which album it is, let alone which pressing
+  //? said it: the name can't tell which album it is, let alone which pressing
   const ownership = owned ? ownedForGroup(owned.index, {
     groupId: mbid,
     releaseIds: releases.map((release) => release.id),

@@ -7,9 +7,9 @@ import { FIELD_GROUPS, TRACK_FIELDS, type FieldGroup, type TrackRow } from './tr
  * Inside a track, in the app (2.0.0-player.44): what the Edit panel's track inspector says of one track -
  * pure, so the inspector (app/TrackInspector.tsx) draws it and inspector.sim.cjs holds it.
  *
- * It is the main page's track view (components/LibraryDetails.tsx, TrackDetailsView) read for a panel
- * 390 to 470px wide: the SAME registry of fields (lib/trackFields.ts) - every field the main page offers,
- * not only the ones its Fields menu shows, each under its group (Tags, Audio, MusicBrainz, File) in the
+ * It is the main page's track view as it was (its TrackDetailsView, retired with it in 2.0.0-player.66)
+ * read for a panel 390 to 470px wide: the SAME registry of fields (lib/trackFields.ts) - every field the
+ * main page offered, not only the ones its Fields menu showed, each under its group (Tags, Audio, MusicBrainz, File) in the
  * registry's order - the same values from the scan's copy and the file read just now (`/library/tracks`,
  * hooks/useTrackDetails.ts), the same dimmed disc 1 for a file with no disc tag, and the same words for
  * where the track sits, its pictures and its lyrics.
@@ -35,7 +35,7 @@ export interface InspectorGroup {
 }
 
 /**
- * Every field the main page's track viewer offers, under its group, for one track: the scan's copy at
+ * Every field the main page's track viewer offered, under its group, for one track: the scan's copy at
  * once, the file's own once read (the file wins where both say - lib/trackFields.ts). A field with no
  * value is '' (drawn as a dash), or `waiting` while the file is still being read and the scan can't say.
  */
@@ -62,13 +62,13 @@ export function trackTitle(track: LibraryTrack, details: TrackDetails | undefine
   return details?.tags['title'] ?? track.title
 }
 
-/** Whether the title shown is the file's NAME - the file has no title tag (the main page's table marks it). */
+/** Whether the title shown is the file's NAME - the file has no title tag (as the main page's table marked it). */
 export function untitled(track: LibraryTrack, details: TrackDetails | undefined): boolean {
   return details ? !details.tags['title'] : !track.has_title_tag
 }
 
 /**
- * Where the track sits, as the main page's track view says it: "Track 3, disc 2 of 2 · <disc title>",
+ * Where the track sits, as the main page's track view said it: "Track 3, disc 2 of 2 · <disc title>",
  * then its length and its format - "Unnumbered" for a file with no track number.
  */
 export function trackPlace(album: LibraryAlbum, track: LibraryTrack): string {
@@ -115,7 +115,7 @@ export const NO_PICTURES = "None - a player shows the album's cover for this son
 
 /**
  * What the lyrics say when the track has none on disk - and, while some of the album's tracks have none,
- * where Get lyrics is: in the panel it is the Lyrics tab (the main page's "above" is its command bar).
+ * where Get lyrics is: in the panel it is the Lyrics tab (the main page's "above" was its command bar).
  */
 export function noLyricsWords(album: Pick<LibraryAlbum, 'lyrics_count' | 'track_count'>): string {
   return `No lyrics for this track on disk.${album.lyrics_count < album.track_count ? ' Get lyrics, in the Lyrics tab, looks for them on LRCLIB.' : ''}`
@@ -129,7 +129,7 @@ export function lyricsSource(lyrics: Pick<TrackLyrics, 'source' | 'lyrics_file'>
 /**
  * What one track's lyrics are read again on: the album's folder and the track, the folder's mtime (a
  * fetch writing a .lrc moves it) and how many .lrc files the scan counted - so lyrics just fetched show
- * without leaving the track, as on the main page.
+ * without leaving the track, as on the main page as it was.
  */
 export function lyricsKey(album: Pick<LibraryAlbum, 'path' | 'modified_at' | 'lyrics_count'>, filename: string): string {
   return `${album.path}\n${filename}\n${album.modified_at}\n${album.lyrics_count}`

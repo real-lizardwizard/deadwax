@@ -2,7 +2,7 @@
  * The one place that talks to the network.
  *
  * Everything here exists to keep two things from being confused with each other: a request
- * that failed, and a request that succeeded and found nothing. The vanilla frontend blurred
+ * that failed, and a request that succeeded and found nothing. The original vanilla frontend blurred
  * that line and it cost real debugging time - a MusicBrainz outage rendered as though the
  * user had typed a bad search.
  */
@@ -62,8 +62,8 @@ async function readBody(response: Response): Promise<{ detail: string | null; bu
 /**
  * What the page is told when a session ends (2.0.0-player.48): a 401 from any route but the sign-in's
  * own, with the server's words as the event's `detail`. The app's sign-in screen comes back over
- * whatever shows (app/signInGate.tsx), and the main page says it is signed out
- * (components/SignedOutNotice.tsx). With logins off nothing answers 401, so nothing is ever said.
+ * whatever shows (app/signInGate.tsx) - as the main page's notice did, until it retired in
+ * 2.0.0-player.66. With logins off nothing answers 401, so nothing is ever said.
  */
 export const SIGNED_OUT = 'deadwax:signed-out'
 

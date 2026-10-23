@@ -37,7 +37,7 @@ export async function fullySearch(
   /**
    * The app's Search (2.0.0-player.55): a search's patience on the server (three attempts, not ten), a query
    * MusicBrainz refuses a 422 with words, MusicBrainz shedding a busy 503, and an abandoned search stopped. The
-   * main page and the metadata editor send none. Not sent to MusicBrainz: the server's cache entry is the same.
+   * metadata editor sends none (as the main page's search sent none). Not sent to MusicBrainz: the server's cache entry is the same.
    */
   quick = false,
 ): Promise<FullySearchResponse> {

@@ -54,8 +54,9 @@ def test_the_dockerfile_asks_the_same_address():
 def test_the_interface_is_revalidated_and_hashed_assets_are_cached_hard():
     client = client_with(SimpleNamespace(done=lambda: False))
     assert client.get("/").headers["cache-control"] == "no-cache"
-    assert client.get("/scripts/main.js").headers["cache-control"] == "no-cache"
-    assert client.get("/styles/main.css").headers["cache-control"] == "no-cache"
+    assert client.get("/", follow_redirects=False).headers["cache-control"] == "no-cache"
+    assert client.get("/styles/theme.css").headers["cache-control"] == "no-cache"
+    assert client.get("/player/app.css").headers["cache-control"] == "no-cache"
     assert client.get("/dist/assets/app-0123abcd.js").headers["cache-control"] == \
         "public, max-age=31536000, immutable"
 

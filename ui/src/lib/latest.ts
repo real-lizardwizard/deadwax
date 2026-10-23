@@ -1,11 +1,11 @@
 /**
- * Only the newest answer counts - the Preact half's copy of interface/scripts/latest.mjs, which
- * says why at length. In short: pick one pressing in the metadata editor, then another before
+ * Only the newest answer counts (the Preact half's copy of the main page's latest.mjs, which it
+ * outlived when that page retired in 2.0.0-player.66). In short: pick one pressing in the metadata editor, then another before
  * the first's tracklist arrived, and the FIRST one's tracklist landed last and became what Apply
  * would write, under the second one's highlight. Every fetch that draws goes through one of
  * these, and asks `current()` before it writes anything.
  *
- * Kept in step with the vanilla copy by ui/test/latest.sim.cjs, which runs both.
+ * Pinned by ui/test/latest.sim.cjs.
  */
 
 export interface Ticket {

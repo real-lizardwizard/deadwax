@@ -371,7 +371,7 @@ def test_the_start_up_report_says_where_the_address_came_from(env, monkeypatch, 
     with caplog.at_level(logging.INFO):
         Config.report_navidrome()
 
-    assert "http://navidrome:4533 (from the settings tab)" in caplog.records[-1].getMessage()
+    assert "http://navidrome:4533 (from Server settings)" in caplog.records[-1].getMessage()
 
 
 def test_nothing_set_is_said_plainly_with_what_needs_it(env, monkeypatch, caplog):

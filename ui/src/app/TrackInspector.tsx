@@ -22,14 +22,15 @@ const NOW_ID = 'app-inspect-now'
 
 /**
  * Inside a track, in the app (2.0.0-player.44): the Edit panel's Tags tab, a track's name tapped - its
- * inspector, a view pushed over the track list, with Back to it. The main page's track view
- * (components/LibraryDetails.tsx, TrackDetailsView), read for a panel 390 to 470px wide:
+ * inspector, a view pushed over the track list, with Back to it. The main page's track view as it
+ * was (its LibraryDetails.tsx's TrackDetailsView, retired with it in 2.0.0-player.66), read for a panel
+ * 390 to 470px wide:
  *
- *  - EVERY field the main page offers (lib/trackFields.ts's registry, not only the ones its Fields menu
- *    shows), grouped as it groups them - Tags, Audio, MusicBrainz, File - each its value, or a dash for a
+ *  - EVERY field the main page offered (lib/trackFields.ts's registry, not only the ones its Fields menu
+ *    showed), grouped as it grouped them - Tags, Audio, MusicBrainz, File - each its value, or a dash for a
  *    field the file lacks, '…' while the file is still being read and the scan can't say, and the dimmed
  *    disc 1 of a file with no disc tag, saying why (lib/trackInspector.ts inspectorGroups). From the
- *    panel's useTrackDetails (`/library/tracks`, the files as they are now), as the main page reads them;
+ *    panel's useTrackDetails (`/library/tracks`, the files as they are now), as the main page read them;
  *  - "Pictures in this file": each embedded picture, its type, its pixel size once it has loaded, its
  *    bytes and format - a tap opens it in the cover viewer (CoverViewer: the main page's ArtViewer);
  *  - the track's lyrics: the .lrc beside it, else the file's own, synced lines with their times and
@@ -173,7 +174,7 @@ export function TrackInspector({
 /**
  * The pictures stored inside the file - a player shows a song's OWN picture in place of its album's
  * cover, which is how a song comes to show a sleeve that doesn't match. Each labelled with its declared
- * type, its real pixel size once it loads (measured by the browser, as on the main page), its bytes and
+ * type, its real pixel size once it loads (measured by the browser, as the main page measured it), its bytes and
  * format; a tap opens it full size.
  */
 function InspectorPictures({

@@ -223,21 +223,21 @@ src/
                    Navidrome admin's, unlocked with their own password - see "Managing accounts");
                    library's /queue/summary is the app's Needs-a-look count, from the saved
                    scan alone - see "Needs a look"
-interface/         vanilla JS/CSS. Still the served page; main.js is shrinking as panels
-                   are ported. main.css styles BOTH halves - see below.
-  styles/theme.css THE TOKEN LAYER. Every colour, size, space, radius, shadow, duration and
-                   easing in the application. Because both halves consume it, editing a
-                   value here restyles the vanilla and Preact sides together. Raw values in
-                   main.css or in a component are a bug. NOTE it is @import-ed, so it caches
-                   separately - hard-refresh when verifying a palette change.
+interface/         the app's pages: player/ (the app, its stylesheets, manifest and icons),
+                   player/lab/ (the bench), styles/theme.css and its fonts; `/` (and
+                   /index.html) redirects to /player/ (307) - see "The main page retired".
+  styles/theme.css THE TOKEN LAYER - every colour, size, space, radius, shadow, duration and
+                   easing in the app, linked first by each page; section 10's --dw-* are the
+                   app's, sections 1-9 what they alias. Raw values in a stylesheet or a
+                   component are a bug; tests/test_app_css.py keeps a token nothing reads out.
   player/          the app's page at /player/, manifest, icons, and its stylesheets: player.css
                    (the player; mechanics its own, look on theme.css section 10) and app.css (the
                    tab bar, Home, Requests, You) - see "The one app" - and signin.css (the sign-in
                    and Sign out, linked only with logins on). player/lab/ is the turntable's
                    test bench's page and its own lab.css.
   dist/            BUILT from ui/, gitignored. Not present in a fresh checkout.
-ui/                Preact + Vite + TypeScript. New work goes here — see below.
-                   ui/src/player/ is the phone player, a second entry beside the main one;
+ui/                Preact + Vite + TypeScript: the app (src/player/main.tsx -> src/app/App.tsx)
+                   and the bench. ui/src/player/ is the player;
                    player/streamSource.ts is its one-stream gapless engine, with the pure
                    lib/streamPlan.ts and lib/fmp4.ts - see "One stream for FLAC". The level a queued song
                    is played at rides on its entry: the pure lib/loudness.ts (the rule, the address's
@@ -254,7 +254,9 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    app/ArtistPanel.tsx is the artist page's managing on both frames (Artist
                    images…, Move albums to …, Which artist is this?), its rules and the page's
                    In your library and full facts lib/artistManage.ts - see "The artist page, as
-                   the main page had it".
+                   the main page had it". components/ holds the editors the Edit panel hosts
+                   (MetadataEditor, TrackTagEditor, DeleteAlbumDialog, ArtViewer, LibraryParts'
+                   Get buttons) and SettingsView.tsx, the server settings' parts.
                    app/ServerSettings.tsx (drawn from components/SettingsView.tsx's own exported
                    parts) and app/EventLog.tsx (lib/eventLog.ts) are the server's settings and the
                    event log (both frames) - see "Server settings and the log in the app".
@@ -271,8 +273,8 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    album's Play Next and Play Last, app/ShuffleSongs.tsx the Library's Shuffle and
                    app/useShuffleFeed.ts its pages - see "Up Next, shuffle and repeat".
                    app/LibraryCare.tsx is Rescan and the bulk runs (both frames; its runs
-                   app/useLibraryCare.ts; which albums each takes lib/bulkTargets.ts, the main
-                   page's too) - see "Looking after the library".
+                   app/useLibraryCare.ts; which albums each takes lib/bulkTargets.ts) - see
+                   "Looking after the library".
                    app/useMyLibrary.ts is your library as the app keeps it (logins on), drawn by
                    app/YourLibrary.tsx (You), Home's New shelf and the Library's New marks;
                    app/HeldByNobody.tsx is Library care's; the words lib/myLibrary.ts - see
@@ -298,7 +300,7 @@ ui/                Preact + Vite + TypeScript. New work goes here — see below.
                    ui/src/lab/ is the turntable's test bench at /player/lab/, a third page built
                    in a pass of its own: the real Turntable and deck over signals it makes, set
                    beside an ideal turntable - see notes/turntable-bench.md.
-tests/             3605 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             3629 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -321,14 +323,15 @@ section of that title in notes/: `grep -rn "### X" notes/` finds it.
 | area | notes |
 | --- | --- |
 | every settled decision, in full | `notes/decisions.md` |
-| the main page's look: CSS, panels that move, phones, the design system | `notes/interface.md` |
+| the main page's look: CSS, panels that move, phones, the design system (the retired main page's - history) | `notes/interface.md` |
 | search, the releases grid, discographies, "in your library" marks, newest-answer guards | `notes/search.md` |
 | the candidates panel, quality filters, next peer / same peer, peers' speeds, the downloads panel | `notes/downloads.md` |
 | the 1.0.1 fixes: the same-origin guard, held releases, a card's Find, the two-step apply | `notes/fixes-1.0.md` |
 | the fixes before 2.0.0 (.65): secrets over two saves, symlinks, break-glass, shuffle memory, stop, the start-up scan, proxies, re-starring, warming | `notes/fixes-2.0.md` |
 | the library explorer and saved scan, discs and disc titles, the editors, artist pages, CD art, lyrics, folder template | `notes/library.md` |
 | artist credits, renamed artists, searching Soulseek under every name | `notes/names.md` |
-| the main page's settings tab | `notes/settings-tab.md` |
+| the main page's settings tab (the retired main page's - history) | `notes/settings-tab.md` |
+| the frontend migration: its plan, the typed API surface, the port's history | `notes/frontend-migration.md` |
 | the phone player, the Navidrome relay, the scan wait | `notes/player.md` |
 | gapless and seeking | `notes/player-gapless-seeking.md` |
 | FLAC in an MP4 for Safari, the muxer, the player cache | `notes/player-flac-mp4.md` |
@@ -436,7 +439,6 @@ The rest are in `notes/backend-gotchas.md`, `notes/tooling.md` and `notes/interf
   `tests/test_source_bytes.py` fails on raw control bytes. Write such escapes with a byte-level replace.
 - **The sims need a writable `TMPDIR`** (`TMPDIR=<scratch> node ui/test/<name>.sim.cjs`); pytest must
   NOT get that TMPDIR (`test_a_setgid_bit_is_no_bar` fails under a folder whose group you're not in).
-- **The responsive blocks must stay the last thing in `main.css`**; new rules go above them.
 - **`hidden` reading true is not evidence an element is hidden** when CSS sets `display`: measure it.
 - `overflow-y: auto` promotes `overflow-x` too; a flex item needs `min-width: 0` for its ellipsis;
   `getBoundingClientRect()` is the transformed box, `offsetWidth` isn't.
@@ -447,61 +449,14 @@ The rest are in `notes/backend-gotchas.md`, `notes/tooling.md` and `notes/interf
   screenshot over computed styles.
 - **MusicBrainz and the Cover Art Archive go away for minutes at a time**: retry before concluding.
 
-## Frontend migration (in progress)
+## Frontend: done
 
-**Preact + Vite + TypeScript, in `ui/`.** Adopted incrementally: the vanilla app still serves
-the page, and ported panels mount into it via one extra module script.
-
-**→ Full plan, API surface, port order and traps: [docs/FRONTEND-MIGRATION.md](docs/FRONTEND-MIGRATION.md).**
-
-| ported | still vanilla |
-| --- | --- |
-| Downloads panel, tab shell, library explorer (tree + details pane), metadata editor, metadata queue, delete dialog, cover viewer, tag editor (v0.6.9 - born in Preact), candidates panel (v0.9.10) | search bar, releases grid, filter column, log |
-
-**Beside the port, the one app** (2.0.0-player.9): the page at `/player/` is growing into the app
-that will replace the main page - five tabs with the player inside them, born in Preact, with
-Search and Requests linking to the main page until they are built. See "The one app"; when it
-covers everything the main page does, the vanilla half retires in one commit. **Since
-2.0.0-player.21 the main page's editors serve both pages**: the app's Edit panel - a desktop's side
-panel, and since 2.0.0-player.47 a phone's sheet - hosts `MetadataEditor`, `TrackTagEditor`, the Get
-buttons and `DeleteAlbumDialog` as they are (styled by their ids and classes in app-desktop.css for the
-panel and in app.css's "looking after deadwax from a phone" section for the sheet), so a change to one
-of them is checked on all three: the main page, the desktop's panel and the phone's sheet.
-
-**How the two halves coexist:**
-
-- `interface/index.html` provides empty mount points (`#downloads-root`, `#tabs-root`,
-  `#library-root`) and loads `dist/deadwax-ui.js` after `main.js`. The mount points are
-  `display: contents` where they sit inside a flex row, so the layout is untouched.
-- Ported components reuse the **existing class names and IDs verbatim**, so `main.css` applies
-  unchanged. A visual difference means a porting mistake, not a restyle.
-- Both files are ES modules and can't call each other, so cross-boundary calls meet on
-  `window.deadwax` (`ui/src/bridge.ts`). Entries today: `refreshDownloads`,
-  `openCandidates` (v0.9.10), `buildDownloadRelease` (2.0.0-player.15 - the one payload builder,
-  for the releases grid's Find buttons), `closeDownloads`, `closeOtherDropdowns`, `runSearch`,
-  `refreshNewImports`. **An empty bridge means the migration is done.**
-
-Why, from measurements of the original code:
-
-| hand-rolled machinery | count |
-| --- | --- |
-| render/refresh/notify functions | 12 |
-| call sites that must remember to call one | **29** |
-| `innerHTML` assignments | 43 |
-| separate mutable state objects | 7 |
-| `buildReleasesGrid` (unreusable table) | 312 lines |
-| hand-written keyed reconciliation | 81 lines → **deleted**, replaced by `key={job.id}` |
-
-Those 29 call sites *are* the "things not updating" complaint.
-
-**Don't expect the port to shrink the codebase — it doesn't.** Downloads went from 260 lines
-of `main.js` to 507 across six files. Roughly half is comments and types, and the reusable
-parts get spent again by later panels. The return is the deleted reconciler, compile-time
-checking, and rows that can't silently stop updating — not fewer lines.
-
-Preact over React: same API, ~4 KB vs ~45 KB, `preact/compat` keeps the React ecosystem
-available. TypeScript would have caught the real `releaseGroupContext is not defined` bug at
-compile time.
+**Preact + Vite + TypeScript, in `ui/`.** The vanilla main page retired in 2.0.0-player.66 (`/` answers
+a 307 to `/player/`): the app is the only page, beside the turntable's bench. The plan, the typed API
+surface and the port's history are in `notes/frontend-migration.md`. The main page's editors live on
+in the app's Edit panel, styled by their ids and classes in app-desktop.css and in app.css's "looking
+after deadwax from a phone" section, so a change to one is checked on the desktop's panel and the
+phone's sheet.
 
 ## Conventions
 
@@ -548,16 +503,15 @@ compile time.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 3605 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 3629 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see `notes/tooling.md`:
 
 ```bash
 npm install
-npm run build      # tsc --noEmit && vite build && vite build --mode lab (the test bench's pass) -> interface/dist/, required to see downloads
+npm run build      # tsc --noEmit && vite build && vite build --mode lab (the test bench's pass) -> interface/dist/, required to see the app
 npm run typecheck  # tsc alone; runs on older Node when the build won't
-npm run dev        # harness on :5173, proxies /deadwax + /styles to :8080 (start the backend first)
 ```
 
 ```bash
@@ -568,9 +522,8 @@ its own. Run them all with
 What each one holds: `notes/sims.md`.
 ```
 
-`npm run dev` serves `ui/index.html`, a harness for working on one component in isolation with
-HMR — **not** the real page. The real page is still `interface/index.html` served by FastAPI on
-8080, and it only picks up frontend changes after `npm run build`.
+There is no harness: the real page is `/player/`, served by FastAPI on 8080, and it only picks up
+frontend changes after `npm run build`.
 
 `.env`, `.devdata/`, `run_dev.sh`, `.claude/`, `node_modules/`, `interface/dist/` are gitignored.
 
@@ -586,7 +539,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 3605 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 3629 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 
@@ -616,10 +569,8 @@ A green suite here means the logic is sound, not that it works against real infr
 
 1. **Real infrastructure**: search, enqueue, completion and filing have run end to end against a real
    slskd; still unwatched live: the derived download speed, queue position, and cancel.
-2. **The port**, in docs/FRONTEND-MIGRATION.md's order: the filter column, the releases grid, the top
-   bar - and the one app replacing the main page (notes/app.md).
-3. **The candidates panel against real Soulseek data** (seen only against fakes).
-4. **The phone player on James's iPhone, locked**: the "NOT verified" lists in the player and
+2. **Sources against real Soulseek data** (seen only against fakes).
+3. **The phone player on James's iPhone, locked**: the "NOT verified" lists in the player and
    turntable notes are what the phone answers.
 
 **Deliberately not built**: embedding art into the audio; undo, for a retag or a delete (the preview

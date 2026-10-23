@@ -34,12 +34,12 @@ export function forgetEventLogPage(): void {
 }
 
 /**
- * The event log in the app (2.0.0-player.33; a phone's too since 2.0.0-player.47) - the main page's log (interface/scripts/
- * init.js, which is left as it is) as a page of the app, pushed on You (`#/you/log/all`). There is no
+ * The event log in the app (2.0.0-player.33; a phone's too since 2.0.0-player.47) - the main page's log (its
+ * init.js, until that page retired in 2.0.0-player.66) as a page of the app, pushed on You (`#/you/log/all`). There is no
  * board for it; the desktop sidebar's Managing names it.
  *
  * THE LINES are TEXT, never markup: the log quotes MusicBrainz titles, Soulseek queries and folder
- * paths, all typed by strangers (the v0.9.21 rule). Newest first, as the main page's; each with its
+ * paths, all typed by strangers (the v0.9.21 rule). Newest first, as the main page's was; each with its
  * time (the server's, as it logged it), its level - errors red, warnings amber - and its words. At most
  * LOG_KEPT (500) are kept, the oldest dropped. Clear empties the view, nothing on the server.
  *

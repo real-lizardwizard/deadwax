@@ -81,7 +81,7 @@ export function floorNote(download: DownloadInFlight, floor: QualityFloor | null
 }
 
 /** The last line of a download somebody else asked for: what Join does - in the page's own place for
- *  downloads (the app's Requests, the main page's Downloads), however many already wait for it. */
+ *  downloads (the app's Requests; the main page's Downloads until it retired), however many already wait for it. */
 export const joinNote = (place: 'Downloads' | 'Requests') =>
   `Join it to have it in your ${place} too - one download, everyone who asked waiting for it.`
 
@@ -112,8 +112,8 @@ export const sharedNote = (place: 'Downloads' | 'Requests') =>
   `Someone else asked for it too, so cancelling it in ${place} only takes it off your list - another peer isn't offered for a download you share.`
 
 /**
- * The store's status for a pressing (lib/candidates.ts storeStatus) - every page's, the main page's
- * included - with these cases of its own:
+ * The store's status for a pressing (lib/candidates.ts storeStatus) - every page's (the main page's
+ * too, until it retired) - with these cases of its own:
  *
  *  - a download somebody ELSE asked for (`yours` false - logins on) is theirs to join. Its title says
  *    so, its first line says what you'd get - the peer, the copy and how far it has got - then the

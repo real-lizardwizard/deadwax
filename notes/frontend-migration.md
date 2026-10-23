@@ -1,3 +1,5 @@
+Finished in 2.0.0-player.66, when the main page retired.
+
 # Frontend migration: vanilla → Preact + Vite + TypeScript
 
 Everything a fresh session needs to start. The decision is settled (see CLAUDE.md); this is

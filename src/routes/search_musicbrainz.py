@@ -63,8 +63,8 @@ async def fully_search(
     offset: int = Query(0, ge=0, le=FULLY_SEARCH_OFFSET_MAX),
     #? (2.0.0-player.55) the app's Search alone sends it: a search's patience (three attempts, not ten), a
     #? 400 said as words to try others, MusicBrainz shedding said as busy, and an abandoned search stopped.
-    #? Not sent to MusicBrainz, so the request and its cache entry are the same; the main page and the
-    #? metadata editor send none and are answered exactly as before.
+    #? Not sent to MusicBrainz, so the request and its cache entry are the same; the metadata editor
+    #? sends none (as the main page sent none) and is answered exactly as before.
     quick: bool = Query(False),
 ):
     if quick:

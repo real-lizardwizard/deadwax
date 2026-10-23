@@ -60,7 +60,7 @@ const estimateOf = (block: Block<unknown>, metrics: Metrics) =>
  * the list changes); one holding the focus is never let go. A new list, sort or Find draws at once the blocks within
  * a screen of where the page is, by their estimates (blocksNear), and the observer corrects that. Each block is still
  * `section.app-shelf-block` with `content-visibility: auto`, and a drawn one carries `contain-intrinsic-block-size:
- * auto <estimate>px` inline (a computed size, as treeWindow's inline `top` is) - a block not drawn its height inline.
+ * auto <estimate>px` inline (a computed size, as the main page's treeWindow's inline `top` was) - a block not drawn its height inline.
  *
  * A labelled group's first block opens with its header, `h2.app-shelf-head`, in the flow (not sticky) - every header
  * always in the page, the headings VoiceOver's rotor walks. A grid's block holds one `div.pl-grid`, so the columns,

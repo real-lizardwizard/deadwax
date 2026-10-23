@@ -1,8 +1,9 @@
 # How matching works
 
 Every folder a Soulseek search finds is scored against the release you picked, from 0 to 100.
-The score is a weighted average of six signals. The candidates panel shows each one as a chip,
-so you can see *why* a folder scored what it did rather than just trusting the number.
+The score is a weighted average of six signals. Each source card shows each one as a chip, under
+**Why it scored what it did** ([downloading](downloading.md#choosing-a-source)), so you can see
+*why* a folder scored what it did rather than just trusting the number.
 
 | signal | weight | measures |
 | --- | --- | --- |
@@ -50,7 +51,8 @@ their whole history, so it isn't a prediction of your download.
 ## When a signal has nothing to go on
 
 A signal with no information is **left out**, not scored as zero, and the weights of the others
-are rescaled. With **Find** on an album card there's no tracklist, so titles, count and lengths
+are rescaled. With a **Get** of the album as a whole (MusicBrainz couldn't list its pressings) there's no
+tracklist, so titles, count and lengths
 all drop out, and the score comes from edition, format and peer. With a release whose lengths
 MusicBrainz doesn't know, lengths drops out.
 

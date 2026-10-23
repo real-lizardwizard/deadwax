@@ -1,5 +1,5 @@
 {
- "about": "A library as /deadwax/library/owned answers it (OWNED_FIELDS), and what holds what. ui/test/owned.sim.cjs runs interface/scripts/owned.mjs and its TypeScript port, ui/src/lib/owned.ts, against every case here, so the main page's marks and the app's Search can never disagree about whether an album is in the library. Albums in an answer are written as their paths.",
+ "about": "A library as /deadwax/library/owned answers it (OWNED_FIELDS), and what holds what. ui/test/owned.sim.cjs runs ui/src/lib/owned.ts against every case here. Until 2.0.0-player.66 it ran the main page's interface/scripts/owned.mjs too, so the two copies could never disagree; that page retired, and what its copy answered beyond the cases - the functions it exported, every name in the fixture folded, the tooltip for both Dummys - is kept in `frozen`, generated once from the .mjs before it was deleted. Albums in an answer are written as their paths.",
  "albums": [
   {"path": "Portishead/Dummy (1994)", "artist": "Portishead", "album": "Dummy", "year": "1994", "edition": "", "release_mbid": "76df3287-6cda-33eb-8e9a-044b5e15ffdd", "release_group_mbid": "48140466-cff6-3222-bd55-63c27e43190d", "formats": ["flac"], "track_count": 11},
   {"path": "Portishead/Dummy (1994) [20th Anniversary Reissue 180gram]", "artist": "Portishead", "album": "Dummy", "year": "1994", "edition": "20th Anniversary Reissue 180gram", "release_mbid": "f5804905-6e8d-45dc-bae9-b36c64ccc99b", "release_group_mbid": "48140466-cff6-3222-bd55-63c27e43190d", "formats": ["flac"], "track_count": 10},
@@ -32,5 +32,35 @@
   {"label": "a folder tagged with only a group id is held by it...", "fn": "ownedForGroup", "args": [{"groupId": "b1392450-e666-3926-a536-22c65f834433", "title": "OK Computer", "artists": ["Radiohead"]}], "expected": {"held": ["Radiohead/OK Computer (1997)"], "guessed": []}},
   {"label": "...and, tagged, never claimed by its name for another group", "fn": "ownedForGroup", "args": [{"groupId": "ok-computer-oknotok", "title": "OK Computer", "artists": ["Radiohead"]}], "expected": {"held": [], "guessed": []}},
   {"label": "the index counts every album", "fn": "total", "args": [], "expected": 8}
- ]
+ ],
+ "frozen": {
+  "exported": ["buildOwnedIndex", "describeFolders", "describeGroupOwnership", "foldName", "ownedForGroup", "ownedForRelease"],
+  "folded": [
+   ["Portishead", "portishead"],
+   ["Dummy", "dummy"],
+   ["Portishead/Dummy (1994)", "portishead dummy"],
+   ["Portishead", "portishead"],
+   ["Dummy", "dummy"],
+   ["Portishead/Dummy (1994) [20th Anniversary Reissue 180gram]", "portishead dummy"],
+   ["Tame Impala", "tame impala"],
+   ["Currents", "currents"],
+   ["Tame Impala/Currents (2015)", "tame impala currents"],
+   ["Pink Floyd", "pink floyd"],
+   ["Wish You Were Here (Remastered)", "wish you were here"],
+   ["Old Rips/Pink Floyd - Wish You Were Here", "old rips pink floyd wish you were here"],
+   ["Kanye West", "kanye west"],
+   ["Donda", "donda"],
+   ["Kanye West/Donda", "kanye west donda"],
+   ["Portishead", "portishead"],
+   ["Third", "third"],
+   ["Somebody Else/Third", "somebody else third"],
+   ["The Mot\u00f6rhead & Friends", "motorhead and friends"],
+   ["Ace of Spades", "ace of spades"],
+   ["The Mot\u00f6rhead & Friends/Ace of Spades", "motorhead and friends ace of spades"],
+   ["Radiohead", "radiohead"],
+   ["OK Computer", "ok computer"],
+   ["Radiohead/OK Computer (1997)", "radiohead ok computer"]
+  ],
+  "tooltip": {"case": "both editions of Dummy, by group id", "title": "Already in your library:\nPortishead/Dummy (1994) (FLAC)\nPortishead/Dummy (1994) [20th Anniversary Reissue 180gram] (FLAC)"}
+ }
 }

@@ -1,6 +1,6 @@
 /**
  * The connection checks the app's You tab runs as it first shows - the same pings the main page's
- * pills make (interface/scripts/init.js), and the player's Navidrome status.
+ * pills made (its init.js, until it retired in 2.0.0-player.66), and the player's Navidrome status.
  *
  * A ping answers 200 with `{status: 'ok'}` or `{status: 'failed', code, error}`: a failure is in
  * the body, not the status. The code is a short name ("NOT_LOGGED_IN", 401) and the error slskd's

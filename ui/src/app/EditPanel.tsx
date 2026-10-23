@@ -141,11 +141,11 @@ function useEscapeFrom(box: RefObject<HTMLElement>, inner: { current: boolean },
  * Edit an album, beside its page (2.0.0-player.21) - the desktop's Edit panel, as
  * DesktopManage.dc.html draws it: "Edit album" and a close button, and underline tabs.
  *
- *  - RELEASE: the main page's metadata editor (components/MetadataEditor.tsx), as it is - its search
+ *  - RELEASE: the metadata editor (components/MetadataEditor.tsx), the main page's as it was - its search
  *    as it opens, `selectedId` apart from `selected`, only the newest pick's tracklist, the preview
  *    from the planner the write recomputes, the rename held back for Navidrome and the wait said.
- *  - TAGS: the album's tracks with a tick box each (Shift ticks a run, as the main page's table), and
- *    the main page's tag editor (TrackTagEditor) for the ticked ones - or all of them, none ticked -
+ *  - TAGS: the album's tracks with a tick box each (Shift ticks a run, as the main page's table did), and
+ *    the tag editor (TrackTagEditor, the main page's) for the ticked ones - or all of them, none ticked -
  *    its file list fixed as it opens.
  *  - ARTWORK: the cover and CD art - Get cover and Get CD art, the main page's buttons. A cover is
  *    replaced in Release, comparing the two (the main page's rule: never one click from the list).
@@ -161,8 +161,8 @@ function useEscapeFrom(box: RefObject<HTMLElement>, inner: { current: boolean },
  *
  * WHICH FOLDER comes from the id bridge (GET /deadwax/store/album, by the page's Navidrome id) and,
  * where the store has none, the library's scan (lib/albumEdit.ts editFolders) - asked through one
- * latestOnly(), its answer counting only for the Edit it was asked for; the scan is the main page's
- * (hooks/useLibrary.ts: the saved scan, then a real one), read as the panel first opens - the album
+ * latestOnly(), its answer counting only for the Edit it was asked for; the scan is the one the main page's
+ * library read (hooks/useLibrary.ts: the saved scan, then a real one), read as the panel first opens - the album
  * taken only from the real one - and read again underneath on every Edit after, the album taken from
  * the scan in hand at once and followed to the fresh one when it lands. Several found by name alone,
  * and the user says which; a set kept one folder per disc starts on the first, the others a choice
@@ -353,7 +353,7 @@ export function EditPanel({
   //? every Edit pressed: the album's folders asked afresh, everything about the last one let go - as
   //? it opens, never for a request kept from before (the panel mounted again, closed, as the window
   //? crosses back into the desktop frame). After the first, the library is read again underneath
-  //? (the app is a player left open for hours; another device, or the main page, may have changed the
+  //? (the app is a player left open for hours; another device, or another tab, may have changed the
   //? album since): the album is taken from the scan in hand at once, and followed to the fresh one -
   //? or let go, its folder gone, to be taken again from what the fresh one says - unless a write has
   //? been made meanwhile, whose own reload followed it already.
@@ -961,7 +961,7 @@ export function EditPanel({
 }
 
 /**
- * The album's tracks, a tick box each, as the main page's track table ticks them: one click ticks
+ * The album's tracks, a tick box each, as the main page's track table ticked them: one click ticks
  * one, Shift ticks the run from the last one clicked to this one's new state, the head's box ticks
  * or unticks them all. "Edit N tracks…" opens the tag editor on the ticked ones - or on all of them
  * with none ticked. Each box sits in a label filling its cell, the target a finger needs where the

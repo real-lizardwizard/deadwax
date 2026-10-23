@@ -1,10 +1,10 @@
 /**
- * Editing tags by hand, and arranging the track viewer's columns.
+ * Editing tags by hand, and the disc field the track inspector reads.
  *
- * A script for the same reason as the others here: there is no JS test runner. Both halves fail
- * quietly. A mass edit that sends a field you never touched overwrites every track's own value
- * and looks exactly like one that didn't; a column order that loses a field when a later
- * version adds one simply stops showing it, with nothing to say it exists.
+ * A script for the same reason as the others here: there is no JS test runner. A mass edit that
+ * sends a field you never touched overwrites every track's own value and looks exactly like one
+ * that didn't. (The main page's track table - its columns arranged, sized and saved - was pinned
+ * here too, until it retired with that page in 2.0.0-player.66.)
  *
  * Run it with:  node ui/test/tags.sim.cjs
  */
@@ -82,52 +82,13 @@ check('shift with nothing clicked before is an ordinary click',
       [...tags.tickTracks(order, new Set(), null, '03', true).files], ['03']);
 
 console.log('\nthe disc column: untagged reads as disc 1, and says so');
-const disc = fields.fieldById('disc');
+const disc = fields.TRACK_FIELDS.find((field) => field.id === 'disc');
 const row = (scanDisc, details) => ({ track: { disc: scanDisc, position: 1 }, details });
 check('no disc tag shows 1', disc.value(row(null, undefined)), '1');
 check('...dimmed as a default, with the reason', disc.inferred(row(null, undefined)) !== null, true);
 check('a tagged disc is itself', disc.value(row(2, undefined)), '2');
 check('...and not a default', disc.inferred(row(2, undefined)), null);
 check('the file, once read, wins over a stale scan', disc.value(row(2, { disc: null, position: 1 })), '1');
-
-console.log('\narranging the columns');
-const defaults = fields.defaultOrder();
-check('number and disc come before the title, as on a sleeve', defaults.slice(0, 3), ['number', 'disc', 'title']);
-check('every field has a place', defaults.length, fields.TRACK_FIELDS.length + 1);
-check('nothing saved: the default order', fields.reconcileOrder(undefined), defaults);
-check('an older blob with no order: the default', fields.reconcileOrder([]), defaults);
-const moved = fields.moveColumn(defaults, 'title', 'number');
-check('a column dragged to the front goes first', moved.slice(0, 3), ['title', 'number', 'disc']);
-check('dropping past the last column puts it last', fields.moveColumn(defaults, 'number', null).at(-1), 'number');
-check('dropping a column on itself changes nothing', fields.moveColumn(defaults, 'disc', 'disc'), defaults);
-check('dropping just before its own neighbour changes nothing', fields.moveColumn(defaults, 'number', 'disc'), defaults);
-check('a saved order keeps its arrangement', fields.reconcileOrder(moved), moved);
-check('a column that no longer exists is dropped', fields.reconcileOrder([...moved, 'gone']).includes('gone'), false);
-const restored = fields.reconcileOrder(moved.filter((id) => id !== 'bitrate'));
-check('a column added since you arranged them turns up beside its default neighbour',
-      restored.indexOf('bitrate'), restored.indexOf(defaults[defaults.indexOf('bitrate') - 1]) + 1);
-check('...and nothing is lost or doubled', [...new Set(restored)].length, defaults.length);
-check('the title is always drawn', fields.visibleColumns(defaults, ['number']), ['number', 'title']);
-check('hidden columns keep their place in the order', fields.visibleColumns(moved, ['disc', 'number']),
-      ['title', 'number', 'disc']);
-
-console.log('\nsizing the columns');
-check('untouched columns keep their own sizes',
-      fields.columnLayout(['number', 'title'], {}, ['2.4em']).template, '2.4em 2.6em minmax(10em, 2fr)');
-const sized = fields.columnLayout(['number', 'title'], { title: 300 }, ['2.4em']);
-check('a dragged column is exactly that wide', sized.template, '2.4em 2.6em 300px');
-check('...and counts towards the table\'s minimum in px', sized.minWidth.includes('300px'), true);
-check('the minimum is exactly the columns\' own minimums, with no slack for a lone flexible column to swallow',
-      fields.columnLayout(['number', 'title'], {}, ['2.4em']).minWidth, 'calc(15em + 0px)');
-check('a column that stretches is flexible - a resize has to pin those to its left',
-      [fields.isFlexible('title'), fields.isFlexible('artist')], [true, true]);
-check('...and one with a size of its own is not, so it never moves under the drag',
-      [fields.isFlexible('number'), fields.isFlexible('length')], [false, false]);
-check('a column nobody has heard of takes the flexible default', fields.isFlexible('nonesuch'), true);
-check('the title\'s track is the one the layout draws it with', fields.columnSize('title'), fields.TITLE_WIDTH);
-check('a width below the minimum is raised to it', fields.clampWidth(4), fields.MIN_COLUMN_PX);
-check('saved widths for columns that are gone are dropped',
-      fields.reconcileWidths({ title: 200, gone: 90 }), { title: 200 });
 
 console.log('\nartist credits (mirrors credit_name/credit_ids in src/artists.py)');
 const SPLIT = [

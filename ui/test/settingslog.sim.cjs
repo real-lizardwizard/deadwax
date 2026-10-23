@@ -3,18 +3,19 @@
  * lib/eventLog.ts and lib/serverSettings.ts, and both pages (app/ServerSettings.tsx, app/EventLog.tsx)
  * compiled with the repo's TypeScript and rendered by the small stand-in for Preact the other page sims
  * use (needslook.sim, group.sim) - here with function components drawn through, since the settings page
- * is drawn from the main page's own parts (components/SettingsView.tsx's ServerGroup, SettingRow,
- * OrganizingVerdict, OrganizeModes), which this renders for real.
+ * is drawn from the parts of what was the main page's settings tab (components/SettingsView.tsx's
+ * ServerGroup, SettingRow, OrganizingVerdict, OrganizeModes), which this renders for real.
  *
  * What it pins:
  *
  *  - SERVER SETTINGS: the server's groups only - no browser preference of the main page's (one line
- *    says they are the main page's, its link beside the app) - and, since 2.0.0-player.42, Re-time saved
+ *    says your own choices are in You, under Getting albums - since 2.0.0-player.66, when the main page
+ *    it pointed at retired) - and, since 2.0.0-player.42, Re-time saved
  *    lyrics under the Lyrics group alone, refused while the lead is a draft; every rule of a row (a
  *    secret masked, choices a dropdown, a locked one saying why, revert, the retype note); since
  *    2.0.0-player.54 Clear MusicBrainz's saved answers under their group's two rows on Connections alone,
- *    refused while the path (not the size) is a draft, keyed on the group's saved values and told `live` -
- *    and on the main page's settings tab (components/SettingsView.tsx, drawn here too) the same; drafts kept
+ *    refused while the path (not the size) is a draft, keyed on the group's saved values and told `live`
+ *    (and on the main page's settings tab the same, until it retired in 2.0.0-player.66); drafts kept
  *    across the tabs (a tab holding one marked) and ONE save sending them all in one batch; a refusal
  *    said in the bar with every draft still there, until the next save or Discard; Save the one solid
  *    purple button; read when it first shows and again on coming back only with no draft; a save calling
@@ -113,17 +114,11 @@ globalThis.fetch = (address, init) => new Promise((resolve, reject) => globalThi
   resolve: (body) => resolve({ ok: true, status: 200, json: () => Promise.resolve(body) }),
 }))
 write('player/icons.js', `exports.ChevronLeftIcon = function Icon() { return null }\n`)
-//? the main page's settings tab pulls in modules the server half never calls
-write('components/Loading.js', `exports.Loading = () => null; exports.LoadingPanel = () => null\n`)
 //? Re-time saved lyrics (2.0.0-player.42), the tab's own, drawn where the page draws it - itself pinned
 //? in care.sim.cjs: here a stand-in that says where it went and what it was told
 write('components/RetimeLyrics.js', `exports.RetimeLyrics = ({ unsaved }) => ({ type: 'div', props: { class: 'retime-stub', 'data-unsaved': unsaved, children: 'Re-time saved lyrics' } })\n`)
 //? Clear MusicBrainz's saved answers (2.0.0-player.54), the same way - itself pinned in mbanswers.sim.cjs
 write('components/MusicBrainzAnswers.js', `exports.MusicBrainzAnswers = ({ unsaved }) => ({ type: 'div', props: { class: 'answers-stub', 'data-unsaved': unsaved, children: "Clear MusicBrainz's saved answers" } })\n`)
-write('state/persisted.js', `
-exports.readSettingsTab = () => globalThis.__settingsTab ?? null; exports.writeSettingsTab = () => {}
-exports.useDownloadDefaults = () => [{}, () => {}]; exports.usePreferences = () => [{}, () => {}, () => {}]
-`)
 
 //? the stream: each EventSource made, kept, closable
 class FakeSource {
@@ -489,7 +484,7 @@ async function settingsPage() {
     check('...no key in the environment, so nothing to bring back: none', SV.retypeSecretNote('SLSKD_APIKEY', server(saved, { env_set: false }), { SLSKD_APIKEY: null }), null)
   }
 
-  console.log('\nserver settings: read when it shows, its groups drawn from the main page\'s parts')
+  console.log('\nserver settings: read when it shows, its groups drawn from the settings tab\'s parts')
   reset()
   const page = mount(ServerSettings, { live: false })
   page.draw()
@@ -509,14 +504,15 @@ async function settingsPage() {
     [find((node) => /Results per search|Auto-grab|Studio albums|Open the log on start/.test(typeof node === 'string' ? node : '')).length,
       words(tree).includes('Results per search'), words(tree).includes('Auto-grab')],
     [0, false, false])
-  //? (2.0.0-player.42) Re-time saved lyrics is here now, beside the lead as on the main page's tab
+  //? (2.0.0-player.42) Re-time saved lyrics is here, beside the lead
   const lyricsGroup = find((node) => byClass('settings-section')(node) && words(classed('settings-section-title', node)[0]) === 'Lyrics')[0]
   check('Re-time saved lyrics: once, inside the Lyrics group, after its rows - the lead saved, so not refused',
     [classed('retime-stub').length, classed('retime-stub', lyricsGroup).length, classed('retime-stub')[0]?.props['data-unsaved']], [1, 1, false])
   const line = classed('app-settings-line')[0]
   const lineLink = find((node) => node.type === 'a', line)[0]
-  check('...one line says the browser\'s preferences are the main page\'s, its link beside the app - re-timing no longer',
-    [words(line).includes("This browser's preferences are on"), /re-tim/i.test(words(line)), lineLink.props.href, lineLink.props.target, lineLink.props.rel], [true, false, '/', '_blank', 'noopener'])
+  check('...one line says your own choices are in You, under Getting albums - no link to the retired main page (2.0.0-player.66), re-timing no longer',
+    [words(line).includes('Your own choices - what Get does, the quality floor, Format and whether cancelling asks first - are in You, under Getting albums.'),
+      /re-tim/i.test(words(line)), lineLink, /main page/i.test(words(line))], [true, false, undefined, false])
   check('a row: where its value came from, its status, what it does',
     [words(row('LIBRARY_PATH')).includes('Set here'), words(row('SLSKD_DOWNLOAD_PATH')).includes('Needs attention'), words(row('SLSKD_DOWNLOAD_PATH')).includes('Not set: nothing can be filed.'), words(row('LIBRARY_PATH')).includes('what LIBRARY_PATH does')],
     [true, true, true, true])
@@ -909,7 +905,7 @@ async function settingsPage() {
   console.log("\nserver settings: Clear MusicBrainz's saved answers, under their two settings on Connections (2.0.0-player.54)")
   {
     reset()
-    check('their group sits on Connections, on both pages (tabForGroup, the main page\'s own)', SV.tabForGroup('musicbrainz-cache'), 'connections')
+    check('their group sits on Connections (tabForGroup)', SV.tabForGroup('musicbrainz-cache'), 'connections')
     const withAnswers = () => {
       const settings = SETTINGS()
       settings.groups.splice(1, 0, { id: 'musicbrainz-cache', label: "MusicBrainz's saved answers", note: 'Saved on disk.', settings: [
@@ -948,35 +944,6 @@ async function settingsPage() {
     answers.draw({ live: false })
     check('...and when it isn\'t (another tab in front: drawn, hidden)', element()?.props.live, false)
     answers.unmount()
-  }
-
-  console.log("\nthe main page's settings tab: Clear MusicBrainz's saved answers under the same group (2.0.0-player.54)")
-  {
-    reset()
-    globalThis.__settingsTab = 'connections'
-    const withAnswers = () => {
-      const settings = SETTINGS()
-      settings.groups.splice(1, 0, { id: 'musicbrainz-cache', label: "MusicBrainz's saved answers", note: 'Saved on disk.', settings: [
-        setting('MUSICBRAINZ_CACHE_PATH', { status: 'unset' }), setting('MUSICBRAINZ_CACHE_MB', { value: '200' })] })
-      return settings
-    }
-    const main = mount(SV.SettingsView, { active: true })
-    main.draw()
-    W.reads[0].resolve(withAnswers())
-    await settle()
-    main.draw()
-    const group = find((node) => byClass('settings-section')(node) && words(classed('settings-section-title', node)[0]) === "MusicBrainz's saved answers")[0]
-    check('on its Connections tab: Clear drawn once, inside the group, under its two rows - the path saved, so not refused',
-      [!!group, classed('answers-stub').length, classed('answers-stub', group).length, !!row('MUSICBRAINZ_CACHE_PATH') && !!row('MUSICBRAINZ_CACHE_MB'),
-        classed('answers-stub')[0]?.props['data-unsaved']], [true, 1, 1, true, false])
-    const element = find((node) => node.type === MBA.MusicBrainzAnswers, main.raw())[0]
-    check('...keyed on the settings as saved; no `live` (the tab is drawn afresh each time it opens)',
-      [element?.key, element?.props.live], ['MUSICBRAINZ_CACHE_PATH=|MUSICBRAINZ_CACHE_MB=200', undefined])
-    type('MUSICBRAINZ_CACHE_PATH', '/ssd')
-    main.draw()
-    check('...a draft of the path refuses it', classed('answers-stub')[0]?.props['data-unsaved'], true)
-    main.unmount()
-    globalThis.__settingsTab = undefined
   }
 
   //? the saves since the listener was let go (off(), above) told it nothing

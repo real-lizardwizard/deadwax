@@ -20,7 +20,7 @@ AUDIO_EXTENSIONS = {
 
 LOSSLESS_EXTENSIONS = {"flac", "wav", "alac", "aiff", "aif", "ape", "wv"}
 
-#? mirrors EDITION_KEYWORDS in interface/scripts/main.js. the frontend tags the release,
+#? mirrors EDITION_KEYWORDS in ui/src/lib/release.ts. the frontend tags the release,
 #? this tags the candidate folder name, and then we compare the two.
 EDITION_PATTERNS = [
     (re.compile(r"super\s*deluxe"), "SUPER DELUXE"),
