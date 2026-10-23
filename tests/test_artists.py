@@ -43,6 +43,15 @@ def test_a_commons_file_page_becomes_a_picture():
     assert commons_title("https://commons.wikimedia.org/wiki/Special:FilePath/X.jpg") == "X.jpg"
 
 
+def test_a_percent_encoded_commons_title_is_quoted_exactly_once():
+    #? (1.1.9) MusicBrainz stores image relations percent-encoded; decoding the title before commons_file_url()
+    #? quotes it is what keeps "%2C" from going out as "%252C" - a 404 from Commons
+    url = "https://commons.wikimedia.org/wiki/File:Pink_Floyd%2C_1971_%28HQ%29.jpg"
+    assert commons_title(url) == "Pink_Floyd,_1971_(HQ).jpg"
+    assert commons_file_url(commons_title(url), 600) == (
+        "https://commons.wikimedia.org/wiki/Special:FilePath/Pink_Floyd%2C_1971_%28HQ%29.jpg?width=600")
+
+
 def test_anything_that_is_not_commons_is_left_alone():
     #? an image relation can point anywhere - a band's own site, a dead image host - and only
     #? Commons can be turned into a file by guessing a URL
