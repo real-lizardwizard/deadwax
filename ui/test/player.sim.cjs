@@ -5690,6 +5690,567 @@ async function outcome(promise, ms = 1_000) {
       ['2', '/deadwax/navidrome/stream/2?format=raw&wrap=mp4&level=album', false])
   }
 
+  /* ======================================================================== */
+  //? (2.0.0-player.64) A queue put back, paused: restoreQueue puts a queue in the engine with nothing loaded, its song
+  //? shown at the second it stopped, and the next play is resume() - playTracks' own path for the queue in hand, plus
+  //? the seek, in the tap. Traced from here: every write the page makes to an element (src, srcObject,
+  //? removeAttribute, load(), play(), currentTime), every fetch but a scrobble, and the lock screen (its title, its
+  //? state, its position) - a blob: address as 'blob:'.
+  const { usePosition } = require(path.join(OUT, 'player/usePlayer.js'))
+  const trace = []
+  let tracing = false
+  const note = (entry) => { if (tracing) trace.push(entry) }
+  const shortAddress = (value) => (String(value).startsWith('blob:') ? 'blob:' : String(value))
+  const proto64 = FakeAudio.prototype
+  const before64 = {
+    play: proto64.play, load: proto64.load, removeAttribute: proto64.removeAttribute,
+    src: Object.getOwnPropertyDescriptor(proto64, 'src'), srcObject: Object.getOwnPropertyDescriptor(proto64, 'srcObject'),
+    currentTime: Object.getOwnPropertyDescriptor(proto64, 'currentTime'), fetch: globalThis.fetch, setPositionState: media.setPositionState,
+    metadata: media.metadata, playbackState: media.playbackState,
+  }
+  proto64.play = function () { note(`e${this.n} play()`); return before64.play.call(this) }
+  proto64.load = function () { note(`e${this.n} load()`); return before64.load.call(this) }
+  proto64.removeAttribute = function (name) { note(`e${this.n} removeAttribute ${name}`); return before64.removeAttribute.call(this, name) }
+  Object.defineProperty(proto64, 'src', { configurable: true, get: before64.src.get, set(value) { note(`e${this.n} src ${shortAddress(value)}`); before64.src.set.call(this, value) } })
+  Object.defineProperty(proto64, 'srcObject', { configurable: true, get: before64.srcObject.get, set(value) { note(`e${this.n} srcObject ${value ? value.constructor.name : value}`); before64.srcObject.set.call(this, value) } })
+  Object.defineProperty(proto64, 'currentTime', { configurable: true, get: before64.currentTime.get, set(value) { note(`e${this.n} currentTime ${r6(value)}`); before64.currentTime.set.call(this, value) } })
+  define('fetch', (address, init = {}) => {
+    const range = headerIn(init.headers, 'Range')
+    if (!String(address).includes('/scrobble/')) note(`fetch ${address}${range ? ` ${range}` : ''}`)
+    return before64.fetch(address, init)
+  })
+  let shownMeta = before64.metadata, shownState = before64.playbackState
+  Object.defineProperty(media, 'metadata', { configurable: true, get: () => shownMeta, set(value) { note(`lock screen: ${value?.title ?? null}`); shownMeta = value } })
+  Object.defineProperty(media, 'playbackState', { configurable: true, get: () => shownState, set(value) { note(`lock screen ${value}`); shownState = value } })
+  media.setPositionState = (state) => { note(`lock screen at ${r6(state.position)} of ${r6(state.duration)}`); before64.setPositionState(state) }
+  //? what `fn` does to elements, the network and the lock screen, from now to `ms` after - as a list of lines
+  async function traced(fn, ms = 0) {
+    trace.length = 0
+    tracing = true
+    try { fn(); await run(ms) } finally { tracing = false }
+    return [...trace]
+  }
+  //? a page with Repeat already set on the device (page() clears the storage)
+  function repeatPage(repeat, options) {
+    freshPage(options)
+    storage.set('deadwax-player-repeat', repeat)
+    const render = hooks.root(usePlayer)
+    const heard = []
+    render().onPosition((seconds) => heard.push({ at: now, s: seconds }))
+    return { get player() { return render() }, heard, lastHeard: () => heard[heard.length - 1].s }
+  }
+  const ALBUM = { 1: 120, 2: 120, 3: 100, 4: 30 }
+  const putBack = (p, list, index, at) => p.player.restoreQueue(UP.startUpNext(list, index), at)
+  const elementWrites = (lines) => lines.filter((line) => /^e\d|^fetch/.test(line))
+
+  //? the trace an album's tap makes on a fresh page, by page kind - to be held to the engine of 2.0.0-player.63 (git
+  //? e2f1d2b) running these very scenarios: DEADWAX_RECORD_TAP=1 prints them instead of checking, to record them again
+  //? (run before anything here calls restoreQueue, so the engine before it can record them too)
+  const TAP_KINDS = [
+    ['Chromium, one element', () => page({ userAgent: ARC, maxTouchPoints: 0, durations: ALBUM })],
+    ['iPhone, one element', () => page({ userAgent: IPHONE, maxTouchPoints: 5, durations: ALBUM })],
+    ['iPhone, one stream', () => streamPage({ durations: ALBUM })],
+    ['Chromium, one stream', () => streamPage({ mse: 'plain', userAgent: ARC, maxTouchPoints: 0, durations: ALBUM })],
+  ]
+  const todayTaps = {}
+  for (const [name, make] of TAP_KINDS) {
+    const fresh = make()
+    todayTaps[name] = await traced(() => tap(() => fresh.player.playTracks(tracks(['1', '2']), 0)), 4_000)
+  }
+  if (process.env.DEADWAX_RECORD_TAP) {
+    console.log(`RECORDED ${JSON.stringify(todayTaps)}`)
+    process.exit(0)
+  }
+  console.log('\nan album\'s tap on a fresh page: event for event what the engine of 2.0.0-player.63 did (2.0.0-player.64)')
+  const TAP_BEFORE = {
+    "Chromium, one element": [
+      "lock screen: song 1",
+      "e0 src /deadwax/navidrome/stream/1?format=raw",
+      "e0 play()",
+      "lock screen playing",
+      "lock screen at 0 of 120",
+      "lock screen at 0 of 120",
+    ],
+    "iPhone, one element": [
+      "lock screen: song 1",
+      "e0 src /deadwax/navidrome/stream/1?format=raw&wrap=mp4",
+      "e0 play()",
+      "fetch /deadwax/navidrome/stream/1?format=raw&wrap=mp4 bytes=0-1",
+      "lock screen playing",
+      "lock screen at 0 of 120",
+      "lock screen at 0 of 120",
+    ],
+    "iPhone, one stream": [
+      "e1 load()",
+      "lock screen: song 1",
+      "e0 removeAttribute src",
+      "e0 srcObject FakeManagedMediaSource",
+      "fetch /deadwax/navidrome/stream/1?format=raw&wrap=fmp4 bytes=0-262143",
+      "e0 play()",
+      "lock screen playing",
+      "lock screen at 0 of 120",
+      "lock screen at 0 of 120.371701",
+      "lock screen at 0 of 120.371701",
+      "fetch /deadwax/navidrome/stream/1?format=raw&wrap=fmp4 bytes=230942-689437",
+      "lock screen at 0 of 120.371701",
+      "fetch /deadwax/navidrome/stream/1?format=raw&wrap=fmp4 bytes=689438-1147782",
+      "lock screen at 0.25 of 120.371701",
+      "fetch /deadwax/navidrome/stream/1?format=raw&wrap=fmp4 bytes=1147783-1606233",
+      "lock screen at 0.25 of 120.371701",
+      "fetch /deadwax/navidrome/stream/1?format=raw&wrap=fmp4 bytes=1606234-2064533",
+      "lock screen at 0.5 of 120.371701",
+      "fetch /deadwax/navidrome/stream/1?format=raw&wrap=fmp4 bytes=2064534-2522939",
+      "lock screen at 0.75 of 120.371701",
+      "fetch /deadwax/navidrome/stream/1?format=raw&wrap=fmp4 bytes=2522940-2981194",
+      "lock screen at 0.75 of 120.371701",
+      "fetch /deadwax/navidrome/stream/1?format=raw&wrap=fmp4 bytes=2981195-3439555",
+      "lock screen at 1 of 120.371701",
+    ],
+    "Chromium, one stream": [
+      "e1 load()",
+      "lock screen: song 1",
+      "e0 removeAttribute src",
+      "e0 src blob:",
+      "fetch /deadwax/navidrome/stream/1?format=raw&wrap=fmp4 bytes=0-262143",
+      "e0 play()",
+      "lock screen playing",
+      "lock screen at 0 of 120",
+      "lock screen at 0 of 120.371701",
+      "fetch /deadwax/navidrome/stream/1?format=raw&wrap=fmp4 bytes=230942-689437",
+      "fetch /deadwax/navidrome/stream/1?format=raw&wrap=fmp4 bytes=689438-1147782",
+      "fetch /deadwax/navidrome/stream/1?format=raw&wrap=fmp4 bytes=1147783-1606233",
+      "fetch /deadwax/navidrome/stream/1?format=raw&wrap=fmp4 bytes=1606234-2064533",
+      "fetch /deadwax/navidrome/stream/1?format=raw&wrap=fmp4 bytes=2064534-2522939",
+      "fetch /deadwax/navidrome/stream/1?format=raw&wrap=fmp4 bytes=2522940-2981194",
+      "fetch /deadwax/navidrome/stream/1?format=raw&wrap=fmp4 bytes=2981195-3439555",
+      "fetch /deadwax/navidrome/stream/1?format=raw&wrap=fmp4 bytes=3439556-3897765",
+    ],
+  }
+  for (const name of Object.keys(TAP_BEFORE)) check(`${name}: every write to an element, fetch and lock-screen line, in order, as 2.0.0-player.63 made them`, todayTaps[name], TAP_BEFORE[name])
+
+  console.log('\na queue put back, paused (2.0.0-player.64): on a fresh page, nothing loaded, fetched or played')
+  {
+    const p = page({ durations: ALBUM })
+    const [e0] = elements
+    let back = null
+    const lines = await traced(() => { back = putBack(p, tracks(['1', '2', '3', '4']), 2, 95) }, 1_000)
+    check('the lock screen told its song, paused, at the second - and nothing else touched: no element, no fetch', lines,
+      ['lock screen: song 3', 'lock screen paused', 'lock screen at 95 of 100'])
+    check('...no element holds anything, nothing asked of the network', [e0.getAttribute('src'), e0.srcObject, e0.playRates.length, fetched.length], [null, null, 0, 0])
+    check('the song shown: song 3, its tags\' length, paused, at 1:35 - position() and the bar alike',
+      [p.player.track?.id, p.player.duration, p.player.playing, p.player.position(), p.lastHeard()], ['3', 100, false, 95, 95])
+    const reader = hooks.root(() => usePosition(p.player))
+    check('...a usePosition reader drawn now reads 1:35 at once', reader(), 95)
+    check('the queue it put back handed back, and shown', [back === p.player.queue, back.index, back.tracks.map((t) => t.id)], [true, 2, ['1', '2', '3', '4']])
+    check('...the lock screen\'s title, state and position as it put them', [media.metadata?.title, media.playbackState], ['song 3', 'paused'])
+    const late = putBack(page({ durations: ALBUM }), tracks(['1', '2', '3', '4']), 3, 999)
+    check('a second past the song\'s end is held to it; none is a queue it can\'t put back', [late !== null && elements.length, page({ durations: ALBUM }).player.restoreQueue(UP.startUpNext([], 0), 5)],
+      [1, null])
+  }
+  {
+    //? (review) the second put back held to the song: past its end at its end, below 0 and not a number at 0:00
+    const held = [999, -5, NaN].map((second) => {
+      const p = page({ durations: ALBUM })
+      putBack(p, tracks(['1', '2', '3', '4']), 2, second)
+      return [p.player.position(), p.lastHeard()]
+    })
+    check('a second past song 3\'s end at its end (100 s, position() and the bar alike); below 0 or not a number at 0:00',
+      held, [[100, 100], [0, 0], [0, 0]])
+  }
+  {
+    //? (review) put back over a song whose "Skipped ..." still shows (song 1 failed, song 2 playing, paused): the line goes
+    const p = page({ durations: { 2: 30, 3: 100, 4: 30 } })
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(2_000)
+    tap(() => p.player.toggle())
+    await run(200)
+    const shown = p.player.error
+    putBack(p, tracks(['3', '4']), 0, 50)
+    check('a "Skipped" line showing (the case itself), then a queue put back: no line, song 3 at 0:50, nothing loading',
+      [/^Skipped "song 1"/.test(shown ?? ''), p.player.track?.id, p.player.error, p.player.position(), p.player.buffering], [true, '3', null, 50, false])
+  }
+  {
+    //? (review) paused while a song was still loading (its 'waiting' said, Buffering showing): put back, none shows
+    const p = page({ durations: { ...ALBUM, 1: { duration: 120, delay: 5_000 } } })
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(100)
+    tap(() => p.player.toggle())
+    await run(100)
+    const loading = p.player.buffering
+    const back = putBack(p, tracks(['3', '4']), 0, 50)
+    check('Buffering showing, paused (the case itself), then a queue put back: none, song 3 at 0:50',
+      [loading, back !== null, p.player.buffering, p.player.track?.id, p.player.position()], [true, true, false, '3', 50])
+    await run(6_000)
+  }
+  {
+    //? (review) Debug's last seek, still on its way as a queue is put back: closed, as a song change closes it - never
+    //? left "seeking…" for a song that is gone
+    const p = page({ userAgent: ARC, maxTouchPoints: 0, durations: ALBUM })
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(2_000)
+    tap(() => p.player.toggle())
+    await run(200)
+    net.seekDelay = 3_000
+    tap(() => p.player.seek(20))
+    await run(100)
+    const before = p.seekLine()
+    putBack(p, tracks(['3', '4']), 0, 50)
+    const after = p.seekLine()
+    await run(3_500)
+    net.seekDelay = NET.seekDelay
+    check('Debug: a seek on its way (the case itself), then a queue put back: interrupted - and still, after its time',
+      [before, after, p.seekLine()], ['Last seek: asked 0:20, seeking…', 'Last seek: asked 0:20, interrupted', 'Last seek: asked 0:20, interrupted'])
+  }
+  {
+    //? fitted to this device's Repeat, as a Repeat change fits the queue playing
+    const list = tracks(['1', '2', '3', '4'])
+    let p = repeatPage('all', { durations: ALBUM })
+    let back = putBack(p, list, 3, 10)
+    check('Repeat All on the device: the queue put back at its last song is topped up with the next time round',
+      [back.tracks.length, back.upNext.marks.slice(4).map((m) => m.pass), p.player.queue === back], [8, [1, 1, 1, 1], true])
+    p = repeatPage('off', { durations: ALBUM })
+    back = p.player.restoreQueue(UP.toppedUp(UP.startUpNext(list, 3), 'all'), 10)
+    check('Repeat off on the device: a later round saved under Repeat All is dropped', back.tracks.map((t) => t.id), ['1', '2', '3', '4'])
+    p = repeatPage('one', { durations: ALBUM })
+    back = putBack(p, list, 1, 10)
+    check('Repeat One on the device: the song\'s copies made after it', back.tracks.map((t) => t.id), ['1', '2', '2', '2', '3', '4'])
+  }
+
+  console.log('\na queue put back: refused while anything plays or means to, and over a paused queue everything let go')
+  {
+    let p = page({ durations: ALBUM })
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(2_000)
+    check('refused while playing - nothing changed', [putBack(p, tracks(['3', '4']), 0, 50), p.player.track?.id, p.player.playing], [null, '1', true])
+    p = page({ durations: { ...ALBUM, 1: { duration: 120, delay: 5_000 } } })
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(100)
+    check('refused while a song tapped is still loading', [putBack(p, tracks(['3', '4']), 0, 50), p.player.track?.id], [null, '1'])
+    p = page({ durations: { 2: 120 } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(200)
+    check('refused while a song that failed waits to be asked again', [p.player.buffering, putBack(p, tracks(['2']), 0, 50), p.player.track?.id], [true, null, '1'])
+    void e0
+  }
+  {
+    //? the element playing by itself (iOS carrying on after a call) before its 'play' has said so: refused all the same
+    const p = page({ durations: ALBUM })
+    const [e0] = elements
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(2_000)
+    tap(() => p.player.toggle())
+    await run(500)
+    e0.play()
+    check('refused while the element plays though nobody asked it here yet', [e0.paused, putBack(p, tracks(['3', '4']), 0, 50), p.player.track?.id], [false, null, '1'])
+    await run(500)
+  }
+  {
+    //? a handover iOS refuses a moment after it was asked (as "a handover refused across an edit" makes one), the
+    //? listener pausing and a queue put back in that moment: the refusal must not load - and so play - what was put back
+    const p = page({ gapless: true, durations: { 1: 6, 2: 6, 3: 100, 4: 30 } })
+    const [e0, e1] = elements
+    tap(() => p.player.playTracks(mp3(['1', '2']), 0))
+    await run(5_000)
+    const realPlay = e1.play
+    e1.play = function () { e1.play = realPlay; return new Promise((_, reject) => later(200, () => reject(new DOMException('refused', 'NotAllowedError')))) }
+    for (let k = 0; k < 300 && p.player.track.id !== '2'; k++) await run(10)
+    check('refused while the listener means music to play and the element taken over is still paused (its play() out)',
+      [elements[1].paused, putBack(p, tracks(['3', '4']), 0, 50), p.player.track?.id], [true, null, '2'])
+    //? (the lock screen's pause: the element taken over is paused, its play() still out - a tap on the bar would ask it again)
+    media.handlers.pause()
+    const back = putBack(p, tracks(['3', '4']), 0, 50)
+    await run(800)
+    check('a handover refused after a queue was put back over it: nothing loaded or played - the put-back song stays, at 0:50',
+      [back !== null, p.player.track?.id, p.player.playing, p.player.position(), e0.getAttribute('src'), e0.playingNow, e1.playingNow], [true, '3', false, 50, null, false, false])
+  }
+  {
+    //? the URL way, paused
+    const p = page({ userAgent: IPHONE, maxTouchPoints: 5, durations: ALBUM })
+    const [e0] = elements
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(3_000)
+    tap(() => p.player.toggle())
+    await run(500)
+    let back = null
+    const lines = await traced(() => { back = putBack(p, tracks(['3', '4']), 0, 50) }, 1_000)
+    check('over a paused queue: its element emptied - no new source, no play, nothing fetched',
+      elementWrites(lines), ['e0 removeAttribute src', 'e0 load()'])
+    check('...song 3 shown at 0:50, paused', [back !== null, p.player.track?.id, p.player.position(), p.player.playing, e0.getAttribute('src')], [true, '3', 50, false, null])
+    e0.dispatch('timeupdate')
+    check('...the emptied element\'s \'timeupdate\' leaves the bar and position() at 0:50', [p.player.position(), p.lastHeard()], [50, 50])
+  }
+  {
+    //? one stream, paused with a change held (a seek on its way, the playhead already past the join - as "(review) a
+    //? change held through a seek" makes one): all of it let go
+    const p = streamPage({ durations: { 1: 10, 2: 10, 3: 100, 4: 30, 9: 10 } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    const at = starts(['1', '2'])
+    await run((at[1] - 1) * 1000)
+    net.mseSeekDelay = 1_500
+    tap(() => p.player.seek(mseSong('1').seconds - 0.3))
+    e0.clock = e0.heard = at[1] + 0.2
+    tap(() => p.player.playNext(tracks(['9'])))
+    const heldThen = comingIds(p)
+    const source = e0.ms
+    tap(() => p.player.toggle())
+    const before = fmp4Requests.length
+    const lines = await traced(() => putBack(p, tracks(['3', '4']), 0, 50), 2_000)
+    net.mseSeekDelay = NET.mseSeekDelay
+    check('over a paused stream with a change held: the stream closed, the element let go of, nothing fetched after',
+      [heldThen, source?.readyState, e0.srcObject, elementWrites(lines).filter((line) => /^fetch/.test(line)), fmp4Requests.length - before],
+      [['2'], 'closed', null, [], 0])
+    tap(() => p.player.toggle())
+    await run(3_000)
+    check('...and the change held for the old queue is gone: the song put back plays with no song 9 after it',
+      [p.player.track?.id, p.player.playing, comingIds(p)], ['3', true, ['4']])
+  }
+  {
+    //? Gapless with no MediaSource: a standby holding the next song
+    const p = page({ gapless: true, userAgent: ARC, maxTouchPoints: 0, durations: { 1: 8, 2: 8, 3: 100, 4: 30 } })
+    const [e0, e1] = elements
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(5_000)
+    const held = e1.getAttribute('src')
+    tap(() => p.player.toggle())
+    await run(200)
+    const lines = await traced(() => putBack(p, tracks(['3', '4']), 0, 50), 1_000)
+    check('over a paused queue with a standby holding the next: both elements emptied, nothing fetched',
+      [held !== null, e0.getAttribute('src'), e1.getAttribute('src'), elementWrites(lines).filter((line) => /^fetch|play\(\)|src \//.test(line))], [true, null, null, []])
+  }
+
+  console.log('\na queue put back over a paused one (review): what the song before left behind goes with it')
+  {
+    //? an iPhone's FLAC in an MP4, recorded for Info: the song put back hasn't been asked about yet
+    const p = page({ userAgent: IPHONE, maxTouchPoints: 5, durations: ALBUM })
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(3_000)
+    tap(() => p.player.toggle())
+    await run(500)
+    const before = p.player.wrapped
+    putBack(p, tracks(['3', '4']), 0, 50)
+    check('Info\'s "FLAC in MP4" for the song before (the case itself), nothing for the song put back', [before !== null, p.player.wrapped], [true, null])
+  }
+  {
+    //? a seek on its way as the queue is put back: the bar shows the second put back, not that seek's target
+    const p = page({ userAgent: ARC, maxTouchPoints: 0, durations: ALBUM })
+    tap(() => p.player.playTracks(tracks(['1', '2']), 0))
+    await run(2_000)
+    tap(() => p.player.toggle())
+    await run(500)
+    net.seekDelay = 3_000
+    tap(() => p.player.seek(20))
+    await run(100)
+    const heardThen = p.lastHeard()
+    putBack(p, tracks(['3', '4']), 0, 50)
+    check('a seek on its way (the bar at its target), then a queue put back: the bar at the second put back', [heardThen, p.lastHeard(), p.player.position()], [20, 50, 50])
+    tap(() => p.player.seek(70))
+    check('...and a scrub of it after: where it was scrubbed to', [p.lastHeard(), p.player.position()], [70, 70])
+    net.seekDelay = NET.seekDelay
+  }
+  {
+    //? the next song's resampled copy asked for ahead, still being made as the listener paused: let go of
+    const p = page({ userAgent: ARC, maxTouchPoints: 0, durations: { ...warmAlbum(), 4: 30 } })
+    net.resampleMakeMs = 15_000
+    tap(() => p.player.playTracks(hiresTracks(['1', '2', '3']), 0))
+    await run(3_500)
+    tap(() => p.player.toggle())
+    await run(200)
+    const asked = [fetched.includes(warmOf('2')), letGo(warmOf('2'))]
+    putBack(p, tracks(['4']), 0, 10)
+    check('a warm-up out for the next song (the case itself), then a queue put back: its ask let go', [asked, letGo(warmOf('2'))], [[true, 0], 1])
+    net.resampleMakeMs = NET.resampleMakeMs
+  }
+  {
+    const p = page({ durations: ALBUM })
+    putBack(p, tracks(['1', '2', '3', '4']), 2, 95)
+    media.handlers.seekto({ seekTime: 500 })
+    check('the lock screen\'s seekto past the song\'s end, put back: held to its length', [p.player.position(), p.lastHeard()], [100, 100])
+    media.handlers.seekto({ seekTime: -5 })
+    check('...and before its start, to 0:00', p.player.position(), 0)
+  }
+
+  console.log('\nthe tap on a queue put back, one stream: from 1:35, in the tap, joined into song 4 sample to sample')
+  for (const [name, options] of [['iPhone (ManagedMediaSource)', {}], ['Chromium (plain MediaSource)', { mse: 'plain', userAgent: ARC, maxTouchPoints: 0 }]]) {
+    const p = streamPage({ ...options, durations: ALBUM })
+    const [e0, e1] = elements
+    putBack(p, tracks(['1', '2', '3', '4']), 2, 95)
+    let firstPlaying = null, playingAt = null
+    e0.addEventListener('playing', () => { if (firstPlaying === null) { firstPlaying = e0.currentTime; playingAt = now } })
+    trace.length = 0
+    tracing = true
+    tap(() => p.player.toggle())
+    const inTap = [...trace]
+    tracing = false
+    check(`${name}: one play() in the tap, one MediaSource, the second element unlocked in it`,
+      [inTap.filter((line) => line.endsWith('play()')), mediaSources.length, e1.unlocked], [['e0 play()'], 1, true])
+    check(`${name}: song 3's head asked first`, fmp4Requests[0] && [fmp4Requests[0].id, fmp4Requests[0].range], ['3', 'bytes=0-262143'])
+    check(`${name}: ...nothing scrobbled before it plays`, scrobbles, [])
+    await run(3_000)
+    check(`${name}: the seek applied once the head was in - playing from 1:35 to within 0.05 s, and on from there`,
+      [firstPlaying !== null && Math.abs(firstPlaying - 95) <= 0.05, p.player.track?.id, e0.playingNow, near(p.player.position(), 95 + (now - playingAt) / 1000, 0.3)], [true, '3', true, true])
+    check(`${name}: "now playing" for song 3 once it played`, scrobbles, ['3:now'])
+    const at = starts(['3', '4'])
+    await run((at[1] - e0.currentTime) * 1000 + 1_500)
+    const sb = e0.ms.sourceBuffers[0]
+    const lastOf3 = sb.frames.filter((f) => f.id === '3').pop()?.end
+    const firstOf4 = sb.frames.find((f) => f.id === '4')?.start
+    //? to the microsecond, which is what Chromium rounds a frame's time to (WebKit keeps the samples)
+    check(`${name}: into song 4 at the join, sample to sample in the one stream`,
+      [p.player.track?.id, Math.abs(lastOf3 - at[1]) <= 1e-6, Math.abs(firstOf4 - at[1]) <= 1e-6, p.gapLine(), mediaSources.length], ['4', true, true, 'Last song change 0 ms, in one stream', 1])
+  }
+
+  console.log('\nthe tap on a queue put back, the URL way: the start kept while loading, landing at 1:35')
+  for (const [name, options, address] of [
+    ['iPhone, Gapless off', { userAgent: IPHONE, maxTouchPoints: 5 }, '/deadwax/navidrome/stream/3?format=raw&wrap=mp4'],
+    ['Chromium', { userAgent: ARC, maxTouchPoints: 0 }, '/deadwax/navidrome/stream/3?format=raw'],
+  ]) {
+    const p = page({ ...options, durations: ALBUM })
+    const [e0] = elements
+    putBack(p, tracks(['1', '2', '3', '4']), 2, 95)
+    const lines = await traced(() => tap(() => p.player.toggle()))
+    const probe = options.userAgent === IPHONE ? [`fetch ${address} bytes=0-1`] : []
+    check(`${name}: the song's address, play() in the tap, the second set while it is still loading`,
+      elementWrites(lines), [`e0 src ${address}`, 'e0 play()', ...probe, 'e0 currentTime 95'])
+    await run(1_000)
+    check(`${name}: 'seeked' at 1:35, and playing on from there`, [e0.playingNow, near(e0.currentTime, 95.5, 0.4), near(p.player.position(), 95.5, 0.4)], [true, true, true])
+  }
+  for (const [name, options] of [['iPhone', { userAgent: IPHONE, maxTouchPoints: 5 }], ['Chromium', { userAgent: ARC, maxTouchPoints: 0 }]]) {
+    //? a hi-res song under 48 kHz, and a levelled entry: the address any tap asks
+    let p = page({ ...options, durations: { 3: { duration: 100, rate: 192000 }, 4: 30 } })
+    putBack(p, hiresTracks(['3', '4']), 0, 40)
+    tap(() => p.player.toggle())
+    check(`${name}: a hi-res song under 48 kHz asks its resampled copy`, elements[0].getAttribute('src'), '/deadwax/navidrome/stream/3?format=raw&wrap=mp4&max_rate=48000')
+    p = page({ ...options, durations: ALBUM })
+    putBack(p, levelledTracks(cd(['3', '4'])), 0, 40)
+    tap(() => p.player.toggle())
+    check(`${name}: a levelled entry asks its level`, elements[0].getAttribute('src'), '/deadwax/navidrome/stream/3?format=raw&wrap=mp4&level=album')
+  }
+  {
+    const p = streamPage({ durations: ALBUM })
+    putBack(p, levelledTracks(cd(['3', '4'])), 0, 40)
+    const lines = await traced(() => tap(() => p.player.toggle()), 500)
+    const asked = lines.filter((line) => line.startsWith('fetch ')).map((line) => line.split(' ')[1])
+    check('one stream: a levelled entry\'s head and pieces all asked at its level, in its fmp4 address',
+      [asked[0], asked.length > 1 && asked.every((address) => address.endsWith('&wrap=fmp4&level=album'))], ['/deadwax/navidrome/stream/3?format=raw&wrap=fmp4&level=album', true])
+  }
+
+  console.log('\nthe lock screen on a queue put back: its play is the tap\'s, its seekto moves the second')
+  {
+    const recordOf = async (how) => {
+      const p = page({ userAgent: IPHONE, maxTouchPoints: 5, durations: ALBUM })
+      putBack(p, tracks(['1', '2', '3', '4']), 2, 95)
+      return traced(() => tap(() => how(p)), 2_000)
+    }
+    const byToggle = await recordOf((p) => p.player.toggle())
+    const byLockScreen = await recordOf(() => media.handlers.play())
+    check('the lock screen\'s play makes, line for line, the trace toggle() makes', [byLockScreen.length > 4, byLockScreen], [true, byToggle])
+    const p = page({ durations: ALBUM })
+    putBack(p, tracks(['1', '2', '3', '4']), 2, 95)
+    const lines = await traced(() => media.handlers.seekto({ seekTime: 30 }), 500)
+    check('...its seekto moves the second put back, and loads nothing', [p.player.position(), p.lastHeard(), lines], [30, 30, ['lock screen at 30 of 100']])
+  }
+
+  console.log('\nevery other action on a queue put back')
+  {
+    const list = () => tracks(['1', '2', '3', '4'])
+    let p = page({ userAgent: ARC, maxTouchPoints: 0, durations: ALBUM })
+    putBack(p, list(), 2, 95)
+    let lines = await traced(() => tap(() => p.player.previous()), 500)
+    check('Previous at 1:35: the song again from the top - still put back, at 0:00, nothing loaded',
+      [p.player.track?.id, p.player.position(), p.lastHeard(), elementWrites(lines)], ['3', 0, 0, []])
+    p = page({ userAgent: ARC, maxTouchPoints: 0, durations: ALBUM })
+    putBack(p, list(), 2, 1)
+    lines = await traced(() => tap(() => p.player.previous()), 1_000)
+    check('Previous at 0:01: the song before, loaded paused', [p.player.track?.id, p.player.playing, elementWrites(lines)],
+      ['2', false, ['e0 src /deadwax/navidrome/stream/2?format=raw']])
+    p = page({ userAgent: ARC, maxTouchPoints: 0, durations: ALBUM })
+    putBack(p, list(), 2, 95)
+    const fromParked = await traced(() => tap(() => p.player.next()), 1_000)
+    const q = page({ userAgent: ARC, maxTouchPoints: 0, durations: ALBUM })
+    tap(() => q.player.playTracks(list(), 2))
+    await run(1_000)
+    tap(() => q.player.toggle())
+    await run(500)
+    const fromPaused = await traced(() => tap(() => q.player.next()), 1_000)
+    check('Next: the song after loaded paused - line for line what Next on a paused queue does today',
+      [p.player.track?.id, p.player.playing, fromParked], ['4', false, fromPaused])
+    p = page({ userAgent: ARC, maxTouchPoints: 0, durations: ALBUM })
+    putBack(p, list(), 0, 95)
+    const row = keyIn(p, '3')
+    tap(() => p.player.jumpTo(row))
+    await run(1_000)
+    check('a row\'s tap in Up Next: that song, playing', [p.player.track?.id, p.player.playing, elements[0].getAttribute('src')], ['3', true, '/deadwax/navidrome/stream/3?format=raw'])
+    p = page({ userAgent: ARC, maxTouchPoints: 0, durations: { ...ALBUM, 9: 60 } })
+    putBack(p, list(), 2, 95)
+    let started = null
+    lines = await traced(() => tap(() => { started = p.player.playNext(tracks(['9'])) }), 500)
+    check('Play Next: after the song put back, nothing loaded, still at 1:35', [started, comingIds(p), elementWrites(lines), p.player.position()], [false, ['9', '4'], [], 95])
+    p = page({ userAgent: ARC, maxTouchPoints: 0, durations: ALBUM })
+    putBack(p, list(), 2, 95)
+    lines = await traced(() => tap(() => p.player.setShuffle(true)), 500)
+    check('Shuffle on: an edit - the song put back stays, nothing loaded', [p.player.shuffle, p.player.track?.id, p.player.position(), elementWrites(lines)], [true, '3', 95, []])
+    p = page({ userAgent: ARC, maxTouchPoints: 0, durations: ALBUM })
+    putBack(p, list(), 2, 95)
+    lines = await traced(() => tap(() => p.player.seek(42)), 500)
+    check('the scrubber: the second put back moves - told the bar and the lock screen, nothing loaded',
+      [p.player.position(), p.lastHeard(), lines], [42, 42, ['lock screen at 42 of 100']])
+    p = page({ userAgent: ARC, maxTouchPoints: 0, durations: { ...ALBUM, 8: 60 } })
+    p.player.restoreQueue(UP.startUpNext(list(), 2, false, Math.random, { token: 'tok', total: 5, fetched: 4, scope: 'yours' }), 95)
+    lines = await traced(() => p.player.extendQueue('tok', tracks(['8'])), 500)
+    check('the shuffle\'s feed: its page appended, nothing loaded', [comingIds(p), elementWrites(lines), p.player.position()], [['4', '8'], [], 95])
+    p = page({ userAgent: ARC, maxTouchPoints: 0, durations: ALBUM })
+    putBack(p, list(), 2, 95)
+    lines = await traced(() => tap(() => p.player.setGapless(true)), 500)
+    check('Gapless on: the second element made and unlocked in the tap, nothing loaded on either',
+      [elements.length, elements[1].unlocked, elementWrites(lines).filter((line) => !/^e1 load\(\)$/.test(line)), p.player.position()], [2, true, [], 95])
+  }
+
+  console.log('\nan album from a tap after a queue was put back: exactly today\'s path')
+  for (const [name, make] of [
+    ['Chromium, one element', () => page({ userAgent: ARC, maxTouchPoints: 0, durations: ALBUM })],
+    ['iPhone, one element', () => page({ userAgent: IPHONE, maxTouchPoints: 5, durations: ALBUM })],
+    ['iPhone, one stream', () => streamPage({ durations: ALBUM })],
+    ['Chromium, one stream', () => streamPage({ mse: 'plain', userAgent: ARC, maxTouchPoints: 0, durations: ALBUM })],
+  ]) {
+    const fresh = make()
+    const today = await traced(() => tap(() => fresh.player.playTracks(tracks(['1', '2']), 0)), 4_000)
+    const parked = make()
+    putBack(parked, tracks(['3', '4']), 0, 95)
+    const after = await traced(() => tap(() => parked.player.playTracks(tracks(['1', '2']), 0)), 4_000)
+    check(`${name}: event for event the trace a fresh page's tap makes`, [after.length > 3, after], [true, today])
+    check(`${name}: ...and position() the element's again`, near(parked.player.position(), fresh.player.position(), 1e-6), true)
+  }
+
+  console.log('\nplay on a queue put back is playTracks plus a seek, in one tap')
+  for (const [name, make] of [
+    ['iPhone, the URL way', () => page({ userAgent: IPHONE, maxTouchPoints: 5, durations: ALBUM })],
+    ['iPhone, one stream', () => streamPage({ durations: ALBUM })],
+    ['Chromium, one stream', () => streamPage({ mse: 'plain', userAgent: ARC, maxTouchPoints: 0, durations: ALBUM })],
+  ]) {
+    const parked = make()
+    putBack(parked, tracks(['1', '2', '3', '4']), 2, 95)
+    const resumed = await traced(() => tap(() => parked.player.toggle()), 4_000)
+    const tapped = make()
+    const asTap = await traced(() => tap(() => { tapped.player.playTracks(tracks(['1', '2', '3', '4']), 2); tapped.player.seek(95) }), 4_000)
+    check(`${name}: line for line the trace of playTracks(its songs, 2) and seek(95) in one tap`, [resumed.length > 4, resumed], [true, asTap])
+  }
+
+  //? the section's own wrappers let go of
+  proto64.play = before64.play
+  proto64.load = before64.load
+  proto64.removeAttribute = before64.removeAttribute
+  Object.defineProperty(proto64, 'src', before64.src)
+  Object.defineProperty(proto64, 'srcObject', before64.srcObject)
+  Object.defineProperty(proto64, 'currentTime', before64.currentTime)
+  define('fetch', before64.fetch)
+  delete media.metadata
+  delete media.playbackState
+  media.metadata = shownMeta
+  media.playbackState = shownState
+  media.setPositionState = before64.setPositionState
+
   Object.defineProperty(FakeAudio.prototype, 'src', srcBefore)
   define('fetch', fetchBefore)
 

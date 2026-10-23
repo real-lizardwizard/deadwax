@@ -435,6 +435,28 @@ CREATE TABLE IF NOT EXISTS loudness (
     seconds     REAL NOT NULL,
     measured_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS play_queue (
+    -- (2.0.0-player.64) What each person was playing, as deadwax last saved it - beside Navidrome's own play queue
+    -- (savePlayQueueByIndex, as them), which is the interchange any Subsonic app sees and the authority on what was
+    -- played last. Navidrome holds only the ids, the current index and the position; this holds what it can't: the
+    -- page's account of Up Next (`snapshot`, opaque JSON only the page reads - Playing Next, the shuffle, the paged
+    -- shuffle, levels), the device that saved it, and two counters - `rev`, bumped by every save, and `ids_rev`, the
+    -- rev of the last save that sent the ids, which a position save must name (a 409 otherwise: another device
+    -- replaced the ids since). Keyed on src/users.py's user - `local` with logins off, one queue for everyone - and
+    -- forgotten with the person (PERSON_TABLES). Never taken over by adopt_local: local's describes the shared
+    -- account's Navidrome queue, not the admin's. src/play_queue.py and notes/app.md say how the two are read.
+    user        TEXT PRIMARY KEY,
+    rev         INTEGER NOT NULL,
+    ids_rev     INTEGER NOT NULL,
+    ids         TEXT NOT NULL,      -- a JSON list of Navidrome song ids, in order, duplicates kept
+    idx         INTEGER NOT NULL,   -- the song playing, an index into ids
+    position    REAL NOT NULL,      -- seconds into it
+    snapshot    TEXT,
+    device      TEXT NOT NULL,
+    label       TEXT NOT NULL,
+    saved_at    TEXT NOT NULL
+);
 """
 
 #? (2.0.0-player.51) the states a library entry is held in - waiting or starred - beside `removed`
@@ -476,7 +498,7 @@ SESSION_COLUMNS = {
 #? name, which People's removal and Forget clear in one transaction (forget_person), sessions FIRST so
 #? live_credentials can't copy a session's login back in. The value: what of it is a "live" row, counted.
 PERSON_TABLES = ("sessions", "user_credentials", "library_membership", "pins", "user_prefs", "job_requests",
-                 "permissions")
+                 "permissions", "play_queue")
 
 #? (2.0.0-player.61) The break-glass admin's name until then, and its name since (src/auth.py BREAK_GLASS_USER) - for
 #? the one-time step below. Literals: src/auth.py imports this module.
@@ -3025,7 +3047,7 @@ class JobStore:
     def known_users(self) -> dict[str, dict]:
         """
         Every name deadwax keeps anything for - sessions, a kept login, library entries, pins, Getting albums
-        settings, requests, permissions - with how much of each: what People's "Known only to deadwax" lists
+        settings, requests, permissions, (2.0.0-player.64) a play queue - with how much of each: what People's "Known only to deadwax" lists
         for the names Navidrome has no account for. Never a reserved name (`local` is logins-off's user).
         """
         from src.auth import RESERVED_NAMES
@@ -3033,7 +3055,7 @@ class JobStore:
 
         def of(user):
             return found.setdefault(user, {"user": user, "sessions": 0, "credential": False, "library": 0, "pins": 0,
-                                           "preferences": False, "requests": 0, "permissions": 0})
+                                           "preferences": False, "requests": 0, "permissions": 0, "queue": False})
 
         with self._connect() as connection:
             for row in connection.execute("SELECT user, COUNT(*) AS n FROM sessions GROUP BY user"):
@@ -3057,6 +3079,10 @@ class JobStore:
                 of(row["user"])
             for row in connection.execute("SELECT user, COUNT(*) AS n FROM permissions GROUP BY user"):
                 of(row["user"])["permissions"] = row["n"]
+            #? (2.0.0-player.64) the play queue deadwax keeps beside Navidrome's - a name with only that left is one
+            #? keeps_anything refuses a new account for, so it is listed here, to be forgotten
+            for row in connection.execute("SELECT user FROM play_queue"):
+                of(row["user"])["queue"] = True
         return {user: facts for user, facts in found.items() if user not in RESERVED_NAMES}
 
     def keeps_anything(self, user: str) -> bool:
@@ -3069,7 +3095,8 @@ class JobStore:
     def forget_person(self, user: str) -> dict[str, int]:
         """
         Everything deadwax keeps under `user`, gone - sessions first (so live_credentials can't copy one's login
-        back in), then their kept login, library, pins, Getting albums settings, requests and permissions - in
+        back in), then their kept login, library, pins, Getting albums settings, requests, permissions and
+        (2.0.0-player.64) play queue - in
         ONE immediate transaction: all of it or none. How many rows of each. Never for a reserved name
         (ValueError): `local` is logins-off's user, and `deadwax` the break-glass admin's. The store's albums,
         the jobs (a download only they wanted carries on and files for nobody) and library_flags' history stay.
@@ -3107,6 +3134,49 @@ class JobStore:
             return connection.execute(
                 f"DELETE FROM permissions WHERE user = ? AND permission IN ({', '.join('?' * len(which))})",
                 (user, *which)).rowcount
+
+    # ----- the play queue kept beside Navidrome's (2.0.0-player.64, src/play_queue.py; SYNCHRONOUS; they raise)
+
+    def play_queue(self, user: str) -> dict | None:
+        """`user`'s record as the routes read it - its ids a list, its index `index` - or None for none."""
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT rev, ids_rev, ids, idx, position, snapshot, device, label FROM play_queue WHERE user = ?",
+                (user,)).fetchone()
+        if row is None:
+            return None
+        return {"rev": row["rev"], "ids_rev": row["ids_rev"], "ids": json.loads(row["ids"]), "index": row["idx"],
+                "position": row["position"], "snapshot": row["snapshot"], "device": row["device"], "label": row["label"]}
+
+    def put_play_queue(self, user: str, ids: list[str], index: int, position: float, snapshot: str | None,
+                       device: str, label: str) -> tuple[int, int]:
+        """A full save, written once Navidrome took it: everything replaced, `rev` one more and `ids_rev` = rev - the
+        ids a position save must name from now on. (rev, ids_rev)."""
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            held = connection.execute("SELECT rev FROM play_queue WHERE user = ?", (user,)).fetchone()
+            rev = (held["rev"] if held else 0) + 1
+            connection.execute(
+                "INSERT OR REPLACE INTO play_queue (user, rev, ids_rev, ids, idx, position, snapshot, device, label, saved_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (user, rev, rev, json.dumps(list(ids)), index, position, snapshot, device, label, _now()))
+        return rev, rev
+
+    def move_play_queue(self, user: str, ids_rev: int, index: int, position: float, device: str,
+                        label: str) -> tuple[int, int] | None:
+        """A position save against the ids of the full save `ids_rev`: the index, position, device and label moved,
+        `rev` one more, the ids and the snapshot as they were. None when there is no record or its ids are another
+        save's (nothing written)."""
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            held = connection.execute("SELECT rev, ids_rev FROM play_queue WHERE user = ?", (user,)).fetchone()
+            if held is None or held["ids_rev"] != ids_rev:
+                return None
+            rev = held["rev"] + 1
+            connection.execute(
+                "UPDATE play_queue SET rev = ?, idx = ?, position = ?, device = ?, label = ?, saved_at = ? WHERE user = ?",
+                (rev, index, position, device, label, _now(), user))
+        return rev, ids_rev
 
     # ----- the store seeded into the first admin's library, once ever (SYNCHRONOUS; raises)
 

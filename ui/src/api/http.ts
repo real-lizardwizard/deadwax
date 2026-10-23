@@ -81,6 +81,12 @@ export function newSession(): void {
   session += 1
 }
 
+/** (2.0.0-player.64) Which session the page's requests go out under now - app/useResume.ts stops saving the play queue
+ *  at a 401 until it is another (someone signed in since). */
+export function currentSession(): number {
+  return session
+}
+
 function noteSignedOut(path: string, status: number, detail: string | null, sentUnder: number): void {
   if (status !== 401 || path.startsWith('/auth/') || sentUnder !== session) return
   if (typeof globalThis.dispatchEvent !== 'function') return
@@ -133,7 +139,7 @@ export function put<T>(path: string, body?: unknown): Promise<T> {
   })
 }
 
-export function post<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+export function post<T>(path: string, body?: unknown, signal?: AbortSignal, keepalive = false): Promise<T> {
   return request<T>(path, {
     method: 'POST',
     ...(body === undefined
@@ -141,6 +147,8 @@ export function post<T>(path: string, body?: unknown, signal?: AbortSignal): Pro
       : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
     //? lib/latest.ts aborts a request that has been superseded - see there
     ...(signal ? { signal } : {}),
+    //? (2.0.0-player.64) sent on as the page goes away - the play queue's last save (app/useResume.ts)
+    ...(keepalive ? { keepalive: true } : {}),
   })
 }
 

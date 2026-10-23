@@ -212,6 +212,9 @@ def test_every_navidrome_route_asks_through_client_for(upstream, client, monkeyp
         "/deadwax/navidrome/album_index?scope=store",
         #? 2.0.0-player.62: Info's level of a song - the song confirmed the asker's through the seam (_theirs)
         "/deadwax/navidrome/level/so-1?level=album",
+        #? 2.0.0-player.64: the play queue read as the asker (its two saves ask through the seam too, once deadwax's
+        #? database is there to keep the record - this app has none: tests/test_play_queue.py walks them as ethan)
+        "/deadwax/navidrome/queue",
     ]
     for path in paths:
         client.get(path)
@@ -238,7 +241,7 @@ def test_every_navidrome_route_asks_through_client_for(upstream, client, monkeyp
     #? step 6 checks a user's access at the route. And /shuffle/{token} (2.0.0-player.57) asks Navidrome nothing: it
     #? pages deadwax's own order of what /shuffle read through the seam
     assert {"/scrub/{song_id}", "/shuffle/{token}"} <= {route.path for route in navidrome_routes.router.routes}
-    assert len({route.path for route in navidrome_routes.router.routes}) == 21
+    assert len({route.path for route in navidrome_routes.router.routes}) == 23
 
 
 def test_the_turntables_internal_call_asks_through_client_for(monkeypatch, tmp_path, configured):

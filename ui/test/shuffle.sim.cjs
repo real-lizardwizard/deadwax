@@ -364,6 +364,8 @@ const songs = (from, count, prefix = 's') => Array.from({ length: count }, (_, i
     await turn()
     check('...appended as the rest of this round, the shuffle from then on the new one, the notice said once',
       [extended, player.queue.upNext.marks[200].pass, player.queue.upNext.paged.token, S.said], [[['old', 200, { token: 'new', total: 450, fetched: 0, scope: 'yours' }]], 0, 'new', [F.SHUFFLE_STARTED_OVER]])
+    //? (2.0.0-player.64) the words: an order a day old (a shuffle picked up again later) is no restart
+    check('...in words true of a restart and of a day-old order alike', F.SHUFFLE_STARTED_OVER, 'Your shuffle started over - deadwax no longer had its order')
     const plain = { queue: U.startUpNext(tracks(songs(1, 3)), 0), repeat: 'all', extendQueue: () => extended.push('plain') }
     const quiet = hooks.root(() => F.useShuffleFeed(plain))
     S.asks.length = 0

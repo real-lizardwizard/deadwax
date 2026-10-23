@@ -44,6 +44,8 @@ export interface KnownOnly {
   preferences: boolean
   requests: number
   permissions: number
+  /** (2.0.0-player.64) the play queue deadwax keeps beside Navidrome's */
+  queue?: boolean
 }
 
 export interface PeopleState {

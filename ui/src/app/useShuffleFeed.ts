@@ -14,8 +14,10 @@ import { sayPins } from './usePins'
 export const FEED_BELOW = 50
 /** A page that wouldn't come is asked for again this long after, while the queue still has songs. */
 export const FEED_RETRY_MS = 30_000
-/** What the app's notice says, once, when the shuffle's order had gone from deadwax and a fresh one took over. */
-export const SHUFFLE_STARTED_OVER = 'Your shuffle started over - deadwax had restarted'
+/** What the app's notice says, once, when the shuffle's order had gone from deadwax and a fresh one took over - a
+ *  restart, or (2.0.0-player.64) a day without it being asked for, which a shuffle picked up again after a while
+ *  meets: "had restarted" would be untrue then. */
+export const SHUFFLE_STARTED_OVER = 'Your shuffle started over - deadwax no longer had its order'
 
 /** A song of a shuffle as the queue takes it: its album known only by its id and name (Info asks for the rest). */
 export function shuffledTrack(song: Song): QueueTrack {
@@ -49,7 +51,8 @@ export function songsAhead(queue: UpNextQueue): number {
  * All a fresh order (shuffleStart - the list built again if it is old, so songs added since are in it) as the next
  * time round, never starting with the song that ends this one (startingElsewhere); with Repeat off nothing, and the
  * queue ends after the last song, every song heard once. The order
- * gone from deadwax (a 404 - it restarted, or a day untouched): a fresh order as the rest of this round, said once.
+ * gone from deadwax (a 404 - it restarted, or a day untouched, as a shuffle put back by app/useResume.ts can be): a
+ * fresh order as the rest of this round, said once.
  * A page that won't come is asked again after FEED_RETRY_MS while the queue still has songs; the music plays on.
  * Its fresh orders are asked for `claim`ed - they play at once, so deadwax keeps them as orders playing. Repeat
  * turned off (or to One) while a fresh round is on its way lets the ask go, and an answer that lands anyway is

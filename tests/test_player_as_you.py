@@ -93,8 +93,11 @@ class Player(Navidrome):
     """
 
     PLAYLIST_CALLS = frozenset({"getPlaylists", "getPlaylist", "createPlaylist", "updatePlaylist", "deletePlaylist"})
+    #? (2.0.0-player.64) Navidrome's play queue, one per user, as server/subsonic/bookmarks.go and
+    #? persistence/playqueue_repository.go keep it at 0.64.2 - see play_queue_call
+    QUEUE_CALLS = frozenset({"getPlayQueue", "getPlayQueueByIndex", "savePlayQueue", "savePlayQueueByIndex"})
     PLAYER_CALLS = frozenset({"ping", "getAlbumList2", "getArtists", "getArtist", "getSong", "getCoverArt",
-                              "stream", "scrobble"}) | PLAYLIST_CALLS
+                              "stream", "scrobble"}) | PLAYLIST_CALLS | QUEUE_CALLS
 
     def __init__(self):
         super().__init__()
@@ -115,6 +118,10 @@ class Player(Navidrome):
         #? a user's name as Navidrome stores it - what `owner` says
         self.stored_names: dict[str, str] = {}
         self.playlist_calls: list[dict] = []
+        #? (2.0.0-player.64) each user's play queue - ids (as stored, comma-joined in Navidrome), current index,
+        #? position (ms), changedBy (the `c` of the call that saved) and changed - and every play queue call kept
+        self.queues: dict[str, dict] = {}
+        self.queue_calls: list[dict] = []
         self.ticks = 0
         #? one playlist owned by each account the walk asks as - ethan, and the shared `demo` (logins off,
         #? break-glass) - and a private one of james's nobody else may see
@@ -212,6 +219,51 @@ class Player(Navidrome):
         held["changed"] = self.tick()
         return httpx.Response(200, json=ok())
 
+    def play_queue_call(self, endpoint: str, user: str, values: dict[str, list[str]]) -> httpx.Response:
+        """
+        Navidrome's play queue as 0.64.2 keeps it (server/subsonic/bookmarks.go, persistence/playqueue_repository.go):
+        ONE per user. savePlayQueueByIndex takes `id` repeated and - with any ids - a `currentIndex` inside them, else
+        error 10; savePlayQueue finds `current` by the FIRST id equal to it (0 when none is); either with no ids clears
+        the queue; `position` an int64, 0 when it isn't one; `changedBy` the request's `c`, `changed` the server's
+        time. getPlayQueueByIndex drops songs it no longer has, in order, and answers the STORED index unchanged; an
+        empty queue answers only the username, the zero time and an empty changedBy.
+        """
+        one = lambda key: (values.get(key) or [None])[0]
+        if endpoint in ("savePlayQueue", "savePlayQueueByIndex"):
+            ids = list(values.get("id") or [])
+            try:
+                position = int(one("position") or 0)
+            except ValueError:
+                position = 0
+            current = 0
+            if endpoint == "savePlayQueueByIndex" and ids:
+                try:
+                    current = int(one("currentIndex"))
+                except (TypeError, ValueError):
+                    current = -1
+                if current < 0 or current >= len(ids):
+                    return httpx.Response(200, json=failed(10, "missing parameter index, err: required 'currentIndex' parameter is missing"))
+            elif endpoint == "savePlayQueue":
+                current = next((i for i, song in enumerate(ids) if song == one("current")), 0)
+            self.queues.pop(user, None)
+            if ids:
+                self.queues[user] = {"ids": ids, "current": current, "position": position,
+                                     "changedBy": one("c") or "", "changed": self.tick()}
+            return httpx.Response(200, json=ok())
+        held = self.queues.get(user)
+        entries = [self.songs[song] for song in (held or {}).get("ids", []) if song in self.songs]
+        key = "playQueueByIndex" if endpoint == "getPlayQueueByIndex" else "playQueue"
+        if not entries:
+            return httpx.Response(200, json=ok(**{key: {"username": user, "changed": "0001-01-01T00:00:00Z", "changedBy": ""}}))
+        body = {"entry": entries, "username": user, "changed": held["changed"], "changedBy": held["changedBy"]}
+        if held["position"]:
+            body["position"] = held["position"]
+        if endpoint == "getPlayQueueByIndex":
+            body["currentIndex"] = held["current"]
+        elif 0 <= held["current"] < len(entries):
+            body["current"] = entries[held["current"]]["id"]
+        return httpx.Response(200, json=ok(**{key: body}))
+
     def handle(self, request: httpx.Request) -> httpx.Response:
         endpoint = request.url.path.removeprefix("/rest/")
         if endpoint not in self.PLAYER_CALLS:
@@ -228,6 +280,8 @@ class Player(Navidrome):
         self.calls.append((user, endpoint, q))
         if endpoint in self.PLAYLIST_CALLS:
             self.playlist_calls.append({"user": user, "endpoint": endpoint, "form": form, "query": query, "values": values})
+        if endpoint in self.QUEUE_CALLS:
+            self.queue_calls.append({"user": user, "endpoint": endpoint, "form": form, "query": query, "values": values})
         if self.down:
             raise httpx.ConnectError("connection refused")
         token = hashlib.md5((self.passwords.get(user, "") + q.get("s", "")).encode()).hexdigest()
@@ -237,6 +291,8 @@ class Player(Navidrome):
             return self.errors[(user, endpoint)]
         if endpoint in self.PLAYLIST_CALLS:
             return self.playlist_call(endpoint, user, values)
+        if endpoint in self.QUEUE_CALLS:
+            return self.play_queue_call(endpoint, user, values)
         if q.get("id") in self.hidden.get(user, set()):
             return httpx.Response(200, json=failed(70, "Song not found"))
         stars = self.starred(user)
@@ -357,6 +413,12 @@ WALK = {
     #? (2.0.0-player.62) Normalization: Info's level of a song, and an album page's "measure this album" (a 202)
     "/level/{song_id}": [("get", f"/level/{SONG}?level=track")],
     "/level/album/{album_id}": [("post", "/level/album/nd-dummy")],
+    #? (2.0.0-player.64) resume what was playing: read, a full save, then a position save against its ids (the first
+    #? full save of a fresh database is rev 1)
+    "/queue": [("get", "/queue"), ("post", "/queue", {"ids": [SONG, SONG], "index": 1, "position": 12.5,
+                                                         "device": "walk-device-1", "label": "Mac", "snapshot": None})],
+    "/queue/at": [("post", "/queue/at", {"ids_rev": 1, "index": 0, "position": 3.0, "device": "walk-device-1",
+                                         "label": "Mac"})],
 }
 
 #? whose playlist the walk's `{mine}` is, by who asks
@@ -427,6 +489,12 @@ def test_every_player_route_asks_navidrome_as_the_signed_in_user(player):
     assert made[f"/stream/{SONG}?format=raw"] == [("ethan", "stream")]
     #? his play counted for him alone - never the shared account, never james
     assert player.fake.plays == {("ethan", SONG): 1}
+    #? (2.0.0-player.64) his queue is his: Navidrome's as ethan, by index, as forms; deadwax's record under his name
+    assert [made["/queue"], made["POST /queue"], made["POST /queue/at"]] == [
+        [("ethan", "getPlayQueueByIndex")], [("ethan", "savePlayQueueByIndex")], [("ethan", "savePlayQueueByIndex")]]
+    assert all(call["form"] for call in player.fake.queue_calls if call["endpoint"].startswith("save"))
+    assert set(player.fake.queues) == {"ethan"} and player.fake.queues["ethan"]["ids"] == [SONG, SONG]
+    assert player.store.play_queue("ethan")["rev"] == 2 and player.store.play_queue("demo") is None
 
 
 def test_with_logins_off_every_call_is_the_shared_accounts_and_nothing_is_checked(player, monkeypatch):
@@ -436,6 +504,8 @@ def test_with_logins_off_every_call_is_the_shared_accounts_and_nothing_is_checke
     assert {user for calls in made.values() for user, _ in calls} == {"demo"}
     assert all(endpoint != "getSong" for path, calls in made.items() if "/songs/" not in path for _, endpoint in calls)
     assert player.fake.plays == {("demo", SONG): 1}
+    #? (2.0.0-player.64) one queue for everyone: the shared account's in Navidrome, local's in deadwax
+    assert set(player.fake.queues) == {"demo"} and player.store.play_queue("local")["rev"] == 2
 
 
 def test_the_break_glass_admin_plays_as_the_shared_account(player):
@@ -443,6 +513,9 @@ def test_the_break_glass_admin_plays_as_the_shared_account(player):
 
     assert {user for calls in made.values() for user, _ in calls} == {"demo"}
     assert ("demo", "getSong") not in made[f"/stream/{SONG}?format=raw&wrap=mp4"]
+    #? (2.0.0-player.64) it keeps no queue: the shared account's (which may be a person's) asked nothing, nothing written
+    assert [made["/queue"], made["POST /queue"], made["POST /queue/at"]] == [[], [], []]
+    assert player.fake.queues == {} and player.store.play_queue(auth.BREAK_GLASS_USER) is None
 
 
 def names_the_shared_client(source: str) -> bool:

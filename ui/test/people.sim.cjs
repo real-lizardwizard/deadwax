@@ -94,7 +94,7 @@ console.log('\nRemove')
 const lines = L.removeLines(person({ signed_in: 2, waiting_alone: 1 }))
 check('what goes, what stays, from the server\'s numbers', [lines.navidrome, lines.deadwax, lines.stays, lines.undo], [
   "In Navidrome, for good: ethan's account, their play counts and play history, their favourites (the 312 albums in their library), all their playlists - shared ones too - and their Last.fm or ListenBrainz link.",
-  'In deadwax: their sign-ins (2 devices), their library list, their pins, Getting albums settings and permissions.',
+  'In deadwax: their sign-ins (2 devices), their library list, their pins, their play queue, Getting albums settings and permissions.',
   'Stays: every album in the store. 1 download only they are waiting for carries on and is filed for nobody - cancel it in Requests first if nobody wants it.',
   "There's no undo. If they might come back, reset their password instead."])
 check('...no numbers where there are none - never "the 0 albums" or "(0 devices)"', [L.removeLines(person({ library: 0 })).navidrome.includes('their favourites, all'), L.removeLines(person()).deadwax.startsWith('In deadwax: their sign-ins, their')],
@@ -118,6 +118,9 @@ check('after a change', [L.madeWords('ethan2', 'http://deadwax.lan:8080'), L.res
     'Done. ethan is signed out of deadwax on 2 devices and signs in with the new password - Amperfy and any other app they use need it too.'])
 check('Known only to deadwax: what is kept', L.knownWords({ user: 'olduser', sessions: 0, credential: true, library: 12, pins: 3, preferences: true, requests: 1, permissions: 0 }),
   'deadwax keeps a kept login, 12 albums in their library, 3 pins, Getting albums settings, 1 request.')
+//? (2.0.0-player.64) a name with only a play queue left - which still keeps a new account of that name from being made
+check('...a play queue alone, said', L.knownWords({ user: 'olduser', sessions: 0, credential: false, library: 0, pins: 0, preferences: false, requests: 0, permissions: 0, queue: true }),
+  'deadwax keeps a play queue.')
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')
 process.exit(failures ? 1 : 0)

@@ -389,8 +389,9 @@ Previous always act on the song you're hearing: pressed in the instant one song 
 [one stream](#one-stream-for-flac), before the screen has caught up, Next goes to the song after the new one.
 
 **What is kept.** Repeat is remembered on the device, like Gapless. Shuffle belongs to what's playing (Play
-plays in order, Shuffle shuffles, and Up Next switches it), and the queue - Up Next with it - is gone when the
-page reloads or iOS closes the app, as it always was.
+plays in order, Shuffle shuffles, and Up Next switches it), and since 2.0.0-player.64 the queue - Up Next with it -
+comes back when the app is opened again, paused where it stopped
+([picking up where you left off](#picking-up-where-you-left-off)).
 
 ### Shuffling the whole library
 
@@ -405,10 +406,71 @@ The songs come to the phone 200 at a time as they're needed, so Up Next says the
 more songs."). With **Repeat All**, the end of the whole order starts a fresh one - songs added to the
 library meanwhile are in it; with Repeat off the queue ends once every song has played. The order is a
 snapshot: a song deleted since is skipped when its turn comes, and one added since comes in the next
-shuffle. If deadwax restarts mid-shuffle, the shuffle starts over with a fresh order (it says so, once), so
-songs already heard can come again. Turning Repeat off (or to One) once the next order has started coming
+shuffle. If deadwax restarts mid-shuffle - or a day passes without the shuffle being played, as when one is
+picked up again later - deadwax no longer has its order, and the shuffle starts over with a fresh one (it says
+so, once: "Your shuffle started over - deadwax no longer had its order"), so songs already heard can come again. Turning Repeat off (or to One) once the next order has started coming
 lets that order go, and the shuffle ends after the one playing. Up Next's Shuffle chip, and the desktop
 player bar's Shuffle, read on and can't be turned off for it - the order is the shuffle.
+
+## Picking up where you left off
+
+Since 2.0.0-player.64. Close the app - iOS clearing it from memory, a reload, the browser quit - and open it
+again, and what was playing is back: the song, the second it stopped at, and Up Next as it was (Playing Next,
+Shuffle, the rest of the album or list, a whole library's shuffle). It comes back **paused**: the mini player,
+and a desktop's player bar, show the song with the scrubber where it stopped, and nothing is loaded or played
+until you press play - iOS starts sound only from a tap. Play - on the mini player, the now-playing screen, the
+turntable, the desktop's player bar, Space in the visualizer, the lock screen - carries on from that second,
+the way any song plays: Gapless's one stream, FLAC in an MP4 on an iPhone, the resampled copy and
+Normalization all as they would be. Next, Previous, the scrubber, a song tapped in Up Next and Play Next work on
+it as on any paused queue, and anything else you play simply replaces it.
+
+**It follows you.** It's kept as your **play queue in Navidrome** - with logins on, your own, as you - with
+deadwax's account of Up Next beside it in its own database (Navidrome keeps only the songs, which one is
+playing and how far into it). So stop on the phone, open deadwax on the computer, and the computer has it. When
+it came from another of your devices, a line at the top says so, once - "Picked up from your iPhone" - and from
+another app, by its name - "Picked up from Symfonium". From the same device nothing is said.
+
+- **Other apps.** Navidrome keeps one play queue for each person, which a Subsonic app may read and save. One
+  another app saved comes back as a plain list - its songs in its order, at its song and second - without
+  Playing Next or the Shuffle chip, which only deadwax keeps. **Amperfy doesn't use Navidrome's play queue** (it
+  keeps its own on the phone), so it won't show what deadwax was playing, nor replace it - and deadwax won't
+  pick up what Amperfy was playing. Which other apps use it hasn't been checked.
+- **A device left paused** - the home-screen app iOS kept in memory, a computer's tab - takes what another of
+  your devices or apps played since as it comes back to the front, paused, with that line (with logins on).
+  Anything playing is never interrupted, and a change you made there that isn't saved yet is saved rather than
+  replaced. On a computer it asks half a second after the window comes forward, so a click on Play that brings
+  the window forward plays what it showed. A queue picked up and not played here since follows the other device
+  as it plays on - its song and second - without the line again, until it's other songs.
+- **With logins off** everyone shares one queue - the `NAVIDROME_USER` account's - as plays and playlists are
+  everybody's then, and the line says "Picked up from a Mac". A device opening with nothing queued picks it up
+  (and one whose queue was put back and not played since takes a newer one), but a paused player never takes
+  somebody else's.
+- **The break-glass admin** keeps no queue: nothing is put back or saved for it.
+
+**When it's saved.** Only as this device plays - opening the app saves nothing. A change of the songs or of Up
+Next is saved 2 seconds after the last change (a song change in the middle included); a song change
+alone a second after it; a pause at once; every 30
+seconds of playing; a scrub while paused a second after it; and whatever is due as the app goes to the
+background. So an app iOS closes in a pocket comes back from its last save, up to 30 seconds before where it
+stopped. None of it needs HTTPS.
+
+**Long queues, and songs gone.** At most 2,000 songs are kept: 50 before the song playing (what Previous walks)
+and the rest after it - a 5,000-song playlist played from the top keeps its next 1,950. A queue whose account of
+Up Next would be very long (over 262,144 characters, about 256 KB - a playlist of thousands of different songs)
+comes back as a plain list of those songs. A song whose file was deleted since stays in Navidrome as a *missing file*
+until it is purged - Navidrome's **Missing Files** page, or its `ND_SCANNER_PURGEMISSING` setting, which is `never`
+unless you set it - so until then it comes back with the rest, and is skipped as any song that won't play is when its
+turn comes (**Skipped "…" - it wouldn't play**). Once it's purged it isn't there at all: if it was the one playing, the
+next one is put back at 0:00. A song that had played to its end comes back as the next one, at 0:00 (the queue's last
+song: that song again, at 0:00).
+
+**What stays each device's.** Repeat, Gapless, Maximum quality and the speed stay as each device has them, and
+the queue put back follows this device's Repeat (Repeat One's copies made, a later time round dropped under
+Repeat off). So does Normalization: the levels are this device's setting's.
+
+**The lock screen** shows nothing after the app is opened again until the first play - iOS shows Now Playing
+only for something that has played - and then the song as usual. A play counts from your tap
+([how plays are counted](#how-plays-are-counted)).
 
 ## Artist pages
 
@@ -1958,6 +2020,9 @@ played" and Navidrome's own Last.fm or ListenBrainz scrobbling carry on working.
   another play. Pausing and carrying on is the same listen. So does a song heard again because of
   [Repeat](#up-next-shuffle-and-repeat) (since 2.0.0-player.57): each time round, and each repeat of a
   song, is a listen of its own, counted by the same rule.
+- **A queue [picked up](#picking-up-where-you-left-off)** (since 2.0.0-player.64) starts a new listen at your
+  tap: what was heard before the app closed isn't carried over. A song put back at 3:00 of 4:00 and heard to its
+  end is a minute heard - not a play, since that's under half of it.
 - Plays go to the `NAVIDROME_USER` account with logins off, and on to Last.fm or ListenBrainz if that
   account has them linked in Navidrome. With logins on they go to **your own**
   Navidrome account - the one you signed in with - and to your Last.fm or ListenBrainz
@@ -2218,8 +2283,9 @@ fixes that.
   a phone too; the browser preferences of its settings tab stay the main page's. The [visualizer](#the-visualizer)
   sees FLAC songs only; its play/pause is its one control of the music (skip and seek from the player
   bar, after leaving it).
-- **The queue doesn't survive iOS closing the app.** Reopen it after iOS has cleared it from
-  memory and nothing is queued - Up Next and its Shuffle with it; Repeat is kept.
+- **[Picking up where you left off](#picking-up-where-you-left-off)** comes back from the last save - up to 30
+  seconds early for an app iOS closed in a pocket - keeps 2,000 songs at most, and from another app's queue
+  only the songs, as a plain list. Amperfy keeps its own queue, which deadwax can't see.
 - **Up Next** (2.0.0-player.57) has no history of what played before the song playing (Previous walks it),
   no "keep playing similar music" after the list, no ••• on album tiles (an album's ••• is on its page),
   no long-press or right-click menu, and no way yet to save it as a playlist.
@@ -2255,6 +2321,14 @@ question the whole player existed to answer. Still to find out:
   [troubleshooting](troubleshooting.md)). And how long an album's first
   play waits for its measuring on the NAS, over WireGuard; and whether -18 LUFS is loud enough on AirPods;
 
+- **[picking up where you left off](#picking-up-where-you-left-off)** (2.0.0-player.64): whether iOS closing the
+  home-screen app lets its last save out as it goes to the background, or the last 30-second save is what comes
+  back - and whether those saves go out from a locked phone in a pocket; the lock screen after opening it again
+  (nothing until the first play, then the song put back with its cover, its second and previous/next), and
+  AirPods' play before any tap (likely nothing); the first tap's start at the saved second in the gapless
+  stream (the seek made before the song's start has come) and with Gapless off (Safari keeping the start set
+  while the MP4 loads); the app kept in memory for hours, brought back after the computer played on (it should
+  take the computer's queue); and how long its ask takes over WireGuard before the mini player shows the song;
 - whether the **lock-screen and Control Center controls** work;
 - whether **AirPlay** works;
 - **the Library's index** (2.0.0-player.59) under a real finger in the home-screen app - dragging down it

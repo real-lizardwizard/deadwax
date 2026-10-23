@@ -239,6 +239,11 @@
  *    App); the song rows' ••• (Search's, the Library's, an album page's) call App's menu, never the player;
  *    ActionsContext isn't widened; lib/upNext.ts is pure; Up Next and the menu are sheets by the one hook with locks
  *    of their own, Up Next's scroller Info's; Now Playing's icon row has Up next always, before •••.
+ *  - Resume what was playing (2.0.0-player.64): the engine's restoreQueue is reached only from app/useResume.ts, and
+ *    that hook reaches nothing else of the player; it is called once, in App, after useShuffleFeed; ActionsContext
+ *    isn't widened; lib/resume.ts is pure; neither new file needs a secure page (no randomUUID, no crypto.subtle) -
+ *    the device id is persisted.ts's, from crypto.getRandomValues; the open's ask goes through latestOnly(), and the
+ *    two saves through player/api.ts, the beacon by sendBeacon with its fallback.
  *  - The page's entry renders App, and the old shell and settings sheet are gone.
  *
  * Run it with:  node ui/test/app-rules.sim.cjs
@@ -336,13 +341,16 @@ const ALLOWED = {
   'app/useShuffleFeed.ts': ['extendQueue'],
   //? playlists (2.0.0-player.58): a playlist's Play, Shuffle and a row's tap - its songs, all in hand
   'app/PlaylistPage.tsx': ['playTracks'],
+  //? (2.0.0-player.64) resume what was playing: a queue put back paused - nothing that plays (the next play is a tap's)
+  'app/useResume.ts': ['restoreQueue'],
 }
 
 /** Which playback actions a file's code reaches: by name, as a member, or taken apart from one. */
 function actionsIn(text) {
   const found = new Set()
   //? (2.0.0-player.57: and Up Next's, each distinctive enough to find by name, as setSpeed is)
-  for (const match of text.matchAll(/\b(playTracks|setGapless|showAirPlay|setSpeed|playNext|playLast|jumpTo|setShuffle|setRepeat|moveInQueue|removeFromQueue|clearPlayingNext|extendQueue)\b/g)) found.add(match[1])
+  //? (2.0.0-player.64: and restoreQueue)
+  for (const match of text.matchAll(/\b(playTracks|setGapless|showAirPlay|setSpeed|playNext|playLast|jumpTo|setShuffle|setRepeat|moveInQueue|removeFromQueue|clearPlayingNext|extendQueue|restoreQueue)\b/g)) found.add(match[1])
   //? toggle, next and previous are ordinary words, so only as a member - classList.toggle aside
   for (const match of text.matchAll(/(?<!classList)\.(toggle|next|previous)\b/g)) found.add(match[1])
   //? and taken out of an object: const { toggle } = player (the KEY taken - `{ nav: next }` takes nav)
@@ -412,6 +420,7 @@ console.log('\nthe playback actions only from the files allowed')
     'app/ShuffleSongs.tsx': ['playTracks'],
     'app/UpNext.tsx': ['clearPlayingNext', 'jumpTo', 'moveInQueue', 'removeFromQueue', 'setRepeat', 'setShuffle'],
     'app/context.ts': ['next', 'playTracks', 'previous', 'setGapless', 'showAirPlay', 'toggle'],
+    'app/useResume.ts': ['restoreQueue'],
     'app/useShuffleFeed.ts': ['extendQueue'],
     'player/AlbumPage.tsx': ['playTracks'],
     'player/MiniPlayer.tsx': ['next', 'toggle'],
@@ -2804,6 +2813,38 @@ console.log('\nInfo\'s Debug is an admin\'s (2.0.0-player.63): the role from /me
   check('nothing but Info draws Debug\'s sections or its test bench link',
     [files.filter((file) => /\bdebugSections\(/.test(code(read(file)))).sort(), files.filter((file) => /\bbenchRow\(|BENCH_ADDRESS/.test(code(read(file)))).sort()],
     [['app/InfoSheet.tsx', 'lib/debugRows.ts'], ['lib/debugRows.ts']])
+}
+
+console.log('\nresume what was playing (2.0.0-player.64): restoreQueue from its one hook, called once; the rules pure')
+{
+  const app = code(read('app/App.tsx'))
+  const hook = code(read('app/useResume.ts'))
+  const lib = code(read('lib/resume.ts'))
+  const persisted = code(read('state/persisted.ts'))
+  const api = code(read('player/api.ts'))
+  check('restoreQueue is reached from app/useResume.ts alone, and the hook reaches nothing else of the player',
+    [files.filter((file) => !ENGINE.has(file) && /\brestoreQueue\b/.test(code(read(file)))), actionsIn(hook)], [['app/useResume.ts'], ['restoreQueue']])
+  check('...called once in its answer\'s callback, nothing played - the next play is the ordinary toggle, in its tap',
+    [(hook.match(/\brestoreQueue\(/g) ?? []).length, /const put = player\.restoreQueue\(back\.queue, back\.position\)/.test(hook),
+      /\.(play|toggle|load)\(/.test(hook)], [1, true, false])
+  check('useResume is called once - in App, after the feed - and nowhere else',
+    [(app.match(/\buseResume\(/g) ?? []).length, /useShuffleFeed\(player\)\s*useResume\(player\)/.test(app),
+      files.filter((file) => file !== 'app/App.tsx' && file !== 'app/useResume.ts' && /\buseResume\(/.test(code(read(file))))], [1, true, []])
+  check('ActionsContext isn\'t widened: it names none of it',
+    /'playTracks' \| 'toggle' \| 'next' \| 'previous' \| 'seek' \| 'showAirPlay' \| 'setGapless' \| 'setMaxRate'\s*>/.test(code(read('app/context.ts'))) && !/restoreQueue/.test(code(read('app/context.ts'))), true)
+  check('lib/resume.ts is pure: no fetch, no page, no storage, no Preact, no playback, no clock of its own',
+    [/\bfetch\(|\bdocument\.|\bwindow\.|\bnavigator\.|localStorage|from 'preact|Date\.now|setTimeout/.test(lib), actionsIn(lib)], [false, []])
+  check('neither new file needs a secure page: no randomUUID, no crypto.subtle - the device id is persisted.ts\'s, getRandomValues or Math.random',
+    [/randomUUID|crypto\.subtle/.test(hook + lib + persisted), /crypto\.getRandomValues === 'function'/.test(persisted), /Math\.random\(\)/.test(persisted)], [false, true, true])
+  check('the open\'s ask through latestOnly(), and its answer only while the queue is still the one it was asked for',
+    [/const request = asks\.begin\(\)\s*resumeQueue\(request\.signal\)/.test(hook), /if \(!request\.current\(\)\) return/.test(hook),
+      /if \(queue !== asked \|\| playing\) return/.test(hook)], [true, true, true])
+  check('...the song\'s album asked through latestOnly() too, remembered only while that song still shows',
+    /const request = albums\.begin\(\)\s*album\(song\.albumId, request\.signal\)\.then\(\(found\) => \{\s*if \(request\.current\(\) && queue && current\(queue\)\?\.id === song\.id\) rememberAdded\(\[found\]\)/.test(hook), true)
+  check('the beacon: sendBeacon with a JSON Blob, a keepalive fetch where it is missing or refuses',
+    [/navigator\.sendBeacon\(address, new Blob\(\[text\], \{ type: 'application\/json' \}\)\)/.test(api), /if \(!sent\) \{\s*fetch\(address, \{ method: 'POST', keepalive: true/.test(api)], [true, true])
+  check('the hook\'s listeners are removed as it goes', ['visibilitychange', 'pageshow', 'focus', 'pagehide'].map((name) =>
+    new RegExp(`addEventListener\\('${name}'`).test(hook) && new RegExp(`removeEventListener\\('${name}'`).test(hook)), [true, true, true, true])
 }
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

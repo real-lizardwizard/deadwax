@@ -53,6 +53,10 @@ deadwax too, in **People**. Then, for each person:
 - **Their own player.** The app plays as them, so their plays, play counts, **Recently played** and
   **Not played in a while** are theirs, and plays go on to their own Last.fm or ListenBrainz if they
   linked one in Navidrome. ([The player as you](player.md#the-player-as-you-with-logins-on).)
+- **Their own queue.** What they were playing is kept as their own play queue in Navidrome, with deadwax's
+  account of Up Next beside it, so it follows them between devices: they stop on the phone, open deadwax on the
+  computer, and it's there, paused where they stopped. Nobody else's queue is ever put back for them.
+  ([Picking up where you left off](player.md#picking-up-where-you-left-off).)
 - **Their own playlists.** Playlists are Navidrome's, made as them, so they're theirs in Amperfy too.
   One they share (**Shared with everyone**) shows to the others under **Shared with you** - playable,
   but only its owner can change it. A private one is never shown to anyone else in deadwax - though
@@ -148,7 +152,8 @@ beat compose, so a wrong one could lock everyone out with no way back from the p
      password sign in an admin without asking Navidrome or reading deadwax's database - for when
      Navidrome is down, or nobody who can sign in is a Navidrome admin. It lasts 12 hours, and ends at
      once if the password changes. It has no Navidrome account behind it, so no library of its own,
-     its player plays as `NAVIDROME_USER`, and it can't use **People** (which asks Navidrome as you).
+     its player plays as `NAVIDROME_USER`, it keeps no play queue (nothing is put back or saved for it), and it
+     can't use **People** (which asks Navidrome as you).
 3. **Behind a reverse proxy**, if it rewrites the `Host` header (nginx does, unless told
    `proxy_set_header Host $http_host`), also set `TRUSTED_ORIGINS` to the address you open deadwax
    at, such as `https://music.example.com` - otherwise every change, plays included, looks like it
@@ -228,14 +233,14 @@ admin's job, tick it under their **Permissions** instead ([below](#admins-permis
 - **Removing a person.** In People, **Remove…** on their row opens a dialog saying exactly what goes:
   in Navidrome, for good, their account, play counts and history, favourites, every playlist they own
   (shared ones too) and their Last.fm or ListenBrainz link; in deadwax, their sign-ins, library list,
-  pins, Getting albums settings and permissions. Every album stays in the store, and a download only
+  pins, play queue, Getting albums settings and permissions. Every album stays in the store, and a download only
   they were waiting for carries on, filed for nobody (cancel it in Requests first if nobody wants it).
   There's no undo: type their user name to remove them. They're signed out on every device at once.
   If they may come back, reset their password instead.
   An account deleted in Navidrome's own Users page instead signs them out within about six minutes,
   and what deadwax kept for them shows in People under **Known only to deadwax**, with **Forget** -
   until it's forgotten, deadwax won't make a new account of that name in People, so a new person never
-  inherits someone else's library, pins or permissions.
+  inherits someone else's library, pins, play queue or permissions.
 - **A forgotten password**: in People, **Reset password…** on their row - the new one typed twice. They
   are signed out of deadwax on every device at once, and sign in with the new password; Amperfy and any
   other app they use need it too. Their library stays. (You can't reset your own there: change it in
@@ -323,7 +328,8 @@ something else that asks for a password.
 - **Back to one**: there's one library again - the whole store - and "in your library" means the
   store. Every download is listed, and **Clear done** in Requests (the main page's **Clear finished**)
   forgets every finished one. The player
-  plays as `NAVIDROME_USER` again, so plays and playlists are that account's, shared by everyone.
+  plays as `NAVIDROME_USER` again, so plays, playlists and the play queue are that account's, shared by
+  everyone.
   Nothing is starred while logins are off.
 - **Switched on again later**, what was got and pinned meanwhile goes to the first Navidrome admin back,
   as it did the first time, and a session used within the last 30 days is still signed in.

@@ -163,6 +163,13 @@ export interface Player {
   /** (Part B) the library's shuffle's feed: its next page (`token` the shuffle it is for), or with `next` a
    *  fresh order - app/useShuffleFeed.ts */
   extendQueue(token: string, tracks: QueueTrack[], next?: Paged): void
+  /** (2.0.0-player.64) Resume what was playing: puts a queue back PAUSED - its song shown at `position` (held to the
+   *  song), nothing loaded, nothing fetched, nothing played - and the next play starts it from there, in its tap
+   *  (resume()). Hands back the queue it put back, fitted to this device's Repeat, or null when it refuses: while the
+   *  listener means music to play, the element plays, or a retry is pending. Over a paused queue it lets go of what
+   *  the elements hold first. Not a playback action - it may be called after an await. The ONE caller:
+   *  app/useResume.ts. */
+  restoreQueue(queue: UpNextQueue, position: number): UpNextQueue | null
 }
 
 /** Safari's AirPlay additions to the media element, which the DOM types don't carry. */
@@ -252,6 +259,9 @@ export function usePlayer(): Player {
     const state = {
       //? (2.0.0-player.57) with Up Next's account of it, which every { ...queue, index } carries
       queue: EMPTY_QUEUE as UpNextQueue,
+      //? (2.0.0-player.64) a queue put back paused (restoreQueue): where in its song it stands, with nothing loaded -
+      //? let go of by the next song loaded (load()), the put-back one included (resume())
+      parked: null as { position: number } | null,
       //? Repeat, kept on the device; an Up Next change held for the next 'timeupdate' (edit()); and a count
       //? of every move of the queue's song, by which a refused handover knows the queue hasn't moved since
       repeat: readPlayerRepeat(),
@@ -424,8 +434,9 @@ export function usePlayer(): Player {
       return liveStream()?.song(state.queue.index)?.start ?? 0
     }
 
-    /** Seconds into the current song, stream or not. */
+    /** Seconds into the current song, stream or not - or where a queue put back stands (restoreQueue). */
     function songPosition(): number {
+      if (state.parked) return state.parked.position
       return Math.max(0, (live().currentTime || 0) - songStart())
     }
 
@@ -622,6 +633,7 @@ export function usePlayer(): Player {
       cancelRetry()
       state.moves += 1
       state.queue = next
+      state.parked = null
       state.retried = false
       state.resumeAt = 0
       newListen()
@@ -932,6 +944,14 @@ export function usePlayer(): Player {
      * PENDING_MAX_MS while the song played. A seek to where it already is moves nothing either.
      */
     function seek(seconds: number): { target: number; answered: boolean } | null {
+      //? (2.0.0-player.64) a queue put back: the second it stands at moves, and nothing loads
+      if (state.parked) {
+        const length = current(state.queue)?.duration ?? 0
+        state.parked.position = Math.max(0, length > 0 ? Math.min(seconds, length) : seconds)
+        report(state.parked.position)
+        updatePositionState()
+        return null
+      }
       const audio = live()
       if (!hasSource(audio)) return null
       const stream = liveStream()
@@ -970,6 +990,40 @@ export function usePlayer(): Player {
       //? no 'playing' follows a seek to a start that is already buffered, so a restart while
       //? playing begins its listen here
       if (!live().paused) beginListen()
+    }
+
+    /**
+     * (2.0.0-player.64) Play on a queue put back (restoreQueue): playTracks' own path for a queue already in hand - the
+     * second element unlocked, the song loaded as a tap loads it (a stream may start, play() inside) - then the seek to
+     * where it stood, in the same turn, nothing awaited. After load(), so the seek is the ordinary one: in a stream its
+     * seekTo() before the song's head is in, by address the start kept on an element still loading.
+     */
+    function resume() {
+      const at = state.parked?.position ?? 0
+      state.change = null
+      unlockSpare()
+      load(state.queue, true, true)
+      if (at > 0) {
+        readSeek({ kind: 'other seek' })
+        seek(at)
+      }
+    }
+
+    /** (2.0.0-player.64) A queue put back over a paused one: what the elements hold let go of, as mount()'s clean-up
+     *  and a standby's letting go do - the retry, the standby, the element's song (a stream detached and closed), the
+     *  readout's ask and the warm-ups. */
+    function letGo() {
+      cancelRetry()
+      dropStandby()
+      if (hasSource(live())) empty(live())
+      state.wrapCheck?.abort()
+      state.wrapCheck = null
+      for (const warm of [state.warm, state.warmCarried]) {
+        if (warm?.timer !== undefined) clearTimeout(warm.timer)
+        warm?.controller?.abort()
+      }
+      state.warm = null
+      state.warmCarried = null
     }
 
     /** "Skipped ..." in place of the artist's name for a while, unless something replaces it. */
@@ -1444,6 +1498,11 @@ export function usePlayer(): Player {
         load(toppedUp(startUpNext(tracks, start, shuffle, Math.random, paged), state.repeat), true, true)
       },
       toggle() {
+        //? (2.0.0-player.64) a queue put back: played from where it stood, in this tap
+        if (state.parked) {
+          resume()
+          return
+        }
         const audio = live()
         if (!hasSource(audio)) return
         //? a failed song shows play whether or not the browser counts the element as paused,
@@ -1616,9 +1675,47 @@ export function usePlayer(): Player {
       extendQueue(token: string, tracks: QueueTrack[], next?: Paged) {
         edit((queue) => withMore(queue, token, tracks, next))
       },
+      //? (2.0.0-player.64) a queue put back paused, the song shown at `position` - see the interface. Nothing here
+      //? loads, fetches or plays: the next play is resume()'s, in its tap
+      restoreQueue(queue: UpNextQueue, position: number): UpNextQueue | null {
+        if (state.intendsToPlay || !live().paused || state.retryTimer !== undefined) return null
+        //? fitted to this device's Repeat, as a Repeat change fits the queue playing
+        const next = toppedUp(withRepeat(queue, state.repeat), state.repeat)
+        const track = current(next)
+        if (!track) return null
+        const spare = other()
+        if (current(state.queue) || hasSource(live()) || (spare && hasSource(spare))) letGo()
+        state.change = null
+        state.join = null
+        state.heldEdit = null
+        state.pendingSeek = null
+        //? a refused handover from before can't fire on it
+        state.moves += 1
+        state.queue = next
+        state.retried = false
+        state.resumeAt = 0
+        newListen()
+        const at = Number.isFinite(position) ? Math.max(0, track.duration > 0 ? Math.min(position, track.duration) : position) : 0
+        state.parked = { position: at }
+        setQueue(next)
+        setDuration(track.duration)
+        setError(null)
+        setPlaying(false)
+        setBuffering(false)
+        setWrapped(null)
+        readSeek({ kind: 'song change' })
+        report(at)
+        showOnLockScreen(track)
+        const media = session()
+        if (media) media.playbackState = 'paused'
+        updatePositionState()
+        return next
+      },
     }
 
     function onTimeUpdate() {
+      //? (2.0.0-player.64) an element emptied as a queue was put back says 'timeupdate' as its time goes to 0
+      if (state.parked) return
       const audio = live()
       const at = performance.now()
       const stream = liveStream()
@@ -2014,6 +2111,11 @@ export function usePlayer(): Player {
 
     const handlers: [MediaSessionAction, MediaSessionActionHandler][] = [
       ['play', () => {
+        //? (2.0.0-player.64) a queue put back: played from where it stood, as toggle()
+        if (state.parked) {
+          resume()
+          return
+        }
         if (!hasSource(live())) return
         //? the lock screen's play, as toggle(): the listener starting the music, not a song change
         state.change = null

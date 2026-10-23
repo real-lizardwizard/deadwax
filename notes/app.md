@@ -603,8 +603,205 @@ engine files changed, as that spec said they would: `ui/src/player/usePlayer.ts`
   edits; Part B against 3,000 stand-in songs (every song once, the build's time and size, a deadwax restart mid-shuffle).
   Part B against a real Navidrome 0.64.2: search3 with songCount 2000 and offsets into the
   tens of thousands, its time on James's NAS, and an order made while a scan runs. Not built (spec's "Left out"): history,
-  autoplay, keeping the queue across a reload, long-press menus and a ••• on album tiles, saving Up Next as a playlist, a •••
+  autoplay, keeping the queue across a reload (built in 2.0.0-player.64, below), long-press menus and a ••• on album tiles, saving Up Next as a playlist, a •••
   on Up Next's own rows, dragging between groups, crossfade.
+
+### Resume what was playing (2.0.0-player.64)
+
+James, 2026-10-22: **"every time I open the app, whatever was playing is gone. Is there a way we can fix that?"** Asked
+where it should be kept he chose **"Follows you everywhere"** - as the signed-in person's play queue in Navidrome - and
+approved all 16 choices of `uplan/slice-resume.md` ("Go"), choice 7 (a paused player taking a newer queue from another
+device, logins on) included. On opening, the queue, the song and the second come back **paused**: iOS starts sound only
+from a tap, so nothing loads or plays until one.
+
+- **What Navidrome's source says** (0.64.2, read at `work/design57/navidrome/nd-v0.64.2`): ONE play queue per user
+  (`model/playqueue.go`, `persistence/playqueue_repository.go`, `server/subsonic/bookmarks.go`) - the ids comma-joined,
+  `current` an INDEX (migration `20250611010101`), `position` the client's int64 (ms), `changed_by` the call's `c`,
+  `changed` the server's time; no size limit, duplicates kept; an empty save clears it (deleted, nothing inserted); the
+  user's row goes with the account (`on delete cascade`). **`savePlayQueue` finds `current` by the FIRST id equal to
+  it** - wrong for deadwax's queue, which holds a song more than once by design (Repeat One's copies, Repeat All's
+  rounds) - so deadwax uses **`savePlayQueueByIndex`** (error 10 for a `currentIndex` missing or outside the ids) and
+  **`getPlayQueueByIndex`** (OpenSubsonic's `indexBasedQueue` v1, which 0.64.2 advertises; every call takes a form body).
+  **On a read, songs no longer in the library are dropped but the stored index is answered unchanged** - after a
+  deletion it can name the wrong song or none - so the page aligns rather than trusts. Navidrome's own web player keeps
+  its queue in the browser's localStorage, not here. **Amperfy doesn't use it at all** (every `forAction:` in
+  `SubsonicServerApi.swift` read: no savePlayQueue, getPlayQueue or bookmarks; its queue is Core Data on the phone): it
+  will neither show deadwax's queue nor overwrite it, and the docs say so plainly. Which other apps use Navidrome's
+  queue isn't verified, and the docs name none as fact.
+- **Two places, written together, read together.** Navidrome's play queue as the asker (`client_for`) - the interchange,
+  and the authority on what was played last - and **deadwax's record beside it**, per deadwax user, in SQLite
+  (`play_queue`: the same ids and index, the position in seconds, the page's opaque versioned snapshot of Up Next, the
+  device and its label, `rev` bumped by every save, `ids_rev` the rev of the last save that sent the ids). Navidrome's
+  answer always decides WHAT is newest: the record is handed out (`kept`) only when Navidrome says deadwax saved last,
+  and the page believes it only when Navidrome's ids are its ids (equal, or less songs Navidrome dropped). Anything
+  else - another app, a second deadwax on the same account, a record from before logins - comes back as a **plain
+  list**: Navidrome's songs in its order from its index, as `playTracks(tracks, index)` would queue them.
+- **The server** (`src/routes/navidrome.py`'s last section, `src/play_queue.py` pure, `store.py`'s three methods):
+  `GET /queue` (Navidrome's queue in SHUFFLE_FIELDS, its index as it said it, the position in seconds, `changed_by`
+  cleaned to 64 characters, `shared` with logins off, `kept`; a foreign list over 2,000 answered as the window around
+  its song), `POST /queue` (`QueueSave`, `extra="forbid"`: 1-2,000 ids, an index inside them, 0-86,400 s, a device of
+  8-64 `[A-Za-z0-9_-]`, a label of 1-40 letters, digits and spaces, a snapshot of at most 262,144 characters that must
+  be a JSON object of `v: 1`; Navidrome written as a form, THEN the record) and `POST /queue/at` (`QueueAt`: a position
+  against the record's ids - no record, or another `ids_rev`, a 409 "The queue changed on another device or in another
+  app"; an index past them a 422). One save at a time per user (an asyncio lock per event loop, as `_gate`'s), so a
+  beacon and a full save can't interleave their two writes - and the GET reads under it too (review: a reload's GET
+  could otherwise read before its own pagehide's save landed, or between its two writes); a Navidrome failure leaves the record and logs one warning
+  per user per 10 minutes, never to the page's log. **Break-glass** (`logins_on() and asks_as_shared(client_for())`):
+  an empty GET and `{rev: null}` saves, Navidrome asked nothing - the shared account's queue may be a person's. With
+  logins off it is `local`'s record and the shared account's queue: `shared: true`. Every answer `no-store`.
+  `play_queue` joins `PERSON_TABLES`; `adopt_local` leaves `local`'s (it describes the shared account's queue).
+  *Beyond the spec, each on purpose*: (1) **`known_users` lists a `queue`** - a name with only a queue left would
+  otherwise be refused a new account (`keeps_anything`) yet never offered Forget; People's Remove and known-only
+  words gain "their play queue" / "a play queue" (people.sim); (2) **the queue routes' 422s are words**
+  (`validation_words` now covers `/deadwax/navidrome/queue`, `QUEUE_FORM` for a bound's refusal) - FastAPI's list
+  would echo a 256 KB snapshot back; (3) **no database is a 503 and Navidrome is not written** (the two places stay in
+  step), where the spec left it open.
+- **The page's rules** (`lib/resume.ts`, pure): `toSave` (the window - at most 50 before the song and 2,000 in all,
+  `startedAt` moved down and floored, the marks sliced; snapshot v1 with one level character an entry, the source by
+  id and `extra` - the whole song - only for source songs outside the window, left out over the cap; returns `start`
+  too, which the hook needs to number a later position save inside that window), `fromSnapshot` (songs rebuilt one
+  object per (id, level), shared by entries and source; every check the spec lists but one - and a source mark's `at`
+  must name its own song; `startedAt` need only be at or after 0, not at or before the index as the spec said: Previous
+  takes the index back before where playTracks began, a live state the review found refused, Playing Next lost), `resumed` (exact / dropped / anyone else's / played to its end; returns `exact` beside the spec's three,
+  for the hook's `ids_rev`; Navidrome's ids equal to the record's at ANOTHER index - its position save landing in
+  Navidrome but not the record - is the plain list at Navidrome's index), `relevel`, `deviceLabel`, `pickedUpWords`
+  ("an iPhone", "an iPad", "an Android phone" with logins off), `changedSince` and `saveDue` (the save rules as a
+  function of the baseline, the queue, the position, playing, the clock and the trigger).
+- **The hook** (`app/useResume.ts`, called once in App after `useShuffleFeed`): the open's GET through latestOnly, used
+  only while the queue is still the one asked for and nothing plays; `restoreQueue`; the notice (`sayPins`); the
+  album asked through its own latestOnly and remembered only while its song shows; the re-check on visible, `pageshow`
+  and `focus` (15 s, never playing, unsaved changes saved instead, logins off never taking anything into a paused
+  player - nor even asking, once it knows); the saves. *Choices the spec left to the build*: the render's queue and
+  play state are read during render (a ref, bookkeeping only - what it asks for is sent in a microtask), because a
+  render comes reliably after every change where an effect waits for a frame a locked phone may not draw; while
+  playing, the waits are judged at the player's own position updates too (the timers are a paused page's), so a
+  locked phone's sleeping timers lose nothing; **the 30 s are counted from the later of the last save and playing
+  starting**, so a pause's save and a play a minute later don't save at once; a trigger met while a request is out is
+  kept by kind and asked again in the order pause (or a 409's full save), wait, position - asking every one "at once"
+  sent a second save after every 30 s save on a slow network (resume.sim caught it); `ids_rev` is taken from `kept`
+  only when the queue put back is exactly the record's ids - fitting it to this device's Repeat (copies made, a round
+  dropped) changes the list, and a position save then would name the wrong song; a 401 stops saving until
+  `api/http.ts`'s session counter moves (a sign-in since - `currentSession()`, new), since the same person signing in
+  again doesn't remount App; an answer with no rev (break-glass) stops it for the page's life; the beacon's answer is
+  taken as saved, so `pagehide` after `visibilitychange` sends nothing twice, and a full save going away goes keepalive
+  only while its body's UTF-8 BYTES (`utf8Length`), with every keepalive save still out, are within BEACON_MAX - the
+  browser's 64 KiB is for all keepalive bodies in flight, and one over it is refused outright (`post()` gains a
+  `keepalive` flag). The device id is `persisted.ts`'s `readPlayerDevice()`
+  under the key **`deadwax-player-device`** - the spec said `deadwax.player.device`; every other key here is
+  `deadwax-player-*`, so it follows them.
+- **The engine** (`ui/src/player/usePlayer.ts` only, as the spec named; `ui/test/player.sim.cjs` by additions only;
+  `streamSource.ts` and `lib/{playQueue,gapless,scrub,streamWrap,streamPlan,fmp4}.ts` have no diff): a put-back queue is
+  **parked** - `state.parked = { position }` beside `state.queue`, React's queue showing it, nothing on any element.
+  `songPosition()` reads the parked second; `load()` lets it go (`state.parked = null` beside `state.queue = next` -
+  the one line on an album tap's path); the inner `seek()` moves the parked second (held to the song, `report`,
+  `updatePositionState`, null - so the scrubber, the lock screen's seekto and Previous's restart load nothing);
+  `onTimeUpdate` returns while parked (an emptied element's 'timeupdate' would draw 0:00); `toggle()` and the lock
+  screen's play call `resume()` - `unlockSpare()`, `load(state.queue, true, true)` (a tap's load: a stream may start,
+  play() inside), then the ordinary seek, in the same turn. `letGo()` empties what a paused queue held (the retry, the
+  standby, the element - a stream detached and closed - the readout's ask, the warm-ups). `restoreQueue` refuses while
+  the listener means music to play, the element plays or a retry is pending; fits the queue to Repeat (`withRepeat`
+  then `toppedUp`); holds the second to the song (past its end at its end, below 0 or not a number at 0:00); clears a
+  held edit and a pending seek, closes Debug's seek on its way (as a song change does), drops a "Skipped …" line and
+  Buffering (paused while a song loaded); counts a move (a refused handover can't fire on it); and tells the lock
+  screen (metadata, `paused`, the position) - each of those pinned in player.sim. It also clears a change, a join, the
+  retry's marks and the listen, and lets go whenever the queue had a song even with nothing on an element: defensive
+  only - a pause has already cleared the change, and the next `load()` (resume's) clears the rest before anything
+  reads them, so no test can tell them apart (a review's mutation run found them surviving; this says so rather than
+  claiming them).
+- **Verified** - Python: 3536 collected (3534 passed, 2 skipped; 63 more than .63's 3473, all in the new
+  `test_play_queue.py`, 7 of them the review's; the walk, the ROUTES and route-list tables - test_navidrome's, test_turntable_disc_art's - and
+test_navidrome_search's seam list grew the queue). Sims, all 63 (resume.sim
+  new); player.sim's new section "a queue put back, paused" (nothing touched on a fresh page; refused while playing,
+  while a tapped song loads, while a retry waits, while a handover's play() is out, while the element plays by itself;
+  over a paused queue - the URL way, a stream with a held edit, a standby, a handover refused a moment later -
+  everything let go; the tap in both MediaSources from 1:35 within 0.05 s, the join sample-exact; the URL way's start
+  set while loading; a hi-res and a levelled entry's addresses; the lock screen; every other action; **an album from a
+  tap after a put-back exactly today's trace event for event**, four page kinds; **play on it exactly playTracks + a
+  seek in one tap**, three page kinds; and, ahead of all of it, **an album's tap on a fresh page held line for line to
+  the trace the engine of 2.0.0-player.63 made** - every element write, fetch and lock-screen line, four page kinds,
+  recorded by running that engine (git e2f1d2b, exported with `git archive`) under the new sim with
+  `DEADWAX_RECORD_TAP=1`, the two recordings byte-identical; an extra lock-screen line in load() fails all four). Mutations: 17 of the engine (all caught but the retry-pending refusal, which no
+  reachable state tells apart - a retry is only ever pending while the listener means to play, so the first refusal
+  covers it; kept as the spec's belt and braces), 16 of lib/resume, 19 of the hook and app-rules, 14 of the server -
+  each caught, the file put back byte for byte (sha256 compared). **The real page** (own deadwax on 8110 logins on /
+  8111 off, the stand-in Navidrome on 4554 grown the four play-queue calls by Navidrome's rules and `missing.json`,
+  headless Chromium as `deadwax.test` over plain http, 390x844 and 1440x900): an album played, song 3 sought to 1:36 and
+  paused - the stand-in held the five ids, currentIndex 2, 96 431 ms, `deadwax`; reloaded - the mini player showed song
+  3 paused, the scrubber at 96, Up Next "From Long Album" 4 and 5, and the reload asked the queue once and no audio at
+  all; tap play with Gapless on - one MediaSource, the first 'playing' at 96.444 s (the second saved to the
+  millisecond), song 3's head asked first, into song 4 with one buffered range and no 'waiting'; an iPhone's user agent
+  with Gapless off - `wrap=mp4&level=album`, playing on from the second put back; Play Next twice, Shuffle on, Repeat
+  All, reload - Playing Next, the order and both chips back; a second device picked it up ("Picked up from your iPad" -
+  the first context's Mac user agent with touch points reads as an iPad, as iPadOS's does), played to song 5 and
+  paused; the first, paused, brought to the front took song 5 with logins on ("Picked up from your iPhone") and kept
+  its own with them off; a Symfonium save of three songs came back as a plain list at its song and 0:04, "Picked up
+  from Symfonium"; song 3 in `missing.json` - song 4 at 0:00; break-glass - nothing put back, the stand-in's queue
+  untouched by its playing; hidden while playing - a beacon to `/queue/at` within 300 ms and in Navidrome within the
+  second; song 3 (100 s) played 76 s - saves at 2, 32 and 62 s; two 30 s songs - one save a second after each change
+  and no more; a queue put back and hidden for a minute - none; the desktop bar's Play from the parked second, and
+  after a reload the visualizer's Space (its first 'playing' read at 10.75 s against the 10.60 put back - inside the
+check's 0.3 s; why 0.15 s later than the phone's landing to the millisecond is not known); a 2,500-song
+  playlist (nine songs cycled) from its tenth - 2,000 ids, currentIndex 9, the snapshot's source all 2,500 - and
+  reloaded, "Still to play", 100 rows, "And 1,890 more songs.". No console errors in any.
+- **NOT verified - the iPhone's** (docs/player.md's list): iOS killing the home-screen app (whether
+  `visibilitychange`/`pagehide` fire and the beacon gets out, or the last 30 s save is what comes back; whether the 30 s
+  saves go out locked in a pocket); the lock screen after reopening (nothing until the first play, then the song, its
+  cover and position, previous/next; AirPods' play before any tap - likely nothing, no session yet); the first tap's
+  resume on ManagedMediaSource (the seek before the head landing at the saved second) and the URL way (WebKit's default
+  playback start position honoured in the MP4); the app kept in memory for hours, brought back after the desktop played
+  on; how long the open's GET takes over WireGuard before the mini player shows the song. Not run against a real
+  Navidrome either: `getPlayQueueByIndex`'s answer and `changedBy` as a real 0.64.2 writes them, and a real Subsonic
+  app's `c` in the notice.
+- **After review** (eleven findings, all real; each fix with a check that fails without it):
+  - `fromSnapshot` refused any queue with `startedAt` past the index - an album tapped at song 5, Play Next, then
+    Previous - so Up Next came back a plain list (under Repeat All the list grew to both rounds). Now `startedAt >= 0`
+    only (withShuffle reads it only as a loop's start, bounded by the index). resume.sim's round trip gained Previous
+    - and a first draw thrown away: a small seed's first draw is always near 0, so EVERY run had started from its first
+    song (null), and no run had ever had a `startedAt` above 0.
+  - **A deleted song comes back** (the premise was wrong): Navidrome's `loadTracks` drops only ids
+    `mediaFileRepository.GetAll` doesn't return, and that has no `missing = false` - a deleted file is marked missing
+    and kept until purged (`Scanner.PurgeMissing` defaults to `never`; the Missing Files page). So it is put back and
+    skipped on its first play like any song that won't play; only once purged does "the next at 0:00" apply.
+    docs/player.md, troubleshooting.md and src/play_queue.py say so now; the fakes model a purged song.
+  - Keepalive by bytes, and by the bytes still out (above). resume.sim: Japanese titles under BEACON_MAX in characters
+    and over it in bytes; two 37 KB saves going away at once, the second an ordinary request.
+  - **The notice once**: a desktop tab put back from the phone and untouched took the phone's newer save at every
+    return to the front (its rev moves every 30 s) and said "Picked up from your iPhone" each time, asking the album
+    again. Now said only when where it came from or its songs change, or the queue had been played here since; the
+    album is not asked while `playedAlbum()` has it.
+  - **The focusing click**: a window's `focus` fires on the mousedown of the click that focused it, often a press of
+    Play; an answer landing before the click swapped the queue under it. `focus` now asks RESUME_FOCUS_GRACE_MS (500 ms)
+    after it (a click that played makes front() ask nothing); `visibilitychange` and `pageshow` still ask at once,
+    since a phone's page shows before it can be touched (the interaction guard the review offered first would have
+    dropped the desktop's queue whenever a phone was touched within the GET's round trip).
+  - **GET under the save lock** (above); test_play_queue: a save held at Navidrome's write and at the record's, the GET
+    answering after with both agreeing.
+  - Pins for what the build chose but no test held: the `sameIds` guard (a Repeat One record put back under Repeat off,
+    then a song change: a full save), the 30 s from playing starting, a 422 then a full save, a scrubbed put-back queue
+    kept against its own device's newer save; fromSnapshot's added-mark, copy-mark and `extra` song checks; the engine's
+    restoreQueue `setWrapped(null)` and `pendingSeek = null`, letGo's warm-up abort, the parked seek's clamps
+    (player.sim, additions only); the device id and `post()`'s keepalive through the real persisted.ts and player/api.ts
+    (resume.sim compiles them apart from its stubs); the server's no-store on every 200 (the break-glass admin's too),
+    the record failing to read (a plain list) or to write (503), another app's name cleaned, a 401 never logged.
+  - Mutations, each caught, the file put back byte for byte: 24 against resume.sim (resume.ts, useResume.ts,
+    persisted.ts, http.ts, player/api.ts), 5 of the engine against player.sim, 7 of the server (the lockless GET caught by each of its two cases).
+- **After a second review** (three findings, all real):
+  - **An edit, then a song change inside its 2 s, while paused, was never saved on a schedule**: render() chose the
+    wait from the drawing before (only the index moved: a position wait) and moved `changedAt`, so the full wait ran
+    out under 2 s after the last change, the position wait saw a change of the songs still under 2 s, and with no
+    position updates while paused nothing asked again - the edit sat unsaved until the page went away or came back,
+    when front() saved it over whatever another device had saved since. The wait is now chosen against what was last
+    SAVED (`changedSince(clock.saved, …) === 'songs'`: full, from the last change). resume.sim pins it: paused, Play
+    Next, Next 1.5 s later, one full save 2 s after the Next and no position save.
+  - player.sim's "held to the song" check read no second: now 999 s of a 100 s song reads 100 (position() and the
+    bar), -5 and NaN 0:00; and restoreQueue's `setError(null)` (a "Skipped" line showing), `setBuffering(false)`
+    (paused while loading) and `readSeek` (Debug's seek on its way closed) are pinned. What is left unpinned is said
+    above as defensive.
+  - troubleshooting.md's "deadwax's own log" for the queue warning (which never reaches the event log - `_warn_queue`
+    logs without `frontend`) is now "the container's log (not the event log)".
+- **Left out, on purpose** (the spec's list): a "Resume?" prompt; a setting to turn it off; syncing a PLAYING queue live
+  between devices; history beyond 50 songs back; Repeat and speed following you; bookmarks; Navidrome's native
+  `/api/queue`; carrying the listen heard before closing into the play count.
 
 ### Debug for admins only (2.0.0-player.63)
 

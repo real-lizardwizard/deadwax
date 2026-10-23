@@ -708,7 +708,7 @@ didn't get an answer. Check in Navidrome's own Users page that they have a libra
 ### People can't make an account: "deadwax still keeps pins, settings or a library for an earlier …"
 
 deadwax still keeps something under that name - an account removed in Navidrome's own Users page, or a
-removal deadwax couldn't finish - and a new person must not inherit someone else's library, pins or
+removal deadwax couldn't finish - and a new person must not inherit someone else's library, pins, play queue or
 permissions. Find the name under **Known only to deadwax** at the foot of People and **Forget** it, then
 make the account; or choose another name.
 
@@ -848,9 +848,10 @@ first time (an estimate: it hasn't been timed on one yet); within ten minutes of
   songs, far beyond a home server's library.
 - **A song you added a moment ago isn't in the shuffle**: the order is made from the list as it was read,
   kept ten minutes; the next shuffle after that has it.
-- **"Your shuffle started over - deadwax had restarted"**: deadwax keeps a shuffle's order in memory, so
-  after a restart (or a day without it being played) a fresh order takes over, and songs already heard in
-  the old one can come round again. It keeps the last four orders each Shuffle button asked for ahead,
+- **"Your shuffle started over - deadwax no longer had its order"** (until 2.0.0-player.64, "... - deadwax had
+  restarted"): deadwax keeps a shuffle's order in memory, so after a restart (or a day without it being played -
+  a shuffle [picked up](player.md#picking-up-where-you-left-off) the next day, say) a fresh order takes over, and
+  songs already heard in the old one can come round again. It keeps the last four orders each Shuffle button asked for ahead,
   across all your devices, so it can also happen if the list sat open on one device while that same
   Shuffle got ready (or was tapped) more than four times elsewhere before you tapped it.
 
@@ -1228,6 +1229,60 @@ Every request deadwax sends slskd carries the API key, and the key gives full co
 so deadwax won't send the saved key to a new address until it has been typed for it. Change
 `SLSKD_URL` and type `SLSKD_APIKEY` too, then save both at once; the key's row says so in red
 before you save. Saving the address it already is, or reverting it, doesn't need the key.
+
+## The player doesn't pick up where I left off
+
+Since 2.0.0-player.64 the app puts back what was playing as it opens, paused
+([picking up where you left off](player.md#picking-up-where-you-left-off)). When it doesn't:
+
+- **You're signed in as the break-glass admin** (`deadwax`): it keeps no queue - it has no Navidrome account of
+  its own.
+- **Navidrome (or deadwax) didn't answer as the app opened**: nothing is put back then. It asks again when you
+  come back to the app - switch away and back - at most every 15 seconds.
+- **The song that was playing was deleted**: Navidrome keeps a deleted file's song as a *missing file* until it is
+  purged (its **Missing Files** page, or `ND_SCANNER_PURGEMISSING`, which is `never` unless set), and until then it
+  comes back with the queue - press play and it's skipped like any song that won't play, **Skipped "…" - it
+  wouldn't play**, and the next one plays. Once purged, the next one is put back, at 0:00; one further along just
+  isn't there.
+- **Another app saved an empty queue** since - cleared it: Navidrome's queue is the one believed, so there's
+  nothing to put back.
+- **It came back a little before where it stopped**: an app iOS closed in a pocket comes back from its last
+  save, which is up to 30 seconds old.
+- **A browser that won't keep anything for the page** (its storage blocked, or cleared every time): it still picks
+  up, but can't remember which device it is, so its own queue comes back with "Picked up from your …" each time.
+- **A Navidrome too old for it**: deadwax saves and reads the queue by its position in the list (OpenSubsonic's
+  `indexBasedQueue`, which Navidrome 0.64.2 has), so a song in it twice is never confused. A Navidrome without it
+  refuses those calls: nothing is put back or saved, and the container's log (not the event log) says now and
+  then (at most every ten minutes) that Navidrome didn't keep the play queue.
+
+## It picked up a queue I didn't play
+
+The line at the top said where it came from:
+
+- **"Picked up from a …"** - logins are off, and everyone shares one queue (the `NAVIDROME_USER` account's), so a
+  device opening with nothing queued picks up whatever anyone played last. A paused player never takes someone
+  else's. With logins on everyone has their own ([Sharing deadwax](sharing.md)).
+- **"Picked up from your …"** - another of your devices played since. A paused player brought back to the front
+  takes it too, with logins on - play something and the queue is yours again.
+- **"Picked up from …" an app's name** - another Subsonic app saved your play queue in Navidrome since. Navidrome
+  keeps one queue for each person, and the newest wins.
+
+## Amperfy doesn't show what I was playing in deadwax
+
+Amperfy doesn't use Navidrome's play queue: it keeps its own, on the phone. So it neither shows deadwax's nor
+replaces it, and deadwax won't pick up what Amperfy was playing.
+
+## Up Next lost Playing Next or Shuffle after picking up
+
+The queue came back as a plain list - its songs in order from the song playing, which are right - without Up
+Next's groups or the Shuffle chip, which only deadwax's own account of the queue keeps. That happens when:
+
+- **another app saved the queue last** - it keeps only the songs;
+- **songs were removed from the library** since - deleted and purged from Navidrome's missing files - so the
+  account no longer matches the songs;
+- **the account was very long** - over 262,144 characters, about 256 KB: a playlist of thousands of different
+  songs - and was left out (the 2,000 songs kept are all there);
+- **another deadwax on the same Navidrome account** saved it.
 
 ## Plays don't show up in Navidrome
 

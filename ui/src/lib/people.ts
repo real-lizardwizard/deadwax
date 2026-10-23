@@ -184,7 +184,7 @@ export function removeLines(person: Pick<Person, 'user' | 'admin' | 'library' | 
   const devices = person.signed_in ? ` (${plural(person.signed_in, 'device', 'devices')})` : ''
   return {
     navidrome: `In Navidrome, for good: ${person.user}'s account, their play counts and play history, their favourites${favourites}, all their playlists - shared ones too - and their Last.fm or ListenBrainz link${role}.`,
-    deadwax: `In deadwax: their sign-ins${devices}, their library list, their pins, Getting albums settings and permissions.`,
+    deadwax: `In deadwax: their sign-ins${devices}, their library list, their pins, their play queue, Getting albums settings and permissions.`,
     stays: `Stays: every album in the store.${waiting}`,
     undo: "There's no undo. If they might come back, reset their password instead.",
   }
@@ -200,6 +200,7 @@ export function knownWords(entry: KnownOnly): string {
     ...(entry.preferences ? ['Getting albums settings'] : []),
     ...(entry.requests ? [plural(entry.requests, 'request', 'requests')] : []),
     ...(entry.permissions ? [plural(entry.permissions, 'permission', 'permissions')] : []),
+    ...(entry.queue ? ['a play queue'] : []),
   ]
   return parts.length ? `deadwax keeps ${parts.join(', ')}.` : 'deadwax keeps a little history for them.'
 }

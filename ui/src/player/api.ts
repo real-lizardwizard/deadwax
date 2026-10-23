@@ -10,6 +10,7 @@ import { fetchOk, get, post, url } from '../api/http'
 import { levelParam, levels, type Level, type LevelAnswer, type LevelledTrack } from '../lib/loudness'
 import { createPlayedAlbums } from '../lib/playedAlbums'
 import type { QueueTrack } from '../lib/playQueue'
+import type { QueueAnswer } from '../lib/resume'
 import { asksForMp4, resamples, type MaxRate } from '../lib/streamWrap'
 import { discArtPath } from '../lib/turntable'
 
@@ -254,6 +255,68 @@ export function shuffleStart(
  *  day untouched): the feed then starts a fresh order (app/useShuffleFeed.ts). */
 export function shufflePage(token: string, offset: number, signal?: AbortSignal): Promise<{ total: number; songs: Song[] }> {
   return get(`/navidrome/shuffle/${encodeURIComponent(token)}?offset=${offset}`, signal)
+}
+
+/* ===== resume what was playing (2.0.0-player.64) - app/useResume.ts, lib/resume.ts ===== */
+
+/** What deadwax answered a save with: the record's rev and the ids_rev a position save names - both null for the
+ *  break-glass admin, who keeps no queue. */
+export interface SavedQueue {
+  rev: number | null
+  ids_rev: number | null
+}
+
+/** A full save (POST /deadwax/navidrome/queue): the window's ids, the song playing in them, the second, this device,
+ *  and the snapshot of Up Next (lib/resume.ts toSave). */
+export interface QueueSave {
+  ids: string[]
+  index: number
+  position: number
+  device: string
+  label: string
+  snapshot: string | null
+}
+
+/** A position save (POST /deadwax/navidrome/queue/at): the song and the second, against the full save `ids_rev`. */
+export interface QueueAt {
+  ids_rev: number
+  index: number
+  position: number
+  device: string
+  label: string
+}
+
+/** The signed-in person's play queue - Navidrome's, as them, with deadwax's record when deadwax saved it last. */
+export function resumeQueue(signal?: AbortSignal): Promise<QueueAnswer<Song>> {
+  return get<QueueAnswer<Song>>('/navidrome/queue', signal)
+}
+
+/** A full save; `keepalive` as the page goes away (a body of at most lib/resume.ts BEACON_MAX). */
+export function saveQueue(body: QueueSave, keepalive = false): Promise<SavedQueue> {
+  return post<SavedQueue>('/navidrome/queue', body, undefined, keepalive)
+}
+
+/**
+ * A position save. `beacon`, as the page goes away: navigator.sendBeacon with the body as a JSON Blob - neither needs
+ * a secure page, both work over plain http - falling back to a keepalive fetch where sendBeacon is missing or
+ * refuses it; nobody waits for its answer, so it resolves with nothing. Otherwise an ordinary POST, its answer
+ * through api/http.ts as any request's (a 401 brings the sign-in back).
+ */
+export function saveQueueAt(body: QueueAt, beacon = false): Promise<SavedQueue | null> {
+  if (!beacon) return post<SavedQueue>('/navidrome/queue/at', body)
+  const address = url('/navidrome/queue/at')
+  const text = JSON.stringify(body)
+  let sent = false
+  try {
+    sent = typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function' &&
+      navigator.sendBeacon(address, new Blob([text], { type: 'application/json' }))
+  } catch {
+    sent = false
+  }
+  if (!sent) {
+    fetch(address, { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: text }).catch(() => {})
+  }
+  return Promise.resolve(null)
 }
 
 /** How long an album asked for ahead of its page opening is worth using. */

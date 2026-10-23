@@ -271,13 +271,19 @@ def test_there_is_no_general_proxy():
     listing - internal calls through the client); its parameters a Literal level and the stream's own cap. The
     second (a POST) starts measuring an album's songs in the background, after one getAlbum AS THE ASKER for the
     id it was given, bounded. Neither passes anything the page sent on - see test_normalization.py.
+
+    `/queue` (GET and POST) and `/queue/at` joined it in 2.0.0-player.64, deliberately: resume what was playing -
+    Navidrome's own play queue, as the asker. Two Subsonic calls between them, getPlayQueueByIndex and
+    savePlayQueueByIndex, with parameters deadwax builds from declared, bounded fields (the request models forbid any
+    other): nothing the page sends is passed on but the ids, the index and the position. deadwax's own record of the
+    queue beside it is the asker's alone, and the break-glass admin is asked nothing - see test_play_queue.py.
     """
     paths = sorted(route.path for route in navidrome_routes.router.routes)
 
     assert paths == [
         "/album_index", "/albums", "/albums/{album_id}", "/artists", "/artists/{artist_id}", "/cover/{cover_id}",
         "/level/album/{album_id}", "/level/{song_id}", "/playlists", "/playlists", "/playlists/{playlist_id}", "/playlists/{playlist_id}/add",
-        "/playlists/{playlist_id}/delete", "/playlists/{playlist_id}/edit",
+        "/playlists/{playlist_id}/delete", "/playlists/{playlist_id}/edit", "/queue", "/queue", "/queue/at",
         "/scrobble/{song_id}", "/scrub/{song_id}", "/search", "/shuffle", "/shuffle/{token}", "/songs/{song_id}",
         "/status", "/stream/{song_id}",
     ]

@@ -69,6 +69,7 @@ import { askPlaylists, playlistsNow, usePlaylists } from './usePlaylists'
 import { askQueueSummary, useQueueSummary } from './useQueueSummary'
 import { askMyLibrary, hasLibrary, seenAlbum, useMyLibrary } from './useMyLibrary'
 import { takeOpener } from './useSheet'
+import { useResume } from './useResume'
 import { useShuffleFeed } from './useShuffleFeed'
 import { UpNext } from './UpNext'
 import { You } from './You'
@@ -282,6 +283,11 @@ function usePageShown(): boolean {
  * (QueueMenu.tsx: Play Next, Play Last) over everything - the page behind inert, a side panel too - with the songs
  * in hand, and the menu plays them in its tap. A whole library's shuffle (Part B) is fed its pages by
  * useShuffleFeed, called here once, as the player is.
+ *
+ * RESUME WHAT WAS PLAYING (2.0.0-player.64, app/useResume.ts, lib/resume.ts): useResume, called here once after the
+ * feed, puts the person's play queue back paused as the app opens (and takes a newer one coming back to the front),
+ * and saves it - to Navidrome as them, with deadwax's account of Up Next beside it - as this page plays. Its one action
+ * is the engine's restoreQueue; the next play is the ordinary toggle, in its tap.
  *
  * PLAYLISTS (2.0.0-player.58, app/PlaylistsPage.tsx, app/PlaylistPage.tsx, app/PlaylistPicker.tsx): Navidrome's own,
  * as you. The Playlists page and a playlist's page are pages of their own kinds, pushed on the Library - from the
@@ -1023,6 +1029,8 @@ export function App() {
 
   //? a whole library's shuffle (Part B): its pages fed as it plays - once, here, beside the engine
   useShuffleFeed(player)
+  //? (2.0.0-player.64) what was playing, put back paused as the app opens, and kept as it plays - once, here
+  useResume(player)
 
   //? The Edit panel is the album page's: as that page stops being the one showing - another page, a
   //? tab, the sidebar - it closes, focus given back to nothing (the Edit it came from is gone). Opened

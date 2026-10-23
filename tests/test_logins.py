@@ -185,6 +185,10 @@ ROUTES = {
     ("POST", "/deadwax/navidrome/playlists/{playlist_id}/add"): "user",
     ("POST", "/deadwax/navidrome/playlists/{playlist_id}/edit"): "user",
     ("POST", "/deadwax/navidrome/playlists/{playlist_id}/delete"): "user",
+    #? (2.0.0-player.64) resume what was playing - each person's own queue, as their plays are
+    ("GET", "/deadwax/navidrome/queue"): "user",
+    ("POST", "/deadwax/navidrome/queue"): "user",
+    ("POST", "/deadwax/navidrome/queue/at"): "user",
     ("GET", "/deadwax/me"): "user",
     ("GET", "/deadwax/me/preferences"): "user",
     ("PUT", "/deadwax/me/preferences"): "user",

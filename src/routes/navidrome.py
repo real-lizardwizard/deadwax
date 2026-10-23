@@ -7,7 +7,9 @@ call means adding a route here, on purpose. (The Library's Shuffle, 2.0.0-player
 search3 and getAlbumList2 as the asker, deadwax's own order of what they list - see near the end. The
 playlists, 2.0.0-player.58, a fixed call or two each with declared, bounded input - see the end. The Library's
 whole album list, 2.0.0-player.59's /album_index, getAlbumList2 a page at a time as the asker, its one parameter the
-scope, which picks the list type - see after /albums.)
+scope, which picks the list type - see after /albums. Resume what was playing, 2.0.0-player.64's /queue and
+/queue/at: getPlayQueueByIndex and savePlayQueueByIndex as the asker, with deadwax's own record beside them - see the
+very end.)
 """
 
 import asyncio
@@ -22,14 +24,16 @@ from typing import Annotated, Literal
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi import Path as PathParam
-from fastapi.responses import Response, StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
+from fastapi.responses import JSONResponse, Response, StreamingResponse
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 from starlette.background import BackgroundTask
 
 from src import library_ledger, player_cache
+from src import play_queue as queue_rules
 from src import playlists as playlist_rules
 from src.api.json_etag import json_with_etag
-from src.api.navidrome_endpoint import NOT_CONFIGURED, NavidromeError, SignedOut, UserClient, asks_as_shared, client_for
+from src.api.navidrome_endpoint import (CLIENT_NAME, NOT_CONFIGURED, NavidromeError, SignedOut, UserClient, asks_as_shared,
+                                        client_for)
 from src.config import Config
 from src.logger import logger
 from src.routes.download import ClientGone, unless_abandoned
@@ -931,15 +935,17 @@ def _at_most(words: str):
 def validation_words(path: str, errors) -> str | None:
     """A refusal of a playlist route's body in deadwax's words: the first of the models' own (a ValueError raised by
     a validator here), for a path under /deadwax/navidrome/playlists - else None, and FastAPI answers as it always
-    does. src/api/app.py's handler asks it."""
-    if not path.startswith("/deadwax/navidrome/playlists"):
+    does. src/api/app.py's handler asks it. (2.0.0-player.64) The play queue's too, and for one of its bodies always
+    words - never FastAPI's list, which echoes the `input`: a queue's account of Up Next can be 256 KB."""
+    queue = path.startswith("/deadwax/navidrome/queue")
+    if not queue and not path.startswith("/deadwax/navidrome/playlists"):
         return None
     for error in errors:
         if error.get("type") == "value_error":
             raised = (error.get("ctx") or {}).get("error")
             if raised is not None and str(raised):
                 return str(raised)
-    return None
+    return queue_rules.QUEUE_FORM if queue else None
 
 
 class NewPlaylist(BaseModel):
@@ -1232,3 +1238,204 @@ async def delete_playlist(playlist_id: PlaylistIdPath, request: Request):
     _writable(found, asked_as(client))
     await _write(client, "deletePlaylist", {"id": playlist_id})
     return {"deleted": True}
+
+
+# ---------------------------------------------------------------- resume what was playing (2.0.0-player.64)
+#
+# Navidrome's play queue, AS THE ASKER (client_for), and deadwax's record of it beside it (store.py play_queue): three
+# routes, two Subsonic calls - getPlayQueueByIndex and savePlayQueueByIndex (never savePlayQueue, which finds the song
+# playing by the FIRST copy of its id: deadwax's queue holds a song more than once by design) - their parameters
+# built from declared, bounded fields: the ids, the index and the position, nothing else the page sends. Every answer
+# `Cache-Control: no-store`. The break-glass admin keeps no queue: it has no Navidrome account of its own (it plays as
+# the shared one, which may be a person's), so it is asked nothing and nothing is written. src/play_queue.py and
+# notes/app.md "Resume what was playing" have the rest.
+
+class QueueSave(BaseModel):
+    """POST /queue: a full save - the ids in order (duplicates kept), the song playing's index, how far into it, the
+    device and its label, and the page's account of Up Next (`snapshot`, opaque to deadwax but checked to be one)."""
+
+    model_config = ConfigDict(extra="forbid")
+    ids: list[SongId] = Field(..., min_length=1, max_length=queue_rules.RESUME_MAX)
+    index: int = Field(..., ge=0)
+    position: float = Field(..., ge=0, le=queue_rules.POSITION_MAX, allow_inf_nan=False)
+    device: str = Field(..., pattern=queue_rules.DEVICE_PATTERN)
+    label: str = Field(..., pattern=queue_rules.LABEL_PATTERN)
+    snapshot: str | None = Field(None, max_length=queue_rules.SNAPSHOT_MAX)
+
+    @field_validator("snapshot")
+    @classmethod
+    def _snapshot(cls, value: str | None) -> str | None:
+        problem = queue_rules.snapshot_problem(value)
+        if problem:
+            raise ValueError(problem)
+        return value
+
+    @model_validator(mode="after")
+    def _index_inside(self):
+        if self.index >= len(self.ids):
+            raise ValueError("The song playing isn't in the queue sent")
+        return self
+
+
+class QueueAt(BaseModel):
+    """POST /queue/at: a position save - which song of the last full save's ids (`ids_rev` names that save) and how
+    far into it, from which device."""
+
+    model_config = ConfigDict(extra="forbid")
+    ids_rev: int = Field(..., ge=1)
+    index: int = Field(..., ge=0)
+    position: float = Field(..., ge=0, le=queue_rules.POSITION_MAX, allow_inf_nan=False)
+    device: str = Field(..., pattern=queue_rules.DEVICE_PATTERN)
+    label: str = Field(..., pattern=queue_rules.LABEL_PATTERN)
+
+
+#? a user -> (the event loop, its lock): one save at a time per user, so a beacon and a full save can't interleave their
+#? Navidrome write and their record's, and GET /queue reads only between saves - made afresh for another loop, as
+#? navidrome_endpoint._gate makes its locks
+_queue_locks: "OrderedDict[str, tuple[asyncio.AbstractEventLoop, asyncio.Lock]]" = OrderedDict()
+QUEUE_LOCKS_KEPT = 1000
+#? a failed Navidrome write is said once per user in this long - not once for every 30 s save
+QUEUE_WARN_SECONDS = 600
+_queue_warned: dict[str, float] = {}
+
+
+def forget_queue_locks() -> None:
+    """Every lock and warning forgotten (the tests)."""
+    _queue_locks.clear()
+    _queue_warned.clear()
+
+
+def _queue_lock(user: str) -> asyncio.Lock:
+    loop = asyncio.get_running_loop()
+    held = _queue_locks.get(user)
+    if held is None or held[0] is not loop:
+        held = (loop, asyncio.Lock())
+        _queue_locks[user] = held
+    _queue_locks.move_to_end(user)
+    while len(_queue_locks) > QUEUE_LOCKS_KEPT:
+        _queue_locks.popitem(last=False)
+    return held[1]
+
+
+def _warn_queue(user: str, error: NavidromeError) -> None:
+    """The server's log only (never the page's): Navidrome didn't take a save - once per user per QUEUE_WARN_SECONDS."""
+    if isinstance(error, SignedOut) or error.status == 401:
+        return
+    now = time.monotonic()
+    if now - _queue_warned.get(user, -QUEUE_WARN_SECONDS) < QUEUE_WARN_SECONDS:
+        return
+    _queue_warned[user] = now
+    logger.warning(f"Navidrome didn't keep {user}'s play queue ({error}) - the player tries again as it plays")
+
+
+def _keeps_no_queue(request: Request) -> bool:
+    """The break-glass admin: logins on, and asking as the shared account - it has no Navidrome account of its own."""
+    return Config.logins_on() and asks_as_shared(client_for(request))
+
+
+def _no_store(body: dict) -> JSONResponse:
+    return JSONResponse(body, headers={"Cache-Control": "no-store"})
+
+
+def _queue_store(request: Request):
+    store = getattr(request.app.state, "store", None)
+    return store if store is not None and getattr(store, "available", False) else None
+
+
+@router.get("/queue")
+async def queue(request: Request, user: str = Depends(current_user)):
+    """
+    What was playing, to put back paused (2.0.0-player.64): Navidrome's play queue as the asker
+    (getPlayQueueByIndex) - its songs (SHUFFLE_FIELDS), the index it says, the position in seconds, who saved it
+    (`changed_by`) - with logins off `shared` (one queue for everyone), and deadwax's record as `kept` only when
+    deadwax saved last. The break-glass admin: an empty queue, Navidrome asked nothing. Read under the person's save
+    lock: a reload's ask waits for the save its page sent as it went away, and never reads between a save's two
+    writes - Navidrome's new queue beside the old record would come back a plain list.
+    """
+    shared = not Config.logins_on()
+    if _keeps_no_queue(request):
+        return _no_store({"tracks": [], "index": None, "position": 0, "changed_by": "", "shared": shared, "kept": None})
+    store = _queue_store(request)
+    record = None
+    async with _queue_lock(user):
+        try:
+            body = await client_for(request).call("getPlayQueueByIndex")
+        except NavidromeError as e:
+            raise _fail(e)
+        if store is not None:
+            try:
+                record = await asyncio.to_thread(store.play_queue, user)
+            except Exception as e:
+                #? the record is the extra: without it the queue still comes back, as a plain list
+                logger.error(f"couldn't read {user}'s play queue from the database ({e})")
+    held = body.get("playQueueByIndex") if isinstance(body.get("playQueueByIndex"), dict) else {}
+    return _no_store(queue_rules.answer(held, record, shared, SHUFFLE_FIELDS, CLIENT_NAME))
+
+
+@router.post("/queue")
+async def save_queue(saving: QueueSave, request: Request, user: str = Depends(current_user)):
+    """
+    A full save: savePlayQueueByIndex AS THE ASKER (as a form: the ids in order, `currentIndex`, the position in ms),
+    then - only once Navidrome took it - deadwax's record (rev one more, ids_rev = rev). A Navidrome failure leaves the
+    record as it was. -> {rev, ids_rev}; the break-glass admin {rev: null, ids_rev: null}, nothing asked or written.
+    """
+    if _keeps_no_queue(request):
+        return _no_store({"rev": None, "ids_rev": None})
+    store = _queue_store(request)
+    if store is None:
+        raise HTTPException(status_code=503, detail=queue_rules.NO_RECORD)
+    async with _queue_lock(user):
+        try:
+            await client_for(request).call(
+                "savePlayQueueByIndex", queue_rules.save_params(saving.ids, saving.index, saving.position), form=True)
+        except NavidromeError as e:
+            _warn_queue(user, e)
+            raise _fail(e)
+        try:
+            rev, ids_rev = await asyncio.to_thread(store.put_play_queue, user, saving.ids, saving.index, saving.position,
+                                                   saving.snapshot, saving.device, saving.label)
+        except Exception as e:
+            logger.error(f"couldn't keep {user}'s play queue in the database ({e})")
+            raise HTTPException(status_code=503, detail=queue_rules.NO_RECORD)
+    return _no_store({"rev": rev, "ids_rev": ids_rev})
+
+
+@router.post("/queue/at")
+async def save_queue_at(at: QueueAt, request: Request, user: str = Depends(current_user)):
+    """
+    A position save: the song and the second, against the ids of the full save `ids_rev` names - no record, or ids
+    another device or app replaced since, is a 409 (the page then saves in full); an index past those ids a 422. Then
+    savePlayQueueByIndex with the record's ids, and the record moved. -> {rev, ids_rev}; the break-glass admin
+    {rev: null, ids_rev: null}.
+    """
+    if _keeps_no_queue(request):
+        return _no_store({"rev": None, "ids_rev": None})
+    store = _queue_store(request)
+    if store is None:
+        raise HTTPException(status_code=503, detail=queue_rules.NO_RECORD)
+    async with _queue_lock(user):
+        try:
+            record = await asyncio.to_thread(store.play_queue, user)
+        except Exception as e:
+            logger.error(f"couldn't read {user}'s play queue from the database ({e})")
+            raise HTTPException(status_code=503, detail=queue_rules.NO_RECORD)
+        if record is None or record["ids_rev"] != at.ids_rev:
+            raise HTTPException(status_code=409, detail=queue_rules.QUEUE_CHANGED)
+        if at.index >= len(record["ids"]):
+            raise HTTPException(status_code=422, detail=queue_rules.NOT_IN_QUEUE)
+        try:
+            await client_for(request).call(
+                "savePlayQueueByIndex", queue_rules.save_params(record["ids"], at.index, at.position), form=True)
+        except NavidromeError as e:
+            _warn_queue(user, e)
+            raise _fail(e)
+        try:
+            moved = await asyncio.to_thread(store.move_play_queue, user, at.ids_rev, at.index, at.position, at.device,
+                                            at.label)
+        except Exception as e:
+            logger.error(f"couldn't keep {user}'s play queue in the database ({e})")
+            raise HTTPException(status_code=503, detail=queue_rules.NO_RECORD)
+    if moved is None:
+        raise HTTPException(status_code=409, detail=queue_rules.QUEUE_CHANGED)
+    rev, ids_rev = moved
+    return _no_store({"rev": rev, "ids_rev": ids_rev})

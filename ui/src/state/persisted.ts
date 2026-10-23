@@ -80,6 +80,9 @@ export const STORAGE_KEYS = {
    *  or 'default' - carried over from the main page's own setting in this browser, which said to ask
    *  (or said nothing), so it reads as the default, on. Nothing stored: not yet carried over. */
   playerConfirmCancel: 'deadwax-player-confirm-cancel',
+  /** (2.0.0-player.64) This device's own name for its saves of the play queue (app/useResume.ts): 16 characters of
+   *  A-Z a-z 0-9 _ -, made once. What tells "picked up from your Mac" from this device's own queue coming back. */
+  playerDevice: 'deadwax-player-device',
 } as const
 
 /*
@@ -424,6 +427,30 @@ export function readPlayerSpeed(): number {
 
 export function writePlayerSpeed(speed: number): void {
   writeRaw(STORAGE_KEYS.playerSpeed, String(speed))
+}
+
+/* ===== deadwax-player-device ===== */
+
+const DEVICE_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'
+const DEVICE_ID = /^[A-Za-z0-9_-]{8,64}$/
+
+/**
+ * (2.0.0-player.64) This device's id for its saves of the play queue - what deadwax's record says saved it - made
+ * once and kept. 16 characters from crypto.getRandomValues where the browser has it (over plain http too: it needs
+ * no secure page, unlike randomUUID), Math.random where it hasn't; read with care like the others - a kept value
+ * that isn't one is made again, and where storage is refused the page makes a new one each load (its own queue then
+ * reads as another device's: "Picked up from your iPhone" once).
+ */
+export function readPlayerDevice(): string {
+  const saved = readRaw(STORAGE_KEYS.playerDevice)
+  if (saved !== null && DEVICE_ID.test(saved)) return saved
+  const bytes = new Uint8Array(16)
+  const random = typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function' ? crypto : null
+  if (random) random.getRandomValues(bytes)
+  else for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256)
+  const made = Array.from(bytes, (byte) => DEVICE_LETTERS[byte & 63]).join('')
+  writeRaw(STORAGE_KEYS.playerDevice, made)
+  return made
 }
 
 /* ===== deadwax-player-viz-effect, -colours, -style ===== */
