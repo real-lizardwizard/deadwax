@@ -150,14 +150,14 @@ def test_no_setting_words_in_the_app_read_as_a_test_note(path):
 
 
 def test_the_scan_finds_what_it_is_for():
-    """The scan itself, against what You said until 2.0.2 - and a comment, which it leaves alone."""
+    """The scan itself, against what You said until 2.0.1 - and a comment, which it leaves alone."""
     assert offending(["An experiment: it shortens the pause between songs"]) != []
     assert offending(["Verified on an iPhone", "since 2.0.0-player.62", "on trial"]) != [] and len(offending(["a test"])) == 1
     assert without_comments("x // An experiment\n/* trial */ <p>{/* verified */}Plays</p> 'https://x'") == "x \n <p>{}Plays</p> 'https://x'"
     assert offending(["UNVERIFIED", "access.unverified", "latest", "contest"]) == []
 
 
-#? (2.0.2, after review) what the reviewers found the rewrite said wrongly, each held to its fix
+#? (2.0.1, after review) what the reviewers found the rewrite said wrongly, each held to its fix
 
 
 def cache_size_words(monkeypatch, value) -> str:

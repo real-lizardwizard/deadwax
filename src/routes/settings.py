@@ -76,7 +76,7 @@ ORGANIZE_MODES = {
     "move": "Move into the library",
 }
 
-#? What ORGANIZE_MODE's dropdown names each mode (2.0.2): the values stay ORGANIZE_MODES' own, what compose takes,
+#? What ORGANIZE_MODE's dropdown names each mode (2.0.1): the values stay ORGANIZE_MODES' own, what compose takes,
 #? and the Organize modes list under the group names them by those.
 ORGANIZE_MODE_CHOICES = {"off": "Off", "dry_run": "Dry run", "copy": "Copy", "move": "Move"}
 
@@ -392,7 +392,7 @@ def _player_cache_rows() -> list[dict]:
     megabytes = parse_player_cache_mb(Config.PLAYER_CACHE_MB)
     low, high = PLAYER_CACHE_MB_RANGE
     used = megabytes or DEFAULT_PLAYER_CACHE_MB
-    #? (2.0.2, after review) the advice only where it holds: at the default or under it, never to an admin who
+    #? (2.0.1, after review) the advice only where it holds: at the default or under it, never to an admin who
     #? has already given the cache more
     advice = ", so a few GB suits it better" if used <= DEFAULT_PLAYER_CACHE_MB else ""
     size_effect = (

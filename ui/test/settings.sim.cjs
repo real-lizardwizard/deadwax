@@ -452,7 +452,7 @@ console.log('\nthe "Maximum quality" notes say what the code does')
     'Hi-res songs are sent at their own rate, in case a USB DAC can play them at it; otherwise an iPhone converts ' +
     'them to 44.1 or 48 kHz itself. With Gapless on, FLAC songs play without a gap too, but an iPhone holds only a ' +
     'few seconds of them ahead, so a weak connection can make them stall.')
-  //? (2.0.2, after review) Normalization levels a hi-res song under Original too, so it isn't sent "exactly" as it
+  //? (2.0.1, after review) Normalization levels a hi-res song under Original too, so it isn't sent "exactly" as it
   //? is; and whether an iPhone ever runs a USB DAC at a song's own rate isn't known (docs/player.md), so Original
   //? is never sold as the DAC's choice
   check('...Original never says it sends songs exactly as they are, nor that it is the choice for a USB DAC',
