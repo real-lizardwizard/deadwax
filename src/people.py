@@ -45,7 +45,7 @@ NEEDS_LOGINS = "People needs logins on - with them off, anyone who can reach dea
 BREAK_GLASS = ("The break-glass sign-in has no Navidrome account, so People can't ask Navidrome as you - sign in "
                "with your own account.")
 SHARED_ACCOUNT = "That's deadwax's own account (NAVIDROME_USER) - deadwax would lose its way into Navidrome."
-YOUR_PASSWORD = "That's you - change your own password in You → Change password."
+YOUR_PASSWORD = "That's you - change your own password in You → Account → Change password."
 YOUR_ACCOUNT = "deadwax doesn't remove the account you're signed in with."
 YOUR_ROLE = "You can't take away your own admin role."
 YOUR_PERMISSIONS = "That's you - an admin has every permission."

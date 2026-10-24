@@ -53,27 +53,33 @@ export function scopeLine(inScope: number, all: number, typed: string): string {
   return inScope ? `The runs act on ${inScope} of ${foldersWord(all)}: those matching “${text}”.` : `No album folder matches “${text}”.`
 }
 
+/** (2.0.8, UX batch 5) The library's read failing, said in place of its raw words (lib/errorWords.ts's `failed`) -
+ *  Library care's and Needs a look's. */
+export const READ_FAILED = "Couldn't read the library."
+export const CHECK_FAILED = "Couldn't check the library just now."
+export const REREAD_FAILED = "Couldn't read the library just now."
+
 /** What a run will do, said before it starts: how many album folders it takes, which, and what it
- *  writes - CD art by the names src/disc_art.py's disc_art_filename gives (disc.<ext>, or disc<N>.<ext>
- *  per disc of a set; the extension the picture's own). */
+ *  writes. (2.0.8, UX batch 5) In plain words - "matched to a release", "a disc picture from deadwax" - where it
+ *  said "with a release", "CD art of deadwax's own" and listed src/disc_art.py's file names. */
 export function planWords(kind: BulkKind, count: number, typed: string): string {
   const where = scopeWords(typed)
   if (kind === 'covers') {
     return count
-      ? `${foldersWord(count)} with a release and no cover${where}. Each cover comes from the Cover Art Archive, `
-        + "by the release the album's tags name, and is saved beside its tracks - nothing else about the album changes."
-      : `No album with a release is missing its cover${where}.`
+      ? `${foldersWord(count)} matched to a release with no cover${where}. Each cover comes from the Cover Art Archive, `
+        + 'for the release the album is matched to, and is saved beside its tracks - nothing else about the album changes.'
+      : `No album matched to a release is missing its cover${where}.`
   }
   if (kind === 'disc') {
     return count
-      ? `${foldersWord(count)} with a release and no CD art of deadwax's own${where}. A picture of each disc, from `
-        + 'the Cover Art Archive (or fanart.tv, with a key), is saved beside the tracks as disc.jpg (disc1.jpg, '
-        + "disc2.jpg… for a set with a picture per disc; .png when that's what the source has) - nothing else changes."
-      : `Every album with a release has CD art of deadwax's own${where}.`
+      ? `${foldersWord(count)} matched to a release with no disc picture from deadwax yet${where}. A picture of each disc `
+        + 'comes from the Cover Art Archive (or fanart.tv, with a key in Server settings) and is saved beside the tracks - '
+        + 'nothing else changes.'
+      : `Every album matched to a release has a disc picture from deadwax${where}.`
   }
   return count
-    ? `${foldersWord(count)} with no lyrics at all${where}. Each track is looked up on LRCLIB and saved as a .lrc `
-      + "beside it - nothing else changes. An album with some lyrics is finished from its own Get lyrics, in its Edit panel."
+    ? `${foldersWord(count)} with no lyrics at all${where}. Each track's lyrics come from LRCLIB and are saved beside it - `
+      + "nothing else changes. An album with some lyrics is finished from its own Get lyrics, in Edit album."
     : `Every album has some lyrics${where}.`
 }
 
@@ -113,22 +119,22 @@ export function scanAge(
   return scan.scannedAt ? `Scanned ${age}${scan.scanSeconds ? ` in ${scan.scanSeconds}s` : ''}` : ''
 }
 
-/** What the page says it is for. */
-export const CARE_LINE = 'Rescan, and the runs that fetch covers, CD art and lyrics for the albums missing them - '
-  + "one album at a time, through the same steps as an album's own Get buttons, each with Stop."
+/** What the page says it is for - (2.0.8, UX batch 5) what it is FOR, where it said how it works ("through the same
+ *  steps as an album's own Get buttons"). A run stops after the album it is on (lib/bulkTargets.ts runBulk). */
+export const CARE_LINE = 'Rescan the library after changing tags in another program, and fill in missing covers, CD art '
+  + 'and lyrics across many albums at once - one album at a time, and Stop ends a run after the album it\'s on.'
 
 /** (2.0.0-player.65, the 2.0.0 release review) What the page says it is for, naming only the parts it draws for this
  *  person (permissions.ts careParts): the runs alone for Edit albums, Rescan alone for Look after the library. */
 export function careLine(parts: { rescan: boolean; bulk: boolean }): string {
   if (parts.rescan && parts.bulk) return CARE_LINE
   if (parts.bulk) {
-    return "The runs that fetch covers, CD art and lyrics for the albums missing them - one album at a time, through the "
-      + "same steps as an album's own Get buttons, each with Stop."
+    return 'Fill in missing covers, CD art and lyrics across many albums at once - one album at a time, and Stop ends a '
+      + "run after the album it's on."
   }
-  return 'Rescan, which reads every file of the library again.'
+  return 'Rescan reads every file of the library again - use it after changing tags in another program.'
 }
 
-/** Why Rescan is there. */
-export const RESCAN_WORDS = "deadwax notices a changed album by its folder's date, and a tag edited in place by another "
-  + "program doesn't change it - so after a retag elsewhere, Rescan reads every file again. Albums filed from a "
-  + 'download appear without it.'
+/** Why Rescan is there - (2.0.8) when to use it first, then why. */
+export const RESCAN_WORDS = "Use Rescan after editing tags in another program: deadwax spots a changed album by its "
+  + "folder's date, and editing tags in place doesn't change it. Albums added from a download show up without it."

@@ -125,6 +125,8 @@ function check(label, actual, expected) {
 
 const hooks = require(path.join(OUT, 'node_modules/preact/hooks.js'))
 const W = require(path.join(OUT, 'lib/myLibrary.js'))
+//? (2.0.8) a refusal as api/http.ts throws it, so Held by nobody's words go through lib/errorWords.ts as they do live
+const { ApiError } = require(path.join(OUT, 'api/http.js'))
 const store = require(path.join(OUT, 'app/useMyLibrary.js'))
 const { YourLibrary } = require(path.join(OUT, 'app/YourLibrary.js'))
 const { HeldByNobody, HELD_SHOWN } = require(path.join(OUT, 'app/HeldByNobody.js'))
@@ -369,7 +371,9 @@ async function run() {
     check('not showing: nothing asked', L.asks, [])
     tree = draw({ live: true })
     draw.commit()
-    check('showing: asked, saying so meanwhile', [L.asks.map((a) => a[0]), words(find(byClass('app-care-note'), tree))], [['held'], 'Asking deadwax…'])
+    check('showing: asked, saying so meanwhile', [L.asks.map((a) => a[0]), words(find(byClass('app-care-note'), tree))], [['held'], 'Loading…'])
+    //? (2.0.8, UX batch 5) "In nobody's library" - it was "Held by nobody"
+    check('...headed by what it lists', words(find(byClass('app-care-title'), tree)), "In nobody's library")
     const albums = Array.from({ length: 23 }, (_, n) => ({ id: n + 1, path: `A/${n}`, artist: 'A', album: `Album ${n}`, edition: '', year: '', release_mbid: null, formats: [], track_count: 1 }))
     const flags = [{ id: 5, album_id: 3, artist: 'Portishead', album: 'Third', path: 'Portishead/Third (2008)', release_mbid: 'rel-3', users: ['ethan'], created_at: 'x' }]
     answer('held', { count: 23, albums, flags })
@@ -388,7 +392,7 @@ async function run() {
     buttons(flag)[0].props.onClick()
     buttons(flag)[1].props.onClick()
     check('Add for them asks once - Dismiss waits for it', L.asks, [['add', 5]])
-    answer('add', new Error('That album isn\'t in the collection any more - dismiss it.'))
+    answer('add', new ApiError(409, 'That album isn\'t in the collection any more - dismiss it.', 'POST /library/held/add failed', false, null, null, '/library/held/5/add'))
     await settle()
     tree = draw({ live: true })
     check('...refused: deadwax\'s words, and the list asked again', [words(find(byClass('app-care-problem'), tree)), L.asks.map((a) => a[0])],

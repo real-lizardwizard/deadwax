@@ -618,6 +618,23 @@ def test_an_album_with_no_release_id_waits_saying_so(on):
     assert on.fake.asked("search3") == []
 
 
+def test_no_release_is_said_to_whoever_can_apply_one_as_theirs_to_fix(on):
+    """(2.0.8, UX batch 5) "An admin needs to match it…" said to an admin was the admin told to ask themselves: to
+    anyone who may apply a release (Edit albums - an admin has it) it is what to do, in Edit album; anyone else
+    still reads that an admin needs to."""
+    album = held(on, tagged=False)
+    ethan, james = signed_in(on, "ethan"), signed_in(on, "james")
+    grant(on, ["ethan", "james"], album)
+    work(on)
+    [theirs] = ethan.get(LIBRARY).json()["waiting_albums"]
+    [mine] = james.get(LIBRARY).json()["waiting_albums"]
+    assert (theirs["problem"], mine["problem"]) == ("no_release", "no_release")
+    assert theirs["words"] == "An admin needs to match it to a release on MusicBrainz before it can be added."
+    assert mine["words"] == library_ledger.NO_RELEASE_YOURS
+    assert "Apply a release to it in Edit album" in mine["words"] and "admin" not in mine["words"]
+    assert library_ledger.problem_text(library_ledger.NOT_IN_NAVIDROME, True) == library_ledger.PROBLEM_WORDS[library_ledger.NOT_IN_NAVIDROME]
+
+
 def test_navidrome_down_stops_the_pass_and_counts_against_nothing(on):
     first, second = held(on), held(on, THIRD, "rel-third")
     signed_in(on, "ethan")

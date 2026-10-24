@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { forgetPerson, lockPeople, savePermissions, setAdmin, type KnownOnly, type Person } from '../api/people'
-import { MANAGING_ADMINS_ONLY } from '../lib/appRoutes'
+import { PEOPLE_ONLY } from '../lib/permissions'
 import { latestOnly } from '../lib/latest'
 import {
   KNOWN_ONLY_LINE, KNOWN_ONLY_TITLE, SHARING_DOC, UNLOCKED_LINE, actions, chips, knownWords, librariesWarning, libraryWords,
@@ -78,7 +78,7 @@ export function People({
       <section class="app-people is-refused app-needs">
         {header}
         <div class="app-card app-placeholder-body">
-          <p class="app-placeholder-text">{MANAGING_ADMINS_ONLY}</p>
+          <p class="app-placeholder-text">{PEOPLE_ONLY}</p>
         </div>
       </section>
     )
@@ -101,7 +101,7 @@ export function People({
           {said && <p class="app-people-done" role="status">{said}</p>}
         </div>
         {problem && <p class="app-people-problem" role="alert">{problem}</p>}
-        {view === 'asking' && !problem && <div class="pl-spinner" aria-label="Asking deadwax" />}
+        {view === 'asking' && !problem && <div class="pl-spinner" aria-label="Loading" />}
 
         {state && state.problem && (
           <div class="app-card app-people-state">

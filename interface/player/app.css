@@ -5962,8 +5962,6 @@ html.app-edit-open { overflow: hidden; }
     font-size: var(--dw-text-label);
 }
 
-.app-shell:not(.app-desk) .app-edit .metadata-mbid { color: var(--dw-text-2); font-family: var(--dw-font-mono); overflow-wrap: anywhere; }
-
 .app-shell:not(.app-desk) .app-edit #metadata-search { display: flex; gap: var(--app-ph-lines); }
 .app-shell:not(.app-desk) .app-edit #metadata-search > input { flex: 1; }
 

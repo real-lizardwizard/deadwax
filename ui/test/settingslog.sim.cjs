@@ -143,6 +143,9 @@ const MBA = require(path.join(OUT, 'components/MusicBrainzAnswers.js'))
 const MBL = require(path.join(OUT, 'lib/musicbrainzAnswers.js'))
 const R = require(path.join(OUT, 'lib/appRoutes.js'))
 const NS = require(path.join(OUT, 'app/navidromeSetUp.js'))
+//? (2.0.8) a refusal as api/http.ts throws it - an ApiError with its status - so the page's 400 rule is what is tested
+const HTTP = require(path.join(OUT, 'api/http.js'))
+const refusal = (detail) => new HTTP.ApiError(400, detail, 'POST /settings failed', false, null, null, '/settings')
 const NC = require(path.join(OUT, 'lib/navidromeCheck.js'))
 const { EventLog, forgetEventLogPage } = require(path.join(OUT, 'app/EventLog.js'))
 //? a fresh page: the asks forgotten, and what both pages keep beyond their own life (their modules)
@@ -250,7 +253,7 @@ console.log('\nthe log: history and stream joined by number')
   check('at most 500 lines kept, the oldest dropped', [L.LOG_KEPT, many.lines.length, many.lines.at(-1).event_content, many.lines[0].event_content], [500, 500, 'line 101', 'line 600'])
   check('errors red, warnings amber, the rest plain', ['ERROR', 'CRITICAL', 'WARNING', 'INFO', 'DEBUG'].map(L.levelOf), ['error', 'error', 'warning', 'info', 'info'])
   check('a line\'s time: HH:MM:SS from the server\'s; none when it sent none', [/^\d\d:\d\d:\d\d$/.test(L.lineTime(line(1, 'x'))), L.lineTime({ event_type: 'INFO', event_content: 'x' })], [true, ''])
-  check('where the stream stands, in words', L.STREAM_WORDS, { connecting: 'Connecting…', live: 'Live', lost: 'The stream was lost - trying again' })
+  check('where the stream stands, in words', L.STREAM_WORDS, { connecting: 'Connecting…', live: 'Live', lost: 'Lost the live feed - reconnecting…' })
 }
 
 console.log('\nthe log: its addresses, as api/logs.ts makes them')
@@ -568,7 +571,7 @@ async function settingsPage() {
   check('ONE batch with every draft, whichever tab it was made on', W.saves.map((save) => [...save.updates].sort((a, b) => a.key.localeCompare(b.key))),
     [[{ key: 'NAVIDROME_PASSWORD', value: 'hunter2' }, { key: 'NAVIDROME_URL', value: 'http://elsewhere:4533' }, { key: 'ORGANIZE_MODE', value: 'copy' }]])
   check('...saying so meanwhile, and refusing a second save', [words(button('Saving…')), button('Saving…').props['aria-disabled']], ['Saving…', 'true'])
-  W.saves[0].reject(new Error("NAVIDROME_URL: has a user name or password in it - leave the login to NAVIDROME_USER"))
+  W.saves[0].reject(refusal("NAVIDROME_URL: has a user name or password in it - leave the login to NAVIDROME_USER"))
   await settle()
   page.draw()
   check('refused: said in the bar, every draft still there, nothing on the page changed',
@@ -695,7 +698,7 @@ async function settingsPage() {
     W.reads[1].reject(new Error('HTTP 502'))
     await settle()
     again.draw()
-    check('a read failing over settings in hand: said over them', words(classed('app-settings-problem')[0]), "Couldn't read the settings again just now: HTTP 502")
+    check('a read failing over settings in hand: said over them', words(classed('app-settings-problem')[0]), "Couldn't read the settings again just now. Try again. (HTTP 502)")
     type('SLSKD_SEARCH_TIMEOUT', '12')
     again.draw()
     button('Save changes').props.onClick()
@@ -717,13 +720,22 @@ async function settingsPage() {
     type('ORGANIZE_MODE', 'move')
     refused.draw()
     button('Save changes').props.onClick()
-    W.saves[0].reject(new Error('ORGANIZE_MODE: no'))
+    W.saves[0].reject(refusal('ORGANIZE_MODE: no'))
     await settle()
     refused.draw()
     check('refused: said in the bar', [savebar(), classed('app-settings-savebar')[0].props.class], ['Not saved: ORGANIZE_MODE: no', 'app-settings-savebar has-error is-said'])
     button('Discard').props.onClick()
     refused.draw()
     check('...Discard: the drafts and the refusal gone, the bar saying nothing', [savebar(), classed('app-settings-savebar')[0].props.class], ['', 'app-settings-savebar'])
+    //? (2.0.8, UX batch 5) a save that never reached deadwax is said in words (lib/errorWords.ts) - never fetch's own
+    type('ORGANIZE_MODE', 'move')
+    refused.draw()
+    button('Save changes').props.onClick()
+    W.saves[1].reject(new TypeError('Failed to fetch'))
+    await settle()
+    refused.draw()
+    check('...a save that never reached deadwax: said in words, never "Failed to fetch" alone', savebar(),
+      "Not saved: Can't connect to deadwax. Check your connection, then try again. (Failed to fetch)")
     refused.unmount()
   }
 
@@ -742,7 +754,7 @@ async function settingsPage() {
     type('NAVIDROME_URL', 'http://elsewhere:4533')
     first.draw()
     button('Save changes').props.onClick()
-    W.saves[0].reject(new Error('NAVIDROME_PASSWORD: type it again'))
+    W.saves[0].reject(refusal('NAVIDROME_PASSWORD: type it again'))
     await settle()
     first.draw()
     //? App draws only a tab's top page: the sidebar's Log (which replaces it), Back, Go to album - it goes
@@ -1016,7 +1028,7 @@ async function logPage() {
   source.onerror()
   page.draw()
   check('lost three times: one line above the log, and the log no longer for it', [classed('app-log-stream').length, words(classed('app-log-stream')[0]), drawnLines().length],
-    [1, 'The stream was lost - trying again', 6])
+    [1, 'Lost the live feed - reconnecting…', 6])
   source.onopen()
   page.draw()
   check('...back: "Live" again', words(classed('app-log-stream')[0]), 'Live')
@@ -1050,7 +1062,7 @@ async function logPage() {
   await settle()
   page.draw()
   check('the history failing: said, and the stream opened from what the page has', [words(classed('app-log-problem')[0]), W.sources[2].url],
-    ["deadwax couldn't send the lines it kept: HTTP 502", '/deadwax/interface_logs/interface_logs?after=1&boot=B'])
+    ["Couldn't load the lines deadwax kept - what happens from now still shows. (HTTP 502)", '/deadwax/interface_logs/interface_logs?after=1&boot=B'])
   page.unmount()
   check('...and left: the stream closed', W.sources[2].closed, true)
 
@@ -1166,7 +1178,7 @@ async function logPage() {
       first.readyState = 0
       first.onerror()
       retry.draw()
-      check('a network error: "trying again", left to EventSource (it tries again by itself)', [words(classed('app-log-stream')[0]), timers.length, first.closed], ['The stream was lost - trying again', 0, false])
+      check('a network error: "trying again", left to EventSource (it tries again by itself)', [words(classed('app-log-stream')[0]), timers.length, first.closed], ['Lost the live feed - reconnecting…', 0, false])
       first.readyState = 1
       first.onopen()
       first.send(logLine(3, 'three'))
@@ -1176,7 +1188,7 @@ async function logPage() {
       first.onerror()
       retry.draw()
       check('...the browser giving up (CLOSED): the line still says so, and the page asks again itself, once, after a pause',
-        [words(classed('app-log-stream')[0]), timers.length, timers[0]?.ms, L.STREAM_RETRY_MS, first.closed], ['The stream was lost - trying again', 1, 5000, 5000, true])
+        [words(classed('app-log-stream')[0]), timers.length, timers[0]?.ms, L.STREAM_RETRY_MS, first.closed], ['Lost the live feed - reconnecting…', 1, 5000, 5000, true])
       timers[0].fn()
       check('...the pause over: the history read again before a new stream', [W.recents.length, W.sources.length], [2, 1])
       W.recents[1].resolve({ boot: 'A', last: 5, lines: [logLine(3, 'three'), logLine(4, 'four'), logLine(5, 'five')] })

@@ -25,11 +25,11 @@ export const UNLOCK_TITLE = 'Unlock People'
 export function unlockLine(user: string): string {
   return `People changes Navidrome's accounts as you, ${user}. Navidrome needs your password for that; deadwax uses it once and doesn't keep it.`
 }
-export const UNLOCKED_LINE = `Unlocked on this device for ${UNLOCK_IDLE_MINUTES} minutes since you last use it - Lock ends it now.`
-export const HTTP_NOTE = "This page isn't over HTTPS: a password typed here crosses your network readable, as everyone's sign-in does. That's fine on your own network or over WireGuard; anywhere else, put HTTPS in front of deadwax first."
+export const UNLOCKED_LINE = `Unlocked on this device until it's left alone for ${UNLOCK_IDLE_MINUTES} minutes. Lock ends it now.`
+export const HTTP_NOTE = "This page isn't over HTTPS: a password typed here crosses your network readable, as everyone's sign-in does. That's fine on your own network or over a VPN; anywhere else, put HTTPS in front of deadwax first."
 export const SHARING_DOC = 'https://github.com/real-lizardwizard/deadwax/blob/main/docs/sharing.md'
 export const KNOWN_ONLY_TITLE = 'Known only to deadwax'
-export const KNOWN_ONLY_LINE = "Names deadwax keeps things for that have no Navidrome account - deleted in Navidrome's own Users page, or a removal deadwax couldn't finish."
+export const KNOWN_ONLY_LINE = "People deadwax still keeps things for who no longer have a Navidrome account - deleted in Navidrome's own Users page, or a removal deadwax couldn't finish."
 
 /** The control characters a field may not have: what Python calls Cc, Cf, Zl and Zp, near enough. */
 const CONTROL = /[\u0000-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u2028-\u202e\u2060-\u2064\ufeff]/
@@ -120,7 +120,7 @@ export function libraryWords(person: Pick<Person, 'library'>): string {
 /** Only when a non-admin has no Navidrome library at all. */
 export function librariesWarning(person: Pick<Person, 'admin' | 'libraries'>): string | null {
   if (person.admin || person.libraries !== 0) return null
-  return "Navidrome gives them no library - they'll see nothing. Tick one for them in Navidrome's Users page."
+  return "Navidrome gives them no library - they'll see nothing. Choose one for them in Navidrome's Users page."
 }
 
 export type ActionKind = 'reset' | 'admin' | 'remove'
@@ -155,13 +155,13 @@ export function removeReady(typed: string, user: string): boolean {
 export function makeAdminWords(user: string): { question: string; body: string } {
   return {
     question: `Make ${user} an admin?`,
-    body: `In deadwax they'll edit and delete albums, see everyone's downloads, the albums that need a look, Library care, the settings, the log and People. In Navidrome they become an admin too: its Users, libraries and settings, every library, and in Amperfy everyone's playlists, private ones included.`,
+    body: `In deadwax they'll edit and delete albums, see everyone's downloads, Needs a look, Library care, Server settings, the event log and People. In Navidrome they become an admin too: its Users, libraries and settings, every library, and - in their other music apps too - everyone's playlists, private ones included.`,
   }
 }
 
 /** No longer admin's question - and what they keep (Navidrome's libraries; what was ticked before). */
 export function unmakeAdminWords(user: string, ticked: readonly string[]): { question: string; body: string } {
-  const before = ticked.length ? ` They keep what was ticked for them before: ${ticked.join(', ')}.` : ''
+  const before = ticked.length ? ` They keep what they were given before: ${ticked.join(', ')}.` : ''
   return {
     question: `${user} no longer an admin?`,
     body: `${user} keeps every library Navidrome gave them as an admin - narrow them in Navidrome's Users page if they shouldn't see them all.${before}`,
@@ -208,11 +208,11 @@ export function knownWords(entry: KnownOnly): string {
 /* ----- after a change ----- */
 
 export function madeWords(user: string, origin: string): string {
-  return `Made ${user}. Tell them their user name, the password you chose and deadwax's address (${origin}/player/) - Amperfy signs in with the same.`
+  return `Made ${user}. Tell them their user name, the password you chose and deadwax's address (${origin}/player/) - their other music apps sign in with the same user name and password.`
 }
 
 export function resetWords(user: string, signedOut: number): string {
-  return `Done. ${user} is signed out of deadwax on ${plural(signedOut, 'device', 'devices')} and signs in with the new password - Amperfy and any other app they use need it too.`
+  return `Done. ${user} is signed out of deadwax on ${plural(signedOut, 'device', 'devices')} and signs in with the new password - their other music apps need it too.`
 }
 
 /* ----- the page ----- */
@@ -222,13 +222,14 @@ export function httpNote(protocol: string): string | null {
   return protocol === 'https:' ? null : HTTP_NOTE
 }
 
-/** "People was made for Navidrome 0.64 - this is …" when Navidrome's status names another minor version - a note,
- *  never a block. `server` is /deadwax/navidrome/status's ("Navidrome 0.65.0 (abc)"). */
+/** (2.0.8, UX batch 5: it said "People was made for Navidrome 0.64 - this is 0.65.0.") What to do when Navidrome's
+ *  status names another minor version than People was checked with - a note, never a block. `server` is
+ *  /deadwax/navidrome/status's ("Navidrome 0.65.0 (abc)"). */
 export function versionNote(server: string | null | undefined): string | null {
   const found = /(\d+)\.(\d+)(?:\.(\d+))?/.exec(server ?? '')
   if (!found) return null
   if (`${found[1]}.${found[2]}` === TESTED_NAVIDROME) return null
-  return `People was made for Navidrome ${TESTED_NAVIDROME} - this is ${found[0]}.`
+  return `Your Navidrome (${found[0]}) isn't the one People was checked with (${TESTED_NAVIDROME}). If something here doesn't work, use Navidrome's own Users page.`
 }
 
 /** What the page draws: the unlock form, the list, or only the problem. */

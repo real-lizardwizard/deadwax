@@ -94,7 +94,7 @@ export function ArtViewer({ images, onClose, action }: Props) {
       <div class="art-viewer-frame" onClick={(event) => event.stopPropagation()}>
         <div class="window-titlebar">
           <span class="window-title">Cover art</span>
-          <button type="button" class="window-close" title="Close (Esc)" onClick={onClose}>✕</button>
+          <button type="button" class="window-close" title="Close (Esc)" aria-label="Close" onClick={onClose}>✕</button>
         </div>
 
         <div class={`art-viewer-panes count-${images.length}`}>

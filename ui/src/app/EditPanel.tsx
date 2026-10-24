@@ -24,6 +24,8 @@ import type { FolderChange } from '../lib/needsLook'
 import { tickTracks } from '../lib/tagEdit'
 import { revealBy } from '../lib/trackInspector'
 import { CloseIcon } from '../player/icons'
+import { READ_FAILED } from '../lib/libraryCare'
+import { sayError } from './sayError'
 import { useAccess } from './access'
 import { CoverViewer } from './CoverViewer'
 import { FolderPicker } from './FolderPicker'
@@ -756,7 +758,8 @@ export function EditPanel({
   const status = request ? editStatus({
     deleted,
     problem: library.problem,
-    error: library.error,
+    //? (2.0.8, UX batch 5) in words (lib/errorWords.ts) - its own words in brackets for whoever runs deadwax
+    error: library.error ? sayError(library.error, '', { failed: READ_FAILED, retry: true }) : null,
     albums: library.albums.length,
     loaded: library.loaded,
     stale: library.stale,
@@ -864,8 +867,7 @@ export function EditPanel({
           {choosing && (
             <div class="app-edit-state">
               <p class="app-edit-note">
-                Navidrome knows this album by no MusicBrainz release, and {folders!.paths.length} untagged folders in the
-                library have its name. Which one is it?
+                {`${folders!.paths.length} folders have this album's name, and none is matched to a release. Which one is it?`}
               </p>
               <ul class="app-edit-choices">
                 {folders!.paths.map((path) => (
@@ -1000,7 +1002,8 @@ function TagsList({
           {count ? `Edit ${count} track${count === 1 ? '' : 's'}…` : 'Edit all tracks…'}
         </button>
         <span class="app-edit-note">
-          {count ? `${count} of ${tracks.length} ticked` : sheet ? 'Tick tracks to edit only those.' : 'Tick tracks to edit only those; Shift ticks a run.'}
+          {/* (2.0.8, UX batch 5) "Select", never "Tick"; and the track names say they open */}
+          {count ? `${count} of ${tracks.length} selected` : sheet ? "Select tracks to edit only those. Tap a track's name to see everything in its file." : "Select tracks to edit only those; Shift selects a run. Click a track's name to see everything in its file."}
         </span>
       </div>
 
@@ -1011,7 +1014,7 @@ function TagsList({
               <label class="app-edit-hit">
                 <input
                   type="checkbox"
-                  aria-label={all ? 'Untick every track' : 'Tick every track'}
+                  aria-label={all ? 'Deselect every track' : 'Select every track'}
                   checked={all}
                   ref={(element) => {
                     if (element) element.indeterminate = some
@@ -1034,7 +1037,7 @@ function TagsList({
                   <label class="app-edit-hit">
                     <input
                       type="checkbox"
-                      aria-label={`Tick ${track.title || track.filename}`}
+                      aria-label={`Select ${track.title || track.filename}`}
                       checked={on}
                       onClick={(event) => onTick(track.filename, event.shiftKey)}
                     />
@@ -1099,9 +1102,9 @@ function ArtworkTab({ album, onDone }: { album: LibraryAlbum; onDone: () => void
             </p>
             <GetArtButton album={album} onDone={onDone} class="app-edit-button" />
             {!album.release_mbid ? (
-              <p class="app-edit-note">A cover is looked up by the album's release: match one in Release first.</p>
+              <p class="app-edit-note">To get a cover, first match the album to a release in the Release tab.</p>
             ) : album.art ? (
-              <p class="app-edit-note">To replace it, compare it with the release's in Release (Compare full size…).</p>
+              <p class="app-edit-note">To replace it, compare it with the release's in the Release tab (Compare full size…).</p>
             ) : null}
           </div>
         </div>
@@ -1132,7 +1135,7 @@ function ArtworkTab({ album, onDone }: { album: LibraryAlbum; onDone: () => void
         )}
         <GetDiscArtButton album={album} onDone={onDone} class="app-edit-button" />
         {!album.release_mbid ? (
-          <p class="app-edit-note">CD art is looked up by the album's release: match one in Release first.</p>
+          <p class="app-edit-note">To get CD art, first match the album to a release in the Release tab.</p>
         ) : ownDisc.length ? (
           <p class="app-edit-note">deadwax never replaces CD art it saved.</p>
         ) : null}
@@ -1155,7 +1158,8 @@ function LyricsTab({ album, onDone }: { album: LibraryAlbum; onDone: () => void 
         </p>
         <GetLyricsButton album={album} onDone={onDone} class="app-edit-button" />
         {album.lyrics_count >= album.track_count && <p class="app-edit-note">Every track has lyrics.</p>}
-        <p class="app-edit-note">The lyrics lead, and re-timing the lyrics already saved, are in Managing's Settings, under Library.</p>
+        {/* (2.0.8, UX batch 5) the page and group it is on, by their own names */}
+        <p class="app-edit-note">To shift when synced lyrics appear, or re-time the ones already saved, see Lyrics in Server settings (Library).</p>
       </section>
     </div>
   )

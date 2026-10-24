@@ -470,7 +470,8 @@ async function inspector() {
   I.lyrics.at(-1).reject(new Error('no such track'))
   await settle()
   tree = view.draw(props('01 - Mysterons.flac'))
-  check('a lyrics read that failed is said', words(one('app-inspect-warn', lyricsPart())), 'no such track')
+  //? (2.0.8, UX batch 5) in words (lib/errorWords.ts), the read's own words in brackets for whoever runs deadwax
+  check('a lyrics read that failed is said', words(one('app-inspect-warn', lyricsPart())), "Couldn't read this track's lyrics. Try again. (no such track)")
   delete globalThis.document
   delete globalThis.window
   hooks.__reset()

@@ -197,8 +197,9 @@ export function Sidebar({
 
       {managing.any && (
         <section class="app-side-group" aria-labelledby="app-side-managing">
+          {/* (2.0.8, UX batch 5) "Manage", James's word for the admin area - it was "Managing" */}
           <h2 id="app-side-managing" class="app-side-label">
-            Managing
+            Manage
           </h2>
           <ul class="app-side-list">
             {managing.queue && item(SIDEBAR_QUEUE)}

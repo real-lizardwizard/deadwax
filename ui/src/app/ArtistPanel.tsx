@@ -14,6 +14,7 @@ import { artistArtUrl } from '../lib/format'
 import { isAbort, latestOnly } from '../lib/latest'
 import { CheckIcon, CloseIcon } from '../player/icons'
 import { useSheet } from './useSheet'
+import { sayError } from './sayError'
 
 /** What the artist page's panel is opened for (2.0.0-player.45). */
 export type ArtistManageMode = 'images' | 'refile' | 'who'
@@ -54,7 +55,9 @@ const TITLES: Readonly<Record<ArtistManageMode, string>> = {
   who: 'Which artist is this?',
 }
 
-const message = (error: unknown, fallback: string) => (error instanceof Error && error.message ? error.message : fallback)
+//? (2.0.8, UX batch 5) a failure in words (lib/errorWords.ts) - `failed` its sentence, its own words in brackets for
+//? whoever runs deadwax - where it was the error's own words
+const message = (error: unknown, failed: string) => sayError(error, '', { failed })
 
 /** Focus fell to the page (or was never taken) - the only time a body moves it. */
 const focusLost = (): boolean => {
@@ -174,7 +177,7 @@ export function RefileBody({ request, live, onClose, onSettle }: {
         if (ticket.current()) setPlans(found)
       },
       (caught: unknown) => {
-        if (ticket.current() && !isAbort(caught)) setError(message(caught, "deadwax couldn't work out the moves"))
+        if (ticket.current() && !isAbort(caught)) setError(message(caught, "Couldn't work out the moves."))
       },
     )
     return () => previews.supersede()
@@ -207,7 +210,7 @@ export function RefileBody({ request, live, onClose, onSettle }: {
       try {
         applied.push({ name, ...(await applyArtistRefile(name, request.mbid)) })
       } catch (caught) {
-        problem = message(caught, 'the move failed')
+        problem = message(caught, "The move didn't work.")
         break
       }
     }
@@ -370,7 +373,7 @@ export function ImagesBody({ request, live }: { request: ArtistManageRequest; li
       (caught: unknown) => {
         if (!ticket.current() || isAbort(caught)) return
         setLoading(null)
-        setProblem(message(caught, "deadwax couldn't look for pictures just now"))
+        setProblem(message(caught, "Couldn't look for pictures just now."))
       },
     )
   }
@@ -652,7 +655,7 @@ export function WhoBody({ request, live, onClose }: { request: ArtistManageReque
       {searching && matches === null ? (
         <div class="app-asking" role="status">
           <span class="app-sweep" aria-hidden="true" />
-          <span class="app-asking-text">Asking MusicBrainz…</span>
+          <span class="app-asking-text">Searching MusicBrainz…</span>
         </div>
       ) : null}
       {note && <p class="app-artist-panel-note">{note}</p>}

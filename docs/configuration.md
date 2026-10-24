@@ -3,8 +3,8 @@
 There are three kinds of setting:
 
 - **Server settings** belong to the container: where slskd is, where your library is, how albums are
-  filed. They're edited in the app's **Server settings** - the desktop sidebar's **Settings**, under
-  **Managing**, or **You → Server settings** on a phone - which has three pages: **Library**,
+  filed. They're edited in the app's **Server settings** - the desktop sidebar's **Server settings**, under
+  **Manage**, or **You → Manage → Server settings** on a phone - which has three pages: **Library**,
   **Downloads** and **Connections**. "Settings → Library" in this guide means that page.
 - **Your Getting albums settings** - what **Get** does, the quality floor and Format - are
   [kept for you on deadwax](#your-settings-in-the-app-per-user-on-deadwax), so they follow you from
@@ -49,7 +49,7 @@ Connections.
 bottom above the tab bar and the player). Changes stay drafts until **Save changes**, which saves
 every page's changes at once or, if deadwax refuses one, none of them, saying why. A change made while
 a save is still on its way stays a draft for the next save, and drafts are kept if you go to another
-page - the Log, say - and come back, until the app is reloaded. A page holding a change, or a setting
+page - the Event log, say - and come back, until the app is reloaded. A page holding a change, or a setting
 that needs attention, is marked on its tab, so neither can hide behind one you aren't looking at.
 **Re-time saved lyrics** is there too, under **Library**'s Lyrics group beside `LYRICS_LEAD_MS`: it
 is refused while the lead has an unsaved change ("Save the new lead first." - it re-times to the
@@ -75,7 +75,7 @@ three Navidrome settings are saved, the app asks Navidrome again by itself.
 
 | setting | default | what it does |
 | --- | --- | --- |
-| `SLSKD_URL` | *(required)* | slskd's address **as seen from inside this container**, with the scheme: `http://slskd:5030` for a container on the same Docker network. If slskd has a URL base, include it, as in `http://slskd:5030/slskd`. It can't hold a user name or password, a `?` or `#`, or a space, and Server settings explains exactly what's wrong with an address it can't use. One set in compose or `.env` that fails the same check is refused as well: deadwax sends slskd nothing at it, and the **Log** and the container's log say why. **Changing it takes the API key again**, typed in the same save, so the saved key is never sent to an address it wasn't entered for. Reverting it doesn't. Nor can the key from compose or `.env` be put back while the address is a new one: reverting `SLSKD_APIKEY` alone while the address in force is a different one from compose's or `.env`'s is refused, and the key's row says so before you save: type the key, or revert the address with it. With logins on, **only an admin can change it** (or the key) in Server settings, even someone given Settings and the log: the key is full control of slskd. |
+| `SLSKD_URL` | *(required)* | slskd's address **as seen from inside this container**, with the scheme: `http://slskd:5030` for a container on the same Docker network. If slskd has a URL base, include it, as in `http://slskd:5030/slskd`. It can't hold a user name or password, a `?` or `#`, or a space, and Server settings explains exactly what's wrong with an address it can't use. One set in compose or `.env` that fails the same check is refused as well: deadwax sends slskd nothing at it, and the **Event log** and the container's log say why. **Changing it takes the API key again**, typed in the same save, so the saved key is never sent to an address it wasn't entered for. Reverting it doesn't. Nor can the key from compose or `.env` be put back while the address is a new one: reverting `SLSKD_APIKEY` alone while the address in force is a different one from compose's or `.env`'s is refused, and the key's row says so before you save: type the key, or revert the address with it. With logins on, **only an admin can change it** (or the key) in Server settings, even someone given Settings and the log: the key is full control of slskd. |
 | `SLSKD_APIKEY` | *(required)* | an API key from slskd's configuration. Never shown in the page, only whether it's set. Every request to `SLSKD_URL` carries it, and it gives full control of slskd. With logins on, only an admin can change it in Server settings. |
 | `MUSICBRAINZ_EMAIL` | *(recommended)* | your contact address for MusicBrainz. The app builds its identifying user agent around it, as `deadwax/<version> ( you@example.com )`, so the version it sends is always the one running. Without a contact, MusicBrainz may refuse or throttle requests. |
 | `MUSICBRAINZ_USERAGENT` | | the old way: a whole user agent written by hand. Still read, and its contact is used if `MUSICBRAINZ_EMAIL` isn't set. |
@@ -104,7 +104,7 @@ same music `LIBRARY_PATH` reads.
 ### MusicBrainz's saved answers (Settings → Connections)
 
 Every answer MusicBrainz gives deadwax is saved on disk, so asking the same thing
-again - a search, an artist, an album's pressings, the metadata editor's lookups, a download's
+again - a search, an artist, an album's pressings, the lookups in Edit album's Release tab, a download's
 tracklist - is answered at once instead of waiting on MusicBrainz, even after deadwax restarts and even
 while MusicBrainz is away. The answers are shared by everyone using deadwax. Only answers are saved,
 never a failure: a minute when MusicBrainz is down is never remembered as an answer. (Before, they were
@@ -194,7 +194,7 @@ can land seconds off.
 | `ORGANIZE_MODE` | `dry_run` | what happens when a download finishes. `off`: nothing. `dry_run`: the log says where each file would go, and nothing is written. `copy`: files are tagged and copied into the library, and slskd's copies stay. `move`: files are tagged and moved, and slskd's emptied folder is removed. See [Organizing](organizing.md). With [logins](#logins-environment-only) on it has to be `copy` or `move`. |
 | `ALBUM_FOLDER_TEMPLATE` | `{album} ({year}) [{edition}]` | how an album's folder is named. The artist folder above it is always the artist. See [folder names](organizing.md#folder-names). |
 | `COUNTRY_IN_FOLDER` | `off` | `on` lets a release's country name its folder when nothing else tells the pressing apart, as in `Dummy (1994) [GB]`. Two different releases never share a folder either way. |
-| `RETAG_RENAME_WAIT` | `20` | when applying a release changes an album's tags **and** its folder, the metadata editor writes the tags first and renames the folder afterwards, because Navidrome keeps plays, ratings and favourites across either change, but not both at once. Without Navidrome set up, this is the seconds it waits between the two. **With Navidrome set up** (its three settings, [above](#navidrome-settings--connections)), it asks Navidrome instead, and renames as soon as Navidrome has finished a scan that began after the tags were written, usually a few seconds later; the number then only has to be more than 0, and is the fixed wait used if Navidrome answers from the start in a way deadwax can't use (a refused login, say). If Navidrome finishes no scan within 90 seconds, or can't be reached at all, the folder is left where it is and the editor says so; applying the album again checks with Navidrome first, and renames once it has scanned (see [troubleshooting](troubleshooting.md#applying-a-release-left-the-folder-where-it-was)). `0` renames straight away, either way. From 0 to 300. |
+| `RETAG_RENAME_WAIT` | `20` | when applying a release changes an album's tags **and** its folder, Edit album's Release tab writes the tags first and renames the folder afterwards, because Navidrome keeps plays, ratings and favourites across either change, but not both at once. Without Navidrome set up, this is the seconds it waits between the two. **With Navidrome set up** (its three settings, [above](#navidrome-settings--connections)), it asks Navidrome instead, and renames as soon as Navidrome has finished a scan that began after the tags were written, usually a few seconds later; the number then only has to be more than 0, and is the fixed wait used if Navidrome answers from the start in a way deadwax can't use (a refused login, say). If Navidrome finishes no scan within 90 seconds, or can't be reached at all, the folder is left where it is and the Release tab says so; applying the album again checks with Navidrome first, and renames once it has scanned (see [troubleshooting](troubleshooting.md#applying-a-release-left-the-folder-where-it-was)). `0` renames straight away, either way. From 0 to 300. |
 
 ### Soulseek searches (Settings → Downloads)
 
@@ -235,7 +235,7 @@ password, and only deadwax's admins - **Navidrome's admins** - and anyone an adm
 can change the library - [Sharing deadwax](sharing.md) walks
 through turning them on, what each person gets, and turning them off again. All three are read from the container's
 environment (compose's `environment:` block or `.env`) and nowhere else: Server settings, and the
-app's **Managing → Settings**, show them under **Connections**, locked, saying so - a value saved
+app's **Manage → Server settings**, show them under **Connections**, locked, saying so - a value saved
 there would beat your compose file, so a wrong one could lock everyone out with no way back from the
 page that saved it. Change one in `.env` (or compose) and recreate the container - `docker compose up -d
 --force-recreate`, or deploy the Komodo stack again: a restart keeps the old values
@@ -250,8 +250,8 @@ page that saved it. Change one in `.env` (or compose) and recreate the container
 **Who can do what.** An admin - a Navidrome admin - can do everything. Anyone else signed in can
 search, find and get albums, play, pin to Home and choose their own Getting albums settings; editing
 the library (applying a release, tags, covers, lyrics, CD art, an artist's pictures), deleting and
-re-filing, rescans, the albums that need a look, the log and the server settings are an admin's - unless
-an admin gives that person the permission for them, by category, in **You → Managing deadwax →
+re-filing, rescans, Needs a look, the event log and the server settings are an admin's - unless
+an admin gives that person the permission for them, by category, in **You → Manage →
 People** - and Get albums can be taken away. **Permissions are kept in deadwax's database, per person,
 and set in People** - no setting of their own. The app doesn't show anyone what they can't use, and
 deadwax refuses it (a 403 that says what it needs) - [the full table](sharing.md#admins-permissions-and-everyone-else). **Downloads are each person's own**: you see the downloads you asked for, and join one somebody else already has
@@ -269,7 +269,7 @@ save that would switch organizing off.
 used deadwax there, through restarts. Every few minutes deadwax asks Navidrome whether the login you
 signed in with still stands, so changing your Navidrome password in Navidrome or Amperfy, or your account
 being deleted, signs you out within about six minutes; Navidrome merely being down signs nobody out.
-(Changed in deadwax with **You → Change password**, the device you changed it on stays signed in and your
+(Changed in deadwax with **You → Account → Change password**, the device you changed it on stays signed in and your
 others are signed out at once - [Sharing deadwax](sharing.md#when-something-changes).) Your deadwax user is
 your Navidrome user name, lowercased: renamed in Navidrome, you sign in again under the new name.
 Three wrong passwords for one name within a minute and deadwax stops asking Navidrome about that name

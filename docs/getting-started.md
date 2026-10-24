@@ -105,8 +105,8 @@ dry run nobody can reach Server settings to set it again, and without Navidrome 
 ## The first run
 
 1. **Start it** and open `http://your-server:8080` - that opens the app, at `/player/`.
-2. **Fill in Settings → Connections** - the desktop sidebar's **Settings**, or **You → Server
-   settings** on a phone - and **Save changes**; it applies at once:
+2. **Fill in Server settings → Connections** - the desktop sidebar's **Server settings**, or **You → Manage →
+   Server settings** on a phone - and **Save changes**; it applies at once:
    - **`SLSKD_URL`**, slskd's address **as seen from inside this container**, which is often not the
      one you type into a browser: for another container on the same Docker network, its service name
      and internal port, `http://slskd:5030`. Include the `http://`; deadwax says exactly what's wrong
@@ -129,7 +129,7 @@ dry run nobody can reach Server settings to set it again, and without Navidrome 
 4. **Download something small.** Search for an album, open it, pick a pressing, press **Get the
    album**, then **Get** on a good source. [Finding music](finding-music.md) and
    [Downloading](downloading.md) walk through it.
-5. **Watch the log** (the sidebar's **Log**, or **You → Log**). Organizing starts in **dry run**, so when
+5. **Watch the log** (the sidebar's **Event log**, or **You → Manage → Event log**). Organizing starts in **dry run**, so when
    the download finishes the log says where each file *would* have been filed, and nothing is
    written. Check the paths look right.
 6. **Switch organizing on.** In Settings → Library → Organizing, set `ORGANIZE_MODE` to `copy`

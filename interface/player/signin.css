@@ -32,7 +32,7 @@
     --app-signin-busy: 0.75;                        /* the button while it signs in: faded, still legible */
     --app-signin-reason-pad: 10px 12px;
     --app-signin-ring: 2px;
-    --app-signout-gap: 12px;                        /* About's list to Sign out */
+    --app-signout-gap: 12px;                        /* Change password to Sign out, in Account */
     --app-own-password-gap: 12px;                   /* (2.0.2) Change password's row to its form, and to what it said */
 }
 
@@ -163,16 +163,19 @@ html.has-signin { overflow: hidden; }
 .app-signin-submit:disabled { opacity: var(--app-signin-busy); }
 .app-signin-submit:focus-visible { outline: var(--app-signin-ring) solid var(--dw-accent); outline-offset: var(--app-signin-ring); }
 
-/* You > About's Sign out, under the version and Logins */
+/* You > Account's Sign out (2.0.8: About's until then), under Change password */
 .app-signout { margin-top: var(--app-signout-gap); }
 /* the whole row is the button, its name to the right as About's values are */
 .app-signout-row { box-sizing: border-box; width: 100%; text-align: left; }
 .app-signout-row .app-row-label { flex: 1 1 auto; color: var(--dw-danger-text); }
 .app-signout-row:disabled { opacity: var(--app-signin-busy); }
 
-/* (2.0.2) You > About's Change password: a row like Sign out's, its form a card under it - People's fields (app.css:
+/* (2.0.2) You > Account's Change password (About's until 2.0.8): a row like Sign out's, its form a card under it - People's fields (app.css:
    17px, so iOS doesn't zoom), its own primary button - and what it said under that */
 .app-own-password { margin-top: var(--app-signout-gap); }
+/* (2.0.8) ...and Account's first row straight under its heading, as every section's first group sits */
+.app-section-title + .app-own-password,
+.app-section-title + .app-signout { margin-top: 0; }
 .app-own-password-row { box-sizing: border-box; width: 100%; text-align: left; }
 .app-own-password-form {
     display: flex;

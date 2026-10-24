@@ -9,6 +9,9 @@ import { SERVER_TABS, draftsAfterSave, serverTabAfter } from '../lib/serverSetti
 import { MANAGING_ADMINS_ONLY } from '../lib/appRoutes'
 import { isAbort, latestOnly } from '../lib/latest'
 import { ChevronLeftIcon } from '../player/icons'
+import { ApiError } from '../api/http'
+import { errorNote } from './ErrorNote'
+import { sayError } from './sayError'
 
 /** What the page holds beyond its own life: the settings as last answered, the drafts made against
  *  them, the tab, a save on its way and how the last ended - one page's worth, shared by every copy of
@@ -129,7 +132,8 @@ export function ServerSettings({
     }
   }, [])
   const { server, drafts: draftEnv, tab, saving, saveError, justSaved } = kept
-  const [error, setError] = useState<string | null>(null)
+  //? (2.0.8) the failure itself, said through lib/errorWords.ts (errorNote, sayError)
+  const [error, setError] = useState<unknown>(null)
   const [loading, setLoading] = useState(false)
   const tablist = useRef<HTMLDivElement>(null)
   const barText = useRef<HTMLSpanElement>(null)
@@ -148,7 +152,7 @@ export function ServerSettings({
       },
       (reason: unknown) => {
         if (!ticket.current() || isAbort(reason)) return
-        setError(reason instanceof Error ? reason.message : 'Could not read settings')
+        setError(reason)
         setLoading(false)
       },
     )
@@ -210,7 +214,9 @@ export function ServerSettings({
       for (const listener of [...saved]) listener(Object.keys(sent))
     } catch (caught: unknown) {
       //? the server took none of the batch: every draft stays, and the bar says why
-      keep({ saveError: caught instanceof Error ? caught.message : 'Could not save', saving: false })
+      //? (2.0.8) a refusal (400) is the rows' own words - "LIBRARY_PATH: not a directory" - kept as written; anything
+      //? else in words (lib/errorWords.ts), its own words in brackets for whoever runs deadwax
+      keep({ saveError: caught instanceof ApiError && caught.status === 400 && caught.detail ? caught.detail : sayError(caught, '', { failed: "Couldn't save the settings." }), saving: false })
     }
   }
 
@@ -262,7 +268,7 @@ export function ServerSettings({
 
         {!server && error ? (
           <div class="app-settings-state">
-            <p>deadwax couldn't read its settings: {error}</p>
+            {errorNote(error, { failed: "Couldn't read the settings.", retry: true })}
             <button type="button" class="app-button" aria-disabled={loading ? 'true' : undefined} onClick={() => !loading && read()}>
               Try again
             </button>
@@ -295,7 +301,7 @@ export function ServerSettings({
                 )
               })}
             </div>
-            {error && <p class="app-settings-problem">Couldn't read the settings again just now: {error}</p>}
+            {error ? <p class="app-settings-problem">{sayError(error, '', { failed: "Couldn't read the settings again just now." })}</p> : null}
 
             <div id="app-settings-panel" class="app-settings-panel" role="tabpanel" aria-labelledby={`app-settings-tab-${tab}`}>
               {tab === 'library' && <OrganizingVerdict organizing={server.organizing} />}

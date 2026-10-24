@@ -1532,8 +1532,6 @@
         font-size: var(--dw-text-label);
     }
 
-    .app-desk .app-edit .metadata-mbid { color: var(--dw-text-2); font-family: var(--dw-font-mono); }
-
     .app-desk .app-edit #metadata-search { display: flex; gap: var(--app-desk-field-gap); }
     .app-desk .app-edit #metadata-search > input { flex: 1; }
 

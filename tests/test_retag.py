@@ -105,7 +105,7 @@ def test_plan_refuses_to_merge_into_an_existing_folder(tmp_path):
 def test_plan_flags_a_tracklist_that_does_not_fit(tmp_path):
     seed(tmp_path, titles=("One More Year",))
     plan = plan_retag("Tame Impala/The Slow Rush (2020)", RELEASE, str(tmp_path))
-    assert any("2 track(s) but the folder has 1" in p for p in plan["problems"])
+    assert any("2 tracks but the folder has 1" in p for p in plan["problems"])
 
 
 def test_unmatched_files_keep_their_own_title_and_number(tmp_path):
@@ -117,7 +117,14 @@ def test_unmatched_files_keep_their_own_title_and_number(tmp_path):
     assert len(unmatched) == 1
     assert "title" not in unmatched[0]["changes"]
     assert "tracknumber" not in unmatched[0]["changes"]
-    assert any("didn't match the tracklist" in p for p in plan["problems"])
+    #? (2.0.8) counted in words - "1 file", "its" - never "1 file(s)" or "their"
+    assert "1 file didn't match the tracklist and will keep its existing title and track number" in plan["problems"]
+
+
+def test_two_unmatched_files_are_counted_as_files(tmp_path):
+    seed(tmp_path, titles=("Not On It", "Nor This One"))
+    plan = plan_retag("Tame Impala/The Slow Rush (2020)", RELEASE, str(tmp_path))
+    assert "2 files didn't match the tracklist and will keep their existing title and track number" in plan["problems"]
 
 
 @pytest.mark.parametrize("attempt", ["../../../etc", "", "/etc", "Tame Impala/../../.."])

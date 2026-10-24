@@ -439,7 +439,7 @@ rather than joined.
   - **every file was already there**, in the folder of that same release - a second copy isn't filed
     beside the first, and it's added: **Already in the collection, added to your library**;
   - **every file was already there** in a folder of **another pressing or an untagged rip** - given to
-    nobody on a guess, and an admin is asked to look (**Library care → Held by nobody**):
+    nobody on a guess, and an admin is asked to look (**Library care → In nobody's library**):
     **Not added - the collection's copy may be another pressing, so an admin has been asked to check it**.
     Once the admin has looked, the row says so: **Already in the collection, added to your library** after
     their **Add for them**, **Not added - the collection's copy may be another pressing; an admin has
@@ -457,12 +457,12 @@ rather than joined.
 
 ## The event log
 
-**Log** - the desktop sidebar's, under **Managing**, or **You → Log** on a phone - shows what's
+**Event log** - the desktop sidebar's, under **Manage**, or **You → Manage → Event log** on a phone - shows what's
 happening behind the scenes: searches, how many answers came back, queueing, filing, and anything that
 went wrong, with slskd's or MusicBrainz's own words where there are any. It shows the last 500 lines
 since deadwax started, newest first, then follows new ones live while the page shows: each with its
 time, its level - errors in red, warnings in amber - and its words, as text. **Clear** empties the
 view; nothing on the server changes. It's an admin's, or the log's for anyone an admin gave
 **Settings and the log** ([Sharing deadwax](sharing.md#admins-permissions-and-everyone-else)). See
-[troubleshooting](troubleshooting.md#the-apps-log-is-missing-lines-says-the-stream-was-lost-or-starts-empty)
+[troubleshooting](troubleshooting.md#the-event-log-is-missing-lines-says-lost-the-live-feed-or-starts-empty)
 when it isn't showing what it should.

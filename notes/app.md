@@ -1698,3 +1698,228 @@ listener's About with logins on (no folder - info.sim), "Now showing:" with Rota
 - "Up next" left in two app.css comments, and "now:"/"feel:" in app-desktop.css's comments: fixed.
 - The new playback words were pinned nowhere: vocabulary.sim pins them in usePlayer.ts and as troubleshooting.md
   quotes them (player.sim, an engine file, keeps no diff).
+
+### Managing in plain words: Edit album, Needs a look, Library care, People, the Event log, You (2.0.8)
+
+James, 2026-10-23: "apply that same review to the info panel and everything else. I want to make sure it all provides a
+good user experience." This is **batch 5**, the last of the words-and-UX review's five (`work/ux-audit/words-ux.md` in the
+scratch folder: its "Batches" section, findings #13, #14, #15, M8, M9, and the B7-B12 sections), with James's decisions
+(`work/ux-audit/decisions.md`): **Manage** for the admin area, its pages **Server settings**, **Library care** and
+**Event log**; **It's fine as it is** / **Marked fine** / **Ask about it again**; **Select**, not Tick; **Dismiss**.
+Words and the small UX the batch names - results under the Get buttons, You's headline and Account section, Logins for
+admins only. No route, status or behaviour changed, nothing heard changed, and the engine files have no diff. Batch 1's
+errorWords carries the managing pages' errors now (they were left to this batch), and the vocabulary sim is extended.
+
+**The issues, in sentences** (#14, src/metadata_health.py `ISSUE_TYPES`): every hint a sentence or two - a capital, a
+full stop - saying what's wrong and then what fixes it, by the app's names, never a tag's name: "No original year" is
+"The tags don't record the album's first year - the year its folder is named after. Applying a release writes it." (was
+"no originaldate tag, so there is nothing recording…"; true whether or not a pressing year is there - a rip with no
+year at all shows both chips). The one place the hints are read as text is the Release tab itself, so none sends you
+there: "Find their release and apply it.", "Applying a release renames it to match.", and No cover art's "Get cover,
+on the Artwork tab, fetches one from the Cover Art Archive." with no "once the album is matched" (a matched album read
+that as untrue; the Artwork tab says it for an unmatched one). Two chips renamed (#15): **Not matched to MusicBrainz** (was "No release id") and
+**Folder name doesn't match the tags** (was "Folder off-convention"). "Not in Navidrome" stays - an admin's page, and
+troubleshooting's anchor. tests/test_metadata_health.py holds every hint to it.
+
+**Edit album** (#13, #14, B12). The Release tab's "currently: no edition · 1994 · 2 tracks · 11111111…" is **Now: No
+edition · 1994 (this pressing 2014) · 2 tracks · Matched to MusicBrainz** (the release id in that span's title); its
+search box shows the plain words a blank box searches for (`plainAlbumQuery`, lib/release.ts - the fielded query is
+still what's sent, the decision kept); the ignored line "2 issue(s) ignored on this album" + "un-ignore" is **Marked
+fine: No cover art, …** + **Ask about it again** (title "Put this album back in Needs a look"); the accept button's
+title "Mark it fine and stop asking about …", busy "Marking it fine…"; ◁ has "Previous album" as title and
+aria-label, "skip ▷" is **Skip ▷**, ✕ is named "Close" (the editor's, the tag editor's and the cover viewer's). Every
+message a sentence: "Couldn't load that release.", "The search didn't work.", "Couldn't work out the changes.",
+"Couldn't apply the changes.", "Couldn't write 3 files.", "Updated the tags in 12 files, saved cover.jpg, moved the
+folder to match its tags." (was "Retagged 12 file(s)", "re-filed the folder"), "0 of 2 files would change, the cover
+would be downloaded", **Save cover only** / **Replace cover only**, **Download cover art**, "Fetching the
+tracklist…", "Working out the changes…", "Nothing to change." - "1 file", "2 files" everywhere (`filesWord`,
+lib/format.ts), never "(s)". The writers' problems, in the preview and after Apply, are drawn as sentences
+(`asSentence` - a capital, a full stop - however the server wrote them), and src/retag.py's three "(s)" are counted
+properly ("1 file didn't match the tracklist and will keep its existing title and track number", "this release has 2
+tracks but the folder has 1…", "1 file name here is already taken there"). The tag editor: "Saved 3 files.", "Fix the marked fields first." (was "marked in
+yellow"), "the Release tab moves an album's folder to where its tags say it belongs" (was "the metadata editor
+re-files…"). The delete dialog: **Delete permanently**, "Couldn't read that folder." / "Couldn't delete it.". The Tags
+tab: **Select**, never Tick ("2 of 11 selected", "Select tracks to edit only those; Shift selects a run.", "Select
+every track" / "Deselect every track") - and the line says a track's name opens it ("Tap a track's name to see
+everything in its file." on a phone, "Click…" on a desktop). Artwork: "To get a cover, first match the album to a
+release in the Release tab." (and CD art's alike). Lyrics: "To shift when synced lyrics appear, or re-time the ones
+already saved, see Lyrics in Server settings (Library)." - there was never a "Managing's Settings". The folder
+finder: "deadwax can't find this album's folder: no folder in the library is matched to the release Navidrome has for
+it. Choose the folder yourself, or look again." (and the no-release one), "2 folders have this album's name, and none
+is matched to a release. Which one is it?".
+
+**The Get buttons say what came of them** (#13, components/LibraryParts.tsx with the pure lib/getResults.ts). Get cover,
+Get CD art and Get lyrics drew their result only in a tooltip - a phone has none - and a failed cover went only to the
+console. Each now draws a line UNDER the button (`ResultLine`, `.app-edit-note`, a live region): the route's own
+words made a sentence where they're fit (a 404's "The Cover Art Archive has no front cover for that release.", CD
+art's "No CD art on the Cover Art Archive for this release - a fanart.tv key in Server settings adds another source.",
+a 502's "The Cover Art Archive couldn't be reached - try again."), anything else errorWords' sentence with `failed`
+for its lead ("Couldn't get the cover.") - its own words in brackets for whoever runs deadwax, the tell for anyone
+else; said as it fails, for whoever reads then. Busy is words ("Getting the cover…", "Getting CD art…", "Getting
+lyrics…"), never a bare spinner; after a failure the button is **Try again**, and with none to find - the cover's 404
+as CD art's - **Look again** (was "Retry cover" / "No CD art found"; the review found the cover's 404 still read Try
+again). Get lyrics keeps **Lyrics · 9 of 10** on the button and the outcome under it, a sentence ("Saved lyrics for 9
+tracks (all synced), 1 not on LRCLIB." - lib/lyrics.ts `describeLyrics` and `describeRetime` start with a capital now),
+with nothing added: it said "Press it again to look for the rest." whenever tracks were still without, the ones LRCLIB
+had just said it hasn't got included - one press asks for every track without lyrics, and the failures say "try again"
+for themselves. A success says nothing over what it got:
+the cover or the disc picture shows, and the button goes.
+
+**Needs a look** (#15, B11). Its line says what it's for and what to do: "Albums whose tags, folder or cover need
+fixing, albums Navidrome doesn't list, and new downloads nobody has looked at yet. Open one to fix it, or to mark it
+fine as it is." (was what they "want"). The last chip and a row's word are **Marked fine** (`MARKED_FINE`, was
+"Ignored"; its title "Albums you marked fine as they are, with "It's fine as it is"", a row's "Marked fine: no cover"),
+and a row's mark after it too. The database line: "deadwax can't save to its database (check DB_PATH), so an album you
+mark "It's fine as it is" will come back." (11.2); Navidrome unset "…It's set up in Server settings (Connections)."
+(11.3); Navidrome failing says Navidrome's own words only for whoever runs deadwax (`navidromeFailed(problem,
+detail)`, the page passing `seesDetail(accessNow())`) - anyone else "Couldn't ask Navidrome which albums it has - try
+again in a minute.". The library's read failing is "Couldn't read the library." / "Couldn't check the library just
+now." through errorNote / sayError (was "deadwax couldn't read the library: HTTP 502") - **hooks/useLibrary.ts now keeps
+the failure itself** (`error: unknown`), so the pages can say it; the Edit panel hands editStatus the sentence already
+worded.
+
+**Library care** (#15, B11). "Rescan the library after changing tags in another program, and fill in missing covers,
+CD art and lyrics across many albums at once - one album at a time, and Stop ends a run after the album it's on." (the
+runs alone, Rescan alone, as careLine had them); Rescan's note says when first ("Use Rescan after editing tags in another
+program: deadwax spots a changed album by its folder's date, and editing tags in place doesn't change it."), and its
+title - a phone never showed it - went. The plans: "matched to a release" (was "with a release"), "with no disc picture
+from deadwax yet" (was "no CD art of deadwax's own", and the disc.jpg / disc1.jpg file list went). **Stop after this
+album · 3 of 12** says on the button what was only in its title (runBulk asks `stopped()` before each album, so it is
+true). The results are sentences (`bulkSummary`): "Got 7 covers. 2 have none in the Cover Art Archive. 1 failed - run
+it again to try it again. Stopped at 12 of 40." - CD art "Got CD art for 3 albums. 1 has none to find." - lyrics "Saved
+lyrics for 9 tracks. 1 isn't on LRCLIB or is instrumental. 3 failed - try them again from the album's own Get lyrics,
+in Edit album." (a failed cover or CD art is still missing, so the next run takes it; a track that failed may be on an
+album that has some lyrics now, which lyricsTargets never takes - so it isn't told "run it again"). Re-time saved
+lyrics: **Re-timing 3 of 10 albums · Stop after this album**, "Reading the library…", "Re-timed 3 tracks, … Stopped at
+3 of 10 albums.". Both Stop labels count the album being worked on (done + 1, at most the total), so the number
+doesn't move when Stop is pressed ("Stopping after 3 of 12") or when the run stops there ("Stopped at 3 of 12.") - it
+showed the albums finished, one behind, and read "0 of 12" as the first began. **In nobody's library** (was "Held by nobody"), "Loading…" (was "Asking deadwax…"), its refusals in
+words (a 409's own words pass as written).
+
+**People** (B10). The version note: "Your Navidrome (0.65.0) isn't the one People was checked with (0.64). If something
+here doesn't work, use Navidrome's own Users page." (was "People was made for Navidrome 0.64 - this is 0.65.0."); the
+http note "…on your own network or over a VPN…" (was WireGuard); Amperfy is "their other music apps" in Make admin's,
+Made's and Reset's words; "Unlocked on this device until it's left alone for 15 minutes. Lock ends it now."; Add a
+person "Makes a Navidrome account for an ordinary listener. You can make them an admin afterwards."; Known only to
+deadwax "People deadwax still keeps things for who no longer have a Navidrome account…"; "Choose one for them in
+Navidrome's Users page." and "They keep what they were given before: …" (never tick); a non-admin's page "Only an admin
+can open People - it comes with being a Navidrome admin." (`PEOPLE_ONLY`). People's own refusals (a `kind`) keep their
+words as written - setting names and all, its readers are admins - anything else goes through sayError.
+
+**You** (B7, B10). The headline is the person: with logins on the name signed in (the session's until /me answers), with
+them off **deadwax** over "No sign-in needed" (was "deadwax" over "james" or "Logins are off"); the avatar the name's
+first letter, a capital ("d" with logins off, as it was). **Account** (logins on only) holds Change password and Sign out, which were under About; About has the Version
+("Not known" when deadwax didn't answer, was "unknown") and **Logins only for an admin** (`access.admin`). **Manage**
+(was "Managing deadwax") lists **Needs a look** (was "Albums that need a look"), Library care, People, Server settings,
+**Event log** (was "Log"). Sign out's line: "…with your music server (Navidrome) account." / "…with the emergency admin
+password - this sign-in lasts 12 hours." (9.5); its failure "Couldn't reach deadwax, so you're still signed in - try
+again."; the sign-in's lede "Sign in with your music server (Navidrome) account." (9.4). UNVERIFIED (7.8): "Some things
+an admin let you do are off for now - sign out and in again to get them back."; a Manage page without its permission
+(11.1): "This page needs a permission an admin hasn't given you - ask one if you need it.". signin.css puts Account's
+first row straight under its heading, as every section's first group sits (the 12px between the two rows was About's).
+
+**The sidebar and pages**: **Manage** (was "Managing"), **Server settings** and **Event log** (were "Settings" and
+"Log"); the Event log's page title, its back label, its list's name; its stream line "Lost the live feed -
+reconnecting…" (11.14, was "The stream was lost - trying again"); the history's failure "Couldn't load the lines deadwax
+kept - what happens from now still shows." The permission labels stay (Look after the library, Settings and the log -
+People's checkboxes and the server's 403s); their line names "In nobody's library".
+
+**The ledger said to the reader** (M8, src/library_ledger.py): `problem_text(problem, can_apply)` - NO_RELEASE, to
+someone who may apply a release (routes/my_library.py passes `can(request, user, "edit")`: an admin, or anyone given Edit
+albums - the spec said "an admin"; Edit albums is who can actually do it, so they too are told what to do rather than to
+ask an admin), is `NO_RELEASE_YOURS` "It isn't matched to a release on MusicBrainz yet. Apply a release to it in Edit
+album, and it's added after that." - stars.py's worker reads the entry's release afresh at each try, so applying one is
+what adds it. Anyone else keeps "An admin needs to match it…".
+
+**The log** (M9, src/config.py): "DEADWAX_ADMINS is set, but deadwax no longer reads it (since 2.0.0): …" (was "since
+2.0.0-player.61").
+
+**Errors on the managing pages** go through batch 1's errorWords: Needs a look, Library care, In nobody's library,
+People (usePeople), Server settings (a 400 save refusal - "LIBRARY_PATH: …" - kept as written: those are the rows' own
+words, read by Settings holders; anything else in a sentence), MusicBrainz's saved answers, the Event log's history,
+the Edit panel's editors, the track inspector (its lyrics, useTrackDetails), the artist panel, the delete dialog,
+re-time - a sentence for anyone, the error's own words in brackets or under it for whoever runs deadwax (an admin
+still sees the detail).
+
+**Pinned**: getresults.sim (new: the words, and the three buttons drawn - busy, the line under the button, Try again /
+Look again, the line per album, a success saying nothing, no title holding a reason, no console.error); vocabulary.sim
+BATCH5 (39 files: no "(s)", Tick, Ignored/un-ignore/Accepted as it is, Managing, "the metadata editor", "could not",
+Held by nobody, WireGuard/Amperfy, "No release id"/off-convention, "the queue", "deadwax's settings", "Asking", "Stop
+·", "the Archive", "Logins are off", "Albums that need a look", "People was made for", "Retry cover", "break-glass";
+BATCH5_LOWER the lower-case starts put right; BATCH5_LABELS "currently:", a bare "Log" and "un-ignore" in any text - a
+lower-case hyphenated word reads as a class name to the words-only scan; a declaration the JSX-text scan takes for words
+is skipped); errors.sim MANAGING_FILES (no catch keeping raw words on any managing
+page, editor or hook - a list key `key={`…${problem}`}` aside); needslook.sim (Marked fine, the line, the database and
+Navidrome lines, Navidrome's words by reader on the page too, the read failure in words by reader, useLibrary keeping the
+failure itself); care.sim (careLine, RESCAN_WORDS, the plans, the run sentences against an oracle of their own, Stop
+after this album, the re-time words, the read failure in words); you.sim (the headline both ways, Account, Logins an
+admin's, Manage and its rows); routes.sim (the sidebar and page labels, the refusal, editStatus taking worded errors and
+the panel wording them, the folder sentences); permissions.sim, people.sim, signin.sim (the lede, Sign out's words),
+settingslog.sim (the stream line, the history line, a 400 kept, a save that never reached deadwax in words),
+mbanswers.sim, inspector.sim, mylibrary.sim (In nobody's library, its refusal through an ApiError as http throws it),
+artist.sim, app-rules.sim (the Lyrics pointer, Select, Account) - each updated on purpose. Python:
+test_metadata_health (sentences, no tag names, the two labels), test_personal_libraries (NO_RELEASE by reader, through
+the route), test_logins (the log line), test_logins_css (Account under its heading).
+
+**Verified** (as built, before review): 3790 Python tests (3788 passed, 2 skipped; three new - test_metadata_health 1,
+test_personal_libraries 1, test_logins_css 1 - and test_logins' and test_retag's pins tightened), pyflakes, tsc, the
+build, all 66 sims (getresults.sim new); the engine guard empty. 69 mutations (`work/uxb5-builder/mut/mutate.py`), each
+seen failing its check and restored byte for byte (sha256): two slipped through at first - "un-ignore" back in the
+editor (the words-only scan reads a lower-case hyphenated word as a class name: now BATCH5_LABELS) and the avatar's
+initial (now you.sim) - and were caught once pinned. Seen in a real page (headless Chromium as deadwax.test, my own
+deadwax on 8110 with logins on and 8111 with them off, over a stand-in Navidrome on 4549, slskd absent; 390x844 and
+1440x900): james's You - "james" as the headline, Manage's five rows, Account's Change password and Sign out, About's
+Version and Logins - and his Your library saying "It isn't matched to a release on MusicBrainz yet. Apply a release to it
+in Edit album, and it's added after that."; Needs a look's line and chips (Not matched to MusicBrainz, No original year,
+No cover art) and the Release tab's hints in sentences and its **Now:** line; the Lyrics tab's pointer; the Tags tab's
+Select line; Library care's lines, plans and a covers run ending "Got 0 covers. 4 have none in the Cover Art Archive.";
+In nobody's library; People's http note with a VPN; the Event log's title; logins off at 1440 the sidebar's Manage
+(Needs a look, Library care, Server settings, Event log), Get cover and Get CD art on Mezzanine each saying under the
+button why there was none ("The Cover Art Archive has no front cover for that release.", "No CD art on the Cover Art
+Archive for this release - a fanart.tv key in Server settings adds another source.") with Try again / Look again, and You
+headed "deadwax" over "No sign-in needed"; ethan's You - "ethan", Account, About with the Version alone, no Manage - and
+both Needs a look's and People's refusals in their new words; no console errors. Not seen: a Stop pressed mid-run (the
+stand-in's run ends in a moment - care.sim drives it), the editors' failure sentences (care.sim, errors.sim and
+settingslog.sim drive them), a phone's Edit sheet with a Get failing (the same component; getresults.sim draws it).
+
+**After review** (sixteen findings, each reproduced or refuted first; two were one). The **No original year** hint
+claimed a pressing year a rip with no year at all hasn't got - "The tags don't record the album's first year - the year
+its folder is named after." now, in docs/library.md's table too. The hints are read as text only on the Release tab, so
+none sends you there any more, and No cover art's dropped "once the album is matched" (both above). Library care's and
+Re-time's **Stop** count the album being worked on (above). Edit album's **Marked fine:** names only what the album
+still has - `markedFineIssues()` (lib/metadataQueue.ts), which Needs a look's chip title uses too: the stored list
+named a problem since fixed. "Matched to MusicBrainz" is in the line's own face: its span kept the raw id's mono class
+(`metadata-mbid`, whose two rules in app.css and app-desktop.css went with it), which set the words in mono and onto a
+line of their own on a phone. The Release tab's last lower-case lines are sentences - "Search to match this album to a
+release, or just edit the fields.", "No releases found for that search.", "The release this album is matched to isn't
+in these results.", "None on file" / "Pick a release", a row's "11 tracks" (was "11 trk"), the Current badge's "matched
+to", the tag editor's **Undo** - and vocabulary.sim holds each (BATCH5_RULES, BATCH5_LOWER, BATCH5_LABELS). The **Now:**
+year is `nowYear()` (lib/release.ts, tags.sim): the pressing's in brackets only when there is one - an originaldate
+with no date read "1994 (this pressing )". People's **unknown_shape** (src/api/navidrome_admin.py) says what the
+version note says: "People was checked with Navidrome 0.64, and the interface it uses can change between versions - use
+Navidrome's own Users page meanwhile." (test_people). A cover the Archive hasn't got reads **Look again**, as CD art's
+does - its 404 is a fact, not a failure; and a Get lyrics result no longer adds "Press it again to look for the rest."
+(above). A tag editor problem that starts with a file's name keeps its case (`asSentenceKeeping()`, lib/errorWords.ts,
+errors.sim): "intro.flac couldn't be read as audio." was "Intro.flac…", a file that isn't there. retag's counts are
+pinned word for word - "1 file didn't match the tracklist and will keep its existing title…", "2 files … their", "1
+file name here is already taken there (01.flac)", "2 file names here are…" (test_retag, test_split_discs). The docs:
+configuration.md's two "metadata editor"s are the Release tab; README's **Event log**; README's and sharing.md's
+"tick"/"ticked" are choose, select and given; every "You → Change password" is **You → Account → Change password** -
+the People refusal `YOUR_PASSWORD` (src/people.py) too. vocabulary.sim's scanner read a self-closing tag's "/>" after
+an attribute's expression (`<Loading label={x} />`) as a regex and lost the rest of the line - Get cover's label among
+it; it doesn't now, and "Retry cover" there is caught. Verified: 3793 Python tests (3791 passed, 2 skipped; three new),
+pyflakes, tsc, the build, all 66 sims; the engine guard empty; 28 mutations
+(`work/uxb5-fixer/mutate.py`), each failing its check and restored byte for byte (sha256).
+
+**After the second review** (three findings, each reproduced first; all real, all nits). Edit album's issues box was
+right but unguarded: putting its condition back to the stored list (`album.ignored_issues.length > 0`) drew an empty
+`#metadata-issues` box - one gap above **Now:** - for an album marked fine for a problem since fixed, and no check
+noticed; needslook.sim now holds the condition on `markedFine`. People's `refusalOf` (app/usePeople.ts) keeps a
+refusal's words only when it has a `kind`, and nothing held that either: errors.sim now runs the real refusalOf - a
+`locked` refusal as written, a 500 whose detail is an exception's text through sayError, the route guard's 403 the same
+way. And the guide still sent a phone's reader to rows straight under You: every way to a managing page is now **You →
+Manage → …** (configuration.md, getting-started.md, downloading.md, troubleshooting.md, README), the sidebar's
+**Server settings** (it said "Settings"), getting-started.md's step 2 **Fill in Server settings → Connections**, and
+player.md's wrapped "You → Change password" **You → Account → Change password**; vocabulary.sim reads every guide, a
+wrapped path as one line, for each old way. Seven mutations (`work/uxb5-fixer2/mutate.py`), each caught and restored
+byte for byte (sha256).

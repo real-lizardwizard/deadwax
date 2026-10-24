@@ -2246,8 +2246,9 @@ console.log('\nLooking after the library in the app, on a desktop (2.0.0-player.
   //? doing so" - ServerSettings' line is pinned in settingslog.sim; the Edit panel's Lyrics note is words, not a
   //? link, so the links-out count can't see it (review). Read raw: an apostrophe in JSX text isn't a string
   const lyricsNote = (read('app/EditPanel.tsx').match(/<h3 id="app-edit-lyrics"[\s\S]*?<\/section>/) ?? [''])[0]
-  check('the Edit panel\'s Lyrics tab: re-timing named where it is - Managing\'s Settings, under Library - never the main page',
-    [/re-timing the lyrics already saved, are in Managing's Settings, under Library\./.test(lyricsNote), /main page/i.test(lyricsNote)], [true, false])
+  //? (2.0.8, UX batch 5) by the page's own name and group - there was never a "Managing's Settings"
+  check('the Edit panel\'s Lyrics tab: re-timing named where it is - Lyrics in Server settings (Library) - never the main page',
+    [/re-time the ones already saved, see Lyrics in Server settings \(Library\)\./.test(lyricsNote), /main page|Managing/i.test(lyricsNote)], [true, false])
   //? (2.0.0-player.66) the main page retired: Managing lists only its pages - its "Open the main page" went, and
   //? so did You's row and footnote (read raw, comments and all: no link to `/` in any form)
   check('Managing has no link to `/` - the sidebar\'s nor You\'s',
@@ -2601,7 +2602,7 @@ console.log('\nlooking after deadwax from a phone (2.0.0-player.47)')
   const panel = code(read('app/EditPanel.tsx'))
   check('the Edit sheet\'s Tags note says nothing of Shift - a phone has none to tick a run with',
     [/<TagsList\s+album=\{subject\}\s+sheet=\{modal\}/.test(panel),
-      /\{count \? `\$\{count\} of \$\{tracks\.length\} ticked` : sheet \? 'Tick tracks to edit only those\.' : 'Tick tracks to edit only those; Shift ticks a run\.'\}/.test(panel)],
+      /\{count \? `\$\{count\} of \$\{tracks\.length\} selected` : sheet \? "Select tracks to edit only those\. Tap a track's name to see everything in its file\." : "Select tracks to edit only those; Shift selects a run\. Click a track's name to see everything in its file\."\}/.test(panel)],
     [true, true])
   check('the gate: no link out - "Set up Navidrome", the app\'s secondary button, calls the module\'s setUpNavidrome',
     [linksOut(gate).length, /import \{ setUpNavidrome \} from '\.\/navidromeSetUp'/.test(gate),
@@ -2766,8 +2767,9 @@ console.log('\nChange password (2.0.2)')
   check('...every password field dropped once a change is done, and no confirm()',
     [/\(answer\) => \{[\s\S]{0,120}?setForm\(EMPTY_FORM\)/.test(own), /confirm\(/.test(own)], [true, false])
   const you = code(read('app/You.tsx'))
-  check('You draws it only for a Navidrome sign-in (lib/ownPassword.ts changeOffered), before Sign out',
-    /\{who && changeOffered\(who\) && <ChangePassword user=\{who\.user\} \/>\}[\s\S]{0,200}?<SignOutRow/.test(you), true)
+  //? (2.0.8, UX batch 5) in You's Account section, drawn with logins on alone
+  check('You draws it only for a Navidrome sign-in (lib/ownPassword.ts changeOffered), before Sign out, in Account',
+    /\{who\?\.auth === 'on' && \(\s*<section class="app-section" aria-labelledby="app-account-title">[\s\S]{0,200}?\{changeOffered\(who\) && <ChangePassword user=\{who\.user\} \/>\}[\s\S]{0,120}?<SignOutRow user=\{who\.user\} \/>/.test(you), true)
 }
 
 console.log('\nNormalization (2.0.0-player.62): every queued song through queued(), in the tap; the rule pure')

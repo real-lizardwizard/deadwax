@@ -110,7 +110,7 @@ console.log('\nthe list and its facets')
   const chips = N.facets(LIBRARY, TYPES)
   check('the chips: All, Newly added, then each issue with albums - the most first, then by label',
     chips.map((chip) => [chip.id, chip.label, chip.count]),
-    [[null, 'All', 4], ['new', 'Newly added', 2], ['misfiled', 'folder off-convention', 2], ['no_art', 'no cover', 2], ['no_release', 'no release', 1], ['ignored', 'Ignored', 1]])
+    [[null, 'All', 4], ['new', 'Newly added', 2], ['misfiled', 'folder off-convention', 2], ['no_art', 'no cover', 2], ['no_release', 'no release', 1], ['ignored', 'Marked fine', 1]])
   check('...each issue chip carrying its hint, for its title', chips.slice(2, 5).map((chip) => chip.hint), [TYPES.misfiled.hint, TYPES.no_art.hint, TYPES.no_release.hint])
   check('Newly added only when there is one', N.facets([RIP, COVERLESS], TYPES).map((chip) => chip.id), [null, 'no_art', 'misfiled', 'no_release'])
   check('an ignored issue is not an issue chip, nor counted in All', N.facets([IGNORED], TYPES).map((chip) => [chip.id, chip.count]), [[null, 0], ['ignored', 1]])
@@ -120,6 +120,22 @@ console.log('\nthe list and its facets')
   check('a facet with albums shows; one that has emptied, or was never there, falls back to All',
     [N.facetShown(chips, 'no_art'), N.facetShown(N.facets([RIP], TYPES), 'new'), N.facetShown(chips, 'nonsense'), N.facetShown(chips, null)],
     ['no_art', null, null, null])
+  {
+    //? (2.0.8) the stored ignores can name a problem since fixed: marked fine for no cover, then a cover got
+    const fixedSince = { ...IGNORED, issues: ['misfiled'], ignored_issues: ['misfiled', 'no_art'] }
+    check('Marked fine names only what the album still has - not a cover got since', Q.markedFineIssues(fixedSince), ['misfiled'])
+    check('...and nothing when every marked problem has gone', Q.markedFineIssues({ ...IGNORED, issues: [], ignored_issues: ['no_art'] }), [])
+    const editor = fs.readFileSync(path.join(UI, 'src/components/MetadataEditor.tsx'), 'utf8')
+    const page = fs.readFileSync(path.join(UI, 'src/app/NeedsALook.tsx'), 'utf8')
+    check('Edit album\'s "Marked fine: …" line and Needs a look\'s chip title both say markedFineIssues, never the stored list',
+      [/Marked fine: \{markedFine\.map\(/.test(editor), /const markedFine = markedFineIssues\(album\)/.test(editor),
+       /album\.ignored_issues\.map\(/.test(editor), /markedFineIssues\(album\)\.map\(/.test(page)],
+      [true, true, false, true])
+    //? (review) and whether the box is drawn at all: a stored ignore whose problem has gone draws no empty box
+    check('Edit album\'s issues box is drawn on what it will show (issues, markedFine), never the stored ignore list',
+      [/\(issues\.length > 0 \|\| markedFine\.length > 0\) && \(\s*<div id="metadata-issues">/.test(editor), /album\.ignored_issues\.length/.test(editor)],
+      [true, false])
+  }
   check('a count for VoiceOver', [N.needsLookLabel('Needs a look', 3), N.needsLookLabel('Needs a look', 1), N.needsLookLabel('Needs a look', 0), N.needsLookLabel('Needs a look', null)],
     ['Needs a look, 3 albums', 'Needs a look, 1 album', 'Needs a look', 'Needs a look'])
 }
@@ -135,7 +151,7 @@ console.log('\nIgnored (2.0.0-player.66): the albums whose every issue was accep
   check('nothing ignored: no Ignored chip', N.facets([RIP, COVERLESS, NEW_CLEAN, CLEAN], TYPES).some((chip) => chip.id === N.IGNORED_FACET), false)
   const chips = N.facets([...LIBRARY, HALF, STALE, UNLISTED], TYPES)
   check('Ignored is the last chip, its title the spec\'s words', [chips.at(-1).id, chips.at(-1).label, chips.at(-1).hint],
-    ['ignored', 'Ignored', 'Albums whose issues you accepted as they are'])
+    ['ignored', 'Marked fine', "Albums you marked fine as they are, with \u201cIt's fine as it is\u201d"])
   check('...counting only albums with an accepted issue and nothing outstanding (not HALF, not STALE)',
     [chips.at(-1).count, [IGNORED, HALF, STALE, UNLISTED, CLEAN].map(N.isIgnoredOnly)], [2, [true, false, false, true, false]])
   check('...never in All\'s count nor the badge\'s: both count HALF (outstanding), neither IGNORED nor UNLISTED',
@@ -155,15 +171,18 @@ console.log('\nNot in Navidrome (2.0.0-player.46): what the page says about the 
   const waiting = { state: 'checking', problem: null }
   const listed = { state: 'listed', problem: null }
   check('checked, or nothing said at all: nothing to say', [N.navidromeNote(listed), N.navidromeNote(null)], [null, null])
-  check('not set up: said, with where to set it up', [N.navidromeNote(unset), /no album is checked/.test(N.NAVIDROME_UNSET), /deadwax's settings \(Connections\)/.test(N.NAVIDROME_UNSET)],
+  check('not set up: said, with where to set it up', [N.navidromeNote(unset), /no album is checked/.test(N.NAVIDROME_UNSET), /Server settings \(Connections\)/.test(N.NAVIDROME_UNSET)],
     [N.NAVIDROME_UNSET, true, true])
   check('failed: why, as deadwax said it', [N.navidromeNote(failed), /^Couldn't ask Navidrome which albums it has: Navidrome couldn't be reached/.test(N.navidromeFailed(failed.problem))],
     [N.navidromeFailed(failed.problem), true])
-  check('...a failure with no words still says something', /: no reason given$/.test(N.navidromeFailed(null)), true)
+  check('...a failure with no words still says something', N.navidromeFailed(null), "Couldn't ask Navidrome which albums it has - try again in a minute.")
+  //? (2.0.8, UX batch 5) Navidrome's own words only for whoever runs deadwax - its address is nothing anyone else can act on
+  check('...and only whoever runs deadwax reads Navidrome\'s own words', [N.navidromeNote(failed, false), N.navidromeNote(failed, true) === N.navidromeFailed(failed.problem)],
+    ["Couldn't ask Navidrome which albums it has - try again in a minute.", true])
   check('scanning, or not answered yet: said', [N.navidromeNote(scanning), N.navidromeNote(waiting)], [N.NAVIDROME_SCANNING, N.NAVIDROME_WAITING])
   check('...the scan in the past tense - still true once it has ended, with nothing reading again on its own',
     [/^Navidrome was scanning when last asked/.test(N.NAVIDROME_SCANNING), /is scanning/.test(N.NAVIDROME_SCANNING)], [true, false])
-  check('the page\'s own line names the albums Navidrome doesn\'t list', /or that Navidrome doesn't list/.test(N.NEEDS_LOOK_LINE), true)
+  check('the page\'s own line names the albums Navidrome doesn\'t list - and says what to do (2.0.8)', [/albums Navidrome doesn't list/.test(N.NEEDS_LOOK_LINE), /Open one to fix it, or to mark it fine as it is\.$/.test(N.NEEDS_LOOK_LINE), /want attention|filed/.test(N.NEEDS_LOOK_LINE)], [true, true, false])
 }
 
 console.log('\nthe session')
@@ -374,7 +393,19 @@ async function page() {
     one.draw()
     const retry = find((node) => node.type === 'button' && words(node) === 'Try again')[0]
     check('a failed read with nothing to show: said, with Try again', [words(classed('app-queue-state')[0]).includes('HTTP 502'), !!retry], [true, true])
-    click(retry)
+    //? (2.0.8, UX batch 5) in words (lib/errorWords.ts): the sentence for anyone, the read's own words only for whoever runs
+    //? deadwax - it was "deadwax couldn't read the library: HTTP 502" for everyone
+    check('...in a sentence, its own words under it for whoever runs deadwax', words(classed('app-queue-state')[0]), "Couldn't read the library.HTTP 502Try again")
+    {
+      const Access = require(path.join(PAGE, 'app/access.js'))
+      Access.noteAccess({ auth: 'on', user: 'ann', admin: false, permissions: ['request', 'library'] })
+      one.draw()
+      check('...and for someone with Look after the library alone, the sentence and the tell - never the read\'s words',
+        words(classed('app-queue-state')[0]), "Couldn't read the library. If it keeps happening, tell whoever runs deadwax.Try again")
+      Access.forgetAccess()
+      one.draw()
+    }
+    click(find((node) => node.type === 'button' && words(node) === 'Try again')[0])
     check('...which reads the library again', W.reloads.length, 1)
 
     libraryOf([CLEAN, SEEN])
@@ -396,8 +427,8 @@ async function page() {
     const one = mount()
     one.draw()
     check('the rows in queueAlbums\' order', rowAlbums(), ['BULLY (2025)', 'Currents (2015)', 'Third rip', 'Dummy (1994)'])
-    check('the facets, All pressed', facetChips(), [['All 4', true], ['Newly added 2', false], ['folder off-convention 2', false], ['no cover 2', false], ['no release 1', false], ['Ignored 1', false]])
-    check('...Ignored titled with what it lists', classed('app-queue-facet').at(-1).props.title, 'Albums whose issues you accepted as they are')
+    check('the facets, All pressed', facetChips(), [['All 4', true], ['Newly added 2', false], ['folder off-convention 2', false], ['no cover 2', false], ['no release 1', false], ['Marked fine 1', false]])
+    check('...Marked fine titled with what it lists', classed('app-queue-facet').at(-1).props.title, "Albums you marked fine as they are, with \u201cIt's fine as it is\u201d")
     check('...and no Ignored row in All - the album is out of the queue', rowAlbums().includes('Live 1998'), false)
     const rip = rowButtons()[2]
     check('a row: New for a new import, its outstanding issues as chips, each titled with its hint, the plain tile with no cover',
@@ -450,10 +481,10 @@ async function page() {
     libraryOf(LIBRARY)
     const one = mount({ facet: 'ignored' })
     one.draw()
-    check('the Ignored facet: its album, the chip pressed', [rowAlbums(), facetChips().at(-1)], [['Live 1998'], ['Ignored 1', true]])
+    check('the Ignored facet: its album, the chip pressed', [rowAlbums(), facetChips().at(-1)], [['Live 1998'], ['Marked fine 1', true]])
     const word = find(byClass('is-ignored'), rowButtons()[0])
     check('...drawn as the others are, with a quiet Ignored word titled with what was accepted, and no issue chip',
-      [word.map(words), word[0].props.title, find(byClass('app-queue-chip'), rowButtons()[0]).length], [['Ignored'], 'Accepted as it is: no release', 1])
+      [word.map(words), word[0].props.title, find(byClass('app-queue-chip'), rowButtons()[0]).length], [['Marked fine'], 'Marked fine: no release', 1])
     check('...the count still All\'s, not Ignored\'s', W.counts.at(-1), 4)
     click(rowButtons()[0])
     one.draw()
@@ -473,7 +504,7 @@ async function page() {
     one.draw()
     one.draw({ facet: one.facetsAsked.at(-1) ?? one.all.facet })
     check('...the session over and the scan in: Ignored emptied, so All - the album back in it, the address told',
-      [facetChips()[0], rowAlbums().includes('Live 1998'), facetChips().some(([label]) => label.startsWith('Ignored')), one.facetsAsked.at(-1)],
+      [facetChips()[0], rowAlbums().includes('Live 1998'), facetChips().some(([label]) => label.startsWith('Marked fine')), one.facetsAsked.at(-1)],
       [['All 5', true], true, false, null])
     check('...and the badge counts it again', W.counts.at(-1), 5)
   }
@@ -492,7 +523,7 @@ async function page() {
     libraryOf([...LIBRARY, NEW_ACCEPTED])
     const ign = mount({ facet: 'ignored' })
     ign.draw()
-    check('...under Ignored: the quiet word', find(byClass('is-ignored'), rowButtons()[rowAlbums().indexOf('Vultures (2024)')]).map(words), ['Ignored'])
+    check('...under Ignored: the quiet word', find(byClass('is-ignored'), rowButtons()[rowAlbums().indexOf('Vultures (2024)')]).map(words), ['Marked fine'])
   }
 
   console.log('\nthe page: a session')
@@ -669,7 +700,7 @@ async function page() {
     libraryOf(LIBRARY.map((album) => ({ ...album, issues: album.issues.filter((code) => code !== 'no_art') })))
     one.draw()
     check('the chips as the session began, its facet pressed - none vanishing, none shifting, no count moving',
-      facetChips(), [['All 4', false], ['Newly added 2', false], ['folder off-convention 2', false], ['no cover 2', true], ['no release 1', false], ['Ignored 1', false]])
+      facetChips(), [['All 4', false], ['Newly added 2', false], ['folder off-convention 2', false], ['no cover 2', true], ['no release 1', false], ['Marked fine 1', false]])
     one.draw({ editing: null })
     await settle()
     check('...and while its rows are held, still', facetChips()[3], ['no cover 2', true])
@@ -759,6 +790,16 @@ async function page() {
     libraryOf(LIBRARY, { navidromeCheck: { state: 'failed', problem: 'Navidrome answered 502' } })
     two.draw()
     check('...a failure said when it lands, why as deadwax said it', [note(), parts()], [[N.navidromeFailed('Navidrome answered 502')], settled])
+    {
+      //? (2.0.8, UX batch 5) Navidrome's own words only for whoever runs deadwax - someone given Look after the library
+      //? alone reads what to do
+      const Access = require(path.join(PAGE, 'app/access.js'))
+      Access.noteAccess({ auth: 'on', user: 'ann', admin: false, permissions: ['request', 'library'] })
+      two.draw()
+      check('...for someone who doesn\'t run deadwax, no Navidrome words: what to do', note(), ["Couldn't ask Navidrome which albums it has - try again in a minute."])
+      Access.forgetAccess()
+      two.draw()
+    }
     for (const state of ['scanning', 'checking', 'listed']) {
       libraryOf(LIBRARY, { navidromeCheck: { state, problem: null } })
       two.draw()
@@ -801,7 +842,7 @@ async function page() {
     gate({ ok: false, configured: false, problem: 'Navidrome isn\'t set up - fill in NAVIDROME_URL' })
     const setUp = find((node) => node.type === 'button')[0]
     check('not set up: Connect Navidrome, the reason, then why and how', [words(classed('app-needs-title')[0]), classed('app-needs-text').map(words).map((w) => w.replace(/\s+/g, ' '))],
-      ['Connect Navidrome', ['Navidrome isn\'t set up - fill in NAVIDROME_URL', `${NAVIDROME_REQUIRED} Set it up in deadwax's settings (Connections), then come back.`]])
+      ['Connect Navidrome', ['Navidrome isn\'t set up - fill in NAVIDROME_URL', `${NAVIDROME_REQUIRED} Set it up in Server settings (Connections), then come back.`]])
     check('...needed for the library, said so', /needs Navidrome for your library/.test(NAVIDROME_REQUIRED), true)
     //? (2.0.0-player.47: the link to the main page's settings tab became "Set up Navidrome", opening the app's own)
     check('...and "Set up Navidrome", the app\'s own settings, no link out', [words(setUp), setUp.props.class, find((node) => node.type === 'a').length], ['Set up Navidrome', 'app-button app-needs-setup', 0])
@@ -826,7 +867,7 @@ async function page() {
     libraryOf(LIBRARY, { reviewTracking: false })
     one.draw()
     check('the library\'s answer says it can\'t: the main page\'s warning, in the app\'s words', warning(), [N.IGNORES_UNSAVED])
-    check('...which says what comes of it', /can't be saved/.test(N.IGNORES_UNSAVED) && /come back/.test(N.IGNORES_UNSAVED) && /DB_PATH/.test(N.IGNORES_UNSAVED), true)
+    check('...which says what comes of it', /can't save to its database/.test(N.IGNORES_UNSAVED) && /come back/.test(N.IGNORES_UNSAVED) && /DB_PATH/.test(N.IGNORES_UNSAVED), true)
     libraryOf([], { loaded: false, reviewTracking: false })
     W.tracking = null
     one.draw()
@@ -992,6 +1033,13 @@ exports.loadScan = (mode, etag) => new Promise((resolve, reject) => globalThis._
   await reloaded
   const older = render()
   check('an answer that says nothing of either: null, and ignores taken as kept', [older.navidromeCheck, older.reviewTracking], [null, true])
+  //? (2.0.8, UX batch 5) a read that failed keeps the failure itself, for the pages to say through lib/errorWords.ts
+  const failing = older.reload()
+  const boom = new TypeError('Failed to fetch')
+  H.asks.shift().reject(boom)
+  await settle()
+  await failing
+  check('a read that fails keeps the failure itself - never only its message', render().error, boom)
 }
 
 page().then(store).then(storeFailingFirst).then(libraryHook).then(() => {

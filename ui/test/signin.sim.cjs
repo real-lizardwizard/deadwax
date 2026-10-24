@@ -532,6 +532,8 @@ async function main() {
       [tree.props.role, tree.props['aria-modal'], tree.props['aria-labelledby'], tree.props['aria-describedby'], find(tree, byClass('app-signin-reason'))[0]?.props.id],
       ['dialog', 'true', 'app-signin-title', 'app-signin-reason', 'app-signin-reason'])
     check('why it is showing, above the form', find(tree, byClass('app-signin-reason')).map(text), ['Navidrome no longer accepts the login you signed in with.'])
+    //? (2.0.8, UX batch 5) which account: the music server's, named once
+    check('...and which account to sign in with', find(tree, byClass('app-signin-lede')).map(text), ['Sign in with your music server (Navidrome) account.'])
     const region = find(tree, byClass('app-signin-problem'))[0]
     check('the failure\'s live region is in the page before anything failed', [region?.props['aria-live'], text(region)], ['assertive', ''])
 
@@ -658,10 +660,10 @@ async function main() {
     const footnote = (user) => text(find(hooks.root(SignOutRow)({ user }), byClass('app-footnote')).at(-1))
     check('...signed in with a Navidrome account - or, for the break-glass admin, with its password and its 12 hours',
       [footnote('ethan'), footnote('deadwax'), footnote('admin')],
-      ["Signed in as ethan, with your Navidrome account. Signing out ends this device's session and stops what's playing.",
-        "Signed in as deadwax, with the break-glass password - it lasts 12 hours. Signing out ends this device's session and stops what's playing.",
+      ["Signed in as ethan, with your music server (Navidrome) account. Signing out ends this device's session and stops what's playing.",
+        "Signed in as deadwax, with the emergency admin password - this sign-in lasts 12 hours. Signing out ends this device's session and stops what's playing.",
         //? (2.0.0-player.61) break-glass is `deadwax` now: Navidrome's own `admin` is a person like any other
-        "Signed in as admin, with your Navidrome account. Signing out ends this device's session and stops what's playing."])
+        "Signed in as admin, with your music server (Navidrome) account. Signing out ends this device's session and stops what's playing."])
     reloads = 0
     sent.length = 0
     answer = () => ({ status: 200, body: { signed_out: true } })
@@ -678,7 +680,7 @@ async function main() {
     await settle()
     tree = again({ user: 'ethan' })
     check('...no answer at all: said, and nothing started again', [find(tree, byClass('app-error')).map(text), reloads],
-      [["deadwax didn't answer, so you're still signed in - try again."], 2])
+      [["Couldn't reach deadwax, so you're still signed in - try again."], 2])
   }
 
   console.log('\nthe app drawn with logins off, and logins switched on under it')

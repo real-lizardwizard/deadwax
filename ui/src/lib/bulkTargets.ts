@@ -132,23 +132,31 @@ export async function runBulk<T>(
 const plural = (count: number, one: string, many = `${one}s`) => (count === 1 ? one : many)
 
 /**
- * What a finished run did, in the main page's words (its status bar's, as it had them). "None on the Archive" is kept
- * apart from "failed": the first is a fact about the release, the second worth trying again - and the
- * same split for lyrics, where "not on LRCLIB" is final.
+ * What a finished run did, in sentences (2.0.8, UX batch 5 - it was the main page's status bar's lower-case run-on line,
+ * "fetched 3 covers, 2 had none on the Archive, 1 failed - try those again (stopped at 12 of 40)"). "None in the Cover
+ * Art Archive" is kept apart from "failed": the first is a fact about the release, the second worth trying again - and
+ * the same split for lyrics, where "not on LRCLIB" is final. A cover or CD art that failed is still missing, so the next
+ * run takes it; a track's lyrics that failed may be on an album that has some now, which no run takes (lyricsTargets) -
+ * so those are sent to the album's own Get lyrics.
  */
 export function bulkSummary(kind: BulkKind, run: BulkRun): string {
   const stopped = run.done < run.total
+  const them = (count: number) => (count === 1 ? 'it' : 'them')
   if (kind === 'lyrics') {
-    return `saved lyrics for ${run.written} ${plural(run.written, 'track')}`
-      + (run.missing ? `, ${run.missing} not on LRCLIB or instrumental` : '')
-      + (run.failed ? `, ${run.failed} failed - try those again` : '')
-      + (stopped ? ` (stopped at ${run.done} of ${run.total} albums)` : '')
+    return [
+      `Saved lyrics for ${run.written} ${plural(run.written, 'track')}.`,
+      run.missing ? `${run.missing} ${run.missing === 1 ? "isn't on LRCLIB or is" : "aren't on LRCLIB or are"} instrumental.` : '',
+      run.failed ? `${run.failed} failed - try ${them(run.failed)} again from the album's own Get lyrics, in Edit album.` : '',
+      stopped ? `Stopped at ${run.done} of ${run.total} albums.` : '',
+    ].filter(Boolean).join(' ')
   }
   const head = kind === 'covers'
-    ? `fetched ${run.written} ${plural(run.written, 'cover')}`
-    : `fetched CD art for ${run.written} ${plural(run.written, 'album')}`
-  return head
-    + (run.missing ? `, ${run.missing} ${kind === 'covers' ? 'had none on the Archive' : 'had none to find'}` : '')
-    + (run.failed ? `, ${run.failed} failed - try those again` : '')
-    + (stopped ? ` (stopped at ${run.done} of ${run.total})` : '')
+    ? `Got ${run.written} ${plural(run.written, 'cover')}.`
+    : `Got CD art for ${run.written} ${plural(run.written, 'album')}.`
+  return [
+    head,
+    run.missing ? `${run.missing} ${run.missing === 1 ? 'has' : 'have'} ${kind === 'covers' ? 'none in the Cover Art Archive' : 'none to find'}.` : '',
+    run.failed ? `${run.failed} failed - run it again to try ${them(run.failed)} again.` : '',
+    stopped ? `Stopped at ${run.done} of ${run.total}.` : '',
+  ].filter(Boolean).join(' ')
 }

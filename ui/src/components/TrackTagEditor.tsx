@@ -7,6 +7,9 @@ import {
   buildEdits, EDIT_FIELDS, sharedValue, tagProblem, type EditField, type SharedValue,
 } from '../lib/tagEdit'
 import { Loading, LoadingPanel } from './Loading'
+import { sayError } from '../app/sayError'
+import { asSentenceKeeping } from '../lib/errorWords'
+import { filesWord } from '../lib/format'
 
 //? A plan is a server round trip, and every keystroke would be one - the metadata editor's
 //? figure, for the same reason: long enough to finish a word, short enough to feel attached.
@@ -80,6 +83,8 @@ export function TrackTagEditor({ album, filenames, details, onClose, onApplied }
   const problemCount = Object.keys(problems).length
 
   const edits = useMemo(() => buildEdits(filenames, draft), [filenames, draft])
+  //? (2.0.8) the writer's problems as sentences - one that starts with a file's name keeps it as it is on disk
+  const sentence = useMemo(() => asSentenceKeeping(filenames), [filenames])
 
   /*
    * The preview: debounced, and cancelled when superseded, so an answer to what you typed three
@@ -106,7 +111,7 @@ export function TrackTagEditor({ album, filenames, details, onClose, onApplied }
       } catch (caught) {
         if (!cancelled) {
           setPlan(null)
-          setError(caught instanceof Error ? caught.message : 'could not work out the changes')
+          setError(sayError(caught, '', { failed: "Couldn't work out the changes." }))
         }
       } finally {
         if (!cancelled) setPlanning(false)
@@ -142,8 +147,8 @@ export function TrackTagEditor({ album, filenames, details, onClose, onApplied }
     try {
       const { results } = await libraryApi.applyTagEdits(album.path, edits)
       const said = [
-        `Saved ${results.written} file${results.written === 1 ? '' : 's'}.`,
-        ...results.problems,
+        `Saved ${filesWord(results.written)}.`,
+        ...results.problems.map(sentence),
       ].join(' ')
 
       if (results.failed) setError(said)
@@ -154,7 +159,7 @@ export function TrackTagEditor({ album, filenames, details, onClose, onApplied }
       setPlan(null)
       onApplied()
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'could not save the tags')
+      setError(sayError(caught, '', { failed: "Couldn't save the tags." }))
     } finally {
       setApplying(false)
     }
@@ -170,7 +175,7 @@ export function TrackTagEditor({ album, filenames, details, onClose, onApplied }
     <div id="tags-window" role="dialog" aria-label="Edit tags" onClick={(event) => event.stopPropagation()}>
       <div class="window-titlebar">
         <span class="window-title">Edit tags · {heading}</span>
-        <button type="button" class="window-close" title="Close (Esc)" onClick={onClose}>✕</button>
+        <button type="button" class="window-close" title="Close (Esc)" aria-label="Close" onClick={onClose}>✕</button>
       </div>
 
       <div class="tags-subject">
@@ -218,7 +223,7 @@ export function TrackTagEditor({ album, filenames, details, onClose, onApplied }
               Only the fields you change are written{single ? '' : ', to every track above'}.
               {single ? '' : ' A field showing several values keeps each track’s own unless you type over it.'}
               {' '}Empty a field to remove that tag. No file is renamed and the folder stays where
-              it is - the metadata editor re-files an album once its tags say where it belongs.
+              it is - the Release tab moves an album's folder to where its tags say it belongs.
             </p>
           </div>
 
@@ -233,18 +238,18 @@ export function TrackTagEditor({ album, filenames, details, onClose, onApplied }
 
             {problemCount > 0 && (
               <p class="text yellow tags-status">
-                Fix the field{problemCount === 1 ? '' : 's'} marked in yellow first.
+                Fix the marked field{problemCount === 1 ? '' : 's'} first.
               </p>
             )}
 
             {planning && (
-              <p class="tags-status"><Loading label="working out the changes" /></p>
+              <p class="tags-status"><Loading label="Working out the changes…" /></p>
             )}
 
             {!planning && plan && (
               <>
                 {plan.problems.map((problem) => (
-                  <p class="text yellow metadata-problem" key={problem}>{problem}</p>
+                  <p class="text yellow metadata-problem" key={problem}>{sentence(problem)}</p>
                 ))}
 
                 {plan.empty && !plan.problems.length && (
@@ -278,7 +283,7 @@ export function TrackTagEditor({ album, filenames, details, onClose, onApplied }
         {!error && applied && <span class="text green tags-result">{applied}</span>}
         {!error && !applied && plan && !plan.empty && (
           <span class="text default-muted tags-result">
-            {plan.changed_file_count} of {plan.file_count} file{plan.file_count === 1 ? '' : 's'} would change
+            {plan.changed_file_count} of {filesWord(plan.file_count)} would change
           </span>
         )}
 
@@ -300,7 +305,7 @@ export function TrackTagEditor({ album, filenames, details, onClose, onApplied }
           }
           onClick={() => void apply()}
         >
-          {applying ? <Loading label="Saving" /> : 'Apply'}
+          {applying ? <Loading label="Saving…" /> : 'Apply'}
         </button>
       </div>
     </div>
@@ -353,7 +358,7 @@ function TagField(
             title="Put back what the files say"
             onClick={() => onRevert(field.key)}
           >
-            undo
+            Undo
           </button>
         )}
       </div>

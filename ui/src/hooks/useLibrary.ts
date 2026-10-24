@@ -25,8 +25,9 @@ export interface LibraryState {
   navidromeCheck: NavidromeCheck | null
   /** Set when the library can't be read at all — unset/missing LIBRARY_PATH. Not an error. */
   problem: string | null
-  /** Set when the request itself failed. */
-  error: string | null
+  /** Set when the request itself failed: (2.0.8) the failure itself - the managing pages say it through lib/errorWords.ts (app/ErrorNote.tsx, sayError),
+   *  a sentence for anyone and its own words for whoever runs deadwax; null while the last read worked */
+  error: unknown
   loading: boolean
   /** False until the first load finishes, so the empty state doesn't flash before data. */
   loaded: boolean
@@ -77,7 +78,7 @@ export function useLibrary(enabled: boolean): LibraryState {
   const [reviewTracking, setReviewTracking] = useState(true)
   const [navidromeCheck, setNavidromeCheck] = useState<NavidromeCheck | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<unknown>(null)
   const [loading, setLoading] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [stale, setStale] = useState(false)
@@ -135,7 +136,7 @@ export function useLibrary(enabled: boolean): LibraryState {
       if (id === latest.current) {
         //? the snapshot, if any, stays on screen - a failed refresh is not a reason to empty
         //? a list that was right a moment ago
-        setError(caught instanceof Error ? caught.message : 'failed to read the library')
+        setError(caught ?? new Error('failed to read the library'))
       }
       return null
     } finally {

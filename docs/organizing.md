@@ -65,7 +65,7 @@ only), and it has to include `{album}`. Server settings refuses one that breaks 
 and shows what two example albums would be called.
 
 **Changing the template moves nothing already filed.** Albums filed under the old one show as
-*folder off-convention* in **Needs a look**, and move when you next apply a release to them
+*Folder name doesn't match the tags* in **Needs a look**, and move when you next apply a release to them
 (**Edit → Release**).
 
 **Why `{year}` is the album's year:** a 2011 remaster of a 1975 record files under
@@ -111,8 +111,8 @@ without a word.
 - **Covers and other sidecars** (images, `.cue`, `.log`, `.nfo`, `.txt`, `.m3u`, `.sfv`) that
   are in slskd's download folder next to the tracks come along into the library. Only audio is
   downloaded from Soulseek, so these are there only if slskd happened to fetch them. An album
-  that arrives without a cover shows up in **Needs a look**, and **Get cover** fetches
-  one from the Cover Art Archive (see [The library](library.md#artwork-covers-and-cd-art)).
+  that arrives without a cover shows up in **Needs a look** (*No cover art*), and **Get cover** fetches
+  one from the Cover Art Archive, saying under the button what came of it (see [The library](library.md#artwork-covers-and-cd-art)).
 - **Lyrics** are looked up on [LRCLIB](https://lrclib.net) for each track once the album is
   filed (unless `FETCH_LYRICS` is off), and saved as a `.lrc` file with the track's own name,
   beside it. Synced lyrics are saved when LRCLIB has them, plain ones otherwise; an

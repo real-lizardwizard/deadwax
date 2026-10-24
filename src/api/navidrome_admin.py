@@ -85,9 +85,11 @@ WORDS = {
     "refused": "Navidrome refused it: {}.",
     "not_found": "That account isn't in Navidrome any more.",
     "not_you": "Navidrome answered for another account than yours, so deadwax won't use what it gave.",
-    "unknown_shape": ("Navidrome answered in a way deadwax doesn't know ({}). People was made for Navidrome 0.64 and "
-                      "uses its web UI's own interface, which can change between versions - change accounts in "
-                      "Navidrome's Users page meanwhile."),
+    #? (2.0.8, UX batch 5) said as People's version note says it ("checked with", not "made for"); the bracket is the
+    #? detail an admin reads - People is theirs alone
+    "unknown_shape": ("Navidrome answered in a way deadwax doesn't know ({}). People was checked with Navidrome 0.64, "
+                      "and the interface it uses can change between versions - use Navidrome's own Users page "
+                      "meanwhile."),
     "timed_out": "Navidrome didn't answer in time.",
 }
 

@@ -56,6 +56,7 @@
  */
 
 import type { LibraryPick } from './appFrame'
+import { NO_PERMISSION } from './permissions'
 
 export type Tab = 'home' | 'library' | 'search' | 'requests' | 'you'
 
@@ -96,7 +97,7 @@ export const SETTINGS_PAGE: Page = { kind: 'settings', id: SETTINGS_ID, label: '
 
 /** The event log (2.0.0-player.33): one page, whatever id an address gives it. */
 export const LOG_ID = 'all'
-export const LOG_PAGE: Page = { kind: 'log', id: LOG_ID, label: 'Log' }
+export const LOG_PAGE: Page = { kind: 'log', id: LOG_ID, label: 'Event log' }
 
 /** Library care (2.0.0-player.42): Rescan and the bulk runs - one page, whatever id an address gives it. */
 export const CARE_ID = 'library'
@@ -114,7 +115,7 @@ export const PLAYLISTS_PAGE: Page = { kind: 'playlists', id: PLAYLISTS_ID, label
 /** What a Managing page says, in place of itself, to someone without its permission (2.0.0-player.47: the pages
  *  are on both frames - until then a phone's note stood here, pointing at the main page; 2.0.0-player.61: per
  *  page, by its permission - lib/permissions.ts). With logins off everyone is the admin, so nobody sees it. */
-export const MANAGING_ADMINS_ONLY = "You don't have permission for this page."
+export const MANAGING_ADMINS_ONLY = NO_PERMISSION
 
 /** The Managing pages that are one page each, by kind: an address's id is made this one. */
 const ONE_PAGE: Partial<Record<PageKind, string>> = { settings: SETTINGS_ID, log: LOG_ID, care: CARE_ID, people: PEOPLE_ID, playlists: PLAYLISTS_ID }

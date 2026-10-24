@@ -4,6 +4,7 @@ import { addFlagged, dismissFlag, heldByNobody } from '../api/library'
 import type { HeldByNobody as HeldAnswer } from '../api/types'
 import { isAbort, latestOnly } from '../lib/latest'
 import { flagWords, heldByNobodyLine, nextFocus } from '../lib/myLibrary'
+import { sayError } from './sayError'
 
 /** How many of the albums nobody holds are listed before "Show all". */
 export const HELD_SHOWN = 20
@@ -56,7 +57,7 @@ export function HeldByNobody({ live }: { live: boolean }) {
         setProblem(null)
       },
       (caught: unknown) => {
-        if (request.current() && !isAbort(caught)) setProblem(caught instanceof Error ? caught.message : String(caught))
+        if (request.current() && !isAbort(caught)) setProblem(sayError(caught, '', { failed: "Couldn't read who has which albums." }))
       },
     )
   }
@@ -102,7 +103,7 @@ export function HeldByNobody({ live }: { live: boolean }) {
       },
       (caught: unknown) => {
         setSaid('')
-        setRefused(caught instanceof Error ? caught.message : String(caught))
+        setRefused(sayError(caught, '', { failed: how === 'add' ? "Couldn't add it for them." : "Couldn't dismiss it." }))
         done()
       },
     )
@@ -112,9 +113,10 @@ export function HeldByNobody({ live }: { live: boolean }) {
   const shown = all ? albums : albums.slice(0, HELD_SHOWN)
   return (
     <section class="app-care-section" aria-labelledby="app-care-held">
-      <h2 ref={heading} id="app-care-held" class="app-care-title" tabIndex={-1}>Held by nobody</h2>
+      {/* (2.0.8, UX batch 5) "In nobody's library" - it was "Held by nobody" */}
+      <h2 ref={heading} id="app-care-held" class="app-care-title" tabIndex={-1}>In nobody's library</h2>
       {!answer ? (
-        problem ? <p class="app-care-problem">{problem}</p> : <p class="app-care-note">Asking deadwax…</p>
+        problem ? <p class="app-care-problem">{problem}</p> : <p class="app-care-note">Loading…</p>
       ) : (
         <>
           <p class="app-care-note">{heldByNobodyLine(answer.count)}</p>

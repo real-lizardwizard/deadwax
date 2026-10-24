@@ -38,7 +38,7 @@ const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-errors-'))
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
   'src/lib/errorWords.ts', 'src/lib/signIn.ts', 'src/app/ErrorNote.tsx', 'src/app/sayError.ts', 'src/app/NeedsNavidrome.tsx',
-  'src/lib/requestsView.ts', 'src/app/access.ts', 'src/lib/navidromeCheck.ts',
+  'src/lib/requestsView.ts', 'src/app/access.ts', 'src/lib/navidromeCheck.ts', 'src/app/usePeople.ts',
   '--rootDir', 'src', '--outDir', OUT,
   '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
   '--lib', 'es2022,dom,dom.iterable', '--jsx', 'react-jsx', '--jsxImportSource', 'preact',
@@ -53,6 +53,8 @@ exports.Fragment = 'fragment'
 fs.writeFileSync(path.join(OUT, 'node_modules/preact/hooks.js'), `
 exports.useState = (v) => [typeof v === 'function' ? v() : v, () => {}]
 exports.useEffect = () => {}
+exports.useCallback = (f) => f
+exports.useMemo = (f) => f()
 `)
 
 const E = require(path.join(OUT, 'lib/errorWords.js'))
@@ -64,6 +66,7 @@ const Gate = require(path.join(OUT, 'app/NeedsNavidrome.js'))
 const V = require(path.join(OUT, 'lib/requestsView.js'))
 const Access = require(path.join(OUT, 'app/access.js'))
 const NC = require(path.join(OUT, 'lib/navidromeCheck.js'))
+const PeopleHook = require(path.join(OUT, 'app/usePeople.js'))
 
 let failures = 0
 function check(label, actual, expected) {
@@ -158,6 +161,14 @@ console.log('\nthe classes')
     [`Something went wrong. Try again - ${KEEPS}`, 'Something went wrong. Try again.'])
   check('a sentence and its advice joined with a full stop where the words left none', E.said({ text: 'it broke', advice: 'Try again.' }), 'it broke. Try again.')
   check('deadwax and slskd never capitalised at a sentence\'s start', [E.asSentence('deadwax broke'), E.asSentence('slskd broke'), E.asSentence('it broke')], ['deadwax broke.', 'slskd broke.', 'It broke.'])
+  {
+    //? (2.0.8) track_tags.py starts some problems with the file's name: upper-cased, it names a file that isn't there
+    const keeping = E.asSentenceKeeping(['intro.flac', '02 my song.flac'])
+    check('a problem that starts with a file in the edit keeps its case, and gains its full stop; any other is a sentence',
+      [keeping("intro.flac couldn't be read as audio"), keeping('02 my song.flac is in this edit twice.'), keeping("title can't be edited here")],
+      ["intro.flac couldn't be read as audio.", '02 my song.flac is in this edit twice.', "Title can't be edited here."])
+    check('...handed to map, which passes an index too', ['intro.flac could not be written: denied'].map(keeping), ['intro.flac could not be written: denied.'])
+  }
   check('one line for a store: lead, sentence, advice - and the detail in brackets for whoever runs deadwax',
     [E.noticeWords("Couldn't get your pins.", new TypeError('Failed to fetch'), LISTENER), E.noticeWords("Couldn't get your pins.", new TypeError('Failed to fetch'), ADMIN)],
     ["Couldn't get your pins. Can't connect to deadwax. Check your connection, then try again.",
@@ -410,7 +421,7 @@ console.log('\nthe Navidrome gate')
     ['Connect Navidrome', [UNSET.problem, `${Gate.NAVIDROME_REQUIRED} ${Gate.ADMIN_SETS_UP}`], []])
   Access.forgetAccess()
   check('an admin (logins off): Navidrome\'s own words, and Set up Navidrome', say(gate(UNSET)),
-    ['Connect Navidrome', [UNSET.problem, `${Gate.NAVIDROME_REQUIRED} Set it up in deadwax's settings (Connections), then come back.`], ['Set up Navidrome']])
+    ['Connect Navidrome', [UNSET.problem, `${Gate.NAVIDROME_REQUIRED} Set it up in Server settings (Connections), then come back.`], ['Set up Navidrome']])
   check('...reached: what it guards', gate({ ok: true, configured: true, problem: null }).props.children, 'LIBRARY')
 }
 
@@ -444,6 +455,37 @@ console.log('\nthe pages: no catch keeps an error\'s raw words for the screen')
     })
   }
   check('every listener page and store: errors said through lib/errorWords.ts, never their own words', kept, [])
+  //? (2.0.8, UX batch 5) the managing pages too - their readers mostly run deadwax, who see an error's own words as its
+  //? detail (lib/errorWords.ts), but Look after the library or Edit albums alone doesn't make someone that, and a
+  //? "Failed to fetch" was nobody's sentence. A plan's problem as a list key (`key={`applied:${problem}`}`) is no error
+  const MANAGING_FILES = [
+    'app/NeedsALook.tsx', 'app/LibraryCare.tsx', 'app/useLibraryCare.ts', 'app/HeldByNobody.tsx', 'app/People.tsx', 'app/usePeople.ts',
+    'app/AddPerson.tsx', 'app/RemovePerson.tsx', 'app/ResetPassword.tsx', 'app/UnlockPeople.tsx', 'app/EventLog.tsx', 'app/ServerSettings.tsx',
+    'app/EditPanel.tsx', 'app/TrackInspector.tsx', 'app/ArtistPanel.tsx', 'app/SignOutRow.tsx', 'app/FolderPicker.tsx',
+    'components/MetadataEditor.tsx', 'components/TrackTagEditor.tsx', 'components/LibraryParts.tsx', 'components/DeleteAlbumDialog.tsx',
+    'components/RetimeLyrics.tsx', 'components/MusicBrainzAnswers.tsx', 'hooks/useLibrary.ts', 'hooks/useTrackDetails.ts',
+  ]
+  const managing = []
+  for (const file of MANAGING_FILES) {
+    fs.readFileSync(path.join(SRC, file), 'utf8').split('\n').forEach((line, at) => {
+      if (RAW_KEPT.test(line.replace(/key=\{`[^`]*`\}/g, '')) && !/console\./.test(line)) managing.push(`${file}:${at + 1}`)
+    })
+  }
+  check('every managing page (2.0.8): errors said through lib/errorWords.ts, never their own words alone', managing, [])
+  //? (review) People's refusalOf: its own refusals (a `kind`) as written, anything else - a 500 with an exception's
+  //? text as its detail, the route guard's 403 - through sayError (which keeps a refusal's words, and puts a crash in a
+  //? sentence), never its raw detail alone
+  {
+    const own = PeopleHook.refusalOf(new ApiError(409, 'People is locked - type your password again.', 'x', false, 'locked'))
+    const crash = PeopleHook.refusalOf(new ApiError(500, "KeyError: 'users'", 'x'))
+    const guard = PeopleHook.refusalOf(new ApiError(403, 'Not allowed', 'x'))
+    check("People: a refusal of its own (a kind) as written, and whether it's locked again",
+      [own.words, own.locked], ['People is locked - type your password again.', true])
+    check('...a 500 with a detail and no kind goes through sayError, not its raw words',
+      [crash.words === "KeyError: 'users'", crash.words === sayError(new ApiError(500, "KeyError: 'users'", 'x')), crash.locked], [false, true, false])
+    check('...and the route guard\'s 403 the same way (a named refusal, so sayError keeps its words)',
+      [guard.words === sayError(new ApiError(403, 'Not allowed', 'x')), guard.locked], [true, false])
+  }
   //? (review) a Done row that can't open, when deadwax itself didn't answer the check: not the music server's sentence
   const app = fs.readFileSync(path.join(SRC, 'app/App.tsx'), 'utf8')
   check('App: a Done row\'s can\'t-open line says deadwax wasn\'t reached when it wasn\'t (offline), before the music server\'s',

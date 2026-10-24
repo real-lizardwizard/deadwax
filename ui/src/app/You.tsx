@@ -27,10 +27,15 @@ import { SignOutRow } from './SignOutRow'
 import { ChangePassword } from './ChangePassword'
 import { changeOffered } from '../lib/ownPassword'
 import { YourLibrary } from './YourLibrary'
+import { sessionMe } from './session'
 
 /** (2.0.4) Getting albums' three, when deadwax's database can't keep them - "Tell whoever runs deadwax." after it for
  *  anyone else, who can't put the volume right. */
 export const GETTING_UNSAVED = "deadwax can't keep these: its database isn't writable."
+
+/** (2.0.8) You's headline's line with logins off, and what About says of what deadwax didn't answer. */
+export const NO_SIGN_IN = 'No sign-in needed'
+export const NOT_KNOWN = 'Not known'
 
 type CheckState = { state: 'pending' | 'ok' | 'failed'; text: string; detail?: string }
 
@@ -230,17 +235,22 @@ export function You({
     if (shown && runsDeadwax && !pinged.current) pingAll()
   }, [shown, runsDeadwax])
   const managing = managingOf(access.permissions, access.on)
-  //? only what deadwax has said: nothing while it hasn't answered, "…" while it is being asked
-  const identity = who ? (who.auth === 'off' ? 'Logins are off' : who.user) : whoFailed ? null : '…'
+  //? (2.0.8, UX batch 5) the headline is the person - who is signed in, from /me or, until it answers, the session -
+  //? and "deadwax" only with logins off ("No sign-in needed" under it), where it was "deadwax" over "james" or
+  //? "Logins are off". Under it only what deadwax has said: nothing while it hasn't answered, "…" while it is asked
+  const session = sessionMe()
+  const signedIn = who ? (who.auth === 'on' ? who.user : null) : session?.auth === 'on' ? session.user : null
+  const headline = signedIn ?? 'deadwax'
+  const identity = who ? (who.auth === 'off' ? NO_SIGN_IN : null) : whoFailed || signedIn ? null : '…'
 
   return (
     <section class="app-you">
       <header class="app-identity">
         <span class="app-avatar" aria-hidden="true">
-          d
+          {signedIn ? signedIn.charAt(0).toUpperCase() : 'd'}
         </span>
         <div class="app-identity-text">
-          <h1 class="app-identity-name">deadwax</h1>
+          <h1 class="app-identity-name">{headline}</h1>
           {identity && <p class="app-identity-sub">{identity}</p>}
         </div>
       </header>
@@ -351,17 +361,17 @@ export function You({
       {managing.any && (
         <section class="app-section" aria-labelledby="app-managing-title">
           <h2 id="app-managing-title" class="app-section-title">
-            Managing deadwax
+            Manage
           </h2>
           <div class="app-group">
             {managing.queue && (
               <button
                 type="button"
                 class="app-row app-link-row app-queue-link-row"
-                {...(needsLook ? { 'aria-label': needsLookLabel('Albums that need a look', needsLook) } : {})}
+                {...(needsLook ? { 'aria-label': needsLookLabel('Needs a look', needsLook) } : {})}
                 onClick={() => onNeedsLook?.()}
               >
-                <span class="app-row-label">Albums that need a look</span>
+                <span class="app-row-label">Needs a look</span>
                 {badgeText(needsLook ?? 0) && (
                   <span class="app-queue-badge app-mono" aria-hidden="true">
                     {badgeText(needsLook ?? 0)}
@@ -390,11 +400,25 @@ export function You({
             )}
             {managing.log && (
               <button type="button" class="app-row app-link-row app-queue-link-row" onClick={() => onManaging?.('log')}>
-                <span class="app-row-label">Log</span>
+                <span class="app-row-label">Event log</span>
                 <ChevronRightIcon class="app-chevron" />
               </button>
             )}
           </div>
+        </section>
+      )}
+
+      {/* (2.0.8, UX batch 5) Account: your own password and Sign out, together - they were under About.
+          Only with logins on: off, there is no account and nobody to sign out */}
+      {who?.auth === 'on' && (
+        <section class="app-section" aria-labelledby="app-account-title">
+          <h2 id="app-account-title" class="app-section-title">
+            Account
+          </h2>
+          {/* (2.0.2) your own Navidrome password - a Navidrome sign-in only (never break-glass) */}
+          {changeOffered(who) && <ChangePassword user={who.user} />}
+          {/* (2.0.0-player.48) */}
+          <SignOutRow user={who.user} />
         </section>
       )}
 
@@ -405,18 +429,17 @@ export function You({
         <dl class="app-group">
           <div class="app-row">
             <dt class="app-row-label">Version</dt>
-            <dd class="app-row-value app-mono">{who?.version ?? (whoFailed ? 'unknown' : '…')}</dd>
+            <dd class="app-row-value app-mono">{who?.version ?? (whoFailed ? NOT_KNOWN : '…')}</dd>
           </div>
-          <div class="app-row">
-            <dt class="app-row-label">Logins</dt>
-            <dd class="app-row-value">{who ? (who.auth === 'off' ? 'Off' : 'On') : whoFailed ? 'unknown' : '…'}</dd>
-          </div>
+          {/* (2.0.8) whether logins are on is an admin's to know (and change): nobody else is shown it */}
+          {access.admin && (
+            <div class="app-row">
+              <dt class="app-row-label">Logins</dt>
+              <dd class="app-row-value">{who ? (who.auth === 'off' ? 'Off' : 'On') : whoFailed ? NOT_KNOWN : '…'}</dd>
+            </div>
+          )}
         </dl>
         {whoFailed ? errorNote(whoFailed, { class: 'app-footnote app-error' }) : null}
-        {/* (2.0.2) your own Navidrome password - logins on and a Navidrome sign-in only (never break-glass) */}
-        {who && changeOffered(who) && <ChangePassword user={who.user} />}
-        {/* (2.0.0-player.48) only with logins on - off, there is nobody to sign out */}
-        {who?.auth === 'on' && <SignOutRow user={who.user} />}
       </section>
     </section>
   )

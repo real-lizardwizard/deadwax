@@ -60,10 +60,10 @@ A few words mean something specific here, and the rest of the guide leans on the
 It's one app with five tabs - **Home**, **Library**, **Search**, **Requests** and **You** - and a
 player inside them, made to be added to an iPhone's home screen and opened like an app
 ([adding it](player.md#adding-it-to-an-iphones-home-screen)). Each tab keeps its own pages, as an
-iPhone app's do, and looking after deadwax is in **You → Managing deadwax**, laid out for a phone.
+iPhone app's do, and looking after deadwax is in **You → Manage**, laid out for a phone.
 
 In a window 1024 pixels wide or more it has [a desktop's layout](player.md#on-a-desktop): a sidebar
-for the tabs and for **Managing** (Needs a look, Library care, People, Settings and Log), a player
+for the tabs and for **Manage** (Needs a look, Library care, People, Server settings and Event log), a player
 bar along the bottom, an album's sources, Info and the Edit panel beside the page, and a full-screen
 [visualizer](player.md#the-visualizer) from the player bar. Resizing across 1024 pixels swaps the
 layout without stopping the music.

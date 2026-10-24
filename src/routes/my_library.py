@@ -34,7 +34,7 @@ from src.logger import logger
 from src.routes.download import FindCandidatesRequest
 from src.routes.navidrome import ID_MAX
 from src.store_index import held_copy
-from src.users import current_user
+from src.users import can, current_user
 
 router = APIRouter()
 
@@ -102,6 +102,8 @@ async def my_library(request: Request, user: str = Depends(current_user)):
 
     held = [entry for entry in entries if entry["state"] in ("waiting", "starred")]
     waiting = [entry for entry in held if entry["state"] == "waiting"]
+    #? (2.0.8) an album with no release, said to someone who may apply one as theirs to fix (library_ledger)
+    can_apply = can(request, user, "edit")
     return {
         "on": True,
         "library": True,
@@ -113,7 +115,7 @@ async def my_library(request: Request, user: str = Depends(current_user)):
         "login": login,
         "login_problem": why if login == "dead" else None,
         "waiting_albums": [{**_entry(entry), "problem": entry.get("problem"),
-                            "words": rules.problem_text(entry.get("problem"))} for entry in waiting],
+                            "words": rules.problem_text(entry.get("problem"), can_apply)} for entry in waiting],
         "new": [_entry(entry) for entry in held if entry.get("seen_at") is None],
         "removed": [{**_entry(entry), "removed_at": entry.get("removed_at")} for entry in entries
                     if entry["state"] == "removed" and entry.get("removed_why") == "deleted"],

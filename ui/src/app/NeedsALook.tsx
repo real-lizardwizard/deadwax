@@ -4,15 +4,19 @@ import * as libraryApi from '../api/library'
 import type { LibraryAlbum } from '../api/types'
 import { useLibrary } from '../hooks/useLibrary'
 import { albumArtUrl } from '../lib/format'
-import { isNewImport, issueLabel, outstandingIssues } from '../lib/metadataQueue'
+import { isNewImport, issueLabel, markedFineIssues, outstandingIssues } from '../lib/metadataQueue'
 import {
-  IGNORED_FACET, IGNORES_UNSAVED, MARK_WORDS, NEEDS_LOOK_LINE, facetAlbums, facetShown, facets, ignoresUnsaved, isIgnoredOnly, leavingAtEnd,
+  IGNORED_FACET, IGNORES_UNSAVED, MARK_WORDS, MARKED_FINE, NEEDS_LOOK_LINE, facetAlbums, facetShown, facets, ignoresUnsaved, isIgnoredOnly, leavingAtEnd,
   navidromeNote, rowChanged, startSession, stepTarget, summaryTotal,
   type Facet, type FolderChange, type LookSession, type RowMark,
 } from '../lib/needsLook'
 import { MANAGING_ADMINS_ONLY } from '../lib/appRoutes'
 import { NEEDS_EDIT } from '../lib/permissions'
+import { CHECK_FAILED, READ_FAILED } from '../lib/libraryCare'
 import { ChevronLeftIcon } from '../player/icons'
+import { accessNow, seesDetail } from './access'
+import { errorNote } from './ErrorNote'
+import { sayError } from './sayError'
 import type { FolderRequest } from './EditPanel'
 import { askQueueSummary, setPageQueueCount, useQueueTracking } from './useQueueSummary'
 import { takeOpener } from './useSheet'
@@ -86,6 +90,7 @@ const focusLost = (): boolean => {
  * IGNORED (2.0.0-player.66): the last chip lists the albums whose every issue was accepted as it is - out
  * of the queue, so with no other way back to the Edit panel (and its Un-ignore) for a folder Navidrome
  * doesn't list. Each row opens Edit like any other, with a quiet "Ignored" word; its count is never All's.
+ * (2.0.8, UX batch 5) The chip and the word are "Marked fine", the editor's undo "Ask about it again".
  */
 export function NeedsALook({
   allowed,
@@ -352,7 +357,8 @@ export function NeedsALook({
   }
   const checking = library.loaded && (library.stale || library.loading)
   //? said once, in the status line, by the answer on screen (there only over albums there are to check)
-  const navidrome = navidromeNote(library.navidromeCheck ?? null)
+  //? (2.0.8) Navidrome's own words only for whoever runs deadwax (access.ts seesDetail)
+  const navidrome = navidromeNote(library.navidromeCheck ?? null, seesDetail(accessNow()))
   const pressed = session ? session.facet : ending ? ending.facet : showing
 
   return (
@@ -369,7 +375,8 @@ export function NeedsALook({
           <div class="pl-spinner" aria-label="Reading the library" />
         ) : library.error && !library.albums.length ? (
           <div class="app-queue-state">
-            <p>deadwax couldn't read the library: {library.error}</p>
+            {/* (2.0.8, UX batch 5) in words (lib/errorWords.ts), its own words under it for whoever runs deadwax */}
+            {errorNote(library.error, { failed: READ_FAILED, retry: true })}
             <button type="button" class="app-button" aria-disabled={library.loading ? 'true' : undefined} onClick={retry}>
               Try again
             </button>
@@ -396,7 +403,7 @@ export function NeedsALook({
             <p class="app-queue-checking" role="status">
               {library.error ? (
                 <>
-                  Couldn't check the library just now: {library.error}{' '}
+                  {sayError(library.error, '', { failed: CHECK_FAILED, retry: true })}{' '}
                   <button type="button" class="app-text-button" aria-disabled={library.loading ? 'true' : undefined} onClick={retry}>
                     Try again
                   </button>
@@ -411,7 +418,7 @@ export function NeedsALook({
             {!rows.length ? (
               <p class="app-queue-state">Nothing needs a look.</p>
             ) : (
-              <ul ref={list} class="app-queue-list" aria-label="Albums that need a look">
+              <ul ref={list} class="app-queue-list" aria-label="Albums">
                 {rows.map((row, index) => {
                   const { album, mark } = row
                   const current = !!session && session.index === index
@@ -461,9 +468,9 @@ export function NeedsALook({
                               {pressed === IGNORED_FACET && isIgnoredOnly(album) && (
                                 <span
                                   class="app-queue-chip is-ignored"
-                                  title={`Accepted as it is: ${album.issues.filter((code) => album.ignored_issues.includes(code)).map((code) => issueLabel(code, library.issueTypes)).join(', ')}`}
+                                  title={`${MARKED_FINE}: ${markedFineIssues(album).map((code) => issueLabel(code, library.issueTypes)).join(', ')}`}
                                 >
-                                  Ignored
+                                  {MARKED_FINE}
                                 </span>
                               )}
                             </>

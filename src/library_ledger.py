@@ -77,7 +77,16 @@ def retry_after(attempts: int) -> float:
     return float(min(LAST_RETRY_SECONDS, FIRST_RETRY_SECONDS * 2 ** max(0, attempts - 1)))
 
 
-def problem_text(problem: str | None) -> str | None:
+#? (2.0.8, UX batch 5) NO_RELEASE said to someone who can put it right themselves - an admin, or anyone given Edit
+#? albums: applying a release writes the release id the worker looks the album up by, and its next try adds it
+NO_RELEASE_YOURS = "It isn't matched to a release on MusicBrainz yet. Apply a release to it in Edit album, and it's added after that."
+
+
+def problem_text(problem: str | None, can_apply: bool = False) -> str | None:
+    """Why an entry still waits, for its reader: `can_apply` - they may apply a release (Edit albums) - says
+    the NO_RELEASE fix as theirs to make."""
+    if can_apply and problem == NO_RELEASE:
+        return NO_RELEASE_YOURS
     return PROBLEM_WORDS.get(problem or "") if problem else None
 
 

@@ -96,3 +96,12 @@ def test_the_app_page_links_it_only_with_logins_on_after_app_css(monkeypatch):
     #? the test bench doesn't draw the sign-in screen, so doesn't load its sheet (`/` is the app since 2.0.0-player.66)
     assert "signin.css" not in client.get("/player/lab/").text
     assert SIGNIN_SHEET == '<link rel="stylesheet" href="/player/signin.css">'
+
+
+def test_your_account_sits_under_its_heading_as_every_section_does():
+    """(2.0.8, UX batch 5) You's Account - Change password and Sign out, with logins on (this sheet is linked only
+    then) - starts straight under its heading, as every other section's first group does: the gap kept between
+    the two rows was About's, from its list to Sign out."""
+    for first in (".app-section-title + .app-own-password", ".app-section-title + .app-signout"):
+        assert declarations(SIGNIN, first)["margin-top"] == "0", first
+    assert resolved(declarations(SIGNIN, ".app-signout")["margin-top"]) == "12px"

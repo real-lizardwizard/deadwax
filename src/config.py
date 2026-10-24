@@ -356,7 +356,7 @@ LOGIN_SETTINGS = ("AUTH_MODE", "DEADWAX_SECRET_KEY", "DEADWAX_ADMIN_PASSWORD")
 
 #? (2.0.0-player.61) What start-up says when the removed DEADWAX_ADMINS is still in the environment.
 DEADWAX_ADMINS_IGNORED = (
-    "DEADWAX_ADMINS is set, but deadwax no longer reads it (since 2.0.0-player.61): deadwax's admins are "
+    "DEADWAX_ADMINS is set, but deadwax no longer reads it (since 2.0.0): deadwax's admins are "
     "Navidrome's admins. Make your Navidrome account an admin in Navidrome's Users page, then take "
     "DEADWAX_ADMINS out of compose."
 )

@@ -75,20 +75,20 @@ check('its deadwax sign-in', [L.signInWords(person({ signed_in: 2 }), now), L.si
   ['Signed in on 2 devices', 'Signed in on 1 device', 'Last signed in 3 days ago', 'Last signed in 1 minute ago', 'Never signed in to deadwax'])
 check('its library', [L.libraryWords(person()), L.libraryWords(person({ library: 1 }))], ['312 albums in their library', '1 album in their library'])
 check('Navidrome giving a non-admin no library is said; an admin\'s never', [L.librariesWarning(person({ libraries: 0 })), L.librariesWarning(person({ libraries: 0, admin: true })), L.librariesWarning(person())],
-  ["Navidrome gives them no library - they'll see nothing. Tick one for them in Navidrome's Users page.", null, null])
+  ["Navidrome gives them no library - they'll see nothing. Choose one for them in Navidrome's Users page.", null, null])
 check('its actions, from the server\'s can', L.actions(person()).map((action) => [action.kind, action.label, action.refused]),
   [['reset', 'Reset password…', null], ['admin', 'Make admin', null], ['remove', 'Remove…', null]])
-const you = person({ you: true, admin: true, can: { reset: "That's you - change your own password in You → Change password.", remove: "deadwax doesn't remove the account you're signed in with.",
+const you = person({ you: true, admin: true, can: { reset: "That's you - change your own password in You → Account → Change password.", remove: "deadwax doesn't remove the account you're signed in with.",
   admin: "You can't take away your own admin role.", permissions: "That's you - an admin has every permission." } })
 check('...refused ones with their reasons, in words - never a bare greyed button', [L.actions(you).map((action) => action.label), L.refusals(you)],
-  [['Reset password…', 'No longer admin', 'Remove…'], ["That's you - change your own password in You → Change password.", "You can't take away your own admin role.", "deadwax doesn't remove the account you're signed in with."]])
+  [['Reset password…', 'No longer admin', 'Remove…'], ["That's you - change your own password in You → Account → Change password.", "You can't take away your own admin role.", "deadwax doesn't remove the account you're signed in with."]])
 const shared = person({ can: { reset: 'S', remove: 'S', admin: 'S', permissions: 'S' } })
 check('...one reason said once, however many actions share it', L.refusals(shared), ['S'])
 check('Make admin says what it gives, in Navidrome and Amperfy too', [L.makeAdminWords('maya').question, L.makeAdminWords('maya').body.includes('every library'),
   L.makeAdminWords('maya').body.includes("everyone's playlists, private ones included")], ['Make maya an admin?', true, true])
 check('No longer admin says what they keep - and what was ticked before', [L.unmakeAdminWords('maya', []).body, L.unmakeAdminWords('maya', ['Edit albums']).body],
   ["maya keeps every library Navidrome gave them as an admin - narrow them in Navidrome's Users page if they shouldn't see them all.",
-    "maya keeps every library Navidrome gave them as an admin - narrow them in Navidrome's Users page if they shouldn't see them all. They keep what was ticked for them before: Edit albums."])
+    "maya keeps every library Navidrome gave them as an admin - narrow them in Navidrome's Users page if they shouldn't see them all. They keep what they were given before: Edit albums."])
 
 console.log('\nRemove')
 const lines = L.removeLines(person({ signed_in: 2, waiting_alone: 1 }))
@@ -106,16 +106,16 @@ check('the typed name: exactly it - another case, a space, nothing, never', ['et
 
 console.log('\nthe page')
 check('the plain-http note: on http, never on https', [L.httpNote('http:') === L.HTTP_NOTE, L.httpNote('https:')], [true, null])
-check('...its words', L.HTTP_NOTE, "This page isn't over HTTPS: a password typed here crosses your network readable, as everyone's sign-in does. That's fine on your own network or over WireGuard; anywhere else, put HTTPS in front of deadwax first.")
+check('...its words', L.HTTP_NOTE, "This page isn't over HTTPS: a password typed here crosses your network readable, as everyone's sign-in does. That's fine on your own network or over a VPN; anywhere else, put HTTPS in front of deadwax first.")
 check('the version note: only for another minor version - a note, never a block', [L.versionNote('navidrome 0.64.2 (abc123)'), L.versionNote('navidrome 0.65.0 (def)'), L.versionNote('navidrome'), L.versionNote(null)],
-  [null, 'People was made for Navidrome 0.64 - this is 0.65.0.', null, null])
+  [null, "Your Navidrome (0.65.0) isn't the one People was checked with (0.64). If something here doesn't work, use Navidrome's own Users page.", null, null])
 const state = (more) => ({ on: true, available: true, locked: true, problem: null, fix: null, you: 'admin', account: 'demo', people: [], known_only: [], ...more })
 check('what it draws: asking, the problem alone, the unlock, the list', [L.peopleView(null), L.peopleView(state({ available: false })), L.peopleView(state()), L.peopleView(state({ locked: false }))],
   ['asking', 'unavailable', 'locked', 'list'])
 check('the unlock\'s words name you', L.unlockLine('james'), "People changes Navidrome's accounts as you, james. Navidrome needs your password for that; deadwax uses it once and doesn't keep it.")
 check('after a change', [L.madeWords('ethan2', 'http://deadwax.lan:8080'), L.resetWords('ethan', 2)],
-  ["Made ethan2. Tell them their user name, the password you chose and deadwax's address (http://deadwax.lan:8080/player/) - Amperfy signs in with the same.",
-    'Done. ethan is signed out of deadwax on 2 devices and signs in with the new password - Amperfy and any other app they use need it too.'])
+  ["Made ethan2. Tell them their user name, the password you chose and deadwax's address (http://deadwax.lan:8080/player/) - their other music apps sign in with the same user name and password.",
+    'Done. ethan is signed out of deadwax on 2 devices and signs in with the new password - their other music apps need it too.'])
 check('Known only to deadwax: what is kept', L.knownWords({ user: 'olduser', sessions: 0, credential: true, library: 12, pins: 3, preferences: true, requests: 1, permissions: 0 }),
   'deadwax keeps a kept login, 12 albums in their library, 3 pins, Getting albums settings, 1 request.')
 //? (2.0.0-player.64) a name with only a play queue left - which still keeps a new account of that name from being made

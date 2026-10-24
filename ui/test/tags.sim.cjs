@@ -115,5 +115,12 @@ check('"Jackpot Juicer (instrumental)" is tagged INSTRUMENTAL',
 check('the ordinary album is not',
       release.detectEditionTags({ id: 'y', title: 'Jackpot Juicer', disambiguation: '' }), []);
 
+console.log('\nthe Release tab\'s "Now:" year (2.0.8)');
+check('a reissue: the first year, this pressing\'s in brackets', release.nowYear({ original_year: '1994', year: '2014' }), '1994 (this pressing 2014)');
+check('one year for both: said once', release.nowYear({ original_year: '1994', year: '1994' }), '1994');
+check('an originaldate with no date: the year alone, never "(this pressing )"', release.nowYear({ original_year: '1994', year: '' }), '1994');
+check('a date with no originaldate: that year', release.nowYear({ original_year: '', year: '2014' }), '2014');
+check('neither: No year', release.nowYear({ original_year: '', year: '' }), 'No year');
+
 console.log(failures ? `\n${failures} FAILED\n` : '\nall passed\n');
 process.exit(failures ? 1 : 0);

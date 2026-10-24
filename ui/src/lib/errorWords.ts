@@ -164,6 +164,20 @@ export function asSentence(text: string): string {
   return /[.!?…]$/.test(upper) ? upper : `${upper}.`
 }
 
+/**
+ * asSentence, for words that can begin with a file's name (2.0.8): src/track_tags.py writes "intro.flac couldn't be
+ * read as audio", and upper-casing it would name a file that isn't there on a case-sensitive disk. A sentence that
+ * starts with one of `names` keeps its case and only gains its full stop. A function to hand to `.map()`, which passes
+ * an index as a second argument.
+ */
+export function asSentenceKeeping(names: readonly string[]): (text: string) => string {
+  return (text) => {
+    const trimmed = text.trim()
+    if (!names.some((name) => name && trimmed.startsWith(name))) return asSentence(text)
+    return /[.!?…]$/.test(trimmed) ? trimmed : `${trimmed}.`
+  }
+}
+
 /** The error's own words, as an admin is shown them: the server's why, else its detail, else the message. */
 export function rawWords(error: unknown): string {
   if (error instanceof ApiError) return error.why || error.detail || error.message

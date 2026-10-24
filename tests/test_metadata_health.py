@@ -14,6 +14,7 @@ Two halves, deliberately:
   to cross it.
 """
 
+import re
 import sys
 from pathlib import Path
 
@@ -98,6 +99,32 @@ def test_every_issue_code_is_described():
     for code in issues:
         assert ISSUE_TYPES[code]["label"]
         assert ISSUE_TYPES[code]["hint"]
+
+
+def test_each_issue_is_said_in_sentences_a_person_can_act_on():
+    """(2.0.8, UX batch 5) Needs a look's chips and the editor's lines are these words: each hint a sentence - a
+    capital, a full stop - naming no tag ("no originaldate tag") and no editor the app doesn't name ("the editor"),
+    and the two chips that read as plumbing in a person's words."""
+    for code, issue in ISSUE_TYPES.items():
+        hint = issue["hint"]
+        assert hint[0].isupper() and hint.endswith("."), (code, hint)
+        assert not re.search(r"originaldate|\bdate tag|title tag|\bthe editor\b|metadata editor|off-convention|re-files?", hint), (code, hint)
+        assert issue["label"][0].isupper(), code
+    assert ISSUE_TYPES["no_release"]["label"] == "Not matched to MusicBrainz"
+    assert ISSUE_TYPES["misfiled"]["label"] == "Folder name doesn't match the tags"
+    #? read as text only on the Release tab itself, so none sends you to the tab you are on, and no_art's says
+    #? nothing about matching that a matched album would read as untrue (the Artwork tab says that for itself)
+    for code, issue in ISSUE_TYPES.items():
+        assert "Release tab" not in issue["hint"], code
+    assert "matched" not in ISSUE_TYPES["no_art"]["hint"]
+    assert "Find their release and apply it." in ISSUE_TYPES["no_release"]["hint"]
+
+
+def test_the_no_original_year_hint_holds_when_no_file_has_a_year_at_all():
+    """A rip with neither date: both chips show, and No original year must not claim a pressing year is there."""
+    issues = inspect_album(make_album(original_year="", year=""))
+    assert "no_original_year" in issues and "no_year" in issues
+    assert "pressing" not in ISSUE_TYPES["no_original_year"]["hint"]
 
 
 def test_issues_come_back_worst_first():

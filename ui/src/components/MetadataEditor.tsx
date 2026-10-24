@@ -6,17 +6,22 @@ import * as musicbrainz from '../api/musicbrainz'
 import type {
   LibraryAlbum, MetadataIssueType, Release, RetagPlan, RetagRelease,
 } from '../api/types'
-import { albumArtUrl } from '../lib/format'
+import { albumArtUrl, filesWord } from '../lib/format'
 import { latestOnly } from '../lib/latest'
+import { sayError } from '../app/sayError'
+//? (2.0.8, UX batch 5) the writers' problems are said as sentences - a capital, a full stop - however the server wrote them
+import { asSentence } from '../lib/errorWords'
 import { ArtViewer } from './ArtViewer'
 import { Loading, LoadingPanel } from './Loading'
-import { issueLabel, outstandingIssues } from '../lib/metadataQueue'
+import { issueLabel, markedFineIssues, outstandingIssues } from '../lib/metadataQueue'
 import {
   buildRetagRelease,
   currentName,
   describeRelease,
   fieldedAlbumQuery,
+  plainAlbumQuery,
   isCurrentRelease,
+  nowYear,
   releaseTrackCount,
   scoreReleaseGroupMatch,
   scoreReleaseMatch,
@@ -156,7 +161,7 @@ function ArtComparison(
             />
           </button>
         ) : (
-          <div class="metadata-art-empty">{releaseId ? 'none on file' : 'pick a release'}</div>
+          <div class="metadata-art-empty">{releaseId ? 'None on file' : 'Pick a release'}</div>
         )}
       </div>
 
@@ -364,7 +369,7 @@ export function MetadataEditor(
         caught instanceof MusicBrainzUnavailable
           ? "MusicBrainz couldn't be reached for that release's tracklist, so it can't be " +
             'applied yet. You can still correct the fields by hand.'
-          : caught instanceof Error ? caught.message : 'could not load that release',
+          : sayError(caught, '', { failed: "Couldn't load that release." }),
       )
     } finally {
       if (request.current()) setLoadingRelease(false)
@@ -462,9 +467,7 @@ export function MetadataEditor(
         caught instanceof MusicBrainzUnavailable
           ? "MusicBrainz is unreachable right now, so there's nothing to match against. " +
             'You can still correct the fields by hand.'
-          : caught instanceof Error
-            ? caught.message
-            : 'the search failed',
+          : sayError(caught, '', { failed: "The search didn't work." }),
       )
       setReleases([])
     } finally {
@@ -571,7 +574,7 @@ export function MetadataEditor(
         setApplyError(null)
       } catch (caught) {
         if (!live) return
-        setApplyError(caught instanceof Error ? caught.message : 'could not work out the changes')
+        setApplyError(sayError(caught, '', { failed: "Couldn't work out the changes." }))
         setPlan(null)
       } finally {
         if (live) setPlanning(false)
@@ -595,23 +598,24 @@ export function MetadataEditor(
       setAppliedProblems(results.problems.filter((problem) => !plan?.problems.includes(problem)))
 
       if (results.failed) {
-        setApplyError(`${results.failed} file(s) could not be written`)
+        setApplyError(`Couldn't write ${filesWord(results.failed)}.`)
       } else {
-        //? "Retagged 0 file(s)" is a silly thing to say when only the folder changed, which
-        //? is exactly what happens if you edit nothing but the edition name
+        //? "Updated the tags in 0 files" is a silly thing to say when only the folder changed, which
+        //? is exactly what happens if you edit nothing but the edition name. (2.0.8, UX batch 5) In words:
+        //? it said "Retagged 12 file(s)" and "re-filed the folder"
         setApplied(
           [
-            results.tagged ? `Retagged ${results.tagged} file(s)` : '',
+            results.tagged ? `updated the tags in ${filesWord(results.tagged)}` : '',
             results.art_written ? `saved ${results.art_written}` : '',
-            results.merged ? 'merged it in beside the other discs'
-              : results.moved_to ? 're-filed the folder' : '',
+            results.merged ? 'moved it in beside the other discs'
+              : results.moved_to ? 'moved the folder to match its tags' : '',
           ].filter(Boolean).join(', ').replace(/^./, (c) => c.toUpperCase()) + '.',
         )
         //? where the album lives now - the same path unless the folder was renamed
         onApplied(results.moved_to && plan?.target_path ? plan.target_path : album.path)
       }
     } catch (caught) {
-      setApplyError(caught instanceof Error ? caught.message : 'could not apply the changes')
+      setApplyError(sayError(caught, '', { failed: "Couldn't apply the changes." }))
     } finally {
       setApplying(false)
     }
@@ -624,6 +628,8 @@ export function MetadataEditor(
   //? so it follows the refreshed album after an apply and the list visibly shrinks as you fix
   //? things - which is the only feedback that the edit did what you wanted.
   const issues = outstandingIssues(album)
+  //? (2.0.8) only what was marked fine that the album still has - the stored list can name a problem since fixed
+  const markedFine = markedFineIssues(album)
 
   /**
    * Write the cover on its own, replacing whatever is there.
@@ -648,7 +654,7 @@ export function MetadataEditor(
       setArtResult(`Saved ${result.written}${result.replaced ? `, replacing ${result.replaced}` : ''}.`)
       onApplied(album.path)
     } catch (caught) {
-      setArtResult(caught instanceof Error ? caught.message : 'could not save the cover')
+      setArtResult(sayError(caught, '', { failed: "Couldn't save the cover." }))
     } finally {
       setSavingArt(false)
     }
@@ -679,7 +685,7 @@ export function MetadataEditor(
               </span>
             )}
 
-            <button type="button" id="metadata-close-button" title="Close" onClick={onClose}>✕</button>
+            <button type="button" id="metadata-close-button" title="Close" aria-label="Close" onClick={onClose}>✕</button>
           </div>
 
           {/*
@@ -687,7 +693,7 @@ export function MetadataEditor(
             words each because a row has no space; here there is room for the sentence that says
             what actually fixes it, which is the difference between a warning and instructions.
           */}
-          {(issues.length > 0 || album.ignored_issues.length > 0) && (
+          {(issues.length > 0 || markedFine.length > 0) && (
             <div id="metadata-issues">
               {issues.map((code) => (
                 <span class="metadata-issue" key={code} title={issueTypes[code]?.hint}>
@@ -696,18 +702,20 @@ export function MetadataEditor(
                 </span>
               ))}
 
-              {album.ignored_issues.length > 0 && (
+              {markedFine.length > 0 && (
                 <span class="metadata-issue is-ignored">
+                  {/* (2.0.8, UX batch 5) James's words: "Marked fine" for what "It's fine as it is" did, and
+                      "Ask about it again" to undo it - it said "2 issue(s) ignored" and "un-ignore" */}
                   <span class="text default-muted">
-                    {album.ignored_issues.length} issue(s) ignored on this album
+                    Marked fine: {markedFine.map((code) => issueLabel(code, issueTypes)).join(', ')}
                   </span>
                   <button
                     type="button"
                     class="metadata-issue-undo"
-                    title="Put this album back in the queue"
+                    title="Put this album back in Needs a look"
                     onClick={() => void onUnignore(album)}
                   >
-                    un-ignore
+                    Ask about it again
                   </button>
                 </span>
               )}
@@ -718,22 +726,21 @@ export function MetadataEditor(
             What the album currently claims to be. Without this you can't tell whether it's
             tagged at all, let alone which release it points at.
           */}
+          {/* (2.0.8, UX batch 5) "Now:", in words - it was "currently: no edition · 1994 · 2 tracks · 11111111…",
+              the release a raw id; the id is in the title now, for whoever wants it */}
           <div id="metadata-current" class="text default-muted">
-            <span>currently:</span>
-            <span class="text white-tertiary">{album.edition || 'no edition'}</span>
-            <span class="text white-tertiary">
-              {album.original_year && album.original_year !== album.year
-                ? `${album.original_year} (this press ${album.year})`
-                : album.year || 'no year'}
-            </span>
-            <span class="text white-tertiary">{album.track_count} tracks</span>
+            <span>Now:</span>
+            <span class="text white-tertiary">{album.edition || 'No edition'}</span>
+            {/* the pressing's year in brackets only when there is one: a hand-tagged originaldate with no date
+                read "1994 (this pressing )" */}
+            <span class="text white-tertiary">{nowYear(album)}</span>
+            <span class="text white-tertiary">{album.track_count} {album.track_count === 1 ? 'track' : 'tracks'}</span>
             {album.disc_count > 1 && (
               <span class="text white-tertiary">{album.disc_count} discs</span>
             )}
-            <span class={taggedRelease ? 'metadata-mbid' : 'text yellow'}>
-              {taggedRelease
-                ? `${taggedRelease.slice(0, 8)}…`
-                : 'not tagged with a MusicBrainz release'}
+            {/* words in the line's own face - the mono class it had was the raw id's, which is in the title now */}
+            <span class={taggedRelease ? 'text white-tertiary' : 'text yellow'} {...(taggedRelease ? { title: `MusicBrainz release ${taggedRelease}` } : {})}>
+              {taggedRelease ? 'Matched to MusicBrainz' : 'Not matched to MusicBrainz'}
             </span>
           </div>
 
@@ -742,8 +749,8 @@ export function MetadataEditor(
               type="text"
               class="releases-filter-input"
               value={query}
-              placeholder={fieldedAlbumQuery(fields.album, fields.artist)}
-              title="Leave blank to search on the artist and album fields below"
+              placeholder={plainAlbumQuery(fields.album, fields.artist)}
+              title="Leave it blank to search for the album and artist below"
               onInput={(event) => setQuery((event.target as HTMLInputElement).value)}
               onKeyDown={(event) => { if (event.key === 'Enter') void search() }}
             />
@@ -756,15 +763,15 @@ export function MetadataEditor(
             <div class="scrollable metadata-releases">
               {searchError && <h4 class="text yellow metadata-status">{searchError}</h4>}
 
-              {searching && !releases.length && <LoadingPanel label="Asking MusicBrainz…" />}
+              {searching && !releases.length && <LoadingPanel label="Searching MusicBrainz…" />}
 
               {!searchError && searched && !releases.length && !searching && (
-                <h4 class="text default-muted metadata-status">No releases found for that search</h4>
+                <h4 class="text default-muted metadata-status">No releases found for that search.</h4>
               )}
 
               {!searched && !searching && (
                 <h4 class="text default-muted metadata-status">
-                  search to match this against a release, or just edit the fields
+                  Search to match this album to a release, or just edit the fields.
                 </h4>
               )}
 
@@ -772,7 +779,7 @@ export function MetadataEditor(
                   the top result is otherwise indistinguishable from a confirmed match */}
               {searched && releases.length > 0 && taggedRelease && !foundCurrent && (
                 <h5 class="text yellow metadata-status">
-                  the release this album is tagged with isn't in these results
+                  The release this album is matched to isn't in these results.
                 </h5>
               )}
 
@@ -787,7 +794,7 @@ export function MetadataEditor(
                     class={`metadata-release${selectedId === release.id ? ' active' : ''}${current ? ' current' : ''}`}
                     onClick={() => chooseRelease(release)}
                   >
-                    {current && <span class="metadata-current-badge" title="This album is tagged with this release">Current</span>}
+                    {current && <span class="metadata-current-badge" title="This album is matched to this release">Current</span>}
                     <span class="metadata-release-title">{release.title}</span>
                     <span class="metadata-release-detail text default-muted">
                       {[release.date?.substring(0, 4), describeRelease(release)].filter(Boolean).join(' · ')}
@@ -803,7 +810,7 @@ export function MetadataEditor(
                         : undefined}
                     >
                       {(release.media ?? []).length > 1 ? `${(release.media ?? []).length} discs · ` : ''}
-                      {tracks || '?'} trk
+                      {tracks ? `${tracks} ${tracks === 1 ? 'track' : 'tracks'}` : '? tracks'}
                     </span>
                   </button>
                 )
@@ -869,14 +876,14 @@ export function MetadataEditor(
                     disabled={savingArt}
                     title={
                       album.art
-                        ? 'replace the cover on disk with this one, and change nothing else'
-                        : 'save this cover into the album folder, and change nothing else'
+                        ? 'Replace the cover on disk with this one, and change nothing else.'
+                        : 'Save this cover into the album folder, and change nothing else.'
                     }
                     onClick={() => void saveArtOnly()}
                   >
                     {savingArt
-                      ? <Loading label="Saving" />
-                      : album.art ? 'replace cover only' : 'save cover only'}
+                      ? <Loading label="Saving…" />
+                      : album.art ? 'Replace cover only' : 'Save cover only'}
                   </button>
 
                   {artResult && <span class="text white-tertiary metadata-hint">{artResult}</span>}
@@ -887,12 +894,12 @@ export function MetadataEditor(
                 <input type="checkbox" checked={fetchArt}
                        onChange={(e) => setFetchArt((e.target as HTMLInputElement).checked)} />
                 <span class="text default-secondary">
-                  {plan?.art.existing ? `replace ${plan.art.existing}` : 'download cover art'}
+                  {plan?.art.existing ? `Replace ${plan.art.existing}` : 'Download cover art'}
                 </span>
                 <span class="text white-tertiary metadata-hint">
                   {plan?.art.existing
-                    ? 'this album already has a cover; only overwrite it if the new one is better'
-                    : 'from the Cover Art Archive, saved into the album folder'}
+                    ? 'This album already has a cover - only replace it if the new one is better'
+                    : 'From the Cover Art Archive, saved into the album folder'}
                   {/* the size is chosen in the settings tab, so say which one this will be */}
                   {plan?.art.size
                     ? ` — ${plan.art.size === 'full' ? 'at full size' : `at ${plan.art.size} × ${plan.art.size}`}`
@@ -904,19 +911,19 @@ export function MetadataEditor(
                 <h5 class="metadata-status">
                   {/* naming the actual wait: the tracklist arrives separately from the list of
                       pressings, so "working out the changes" would be describing the wrong step */}
-                  <Loading label={loadingRelease ? 'fetching the tracklist' : 'working out the changes'} />
+                  <Loading label={loadingRelease ? 'Fetching the tracklist…' : 'Working out the changes…'} />
                 </h5>
               )}
 
               {/* what the last apply reported, kept on screen while the preview is redone under it */}
               {appliedProblems.map((problem) => (
-                <h5 class="text yellow metadata-problem" key={`applied:${problem}`}>{problem}</h5>
+                <h5 class="text yellow metadata-problem" key={`applied:${problem}`}>{asSentence(problem)}</h5>
               ))}
 
               {!planning && plan && (
                 <>
                   {plan.problems.map((problem) => (
-                    <h5 class="text yellow metadata-problem" key={problem}>{problem}</h5>
+                    <h5 class="text yellow metadata-problem" key={problem}>{asSentence(problem)}</h5>
                   ))}
 
                   {plan.moves && (
@@ -957,7 +964,7 @@ export function MetadataEditor(
                   )}
 
                   {plan.empty && (
-                    <h5 class="text default-muted metadata-status">Nothing to change</h5>
+                    <h5 class="text default-muted metadata-status">Nothing to change.</h5>
                   )}
 
                   {plan.files.filter((file) => Object.keys(file.changes).length).map((file) => (
@@ -983,9 +990,9 @@ export function MetadataEditor(
 
             {!applyError && plan && !plan.empty && (
               <span class="text default-muted metadata-summary">
-                {plan.changed_file_count} of {plan.file_count} file(s) would change
-                {plan.art.action === 'download' ? ', cover art would be downloaded' : ''}
-                {plan.art.action === 'replace' ? ', the cover art would be replaced' : ''}
+                {plan.changed_file_count} of {filesWord(plan.file_count)} would change
+                {plan.art.action === 'download' ? ', the cover would be downloaded' : ''}
+                {plan.art.action === 'replace' ? ', the cover would be replaced' : ''}
                 {plan.moves ? (plan.merge ? ', and the files would join the other disc' : ', and the folder would be renamed') : ''}
               </span>
             )}
@@ -1001,10 +1008,10 @@ export function MetadataEditor(
                 type="button"
                 class="columns-toggle-button metadata-ignore-button"
                 disabled={ignoring}
-                title={`stop asking about: ${issues.map((c) => issueLabel(c, issueTypes)).join(', ')}`}
+                title={`Mark it fine and stop asking about ${issues.map((c) => issueLabel(c, issueTypes)).join(', ')}`}
                 onClick={() => void ignore()}
               >
-                {ignoring ? <Loading label="Ignoring" /> : "It's fine as it is"}
+                {ignoring ? <Loading label="Marking it fine…" /> : "It's fine as it is"}
               </button>
             )}
 
@@ -1014,7 +1021,8 @@ export function MetadataEditor(
                   type="button"
                   class="columns-toggle-button"
                   disabled={queue.position <= 1}
-                  title="The previous album in the queue"
+                  title="Previous album"
+                  aria-label="Previous album"
                   onClick={queue.onPrevious}
                 >
                   ◁
@@ -1026,7 +1034,7 @@ export function MetadataEditor(
                   title="Leave this one for now and move on"
                   onClick={queue.onNext}
                 >
-                  skip ▷
+                  Skip ▷
                 </button>
               </div>
             )}

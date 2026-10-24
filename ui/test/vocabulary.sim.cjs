@@ -27,6 +27,13 @@
  *    "bpm" in ANY of those files' text (BATCH4_LABELS: short labels and template tails the words-only scan drops as
  *    code), and the playback error words pinned in usePlayer.ts and as troubleshooting.md quotes them.
  *
+ *  - (2.0.8) in batch 5's files (BATCH5): the managing pages, the Edit album panel and its editors, People, You and the
+ *    sidebar say "Select" (never "Tick"), "Marked fine" / "Ask about it again" (never "Ignored", "un-ignore", "Accepted as
+ *    it is"), "Manage" (never "Managing"), "In nobody's library", "Needs a look" (never "Albums that need a look" or "the
+ *    queue"), the Release tab (never "the metadata editor"), "Server settings" (never "deadwax's settings"); no "(s)", no
+ *    "could not", no "currently:", no "No release id" or "off-convention", no WireGuard or Amperfy, no "Stop ·" whose
+ *    meaning was only its title, no "Retry cover"; and none of the lower-case starts it put right (BATCH5_LOWER).
+ *
  * Each rule is checked on a sample that breaks it, so a scan that finds nothing is known to look.
  *
  * Run it with:  node ui/test/vocabulary.sim.cjs
@@ -75,7 +82,9 @@ function tokens(src) {
     if (c === '`') { stack.push({ kind: 'template', at: i, text: '' }); code += c; i++; continue }
     //? a regex literal (a "/" where a value starts - after an operator, a bracket, a comma or `return`): skipped
     //? whole, so a quote or backtick in it - /[’‘`´]/ - never opens a string
-    if (c === '/' && /(?:^|[(,=:[!&|?{};+\-*%<>~^]|\breturn)\s*$/.test(code.slice(-40))) {
+    //? (2.0.8 review) never a self-closing tag's "/>" after an attribute's expression (`<Loading label={x} />`): taken
+    //? for a regex, it swallowed the rest of the line - Get cover's 'Try again' : 'Get cover' went unread
+    if (c === '/' && !(src[i + 1] === '>' && /\}\s*$/.test(code.slice(-40))) && /(?:^|[(,=:[!&|?{};+\-*%<>~^]|\breturn)\s*$/.test(code.slice(-40))) {
       let j = i + 1, inClass = false
       while (j < src.length && src[j] !== '\n') {
         if (src[j] === '\\') { j += 2; continue }
@@ -253,6 +262,63 @@ const PLAYBACK_WORDS = [
   ['Skipped "${title}" - this device couldn\'t play its audio', 'Skipped "…" - this device couldn\'t play its audio'],
 ]
 
+/** (2.0.8, UX batch 5) Managing in plain words: Edit album and its editors, Needs a look, Library care, In nobody's library,
+ *  People, Server settings, the event log, You's structure and the sidebar's Manage group. */
+const BATCH5 = [
+  'app/NeedsALook.tsx', 'lib/needsLook.ts', 'lib/metadataQueue.ts', 'app/LibraryCare.tsx', 'app/useLibraryCare.ts', 'lib/libraryCare.ts',
+  'lib/bulkTargets.ts', 'app/HeldByNobody.tsx', 'app/People.tsx', 'app/usePeople.ts', 'app/AddPerson.tsx', 'app/RemovePerson.tsx',
+  'app/ResetPassword.tsx', 'app/UnlockPeople.tsx', 'lib/people.ts', 'lib/permissions.ts', 'app/You.tsx', 'app/SignOutRow.tsx',
+  'app/EventLog.tsx', 'lib/eventLog.ts', 'app/ServerSettings.tsx', 'lib/serverSettings.ts', 'app/EditPanel.tsx', 'lib/albumEdit.ts',
+  'app/FolderPicker.tsx', 'app/TrackInspector.tsx', 'hooks/useTrackDetails.ts', 'components/MetadataEditor.tsx', 'components/TrackTagEditor.tsx',
+  'components/LibraryParts.tsx', 'components/DeleteAlbumDialog.tsx', 'components/RetimeLyrics.tsx', 'components/MusicBrainzAnswers.tsx',
+  'lib/getResults.ts', 'lib/lyrics.ts', 'app/ArtistPanel.tsx', 'app/Sidebar.tsx', 'lib/appFrame.ts', 'lib/appRoutes.ts',
+]
+
+/** The words batch 5's files never say - each with a sample that says it. */
+const BATCH5_RULES = [
+  ['"(s)" for a count', /\w\(s\)/, '12 of 14 file(s) would change'],
+  ['"Tick" for choosing', /\b(?:un)?tick(?:s|ed|ing)?\b/i, 'Tick tracks to edit only those; Shift ticks a run.'],
+  ['"Ignored" and its kin, for "Marked fine"', /\bIgnor(?:ed|ing)\b|\bun-ignore\b|Accepted as it is/i, 'Accepted as it is: no release'],
+  ['"Managing" for the admin area', /\bManaging\b/, "The lyrics lead are in Managing's Settings, under Library."],
+  ['"the metadata editor"', /metadata editor/i, 'No file is renamed - the metadata editor re-files an album once its tags say where it belongs.'],
+  ['"could not"', /\bcould not\b/i, 'could not load that release'],
+  ['"Held by nobody"', /Held by nobody/i, 'Held by nobody'],
+  ['WireGuard and Amperfy', /WireGuard|Amperfy/, "That's fine on your own network or over WireGuard"],
+  ['the plumbing chips', /No release id|off-convention/i, 'Folder off-convention'],
+  ['"the queue" for Needs a look', /\bthe queue\b/i, 'Put this album back in the queue'],
+  ['"deadwax\'s settings" for Server settings', /deadwax's settings/, "set it up in deadwax's settings (Connections)."],
+  ['"Asking…"', /\bAsking\b/, 'Asking deadwax…'],
+  ['"Stop ·" with what it does only in a title', /\bStop · /, 'Stop · 3 of 40'],
+  ['the Archive by a nickname', /\bthe Archive\b/, '2 had none on the Archive'],
+  ['"Logins are off" as a headline', /Logins are off/, 'Logins are off'],
+  ['"Albums that need a look"', /Albums that need a look/i, 'Albums that need a look'],
+  ['"People was made for"', /People was made for/, 'People was made for Navidrome 0.64 - this is 0.65.0.'],
+  ['a Get button\'s old words', /\bRetry (?:cover|lyrics|CD art)\b|No CD art found/, 'Retry cover'],
+  ['"break-glass" said to a person', /break-glass/i, 'with the break-glass password - it lasts 12 hours.'],
+  //? (2.0.8 review) the Release tab's lines the first pass missed: "tagged with" right under "Matched to MusicBrainz"
+  ['"tagged with" a release, for "matched to"', /\b(?:is|was) tagged with\b/i, 'This album is tagged with this release'],
+  ['a sentence without its full stop', /^No releases found for that search$/, 'No releases found for that search'],
+]
+
+/** (2.0.8) Short labels the words-only scan drops as code (readable's `all`, as BATCH4_LABELS): the editor's old
+ *  "currently:" over its line, the sidebar's and page's bare "Log", and the editor's "un-ignore" - each sample shaped
+ *  like the code that said it. */
+const BATCH5_LABELS = [
+  ['editor\'s "currently:" line', /^currently:$/i, 'const v = <span>currently:</span>'],
+  ['a bare "Log" for the Event log', /^Log$/, "const SIDEBAR_LOG = { id: 'log', label: 'Log' }"],
+  //? (after a mutation slipped past) a lower-case hyphenated word reads as a class name to the words-only scan
+  ['old undo "un-ignore"', /\bun-ignore\b/i, 'const v = <button class="metadata-issue-undo">un-ignore</button>'],
+  //? (2.0.8 review) a release row's "11 trk", and the tag editor's lower-case "undo" - both too short for the words scan
+  ['"trk" for tracks', /\btrk\b/, "const v = <span>{tracks || '?'} trk</span>"],
+  ['a lower-case "undo"', /^undo$/, 'const v = <button class="tags-revert">undo</button>'],
+]
+
+/** ...and the lower-case starts batch 5 put right, as they started (case matters: the sentence's own first words). */
+const BATCH5_LOWER = /^(?:could not|the search failed|replace cover only|save cover only|download cover art|working out the changes|fetching the tracklist|delete permanently|re-timing|reading the library|skip ▷|fetched |saved lyrics for|stop asking about|no edition|no year|not tagged with|none on file|pick a release|search to match|the release this album)/
+
+/** Lines batch 5's rules leave on purpose: [file, the line's words, why]. */
+const ALLOW5 = []
+
 function filesUnder(dir) {
   return fs.readdirSync(path.join(SRC, dir)).filter((name) => /\.tsx?$/.test(name)).map((name) => `${dir}/${name}`)
 }
@@ -273,11 +339,20 @@ console.log('\nthe scanner sees what a listener reads, and only that')
     const g = 'Then the end'
   `
   const words = readable(sample).map(([, text]) => text.trim())
+  //? (2.0.8 review) a string after a self-closing tag with an attribute's expression, inside an expression - Get cover's
+  check('the strings after "<Loading label={x} />" in an expression are read',
+    readable("{state === 'working' ? <Loading label={GETTING.cover} /> : state === 'failed' ? 'Retry cover' : 'Get cover'}").map(([, text]) => text),
+    ['Retry cover', 'Get cover'])
   check("a string, a template and JSX text are read; comments, imports, classes, scopes and a regex's quotes are not",
     words, ['Removed from the store', 'albums in the store', 'Then the end', 'Browse the store', 'Your favourite (starred) albums.'])
-  for (const [name, rule, said] of [...BATCH_RULES, APP_RULE, ...BATCH3_RULES, ...BATCH4_RULES]) {
+  for (const [name, rule, said] of [...BATCH_RULES, APP_RULE, ...BATCH3_RULES, ...BATCH4_RULES, ...BATCH5_RULES]) {
     check(`the ${name} rule catches "${said}"`, readable(`const x = ${JSON.stringify(said)}`).some(([, text]) => rule.test(text)), true)
   }
+  for (const [name, rule, said] of BATCH5_LABELS) {
+    check(`the ${name} rule catches ${said} - in every piece of text`, readable(said, true).some(([, text]) => rule.test(text.trim())), true)
+  }
+  check('the batch 5 lower-case rule catches "could not load that release" - and not "Couldn\'t load that release."',
+    [readable('const x = "could not load that release"').some(([, text]) => BATCH5_LOWER.test(text.trim())), BATCH5_LOWER.test("Couldn't load that release.")], [true, false])
   for (const [name, rule, said] of BATCH4_LABELS) {
     check(`the ${name} rule catches ${said} - in every piece of text, which the words alone miss`,
       [readable(said, true).some(([, text]) => rule.test(text.trim())), readable(said).some(([, text]) => rule.test(text.trim()))], [true, false])
@@ -331,6 +406,23 @@ for (const file of BATCH4) {
     PLAYBACK_WORDS.map(([source, quoted]) => [player.includes(source), guide.includes(quoted)]), PLAYBACK_WORDS.map(() => [true, true]))
 }
 
+console.log('\nbatch 5\'s files (2.0.8): managing in plain words - Select, Marked fine, Manage, sentences, no plumbing')
+for (const file of BATCH5) {
+  const source = fs.readFileSync(path.join(SRC, file), 'utf8')
+  //? a declaration the JSX-text scan takes for words (`interface Managing`, `function checkboxes(… ticked: …`) is code
+  const found = readable(source).filter(([, text]) => !/^(?:export\s+)?(?:interface|function|type|const|let)\b/.test(text.trim()))
+  const broken = []
+  for (const [line, text] of found) {
+    for (const [name, rule] of BATCH5_RULES) if (rule.test(text)) broken.push(`${file}:${line} ${name}: ${text.trim().slice(0, 120)}`)
+    if (BATCH5_LOWER.test(text.trim())) broken.push(`${file}:${line} a lower-case start: ${text.trim().slice(0, 120)}`)
+  }
+  for (const [line, text] of readable(source, true)) {
+    for (const [name, rule] of BATCH5_LABELS) if (rule.test(text.trim())) broken.push(`${file}:${line} ${name}: ${text.trim().slice(0, 120)}`)
+  }
+  check(`${file}: none of batch 5's old words (${found.length} lines read)`, broken, [])
+}
+check('every line left on purpose is still there - ALLOW5 has none', ALLOW5, [])
+
 console.log('\nthe whole app: "the collection", never "the store"')
 {
   const files = ['app', 'lib', 'player', 'hooks', 'components'].flatMap(filesUnder)
@@ -339,6 +431,34 @@ console.log('\nthe whole app: "the collection", never "the store"')
     for (const [line, text] of readable(fs.readFileSync(path.join(SRC, file), 'utf8'))) if (APP_RULE[1].test(text)) broken.push(`${file}:${line} ${text.trim().slice(0, 120)}`)
   }
   check(`no file of ${files.length} says "the store" to anyone`, broken, [])
+}
+
+console.log('\nthe guide (2.0.8): the way to a managing page goes through You → Manage, its rows by their names now')
+{
+  //? (review) You's managing rows sit under Manage, Change password under Account, and the sidebar says Server settings
+  //? and Event log: a path written the old way sends a phone's reader looking for a row that isn't where it says
+  const OLD_PATHS = [
+    ['a managing row straight under You', /You →(?: \*\*)? ?(?:Server settings|Library care|Event log|Log\b|Needs a look|People|In nobody's library)/],
+    ['Change password straight under You', /You →(?: \*\*)? ?Change password/],
+    ["the sidebar's old Settings or Log", /sidebar's (?:\*\*)?(?:Settings|Log)\b/],
+    ['"Settings" for the Server settings page in a step', /Fill in Settings →/],
+  ]
+  const docs = path.join(SRC, '..', '..', 'docs')
+  const guides = [...fs.readdirSync(docs).filter((name) => name.endsWith('.md')).map((name) => path.join(docs, name)), path.join(docs, '..', 'README.md')]
+  const broken = []
+  for (const file of guides) {
+    //? a path wraps across lines in the guide: read it as one line
+    const words = fs.readFileSync(file, 'utf8').replace(/\s+/g, ' ')
+    for (const [name, rule] of OLD_PATHS) {
+      const at = words.match(new RegExp(rule.source, 'g'))
+      if (at) broken.push(`${path.basename(file)} ${name}: ${at.join(' | ')}`)
+    }
+  }
+  const samples = ['or **You → Library care**)', 'with **You → Change password**', "the desktop sidebar's Settings, or", '**Fill in Settings → Connections**']
+  check('the guide scan knows each old way, and passes the new', [OLD_PATHS.map(([, rule], at) => rule.test(samples[at])),
+    OLD_PATHS.some(([, rule]) => rule.test("**You → Manage → Library care**, **You → Account → Change password**, the sidebar's Server settings"))],
+    [[true, true, true, true], false])
+  check(`${guides.length} guides: none writes a managing page's way the old way`, broken, [])
 }
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

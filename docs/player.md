@@ -69,7 +69,7 @@ itself.
 
 Then open `http://your-server:8080/player/`. If something's wrong, Home and the Library tab say
 what, in place of the albums: **Connect Navidrome** when the settings aren't all there - deadwax
-needs Navidrome for your library, set up in deadwax's settings (Connections) - or **Can't reach
+needs Navidrome for your library, set up in Server settings (Connections) - or **Can't reach
 Navidrome** with the reason and a **Try again** button. Anyone who doesn't run deadwax reads **Your
 music isn't available yet** or **…right now** instead, with what they can do - try again, or tell
 whoever runs deadwax - never Navidrome's address or a setting. The tab bar and You work without
@@ -177,17 +177,20 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
   **Connections** (for an admin, and anyone given **Settings and the log**), whether deadwax can reach
   MusicBrainz, slskd and Navidrome - a word for each (**Connected**, **Not on Soulseek**, **Can't reach
   it**…) and a sentence under it saying where to put it right - checked the first
-  time you open You and again with **Check again** (which asks for the version again too); the
-  version, and whether logins are on - with them on, who you're signed in as, **Change password**
+  time you open You and again with **Check again** (which asks for the version again too). At the top,
+  with logins on, the name you're signed in as is the headline (with them off, **deadwax**, and *No
+  sign-in needed* under it). With logins on, **Account** has **Change password**
   (signed in with your own Navidrome account: your current password and the new one twice; this device
   stays signed in and your other devices sign in again - [Sharing deadwax](sharing.md#when-something-changes))
   and **Sign out**, which
   ends this device's session (and stops what's playing) and goes back to the sign-in screen
-  ([Signing in](#signing-in)). For an admin, **Managing deadwax**: **Albums that need a look**,
-  with how many, which opens **Needs a look**, then **Library care**, **People** (with logins on),
-  **Server settings** and **Log** - on a phone as on a desktop
-  ([below](#looking-after-deadwax-from-a-phone)). Someone an admin gave some of these to sees only theirs: Albums that need a look
-  with Look after the library, Library care with it or Edit albums, Server settings and Log with
+  ([Signing in](#signing-in)); under it a line says how you signed in ("with your music server
+  (Navidrome) account", or, for `deadwax`, "with the emergency admin password - this sign-in lasts 12
+  hours"). **About** has the version - and, for an admin, whether logins are on. For an admin,
+  **Manage**: **Needs a look**, with how many, then **Library care**, **People** (with logins on),
+  **Server settings** and **Event log** - on a phone as on a desktop
+  ([below](#looking-after-deadwax-from-a-phone)). Someone an admin gave some of these to sees only theirs: Needs a look
+  with Look after the library, Library care with it or Edit albums, Server settings and Event log with
   Settings and the log - People is a Navidrome admin's alone ([Sharing deadwax](sharing.md#admins-permissions-and-everyone-else)).
 - **Requests**: your downloads, under **Downloading** (a bar, "6 of 10 files · 1.8 MB/s", who it's
   from, and **✕** to cancel, which asks in the card first - **Keep it** or **Cancel download** -
@@ -569,7 +572,7 @@ desktop - and for someone an admin gave Edit albums (**Artist images…**, **Whi
 Look after the library (**Move albums to …**):
 
 - **Artist images…** (under In your library) shows every picture of them found - Wikimedia Commons
-  always, TheAudioDB and fanart.tv when deadwax's settings have their keys (under **Connections**;
+  always, TheAudioDB and fanart.tv when Server settings has their keys (under **Connections**;
   the picker says which is missing) - slot by slot: square image, banner, background, logo, wide
   image and clear art, each with where it's from, and the file already in their folder or "none
   found for this". The best of each is chosen to start with; tap a picture to choose it, tap it again
@@ -600,7 +603,7 @@ Look after the library (**Move albums to …**):
   don't say, or several artists share the name: there are eight called Nirvana) - searches MusicBrainz
   for the name and lists every artist going by it, with what tells them apart ("as Kanye West" when an
   old name of theirs matched). Choosing one gives the page their albums, About and pictures for this
-  visit (the page says so, with **Change**); applying an album's release in the metadata editor writes
+  visit (the page says so, with **Change**); applying an album's release in Edit album's Release tab writes
   who it's by into its files, for good.
 
 These open as a sheet over the whole screen on a phone (on its side, the sheet scrolls as one), and
@@ -831,24 +834,24 @@ everyone:
   enough that iOS doesn't zoom into them, **Apply** kept at the foot of the sheet, in reach above the
   home indicator, as you scroll the preview). It finds the album's folder, follows the album to its new
   id after you apply another release and goes back from a deleted album exactly as on a desktop -
-  [the library guide](library.md#editing-an-album) has all of it. Ticking a run of tracks
-  with Shift is a keyboard's; tick each one. The page behind waits while the sheet is open. The close
+  [the library guide](library.md#editing-an-album) has all of it. Selecting a run of tracks
+  with Shift is a keyboard's; select each one. The page behind waits while the sheet is open. The close
   button closes it - a tap on the dimmed page beside it doesn't (it shows there on a phone on its side
   or an iPad), so a stray one can't throw away an edit you've half made; inside the tag editor, a track or the delete confirmation, their own **Cancel**,
   **Tracks** or **Close** goes back one step. Turn an iPad (or widen the window) past 1024 pixels with
   the sheet open and it becomes the desktop's panel beside the page - and a sheet again the other way.
-- **You → Managing deadwax**: **Albums that need a look** (with how many) opens **Needs a look** - the
-  albums whose tags, folder or cover want attention and the ones deadwax filed that you haven't looked
+- **You → Manage**: **Needs a look** (with how many) opens **Needs a look** - the albums whose tags,
+  folder or cover need fixing, the ones Navidrome doesn't list and the new downloads nobody has looked
   at, with a chip per kind of issue. Tap one and the Edit sheet opens on it, saying where it is in the
-  list (*1 of 17*), with **◁**, **skip ▷** and, after **Apply**, **Next album ▷** to work through them
+  list (*1 of 17*), with **◁**, **Skip ▷** and, after **Apply**, **Next album ▷** to work through them
   ([the library guide](library.md#needs-a-look)). **Library care** has **Rescan** and the runs
-  that fetch covers, CD art and lyrics, each with its **Stop** ([the library guide](library.md#library-care)).
+  that fetch covers, CD art and lyrics, each with **Stop after this album** while it goes ([the library guide](library.md#library-care)).
   **Server settings** is every server setting - three tabs, every change a
   draft until **Save changes** in the bar along the bottom, above the tab bar and the player
-  ([configuration](configuration.md#in-the-app)). **Log** is deadwax's event log, newest first, each line's
+  ([configuration](configuration.md#in-the-app)). **Event log** is deadwax's event log, newest first, each line's
   time, level and where it came from over its words; it follows deadwax live while the page shows, and
   lets go while the now-playing screen is over it or you're elsewhere
-  ([troubleshooting](troubleshooting.md#the-apps-log-is-missing-lines-says-the-stream-was-lost-or-starts-empty)).
+  ([troubleshooting](troubleshooting.md#the-event-log-is-missing-lines-says-lost-the-live-feed-or-starts-empty)).
   **People** (with logins on, a Navidrome admin's) manages Navidrome's accounts as you: unlock it with
   your own Navidrome password, then **Add a person**, and on each person's row **Reset password…**,
   **Make admin** / **No longer admin**, **Remove…** and their **Permissions** - and, under the list,
@@ -878,14 +881,14 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
   **Your artists** - and an **All music** group under them has the collection's **All albums**, **All artists**
   and **All songs** - [the player as you](#the-player-as-you-with-logins-on))
   - then **Playlists**: **All playlists**, and up to 20 playlists by name, yours
-  then those shared with you, each opening its page ([Playlists](#playlists)) - then **Managing**: **Needs a look**, with how many albums need one, the
+  then those shared with you, each opening its page ([Playlists](#playlists)) - then **Manage**: **Needs a look**, with how many albums need one, the
   library's review queue in the app, an album folder Navidrome doesn't list among them (**Not in
   Navidrome**; [the library guide](library.md#needs-a-look) has it),
   **Library care** - **Rescan** and the runs that fetch covers, CD art and lyrics for the albums
-  missing them ([the library guide](library.md#library-care)) - **Settings**, the server's settings, its
-  three pages and its one save ([Configuration](configuration.md#in-the-app) has it) - and **Log**,
+  missing them ([the library guide](library.md#library-care)) - **Server settings**, the server's settings, its
+  three pages and its one save ([Configuration](configuration.md#in-the-app) has it) - and **Event log**,
   deadwax's event log: the last 500 lines since it started, then new ones as they come, while the page
-  shows ([troubleshooting](troubleshooting.md#the-apps-log-is-missing-lines-says-the-stream-was-lost-or-starts-empty))
+  shows ([troubleshooting](troubleshooting.md#the-event-log-is-missing-lines-says-lost-the-live-feed-or-starts-empty))
   - and **You** at the foot. An album is edited from its own page (below), and an artist's pictures and
   **Move albums to …** are on the artist's page ([above](#managing-an-artist)). Where you are is highlighted. Home, Requests and You work as the phone's tabs
   do: a click shows it as you left it, and a click on the one showing goes back to its first page
@@ -931,9 +934,9 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
   songs in a list as on a phone. Between 1024 and 1279 pixels wide, while a panel lies over the page,
   the row moves under the cover, so the panel - the Edit panel included - leaves it in view.
 - **Edit** (for an admin - everyone, with logins off) opens the **Edit album**
-  panel beside the page, and shows pressed while it's open: underline tabs for **Release** (the
-  metadata editor: pick the pressing, read the preview, **Apply**), **Tags** (the album's
-  tracks with tick boxes, and the tag editor for the ticked ones - a track's name opens what's inside
+  panel beside the page, and shows pressed while it's open: underline tabs for **Release** (match it
+  to a release: pick the pressing, read the preview, **Apply**), **Tags** (the album's
+  tracks with a box each to select them, and the tag editor for the selected ones - a track's name opens what's inside
   it: every field, the pictures in the file, its lyrics and all its tags, with **Previous**, **Next**
   and **Edit this track…**), **Artwork** (**Get cover**, **Get CD art**, the
   cover and CD art opening full size), **Lyrics** (**Get lyrics**) and **Delete**. They
@@ -1101,7 +1104,7 @@ below.
 - **Finding it**: the phone only knows Navidrome's name for the album, so deadwax asks Navidrome
   which MusicBrainz release the album is (Navidrome reads that from the files), and finds the
   folder filed as that release. So an album with no release id in its tags - an untagged rip -
-  always gets the plain record; match a release in the metadata editor first, as Get CD art needs
+  always gets the plain record; match a release in Edit album's Release tab first, as Get CD art needs
   anyway. CD art saved while the turntable is showing appears the next time the now-playing screen
   opens (or when you switch to the cover and back); a picture replaced by hand can take up to five
   minutes to change, as the phone keeps one that long. [Troubleshooting](troubleshooting.md#the-turntable-shows-a-plain-black-record-not-the-albums-cd-art)
@@ -1627,7 +1630,7 @@ where it's read matters. The rows about the song - **Fields from Navidrome**'s *
 other songs** and **Album fields** - say the same on any device, so an admin can read them on theirs, playing the same song. The
 rest describe the device and browser Info is open on (how the song is sent to it, its gaps and seeks, its
 speed, the turntable's sound and timing, a recording): on an admin's own phone they're that phone's, not
-yours. For those an admin reads Debug on your device - **You → About → Sign out**, they sign in there and
+yours. For those an admin reads Debug on your device - **You → Account → Sign out**, they sign in there and
 do what went wrong again, then sign out and you sign back in. Nothing on the server is kept from anyone by
 this: Debug is drawn from what the page already has.
 
@@ -2107,7 +2110,7 @@ With logins on ([sharing deadwax](sharing.md) says how to turn them on), the app
 screen: your **Navidrome** user name and password. Nothing else of the app is drawn until you've signed
 in, and then you stay signed in on that device - the home-screen app included - for 30 days from when
 you last used it. Admins - Navidrome's admins - see everything described here;
-anyone else sees no **Managing deadwax** in You or the sidebar, no **Edit** on an album and no managing on
+anyone else sees no **Manage** in You or the sidebar, no **Edit** on an album and no managing on
 an artist's page, and can do everything else - search, **Get**, play, pin - unless an admin gave them
 some of the managing (they see that part) or took Get albums away (Get then says "Getting albums is off
 for you - ask an admin."). A change an admin makes to what you may do is in force from your next tap; if
@@ -2121,7 +2124,7 @@ whoever runs deadwax."). What they need - the setting's name, Navidrome's own an
 it, behind **For whoever runs deadwax** ([troubleshooting](troubleshooting.md#signing-in)).
 
 If your session ends while you're using the app - you changed your Navidrome password in Navidrome, say
-(or with **You → Change password** on another device), or your account was removed, which deadwax notices within about six minutes - the sign-in screen comes back
+(or with **You → Account → Change password** on another device), or your account was removed, which deadwax notices within about six minutes - the sign-in screen comes back
 **over** whatever was showing, saying why: as soon as the app next asks deadwax for something, as it
 comes back to the front, or as a song fails to load. Sign in again as the same person and it goes, leaving the app as it
 was underneath. **The music doesn't wait for you, though**: until you've signed in again the player
@@ -2175,7 +2178,9 @@ favourites, the same ones Amperfy (or any Subsonic app) shows as starred - and d
   ("12 albums · 2 waiting to be added"), and why - a few albums named for each reason, then how many more:
   "The music server hasn't picked it up yet - it's added as soon as it has.", "An admin needs to match it
   to a release on MusicBrainz before it can be added." (it has no MusicBrainz release id; an admin applies
-  one in Edit album), "Its files aren't there just now - it's added once they are.", "The music server isn't
+  one in Edit album - and to anyone who can, an admin or someone given Edit albums, it says "It isn't
+  matched to a release on MusicBrainz yet. Apply a release to it in Edit album, and it's added after
+  that."), "Its files aren't there just now - it's added once they are.", "The music server isn't
   answering - it's added once it does.", and "Being added again - nothing for you to do." when Navidrome took
   a star but didn't keep it. Under them, once: "Your library is also in your other music apps, such as
   Amperfy, as your favourite albums." **If you
@@ -2183,7 +2188,7 @@ favourites, the same ones Amperfy (or any Subsonic app) shows as starred - and d
   says so in red - "New albums can't be added to your library until you sign in again. Sign out, then sign in
   - with your new password if you changed it. Nothing is lost meanwhile." - and what you get meanwhile
   waits, then is starred once you've signed in with the new password. (Changed in deadwax, with **You →
-  Change password**, deadwax keeps the new login at once: no red line, and what was waiting is starred
+  Account → Change password**, deadwax keeps the new login at once: no red line, and what was waiting is starred
   within a few seconds.) An album an admin deleted is listed there as
   **Removed by an admin.**, with **Get it again** (its album page, where **Get** is - shown only to someone
   allowed to Get albums) and **Dismiss**;
@@ -2203,7 +2208,7 @@ favourites, the same ones Amperfy (or any Subsonic app) shows as starred - and d
   in: that is theirs. An album somebody else had starred in Amperfy, or added, goes into both libraries.
   Anyone else's library starts with only the albums they'd already starred. An album that arrives
   without anyone asking for it - copied in by hand, or by another program - is nobody's: it stays in the
-  collection for anyone to add, and an admin sees it under **Library care → Held by nobody**.
+  collection for anyone to add, and an admin sees it under **Library care → In nobody's library**.
 - **The break-glass `deadwax`** has no Navidrome account, so no library: nothing it downloads goes into
   one, its store line reads as it always did, and **Add to my library** isn't offered to it. Its player
   plays as the shared `NAVIDROME_USER` account ([below](#the-player-as-you-with-logins-on)).
@@ -2303,7 +2308,7 @@ lists at all (**Not in Navidrome**). With logins off nothing here changes: one a
   there to get you in when your own login won't, and the shared account is the one deadwax was set up
   with.
 - **If your Navidrome password changes** while you're signed in - in Navidrome or Amperfy; changed in
-  deadwax with **You → Change password**, the device you changed it on stays signed in and your others are
+  deadwax with **You → Account → Change password**, the device you changed it on stays signed in and your others are
   signed out at once, saying **Your password was changed from another device - sign in with the new one**
   ([Sharing deadwax](sharing.md#when-something-changes)) - the player's next request is refused:
   your session ends there and then (as the six-minute check would end it), the sign-in screen comes up

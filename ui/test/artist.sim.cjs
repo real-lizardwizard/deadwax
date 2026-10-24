@@ -1586,7 +1586,7 @@ async function manage() {
     answer('refileApply', new Error('deadwax is unreachable'))
     await broke.drawn()
     check('an apply that fails: none after it (what the preview said is no longer what is on disk), and the failure said',
-      [asked('refileApply').map((one) => one[0]), broke.told, failures()], [['Kanye West'], [], ['deadwax is unreachable']])
+      [asked('refileApply').map((one) => one[0]), broke.told, failures()], [['Kanye West'], [], ["The move didn't work. Try again - if it keeps happening, tell whoever runs deadwax."]])
 
     reset()
     const same = body(['Kanye', 'Kanye West'])
@@ -1702,7 +1702,7 @@ async function manage() {
     answer('imagesPreview', new Error('fanart.tv is unreachable'))
     await drawn()
     check('...the look failing: said, with Try again - and Save still can\'t be pressed, nothing it would write on screen',
-      [classed('is-warning').map(words), classed('app-artist-panel-primary')[0].props.disabled], [['fanart.tv is unreachable'], true])
+      [classed('is-warning').map(words), classed('app-artist-panel-primary')[0].props.disabled], [["Couldn't look for pictures just now. Try again - if it keeps happening, tell whoever runs deadwax."], true])
     find((node) => node.type === 'button' && words(node) === 'Try again')[0].props.onClick()
     check('...Try again asks again for the artist last picked, not the page\'s', asked('imagesPreview').slice(-1), [['Ye', NIRVANA_UK, true]])
 

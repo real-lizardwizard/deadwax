@@ -203,6 +203,10 @@ const byClass = (name) => (node) => typeof node.props?.class === 'string' && nod
 const about = () => Object.fromEntries(find((node) => node.type === 'div' && node.props?.class === 'app-row')
   .map((row) => [text(row.props.children[0]), text(row.props.children[1])]))
 const identity = () => find(byClass('app-identity-sub')).map(text)
+const aboutRows = () => Object.fromEntries(find((node) => node.type === 'div' && node.props?.class === 'app-row')
+  .map((row) => [text(row.props.children[0]), text(row.props.children[1])]))
+//? (2.0.8, UX batch 5) the headline: the person signed in - "deadwax" only with logins off
+const headline = () => find(byClass('app-identity-name')).map(text)
 const failure = () => find(byClass('app-error')).map(text)
 const checkAgain = () => find((node) => node.type === 'button' && text(node) === 'Check again')[0]
 
@@ -218,7 +222,7 @@ async function main() {
   check('shown: /me and the three pings, once each', asked, { me: 1, musicbrainz: 1, slskd: 1, navidrome: 1 })
   await settle()
   draw({ shown: true, current: true, ...LOOK })
-  check('/me failed: the version and logins say they are not known', about(), { Version: 'unknown', Logins: 'unknown' })
+  check('/me failed: the version and logins say they are not known', about(), { Version: 'Not known', Logins: 'Not known' })
   //? (2.0.4) in a listener's words, and (logins off: everyone runs deadwax) fetch's own under them
   check('...the failure is said', failure(), ["Can't connect to deadwax. Check your connection, then try again.Failed to fetch"])
   check('...and the identity line claims nothing', identity(), [])
@@ -232,7 +236,8 @@ async function main() {
   await settle()
   draw({ shown: true, current: true, ...LOOK })
   check('deadwax back: the version and logins, and nothing failed', [about(), failure()], [{ Version: '2.0.0-player.9', Logins: 'Off' }, []])
-  check('...and the identity line says what deadwax said', identity(), ['Logins are off'])
+  check('...and the identity line says what deadwax said', identity(), ['No sign-in needed'])
+  check('...under "deadwax" - nobody signs in, so there is nobody to name (2.0.8) - and its "d" as ever', [headline(), find(byClass('app-avatar')).map(text)], [['deadwax'], ['d']])
 
   meAnswers.push(failsWithAnswer(502))
   checkAgain().props.onClick()
@@ -660,9 +665,11 @@ exports.readDownloadDefaults = () => globalThis.__getting.downloadDefaults
     const order = find(byClass('app-link-row')).map(text)
     //? (2.0.0-player.33) Server settings and Log after it - and (.42) Library care first of them; the link to the
     //? main page that came last went in 2.0.0-player.66
-    check('"Albums that need a look" with its count, first in Managing - and nothing after Log',
-      [text(within(row(), byClass('app-row-label'))[0]), text(within(row(), byClass('app-queue-badge'))[0]), row().props['aria-label'], order[0].startsWith('Albums that need a look'), order.length],
-      ['Albums that need a look', '3', 'Albums that need a look, 3 albums', true, 4])
+    //? (2.0.8, UX batch 5) "Needs a look" - the page's own name - under "Manage"
+    check('"Needs a look" with its count, first in Manage - and nothing after Event log',
+      [text(within(row(), byClass('app-row-label'))[0]), text(within(row(), byClass('app-queue-badge'))[0]), row().props['aria-label'], order[0].startsWith('Needs a look'), order.length,
+        find((node) => node.props?.id === 'app-managing-title').map(text)],
+      ['Needs a look', '3', 'Needs a look, 3 albums', true, 4, ['Manage']])
     row().props.onClick()
     check('...a tap goes to its page', opened, [true])
     check('...and the main page\'s footnote no longer says the queue is there', footnotes().some((words) => words.includes('albums that need a look')), false)
@@ -676,12 +683,12 @@ exports.readDownloadDefaults = () => globalThis.__getting.downloadDefaults
     const footnotes = () => find(byClass('app-footnote')).map(text)
     const opened = []
     draw({ shown: true, current: true, ...LOOK, needsLook: 2, onNeedsLook: () => {}, onManaging: (kind) => opened.push(kind) })
-    check('under "Albums that need a look", Library care, Server settings then Log - and no main page after them (2.0.0-player.66)', rows().map((words) => words.replace(/\d+$/, '')),
-      ['Albums that need a look', 'Library care', 'Server settings', 'Log'])
+    check('under "Needs a look", Library care, Server settings then Event log - and no main page after them (2.0.0-player.66)', rows().map((words) => words.replace(/\d+$/, '')),
+      ['Needs a look', 'Library care', 'Server settings', 'Event log'])
     const button = (words) => find((node) => node.type === 'button' && text(node) === words)[0]
     button('Library care').props.onClick()
     button('Server settings').props.onClick()
-    button('Log').props.onClick()
+    button('Event log').props.onClick()
     check('...each opening its page', opened, ['care', 'settings', 'log'])
     check('...and the footnote no longer says settings and the log are on the main page', footnotes().some((words) => /settings|the log/i.test(words)), false)
     //? (2.0.0-player.42) nor the bulk runs, and (2.0.0-player.45) nor an artist's pictures and re-filing: nothing
@@ -728,12 +735,12 @@ exports.readDownloadDefaults = () => globalThis.__getting.downloadDefaults
       [[], false])
   }
 
-  console.log('\nChange password (2.0.2): in About, before Sign out - a Navidrome sign-in\'s alone')
+  console.log('\nChange password (2.0.2): before Sign out - a Navidrome sign-in\'s alone - both in Account (2.0.8)')
   {
     const props = { shown: true, current: true, ...LOOK }
     const named = (name) => find((node) => typeof node.type === 'function' && node.type.name === name)
     const about = () => {
-      const section = find((node) => node.type === 'section' && node.props?.['aria-labelledby'] === 'app-about-title')[0]
+      const section = find((node) => node.type === 'section' && node.props?.['aria-labelledby'] === 'app-account-title')[0]
       const parts = []
       const visit = (node) => {
         if (!node || typeof node !== 'object') return
@@ -755,10 +762,15 @@ exports.readDownloadDefaults = () => globalThis.__getting.downloadDefaults
     await asWho({ ...ME, user: 'ethan', admin: false, auth: 'on', permissions: ['request'] })
     check('logins on, signed in through Navidrome: Change password, then Sign out', about(), ['ChangePassword', 'SignOutRow'])
     check('...handed who they are', named('ChangePassword')[0]?.props, { user: 'ethan' })
+    //? (2.0.8, UX batch 5) the person as the headline, an Account section, About's Logins an admin's alone
+    check('...their name the headline, nothing under it - and About only the version: Logins is an admin\'s',
+      [headline(), identity(), find((node) => node.props?.id === 'app-account-title').map(text), Object.keys(aboutRows())], [['ethan'], [], ['Account'], ['Version']])
+    check('...the avatar their initial, a capital', find(byClass('app-avatar')).map(text), ['E'])
     await asWho({ ...ME, user: 'deadwax', admin: true, auth: 'on' })
     check('the break-glass sign-in: no Navidrome account, so Sign out alone', about(), ['SignOutRow'])
+    check('...an admin: About says whether logins are on', aboutRows(), { Version: '2.0.0-player.9', Logins: 'On' })
     await asWho(ME)
-    check('logins off: neither', about(), [])
+    check('logins off: neither - and no Account section at all', [about(), find((node) => node.props?.id === 'app-account-title').length], [[], 0])
   }
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed')

@@ -15,7 +15,7 @@ All of it is in the app, on a phone and on a desktop:
 - An artist's page has [their pictures, and moving their albums under their current name](#artist-pages).
 
 On a desktop (a window 1024 pixels wide or more) Needs a look and Library care are the sidebar's,
-under **Managing**; on a phone they're in **You → Managing deadwax**. They're there for an admin,
+under **Manage**; on a phone they're in **You → Manage**. They're there for an admin,
 which with logins off is everyone - and for anyone an admin gives their permission to
 ([Sharing deadwax](sharing.md#admins-permissions-and-everyone-else)).
 
@@ -42,24 +42,27 @@ Each album is checked for these, fresh on every scan:
 
 | issue | means | the fix |
 | --- | --- | --- |
-| No release id | never matched to a MusicBrainz release, so nothing else can be checked | pick its release in **Edit → Release** |
+| Not matched to MusicBrainz | never matched to a release on MusicBrainz, so nothing else can be checked | pick its release in **Edit → Release** |
 | No artist tag | no file names an artist, so the name shown came from the folder | apply a release |
 | Mixed tags | the files disagree about which album they're from, often two albums sharing a folder | sort the files out, or apply a release |
 | Split across folders | this folder holds only some discs of a release whose other discs are elsewhere | apply the release to each; the second merges into the first, which keeps anything you'd said was fine about it |
 | Artist under two names | the artist's albums are under two folder names, usually a rename | **Move albums to …** on the artist's page |
-| Folder off-convention | the folder isn't named the way its tags say it should be | apply its release, which re-files it |
-| No original year | no `originaldate` tag, which the folder name uses | apply a release |
+| Folder name doesn't match the tags | the folder isn't named the way its tags say it should be | apply its release, which renames it to match |
+| No original year | the tags don't record the album's first year (the `originaldate` tag), which the folder is named after | apply a release |
 | No year | no date on any file | apply a release |
 | Untitled tracks | some files have no title tag, so filenames are shown | apply a release |
 | Unnumbered tracks | some files have no track number, so the order is alphabetical | apply a release |
 | No cover art | no cover beside the tracks or inside them | **Edit → Artwork → Get cover** |
 | Not in Navidrome | Navidrome doesn't list the album, so the app can't show or play it ([below](#not-in-navidrome)) | let Navidrome scan it, make its files readable to Navidrome, or point Navidrome at this music folder |
 
+Each chip's line - in **Edit → Release**, and when you point at a chip in **Needs a look** - says the same in a
+sentence or two: what's wrong, then what fixes it.
+
 For an album that's right as it is (a bootleg that will never be on MusicBrainz, say), **It's fine
-as it is**, in **Edit → Release**, stops it being flagged for the issues it has now. It's still
-flagged if something new goes wrong, such as the cover going missing. Such an album leaves the
-queue, and **Needs a look → Ignored** lists it, so it can always be opened again - to undo that with
-**un-ignore**, fix it after all, or delete it ([below](#needs-a-look)).
+as it is**, in **Edit → Release**, marks it fine: it stops being flagged for the issues it has now.
+It's still flagged if something new goes wrong, such as the cover going missing. Such an album leaves
+the queue, and **Needs a look → Marked fine** lists it, so it can always be opened again - to undo
+that with **Ask about it again**, fix it after all, or delete it ([below](#needs-a-look)).
 
 ### Not in Navidrome
 
@@ -97,8 +100,8 @@ panel opens on it like any other.
   list where *Checking the library…* shows ([below](#needs-a-look)).
 - **Fixing it** - see [troubleshooting](troubleshooting.md#an-album-says-not-in-navidrome): start a scan in
   Navidrome, make the files readable by the user Navidrome runs as, or point Navidrome at the folder
-  `LIBRARY_PATH` reads. **It's fine as it is** accepts it, as for any issue - and **Needs a look →
-  Ignored** keeps it in reach.
+  `LIBRARY_PATH` reads. **It's fine as it is** marks it fine, as for any issue - and **Needs a look →
+  Marked fine** keeps it in reach.
 
 ## Editing an album
 
@@ -114,9 +117,13 @@ A row of **Needs a look** opens the same panel on that album's folder.
 The panel has five tabs - **Release**, **Tags**, **Artwork**, **Lyrics** and **Delete** - for someone
 given Look after the library but not Edit albums, only **Delete**.
 
-### Release: the metadata editor
+### Release: matching it to a release
 
-**Release** opens already searching MusicBrainz using the album's artist and album tags. You:
+**Release** opens already searching MusicBrainz using the album's artist and album tags - its search
+box shows those words while it's blank (a blank box searches for exactly that album by that artist).
+Above it, **Now:** says what the files claim to be: their edition (or *No edition*), year - *1999
+(this pressing 2014)* for a reissue - track count, discs, and **Matched to MusicBrainz** or **Not
+matched to MusicBrainz** (point at the first for the release id). You:
 
 1. **Pick the release** the album really is from the list of pressings. The one the files
    already claim is marked **Current**. Each row shows year, format, country, catalogue number
@@ -126,7 +133,7 @@ given Look after the library but not Edit albums, only **Delete**.
 3. **Read the preview**. It shows every tag that would change, file by file; whether the folder
    would move or be renamed (to follow the template, or the artist's current name); and, when
    the album is split across folders, whether it would merge.
-4. **Cover art**: tick **download cover art** to save the release's cover from the Cover Art
+4. **Cover art**: tick **Download cover art** to save the release's cover from the Cover Art
    Archive, and compare it with the one you have (**Compare full size…**) before replacing it.
 5. **Apply** writes the tags, fetches the cover and moves the folder. There's no undo, which is
    why the preview shows everything first. When the apply changes both the album's tags and its
@@ -151,26 +158,30 @@ given Look after the library but not Edit albums, only **Delete**.
    everything. With a second library in Navidrome, or an admin scanning some other folder at
    that moment, the rename can come before this album has been scanned.
 
-**Cancel** closes the panel; nothing is written until **Apply**. For an album with issues, **It's fine
-as it is** accepts them ([above](#what-needs-attention)), and **un-ignore** takes that back.
+**Cancel** closes the panel; nothing is written until **Apply**, which then says what it did (*Updated
+the tags in 12 files, saved cover.jpg, moved the folder to match its tags.*), or what it couldn't. For
+an album with issues, **It's fine as it is** marks it fine ([above](#what-needs-attention)) - the line
+above the search then says **Marked fine:** and which - and **Ask about it again** takes that back.
 
-![Needs a look with a stranger's rip of Portishead's Third, and the Edit album panel's Release tab on it: no release id, the folder off-convention, no original year, no cover - and Third's pressings on MusicBrainz, the first picked, with what applying it would change](../assets/images/editor.png)
+![Needs a look with a stranger's rip of Portishead's Third, and the Edit album panel's Release tab on it: not matched to MusicBrainz, the folder's name not matching the tags, no original year, no cover - and Third's pressings on MusicBrainz, the first picked, with what applying it would change](../assets/images/editor.png)
 
 ### Tags: editing tags by hand
 
-**Tags** lists the album's tracks with a tick box each. Tick some (on a desktop Shift ticks a run),
-then **Edit N tracks…**, or **Edit all tracks…** with none ticked. You can edit title, artist, album,
-album artist, track, disc, disc title, date, original date, genre and composer. A disc title is
-the one to set for a box set or a bootleg whose discs MusicBrainz leaves untitled: tick that
+**Tags** lists the album's tracks with a box each to select it. Select some (on a desktop Shift selects
+a run), then **Edit N tracks…**, or **Edit all tracks…** with none selected. You can edit title, artist,
+album, album artist, track, disc, disc title, date, original date, genre and composer. A disc title is
+the one to set for a box set or a bootleg whose discs MusicBrainz leaves untitled: select that
 disc's tracks and type it once.
 
-- A field whose value differs between the ticked tracks starts empty and says **Several
+- A field whose value differs between the selected tracks starts empty and says **Several
   values**. Leave it alone and each track keeps its own.
 - Only fields you change are written. Emptying a field you changed **removes** that tag.
 - The preview shows each change before **Apply**. If anything is invalid (a track number that
   isn't a number), nothing is written at all.
-- It edits tags only; no file or folder is renamed. **Release** is what re-files an album once its
-  tags say it belongs somewhere else.
+- It edits tags only; no file or folder is renamed. **Release** is what moves an album's folder once
+  its tags say it belongs somewhere else.
+- A field that won't do is marked, and **Fix the marked field first.** says so; after **Apply**,
+  *Saved 3 files.*
 
 **Cancel**, **Close** or Escape goes back to the list.
 
@@ -181,7 +192,7 @@ download or an applied release gives the disc a title, and you can set it by han
 
 ### Inside a track
 
-A track's **name** (not its tick box) in **Tags** opens it in the panel:
+A track's **name** (not its box) in **Tags** opens it in the panel - the line above the list says so:
 
 - **Tracks** at the top goes back to the list, where you left it - scrolled on just enough to show the
   track you were on, if **Previous** and **Next** took you past the ones in view; **2 of 11** says
@@ -218,21 +229,26 @@ panel; Escape in the cover viewer closes only the viewer.
 
 **Artwork** shows the cover the album has and the CD art beside its tracks - as pictures, each with
 its file name, opening in [the cover viewer](#the-cover-viewer) when you click them - with **Get
-cover** and **Get CD art** where they can help. Each needs the album's release id, so an untagged
-album is matched in **Release** first.
+cover** and **Get CD art** where they can help. Each needs the album matched to a release, so an
+untagged album is matched in **Release** first (*To get a cover, first match the album to a release in
+the Release tab.*). While one works its button says so (*Getting the cover…*), and what came of it is
+said in a line **under the button** - on a phone too, which shows no tooltips.
 
 - **Get cover** fetches the cover of the release the album's tags name, from the Cover Art
   Archive, at `COVER_ART_SIZE`, and saves it as `cover.jpg` (or `.png`). It only appears on albums
   that have a release id and no cover, and it never replaces one. To replace a cover, use
-  **Release**, where you can compare the two. "No cover on the Archive" and "the request failed"
-  are told apart, because only the second is worth trying again: an Archive that couldn't be
-  reached, or answered with an error, counts as failed.
+  **Release**, where you can compare the two. *The Cover Art Archive has no front cover for that
+  release.* and a failure (*The Cover Art Archive couldn't be reached - try again.*) are told apart,
+  because only the second is worth trying again: the button reads **Look again** after the first and
+  **Try again** after the second.
 - **Get CD art** saves a picture of the disc itself, as `disc.jpg` (or `disc1.jpg`,
   `disc2.jpg`… per disc of a set), from the Cover Art Archive's scans of that exact release, and
   otherwise from fanart.tv if you've set a key. Navidrome shows it for the songs on that disc,
   and it's the face of the record on the player's [turntable](player.md#the-turntable). A `disc.*`
   file sits ahead of a download's `cd.jpg` in every player's order, so the scan stops being what
-  shows without being deleted. It never replaces CD art that's already there.
+  shows without being deleted. It never replaces CD art that's already there. When neither has a
+  picture of the disc the line under it says so (with, when you haven't set one, that a fanart.tv
+  key in Server settings adds another source), and the button reads **Look again**.
 
 #### Why a song can show a different picture
 
@@ -246,16 +262,18 @@ the album's cover in Navidrome, that's two of *its* settings: `ND_ENABLEMEDIAFIL
 
 **Lyrics** says how many tracks have a `.lrc`, with **Get lyrics** for the rest: it looks up
 lyrics on LRCLIB for the tracks that have none, and saves each as a `.lrc` beside its track, then
-reports how many it found (**Lyrics · 9 of 10**, with the details in its tooltip). The lyrics
-lead, and re-timing the lyrics already saved, are in **Server settings**, under **Library**
-([Configuration](configuration.md#lyrics)). How lyrics are matched and saved is in
-[organizing](organizing.md).
+says how many it found on the button (**Lyrics · 9 of 10**) and the rest in the line under it
+(*Saved lyrics for 9 tracks (all synced), 1 not on LRCLIB.*; a track that failed says *1 failed - try
+again*, and pressing it again asks LRCLIB for those).
+When synced lyrics appear (the lyrics lead), and re-timing the ones already saved, are under
+**Lyrics** in **Server settings** (**Library**) - the tab says so ([Configuration](configuration.md#lyrics)).
+How lyrics are matched and saved is in [organizing](organizing.md).
 
 ### Delete
 
 **Delete** removes the album's folder and everything in it, **permanently**. The confirmation, read
 as you open the tab, names the track count and size, and lists any files that aren't audio, in case
-one is the only copy of a rip log. **delete permanently** does it. It only ever deletes a folder that
+one is the only copy of a rip log. **Delete permanently** does it. It only ever deletes a folder that
 holds audio directly, inside your library, and never the library folder itself. A deleted album
 leaves **Needs a look** straight away. **Cancel** (or Escape) goes back to **Release** - or, for
 someone whose panel has only **Delete**, closes it.
@@ -276,10 +294,11 @@ deadwax finds it by the album's MusicBrainz release, as the store index has it (
 gives the album page its "Also: …" chips). An album Navidrome knows by **no** release - a rip that was
 never tagged, exactly what the release editor is for - is found among the library's folders that
 carry no release id either, by its name and artist (and its track count, when that still leaves
-several); when more than one folder fits, the panel asks which. A release kept one folder per disc
+several); when more than one folder fits, the panel asks which (*2 folders have this album's name, and
+none is matched to a release. Which one is it?*). A release kept one folder per disc
 starts on the first folder, with a **Folder** choice above the tabs for the others - apply the
 release to each, and they merge. When **no** folder is found - by release or by name - the panel says
-so, with **Look again** and **Choose the folder**: a list of every folder in the library's scan, each
+so (*deadwax can't find this album's folder: …*), with **Look again** and **Choose the folder**: a list of every folder in the library's scan, each
 with its artist and album tags (and "no release" for one with no release id), narrowed as you type -
 every word you type has to be somewhere in the folder's path, artist or album, accents and capitals
 aside; the first 50 are listed, and it says how many match. Click the one this album is, and the
@@ -320,9 +339,11 @@ back (the browser's Back, a mouse's back button, a phone's back gesture), which 
 
 ## Needs a look
 
-**Needs a look** - the desktop sidebar's first item under **Managing**, with how many albums need one
-beside it, or **You → Managing deadwax → Albums that need a look** on a phone, with the same count -
-is the library's review queue:
+**Needs a look** - the desktop sidebar's first item under **Manage**, with how many albums need one
+beside it, or **You → Manage → Needs a look** on a phone, with the same count - is the library's
+review queue. The line at its top says what it's for: *Albums whose tags, folder or cover need fixing,
+albums Navidrome doesn't list, and new downloads nobody has looked at yet. Open one to fix it, or to
+mark it fine as it is.*
 
 - **The albums, in order**: every album with an issue you haven't accepted, and every album deadwax
   filed that nobody has looked at yet - those first, then the worst first, then by artist and album.
@@ -330,37 +351,40 @@ is the library's review queue:
   reading the disk (an album filed since the last scan is counted too, as the list shows it once it
   has scanned).
 - **Chips narrow it**: **All**, **Newly added** (when there is one), one for each kind of issue
-  that has an album, with how many - and, last, **Ignored**. The chip you press is in the page's
+  that has an album, with how many - and, last, **Marked fine**. The chip you press is in the page's
   address, so a reload keeps it; one whose last album gets fixed falls back to **All**.
 - **A row** shows the album's cover, name, artist and edition, **New** for an album just filed, and
   its outstanding issues (hover one for what it means). The list is read the first time you open the
   page - the saved scan at once, then the disk, with *Checking the library…* meanwhile.
 
-**Ignored** is there only while an album has an issue accepted with **It's fine as it is** and
+**Marked fine** is there only while an album has an issue marked fine with **It's fine as it is** and
 nothing outstanding: those albums aren't in the queue any more, so this is where they're kept in
 reach - a folder Navidrome doesn't list above all, which nothing else in the app can open. Each row
-says **Ignored**, quietly (point at it for what was accepted), and opens the Edit panel like any
-other, where **un-ignore** puts the album back in **All**. It's a view, not a count: **All** and the
-count beside **Needs a look** go on counting what's outstanding and what's new.
+says **Marked fine**, quietly (point at it for which issues), and opens the Edit panel like any
+other, where **Ask about it again** puts the album back in **All**. It's a view, not a count: **All**
+and the count beside **Needs a look** go on counting what's outstanding and what's new.
 
 **Not in Navidrome** is one of its chips ([above](#not-in-navidrome)): an album folder Navidrome doesn't
 list, which the rest of the app can't reach - its row opens the **Edit album** panel like any other.
 When no album can be checked against Navidrome, the line above the list (where *Checking the library…*
-shows) says why once the disk has been read: *Navidrome isn't set up…* (with where to set it up),
-*Couldn't ask Navidrome which albums it has…* (with the reason), *Navidrome was scanning when last
+shows) says why once the disk has been read: *Navidrome isn't set up…* (with where to set it up:
+Server settings (Connections)), *Couldn't ask Navidrome which albums it has…* (with Navidrome's own
+words for whoever runs deadwax; anyone else is told to try again in a minute), *Navidrome was scanning when last
 asked…*, or *Navidrome hasn't answered yet…* (it's asked again the next time the page reads the
 library). It's kept to one line, so it never moves the rows; hover it for the whole of it.
 
-**Ignores can't be saved without the job store.** When deadwax couldn't open its database
-(`DB_PATH`), the page says so above the list: an album you accept with **It's fine as it is** comes
-back. See [Troubleshooting](troubleshooting.md#ignored-albums-come-back-to-the-review-queue).
+**Marking fine needs the database.** When deadwax couldn't open its database (`DB_PATH`), the page
+says so above the list: *deadwax can't save to its database (check DB_PATH), so an album you mark
+"It's fine as it is" will come back.* See [Troubleshooting](troubleshooting.md#albums-marked-fine-come-back-to-needs-a-look).
+A library that couldn't be read is said in a sentence too (*Couldn't read the library.*, with **Try
+again**), with what went wrong under it for whoever runs deadwax.
 
 **Click a row** and the **Edit album** panel opens on that album's folder, beside the list (on a phone,
 as a sheet over it) - all five tabs ([above](#editing-an-album)), the row highlighted. **Release**
-says where the album is in the queue (*3 of 17*), with **◁** and **skip ▷**, and after **Apply** its
+says where the album is in the queue (*3 of 17*), with **◁** (Previous album) and **Skip ▷**, and after **Apply** its
 button becomes **Next album ▷**, so you can work through the queue without going back to the list -
 or click another row. While the panel is open the list doesn't move: an album you fix, accept (**It's
-fine as it is**) or delete stays where it was, faded, saying **Fixed**, **Ignored** or **Deleted**
+fine as it is**) or delete stays where it was, faded, saying **Fixed**, **Marked fine** or **Deleted**
 (after a delete the panel stays open, saying so, with **Next album ▷**). Moving on from an album -
 Next, Previous, another row, closing the panel - counts as having looked at it, which is what clears
 **New** (it keeps its issues). Closing the panel, choosing another chip or leaving the page ends the
@@ -373,21 +397,26 @@ An album page showing the same album elsewhere in the app isn't asked again afte
 
 ## Library care
 
-**Library care** - after **Needs a look** in the desktop sidebar's **Managing**, and in **You →
-Managing deadwax** on a phone, where the page is laid out for it - holds:
+**Library care** - after **Needs a look** in the desktop sidebar's **Manage**, and in **You →
+Manage** on a phone, where the page is laid out for it - says at its top what it's for (*Rescan the
+library after changing tags in another program, and fill in missing covers, CD art and lyrics across
+many albums at once - one album at a time, and Stop ends a run after the album it's on.*) and holds:
 
 - **Rescan** - every file read again, ignoring the saved scan. Under it, what the library holds and
   how old the scan is (*7 albums · 87 tracks · 425 MB · Scanned 3 min ago in 2s*, or *Saved scan from
   2 h ago* while the saved copy is what's on screen). Press it after changing tags with another
-  program.
+  program: deadwax spots a changed album by its folder's date, which editing tags in place doesn't
+  change.
 - **Covers**, **CD art** and **Lyrics** - **Get covers · N**, **Get CD art · N** and **Get lyrics · N**:
-  a cover for an album with a release id and no cover, CD art for one with a release id and no
-  `disc*` image of deadwax's own, lyrics for one with no lyrics at all. Each run asks for one album at
-  a time, through the same step as that album's own **Get** button in the Edit panel, so you can watch
-  it and stop it: while it runs its button is **Stop · 3 of 12**, and **Stop** finishes the album
-  being fetched and goes no further. When it ends it says what it did (*fetched 10 covers, 1 had none
-  on the Archive, 1 failed - try those again*; lyrics are counted in tracks), and that stays on the
-  page until that run is started again - also when you go to another page, the **Log** say, and come
+  a cover for an album matched to a release with no cover, CD art for one matched to a release with no
+  disc picture from deadwax yet (no `disc*` image - a download's `cd.jpg` doesn't count), lyrics for one
+  with no lyrics at all. Each run asks for one album at a time, through the same step as that album's
+  own **Get** button in the Edit panel, so you can watch it and stop it: while it runs its button is
+  **Stop after this album · 3 of 12** (the third album is the one being fetched), and pressing it
+  finishes that album and goes no further. When it ends it says what it did in sentences (*Got 10 covers. 1 has none in the Cover Art
+  Archive. 1 failed - run it again to try it again.*; lyrics are counted in tracks, and a track that
+  failed is tried again from its album's own **Get lyrics**), and that stays on the
+  page until that run is started again - also when you go to another page, the **Event log** say, and come
   back. A run goes on while you're on another page of the app; reloading the app forgets what the
   last ones said. The three can run at once. When a run that saved something ends, the page reads the
   library again before it offers that run again - its line says *Checking the library…* for that
@@ -397,7 +426,7 @@ Managing deadwax** on a phone, where the page is laid out for it - holds:
   matching "portishead"*). Before you start one, each says how many album folders it will take and
   what it writes - folders, as the line above counts them: an album you keep in two pressings is one
   album in the scan's count and two folders here.
-- **Held by nobody** - with logins on, under the runs: the albums nobody has in their
+- **In nobody's library** - with logins on, under the runs: the albums nobody has in their
   library (the first 20, then **Show all** - and **Show fewer**), and the flagged downloads with **Add for
   them** and **Dismiss** - see [who has an album](#who-has-an-album-with-logins-on).
 
@@ -464,7 +493,7 @@ deadwax keeps that true as you look after the library:
 - **Moving an artist's albums** under their current name changes only where they are: whoever had them
   still has them.
 - **Deleting an album** takes it out of everyone's library, telling each of the others ([above](#delete)).
-- **Library care → Held by nobody** (an admin's) lists every album in the collection that is in
+- **Library care → In nobody's library** (an admin's) lists every album in the collection that is in
   nobody's library - copied in by hand or by another program, or unstarred by everyone who had it - and
   the downloads **flagged** for you: ones whose every file was already in the folder they'd have been
   filed into, but that folder holds another pressing or an untagged rip, so deadwax gave the album to

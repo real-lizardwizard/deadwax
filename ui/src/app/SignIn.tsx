@@ -94,7 +94,7 @@ export function SignIn({
             deadwax
           </h1>
         </div>
-        <p class="app-signin-lede">Sign in with your Navidrome account.</p>
+        <p class="app-signin-lede">Sign in with your music server (Navidrome) account.</p>
         {why && (
           <p id="app-signin-reason" class="app-signin-reason">
             {why}

@@ -112,7 +112,7 @@ export function NeedsNavidrome({
           ) : (
             <>
               <p class="app-needs-text">
-                {NAVIDROME_REQUIRED} {access.admin ? "Set it up in deadwax's settings (Connections), then come back." : ADMIN_SETS_UP}
+                {NAVIDROME_REQUIRED} {access.admin ? "Set it up in Server settings (Connections), then come back." : ADMIN_SETS_UP}
               </p>
               {/* (2.0.4) an admin's: Navidrome's rows in Server settings are theirs alone */}
               {access.admin && (

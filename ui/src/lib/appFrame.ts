@@ -228,8 +228,9 @@ export const SIDEBAR_CARE: SidebarItem = { id: 'care', label: 'Library care' }
 export const SIDEBAR_PEOPLE: SidebarItem = { id: 'people', label: 'People' }
 
 /** Managing's server settings and event log (2.0.0-player.33), after Library care. */
-export const SIDEBAR_SETTINGS: SidebarItem = { id: 'settings', label: 'Settings' }
-export const SIDEBAR_LOG: SidebarItem = { id: 'log', label: 'Log' }
+//? (2.0.8, UX batch 5) the pages' own names - "Server settings", "Event log" - where they were "Settings" and "Log"
+export const SIDEBAR_SETTINGS: SidebarItem = { id: 'settings', label: 'Server settings' }
+export const SIDEBAR_LOG: SidebarItem = { id: 'log', label: 'Event log' }
 
 /** The Library's views the sidebar lists: Songs left out when Navidrome's empty search lists none,
  *  as the phone's root leaves out its row (null: not known yet, so it stays) - the phone's root lists these

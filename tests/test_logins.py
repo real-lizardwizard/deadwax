@@ -1897,6 +1897,8 @@ def test_deadwax_admins_still_set_is_said_once_and_grants_nobody_anything(on, mo
     Config.report_logins()
     said = [record.getMessage() for record in caplog.records if "DEADWAX_ADMINS" in record.getMessage()]
     assert said == [DEADWAX_ADMINS_IGNORED] and "no longer reads it" in said[0]
+    #? (2.0.8) the release a person knows - never a branch's build number
+    assert "(since 2.0.0)" in said[0] and "player." not in said[0]
     assert [record.levelno for record in caplog.records if "DEADWAX_ADMINS" in record.getMessage()] == [logging.ERROR]
     ethan = signed_in(on, "ethan")
     assert ethan.get(ME).json()["admin"] is False and ethan.get("/deadwax/settings").status_code == 403

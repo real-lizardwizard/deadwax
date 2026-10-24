@@ -25,6 +25,15 @@ export function outstandingIssues(album: LibraryAlbum): string[] {
 }
 
 /**
+ * The issues marked fine that the album still has (2.0.8, UX batch 5). `ignored_issues` is the stored list as it was
+ * saved, so it can name a problem since fixed - marked fine for No cover art, then a cover got. Edit album's "Marked
+ * fine: …" line and Needs a look's Marked fine chip both say these, so the two never name a problem that is gone.
+ */
+export function markedFineIssues(album: LibraryAlbum): string[] {
+  return album.ignored_issues.filter((code) => album.issues.includes(code))
+}
+
+/**
  * An album deadwax filed that you haven't looked at yet. What the tab badge counts.
  *
  * Kept separate from "has issues" because they are genuinely different questions, and

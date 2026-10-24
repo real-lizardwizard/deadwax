@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'preact/hooks'
 import { ApiError } from '../api/http'
 import { getPeople, type PeopleState } from '../api/people'
 import { isAbort, latestOnly } from '../lib/latest'
+import { sayError } from './sayError'
 
 /**
  * People's state (2.0.0-player.61): `GET /deadwax/people`, asked as the page shows and after every change - through
@@ -30,7 +31,7 @@ export function usePeople(live: boolean, allowed: boolean): {
       },
       (reason: unknown) => {
         if (!request.current() || isAbort(reason)) return
-        setProblem(reason instanceof Error ? reason.message : String(reason))
+        setProblem(sayError(reason, '', { failed: "Couldn't read Navidrome's accounts." }))
       },
     )
   }, [])
@@ -49,8 +50,11 @@ export function usePeople(live: boolean, allowed: boolean): {
   return { state, problem, ask, locked }
 }
 
-/** A refusal's words - and whether it was People saying it is locked again. */
+/** A refusal's words - and whether it was People saying it is locked again. (2.0.8, UX batch 5) Through
+ *  lib/errorWords.ts: People's own refusals (src/routes/people.py Refused, a `kind`) as written, anything else -
+ *  deadwax not answering, a 500 - in a sentence, with its own words in brackets for the admin reading it. */
 export function refusalOf(reason: unknown): { words: string; locked: boolean } {
-  if (reason instanceof ApiError) return { words: reason.message, locked: reason.kind === 'locked' }
-  return { words: reason instanceof Error ? reason.message : String(reason), locked: false }
+  //? People's own refusals are written for the admin reading them, setting names and all ("…AUTH_MODE…"): as written
+  if (reason instanceof ApiError && reason.kind && reason.detail) return { words: reason.detail, locked: reason.kind === 'locked' }
+  return { words: sayError(reason), locked: false }
 }
