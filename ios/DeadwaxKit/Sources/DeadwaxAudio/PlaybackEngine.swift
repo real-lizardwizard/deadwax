@@ -50,12 +50,12 @@ public struct EngineState: Equatable {
 ///   crossfaded. A song in another format goes on its own lane, started at the moment the first
 ///   lane's last sample plays.
 /// - Nothing is processed but what an output needs: no gain, the decoder's int-to-float (exact),
-///   and the main mixer at unity. Each lane is connected to the main mixer in its file's own format
-///   and the mixer's output runs at the route's rate (48 kHz on the speaker and AirPods), so when
-///   they differ - a 44.1 kHz CD, a 96 or 192 kHz file - THE MIXER, inside the app's own engine,
-///   converts the rate. Any app must convert for a 48 kHz output; how well this one does is
-///   measured by EngineRenderTests' `theMixersRateConversionMeasured` (notes/ios.md), and if it
-///   falls short a lane can convert with its own AVAudioConverter at its best quality instead.
+///   the main mixer at unity, and - only when a file's rate isn't the output's (48 kHz on the
+///   speaker and AirPods: a 44.1 kHz CD, a 96 or 192 kHz file) - the lane's own AVAudioConverter at
+///   its best quality (the mastering algorithm, `.max`), one per lane and kept across its songs so a
+///   join stays continuous. Every node runs at the output's rate, so the mixer itself converts
+///   nothing. (The mixer's own conversion was measured first and failed: a 30 kHz tone in a 192 kHz
+///   file came out at -21.8 dB, aliased - EngineRenderTests' `theRateConversionMeasured`.)
 /// - The output is started once and kept running across songs and pauses, so a song is scheduled
 ///   onto an output that is already live - never a new output on a tap. A song started from silence
 ///   is scheduled `startLead` ahead (the output's latency and one IO buffer), so the output is
@@ -89,6 +89,9 @@ public final class PlaybackEngine {
     /// (outputLatency + ioBufferDuration). Zero plays at once.
     public var startLead: () -> TimeInterval = { 0 }
     public var onChange: ((EngineState) -> Void)?
+    /// Tests: what the engine does, line by line, on its queue - offline, each line starts with the
+    /// render's sample count.
+    var trace: ((String) -> Void)?
 
     private let settings: Settings
     private let queue = DispatchQueue(label: "deadwax.engine", qos: .userInitiated)
@@ -97,27 +100,60 @@ public final class PlaybackEngine {
 
     private final class Lane {
         let node: AVAudioPlayerNode
+        /// The songs' own format, as decoded. The timeline counts in its frames.
         let format: AVAudioFormat
+        /// The format the node is connected in: the output's rate, the songs' channels - the songs'
+        /// own format itself when the rates agree.
+        let nodeFormat: AVAudioFormat
+        /// From `format` to `nodeFormat`, when the rates differ; nil when they don't (nothing done).
+        let converter: AVAudioConverter?
         var timeline = LaneTimeline()
         var pending = 0
         var started = false
-        /// The node's sample count when it was last read playing - where the song was when iOS
-        /// stops the engine (its clock reads nil then).
+        /// Frames scheduled on the node since it started, at the node's rate.
+        var nodeFrames: Int64 = 0
+        /// The converter holds frames it hasn't given out yet (its filter's look-ahead): given out by
+        /// `flush` when the lane's songs end.
+        var holding = false
+        /// The node's sample count when it was last read playing, in the songs' frames - where the
+        /// song was when iOS stops the engine (its clock reads nil then).
         var lastSample: Int64?
         /// Offline only: the render's sample count when the node started.
         var renderStart: AVAudioFramePosition?
 
-        init(node: AVAudioPlayerNode, format: AVAudioFormat) {
+        init(node: AVAudioPlayerNode, format: AVAudioFormat, nodeFormat: AVAudioFormat, converter: AVAudioConverter?) {
             self.node = node
             self.format = format
+            self.nodeFormat = nodeFormat
+            self.converter = converter
         }
 
-        /// Nothing scheduled, not started (the node itself is stopped by the caller).
+        /// A count of the node's samples in the songs' frames.
+        func songFrames(_ nodeSamples: Int64) -> Int64 {
+            guard converter != nil else { return nodeSamples }
+            return Int64((Double(nodeSamples) * format.sampleRate / nodeFormat.sampleRate).rounded(.down))
+        }
+
+        /// Where on the node the last frame scheduled will have played: exact once the converter has
+        /// given out all it holds, estimated from the songs' frames before.
+        var nodeEnd: Int64 {
+            guard holding else { return nodeFrames }
+            return Int64((Double(timeline.end) * nodeFormat.sampleRate / format.sampleRate).rounded())
+        }
+
+        /// Nothing scheduled, not started (the node itself is stopped by the caller). The converter
+        /// keeps what it holds: `resetConverter` lets it go.
         func clear() {
             timeline.reset()
             pending = 0
             started = false
+            nodeFrames = 0
             lastSample = nil
+        }
+
+        func resetConverter() {
+            converter?.reset()
+            holding = false
         }
     }
 
@@ -375,6 +411,7 @@ public final class PlaybackEngine {
         for lane in lanes.values {
             lane.node.stop()
             lane.clear()
+            lane.resetConverter()
         }
         heardLane = nil
         tail = nil
@@ -390,10 +427,32 @@ public final class PlaybackEngine {
         if let lane = lanes[key] { return lane }
         let node = AVAudioPlayerNode()
         engine.attach(node)
-        engine.connect(node, to: engine.mainMixerNode, format: format)
-        let lane = Lane(node: node, format: format)
+        // the rate the main mixer runs at - the output's, or the offline render's
+        let output = settings.offline?.sampleRate ?? engine.mainMixerNode.outputFormat(forBus: 0).sampleRate
+        var nodeFormat = format
+        var converter: AVAudioConverter?
+        if output > 0, output != format.sampleRate,
+           let converted = floatFormat(sampleRate: output, channels: format.channelCount),
+           let made = AVAudioConverter(from: format, to: converted) {
+            made.sampleRateConverterAlgorithm = AVSampleRateConverterAlgorithm_Mastering
+            made.sampleRateConverterQuality = AVAudioQuality.max.rawValue
+            // the output lines up with the input, frame 0 with frame 0: nothing ahead of the song
+            made.primeMethod = .normal
+            nodeFormat = converted
+            converter = made
+        }
+        engine.connect(node, to: engine.mainMixerNode, format: nodeFormat)
+        let lane = Lane(node: node, format: format, nodeFormat: nodeFormat, converter: converter)
         lanes[key] = lane
+        note("lane \(Int(format.sampleRate)) Hz x \(format.channelCount): its node at \(Int(nodeFormat.sampleRate)) Hz")
         return lane
+    }
+
+    /// One line for `trace`.
+    private func note(_ words: @autoclosure () -> String) {
+        guard let trace else { return }
+        let at = settings.offline != nil ? "\(engine.manualRenderingSampleTime) " : ""
+        trace(at + words())
     }
 
     /// The node's own sample count now, once it is playing - kept as the lane's `lastSample`. Nil
@@ -401,8 +460,9 @@ public final class PlaybackEngine {
     private func sample(of lane: Lane) -> Int64? {
         guard lane.started, let nodeTime = lane.node.lastRenderTime, nodeTime.isSampleTimeValid,
               let playerTime = lane.node.playerTime(forNodeTime: nodeTime) else { return nil }
-        lane.lastSample = playerTime.sampleTime
-        return playerTime.sampleTime
+        let frame = lane.songFrames(playerTime.sampleTime)
+        lane.lastSample = frame
+        return frame
     }
 
     private func ahead(_ lane: Lane) -> Int64 {
@@ -460,6 +520,10 @@ public final class PlaybackEngine {
     private func schedule(_ decoded: AVAudioPCMBuffer, feed feeding: inout Feed) -> Bool {
         let key = LaneKey(decoded.format)
         let beginning = feeding.lane != key || feeding.entry == nil
+        if beginning, let last = tail, last != key, let lastLane = lanes[last] {
+            // the lane scheduled last has had its last song for now: what its converter holds goes on
+            flush(lastLane, key: last)
+        }
         if beginning, let busy = lanes[key], !busy.timeline.isEmpty,
            let last = tail, last != key, let lastLane = lanes[last], !lastLane.timeline.isEmpty {
             return false
@@ -483,13 +547,85 @@ public final class PlaybackEngine {
         guard let id = feeding.entry else { return true }
         lane.timeline.extend(id: id, frames: Int64(buffer.frameLength))
         feeding.decoded += Int64(buffer.frameLength)
+        if let converter = lane.converter {
+            convert(buffer, with: converter, on: lane, key: key)
+        } else {
+            enqueue(buffer, on: lane, key: key)
+        }
+        return true
+    }
+
+    /// One buffer onto the lane's node. Its completion is `.dataRendered`: the moment the render
+    /// has taken the buffer's last sample, which is what the engine's bookkeeping needs (the lane fed,
+    /// the next lane started in time, a lane known to be done). `.dataPlayedBack` comes the output's
+    /// latency later - offline, a fixed half second or so (ios.yml's first macOS run), longer than a
+    /// short song in another format, so the song after it started late.
+    private func enqueue(_ buffer: AVAudioPCMBuffer, on lane: Lane, key: LaneKey) {
+        guard buffer.frameLength > 0 else { return }
         lane.pending += 1
+        lane.nodeFrames += Int64(buffer.frameLength)
         let generation = self.generation
-        lane.node.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { [weak self] _ in
+        lane.node.scheduleBuffer(buffer, completionCallbackType: .dataRendered) { [weak self] _ in
             guard let self else { return }
             self.queue.async { self.played(generation: generation, lane: key) }
         }
-        return true
+    }
+
+    /// A decoded buffer through the lane's converter, and what comes out onto its node. The input is
+    /// handed over as the converter asks for it, so none of it is left behind in the converter's
+    /// keeping between calls; what its filter still needs to see more of, it holds until the next
+    /// buffer, or `flush`.
+    private func convert(_ input: AVAudioPCMBuffer, with converter: AVAudioConverter, on lane: Lane, key: LaneKey) {
+        let ratio = lane.nodeFormat.sampleRate / lane.format.sampleRate
+        let capacity = AVAudioFrameCount((Double(input.frameLength) * ratio).rounded(.up)) + 1_024
+        var offset: AVAudioFrameCount = 0
+        while offset < input.frameLength {
+            guard let out = AVAudioPCMBuffer(pcmFormat: lane.nodeFormat, frameCapacity: capacity) else { return }
+            let before = offset
+            var failure: NSError?
+            let status = converter.convert(to: out, error: &failure) { wanted, inputStatus in
+                let left = input.frameLength - offset
+                guard left > 0, let piece = AVAudioPCMBuffer(pcmFormat: input.format, frameCapacity: min(wanted, left)),
+                      let from = input.floatChannelData, let into = piece.floatChannelData else {
+                    inputStatus.pointee = .noDataNow
+                    return nil
+                }
+                let count = min(wanted, left)
+                for channel in 0..<Int(input.format.channelCount) {
+                    into[channel].update(from: from[channel] + Int(offset), count: Int(count))
+                }
+                piece.frameLength = count
+                offset += count
+                inputStatus.pointee = .haveData
+                return piece
+            }
+            lane.holding = true
+            enqueue(out, on: lane, key: key)
+            if status == .error {
+                note("the converter failed: \(failure?.localizedDescription ?? "no reason given")")
+                return
+            }
+            // nothing taken and nothing given: the converter is stuck - never spin on it
+            if offset == before && out.frameLength == 0 { return }
+        }
+    }
+
+    /// What the lane's converter holds, given out onto its node: the lane's last song for now has
+    /// all been decoded. The converter starts afresh for the lane's next song.
+    private func flush(_ lane: Lane, key: LaneKey) {
+        guard let converter = lane.converter, lane.holding else { return }
+        while true {
+            guard let out = AVAudioPCMBuffer(pcmFormat: lane.nodeFormat, frameCapacity: 4_096) else { break }
+            var failure: NSError?
+            let status = converter.convert(to: out, error: &failure) { _, inputStatus in
+                inputStatus.pointee = .endOfStream
+                return nil
+            }
+            enqueue(out, on: lane, key: key)
+            if status != .haveData || out.frameLength == 0 { break }
+        }
+        lane.resetConverter()
+        note("lane \(Int(lane.format.sampleRate)) Hz flushed: \(lane.nodeFrames) frames on its node")
     }
 
     /// The same samples in the lane's own AVAudioFormat object, when the decoder's differs only in
@@ -512,13 +648,24 @@ public final class PlaybackEngine {
         if let key = ended.lane, let id = ended.entry { lanes[key]?.timeline.close(id: id) }
         ended.source.close()
         feed = nil
+        let endedLane = ended.lane.flatMap { key in lanes[key].map { (key, $0) } }
         let next = ended.index + 1
-        guard tracks.indices.contains(next) else { return }
+        guard tracks.indices.contains(next) else {
+            if case let (key, lane)? = endedLane { flush(lane, key: key) }
+            return
+        }
         do {
-            feed = Feed(index: next, source: try tracks[next].open(.beginning), start: .beginning)
+            let source = try tracks[next].open(.beginning)
+            feed = Feed(index: next, source: source, start: .beginning)
+            // a song in another format next: the lane has had its last song for now (a stream's format
+            // is known only once its header arrives - then its first buffer flushes, in `schedule`)
+            if case let (key, lane)? = endedLane, let format = source.format, LaneKey(format) != key {
+                flush(lane, key: key)
+            }
         } catch {
             // the song heard plays to its end; the queue stops there
             feed = nil
+            if case let (key, lane)? = endedLane { flush(lane, key: key) }
         }
     }
 
@@ -535,15 +682,19 @@ public final class PlaybackEngine {
             lane.renderStart = settings.offline != nil ? engine.manualRenderingSampleTime : nil
             lane.started = true
             heardLane = key
+            note("lane \(Int(lane.format.sampleRate)) Hz started from silence")
             publish(.playing)
         }
         // then a song in another format after it: its lane starts when the heard lane runs out
-        guard let heardKey = heardLane, let heard = lanes[heardKey], heard.started, heard.pending > 0 else { return }
+        // (its end is exact once its converter has given out all it holds)
+        guard let heardKey = heardLane, let heard = lanes[heardKey], heard.started, heard.pending > 0,
+              !heard.holding else { return }
         for (key, lane) in lanes where key != heardKey && !lane.started && !lane.timeline.isEmpty && ready(lane, key) {
             guard let when = time(whenEnds: heard) else { continue }
             lane.node.play(at: when)
             lane.renderStart = settings.offline != nil && when.isSampleTimeValid ? when.sampleTime : nil
             lane.started = true
+            note("lane \(Int(lane.format.sampleRate)) Hz to start at \(when.isSampleTimeValid ? "\(when.sampleTime)" : "a host time"), when lane \(Int(heard.format.sampleRate)) Hz ends")
         }
     }
 
@@ -575,12 +726,13 @@ public final class PlaybackEngine {
     private func time(whenEnds lane: Lane) -> AVAudioTime? {
         if let offline = settings.offline, let start = lane.renderStart {
             // rendering offline there is no clock: the render's own sample count, from where it started
-            let frames = Double(lane.timeline.end) * offline.sampleRate / lane.format.sampleRate
+            // (every node runs at the render's rate, so a node's sample time is the render's)
+            let frames = Double(lane.nodeEnd) * offline.sampleRate / lane.nodeFormat.sampleRate
             return AVAudioTime(sampleTime: start + AVAudioFramePosition(frames.rounded()), atRate: offline.sampleRate)
         }
         guard let nodeTime = lane.node.lastRenderTime, nodeTime.isSampleTimeValid,
               let playerTime = lane.node.playerTime(forNodeTime: nodeTime) else { return nil }
-        let remaining = Double(max(lane.timeline.end - playerTime.sampleTime, 0)) / playerTime.sampleRate
+        let remaining = Double(max(lane.nodeEnd - playerTime.sampleTime, 0)) / playerTime.sampleRate
         if nodeTime.isHostTimeValid {
             return AVAudioTime(hostTime: nodeTime.hostTime + AVAudioTime.hostTime(forSeconds: remaining))
         }
@@ -605,9 +757,15 @@ public final class PlaybackEngine {
     private func played(generation: Int, lane key: LaneKey) {
         guard generation == self.generation, let lane = lanes[key] else { return }
         lane.pending = max(lane.pending - 1, 0)
+        note("lane \(Int(lane.format.sampleRate)) Hz: a buffer rendered, \(lane.pending) to go")
+        if lane.pending == 0, lane.holding, feed?.lane != key {
+            // its songs are done but the converter still holds their last frames: those go on first
+            flush(lane, key: key)
+        }
         if lane.pending == 0 {
             if var feeding = feed, feeding.lane == key, let id = feeding.entry, let entry = lane.timeline.entry(id: id) {
-                // ran dry mid-song: start the lane again from the frame it reached, once buffered
+                // ran dry mid-song: start the lane again from the frame it reached, once buffered (the
+                // converter keeps what it holds, so the song goes on unbroken from it)
                 let songFrame = entry.songOffset + entry.frames
                 lane.node.stop()
                 lane.clear()
@@ -626,6 +784,7 @@ public final class PlaybackEngine {
                 // this lane's songs are all heard
                 lane.node.stop()
                 lane.clear()
+                lane.resetConverter()
                 if heardLane == key {
                     heardLane = lanes.first(where: { $0.key != key && $0.value.started })?.key
                 }
@@ -729,14 +888,13 @@ public final class PlaybackEngine {
 
     private func configurationChanged() {
         // the engine was stopped by a new route or hardware format (AirPods connecting, AirPlay):
-        // connect the lanes again and go on from the frame reached
+        // make the lanes again and go on from the frame reached
         let at = heard()
         let playing = wantsPlay
         reset()
-        for lane in lanes.values {
-            engine.disconnectNodeOutput(lane.node)
-            engine.connect(lane.node, to: engine.mainMixerNode, format: lane.format)
-        }
+        // the output's rate may be another now: the lanes are made again, converting to it
+        for lane in lanes.values { engine.detach(lane.node) }
+        lanes.removeAll()
         asleep = true
         held = at
         guard playing, at != nil else {

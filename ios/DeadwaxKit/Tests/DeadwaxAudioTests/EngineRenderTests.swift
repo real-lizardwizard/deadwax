@@ -222,6 +222,7 @@ func energyMap(_ samples: [Float], block: Int = 2_048) -> String {
         let between = signal(frames: 48_000, channels: 2, seed: 0.25) // 0.5 s at 96 kHz
         let third = signal(frames: 22_050, channels: 2, seed: 0.35) // 0.5 s
         let engine = try offlineEngine(rate: rate, channels: 2)
+        engine.trace = { print("engine: \($0)") }
         engine.play([
             EngineTrack(song: Song(id: "a")) { _ in MemorySource(first, rate: rate) },
             EngineTrack(song: Song(id: "b")) { _ in MemorySource(between, rate: 96_000) },
@@ -353,10 +354,11 @@ func energyMap(_ samples: [Float], block: Int = 2_048) -> String {
         #expect(engine.position()?.seconds == 0.5)
     }
 
-    // The one lossy step in the chain: the main mixer converting a file's rate to the output's
-    // (48 kHz here, as on the speaker and AirPods). Measured and printed, so the quality is a number
-    // (notes/ios.md); the bounds only catch a conversion that is broken outright.
-    @Test func theMixersRateConversionMeasured() throws {
+    // The one lossy step in the chain: a lane's converter taking a file's rate to the output's (48 kHz
+    // here, as on the speaker and AirPods). Measured and printed, so the quality is a number
+    // (notes/ios.md); the bounds only catch a conversion that is broken outright - as the main mixer's
+    // own was, from 192 kHz (a 30 kHz tone left at -21.8 dB).
+    @Test func theRateConversionMeasured() throws {
         for rate in [192_000.0, 96_000.0, 44_100.0] {
             func render(_ song: [[Float]]) throws -> [Float] {
                 let engine = try offlineEngine(rate: 48_000, channels: 2)
