@@ -122,7 +122,7 @@ export function SourceCard({
       <dl class="app-source-facts">
         <div class="app-source-fact">
           <dt class="app-source-label">Tracks</dt>
-          <dd class={`app-source-value app-mono${missing ? ' is-warning' : ''}`}>{tracksText(candidate)}</dd>
+          <dd class={`app-source-value${missing ? ' is-warning' : ''}`}>{tracksText(candidate)}</dd>
         </div>
         <div class="app-source-fact">
           <dt class="app-source-label">Quality</dt>
@@ -134,7 +134,7 @@ export function SourceCard({
         </div>
         <div class="app-source-fact">
           <dt class="app-source-label">Starts</dt>
-          <dd class={`app-source-value app-mono ${starts.waits ? 'is-warning' : 'is-now'}`}>{starts.text}</dd>
+          <dd class={`app-source-value ${starts.waits ? 'is-warning' : 'is-now'}`}>{starts.text}</dd>
         </div>
       </dl>
 

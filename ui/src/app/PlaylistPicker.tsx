@@ -208,7 +208,7 @@ export function PlaylistPicker({
               <span class="app-playlist-pick-art is-new" aria-hidden="true">
                 <PlaylistAddIcon class="app-playlist-art-icon" />
               </span>
-              <span class="app-playlist-pick-name">New playlist…</span>
+              <span class="app-playlist-pick-name" dir="auto">New playlist…</span>
             </button>
             {rows.map((playlist) => (
               <button
@@ -222,7 +222,7 @@ export function PlaylistPicker({
                   {playlist.coverArt ? <Cover id={playlist.coverArt} size={80} class="app-playlist-pick-cover" /> : <PlaylistIcon class="app-playlist-art-icon" />}
                 </span>
                 <span class="app-playlist-pick-text">
-                  <span class="app-playlist-pick-name">{playlist.name}</span>
+                  <span class="app-playlist-pick-name" dir="auto">{playlist.name}</span>
                   <span class="app-playlist-pick-line">{adding?.id === playlist.id ? 'Adding…' : songCount(playlist.songCount)}</span>
                 </span>
               </button>

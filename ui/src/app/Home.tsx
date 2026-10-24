@@ -48,8 +48,8 @@ function Tiles({ albums, onOpen }: { albums: readonly Album[]; onOpen: (album: A
             <Cover id={album.coverArt} size={260} class="app-tile-cover" />
             {/* one block, as the board has it: the two lines sit together under the cover */}
             <span class="app-tile-text">
-              <span class="app-tile-title">{album.name}</span>
-              <span class="app-tile-artist">{album.artist}</span>
+              <span class="app-tile-title" dir="auto">{album.name}</span>
+              <span class="app-tile-artist" dir="auto">{album.artist}</span>
             </span>
           </button>
         </li>

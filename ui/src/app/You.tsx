@@ -373,7 +373,7 @@ export function You({
               >
                 <span class="app-row-label">Needs a look</span>
                 {badgeText(needsLook ?? 0) && (
-                  <span class="app-queue-badge app-mono" aria-hidden="true">
+                  <span class="app-queue-badge" aria-hidden="true">
                     {badgeText(needsLook ?? 0)}
                   </span>
                 )}

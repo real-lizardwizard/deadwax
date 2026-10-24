@@ -206,8 +206,8 @@ export function Pinned({
                 style={offset ? { transform: `translateY(${offset}px)` } : undefined}
               >
                 <span class="app-pin-text">
-                  <span class="app-pin-title">{pin.label}</span>
-                  <span class="app-pin-line">{pinLine(pin, personal)}</span>
+                  <span class="app-pin-title" dir="auto">{pin.label}</span>
+                  <span class="app-pin-line" dir="auto">{pinLine(pin, personal)}</span>
                 </span>
                 <button
                   type="button"
@@ -264,8 +264,8 @@ export function Pinned({
               <>
                 <Cover id={pin.cover} size={96} class={`app-pin-thumb${pin.kind === 'artist' ? ' is-round' : ''}`} />
                 <span class="app-pin-text">
-                  <span class="app-pin-title">{pin.label}</span>
-                  <span class="app-pin-line">{pinLine(pin, personal)}</span>
+                  <span class="app-pin-title" dir="auto">{pin.label}</span>
+                  <span class="app-pin-line" dir="auto">{pinLine(pin, personal)}</span>
                 </span>
               </>
             )

@@ -563,6 +563,7 @@ html:has(.app-shell.has-mini) { scroll-padding-bottom: var(--app-chrome-bottom-m
 
 .app-identity-name {
     margin: 0;
+    font-family: var(--dw-font-title);
     font-size: var(--dw-text-title-2);
     font-weight: var(--dw-weight-bold);
     letter-spacing: var(--dw-tracking-title);
@@ -1022,6 +1023,7 @@ html.app-viz-open { overflow: hidden; }
     font-weight: var(--dw-weight-semibold);
     line-height: var(--dw-leading-label);
     overflow-wrap: anywhere;
+    text-wrap: balance;
 }
 
 .app-info-line {
@@ -1468,7 +1470,6 @@ html.app-viz-open { overflow: hidden; }
     border-radius: var(--dw-radius-control);
     background: linear-gradient(var(--dw-badge-purple-bg), var(--dw-badge-purple-bg)), var(--dw-tab-bar);
     color: var(--dw-accent-text);
-    font-family: var(--dw-font-mono);
     font-size: var(--dw-text-tab);
     font-weight: var(--dw-weight-bold);
 }
@@ -1584,11 +1585,13 @@ html.app-viz-open { overflow: hidden; }
 .app-job-data,
 .app-job-brief {
     color: var(--dw-text-2);
-    font-family: var(--dw-font-mono);
     font-size: var(--dw-text-footnote);
-    font-variant-numeric: tabular-nums;
     line-height: var(--dw-leading-note);
 }
+
+/* ...the files and the speed in the data face; the brief - "6 of 10", "2nd in line", "starting" - is a
+   count or a word, in the text face (2.0.9) */
+.app-job-data { font-family: var(--dw-font-mono); }
 
 /* an Arriving card's state word gives way before the album's name does */
 .app-job-brief { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1827,7 +1830,7 @@ html.app-viz-open { overflow: hidden; }
     background: transparent;
     color: var(--dw-text);
     font: inherit;
-    font-size: var(--dw-text-body);
+    font-size: var(--dw-text-field);
     outline: none;
     -webkit-appearance: none;
     appearance: none;
@@ -2403,7 +2406,7 @@ button.app-result:active { background: var(--dw-pressed); }
     inset: 0;
     width: 100%;
     opacity: var(--app-chip-select);
-    font-size: var(--dw-text-body);
+    font-size: var(--dw-text-field);
 }
 
 .app-sources-sort-icon { flex: none; width: var(--app-chip-icon); height: var(--app-chip-icon); }
@@ -2479,7 +2482,7 @@ button.app-result:active { background: var(--dw-pressed); }
     box-shadow: var(--dw-well-inset);
     color: var(--dw-text);
     font: inherit;
-    font-size: var(--dw-text-body);
+    font-size: var(--dw-text-field);
     -webkit-appearance: none;
     appearance: none;
 }
@@ -2550,7 +2553,8 @@ button.app-result:active { background: var(--dw-pressed); }
     padding: 0 var(--app-source-get-pad);
     border: var(--dw-hairline) solid transparent;
     border-radius: var(--dw-radius-control);
-    font-size: var(--dw-text-data);
+    /* (2.0.9) a word, not data: Search's Get's size (it read --dw-text-data, 14px until the data size went to 15) */
+    font-size: var(--dw-text-heading);
     font-weight: var(--dw-weight-semibold);
 }
 
@@ -2843,7 +2847,7 @@ button.app-result:active { background: var(--dw-pressed); }
     box-shadow: var(--dw-well-inset);
     color: var(--dw-text);
     font: inherit;
-    font-size: var(--dw-text-body);
+    font-size: var(--dw-text-field);
     -webkit-appearance: none;
     appearance: none;
 }
@@ -3143,11 +3147,13 @@ button.app-result:active { background: var(--dw-pressed); }
 
 .app-artist-name {
     margin: 0;
+    font-family: var(--dw-font-title);
     font-size: var(--dw-text-large-title);
     font-weight: var(--dw-weight-bold);
     line-height: var(--dw-leading-title);
     letter-spacing: var(--dw-tracking-title);
     overflow-wrap: anywhere;
+    text-wrap: balance;
 }
 
 .app-artist-facts {
@@ -3396,7 +3402,7 @@ button.app-result:active { background: var(--dw-pressed); }
     inset: 0;
     width: 100%;
     opacity: var(--app-chip-select);
-    font-size: var(--dw-text-body);
+    font-size: var(--dw-text-field);
 }
 
 .app-sort:has(.app-sort-select:focus-visible) {
@@ -3405,7 +3411,7 @@ button.app-result:active { background: var(--dw-pressed); }
     border-radius: var(--dw-radius-control);
 }
 
-.app-library-count { color: var(--dw-text-2); white-space: nowrap; }
+.app-library-count { color: var(--dw-text-2); font-size: var(--dw-text-footnote); white-space: nowrap; }
 /* (2.0.0-player.52) your library empty: what it is, what to do, and Browse the store under them */
 .app-library-empty { display: flex; flex-direction: column; align-items: center; gap: var(--app-album-mine-gap); }
 /* the Library's title takes the focus Browse the store hands on, where no Browse chip is drawn (a desktop) */
@@ -4126,7 +4132,7 @@ html.app-artist-panel-open { overflow: hidden; }
     background: var(--dw-well);
     box-shadow: var(--dw-well-inset);
     color: var(--dw-text);
-    font-size: var(--dw-text-body);
+    font-size: var(--dw-text-field);
 }
 
 .app-artist-search-input:focus-visible { outline: var(--app-ring) solid var(--dw-accent); outline-offset: var(--app-ring); }
@@ -4950,7 +4956,7 @@ html.app-queue-menu-open { overflow: hidden; }
     --app-playlist-hero-icon: 64px;       /* ...and on an empty playlist's hero */
     --app-picker-list-max: 50dvh;         /* the picker's list scrolls past this */
     --app-playlist-edit-gap: 12px;        /* between Edit's fields, and before its rows */
-    --app-playlist-field-text: var(--dw-text-body); /* Edit's and the form's fields: 16px or more, so iOS doesn't zoom */
+    --app-playlist-field-text: var(--dw-text-field); /* Edit's and the form's fields: 16px or more, so iOS doesn't zoom */
     --app-playlists-fold-turn: 90deg;     /* From files' chevron, opened */
 }
 
@@ -5075,6 +5081,10 @@ html.app-picker-open { overflow: hidden; }
 
 /* a song's row: its own cover in the number's column, the playing bars over it */
 .app-playlist-track { grid-template-columns: var(--app-playlist-row-cover) minmax(0, 1fr) auto; }
+/* (2.0.9) a playlist's row aligns its title and length by their first baselines, as an album's row does
+   (player.css's .pl-track), and only its cover is centred: a baseline would sit the cover on the line, and
+   the whole row centred drew the length between the title's line and the artist's */
+.app-playlist-track-art { align-self: center; }
 
 .app-playlist-track-art {
     position: relative;
@@ -5255,7 +5265,7 @@ html.app-picker-open { overflow: hidden; }
    look's "needs Edit albums" line. */
 :root {
     --app-people-gap: 12px;                       /* between a card's parts, and between cards */
-    --app-people-field-text: var(--dw-text-body); /* every field: 17px */
+    --app-people-field-text: var(--dw-text-field); /* every field: 17px */
     --app-people-dialog-max: 480px;               /* Remove's card on a desktop */
     --app-people-dialog-height: 100dvh;           /* ...and how tall it may get, less the status bar */
     --app-people-max: 760px;                      /* the page's column on a desktop: forms a line can be read across */
@@ -5775,7 +5785,7 @@ html.app-edit-open { overflow: hidden; }
     box-shadow: var(--dw-well-inset);
     color: var(--dw-text);
     font: inherit;
-    font-size: var(--dw-text-body);
+    font-size: var(--dw-text-field);
     outline: none;
 }
 
@@ -6658,7 +6668,7 @@ html.app-edit-open { overflow: hidden; }
     box-shadow: var(--dw-well-inset);
     color: var(--dw-text);
     font-family: var(--dw-font-mono);
-    font-size: var(--dw-text-body);
+    font-size: var(--dw-text-field);
     outline: none;
 }
 
@@ -6938,7 +6948,7 @@ html:has(.app-shell.has-mini:not(.app-desk) .app-pane:not([hidden]) .app-setting
     box-shadow: var(--dw-well-inset);
     color: var(--dw-text);
     font: inherit;
-    font-size: var(--dw-text-body);
+    font-size: var(--dw-text-field);
     outline: none;
 }
 

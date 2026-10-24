@@ -606,9 +606,9 @@ function VisualizerScreen({ player, opener, onClose }: { player: Player; opener:
           <div class="app-viz-song" data-chrome="1">
             <Cover id={track?.coverArt} size={112} class="app-viz-cover" />
             <div class="app-viz-song-text">
-              <span class="app-viz-title">{track ? track.title : 'Nothing playing'}</span>
-              {byline[0] ? <span class="app-viz-artist">{byline[0]}</span> : null}
-              {byline[1] ? <span class="app-viz-album">{byline[1]}</span> : null}
+              <span class="app-viz-title" dir="auto">{track ? track.title : 'Nothing playing'}</span>
+              {byline[0] ? <span class="app-viz-artist" dir="auto">{byline[0]}</span> : null}
+              {byline[1] ? <span class="app-viz-album" dir="auto">{byline[1]}</span> : null}
             </div>
           </div>
 

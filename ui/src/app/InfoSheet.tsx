@@ -280,14 +280,14 @@ export function InfoSheet({
                 </h3>
                 <div class="app-card app-info-card">
                   <div class="app-info-text">
-                    <p class="app-info-name">{about.song.title}</p>
-                    {about.song.artist && <p class="app-info-line">{about.song.artist}</p>}
+                    <p class="app-info-name" dir="auto">{about.song.title}</p>
+                    {about.song.artist && <p class="app-info-line" dir="auto">{about.song.artist}</p>}
                     {about.song.lines.map((line) => (
-                      <p key={line} class="app-info-line">
+                      <p key={line} class="app-info-line" dir="auto">
                         {line}
                       </p>
                     ))}
-                    {about.song.writtenBy && <p class="app-info-line">Written by {about.song.writtenBy}</p>}
+                    {about.song.writtenBy && <p class="app-info-line" dir="auto">Written by {about.song.writtenBy}</p>}
                   </div>
                 </div>
               </section>
@@ -301,9 +301,9 @@ export function InfoSheet({
                     <button type="button" class="app-card app-info-card is-link" onClick={onAlbum}>
                       <Cover id={about.album.coverArt} size={120} class="app-info-cover" />
                       <span class="app-info-text">
-                        <span class="app-info-name">{about.album.title}</span>
-                        {about.album.line && <span class="app-info-line">{about.album.line}</span>}
-                        {about.album.pressing && <span class="app-info-line">{about.album.pressing}</span>}
+                        <span class="app-info-name" dir="auto">{about.album.title}</span>
+                        {about.album.line && <span class="app-info-line" dir="auto">{about.album.line}</span>}
+                        {about.album.pressing && <span class="app-info-line" dir="auto">{about.album.pressing}</span>}
                       </span>
                       <ChevronRightIcon class="app-chevron" />
                     </button>
@@ -311,9 +311,9 @@ export function InfoSheet({
                     <div class="app-card app-info-card">
                       <Cover id={about.album.coverArt} size={120} class="app-info-cover" />
                       <div class="app-info-text">
-                        <p class="app-info-name">{about.album.title}</p>
-                        {about.album.line && <p class="app-info-line">{about.album.line}</p>}
-                        {about.album.pressing && <p class="app-info-line">{about.album.pressing}</p>}
+                        <p class="app-info-name" dir="auto">{about.album.title}</p>
+                        {about.album.line && <p class="app-info-line" dir="auto">{about.album.line}</p>}
+                        {about.album.pressing && <p class="app-info-line" dir="auto">{about.album.pressing}</p>}
                       </div>
                     </div>
                   )}
@@ -328,20 +328,20 @@ export function InfoSheet({
                   {about.artist.id && onArtist ? (
                     <button type="button" class="app-card app-info-card is-link" onClick={() => onArtist({ id: about.artist!.id!, name: about.artist!.pageName ?? about.artist!.name })}>
                       <span class="app-info-text">
-                        <span class="app-info-name">{about.artist.name}</span>
-                        {about.artist.facts && <span class="app-info-line">{about.artist.facts}</span>}
-                        {about.artist.count && <span class="app-info-line">{about.artist.count}</span>}
-                        {about.artist.note && <span class="app-info-line">{about.artist.note}</span>}
+                        <span class="app-info-name" dir="auto">{about.artist.name}</span>
+                        {about.artist.facts && <span class="app-info-line" dir="auto">{about.artist.facts}</span>}
+                        {about.artist.count && <span class="app-info-line" dir="auto">{about.artist.count}</span>}
+                        {about.artist.note && <span class="app-info-line" dir="auto">{about.artist.note}</span>}
                       </span>
                       <ChevronRightIcon class="app-chevron" />
                     </button>
                   ) : (
                     <div class="app-card app-info-card">
                       <div class="app-info-text">
-                        <p class="app-info-name">{about.artist.name}</p>
-                        {about.artist.facts && <p class="app-info-line">{about.artist.facts}</p>}
-                        {about.artist.count && <p class="app-info-line">{about.artist.count}</p>}
-                        {about.artist.note && <p class="app-info-line">{about.artist.note}</p>}
+                        <p class="app-info-name" dir="auto">{about.artist.name}</p>
+                        {about.artist.facts && <p class="app-info-line" dir="auto">{about.artist.facts}</p>}
+                        {about.artist.count && <p class="app-info-line" dir="auto">{about.artist.count}</p>}
+                        {about.artist.note && <p class="app-info-line" dir="auto">{about.artist.note}</p>}
                       </div>
                     </div>
                   )}

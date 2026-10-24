@@ -30,6 +30,7 @@ import { queued, warmAlbum } from './levelling'
 import type { Player } from './usePlayer'
 import { accessNow, seesDetail, useAccess } from '../app/access'
 import { errorNote } from '../app/ErrorNote'
+import { heroTitleClass } from '../lib/titles'
 
 /**
  * One album: its cover, Play and Shuffle, and its songs.
@@ -371,15 +372,15 @@ export function AlbumPage({
         ) : (
           <Cover id={shown?.coverArt} size={800} class="pl-hero-cover" />
         )}
-        <h1 class="pl-hero-title">{shown?.name ?? ''}</h1>
+        <h1 class={heroTitleClass(shown?.name)} dir="auto">{shown?.name ?? ''}</h1>
         {artistId && artistName && onArtist ? (
-          <button type="button" class="pl-hero-artist app-hero-link" onClick={() => onArtist({ id: artistId, name: artistName })}>
+          <button type="button" class="pl-hero-artist app-hero-link" dir="auto" onClick={() => onArtist({ id: artistId, name: artistName })}>
             {artistName}
           </button>
         ) : (
           //? not a link: drawn plain once the album has said it names no artist to go to - never while
           //? it might still be one, which would flash from grey to the link's colour
-          <p class={`pl-hero-artist${album ? ' app-hero-plain' : ''}`}>{artistName}</p>
+          <p class={`pl-hero-artist${album ? ' app-hero-plain' : ''}`} dir="auto">{artistName}</p>
         )}
         <p class="pl-hero-meta">
           {[shown?.genre, shown?.year, format].filter(Boolean).join(' · ')}
@@ -503,8 +504,8 @@ export function AlbumPage({
                     {isCurrent ? <PlayingBars paused={!player.playing} /> : song.track ?? ''}
                   </span>
                   <span class="pl-track-text">
-                    <span class="pl-track-title">{song.title}</span>
-                    {showArtist && <span class="pl-track-artist">{song.artist}</span>}
+                    <span class="pl-track-title" dir="auto">{song.title}</span>
+                    {showArtist && <span class="pl-track-artist" dir="auto">{song.artist}</span>}
                   </span>
                   <span class="pl-track-time">{trackTime(song.duration)}</span>
                 </button>

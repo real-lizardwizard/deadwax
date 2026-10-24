@@ -357,16 +357,16 @@ export function NowPlaying({
           {player.error && <p class="pl-sheet-error">{player.error}</p>}
           {/* (2.0.7) the turntable's silent record, said in the same place - a failure first, which says more */}
           {!player.error && turntable && silent && <p class="app-tt-silent">{silent}</p>}
-          <h2 class="pl-sheet-title">{track.title}</h2>
+          <h2 class="pl-sheet-title" dir="auto">{track.title}</h2>
           {/* one box either way, so which it is never moves the bar; the ellipsis is the span's,
               since the link's tap target reaches past its own box (player.css) */}
           {track.albumId ? (
             <button type="button" class="pl-sheet-artist is-link" onClick={onAlbum} aria-label={`Go to the album: ${byline}`}>
-              <span class="pl-sheet-byline">{byline}</span>
+              <span class="pl-sheet-byline" dir="auto">{byline}</span>
             </button>
           ) : (
             <p class="pl-sheet-artist">
-              <span class="pl-sheet-byline">{byline}</span>
+              <span class="pl-sheet-byline" dir="auto">{byline}</span>
             </p>
           )}
         </div>

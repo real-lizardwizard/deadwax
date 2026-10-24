@@ -25,8 +25,8 @@ export function AlbumTile({ album, marks, onOpen }: {
       onClick={() => onOpen(album)}
     >
       <Cover id={album.coverArt} size={400} class="pl-album-cover" />
-      <span class="pl-album-title">{album.name}</span>
-      <span class="pl-album-artist">{album.artist}</span>
+      <span class="pl-album-title" dir="auto">{album.name}</span>
+      <span class="pl-album-artist" dir="auto">{album.artist}</span>
       {isNew(marks, album) && (
         <span class="pl-album-new">
           New<span class="app-visually-hidden"> in your library</span>

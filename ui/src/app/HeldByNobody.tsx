@@ -124,7 +124,7 @@ export function HeldByNobody({ live }: { live: boolean }) {
             <ul class="app-care-held">
               {shown.map((album) => (
                 <li key={album.id} class="app-care-held-row">
-                  <span class="app-care-held-name">{[album.album || 'Unknown album', album.artist].filter(Boolean).join(' · ')}</span>
+                  <span class="app-care-held-name" dir="auto">{[album.album || 'Unknown album', album.artist].filter(Boolean).join(' · ')}</span>
                   <span class="app-care-held-path">{album.path}</span>
                 </li>
               ))}
@@ -142,7 +142,7 @@ export function HeldByNobody({ live }: { live: boolean }) {
               <ul ref={flagList} class="app-care-held">
                 {answer.flags.map((flag) => (
                   <li key={flag.id} class="app-care-held-row" data-flag={String(flag.id)}>
-                    <span class="app-care-held-name">{flagName(flag)}</span>
+                    <span class="app-care-held-name" dir="auto">{flagName(flag)}</span>
                     <span class="app-care-held-path">{flagWords(flag)}</span>
                     <span class="app-care-held-actions">
                       <button type="button" class="app-button app-care-button" aria-disabled={busy === flag.id} onClick={() => act(flag.id, 'add')}>

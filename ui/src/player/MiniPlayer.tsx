@@ -33,8 +33,8 @@ export function MiniPlayer({ player, onOpen }: { player: Player; onOpen: (event:
       <button type="button" class="pl-mini-open" onClick={onOpen} aria-label={miniPlayerLabel(track.title, player.error ?? track.artist)}>
         <Cover id={track.coverArt} size={120} class="pl-mini-cover" />
         <span class="pl-mini-text">
-          <span class="pl-mini-title">{track.title}</span>
-          <span class="pl-mini-artist">{player.error ?? track.artist}</span>
+          <span class="pl-mini-title" dir="auto">{track.title}</span>
+          <span class="pl-mini-artist" dir="auto">{player.error ?? track.artist}</span>
         </span>
       </button>
       <button

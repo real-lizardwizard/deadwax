@@ -19,6 +19,7 @@ import type { Player } from '../player/usePlayer'
 import { ConfirmLine } from './ConfirmLine'
 import { announcePlaylistChanged, forgetPlaylist, keepPlaylist, keptPlaylist, onPlaylistChanged } from './usePlaylists'
 import { sayError } from './sayError'
+import { heroTitleClass } from '../lib/titles'
 
 /** A row being dragged in Edit: which, from where, the pointer's start and now, the page's scroll at the start,
  *  the rows' pitch, and the pointer. */
@@ -458,8 +459,8 @@ export function PlaylistPage({
               <PlaylistIcon class="app-playlist-hero-icon" />
             </span>
           )}
-          <h1 class="pl-hero-title">{shownPlaylist.name}</h1>
-          <p class="pl-hero-artist app-hero-plain app-playlist-owner">{ownerLine(shownPlaylist)}</p>
+          <h1 class={heroTitleClass(shownPlaylist.name)} dir="auto">{shownPlaylist.name}</h1>
+          <p class="pl-hero-artist app-hero-plain app-playlist-owner" dir="auto">{ownerLine(shownPlaylist)}</p>
           {/* why there is no Edit, under whose it is; then the description - one slot, which a desktop's drawer places */}
           {((readOnly && !editing) || shownPlaylist.comment) && (
             <div class="app-playlist-notes">
@@ -560,8 +561,8 @@ export function PlaylistPage({
                   style={offset ? { transform: `translateY(${offset}px)` } : undefined}
                 >
                   <span class="app-pin-text">
-                    <span class="app-pin-title">{row.title}</span>
-                    <span class="app-pin-line">{row.artist}</span>
+                    <span class="app-pin-title" dir="auto">{row.title}</span>
+                    <span class="app-pin-line" dir="auto">{row.artist}</span>
                   </span>
                   <button type="button" class="app-pin-move app-pin-up" aria-label={`Move ${row.title} up`} aria-disabled={index === 0 || saving} onClick={() => move(index, -1)}>
                     <span class="app-pin-move-face">
@@ -641,8 +642,8 @@ export function PlaylistPage({
                     )}
                   </span>
                   <span class="pl-track-text">
-                    <span class="pl-track-title">{song.title}</span>
-                    <span class="pl-track-artist">{[song.artist, song.album].filter(Boolean).join(' · ')}</span>
+                    <span class="pl-track-title" dir="auto">{song.title}</span>
+                    <span class="pl-track-artist" dir="auto">{[song.artist, song.album].filter(Boolean).join(' · ')}</span>
                   </span>
                   <span class="pl-track-time">{trackTime(song.duration)}</span>
                 </button>

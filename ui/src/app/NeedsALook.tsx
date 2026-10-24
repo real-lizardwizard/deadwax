@@ -393,7 +393,7 @@ export function NeedsALook({
                   {...(chip.hint ? { title: chip.hint } : {})}
                   onClick={() => chooseFacet(chip.id)}
                 >
-                  {chip.label} <span class="app-queue-count app-mono">{chip.count}</span>
+                  {chip.label} <span class="app-queue-count">{chip.count}</span>
                 </button>
               ))}
             </div>

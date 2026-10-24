@@ -244,7 +244,7 @@ export function topRow(row: Row, context: RowContext, tile: boolean) {
     >
       {cover(row, context, tile ? 112 : 96)}
       <span class="app-result-text">
-        <span class="app-result-title">{title(row)}</span>
+        <span class="app-result-title" dir="auto">{title(row)}</span>
         {tile ? (
           <>
             <span class="app-result-line">{line}</span>
@@ -303,7 +303,7 @@ function songDisclosure(row: Extract<Row, { type: 'mb-song' }>, context: RowCont
           onClick={() => context.onOpenSongAlbum(song, album)}>
           <ArchiveCover addresses={coverAddresses(null, album.id, 250)} class="app-result-cover" />
           <span class="app-result-text">
-            <span class="app-result-title">{album.title}</span>
+            <span class="app-result-title" dir="auto">{album.title}</span>
             <span class="app-result-line">{songAlbumLine(album, song, context.index, context.personal, context.evidence)}</span>
           </span>
         </button>
@@ -316,7 +316,7 @@ function songDisclosure(row: Extract<Row, { type: 'mb-song' }>, context: RowCont
         <button type="button" class="app-result app-song-row" data-row={row.key} aria-expanded={open} aria-controls={id} onClick={() => context.onToggleSong(song.key)}>
           {cover(row, context, 96)}
           <span class="app-result-text">
-            <span class="app-result-title">{song.title}</span>
+            <span class="app-result-title" dir="auto">{song.title}</span>
             <span class="app-result-line app-result-split">
               <span class="app-result-facts">{line}</span>
               {place ? <span class="app-result-place">{`${line ? ' · ' : ''}${place}`}</span> : null}
@@ -370,7 +370,7 @@ export function sectionRow(row: Row, context: RowContext, index: number) {
       >
         {cover(row, context, 96)}
         <span class="app-result-text">
-          <span class="app-result-title">{title(row)}</span>
+          <span class="app-result-title" dir="auto">{title(row)}</span>
           {line || place ? (
             <span class="app-result-line app-result-split">
               <span class="app-result-facts">{line}</span>

@@ -483,7 +483,7 @@ export function Sources({
               Cancel
             </button>
             <h2 id="app-sources-title" class="app-sources-title">Choose a source</h2>
-            {request && <p class="app-sources-subtitle">{request.subtitle}</p>}
+            {request && <p class="app-sources-subtitle" dir="auto">{request.subtitle}</p>}
           </header>
         ) : (
           //? the desktop panel's head, as its board has it: what they are for under the heading, and
@@ -491,7 +491,7 @@ export function Sources({
           <header class="app-sources-head is-panel">
             <div class="app-sources-heading">
               <h2 id="app-sources-title" class="app-sources-title">Sources</h2>
-              {request && <p class="app-sources-subtitle">for {request.subtitle}</p>}
+              {request && <p class="app-sources-subtitle" dir="auto">for <bdi>{request.subtitle}</bdi></p>}
             </div>
             <button ref={cancel} type="button" class="app-sources-close" onClick={onClose} aria-label="Close the sources">
               <CloseIcon class="app-sources-close-icon" />

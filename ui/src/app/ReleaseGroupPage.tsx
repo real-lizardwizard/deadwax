@@ -35,6 +35,7 @@ import { takeOpener } from './useSheet'
 import { hasLibrary } from './useMyLibrary'
 import { refreshOwned, useOwned } from './useOwned'
 import { noticeWords } from '../lib/errorWords'
+import { heroTitleClass } from '../lib/titles'
 
 export { PRESSINGS_KEPT } from './pressingLists'
 
@@ -104,7 +105,7 @@ function DeskTracklist({
               )}
               <tr class={`app-rg-row${row.mark ? ` is-marked is-${row.mark.kind}` : ''}${row.song ? ' is-song' : ''}`}>
                 <td class="app-rg-number">{row.number}</td>
-                <td class="app-rg-title" title={row.title}>
+                <td class="app-rg-title" dir="auto" title={row.title}>
                   {row.title}
                   {row.song && <span class="app-visually-hidden">{SONG_WORDS}</span>}
                 </td>
@@ -132,7 +133,7 @@ function DeskTracklist({
               {missing.map((track, index) => (
                 <tr key={`${index}:${track.title}`} class="app-rg-row is-left">
                   <td class="app-rg-number" aria-hidden="true">–</td>
-                  <td class="app-rg-title" title={track.title}>
+                  <td class="app-rg-title" dir="auto" title={track.title}>
                     {track.title}
                   </td>
                   <td class="app-rg-length">{track.length}</td>
@@ -490,13 +491,13 @@ export function ReleaseGroupPage({
 
       <div class="pl-album-hero">
         <ArchiveCover addresses={mbid ? coverAddresses(chosen?.id ?? release, mbid) : []} class="pl-hero-cover" />
-        <h1 class="pl-hero-title">{header.title || title}</h1>
+        <h1 class={heroTitleClass(header.title || title)} dir="auto">{header.title || title}</h1>
         {artistLink ? (
-          <button type="button" class="pl-hero-artist app-hero-link" onClick={() => onArtist?.(artistLink)}>
+          <button type="button" class="pl-hero-artist app-hero-link" dir="auto" onClick={() => onArtist?.(artistLink)}>
             {header.artist}
           </button>
         ) : (
-          <p class="pl-hero-artist app-hero-plain">{header.artist}</p>
+          <p class="pl-hero-artist app-hero-plain" dir="auto">{header.artist}</p>
         )}
         {/* said once something is known - a cold link has nothing to say until the pressings come; a
             folder of this name with no ids is a dashed "maybe" - why, in a line under Get (2.0.6), its folders in
@@ -580,7 +581,7 @@ export function ReleaseGroupPage({
                 <li class={`app-rg-track${row.mark ? ` is-marked is-${row.mark.kind}` : ''}${row.song ? ' is-song' : ''}`}>
                   <span class="app-rg-number">{row.number}</span>
                   <span class="app-rg-text">
-                    <span class="app-rg-title">
+                    <span class="app-rg-title" dir="auto">
                       {row.title}
                       {row.song && <span class="app-visually-hidden">{SONG_WORDS}</span>}
                     </span>
@@ -600,7 +601,7 @@ export function ReleaseGroupPage({
                   <li key={`${index}:${track.title}`} class="app-rg-track is-left">
                     <span class="app-rg-number" aria-hidden="true">–</span>
                     <span class="app-rg-text">
-                      <span class="app-rg-title">{track.title}</span>
+                      <span class="app-rg-title" dir="auto">{track.title}</span>
                     </span>
                     <span class="app-rg-length">{track.length}</span>
                   </li>

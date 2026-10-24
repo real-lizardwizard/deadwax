@@ -62,7 +62,9 @@ export interface DebugRow {
   value: string
   /** a second, smaller line under the value - the song changes before the last */
   note?: string
-  /** a data value - numbers, rates, field names - set in the monospace face */
+  /** a data value set in the monospace face: since 2.0.9 only Navidrome's field names (ids, not words) - a value
+   *  that reads as a phrase ("FLAC, 16-bit, 44.1 kHz, stereo", "96 kHz to 48 kHz, 3 dB quieter") is in the text
+   *  face, as the type review's rule has it: the data face for numbers, times, ids and paths, never a sentence */
   mono?: boolean
   /** (2.0.7) the note is data too - field names - and set in the monospace face; every other note is in the
    *  text face (the review's 1.10: every note was monospace) */
@@ -153,10 +155,10 @@ export function formatWords(track: QueueTrack): string {
   ].filter(Boolean).join(', ')
 }
 
-/** Debug's Format row: formatWords(), in the data face - "Navidrome didn't say" when it didn't. */
+/** Debug's Format row: formatWords(), in the text face (2.0.9: words, not data) - "Navidrome didn't say" when it didn't. */
 export function formatRow(track: QueueTrack): DebugRow {
   const words = formatWords(track)
-  return { label: 'Format', value: words || "Navidrome didn't say", mono: true }
+  return { label: 'Format', value: words || "Navidrome didn't say" }
 }
 
 /** What came back for THIS song when it was asked for inside an MP4, or null. */
@@ -197,7 +199,7 @@ export function sentAsRow(input: Pick<DebugInput, 'track' | 'wrapped' | 'maxRate
     if (mine.got === null || awaitingResample(input)) return { label, value: upperFirst(words) }
     const tail = mine.resampled ? depthAndRate(24, mine.resampled.to)
       : mine.got !== 'flac' && levelledNow(input) ? depthAndRate(24, track.sampleRate) : depthAndRate(track.bitDepth, track.sampleRate)
-    return { label, value: upperFirst(words) + tail, mono: true }
+    return { label, value: upperFirst(words) + tail }
   }
   if (format === 'mp3') return { label, value: 'MP3, transcoded by Navidrome' }
   if (format === 'raw') {
@@ -226,7 +228,7 @@ export function resampledRow(input: Pick<DebugInput, 'track' | 'wrapped' | 'maxR
   const resampled = wrappedFor(input.wrapped, input.track)?.resampled
   if (resampled) {
     const quieter = levelledNow(input) ? '' : `, ${RESAMPLE_HEADROOM_DB} dB quieter`
-    return { label: 'Resampled', value: `${khz(resampled.from)} to ${khz(resampled.to)}${quieter}`, mono: true }
+    return { label: 'Resampled', value: `${khz(resampled.from)} to ${khz(resampled.to)}${quieter}` }
   }
   return { label: 'Resampled', value: awaitingResample(input) ? NOT_KNOWN_YET : 'No' }
 }
@@ -348,7 +350,7 @@ export function turntableRow(report: DeckReport | null | undefined): DebugRow {
   if (report.refused) return { label, value: `Off: ${report.refused}` }
   if (report.context === 'none') return { label, value: 'Off: waiting for a tap to start the sound', ...ready }
   if (report.context === 'starting') return { label, value: 'Off: still starting - a press scrubs silently until it has', ...ready }
-  if (window) return { label, value: `Ready: ${stretch}`, mono: true }
+  if (window) return { label, value: `Ready: ${stretch}` }
   if (report.failed) return { label, value: `Off: ${report.failed}` }
   if (report.loading) return { label, value: 'Off: its window is loading - a press scrubs silently until it is in' }
   return { label, value: 'Off: no window yet - a press scrubs silently; one is fetched while the song plays, or as the record is pressed' }
@@ -368,7 +370,7 @@ export function turntableSoundFacts(report: DeckReport | null | undefined): Debu
   const rows: DebugRow[] = []
   if (report.voice === 'script') rows.push({ label: 'Voice', value: `On the main thread - ${report.voiceWhy ?? 'this browser has no AudioWorklet'}` })
   else if (report.voice === 'worklet') rows.push({ label: 'Voice', value: 'On its own audio thread (an AudioWorklet)' })
-  if (report.clockStep && report.clockStep > 0) rows.push({ label: 'Clock step', value: `${(report.clockStep * 1000).toFixed(1)} ms at a time`, mono: true })
+  if (report.clockStep && report.clockStep > 0) rows.push({ label: 'Clock step', value: `${(report.clockStep * 1000).toFixed(1)} ms at a time` })
   if (report.fetched > 0) {
     rows.push({
       label: 'Data used',
@@ -573,7 +575,7 @@ export function normalizationRow(input: Pick<DebugInput, 'track' | 'format' | 'l
   const track = input.track as LevelledTrack
   const answer = input.level && input.level.level === track.level ? input.level : null
   const value = describeLevel(track, input.format, answer)
-  return { label: 'Normalization', value, ...(answer?.state === 'measured' ? { mono: true } : {}) }
+  return { label: 'Normalization', value }
 }
 
 /** Info's two tabs (2.0.0-player.10). */

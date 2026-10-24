@@ -215,7 +215,7 @@ export function UpNext({
               <button type="button" class="app-result" aria-label={`${row.track.title}, play now`} onClick={() => jump(group, rows, index)}>
                 <Cover id={row.track.coverArt} size={96} class="app-result-cover" />
                 <span class="app-result-text">
-                  <span class="app-result-title">{row.track.title}</span>
+                  <span class="app-result-title" dir="auto">{row.track.title}</span>
                   <span class="app-result-line">{songLine(row)}</span>
                 </span>
               </button>
@@ -238,8 +238,8 @@ export function UpNext({
               style={offset ? { transform: `translateY(${offset}px)` } : undefined}
             >
               <span class="app-pin-text">
-                <span class="app-pin-title">{row.track.title}</span>
-                <span class="app-pin-line">{songLine(row)}</span>
+                <span class="app-pin-title" dir="auto">{row.track.title}</span>
+                <span class="app-pin-line" dir="auto">{songLine(row)}</span>
               </span>
               <button type="button" class="app-pin-move app-pin-up" aria-label={`Move ${row.track.title} up`} aria-disabled={index === 0} onClick={() => move(row, rows, index, -1)}>
                 <span class="app-pin-move-face">
@@ -302,8 +302,8 @@ export function UpNext({
               <div class="app-card app-info-card app-upnext-playing">
                 <Cover id={playing.coverArt} size={128} class="app-info-cover" />
                 <div class="app-info-text">
-                  <p class="app-info-name">{playing.title}</p>
-                  <p class="app-info-line">{[playing.artist, playing.album].filter(Boolean).join(' · ')}</p>
+                  <p class="app-info-name" dir="auto">{playing.title}</p>
+                  <p class="app-info-line" dir="auto">{[playing.artist, playing.album].filter(Boolean).join(' · ')}</p>
                 </div>
               </div>
               {view.repeatOne && <p class="app-store-line">{REPEATING_ONE}</p>}

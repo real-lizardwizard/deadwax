@@ -343,9 +343,13 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
 - **Back** works: an open album is in the page's address, so the browser's back goes back to
   where you opened it from, scrolled where you left it. A saved link to an album from before the
   tabs (`#/album/…`) still opens it, in the Library.
-- **The look** is deadwax's own, the same "touch of Windows 7" as its other screens: Noto Sans,
-  with monospace for track numbers and times, square-ish corners, no blur. It's drawn from the
-  same fonts deadwax serves itself, so it needs no internet.
+- **The look** is deadwax's own, the same "touch of Windows 7" as its other screens: Noto Sans
+  for words, Noto Sans SemiCondensed - the same letters a little narrower, like a record sleeve's -
+  for the big titles (a tab's, an album's and an artist's name, the song in Now Playing), and Noto
+  Sans Mono for track numbers, times and other figures, set on the title's line; square-ish
+  corners, no blur. A very long album title is drawn a size smaller. All three fonts are served by
+  deadwax itself, so it needs no internet. An album's, a song's or an artist's name in Arabic or
+  Hebrew reads right to left, in the same place on the page as any other name.
 
 ## Up Next, shuffle and repeat
 

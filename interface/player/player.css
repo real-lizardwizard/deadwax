@@ -23,9 +23,10 @@
    it can't carry the stamp that lets the browser keep it (see stamped_page in src/api/app.py). */
 
 :root {
-    /* the look, from theme.css section 10: Noto Sans for words, monospace for data */
+    /* the look, from theme.css section 10: Noto Sans for words, its SemiCondensed for the large titles
+       (2.0.9), Noto Sans Mono for data */
     --pl-font: var(--dw-font);
-    --pl-font-display: var(--dw-font);
+    --pl-font-display: var(--dw-font-title);
     --pl-font-data: var(--dw-font-mono);
 
     /* STYLE.md's palette */
@@ -67,12 +68,16 @@
     /* the brand purple one step lighter, to read as text on black */
     --pl-accent: var(--dw-accent);
 
-    /* the phone's text sizes, in CSS px */
+    /* the phone's text sizes, in CSS px - each section 10's token of the same purpose. (The artist under
+       an album's title was --pl-text-title-2, which said 20px beside section 10's --dw-text-title-2 of 28:
+       named for what it is since 2.0.9.) */
     --pl-text-large-title: var(--dw-text-large-title);
     --pl-text-title: var(--dw-text-title);
-    --pl-text-title-2: var(--dw-text-artist-hero);
+    --pl-text-title-long: var(--dw-text-title-long);
+    --pl-text-artist-hero: var(--dw-text-artist-hero);
     --pl-text-body: var(--dw-text-body);
     --pl-text-subhead: var(--dw-text-heading);
+    --pl-text-data: var(--dw-text-data);
     --pl-text-footnote: var(--dw-text-footnote);
     --pl-text-caption: var(--dw-text-label);
     --pl-weight-regular: var(--dw-weight-regular);
@@ -80,6 +85,11 @@
     --pl-weight-semibold: var(--dw-weight-semibold);
     --pl-weight-bold: var(--dw-weight-bold);
     --pl-tracking-title: var(--dw-tracking-title);
+    /* line heights: a title's, a tile's two lines, a two-line title's, and every other line's (body) */
+    --pl-leading-title: var(--dw-leading-title);
+    --pl-leading-tile: var(--dw-leading-heading);
+    --pl-leading-tight: var(--dw-leading-tight);
+    --pl-leading-row: var(--dw-leading-row);
 
     --pl-gutter: 20px;
     --pl-gap: 16px;
@@ -137,7 +147,7 @@
        which takes no taps, and down into the gap above the scrubber, short of the bar's own tap
        target - to make it a full target tall without moving anything */
     --pl-byline-gap: 3px;
-    --pl-byline-leading: 1.25;
+    --pl-byline-leading: var(--pl-leading-tight);
     --pl-byline-reach-up: 14px;
     --pl-byline-reach-down: 9px;
     --pl-scrub-gap: 14px;          /* the title block to the scrubber's tap target */
@@ -172,8 +182,23 @@ body {
     color: var(--pl-text);
     font-family: var(--pl-font);
     font-size: var(--pl-text-body);
+    /* (2.0.9) never `normal`: that is each face's own, and a row whose number is in one face and title in
+       another drew them on different lines */
+    line-height: var(--pl-leading-row);
     -webkit-font-smoothing: antialiased;
     -webkit-tap-highlight-color: transparent;
+}
+
+/* (2.0.9) A name with dir="auto" takes its DIRECTION from its words - an Arabic or a Hebrew name reads
+   right to left, and a mixed byline doesn't reorder round its dash - but not its SIDE: `start` would be the
+   right edge for it, and an Arabic artist's name sat flush right over a page whose Play, albums and facts
+   start at the left. match-parent is the alignment the line would have had in the page's own direction
+   (left, or a centred parent's centre). Zero specificity, so any rule of its own (a centred title, a
+   right-aligned time) still wins; buttons keep the browser's centring. Chromium and WebKit know only the
+   prefixed spelling (Chromium 154 drops the plain one), Firefox the plain one: each keeps the one it reads. */
+:where([dir="auto"]:not(button)) {
+    text-align: -webkit-match-parent;
+    text-align: match-parent;
 }
 
 button {
@@ -202,8 +227,9 @@ img { display: block; }
     font-family: var(--pl-font-display);
     font-size: var(--pl-text-large-title);
     font-weight: var(--pl-weight-bold);
-    line-height: 1.2;
+    line-height: var(--pl-leading-title);
     letter-spacing: var(--pl-tracking-title);
+    text-wrap: balance;
 }
 
 .pl-notice {
@@ -281,7 +307,7 @@ img { display: block; }
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: var(--pl-text-footnote);
-    line-height: 1.35;
+    line-height: var(--pl-leading-tile);
 }
 
 .pl-album-title { margin-top: 6px; font-weight: var(--pl-weight-medium); }
@@ -334,16 +360,22 @@ img { display: block; }
 
 .pl-hero-title {
     margin: 18px 0 2px;
+    font-family: var(--pl-font-display);
     font-size: var(--pl-text-title);
     font-weight: var(--pl-weight-bold);
-    line-height: 1.2;
+    line-height: var(--pl-leading-title);
+    /* (2.0.9) the lines of a long title evened out, never a last word alone - and one over 60 letters a
+       step smaller (.is-long, set by the page from lib/titles.ts) */
+    text-wrap: balance;
 }
+
+.pl-hero-title.is-long { font-size: var(--pl-text-title-long); }
 
 .pl-hero-artist {
     margin: 0;
     color: var(--pl-accent);
-    font-size: var(--pl-text-title-2);
-    line-height: 1.25;
+    font-size: var(--pl-text-artist-hero);
+    line-height: var(--pl-leading-tight);
 }
 
 .pl-hero-meta {
@@ -410,7 +442,12 @@ img { display: block; }
 .pl-track {
     display: grid;
     grid-template-columns: 28px minmax(0, 1fr) auto;
-    align-items: center;
+    /* (2.0.9) the number, the title and the length on ONE line: aligned by their first baselines - the
+       title's, when an artist's line is under it - and the row's one line of them centred in the row.
+       Centred one by one, as they were, a 15px number sat about 3px above a 17px title, and with an
+       artist's line under the title, level with neither line. */
+    align-items: baseline;
+    align-content: center;
     gap: 10px;
     width: 100%;
     min-height: var(--pl-row);
@@ -425,7 +462,7 @@ img { display: block; }
 .pl-track-time {
     color: var(--pl-text-2);
     font-family: var(--pl-font-data);
-    font-size: var(--pl-text-subhead);
+    font-size: var(--pl-text-data);
     font-variant-numeric: tabular-nums;
 }
 
@@ -661,9 +698,10 @@ img { display: block; }
 
 .pl-sheet-title {
     margin: 0;
+    font-family: var(--pl-font-display);
     font-size: var(--pl-text-title);
     font-weight: var(--pl-weight-bold);
-    line-height: 1.25;
+    line-height: var(--pl-leading-tight);
 }
 
 /*

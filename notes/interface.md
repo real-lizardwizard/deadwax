@@ -307,6 +307,8 @@ stay; the CRT overlay, the text-glow and the ░▒▓ chrome go.
   beside the files, as the licence requires. The "0 font bytes on load" figure in the
   performance table below is therefore now one 35 KB Latin file, cached; all seven together
   are 342 KB, of which Latin Extended (164 KB) is the one a European name will pull in.
+  (Since 2.0.9 the data face is Noto Sans Mono, the large titles Noto Sans SemiCondensed and the
+  Latin Extended file trimmed to 68 KB - see "Fonts and type (2.0.9)" below.)
 - **Checkboxes, not switches (v0.6.6), for every checkbox in the app.** The settings tab's
   sliding switches were the one phone idiom left; they are plain checkboxes now, drawn by one
   `input[type="checkbox"]` rule in the Windows 7 block (a sunken square, a gloss on hover, a
@@ -451,3 +453,170 @@ stay; the CRT overlay, the text-glow and the ░▒▓ chrome go.
   `scrollbar-width` or `scrollbar-color`.** `.scrollable` set both, so the Windows 7 scrollbars
   applied in Safari only. The Windows 7 block resets both to `auto` first; if the scrollbars
   ever look flat again in Chrome, look for one of those two properties having crept back.
+
+### Fonts and type (2.0.9)
+
+James asked for "a font review as well" beside the review of the app's words (2026-10-23). The review is
+`deadwax-scratch/work/ux-audit/fonts.md` (today's faces, a census of every drawn size, the contrast table, a
+proposed scale, ranked fixes, candidate files); he chose its recommended set **plus Noto Sans SemiCondensed for
+the large titles**, and no Text size setting. What was built, fix by fix:
+
+- **Three faces, all Noto, all self-hosted** (theme.css section 1). Noto Sans for words, as since v0.6.7.
+  **Noto Sans Mono** (`styles/font/noto-sans-mono/`, seven files, one per script as Noto Sans's, OFL beside them)
+  first in `--font-mono`: until now the data face was the system's (SF Mono on an iPhone, Liberation
+  Mono on Linux), so nobody had chosen it; it is the face James liked on the roadmap page and has exactly Noto
+  Sans's vertical metrics. **Noto Sans SemiCondensed** (`styles/font/noto-sans-semicondensed/`, seven files, one
+  per script, OFL beside them) for the large titles. The mono's Latin file is Google's (31 KB); its other six are
+  Noto Sans Mono 2.014's variable font (notofonts' release, `NotoSansMono/unhinted/variable`) with the width pinned
+  at 100 and the weight axis whole, as Google's, subset to Noto Sans's own ranges. The first build bundled the
+  Latin file alone, and the review after it found a folder named Czesław drawn in two monospace designs (the ł
+  from the system's, a different weight and shape) and a Cyrillic path's letters in the system's monospace between
+  Noto Sans Mono's slashes and digits: a path, a folder or an artist's folder in any of Noto's scripts is one face now.
+- **SemiCondensed is a family of its own, not Noto Sans at `font-stretch: 87.5%`** - the review's option C
+  proposed the latter, serving the Latin file with its width axis. Chrome (FontFaceCache keys its segmented faces
+  by their descriptors) and Safari both group a family's faces by identical descriptors and take ONE group for a
+  run of text, so a width-variable Latin face beside fixed-width faces for the other scripts would have left
+  Greek, Cyrillic and Vietnamese to the system face - and a Polish title would have mixed widths (its ł and ś at
+  100%). Each SemiCondensed file is the width axis pinned at 87.5 (fontTools' instancer): the Latin one from
+  Google's width-and-weight Latin file (the review's candidate), the other six subset from Noto Sans 2.015's
+  variable font (notofonts/latin-greek-cyrillic's release, `NotoSans/unhinted/variable-ttf`) with Google's
+  unicode-ranges. Every face of each Noto family has the same descriptors (weight 300 700); tests/test_type.py
+  holds that, and that SemiCondensed covers every range Noto Sans does.
+- **The large titles**: `.pl-large-title`, `.pl-hero-title`, `.pl-sheet-title`, `.app-artist-name`, You's
+  `.app-identity-name`, the sign-in's `.app-signin-title` and the desktop's `.app-side-brand`, through
+  `--dw-font-title` (player.css's `--pl-font-display`). Not section headings, panel titles or rows.
+  `text-wrap: balance` on the ones that wrap (and Info's names); the sheet's song is one line with an ellipsis.
+  An album's title over 60 letters (code points - `lib/titles.ts`, `heroTitleClass()`, used by the album page,
+  the album you don't have and a playlist's page) takes `.is-long`, `--dw-text-title-long`: 20px on a phone, 24
+  on a desktop. Fiona Apple's 23-word title: 5 lines before, 4 balanced lines at 20px after (phone); 2 on a desktop.
+- **Pinned line heights**: `--dw-leading-row` (1.36, Noto's own `normal` - its 1069 + 293 thousandths) on
+  `body`, so no text takes a face's `normal`. player.css's five raw line heights are tokens (`--pl-leading-*`,
+  aliasing section 10's at the SAME values - 1.2, 1.25, 1.35 - so nothing moved).
+- **A track's number and length on its title's line.** They were 15px mono beside a 17px title, each centred in
+  the row's grid: measured in headless Chromium, the number's and the length's baselines sat 3px above the
+  title's on a phone, 2.5 on a desktop, and with an artist's line under the title 6px BELOW it (centred on the
+  two lines). `.pl-track` now aligns its items by their first baselines (`align-items: baseline` - the text
+  column's first baseline is its title's) and centres that one line of them in the row (`align-content: center`):
+  0px on both frames, with or without an artist's line, the line of them within a pixel of the row's middle.
+  The numbers read `--dw-text-data` (15px on a phone, as they were through `--pl-text-subhead`). The review's
+  "a quick align-self made it worse" was the number and the length baseline-aligned while the text column stayed
+  centred. **A playlist's row** (every one has an artist's line) is aligned the same way, and only its cover is
+  centred (`.app-playlist-track-art { align-self: center }` - a baseline would sit the cover on the line): the
+  first build kept the whole row centred, which drew the length 8.2px below the title's line on a phone and 7.5
+  on a desktop (6.0 and 6.5 in 2.0.8). Measured after: 0px on both; the title and artist block is centred on the
+  cover on a phone, and 1.6px above the cover's middle on a desktop, where its two lines (14 and 13px) are shorter
+  than the 40px cover and a baseline group starts at the top of the row's line. The playing bars in the number's
+  place stand on the line.
+- **One type scale per frame, in theme.css.** The phone's is unchanged but for `--dw-text-data` (14 to 15, the
+  track numbers' size, so the `.app-mono` spans that take it grow a pixel) and two new tokens: `--dw-text-field`
+  (17px, every text field and picker, NEVER redefined - iOS zooms into a field under 16px, and an iPad on its
+  side is a desktop) and `--dw-text-title-long`. The desktop's: body 14px (was 17 - so a search result, You's
+  choices, a menu item now match the track rows instead of being 3px bigger), meta 13, data 13 (was 12: track
+  times, the player bar's clocks, which were a local 11px), labels 12 (was 11: the sidebar's group labels, Info's
+  labels - the hardest text to read), brand 20. app-desktop.css's own sizes are folded in and gone:
+  `--app-desk-text` (= body), `-text-sm` and `-field-text` (= footnote), `-chip-text` (= label), `-clock`
+  (= data), `-speed-text` (= body), `-brand` (= `--dw-text-brand`), and the visualizer's `--app-viz-title`
+  (17, now the artist-hero 18), `-artist`, `-album`, `-text`, `-small` (11, now 12), `-hint`; its three lines'
+  19px leading is `--dw-leading-tight` (the cover's 56px tall in all). Every field rule moved from
+  `--dw-text-body` to `--dw-text-field` (app.css, signin.css, the bench's, and the desktop's coarse-pointer
+  block). `--app-pin-title-size` (Home's pinned cards, 14px on both frames) was left as it is. Three things a
+  size token moved that are not a list's rows: **the sign-in card's button** reads `--app-signin-button-text`
+  (`--dw-text-field`, 17px on every frame - the card is the phone's, centred, on a desktop too, and its button had
+  dropped to the desktop's 14px body under its own 17px fields); **a source card's Get** reads `--dw-text-heading`,
+  Search's Get's size, not the data size (it was 14px through `--dw-text-data`, and grew with it to 15: it is 15px
+  on a phone now, as Search's Get, and 13 on a desktop); and **the turntable's bench** (`/player/lab/`), which links
+  theme.css and has no desktop frame, takes the desktop scale in a window 1024px or wider as the app does - its body
+  and buttons 14px there (17 before), its labels 12 (11), its headings and title 13 and 28 as before, its fields
+  17. test_type.py pins that every rule sized by the data token is in the data face or one of five desktop rules
+  it names.
+- **The data face only for data** - numbers, times, ids, paths, the turntable's readouts - never a sentence or a
+  count: off the Requests tab's badge, an Arriving card's brief ("6 of 10", "2nd in line", "starting" - the
+  Downloading line's "files · MB/s" keeps it), the Library's count ("69 albums", now 13px text), You's and the
+  sidebar's Needs a look badges, Needs a look's chip counts, and a source card's Tracks ("10 of 12") and Starts
+  ("after 3 others"); Quality, Size and the score keep it. Debug's values that read as phrases are in the text
+  face too - Format, Sent as, Resampled, Normalization, the turntable's Ready and Clock step (2.0.7 had already
+  moved its notes); only Navidrome's field names keep `mono` (debug.sim pins that `mono: true` is in those two
+  rows alone).
+- **`--dw-text-3` #7d7d92 to #8e8ea3**: 3.6:1 on a popover and 3.9 on a card before, where the Edit panel, the
+  inspector and the log draw it at 12-13px; now at least 4.52 (the popover) on every surface, both frames, and
+  still the quietest grey. Dark only, so one value.
+- **Token hygiene**: player.css's `--pl-text-title-2` (the 20px artist line, beside section 10's 28px
+  `--dw-text-title-2`) is `--pl-text-artist-hero`; its type is tokens only (test_type.py). The six leading tokens
+  were kept (the review's four would have moved lines); `tabular-nums` on the mono rules was left - harmless.
+- **`dir="auto"`** straight after the class of every title, artist and byline (hero, track rows, Now Playing,
+  the mini player, the player bar, the visualizer, tiles, Info's names and lines, the artist's name, result rows,
+  pinned cards and their lines, Requests' titles and lines, an Arriving card's artist, the album you don't have's
+  tracks, the sources' "for ..." with the album isolated in a `<bdi>`, Held by nobody's rows, the sidebar's
+  playlists, a band's members, Which artist is this?'s names, the playlist picker's): an Arabic album's title is
+  right to left, its own words' direction. The first build had missed the album you don't have's tracklist and the
+  lines under a title; test_type.py's list of 32 classes is checked against every element that draws one. The
+  main page's editors, which the Edit panel hosts as they are (MetadataEditor, TrackTagEditor, the delete dialog),
+  name their album and artist with generic classes and are left as they were.
+  **Its direction, not its side**: dir="auto" also makes `start` the right edge for an RTL line, so wherever a name's
+  alignment was inherited `start` it moved: the recheck measured an Arabic artist's name flush right over a page
+  whose Play, albums and facts start at the left (x 1344-1408 of 264-1408 on a desktop, 292-370 of 20-370 on a
+  phone), and Now Playing's song flush right over its left-aligned byline. player.css's
+  `:where([dir="auto"]:not(button)) { text-align: -webkit-match-parent; text-align: match-parent }` gives every such
+  line the alignment its parent has in the page's own direction (left, or a centred parent's centre), at zero
+  specificity so a rule of its own still wins; buttons keep the browser's centring. Chromium 154 reads only the
+  prefixed spelling (it drops the plain one), Firefox only the plain one. Measured after, in Chromium at 390 and
+  1440: both lines start at the left edge, and every other dir="auto" line on Home, the album, Now Playing, the
+  artist and the Library computes the same alignment as before. Not measured: the screens the test library has no
+  Arabic name on (the visualizer, Requests, the album you don't have, the sources, Held by nobody, a band's
+  members, the picker) - the rule covers them the same way - and Safari, whose WebKit has the prefixed value
+  (its own stylesheet uses it for list items). test_type.py pins the rule and that no app rule sets
+  `start`/`end`, or a non-physical alignment on a name's class.
+- **Latin Extended trimmed**: Google's latin-ext (164 KB) carried IPA, phonetic and Latin Extended-C/D letters no
+  name needs. `noto-sans-latin-ext-europe.woff2` (68 KB, a NEW name - fonts are served immutable for a year) keeps
+  Latin Extended-A and -B, the African reference letters (ɓ ɔ ɖ ɗ ə ɛ ɣ ɨ ɩ ɲ ʉ ʋ ʒ - the review's 66 KB trim
+  dropped ə, Azerbaijani's), the modifier letters romanised names use (ʹ ʺ ʾ ʿ ˈ ː - "Saʿīd"), Latin Extended
+  Additional less Vietnamese's own file's range, the currency signs, ℓ and the dagger †. The first build dropped
+  the modifier letters and † with the IPA block: Google's Latin face claims U+2000-206F but its file has no †
+  (Justice's album), which Google's latin-ext had carried, so a dagger went to the fallback's Arial. The same file
+  again: `pyftsubset --no-hinting --flavor=woff2` from Noto Sans 2.015 pinned at width 100 (the first build's
+  recipe, which reproduces its file byte for byte), 72 bytes bigger; SemiCondensed's latin-ext the same from the
+  87.5 instance (77 KB). **The files' own characters are in the suite now**: tests/fixtures/font_cmaps.json is
+  each file's cmap, written by tests/fixtures/font_cmaps.py with fontTools (which the suite hasn't - nor the brotli
+  a woff2's tables need) and kept to its file by sha256, so a rebuilt file without the list run again fails.
+  test_type.py checks what each family DRAWS - each face's range as far as its file has it - for every letter
+  and mark of its list (every European language's, the African letters, Vietnamese, Greek, Cyrillic, the
+  modifier letters and †), in all three families, and that nothing Google's latin-ext served left Noto but the
+  IPA, phonetic, modifier and Latin Extended-C/D letters the trim was for. Arrows and shapes the app uses
+  (→ ↗ ▶ ✕) were never in a Noto subset and still come from the system.
+- **A fallback sized to Noto Sans** (`Noto Sans Fallback`, second in `--font-family`): `local()` Arial (ArialMT,
+  Liberation Sans, Arimo) at `size-adjust: 107.14%` - Noto's average English letter over Arial's, measured with
+  fontTools - with Noto's ascent and descent as overrides divided by that (99.77%, 27.35%), a bold face for 600-700,
+  and only over the characters Noto Sans's seven files have (their cmaps' union, 70 ranges as theme.css writes them), so it never draws
+  what Noto Sans lacks. The first build gave it the union of Noto's faces' RANGES, which claim 85 printable
+  characters the files haven't (Coptic's in the Greek block, and most of U+2000-206F's punctuation and spaces) - the U+2010 hyphen MusicBrainz writes in "Jay‐Z" and "Wu‐Tang Clan" among them - so those were
+  drawn in Arial, 7% grown, for good, where 2.0.8 drew them in the system face; they go to the system face again.
+  Safari reads size-adjust (17+) but not the overrides; it is on screen for a moment, on a first load.
+- **Loading**: the page preloads Noto Sans's and SemiCondensed's Latin files (nearly every screen has a large
+  title); the mono's Latin file comes when text needs it - an album page, Now Playing - and its other scripts' as
+  Noto Sans's do. The bench
+  page preloads only Noto Sans's (it draws no large title). A first visit to Home now fetches 76 KB of fonts
+  (was 36); a Polish name 68 KB of Latin Extended (was 164), plus 76 KB more if it is in a title.
+
+**Measured** (headless Chromium as deadwax.test over plain http, logins off, my own deadwax on 8111 over a stand-in
+Navidrome on 4541 with the review's library plus a Polish, a Vietnamese, a Turkish and a various-artists album;
+390x844 and 1440x900; before = HEAD 821456c served from an export on 8113): baselines as above; every title in
+SemiCondensed, including Polish, Cyrillic and Vietnamese ones (their SemiCondensed files loaded); the Arabic album's
+title and artist `direction: rtl`; body line height 23.12px at 17px; no console errors. Shots, before and after, in
+`deadwax-scratch/work/fonts209-builder/rp/{before,after}-{phone,desk}/shots/`. **Not seen**: an iPhone (SF Mono
+was never the data face there now, but the baselines were measured only in Chromium), Safari's `text-wrap:
+balance` (17.5+; older ones wrap as before), and the fallback on a slow first load.
+
+**After review** (the same rig, mine on 8114 over a stand-in on 4542, a playlist of twelve songs added to it): a
+playlist row's length on its title's line, 0px on both frames (8.2 and 7.5 before the fix); CDP's
+`CSS.getPlatformFontsForNode` on "Justice †", "Saʿīd ʾAbd", "Czesław/Niemen 1969", "Кино/Группа крови", "Mỹ
+Tâm/2001" and "Βαγγέλης/Ωμέγα" in each of the three stacks: every glyph in the bundled face (the dagger, the
+ayin and the ł were Liberation's before); "Jay‐Z"'s U+2010 in the system face, as in 2.0.8, not the fallback's
+Liberation Sans.
+
+**Pinned**: tests/test_type.py (21 tests: the files and licences, the files' own characters kept to them, the
+descriptors, the ranges and what each family draws of the names' letters and marks, the fallback, the stacks, the preloads and their headers, the scale per frame, every field's size, the
+pinned lines and player.css's tokens, the track row and a playlist's, the data face off prose and the data size
+only on data, the sign-in button's size, the title face and balance, the
+contrast, dir="auto" and the side it leaves a name on); ui/test/titles.sim.cjs (LONG_TITLE, code points, the three pages); debug.sim (the data face
+on the field names' rows only); test_app_css / test_app_desktop_css / test_lab_page moved to `--dw-text-field` and
+the folded tokens.

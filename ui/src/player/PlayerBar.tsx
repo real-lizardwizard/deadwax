@@ -84,15 +84,15 @@ export function PlayerBar({
       <div class="app-playbar-now">
         <Cover id={track.coverArt} size={120} class="app-playbar-cover" />
         <span class="app-playbar-text">
-          <span class="app-playbar-title">{track.title}</span>
+          <span class="app-playbar-title" dir="auto">{track.title}</span>
           {player.error ? (
-            <span class="app-playbar-byline is-error">{player.error}</span>
+            <span class="app-playbar-byline is-error" dir="auto">{player.error}</span>
           ) : onAlbum ? (
-            <button type="button" class="app-playbar-byline is-link" onClick={onAlbum} aria-label={`Go to the album: ${byline}`}>
+            <button type="button" class="app-playbar-byline is-link" dir="auto" onClick={onAlbum} aria-label={`Go to the album: ${byline}`}>
               {byline}
             </button>
           ) : (
-            <span class="app-playbar-byline">{byline}</span>
+            <span class="app-playbar-byline" dir="auto">{byline}</span>
           )}
         </span>
       </div>

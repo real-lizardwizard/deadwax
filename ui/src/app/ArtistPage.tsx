@@ -936,7 +936,7 @@ export function ArtistPage({
           )}
         </div>
         <div class="app-artist-names">
-          <h1 class="app-artist-name">
+          <h1 class="app-artist-name" dir="auto">
             {logo ? <img class="app-artist-logo" src={logo} alt={name} decoding="async" onError={broken(logo)} /> : name}
           </h1>
           {about && <p class="app-artist-facts">{about}</p>}
@@ -1009,7 +1009,7 @@ export function ArtistPage({
                         <ArchiveCover addresses={coverAddresses(null, row.group.id, 250)} class="app-artist-cover" />
                       )}
                       <span class="app-result-text">
-                        <span class="app-result-title">{row.title}</span>
+                        <span class="app-result-title" dir="auto">{row.title}</span>
                         <span class="app-result-line app-artist-line">
                           {row.held === true && (!personal || row.yours !== false) && <CheckIcon class="app-artist-held" />}
                           <span class="app-artist-line-text">{rowLine(row, personal)}</span>
@@ -1184,7 +1184,7 @@ export function ArtistPage({
                       //? one person can be in a band twice - left, and back - so the place keeps keys apart
                       <li key={`${member.mbid ?? member.name}:${at}`} class={`app-row app-artist-member${member.current ? '' : ' is-past'}`}>
                         <span class="app-artist-member-text">
-                          <span class="app-artist-member-name">{member.name}</span>
+                          <span class="app-artist-member-name" dir="auto">{member.name}</span>
                           {member.roles.length > 0 && <span class="app-artist-member-roles">{memberRoles(member)}</span>}
                         </span>
                         <span class="app-row-value app-artist-member-years">{memberYears(member)}</span>

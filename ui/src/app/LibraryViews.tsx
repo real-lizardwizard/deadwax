@@ -47,7 +47,7 @@ export function ArtistRow({ artist, inStore = false, onOpenArtist }: {
     <button type="button" class="app-result is-artist" onClick={() => onOpenArtist(artist)}>
       <Cover id={artist.coverArt} size={112} class="app-result-cover is-round" />
       <span class="app-result-text">
-        <span class="app-result-title">{artist.name}</span>
+        <span class="app-result-title" dir="auto">{artist.name}</span>
         {albumCountLine(artist.albumCount, inStore ? IN_THE_STORE : '') && (
           <span class="app-result-line">{albumCountLine(artist.albumCount, inStore ? IN_THE_STORE : '')}</span>
         )}
@@ -105,7 +105,7 @@ export function SongsView({ onOpen, onCount, onSongMenu }: {
             >
               <Cover id={song.coverArt} size={96} class="app-result-cover" />
               <span class="app-result-text">
-                <span class="app-result-title">{song.title}</span>
+                <span class="app-result-title" dir="auto">{song.title}</span>
                 <span class="app-result-line">{[song.artist, song.album].filter(Boolean).join(' · ')}</span>
               </span>
               <span class="app-visually-hidden">, opens its album</span>

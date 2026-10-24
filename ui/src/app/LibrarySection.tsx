@@ -141,7 +141,7 @@ function SectionHead({ page, title, titleRef, find, sort, count }: {
         ) : (
           <span />
         )}
-        <span class="app-library-count app-mono">{count}</span>
+        <span class="app-library-count">{count}</span>
       </div>
     </>
   )

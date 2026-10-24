@@ -709,7 +709,7 @@ console.log('\nnothing below the title in Now Playing can change height')
     ['class="pl-sheet-title"', 'pl-sheet-artist', '<Scrubber ', 'class="pl-transport"', 'class="pl-sheet-footer"'].map(at).every((place, index, all) => place !== -1 && (index === 0 || place > all[index - 1])), true)
   check('...the turntable\'s time line in the bar\'s place, one or the other',
     /\{turntable \? <TurntableTime player=\{player\} previewing=\{previewing\} \/> : <Scrubber player=\{player\} \/>\}/.test(body), true)
-  check('the album line is one box, link or not', (body.match(/<span class="pl-sheet-byline">\{byline\}<\/span>/g) ?? []).length, 2)
+  check('the album line is one box, link or not', (body.match(/<span class="pl-sheet-byline" dir="auto">\{byline\}<\/span>/g) ?? []).length, 2)
   const footer = body.slice(at('class="pl-sheet-footer"'))
   //? (2.0.0-player.57: Up next drawn - it opens Up Next - after AirPlay's place and before •••)
   check('the icon row: AirPlay only with a speaker, ••• always, Up next always (opening Up Next), and no dead Lyrics',
@@ -1371,7 +1371,7 @@ console.log('\nArtists and the id bridge: Play from the tap with every album in 
   check('Search\'s held row opens the album you have with its credited artist, so the page\'s artist line holds its place',
     /const artist = creditName\(group\['artist-credit'\]\)\s*if \(album\) onOpenAlbum\(\{ id: album, name: group\.title \?\? '', \.\.\.\(artist \? \{ artist \} : \{\}\) \}\)/.test(code(read('app/Search.tsx'))), true)
   check('an artist\'s name that isn\'t a link is drawn plain: on an album page only once the album has said so, never in a flash',
-    [/<p class=\{`pl-hero-artist\$\{album \? ' app-hero-plain' : ''\}`\}>\{artistName\}<\/p>/.test(album), /<p class="pl-hero-artist app-hero-plain">\{header\.artist\}<\/p>/.test(code(read('app/ReleaseGroupPage.tsx')))],
+    [/<p class=\{`pl-hero-artist\$\{album \? ' app-hero-plain' : ''\}`\} dir="auto">\{artistName\}<\/p>/.test(album), /<p class="pl-hero-artist app-hero-plain" dir="auto">\{header\.artist\}<\/p>/.test(code(read('app/ReleaseGroupPage.tsx')))],
     [true, true])
   check('a row looking for its album fades: an artist\'s, Search\'s, a Done row',
     [/class=\{`app-artist-album\$\{opening === row\.key \? ' is-busy' : ''\}`\}/.test(page), /class=\{`app-result\$\{looking \? ' is-busy' : ''\}`\}/.test(code(read('app/SearchRows.tsx'))),
@@ -2510,7 +2510,7 @@ console.log('\nGet, as the main page had it (2.0.0-player.41)')
   const held = /const openHeldGroup = useCallback\(\(group: \{ id: string; title: string \}\) => \{([\s\S]*?)\n  \}, \[\]\)/.exec(app)?.[1] ?? ''
   check('...App opens it as a page on the tab showing, its name the label - and no preview, so the header and Get are MusicBrainz\'s own',
     [/const page: Page = \{ kind: 'group', id: group\.id, \.\.\.\(group\.title \? \{ label: group\.title \} : \{\}\) \}/.test(held), /router\.open\(page\)/.test(held), /groupPreviews/.test(held),
-      /title=\{page\.label \?\? ''\}/.test(app), /<h1 class="pl-hero-title">\{header\.title \|\| title\}<\/h1>/.test(page), /getGroup\(mbid, preview, releases, chosen\)/.test(page)],
+      /title=\{page\.label \?\? ''\}/.test(app), /<h1 class=\{heroTitleClass\(header\.title \|\| title\)\} dir="auto">\{header\.title \|\| title\}<\/h1>/.test(page), /getGroup\(mbid, preview, releases, chosen\)/.test(page)],
     [true, true, false, true, true, true])
   check('the pressing list marks what the library holds, from the page\'s one /library/owned answer (whose each is, as the store line last said - second review)',
     [/const ownership = owned \? ownedForGroup\(owned\.index, \{\s*groupId: mbid,\s*releaseIds: releases\.map\(\(release\) => release\.id\),[\s\S]*?\}\) : null\s*(?:const [^\n]*\n\s*){3}const holding = ownership \? withStoreLine\(ownership\.held, said\) : null/.test(page),

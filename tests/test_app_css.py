@@ -377,8 +377,8 @@ def test_home_sits_as_the_board_has_it():
     text = declarations(APP, ".app-tile-text")
     assert text["display"] == "flex" and "gap" not in text
     home = (Path(__file__).resolve().parent.parent / "ui" / "src" / "app" / "Home.tsx").read_text()
-    assert re.search(r'<span class="app-tile-text">\s*<span class="app-tile-title">.*?</span>\s*'
-                     r'<span class="app-tile-artist">.*?</span>\s*</span>', home, re.S)
+    assert re.search(r'<span class="app-tile-text">\s*<span class="app-tile-title" dir="auto">.*?</span>\s*'
+                     r'<span class="app-tile-artist" dir="auto">.*?</span>\s*</span>', home, re.S)
 
 
 def test_the_reader_reads_rules_as_the_browser_would():
@@ -394,6 +394,13 @@ def px(token: str) -> float:
     value = ALL_TOKENS[token]
     assert value.endswith("px"), (token, value)
     return float(value[:-2])
+
+
+def ratio(token: str) -> float:
+    """(2.0.9) A token that is a plain number - a line height - or a var() of one, as a number."""
+    value = ALL_TOKENS[token]
+    found = re.fullmatch(r"var\((--[\w-]+)\)", value)
+    return ratio(found.group(1)) if found else float(value)
 
 
 def length(token: str) -> float:
@@ -471,7 +478,7 @@ def test_now_playing_has_no_readouts_or_switch_and_a_fixed_icon_row():
 def test_a_small_control_reaches_a_full_tap_target_without_reaching_the_scrubber():
     hit = px("--pl-hit")
     #? the album line: its reach up and down, and its own line (17px at the token's leading)
-    line = px("--dw-text-body") * float(ALL_TOKENS["--pl-byline-leading"])
+    line = px("--dw-text-body") * ratio("--pl-byline-leading")
     assert px("--pl-byline-reach-up") + line + px("--pl-byline-reach-down") >= hit
     assert px("--pl-byline-reach-down") < px("--pl-scrub-gap")
     reach = declarations(PLAYER_CSS, ".pl-sheet-artist.is-link::before")
@@ -682,7 +689,7 @@ def test_the_requests_tabs_live_region_is_read_and_not_drawn():
 
 def test_the_search_field_is_never_small_enough_for_ios_to_zoom():
     field = declarations(APP, ".app-search-input")
-    assert field["font-size"] == "var(--dw-text-body)" and px("--dw-text-body") >= 16
+    assert field["font-size"] == "var(--dw-text-field)" and px("--dw-text-field") >= 16
     #? the well is STYLE.md's; nothing native is drawn over it
     assert field["appearance"] == "none"
 
@@ -798,8 +805,8 @@ def test_every_control_of_get_and_the_sources_is_a_tap_target():
 
 def test_the_sources_text_fields_are_never_small_enough_for_ios_to_zoom():
     for field in (".app-sources-query-input", ".app-sources-sort-select"):
-        assert declarations(APP, field)["font-size"] == "var(--dw-text-body)", field
-    assert px("--dw-text-body") >= 16
+        assert declarations(APP, field)["font-size"] == "var(--dw-text-field)", field
+    assert px("--dw-text-field") >= 16
     #? the sort's own picker covers its chip whole, unseen - the chip shows what it says
     select = declarations(APP, ".app-sources-sort-select")
     assert (select["position"], select["inset"], select["opacity"]) == ("absolute", "0", "var(--app-chip-select)")
@@ -924,8 +931,8 @@ def test_the_librarys_chips_and_sort():
     assert declarations(APP, ".app-sort")["min-height"] == "var(--pl-hit)"
     select = declarations(APP, ".app-sort-select")
     assert (select["position"], select["inset"], select["opacity"], select["font-size"]) == (
-        "absolute", "0", "var(--app-chip-select)", "var(--dw-text-body)")
-    assert px("--dw-text-body") >= 16
+        "absolute", "0", "var(--app-chip-select)", "var(--dw-text-field)")
+    assert px("--dw-text-field") >= 16
 
 
 def test_a_done_row_opens_from_the_whole_row_and_plays_from_its_round_button():
@@ -1002,7 +1009,7 @@ def test_what_lands_late_on_the_artist_page_moves_nothing():
     #? an album page's artist line holds its line before the album answers
     assert declarations(APP, ".app-shell .pl-hero-artist")["min-height"] == "var(--app-hero-artist-line)"
     assert ALL_TOKENS["--app-hero-artist-line"] == "1.25em"
-    assert declarations(PLAYER_CSS, ".pl-hero-artist")["line-height"] == "1.25"
+    assert declarations(PLAYER_CSS, ".pl-hero-artist")["line-height"] == "var(--pl-leading-tight)" and ratio("--pl-leading-tight") == 1.25
 
 
 def test_a_row_looking_for_its_album_fades_and_a_name_that_isnt_a_link_isnt_the_links_colour():
@@ -1343,8 +1350,8 @@ def test_the_artist_pages_panel_is_a_fingers_and_ios_never_zooms_into_its_search
     for selector in (".app-artist-panel-inline", ".app-artist-replace", ".app-artist-change"):
         assert declarations(APP, selector)["min-height"] == "var(--pl-hit)", selector
     field = declarations(APP, ".app-artist-search-input")
-    assert (field["font-size"], field["min-height"]) == ("var(--dw-text-body)", "var(--pl-pill-height)")
-    assert px("--dw-text-body") >= 16
+    assert (field["font-size"], field["min-height"]) == ("var(--dw-text-field)", "var(--pl-pill-height)")
+    assert px("--dw-text-field") >= 16
     #? a row a match is: the grouped list's, a finger tall
     assert declarations(APP, ".app-row")["min-height"] == "var(--dw-row)" and px("--dw-row") >= px("--pl-hit")
     for selector in (".app-artist-move-path", ".app-artist-move-to", ".app-artist-match-name", ".app-artist-panel-note"):
@@ -1544,7 +1551,7 @@ def test_the_chosen_pressings_facts_hold_their_height_whatever_they_say():
 
 def test_the_pressing_lists_filter_never_zooms_and_stays_over_the_list():
     field = declarations(APP, ".app-picker-filter-input")
-    assert field["font-size"] == "var(--dw-text-body)" and px("--dw-text-body") >= 16
+    assert field["font-size"] == "var(--dw-text-field)" and px("--dw-text-field") >= 16
     assert (field["height"], field["appearance"]) == ("var(--app-field)", "none")
     holder = declarations(APP, ".app-picker-filter")
     assert (holder["position"], holder["top"], holder["background"]) == ("sticky", "calc(-1 * var(--app-picker-inset))", "var(--dw-popover)")
@@ -1578,7 +1585,7 @@ def test_the_sample_rate_chip_rings_as_the_sort_does():
     assert (ring["outline"], ring["outline-offset"]) == ("var(--app-ring) solid var(--dw-accent)", "var(--app-ring)")
     #? its picker is the sort's, covering it whole, unseen, never small enough for iOS to zoom
     select = declarations(APP, ".app-sources-sort-select")
-    assert (select["position"], select["inset"], select["font-size"]) == ("absolute", "0", "var(--dw-text-body)")
+    assert (select["position"], select["inset"], select["font-size"]) == ("absolute", "0", "var(--dw-text-field)")
 
 
 # ---------------------------------------------------------------- looking after deadwax from a phone (2.0.0-player.47)
@@ -1813,10 +1820,10 @@ def test_the_edit_panel_is_a_sheet_over_the_whole_screen_on_a_phone():
 def test_the_edit_sheets_targets_are_a_fingers_and_ios_never_zooms_into_its_fields():
     """Every field 17px and a finger tall (iOS zooms into one under 16); the close button, the tabs, a tick box's
     label, a folder to choose, a pressing, every button of the hosted editors - and Apply - 44px."""
-    assert px("--dw-text-body") >= 16 and px("--pl-hit") == 44
+    assert px("--dw-text-field") >= 16 and px("--pl-hit") == 44
     for selector in (".app-edit .releases-filter-input", ".app-edit-select", ".app-edit-pick-input"):
         field = phone(selector)
-        assert (field["font-size"], field["min-height"]) == ("var(--dw-text-body)", "var(--pl-hit)"), selector
+        assert (field["font-size"], field["min-height"]) == ("var(--dw-text-field)", "var(--pl-hit)"), selector
     close = phone(".app-edit-close")
     assert (close["width"], close["height"]) == ("var(--pl-hit)", "var(--pl-hit)")
     for selector in (".app-edit-tab", ".app-edit-choice", ".app-edit .app-edit-button", ".app-edit .columns-toggle-button", ".app-edit .win-button",
@@ -1895,7 +1902,7 @@ def test_the_managing_pages_on_a_phone_are_a_fingers_and_never_zoom():
     finger's, 17px fields; the facets the Library's chips (a finger's reach) within the page's edges."""
     for selector in (".app-settings .settings-env-input", ".app-care-input"):
         field = phone(selector)
-        assert (field["font-size"], field["min-height"]) == ("var(--dw-text-body)", "var(--pl-hit)"), selector
+        assert (field["font-size"], field["min-height"]) == ("var(--dw-text-field)", "var(--pl-hit)"), selector
     for selector in (".app-queue-row", ".app-queue-checking", ".app-settings .settings-env-revert", ".app-settings-discard", ".app-settings-save",
                      ".app-settings .settings-retime .win-button", ".app-care .app-text-button"):
         assert phone(selector)["min-height"] == "var(--pl-hit)", selector
@@ -2013,7 +2020,7 @@ def test_playlists_lock_the_page_scroll_their_picker_and_reach_a_finger():
     assert chip["inset"] == "calc(-1 * var(--app-pin-toggle-reach))" and declarations(APP, ".app-playlist-chip")["height"] == "var(--app-pin-toggle)"
     for field in (".app-playlist-input", ".app-new-playlist-input"):
         assert declarations(APP, field)["font-size"] == "var(--app-playlist-field-text)", field
-    assert ALL_TOKENS["--app-playlist-field-text"] == "var(--dw-text-body)" and px("--dw-text-body") >= 16
+    assert ALL_TOKENS["--app-playlist-field-text"] == "var(--dw-text-field)" and px("--dw-text-field") >= 16
     #? (2.0.0-player.59, on purpose) the Library's row is the first row of the phone root's first group now
     home = (ui / "app" / "LibraryHome.tsx").read_text()
     group = home.index('<div class="app-group app-library-group">')
@@ -2067,7 +2074,7 @@ def test_the_librarys_shelf_and_index_draw_from_tokens_and_hold_a_finger():
     assert declarations(APP, ".app-index-dot")["pointer-events"] == "none"
     section = (ui / "app" / "LibrarySection.tsx").read_text()
     assert '<label class="app-search-field app-library-find">' in section and 'type="search"\n              class="app-search-input"' in section
-    assert declarations(APP, ".app-search-input")["font-size"] == "var(--dw-text-body)" and px("--dw-text-body") >= 16
+    assert declarations(APP, ".app-search-input")["font-size"] == "var(--dw-text-field)" and px("--dw-text-field") >= 16
     assert declarations(APP, ".app-library-find")["flex"] == "1 0 100%"
 
 

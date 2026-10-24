@@ -673,7 +673,7 @@ export function MatchList({ matches, label, onPick }: { matches: readonly Artist
         return (
           <li key={match.mbid}>
             <button type="button" class="app-row app-link-row app-artist-match" onClick={() => onPick(match)}>
-              <span class="app-artist-match-name">{match.name}</span>
+              <span class="app-artist-match-name" dir="auto">{match.name}</span>
               {line && <span class="app-artist-match-line">{line}</span>}
             </button>
           </li>

@@ -128,9 +128,9 @@ export function DownloadingCard({ row, onCancel, asking = false, onKeep, onConfi
     <div class={`app-card app-job is-downloading${row.dimmed ? ' is-dimmed' : ''}${question ? ' is-asking' : ''}`}>
       <JobCover src={row.cover} large />
       <div class="app-job-body">
-        <span class="app-job-title">{row.title}</span>
-        <span class="app-job-line">{row.line}</span>
-        {row.askedBy && <span class="app-job-line">{row.askedBy}</span>}
+        <span class="app-job-title" dir="auto">{row.title}</span>
+        <span class="app-job-line" dir="auto">{row.line}</span>
+        {row.askedBy && <span class="app-job-line" dir="auto">{row.askedBy}</span>}
         <JobBar progress={row.progress} />
         <span class="app-job-data">{row.data}</span>
       </div>
@@ -150,9 +150,9 @@ export function WaitingCard({ row, onCancel, asking = false, onKeep, onConfirm }
     <div class={`app-card app-job${row.dimmed ? ' is-dimmed' : ''}${question ? ' is-asking' : ''}`}>
       <JobCover src={row.cover} />
       <div class="app-job-body">
-        <span class="app-job-title">{row.title}</span>
-        <span class={`app-job-line${toneClass(row)}`}>{row.line}</span>
-        {row.askedBy && <span class="app-job-line">{row.askedBy}</span>}
+        <span class="app-job-title" dir="auto">{row.title}</span>
+        <span class={`app-job-line${toneClass(row)}`} dir="auto">{row.line}</span>
+        {row.askedBy && <span class="app-job-line" dir="auto">{row.askedBy}</span>}
       </div>
       <CancelButton row={row} onCancel={onCancel} asking={question} />
       {question && <CancelConfirm row={row} onKeep={onKeep} onConfirm={onConfirm} />}
@@ -186,13 +186,13 @@ export function AttentionCard({
       <div class="app-job-top">
         <JobCover src={row.cover} />
         <div class="app-job-body">
-          <span class="app-job-title">{row.title}</span>
-          {row.line && <span class="app-job-line">{row.line}</span>}
-          {row.askedBy && <span class="app-job-line">{row.askedBy}</span>}
+          <span class="app-job-title" dir="auto">{row.title}</span>
+          {row.line && <span class="app-job-line" dir="auto">{row.line}</span>}
+          {row.askedBy && <span class="app-job-line" dir="auto">{row.askedBy}</span>}
           {row.reason &&
             errorLine(row.reasonTell && !runs ? `${row.reason} ${TELL}` : row.reason, runs ? row.reasonDetail : null, { as: 'span', class: 'app-job-reason' })}
           {row.problem && errorLine(row.problem, runs ? row.problemDetail : null, { as: 'span', class: 'app-job-reason' })}
-          {!getsAlbums && (row.nextPeer || row.askAgain) && <span class="app-job-line app-get-off">{GET_OFF}</span>}
+          {!getsAlbums && (row.nextPeer || row.askAgain) && <span class="app-job-line app-get-off" dir="auto">{GET_OFF}</span>}
         </div>
       </div>
       {(nextPeer || askAgain) && (
@@ -255,12 +255,12 @@ export function DoneRow({
     <>
       <JobCover src={row.cover} />
       <span class="app-job-body">
-        <span class="app-job-title">{row.title}</span>
-        <span class={`app-job-line${toneClass(row)}`}>{row.line}</span>
+        <span class="app-job-title" dir="auto">{row.title}</span>
+        <span class={`app-job-line${toneClass(row)}`} dir="auto">{row.line}</span>
         {runs && row.reasonDetail && <span class="app-error-detail">{row.reasonDetail}</span>}
-        {!runs && row.reasonTell && <span class="app-job-line">{TELL}</span>}
-        {row.askedBy && <span class="app-job-line">{row.askedBy}</span>}
-        {note && <span class="app-job-line is-warning">{note}</span>}
+        {!runs && row.reasonTell && <span class="app-job-line" dir="auto">{TELL}</span>}
+        {row.askedBy && <span class="app-job-line" dir="auto">{row.askedBy}</span>}
+        {note && <span class="app-job-line is-warning" dir="auto">{note}</span>}
       </span>
     </>
   )
@@ -290,8 +290,8 @@ export function ArrivingCard({ row, onOpen }: { row: RequestRow; onOpen: () => v
     <button type="button" class="app-card app-job app-arriving-card" onClick={onOpen}>
       <JobCover src={row.cover} />
       <span class="app-job-body">
-        <span class="app-job-title">{row.title}</span>
-        {row.artist && <span class="app-job-line">{row.artist}</span>}
+        <span class="app-job-title" dir="auto">{row.title}</span>
+        {row.artist && <span class="app-job-line" dir="auto">{row.artist}</span>}
         <JobBar progress={row.progress} />
       </span>
       <span class="app-job-brief">{row.brief}</span>

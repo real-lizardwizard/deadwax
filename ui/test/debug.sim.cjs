@@ -147,7 +147,7 @@ console.log('\nTurntable sound (2.0.0-player.14): ready, or off and why - how an
   }
   check('ready: the stretch of the song, its kind, the rate it was decoded at - and what windows have cost a row of its own (2.0.7)',
     [turntable(ready).value, turntable(ready).note, turntable(ready).mono, facts(ready)['Data used']],
-    ['Ready: 0:42-1:12, FLAC, decoded at 48 kHz', undefined, true, '3.4 MB a window; 6.8 MB fetched since the turntable showed, the last window 1:01 in'])
+    ['Ready: 0:42-1:12, FLAC, decoded at 48 kHz', undefined, undefined, '3.4 MB a window; 6.8 MB fetched since the turntable showed, the last window 1:01 in'])
   check('...and the rows in the debug sections, from what Info is handed',
     [table(rows.debugSections(input({ turntable: ready })))['Turntable sound'], table(rows.debugSections(input({ turntable: ready })))['Data used']],
     ['Ready: 0:42-1:12, FLAC, decoded at 48 kHz', '3.4 MB a window; 6.8 MB fetched since the turntable showed, the last window 1:01 in'])
@@ -211,10 +211,10 @@ console.log('\nTurntable sound (2.0.0-player.24): how far the audio\'s clock mov
     loading: false, refused: null, failed: null, fetched: 6_800_000, lastFetchAt: 61_000, clockStep: 1024 / 48000,
   }
   check('...and Turntable sound itself says only what it says: no note of the voice, the clock or the cost',
-    rows.turntableRow(ready), { label: 'Turntable sound', value: 'Ready: 0:31-1:12, FLAC, decoded at 44.1 kHz', mono: true })
-  check('an iPhone\'s 1024 frames a render: after the voice, before the cost, in the data face',
+    rows.turntableRow(ready), { label: 'Turntable sound', value: 'Ready: 0:31-1:12, FLAC, decoded at 44.1 kHz' })
+  check('an iPhone\'s 1024 frames a render: after the voice, before the cost, in the text face (2.0.9: a phrase)',
     [facts(ready)['Clock step'], factLabels(ready), rows.turntableRows(ready).find((row) => row.label === 'Clock step').mono],
-    ['21.3 ms at a time', ['Turntable sound', 'Voice', 'Clock step', 'Data used', 'Turntable timing'], true])
+    ['21.3 ms at a time', ['Turntable sound', 'Voice', 'Clock step', 'Data used', 'Turntable timing'], undefined])
   check('...desktop Brave\'s 256 at 44.1 kHz; nothing said before it has been seen to move (0), nor by a report without it',
     [facts({ ...ready, clockStep: 256 / 44100, fetched: 0 })['Clock step'], facts({ ...ready, clockStep: 0, fetched: 0 })['Clock step'],
       facts({ ...ready, clockStep: undefined, fetched: 0 })['Clock step']],
@@ -310,7 +310,8 @@ check('an MP3 says no depth', rows.formatRow(track({ suffix: 'mp3', contentType:
 check('missing fields are left out, not guessed', rows.formatRow(track({ sampleRate: 0, bitDepth: 0 })).value, 'FLAC, stereo')
 check('nothing said at all', rows.formatRow(track({ suffix: null, contentType: null, sampleRate: 0, bitDepth: 0, channels: 0 })).value, "Navidrome didn't say")
 check('the kind from the type when there is no extension', rows.formatRow(track({ suffix: null, contentType: 'audio/x-flac' })).value, 'FLAC, 16-bit, 44.1 kHz, stereo')
-check('set in the data face', rows.formatRow(track()).mono, true)
+//? (2.0.9) words in the text face: the data face is for numbers, times, ids and paths, never a phrase
+check('set in the text face (2.0.9: a phrase, not data)', rows.formatRow(track()).mono, undefined)
 
 console.log('\na FLAC 24/192, resampled')
 check('in an MP4 (Safari): sent at 24-bit 48 kHz, 3 dB quieter, because of the setting',
@@ -480,8 +481,8 @@ console.log('\nNormalization (2.0.0-player.62)')
   check('deadwax won\'t level it, and why', row({ level: 'album' }, answer({ state: 'not_levelled', gain_db: null, why: "its file can't be read as FLAC by deadwax (20- or 32-bit)" })),
     "Not levelled - its file can't be read as FLAC by deadwax (20- or 32-bit)")
   check('an answer about the other level is not this song\'s', row({ level: 'track' }, answer()), "Asked for; deadwax hasn't said yet")
-  check('the gain in the data face once measured', [rows.normalizationRow({ track: track({ level: 'album' }), format: 'raw', level: answer() }).mono,
-    rows.normalizationRow({ track: track(), format: 'raw', level: null }).mono], [true, undefined])
+  check('the gain in the text face, measured or not (2.0.9: a phrase)', [rows.normalizationRow({ track: track({ level: 'album' }), format: 'raw', level: answer() }).mono,
+    rows.normalizationRow({ track: track(), format: 'raw', level: null }).mono], [undefined, undefined])
   const resampled = { id: 's1', got: 'mp4', resampled: { from: 192000, to: 48000 }, hiRes: null }
   const resampledRow = (entry, level) => rows.resampledRow({ track: track({ ...HIRES, ...entry }), wrapped: resampled, maxRate: '48000', format: 'raw', level }).value
   check('Resampled: a levelled song gets its level\'s gain instead of the 3 dB - and keeps the 3 dB when it played unlevelled',
@@ -525,6 +526,10 @@ console.log('\nheld to the code they describe')
   check('the setting\'s names are the ones You shows', rows.MAX_RATE_LABELS, labels)
   const source = fs.readFileSync(path.join(UI, 'src/lib/debugRows.ts'), 'utf8')
   check('built on describeGaps, describeSeek and describeWrap', ['describeGaps(', 'describeSeek(', 'describeWrap('].map((name) => source.includes(name)), [true, true, true])
+  //? (2.0.9, the type review) the data face only for data: Navidrome's field names are its one value in it - every
+  //? other value is a phrase ("FLAC, 16-bit, 44.1 kHz, stereo", "96 kHz to 48 kHz, 3 dB quieter"), in the text face
+  const monoRows = [...source.matchAll(/^(?:function|export function) (\w+)[\s\S]*?^}/gm)].filter((m) => /mono: true/.test(m[0])).map((m) => m[1])
+  check('the data face only on the field names\' rows', [monoRows, (source.match(/mono: true/g) ?? []).length], [['sentRow', 'otherSongsRow'], 2])
   //? (2.0.7) docs/player.md names Debug's sections as Debug draws them: "Fields from Navidrome", never 2.0.6's
   //? "Navidrome sent" or "What this device is sent" (its not-verified list still said the first, after review)
   const guide = fs.readFileSync(path.join(REPO, 'docs/player.md'), 'utf8').replace(/\s+/g, ' ')

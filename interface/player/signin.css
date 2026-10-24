@@ -27,8 +27,11 @@
     --app-signin-head-gap: 14px;                    /* the d to deadwax */
     --app-signin-field: var(--pl-hit);              /* a field: a tap target */
     --app-signin-field-pad: 12px;
-    --app-signin-field-text: var(--dw-text-body);   /* 17px: never under 16 */
+    --app-signin-field-text: var(--dw-text-field);   /* 17px: never under 16 */
     --app-signin-button: var(--pl-hit);
+    --app-signin-button-text: var(--dw-text-field); /* (2.0.9) the card's button as its fields, 17px on every
+                                                       frame: the card is the phone's, centred, on a desktop too,
+                                                       where --dw-text-body is 14px */
     --app-signin-busy: 0.75;                        /* the button while it signs in: faded, still legible */
     --app-signin-reason-pad: 10px 12px;
     --app-signin-ring: 2px;
@@ -74,6 +77,7 @@ html.has-signin { overflow: hidden; }
 
 .app-signin-title {
     margin: 0;
+    font-family: var(--dw-font-title);
     font-size: var(--dw-text-title-2);
     font-weight: var(--dw-weight-bold);
     letter-spacing: var(--dw-tracking-title);
@@ -155,7 +159,7 @@ html.has-signin { overflow: hidden; }
     box-shadow: var(--dw-primary-highlight);
     color: var(--dw-text);
     font: inherit;
-    font-size: var(--dw-text-body);
+    font-size: var(--app-signin-button-text);
     font-weight: var(--dw-weight-semibold);
 }
 

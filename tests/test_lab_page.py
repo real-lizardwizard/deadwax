@@ -121,7 +121,7 @@ def test_every_control_on_the_bench_is_a_fingers_height_where_the_pointer_is_coa
 
 def test_the_benchs_text_fields_are_never_small_enough_to_zoom():
     flat = {" ".join(selector.split()): values for context, selector, values in rules(LAB_CSS.read_text()) if context == ""}
-    assert flat[".lab-file input, .lab-field select, .lab-field input"]["font-size"] == "var(--dw-text-body)"
+    assert flat[".lab-file input, .lab-field select, .lab-field input"]["font-size"] == "var(--dw-text-field)"
 
 
 def test_every_focusable_control_of_the_benchs_own_draws_a_ring():

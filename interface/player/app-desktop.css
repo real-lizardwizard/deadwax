@@ -9,9 +9,10 @@
   EVERY RULE HERE IS INSIDE A MEDIA QUERY FROM 1024px, and every selector but html's and :root's is
   under `.app-desk`: below 1024px the phone app is exactly what it was - its rules, classes and
   order untouched (tests/test_app_desktop_css.py holds the file to that). The desktop's values for
-  the look's own tokens (labels 11px, headings 13px, cards #1e1c26 ...) are theme.css section 10's,
-  redefined there in the same media query; this file adds the frame's layout, as tokens, and the
-  rules that use them. Tokens only, as app.css.
+  the look's own tokens (labels 12px, headings 13px, cards #1e1c26 ...) are theme.css section 10's,
+  redefined there in the same media query - every type size included since 2.0.9, so this file has
+  no size of its own (tests/test_type.py); it adds the frame's layout, as tokens, and the rules that
+  use them. Tokens only, as app.css.
 
   The document stays the scroller, as on a phone - so the per-tab scroll App keeps and puts back, the
   Library's pages and every sticky bar work unchanged: the sidebar, the bar and a panel are fixed,
@@ -36,8 +37,6 @@
         --pl-edge-right: 32px;
         --app-desk-top: 28px;
         --app-desk-content-max: 760px;    /* a list drawn for a phone - You, Requests, Search - kept readable */
-        --app-desk-text: 14px;            /* the sidebar's items, a desktop row's words */
-        --app-desk-text-sm: 13px;         /* a desktop table's words, the meta and the bar's byline */
         --app-desk-gap: 20px;             /* between the main area's parts */
         --app-desk-control: 34px;         /* Get the album, the pressing, Play and Shuffle */
         --app-desk-control-pad: 18px;
@@ -52,11 +51,9 @@
         --app-desk-item-pad: 10px;
         --app-desk-item-gap: 2px;
         --app-desk-label-pad: 6px;        /* a group's label to its first item */
-        --app-desk-brand: 20px;
         --app-desk-field: 32px;
         --app-desk-field-icon: 15px;
         --app-desk-field-gap: 8px;
-        --app-desk-field-text: 13px;
         --app-desk-badge: 20px;
         --app-desk-badge-pad: 4px;
         --app-desk-you: 44px;
@@ -82,7 +79,6 @@
         --app-desk-scrub-max: 520px;
         --app-desk-scrub-hit: 16px;       /* the bar's own target: a pointer, not a thumb */
         --app-desk-clock-gap: 10px;
-        --app-desk-clock: 11px;
         --pl-scrub-track: 6px;            /* the board's thin sunken bar */
         --pl-scrub-track-held: 8px;
         --pl-scrub-thumb: 10px;
@@ -127,7 +123,6 @@
         --app-desk-chips-gap: 6px;
         --app-desk-chip-h: 26px;
         --app-desk-chip-pad-x: 10px;
-        --app-desk-chip-text: 12px;
         --app-desk-signals: 300px;       /* (2.0.6) "Track lengths", "Availability" on one line */
         --app-desk-signals-gap: 8px;
         --app-desk-signals-name: 100px;
@@ -146,7 +141,6 @@
         --app-desk-facts: 1.4fr 0.85fr 1.25fr 0.75fr 0.55fr;
         --app-desk-facts-gap: 12px;
         --app-desk-fact-lines: 4px;
-        --app-desk-speed-text: 14px;
         --app-desk-speed-bar: 7px;
 
         /* the Edit panel (2.0.0-player.21), as DesktopManage.dc.html draws it - and the main page's
@@ -215,7 +209,8 @@
     .app-desk .app-side-brand {
         margin: 0;
         padding: 0 var(--app-desk-item-pad);
-        font-size: var(--app-desk-brand);
+        font-family: var(--dw-font-title);
+        font-size: var(--dw-text-brand);
         font-weight: var(--dw-weight-bold);
         letter-spacing: var(--dw-tracking-title);
     }
@@ -246,7 +241,7 @@
         background: transparent;
         color: var(--dw-text);
         font: inherit;
-        font-size: var(--app-desk-field-text);
+        font-size: var(--dw-text-footnote);
         outline: none;
         -webkit-appearance: none;
         appearance: none;
@@ -284,7 +279,7 @@
         border: var(--dw-hairline) solid transparent;
         border-radius: var(--dw-radius-control);
         color: var(--dw-text);
-        font-size: var(--app-desk-text);
+        font-size: var(--dw-text-body);
         text-align: left;
         text-decoration: none;
     }
@@ -371,7 +366,7 @@
         grid-column: 1 / -1;
         margin: 0;
         color: var(--dw-text-3);
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
         text-align: center;
     }
 
@@ -398,8 +393,8 @@
         text-align: left;
     }
 
-    .app-desk .app-playbar-title { font-size: var(--app-desk-text); font-weight: var(--dw-weight-medium); }
-    .app-desk .app-playbar-byline { color: var(--dw-text-2); font-size: var(--app-desk-text-sm); }
+    .app-desk .app-playbar-title { font-size: var(--dw-text-body); font-weight: var(--dw-weight-medium); }
+    .app-desk .app-playbar-byline { color: var(--dw-text-2); font-size: var(--dw-text-footnote); }
     .app-desk .app-playbar-byline.is-link:hover { color: var(--dw-accent-text); }
     .app-desk .app-playbar-byline.is-error { color: var(--dw-danger-text); }
 
@@ -458,7 +453,7 @@
         margin: 0;
     }
 
-    .app-desk .app-playbar .pl-clocks { display: contents; font-size: var(--app-desk-clock); }
+    .app-desk .app-playbar .pl-clocks { display: contents; font-size: var(--dw-text-data); }
     .app-desk .app-playbar .pl-clocks > :first-child { grid-row: 1; grid-column: 1; }
     .app-desk .app-playbar .pl-scrub { grid-row: 1; grid-column: 2; height: var(--app-desk-scrub-hit); }
     .app-desk .app-playbar .pl-clocks > :last-child { grid-row: 1; grid-column: 3; }
@@ -491,7 +486,7 @@
     /* the speed's chip (2.0.0-player.39), first in the tools wherever the speed isn't 1x: the tools'
        height, its face smaller - the tools sit at the row's right end, so it moves none of them */
     .app-desk .app-playbar-tools .app-speed-chip { height: var(--app-desk-tool); margin-right: 0; border-radius: var(--dw-radius-control); }
-    .app-desk .app-playbar-tools .app-speed-chip-face { height: var(--app-desk-speed-chip); font-size: var(--app-desk-text-sm); }
+    .app-desk .app-playbar-tools .app-speed-chip-face { height: var(--app-desk-speed-chip); font-size: var(--dw-text-footnote); }
     .app-desk .app-playbar-tools .app-speed-chip:hover .app-speed-chip-face { color: var(--dw-text); }
 
     /* ===== the main area: every tab's page, in the desktop's measure ===== */
@@ -562,7 +557,7 @@
         padding: var(--app-desk-top) var(--pl-edge-right) var(--pl-gap-xs) 0;
     }
 
-    .app-desk .app-library-count { color: var(--dw-text-2); font-size: var(--app-desk-text-sm); }
+    .app-desk .app-library-count { color: var(--dw-text-2); font-size: var(--dw-text-footnote); }
 
     /* the sort: STYLE.md's secondary button, holding the platform's own picker */
     .app-desk .app-sort {
@@ -573,7 +568,7 @@
         background: var(--dw-secondary-bg);
         box-shadow: var(--dw-highlight);
         color: var(--dw-text-on-secondary);
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
     }
 
     .app-desk .pl-grid {
@@ -591,7 +586,7 @@
 
     /* the back link, a breadcrumb at the top of the main area */
     .app-desk .pl-nav-bar { padding: var(--app-desk-gap) var(--pl-edge-right) 0 var(--pl-edge-left); }
-    .app-desk .pl-back { font-size: var(--app-desk-text); }
+    .app-desk .pl-back { font-size: var(--dw-text-body); }
     .app-desk .pl-back-icon { width: var(--app-desk-crumb-icon); height: var(--app-desk-crumb-icon); }
 
     /* the words beside the cover, at its foot as the board sets them */
@@ -616,7 +611,7 @@
     .app-desk .pl-hero-title,
     .app-desk .pl-hero-meta { margin: 0; }
     .app-desk .pl-hero-title { letter-spacing: var(--dw-tracking-title); }
-    .app-desk .pl-hero-meta { font-size: var(--app-desk-text-sm); }
+    .app-desk .pl-hero-meta { font-size: var(--dw-text-footnote); }
 
     /* "In your library" and its chips start under the title, as Play and Shuffle do - the phone's
        centred row left them floating mid-column beside a left-aligned hero */
@@ -674,12 +669,12 @@
     .app-desk .pl-pill {
         height: var(--app-desk-control);
         padding: 0 var(--app-desk-control-pad);
-        font-size: var(--app-desk-text);
+        font-size: var(--dw-text-body);
     }
 
     .app-desk .pl-tracks { margin-top: var(--app-desk-gap); }
     .app-desk .pl-track { min-height: var(--app-desk-row); }
-    .app-desk .pl-track-title { font-size: var(--app-desk-text); }
+    .app-desk .pl-track-title { font-size: var(--dw-text-body); }
 
     .app-desk .pl-track-number,
     .app-desk .pl-track-time { font-size: var(--dw-text-data); }
@@ -743,7 +738,7 @@
         width: auto;
         min-height: var(--app-desk-control);
         padding: 0 var(--app-desk-control-pad);
-        font-size: var(--app-desk-text);
+        font-size: var(--dw-text-body);
     }
 
     .app-desk .app-rg-get-icon { display: none; }
@@ -753,7 +748,7 @@
     .app-desk .app-store-join {
         min-height: var(--app-desk-control);
         padding: 0 var(--app-desk-control-pad);
-        font-size: var(--app-desk-text);
+        font-size: var(--dw-text-body);
     }
 
     /* pressed while the panel shows its sources: the toggled tint - the best match's Get is then the
@@ -776,8 +771,8 @@
     }
 
     .app-desk .app-picker-button .app-picker-text { flex-direction: row; align-items: baseline; gap: var(--app-desk-field-gap); }
-    .app-desk .app-picker-label { font-size: var(--app-desk-text-sm); }
-    .app-desk .app-picker-value { font-size: var(--app-desk-text-sm); }
+    .app-desk .app-picker-label { font-size: var(--dw-text-footnote); }
+    .app-desk .app-picker-value { font-size: var(--dw-text-footnote); }
 
     .app-desk .app-picker-popover {
         right: auto;
@@ -792,7 +787,7 @@
 
     .app-desk .app-picker-option:hover { background: var(--app-desk-hover); }
     .app-desk .app-picker-option.is-selected { border-color: var(--dw-selection-border); background: var(--dw-selected-row); }
-    .app-desk .app-picker-option-label { font-size: var(--app-desk-text); }
+    .app-desk .app-picker-option-label { font-size: var(--dw-text-body); }
 
     /* the tracklist: "Tracklist" and how this pressing compares, then the table */
     .app-desk .app-rg-desk { padding-top: var(--app-desk-gap); }
@@ -818,7 +813,7 @@
         width: 100%;
         border-collapse: collapse;
         table-layout: fixed;
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
     }
 
     .app-desk .app-rg-table th,
@@ -856,7 +851,7 @@
     }
 
     .app-desk .app-rg-table.has-against thead th:nth-child(3) { width: calc(var(--app-desk-against) + 2 * var(--app-desk-cell-pad)); }
-    .app-desk .app-rg-table .app-rg-title { font-size: var(--app-desk-text-sm); }
+    .app-desk .app-rg-table .app-rg-title { font-size: var(--dw-text-footnote); }
 
     /* the chip a box, and the note plain text after it - never a box of its own, which an ellipsis
        would hide whole rather than shorten (the cell's title holds the whole note) */
@@ -997,7 +992,7 @@
     .app-desk .app-layer.is-panel .app-chip {
         height: var(--app-desk-chip-h);
         padding: 0 var(--app-desk-chip-pad-x);
-        font-size: var(--app-desk-chip-text);
+        font-size: var(--dw-text-label);
     }
 
     /* Signals: the chip, and its sliders under it */
@@ -1024,7 +1019,7 @@
         grid-template-columns: var(--app-desk-signals-name) minmax(0, 1fr) var(--app-desk-signals-value);
         align-items: center;
         gap: var(--app-desk-signals-gap);
-        font-size: var(--app-desk-chip-text);
+        font-size: var(--dw-text-label);
     }
 
     .app-desk .app-signals-name { color: var(--dw-text-2); }
@@ -1034,7 +1029,7 @@
     .app-desk .app-signals-reset {
         align-self: flex-end;
         color: var(--dw-accent);
-        font-size: var(--app-desk-chip-text);
+        font-size: var(--dw-text-label);
     }
 
     .app-desk .app-signals-reset:focus-visible,
@@ -1064,11 +1059,11 @@
         min-width: var(--app-desk-source-score-w);
         height: var(--app-desk-source-score-h);
         padding: 0 var(--app-desk-source-score-pad);
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
     }
 
     .app-desk .app-layer.is-panel .app-source-name { flex-direction: row; align-items: baseline; gap: var(--app-desk-source-name-gap); }
-    .app-desk .app-layer.is-panel .app-source-folder { font-size: var(--app-desk-text-sm); }
+    .app-desk .app-layer.is-panel .app-source-folder { font-size: var(--dw-text-footnote); }
     .app-desk .app-layer.is-panel .app-source-peer { flex: none; font-size: var(--dw-text-label); }
 
     .app-desk .app-layer.is-panel .app-source-get {
@@ -1089,7 +1084,7 @@
     .app-desk .app-layer.is-panel .app-source-facts { display: contents; }
 
     .app-desk .app-layer.is-panel .app-source-speed .app-source-label { order: 1; }
-    .app-desk .app-layer.is-panel .app-source-speed-text { order: 2; font-size: var(--app-desk-speed-text); }
+    .app-desk .app-layer.is-panel .app-source-speed-text { order: 2; font-size: var(--dw-text-body); }
     .app-desk .app-layer.is-panel .app-source-bar { order: 3; height: var(--app-desk-speed-bar); }
     .app-desk .app-layer.is-panel .app-source-speed-note { order: 4; }
 
@@ -1155,7 +1150,7 @@
         padding: var(--app-desk-edit-tab-y) var(--app-desk-edit-tab-x);
         border-bottom: var(--app-desk-edit-rule) solid transparent;
         color: var(--dw-text-2);
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
     }
 
     .app-desk .app-edit-tab:hover { color: var(--dw-text); }
@@ -1184,7 +1179,7 @@
         overflow-y: auto;
         overscroll-behavior: contain;
         touch-action: pan-y;
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
     }
 
     .app-desk .app-edit-body:focus { outline: none; }
@@ -1204,7 +1199,7 @@
     .app-desk .app-edit-note {
         margin: 0;
         color: var(--dw-text-2);
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
         line-height: var(--dw-leading-note);
         overflow-wrap: anywhere;
     }
@@ -1268,7 +1263,7 @@
         width: 100%;
         border-collapse: collapse;
         table-layout: fixed;
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
     }
 
     .app-desk .app-edit-tracks th,
@@ -1325,8 +1320,8 @@
     .app-desk .app-edit h5,
     .app-desk .app-edit p { margin: 0; }
 
-    .app-desk .app-edit h4 { font-size: var(--app-desk-text-sm); font-weight: var(--dw-weight-semibold); }
-    .app-desk .app-edit h5 { font-size: var(--app-desk-text-sm); font-weight: var(--dw-weight-regular); }
+    .app-desk .app-edit h4 { font-size: var(--dw-text-footnote); font-weight: var(--dw-weight-semibold); }
+    .app-desk .app-edit h5 { font-size: var(--dw-text-footnote); font-weight: var(--dw-weight-regular); }
 
     /* the main page's colour classes, in this page's palette */
     .app-desk .app-edit .white { color: var(--dw-text); }
@@ -1355,7 +1350,7 @@
         box-shadow: var(--dw-well-inset);
         color: var(--dw-text);
         font: inherit;
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
         outline: none;
     }
 
@@ -1388,7 +1383,7 @@
         background: var(--dw-secondary-bg);
         box-shadow: var(--dw-highlight);
         color: var(--dw-text-on-secondary);
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
         font-weight: var(--dw-weight-medium);
         white-space: nowrap;
     }
@@ -1400,7 +1395,7 @@
     /* opened from Needs a look (2.0.0-player.25): the editor's place in the queue, and its Previous and
        skip a pair of buttons with the actions' own gap between them */
     .app-desk .app-edit .metadata-queue-nav { display: inline-flex; gap: var(--app-desk-edit-lines); }
-    .app-desk .app-edit .metadata-queue-position { color: var(--dw-text-2); font-size: var(--app-desk-text-sm); }
+    .app-desk .app-edit .metadata-queue-position { color: var(--dw-text-2); font-size: var(--dw-text-footnote); }
 
     /* a Get that failed: still a button to press again, its words amber */
     .app-desk .app-edit .app-edit-button.failed { color: var(--dw-amber-text); }
@@ -1425,7 +1420,7 @@
     .app-desk .app-edit #delete-actions .columns-toggle-button {
         min-height: var(--app-desk-edit-apply);
         padding: 0 var(--app-desk-edit-apply-pad);
-        font-size: var(--app-desk-text);
+        font-size: var(--dw-text-body);
     }
 
     .app-desk .app-edit button:focus-visible,
@@ -1484,7 +1479,7 @@
         gap: var(--app-desk-edit-lines) var(--app-desk-field-gap);
     }
 
-    .app-desk .app-edit #metadata-header > h4 { font-size: var(--app-desk-text); }
+    .app-desk .app-edit #metadata-header > h4 { font-size: var(--dw-text-body); }
 
     /* the folder: the one string here people copy */
     .app-desk .app-edit .metadata-path,
@@ -1721,7 +1716,7 @@
     .app-desk .app-edit .window-title {
         min-width: 0;
         color: var(--dw-text-heading-color);
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
         font-weight: var(--dw-weight-semibold);
         overflow-wrap: anywhere;
     }
@@ -1771,7 +1766,7 @@
     .app-desk .app-edit #delete-window,
     .app-desk .app-edit #delete-panel { display: flex; flex-direction: column; gap: var(--app-desk-edit-block); }
 
-    .app-desk .app-edit #delete-panel > h4 { font-size: var(--app-desk-text); }
+    .app-desk .app-edit #delete-panel > h4 { font-size: var(--dw-text-body); }
 
     .app-desk .app-edit .library-edition {
         padding: 0 var(--app-desk-chip-pad);
@@ -1802,7 +1797,7 @@
         background: var(--dw-danger-bg);
         box-shadow: var(--dw-primary-highlight);
         color: var(--dw-text);
-        font-size: var(--app-desk-text);
+        font-size: var(--dw-text-body);
         font-weight: var(--dw-weight-semibold);
     }
 
@@ -1938,7 +1933,7 @@
     }
 
     /* their rows at a desktop row's height and words - a finger's (the coarse pointer's token) on an iPad */
-    .app-desk .app-artist-more .app-row { min-height: var(--app-desk-row); font-size: var(--app-desk-text); }
+    .app-desk .app-artist-more .app-row { min-height: var(--app-desk-row); font-size: var(--dw-text-body); }
 
     .app-desk .app-artist-panel {
         position: absolute;
@@ -1955,7 +1950,7 @@
     }
 
     .app-desk .app-artist-panel-subtitle { font-size: var(--dw-text-label); }
-    .app-desk .app-artist-panel-body { font-size: var(--app-desk-text-sm); }
+    .app-desk .app-artist-panel-body { font-size: var(--dw-text-footnote); }
 
     .app-desk .app-artist-panel-foot {
         padding: var(--app-desk-panel-pad) 0;
@@ -1968,10 +1963,10 @@
     .app-desk .app-artist-search-row .pl-pill {
         height: var(--app-desk-control);
         padding: 0 var(--app-desk-control-pad);
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
     }
 
-    .app-desk .app-artist-search-input { min-height: var(--app-desk-control); font-size: var(--app-desk-text-sm); }
+    .app-desk .app-artist-search-input { min-height: var(--app-desk-control); font-size: var(--dw-text-footnote); }
 
     .app-desk .app-artist-option-image { width: var(--app-desk-artist-option-wide); height: var(--app-desk-artist-option); }
     .app-desk .app-artist-option-image.is-square { width: var(--app-desk-artist-option); }
@@ -1980,7 +1975,7 @@
 /* the artist page's panel (2.0.0-player.45) for a finger: its buttons and field a tap target, the field
    never small enough for iOS to zoom into */
 @media (min-width: 1024px) and (pointer: coarse) {
-    .app-desk .app-artist-search-input { min-height: var(--pl-hit); font-size: var(--dw-text-body); }
+    .app-desk .app-artist-search-input { min-height: var(--pl-hit); font-size: var(--dw-text-field); }
     .app-desk .app-artist-panel-foot .pl-pill,
     .app-desk .app-artist-search-row .pl-pill { height: var(--pl-hit); }
 }
@@ -2015,7 +2010,7 @@
         --app-desk-edit-tick: var(--pl-hit);
     }
 
-    .app-desk .app-side-input { font-size: var(--dw-text-body); }
+    .app-desk .app-side-input { font-size: var(--dw-text-field); }
     .app-desk .app-playbar { padding-bottom: var(--pl-safe-bottom); }
     /* Previous and Next: their 22px glyph in a box a finger can find */
     .app-desk .app-playbar-transport .app-playbar-button { min-width: var(--pl-hit); min-height: var(--pl-hit); }
@@ -2037,7 +2032,7 @@
 
     .app-desk .app-edit .releases-filter-input,
     .app-desk .app-edit-select,
-    .app-desk .app-edit-pick-input { font-size: var(--dw-text-body); }
+    .app-desk .app-edit-pick-input { font-size: var(--dw-text-field); }
 
     .app-desk .app-edit .hint-pointer { display: none; }
     .app-desk .app-edit .hint-touch { display: inline; }
@@ -2073,17 +2068,11 @@
         --app-viz-gap: 14px;
         --app-viz-row-gap: 10px;          /* the choices' rows, wrapped at a narrow desktop */
         --app-viz-cover: 56px;
-        --app-viz-title: 17px;
-        --app-viz-artist: 14px;
-        --app-viz-album: 13px;
-        --app-viz-lines: 19px;
         --app-viz-control: 32px;
         --app-viz-well: var(--app-viz-control);   /* the effect and colour pickers' well */
         --app-viz-well-pad: 2px;
         --app-viz-segment-gap: 2px;
         --app-viz-segment-pad: 12px;
-        --app-viz-text: 13px;
-        --app-viz-small: 11px;
         --app-viz-small-lines: 14px;
         --app-viz-chevron: 12px;
         --app-viz-leave-icon: 14px;
@@ -2107,7 +2096,6 @@
         --app-viz-play-icon: 20px;
         --app-viz-play-bottom: 84px;
         --app-viz-hint-bottom: 54px;      /* the keys at the bottom left, a note at the bottom right */
-        --app-viz-hint: 12px;
         --app-viz-hint-lines: 16px;
         --app-viz-notes-gap: 4px;
         --app-viz-shown: 1;
@@ -2192,7 +2180,7 @@
         min-width: 0;
         display: flex;
         flex-direction: column;
-        line-height: var(--app-viz-lines);
+        line-height: var(--dw-leading-tight);   /* three lines the cover's height (2.0.9) */
     }
     .app-desk .app-viz-title,
     .app-desk .app-viz-artist,
@@ -2201,9 +2189,9 @@
         overflow: hidden;
         text-overflow: ellipsis;
     }
-    .app-desk .app-viz-title { font-size: var(--app-viz-title); font-weight: var(--dw-weight-semibold); }
-    .app-desk .app-viz-artist { font-size: var(--app-viz-artist); color: var(--dw-viz-artist); }
-    .app-desk .app-viz-album { font-size: var(--app-viz-album); color: var(--dw-text-2); }
+    .app-desk .app-viz-title { font-size: var(--dw-text-artist-hero); font-weight: var(--dw-weight-semibold); }
+    .app-desk .app-viz-artist { font-size: var(--dw-text-body); color: var(--dw-viz-artist); }
+    .app-desk .app-viz-album { font-size: var(--dw-text-footnote); color: var(--dw-text-2); }
 
     .app-desk .app-viz-tools {
         flex: 0 1 auto;
@@ -2213,7 +2201,7 @@
         justify-content: flex-end;
         align-items: center;
         gap: var(--app-viz-row-gap) var(--app-viz-gap);
-        font-size: var(--app-viz-text);
+        font-size: var(--dw-text-footnote);
     }
     .app-desk .app-viz-segmented {
         height: var(--app-viz-well);
@@ -2250,7 +2238,7 @@
         background: var(--dw-secondary-bg);
         box-shadow: var(--dw-highlight);
         color: var(--dw-text-on-secondary);
-        font-size: var(--app-viz-text);
+        font-size: var(--dw-text-footnote);
         display: flex;
         align-items: center;
         gap: var(--app-viz-button-gap);
@@ -2270,7 +2258,7 @@
         top: var(--app-viz-readout-drop);
         display: none;
         flex-direction: column;
-        font-size: var(--app-viz-small);
+        font-size: var(--dw-text-label);
         line-height: var(--app-viz-small-lines);
         color: var(--dw-text-3);
         white-space: nowrap;
@@ -2295,7 +2283,7 @@
         margin-top: var(--app-viz-heading-gap);
         padding: var(--app-viz-heading-pad);
         border-top: var(--dw-hairline) solid var(--dw-border);
-        font-size: var(--app-viz-small);
+        font-size: var(--dw-text-label);
         font-weight: var(--dw-weight-semibold);
         color: var(--dw-text-label-color);
     }
@@ -2308,7 +2296,7 @@
         border-radius: var(--dw-radius-control);
         background: transparent;
         color: var(--dw-text);
-        font-size: var(--app-viz-text);
+        font-size: var(--dw-text-footnote);
         display: flex;
         align-items: center;
         gap: var(--app-viz-option-gap);
@@ -2324,7 +2312,7 @@
     }
     .app-desk .app-viz-tick-icon { width: var(--app-viz-tick); height: var(--app-viz-tick); }
     .app-desk .app-viz-colours { display: flex; align-items: center; gap: var(--app-viz-colour-gap); }
-    .app-desk .app-viz-label { font-size: var(--app-viz-small); color: var(--dw-text-label-color); }
+    .app-desk .app-viz-label { font-size: var(--dw-text-label); color: var(--dw-text-label-color); }
 
     /* play/pause, at the foot, in the middle */
     .app-desk .app-viz-transport {
@@ -2354,7 +2342,7 @@
         position: absolute;
         bottom: var(--app-viz-hint-bottom);
         margin: 0;
-        font-size: var(--app-viz-hint);
+        font-size: var(--dw-text-label);
         line-height: var(--app-viz-hint-lines);
         color: var(--dw-text-3);
     }
@@ -2438,7 +2426,7 @@
     .app-desk .app-queue-state {
         margin: 0;
         color: var(--dw-text-2);
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
         line-height: var(--dw-leading-note);
     }
 
@@ -2457,7 +2445,7 @@
         min-height: var(--app-desk-row);
         margin: 0;
         color: var(--dw-text-3);
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
     }
 
     /* why no album may be marked "Not in Navidrome" (2.0.0-player.46), said in that line: one line of
@@ -2483,7 +2471,7 @@
         border: var(--dw-hairline) solid transparent;
         border-radius: var(--dw-radius-control);
         color: var(--dw-text);
-        font-size: var(--app-desk-text);
+        font-size: var(--dw-text-body);
         text-align: left;
     }
 
@@ -2530,7 +2518,7 @@
     }
 
     .app-desk .app-queue-album { font-weight: var(--dw-weight-semibold); }
-    .app-desk .app-queue-artist { color: var(--dw-text-2); font-size: var(--app-desk-text-sm); }
+    .app-desk .app-queue-artist { color: var(--dw-text-2); font-size: var(--dw-text-footnote); }
 
     /* one line of whole chips: those that no longer fit wrap out of it and out of sight, so a chip is
        never cut to a stub - one alone wider than the room left ellipsizes */
@@ -2694,7 +2682,7 @@
     .app-desk .app-log-empty {
         margin: 0;
         color: var(--dw-text-2);
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
         line-height: var(--dw-leading-note);
         overflow-wrap: anywhere;
     }
@@ -2735,7 +2723,7 @@
         max-width: var(--app-desk-set-note);
         margin: 0;
         color: var(--dw-text-2);
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
         line-height: var(--dw-leading-note);
         overflow-wrap: anywhere;
     }
@@ -2787,7 +2775,7 @@
 
     .app-desk .app-settings .settings-mode { flex-direction: row; align-items: baseline; gap: var(--app-desk-set-lines); }
     .app-desk .app-settings .settings-mode-name { flex: none; color: var(--dw-accent-text); }
-    .app-desk .app-settings .settings-mode-note { color: var(--dw-text-2); font-size: var(--app-desk-text-sm); }
+    .app-desk .app-settings .settings-mode-note { color: var(--dw-text-2); font-size: var(--dw-text-footnote); }
 
     /* where the value came from, the row's badge, a setting that can't be changed here */
     .app-desk .app-settings .settings-env-source,
@@ -2834,7 +2822,7 @@
         box-shadow: var(--dw-well-inset);
         color: var(--dw-text);
         font-family: var(--dw-font-mono);
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
         outline: none;
     }
 
@@ -2844,7 +2832,7 @@
     .app-desk .app-settings .settings-env-revert {
         align-self: flex-start;
         color: var(--dw-accent);
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
         text-align: left;
         overflow-wrap: anywhere;
     }
@@ -2859,7 +2847,7 @@
     .app-desk .app-settings .settings-env-detail {
         max-width: var(--app-desk-set-note);
         color: var(--dw-danger-text);
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
         line-height: var(--dw-leading-note);
         overflow-wrap: anywhere;
     }
@@ -2877,14 +2865,14 @@
     }
 
     .app-desk .app-settings .settings-verdict.ok { border-color: var(--dw-badge-green-border); background: var(--dw-tint-green); }
-    .app-desk .app-settings .settings-verdict-title { color: var(--dw-amber-text); font-size: var(--app-desk-text); }
+    .app-desk .app-settings .settings-verdict-title { color: var(--dw-amber-text); font-size: var(--dw-text-body); }
     .app-desk .app-settings .settings-verdict.ok .settings-verdict-title { color: var(--dw-badge-green-text); }
 
     .app-desk .app-settings .settings-verdict-list {
         margin: 0;
         padding-left: var(--app-desk-gap);
         color: var(--dw-text-2);
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
         line-height: var(--dw-leading-note);
     }
 
@@ -2921,7 +2909,7 @@
         flex: 1 1 auto;
         min-width: 0;
         color: var(--dw-text-2);
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
         overflow-wrap: anywhere;
     }
 
@@ -2931,7 +2919,7 @@
     .app-desk .app-settings-save {
         min-height: var(--app-desk-control);
         padding: 0 var(--app-desk-control-pad);
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
     }
 
     /* the page's one solid purple button */
@@ -2956,7 +2944,7 @@
         gap: var(--app-desk-field-gap);
         margin: 0;
         color: var(--dw-text-2);
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
     }
 
     .app-desk .app-log-dot {
@@ -3007,7 +2995,7 @@
 /* a finger where the pointer is coarse: a field iOS won't zoom into, and a finger's targets */
 @media (min-width: 1024px) and (pointer: coarse) {
     :root { --app-desk-set-bar: calc(var(--pl-hit) + 2 * var(--app-desk-set-bar-pad)); }   /* the save bar, its buttons a finger */
-    .app-desk .app-settings .settings-env-input { height: var(--pl-hit); font-size: var(--dw-text-body); }
+    .app-desk .app-settings .settings-env-input { height: var(--pl-hit); font-size: var(--dw-text-field); }
     .app-desk .app-settings .settings-env-revert,
     .app-desk .app-settings-discard,
     .app-desk .app-settings-save,
@@ -3056,7 +3044,7 @@
         max-width: var(--app-desk-care-note);
         margin: 0;
         color: var(--dw-text-2);
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
         line-height: var(--dw-leading-note);
         overflow-wrap: anywhere;
     }
@@ -3112,14 +3100,14 @@
         font-weight: var(--dw-weight-semibold);
     }
 
-    .app-desk .app-care-heading { color: var(--dw-text); font-size: var(--app-desk-text); }
+    .app-desk .app-care-heading { color: var(--dw-text); font-size: var(--dw-text-body); }
 
     /* STYLE.md's secondary button at the frame's control height; busy, the player's own ring */
     .app-desk .app-care-button {
         gap: var(--app-desk-field-gap);
         min-height: var(--app-desk-control);
         padding: 0 var(--app-desk-control-pad);
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
         white-space: nowrap;
     }
 
@@ -3152,7 +3140,7 @@
         box-shadow: var(--dw-well-inset);
         color: var(--dw-text);
         font: inherit;
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
         outline: none;
     }
 
@@ -3169,7 +3157,7 @@
     .app-desk .app-edit-pick-sub {
         color: var(--dw-text-2);
         font-family: var(--pl-font);
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
     }
 
     /* the panel's body clips sideways and these run to its edges - the field, and every folder (the
@@ -3187,7 +3175,7 @@
         border-radius: var(--dw-radius-card);
         background: var(--dw-tint-amber);
         color: var(--dw-amber-text);
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
         line-height: var(--dw-leading-note);
     }
 
@@ -3218,7 +3206,7 @@
         background: var(--dw-secondary-bg);
         box-shadow: var(--dw-highlight);
         color: var(--dw-text-on-secondary);
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
         font-weight: var(--dw-weight-medium);
         white-space: nowrap;
     }
@@ -3240,7 +3228,7 @@
         flex: 1 1 auto;
         min-width: 0;
         color: var(--dw-text-2);
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
         line-height: var(--dw-leading-note);
         overflow-wrap: anywhere;
     }
@@ -3263,7 +3251,7 @@
 /* a finger where the pointer is coarse: the page's controls a finger's (--app-desk-control already is),
    and fields iOS won't zoom into */
 @media (min-width: 1024px) and (pointer: coarse) {
-    .app-desk .app-care-input { font-size: var(--dw-text-body); }
+    .app-desk .app-care-input { font-size: var(--dw-text-field); }
     .app-desk .app-care .app-text-button { min-height: var(--pl-hit); }
 }
 
@@ -3280,14 +3268,14 @@
 
     .app-desk .app-rg-facts {
         flex-basis: 100%;
-        height: calc(var(--app-desk-rg-facts-lines) * var(--dw-leading-note) * var(--app-desk-text-sm));
+        height: calc(var(--app-desk-rg-facts-lines) * var(--dw-leading-note) * var(--dw-text-footnote));
         margin: 0;
         padding: 0;
-        font-size: var(--app-desk-text-sm);
+        font-size: var(--dw-text-footnote);
         -webkit-line-clamp: var(--app-desk-rg-facts-lines);
     }
 
-    .app-desk .app-picker-facts { font-size: var(--app-desk-text-sm); }
+    .app-desk .app-picker-facts { font-size: var(--dw-text-footnote); }
 
 }
 

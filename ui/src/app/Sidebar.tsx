@@ -95,9 +95,9 @@ export function Sidebar({
           {...(badge ? { 'aria-label': id === 'queue' ? needsLookLabel(label, needsLook) : badgeLabel(label, arriving) } : {})}
           onClick={() => onSelect(id)}
         >
-          <span class="app-side-item-label">{label}</span>
+          <span class="app-side-item-label" dir="auto">{label}</span>
           {badge && (
-            <span class="app-side-badge app-mono" aria-hidden="true">
+            <span class="app-side-badge" aria-hidden="true">
               {badge}
             </span>
           )}
@@ -172,7 +172,7 @@ export function Sidebar({
             ? (
               <li key="playlists">
                 <button type="button" class="app-side-item" onClick={() => onSelect('playlists')}>
-                  <span class="app-side-item-label">{SIDEBAR_PLAYLISTS.label}</span>
+                  <span class="app-side-item-label" dir="auto">{SIDEBAR_PLAYLISTS.label}</span>
                 </button>
               </li>
             )
@@ -187,7 +187,7 @@ export function Sidebar({
                   {...(chosen ? { 'aria-current': 'page' as const } : {})}
                   onClick={() => onPlaylist?.(one.id)}
                 >
-                  <span class="app-side-item-label">{one.name}</span>
+                  <span class="app-side-item-label" dir="auto">{one.name}</span>
                 </button>
               </li>
             )
@@ -220,7 +220,7 @@ export function Sidebar({
         <span class="app-side-avatar" aria-hidden="true">
           <YouIcon class="app-side-avatar-icon" />
         </span>
-        <span class="app-side-item-label">You</span>
+        <span class="app-side-item-label" dir="auto">You</span>
       </button>
     </nav>
   )
