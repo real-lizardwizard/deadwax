@@ -2867,7 +2867,16 @@ console.log('\nInfo\'s Debug is an admin\'s (2.0.0-player.63): the role from /me
   //? (review of 2.0.0-player.63) the strip going with focus in it gives that focus to the list, not to <body>
   check('...the strip going with focus inside it hands the focus to the list',
     /if \(tabs\.length < 2 && strip\.current\?\.contains\(document\.activeElement\)\) refocus\.current = true\s*useLayoutEffect\(\(\) => \{\s*if \(!refocus\.current\) return\s*refocus\.current = false\s*scroller\.current\?\.focus\(\{ preventScroll: true \}\)\s*\}, \[tabs\.length\]\)/.test(info), true)
-  check('...About\'s Playing group from Debug\'s own rows', /playing: playingRows\(\{ track, wrapped: player\.wrapped, gapless: player\.gapless, format: sentFormat\(track\), level \}\)/.test(info), true)
+  //? (2.0.7) About's Sound group from its own formatters (lib/aboutSound.ts), on Debug's own inputs; Debug keeps its rows
+  check('...About\'s Sound group from its own formatters, on Debug\'s inputs - never Debug\'s rows',
+    [/sound: soundRows\(\{ track, gapless: player\.gapless, format: sentFormat\(track\), level \}\)/.test(info), /playingRows|formatRow\(|normalizationRow\(|gaplessRow\(/.test(info)], [true, false])
+  //? (2.0.7) notes in the text face - the review's 1.10: every note was monospace - but a row's noteMono (field names)
+  check('...a row\'s note in the data face only when the row says it is data (noteMono)',
+    [/<dd class=\{`app-kv-note\$\{row\.noteMono \? ' app-mono' : ''\}`\}>\{row\.note\}<\/dd>/.test(info), /class="app-kv-note app-mono"/.test(info)], [true, false])
+  //? (2.0.7) the folder for whoever looks after the albums: App says who, by the one rule; Info hands it to About
+  check('...the folder only for an admin: App passes seesFolders on the admin flag alone, Info hands it to aboutRows',
+    [/<InfoSheet\b[^>]*\bfolders=\{seesFolders\(access\.admin\)\}/.test(app.replace(/\n\s*/g, ' ')),
+      /about: aboutRows\(track, album, details, hasLibrary\(\), folders\)/.test(info), /folders = false,/.test(info)], [true, true, true])
   check('nothing but Info draws Debug\'s sections or its test bench link',
     [files.filter((file) => /\bdebugSections\(/.test(code(read(file)))).sort(), files.filter((file) => /\bbenchRow\(|BENCH_ADDRESS/.test(code(read(file)))).sort()],
     [['app/InfoSheet.tsx', 'lib/debugRows.ts'], ['lib/debugRows.ts']])

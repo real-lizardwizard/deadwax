@@ -32,7 +32,7 @@ const plural = (count: number) => `And ${count.toLocaleString('en-US')} more ${c
 
 /**
  * Up Next (2.0.0-player.57) - James: "i'd like to be able to see the queue somewhere in the player, but I don't
- * want to disrupt the theme we have going". Opened from Now Playing's Up next button, as a sheet over it on a
+ * want to disrupt the theme we have going". Opened from Now Playing's Up Next button, as a sheet over it on a
  * phone, and from the player bar's Up Next as the side panel on a desktop - Info's shell, so it looks like Info.
  * What it draws is lib/upNext.ts's upNextView: the song playing (and, with Repeat One, that it repeats); Shuffle
  * and Repeat, the iPhone's Music app's place for them, so Now Playing's own screen gets nothing but the button;

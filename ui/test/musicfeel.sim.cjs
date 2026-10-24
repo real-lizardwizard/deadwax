@@ -60,7 +60,10 @@ execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
   '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
 ], { cwd: UI, stdio: 'inherit' })
 
-const { musicFeel, newFeel, feelWords, feelScore, smooth, FEEL_SCORE, LIFT_FLOOR, LEVEL_WINDOW, AGGR_FOLLOW_S } = require(path.join(OUT, 'musicFeel.js'))
+const { musicFeel, newFeel, feelWords, feelScore, smooth, FEEL_SCORE, LIFT_FLOOR, LEVEL_WINDOW, AGGR_FOLLOW_S, MOODS } = require(path.join(OUT, 'musicFeel.js'))
+//? (2.0.7, UX batch 4) the words a listener reads for the detector's three readings - smooth, in between and
+//? aggressive below are the readings, these the moods the readout names them by ("Mood: intense · 128 BPM")
+const [CALM, LIVELY, INTENSE] = MOODS
 const V = require(path.join(OUT, 'visualizer.js'))
 
 let failures = 0
@@ -195,13 +198,16 @@ function run(F, signal, seconds, from = 0, at = () => {}) {
 
 const round = (x, places = 2) => Math.round(x * 10 ** places) / 10 ** places
 
+console.log('\nthe moods the readout names (2.0.7)')
+check('the moods, calmest first: calm, lively, intense', MOODS, ['calm', 'lively', 'intense'])
+
 console.log('\nthe board\'s three songs: how aggressive each reads')
 const smoothSong = run(newFeel(), (mt, r, w) => boardSignal('smooth', mt, r, w), 40)
 const metal = run(newFeel(), (mt, r, w) => boardSignal('aggressive', mt, r, w), 40)
 console.log(`    (smooth: aggr ${round(smoothSong.aggr)}, ${round(smoothSong.bpm, 1)} bpm, conf ${round(smoothSong.conf)}; aggressive: aggr ${round(metal.aggr)}, ${round(metal.bpm, 1)} bpm, conf ${round(metal.conf)})`)
 check('the smooth song (like Comfortably Numb) reads smooth - under a third', smoothSong.aggr < 0.34, true)
 check('the aggressive one (like metal) reads aggressive - over two thirds', metal.aggr > 0.67, true)
-check('...and the words say so', [feelWords(smoothSong).split(' · ')[0], feelWords(metal).split(' · ')[0]], ['smooth', 'aggressive'])
+check('...and the words say so: calm and intense', [feelWords(smoothSong).split(' · ')[0], feelWords(metal).split(' · ')[0]], [CALM, INTENSE])
 
 const builds = newFeel()
 const along = {}
@@ -238,8 +244,8 @@ check('the Mandala\'s beats halved into 0.9-2.2 a second: 180 bpm (3 a second) i
   [round(metal.beats, 2), round(click150.beats, 2), round(click120.beats, 2), round(smoothSong.beats, 2)], [1.5, 1.25, 2, 1.05])
 check('...and the flowing styles\' tempo factor kept within 0.65-1.5', [metal.tempo, smoothSong.tempo].every((t) => t >= 0.65 && t <= 1.5), true)
 check('...metal faster than the smooth song', metal.tempo > smoothSong.tempo, true)
-check('before it is sure of anything, a neutral pace: "finding the tempo"', feelWords(newFeel()), 'in between · finding the tempo')
-check('...and once it is, the bpm', feelWords(metal), `aggressive · ${Math.round(metal.bpm)} bpm`)
+check('before it is sure of anything, a neutral pace: "listening for the tempo"', feelWords(newFeel()), 'lively · listening for the tempo')
+check('...and once it is, the BPM', feelWords(metal), `intense · ${Math.round(metal.bpm)} BPM`)
 
 console.log('\nhow the onsets are counted (the real tracks\' numbers were taken with it: held exactly)')
 {
@@ -314,7 +320,7 @@ console.log('\nthe onsets counted on a grid of 60 a second, whatever the screen\
   const rates = [60, 120, 144].map(at)
   console.log(`    (the calm piece: ${rates.map((F, i) => `${[60, 120, 144][i]} fps ${round(F.density, 2)} onsets a second, aggr ${round(F.aggr, 2)}`).join('; ')})`)
   check('the same calm piece at 60, 120 and 144 frames a second: onsets a second within 0.4 of each other (per frame it was 1.4 and 2.2 more), and it reads smooth at all three',
-    [Math.max(...rates.map((F) => F.density)) - Math.min(...rates.map((F) => F.density)) < 0.4, rates.map((F) => feelWords(F).split(' · ')[0])], [true, ['smooth', 'smooth', 'smooth']])
+    [Math.max(...rates.map((F) => F.density)) - Math.min(...rates.map((F) => F.density)) < 0.4, rates.map((F) => feelWords(F).split(' · ')[0])], [true, [CALM, CALM, CALM]])
   //? and held to the number, like the songs above: this piece's onsets sit near the threshold, so it is
   //? where the threshold's own terms (and how fast it follows the music on the grid) show
   check('...its onsets a second, held: 2.78, 2.97 and 2.88', rates.map((F) => round(F.density, 2)), [2.78, 2.97, 2.88])
@@ -342,8 +348,8 @@ console.log('\nthe words, at their edges')
 {
   const at = (aggr, conf, bpm = 123.4) => feelWords({ ...newFeel(), aggr, conf, bpm })
   check('smooth under 0.34, in between to 0.67, aggressive from there',
-    [at(0.33, 0), at(0.35, 0), at(0.66, 0), at(0.68, 0)].map((w) => w.split(' · ')[0]), ['smooth', 'in between', 'in between', 'aggressive'])
-  check('...the bpm only once more than 0.35 sure, rounded', [at(0.5, 0.34).split(' · ')[1], at(0.5, 0.36).split(' · ')[1]], ['finding the tempo', '123 bpm'])
+    [at(0.33, 0), at(0.35, 0), at(0.66, 0), at(0.68, 0)].map((w) => w.split(' · ')[0]), [CALM, LIVELY, LIVELY, INTENSE])
+  check('...the BPM only once more than 0.35 sure, rounded', [at(0.5, 0.34).split(' · ')[1], at(0.5, 0.36).split(' · ')[1]], ['listening for the tempo', '123 BPM'])
 }
 
 console.log('\nsilence holds everything')
@@ -356,7 +362,7 @@ console.log('\nsilence holds everything')
   //? a pause fades the analyser out: below the floor (an average band under 0.03) is silence too
   run(F, (mt, r, w) => { r.fill(0.02); w.fill(0.01) }, 10)
   check('...nor does a pause dying away under the floor', { aggr: F.aggr, bpm: F.bpm, conf: F.conf, tempo: F.tempo, beats: F.beats, density: F.density, clock: F.clock }, before)
-  check('...so a stop never reads as smooth', feelWords(F).startsWith('aggressive'), true)
+  check('...so a stop never reads as smooth', feelWords(F).startsWith(INTENSE), true)
   const smoothAfter = run(newFeel(), (mt, r, w) => boardSignal('smooth', mt, r, w), 30)
   const held = smoothAfter.aggr
   run(smoothAfter, (mt, r, w) => { r.fill(0); w.fill(0) }, 20)
@@ -434,7 +440,7 @@ console.log('\nreal music: the tuning held to numbers from real tracks (tests/fi
       if (i + 1 <= 10) return
       seen.push(aggr)
       const word = feelWords({ ...newFeel(), aggr, conf: 0 }).split(' · ')[0]
-      words[word === 'smooth' ? 0 : word === 'aggressive' ? 2 : 1] += 1
+      words[word === CALM ? 0 : word === INTENSE ? 2 : 1] += 1
     })
     return { words: words.map((n) => Math.round((100 * n) / seen.length)), aggr: [q(seen, 0.05), q(seen, 0.5), q(seen, 0.95)] }
   }

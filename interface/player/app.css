@@ -1135,7 +1135,8 @@ html.app-viz-open { overflow: hidden; }
    Two lines at most, and it takes no touch - a press through it lands on what is under it. */
 .app-is-turntable .pl-sheet-titles { position: relative; }
 
-.app-is-turntable .pl-sheet-error {
+.app-is-turntable .pl-sheet-error,
+.app-is-turntable .app-tt-silent {
     position: absolute;
     right: 0;
     bottom: 100%;
@@ -1146,6 +1147,15 @@ html.app-viz-open { overflow: hidden; }
     -webkit-line-clamp: 2;
     line-clamp: 2;
     pointer-events: none;
+}
+
+/* (2.0.7) The record a turn found silent for good on this song - not a FLAC, no Web Audio here - says why in the
+   failure's place, laid over the plinth's foot the same way (above), in the note's colour, not a failure's. */
+.app-tt-silent {
+    margin: 0 0 var(--pl-error-gap);
+    color: var(--dw-text-2);
+    font-size: var(--pl-text-footnote);
+    overflow-wrap: anywhere;
 }
 
 /* The room between the top row and the song's name. A size container, so the plinth can be as big
@@ -4823,7 +4833,7 @@ html.app-viewer-open { overflow: hidden; }
    Up Next is Info's shell - .app-layer, .app-info, its head, its scroller, its card, and on a desktop Info's panel
    by app-desktop.css's .app-layer.is-panel .app-info rules - its rows Search's results and, in Edit, Home's Pinned
    rows; the song menu is ActionMenu's sheet. What is new here: the two sheets' locks, the Edit at the head's left,
-   the row of Shuffle and Repeat, a group's gutter, Now Playing's Up next tinted while Shuffle or Repeat is on, and
+   the row of Shuffle and Repeat, a group's gutter, Now Playing's Up Next tinted while Shuffle or Repeat is on, and
    the ••• at the end of a song's row - a full tap target, its glyph's right edge on an album page where the row's
    time ended - and the album bar's ••• beside the pin, their reaches kept apart. */
 :root {
@@ -4874,7 +4884,7 @@ html.app-queue-menu-open { overflow: hidden; }
 .app-upnext-group,
 .app-upnext .app-store-line { margin-top: var(--app-shelf-gap); }
 
-/* Now Playing's Up next while Shuffle or Repeat is on, so a song repeating isn't a mystery */
+/* Now Playing's Up Next while Shuffle or Repeat is on, so a song repeating isn't a mystery */
 .pl-sheet-footer .app-upnext-button.is-on { color: var(--dw-accent); }
 
 /* the ••• at the end of a song's row: a tap target, the glyph drawn small inside it */

@@ -10,6 +10,16 @@ function Progress({ player }: { player: Player }) {
 }
 
 /**
+ * The mini player's name to a screen reader (2.0.7, UX batch 4): what it shows, then what a tap does - "Now
+ * playing: Roads, Portishead - open". It was "Open now playing", which hid the song: a name given with
+ * aria-label is all VoiceOver reads of the button. The second part is the line under the title - the artist, or
+ * the notice shown in its place ("Skipped …"), so a listener hears what a sighted one reads.
+ */
+export function miniPlayerLabel(title: string, line: string | null | undefined): string {
+  return `Now playing: ${title}${line ? `, ${line}` : ''} - open`
+}
+
+/**
  * What's playing, kept at the bottom of every screen. Tapping it opens the full player - and the
  * tap's own event goes with it, so App can have the button focus itself and give focus back to it
  * when the sheet closes (app/useSheet.ts's takeOpener).
@@ -20,7 +30,7 @@ export function MiniPlayer({ player, onOpen }: { player: Player; onOpen: (event:
 
   return (
     <div class="pl-mini">
-      <button type="button" class="pl-mini-open" onClick={onOpen} aria-label="Open now playing">
+      <button type="button" class="pl-mini-open" onClick={onOpen} aria-label={miniPlayerLabel(track.title, player.error ?? track.artist)}>
         <Cover id={track.coverArt} size={120} class="pl-mini-cover" />
         <span class="pl-mini-text">
           <span class="pl-mini-title">{track.title}</span>

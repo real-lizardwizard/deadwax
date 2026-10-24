@@ -9,6 +9,7 @@ import { browseItems, closesOnCrossing, libraryItems, libraryTitle, liesOver, ma
 import { createRouter, type Router, type StorageLike } from '../lib/appHistory'
 import { CARE_PAGE, LOG_PAGE, PEOPLE_PAGE, PLAYLISTS_PAGE, QUEUE_ID, QUEUE_PAGE, SETTINGS_PAGE, TAB_LABELS, TABS, backLabel, currentRoute, playlistsMove, samePage, scrollKey, type Nav, type Page, type PageKind, type Tab } from '../lib/appRoutes'
 import { handleDownloadRequests } from '../lib/downloadRequests'
+import { seesFolders } from '../lib/aboutRows'
 import { movedTo, noteMove, type EditAlbum } from '../lib/albumEdit'
 import { announceAlbumsFiled } from '../lib/libraryEvents'
 import { latestOnly } from '../lib/latest'
@@ -277,7 +278,7 @@ function usePageShown(): boolean {
  *
  * UP NEXT, SHUFFLE AND REPEAT (2.0.0-player.57, app/UpNext.tsx, lib/upNext.ts): the queue, with Shuffle and Repeat
  * at its top - on a phone a sheet over Now Playing (`over` 'upnext', never with the menu or Info), opened from its
- * Up next button; on a desktop the side panel, from the player bar's Up Next, by the one-panel rule (it puts Info,
+ * Up Next button; on a desktop the side panel, from the player bar's Up Next, by the one-panel rule (it puts Info,
  * Sources, Edit and the artist's away, and each of them puts it away), closed going back to the phone as Info's
  * is. It closes by itself once nothing plays. Every song row's ••• and an album page's own open the song menu
  * (QueueMenu.tsx: Play Next, Play Last) over everything - the page behind inert, a side panel too - with the songs
@@ -722,7 +723,7 @@ export function App() {
   }, [])
   const closeInfoPanel = useCallback(() => setInfoPanel(false), [])
 
-  //? Up Next (2.0.0-player.57): on a phone a sheet over Now Playing, from its Up next button - in place of the menu
+  //? Up Next (2.0.0-player.57): on a phone a sheet over Now Playing, from its Up Next button - in place of the menu
   //? or Info, never with them; on a desktop the side panel, from the player bar's Up Next, by the one-panel rule
   const openUpNext = useCallback((event: MouseEvent) => {
     upNextOpener.current = takeOpener(event)
@@ -1558,7 +1559,7 @@ export function App() {
   //? what fills Info > About in, asked as it opens (2.0.0-player.17)
   const infoDetails = useInfoDetails(infoOpen, playing, playedFrom)
   //? (2.0.0-player.62) and what deadwax says of the song's level, for Debug's Normalization row - and (2.0.0-player.63)
-  //? About's, in its Playing group
+  //? About's, in its Sound group (2.0.7: lib/aboutSound.ts)
   const infoLevel = useLevelAnswer(infoOpen, playing, player.maxRate)
   //? (2.0.0-player.63) Info's Debug is an admin's: /deadwax/me asked again as Info opens, on either frame, so a role
   //? given or taken away shows at the next open - through latestOnly(), a failed ask leaving it as it was
@@ -1707,6 +1708,7 @@ export function App() {
             album={playedFrom}
             sentFormat={sentFormat}
             admin={access.admin}
+            folders={seesFolders(access.admin)}
             turntable={turntableSound}
             recording={turntableRecording}
             onRecord={recordTurntable}

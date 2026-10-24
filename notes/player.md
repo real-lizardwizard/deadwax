@@ -399,7 +399,7 @@ are written up in "The scan wait" above.
   refused request looks like from the page) is asked for once more after `LOAD_RETRY_DELAY_MS`
   (1.5s) on the same element, resuming where it stopped. A second failure, or a decode error,
   moves to `nextIndex()` with autoplay as `ended` does, and the next song's line reads `Skipped
-  "<title>" - it wouldn't play` (or `- its file couldn't be decoded`) for `SKIP_NOTICE_MS` (5s).
+  "<title>" - it wouldn't play` (or `- its file couldn't be decoded`; since 2.0.7 `- this device couldn't play its audio`) for `SKIP_NOTICE_MS` (5s).
   At the end of the queue it stops, the error on screen and the lock screen paused; with nobody
   meaning it to play it only shows the error. Next and previous autoplay from the flag; play on a
   failed song reloads it. **Chromium sends `pause` AFTER `error`, with the error already set** -

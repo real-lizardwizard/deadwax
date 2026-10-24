@@ -165,7 +165,8 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
   of the folder says, so they show once deadwax has answered, and a line deadwax can't say is left
   out.
 - **A mini player** along the bottom, just above the tabs, while something is playing, with
-  play/pause and next. Tap it to open the now-playing screen, from any tab.
+  play/pause and next. Tap it to open the now-playing screen, from any tab. VoiceOver reads it as what it
+  shows, then what a tap does: "Now playing: Roads, Portishead - open".
 - **You**: **Getting albums** - **When I tap Get** (**Show me the sources**, or **Pick the best
   source for me**), the **Quality floor** (Any, 320 kbps, Lossless, 24-bit) and **Format** (Any, Prefer lossless, Lossless only - what a Get's sources are scored
   by), kept for you on deadwax rather than on the device (see [configuration](configuration.md#your-settings-in-the-app-per-user-on-deadwax)),
@@ -273,7 +274,7 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
   under it the artist and the album on one line ("Pink Floyd — Wish You Were Here"): tap that line
   to go to the album. Then the scrubber; previous, play/pause and next; and a row of buttons: at its
   left end, wherever the speed isn't 1x, [the speed's chip](#the-speed-fader) (`1.25x`; tap it for
-  1x), then an **AirPlay** button when there's a speaker on the network to send to, **Up next** (what
+  1x), then an **AirPlay** button when there's a speaker on the network to send to, **Up Next** (what
   plays next, with Shuffle and Repeat - [below](#up-next-shuffle-and-repeat); purple while Shuffle or
   Repeat is on) and **•••**.
   The button at its top right, a round record, shows it as [a turntable](#the-turntable) instead.
@@ -293,19 +294,25 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
   its own disc; the plays as Navidrome counts them now), its disc's title when the album has disc
   titles ("Disc 2 · Unreleased Tracks", as the album page heads it), and **Written by** whoever
   Navidrome says wrote it; the album's cover, title, year, label, format and number of songs, then
-  **This pressing:** its edition, year and format as deadwax holds it (tap the card to go to the
-  album); the artist - who they are, from MusicBrainz ("Group · London · 1965 to 2014"), and how
+  **This pressing:** its edition, year and format as deadwax holds it - only when that says something the line
+  above doesn't (an edition, another year, another format), so a plain CD of a 1994 album doesn't say "1994 · FLAC"
+  twice (tap the card to go to the album); the artist - who they are, from MusicBrainz ("Group · London · 1965 to 2014"), and how
   many of their albums you have (with logins on and a library of your own, how many the collection has:
   "3 albums in the collection") - with the album's own artist beside it when that's someone else,
   as on a compilation; tap it for their page. It's the song's own artist: a Portishead track on a
   compilation goes to Portishead, not Various Artists, and only an old credit of a renamed artist
   (Kanye West on a Ye album, one MusicBrainz artist under two names) goes to the page the album is
-  filed under. Then **Playing**, three rows about how it's playing: **Format**,
-  the file as Navidrome read it (`FLAC, 24-bit, 192 kHz, stereo`); **Gapless**, `Off`, `On`, or `On, in
-  one stream`; and **Normalization**, the song's [level](#normalization) (`Album, -7.42 dB · the album at
-  -10.6 LUFS`, or `Off`) - the same words as the rows of those names in Debug. Last, **In your library → Folder** (headed **In the collection** with logins on and a
-  library of your own - the folder is the collection's, whoever it's in the library of): where the album is on disk, a folder a line for
-  a set kept one folder per disc - text you can select and copy. Info asks Navidrome, deadwax and
+  filed under. Then **Sound**, three rows about how it sounds: **Format**, the file as Navidrome read it
+  (`FLAC, 24-bit, 192 kHz, stereo`, or `Not known`); **Gapless**, `On` or `Off`; and **Normalization**, what
+  [volume matching](#normalization) did with the song: `Album volume matching, 3.6 dB quieter` (or `Song volume
+  matching, 1.2 dB louder`; `- as loud as it can go without distorting` when its loudest moment held it back, and
+  `Album volume matching - kept as it is, it can't go louder without distorting` when it held it at no change at all),
+  `Checking…` while deadwax hasn't said, `Measuring the album… (3 of 10 songs)`, `Not this time - the album was still
+  being measured` or `Not this time - the song hasn't been measured yet` for a song played as it is this time, `Off
+  for this song - …` and why (`only FLAC songs are adjusted`, `this device can't play FLAC, so it's sent as MP3`,
+  `this server can't adjust volume`, `its file is too large`, `its file can't be measured`), or `Off`. Debug, an admin's, has the numbers. Last, for an admin only
+  (everyone, with logins off), **On the server → Folder**: where the album is on disk, a folder a line for
+  a set kept one folder per disc - text you can select and copy. Nobody else sees the path. Info asks Navidrome, deadwax and
   MusicBrainz for these as it opens, so they appear a moment after it does (the song's and the
   pressing's together, so a card doesn't grow under your finger). Anything not sent is left out,
   never guessed. **Debug** is how the song is
@@ -339,7 +346,7 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
 
 ## Up Next, shuffle and repeat
 
-**Up next** on the now-playing screen (beside •••) opens **Up Next**, a sheet over it,
+**Up Next** on the now-playing screen (beside •••) opens **Up Next**, a sheet over it,
 the way Info opens: what plays after the song playing, with the two settings an iPhone's Music app keeps
 there - so nothing else on the now-playing screen changes. On a desktop it is the player bar's **Up Next**,
 and opens as a panel beside the page, as Info does ([on a desktop](#on-a-desktop)).
@@ -1001,21 +1008,22 @@ music carries on throughout - the visualizer only watches it.
   nothing about it is random.
   The Mandala, Waves and Liquid shift and flow with the music rather than flashing on the beat; the
   Media Player five answer it as Media Player's did (Rings strikes a ring on each kick). Under the
-  **Style** button it says how it hears the music - **feel: smooth**, **in between** or
-  **aggressive**, and the tempo it has found - and, with Rotate all, which style is showing (on a
-  window 1280 pixels wide or more). The feel comes from how busy the music is (its onsets, counted 60
+  **Style** button it says how it hears the music - **Mood: calm**, **lively** or **intense**, and the tempo it
+  has found (`Mood: intense · 128 BPM`, or `listening for the tempo` before it's sure of one) - and, with Rotate
+  all, which style is showing (**Now showing: Mandala**) (on a window 1280 pixels wide or more). The mood is shown
+  only while the visualizer is following the song: not for a song it says it can't follow, nor with nothing playing. The mood comes from how busy the music is (its onsets, counted 60
   times a second on a screen drawing 60 frames a second or more), how much of it is above about 2 kHz, and how
   noisy it is (distorted guitars and cymbals are noisy, pianos and pads are tonal), each followed over
   a few seconds; the last two are measured against the loudest part of the sound, so how loud a record
-  was mastered hardly matters (a very quiet one can read a little smoother, a very loud one a little
-  more aggressive). Calm music reads smooth, music with distorted guitars and cymbals aggressive, and
-  funk and other grooving music mostly in between; a sparse, clean guitar piece can read smooth, and a
-  heavy track with little top end, or with few, sparse beats, in between - and a song that builds
+  was mastered hardly matters (a very quiet one can read a little calmer, a very loud one a little
+  more intense). Calm music reads calm, music with distorted guitars and cymbals intense, and
+  funk and other grooving music mostly lively; a sparse, clean guitar piece can read calm, and a
+  heavy track with little top end, or with few, sparse beats, lively - and a song that builds
   moves across as it builds. Below 60 frames a second it reads the music less often and misses some of
   its onsets: at 30, which a battery saver can bring (Chrome's Energy Saver halves a page's frame rate),
-  about a third of them, and heavy music can then read in between and grooving music smooth.
-- **The music shapes it**: the Mandala follows the feel - aggressive music (metal, say) brings sharp,
-  spiky, fast-twisting figures held tighter in the middle; smooth music rounder, slower, wider,
+  about a third of them, and heavy music can then read lively and grooving music calm.
+- **The music shapes it**: the Mandala follows the mood - intense music (metal, say) brings sharp,
+  spiky, fast-twisting figures held tighter in the middle; calm music rounder, slower, wider,
   flowing ones, changing as a song changes - and the tempo sets how fast every style moves.
 - **Colour**: **From the cover** takes its colours from the playing album's cover (a black-and-white
   cover gives grey); **Purple** is deadwax's own.
@@ -1053,16 +1061,19 @@ little more while it finds its place in a long song with no seek table) - never 
 nothing made or kept in the cache, so the visualizer doesn't push anyone's songs out of it.
 The stretch is the same, byte for byte, either way - the song's own audio, untouched.
 
-**"This song can't be seen".** Only FLAC songs have that copy, and a song the visualizer can't hear
+**When it can't follow a song.** Only FLAC songs have that copy, and a song the visualizer can't hear
 runs the effects from a calm, slow idle pattern instead, with a plain note at the bottom right
-saying why (a long one wraps in its corner): the song isn't a FLAC file; deadwax couldn't send its
-sound just now (it tries again after ten seconds); this browser couldn't read its sound; or this
-browser can't analyse sound at all.
-[Troubleshooting](troubleshooting.md#the-visualizer-doesnt-move-with-the-music-or-says-a-song-cant-be-seen)
+saying why (a long one wraps in its corner): **The visualizer follows FLAC songs only - it rests for this one.**;
+**The visualizer has lost the music for now - it keeps trying.** (deadwax couldn't send its sound just then; it asks
+again after ten seconds); **The visualizer can't follow this song - it rests for this one.** (deadwax won't cut it a
+stretch, or this browser couldn't read it); or **This browser can't follow the music, so the visualizer can't move
+with it.** For an admin, or anyone given Settings and the log, the reason's own words follow in brackets.
+[Troubleshooting](troubleshooting.md#the-visualizer-doesnt-move-with-the-music-or-says-it-cant-follow-a-song)
 has what to do.
 
 **Without WebGL** - a browser that doesn't have it, or has it turned off - Ambient shows a simpler
-version (soft drifting colours), and a line at the bottom right says so; the other three effects
+version (soft drifting colours), and a line at the bottom right says so (**This browser can't draw the full Ambient
+effect, so a simpler version is showing.**); the other three effects
 don't need it. **With Reduce Motion on** (your system's accessibility setting), everything moves slowly and
 calmly, and nothing jumps with the beat.
 
@@ -1165,7 +1176,12 @@ below.
     costs about a third more data than the song itself while the turntable shows and the song plays
     (about half as much again for a hi-res song played as it is, whose stretches are shorter), and
     nothing at all on the cover, or before the first tap. An MP3 or any other kind of file turns
-    silently, and with no momentum.
+    silently, and with no momentum - and the first time you turn the record on such a song, a line over
+    the foot of the turntable (where a song's failure goes) says so: **The record makes sound for FLAC songs
+    only - this one moves silently.** In a browser that can't make the record's sound at all (no Web Audio)
+    it says **This browser can't make the record's sound - turning it still moves through the song.**
+    The line stays until the song changes; nothing is said before you turn it, and nothing for a silence
+    that passes (the sound still starting, a stretch still on its way).
   - **It's about an eighth of a second behind your hand**, always the same: the record's sound
     follows every touch your phone reports, each at the moment it was made, and plays the path they
     trace 120 ms later - and 1.5 ms more, for the limiter below. Over plain
@@ -1592,7 +1608,7 @@ leaves a short gap (the second player has to start), just a shorter one.
   connection** it can use more still and not help at all: when a whole song can't download while
   the one before plays, every download is dropped part-way and the song streamed afresh, so part
   of every song is sent twice, for a change no quicker than with Gapless off. If
-  [Info → Debug](#info--debug)'s **Gap** row keeps saying `download unfinished`, turn Gapless off.
+  [Info → Debug](#info--debug)'s **Last song change** row keeps saying `download unfinished`, turn Gapless off.
 
 **Turning Gapless off** takes effect at once: the song you're hearing carries on alone, from
 where it was, and anything got ready is let go of.
@@ -1601,13 +1617,14 @@ where it was, and anything got ready is let go of.
 
 **Debug is an admin's**: it shows for a Navidrome admin and the break-glass
 `deadwax` - and, with logins off, for everyone, as before. Everyone else's Info is
-[About](#what-it-does) alone, with no tab strip, and its **Playing** group holds the three rows
-of Debug a listener can use - Format, Gapless and Normalization - in the same words. A role given or taken
+[About](#what-it-does) alone, with no tab strip, and its **Sound** group says the three things of Debug a
+listener can use - Format, Gapless and Normalization - in a listener's words (`Album volume matching, 3.6 dB
+quieter`, where Debug says `Album, -3.56 dB · the album at -14.4 LUFS`). A role given or taken
 away shows as Info opens, once it has asked deadwax who you are - a moment after it opens, so for that
 moment it can still look as it did; taken away while Debug is showing, Info shows About. So where this
 guide or [Troubleshooting](troubleshooting.md) says to read a row of Debug, that's an admin's to read, and
-where it's read matters. The rows about the song - **Navidrome sent**'s **Song**, **On other songs** and
-**Album** - say the same on any device, so an admin can read them on theirs, playing the same song. The
+where it's read matters. The rows about the song - **Fields from Navidrome**'s **Song fields**, **Only on
+other songs** and **Album fields** - say the same on any device, so an admin can read them on theirs, playing the same song. The
 rest describe the device and browser Info is open on (how the song is sent to it, its gaps and seeks, its
 speed, the turntable's sound and timing, a recording): on an admin's own phone they're that phone's, not
 yours. For those an admin reads Debug on your device - **You → About → Sign out**, they sign in there and
@@ -1616,7 +1633,7 @@ this: Debug is drawn from what the page already has.
 
 How the song you're hearing was sent, and how the last song changes and your last seek went, are
 in **Info**: tap **•••** on the now-playing screen, then **Info**, then **Debug**. (Info opens on
-the tab you last left it on, scrolled to the top.) The **Gap** and
+the tab you last left it on, scrolled to the top.) The **Last song change** and
 **Last seek** rows keep the old lines' words, less their openings (`Last song change`,
 `Last seek:`), and the older changes are on an *Earlier* line. The end of the old seek line, how
 the song was sent (`· FLAC in MP4, 192 kHz resampled to 48 kHz`), is now the **Sent as** row, with
@@ -1625,21 +1642,29 @@ the resampling on a **Resampled** row of its own. Debug has five parts:
 | part | row | what it says |
 | --- | --- | --- |
 | The file | **Format** | the file as Navidrome read it: `FLAC, 24-bit, 192 kHz, stereo`. A part Navidrome didn't give is left out |
-| What this device is sent | **Sent as** | how the song comes: `FLAC in MP4, 24-bit, 44.1 kHz` (a CD song [levelled](#normalization), the default; `16-bit` with Normalization off), `In one stream, 24-bit, 48 kHz`, `FLAC, as the file is`, `MP3, transcoded by Navidrome`. [Seeking](#seeking-and-where-safari-lands) says what the MP4s are for |
+| Sent to this device | **Sent as** | how the song comes: `FLAC in MP4, 24-bit, 44.1 kHz` (a CD song [levelled](#normalization), the default; `16-bit` with Normalization off), `In one stream, 24-bit, 48 kHz`, `FLAC, as the file is`, `MP3, transcoded by Navidrome`. [Seeking](#seeking-and-where-safari-lands) says what the MP4s are for |
 | | **Resampled** | `192 kHz to 48 kHz, 3 dB quieter` when deadwax resampled the song for [Maximum quality](#maximum-quality-hi-res-at-48-khz), `Not known yet` while it hasn't said, otherwise `No`. A song [levelled](#normalization) is resampled at its level's gain instead of 3 dB quieter, so the row says only `192 kHz to 48 kHz` |
 | | **Normalization** | the song's level (see [Normalization](#normalization)): `Album, -7.42 dB · the album at -10.6 LUFS`, `Song, -3.10 dB · the song at -14.9 LUFS`, `Song, +1.20 dB · held there by its peak (it wanted +2.35)`; `Measuring its album… (7 of 12 songs)` while deadwax measures it (asked again every 5 seconds); `Played as it is this time - its album was still being measured` when deadwax couldn't wait for it (Sent as and Resampled then say what came: the file's own depth, `3 dB quieter`); `Not measured yet - it played as it is this time`; `Not levelled - MP3 songs play as they are` (or why deadwax won't level it); `Off` for a song played with Normalization off |
-| | **Why** | why it came that way: `Maximum quality: Up to 48 kHz`, `48 kHz and below is never resampled`, `Only FLAC is resampled`, `Maximum quality: Original`, and so on |
+| | **Why sent this way** | why it came that way: `Maximum quality: Up to 48 kHz`, `48 kHz and below is never resampled`, `Only FLAC is resampled`, `Maximum quality: Original`, and so on |
 | | **Gapless** | `Off`, `On`, or `On, in one stream` while this song is playing in [the stream](#one-stream-for-flac) |
 | | **Speed** | [the speed](#the-speed-fader): `Normal (1.00x) - the song as it is, nothing changed`, `1.25x, the pitch moving with it`, or what the browser did instead - `but the browser is holding the pitch`, `the browser refused it - …` in its own words, `the browser plays it at 1.00x`. Under it, once the song has played a few seconds, how fast it really moved: `The song moved at 1.24x over the last few seconds of playing` (lower than the speed across a moment it waited for the network; begun again from a change of speed). The row keeps up while Debug is open - a change of speed, from the desktop's player bar beside it, shows at once, and the measure as it comes and moves |
-| Last song change and seek | **Gap** | the last song change: how long it took and how it was made (below), with up to four before it on an *Earlier* line |
+| Last song change and seek | **Last song change** | the last song change: how long it took and how it was made (below), with up to four before it on an *Earlier* line |
 | | **Last seek** | where your last seek went: see [Seeking](#seeking-and-where-safari-lands) |
-| The turntable | **Turntable sound** | whether [the turntable](#the-turntable)'s own sound is ready: `Ready: 0:42-1:22, FLAC, decoded at 48 kHz` (the stretch of the song it holds), or off and why (below), with which part plays it (its own audio thread, or the page's main thread and why), how far the phone's audio clock moves at a time, and what its stretches have cost since the turntable showed and when the last of them came (`6.8 MB fetched since the turntable showed, the last window 1:01 in` - divide one by the other for a rate) |
-| The turntable | **Turntable timing** | how the turntable is keeping up on this phone, counted since it last showed: `The song was back 1.24 s after the last let-go - 0.40 s of it the record's run back to speed`, and under it whether the sound - when it is made on the page's main thread - had gaps (`12 of 3400 blocks late, the worst by 38 ms`), how the picture kept up under your finger (`310 frames, 4 late, the longest gap 118 ms`), any let-go after which the song didn't start, and any time the browser interrupted the sound - and how many peaks the record's sound held under full scale and the deepest it turned the sound down to do it (`Peaks held under full scale: 36 since it showed (65 samples), the deepest 1.4 dB`: each of those went past half a decibel under full scale and was turned down; on a loud song about a third of them went over full scale too, where the browser would have cut them off - counted up to a quarter of a second or so after you let go, once the sound, an eighth of a second behind your hand, has caught up, coasts included) - and how far behind your hand the record's sound is by design and what this device's own audio says it adds after that (`The record's sound: 142.8 ms behind the hand by design (blocks of 512 on the main thread), then what this device's audio adds - it says base 2.7 ms, output 8.0 ms, 12.3 ms from render to speaker`: the browser's own figures, each only where it gives them - the output figures include a Bluetooth headset's delay where the browser knows it, and an older Safari may give only the first). The blocks-late count works in Chrome too. If the turntable feels like it hangs, these numbers say where |
+| The turntable | **Turntable sound** | whether [the turntable](#the-turntable)'s own sound is ready: `Ready: 0:42-1:22, FLAC, decoded at 48 kHz` (the stretch of the song it holds), or off and why (below). Each fact after it is a row of its own, shown while the turntable shows and there is something to say: |
+| | **Voice** | which part plays the sound: `On its own audio thread (an AudioWorklet)`, or the page's main thread and why (below) |
+| | **Clock step** | how far the phone's audio clock moves at a time, once it has been seen to move: `21.3 ms at a time` |
+| | **Data used** | what its stretches have cost since the turntable showed and when the last of them came: `3.4 MB a window; 6.8 MB fetched since the turntable showed, the last window 1:01 in` - divide one by the other for a rate |
+| | **Turntable timing** | how the turntable is keeping up on this phone, counted since it last showed: `The song was back 1.24 s after the last let-go - 0.40 s of it the record's run back to speed`. Its facts follow it, a row each. If the turntable feels like it hangs, these rows say where: |
+| | **Main-thread sound** | when the sound is made on the page's main thread, whether it had gaps: `12 of 3400 blocks late, the worst by 38 ms` (it works in Chrome too) |
+| | **Limiter** | how many peaks the record's sound held under full scale and the deepest it turned the sound down to do it: `36 peaks held under full scale since it showed (65 samples), the deepest 1.4 dB` - each of those went past half a decibel under full scale and was turned down; on a loud song about a third of them went over full scale too, where the browser would have cut them off - counted up to a quarter of a second or so after you let go, once the sound, an eighth of a second behind your hand, has caught up, coasts included |
+| | **Frames under a hand** | how the picture kept up under your finger: `310 frames, 4 late, the longest gap 118 ms` |
+| | **Not restarted**, **Interruptions** | only when there were any: `2 let-goes after which the song didn't start`; `The sound was interrupted once` (by the browser) |
+| | **Delay behind the hand** | how far behind your hand the record's sound is by design, and what this device's own audio says it adds after that: `142.8 ms behind the hand by design (blocks of 512 on the main thread), then what this device's audio adds - it says base 2.7 ms, output 8.0 ms, 12.3 ms from render to speaker` - the browser's own figures, each only where it gives them; the output figures include a Bluetooth headset's delay where the browser knows it, and an older Safari may give only the first |
 | The turntable | **Recording** | a 20-second recording of the record's own sound, as a file to send with a bug report. **Record 20 s** starts it (the turntable showing, and its sound started - turn the record once first); close Info and turn the record as you would; when the row says `20 s recorded`, **Save the recording** downloads one JSON file (about 5 MB for 20 s) holding what the record's sound actually played on your device, every touch as it came, and what the sound made of it - exactly what's needed to hear and replay a sound no lab has reproduced; it also holds each moment's loudest sample as it was before the file's 16 bits cut it off, so it shows how far over anything went. Nothing is sent anywhere by itself |
 | The turntable | **Test bench** | a link, **Open the test bench**, that opens the turntable's test bench at `/player/lab/` in a tab of its own beside the app, so the song playing carries on - see [Testing the turntable](#testing-the-turntable) |
-| Navidrome sent | **Song**, **On other songs**, **Album** | the names of the fields Navidrome sent for the song and for its album, without their values; those it sent empty on an *Empty* line; and the fields other songs of the album carry that this one doesn't |
+| Fields from Navidrome | **Song fields**, **Only on other songs**, **Album fields** | the names of the fields Navidrome sent for the song and for its album, without their values; those it sent empty on an *Empty* line; and the fields other songs of the album carry that this one doesn't |
 
-The **Gap** row is timed with Gapless off as well, the same way, so you can compare the two.
+The **Last song change** row is timed with Gapless off as well, the same way, so you can compare the two.
 
 A change is timed from the moment one song ended to the moment the next one's **sound started**:
 when the player's clock for the new song is first seen moving. It isn't timed to the moment the
@@ -1666,7 +1691,7 @@ to 48 kHz, 3 dB quieter`; one streamed as it is under "Original" reads `In one s
 192 kHz`. deadwax resamples the whole song before it sends any of it, which takes a few seconds on a
 NAS, and until the start of the song has arrived nothing on the phone can say what deadwax did: then
 **Sent as** reads just `In one stream` (or `Asked for FLAC in MP4`), **Resampled** `Not known yet`
-and **Why** `Asked for resampled; deadwax hasn't answered yet`. They fill in by themselves while
+and **Why sent this way** `Asked for resampled; deadwax hasn't answered yet`. They fill in by themselves while
 Info is open.
 
 Only songs ending by themselves are timed, and only when the next one went straight to sound.
@@ -1696,14 +1721,16 @@ silent, the song playing on under your finger.
 | `Off: its window is loading - …` | the stretch is on its way |
 | `Off: no window yet - …` | the song is paused and the record hasn't been pressed: nothing is fetched until it plays, or until the record is pressed |
 
-The line under it says which part plays the sound: `On its own audio thread
+**Voice**, the row under it, says which part plays the sound: `On its own audio thread
 (an AudioWorklet)`, or `On the main thread - this page isn't on HTTPS, so the browser has no
 AudioWorklet` when deadwax is opened at a plain `http://` address (or `… the AudioWorklet wouldn't
-load (…)`, in the browser's words, when it refused it) - then, once it has seen it move, how far the phone's audio clock moves at a time, `Its clock moves 21.3 ms at a time`
-(the audio's own render: about 21 ms on an iPhone, 6 on a desktop browser; deadwax times the record's
-sound smoothly across those steps) - then what its stretches have cost.
+load (…)`, in the browser's words, when it refused it). **Clock step**, once it has seen it move, how far the
+phone's audio clock moves at a time, `21.3 ms at a time` (the audio's own render: about 21 ms on an iPhone, 6 on a
+desktop browser; deadwax times the record's sound smoothly across those steps) - and **Data used** what its
+stretches have cost. Until 2.0.7 these three were one dot-joined line under Turntable sound, and Turntable timing's
+rows one line under it.
 
-**Navidrome sent** is there to check what your Navidrome really sends before later parts of the app
+**Fields from Navidrome** is there to check what your Navidrome really sends before later parts of the app
 rely on it: the field names only, such as `discTitles` on an album or `musicBrainzId`, `playCount`
 and `played` on a song, as Navidrome's answer had them. A name alone can mislead both ways, so two
 things more are said:
@@ -1715,7 +1742,7 @@ things more are said:
   the main line has a value.
 - **Other fields Navidrome leaves out whenever they are zero or never set**: `playCount` and
   `played` on a song nobody has played, and on a song `starred`, `userRating`, `year`, `track` and
-  `discNumber`. So a missing name doesn't mean Navidrome can't send it. **On other songs** lists
+  `discNumber`. So a missing name doesn't mean Navidrome can't send it. **Only on other songs** lists
   the fields other songs of the same album carry and this one doesn't, which is where `playCount`
   shows up for a song never played when one beside it has been.
 
@@ -1733,9 +1760,9 @@ second player's song changes took about 98 ms there against about 145 ms with Ga
 94 and 96 ms on an iPhone. To try the stream on the phone:
 
 1. Tick **Gapless** in You and play an album of CD-quality FLAC from a tap, with the screen on.
-   Info → Debug's Gap row should say `0 ms, in one stream`, and you shouldn't hear the joins.
+   Info → Debug's Last song change row should say `0 ms, in one stream`, and you shouldn't hear the joins.
 2. **Lock the phone** and let at least ten songs change by themselves. The lock screen should show
-   each song's title and its own position as it comes. Unlock and open Info → Debug: the Gap row
+   each song's title and its own position as it comes. Unlock and open Info → Debug: the Last song change row
    shows the last change, and up to four before it on its *Earlier* line.
 3. From the app and from the lock screen, try **Next**, **Previous** and the scrubber, and seek
    back to near the start of a song that played a few minutes ago.
@@ -1914,7 +1941,8 @@ of most of an hour in one file) isn't levelled: it's sent exactly as with Normal
 Last. What's already queued keeps the level it was queued at, so an album never changes level halfway
 (a library shuffle's later songs too). To compare Off with Automatic, change it and play the album again.
 
-**What deadwax did** is on Info → About's **Normalization** row, under **Playing**, for everyone, and on
+**What deadwax did** is on Info → About's **Normalization** row, under **Sound**, for everyone (in words:
+`Album volume matching, 3.6 dB quieter` - [What it does](#what-it-does) has them all), and on
 Info → Debug's for an admin (see [Info → Debug](#info--debug)), and
 deadwax's log says what it measured and made (`song 123 measured - -10.6 LUFS, peak -0.31 dBFS`, `song 123
 levelled (album, -7.42 dB), and put in a fragmented MP4 for Normalization`).
@@ -2383,8 +2411,8 @@ question the whole player existed to answer. Still to find out:
   Gapless, the Library's order) as they were;
 - whether **Navidrome sends each disc's title** for your albums (the album page's "Disc 4 · ..."
   headings, and Info → About's disc line);
-- **what Navidrome sends** for a song and an album: [Info → Debug](#info--debug)'s **Navidrome
-  sent** lists the field names, and later parts of the app want `musicBrainzId`, `played` and
+- **what Navidrome sends** for a song and an album: [Info → Debug](#info--debug)'s **Fields from
+  Navidrome** (its **Song fields** and **Album fields** rows) lists the field names, and later parts of the app want `musicBrainzId`, `played` and
   `playCount` from it;
 - **the turntable** under a real finger: turning the record and dragging the arm without the
   screen moving or closing, a tap on the record pausing, and whether it turns smoothly and stops
@@ -2414,11 +2442,11 @@ question the whole player existed to answer. Still to find out:
   plain `http://` alike; the sound should feel a hair behind your finger (an eighth of a second, a
   little more over `http://`) and never lurch - the very first turn of a paused record after opening
   the screen included; stopping your finger should stop it within a moment, and starting again should
-  carry on from there. Debug's **Turntable sound** line says how far your phone's audio clock moves at
-  a time (`Its clock moves … ms at a time`) - tell us what it says;
+  carry on from there. Debug's **Clock step** row says how far your phone's audio clock moves at
+  a time (`… ms at a time`) - tell us what it says;
 - **the turntable's sound never clipping**: scrubbing a loud song should have no
-  crackle on its drum hits, slowed, sped up or at its own speed; Debug's **Turntable timing** should
-  count the peaks it held (`Peaks held under full scale: …`), and a recording made then should have no
+  crackle on its drum hits, slowed, sped up or at its own speed; Debug's **Limiter** row should
+  count the peaks it held (`… peaks held under full scale since it showed …`), and a recording made then should have no
   moment over half a decibel under full scale;
 - **Requests** on the phone: the ✕ asking in the card (unless You's **Confirm before cancelling** is
   off on the phone - it's kept per device, so a home-screen app has its own), the count on the tab, Home's Arriving coming

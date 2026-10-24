@@ -12,7 +12,7 @@
  * words still shown: "handed over, from memory", "in one stream", "FLAC in MP4", "the song ended
  * on time, so it landed there".
  *
- * "Navidrome sent" lists the NAMES of the fields on the playing song and on its album, as
+ * "Fields from Navidrome" (until 2.0.7 "Navidrome sent") lists the NAMES of the fields on the playing song and on its album, as
  * deadwax's route passed them through untouched. It is there so the fields later screens want to
  * rely on (musicBrainzId, played, playCount, discTitles...) can be read off a phone against a real
  * Navidrome first. Names only: what Navidrome sent, never what deadwax hoped for, and never a
@@ -24,8 +24,13 @@
  * the album carry and this one doesn't are named too.
  *
  * AN ADMIN'S (2.0.0-player.63, James: "only make the debug info available to an admin"): Info draws the Debug
- * tab only for an admin (infoTabs, shownTab), and everyone's About ends in "Playing" - three of these rows a
- * listener can use, Format, Gapless and Normalization (playingRows), so they say Debug's words.
+ * tab only for an admin (infoTabs, shownTab). Everyone's About ends in "Sound" - Format, Gapless and
+ * Normalization - which until 2.0.7 were three of these rows, in Debug's words; since UX batch 4 About says them
+ * in a listener's words with its own formatters (lib/aboutSound.ts), and Debug keeps the numbers.
+ *
+ * (2.0.7) Debug's labels say what each row is ("Sent to this device", "Fields from Navidrome", "Last song change",
+ * "Why sent this way", "Song fields"...), and the turntable's facts are a row each (turntableRows) where they were
+ * dot-joined notes under two rows.
  *
  * Pure, like the rest of lib/, so ui/test/debug.sim.cjs holds every row to its words.
  */
@@ -59,6 +64,9 @@ export interface DebugRow {
   note?: string
   /** a data value - numbers, rates, field names - set in the monospace face */
   mono?: boolean
+  /** (2.0.7) the note is data too - field names - and set in the monospace face; every other note is in the
+   *  text face (the review's 1.10: every note was monospace) */
+  noteMono?: boolean
   /** a control on the row (2.0.0-player.32): a button that does something, a link to save a file - or
    *  (2.0.0-player.36) a page that opens BESIDE the app (`beside`), so the music playing isn't unloaded */
   action?: { label: string; onClick?: () => void; href?: string; download?: string; beside?: boolean }
@@ -134,16 +142,21 @@ function depthAndRate(depth: number, rate: number): string {
 /**
  * The file as Navidrome read it: "FLAC, 24-bit, 192 kHz, stereo". From OpenSubsonic's
  * samplingRate, bitDepth and channelCount, which the queue keeps as 0 when Navidrome didn't say -
- * and a part nobody gave is left out, never guessed.
+ * and a part nobody gave is left out, never guessed. '' when none of it is known.
  */
-export function formatRow(track: QueueTrack): DebugRow {
-  const parts = [
+export function formatWords(track: QueueTrack): string {
+  return [
     kindOf(track),
     track.bitDepth > 0 ? `${track.bitDepth}-bit` : '',
     track.sampleRate > 0 ? khz(track.sampleRate) : '',
     track.channels > 0 ? channelWords(track.channels) : '',
-  ].filter(Boolean)
-  return { label: 'Format', value: parts.length ? parts.join(', ') : "Navidrome didn't say", mono: true }
+  ].filter(Boolean).join(', ')
+}
+
+/** Debug's Format row: formatWords(), in the data face - "Navidrome didn't say" when it didn't. */
+export function formatRow(track: QueueTrack): DebugRow {
+  const words = formatWords(track)
+  return { label: 'Format', value: words || "Navidrome didn't say", mono: true }
 }
 
 /** What came back for THIS song when it was asked for inside an MP4, or null. */
@@ -226,7 +239,7 @@ export function resampledRow(input: Pick<DebugInput, 'track' | 'wrapped' | 'maxR
  * what kept it as it is.
  */
 export function whyRow({ track, wrapped, maxRate, format }: Pick<DebugInput, 'track' | 'wrapped' | 'maxRate' | 'format'>): DebugRow {
-  const label = 'Why'
+  const label = 'Why sent this way'
   const mine = wrappedFor(wrapped, track)
   const setting = (rate: MaxRate) => `Maximum quality: ${MAX_RATE_LABELS[rate]}`
   if (mine?.resampled) {
@@ -293,7 +306,7 @@ export function gapRow(gaps: GapReading[]): DebugRow {
   const at = line.indexOf(GAP_EARLIER)
   const last = (at === -1 ? line : line.slice(0, at)).replace(GAP_PREFIX, '')
   return {
-    label: 'Gap',
+    label: 'Last song change',
     value: upperFirst(last),
     ...(at === -1 ? {} : { note: `Earlier: ${line.slice(at + GAP_EARLIER.length)}` }),
   }
@@ -319,58 +332,57 @@ function megabytes(bytes: number): string {
  * (an audio context starts only from one); still starting; deadwax not sending a window; its window
  * loading, or none yet. Off, a press on the record is 2.0.0-player.11's: it scrubs silently, the song
  * playing on (2.0.0-player.16 - the deck takes a press only when the record can sound there). This is
- * how an iPhone tells what WebKit made of it. The note says which voice plays it and why (2.0.0-player.16:
- * on the main thread when the page has no AudioWorklet - it isn't on HTTPS - or it wouldn't load), then
- * how far the audio's clock moves at a time (2.0.0-player.24: the audio's own render - about 21 ms on an
- * iPhone - which the deck maps smoothly over; how James's phone renders, read off it), then what windows
- * have cost since the turntable showed - and when, after it showed, the last of them came: the deck
- * reports as things change, not as time passes, so that is the time the bytes are measured to (divide
- * one by the other for a rate).
+ * how an iPhone tells what WebKit made of it. Its note is only its own: the window ready, while the
+ * sound waits for a tap or is starting. Which voice plays it, its clock's step and what the windows have
+ * cost are rows of their own since 2.0.7 (turntableRows) - they were this row's dot-joined note.
  */
 export function turntableRow(report: DeckReport | null | undefined): DebugRow {
   const label = 'Turntable sound'
   if (!report) return { label, value: "Off: the turntable isn't showing" }
-  const voice = report.voice === 'script'
-    ? `On the main thread - ${report.voiceWhy ?? 'this browser has no AudioWorklet'}`
-    : report.voice === 'worklet' ? 'On its own audio thread (an AudioWorklet)' : undefined
-  const step = report.clockStep && report.clockStep > 0 ? `Its clock moves ${(report.clockStep * 1000).toFixed(1)} ms at a time` : undefined
-  const cost = report.fetched > 0
-    ? `${report.window ? `${megabytes(report.window.bytes)} a window; ` : ''}${megabytes(report.fetched)} fetched since the turntable showed, the last window ${clock(report.lastFetchAt / 1000)} in`
-    : undefined
-  //? the row's own note first, then which voice, then its clock's step, then the cost
-  const withNotes = (row: DebugRow): DebugRow => {
-    const note = [row.note, voice, step, cost].filter(Boolean).join(' · ')
-    return note ? { ...row, note } : row
-  }
   const window = report.window
   const stretch = window ? `${clock(window.start)}-${clock(window.end)}, ${window.kind}, decoded at ${khz(window.decodedAt)}` : ''
+  const ready = window ? { note: `Its window is ready: ${stretch}` } : {}
   if (report.context === 'unsupported') return { label, value: 'Off: this browser has no Web Audio' }
   if (report.context === 'no-voice') return { label, value: 'Off: this browser has neither an AudioWorklet nor a ScriptProcessorNode to play it' }
-  if (report.context === 'failed') return withNotes({ label, value: upperFirst(`off: ${report.problem ?? "the sound couldn't start"}`) })
-  if (report.refused) return withNotes({ label, value: `Off: ${report.refused}` })
-  if (report.context === 'none') {
-    return withNotes({ label, value: 'Off: waiting for a tap to start the sound', ...(window ? { note: `Its window is ready: ${stretch}` } : {}) })
+  if (report.context === 'failed') return { label, value: upperFirst(`off: ${report.problem ?? "the sound couldn't start"}`) }
+  if (report.refused) return { label, value: `Off: ${report.refused}` }
+  if (report.context === 'none') return { label, value: 'Off: waiting for a tap to start the sound', ...ready }
+  if (report.context === 'starting') return { label, value: 'Off: still starting - a press scrubs silently until it has', ...ready }
+  if (window) return { label, value: `Ready: ${stretch}`, mono: true }
+  if (report.failed) return { label, value: `Off: ${report.failed}` }
+  if (report.loading) return { label, value: 'Off: its window is loading - a press scrubs silently until it is in' }
+  return { label, value: 'Off: no window yet - a press scrubs silently; one is fetched while the song plays, or as the record is pressed' }
+}
+
+/**
+ * The record's sound, a fact a row (2.0.7 - they were "Turntable sound"'s dot-joined note): which voice plays
+ * it and why (2.0.0-player.16: on the main thread when the page has no AudioWorklet - it isn't on HTTPS - or it
+ * wouldn't load); how far the audio's clock moves at a time (2.0.0-player.24: the audio's own render - about
+ * 21 ms on an iPhone - which the deck maps smoothly over; how James's phone renders, read off it); and what
+ * windows have cost since the turntable showed - and when, after it showed, the last of them came: the deck
+ * reports as things change, not as time passes, so that is the time the bytes are measured to (divide one by
+ * the other for a rate). Each only when there is something to say, as each note part was.
+ */
+export function turntableSoundFacts(report: DeckReport | null | undefined): DebugRow[] {
+  if (!report) return []
+  const rows: DebugRow[] = []
+  if (report.voice === 'script') rows.push({ label: 'Voice', value: `On the main thread - ${report.voiceWhy ?? 'this browser has no AudioWorklet'}` })
+  else if (report.voice === 'worklet') rows.push({ label: 'Voice', value: 'On its own audio thread (an AudioWorklet)' })
+  if (report.clockStep && report.clockStep > 0) rows.push({ label: 'Clock step', value: `${(report.clockStep * 1000).toFixed(1)} ms at a time`, mono: true })
+  if (report.fetched > 0) {
+    rows.push({
+      label: 'Data used',
+      value: `${report.window ? `${megabytes(report.window.bytes)} a window; ` : ''}${megabytes(report.fetched)} fetched since the turntable showed, the last window ${clock(report.lastFetchAt / 1000)} in`,
+    })
   }
-  if (report.context === 'starting') {
-    return withNotes({ label, value: 'Off: still starting - a press scrubs silently until it has', ...(window ? { note: `Its window is ready: ${stretch}` } : {}) })
-  }
-  if (window) return withNotes({ label, value: `Ready: ${stretch}`, mono: true })
-  if (report.failed) return withNotes({ label, value: `Off: ${report.failed}` })
-  if (report.loading) return withNotes({ label, value: 'Off: its window is loading - a press scrubs silently until it is in' })
-  return withNotes({ label, value: 'Off: no window yet - a press scrubs silently; one is fetched while the song plays, or as the record is pressed' })
+  return rows
 }
 
 /**
  * How the turntable is keeping up on this device (2.0.0-player.28, the deck's DeckHealth): how long the
- * song took to come back after the last let-go, and - in the note - whether the sound, made on the main
- * thread, had gaps, what the voice's limiter held under full scale (2.0.0-player.35: peaks that went over
- * its ceiling, half a decibel under it - on a loud song about a third of them over full scale too, which the
- * browser would have cut off - and the deepest it turned the sound down), how the frames kept up under a
- * hand, and what else got in the way. James: "the turntable player just feels like it hangs a lot,
- * especially when scrubbing" - nothing a lab's browser shows, so the phone says it here. And (2.0.0-player.40)
- * how far behind the hand the record's sound is by design - the blocks the voice renders in, on the main
- * thread - and what this device's audio says it adds after that (latencyNote), Bluetooth included where the
- * browser knows it.
+ * song took to come back after the last let-go. James: "the turntable player just feels like it hangs a lot,
+ * especially when scrubbing" - nothing a lab's browser shows, so the phone says it here. The rest of what the
+ * deck measures is a row each (turntableTimingFacts).
  */
 export function turntableTimingRow(report: DeckReport | null | undefined): DebugRow {
   const label = 'Turntable timing'
@@ -380,26 +392,57 @@ export function turntableTimingRow(report: DeckReport | null | undefined): Debug
   const value = health.backMs === null
     ? 'No let-go of a playing record timed yet'
     : `The song was back ${seconds(health.backMs)} after the last let-go${health.motorMs ? ` - ${seconds(health.motorMs)} of it the record's run back to speed` : ''}`
-  const notes: string[] = []
+  return { label, value }
+}
+
+/**
+ * What the deck measures of keeping up, a fact a row (2.0.7 - they were "Turntable timing"'s dot-joined note):
+ * whether the sound, made on the main thread, had gaps; what the voice's limiter held under full scale
+ * (2.0.0-player.35: peaks that went over its ceiling, half a decibel under it - on a loud song about a third of
+ * them over full scale too, which the browser would have cut off - and the deepest it turned the sound down);
+ * how the frames kept up under a hand; let-goes after which the song didn't start; the sound interrupted; and
+ * (2.0.0-player.40) how far behind the hand the record's sound is by design and what this device's audio says it
+ * adds after that (latencyNote), Bluetooth included where the browser knows it. Each when the note said it.
+ */
+export function turntableTimingFacts(report: DeckReport | null | undefined): DebugRow[] {
+  const health = report?.health
+  if (!report || !health) return []
+  const rows: DebugRow[] = []
   if (report.voice === 'script') {
-    notes.push(health.blocks
-      ? `The sound, on the main thread: ${health.lateBlocks} of ${health.blocks} blocks late${health.lateBlocks ? `, the worst by ${Math.round(health.worstBlockMs)} ms` : ''}`
-      : 'The sound, on the main thread: no block played yet')
+    rows.push({
+      label: 'Main-thread sound',
+      value: health.blocks
+        ? `${health.lateBlocks} of ${health.blocks} blocks late${health.lateBlocks ? `, the worst by ${Math.round(health.worstBlockMs)} ms` : ''}`
+        : 'No block played yet',
+    })
   }
   if (report.voice && health.peaksHeld !== undefined) {
-    notes.push(health.peaksHeld
-      ? `Peaks held under full scale: ${health.peaksHeld} since it showed (${health.samplesHeld} ${health.samplesHeld === 1 ? 'sample' : 'samples'}), the deepest ${health.deepestHoldDb < 0.05 ? 'under 0.1' : health.deepestHoldDb.toFixed(1)} dB`
-      : 'Peaks held under full scale: none since it showed')
+    rows.push({
+      label: 'Limiter',
+      value: health.peaksHeld
+        ? `${health.peaksHeld} ${health.peaksHeld === 1 ? 'peak' : 'peaks'} held under full scale since it showed (${health.samplesHeld} ${health.samplesHeld === 1 ? 'sample' : 'samples'}), the deepest ${health.deepestHoldDb < 0.05 ? 'under 0.1' : health.deepestHoldDb.toFixed(1)} dB`
+        : 'No peaks held under full scale since it showed',
+    })
   }
-  notes.push(health.frames
-    ? `Under a hand: ${health.frames} frames, ${health.slowFrames} late${health.slowFrames ? `, the longest gap ${Math.round(health.worstFrameMs)} ms` : ''}`
-    : 'Under a hand: no frames yet')
-  if (health.notBack) notes.push(`${health.notBack} ${health.notBack === 1 ? 'let-go' : 'let-goes'} after which the song didn't start`)
-  if (health.interruptions) notes.push(`The sound interrupted ${health.interruptions} ${health.interruptions === 1 ? 'time' : 'times'}`)
+  rows.push({
+    label: 'Frames under a hand',
+    value: health.frames ? `${health.frames} frames, ${health.slowFrames} late${health.slowFrames ? `, the longest gap ${Math.round(health.worstFrameMs)} ms` : ''}` : 'No frames yet',
+  })
+  if (health.notBack) rows.push({ label: 'Not restarted', value: `${health.notBack} ${health.notBack === 1 ? 'let-go' : 'let-goes'} after which the song didn't start` })
+  if (health.interruptions) rows.push({ label: 'Interruptions', value: `The sound was interrupted ${health.interruptions === 1 ? 'once' : `${health.interruptions} times`}` })
   const latency = latencyNote(report)
-  if (latency) notes.push(latency)
-  return { label, value, note: notes.join(' · ') }
+  if (latency) rows.push({ label: 'Delay behind the hand', value: latency.replace(LATENCY_LEAD, '') })
+  return rows
 }
+
+/** The turntable's rows in Debug, top to bottom (2.0.7): its sound and that sound's facts, then its timing and its
+ *  facts - one fact a row. */
+export function turntableRows(report: DeckReport | null | undefined): DebugRow[] {
+  return [turntableRow(report), ...turntableSoundFacts(report), turntableTimingRow(report), ...turntableTimingFacts(report)]
+}
+
+/** How latencyNote's sentence begins - the row it is in says whose delay it is. */
+const LATENCY_LEAD = "The record's sound: "
 
 /**
  * The record's sound behind the hand (2.0.0-player.40, the deck's DeckLatency): by design - HAND_DELAY_S, the
@@ -418,7 +461,7 @@ export function latencyNote(report: DeckReport | null | undefined): string | nul
   if (latency.base !== null) adds.push(`base ${ms(latency.base)}`)
   if (latency.output !== null) adds.push(`output ${ms(latency.output)}`)
   if (latency.speaker !== null) adds.push(`${ms(latency.speaker)} from render to speaker`)
-  return `The record's sound: ${ms(latency.design)} behind the hand by design${how}, then what this device's audio adds - ${adds.length ? `it says ${adds.join(', ')}` : "it doesn't say"}`
+  return `${LATENCY_LEAD}${ms(latency.design)} behind the hand by design${how}, then what this device's audio adds - ${adds.length ? `it says ${adds.join(', ')}` : "it doesn't say"}`
 }
 
 /**
@@ -492,7 +535,7 @@ function sentRow(label: string, answer: Answer | null): DebugRow {
     label,
     value: filled.length ? filled.join(', ') : 'Nothing with a value',
     mono: true,
-    ...(empty.length ? { note: `Empty: ${empty.join(', ')}` } : {}),
+    ...(empty.length ? { note: `Empty: ${empty.join(', ')}`, noteMono: true } : {}),
   }
 }
 
@@ -515,7 +558,7 @@ export function otherSongsFields(song: Answer | null, album: Answer | null): str
 }
 
 function otherSongsRow(song: Answer | null, album: Answer | null): DebugRow {
-  const label = 'On other songs'
+  const label = 'Only on other songs'
   const names = otherSongsFields(song, album)
   if (names === null) return { label, value: NOT_KNOWN }
   return names.length ? { label, value: names.join(', '), mono: true } : { label, value: 'Nothing this song lacks' }
@@ -555,27 +598,16 @@ export function shownTab(tab: InfoTab, admin: boolean): InfoTab {
   return infoTabs(admin).some((entry) => entry.id === tab) ? tab : 'about'
 }
 
-/** The title of About's group of the rows a listener can use (2.0.0-player.63). */
-export const PLAYING_TITLE = 'Playing'
-
-/**
- * (2.0.0-player.63) About's "Playing" group, for everyone: the three of Debug's rows a listener can use - the
- * file's Format, Gapless and Normalization - built by Debug's own functions, so the words are Debug's words.
- */
-export function playingRows(input: Pick<DebugInput, 'track' | 'wrapped' | 'gapless' | 'format' | 'level'>): DebugRow[] {
-  return [formatRow(input.track), gaplessRow(input), normalizationRow(input)]
-}
-
 /** Info > Debug, top to bottom. */
 export function debugSections(input: DebugInput): DebugSection[] {
   return [
     { title: 'The file', rows: [formatRow(input.track)] },
-    { title: 'What this device is sent', rows: [sentAsRow(input), resampledRow(input), normalizationRow(input), whyRow(input), gaplessRow(input), speedRow(input.speed)] },
+    { title: 'Sent to this device', rows: [sentAsRow(input), resampledRow(input), normalizationRow(input), whyRow(input), gaplessRow(input), speedRow(input.speed)] },
     { title: 'Last song change and seek', rows: [gapRow(input.gaps), seekRow(input.lastSeek)] },
-    { title: 'The turntable', rows: [turntableRow(input.turntable), turntableTimingRow(input.turntable), recordingRow(input.recording, input.onRecord, input.turntable), benchRow()] },
+    { title: 'The turntable', rows: [...turntableRows(input.turntable), recordingRow(input.recording, input.onRecord, input.turntable), benchRow()] },
     {
-      title: 'Navidrome sent',
-      rows: [sentRow('Song', input.song), otherSongsRow(input.song, input.album), sentRow('Album', input.album)],
+      title: 'Fields from Navidrome',
+      rows: [sentRow('Song fields', input.song), otherSongsRow(input.song, input.album), sentRow('Album fields', input.album)],
     },
   ]
 }

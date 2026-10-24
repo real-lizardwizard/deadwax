@@ -80,15 +80,17 @@ check('nothing playing: nothing asked, nothing said', [brief(plan({ song: null }
 check('...a copy still running is stopped', plan({ song: null, source: { song: 'a', key: 1, at: 50 } }).stop, true)
 check('no Web Audio: the copy stops, nothing asked, and one plain line says so',
   [brief(plan({ audio: 'none', source: { song: 'a', key: 1, at: 50 } })), plan({ audio: 'none' }).why],
-  [[true, null, null, 'unseen'], "This browser can't analyse sound, so the song can't be seen."])
+  [[true, null, null, 'unseen'], "This browser can't follow the music, so the visualizer can't move with it."])
 check('a context still starting (its resume on the way, the page hidden): nothing asked, nothing said',
   [brief(plan({ audio: 'starting' })), plan({ audio: 'starting' }).why], [[false, null, null, 'waiting'], null])
-check('not a FLAC: nothing asked - the song can\'t be seen, said plainly',
-  [brief(plan({ song: { ...SONG, flac: false } })), plan({ song: { ...SONG, flac: false } }).why],
-  [[false, null, null, 'unseen'], "This song can't be seen - it isn't a FLAC file."])
-check('its windows refused (deadwax\'s 415, or a window the browser couldn\'t decode): the same, in their words',
-  [brief(plan({ refused: [{ song: 'a', why: "this browser couldn't read its sound" }] })), plan({ refused: [{ song: 'a', why: "this browser couldn't read its sound" }] }).why],
-  [[false, null, null, 'unseen'], "This song can't be seen - this browser couldn't read its sound."])
+check('not a FLAC: nothing asked - the visualizer rests, said plainly',
+  [brief(plan({ song: { ...SONG, flac: false } })), plan({ song: { ...SONG, flac: false } }).why, plan({ song: { ...SONG, flac: false } }).detail],
+  [[false, null, null, 'unseen'], 'The visualizer follows FLAC songs only - it rests for this one.', null])
+//? (2.0.7) in a listener's words - the refusal's own words are the detail, for whoever runs deadwax only (vizNote)
+check('its windows refused (deadwax\'s 415, or a window the browser couldn\'t decode): a listener\'s line, their words the detail',
+  [brief(plan({ refused: [{ song: 'a', why: "this browser couldn't read its sound" }] })), plan({ refused: [{ song: 'a', why: "this browser couldn't read its sound" }] }).why,
+    plan({ refused: [{ song: 'a', why: "this browser couldn't read its sound" }] }).detail],
+  [[false, null, null, 'unseen'], "The visualizer can't follow this song - it rests for this one.", "this browser couldn't read its sound"])
 check('...another song\'s refusal is not this one\'s', plan({ refused: [{ song: 'b', why: 'x' }] }).seeing, 'waiting')
 
 console.log('\npaused, or stalled')
@@ -102,7 +104,13 @@ check('...not asked again while one is on its way that will cover it', brief(pla
 check('...but asked when the one on its way won\'t (a seek away from it)', plan({ position: 150, pending: { song: 'a', from: 48, to: 88 } }).fetch, 148)
 check('...nor while the last ask failed under 10 s ago - said, in a plain line',
   [brief(plan({ failed: [{ song: 'a', why: "deadwax couldn't send its sound", until: 5000 }] })), plan({ failed: [{ song: 'a', why: "deadwax couldn't send its sound", until: 5000 }] }).why],
-  [[false, null, null, 'unseen'], "This song can't be seen just now - deadwax couldn't send its sound."])
+  [[false, null, null, 'unseen'], 'The visualizer has lost the music for now - it keeps trying.'])
+check('...the failure\'s own words the detail', plan({ failed: [{ song: 'a', why: "deadwax couldn't send its sound", until: 5000 }] }).detail, "deadwax couldn't send its sound")
+check('the note: the detail in brackets only for whoever runs deadwax',
+  [sync.vizNote('Line.', 'its words', true), sync.vizNote('Line.', 'its words', false), sync.vizNote('Line.', null, true)], ['Line. (its words)', 'Line.', 'Line.'])
+check('(after review) the readout\'s mood only while a song is followed: never for one it can\'t follow, nor with no song',
+  ['seen', 'waiting', 'paused', 'unseen', 'nothing'].map(sync.showsMood), [true, true, true, false, false])
+check('no line names a FLAC\'s silence as "can\'t be seen", nor says what deadwax couldn\'t do', Object.values(sync.VIZ_WORDS).filter((line) => /can't be seen|deadwax|analyse/.test(line)), [])
 check('...asked again once the 10 s are up', plan({ now: 5000, failed: [{ song: 'a', why: 'x', until: 5000 }] }).fetch, 48)
 check('a window covering the playhead and what comes next: nothing asked', plan({ held: held(48, 88), source: { song: 'a', key: 1, at: 50 } }).fetch, null)
 check('the next asked 6 s before the end - and it moves on', [plan({ position: 81.5, held: held(48, 88), source: { song: 'a', key: 1, at: 81.5 } }).fetch,

@@ -146,8 +146,42 @@ export interface SyncPlan {
   /** ask for the NEXT song's window from here, s (its first, so 0) */
   prefetch: number | null
   seeing: Seeing
-  /** why the song can't be seen - one plain line for the screen */
+  /** why the song can't be seen - one plain line for the screen, in a listener's words (2.0.7) */
   why: string | null
+  /** (2.0.7) the refusal's or the failure's own words (deadwax's 415, the browser's) - for whoever runs deadwax
+   *  only, after the line; null when there are none */
+  detail: string | null
+}
+
+/**
+ * (2.0.7, UX batch 4) What the visualizer says when it can't follow the song - a listener's words, never the
+ * reason's own (they were "This song can't be seen - …" with deadwax's words after the dash): the review's 5.1.
+ */
+export const VIZ_WORDS = {
+  /** no Web Audio here, or nothing to analyse with */
+  noAudio: "This browser can't follow the music, so the visualizer can't move with it.",
+  /** not a FLAC: only FLAC songs have the silent copy */
+  notFlac: 'The visualizer follows FLAC songs only - it rests for this one.',
+  /** deadwax won't cut this song a copy (a 415), or this browser couldn't read the copy */
+  refused: "The visualizer can't follow this song - it rests for this one.",
+  /** the copy couldn't be had just now: asked for again after VIZ_RETRY_MS (player/vizAudio.ts) */
+  failed: 'The visualizer has lost the music for now - it keeps trying.',
+} as const
+
+/**
+ * (2.0.7, after review) Whether the readout's "Mood: …" may be shown: only while the visualizer follows a song -
+ * never for one it says it can't follow ('unseen': its note says so beside it), nor with no song at all. The feel
+ * is fed only by a song it hears (Visualizer's musicFeel), so for one it can't hear it would still be the last
+ * FLAC's mood, or newFeel()'s "lively", said as this song's.
+ */
+export function showsMood(seeing: Seeing): boolean {
+  return seeing !== 'unseen' && seeing !== 'nothing'
+}
+
+/** The visualizer's note: the line - and, for whoever runs deadwax (`runs`), the reason's own words in brackets
+ *  after it, as batch 1's one-line notices put them. */
+export function vizNote(why: string, detail: string | null, runs: boolean): string {
+  return runs && detail ? `${why} (${detail})` : why
 }
 
 /** The back and ahead margins for windows of `span` seconds: whole for a whole window, in proportion
@@ -185,15 +219,15 @@ function wantsNext(input: SyncInput, song: SyncSong): boolean {
 
 export function planSync(input: SyncInput): SyncPlan {
   const { song, held, source } = input
-  const quiet = (seeing: Seeing, why: string | null, prefetch: number | null = null): SyncPlan =>
-    ({ stop: source !== null, start: null, fetch: null, prefetch, seeing, why })
+  const quiet = (seeing: Seeing, why: string | null, prefetch: number | null = null, detail: string | null = null): SyncPlan =>
+    ({ stop: source !== null, start: null, fetch: null, prefetch, seeing, why, detail })
   if (!song) return quiet('nothing', null)
-  if (input.audio === 'none') return quiet('unseen', "This browser can't analyse sound, so the song can't be seen.")
+  if (input.audio === 'none') return quiet('unseen', VIZ_WORDS.noAudio)
   if (input.audio === 'starting') return quiet('waiting', null)
   //? this song can't be seen - but the next may be, and is asked for ahead all the same
-  if (!song.flac) return quiet('unseen', "This song can't be seen - it isn't a FLAC file.", wantsNext(input, song) ? 0 : null)
+  if (!song.flac) return quiet('unseen', VIZ_WORDS.notFlac, wantsNext(input, song) ? 0 : null)
   const refusal = input.refused.find((r) => r.song === song.id)
-  if (refusal) return quiet('unseen', `This song can't be seen - ${refusal.why}.`, wantsNext(input, song) ? 0 : null)
+  if (refusal) return quiet('unseen', VIZ_WORDS.refused, wantsNext(input, song) ? 0 : null, refusal.why)
   if (!input.running) return quiet('paused', null)
 
   const position = input.position
@@ -229,6 +263,6 @@ export function planSync(input: SyncInput): SyncPlan {
 
   const running = start !== null || (source !== null && !stop)
   const seeing: Seeing = running ? 'seen' : failure && !pending ? 'unseen' : 'waiting'
-  const why = seeing === 'unseen' ? `This song can't be seen just now - ${failure!.why}.` : null
-  return { stop, start, fetch, prefetch, seeing, why }
+  const unseen = seeing === 'unseen'
+  return { stop, start, fetch, prefetch, seeing, why: unseen ? VIZ_WORDS.failed : null, detail: unseen ? failure!.why : null }
 }

@@ -1116,7 +1116,7 @@ It shows only with at least four albums you last played more than 30 days ago, a
 Navidrome says when each album was last played (OpenSubsonic's `played`, on its "recently played"
 list). A library you've been listening through - everything played in the last month - or a fresh
 Navidrome has nothing to show yet. A Navidrome that doesn't send `played` never shows it: Info →
-Debug's **Navidrome sent** row (an admin's - with logins on, ask one to look, playing the same album) lists the fields it sends for the album playing. The plays are the
+Debug's **Fields from Navidrome** rows (an admin's - with logins on, ask one to look, playing the same album) lists the fields it sends for the album playing. The plays are the
 ones Navidrome counts for the account the player asks as - `NAVIDROME_USER` with logins off, your own
 with them on - so plays made in another app under another Navidrome user don't
 count.
@@ -1584,7 +1584,7 @@ asks for it once more a moment later, picking up where it stopped if it got part
 fails again it moves on to the next song and says so for a few seconds, in the mini player where
 the artist goes and above the song's title on the now-playing screen:
 **Skipped "…" - it wouldn't play**. A file that arrived but can't be decoded isn't asked for
-twice: **Skipped "…" - its file couldn't be decoded**. At the end of the queue there's nothing to
+twice: **Skipped "…" - this device couldn't play its audio**. At the end of the queue there's nothing to
 move on to, so playing stops there with the reason on screen, and if nothing was playing (you
 pressed next while paused, say) the reason is only shown. Tap play on a song that failed to ask
 for it again.
@@ -1601,11 +1601,11 @@ for it again.
 - **A limit on transcodes in Navidrome.** There's none unless you set one
   (`ND_TRANSCODING_MAXCONCURRENT`, or `ND_TRANSCODING_MAXCONCURRENTPERUSER`). With one set, a
   transcode over it is refused, and the phone can't tell that apart from audio it can't play: it
-  shows as *Couldn't play this song - Navidrome didn't send audio this device can play*, or as
+  shows as *Couldn't play this song - it didn't come as audio this device can play*, or as
   the song being skipped. Tap it again after a few seconds, or raise the limit.
-- **"Couldn't play this song - Navidrome didn't send audio this device can play"** or **"This
-  song's file couldn't be decoded"**: the file may be damaged, or in a format neither the phone
-  nor the transcode could manage. Try it in Navidrome's own web player. The first message is
+- **"Couldn't play this song - it didn't come as audio this device can play"** or **"This
+  device couldn't play this song's audio"**: the file may be damaged, or in a format neither the
+  phone nor the transcode could manage. Try it in Navidrome's own web player. The first message is
   also how any refused request looks from inside the page: a transcode limit (above), or a song
   whose album had another release applied to it while it sat in the queue, which Navidrome
   may now know by another id. For that one, open the album again from the grid.
@@ -1622,14 +1622,15 @@ for it again.
 
 **Debug is an admin's**: a Navidrome admin's, the break-glass `deadwax`'s, and with
 logins off everyone's. Anyone else's **Info** is **About** alone, with no tabs above it, and About's
-**Playing** group says what a listener can use of it: the file's **Format**, **Gapless** and
-**Normalization**, in Debug's own words. Where this guide asks for another of Debug's rows, an admin
-reads it - and where they read it matters:
+**Sound** group says what a listener can use of it: the file's **Format**, **Gapless** and
+**Normalization**, in a listener's words (Debug has the numbers). Where this guide asks for one of Debug's rows, an
+admin reads it - and where they read it matters:
 
-- **Rows about the song** - **Navidrome sent**'s **Song**, **On other songs** and **Album** - say the same
-  on any device: ask an admin to look on theirs, playing the same song.
-- **Rows about the device** - the rest: **Sent as**, **Resampled**, **Why**, **Speed**, **Gap**,
-  **Last seek**, **Turntable sound**, **Turntable timing** and **Recording** - describe the device and browser Info is open on. On an admin's own phone they're that
+- **Rows about the song** - **Fields from Navidrome**'s **Song fields**, **Only on other songs** and **Album
+  fields** - say the same on any device: ask an admin to look on theirs, playing the same song.
+- **Rows about the device** - the rest: **Sent as**, **Resampled**, **Why sent this way**, **Speed**, **Last song
+  change**, **Last seek**, **Turntable sound** and the rows under it, **Turntable timing** and the rows under it, and
+  **Recording** - describe the device and browser Info is open on. On an admin's own phone they're that
   phone's, not yours. For these, an admin reads Debug on your device: **You → About → Sign out**, let them
   sign in there and do what went wrong again (the same song, the same turn of the record), read the row,
   then sign out and sign back in as you.
@@ -1704,20 +1705,20 @@ Turning the record pauses the song and plays the record's own sound; letting go 
 to speed (0.4 s from still, up to about 0.8 s after a hard flick) and then starts the song again from
 there. How long that really takes, and whether the page kept up while your finger was down, is counted
 on your device: turn the record a few times, then open **•••** > **Info** > **Debug** and read
-**Turntable timing** (an admin's, and read on the device it's about - see [Info has no Debug tab](#info-has-no-debug-tab-or-it-went)).
+**Turntable timing** and the rows under it, a fact each (an admin's, and read on the device it's about - see [Info has no Debug tab](#info-has-no-debug-tab-or-it-went)).
 
 - **`The song was back N s after the last let-go`**: the whole wait from lifting your finger to the
   song's own playback moving, with how much of it was the record's run back to speed. What is left is
   your browser starting the song again after a seek - on an iPhone that can be several tenths of a
   second, and a web page can't shorten it.
-- **`N of M blocks late`** (only where the row above says the sound is "On the main thread", which is
+- **Main-thread sound: `N of M blocks late`** (only where **Voice** says the sound is "On the main thread", which is
   every page opened over plain `http://`): the record's sound is made by the same thread that draws the
   page there, and each late block is a gap or a click in it. Over `https://` (or `localhost`) the
   browser gives it a thread of its own and this can't happen. A block counts as late when it was still being written once the browser had begun to
-  play it. In blocks of 512 (the next line says which) a late block where the record's sound is heard
+  play it. In blocks of 512 (**Delay behind the hand** says which) a late block where the record's sound is heard
   moves the page to blocks of 1024 for the rest of the visit, a little later behind your hand and with
   twice the room.
-- **`The record's sound: N ms behind the hand by design`**: 121.5 ms on its
+- **Delay behind the hand: `N ms behind the hand by design`**: 121.5 ms on its
   own thread, 142.8 in blocks of 512 and 164.2 in blocks of 1024 on the main thread - then what this
   device's own audio says it adds after that: `base` (in Chrome its hardware's own render; Safari always
   says 2.7 ms, its own 128-frame step, whatever the hardware does), `output` (from there to the speaker -
@@ -1728,11 +1729,11 @@ on your device: turn the record a few times, then open **•••** > **Info** 
   and `output`); a
   Bluetooth headset is usually the biggest part of it, and no page can shorten that - wired headphones or
   the speaker can.
-- **`N frames, K late, the longest gap G ms`**: how the picture kept up while your finger held the
+- **Frames under a hand: `N frames, K late, the longest gap G ms`**: how the picture kept up while your finger held the
   record. Late frames are the page itself stalling.
-- **`let-goes after which the song didn't start`**: the browser refused to start the song without a
+- **Not restarted: `N let-goes after which the song didn't start`**: the browser refused to start the song without a
   tap, or it took more than three seconds to load. Tap play.
-- **`The sound interrupted N times`**: something else on the phone took the audio (a call, another
+- **Interruptions: `The sound was interrupted N times`** (or `once`): something else on the phone took the audio (a call, another
   app).
 
 The record's sound also stops as soon as the song is back: before, the two
@@ -1752,9 +1753,9 @@ buzz:
   back the peaks the song has between them, and the sound's filter for the deepest bass adds to them -
   about 2 to 3 dB on a loud, hard-clipped master), and the browser cuts off whatever is over. So the
   sound ends in a limiter that turns it down smoothly, 1.5 ms ahead of a peak, just enough to keep every
-  sample half a decibel under full scale, and changes nothing at all where nothing comes near it. **Info** > **Debug** > **Turntable timing** (an admin's, and read on the device it's about - see [Info has no Debug tab](#info-has-no-debug-tab-or-it-went)) says how many peaks it has held
-  since the turntable showed and the deepest it turned the sound down (`Peaks held under full scale:
-  36 since it showed (65 samples), the deepest 1.4 dB`), brought up to date a moment after you let go
+  sample half a decibel under full scale, and changes nothing at all where nothing comes near it. **Info** > **Debug** > **Limiter** (an admin's, and read on the device it's about - see [Info has no Debug tab](#info-has-no-debug-tab-or-it-went)) says how many peaks it has held
+  since the turntable showed and the deepest it turned the sound down (`36 peaks held under full scale
+  since it showed (65 samples), the deepest 1.4 dB`), brought up to date a moment after you let go
   (the sound runs an eighth of a second behind your hand, and a coast after it is counted too). A loud
   song turned down by a decibel or so on its loudest moments is the limiter doing its job; a crackle
   with that count still at none isn't it.
@@ -1764,7 +1765,7 @@ buzz:
   down. If you hear one, the test bench below tells whether it's deadwax.
 - **A slow wobble** as you turn is your hand: the pitch follows the record's speed, as on a real deck.
 - **Clicks or crackle**, rather than a wobble, on a page opened over plain `http://`: the sound is made
-  on the page's main thread there (**Info** > **Debug** > **Turntable sound** says "On the main
+  on the page's main thread there (**Info** > **Debug** > **Voice** says "On the main
   thread"), and a very busy phone can make it late. Say so if you hear it.
 - **The record feels late under your finger**: that is the eighth of a second. It can be shortened, at
   the cost of some of the steadiness.
@@ -1797,7 +1798,10 @@ anywhere by itself; send the file with your report. On a Mac, Chromium with the 
 [The turntable](player.md#the-turntable) has its own sound: turning the record
 plays the song at the speed of your hand, a flick coasts audibly, and a pause winds down. A press only takes hold of the record when it can make that sound: whenever it can't,
 turning it works as it did before - silently, the song playing on under your finger, and no momentum -
-rather than pausing the song over silence. When it's silent, **Info → Debug**'s **Turntable sound**
+rather than pausing the song over silence. When it can never sound on a song - it isn't a FLAC, or the browser has no Web
+Audio - the first turn of the record on that song says so, in a line above the song's title: **"The record makes sound
+for FLAC songs only - this one moves silently."** or **"This browser can't make the record's sound - turning it still
+moves through the song."** (until the song changes). For anything else, **Info → Debug**'s **Turntable sound**
 row (**•••** on the now-playing screen, then **Info**, then **Debug** - an admin's, and read on the device it's about: see
 [Info has no Debug tab](#info-has-no-debug-tab-or-it-went)) says why, in the order to check:
 
@@ -1835,8 +1839,8 @@ row (**•••** on the now-playing screen, then **Info**, then **Debug** - an
 
 **Opened at a plain `http://` address?** That's fine. A browser gives the
 AudioWorklet - the part that plays this sound on an audio thread of its own - only to pages on HTTPS
-or `localhost`, so over plain `http://` deadwax plays it on the page's main thread instead, and the line
-under **Turntable sound** says so: `On the main thread - this page isn't on HTTPS, so the browser has
+or `localhost`, so over plain `http://` deadwax plays it on the page's main thread instead, and the
+**Voice** row under **Turntable sound** says so: `On the main thread - this page isn't on HTTPS, so the browser has
 no AudioWorklet`. On HTTPS it says `On its own audio thread (an AudioWorklet)`.
 
 Turning the record never touches the song's own playback: if it's silent, the music still plays
@@ -1869,29 +1873,31 @@ turn plays the song at your hand's speed. What's left is by design:
   turntable shows with its sound on, even with the record standing still, so the first grab of a paused
   record after opening the screen or coming back to the app is timed as smoothly as the rest. If the
   first moments of a turn, and only those, warble, say so.
-- **Debug's line under Turntable sound** says how far your phone's audio clock moves at a time (`Its
-  clock moves 21.3 ms at a time`) - the steps the record's sound is now timed smoothly across. If the
-  sound still warbles, say what that line says, and which browser and device.
+- **Debug's Clock step row** says how far your phone's audio clock moves at a time (`21.3 ms at a
+  time`) - the steps the record's sound is now timed smoothly across. If the sound still warbles, say what
+  that row says, and which browser and device.
 
-## The visualizer doesn't move with the music, or says a song can't be seen
+## The visualizer doesn't move with the music, or says it can't follow a song
 
 [The visualizer](player.md#the-visualizer) (the five bars at the right of the desktop's player bar)
 measures its own silent copy of the stretch of the song playing - never the song you hear - and when
 it can't, it runs the effects from a calm, slow idle pattern and says why in a plain note at the
-bottom right of the screen (move the pointer, or click or tap, if the controls have faded):
+bottom right of the screen (move the pointer, or click or tap, if the controls have faded). For an admin, or
+anyone given Settings and the log, the reason's own words follow it in brackets:
 
-- **"This song can't be seen - it isn't a FLAC file."** Only FLAC songs have that copy, as only they
+- **"The visualizer follows FLAC songs only - it rests for this one."** Only FLAC songs have that copy, as only they
   have the turntable's sound. An MP3, AAC or any other song always shows the idle pattern.
-- **"This song can't be seen just now - deadwax couldn't send its sound."** deadwax cuts the copy
+- **"The visualizer has lost the music for now - it keeps trying."** (`deadwax couldn't send its sound`) deadwax cuts the copy
   from the copy of the song the player's cache keeps, or - when the page plays the FLAC as it is -
   straight from the FLAC on Navidrome, and couldn't just then: Navidrome not answering or breaking
   off, or a copy that had to be made and couldn't - the cache unusable or its disk short of space (see
   [A song seeks to the wrong place](#a-song-seeks-to-the-wrong-place), which covers the cache). It
   tries again after ten seconds by itself.
-- **"This song can't be seen - …"** with deadwax's own words after the dash (a song deadwax won't cut
-  a stretch from - a file cut short, say) or **"this browser couldn't read its sound"**: that song stays
-  unseen until you leave the visualizer and open it again; other songs are unaffected.
-- **"This browser can't analyse sound, so the song can't be seen."** The browser has no Web Audio, or
+- **"The visualizer can't follow this song - it rests for this one."** deadwax won't cut that song a stretch (its own
+  words in the brackets - a file cut short, say) or the browser couldn't read it (`this browser couldn't read its
+  sound`): that song stays on the idle pattern until you leave the visualizer and open it again; other songs are
+  unaffected.
+- **"This browser can't follow the music, so the visualizer can't move with it."** The browser has no Web Audio, or
   wouldn't make it - every song shows the idle pattern there.
 
 **It moves, but a moment late after a seek, after opening it, or on a song you skipped to**: the
@@ -1911,35 +1917,37 @@ deadwax reads each stretch the visualizer shows straight out of the FLAC on Navi
 time, and keeps nothing of it in the player's cache. Where it can't, deadwax's log says so once for each song - `a window of song … can't be cut
 straight from its FLAC - …` - and that song's stretches are cut from a copy made in the cache, as
 before (when the cache itself can't be used, the line ends `its windows can't be had` instead, and
-the visualizer says the song can't be seen just now). The words after the dash say why: a FLAC laid
+the visualizer says it has lost the music). The words after the dash say why: a FLAC laid
 out unusually (dozens of large pictures in front of its audio, say, or a seek table that points at
 the wrong places), or something in front of Navidrome - a proxy - answering a request for part of a
 file with another part, or with more than was asked for, or with the whole file once the request is
 longer than a few bytes. (Words beginning `reading it went wrong` are a fault in deadwax itself, not
 in the file - worth reporting, with the line; the stretches still come from the copy.) A proxy should
 pass those requests on to Navidrome as they are. One that ignores every request for part of a file
-shows differently, and in more places: every FLAC song's visualizer says **"This song can't be seen -
-Navidrome didn't answer a range of the file"**, the phone's turntable is silent, Safari and iPhones
+shows differently, and in more places: every FLAC song's visualizer says **"The visualizer can't follow this song"**
+(with `Navidrome didn't answer a range of the file` in the brackets, for an admin), the phone's turntable is silent, Safari and iPhones
 are sent FLAC songs as they are (so their seeks land off again), and the gapless stream plays each
 song the ordinary way - nothing is made in the cache at all. The fix is the same.
 
-**The feel doesn't seem to match the music**: it is read from the copy over the last few seconds, so
-it settles a few seconds into a song and drifts as the song changes (it starts at "in between"). It is tuned on real music: calm music reads **smooth**, metal and other music with
-distorted guitars and cymbals filling its top end **aggressive**, and funk and other grooving music
-mostly **in between**. A sparse, clean guitar piece can read smooth, and a heavy track **in between**
+**The mood doesn't seem to match the music** (the **Mood:** line under the Style button, on a window 1280 pixels
+wide or more): it is read from the copy over the last few seconds, so
+it settles a few seconds into a song and drifts as the song changes (it starts at **lively**, `listening for the
+tempo`). It is tuned on real music: calm music reads **calm**, metal and other music with
+distorted guitars and cymbals filling its top end **intense**, and funk and other grooving music
+mostly **lively**. A sparse, clean guitar piece can read calm, and a heavy track **lively**
 when it has little top end (few cymbals, little distortion above about 2 kHz) or few, sparse beats.
 How loud the record was mastered hardly matters, and neither does a 120 Hz screen; a very quiet record
-can read a little smoother and a very loud one a little more aggressive. A screen drawing fewer than 60
+can read a little calmer and a very loud one a little more intense. A screen drawing fewer than 60
 frames a second does matter: the feel reads the music less often and misses some of its onsets, and at
 30 - which a battery saver can bring (Chrome's Energy Saver halves a page's frame rate) - about a third
-of them, so heavy music can read **in between** and grooving music **smooth**. On a laptop on battery,
+of them, so heavy music can read **lively** and grooving music **calm**. On a laptop on battery,
 turning the battery saver off (or plugging in) brings it back. Only the Mandala's shapes follow the
-feel; every style follows the tempo.
+mood; every style follows the tempo.
 
 **The colours aren't the cover's**: until the cover has loaded, and for an album with no cover, **From
 the cover** uses the purple. A black-and-white cover gives grey - that is its colour.
 
-**"WebGL isn't available here, so Ambient is showing the simple version."** Your browser has no WebGL,
+**"This browser can't draw the full Ambient effect, so a simpler version is showing."** Your browser has no WebGL,
 or has it turned off (some do when the graphics driver is blocked): Ambient shows its plain version;
 Bars, Scope and Halo don't need WebGL.
 
@@ -1950,10 +1958,10 @@ the window instead, and works the same.
 
 [Gapless](player.md#gapless-playback) (in **You**, under **Playback**) depends on the
 device and the connection, and **Info → Debug** (**•••** on the now-playing screen, then **Info**, then **Debug** - an
-admin's, and read on the device it's about: see [Info has no Debug tab](#info-has-no-debug-tab-or-it-went)) says how each song change went, in its **Gap** row. Compare it with Gapless off on the same phone
+admin's, and read on the device it's about: see [Info has no Debug tab](#info-has-no-debug-tab-or-it-went)) says how each song change went, in its **Last song change** row. Compare it with Gapless off on the same phone
 and connection: the difference is what Gapless saves.
 
-FLAC songs are meant to play [in one stream](player.md#one-stream-for-flac), the Gap row reading
+FLAC songs are meant to play [in one stream](player.md#one-stream-for-flac), the Last song change row reading
 `0 ms, in one stream`:
 
 - **`in one stream` with a number above 0**: the stream had to wait for the next song's audio. The
@@ -2044,7 +2052,8 @@ from the next thing you play): every song is then sent bit for bit as it was.
 
 With [Normalization](player.md#normalization) on, the first time deadwax levels an album it downloads and
 measures every FLAC song of it before the first one plays - a few seconds for a CD album, longer on a NAS
-or for hi-res. Info's **Normalization** row (in About's **Playing**, and in Debug) says `Measuring its album… (7 of 12 songs)` meanwhile.
+or for hi-res. Info's **Normalization** row says `Measuring the album… (7 of 12 songs)` meanwhile in About's **Sound**
+(`Measuring its album… (7 of 12 songs)` in Debug).
 It happens once an album: the measurements are kept in deadwax's database, and a download deadwax files
 is measured as it's filed. Opening the album's page before you tap Play starts the measuring early; a play
 from Search, Requests or an artist's **Play** starts it as you tap, so the first play of an album from there
@@ -2056,9 +2065,9 @@ waits are for songs you've played before, the player's cache is too small to kee
 
 Only FLAC songs are levelled by [Normalization](player.md#normalization) - and not every FLAC: a 20- or
 32-bit one, one with more than two channels, and every song while the player's cache can't be used play as
-they are too (Info's **Normalization** row says which). Re-encoding an MP3, AAC or Opus
-file to level it would cost quality, so they play as they are. Info's **Normalization** row (in About's **Playing**, and in Debug) says
-`Not levelled - MP3 songs play as they are`.
+they are too (Info → Debug's **Normalization** row says which; About's says `Off for this song - …`). Re-encoding an MP3, AAC or Opus
+file to level it would cost quality, so they play as they are. Info's **Normalization** row says `Off for this song -
+only FLAC songs are adjusted` in About's **Sound** (`Not levelled - MP3 songs play as they are` in Debug).
 
 ## A box set's first song was louder or quieter than the rest
 
@@ -2066,8 +2075,8 @@ The first time deadwax levels a big album, measuring all of it can take longer t
 is held for (20 for a hi-res song): that first song then plays as it is, that once - and any other song of
 the album that comes up while it's still being measured plays as it is too, straight away rather than after
 a wait of its own. The rest play at the album's level once the measuring is done (it carries on regardless).
-Info's **Normalization** row (in About's **Playing**, and in Debug) says `Played as it is this time - its album was still being measured`
-for such a song, and deadwax's log says `plays as it is this time - its album is still being measured`. Play
+Info's **Normalization** row says `Not this time - the album was still being measured` in About's **Sound**
+(`Played as it is this time - its album was still being measured` in Debug) for such a song, and deadwax's log says `plays as it is this time - its album is still being measured`. Play
 the album again and every song is at the album's level.
 
 ## With Normalization on, songs are skipped one after another

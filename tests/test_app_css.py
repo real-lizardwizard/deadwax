@@ -552,6 +552,18 @@ def test_a_failure_line_on_the_turntable_moves_nothing_a_finger_goes_to():
     assert error["pointer-events"] == "none"
 
 
+def test_the_silent_record_line_lies_where_a_failure_does_in_a_notes_colour():
+    """(2.0.7, UX batch 4) A turn that finds the record silent for good on a song (not a FLAC, no Web Audio) says why in
+    the failure's place - laid over the plinth's foot the same way, so it moves nothing a finger goes to - in the
+    colour of a note, not of a failure."""
+    error = declarations(APP, ".app-is-turntable .pl-sheet-error")
+    silent = declarations(APP, ".app-is-turntable .app-tt-silent")
+    assert silent == error and silent["position"] == "absolute" and silent["pointer-events"] == "none"
+    look = declarations(APP, ".app-tt-silent")
+    assert look["color"] == "var(--dw-text-2)" and look["font-size"] == "var(--pl-text-footnote)"
+    assert look["margin"] == "0 0 var(--pl-error-gap)"
+
+
 def test_the_look_button_is_a_tap_target_and_the_time_line_one_line():
     button = declarations(APP, ".app-look-button")
     assert button["width"] == button["height"] == "var(--pl-hit)"

@@ -1567,3 +1567,134 @@ Arriving in the new words, the retry pair stacked at 390 and 320 and side by sid
 album you don't have's "not in your library", Sources' asking lines, chips, "65%" scores (55px with the chevron on a
 phone, 35px on the desktop panel), "Why it's a 65% match" with each chip beside its meaning (two lines each at 390), the
 footer, and Match details' six sliders on one line each inside the panel; no horizontal scroll, no console errors.
+
+### Info, Now Playing, the turntable and the visualizer in a listener's words (2.0.7)
+
+James, 2026-10-23: "apply that same review to the info panel and everything else. I want to make sure it all provides a
+good user experience." This is **batch 4** of the words-and-UX review's five (`work/ux-audit/words-ux.md` in the scratch
+folder: its "Batches" section, findings #5 and #6, 2.1-2.3, 3.2, 3.3, 4.1, 5.1-5.3, M6, and the B1-B6 sections), with
+James's decisions (`work/ux-audit/decisions.md`). Words and the small UX the batch names - the folder for whoever looks
+after the albums, the conditional pressing line, the face of notes, the turntable's silent-record line. No route, status
+or behaviour changed, nothing heard changed. The one engine change is usePlayer.ts's playback-error STRINGS (this
+change's exception); streamSource.ts, lib/{playQueue,gapless,scrub,streamWrap,streamPlan,fmp4}.ts and player.sim have
+no diff. Batch 1's errorWords and batches 2-3's words are kept; batch 2's vocabulary sim is extended.
+
+**About's Sound** (#5, B1 1.1-1.10). The group was "Playing", three of Debug's own rows in Debug's words - "Album,
+-3.56 dB · the album at -14.4 LUFS" in monospace, "Asked for; deadwax hasn't said yet", "Not levelled - deadwax is
+running without numpy and soundfile", "On, in one stream", "Navidrome didn't say". It is **Sound** now, with its own
+formatters (`lib/aboutSound.ts`, from Debug's own inputs, so the two say one thing two ways), every row in the text face:
+**Format** the file plainly (`formatWords`, shared with Debug's Format; `Not known` when Navidrome gave none of it);
+**Gapless** `On` / `Off`; **Normalization** (the vocabulary's name, "volume" and "adjusted" in its sentences) -
+`Album volume matching, 3.6 dB quieter` (the gain to a tenth; `no change needed` under 0.05), `… - as loud as it can go
+without distorting` when held by its peak, `… - kept as it is, it can't go louder without distorting` when held by its
+peak at a gain that rounds to nothing (after review: a quiet master already peaking at full scale - +4 dB wanted, -0.01
+given - had read "no change needed"), `… - nothing to adjust, the album is silent`, `Checking…`, `Measuring the
+album… (3 of 10 songs)`, `Not this time - the album was still being measured` ('plain'), `Not this time - the song
+hasn't been measured yet` ('unmeasured'), `Off`, and `Off for this song - …`. The server's `why` is never shown: read by
+what it is (`ABOUT_REASONS`, as batch 1's jobErrorWords reads job errors) - levels.py's NO_LIBRARIES and NO_CACHE "this
+server can't adjust volume", NOT_FLAC (and player_cache's own) "only FLAC songs are adjusted", the cache's too-big words
+"its file is too large", anything else (UNREADABLE, the channels, the STREAMINFO, a measurement's error) "its file can't
+be measured" (after review: a "didn't answer in time" line for album_context's timeout was dropped - describe() answers
+its CannotPlan, and the album's asking, as 'unmeasured', so it could never show; info.sim pins that); a FLAC sent as an MP3 transcode "this
+device can't play FLAC, so it's sent as MP3". No reason code was added server side (no route change): info.sim reads each
+reason out of the Python, so a new or reworded one fails it rather than leaking. The review's "Next time it will be" was
+not taken - nothing guarantees the measurement will have finished. **Debug keeps the numbers** (describeLevel unchanged).
+
+**The folder** (#6): headed **On the server** (was "In your library" / "In the collection", which over a path read like a
+shop), drawn only for an admin - `seesFolders(admin)` in lib/aboutRows.ts (everyone, with logins off), as the spec and the
+review's batch list say ("the folder for admins only (#6)"; #6's own fix line also named Edit-albums holders - see
+After review). App passes `folders` to
+InfoSheet, which passes it to aboutRows. **This pressing:** only when it adds to the album's line (M6, idBridge
+`pressingAdds`): an edition, a 4-digit year that isn't the album line's, or formats that aren't its one format - it said
+"1994 · FLAC" under "1994 · FLAC · 11 songs". **Notes** are in the text face; only a row's `noteMono` (Debug's field
+names' *Empty* line) is data (1.10).
+
+**Debug's labels** (2.1, 2.3): **Sent to this device** (was What this device is sent), **Why sent this way** (Why), **Last
+song change** (Gap), **Fields from Navidrome** (Navidrome sent) with **Song fields**, **Only on other songs**, **Album
+fields**. The turntable's facts are a row each (`turntableRows`), where they were dot-joined notes under two rows:
+Turntable sound (its own note only: the window ready), **Voice**, **Clock step** (`21.3 ms at a time`), **Data used**,
+Turntable timing, **Main-thread sound**, **Limiter** (`36 peaks held under full scale since it showed (65 samples), the
+deepest 1.4 dB`), **Frames under a hand**, **Not restarted** and **Interruptions** (only when there were any - `The sound
+was interrupted once`), **Delay behind the hand** (latencyNote less its "The record's sound: "). Each shows when its note
+part did. The test bench uses the same rows, less Voice (its own voice line says it). **Left out**: 2.2 (gapless.ts's "one
+element (off)" words - an engine file with no diff allowed) and 2.4 (the Record 20 s refusal and its row's wording - not
+in batch 4's list).
+
+**The playback errors** (3.1, usePlayer.ts strings only): `This device couldn't play this song's audio` (decode),
+`Couldn't play this song - it didn't come as audio this device can play` (MEDIA_ERR_SRC_NOT_SUPPORTED - which is also how
+a refused request looks from the page, so the review's "this device can't play its file" would have been untrue),
+`Skipped "…" - this device couldn't play its audio`. The review's "seems to be damaged" for a decode error was not taken
+(after review): what the element decodes is often deadwax's own copy - the FLAC in an MP4, the 48 kHz resample, the
+levelled copy - or a format the device's decoder can't manage, not a damaged file (the engine's own comments read a
+decode failure against the copy: loudness.ts unlevelled(), streamFailed's "its RATE is the likelier cause"). Not routed
+through errorWords: a MediaError isn't an ApiError, and fitting it would be new logic. vocabulary.sim pins all three in
+usePlayer.ts and in troubleshooting.md, which quotes them.
+
+**The mini player's name** (3.2): `Now playing: Roads, Portishead - open` (`miniPlayerLabel`, the line under the title -
+the artist, or a "Skipped …" notice in its place - so VoiceOver hears what is shown); was "Open now playing". **Up Next**
+(3.3): Now Playing's button is `Up Next`, `Up Next - Shuffle on`… (upNextLabel), as the sheet and the player bar say it.
+
+**The turntable's silent record** (4.1, B9): the first time the record is turned on a song it can never sound for -
+`SILENT_WORDS.notFlac` "The record makes sound for FLAC songs only - this one moves silently." or, the deck's report
+saying no Web Audio / no voice (`soundless`), `noAudio` "This browser can't make the record's sound - turning it still
+moves through the song." (the browser first: it holds for every song). Marked only by .11's silent turn (a press past the
+tap slop that the deck didn't take), never by a tap, never before a touch (no coach mark), never for a silence that passes
+(starting, a window loading); kept until the song changes. Turntable tells Now Playing (`onSilent`), which draws it as
+`.app-tt-silent` in the failure's slot - laid over the plinth's foot like `.app-is-turntable .pl-sheet-error` (one rule),
+in --dw-text-2, a failure first. The turntable subscribes to the deck's report as a boolean, so nothing else redraws it.
+
+**The visualizer** (5.1-5.3): `VIZ_WORDS` in lib/vizSync.ts - "The visualizer follows FLAC songs only - it rests for
+this one.", "The visualizer can't follow this song - it rests for this one." (a 415 or an undecodable window), "The
+visualizer has lost the music for now - it keeps trying." (it asks again after VIZ_RETRY_MS), "This browser can't follow
+the music, so the visualizer can't move with it." The reason's own words are SyncPlan's new `detail`, passed through
+vizAudio's onSeeing, and drawn in brackets after the line for whoever runs deadwax (`vizNote`, `seesDetail(accessNow())`
+- batch 1's one-line form). Ambient without WebGL: `GL_FALLBACK` "This browser can't draw the full Ambient effect, so a
+simpler version is showing." The readout: **Now showing: Mandala** and **Mood: intense · 128 BPM** / `lively · listening
+for the tempo` (musicFeel `MOODS` calm, lively, intense for the detector's smooth, in between, aggressive) - the mood only
+while the visualizer follows the song (`showsMood`: not 'unseen', not 'nothing'). 5.4 ("Media Player style") isn't in
+batch 4's list and is left.
+
+**Pinned**: info.sim (About's Sound - every Normalization state, every server reason read from levels.py and player_cache.py
+(and describe()'s two plain returns, so a timeout reads as unmeasured), none of Debug's words; the folder by `folders` and seesFolders' rule; the pressing line both ways;
+the mini player's name drawn); debug.sim (the labels, the turntable a fact a row and none dot-joined, noteMono, playingRows
+gone, player.md naming Fields from Navidrome); vizsync.sim (the words, `detail`, vizNote, showsMood); visualizer.sim (GL_FALLBACK, the note's reader, the
+readout and its mood's condition);
+musicfeel.sim (the moods, BPM); turntable.sim (silentNote, soundless, the component: no line before a turn or on a tap,
+once on a turn, the browser's line once the deck says so, gone on a song change and with the turntable; Now Playing's
+slot); upnext.sim, app-rules.sim (App's `folders`, the Sound rows' source, the note face), whose.sim (On the server);
+vocabulary.sim BATCH4 (About, Now Playing, the mini player, Up Next, the turntable, the visualizer and usePlayer.ts's
+strings: no LUFS, "levelled", numpy/soundfile, STREAMINFO/MiB, "in one stream", "hasn't said", Navidrome, "can't be seen",
+WebGL, "Up next", "Open now playing", "couldn't be decoded"; the readout's "now:"/"feel:"/"bpm" in any of their text,
+BATCH4_LABELS; the playback error words in usePlayer.ts and troubleshooting.md); test_app_css (the silent line's rule).
+
+**Verified** (as built, before review): 3787 Python tests (3785 passed, 2 skipped; one new in test_app_css), pyflakes,
+tsc, the build, all 65 sims; the engine guard empty, usePlayer.ts's diff three string literals. 40 mutations
+(`work/uxb4-builder/mut/mutate.py`), each caught and restored byte for byte (sha256). Seen in a real page (headless
+Chromium as deadwax.test, logins off, my own deadwax on 8110 over a stand-in Navidrome on 4540; 390x844 and 1440x900):
+the mini player "Now playing: Mysterons, Portishead - open", Now Playing's "Up Next", About's Sound (FLAC, Off, "Album
+volume matching, 0.9 dB quieter", none monospace), no pressing line for plain Dummy, On the server → Folder; Debug's new
+labels and, after a turn of the record, Voice, Data used, Main-thread sound, Limiter, Frames under a hand and Delay behind
+the hand a row each; the visualizer's "Mood: lively · listening for the tempo" under Style; no console errors. Not seen: the
+silent-record line (the stand-in library is all FLAC and headless Chromium has Web Audio - turntable.sim drives it), a
+listener's About with logins on (no folder - info.sim), "Now showing:" with Rotate all.
+
+**After review** (eight findings, each reproduced or refuted first):
+- A peak-held gain that rounds to 0.0 read "no change needed - as loud as it can go without distorting" (a quiet master
+  peaking at full scale: +4 dB wanted, -0.01 given). Now `… - kept as it is, it can't go louder without distorting`
+  when held with a rise wanted (aboutLevel; info.sim).
+- The "the music server didn't answer in time" reason could never show: describe() answers CannotPlan and the album's
+  asking as 'unmeasured' (traced in levels.py). Dropped from OFF_WORDS, ABOUT_REASONS and player.md; info.sim pins
+  describe()'s two plain returns instead of reading the timeout's words.
+- A decode error said the file "seems to be damaged" - untrue when it is deadwax's own copy or the device's decoder.
+  Now neutral (above); troubleshooting.md matches.
+- The folder was first built for Edit-albums holders too (the review's #6 fix line names them, and batch 3's maybe
+  tooltip shows folders by that rule); a second review held it to the spec, which says "an admin's only" twice, as the
+  batch list does - so `seesFolders(admin)` takes the admin flag alone, and info.sim and app-rules pin it. Widening it
+  again is one line there (plus player.md, sharing.md, README and those two checks).
+- The readout said "Mood: lively" beside "it rests for this one" for an MP3 (the feel is fed only by a song heard, so
+  it held newFeel()'s default or the last FLAC's mood): the mood now shows only while the visualizer follows the song.
+- vocabulary.sim's "now:"/"feel:"/"bpm" rule could never fire on real code (wordy() drops "now:" and " bpm" as code -
+  three mutations passed it): now BATCH4_LABELS over every piece of text, its samples shaped like the code.
+- "Up next" left in two app.css comments, and "now:"/"feel:" in app-desktop.css's comments: fixed.
+- The new playback words were pinned nowhere: vocabulary.sim pins them in usePlayer.ts and as troubleshooting.md
+  quotes them (player.sim, an engine file, keeps no diff).

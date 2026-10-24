@@ -424,8 +424,9 @@ console.log('\nwhat Up Next draws')
     ['From Mezzanine', 'From Mezzanine, again', 'Still to play, again', 'Still to play'])
   check('queuedWords', [U.queuedWords('next', 'Roads'), U.queuedWords('last', 'Dummy')], ['Playing next: Roads', 'Added to Up Next: Dummy'])
   check('repeatLabel, and the cycle', [U.REPEATS.map(U.repeatLabel), U.REPEATS.map(U.nextRepeat)], [['Repeat', 'Repeat all', 'Repeat one'], ['all', 'one', 'off']])
-  check('the Up next button\'s name', [U.upNextLabel(false, 'off'), U.upNextLabel(true, 'off'), U.upNextLabel(false, 'all'), U.upNextLabel(false, 'one'), U.upNextLabel(true, 'all')],
-    ['Up next', 'Up next - Shuffle on', 'Up next - Repeat all', 'Up next - Repeat one', 'Up next - Shuffle and Repeat all'])
+  //? (2.0.7) "Up Next", as the sheet and the player bar say it - it was "Up next" here
+  check('the Up Next button\'s name', [U.upNextLabel(false, 'off'), U.upNextLabel(true, 'off'), U.upNextLabel(false, 'all'), U.upNextLabel(false, 'one'), U.upNextLabel(true, 'all')],
+    ['Up Next', 'Up Next - Shuffle on', 'Up Next - Repeat all', 'Up Next - Repeat one', 'Up Next - Shuffle and Repeat all'])
 }
 
 /* ===== Part B: a library's shuffle, a page at a time ===== */

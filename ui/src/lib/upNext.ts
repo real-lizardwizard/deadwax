@@ -576,10 +576,11 @@ export function nextRepeat(repeat: Repeat): Repeat {
   return REPEATS[(REPEATS.indexOf(repeat) + 1) % REPEATS.length]!
 }
 
-/** Now Playing's Up next button, named with what is on: "Up next - Shuffle and Repeat all". */
+/** Now Playing's Up Next button, named with what is on: "Up Next - Shuffle and Repeat all" (2.0.7: "Up Next", as
+ *  the sheet, the player bar and every notice say it - it was "Up next" here). */
 export function upNextLabel(shuffle: boolean, repeat: Repeat): string {
-  if (shuffle && repeat !== 'off') return `Up next - Shuffle and ${repeatLabel(repeat)}`
-  if (shuffle) return 'Up next - Shuffle on'
-  if (repeat !== 'off') return `Up next - ${repeatLabel(repeat)}`
-  return 'Up next'
+  if (shuffle && repeat !== 'off') return `Up Next - Shuffle and ${repeatLabel(repeat)}`
+  if (shuffle) return 'Up Next - Shuffle on'
+  if (repeat !== 'off') return `Up Next - ${repeatLabel(repeat)}`
+  return 'Up Next'
 }

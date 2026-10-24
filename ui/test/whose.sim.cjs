@@ -441,9 +441,12 @@ console.log('\nthe wiring: every page takes `personal` from hasLibrary() and han
       /\{playsLine\(playing\.length, inHand\.length, settled, library\.state, personal\)\}/.test(artist)],
     [true, true, true, true, true, true, true])
   const info = read('app/InfoSheet.tsx')
-  check('Info: the album\'s rows by hasLibrary(), and its folder headed "In the collection" with a library of your own',
-    [/aboutRows\(track, album, details, hasLibrary\(\)\)/.test(info), /<h3 id="app-info-where" class="app-section-title">[\s\S]{0,200}?\{hasLibrary\(\) \? 'In the collection' : 'In your library'\}\s*<\/h3>/.test(info)],
-    [true, true])
+  //? (2.0.7, UX batch 4) the folder is a path on the server, for whoever looks after the albums: headed "On the server"
+  //? whoever's library it is in (it was "In the collection" / "In your library", which over a path read like a shop)
+  check('Info: the album\'s rows by hasLibrary(), and its folder headed "On the server" - for whoever may see it',
+    [/aboutRows\(track, album, details, hasLibrary\(\), folders\)/.test(info), /<h3 id="app-info-where" class="app-section-title">[\s\S]{0,300}?On the server\s*<\/h3>/.test(info),
+      /hasLibrary\(\) \? 'In the collection' : 'In your library'/.test(info)],
+    [true, true, false])
 }
 
 console.log('\nyour albums are asked again whenever they can have changed - and not for a filing (second review)')

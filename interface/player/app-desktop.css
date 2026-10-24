@@ -2092,7 +2092,7 @@
         --app-viz-button-gap: 6px;
         --app-viz-leave-gap: 7px;
         --app-viz-colour-gap: 8px;
-        --app-viz-readout-drop: 36px;     /* "now:" and "feel:" under the style button */
+        --app-viz-readout-drop: 36px;     /* "Now showing:" and "Mood:" under the style button */
         --app-viz-list: 190px;
         --app-viz-list-drop: 38px;
         --app-viz-list-pad: 6px;
@@ -2379,7 +2379,7 @@
 /* A finger on the visualizer too: an iPad on its side draws it (the frame's rule above), so its
    controls are 44px where the pointer is coarse - the pickers' segments inside a well that much taller,
    the Style and Leave buttons, the style list's options and play/pause - and what hangs under the
-   Style button ("now:" and "feel:", the list) hangs under the taller button. */
+   Style button ("Now showing:" and "Mood:", the list) hangs under the taller button. */
 @media (min-width: 1024px) and (pointer: coarse) {
     :root {
         --app-viz-control: var(--pl-hit);
@@ -2393,8 +2393,8 @@
 }
 
 /* From 1280px the choices hold one row beside the song (the song taking only what they leave), and
-   there is room under the style button for what the visualizer hears ("now:" under Rotate all,
-   "feel:"); narrower, they wrap, and it isn't drawn. */
+   there is room under the style button for what the visualizer hears ("Now showing:" under Rotate all,
+   "Mood:"); narrower, they wrap, and it isn't drawn. */
 @media (min-width: 1280px) {
     .app-desk .app-viz-readout { display: flex; }
 }

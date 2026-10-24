@@ -1,10 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
 
 import { aboutRows, type About, type AboutAlbumFields, type AboutDetails } from '../lib/aboutRows'
+import { soundRows, SOUND_TITLE } from '../lib/aboutSound'
 import type { LevelAnswer } from '../lib/loudness'
 import { panelIsModal, type PanelStyle } from '../lib/appFrame'
 import type { DeckReport } from '../lib/deckVoice'
-import { debugSections, infoTabs, playingRows, shownTab, PLAYING_TITLE, type DebugRow, type DebugSection, type InfoTab, type RecordingState } from '../lib/debugRows'
+import { debugSections, infoTabs, shownTab, type DebugRow, type DebugSection, type InfoTab, type RecordingState } from '../lib/debugRows'
 import type { QueueTrack } from '../lib/playQueue'
 import { Cover } from '../player/Cover'
 import { ChevronRightIcon } from '../player/icons'
@@ -19,8 +20,8 @@ export const SPEED_READ_MS = 1000
 /** What the sheet last drew, kept so it slides away still showing it. */
 interface Drawn {
   about: About | null
-  /** (2.0.0-player.63) About's Playing group */
-  playing: DebugRow[] | null
+  /** (2.0.0-player.63) About's Playing group - since 2.0.7 "Sound", in a listener's words (lib/aboutSound.ts) */
+  sound: DebugRow[] | null
   debug: DebugSection[] | null
 }
 
@@ -32,8 +33,9 @@ interface Drawn {
  *   2.0.0-player.17, what App asks for as Info opens (`details`, app/useInfoDetails.ts): the play
  *   count, the writers, the label, "This pressing" and the folder, and who the artist is. A field
  *   Navidrome didn't send is left out, never invented. The album's card goes to the album, like "Go
- *   to album", and the artist's to their page. The folder is a row of its own at the end ("In your
- *   library"), outside every link: a path is the one thing here people copy (review).
+ *   to album", and the artist's to their page. The folder is a row of its own at the end, outside every
+ *   link: a path is the one thing here people copy (review). Since 2.0.7 it is headed "On the server", and
+ *   drawn only for an admin (`folders`).
  * - DEBUG: what used to be two lines on the now-playing screen - how the song was sent, how the
  *   last song changes and the last seek went - as labelled rows (lib/debugRows.ts), the turntable's
  *   own sound (2.0.0-player.14: ready, or off and why), and the names of the fields Navidrome sent
@@ -42,8 +44,9 @@ interface Drawn {
  * DEBUG IS AN ADMIN'S (2.0.0-player.63, James: "only make the debug info available to an admin"): `admin` is
  * /deadwax/me's (app/access.ts) - a Navidrome admin, break-glass, or everyone with logins off. Everyone else's
  * Info is About alone, with no tab strip (lib/debugRows.ts infoTabs), and About ends, before the folder, with
- * a "Playing" group of the three of Debug's rows a listener can use - Format, Gapless and Normalization - built
- * by Debug's own functions (playingRows). The role going while Debug shows draws About (shownTab).
+ * a "Sound" group - Format, Gapless and Normalization (until 2.0.7 "Playing", three of Debug's own rows in
+ * Debug's words; now in a listener's, lib/aboutSound.ts soundRows). The role going while Debug shows draws About
+ * (shownTab). Notes are in the text face since 2.0.7 - only a row's `noteMono` (field names) in the data face.
  *
  * A sheet like the others (useSheet.ts): its own scroll lock, focus in to Done and back to the •••
  * button, Escape, a tap on the backdrop above it; inert while closed. Its body is the one part of
@@ -78,6 +81,7 @@ export function InfoSheet({
   album,
   sentFormat,
   admin,
+  folders = false,
   turntable = null,
   recording = null,
   onRecord = null,
@@ -100,6 +104,8 @@ export function InfoSheet({
   sentFormat: (track: QueueTrack) => 'raw' | 'mp3' | null
   /** (2.0.0-player.63) /deadwax/me's `admin` (app/access.ts): Debug is drawn only for an admin */
   admin: boolean
+  /** (2.0.7) About draws the album's folder: an admin's only (App: seesFolders) */
+  folders?: boolean
   /** the turntable's sound (2.0.0-player.14), for Debug's "Turntable sound": null while none shows */
   turntable?: DeckReport | null
   /** a recording of it, running or made, and what starts one (2.0.0-player.32) */
@@ -126,7 +132,7 @@ export function InfoSheet({
   //? (2.0.0-player.63) the tabs this person has, and the one shown: About once the admin role goes
   const tabs = infoTabs(admin)
   const tab = shownTab(picked, admin)
-  const drawn = useRef<Drawn>({ about: null, playing: null, debug: null })
+  const drawn = useRef<Drawn>({ about: null, sound: null, debug: null })
   useSheet({ open, covered, onClose, lockClass: 'app-info-open', first: done, opener, modal, area: box })
 
   //? ...and forgotten: the role coming back opens on About, never on a Debug chosen before it went
@@ -174,8 +180,8 @@ export function InfoSheet({
   if (open && track) {
     if (tab === 'about') {
       drawn.current = {
-        about: aboutRows(track, album, details, hasLibrary()),
-        playing: playingRows({ track, wrapped: player.wrapped, gapless: player.gapless, format: sentFormat(track), level }),
+        about: aboutRows(track, album, details, hasLibrary(), folders),
+        sound: soundRows({ track, gapless: player.gapless, format: sentFormat(track), level }),
         debug: null,
       }
     } else {
@@ -183,7 +189,7 @@ export function InfoSheet({
       const song = album?.song?.find((candidate) => candidate.id === track.id) ?? null
       drawn.current = {
         about: null,
-        playing: null,
+        sound: null,
         debug: debugSections({
           track,
           gapless: player.gapless,
@@ -203,7 +209,7 @@ export function InfoSheet({
       }
     }
   }
-  const { about, playing, debug } = drawn.current
+  const { about, sound, debug } = drawn.current
 
   //? a tab list's keys: the arrows move the choice, and the focus with it, between the two
   const onTabKeyDown = (event: KeyboardEvent) => {
@@ -342,13 +348,13 @@ export function InfoSheet({
                 </section>
               )}
 
-              {/* (2.0.0-player.63) what a listener can use of Debug's rows, for everyone - in Debug's words */}
-              {playing && (
-                <section class="app-info-section" aria-labelledby="app-info-playing">
-                  <h3 id="app-info-playing" class="app-section-title">
-                    {PLAYING_TITLE}
+              {/* (2.0.0-player.63) how it sounds, for everyone - since 2.0.7 in a listener's words */}
+              {sound && (
+                <section class="app-info-section" aria-labelledby="app-info-sound">
+                  <h3 id="app-info-sound" class="app-section-title">
+                    {SOUND_TITLE}
                   </h3>
-                  {infoRows(playing)}
+                  {infoRows(sound)}
                 </section>
               )}
 
@@ -358,8 +364,9 @@ export function InfoSheet({
               {about.album?.folder && (
                 <section class="app-info-section" aria-labelledby="app-info-where">
                   <h3 id="app-info-where" class="app-section-title">
-                    {/* (2.0.0-player.52) the album's folder in the store - with a library of your own, said so */}
-                    {hasLibrary() ? 'In the collection' : 'In your library'}
+                    {/* (2.0.7) a path on the server, for whoever looks after the albums (was "In your library" /
+                        "In the collection", which over a path read like a shop) */}
+                    On the server
                   </h3>
                   <dl class="app-group app-kv">
                     <div class="app-kv-row">
@@ -386,7 +393,7 @@ export function InfoSheet({
   )
 }
 
-/** Labelled rows, as Debug draws them and About's Playing group (2.0.0-player.63) - a row's control too. Called,
+/** Labelled rows, as Debug draws them and About's Sound group (2.0.0-player.63) - a row's control too. Called,
  *  not mounted, so the rows are the sheet's own elements. */
 function infoRows(rows: DebugRow[]) {
   return (
@@ -395,7 +402,7 @@ function infoRows(rows: DebugRow[]) {
         <div key={row.label} class="app-kv-row">
           <dt class="app-kv-label">{row.label}</dt>
           <dd class={`app-kv-value${row.mono ? ' app-mono' : ''}`}>{row.value}</dd>
-          {row.note && <dd class="app-kv-note app-mono">{row.note}</dd>}
+          {row.note && <dd class={`app-kv-note${row.noteMono ? ' app-mono' : ''}`}>{row.note}</dd>}
           {row.action && (
             <dd class="app-kv-action">
               {row.action.href && row.action.beside ? (

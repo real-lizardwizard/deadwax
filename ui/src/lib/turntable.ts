@@ -374,6 +374,32 @@ export function timeLine(time: number, length: number, how: Drag['kind'] | null)
   return how === 'arm' ? `Needle up · ${at}` : how === 'record' ? `Scrubbing · ${at}` : at
 }
 
+/**
+ * (2.0.7, UX batch 4) The line the turntable shows when a turn finds the record silent for good on this song - the
+ * review's 4.1: it went quiet with no word on screen, and only Debug's "Turntable sound" said why. Said the first
+ * time the record is turned on each song (the turntable keeps which), until the song changes - never as a coach
+ * mark before anything is touched, and never for a silence that passes (the sound still starting, a window still
+ * loading): a press then scrubs silently for a moment, and says nothing.
+ */
+export const SILENT_WORDS = {
+  /** not a FLAC: only FLAC songs have windows the record can sound */
+  notFlac: 'The record makes sound for FLAC songs only - this one moves silently.',
+  /** no Web Audio, or nothing to play the record's sound on (the deck's 'unsupported' and 'no-voice') */
+  noAudio: "This browser can't make the record's sound - turning it still moves through the song.",
+} as const
+
+/** Which of SILENT_WORDS a turned record says, or null for a record that can sound: the browser first - it holds
+ *  for every song. `noAudio` is the deck's report: no Web Audio here, or no voice to play it on. */
+export function silentNote(flac: boolean, noAudio: boolean): string | null {
+  if (noAudio) return SILENT_WORDS.noAudio
+  return flac ? null : SILENT_WORDS.notFlac
+}
+
+/** Whether the deck's report says the record can never sound in this browser (DeckReport's context). */
+export function soundless(report: { context: string } | null | undefined): boolean {
+  return report?.context === 'unsupported' || report?.context === 'no-voice'
+}
+
 /** The disc the playing song is on, by the album answer it was played from - 1 when that isn't
  *  known (no answer, no disc number: a one-disc album deadwax filed carries none). */
 export function playingDisc(songs: { id: string; discNumber?: number }[] | null | undefined, trackId: string): number {

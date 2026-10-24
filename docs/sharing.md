@@ -328,7 +328,7 @@ else can do what the left column says, and an admin can give any of them more, b
 | **Everyone's downloads**: see who asked ("Asked by ethan"), cancel or retry anyone's, clear everyone's finished | no | **Everyone's downloads** | yes |
 | **Settings and the log**: the server settings and the event log - and You's **Connections**, and the words behind what went wrong (Navidrome's or slskd's own, a setting's name) under each error | no | **Settings and the log** | yes |
 | **People**: make, reset and remove Navidrome accounts, make admins, give permissions | no | never - it comes with being a Navidrome admin | yes |
-| **Info → Debug** on the now-playing screen: how each song is sent, the last song changes and seek, the turntable's readouts and recording, the test bench link, the fields Navidrome sent | no - **Info** is **About** alone, with a **Playing** group (the file's format, Gapless, Normalization) | never - it comes with being an admin | yes |
+| **Info → Debug** on the now-playing screen: how each song is sent, the last song changes and seek, the turntable's readouts and recording, the test bench link, the fields Navidrome sent | no - **Info** is **About** alone, with a **Sound** group (the file's format, Gapless, Normalization, in a listener's words) - and never the album's folder, which is an admin's | never - it comes with being an admin | yes |
 
 - **Giving permissions**: People → their row → **Permissions** → tick what to give → **Save
   permissions**. It's in force from their next tap - no sign-in. An admin's row is all ticked and
@@ -348,8 +348,9 @@ else can do what the left column says, and an admin can give any of them more, b
   was given is off until their next sign-in (a Get albums taken away still applies), and You says so.
 - Making someone an admin keeps what was ticked for them, for if they're ever made ordinary again.
 - **Debug is an admin's**: it was built for testing deadwax on a phone, and everyone
-  else's Info has no tabs - About alone, with a short **Playing** group of the three rows a listener can
-  use. Made an admin, or made ordinary, it shows as Info next opens, once it has asked who they are (a
+  else's Info has no tabs - About alone, with a short **Sound** group of the three things a listener can
+  use, in a listener's words (Debug has the numbers). The album's folder on the server, at About's foot, is an admin's
+  only, like Debug. Made an admin, or made ordinary, it shows as Info next opens, once it has asked who they are (a
   moment after it opens). The turntable's test bench
   at `/player/lab/` still opens by its address, as before - Debug was only its link.
 

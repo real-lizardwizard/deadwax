@@ -448,6 +448,62 @@ const pointer = (point, extra = {}) => ({
   currentTarget: { captured: null, setPointerCapture(id) { this.captured = id } }, ...extra,
 })
 
+//? (2.0.7) first of the turntable's: no release has woken the deck's audio yet, so the browser isn't known to have none
+console.log('\nthe silent record (2.0.7, UX batch 4): a line the first time a turn finds it silent for good on a song')
+{
+  const deckModule = require(path.join(OUT, 'player/deck.js'))
+  check('the words: not a FLAC, and no Web Audio here - the browser first, since it holds for every song; nothing for a FLAC that can sound',
+    [tt.silentNote(false, false), tt.silentNote(true, false), tt.silentNote(true, true), tt.silentNote(false, true)],
+    [tt.SILENT_WORDS.notFlac, null, tt.SILENT_WORDS.noAudio, tt.SILENT_WORDS.noAudio])
+  check('...as the review put them', tt.SILENT_WORDS,
+    { notFlac: 'The record makes sound for FLAC songs only - this one moves silently.', noAudio: "This browser can't make the record's sound - turning it still moves through the song." })
+  check('...a silence for good only: no Web Audio, or nothing to play it on - never one still starting or waiting for a tap',
+    ['unsupported', 'no-voice', 'none', 'starting', 'running', 'failed'].map((context) => tt.soundless({ context })).concat(tt.soundless(null)), [true, true, false, false, false, false, false])
+  const said = []
+  const flac = { id: 'money', title: 'Money', coverArt: 'c', albumId: 'dsotm', suffix: 'flac', contentType: 'audio/flac' }
+  const mp3 = { id: 'time', title: 'Time', coverArt: 'c', albumId: 'dsotm', suffix: 'mp3', contentType: 'audio/mpeg' }
+  const player = fakePlayer({ track: mp3 })
+  const view = mount(Turntable, 'silent turntable')
+  const draw = () => view.render({ player, open: true, discArt: null, onPreview() {}, onSilent: (note) => said.push(note) })
+  const spoken = () => said.filter(Boolean)
+  draw()
+  const record = () => view.find(byClass('app-tt-record'))[0]
+  const at = onRecord(0)
+  check('nothing said before the record is touched - no coach mark', spoken(), [])
+  record().props.onPointerDown(pointer(at))
+  draw()
+  check('...nor by a press that hasn\'t turned it (a tap plays or pauses)', spoken(), [])
+  record().props.onPointerMove(pointer(onRecord(60)))
+  draw()
+  check('an MP3 turned: the line, said once', spoken(), [tt.SILENT_WORDS.notFlac])
+  record().props.onPointerMove(pointer(onRecord(90)))
+  draw()
+  check('...turned on: not said again', spoken(), [tt.SILENT_WORDS.notFlac])
+  //? the release wakes the deck's audio (the first in this sim) - and this sim has no AudioContext, as a browser without Web Audio hasn't
+  record().props.onPointerUp(pointer(onRecord(90)))
+  record().props.onLostPointerCapture(pointer(onRecord(90)))
+  draw()
+  check('...the deck then saying this browser has no Web Audio: the browser\'s line in its place',
+    [tt.soundless(deckModule.deckReport()), said.at(-1)], [true, tt.SILENT_WORDS.noAudio])
+  player.track = flac
+  draw()
+  check('the song changed: the line goes until a turn finds the new one silent', said.at(-1), null)
+  record().props.onPointerDown(pointer(at))
+  record().props.onPointerMove(pointer(onRecord(60)))
+  draw()
+  check('...turned: a FLAC here is silent too - this browser has no Web Audio', said.at(-1), tt.SILENT_WORDS.noAudio)
+  record().props.onPointerUp(pointer(onRecord(60)))
+  view.unmount()
+  check('...and the line goes with the turntable', said.at(-1), null)
+  const source = fs.readFileSync(path.join(UI, 'src/player/Turntable.tsx'), 'utf8')
+  check('only .11\'s silent turn marks it - never the deck\'s live press, whose record sounds',
+    [/if \(next\?\.kind === 'record' && moved\(next\)\) \{\s*turned\.current = true\s*(?:\/\/\?[^\n]*\s*)*if \(turnedSilent !== track\) setTurnedSilent\(track\)/.test(source),
+      (source.match(/setTurnedSilent\(/g) ?? []).length], [true, 1])
+  const now = fs.readFileSync(path.join(UI, 'src/player/NowPlaying.tsx'), 'utf8')
+  check('Now Playing lays it where a failure goes - only on the turntable, and a failure first',
+    [/\{player\.error && <p class="pl-sheet-error">\{player\.error\}<\/p>\}\s*(?:\{\/\*[\s\S]*?\*\/\}\s*)?\{!player\.error && turntable && silent && <p class="app-tt-silent">\{silent\}<\/p>\}/.test(now), /onSilent=\{setSilent\}/.test(now)], [true, true])
+}
+
 console.log('\nthe speed fader (2.0.0-player.39): drawn where the player has one, the deck told the speed')
 {
   const listeners = new Set()

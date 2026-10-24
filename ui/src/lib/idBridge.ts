@@ -11,7 +11,8 @@
  *  - its "Other pressings ›" chip (`otherPressingsGroup`, 2.0.0-player.41): the album's MusicBrainz
  *    release group, as its folders carry it - the album-you-don't-have page lists every pressing,
  *    the ones you hold marked, and gets any of them;
- *  - Info's "This pressing: …" and its folder (`pressingLine`, `folderLine`);
+ *  - Info's "This pressing: …" - only when it adds to the album's line (`pressingAdds`, 2.0.7) - and its folder
+ *    (`pressingLine`, `folderLine`);
  *  - which releases of a MusicBrainz album you hold (`heldReleases`), for opening the album you
  *    have from MusicBrainz's side - in the order every screen opens and plays one of several copies
  *    (`heldInOrder`): the plain edition first, then the oldest, then by folder. Search's row and the
@@ -65,6 +66,22 @@ export function pressingLine(present: readonly Pick<StoreRow, 'edition' | 'year'
   const year = String(first.year ?? '').slice(0, 4)
   const parts = [(first.edition ?? '').trim(), /^\d{4}$/.test(year) ? year : '', formats.join('/')].filter(Boolean)
   return parts.length ? `This pressing: ${parts.join(' · ')}` : null
+}
+
+/**
+ * (2.0.7) Whether Info's "This pressing: …" says anything the album's own line doesn't (the review's M6: it
+ * repeated "1994 · FLAC" under "1994 · FLAC · 2 songs"): an edition, a year that isn't the album's, or formats
+ * that aren't the album's one format - a reissue's year, a deluxe, the FLAC of an album Navidrome lists as
+ * mixed. `album` is what the album line says: its year ('' unknown) and its one format ('' when it has none).
+ */
+export function pressingAdds(present: readonly Pick<StoreRow, 'edition' | 'year' | 'formats'>[], album: { year: string; format: string }): boolean {
+  if (!present.length) return false
+  const first = present[0]!
+  if ((first.edition ?? '').trim()) return true
+  const year = String(first.year ?? '').slice(0, 4)
+  if (/^\d{4}$/.test(year) && year !== album.year) return true
+  const formats = [...new Set(present.flatMap((row) => row.formats ?? []))].map((format) => format.toUpperCase()).join('/')
+  return !!formats && formats !== album.format.toUpperCase()
 }
 
 /** Where it is on disk: the folder (each folder of a set kept one per disc), or null. */

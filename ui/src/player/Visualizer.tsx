@@ -8,12 +8,13 @@ import { levels, type LevelledTrack } from '../lib/loudness'
 import { isFlac, resamples, type MaxRate } from '../lib/streamWrap'
 import { playingDisc } from '../lib/turntable'
 import {
-  CALM_PACE, EFFECTS, EFFECT_NAMES, MAX_2D_PIXELS, PURPLE, PURPLE_ROLES, STYLE_NAMES, STYLE_ROWS, WAVE_POINTS, backingScale, coverPalette,
+  CALM_PACE, EFFECTS, EFFECT_NAMES, GL_FALLBACK, MAX_2D_PIXELS, PURPLE, PURPLE_ROLES, STYLE_NAMES, STYLE_ROWS, WAVE_POINTS, backingScale, coverPalette,
   cycleEffect, idleSignal, makeLut, newShaped, palFloats, rolesFrom, shapeSignal,
   type AmbientChoice, type AmbientStyle, type Colours, type Effect, type Rgb, type Roles,
 } from '../lib/visualizer'
-import type { Seeing, SyncSong } from '../lib/vizSync'
+import { showsMood, vizNote, type Seeing, type SyncSong } from '../lib/vizSync'
 import { readVizColours, readVizEffect, readVizStyle, writeVizColours, writeVizEffect, writeVizStyle } from '../state/persisted'
+import { accessNow, seesDetail } from '../app/access'
 import { coverUrl, discArtUrl, playedAlbum } from './api'
 import { Cover } from './Cover'
 import { CheckIcon, ChevronDownIcon, LeaveFullScreenIcon, PauseIcon, PlayIcon } from './icons'
@@ -127,7 +128,7 @@ function VisualizerScreen({ player, opener, onClose }: { player: Player; opener:
   const [glFailed, setGlFailed] = useState(false)
   const [feelText, setFeelText] = useState('')
   const [nowStyle, setNowStyle] = useState<AmbientStyle | null>(null)
-  const [seeing, setSeeing] = useState<{ seeing: Seeing; why: string | null }>({ seeing: 'nothing', why: null })
+  const [seeing, setSeeing] = useState<{ seeing: Seeing; why: string | null; detail: string | null }>({ seeing: 'nothing', why: null, detail: null })
 
   const root = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
@@ -147,9 +148,9 @@ function VisualizerScreen({ player, opener, onClose }: { player: Player; opener:
   const closing = useRef(onClose)
   closing.current = onClose
 
-  const listener = useMemo(() => new VizListener((next, why) => {
+  const listener = useMemo(() => new VizListener((next, why, detail) => {
     seeingNow.current = next
-    setSeeing({ seeing: next, why })
+    setSeeing({ seeing: next, why, detail })
   }), [])
 
   const loop = useRef<Loop>({
@@ -571,6 +572,8 @@ function VisualizerScreen({ player, opener, onClose }: { player: Player; opener:
 
   const ambient = effect === 'ambient'
   const glOn = ambient && !glFailed
+  //? the readout's mood: only for a song the visualizer follows - never beside its "can't follow" note
+  const mood = feelText && showsMood(seeing.seeing) ? feelText : ''
   const byline = track ? [track.artist, track.album] : []
 
   return (
@@ -628,10 +631,12 @@ function VisualizerScreen({ player, opener, onClose }: { player: Player; opener:
                   <b class="app-viz-button-value">{STYLE_NAMES[choice]}</b>
                   <ChevronDownIcon class="app-viz-chevron" />
                 </button>
-                {!menuOpen && feelText ? (
+                {!menuOpen && (mood || (choice === 'rotate' && nowStyle)) ? (
                   <div class="app-viz-readout">
-                    {choice === 'rotate' && nowStyle ? <span>now: {STYLE_NAMES[nowStyle]}</span> : null}
-                    <span>feel: {feelText}</span>
+                    {/* (2.0.7) in words a listener reads - it was "now: Mandala" over "feel: aggressive · 128 bpm" -
+                        and the mood only while the visualizer follows the song (showsMood) */}
+                    {choice === 'rotate' && nowStyle ? <span>Now showing: {STYLE_NAMES[nowStyle]}</span> : null}
+                    {mood ? <span>Mood: {feelText}</span> : null}
                   </div>
                 ) : null}
                 {menuOpen ? (
@@ -683,8 +688,10 @@ function VisualizerScreen({ player, opener, onClose }: { player: Player; opener:
 
         <p class="app-viz-hint">Space play/pause · V next effect · Esc leave</p>
         <div class="app-viz-notes">
-          {seeing.seeing === 'unseen' && seeing.why ? <p class="app-viz-note">{seeing.why}</p> : null}
-          {ambient && glFailed ? <p class="app-viz-note">WebGL isn't available here, so Ambient is showing the simple version.</p> : null}
+          {/* (2.0.7) a listener's line - and, for whoever runs deadwax, the reason's own words in brackets after it
+              (batch 1's one-line notice) */}
+          {seeing.seeing === 'unseen' && seeing.why ? <p class="app-viz-note">{vizNote(seeing.why, seeing.detail, seesDetail(accessNow()))}</p> : null}
+          {ambient && glFailed ? <p class="app-viz-note">{GL_FALLBACK}</p> : null}
         </div>
       </div>
     </div>

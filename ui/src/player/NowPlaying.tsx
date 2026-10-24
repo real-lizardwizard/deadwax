@@ -132,7 +132,7 @@ export function Scrubber({ player }: { player: Player }) {
  * there is a speaker to send to, and ••• for Info and "Go to album". No readout and no Gapless
  * control: how the song was sent and how the last changes and seek went are in Info > Debug
  * (app/InfoSheet.tsx), and Gapless is a setting, in You > Playback (app/GaplessChoice.tsx). The
- * board's Lyrics icon isn't drawn until there is something for it to open; Up next opens app/UpNext.tsx
+ * board's Lyrics icon isn't drawn until there is something for it to open; Up Next opens app/UpNext.tsx
  * (2.0.0-player.57) - the queue, with Shuffle and Repeat at its top, where the iPhone's Music app has them,
  * so nothing else on this screen changes - and is tinted while Shuffle or Repeat is on, so a song
  * repeating isn't a mystery.
@@ -199,7 +199,7 @@ export function NowPlaying({
   windDown?: boolean
   /** the ••• menu will have the album's pin (App's: a song whose album can be pinned) */
   pinnable?: boolean
-  /** (2.0.0-player.57) the Up next button's tap - the event, so the button can be given focus back */
+  /** (2.0.0-player.57) the Up Next button's tap - the event, so the button can be given focus back */
   onUpNext?: ((event: MouseEvent) => void) | undefined
   /** Up Next is over it */
   upNextOpen?: boolean
@@ -211,6 +211,8 @@ export function NowPlaying({
   //? the look showing: the setting's as it opens, switched by the button while it stays open
   const [look, setLook] = useState<Look>(openAs)
   const [previewing, setPreviewing] = useState<TurntablePreview>(null)
+  //? (2.0.7) the turntable's line for a record a turn found silent for good (lib/turntable.ts silentNote)
+  const [silent, setSilent] = useState<string | null>(null)
   //? the turntable's deck while it shows: the transport's pause winds it down too
   const deck = useRef<Deck | null>(null)
 
@@ -342,6 +344,7 @@ export function NowPlaying({
           windDown={windDown}
           deck={deck}
           fader={player}
+          onSilent={setSilent}
         />
       )}
 
@@ -352,6 +355,8 @@ export function NowPlaying({
               bar or the buttons under a finger. On the turntable, where that room is the record
               and the arm, app.css lays it over the plinth's foot instead, out of the flow. */}
           {player.error && <p class="pl-sheet-error">{player.error}</p>}
+          {/* (2.0.7) the turntable's silent record, said in the same place - a failure first, which says more */}
+          {!player.error && turntable && silent && <p class="app-tt-silent">{silent}</p>}
           <h2 class="pl-sheet-title">{track.title}</h2>
           {/* one box either way, so which it is never moves the bar; the ellipsis is the span's,
               since the link's tap target reaches past its own box (player.css) */}
@@ -386,7 +391,7 @@ export function NowPlaying({
         </div>
 
         {/* The icon row, a tap target tall whatever is in it. ••• is always there, at the right
-            end, and Up next (2.0.0-player.57) always beside it; AirPlay comes and goes to their left,
+            end, and Up Next (2.0.0-player.57) always beside it; AirPlay comes and goes to their left,
             so nothing moves when a speaker does - nor the speed's chip, at the left end, when the speed
             leaves 1x and comes back (2.0.0-player.39). */}
         <div class="pl-sheet-footer">
@@ -400,7 +405,7 @@ export function NowPlaying({
             type="button"
             class={`pl-icon-button app-upnext-button${player.shuffle || player.repeat !== 'off' ? ' is-on' : ''}`}
             onClick={onUpNext}
-            //? what is on, named: "Up next - Shuffle and Repeat all"
+            //? what is on, named: "Up Next - Shuffle and Repeat all"
             aria-label={upNextLabel(player.shuffle, player.repeat)}
             aria-haspopup="dialog"
             aria-expanded={upNextOpen}

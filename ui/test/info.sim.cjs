@@ -29,8 +29,10 @@
  *    its list is back at the top as it opens and as the tab changes, and not as it closes.
  *  - (2.0.0-player.63) Debug is an admin's: drawn with `admin`, About and Debug; without it, no tab strip and no
  *    tab, About alone - the scroller then a region named by the sheet's title - and nothing of Debug. About ends
- *    in "Playing" for everyone: Format, Gapless and Normalization in Debug's words (so About asks how the song
- *    was sent, for Normalization). The role going while Debug shows draws About; given back, it opens on About;
+ *    in "Sound" for everyone (2.0.7, "Playing" until then): Format, Gapless and Normalization in a listener's words
+ *    (lib/aboutSound.ts - so About asks how the song was sent, for Normalization), then - for an admin or an Edit
+ *    albums holder only - the folder, headed On the server. This pressing only when it adds to the album line; the
+ *    mini player named by its song. The role going while Debug shows draws About; given back, it opens on About;
  *    and the strip going with focus inside it hands that focus to the list, never to <body> (review).
  *  - Now Playing is inert and deaf to Escape while the menu or Info is over it.
  *  - The menu's album pin (2.0.0-player.18): "Pin album to Home" or "Unpin album from Home" after Go
@@ -56,7 +58,7 @@ const UI = path.resolve(__dirname, '..')
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-info-'))
 
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
-  'src/app/InfoSheet.tsx', 'src/app/ActionMenu.tsx', 'src/player/NowPlaying.tsx', 'src/lib/playedAlbums.ts',
+  'src/app/InfoSheet.tsx', 'src/app/ActionMenu.tsx', 'src/player/NowPlaying.tsx', 'src/lib/playedAlbums.ts', 'src/player/MiniPlayer.tsx',
   '--rootDir', 'src', '--outDir', OUT,
   '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node',
   '--lib', 'es2022,dom,dom.iterable', '--jsx', 'react-jsx', '--jsxImportSource', 'preact',
@@ -202,7 +204,8 @@ const one = (view, test) => view.find(test)[0]
 /* ===== the songs ===== */
 
 const DOT = String.fromCharCode(0xb7)
-const { aboutRows, writtenBy, playedLine, labelLine } = require(path.join(OUT, 'lib/aboutRows.js'))
+const { aboutRows, writtenBy, playedLine, labelLine, seesFolders } = require(path.join(OUT, 'lib/aboutRows.js'))
+const sound = require(path.join(OUT, 'lib/aboutSound.js'))
 const { sharedFormat } = require(path.join(OUT, 'lib/format.js'))
 const { createPlayedAlbums, PLAYED_KEPT, QUEUE_ALBUMS_KEPT } = require(path.join(OUT, 'lib/playedAlbums.js'))
 
@@ -273,6 +276,73 @@ console.log('\nAbout: the album and the artist')
   check('the one format every song is in, or none', [sharedFormat([{ suffix: 'flac' }, { suffix: 'FLAC' }]), sharedFormat([{ suffix: 'flac' }, {}]), sharedFormat([])], ['FLAC', null, null])
 }
 
+console.log('\nAbout\'s Sound group (2.0.7, UX batch 4): Format, Gapless and Normalization in a listener\'s words')
+{
+  const REPO = path.resolve(UI, '..')
+  const answer = (overrides = {}) => ({
+    level: 'album', state: 'measured', gain_db: -3.56, wanted_db: -3.56, loudness_lufs: -14.4, peak_db: -0.3, held: false,
+    songs: 10, measured_songs: 10, why: null, ...overrides,
+  })
+  const level = (entry, said = null, format = 'raw') => sound.aboutLevel(queueTrack(entry), format, said)
+  check('the heading: Sound (was Playing)', sound.SOUND_TITLE, 'Sound')
+  check('Off, Checking…, and an answer about the other level not this song\'s',
+    [level({}), level({ level: 'album' }), sound.soundRows({ track: queueTrack({ level: 'track' }), gapless: false, format: 'raw', level: answer() })[2].value], ['Off', 'Checking…', 'Checking…'])
+  check('measured: "Album volume matching, 3.6 dB quieter" - the gain to a tenth, its direction in words',
+    [level({ level: 'album' }, answer()), level({ level: 'track' }, answer({ level: 'track', gain_db: 1.2 })), level({ level: 'track' }, answer({ level: 'track', gain_db: 0.04 }))],
+    ['Album volume matching, 3.6 dB quieter', 'Song volume matching, 1.2 dB louder', 'Song volume matching, no change needed'])
+  check('...held by its peak: as loud as it can go without distorting; a silent song: nothing to adjust',
+    [level({ level: 'track' }, answer({ level: 'track', gain_db: 1.2, wanted_db: 2.35, held: true })), level({ level: 'album' }, answer({ gain_db: 0, wanted_db: 0, loudness_lufs: null }))],
+    ['Song volume matching, 1.2 dB louder - as loud as it can go without distorting', 'Album volume matching - nothing to adjust, the album is silent'])
+  //? (review) a quiet master that already peaks at full scale: +4 dB wanted, held at -0.01 - a change wanted and
+  //? not made is never "no change needed"; unheld, a gain that rounds to nothing still is
+  check('...held by its peak at a gain that rounds to nothing: kept as it is, it can\'t go louder - never "no change needed"',
+    [level({ level: 'album' }, answer({ gain_db: -0.01, wanted_db: 4, loudness_lufs: -22, held: true })), level({ level: 'track' }, answer({ level: 'track', gain_db: 0.04, wanted_db: 1.5, held: true })),
+      level({ level: 'album' }, answer({ gain_db: -0.01, wanted_db: -0.01, held: false }))],
+    ["Album volume matching - kept as it is, it can't go louder without distorting", "Song volume matching - kept as it is, it can't go louder without distorting",
+      'Album volume matching, no change needed'])
+  check('measuring, how far along; not this time - still being measured, or not measured yet',
+    [level({ level: 'album' }, answer({ state: 'measuring', gain_db: null, measured_songs: 3 })), level({ level: 'track' }, answer({ level: 'track', state: 'measuring', gain_db: null })),
+      level({ level: 'album' }, answer({ state: 'plain', gain_db: null })), level({ level: 'track' }, answer({ level: 'track', state: 'plain', gain_db: null })),
+      level({ level: 'album' }, answer({ state: 'unmeasured', gain_db: null })), level({ level: 'track' }, answer({ level: 'track', state: 'unmeasured', gain_db: null }))],
+    ['Measuring the album… (3 of 10 songs)', 'Measuring the song…', 'Not this time - the album was still being measured', 'Not this time - the song was still being measured',
+      "Not this time - the album hasn't been measured yet", "Not this time - the song hasn't been measured yet"])
+  check('an MP3, and a FLAC this device is sent as MP3: off, and why, in a listener\'s words',
+    [level({ suffix: 'mp3', contentType: 'audio/mpeg', level: 'album' }), level({ level: 'album' }, null, 'mp3')],
+    ['Off for this song - only FLAC songs are adjusted', "Off for this song - this device can't play FLAC, so it's sent as MP3"])
+  //? every reason the server gives (src/levels.py describe()'s `why`), read out of the Python: none said as it is
+  const levels = fs.readFileSync(path.join(REPO, 'src/levels.py'), 'utf8')
+  const cache = fs.readFileSync(path.join(REPO, 'src/player_cache.py'), 'utf8')
+  //? (review) Navidrome not answering in time is never a reason: describe() answers its CannotPlan, and the album's
+  //? asking, as 'unmeasured' - so About has no line for it (the "didn't answer in time" it had could never show)
+  const describe = /async def describe\([\s\S]*?\n    def _say/.exec(levels)?.[0] ?? ''
+  check('a timeout is "unmeasured", never a reason: describe() returns its plain answer on CannotPlan and on the album\'s asking - and About says nothing of the server not answering',
+    [/except CannotPlan:\n\s+return answer\n/.test(describe), /except \(\*_ASKING, _NoAlbum\):\n\s+return answer\n/.test(describe),
+      Object.values(sound.OFF_WORDS).some((line) => /answer/.test(line))], [true, true, false])
+  const constant = (name) => new RegExp(`^${name} = "([^"]+)"`, 'm').exec(levels)?.[1]
+  const tooBig = /\(f"it is \{version\.size >> 20\} MiB, more than the \{self\.wrap_max_bytes >> 20\} MiB a song is "\s*f"(held in memory to repackage)"\)/.exec(cache)
+  const channels = /return f"(it has) \{info\.channels\} (channels - only mono and stereo are levelled)"/.exec(levels)
+  const streaminfo = /return "(its STREAMINFO doesn't say how long it is)"/.exec(levels)
+  const reasons = {
+    server: [constant('NO_LIBRARIES'), constant('NO_CACHE')],
+    kind: [constant('NOT_FLAC'), /return "(it isn't a FLAC file)"/.exec(cache)?.[1]],
+    large: [tooBig && `it is 412 MiB, more than the 256 MiB a song is ${tooBig[1]}`, tooBig && 'levelled it would be about 300 MiB, more than the 256 MiB a song is held in memory to repackage'],
+    file: [constant('UNREADABLE'), channels && `${channels[1]} 6 ${channels[2]}`, streaminfo?.[1], 'the file is empty', "its first bytes aren't a FLAC file's", 'Error opening: unknown format', null],
+  }
+  check('every reason read from the Python', Object.values(reasons).flat().slice(0, -1).every((why) => typeof why === 'string' && why.length > 5), true)
+  check('...each said in a listener\'s words, by what it is',
+    Object.entries(reasons).map(([kind, whys]) => [kind, [...new Set(whys.map((why) => level({ level: 'album' }, answer({ state: 'not_levelled', gain_db: null, why }))))]]),
+    [['server', ["Off for this song - this server can't adjust volume"]], ['kind', ['Off for this song - only FLAC songs are adjusted']], ['large', ['Off for this song - its file is too large']],
+      ['file', ["Off for this song - its file can't be measured"]]])
+  const words = [...Object.values(sound.OFF_WORDS), sound.LEVEL_CHECKING, level({ level: 'album' }, answer()), level({ level: 'album' }, answer({ state: 'plain', gain_db: null }))]
+  check('...and none of About\'s words is Debug\'s: no dB to the hundredth, LUFS, "levelled", numpy, soundfile, MiB, STREAMINFO, Navidrome or "deadwax hasn\'t said"',
+    words.filter((line) => /\d\.\d\d|LUFS|levelled|numpy|soundfile|MiB|STREAMINFO|Navidrome|hasn't said/.test(line)), [])
+  const hires = { ...queueTrack({ sampleRate: 192000, bitDepth: 24, level: 'album' }) }
+  check('the rows: the format plainly, Gapless On or Off, Normalization - in the text face, every one',
+    [sound.soundRows({ track: hires, gapless: true, format: 'raw', level: answer() }), sound.soundRows({ track: queueTrack({ suffix: null, contentType: null, sampleRate: 0, bitDepth: 0, channels: 0 }), gapless: false, format: 'raw', level: null }).map((row) => row.value)],
+    [[{ label: 'Format', value: 'FLAC, 24-bit, 192 kHz, stereo' }, { label: 'Gapless', value: 'On' }, { label: 'Normalization', value: 'Album volume matching, 3.6 dB quieter' }], ['Not known', 'Off', 'Off']])
+  check('volumeChange to a tenth, both ways', [sound.volumeChange(-7.42), sound.volumeChange(2.35), sound.volumeChange(-0.04), sound.volumeChange(0)], ['7.4 dB quieter', '2.4 dB louder', 'no change needed', 'no change needed'])
+}
+
 console.log('\nAbout filled in (2.0.0-player.17): what Info asks for as it opens')
 const WITH_IDS = { ...EXPERIENCE, artistId: 'ar-floyd', recordLabels: [{ name: 'Harvest' }, { name: ' Harvest ' }, { name: 'EMI' }] }
 const DETAILS = {
@@ -282,11 +352,23 @@ const DETAILS = {
   facts: { type: 'Group', area: 'United Kingdom', begin_area: 'London', country: 'GB', began: '1965', ended: true, ended_on: '2014', disambiguation: '' },
 }
 {
-  const full = aboutRows(queueTrack(), WITH_IDS, DETAILS)
+  //? (2.0.7) with the folder: an admin's only (`folders`)
+  const full = aboutRows(queueTrack(), WITH_IDS, DETAILS, false, true)
   check('the song: "played 12 times" on its first line, and who wrote it', [full.song.lines[0], full.song.writtenBy],
     [`Track 3 of 6 ${DOT} 5:08 ${DOT} played 12 times`, 'Roger Waters, David Gilmour'])
   check('the album: its labels after the year, each once; this pressing; its folder', [full.album.line, full.album.pressing, full.album.folder],
     [`1975 ${DOT} Harvest / EMI ${DOT} FLAC ${DOT} 11 songs`, `This pressing: Experience edition ${DOT} 2011 ${DOT} FLAC`, 'Pink Floyd/Wish You Were Here (1975) [Experience edition]'])
+  check('(2.0.7) the folder only for whoever looks after the albums: without `folders`, none - the rest the same',
+    [aboutRows(queueTrack(), WITH_IDS, DETAILS).album.folder, JSON.stringify({ ...full.album, folder: undefined }) === JSON.stringify(aboutRows(queueTrack(), WITH_IDS, DETAILS).album)], [undefined, true])
+  check('...who that is: an admin (everyone, with logins off) - not someone given Edit albums, nor a listener (the batch list: "the folder for admins only")',
+    [seesFolders(true), seesFolders(false), seesFolders.length], [true, false, 1])
+  //? (2.0.7) "This pressing: …" only when it adds to the album's line (the review's M6: "1994 · FLAC" twice)
+  const pressingOf = (row, album = WITH_IDS) => aboutRows(queueTrack(), album, { ...DETAILS, store: { present: [{ path: 'x', ...row }] } }).album.pressing
+  check('(2.0.7) This pressing only when it says more than the album line: the same year and format - none; an edition, another year, another format - said',
+    [pressingOf({ edition: '', year: '1975', formats: ['flac'] }), pressingOf({ edition: null, year: '1975-09-12', formats: ['FLAC'] }),
+      pressingOf({ edition: 'Experience edition', year: '1975', formats: ['flac'] }), pressingOf({ edition: '', year: '2011', formats: ['flac'] }),
+      pressingOf({ edition: '', year: '1975', formats: ['flac', 'mp3'] }), pressingOf({ edition: '', year: '1975', formats: ['flac'] }, { ...WITH_IDS, year: undefined })],
+    [undefined, undefined, `This pressing: Experience edition ${DOT} 1975 ${DOT} FLAC`, `This pressing: 2011 ${DOT} FLAC`, `This pressing: 1975 ${DOT} FLAC/MP3`, `This pressing: 1975 ${DOT} FLAC`])
   check('the artist: whose page the card goes to, who they are, how many of theirs you have', full.artist,
     { name: 'Pink Floyd', note: null, id: 'ar-floyd', pageName: 'Pink Floyd', facts: `Group ${DOT} London ${DOT} 1965 to 2014`, count: '4 albums in your library' })
   const renamed = { ...WITH_IDS, artist: 'Ye', song: WITH_IDS.song.map((each) => ({ ...each, artist: 'Kanye West' })) }
@@ -377,6 +459,7 @@ console.log('\nthe albums played from')
 const { InfoSheet } = require(path.join(OUT, 'app/InfoSheet.js'))
 const { ActionMenu } = require(path.join(OUT, 'app/ActionMenu.js'))
 const { NowPlaying } = require(path.join(OUT, 'player/NowPlaying.js'))
+const { MiniPlayer, miniPlayerLabel } = require(path.join(OUT, 'player/MiniPlayer.js'))
 
 const player = {
   track: queueTrack(), gapless: true, maxRate: '48000', gaps: [], lastSeek: null,
@@ -447,23 +530,23 @@ console.log('\nInfo: opens with focus in, closes with focus back - by Escape, Do
   const tabs = () => view.find((node) => node.props?.role === 'tab')
   const list = () => one(view, (node) => node.props?.role === 'tablist')
   check('About, then Debug; About chosen, and the only tab stop', tabs().map((tab) => [text(tab), tab.props['aria-selected'], tab.props.tabIndex]), [['About', true, 0], ['Debug', false, -1]])
-  //? (2.0.0-player.63) and the Playing group, for everyone - Debug's own Format, Gapless and Normalization rows
-  check('About draws the song, the album, the artist and what is playing', view.find((node) => node.type === 'h3').map(text), ['The song', 'The album', 'The artist', 'Playing'])
-  check('...Playing: Format, Gapless and Normalization, in Debug\'s words',
-    [view.find(byClass('app-kv-label')).map(text), view.find(byClass('app-kv-value')).map(text)],
-    [['Format', 'Gapless', 'Normalization'], ['FLAC, 16-bit, 44.1 kHz, stereo', 'On, in one stream', 'Off']])
+  //? (2.0.0-player.63) and the group for everyone - since 2.0.7 "Sound", in a listener's words (lib/aboutSound.ts)
+  check('About draws the song, the album, the artist and how it sounds', view.find((node) => node.type === 'h3').map(text), ['The song', 'The album', 'The artist', 'Sound'])
+  check('...Sound: Format, Gapless and Normalization, in a listener\'s words - "On", never "On, in one stream" - and none in the data face',
+    [view.find(byClass('app-kv-label')).map(text), view.find(byClass('app-kv-value')).map(text), view.find(byClass('app-kv-value')).filter(byClass('app-mono')).length],
+    [['Format', 'Gapless', 'Normalization'], ['FLAC, 16-bit, 44.1 kHz, stereo', 'On', 'Off'], 0])
   check('...the song\'s lines as About worked them out', view.find(byClass('app-info-line')).map(text).slice(0, 3), ['Pink Floyd', `Track 3 of 6 ${DOT} 5:08`, `Disc 2 ${DOT} Unreleased Tracks`])
   const card = one(view, (node) => node.type === 'button' && byClass('is-link')(node))
   const closesBefore = closes
   card.props.onClick()
   check('...the album\'s card goes to the album (App closes the sheets as it opens it)', [card.props.onClick === albumTaps.handler, albumTaps.count, closes - closesBefore], [true, 1, 0])
   //? (2.0.0-player.63) for its Normalization row, which says an MP3 transcode isn't levelled
-  check('About asks how the song was sent - for Playing\'s Normalization row', formats > 0, true)
+  check('About asks how the song was sent - for Sound\'s Normalization row', formats > 0, true)
 
   //? 2.0.0-player.17: filled in, the artist's card goes to their page - App closes the sheets as it opens it
   const artistTaps = []
   view.render({
-    admin: true, open: true, opener: openerRef, onClose: () => { closes += 1 }, onAlbum: albumTaps.handler, player, album: WITH_IDS,
+    admin: true, folders: true, open: true, opener: openerRef, onClose: () => { closes += 1 }, onAlbum: albumTaps.handler, player, album: WITH_IDS,
     sentFormat: () => 'raw', details: DETAILS, onArtist: (artist) => artistTaps.push(artist),
   })
   const links = view.find((node) => node.type === 'button' && byClass('is-link')(node))
@@ -472,11 +555,22 @@ console.log('\nInfo: opens with focus in, closes with focus back - by Escape, Do
   check('...the artist\'s opens their page, by Navidrome\'s id, named as the card names them', artistTaps, [{ id: 'ar-floyd', name: 'Pink Floyd' }])
   check('...and the card says who they are and what you have of theirs', view.find(byClass('app-info-line')).map(text).filter((line) => /Group|in your library|Written|pressing/.test(line)),
     ['Written by Roger Waters, David Gilmour', `This pressing: Experience edition ${DOT} 2011 ${DOT} FLAC`, `Group ${DOT} London ${DOT} 1965 to 2014`, '4 albums in your library'])
-  check('...the folder in monospace, a row of its own at the end - in no button, so it can be copied',
+  check('...the folder in monospace, a row of its own at the end, headed On the server (2.0.7) - in no button, so it can be copied',
     [view.find(byClass('app-info-folder')).map((node) => [node.type, text(node), /app-mono/.test(node.props.class)]),
       links.flatMap((link) => view.find(byClass('app-info-folder')).filter((folder) => JSON.stringify(link).includes(JSON.stringify(folder.props.children)))).length,
       view.find((node) => node.type === 'h3').map(text)],
-    [[['dd', 'Pink Floyd/Wish You Were Here (1975) [Experience edition]', true]], 0, ['The song', 'The album', 'The artist', 'Playing', 'In your library']])
+    [[['dd', 'Pink Floyd/Wish You Were Here (1975) [Experience edition]', true]], 0, ['The song', 'The album', 'The artist', 'Sound', 'On the server']])
+  //? (2.0.7) a listener - no `folders` - is shown no path on the server
+  view.render({
+    admin: false, open: true, opener: openerRef, onClose: () => { closes += 1 }, onAlbum: albumTaps.handler, player, album: WITH_IDS,
+    sentFormat: () => 'raw', details: DETAILS, onArtist: (artist) => artistTaps.push(artist),
+  })
+  check('...and none for anyone who doesn\'t look after the albums: no folder, no On the server',
+    [view.find(byClass('app-info-folder')).length, view.find((node) => node.type === 'h3').map(text)], [0, ['The song', 'The album', 'The artist', 'Sound']])
+  view.render({
+    admin: true, folders: true, open: true, opener: openerRef, onClose: () => { closes += 1 }, onAlbum: albumTaps.handler, player, album: WITH_IDS,
+    sentFormat: () => 'raw', details: DETAILS, onArtist: (artist) => artistTaps.push(artist),
+  })
   draw(true)
 
   //? (review of 2.0.0-player.63) About asks too now: only Debug's own asks counted from here
@@ -484,10 +578,10 @@ console.log('\nInfo: opens with focus in, closes with focus back - by Escape, Do
   tabs()[1].props.onClick()
   reopen()
   check('Debug chosen', tabs().map((tab) => [tab.props['aria-selected'], tab.props.tabIndex]), [[false, -1], [true, 0]])
-  check('Debug draws its five sections - the turntable\'s sound among them since 2.0.0-player.14', view.find((node) => node.type === 'h3').map(text), ['The file', 'What this device is sent', 'Last song change and seek', 'The turntable', 'Navidrome sent'])
+  check('Debug draws its five sections - the turntable\'s sound among them since 2.0.0-player.14', view.find((node) => node.type === 'h3').map(text), ['The file', 'Sent to this device', 'Last song change and seek', 'The turntable', 'Fields from Navidrome'])
   //? (2.0.0-player.39: Speed after Gapless - not known here, this player has no speed to read; 2.0.0-player.62:
   //? Normalization after Resampled)
-  check('...as labelled rows', view.find(byClass('app-kv-label')).map(text), ['Format', 'Sent as', 'Resampled', 'Normalization', 'Why', 'Gapless', 'Speed', 'Gap', 'Last seek', 'Turntable sound', 'Turntable timing', 'Recording', 'Test bench', 'Song', 'On other songs', 'Album'])
+  check('...as labelled rows', view.find(byClass('app-kv-label')).map(text), ['Format', 'Sent as', 'Resampled', 'Normalization', 'Why sent this way', 'Gapless', 'Speed', 'Last song change', 'Last seek', 'Turntable sound', 'Turntable timing', 'Recording', 'Test bench', 'Song fields', 'Only on other songs', 'Album fields'])
   check('...the song queued with no level: Normalization Off', text(view.find(byClass('app-kv-value'))[3]), 'Off')
   //? the turntable's test bench (2.0.0-player.36): a link opening beside the app, so the music isn't unloaded
   check('...the test bench a link opening beside the app, to /player/lab/',
@@ -690,7 +784,7 @@ console.log('\na panel that becomes a sheet while open, and back (review): focus
   drawAs('drawer', false)
 }
 
-console.log('\nInfo for everyone else (2.0.0-player.63): About alone, with Playing; Debug an admin\'s')
+console.log('\nInfo for everyone else (2.0.0-player.63): About alone, with Sound; Debug an admin\'s')
 {
   const view = mount(InfoSheet, 'roles')
   const levelled = { ...player, track: { ...queueTrack(), level: 'album' } }
@@ -703,12 +797,12 @@ console.log('\nInfo for everyone else (2.0.0-player.63): About alone, with Playi
   draw(false, false)
   draw(false)
   check('not an admin: no tab strip and no tab - no empty Debug to tap', [view.find((node) => node.props?.role === 'tablist').length, tabs().length], [0, 0])
-  check('...About, ending in Playing', titles(), ['The song', 'The album', 'The artist', 'Playing'])
-  check('...Playing\'s rows: the file, Gapless, and the level as deadwax answered it',
+  check('...About, ending in Sound', titles(), ['The song', 'The album', 'The artist', 'Sound'])
+  check('...Sound\'s rows: the file, Gapless, and the level as deadwax answered it - in a listener\'s words',
     [view.find(byClass('app-kv-label')).map(text), view.find(byClass('app-kv-value')).map(text)],
-    [['Format', 'Gapless', 'Normalization'], ['FLAC, 16-bit, 44.1 kHz, stereo', 'On, in one stream', `Album, -7.42 dB ${DOT} the album at -10.6 LUFS`]])
+    [['Format', 'Gapless', 'Normalization'], ['FLAC, 16-bit, 44.1 kHz, stereo', 'On', 'Album volume matching, 7.4 dB quieter']])
   check('...nothing of Debug: none of its sections, no test bench, no recording',
-    [titles().filter((title) => ['The file', 'What this device is sent', 'Last song change and seek', 'The turntable', 'Navidrome sent'].includes(title)),
+    [titles().filter((title) => ['The file', 'Sent to this device', 'Last song change and seek', 'The turntable', 'Fields from Navidrome'].includes(title)),
       view.find((node) => node.type === 'a' && node.props?.href === '/player/lab/').length, view.find(byClass('app-info-action')).length], [[], 0, 0])
   check('...the scroller a region named by the sheet\'s title, not a tab panel of no tab', [scroller().props.role, scroller().props['aria-labelledby']], ['region', 'app-info-title'])
 
@@ -718,7 +812,7 @@ console.log('\nInfo for everyone else (2.0.0-player.63): About alone, with Playi
   draw(true)
   check('...on Debug', [tabs()[1].props['aria-selected'], titles()[0]], [true, 'The file'])
   draw(false)
-  check('the role gone while Debug shows: About, and no strip', [tabs().length, titles()], [0, ['The song', 'The album', 'The artist', 'Playing']])
+  check('the role gone while Debug shows: About, and no strip', [tabs().length, titles()], [0, ['The song', 'The album', 'The artist', 'Sound']])
   draw(true)
   check('...given back: About again, never the Debug chosen before it went', tabs().map((tab) => [text(tab), tab.props['aria-selected']]), [['About', true], ['Debug', false]])
   //? (review of 2.0.0-player.63) the role taken away with a tab focused: focus to the list, never dropped to <body>
@@ -816,10 +910,10 @@ console.log('\nNow Playing is a sheet too, and deaf under the others')
   draw(false)
   check('...and focus goes back to the mini player', [document.activeElement === opener, locks()], [true, []])
   check('the album line goes to the album', one(view, (node) => node.type === 'button' && byClass('pl-sheet-artist')(node)).props['aria-label'], 'Go to the album: Pink Floyd — Wish You Were Here')
-  check('the icon row: Up next and •••, with no speaker to send to (2.0.0-player.57: Up next always there)', view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['Up next', 'More: info, add to a playlist, go to album, pin'])
+  check('the icon row: Up Next and •••, with no speaker to send to (2.0.0-player.57: Up Next always there)', view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['Up Next', 'More: info, add to a playlist, go to album, pin'])
   view.render({ player, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum() {}, openAs: 'cover', pinnable: false })
   check('...an album the menu has no pin for (no release id, or deadwax can\'t keep pins): ••• doesn\'t promise one',
-    view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['Up next', 'More: info, add to a playlist, go to album'])
+    view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['Up Next', 'More: info, add to a playlist, go to album'])
   let albums = 0
   view.render({ player, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum: () => { albums += 1 }, openAs: 'cover' })
   one(view, (node) => node.type === 'button' && byClass('pl-sheet-artist')(node)).props.onClick()
@@ -831,17 +925,17 @@ console.log('\nNow Playing is a sheet too, and deaf under the others')
     [view.find((node) => node.type === 'button' && byClass('pl-sheet-artist')(node)).length, one(view, (node) => node.type === 'p' && byClass('pl-sheet-artist')(node)) && text(one(view, byClass('pl-sheet-byline')))],
     [0, 'Pink Floyd — Wish You Were Here'])
   check('...••• says the menu holds only Info, and AirPlay sits before it with a speaker there',
-    view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['AirPlay', 'Up next', 'More: info, add to a playlist'])
+    view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['AirPlay', 'Up Next', 'More: info, add to a playlist'])
   //? (2.0.0-player.57) Up next: named and tinted by what is on, opening Up Next from its tap, expanded while it is over
   let upNexts = 0
   view.render({ player: { ...player, shuffle: true, repeat: 'all' }, open: true, covered: true, opener: openerRef, onClose() {}, onMore() {}, onAlbum() {}, openAs: 'cover', onUpNext: () => { upNexts += 1 }, upNextOpen: true })
   const upNext = one(view, (node) => node.type === 'button' && byClass('app-upnext-button')(node))
   upNext.props.onClick()
-  check('Up next with Shuffle and Repeat All on: named so, tinted, expanded while Up Next is over it - and ••• not, its tap App\'s',
+  check('Up Next with Shuffle and Repeat All on: named so, tinted, expanded while Up Next is over it - and ••• not, its tap App\'s',
     [upNext.props['aria-label'], byClass('is-on')(upNext), upNext.props['aria-expanded'], upNext.props['aria-haspopup'], one(view, (node) => node.type === 'button' && byClass('pl-icon-button')(node) && !byClass('app-upnext-button')(node)).props['aria-expanded'], upNexts],
-    ['Up next - Shuffle and Repeat all', true, true, 'dialog', false, 1])
+    ['Up Next - Shuffle and Repeat all', true, true, 'dialog', false, 1])
   view.render({ player, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum() {}, openAs: 'cover', onUpNext() {} })
-  check('...neither on: plain, and not tinted', [one(view, byClass('app-upnext-button')).props['aria-label'], byClass('is-on')(one(view, byClass('app-upnext-button')))], ['Up next', false])
+  check('...neither on: plain, and not tinted', [one(view, byClass('app-upnext-button')).props['aria-label'], byClass('is-on')(one(view, byClass('app-upnext-button')))], ['Up Next', false])
   view.render({ player: { ...player, error: 'Skipped "Shine On" - it wouldn\'t play' }, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum() {}, openAs: 'cover' })
   const titles = one(view, byClass('pl-sheet-titles')).props.children.filter(Boolean)
   check('a failure is drawn above the title, never under it', titles.map((node) => node.props.class.split(' ')[0]), ['pl-sheet-error', 'pl-sheet-title', 'pl-sheet-artist'])
@@ -951,6 +1045,19 @@ async function details() {
     check('...no song artist known and the names differ: nobody\'s details asked for, to draw under the wrong name', I.asks.filter((one) => one[0] === 'artist').length, 0)
   }
   globalThis.setTimeout = realSetTimeout
+}
+
+console.log('\nthe mini player\'s name (2.0.7, UX batch 4): the song, then what a tap does')
+{
+  check('the words', [miniPlayerLabel('Roads', 'Portishead'), miniPlayerLabel('Roads', ''), miniPlayerLabel('Roads', null)],
+    ['Now playing: Roads, Portishead - open', 'Now playing: Roads - open', 'Now playing: Roads - open'])
+  const view = mount(MiniPlayer, 'mini player')
+  const opener = () => view.find(byClass('pl-mini-open'))[0]
+  const base = { track: { ...queueTrack(), title: 'Roads', artist: 'Portishead' }, error: null, playing: true, buffering: false, duration: 300, toggle() {}, next() {} }
+  view.render({ player: base, onOpen() {} })
+  check('drawn: the song playing and its artist, as the button shows them - never "Open now playing"', opener().props['aria-label'], 'Now playing: Roads, Portishead - open')
+  view.render({ player: { ...base, error: 'Skipped "Glory Box" - it wouldn\'t play' }, onOpen() {} })
+  check('...a notice in the artist\'s place: what the line shows is what is heard', opener().props['aria-label'], 'Now playing: Roads, Skipped "Glory Box" - it wouldn\'t play - open')
 }
 
 details().then(() => {
