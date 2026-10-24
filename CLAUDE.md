@@ -221,6 +221,8 @@ src/
                    my_library (/deadwax/me/library) and held (/deadwax/library/held, Look after
                    the library's) - see "Personal libraries"; people (/deadwax/people, People: a
                    Navidrome admin's, unlocked with their own password - see "Managing accounts");
+                   own_password (/deadwax/me/password, You's Change password: yours, changed in
+                   Navidrome as you - see "Changing your own password");
                    library's /queue/summary is the app's Needs-a-look count, from the saved
                    scan alone - see "Needs a look"
 interface/         the app's pages: player/ (the app, its stylesheets, manifest and icons),
@@ -300,7 +302,7 @@ ui/                Preact + Vite + TypeScript: the app (src/player/main.tsx -> s
                    ui/src/lab/ is the turntable's test bench at /player/lab/, a third page built
                    in a pass of its own: the real Turntable and deck over signals it makes, set
                    beside an ideal turntable - see notes/turntable-bench.md.
-tests/             3657 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             3721 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -342,7 +344,7 @@ section of that title in notes/: `grep -rn "### X" notes/` finds it.
 | Requests, Search, the album you don't have, Sources and Get, song search, search like Apple Music | `notes/app-requests-search-get.md` |
 | artists, the id bridge, pins, Home | `notes/app-artists-pins.md` |
 | the desktop frame, the Edit panel, Needs a look (and Not in Navidrome), server settings and the log, Library care - and all of them on a phone | `notes/app-desktop.md` |
-| logins and roles: signing in through Navidrome, sessions, admins, break-glass, the sign-in screen; downloads per person; personal libraries; the player as you (Library and Browse, Add and Remove); People, Navidrome's admins as deadwax's, permissions | `notes/logins.md` |
+| logins and roles: signing in through Navidrome, sessions, admins, break-glass, the sign-in screen; downloads per person; personal libraries; the player as you (Library and Browse, Add and Remove); People, Navidrome's admins as deadwax's, permissions; changing your own password | `notes/logins.md` |
 | playlists: Navidrome's own, as you - whose, the routes and the replace, the picker, a playlist's page and its Edit | `notes/playlists.md` |
 | the app's Library: its root, sections, sorts, groups, the index, Find, the album index route, the shelf | `notes/app-library.md` |
 | the turntable: its look, momentum, the deck, the first fix (.11, .14, .16) | `notes/turntable.md` |
@@ -503,7 +505,7 @@ phone's sheet.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 3657 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 3721 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see `notes/tooling.md`:
@@ -539,7 +541,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 3657 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 3721 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

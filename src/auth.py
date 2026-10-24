@@ -72,6 +72,7 @@ import threading
 import ipaddress
 import time
 from collections import OrderedDict, deque
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Callable, Hashable
 
@@ -143,6 +144,8 @@ WRONG_LOGIN = "That user name and password didn't work."
 #? (2.0.0-player.61) What the next request of a session People ended is told
 PASSWORD_RESET = "An admin reset your password - sign in with the new one."
 ACCOUNT_REMOVED = "Your account was removed."
+#? (2.0.2) What the next request of a person's OTHER sessions is told when they changed their own password from deadwax
+PASSWORD_CHANGED = "Your password was changed from another device - sign in with the new one."
 #? (2.0.0-player.61 review) a session kept under a name deadwax now keeps for itself - a Navidrome account called
 #? `deadwax` signed in before break-glass took that name. It ends at its first request, never standing for
 #? break-glass (JobStore.init also deletes such rows, once, as the upgrade's migration).
@@ -357,13 +360,21 @@ def forget_sessions() -> None:
         _roles.clear()
         _role_changes.clear()
         _role_clock["floor"] = _role_clock["now"]
+        _resealed.clear()
+        _rotated.clear()
         _leftovers_looked = False
     navidrome_admin.forget_all()
 
 
-def _note_ended(key: str, reason: str) -> None:
+def _note_ended(key: str, reason: str, keep: bool = False) -> None:
+    """The session `key` ended in this process, `reason` told to its next request. With `keep` (a refusal of its
+    login - player_refused, the re-check), a reason already noted stands: a call in flight when the session was
+    ended for something else (2.0.2 review: PASSWORD_CHANGED, People's PASSWORD_RESET) and refused after it must not
+    turn the words the device is shown into LOGIN_GONE."""
     with _lock:
         _held.pop(key, None)
+        if keep and key in _ended:
+            reason = _ended[key]
         _ended[key] = reason
         _ended.move_to_end(key)
         while len(_ended) > ENDED_KEPT:
@@ -464,9 +475,10 @@ def end_user_sessions(store, user: str, reason: str) -> int:
     return ended
 
 
-def end_session(store, key: str, reason: str) -> None:
-    """End one session, by id hash: gone from the database and from memory. SYNCHRONOUS - raises on a database error."""
-    _note_ended(key, reason)
+def end_session(store, key: str, reason: str, keep: bool = False) -> None:
+    """End one session, by id hash: gone from the database and from memory. SYNCHRONOUS - raises on a database error.
+    `keep`: as _note_ended's - a reason already noted for it stands."""
+    _note_ended(key, reason, keep)
     store.delete_session(key)
 
 
@@ -524,6 +536,9 @@ def _session(store, raw: str, now: float | None = None) -> tuple[str, _Held]:
     #? (2.0.0-player.61 review) the role clock before the row is read: a role set while it was being read (People,
     #? the re-check) is newer than the row's, and is the one held
     mark = role_mark()
+    #? (2.0.2 review) and the re-seal clock: a password change re-sealing this session while its row was being read
+    #? is newer than the row, and its login is the one held
+    sealed_mark = reseal_mark()
     row = store.session(key)
     if row is None:
         with _lock:
@@ -552,6 +567,9 @@ def _session(store, raw: str, now: float | None = None) -> tuple[str, _Held]:
         if _changed_since(held.user, mark):
             #? set since the row was read: the map has the newer word (unknown is not an admin)
             held.admin = _roles.get(held.user, False)
+        resealed = _resealed.get(key)
+        if resealed is not None and resealed[0] > sealed_mark:
+            held.credential = resealed[1]
         _held[key] = held
         #? (2.0.0-player.61) the role as the database has it - what is_admin reads for this user
         _note_role(held.user, held.admin)
@@ -690,10 +708,15 @@ def player_refused(login: PlayerLogin, why: str = LOGIN_GONE) -> bool:
     while the session was still held in memory). True the first time for a session, so it is logged once
     however many calls were in flight. SYNCHRONOUS (the database); best effort - a database that fails
     still has the session ended here.
+
+    (2.0.2) Not when the login is `superseded` - its person is changing their password from deadwax right now,
+    or the session has been re-sealed with the new one since this login was read: the refusal says nothing
+    about the session then, and it stands (False).
     """
-    with _lock:
-        first = login.key not in _ended
-    _note_ended(login.key, why)
+    if superseded(login.store, login.user, login.key, login.sealed):
+        return False
+    first, told = _refusal(login.user, login.key, why)
+    _note_ended(login.key, told, keep=True)
     store = login.store
     if store is not None and getattr(store, "available", False):
         try:
@@ -703,6 +726,8 @@ def player_refused(login: PlayerLogin, why: str = LOGIN_GONE) -> bool:
         _credential_dead(store, {"user": login.user, "credential": login.sealed}, why)
     if first:
         said = ("their sign-in was sealed with another DEADWAX_SECRET_KEY" if why == KEY_CHANGED
+                else "their password was being changed from another device (the player was refused)"
+                if told == PASSWORD_CHANGED
                 else "Navidrome no longer accepts the login they signed in with (the player was refused)")
         logger.info(f"signed {login.user} out: {said}", extra={"frontend": True})
     return first
@@ -746,6 +771,172 @@ def _take_over_leftovers(store, user: str) -> None:
         return
     if not seeded:
         _seed_library(store, user)
+
+
+# ===== your own password (2.0.2) =====================================================================
+
+#? (2.0.2 review) the SESSIONS (id hashes) a password change is being made from right now (src/routes/own_password.py),
+#? and by how many requests at once - under _lock. While one is, a refusal of its OLD login (the re-check's, a player
+#? call's) is the change itself, never a reason to end it. Only that session: every other one of the person's ends at
+#? its first refusal as ever (the change ends them anyway), so its burst of calls stays one failed login - never
+#? Navidrome's 5-in-20-s block on the name, which would refuse the change's own proof with the NEW password too.
+_changing: dict[str, int] = {}
+#? (2.0.2 review 2) and per PERSON: the changes of theirs running right now (`count`), the OTHER sessions of theirs a
+#? refusal of the old login ended meanwhile (`refused` - the change's doing, so told PASSWORD_CHANGED and counted
+#? among the devices it signed out), and whether one took (`took`, set by own_password_changed). A change that
+#? didn't take puts LOGIN_GONE back for those: their logins died of something else. Under _lock.
+_person_changes: dict[str, dict] = {}
+#? (2.0.2 review) the re-seal clock: bumped by every own_password_changed, which notes the session's new login here
+#? with the clock's value - so a session row read BEFORE the re-seal and installed in memory AFTER it (_session) can
+#? never put the old login back. Under _lock; bounded, the oldest going first (it only matters for one read).
+_resealed: "OrderedDict[str, tuple[int, str]]" = OrderedDict()
+_reseal_clock = {"now": 0}
+RESEALED_KEPT = 1000
+#? (2.0.2 review 3) the sessions (old id hash -> new) a password change has moved under a new id (rotate_session): the
+#? old id is ended, but a request already let in under it - this device's own, sent just before its new cookie came -
+#? may still be refused by Navidrome with the old login, which says nothing about the session it became. Under _lock;
+#? bounded, the oldest going first (it only matters for the requests in flight at the change).
+_rotated: "OrderedDict[str, str]" = OrderedDict()
+
+
+@contextmanager
+def changing_password(key: str, user: str):
+    """(2.0.2) Held from just before Navidrome is asked to change `user`'s password, until the session `key` (the id
+    hash it was asked from) has been re-sealed with the new one (or the change has failed)."""
+    with _lock:
+        _changing[key] = _changing.get(key, 0) + 1
+        change = _person_changes.setdefault(user, {"count": 0, "refused": set(), "took": False})
+        change["count"] += 1
+    try:
+        yield
+    finally:
+        with _lock:
+            left = _changing.get(key, 1) - 1
+            if left > 0:
+                _changing[key] = left
+            else:
+                _changing.pop(key, None)
+            change = _person_changes.get(user)
+            if change is not None:
+                change["count"] -= 1
+                if change["count"] <= 0:
+                    _person_changes.pop(user, None)
+                    if not change["took"]:
+                        for other in change["refused"]:
+                            if _ended.get(other) == PASSWORD_CHANGED:
+                                _ended[other] = LOGIN_GONE
+
+
+def _refusal(user: str, key: str, why: str) -> tuple[bool, str]:
+    """
+    (2.0.2 review 2) A refusal of the session `key`'s login is ending it with `why`: whether it is the first end of
+    that session here (so it is logged once), and the reason to note - PASSWORD_CHANGED, not LOGIN_GONE, while a
+    change of `user`'s is running from another of their sessions (the change's own session is `superseded`, never
+    ended): Navidrome took the new password a moment ago and this device's old login died of it, so it is told what
+    own_password_changed would have told it, and counted among the devices the change signed out.
+    """
+    with _lock:
+        first = key not in _ended
+        change = _person_changes.get(user)
+        if change is None or why != LOGIN_GONE:
+            return first, why
+        if first:
+            change["refused"].add(key)
+        return first, PASSWORD_CHANGED
+
+
+def superseded(store, user: str, key: str, sealed: str) -> bool:
+    """
+    (2.0.2) Whether Navidrome refusing the login `sealed` - the one the session `key` of `user` was read with - says
+    nothing about that session: a password change is being made from that very session this moment, or the session
+    has been re-sealed since with the new one (its login, in memory or else in the database, is another). Never for
+    the person's OTHER sessions while one changes (review). (Review 3) Also for a session the change has since moved
+    under a new id (rotate_session): a request let in under the old one just before is the device's own. SYNCHRONOUS (it may read the session's row); a database
+    that can't be read is no evidence, so False.
+    """
+    with _lock:
+        if _changing.get(key) or key in _rotated:
+            return True
+        held = _held.get(key)
+    if held is not None:
+        return held.credential != sealed
+    if store is None or not getattr(store, "available", False):
+        return False
+    try:
+        row = store.session(key)
+    except Exception:
+        return False
+    return row is not None and row.get("user") == user and (row.get("credential") or "") != sealed
+
+
+def reseal_mark() -> int:
+    """(2.0.2 review) The re-seal clock now - taken before a session row is read (_session)."""
+    with _lock:
+        return _reseal_clock["now"]
+
+
+def own_password_changed(store, key: str, user: str, sealed: str, now: float | None = None) -> int:
+    """
+    (2.0.2) `user` changed their own Navidrome password from the session `key`, and Navidrome took the new one:
+    every OTHER session of theirs ends - in memory first (PASSWORD_CHANGED told to each one's next request, and
+    any People unlock held for it gone with it; one a refusal of its old login ended while the change ran is counted
+    too), then the database - and this one is re-sealed with `sealed`, the
+    login made with the new password, in the database (store.own_password_changed, one transaction, which also
+    keeps it as their login for starring) and then in memory, so the player, the stars and the re-check carry on
+    with it. How many other devices were signed out. SYNCHRONOUS; raises on a database error (the other sessions
+    are ended in memory by then - their logins are dead in Navidrome anyway).
+    """
+    now = time.time() if now is None else now
+    with _lock:
+        held_others = [other for other, held in _held.items() if held.user == user and other != key]
+        #? (review 2) the devices a refusal of their old login signed out while this change ran - its doing too
+        change = _person_changes.get(user)
+        refused = set(change["refused"]) if change is not None else set()
+        if change is not None:
+            change["took"] = True
+    for other in held_others:
+        _note_ended(other, PASSWORD_CHANGED)
+    stored_others, live = store.own_password_changed(user, key, sealed, now)
+    for other in stored_others:
+        if other not in held_others and other != key:
+            _note_ended(other, PASSWORD_CHANGED)
+    with _lock:
+        _reseal_clock["now"] += 1
+        _resealed[key] = (_reseal_clock["now"], sealed)
+        _resealed.move_to_end(key)
+        while len(_resealed) > RESEALED_KEPT:
+            _resealed.popitem(last=False)
+        held = _held.get(key)
+        if held is not None:
+            held.credential = sealed
+    return live + len(refused - set(stored_others) - {key})
+
+
+def rotate_session(store, key: str, user: str) -> str | None:
+    """
+    (2.0.2 review 3) The session `key` of `user`, just re-sealed with the new login by their own password change
+    (own_password_changed), moved under a NEW session id: the cookie's value to set on the change's answer, or None
+    when its row was no longer there to move (signed out meanwhile). Someone changes their password because a copy of
+    their sign-in may be loose - and the copy was of this device's cookie too, which the re-seal alone left working,
+    with the new login. In the database in one statement (store.rotate_session: the row itself moves, with everything
+    it carries), and only then in memory: what is held of it follows to the new id, and the old one ends, its next
+    request told PASSWORD_CHANGED (with it any People unlock held under it). SYNCHRONOUS; raises on a database error
+    with nothing changed - the session then stands under its old id, with the new login.
+    """
+    raw = new_session_id()
+    new_key = id_hash(raw)
+    if not store.rotate_session(key, new_key, user):
+        return None
+    with _lock:
+        held = _held.pop(key, None)
+        if held is not None:
+            _held[new_key] = held
+        _rotated[key] = new_key
+        _rotated.move_to_end(key)
+        while len(_rotated) > RESEALED_KEPT:
+            _rotated.popitem(last=False)
+    _note_ended(key, PASSWORD_CHANGED)
+    return raw
 
 
 # ===== asking Navidrome =============================================================================
@@ -1180,12 +1371,19 @@ async def check_sessions(store, now: float | None = None) -> dict[str, int]:
         try:
             _answered, admin = await check_login(username, token, salt)
         except NavidromeError as e:
+            if e.code == 40 and await asyncio.to_thread(superseded, store, row["user"], row["id_hash"], row["credential"]):
+                #? (2.0.2) they changed their password from deadwax while this was asked: the session stands, re-sealed
+                counts["unanswered"] += 1
+                continue
             if e.code == 40:
-                await asyncio.to_thread(end_session, store, row["id_hash"], LOGIN_GONE)
+                #? (2.0.2 review) refused while a change of theirs runs from another device: that change, said so
+                _first, told = _refusal(row["user"], row["id_hash"], LOGIN_GONE)
+                await asyncio.to_thread(end_session, store, row["id_hash"], told, True)
                 await asyncio.to_thread(_credential_dead, store, row, LOGIN_GONE)
                 counts["ended"] += 1
-                logger.info(f"signed {row['user']} out: Navidrome no longer accepts the login they signed in with",
-                            extra={"frontend": True})
+                said = ("their password was being changed from another device" if told == PASSWORD_CHANGED
+                        else "Navidrome no longer accepts the login they signed in with")
+                logger.info(f"signed {row['user']} out: {said}", extra={"frontend": True})
             else:
                 counts["unanswered"] += 1
             continue

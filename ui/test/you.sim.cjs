@@ -48,6 +48,9 @@
  *    answer until then - and for a read already out (the sheet's, asked as it opened), never sending
  *    the answer that read replaces. Under the three, "Confirm before cancelling" - this device's -
  *    with its note, after what went wrong keeping the three.
+ *  - (2.0.2) Change password in About, before Sign out, handed who is signed in - only with logins on and a
+ *    Navidrome sign-in: never the break-glass admin, never with logins off (app/ChangePassword.tsx's own states are
+ *    ownpassword.sim.cjs's).
  *
  * A script for the same reason as the other sims: there is no JS test runner here.
  *
@@ -679,6 +682,38 @@ exports.readDownloadDefaults = () => globalThis.__getting.downloadDefaults
     await settle()
     draw(props)
     check('...and back once deadwax says so: the four rows', find(byClass('app-queue-link-row')).length, 4)
+  }
+
+  console.log('\nChange password (2.0.2): in About, before Sign out - a Navidrome sign-in\'s alone')
+  {
+    const props = { shown: true, current: true, ...LOOK }
+    const named = (name) => find((node) => typeof node.type === 'function' && node.type.name === name)
+    const about = () => {
+      const section = find((node) => node.type === 'section' && node.props?.['aria-labelledby'] === 'app-about-title')[0]
+      const parts = []
+      const visit = (node) => {
+        if (!node || typeof node !== 'object') return
+        if (Array.isArray(node)) { node.forEach(visit); return }
+        if (typeof node.type === 'function') parts.push(node.type.name)
+        visit(node.props?.children)
+      }
+      visit(section)
+      return parts
+    }
+    const asWho = async (who) => {
+      meAnswers.push(answersWith(who))
+      draw(props)
+      checkAgain().props.onClick()
+      await settle()
+      draw(props)
+    }
+    await asWho({ ...ME, user: 'ethan', admin: false, auth: 'on', permissions: ['request'] })
+    check('logins on, signed in through Navidrome: Change password, then Sign out', about(), ['ChangePassword', 'SignOutRow'])
+    check('...handed who they are', named('ChangePassword')[0]?.props, { user: 'ethan' })
+    await asWho({ ...ME, user: 'deadwax', admin: true, auth: 'on' })
+    check('the break-glass sign-in: no Navidrome account, so Sign out alone', about(), ['SignOutRow'])
+    await asWho(ME)
+    check('logins off: neither', about(), [])
   }
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed')

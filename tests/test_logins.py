@@ -207,6 +207,8 @@ ROUTES = {
     ("POST", "/deadwax/me/library/dismiss"): "user",
     #? (2.0.0-player.52, step 6) Remove from my library - tests/test_player_as_you.py
     ("POST", "/deadwax/me/library/remove"): "user",
+    #? (2.0.2) your own Navidrome password, changed as you - tests/test_own_password.py
+    ("POST", "/deadwax/me/password"): "user",
     ("GET", "/deadwax/library/held"): "library",
     ("POST", "/deadwax/library/held/flags/{flag_id}/add"): "library",
     ("POST", "/deadwax/library/held/flags/{flag_id}/dismiss"): "library",

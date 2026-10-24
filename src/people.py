@@ -11,7 +11,8 @@ deadwax's own safety rules, first match winning (`refusals`):
   - logins off, or the break-glass sign-in: People needs a Navidrome sign-in to ask Navidrome as;
   - NAVIDROME_USER: changing it would cut deadwax off from what is nobody's in particular;
   - yourself: Navidrome's own UI won't delete you, and demoting yourself mid-task is never what was meant -
-    nor is a password changed here (it would need your current one, and sign this device out);
+    nor is a password changed here (it needs your current one: since 2.0.2 that is You > Change password,
+    src/routes/own_password.py, which keeps this device signed in);
   - the LAST Navidrome admin, unmade or removed: an install with no admin can only be fixed from Navidrome's
     command line. (You can't change yourself, and you are an admin, so this can't trigger through People
     today; it is kept as belt and braces.)
@@ -44,7 +45,7 @@ NEEDS_LOGINS = "People needs logins on - with them off, anyone who can reach dea
 BREAK_GLASS = ("The break-glass sign-in has no Navidrome account, so People can't ask Navidrome as you - sign in "
                "with your own account.")
 SHARED_ACCOUNT = "That's deadwax's own account (NAVIDROME_USER) - deadwax would lose its way into Navidrome."
-YOUR_PASSWORD = "That's you - change your own password in Navidrome or Amperfy."
+YOUR_PASSWORD = "That's you - change your own password in You → Change password."
 YOUR_ACCOUNT = "deadwax doesn't remove the account you're signed in with."
 YOUR_ROLE = "You can't take away your own admin role."
 YOUR_PERMISSIONS = "That's you - an admin has every permission."

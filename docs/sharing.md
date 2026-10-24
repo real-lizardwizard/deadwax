@@ -266,10 +266,26 @@ admin's job, tick it under their **Permissions** instead ([below](#admins-permis
   and what deadwax kept for them shows in People under **Known only to deadwax**, with **Forget** -
   until it's forgotten, deadwax won't make a new account of that name in People, so a new person never
   inherits someone else's library, pins, play queue or permissions.
+- **Changing your own password**: **You → About → Change password**, for anyone signed in with their own
+  Navidrome account - your current password, then the new one twice (8 to 128 characters, not your user
+  name, not the one you have), **Show** to see what you typed. deadwax checks the current one against the
+  login you signed in with before it asks Navidrome anything, so a typo costs nothing; then it changes the
+  password in Navidrome *as you*, and checks the new one works. The device you changed it on stays signed
+  in - what's playing carries on - under a new sign-in of its own, so a copy of its old one (if someone
+  had taken this browser's sign-in, the reason to change a password) is signed out too; every other device
+  of yours is signed out and signs in again with the new password, and it says how many ("Signed out of
+  your other 2 devices"). Amperfy and any other app you
+  use with Navidrome need the new password too. It's your Navidrome password, so it's changed for
+  Navidrome itself as well. Not for the break-glass `deadwax` (its password is `DEADWAX_ADMIN_PASSWORD`), nor
+  for `NAVIDROME_USER`'s account - change that one in Navidrome, then in **Server settings → Connections**.
+  A few tries a minute at most; three wrong current passwords hold the name off for the rest of the minute,
+  as at the sign-in. If Navidrome is set not to let people change their own details (`EnableUserEditing`
+  off - it's on unless someone turned it off), it says so, and an admin can reset it for you in People.
 - **A forgotten password**: in People, **Reset password…** on their row - the new one typed twice. They
   are signed out of deadwax on every device at once, and sign in with the new password; Amperfy and any
-  other app they use need it too. Their library stays. (You can't reset your own there: change it in
-  Navidrome or Amperfy.) A password changed in Navidrome itself signs them out within about six
+  other app they use need it too. Their library stays. (You can't reset your own there - change it in
+  **You → Change password**, which needs the one you have; a forgotten admin password needs another admin's
+  People, or Navidrome itself.) A password changed in Navidrome itself signs them out within about six
   minutes, and **You → Your library** says in red that deadwax can't star albums for them until they
   sign in again; nothing waiting is lost.
 - **Making someone an admin, or no longer one**: **Make admin** / **No longer admin** in People, which
@@ -364,7 +380,8 @@ something else that asks for a password.
 ## What it doesn't do
 
 - **No sign-up page**: accounts are made by an admin, in People or in Navidrome.
-- **No changing your own password** from deadwax: change it in Navidrome or Amperfy, and sign in again.
+- **No resetting a password you've forgotten** yourself: changing your own needs the one you have
+  (**You → Change password**); forgotten, an admin resets it in People.
 - **No choosing a person's Navidrome libraries**: People warns when a new account got none - tick them
   in Navidrome's own Users page.
 - **No per-person storage or quotas**: there's one store, and one copy of each album in it.

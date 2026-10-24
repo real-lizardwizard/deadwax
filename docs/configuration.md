@@ -257,8 +257,10 @@ save that would switch organizing off.
 
 **Staying signed in.** Signing in keeps you signed in on that device for 30 days from when you last
 used deadwax there, through restarts. Every few minutes deadwax asks Navidrome whether the login you
-signed in with still stands, so changing your Navidrome password, or your account being deleted, signs
-you out within about six minutes; Navidrome merely being down signs nobody out. Your deadwax user is
+signed in with still stands, so changing your Navidrome password in Navidrome or Amperfy, or your account
+being deleted, signs you out within about six minutes; Navidrome merely being down signs nobody out.
+(Changed in deadwax with **You → Change password**, the device you changed it on stays signed in and your
+others are signed out at once - [Sharing deadwax](sharing.md#when-something-changes).) Your deadwax user is
 your Navidrome user name, lowercased: renamed in Navidrome, you sign in again under the new name.
 Three wrong passwords for one name within a minute and deadwax stops asking Navidrome about that name
 for the rest of the minute ("Too many tries"), so a mistyped password - or someone guessing - never

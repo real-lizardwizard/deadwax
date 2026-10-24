@@ -23,7 +23,11 @@ A FIXED LIST, as the player's Subsonic calls are: `login`, `list_users`, `get_us
 admin flag is set by sending the record back whole) and `delete_user`. Each builds its method and path from
 the constants below and an id checked against ID_PATTERN; nothing the page sends becomes a path or a
 method. tests/test_people.py holds the list (test_the_native_api_is_a_fixed_list), and that only
-src/routes/people.py and src/auth.py import this module.
+src/routes/people.py, src/routes/own_password.py and src/auth.py import this module.
+
+(2.0.2) Changing your OWN password (src/routes/own_password.py, You > Change password) asks through the same three of
+the six - `login` as yourself with your current password (key None: nothing is held), `get_user` of your own record,
+`save_user` of it whole with `password` and `currentPassword` - adding no operation.
 
 THE LOGIN BUDGET IS SHARED. Navidrome limits `/auth/login` to 5 requests per 20 s per client address,
 successful ones too, and every one of deadwax's comes from deadwax's one address - every admin unlocking,
@@ -187,6 +191,16 @@ def forget(key: str) -> None:
     """The unlock held for this session, if any, gone - Lock, the session's end."""
     with _lock:
         _unlocked.pop(key, None)
+
+
+def forget_user(user: str) -> int:
+    """(2.0.2) Every unlock held for `user`, in whichever session, gone - they changed their own password, which kills
+    every JWT of theirs in Navidrome anyway. How many there were."""
+    with _lock:
+        keys = [key for key, held in _unlocked.items() if held.user == user]
+        for key in keys:
+            del _unlocked[key]
+    return len(keys)
 
 
 def forget_all() -> None:

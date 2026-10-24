@@ -8,7 +8,7 @@
 import type { GetSettings, GetSettingsAnswer } from '../lib/getSettings'
 import type { Permission } from '../lib/permissions'
 import type { PinKind, PinsAnswer, PinToggleBody } from '../lib/pins'
-import { get, post, put } from './http'
+import { get, newSession, post, put } from './http'
 import type { AddedToLibrary, FindCandidatesRequest, MyLibrary, RemovedFromLibrary } from './types'
 
 export interface Me {
@@ -95,4 +95,27 @@ export function markLibrarySeen(by: { release_mbid?: string; album_ids?: number[
 /** Put away an album the admin deleted ("removed by the admin"). */
 export function dismissRemoved(albumId: number): Promise<{ dismissed: boolean }> {
   return post<{ dismissed: boolean }>('/me/library/dismiss', { album_id: albumId })
+}
+
+/** (2.0.2) What `POST /deadwax/me/password` answers: done, how many of your other devices were signed out, and a
+ *  warning when deadwax couldn't check the new password works. */
+export interface PasswordChanged {
+  changed: boolean
+  signed_out: number
+  warning: string | null
+}
+
+/**
+ * Change your own Navidrome password (2.0.2, src/routes/own_password.py) - as you, in Navidrome: the current one, the
+ * new one twice. This device stays signed in; every other device of yours signs in again. A refusal is an ApiError
+ * in the server's words.
+ *
+ * (review 3) Done, this device's session has a NEW id - the answer sets its cookie, so a copy of the old one is
+ * signed out too - and the page's requests go out under a new session (api/http.ts newSession): one sent with the
+ * old cookie just before the answer came, and refused for it, is no sign that this device was signed out.
+ */
+export async function changePassword(body: { current: string; password: string; password_again: string }): Promise<PasswordChanged> {
+  const answer = await post<PasswordChanged>('/me/password', body)
+  newSession()
+  return answer
 }

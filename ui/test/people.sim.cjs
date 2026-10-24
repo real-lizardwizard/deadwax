@@ -78,10 +78,10 @@ check('Navidrome giving a non-admin no library is said; an admin\'s never', [L.l
   ["Navidrome gives them no library - they'll see nothing. Tick one for them in Navidrome's Users page.", null, null])
 check('its actions, from the server\'s can', L.actions(person()).map((action) => [action.kind, action.label, action.refused]),
   [['reset', 'Reset password…', null], ['admin', 'Make admin', null], ['remove', 'Remove…', null]])
-const you = person({ you: true, admin: true, can: { reset: "That's you - change your own password in Navidrome or Amperfy.", remove: "deadwax doesn't remove the account you're signed in with.",
+const you = person({ you: true, admin: true, can: { reset: "That's you - change your own password in You → Change password.", remove: "deadwax doesn't remove the account you're signed in with.",
   admin: "You can't take away your own admin role.", permissions: "That's you - an admin has every permission." } })
 check('...refused ones with their reasons, in words - never a bare greyed button', [L.actions(you).map((action) => action.label), L.refusals(you)],
-  [['Reset password…', 'No longer admin', 'Remove…'], ["That's you - change your own password in Navidrome or Amperfy.", "You can't take away your own admin role.", "deadwax doesn't remove the account you're signed in with."]])
+  [['Reset password…', 'No longer admin', 'Remove…'], ["That's you - change your own password in You → Change password.", "You can't take away your own admin role.", "deadwax doesn't remove the account you're signed in with."]])
 const shared = person({ can: { reset: 'S', remove: 'S', admin: 'S', permissions: 'S' } })
 check('...one reason said once, however many actions share it', L.refusals(shared), ['S'])
 check('Make admin says what it gives, in Navidrome and Amperfy too', [L.makeAdminWords('maya').question, L.makeAdminWords('maya').body.includes('every library'),

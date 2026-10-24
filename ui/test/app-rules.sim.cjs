@@ -2740,6 +2740,20 @@ console.log('\nPeople and permissions (2.0.0-player.61)')
     [['app/App.tsx', 'app/You.tsx', 'app/access.ts', 'app/signInGate.tsx'], true])
 }
 
+console.log('\nChange password (2.0.2)')
+{
+  const OWN_FILES = ['app/ChangePassword.tsx', 'lib/ownPassword.ts']
+  check('its files reach no playback action, nor a context',
+    OWN_FILES.map((file) => [actionsIn(code(read(file))), /useContext|PlayerContext|ActionsContext|usePlayer/.test(code(read(file)))]),
+    OWN_FILES.map(() => [[], false]))
+  const own = code(read('app/ChangePassword.tsx'))
+  check('...every password field dropped once a change is done, and no confirm()',
+    [/\(answer\) => \{[\s\S]{0,120}?setForm\(EMPTY_FORM\)/.test(own), /confirm\(/.test(own)], [true, false])
+  const you = code(read('app/You.tsx'))
+  check('You draws it only for a Navidrome sign-in (lib/ownPassword.ts changeOffered), before Sign out',
+    /\{who && changeOffered\(who\) && <ChangePassword user=\{who\.user\} \/>\}[\s\S]{0,200}?<SignOutRow/.test(you), true)
+}
+
 console.log('\nNormalization (2.0.0-player.62): every queued song through queued(), in the tap; the rule pure')
 {
   //? every playTracks, playNext and playLast call in the files allowed to reach them: its songs passed through

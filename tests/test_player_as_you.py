@@ -743,6 +743,95 @@ def test_the_users_login_goes_on_last_and_an_ended_session_asks_nothing(player):
     assert player.fake.by() == []
 
 
+def test_a_refusal_of_a_login_since_resealed_fails_the_call_and_never_signs_out(player):
+    """(2.0.2) A player call made with the login read before its person changed their own password from deadwax, and
+    refused after it (error 40): the session has been re-sealed with the new password (auth.own_password_changed), so
+    the call fails as itself - never a SignedOut, whose 401 would bring the sign-in screen up - and the session stands;
+    and while the change is under way (auth.changing_password) the same."""
+    client, key = ethans_client(player)
+    player.fake.passwords["ethan"] = "changed-from-deadwax"
+    with auth.changing_password(key, "ethan"):
+        with pytest.raises(navidrome_endpoint.NavidromeError) as during:
+            run(client.call("ping"))
+    assert not isinstance(during.value, navidrome_endpoint.SignedOut) and during.value.code == 40
+    assert auth.session_ended(key) is None
+    resealed = auth.seal_credential("ethan", auth.subsonic_token("changed-from-deadwax", "salt"), "salt")
+    with auth._lock:
+        auth._held[key].credential = resealed
+    with pytest.raises(navidrome_endpoint.NavidromeError) as after:
+        run(client.call("ping"))
+    assert not isinstance(after.value, navidrome_endpoint.SignedOut)
+    assert auth.session_ended(key) is None and player.store.session(key) is not None
+    #? an old login with nothing newer behind it is still the sign-out it always was
+    with auth._lock:
+        auth._held[key].credential = client.login.sealed
+    with pytest.raises(navidrome_endpoint.SignedOut):
+        run(client.call("ping"))
+    assert auth.session_ended(key) == auth.LOGIN_GONE
+
+
+def _twenty_pins(env, user: str = "ethan") -> None:
+    pins = [{"kind": "album", "ref": f"release:{uuid.uuid4()}", "label": f"Album {n}", "sub": "X",
+             "navidrome_id": f"nd-{n}", "cover": None} for n in range(20)]
+    assert run(env.store.write_pins(user, pins))
+
+
+def test_a_burst_with_the_old_login_while_the_change_runs_is_one_refused_login(player):
+    """(2.0.2 review) ethan changes his password from this session, Navidrome has taken it, and Home's pins are resolved
+    with the OLD login before the re-seal: the session stands - but the refusal never confirms the dead login, so one
+    call asks and the other nineteen fail without asking (twenty failed logins would trip Navidrome's 5-in-20-s block
+    on the name, and the change's proof with the new password would be refused)."""
+    ethan = signed_in(player, "ethan")
+    _twenty_pins(player)
+    slow(player)
+    player.fake.passwords["ethan"] = "changed-from-deadwax"
+    player.fake.forget()
+    with auth.changing_password(auth.id_hash(ethan.cookies[auth.COOKIE]), "ethan"):
+        answer = ethan.get("/deadwax/me/pins")
+    assert answer.status_code != 401
+    assert len([call for call in player.fake.by() if call[0] == "ethan"]) == 1
+    assert ethan.get("/deadwax/me").json()["user"] == "ethan"
+
+
+def test_concurrent_calls_with_a_superseded_login_ask_navidrome_once(player):
+    client, key = ethans_client(player)
+    navidrome_endpoint.forget_confirmed()                  # the last answer a while ago: the first call goes alone
+    player.fake.passwords["ethan"] = "changed-from-deadwax"
+    player.fake.forget()
+
+    async def eight():
+        with auth.changing_password(key, "ethan"):
+            return await asyncio.gather(*(client.call("ping") for _ in range(8)), return_exceptions=True)
+
+    results = run(eight())
+    assert len(player.fake.by()) == 1
+    assert all(isinstance(r, navidrome_endpoint.NavidromeError) and not isinstance(r, navidrome_endpoint.SignedOut)
+               and r.code == 40 for r in results)
+    assert auth.session_ended(key) is None
+    #? a refused login is never confirmed by its refusal
+    assert key not in navidrome_endpoint._confirmed
+
+
+def test_another_device_while_a_change_runs_ends_at_its_first_refusal_told_why(player):
+    """(2.0.2 review) The guard is the changing SESSION's, never the person's: ethan's desktop, on Home while his phone
+    changes the password, is refused once and signed out - its burst is one failed login, as in 2.0.0 - and (review 2)
+    told it is the change's doing, as the devices own_password_changed ends are. The change never took here, so once
+    it is over the reason noted is LOGIN_GONE again: that login died of something else."""
+    phone, desktop = signed_in(player, "ethan"), signed_in(player, "ethan")
+    _twenty_pins(player)
+    slow(player)
+    player.fake.passwords["ethan"] = "changed-from-deadwax"
+    player.fake.forget()
+    desktop_key = auth.id_hash(desktop.cookies[auth.COOKIE])
+    with auth.changing_password(auth.id_hash(phone.cookies[auth.COOKIE]), "ethan"):
+        answer = desktop.get("/deadwax/me/pins")
+        assert desktop.get("/deadwax/me").json()["detail"] == auth.PASSWORD_CHANGED
+    assert answer.status_code == 401 and answer.json()["detail"] == auth.PASSWORD_CHANGED
+    assert len([call for call in player.fake.by() if call[0] == "ethan"]) == 1
+    assert auth.superseded(player.store, "ethan", desktop_key, "x") is False
+    assert auth.session_ended(desktop_key) == auth.LOGIN_GONE
+
+
 def test_a_login_that_wont_open_asks_navidrome_nothing_and_ends_the_session(player, monkeypatch):
     """Met while the session is still held in memory: the player's first call ends it, so /me says so too
     (review: /me answering 200 while every player call was a 401 had the sign-in screen come and go)."""

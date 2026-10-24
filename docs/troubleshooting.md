@@ -565,9 +565,67 @@ pins and settings are as they were.
 An admin removed your Navidrome account in People. Nothing of yours is left in deadwax to sign in to;
 ask them.
 
+### "Your password was changed from another device - sign in with the new one."
+
+You (or someone signed in as you) changed your password in deadwax's **You → Change password** on another
+device. That device stays signed in, under a new sign-in of its own; every other one is signed out at once -
+and so is any copy of that device's old sign-in - and this message is why. Sign in with the new password -
+Amperfy and any other app you use with Navidrome need it too.
+
+### Change password says "deadwax couldn't give this device a new sign-in"
+
+The password changed, and this device is still signed in with the new one - but deadwax couldn't move it to a
+new sign-in (its database refused the write), so if someone has a copy of this browser's old sign-in, it still
+works. Your other devices are signed out as usual. Sign out here and sign in again with the new password: that
+ends the old sign-in, and any copy of it, for good. If it keeps happening, check that `/config` (where deadwax
+keeps its database) has room and isn't read-only.
+
+### Change password says "Navidrome is set not to let people change their own details"
+
+Navidrome has `EnableUserEditing` turned off (it's on unless someone set `ND_ENABLEUSEREDITING=false`), so it
+refuses to let anyone who isn't one of its admins change their own account, password included. Nothing
+changed. An admin can reset your password for you in People (**Reset password…** on your row), or turn
+`EnableUserEditing` back on in Navidrome's own configuration. Admins can always change their own.
+
+### Change password says "That isn't your current password"
+
+deadwax checks the current password you typed against the login you signed in with, before Navidrome is
+asked anything - so it's the password you used to sign in to deadwax on this device. If you've changed it
+somewhere else since (in Navidrome, Amperfy, or on another device), sign out and in again with the one you
+have now. Three wrong ones in a minute and deadwax holds off ("Too many tries"), as it does at the sign-in;
+and at most five tries a minute in all ("That's a lot of tries in a minute").
+
+### Change password says "Navidrome didn't answer in time, so deadwax can't tell whether your password changed"
+
+Navidrome was asked to change it, and its answer never came (or the connection dropped before it did). deadwax
+then tries the new password once: if Navidrome takes it, the change went through after all and carries on as
+usual - this device stays signed in, your others are signed out - and you don't see this message. You see it
+when the new password didn't work either, or Navidrome couldn't be asked: deadwax changed nothing on its side.
+If the change did take in Navidrome, this device is signed out within about six minutes and you sign in with the
+new password; if it didn't, the old one still works - try again.
+
+### Change password says "Navidrome answered your change in a way deadwax doesn't know"
+
+Navidrome answered the change itself with something deadwax can't read (a Navidrome newer than deadwax knows,
+or an error page from something in front of it), and then couldn't be asked whether the new password works -
+so deadwax can't tell whether it changed, and changed nothing on its side. Try signing in to Navidrome itself
+with the new password. If it works, deadwax signs this device out within about six minutes; sign in with the
+new one. (When the new password does work, deadwax carries on with the change as usual and you never see this;
+when it doesn't, you're told nothing changed.)
+
+### Change password says "Navidrome said it changed your password, but the new one doesn't work"
+
+Navidrome answered that it saved the change, but deadwax's check with the new password was refused - a
+Navidrome newer than deadwax knows may have changed how it takes a password, or Navidrome may be holding the
+account off for a moment after several refused logins. deadwax changed nothing; try signing in to Navidrome
+itself with each password, and change it there if need be.
+
 ### Signed out after changing your Navidrome password
 
-Every few minutes deadwax asks Navidrome whether the login you signed in with still stands. After you
+(Changed in deadwax, under **You → Change password**, the device you changed it on stays signed in and the
+others are signed out at once, saying so - [above](#your-password-was-changed-from-another-device---sign-in-with-the-new-one).
+What follows is a password changed in Navidrome itself, or in Amperfy.) Every few minutes deadwax asks
+Navidrome whether the login you signed in with still stands. After you
 change your Navidrome password - or your account is deleted - that answer is no, and within about six
 minutes deadwax signs you out on every device. The player asks Navidrome as you, so it is often
 sooner: the first thing the app asks of Navidrome with the old login - opening Browse or
@@ -590,7 +648,8 @@ you signed in").
 ### Your library says deadwax can't star albums for you
 
 With logins on, deadwax stars what goes into your library **as you**, with the login you last signed in
-with. After you change your Navidrome password that login stops working, and
+with. After you change your Navidrome password in Navidrome or Amperfy that login stops working (changed in
+deadwax's **You → Change password**, deadwax keeps the new one and this doesn't happen), and
 **You → Your library** says so in red: "deadwax can't star albums for you: Navidrome no longer accepts
 the login you signed in with". Nothing is lost - what you get meanwhile is kept, waiting. Sign out
 (**You → About → Sign out**) and sign in with your new password: deadwax keeps the new login and stars

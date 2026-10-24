@@ -14,7 +14,7 @@ import type { Player } from '../player/usePlayer'
  * Moved here from the player's settings sheet (player/Settings.tsx, deleted in 2.0.0-player.9)
  * word for word: the words, the storage key (usePlayer's deadwax-player-max-rate, per device) and
  * the keyboard handling are all as they were - until 2.0.0-player.10, when Gapless stopped being a
- * switch and the two notes stopped calling it one ("with Gapless on"), and 2.0.2, when both notes were
+ * switch and the two notes stopped calling it one ("with Gapless on"), and 2.0.1, when both notes were
  * written again for the person choosing (what each does for them, and when to pick it).
  */
 export const QUALITIES: { rate: MaxRate; label: string; note: string }[] = [

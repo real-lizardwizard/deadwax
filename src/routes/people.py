@@ -379,7 +379,7 @@ async def unlock(request: Request, body: UnlockBody, user: str = Depends(current
             if e.kind == "login_gone":
                 #? the local check passed, so Navidrome no longer takes the login this session signed in with
                 await asyncio.to_thread(auth.player_refused, login, auth.LOGIN_GONE)
-                raise HTTPException(status_code=401, detail=auth.LOGIN_GONE) from e
+                raise HTTPException(status_code=401, detail=auth.session_ended(login.key) or auth.LOGIN_GONE) from e
             raise await _refusal(e, request, user, login) from e
         auth.throttle.succeeded(user)
     if not held.admin:

@@ -20,6 +20,10 @@ What it holds to, as Navidrome does:
     an admin gives it every library; a new non-admin gets the `default_new_users` libraries; a DELETE records
     the cascade (stars, playlists, plays...). 403 {"error": "...Permission denied"}, 404 {"error": "user(id:X)
     not found"}, 400 {"errors": {field: code}}.
+  - (2.0.2) A PUT of your OWN record wants `currentPassword` with a `password` (validatePasswordChange - admins too),
+    400 {"errors": {"currentPassword": "ra.validation.passwordDoesNotMatch"}} when it's wrong; a non-admin's is refused
+    403 with EnableUserEditing off (`enable_user_editing`), and keeps its name and never becomes an admin's; the
+    refreshed JWT of your own password change carries the bumped epoch.
   - Subsonic getUser with token auth (md5(password + salt)): error 40 for a wrong login; and Navidrome's
     Subsonic auth limiter - 5 failed logins per name per address in 20 s, then every login of that name
     refused (correct ones too) until the window passes.
@@ -79,6 +83,9 @@ class FakeNavidromeNative:
         self.refuse_delete = False              # a DELETE answered 500
         self.hide_from_list: set[str] = set()   # accounts the list leaves out (a test forcing the last-admin rule)
         self.answer_login_as: str | None = None  # /auth/login answering for another account
+        #? (2.0.2) Navidrome's EnableUserEditing (conf/configuration.go: true by default) - off, a non-admin may not PUT
+        #? even their own record (persistence/user_repository.go Update: rest.ErrPermissionDenied)
+        self.enable_user_editing = True
         for name, password, admin in (("admin", "admin-navidrome-pw", True), ("james", "james-navidrome-pw", False),
                                       ("ethan", "ethan-navidrome-pw", False), (shared, "shared-pw", False)):
             self.add(name, password, admin)
@@ -269,8 +276,25 @@ class FakeNavidromeNative:
         if request.method == "PUT" and target_id:
             if not (admin or target_id == account["id"]):
                 return answer(403, denied)
+            if not admin and not self.enable_user_editing:
+                return answer(403, denied)
             if not isinstance(body, dict):
                 return answer(422, {"error": "invalid"})
+            if not admin:
+                #? (2.0.2) Update: a non-admin's own record keeps its name and is never an admin's, whatever was sent
+                body = {**body, "isAdmin": False, "userName": account["userName"]}
+            if target_id == account["id"]:
+                #? (2.0.2) validatePasswordChange: anyone changing their OWN password - an admin too - sends the current one
+                errors = {}
+                if not body.get("password") and body.get("currentPassword"):
+                    errors["password"] = "ra.validation.required"
+                if body.get("password"):
+                    if not body.get("currentPassword"):
+                        errors["currentPassword"] = "ra.validation.required"
+                    if body.get("currentPassword") != self.passwords[target_id]:
+                        errors["currentPassword"] = "ra.validation.passwordDoesNotMatch"
+                if errors:
+                    return answer(400, {"errors": errors})
             other = self.by_name(str(body.get("userName", "")))
             if other is not None and other["id"] != target_id:
                 return answer(400, {"errors": {"userName": "ra.validation.unique"}})
@@ -293,6 +317,10 @@ class FakeNavidromeNative:
             if body.get("password") and not self.ignore_password:
                 self.passwords[target_id] = str(body["password"])
                 self.epochs[target_id] += 1
+                if target_id == account["id"]:
+                    #? (2.0.2) the refreshed JWT of your own password change carries the bumped epoch, as Navidrome's
+                    #? does (server/nativeapi/user_password_token_refresh_test.go); every older one is dead
+                    refreshed = {"X-ND-Authorization": self.jwt(self.accounts[target_id], line)}
             return answer(200, dict(record))
         if request.method == "DELETE" and target_id:
             if not admin:

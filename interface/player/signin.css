@@ -1,5 +1,6 @@
 /*
- * The sign-in screen (2.0.0-player.48, ui/src/app/SignIn.tsx) and You's Sign out (app/SignOutRow.tsx).
+ * The sign-in screen (2.0.0-player.48, ui/src/app/SignIn.tsx), You's Sign out (app/SignOutRow.tsx) and - since 2.0.2,
+ * shown only with logins on too - You's Change password (app/ChangePassword.tsx).
  *
  * A stylesheet of its own beside app.css, and held to app.css's rule: TOKENS ONLY. Every value lives in
  * :root here, drawn from theme.css section 10 (--dw-*) and player.css (--pl-*), and the rules read only
@@ -32,6 +33,7 @@
     --app-signin-reason-pad: 10px 12px;
     --app-signin-ring: 2px;
     --app-signout-gap: 12px;                        /* About's list to Sign out */
+    --app-own-password-gap: 12px;                   /* (2.0.2) Change password's row to its form, and to what it said */
 }
 
 /* the page behind holds still while the screen is up */
@@ -156,3 +158,26 @@ html.has-signin { overflow: hidden; }
 .app-signout-row { box-sizing: border-box; width: 100%; text-align: left; }
 .app-signout-row .app-row-label { flex: 1 1 auto; color: var(--dw-danger-text); }
 .app-signout-row:disabled { opacity: var(--app-signin-busy); }
+
+/* (2.0.2) You > About's Change password: a row like Sign out's, its form a card under it - People's fields (app.css:
+   17px, so iOS doesn't zoom), its own primary button - and what it said under that */
+.app-own-password { margin-top: var(--app-signout-gap); }
+.app-own-password-row { box-sizing: border-box; width: 100%; text-align: left; }
+.app-own-password-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--pl-gap-sm);
+    min-width: 0;
+    margin-top: var(--app-own-password-gap);
+    padding: var(--dw-gutter-grouped);
+}
+.app-own-password-form .app-button.is-primary {
+    border-color: var(--dw-primary-border);
+    background: var(--dw-primary-bg);
+    box-shadow: var(--dw-primary-highlight);
+    color: var(--dw-text);
+}
+.app-own-password-form .app-button[aria-disabled='true'] { opacity: var(--app-signin-busy); }
+.app-own-password-said { display: flex; flex-direction: column; gap: var(--pl-gap-xs); min-width: 0; }
+.app-own-password-said:not(:empty) { margin-top: var(--app-own-password-gap); }
+.app-own-password-said .app-footnote { margin: 0; }

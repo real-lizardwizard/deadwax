@@ -22,6 +22,8 @@ import { WindDownChoice } from './WindDownChoice'
 import { managing as managingOf, UNVERIFIED } from '../lib/permissions'
 import { noteAccess, useAccess } from './access'
 import { SignOutRow } from './SignOutRow'
+import { ChangePassword } from './ChangePassword'
+import { changeOffered } from '../lib/ownPassword'
 import { YourLibrary } from './YourLibrary'
 
 type CheckState = { state: 'pending' | 'ok' | 'failed'; text: string; detail?: string }
@@ -81,7 +83,8 @@ function fromNavidrome(status: NavidromeStatus): CheckState {
  *   MusicBrainz ping is a real request to a rate-limited service), and again on "Check again". Each
  *   row is its own live region, read whole ("slskd, Connected"): the three answers land in any
  *   order, and a bare "Connected" says nothing about which service it is.
- * - About: from `GET /deadwax/me` - the version, and logins (on: who, and Sign out). Asked with the pings, and
+ * - About: from `GET /deadwax/me` - the version, and logins (on: who, Change password (2.0.2, ChangePassword.tsx - a
+ *   Navidrome sign-in's, never break-glass's) and Sign out). Asked with the pings, and
  *   again on "Check again": deadwax restarting under Komodo while You first opened must not leave
  *   "unknown" there until the app is killed.
  * - "Albums that need a look" above it (2.0.0-player.25), with how many - the review queue's page,
@@ -95,7 +98,7 @@ function fromNavidrome(status: NavidromeStatus): CheckState {
  *   again" when Navidrome no longer takes your login), and what the admin deleted, to request again or
  *   put away. Nothing with logins off.
  *
- * THE WORDS (2.0.2, James: "I need the descriptions to be more user oriented and not testing oriented"):
+ * THE WORDS (2.0.1, James: "I need the descriptions to be more user oriented and not testing oriented"):
  * every note under a choice says what it does for the person and when they'd pick it - never how it was
  * built or tried. tests/test_settings_words.py and you.sim scan for test-note words; you.sim and settings.sim
  * pin the words themselves.
@@ -371,6 +374,8 @@ export function You({
           </div>
         </dl>
         {whoFailed && <p class="app-footnote app-error">deadwax didn't answer: {whoFailed}</p>}
+        {/* (2.0.2) your own Navidrome password - logins on and a Navidrome sign-in only (never break-glass) */}
+        {who && changeOffered(who) && <ChangePassword user={who.user} />}
         {/* (2.0.0-player.48) only with logins on - off, there is nobody to sign out */}
         {who?.auth === 'on' && <SignOutRow user={who.user} />}
       </section>

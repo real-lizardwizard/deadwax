@@ -169,7 +169,10 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
   ([below](#maximum-quality-hi-res-at-48-khz)) and **Normalization** ([below](#normalization)) under **Playback**;
   **Connections**, whether deadwax can reach MusicBrainz, slskd and Navidrome, checked the first
   time you open You and again with **Check again** (which asks for the version again too); the
-  version, and whether logins are on - with them on, who you're signed in as and **Sign out**, which
+  version, and whether logins are on - with them on, who you're signed in as, **Change password**
+  (signed in with your own Navidrome account: your current password and the new one twice; this device
+  stays signed in and your other devices sign in again - [Sharing deadwax](sharing.md#when-something-changes))
+  and **Sign out**, which
   ends this device's session (and stops what's playing) and goes back to the sign-in screen
   ([Signing in](#signing-in)). For an admin, **Managing deadwax**: **Albums that need a look**,
   with how many, which opens **Needs a look**, then **Library care**, **People** (with logins on),
@@ -2061,8 +2064,8 @@ for you - ask an admin."). A change an admin makes to what you may do is in forc
 deadwax couldn't check your account as you signed in, You says the extra permissions are off until you
 sign in again ([Sharing deadwax](sharing.md#admins-permissions-and-everyone-else)).
 
-If your session ends while you're using the app - you changed your Navidrome password, say, or your
-account was removed, which deadwax notices within about six minutes - the sign-in screen comes back
+If your session ends while you're using the app - you changed your Navidrome password in Navidrome, say
+(or with **You → Change password** on another device), or your account was removed, which deadwax notices within about six minutes - the sign-in screen comes back
 **over** whatever was showing, saying why: as soon as the app next asks deadwax for something, as it
 comes back to the front, or as a song fails to load. Sign in again as the same person and it goes, leaving the app as it
 was underneath. **The music doesn't wait for you, though**: until you've signed in again the player
@@ -2115,9 +2118,11 @@ favourites, the same ones Amperfy (or any Subsonic app) shows as starred - and d
   starred, and why - a few albums named for each reason, then how many more: "Navidrome hasn't got it
   yet", "It has no MusicBrainz release id" (an admin can apply a release to it), "Its folder isn't there
   just now", "Navidrome isn't answering". **If you
-  change your Navidrome password**, the login deadwax kept for you stops working: it says so in red -
-  deadwax can't star albums for you until you sign in again - and what you get meanwhile waits, then is
-  starred once you've signed in with the new password. An album an admin deleted is listed there as
+  change your Navidrome password** in Navidrome or Amperfy, the login deadwax kept for you stops working: it
+  says so in red - deadwax can't star albums for you until you sign in again - and what you get meanwhile
+  waits, then is starred once you've signed in with the new password. (Changed in deadwax, with **You →
+  Change password**, deadwax keeps the new login at once: no red line, and what was waiting is starred
+  within a few seconds.) An album an admin deleted is listed there as
   **Removed by the admin - request it again to have it back**, with **Request it again** (its album
   page, where **Get** is) and **Put away**; getting it again puts it away by itself.
 - **New** marks: Home's **New in your library**, and a **New** badge on an album's tile in the Library,
@@ -2224,7 +2229,10 @@ lists at all (**Not in Navidrome**). With logins off nothing here changes: one a
   the Library is the store, "in your library" means the store, and Add and Remove aren't offered. It is
   there to get you in when your own login won't, and the shared account is the one deadwax was set up
   with.
-- **If your Navidrome password changes** while you're signed in, the player's next request is refused:
+- **If your Navidrome password changes** while you're signed in - in Navidrome or Amperfy; changed in
+  deadwax with **You → Change password**, the device you changed it on stays signed in and your others are
+  signed out at once, saying **Your password was changed from another device - sign in with the new one**
+  ([Sharing deadwax](sharing.md#when-something-changes)) - the player's next request is refused:
   your session ends there and then (as the six-minute check would end it), the sign-in screen comes up
   saying **Navidrome no longer accepts the login you signed in with - if you changed your Navidrome
   password, sign in with the new one**, and nothing more is asked of Navidrome with the old one. Navidrome

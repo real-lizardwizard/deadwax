@@ -1614,3 +1614,196 @@ preview let through, a delete and the settings refused in NEEDS' words; no conso
 (read, not watched); James's own upgrade (`james` becoming ordinary, `admin` signing in for the first time); the
 iPhone (the keyboard over People's fields, Remove's sheet, a password manager offering to save a password typed
 for someone else - the fields say `new-password`); a real page walk of People (the orchestrator's).
+
+### Changing your own password (2.0.2)
+
+James (2026-10-23, just after 2.0.0 shipped): "I would like to be able to change my user password from deadwax". At
+.61 (People) choice 10 was "You can't change your own password from deadwax (use Navidrome or Amperfy); if wanted, it's a
+later step in You for everyone" - this is that step, and the first change on `main` after 2.0.0.
+
+**What Navidrome 0.64.2 allows** (read in its source at work/design57/navidrome/nd-v0.64.2, never watched): Subsonic's
+`changePassword` answers 501 (`server/subsonic/api.go:231`), so it goes through the native API People uses.
+`userRepository.Update` (`persistence/user_repository.go` ~286-314): a non-admin may update only their own record, and
+only with `EnableUserEditing` on (its default, `conf/configuration.go`) - off, `rest.ErrPermissionDenied`, a 403; a
+non-admin's record keeps its name and is never an admin's whatever is sent. `validatePasswordChange` wants
+`currentPassword` (json `currentPassword`, beside `password`) from anyone changing their OWN password, admins too - a
+wrong one is 400 `{"errors": {"currentPassword": "ra.validation.passwordDoesNotMatch"}}`. The password write bumps
+`token_epoch` in the same UPDATE (every JWT of the account dies; the PUT's refreshed JWT carries the new epoch -
+`server/nativeapi/user_password_token_refresh_test.go`), and the Subsonic token deadwax keeps for the person
+(md5(password + salt)) stops working.
+
+**The route** - `POST /deadwax/me/password` (`src/routes/own_password.py`, a user's route: `tests/test_logins.py`
+ROUTES; the same-origin guard as every write; `OwnPasswordBody` declares `current`, `password`, `password_again`, plain
+str, `extra="forbid"`; a 422 answers `own_password.FORM`, never FastAPI's list, which echoes the input - app.py's
+handler, beside People's and the sign-in's). In order, first refusal wins, each in words (`Refused`, People's
+`{detail, kind, fix}`):
+
+1. logins off (`LOGINS_OFF`, 409 `off`), break-glass or no Navidrome login on the request (`BREAK_GLASS`), and
+   `NAVIDROME_USER`'s own account (`SHARED_ACCOUNT`: change it in Navidrome, then in Server settings → Connections, or
+   deadwax loses its way in) - nothing sent;
+2. the form: a current password (`NO_CURRENT`), People's rules for the new one (`src/people.py password_problem`:
+   8-128, no control characters, not the user name, twice the same) and not the one you have (`SAME_PASSWORD`) - 400
+   `form`;
+3. at most `CHANGES_PER_MINUTE` = 5 tries a minute per person (429 `busy`, Retry-After; People's `_count` pattern,
+   its own clock);
+4. under the sign-in throttle's lock for the name: the throttle's wait (`auth.too_many`), then the current password
+   checked against the session's kept login IN THE DATABASE NOW (`store.session(key)` - never the request's
+   `PlayerLogin`, which a change a moment ago from this session would have replaced), in constant time
+   (`auth.password_matches`), a wrong one counted in the throttle (`NOT_YOUR_PASSWORD`, 409) and never sent;
+5. as the person, three of People's six native calls, no new one: `navidrome_admin.login(typed, current, expect=user)`
+   (deadwax's 4-per-20-s gate; key None, so nothing is held; its 401 after the local check passed ends the session,
+   `LOGIN_GONE`, as People's unlock does), `get_user` of their own id (the answer's `userName` must be theirs, else
+   `STALE`), and `save_user` of that record WHOLE plus `password` and `currentPassword`; then one Subsonic getUser with
+   the NEW password (People's `_signs_in_with`): False is `DIDNT_TAKE` (502, nothing changed in deadwax), None (not
+   answered) carries on with `UNCHECKED` as the answer's `warning`. Navidrome's 403 is `EDITING_OFF` for a non-admin
+   ("Navidrome is set not to let people change their own details - an admin can change it in People, or turn on
+   EnableUserEditing in Navidrome"); its currentPassword 400 `WRONG_CURRENT`; not answering `UNREACHABLE`; a shape it
+   doesn't know `UNKNOWN`; the gate's `held_off` as People says it. A PUT SENT and then not answered in a way deadwax
+   can read - `timed_out` (no answer in 30 s, the connection dropped mid-answer: the fake's `dropped`) or save_user's
+   `unknown_shape` (a status or body it doesn't know) - may have landed, so the proof is asked then too (review):
+   True, the change carries on to step 6 as an answered one; otherwise `TIMED_OUT` (504, unknown outcome: nothing
+   re-sealed or ended - if it took, the re-check ends this session within minutes with LOGIN_GONE), and for an
+   unreadable answer `UNKNOWN` when the proof says the new one doesn't work, `UNKNOWN_SAVED` ("...can't tell whether
+   it changed") when it couldn't be asked;
+6. done: `auth.own_password_changed` - every OTHER session of theirs ended in memory first (`PASSWORD_CHANGED`: "Your
+   password was changed from another device - sign in with the new one.", and with each its People unlock), then ONE
+   immediate transaction (`store.own_password_changed`): this session's credential re-sealed with a login made from
+   the new password (`checked_at` now), the others deleted, the new login kept as theirs for starring (alive, what
+   waits asked about at once, as a sign-in's `keep_credential`); then this session's `_Held.credential` in memory - so
+   the player, stars, playlists and the re-check carry on without a sign-in; then (review 3) this session moved under
+   a new id, its cookie set on the answer (`auth.rotate_session`, below). `navidrome_admin.forget_user` drops any
+   People unlock of theirs in any session (the JWTs are dead anyway). The answer `{changed, signed_out, warning}` -
+   `signed_out` the other sessions that were still live (one already run out is deleted but not counted); the log
+   line "ethan changed their Navidrome password (signed out of 1 other device)", never a password, JWT or token. A
+   database failure after Navidrome's 200 is `NOT_KEPT` (500, "sign out and sign in again with the new password").
+
+**The old login never ends the session the change is made from.** Between the PUT and the re-seal, the person's old
+login is refused by Navidrome - and the re-check, or a player call made with the login read before, would have ended
+this very session (LOGIN_GONE) on that refusal. So `auth.changing_password(key, user)` - the SESSION's id hash - is held
+from the GET to the re-seal, and `auth.superseded(store, user, key, sealed)` - True while it is held for that session,
+or when the session's login (in memory, else in its row) is no longer the one refused - is asked before ending
+anything: by the re-check's error 40 (counted unanswered), by `player_refused` (returns False, ends nothing), and by
+`UserClient._refused` (the call fails as itself, never `SignedOut`, whose 401 would bring the sign-in screen up).
+
+**Review: never a burst of failed logins.** As built, the marker was per PERSON and a superseded refusal still
+confirmed the login (`_answered` called `_stood()` after it), so while a change ran the person's other devices kept
+asking with dead logins, and the session's own burst (Home's pins, covers) went out in parallel - twenty failed logins
+where 2.0.0 made one, enough for Navidrome's 5-in-20-s block on the name, which then refuses the change's proof with
+the NEW password (`DIDNT_TAKE` though it took) and every sign-in for 20 s. Now: the marker is the changing session's
+alone, so every other session of the person ends at its first refusal as in 2.0.0 (the change ends them anyway); a
+superseded refusal is never confirmed, and `(key, sealed)` goes into `navidrome_endpoint._dead` (bounded like
+`_confirmed`) - a later call carrying that login, before or after the gate, fails at once as error 40 asking nothing
+while the session still stands on a newer login, and is the sign-out it always was once it doesn't
+(`_dead_already`). **The re-seal clock**: `_session` takes `reseal_mark()` before reading a row, and
+`own_password_changed` notes `(clock, sealed)` in `_resealed` after its transaction - so a row read just before the
+re-seal and installed in memory just after it never puts the old login back for 60 s (the next refusal would have
+signed out the device just told it stays signed in), as `role_mark` guards the role. **The other devices' words**:
+`_note_ended(key, why, keep=True)` - `player_refused`'s and the re-check's error-40 `end_session` - keeps a reason
+already noted, so a call in flight across the change never turns PASSWORD_CHANGED (or People's PASSWORD_RESET) into
+LOGIN_GONE; and a change that waited on the throttle's lock while another device's change ended it answers
+`auth.session_ended(key)` (PASSWORD_CHANGED), never a bare SIGNED_OUT.
+
+**Review 2: a device refused mid-change is the change's doing.** Ending another device at its first refusal left it
+told LOGIN_GONE ("Navidrome no longer accepts the login you signed in with") and out of the count: refused after
+Navidrome took the PUT and before `own_password_changed` (the proof and the transaction, a few hundred ms), its row
+was gone by the time the change counted. Now `changing_password` also holds the change per PERSON
+(`auth._person_changes[user]`: `count`, `refused`, `took`), and `auth._refusal(user, key, why)` - asked by
+`player_refused` and the re-check's error 40 before noting the end - turns LOGIN_GONE into PASSWORD_CHANGED while a
+change of theirs runs, the session's id hash noted in `refused` the first time it ends; `own_password_changed` sets
+`took` and counts those beside the live rows it deleted (never twice: a key already among the deleted rows, or ended
+before, isn't added). The words reach the device at once: `UserClient`'s refusals, this route's and People's unlock's
+`login_gone` 401s answer `auth.session_ended(key) or LOGIN_GONE`. Still never superseded - each other device ends at
+its first refusal, so no burst. A change that never took puts LOGIN_GONE back in `_ended` for those sessions when the
+last change of the person's ends (their logins died of something else); the 401 already answered then said
+PASSWORD_CHANGED - a window of a few hundred ms, and the device signs in again either way. KEY_CHANGED is never
+turned. The route's local check reading the row as the database holds it now (step 4) is pinned by a test since:
+two tabs of one session, the other's change re-sealing it before this one's check, the old password typed - 409
+`not_your_password`, nothing sent, the session standing (with the request's copy, Navidrome would refuse the old
+password and the 401 would sign out a session that stands).
+
+**Review 3: this device under a new session id.** As built, the device the change was made from kept its session id:
+the others ended, but a copy of THIS device's cookie - the reason someone changes a password - kept working, now
+with the new login. Now, after `own_password_changed`'s transaction (and still inside `changing_password`),
+`auth.rotate_session(store, key, user)` moves the session under a new id: `store.rotate_session` is ONE `UPDATE
+sessions SET id_hash = ? WHERE id_hash = ? AND user = ?`, so the row itself moves with everything it carries (the
+re-sealed login, `admin`, `navidrome_id`, `created_at`, `expires_at`, `last_seen`, `checked_at`) and is never both
+ids and never neither; then in memory the `_Held` follows to the new id hash, the old one is noted in `_rotated`
+(old -> new, bounded like `_resealed`, cleared by `forget_sessions`) and ended with PASSWORD_CHANGED - with it any
+People unlock under it (`_note_ended`; `forget_user` drops all of theirs anyway). The route sets the new cookie on
+the answer with the sign-in's own `_set_cookie` (src/routes/auth.py: `deadwax_session`, HttpOnly, SameSite=Strict,
+Path=/, Secure by `cookie_secure`, max-age `COOKIE_MAX_AGE`); the answer's body is unchanged. A failure of the move
+(the database) leaves the session standing under its old id with the new login, never none: the answer is still 200,
+no cookie set, with `NOT_RENEWED` as its `warning` ("deadwax couldn't give this device a new sign-in, so a copy of
+its old one would still work - sign out and in again here to be sure none does.") - joined after `UNCHECKED` when
+both apply; a row gone meanwhile (signed out from another tab) is moved nowhere and no cookie is set. Anything that
+fails before the transaction is kept - Navidrome refusing, the proof, a timeout, the local check, NOT_KEPT -
+rotates nothing. **Requests in flight**: one let in under the old id just before the browser took the new cookie (the
+device's own) may still be refused by Navidrome with the old login; `superseded` answers True for an id in
+`_rotated`, so it fails as itself and never signs out the session it became. And the app: `api/me.ts changePassword`
+calls `newSession()` (api/http.ts) once the answer has come, so a 401 for a request sent with the old cookie and
+answered after that isn't taken for a sign-out (a 401 answered BEFORE the change's answer is handled still brings the
+sign-in up - a window of milliseconds; the page coming back to the front asks /me again, which answers with the new
+cookie). Two tabs of one browser both saving a change at once: the second, sent with the old cookie, is a 401
+PASSWORD_CHANGED - the browser already holds the new cookie, so that tab's next /me (back to the front) carries on.
+
+**The fake** (tests/navidrome_native_fake.py) gained Navidrome's rules for a PUT of your own record: `currentPassword`
+wanted with a `password` and checked, `enable_user_editing` (off: a non-admin's PUT is 403), a non-admin's name and
+flag kept whatever is sent, and the refreshed JWT of your own password change carrying the bumped epoch (an older one
+of the same line refused for its epoch alone) - all four held by tests since the review.
+
+**The app.** You → About: **Change password** (`app/ChangePassword.tsx`) before Sign out, drawn only by
+`lib/ownPassword.ts changeOffered` - logins on and a Navidrome sign-in, never break-glass - on a phone as on a
+desktop (You is both frames'). A row (`aria-expanded`, `aria-controls`); tapped, a card under it: the line, a hidden
+user name for a password manager, Current (`current-password`), New and Again (`new-password`), Show, what's wrong
+while typing (nothing until both new fields have something), Save (aria-disabled until `formReady`), Cancel, the
+server's refusal in an assertive region, and the plain-http note. The fields are read from the elements at Save (a
+password manager's fill fires no input); one request at a time. Done: the form closes, every field dropped, and a
+polite region always in the page says `doneWords(signed_out)` ("Password changed. Signed out of your other 2 devices
+- they sign in again with the new one. You're still signed in here."), the warning if any, and `APPS_LINE` ("Amperfy
+and any other app you use with Navidrome need the new password too."); focus back on the row. A wrong current password
+is emptied and focused; any other refusal keeps the fields. Escape, Cancel and the row close it, emptied. CSS:
+signin.css (linked only with logins on, as the row is), tokens only, People's field classes from app.css. People's
+own-row refusal now points here (`YOUR_PASSWORD`: "That's you - change your own password in You → Change password.").
+
+**Verified**: 3666 Python tests (3664 passed, 2 skipped; tests/test_own_password.py new - 34 - and one in
+tests/test_player_as_you.py: a refusal of a login since re-sealed, or during a change, fails the call and never signs
+out), pyflakes, tsc, every sim (ownpassword.sim.cjs new; you, app-rules and people updated on purpose - People's
+own-row words), the build; the engine files have no diff. 56 mutations each caught (every refusal and its order's
+effects, the local check and the throttle, the rate limit, the whole-record PUT with currentPassword, the proof and its
+warning, the re-seal in memory and the database, the others ended in memory and deleted, the kept login, the expired
+session not counted, the People unlocks, the 422, the stale record, every native failure's words, the marker and
+`superseded` in each of its three callers and both its sources, the marker's release, the fake's two new rules, and
+the page's offer, typing words, readiness, device count, fields dropped and read from the elements, a wrong current
+emptied, the Amperfy line, one send at a time, focus back, Escape, and You's placement) - two were missed at first
+(the stale record and the fields read from the elements) and a test was added for each.
+**Review fixes, verified**: 3679 Python tests (3677 passed, 2 skipped; tests/test_own_password.py now 44, three
+more in tests/test_player_as_you.py: the session's own burst during a change is one refused login, eight concurrent
+calls with a superseded login ask Navidrome once and confirm nothing, another device during a change ends at its
+first refusal); 20 more mutations each caught (work/fixer-ownpw201/mutations.log: the marker per person, a superseded
+refusal confirming, the dead-login check and its record and its sign-out once not superseded, the re-seal override
+and its mark's order, the waited change's words, `keep` in `_note_ended`, `player_refused` and the re-check, the
+proof after a lost or unreadable answer and its two outcomes' words, the kept login's `dead_at`, `next_try` and
+`checked_at`, the fake's forced name and flag and its refreshed epoch, the throttle cleared after a change).
+**Review 2 fixes, verified**: 3683 Python tests (3681 passed, 2 skipped; tests/test_own_password.py now 48: a device
+and the re-check refused mid-change told PASSWORD_CHANGED and counted, LOGIN_GONE back after a change that didn't
+take, the local check against the row as it is now, this route's and People's 401s in the session's words; the
+test_player_as_you test of another device during a change now expects PASSWORD_CHANGED during it and LOGIN_GONE after
+a change that never took); 13 more mutations each caught (work/fixer2-ownpw201/mutations.log: the request's login in
+the local check, the swap, its record, the count, the rewrite after a failed change, `took`, the person's marker, the
+words in UserClient, this route and People, the re-check's and `player_refused`'s noted reason, KEY_CHANGED left
+alone) - one (KEY_CHANGED swapped too) was missed at first and `_refusal` got a unit check.
+**Review 3 fixes, verified**: 3695 Python tests (3693 passed, 2 skipped), pyflakes, tsc, every sim, the build; tests/test_own_password.py now 60 (12 more: the device
+under a new id - its old cookie and a copy of it 401 on /me, the player, pins and the change itself, asking Navidrome
+nothing, and after a restart; the new cookie on /me and a player call made as the new password; the row moved whole,
+role and account id included, held in memory under the new id; the cookie set exactly as a sign-in's, over http and
+behind an https proxy; five failures part way rotating nothing; the move failing standing with the new login and
+saying so; both warnings together; a session signed out meanwhile not brought back; and the in-flight refusal of the
+old id superseded, never after a restart), and ownpassword.sim.cjs's request check (one new session after a change,
+none after a refusal); 20 mutations each caught (work/ownpw-rotate/mutations.log).
+**NOT verified**: a real browser taking the new cookie mid-playback (the audio element's range requests across the
+move), and a real Navidrome 0.64.2 taking `currentPassword`, refusing with EnableUserEditing off, and its
+refreshed JWT (read, not watched); the Subsonic per-name limiter refusing the proof's getUser - each other device now
+costs at most one failed login, so it takes five devices of the person's asking within the change's few hundred
+milliseconds (it would read as `DIDNT_TAKE` though the change took - the re-check then ends this session and the new
+password signs in); the iPhone (the keyboard over the form, a password manager offering
+to save the new password against the right name); a real page walk (the orchestrator's).

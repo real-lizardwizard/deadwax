@@ -326,12 +326,18 @@ _confirmed: "OrderedDict[str, float]" = OrderedDict()
 #? is the loop's it is first waited on in - the server runs one, the tests a new one per run - so one is
 #? made afresh for another loop
 _gates: "OrderedDict[str, tuple[asyncio.AbstractEventLoop, asyncio.Lock]]" = OrderedDict()
+#? (2.0.2 review) (session id hash, sealed login) -> None: an OLD login Navidrome refused while its session stands -
+#? re-sealed by a password change made from it (auth.superseded). A call still carrying it fails at once, as that
+#? refusal did, asking Navidrome nothing: a burst of such calls is one failed login, never Navidrome's block on the
+#? name (which would refuse the change's proof, and then the new password, too). Bounded like _confirmed.
+_dead: "OrderedDict[tuple[str, str], None]" = OrderedDict()
 
 
 def forget_confirmed() -> None:
     """Every login's confirmation forgotten (the tests)."""
     _confirmed.clear()
     _gates.clear()
+    _dead.clear()
 
 
 def _gate(key: str) -> asyncio.Lock:
@@ -388,13 +394,40 @@ class UserClient(NavidromeClient):
         if reason is not None:
             raise SignedOut(reason)
 
-    async def _refused(self, error: NavidromeError) -> None:
+    async def _dead_already(self) -> None:
+        """(2.0.2 review) This call's login is an old one Navidrome has already refused while the session stood: it
+        fails as that one did, with nothing asked - error 40 while the session still stands on a newer login (or the
+        change is still being made from it), the sign-out a refusal always was once it doesn't."""
+        if (self.login.key, self.login.sealed) not in _dead:
+            return
+        from src import auth
+
+        if await asyncio.to_thread(auth.superseded, self.login.store, self.login.user, self.login.key, self.login.sealed):
+            raise NavidromeError("Wrong username or password", code=40)
+        await asyncio.to_thread(auth.player_refused, self.login)
+        raise SignedOut(auth.session_ended(self.login.key) or auth.LOGIN_GONE, code=40)
+
+    async def _refused(self, error: NavidromeError) -> bool:
+        """A refusal of this login ends the session (SignedOut) - or, superseded, True: the call fails as it is."""
         from src import auth
 
         if error.code == 40:
             _confirmed.pop(self.login.key, None)
+            if await asyncio.to_thread(auth.superseded, self.login.store, self.login.user, self.login.key, self.login.sealed):
+                #? (2.0.2) the old login of someone changing their password from this session: this call fails as it is,
+                #? but the session stands, re-sealed with the new one - never a sign-out (any 401 brings the sign-in up).
+                #? (review) Never confirmed by it, either: the login is dead, and the calls carrying it ask nothing more
+                dead = (self.login.key, self.login.sealed)
+                _dead[dead] = None
+                _dead.move_to_end(dead)
+                while len(_dead) > CONFIRMED_KEPT:
+                    _dead.popitem(last=False)
+                return True
             await asyncio.to_thread(auth.player_refused, self.login)
-            raise SignedOut(auth.LOGIN_GONE, code=40) from error
+            #? (2.0.2 review 2) in the words the session was ended with - PASSWORD_CHANGED, refused while a change of
+            #? this person's ran from another device
+            raise SignedOut(auth.session_ended(self.login.key) or auth.LOGIN_GONE, code=40) from error
+        return False
 
     def _fresh(self) -> bool:
         at = _confirmed.get(self.login.key)
@@ -414,18 +447,20 @@ class UserClient(NavidromeClient):
         try:
             answer = await ask()
         except NavidromeError as e:
-            await self._refused(e)
-            self._stood()
+            if not await self._refused(e):
+                self._stood()
             raise
         self._stood()
         return answer
 
     async def _asked(self, ask):
         self._ended()
+        await self._dead_already()
         if not self._fresh():
             async with _gate(self.login.key):
-                #? waited on the call before: it ended the session, or confirmed the login
+                #? waited on the call before: it ended the session, found the login dead, or confirmed it
                 self._ended()
+                await self._dead_already()
                 if not self._fresh():
                     return await self._answered(ask)
         return await self._answered(ask)
