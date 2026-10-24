@@ -700,6 +700,16 @@ class MusicBrainzClient:
                     await asyncio.sleep(6) #? this is just a fallback if the rate limit class is a little zesty 
                     continue
 
+                if status == 404:
+                    #? (2.0.13) nothing at that address - an id MusicBrainz doesn't have (a bad tag, an entity
+                    #? merged away): as deterministic as a 400, so asked once, not ten times through the rate
+                    #? limit; the caller tells it apart by its code (src/routes/describe.py keeps it as "none")
+                    logger.info(f"MusicBrainz has nothing at {endpoint}")
+                    ping_error_obj["error"] = "MusicBrainz has nothing at that address"
+                    ping_error_obj["status"] = "failed"
+                    ping_error_obj["code"] = 404  # type: ignore
+                    break
+
                 if status == 400:
                     #? A rejected QUERY, not an outage - deterministic, so retrying it ten
                     #? times just spends thirty seconds arriving at the same answer and then
@@ -739,6 +749,9 @@ class MusicBrainzClient:
             #? _refresh_saved says it, quietly: the saved answer stands, and nobody was waiting
             return ping_error_obj
 
+        if ping_error_obj.get("code") == 404:
+            #? MusicBrainz answered - with nothing there; no outage to tell anyone of
+            return ping_error_obj
         logger.error("exceeded maximum retries for MusicBrainz request without getting valid response")
         logger.error("failed to get valid response from MusicBrainz after retries", extra=loud)
         return ping_error_obj
@@ -821,6 +834,16 @@ class MusicBrainzClient:
         """
         return await self.request_with_retries(
             f"artist/{artist_mbid}", {"inc": self.ARTIST_INC, "fmt": "json"}
+        )
+
+    async def get_release_group_urls(self, release_group_mbid: str) -> dict:
+        """
+        One release group with its url relations and nothing else (2.0.13) - its `wikidata` link (or a
+        `wikipedia` one), which is how an album's description is found (src/descriptions.py). The least that
+        answers: no releases, no tags; a lookup, so kept on disk for a month like the others.
+        """
+        return await self.request_with_retries(
+            f"release-group/{release_group_mbid}", {"inc": "url-rels", "fmt": "json"}
         )
 
     async def _browse(self, endpoint: str, params: dict, items: str, count: str, stop_at: int | None = None,

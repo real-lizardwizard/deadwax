@@ -5455,6 +5455,124 @@ html.app-picker-open { overflow: hidden; }
 .app-queue-no-edit { color: var(--dw-text-2); }
 
 
+/* ===== (2.0.13) a short description: the artist's under their Play row, an album's under its hero ===== */
+
+/* app/Description.tsx: Navidrome's words (or Wikipedia's), clamped to three lines with More / Less, and where they
+   came from under them; on an album's, Wikidata's one-line subtitle heads them (an artist's is in the hero,
+   .app-artist-subtitle). Prose, in the body face (2.0.9: never mono). On the artist page it sits in the body's own
+   column (its gap and edges); on an album page, and the album you don't have, at the page's edges as the songs are.
+   At the foot - one that came after what is under its top place was drawn (lib/describe.ts) - it keeps clear of
+   the songs' footer line and the page's links. */
+:root {
+    --app-about-lines: 3;            /* clamped to this many lines until More */
+    --app-about-measure: 68ch;       /* never wider than a comfortable line, whatever the frame */
+    --app-about-top: 18px;           /* an album page's: under the hero (or the line under it) */
+    --app-about-foot-top: 6px;       /* at the foot: under the songs' line, above Properties */
+    --app-about-gap: 2px;            /* the words to the line under them */
+    --app-about-links-gap: 16px;     /* More to "From Wikipedia" */
+}
+
+.app-about {
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-about-gap);
+    min-width: 0;
+}
+
+.pl-album-page > .app-about {
+    padding: var(--app-about-top) var(--pl-edge-right) 0 var(--pl-edge-left);
+}
+
+.pl-album-page > .app-about.is-foot { padding-top: var(--app-about-foot-top); }
+
+/* Wikidata's one line: "1994 studio album by Portishead" - small, in the body face, above the paragraph */
+.app-about-subtitle {
+    max-width: var(--app-about-measure);
+    margin: 0;
+    color: var(--dw-text-2);
+    font-family: var(--dw-font);
+    font-size: var(--dw-text-footnote);
+    font-weight: var(--dw-weight-medium);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
+/* ...an artist's, under their name in the hero, over its picture as the facts line is. ONE line, ellipsized (after
+   review): the hero is 240px at the least, not at the most - a two-line name under an iPhone's status bar outgrows it -
+   so the line it lands in is kept from the first frame (below), and a description wrapping to two would outgrow that */
+.app-artist-subtitle {
+    margin: var(--app-line-gap) 0 0;
+    overflow: hidden;
+    color: var(--dw-text-on-secondary);
+    font-family: var(--dw-font);
+    font-size: var(--dw-text-footnote);
+    font-weight: var(--dw-weight-medium);
+    line-height: var(--dw-leading-note);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* ...and its line kept, above the name, until it comes: the names block as tall before the subtitle lands as after, so
+   a hero that outgrew 240px doesn't grow again, moving Play and Shuffle under a finger; where the hero has room the
+   kept line is room it already had, the names at its foot either way */
+.app-artist-names:not(:has(.app-artist-subtitle))::before {
+    content: '';
+    display: block;
+    height: calc(var(--app-line-gap) + var(--dw-text-footnote) * var(--dw-leading-note));
+}
+
+.app-about-text {
+    max-width: var(--app-about-measure);
+    margin: 0;
+    color: var(--dw-text-2);
+    font-family: var(--dw-font);
+    font-size: var(--dw-text-heading);
+    font-weight: var(--dw-weight-regular);
+    line-height: var(--dw-leading-body);
+    overflow-wrap: anywhere;
+}
+
+.app-about-text.is-clamped {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: var(--app-about-lines);
+    line-clamp: var(--app-about-lines);
+}
+
+/* More and the source, on one line a finger tall - each a finger's reach, the words where they sit */
+.app-about-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 var(--app-about-links-gap);
+    min-height: var(--pl-hit);
+}
+
+.app-about-more {
+    min-height: var(--pl-hit);
+    padding: 0;
+    font-size: var(--dw-text-footnote);
+    font-weight: var(--dw-weight-medium);
+}
+
+.app-about-source {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--pl-hit);
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    text-decoration: underline;
+    text-decoration-color: var(--dw-border);
+    text-underline-offset: var(--app-ring);
+}
+
+.app-about-source:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+    border-radius: var(--dw-radius-control);
+}
+
 /* ===== looking after deadwax from a phone (2.0.0-player.47) =====
    The phone gets every managing page the desktop has: the Edit panel as a sheet over the whole screen
    (app/EditPanel.tsx - the main page's editors hosted in it as they are, styled here by their own ids

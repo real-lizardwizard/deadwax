@@ -21,10 +21,10 @@ tracklist as a table, with a **Compared with the usual** column whenever any pre
 [the app on a desktop](player.md#on-a-desktop).
 
 An artist's name opens [their page](player.md#artist-pages): their albums as MusicBrainz lists them,
-every one, oldest first, with what you have marked and a **Get** on the rest - **Studio only** narrows
+every one, newest first, with what you have marked and a **Get** on the rest - **Studio only** narrows
 it to their studio albums and EPs.
 
-![Dance Gavin Dance's page: their albums from MusicBrainz, oldest first](../assets/images/discography.png)
+![Dance Gavin Dance's page: their albums from MusicBrainz](../assets/images/discography.png)
 
 ## The box
 
@@ -340,7 +340,8 @@ what you already have of that pressing, if anything ("Already in your library", 
 downloading", "You have 9 of 10 tracks of this pressing…", "You also have another pressing…" - or,
 with logins on, "The collection also has another pressing…" for one that isn't yours -
 asked of deadwax without searching Soulseek, for the pressing chosen, and again as you come back to
-the page); and then **that pressing's tracklist**.
+the page); then a **short description** of the album, from Wikipedia, and Wikidata's one line over it ("1994 studio album
+by Portishead"), when they have one ([descriptions](player.md#descriptions)); and then **that pressing's tracklist**.
 
 ![Dummy, an album you don't have, on its 2017 vinyl: the Pressing list open, each pressing saying what it changes about the tracklist twelve of its twenty share](../assets/images/search.png)
 

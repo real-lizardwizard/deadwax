@@ -457,6 +457,20 @@ CREATE TABLE IF NOT EXISTS play_queue (
     label       TEXT NOT NULL,
     saved_at    TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS descriptions (
+    -- (2.0.13) The short descriptions of artists and albums, as Wikipedia and Wikidata gave them
+    -- (src/descriptions.py), kept so a page visited again asks Wikidata and Wikipedia nothing. Shared by
+    -- everyone, like MusicBrainz's saved answers: a Wikipedia lead is nobody's own. Keyed 'artist:<mbid>' or
+    -- 'album:<release group mbid>'. `text` and `url` are Wikipedia's words and page, `subtitle` Wikidata's
+    -- one-line English description; all NULL is a kept "there is none": it stands NONE_FRESH_SECONDS, a found
+    -- one FOUND_FRESH_SECONDS. A failure to ask is never kept.
+    key         TEXT PRIMARY KEY,
+    text        TEXT,
+    url         TEXT,
+    subtitle    TEXT,
+    fetched_at  REAL NOT NULL
+);
 """
 
 #? (2.0.0-player.51) the states a library entry is held in - waiting or starred - beside `removed`
@@ -3369,6 +3383,50 @@ class JobStore:
             return await asyncio.to_thread(write)
         except Exception as e:
             logger.error(f"failed to keep a song's loudness: {e}")
+            return False
+
+
+    # ===== descriptions (2.0.13) =============================================
+    #
+    # Wikipedia's words and Wikidata's subtitle for an artist or an album (src/routes/describe.py). A failure here
+    # costs a description kept for next time, never the page: the route asks Wikipedia instead, and keeps nothing.
+
+    async def description_get(self, key: str) -> dict | None:
+        """The description kept under `key` - {text, url, subtitle, fetched_at}, all but fetched_at None for a
+        kept "none" - or None when none is kept (or it can't be read)."""
+        if not self.available:
+            return None
+
+        def read():
+            with self._connect() as connection:
+                row = connection.execute("SELECT text, url, subtitle, fetched_at FROM descriptions WHERE key = ?",
+                                         (key,)).fetchone()
+            return dict(row) if row else None
+
+        try:
+            return await asyncio.to_thread(read)
+        except Exception as e:
+            logger.error(f"failed to read a kept description: {e}")
+            return None
+
+    async def description_put(self, key: str, text: str | None, url: str | None, fetched_at: float,
+                              subtitle: str | None = None) -> bool:
+        """A description kept (replacing what was kept under `key`); `text` and `subtitle` None keeps "there is
+        none"."""
+        if not self.available:
+            return False
+
+        def write():
+            with self._connect() as connection:
+                connection.execute(
+                    "INSERT OR REPLACE INTO descriptions (key, text, url, subtitle, fetched_at) VALUES (?, ?, ?, ?, ?)",
+                    (key, text, url, subtitle, fetched_at))
+            return True
+
+        try:
+            return await asyncio.to_thread(write)
+        except Exception as e:
+            logger.error(f"failed to keep a description: {e}")
             return False
 
 

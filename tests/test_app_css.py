@@ -2095,3 +2095,56 @@ def test_the_librarys_root_rows_are_yous_managing_rows():
     assert declarations(APP, ".app-library-row .app-row-label")["flex"] == "1"
     #? .58's wrapper and its rules went with the scope chips, on purpose
     assert declarations(APP, ".app-library-playlists") == {} and declarations(APP, ".app-library-playlists .app-row") == {}
+
+
+def test_a_description_is_prose_clamped_to_three_lines_its_links_a_finger_tall():
+    """(2.0.13) The artist's and the album's description: in the body face at the heading size, never mono; clamped to
+    --app-about-lines (3) until More, the clamp only while `is-clamped`; never wider than a comfortable measure; More and
+    its source on one line a finger tall, each a finger's reach, the source's ring drawn outside it; an album page's at
+    the page's edges, as its songs are."""
+    text = declarations(APP, ".app-about-text")
+    assert (text["font-family"], text["font-size"], text["line-height"], text["max-width"]) == (
+        "var(--dw-font)", "var(--dw-text-heading)", "var(--dw-leading-body)", "var(--app-about-measure)")
+    assert "mono" not in " ".join(text.values())
+    clamped = declarations(APP, ".app-about-text.is-clamped")
+    assert (clamped["display"], clamped["overflow"], clamped["-webkit-box-orient"], clamped["-webkit-line-clamp"]) == (
+        "-webkit-box", "hidden", "vertical", "var(--app-about-lines)")
+    assert ALL_TOKENS["--app-about-lines"] == "3"
+    for selector in (".app-about-foot", ".app-about-more", ".app-about-source"):
+        assert declarations(APP, selector)["min-height"] == "var(--pl-hit)", selector
+    assert px("--pl-hit") >= 44
+    assert declarations(APP, ".app-about-source:focus-visible")["outline-offset"] == "var(--app-ring)"
+    assert declarations(APP, ".pl-album-page > .app-about")["padding"] == "var(--app-about-top) var(--pl-edge-right) 0 var(--pl-edge-left)"
+    #? ...and the block draws those classes, its words its own direction
+    ui = Path(__file__).resolve().parent.parent / "ui" / "src"
+    block = (ui / "app" / "Description.tsx").read_text()
+    assert "class={`app-about-text${open ? '' : ' is-clamped'}`} dir=\"auto\"" in block
+    assert 'class="app-text-button app-about-more"' in block and 'class="app-about-source"' in block
+
+
+def test_a_subtitle_is_one_small_line_of_prose():
+    """(2.0.13) Wikidata's one line - an album's heading its description's block, an artist's under their name in the
+    hero, over its picture as the facts line is: the body face, the footnote size, never mono; its own direction."""
+    for selector in (".app-about-subtitle", ".app-artist-subtitle"):
+        line = declarations(APP, selector)
+        assert (line["font-family"], line["font-size"], line["line-height"]) == (
+            "var(--dw-font)", "var(--dw-text-footnote)", "var(--dw-leading-note)"), selector
+        assert "mono" not in " ".join(line.values()), selector
+    assert declarations(APP, ".app-artist-subtitle")["color"] == declarations(APP, ".app-artist-facts")["color"]
+    ui = Path(__file__).resolve().parent.parent / "ui" / "src"
+    assert '<p class="app-about-subtitle" dir="auto">' in (ui / "app" / "Description.tsx").read_text()
+    assert '<p class="app-artist-subtitle" dir="auto">' in (ui / "app" / "ArtistPage.tsx").read_text()
+
+
+def test_an_artists_subtitle_lands_in_a_line_kept_for_it():
+    """(2.0.13, after review) The hero is 240px at the LEAST - a two-line name under an iPhone home-screen app's status
+    bar (safe-area-inset-top, about 59px) outgrows it - so an artist's subtitle, landing after Play and Shuffle are
+    drawn, would grow it and move them. Its line is kept above the name until it comes - as tall as the subtitle with
+    its gap - and the subtitle is one line, ellipsized, so it never needs more than the line kept for it."""
+    line = declarations(APP, ".app-artist-subtitle")
+    assert (line["white-space"], line["overflow"], line["text-overflow"]) == ("nowrap", "hidden", "ellipsis")
+    assert "overflow-wrap" not in line
+    assert declarations(APP, ".app-artist-hero")["min-height"] == "var(--app-artist-hero)"
+    kept = declarations(APP, ".app-artist-names:not(:has(.app-artist-subtitle))::before")
+    assert (kept["content"], kept["display"]) == ("''", "block")
+    assert kept["height"] == "calc({} + {} * {})".format(line["margin"].split()[0], line["font-size"], line["line-height"])

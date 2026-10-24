@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, RedirectResponse, Response
 from starlette.middleware.gzip import GZipMiddleware
 
 from src.routes import search_musicbrainz, interface_logs, monitor_slskd, download, library, settings, navidrome, me, pins, store_album
-from src.routes import auth as auth_routes, held, my_library, own_password, people
+from src.routes import auth as auth_routes, describe, held, my_library, own_password, people
 from src import auth, permissions, player_cache, stars
 from src.api import navidrome_admin
 from src.musicbrainz_cache import saved_answers
@@ -24,6 +24,7 @@ from src.store_index import seed_from_saved_scan
 from src.api.musicbrainz_endpoint import MusicBrainzClient
 from src.api.slskd_endpoint import SlskdClient
 from src.api.lrclib_endpoint import lrclib
+from src.api.wikipedia_endpoint import wikipedia
 from src.api.same_origin import SameOriginWrites
 from src.api.navidrome_endpoint import SignedOut, navidrome as navidrome_client
 from src.config import Config
@@ -176,6 +177,7 @@ async def lifespan(app: FastAPI):
     await library.coverart_client.close_client()
     await library.artist_images_client.close_client()
     await lrclib.close_client()
+    await wikipedia.close_client()
     await navidrome_client.close_client()
     await auth.login_client.close_client()
     await navidrome_admin.close_client()
@@ -446,6 +448,8 @@ def start() -> FastAPI:
     app.include_router(people.router, prefix="/deadwax/people", tags=["people"], dependencies=[Depends(require("people"))])
     #? the id bridge (2.0.0-player.17): one album across the store index, MusicBrainz and Navidrome
     app.include_router(store_album.router, prefix="/deadwax/store", tags=["store"], dependencies=signed_in)
+    #? (2.0.13) the short descriptions on the artist and album pages - a user's, like the id bridge
+    app.include_router(describe.router, prefix="/deadwax/describe", tags=["describe"], dependencies=signed_in)
     #? signing in and out (2.0.0-player.48) - with no session, of course: see routes/auth.py
     app.include_router(auth_routes.router, prefix="/deadwax/auth", tags=["auth"])
 

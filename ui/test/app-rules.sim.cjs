@@ -563,13 +563,14 @@ console.log('\na link out of the app opens beside it')
   //? (2.0.0-player.47: the four phone notes went - Needs a look, Library care, the settings and the log are
   //? drawn on a phone - and so did the gate's link to the main page's settings tab: "Set up Navidrome" opens
   //? the app's own Settings at Connections)
-  check('...and there are links to look at (Info > Debug\'s test bench, an artist\'s About, People\'s Sharing link, an album\'s Properties, the album you don\'t have)',
+  check('...and there are links to look at (Info > Debug\'s test bench, an artist\'s About, a description\'s source, People\'s Sharing link, an album\'s Properties, the album you don\'t have)',
     //? (2.0.0-player.42: the Edit panel's went - "Choose the folder" took its place - and Library care's
     //? phone note came; 2.0.0-player.44: an album page's Properties, its release on musicbrainz.org;
     //? 2.0.0-player.50: the album you don't have, its group and its pressing on musicbrainz.org;
     //? 2.0.0-player.61: People's link to Sharing deadwax, where it says why it needs logins on;
-    //? 2.0.0-player.66: You's, the sidebar's and the server settings' line's links to the main page went with it)
-    [...new Set(out.map(([file]) => file))].sort(), ['app/AlbumProperties.tsx', 'app/ArtistPage.tsx', 'app/InfoSheet.tsx', 'app/People.tsx', 'app/ReleaseGroupPage.tsx'])
+    //? 2.0.0-player.66: You's, the sidebar's and the server settings' line's links to the main page went with it;
+    //? 2.0.13: a description's source, "From Wikipedia" / "More on Last.fm")
+    [...new Set(out.map(([file]) => file))].sort(), ['app/AlbumProperties.tsx', 'app/ArtistPage.tsx', 'app/Description.tsx', 'app/InfoSheet.tsx', 'app/People.tsx', 'app/ReleaseGroupPage.tsx'])
 }
 
 console.log('\nNow Playing covers everything behind it')
@@ -1357,7 +1358,7 @@ console.log('\nArtists and the id bridge: Play from the tap with every album in 
 
   const album = code(read('player/AlbumPage.tsx'))
   check('the album page\'s store answer, Search\'s held row and Info\'s details: each through a latestOnly() of its own',
-    [/const storeRequests = useMemo\(latestOnly, \[\]\)/.test(album), /storeAlbum\(\{ navidrome_id: id \}, request\.signal\)\.then\(\s*\(answer\) => \{\s*if \(request\.current\(\)\) setStore/.test(album),
+    [/const storeRequests = useMemo\(latestOnly, \[\]\)/.test(album), /storeAlbum\(\{ navidrome_id: id \}, request\.signal\)\.then\(\s*\(answer\) => \{\s*if \(!request\.current\(\)\) return\s*setStore\(answer\)/.test(album),
       /const request = heldRequests\.begin\(\)/.test(code(read('app/Search.tsx'))), /const request = requests\.begin\(\)/.test(code(read('app/useInfoDetails.ts')))],
     [true, true, true, true])
   check('...a held row\'s look called off with the chip\'s, when the box changes or the root stops showing',

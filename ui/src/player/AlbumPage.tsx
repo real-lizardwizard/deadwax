@@ -31,6 +31,9 @@ import type { Player } from './usePlayer'
 import { accessNow, seesDetail, useAccess } from '../app/access'
 import { errorNote } from '../app/ErrorNote'
 import { heroTitleClass } from '../lib/titles'
+import { DESCRIPTION_WAIT_MS, inBlock } from '../lib/describe'
+import { DescriptionBlock } from '../app/Description'
+import { useDescription } from '../app/useDescription'
 
 /**
  * One album: its cover, Play and Shuffle, and its songs.
@@ -105,6 +108,11 @@ import { heroTitleClass } from '../lib/titles'
  * its place (review). With logins off, and for the break-glass admin, the badge reads "In your library" as
  * it always did and nothing is offered.
  *
+ * Since 2.0.13 the album's DESCRIPTION (app/useDescription.ts, app/Description.tsx) - Wikidata's one-line subtitle
+ * and Navidrome's or Wikipedia's paragraph - asked once the bridge has answered for this album (on a page come back
+ * to, the answer it had is drawn from its first frame): under the hero when it is in hand as the songs are drawn -
+ * they wait for it DESCRIPTION_WAIT_MS at most - else at the foot, above Properties (lib/describe.ts placeOf).
+ *
  * Since 2.0.0-player.57 (Up Next, shuffle and repeat) every song's row ends with a ••• and the bar has one for
  * the whole album, between the phone's Edit and the pin - each opening the song menu (App's QueueMenu: Play
  * Next, Play Last) through `onQueueMenu`, with the songs in hand: the album's ••• is aria-disabled until they
@@ -163,6 +171,8 @@ export function AlbumPage({
   const access = useAccess()
   //? the bridge failed to answer - so, answered or not, whether the album can be pinned is known
   const [storeFailed, setStoreFailed] = useState(false)
+  //? (2.0.13) which album the bridge last answered (or failed) for - the description is asked by THIS album's ids
+  const [storeFor, setStoreFor] = useState<string | null>(null)
   const storeRequests = useMemo(latestOnly, [])
   const { pins, known: pinsKnown, canSave } = usePins(true)
   //? the cover, full size (2.0.0-player.44), and the control that opened it - focus goes back there
@@ -212,11 +222,15 @@ export function AlbumPage({
     setMineRefused(null)
     storeAlbum({ navidrome_id: id }, request.signal).then(
       (answer) => {
-        if (request.current()) setStore(answer)
+        if (!request.current()) return
+        setStore(answer)
+        setStoreFor(id)
       },
       (reason: unknown) => {
+        if (!request.current() || isAbort(reason)) return
+        setStoreFor(id)
         //? a check that can't be made draws no chip - and no pin, with no release to pin it by
-        if (request.current() && !isAbort(reason) && !again) setStoreFailed(true)
+        if (!again) setStoreFailed(true)
       },
     )
     return () => storeRequests.supersede()
@@ -228,6 +242,25 @@ export function AlbumPage({
   useEffect(() => {
     if (album) warmAlbum(album)
   }, [album?.id])
+
+  //? (2.0.13) the album's description - asked once the bridge has said which MusicBrainz album this is (its release
+  //? group: Wikipedia's words), with Navidrome's id beside it (Navidrome's own). Under the hero when it is in hand as
+  //? the songs are drawn - they wait for it DESCRIPTION_WAIT_MS at most - else at the page's foot, so a late one
+  //? moves no song under a finger. Once drawn, the songs stay drawn (an edit's refresh keeps them)
+  const songsDrawn = useRef<string | null>(null)
+  const describing = useDescription('album', storeFor === id
+    ? { mbid: store?.release_group_mbid ?? null, navidromeId: id } : null, songsDrawn.current === id, id)
+  const [songsWaited, setSongsWaited] = useState<string | null>(null)
+  useEffect(() => {
+    if (!album) return
+    const timer = setTimeout(() => setSongsWaited(id), DESCRIPTION_WAIT_MS)
+    return () => clearTimeout(timer)
+  }, [id, !!album])
+  if (album && (describing.settled || songsWaited === id)) songsDrawn.current = id
+  const drawSongs = !!album && songsDrawn.current === id
+  //? its subtitle and paragraph, together - an album's hero holds Play and the chips from its first frame, so the
+  //? subtitle heads the block rather than landing in the hero above them
+  const describedBlock = inBlock('album', describing.description)
 
   const shown: Album | null = album ?? (preview?.id === id ? preview : null)
   //? what Navidrome has said of the album's release, for Properties' "not tagged" (review - never the
@@ -483,11 +516,13 @@ export function AlbumPage({
         </div>
       )}
 
+      {describedBlock && describing.at === 'top' && <DescriptionBlock description={describedBlock} at="top" />}
+
       {error ? errorNote(error, { class: 'pl-notice', gone: ALBUM_GONE }) : null}
-      {!album && !error && <div class="pl-spinner" aria-label="Loading" />}
+      {!drawSongs && !error && <div class="pl-spinner" aria-label="Loading" />}
 
       <ol class="pl-tracks">
-        {songs.map((song, index) => {
+        {(drawSongs ? songs : []).map((song, index) => {
           const isCurrent = player.track?.id === song.id
           const heading = headings[index]
           const showArtist = song.artist && song.artist !== shown?.artist
@@ -527,12 +562,15 @@ export function AlbumPage({
         })}
       </ol>
 
-      {album && (
+      {drawSongs && album && (
         <p class="pl-album-footer">
           {songs.length} {songs.length === 1 ? 'song' : 'songs'}
           {total ? `, ${formatDuration(total)}` : ''}
         </p>
       )}
+
+      {/* (2.0.13) a description that came after the songs were drawn: here, where it moves nothing under a finger */}
+      {describedBlock && describing.at === 'foot' && <DescriptionBlock description={describedBlock} at="foot" />}
 
       {/* what the main page's details pane said of the album (2.0.0-player.44), once the bridge has answered */}
       <AlbumProperties rows={albumProperties(store, storeFailed, releaseSaid, undefined, albumEdit(access.permissions).editors)} />

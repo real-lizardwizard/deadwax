@@ -270,6 +270,8 @@ see, the fix an admin's.
   and then (below); if it persists, check the container can reach the internet.
 - **Busy** - MusicBrainz is overloaded, or asking deadwax to slow down: it answers again shortly.
 - **Refused** - "MusicBrainz turned deadwax away": usually the contact in `MUSICBRAINZ_EMAIL`.
+- **Not found** - MusicBrainz answered that it has nothing at the address deadwax asked. That's never the
+  connection: the container's log names the address.
 
 ## A search fails with "not logged in", or slskd refused it
 
@@ -562,6 +564,34 @@ happening.
 Your player is showing a picture embedded in the file, or a disc scan (`cd.jpg`) for songs with a
 disc number. A track's **Pictures in this file** (open it from **Edit → Tags**) shows them. **Get CD art** saves a proper `disc.jpg`, which Navidrome prefers over a
 `cd.jpg`.
+
+## An artist or album has no description, or it's at the foot of the page
+
+The short description ([descriptions](player.md#descriptions)) comes from Navidrome first, else from the English
+Wikipedia article that MusicBrainz links to (through Wikidata); its one-line subtitle from Wikidata. Nothing is
+said when there's none, so if a page has no description:
+
+- **Nobody has written one** deadwax can find: Navidrome has nothing - its agents (`ND_AGENTS`, Deezer, Last.fm
+  and ListenBrainz by default; only Deezer and Last.fm write descriptions, Deezer only an artist's, and Last.fm
+  only with `ND_LASTFM_APIKEY` and `ND_LASTFM_SECRET` set) found no biography or album notes - and the artist or
+  album has no Wikidata link on MusicBrainz, the Wikidata item has no English article, or the article is a
+  disambiguation page. An album you don't have only ever has Wikipedia's.
+- **A link added on MusicBrainz isn't showing yet**: deadwax keeps MusicBrainz's answers for a month, so a
+  Wikidata link you add there (on the page's **Edit relationships**) shows once deadwax asks MusicBrainz about
+  that artist or album again - which can take up to a month. **Clear MusicBrainz's saved answers** (Server
+  settings → **Connections**) brings that within three days, when deadwax's own "there's none" for the page runs
+  out. An English article written on Wikipedia for an item MusicBrainz already links shows within three days.
+- **No MusicBrainz id**: an artist or album whose files carry no MusicBrainz ids has only Navidrome's words, and
+  no subtitle. Applying a release in **Edit → Release** writes the ids.
+- **Navidrome, Wikipedia, Wikidata or MusicBrainz didn't answer** just then: deadwax keeps nothing of a failure,
+  and the app asks again when the page next opens, from a minute on. deadwax's own log (the container's output) has a line saying which
+  of the Wikipedia side didn't answer ("no description for that artist just now - …").
+
+A description at the **foot** of the page came after what is under its place was drawn - the artist's albums, the
+album's songs, a pressing's tracklist wait for it only a moment - so it was put where it moves nothing under your
+finger - as is one that came after the page said the album's details or the library couldn't be loaded, with
+**Try again** under where it would go. Next time the page opens deadwax has it kept, and it is under the name or the
+hero.
 
 ## The artist page can't work out who this is
 

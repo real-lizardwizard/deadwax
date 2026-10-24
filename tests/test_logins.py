@@ -199,6 +199,9 @@ ROUTES = {
     ("PUT", "/deadwax/me/pins"): "user",
     ("POST", "/deadwax/me/pins/toggle"): "user",
     ("GET", "/deadwax/store/album"): "user",
+    #? (2.0.13) the artist and album pages' descriptions
+    ("GET", "/deadwax/describe/artist"): "user",
+    ("GET", "/deadwax/describe/album"): "user",
     #? each user's own library - their starred albums - and the admin's "held by nobody" (2.0.0-player.51,
     #? step 5 - tests/test_personal_libraries.py)
     ("GET", "/deadwax/me/library"): "user",

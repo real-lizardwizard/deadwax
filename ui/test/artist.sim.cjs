@@ -594,6 +594,13 @@ exports.accessNow = exports.useAccess
 //? (2.0.4) whether this reader runs deadwax (an error's own words, under its sentence): a listener's page unless a case says
 exports.seesDetail = () => globalThis.__page.runs === true
 `)
+//? (2.0.13) the page's description: what it was asked with kept, and what it answers given by the test - by default
+//? settled with none, so the albums wait for nothing more than they did
+write('app/useDescription.js', `exports.useDescription = (kind, ids, below, page) => {
+  globalThis.__page.describeAsks.push([kind, ids, below, page])
+  return globalThis.__page.describing
+}
+`)
 write('app/useOwned.js', `
 exports.ownedNow = () => globalThis.__page.owned
 exports.useOwned = () => globalThis.__page.owned
@@ -603,6 +610,7 @@ exports.whenOwned = () => globalThis.__page.owned ? Promise.resolve() : new Prom
 const W = globalThis.__page = {
   asks: [], open: [], owned: null, ownedWaiting: [], indexAge: 0, plays: [], remembered: [], sheets: [],
   pins: { pins: [], known: true, canSave: true, problem: null }, pinned: [], said: [],
+  describeAsks: [], describing: { description: null, settled: true, at: null },
   ask(name, ...args) {
     W.asks.push([name, ...args])
     let resolve, reject
@@ -627,6 +635,7 @@ function ownedAnswers(index) {
 function reset() {
   W.asks.length = 0; W.open.length = 0; W.owned = null; W.ownedWaiting.length = 0; W.indexAge = 0; W.plays.length = 0; W.remembered.length = 0; W.sheets.length = 0
   W.pins = { pins: [], known: true, canSave: true, problem: null }; W.pinned.length = 0; W.said.length = 0
+  W.describeAsks.length = 0; W.describing = { description: null, settled: true, at: null }
 }
 
 //? the albums' wait (ROWS_WAIT_MS) and the sections' (ABOUT_WAIT_MS): timers the test fires by hand -
@@ -755,6 +764,13 @@ async function page() {
     again.draw()
     check('the page come back to (Back): its rows on the first frame, from the session', rowKeys(), ['group:rg-third', 'group:rg-roseland', 'group:rg-portishead', 'group:rg-dummy'])
     check('...asking MusicBrainz nothing again', asked('discography').length, 2)
+    //? (2.0.13) its description still out (left before it came): the rows on the first frame all the same - the
+    //? scroll put back needs them - the description, when it comes, at the foot
+    W.describing = { description: null, settled: false, at: null }
+    const thirdTime = mount()
+    thirdTime.draw()
+    check('...come back to with its description still out: the rows on the first frame still', rowKeys().length, 4)
+    W.describing = { description: null, settled: true, at: null }
   }
 
   console.log('\nthe page: MusicBrainz slow - what you have drawn, keyed as its rows will be')
@@ -947,6 +963,98 @@ async function page() {
     pin().props.onClick()
     check('...nobody can say one: live, pinning them by name and Navidrome\'s id', [pin().props['aria-disabled'], W.pinned],
       [false, [[{ kind: 'artist', mbid: null, navidrome_id: 'ar-anon-pin', name: 'Anon', cover: null }, true]]])
+  }
+
+  console.log('\nthe page: their description (2.0.13) - asked once who they are is settled, the albums waiting for it')
+  {
+    reset()
+    W.describing = { description: null, settled: false, at: null }
+    const one = mount({ id: 'ar-desc' })
+    one.draw()
+    check('first frame: not asked - Navidrome\'s artist and their facts still to come', W.describeAsks.at(-1), ['artist', null, false, 'ar-desc'])
+    answer('artistAlbums', { ...PORTISHEAD_ARTIST, id: 'ar-desc' })
+    await one.settled()
+    check('Navidrome answered, the facts not: still not asked (deadwax\'s lookup of them is the facts\' own)', W.describeAsks.at(-1)[1], null)
+    answer('facts', { mbid: PORTISHEAD, name: 'Portishead', genres: [], aliases: [], links: [], members: [] })
+    await one.settled()
+    check('...the facts in: asked by their MusicBrainz id and Navidrome\'s', W.describeAsks.at(-1).slice(0, 2), ['artist', { mbid: PORTISHEAD, navidromeId: 'ar-desc' }])
+    answer('discography', DISCOGRAPHY)
+    ownedAnswers(LIBRARY)
+    await one.settled()
+    check('every other answer in, the description not: the albums still wait', rowKeys(), [])
+    const WIKI = { paragraph: { text: 'Portishead are an English electronic band.', source: 'wikipedia', url: 'https://en.wikipedia.org/wiki/Portishead_(band)' },
+      subtitle: 'English band' }
+    const before = W.describeAsks.length
+    W.describing = { description: WIKI, settled: true, at: 'top' }
+    await one.settled()
+    const blocks = find((node) => node.type?.name === 'DescriptionBlock')
+    check('...it answered: the albums drawn, and the paragraph at its top place - under Play, above the albums - its subtitle not in it',
+      [rowKeys().length, blocks.map((node) => node.props.at), blocks[0]?.props.description.paragraph.text, blocks[0]?.props.description.subtitle], [3, ['top'], WIKI.paragraph.text, null])
+    const names = classed('app-artist-names')[0]
+    const subtitle = classed('app-artist-subtitle')[0]
+    check('...the subtitle under their name, in the hero (fixed in height: it moves nothing below), as text, its direction its own',
+      [!!subtitle && find((node) => node === subtitle, names).length, subtitle?.props.children, subtitle?.props.dir,
+        names.props.children.flat(Infinity).findIndex((node) => node?.type === 'h1') < names.props.children.flat(Infinity).indexOf(subtitle)], [1, 'English band', 'auto', true])
+    const body = classed('app-artist-body')[0].props.children.flat ? classed('app-artist-body')[0].props.children.flat(Infinity) : []
+    const at = (test) => body.findIndex((node) => node && typeof node === 'object' && test(node))
+    check('...in the body after Play and before the albums', [at((node) => node.props?.class === 'app-artist-play') < at((node) => node.type?.name === 'DescriptionBlock'),
+      at((node) => node.type?.name === 'DescriptionBlock') < at((node) => node.props?.class === 'app-artist-albums')], [true, true])
+    check('...told, as it came, that the albums weren\'t drawn yet - and after, that they are', [W.describeAsks[before][2], W.describeAsks.at(-1)[2]], [false, true])
+    W.describing = { description: WIKI, settled: true, at: 'foot' }
+    await one.settled()
+    const after = classed('app-artist-body')[0].props.children.flat(Infinity)
+    const where = (test) => after.findIndex((node) => node && typeof node === 'object' && test(node))
+    check('one placed at the foot: drawn last in the body, under the albums and the sections', [find((node) => node.type?.name === 'DescriptionBlock').map((node) => node.props.at),
+      where((node) => node.type?.name === 'DescriptionBlock') > where((node) => node.props?.class === 'app-artist-albums'),
+      after.filter((node) => node && typeof node === 'object').at(-1)?.type?.name], [['foot'], true, 'DescriptionBlock'])
+  }
+
+  console.log('\nthe page: a subtitle alone - drawn in the hero, nothing in the body')
+  {
+    reset()
+    W.describing = { description: { paragraph: null, subtitle: 'Icelandic band' }, settled: true, at: null }
+    const one = mount({ id: 'ar-desc-sub' })
+    one.draw()
+    answer('artistAlbums', { ...PORTISHEAD_ARTIST, id: 'ar-desc-sub' })
+    await one.settled()
+    check('the subtitle in the hero; no block', [words(classed('app-artist-subtitle')[0]), find((node) => node.type?.name === 'DescriptionBlock').length], ['Icelandic band', 0])
+    W.describing = { description: null, settled: true, at: null }
+    one.draw()
+    check('none: no subtitle line at all', classed('app-artist-subtitle').length, 0)
+  }
+
+  console.log('\nthe page: the library failed - its notice and Try again drawn - the description told it is under the top place')
+  {
+    reset()
+    W.describing = { description: null, settled: false, at: null }
+    const one = mount({ id: 'ar-desc-fail' })
+    one.draw()
+    check('first frame: not told anything is drawn under the top place', W.describeAsks.at(-1)[2], false)
+    answer('artistAlbums', new Error('Navidrome away'))
+    await one.settled()
+    //? (after review) the notice, with Try again, sits under the top place before the description is asked: one that
+    //? lands then goes to the foot, never above that button
+    check('Navidrome failed: the notice drawn, the description asked and told what is under it is drawn',
+      [find((node) => node.props?.class === 'pl-notice' && words(node).includes('Try again')).length > 0, W.describeAsks.at(-1)[1] !== null, W.describeAsks.at(-1)[2]],
+      [true, true, true])
+  }
+
+  console.log('\nthe page: the albums wait for the description no longer than they wait for the rest')
+  {
+    reset()
+    W.describing = { description: null, settled: false, at: null }
+    const one = mount({ id: 'ar-desc-2' })
+    one.draw()
+    answer('artistAlbums', { ...PORTISHEAD_ARTIST, id: 'ar-desc-2' })
+    await one.settled()
+    answer('facts', { mbid: PORTISHEAD, name: 'Portishead', genres: [], aliases: [], links: [], members: [] })
+    answer('discography', DISCOGRAPHY)
+    ownedAnswers(LIBRARY)
+    await one.settled()
+    check('the description still out', rowKeys(), [])
+    fire(1500)
+    await one.settled()
+    check('ROWS_WAIT_MS over: the albums drawn without it', rowKeys().length, 3)
   }
 }
 

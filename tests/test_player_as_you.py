@@ -96,8 +96,10 @@ class Player(Navidrome):
     #? (2.0.0-player.64) Navidrome's play queue, one per user, as server/subsonic/bookmarks.go and
     #? persistence/playqueue_repository.go keep it at 0.64.2 - see play_queue_call
     QUEUE_CALLS = frozenset({"getPlayQueue", "getPlayQueueByIndex", "savePlayQueue", "savePlayQueueByIndex"})
+    #? (2.0.13) the descriptions' fallback, Navidrome's own words - see the end of handle
+    DESCRIBE_CALLS = frozenset({"getArtistInfo2", "getAlbumInfo2"})
     PLAYER_CALLS = frozenset({"ping", "getAlbumList2", "getArtists", "getArtist", "getSong", "getCoverArt",
-                              "stream", "scrobble"}) | PLAYLIST_CALLS | QUEUE_CALLS
+                              "stream", "scrobble"}) | PLAYLIST_CALLS | QUEUE_CALLS | DESCRIBE_CALLS
 
     def __init__(self):
         super().__init__()
@@ -320,6 +322,13 @@ class Player(Navidrome):
             else:
                 self.playing[user] = q["id"]
             return httpx.Response(200, json=ok())
+        #? (2.0.13) the descriptions' fallback: Navidrome's own words for an artist or an album
+        if endpoint == "getArtistInfo2":
+            return httpx.Response(200, json=ok(artistInfo2={"biography": "Portishead are a band from Bristol.",
+                                                            "lastFmUrl": "https://www.last.fm/music/Portishead"}))
+        if endpoint == "getAlbumInfo2":
+            return httpx.Response(200, json=ok(albumInfo={"notes": "Dummy is their first album.",
+                                                          "lastFmUrl": "https://www.last.fm/music/Portishead/Dummy"}))
         if endpoint == "getCoverArt":
             return streamed(200, b"\x89PNG\r\n\x1a\n" + b"\0" * 32, {"content-type": "image/png"})
         return self.serve(request)
@@ -573,13 +582,29 @@ def test_only_the_shared_account_list_names_the_shared_client():
         if names_the_shared_client(path.read_text()):
             named.add(str(path.relative_to(ROOT)))
     assert named == set(SHARED_ACCOUNT_USES)
-    for path in ("src/routes/navidrome.py", "src/routes/store_album.py", "src/routes/pins.py", "src/routes/my_library.py"):
+    for path in ("src/routes/navidrome.py", "src/routes/store_album.py", "src/routes/pins.py", "src/routes/my_library.py",
+                 "src/routes/describe.py"):
         text = (ROOT / path).read_text()
         assert not re.search(r"\bnavidrome\.(call|open)\(", text), path
         assert "client_for" in text, path
     #? the library routes' one call as the shared account is the apply's getScanStatus
     calls = re.findall(r"\bnavidrome\.call\(\"(\w+)\"", (ROOT / "src/routes/library.py").read_text())
     assert calls == ["getScanStatus"]
+
+
+def test_the_descriptions_ask_navidrome_as_the_signed_in_user(player):
+    """(2.0.13) An artist's or an album's description: Navidrome's own words first (no MusicBrainz id here), asked AS
+    THEM - getArtistInfo2 and getAlbumInfo2 through client_for, never the shared account."""
+    ethan = signed_in(player, "ethan")
+    player.fake.forget()
+
+    artist = ethan.get("/deadwax/describe/artist", params={"navidrome_id": "ar-1"})
+    album = ethan.get("/deadwax/describe/album", params={"navidrome_id": "nd-dummy"})
+
+    assert artist.json() == {"text": "Portishead are a band from Bristol.", "source": "lastfm",
+                             "url": "https://www.last.fm/music/Portishead", "subtitle": None, "unavailable": False}
+    assert album.json()["text"] == "Dummy is their first album."
+    assert player.fake.by() == [("ethan", "getArtistInfo2"), ("ethan", "getAlbumInfo2")]
 
 
 # ----------------------------------------------------------------- the cached stream, checked per user
@@ -693,12 +718,15 @@ def test_calls_already_on_their_way_when_the_login_dies_end_it_once(player):
     assert auth.player_refused(stand_in) is False
 
 
-def test_a_refused_login_is_a_401_from_the_status_the_bridge_the_turntable_and_the_pins_too(player):
+def test_a_refused_login_is_a_401_from_the_status_the_bridge_the_turntable_the_pins_and_the_descriptions(player):
     """Each place that turns a Navidrome failure into "Navidrome didn't say" lets a refused login through."""
     asks = [("get", f"{PLAYER}/status", None), ("get", f"{BRIDGE}?navidrome_id=nd-dummy", None),
             ("get", f"{BRIDGE}?release_mbid={CD}", None),
             ("get", "/deadwax/library/disc_art/navidrome?album=nd-dummy", None),
-            ("post", "/deadwax/me/pins/toggle", {"kind": "album", "pinned": True, "navidrome_id": "nd-dummy"})]
+            ("post", "/deadwax/me/pins/toggle", {"kind": "album", "pinned": True, "navidrome_id": "nd-dummy"}),
+            #? (2.0.13) the descriptions' Navidrome side
+            ("get", "/deadwax/describe/artist?navidrome_id=ar-1", None),
+            ("get", "/deadwax/describe/album?navidrome_id=nd-dummy", None)]
     for method, path, body in asks:
         ethan = signed_in(player, "ethan")
         player.fake.passwords["ethan"] = "changed"

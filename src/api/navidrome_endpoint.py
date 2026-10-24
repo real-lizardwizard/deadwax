@@ -18,6 +18,8 @@ every signed-in user would reach it - so a general proxy would hand them the mea
 or delete anybody's playlists on Navidrome. The playlist routes (2.0.0-player.58) change only the asker's own
 playlists, the owner checked by deadwax before anything is written (src/playlists.py), so a shared admin account
 still can't touch anyone else's through deadwax.
+(2.0.13) Outside that list, deadwax's own descriptions (src/routes/describe.py) make two more fixed calls as the
+asker - getArtistInfo2 (`id`, `count=0`) and getAlbumInfo2 (`id`) - nothing the page sends passed on but the id.
 
 WHO IS ASKED AS (2.0.0-player.52, step 6 of the multi-user plan): with logins on, every player call is
 made AS THE SIGNED-IN USER - client_for(request) lays the login their session was signed in with over

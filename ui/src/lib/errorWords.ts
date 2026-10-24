@@ -365,6 +365,7 @@ export const PING_STATUS: Readonly<Record<string, string>> = {
   '429': 'Busy',
   '403': 'Refused',
   '400': 'Refused',
+  '404': 'Not found',
 }
 
 /** MusicBrainz's ping answers with the log's words (request_with_retries's, shared with every MusicBrainz
@@ -376,6 +377,8 @@ export const MUSICBRAINZ_LINES: Readonly<Record<string, string>> = {
   '429': 'MusicBrainz is asking deadwax to slow down - it will answer again shortly.',
   '403': "MusicBrainz turned deadwax away - usually the contact in MUSICBRAINZ_EMAIL (Server settings, Connections).",
   '400': 'MusicBrainz refused the question deadwax asked - the log has the details.',
+  //? (2.0.13) MusicBrainz has nothing at the address asked - asked once, never ten times (request_with_retries)
+  '404': 'MusicBrainz has nothing at the address deadwax asked - the log has the details.',
   VALUE_ERROR: 'No contact is set for MusicBrainz - set MUSICBRAINZ_EMAIL in Server settings (Connections).',
   UNKNOWN_HTTP_ERROR: 'MusicBrainz answered with an error deadwax doesn\'t know - the log has the details.',
   UNKNOWN_ERROR: 'Asking MusicBrainz failed in a way deadwax doesn\'t know - the log has the details.',

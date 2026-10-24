@@ -745,3 +745,182 @@ one album you hold (`heldInOrder`: the plain edition, then the oldest) are uncha
 not the page's order. artist.sim's order checks were rewritten for it (and two that read rows[0] for Dummy now find
 its row by key; one called `rowLine` through `map`, which passed the index as `personal`). The Library's "Artist" sort
 (each artist's albums oldest first) is a different list and stays as it was.
+
+### Descriptions on the artist and album pages (2.0.13)
+
+James (2026-10-24): "I want to have the little descriptions for the artists and albums displayed on their
+respective pages" - Apple Music's blurbs, in the release with 2.0.10's icons. The artist page, the album page
+and the album you don't have each show a short description, three lines with More / Less, its source under it,
+and a one-line subtitle.
+
+**Where the words come from** (`src/descriptions.py`, pure). The slice plan put Wikipedia first; James, after
+seeing Dance Gavin Dance from both sources: "Last.fm FIRST, Wikipedia (via MusicBrainz) as the fallback - for
+artists and albums" - binding, and built that way after review:
+
+1. **Navidrome's own** - getArtistInfo2's `biography` (with `count=0`: no similar artists) or getAlbumInfo2's
+   `notes`, asked AS THE SIGNED-IN PERSON (client_for), read as TEXT (html.parser: tags dropped, entities read,
+   script and style skipped), Last.fm's "Read more on Last.fm" tail cut (0.64.2's lastfm agent cuts it
+   itself; older ones don't, and provider.go writes `<a target='_blank' ...>`), linked only to an https
+   Last.fm address (`lastFmUrl`). Read in Navidrome's source at 0.64.2: its default agents are
+   "deezer,lastfm,listenbrainz"; an artist's biography is Deezer's first, Last.fm's only with
+   `ND_LASTFM_APIKEY`/`SECRET` set (0.64.2 ships none); an album's notes only Last.fm's. So the words may be
+   Deezer's, and the link says only where it goes - **"More on Last.fm"**, not the spec's "From Last.fm"
+   (kept so after review, Last.fm first or not: a Deezer biography credited "From Last.fm" would be wrong).
+2. **Wikipedia's summary** - the REST `page/summary`'s `extract` (plain text; never `extract_html`) and the
+   article's address - of the English page the MusicBrainz entity's `wikidata` relation leads to, else an
+   English `wikipedia` relation of MusicBrainz's own. English only: Portishead's own `wikipedia` relation is
+   the French page, and is never said. Not an article (`type` disambiguation and the rest): none.
+3. Neither: no paragraph - no empty box.
+
+**The subtitle** (James, later the same day: "yes to Wikidata's one-line description as a small SUBTITLE under
+the artist's and the album's name"): the Wikidata item's `descriptions.en` ("English band", "1994 studio album
+by Portishead" - recorded 2026-10-24), from the SAME wbgetentities request as the English page
+(`props=sitelinks|descriptions&languages=en&sitefilter=enwiki`: still a few hundred bytes), whichever source the
+paragraph is; one line, at most `SUBTITLE_LETTERS` (200). Where it is drawn: an **artist's under their name in
+the hero** (`.app-artist-subtitle`, beside the facts line), on ONE line, ellipsized, in a line the hero keeps for
+it from the first frame (`.app-artist-names:not(:has(.app-artist-subtitle))::before`, above the name, as tall as
+the subtitle and its gap). The first build said the hero was of a fixed height, so the line moved nothing; review
+found it is `min-height: --app-artist-hero` (240px) - at the least - and a two-line name under an iPhone
+home-screen app's status bar (safe-area-inset-top ~59px: 59 + 8 + 44 + 2x40.8 + 20.2 + 18 = 231px) fits it only
+without the subtitle, which, landing after the facts and so after Play and Shuffle, grew it to ~251px and moved
+them; a Wikidata line wrapping to two, another 18px. With the line kept, the names block is as tall before the
+subtitle as after: where the hero has room the kept line is room it already had (the names at its foot either
+way); where it hasn't, the hero is that line taller from the first frame and never grows. (The facts line,
+landing the same way, is older than this and not changed here.) An **album's
+heads its description's block** (`.app-about-subtitle`), placed with the paragraph: an album's hero holds Play,
+Shuffle and the chips, drawn from the first frame so nothing moves ("drawn from the first frame: an 'Also' chip
+landing in it moves nothing below"), and a line landing under its title would push all of them down under a
+finger. A deviation from "under the album's name", for that rule - James can move it.
+
+Long text is cut at `MAX_LETTERS` (1500) at the last sentence that fits (Deezer's bio is the whole of it).
+
+**The routes** (`src/routes/describe.py`): `GET /deadwax/describe/artist` and `/album`, a user's
+(tests/test_logins.py ROUTES), with `mbid` (MBID_PATTERN; an album's RELEASE GROUP) and/or `navidrome_id`
+(1-ID_MAX) - at least one: neither (or a malformed one) is a 422; otherwise always a 200 `{text, source, url, subtitle, unavailable}`, so `api/http.ts get()`
+reads it; `source` "lastfm" or "wikipedia". **Navidrome and the Wikipedia side are asked at once**
+(`asyncio.gather`): Navidrome's first answer for an artist can be slow (it asks its agents then), and an album's
+MusicBrainz lookup takes a turn of the rate limit; the slower sets the pace, never the two in turn. The Wikipedia
+side is asked even when Navidrome has words: the subtitle needs Wikidata anyway, and Wikipedia's summary is one
+small request more, kept a month, so the kept row is whole and stands in when Navidrome can't answer.
+The MusicBrainz lookups are the least: an artist's is `get_artist` (the facts' own request and cache entry - so
+the page asks after the facts are in, and two cold lookups don't cost two seconds of the rate limiter); an
+album's is the new `get_release_group_urls` (`release-group/<id>`, `inc=url-rels` alone), a lookup, kept on disk
+a month like every other. Wikidata and Wikipedia are asked by `src/api/wikipedia_endpoint.py` (its own httpx
+client, 8 s, closed in the lifespan) with the user agent MusicBrainz is given, built per request; three outcomes
+- an answer, a definite no (404, `no-such-entity`: None), and a failure (anything else: `Unreachable`).
+`unavailable` is true when a source couldn't be asked just now (the Wikipedia side's Unreachable, a Navidrome
+error other than its "not found", 70): what came is still answered, and the app keeps it only a moment.
+
+**A 404 from MusicBrainz is asked once** (review): `_ask` retried any status it didn't name ten times, each
+through the one-a-second limiter, so an album whose tags name a release group MusicBrainz doesn't have (a bad
+tag, one merged away) cost ten seconds of everyone's MusicBrainz budget on every visit. A 404 is MusicBrainz
+answering, as deterministic as a 400: one attempt, `code` 404, logged at info and not as "exceeded maximum
+retries" (it is no outage); the description route keeps it as "none". Every caller of request_with_retries gets
+it (a deleted release or artist fails at once instead of after ten tries); You's Connections has words for the
+code (lib/errorWords.ts '404', "Not found"), and troubleshooting.md the line.
+
+**Kept**: the Wikipedia side in the database, `store.py`'s `descriptions` table (`artist:<mbid>`,
+`album:<rg mbid>`; `text`, `url`, `subtitle`; all NULL = "none"), shared - a found one (words or a subtitle)
+`FOUND_FRESH_SECONDS` (30 days), a none `NONE_FRESH_SECONDS` (3 days); too old, asked again and replaced, and
+the old one still answered if asking fails. A failure is never kept, and logged at info to the container's log
+only (never the event log a listener's page shows). Navidrome's answers are not kept by deadwax: Navidrome keeps
+its agents' answers itself (core/external/provider.go - fetched once, refreshed in the background after its TTL),
+and they are asked as each person, whose access is Navidrome's to judge. A Wikidata link added ON MUSICBRAINZ
+shows only once the saved MusicBrainz lookup is renewed - up to a month (`LOOKUP_FRESH_SECONDS`); Clear of the
+saved answers brings it within the three days of the kept none. The first build's docs said "within three days"
+for it (review).
+
+**The page** (`lib/describe.ts` pure, `app/useDescription.ts`, `app/Description.tsx`):
+
+- **One question, never called off, kept when it comes** (`askDescription`): shared by every page asking it
+  (a page left and come back to while it is out waits for the same one), its answer kept for the session
+  (`DESCRIPTIONS_KEPT`, 200, least recently used going) even after the page that asked has gone. The first build
+  aborted it on unmount and kept nothing, so an artist page left a second after it opened (an album tapped) came
+  back to its albums waiting `ROWS_WAIT_MS` - and App put the scroll back on a page with no rows (review).
+  Each page draws only its newest question's answer through its own latestOnly().
+- **What isn't the whole story is kept only `UNSURE_KEPT_MS`** (a minute): an answer deadwax said `unavailable`,
+  or no answer at all (a dropped connection, a 401). The first build kept every failure as "none" for the
+  session - days, on a phone's installed app - so a blip left those pages blank until a reload (review). A minute
+  still lets Back draw at once.
+- **Each page's last question** is remembered (`rememberPageKey`): with the ids still being settled (the album
+  page's bridge out again on Back), the answer it had is drawn, settled, on the first frame.
+- **What is drawn stands while the question changes** (review): the ids unsettled a moment (the artist page's
+  library asked again, About's Try again) or a new question (Navidrome's artist found later, an Edit giving the
+  album another release group) - the block stays as drawn until the new question's answer replaces it, where it
+  was (or a none takes it away). The first build dropped it for the round trip and drew it again, moving the
+  albums or songs twice.
+- A link drawn only when it goes where it says (https, en.wikipedia.org or last.fm).
+- **Nothing moves under a finger** (the rule of "Artists, and the two libraries joined"): what lies under the
+  block's top place waits for it - the artist's albums with their other answers (within `ROWS_WAIT_MS`), an
+  album's songs and a pressing's tracklist `DESCRIPTION_WAIT_MS` (500 ms, Info's `INFO_SETTLE_MS`) at most, a
+  spinner / "Loading…" meanwhile - and one landing later goes to the page's foot instead (`placeOf`, judged once
+  as the block first has something - `inBlock`: an artist's paragraph, an album's paragraph or subtitle - kept
+  for the page; a page drawn for another id places afresh). **A notice with Try again counts as drawn under the top
+  place** (review): the album you don't have's pressings' trouble (`|| !!trouble`), and the artist page's
+  library-failed notice (`|| library.state === 'failed'`) - each drawn before the description is asked, under where
+  its block would go - so a description then lands at the foot, never above the button. **A page come back to doesn't wait** (review): the
+  artist page with every other answer from the session on its first frame (`cameBack`), and the album you don't
+  have with its pressings from the session, draw their rows at once - the scroll put back needs them - and a
+  description still out goes to the foot. Top: the artist page's body after Play and before Albums (Play is
+  drawn from the first frame, so nothing above it); an album page's under the hero and the Add / Remove line,
+  above the songs; the album you don't have's under the hero, above the tracklist. Foot: the artist page's last
+  thing; an album page's after the songs' line, above Properties; the album you don't have's above its
+  MusicBrainz links.
+- **Who asks when**: the artist page by their MusicBrainz id and Navidrome's, once Navidrome's artist and the
+  facts are in; the album page once the bridge has answered (or failed) for THIS album (`storeFor === id`: the
+  page can be drawn again for another id with the last one's bridge answer still in state), with its release
+  group and Navidrome's id; the album you don't have by its group alone, **once its pressings have answered or
+  failed** (review): asked beside them, its url-rels lookup took a turn of MusicBrainz's limiter (4 in 5 s, with
+  Search's three just spent) ahead of the pressings' pages, and the page's main content came later. The
+  tracklist's wait starts from the pressings either way, so a cold group's description now lands at the foot
+  more often; a group seen before (kept on the server) still lands at the top.
+- **The album page's songs wait** up to 500 ms for a description on a cold visit and then draw without it (the
+  bridge, then deadwax's answer: on a group nobody has opened, MusicBrainz's lookup takes ~1-2 s, so it lands at
+  the foot). Reviewed and kept: shortening the wait would put a server-kept answer (~100 ms behind the bridge) at
+  the foot too, and a cold visit happens once per album a month across everyone.
+
+The block: the subtitle (an album's) a line of text first; the words a string child (Preact text; nothing
+anywhere sets innerHTML), `dir="auto"`, clamped with `-webkit-line-clamp` (and `line-clamp`) at
+`--app-about-lines` (3); More only when they run past it - measured on layout, again on a ResizeObserver (the
+window's resize where there is none), not while open - a button with `aria-expanded` and `aria-controls`;
+VoiceOver reads the words whole either way. Opened is for those words: drawn for another artist or album (the
+page component kept, its subject changed) it starts clamped again (review). The source link opens beside the
+app. Type: Noto Sans at `--dw-text-heading` (15px phone, 13 desktop), `--dw-text-2`, `--dw-leading-body`, at most
+`--app-about-measure` (68ch); the subtitles at `--dw-text-footnote`, medium, `--dw-leading-note` (the artist's in
+`--dw-text-on-secondary`, as the facts line over the picture); More and the link on one 44px line. No
+`text-align` of its own (test_type: the dir=auto rule's match-parent decides). app.css section before the
+phone's (which must stay last, test_app_css).
+
+**Verified** (after the second review): Python 3851 collected (3849 passed, 2 skipped); test_describe.py 33, from answers
+recorded on 2026-10-24 with deadwax's user agent (MusicBrainz's Portishead and Dummy's release group with url-rels,
+Wikidata's sitelinks and descriptions for both and a missing id, Wikipedia's summaries and its 404) - Navidrome
+first with the subtitle, Wikipedia's words when Navidrome has none, the two asked at once, a MusicBrainz 404 asked
+once and kept as none, Wikidata's no-such-entity kept as none, a re-asked description replacing the kept one, a
+subtitle alone kept a month, `unavailable` for each failure; test_player_as_you.py (the Navidrome side asked as
+ethan; a refused login a 401 from both routes); test_app_css.py (the clamp; the subtitles; the artist's subtitle one
+line, in a line kept for it); pyflakes; tsc; every
+sim (describe.sim's hook rendered: never called off, kept after unmount, shared on a remount, the unsure minute,
+the page's last question, the drawn block standing through a question change, the block closing for other
+words, the album page's bridge on both paths; artist.sim and group.sim render the pages with the hook stood in -
+the subtitle in the hero, a page come back to drawing its rows with its description out, the album you don't have
+asking after its pressings, the pressings' trouble and the library's failed notice counting as drawn below); the build; the engine files no diff; mutation checks (the review's list in its
+report). A real page before review (deadwax from the worktree on :8110, the stand-in Navidrome on :4540, live
+MusicBrainz / Wikidata / Wikipedia): Portishead's page, Dummy's page and Dummy's album you don't have at 390x844
+and 1440x900 - three lines and More, "From Wikipedia" 44px opening a new tab, no sideways scroll, no console
+error. After review, again (deadwax on :8111 from the worktree, the stand-in Navidrome on :4541 - it has no
+getArtistInfo2 / getAlbumInfo2, so Wikipedia's words, each answer `unavailable` for it): "English band" under
+Portishead's name with the facts line under it, the hero still 240px on both frames; "1994 studio album by
+Portishead" heading Dummy's block on its album page and its album-you-don't-have page, Noto Sans 13px; no
+sideways scroll, no console error. Navidrome's words first was not seen in a real page (no Navidrome here has them).
+After the second review (deadwax on :8112, the stand-in on :4542), Portishead's page at 390x844 with
+`--pl-safe-top` set to 59px and the name made two lines by hand: without the kept line the hero went 240 -> 251px
+as the subtitle landed (Play's top 256 -> 267, the review's finding reproduced); with it, 251px before the
+subtitle and after, and a 117-letter subtitle one ellipsized 18.2px line; no console error. Mutation checks: the
+kept line, its height and the subtitle's one line (test_app_css), `|| !!trouble` (group.sim, describe.sim) and
+`|| library.state === 'failed'` (artist.sim, describe.sim), each removed, each caught.
+
+**NOT verified**: a real Navidrome's getArtistInfo2 / getAlbumInfo2 (the stand-in has neither; shapes from
+the source), Deezer's words in it, VoiceOver on an iPhone (the disclosure), Safari's line clamp and the
+ResizeObserver path on a real phone, a right-to-left description, the artist hero under a real iPhone's status
+bar (safe-area-inset-top) with a two-line name, the subtitle and the facts (measured with the inset set by hand
+only, after the second review).

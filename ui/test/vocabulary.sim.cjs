@@ -151,6 +151,8 @@ const BATCH = [
   'lib/albumProperties.ts', 'lib/idBridge.ts', 'lib/upNext.ts', 'player/AlbumPage.tsx', 'player/PlayerBar.tsx',
   //? (2.0.5 review) Library care's Held by nobody: its Put away became Dismiss in this batch too
   'app/HeldByNobody.tsx',
+  //? (2.0.13) the artist's and the album's description - its clamp's words and its source's
+  'app/Description.tsx', 'lib/describe.ts', 'app/useDescription.ts',
 ]
 
 /** The words the batch's files never say to a listener - each with a sample that says it. */

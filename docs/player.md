@@ -151,7 +151,9 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
   Beside an Also chip, in a row too narrow for all three whole (a phone held upright), the badge - In your
   library or **In the collection** - gives way, to leave the Also chip room (a screen reader still hears it,
   and Add or Remove under Play still says whose the album is, with logins on). On a desktop, Info or the Edit
-  panel open beside the page included, the badge keeps its words. The pin at the top right pins the album to Home ([Home and pins](#home-and-pins)).
+  panel open beside the page included, the badge keeps its words. Under Play and Shuffle, **a short description**
+  of the album, headed by a one-line subtitle ("1994 studio album by Portishead") - [descriptions](#descriptions)
+  has where it comes from. The pin at the top right pins the album to Home ([Home and pins](#home-and-pins)).
   Beside it, for an admin (everyone, with logins off), **Edit** opens the album's editors in a sheet over
   the whole screen ([below](#looking-after-deadwax-from-a-phone)), as a panel beside the page on a desktop.
   Tap the **cover** to see it full size - Navidrome's own picture, unresized - in
@@ -514,6 +516,9 @@ have, and Info's artist card.
   so a tap plays at once; the line under them says what they'll play, that Navidrome is still being asked or has
   none of theirs, or that it didn't send some (with **Try again**). They're there from the moment
   the page opens, whenever Navidrome could have albums of theirs, so nothing moves when it answers.
+- **A short description** of them under Play and Shuffle - "Portishead are an English electronic band formed in
+  1991 in Bristol…" - three lines of it, with **More** for the rest, and where it came from under it; and a
+  one-line subtitle under their name ("English band"). [Descriptions](#descriptions) has the details.
 - **Albums** is their albums as MusicBrainz lists them - every one, not a search's best matches -
   newest first, those with no date last (Play and Shuffle go in the same order): the ones you have marked **✓ in your library** (and "2
   editions" when you have more than one pressing - with logins on the ✓ is for yours alone, and one the
@@ -568,6 +573,40 @@ looking, and fills in where it is:
   doesn't answer, About says so, with **Try again**.
 - **Line-up**, for a group: its members, the current ones first, with their roles and years, past
   members stepped back, the first ten with the rest behind "N earlier members".
+
+### Descriptions
+
+An artist's page, an album's and the album you don't have show a short description, as Apple Music
+does - under the artist's **Play** and **Shuffle**, under an album's **Play** and **Shuffle** (or its
+**Get the album**) - and a one-line **subtitle**: "English band", "1994 studio album by Portishead".
+
+- **Where the words come from**: Navidrome's own first - what Navidrome fetches from its metadata agents for the
+  artist or album: an artist's from Deezer with its defaults, and from Last.fm too (albums' from Last.fm alone) once
+  Navidrome is given a Last.fm key - with **More on Last.fm** under it, a link to the Last.fm page when Navidrome
+  has one. When Navidrome has nothing, Wikipedia: the opening paragraph of the artist's or the album's English
+  Wikipedia article, found through MusicBrainz's link to Wikidata (or MusicBrainz's own link to the English
+  article), with **From Wikipedia** under it, a link to the article. An album or artist with neither has no
+  description at all - no empty box. An album you don't have only ever has Wikipedia's (Navidrome has nothing of
+  it); an album or artist with no MusicBrainz id only ever has Navidrome's.
+- **The subtitle** is Wikidata's one-line English description of the same artist or album, whichever source the
+  paragraph came from - none when Wikidata has none, or MusicBrainz has no Wikidata link. An artist's sits under
+  their name, in the picture at the top of the page, on one line (a longer one ends in "…"); an album's heads its
+  description, over the paragraph.
+- **Three lines** of the paragraph, and **More** when there's more - **Less** puts it back. A screen reader reads
+  it whole either way. Its links open beside the app, so the music keeps playing.
+- **It never holds the page up.** The page draws as it always did and the description fills in. The albums on an
+  artist's page, an album's songs and a pressing's tracklist wait a moment for it - the songs and the tracklist
+  half a second at most - so it lands above them rather than pushing them down under your finger; one that comes
+  later still goes to the **foot of the page** instead (under the songs, or the tracklist, or the artist's
+  sections), where it moves nothing - as does one that comes after the page has said something couldn't be loaded,
+  with **Try again** under where it would go. A page you come back to (**Back**) draws as it was, at once.
+- **Kept**: deadwax keeps what Wikipedia and Wikidata said in its database - a found description for a month,
+  "there's none" for three days - so a page you've seen before asks them nothing; the app keeps what it was told
+  for the rest of the visit. Navidrome keeps its own words itself. Nothing is kept of a failure: with Navidrome,
+  Wikipedia, Wikidata or MusicBrainz away the page has what the others gave that time - nothing is said about
+  it - and the app asks again when the page next opens, from a minute on. Nothing to set up: Wikipedia and Wikidata need no key, and are
+  asked with the same user agent MusicBrainz is (built around your `MUSICBRAINZ_EMAIL` -
+  [Connections](configuration.md#connections)).
 
 ### Managing an artist
 
