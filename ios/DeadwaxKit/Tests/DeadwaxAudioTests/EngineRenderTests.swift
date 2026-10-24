@@ -116,6 +116,37 @@ func samples(_ buffer: AVAudioPCMBuffer, channel: Int) -> [Float] {
     Array(UnsafeBufferPointer(start: buffer.floatChannelData![channel], count: Int(buffer.frameLength)))
 }
 
+/// Where two runs of samples first part (nil: they are the same, sample for sample). Expectations
+/// compare through this, not `==` on the arrays: a failed `==` on two collections has Swift Testing
+/// diff them, which is quadratic - two runs of 18,000 samples that differed took the whole test
+/// process down with no message (ios.yml's first macOS run).
+func firstDifference<A: Collection, B: Collection>(_ got: A, _ expected: B) -> String?
+where A.Element == Float, B.Element == Float {
+    var index = 0
+    var left = got.makeIterator(), right = expected.makeIterator()
+    while true {
+        switch (left.next(), right.next()) {
+        case (nil, nil): return nil
+        case let (g?, e?):
+            if g != e { return "sample \(index) of \(got.count) is \(g), expected \(e)" }
+        case (nil, _?): return "\(got.count) samples, expected \(expected.count)"
+        case (_?, nil): return "\(got.count) samples, expected \(expected.count)"
+        }
+        index += 1
+    }
+}
+
+/// Mean square of each `block` frames - a picture of where the sound is, printed by the tests that
+/// lay songs out in time.
+func energyMap(_ samples: [Float], block: Int = 2_048) -> String {
+    stride(from: 0, to: samples.count, by: block).map { start in
+        let piece = samples[start..<min(start + block, samples.count)]
+        let squares: [Float] = piece.map { (sample: Float) -> Float in sample * sample }
+        let mean: Float = squares.reduce(0, +) / Float(piece.count)
+        return "\(start):" + String(format: "%.4f", mean)
+    }.joined(separator: " ")
+}
+
 @Suite(.serialized) struct EngineRenderTests {
     @Test func aJoinIsTheTwoSongsLaidEndToEnd() throws {
         let rate = 44_100.0
@@ -203,16 +234,17 @@ func samples(_ buffer: AVAudioPCMBuffer, channel: Int) -> [Float] {
             Thread.sleep(forTimeInterval: 0.01)
             engine.settle()
         }
+        print("a short song between, energy by 2048 frames (the joins at 22050 and 44100): \(energyMap(left))")
         // past each node's start (it may be ramped) and the rate converter's tail
         let margin = 4_096
-        #expect(Array(left[margin..<22_050]) == Array(first[0][margin...]), "the first song")
+        #expect(firstDifference(left[margin..<22_050], first[0][margin...]) == nil, "the first song")
         let middle = (22_050 + margin)..<(44_100 - margin)
         let squares: [Float] = left[middle].map { (sample: Float) -> Float in sample * sample }
         let middleEnergy: Float = squares.reduce(0, +) / Float(middle.count)
         #expect(middleEnergy > 0.01, "the 96 kHz song, second")
-        #expect(Array(left[middle]) != Array(third[0][(middle.lowerBound - 22_050)..<(middle.upperBound - 22_050)]),
+        #expect(firstDifference(left[middle], third[0][(middle.lowerBound - 22_050)..<(middle.upperBound - 22_050)]) != nil,
                 "not the third song laid straight after the first")
-        #expect(Array(left[(44_100 + margin)..<66_150]) == Array(third[0][margin...]),
+        #expect(firstDifference(left[(44_100 + margin)..<66_150], third[0][margin...]) == nil,
                 "the third song, alone, from the moment the second ends")
         #expect(left[(66_150 + margin)...].allSatisfy { $0 == 0 }, "silence after the three")
     }
@@ -238,7 +270,7 @@ func samples(_ buffer: AVAudioPCMBuffer, channel: Int) -> [Float] {
         engine.settle()
         let out = try engine.renderOffline(24_000)
         let from = Int((held.seconds * rate).rounded())
-        #expect(Array(samples(out, channel: 0)[8_192..<9_192]) == Array(song[0][(from + 8_192)..<(from + 9_192)]),
+        #expect(firstDifference(samples(out, channel: 0)[8_192..<9_192], song[0][(from + 8_192)..<(from + 9_192)]) == nil,
                 "the song goes on from frame \(from)")
     }
 
@@ -258,7 +290,7 @@ func samples(_ buffer: AVAudioPCMBuffer, channel: Int) -> [Float] {
         #expect(abs(at.seconds - before.seconds) < 0.001, "on from \(before.seconds) s, not \(at.seconds) s")
         let out = try engine.renderOffline(24_000)
         let from = Int((before.seconds * rate).rounded())
-        #expect(Array(samples(out, channel: 0)[8_192..<9_192]) == Array(song[0][(from + 8_192)..<(from + 9_192)]))
+        #expect(firstDifference(samples(out, channel: 0)[8_192..<9_192], song[0][(from + 8_192)..<(from + 9_192)]) == nil)
     }
 
     // AirPods out: the engine's configuration change and the app's pause for the old device gone
@@ -385,7 +417,7 @@ func samples(_ buffer: AVAudioPCMBuffer, channel: Int) -> [Float] {
         var got: [Float] = []
         while case .frames(let buffer) = try source.read(maxFrames: 1000) { got += samples(buffer, channel: 0) }
         #expect(got.count == frames)
-        #expect(got == values.map { Float($0) / 8_388_608 })
+        #expect(firstDifference(got, values.map { Float($0) / 8_388_608 }) == nil)
     }
 
     @Test func aStreamDecodesWhatTheFileDoes() throws {
@@ -424,13 +456,13 @@ func samples(_ buffer: AVAudioPCMBuffer, channel: Int) -> [Float] {
             }
         }
         let whole = try decode(FileSource(url: url))
-        #expect(whole == song[0], "the file decodes to what was written")
+        #expect(firstDifference(whole, song[0]) == nil, "the file decodes to what was written")
         let data = try Data(contentsOf: url)
         let streamed = try decode(StreamSource(bytes: GrowingBytes(data, step: 1_000), typeHint: kAudioFileFLACType))
-        #expect(streamed == whole, "the stream decodes to what the file does")
+        #expect(firstDifference(streamed, whole) == nil, "the stream decodes to what the file does")
         let sought = try decode(StreamSource(bytes: GrowingBytes(data, step: 7_000), typeHint: kAudioFileFLACType,
                                              start: .frame(10_000, rate: 44_100)))
-        #expect(sought == Array(whole[10_000...]), "a seek before the bytes arrive drops exactly the frames before it")
+        #expect(firstDifference(sought, whole[10_000...]) == nil, "a seek before the bytes arrive drops exactly the frames before it")
     }
 }
 #endif

@@ -68,23 +68,41 @@ jobs:
       - name: DeadwaxKit, with the engine's offline renders
         run: swift test --package-path ios/DeadwaxKit
 
+      # A test process that crashes can end the step with its last lines unprinted: macOS's crash
+      # report says where (the faulting thread's stack, and an exception's reason)
+      - name: Crash reports, if the tests died
+        if: failure()
+        run: |
+          for dir in ~/Library/Logs/DiagnosticReports /Library/Logs/DiagnosticReports; do
+            ls -lt "$dir" 2>/dev/null | head -20 || true
+            find "$dir" -maxdepth 1 -newer ios/DeadwaxKit/Package.swift \
+              \( -name '*Deadwax*' -o -name '*xctest*' -o -name '*swiftpm*' \) 2>/dev/null |
+              while read -r report; do echo "=== $report"; head -c 60000 "$report"; echo; done
+          done
+
       # GitHub's macOS runners come with iOS Simulator runtimes, which James's Mac doesn't have; a
       # build tool that needs one (actool, ibtool - the plan's R2) would pass here and fail there.
       # So the runtimes go first, as far as the runner lets them (both lists are printed). Even so
       # this is no stand-in for check 1, install.sh on James's Mac.
+      # The app's build runs whether or not a test failed (the job fails either way), so one run shows
+      # both; the checks on what it made only when it built.
       - name: No Simulator runtimes, as on James's Mac
+        if: ${{ !cancelled() }}
         run: |
           xcrun simctl list runtimes || true
           xcrun simctl runtime delete all || sudo xcrun simctl runtime delete all || true
           xcrun simctl list runtimes || true
 
       - name: The app, an unsigned device build
+        id: build
+        if: ${{ !cancelled() }}
         run: |
           xcodebuild -project ios/Deadwax.xcodeproj -scheme Deadwax -configuration Release \
             -destination 'generic/platform=iOS' -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
 
       - name: What the build made
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
           app=build/Build/Products/Release-iphoneos/Deadwax.app
           ls -la "$app"
