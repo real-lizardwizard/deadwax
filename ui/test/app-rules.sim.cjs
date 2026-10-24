@@ -1454,14 +1454,14 @@ console.log('\npins: deadwax\'s own, asked when asked, and nothing about them pl
   check('the album page\'s pin: by the release the bridge says, drawn until it says there is none, live only once it has - and the pins have',
     [/release_mbid: release, navidrome_id: id/.test(album), /\{!\(storeDone && !release\) && \(/.test(album), /ready=\{storeDone && !!release && pinsKnown\}/.test(album),
       /onToggle=\{\(\) => void setPinned\(pinTarget, !pinned\)\}/.test(album), /const \{ pins, known: pinsKnown, canSave \} = usePins\(true\)/.test(album),
-      /onRefused=\{\(\) => sayPins\(PINS_UNSAVED\)\}/.test(album)],
+      /onRefused=\{\(\) => sayPins\(pinsUnsaved\(seesDetail\(accessNow\(\)\)\)\)\}/.test(album)],
     [true, true, true, true, true, true])
   const artist = code(read('app/ArtistPage.tsx')).replace(/\n\s*/g, ' ')
   check('the artist\'s pin: by MusicBrainz id, else name and Navidrome\'s id - live once that is settled, and the pins have answered',
     [/const pinTarget: ArtistPinTarget = \{ kind: 'artist', mbid, navidrome_id: libraryId, name, cover: picture \}/.test(artist),
       /const pinReady = pinsKnown && !!name && \(mbid !== null \|\| \(library\.state !== 'asking' && ownedKnown && libraryId !== null\)\)/.test(artist),
       /<PinToggle look="chip" pinned=\{pinned\} ready=\{pinReady\}/.test(artist), /const \{ pins, known: pinsKnown, canSave \} = usePins\(true\)/.test(artist),
-      /onRefused=\{\(\) => sayPins\(PINS_UNSAVED\)\}/.test(artist)],
+      /onRefused=\{\(\) => sayPins\(pinsUnsaved\(seesDetail\(accessNow\(\)\)\)\)\}/.test(artist)],
     [true, true, true, true, true])
   const appLine = app.replace(/\n\s*/g, ' ')
   check('the ••• menu\'s pin: asked as Now Playing opens, its tap closing the menu, saving and saying so - App\'s, handed to the menu',

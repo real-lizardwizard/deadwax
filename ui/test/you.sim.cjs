@@ -140,7 +140,9 @@ globalThis.__you = {
   },
   ping(service) {
     asked[service] += 1
-    return Promise.resolve(ANSWERS[service])
+    //? (review) an ask that itself fails, as api/http.ts throws it
+    const failing = globalThis.__you.pingFailure?.[service]
+    return failing ? Promise.reject(failing) : Promise.resolve(ANSWERS[service])
   },
 }
 const ME = { user: 'local', admin: true, auth: 'off', version: '2.0.0-player.9' }
@@ -149,7 +151,10 @@ const chosenLooks = []
 const chosenWindDowns = []
 const LOOK = { opensAs: 'turntable', onOpensAs: (look) => chosenLooks.push(look), windDown: true, onWindDown: (on) => chosenWindDowns.push(on) }
 const answersWith = (value) => () => Promise.resolve(value)
-const failsWith = (words) => () => Promise.reject(new Error(words))
+//? (2.0.4) failures as the page meets them: fetch's own TypeError, and an answer as api/http.ts throws it (a 502 from
+//? something in front of deadwax: no words of its own)
+const failsOffline = () => () => Promise.reject(new TypeError('Failed to fetch'))
+const failsWithAnswer = (status) => () => Promise.reject(new (require(path.join(OUT, 'api/http.js')).ApiError)(status, null, 'GET /me failed', false, null, null, '/me'))
 
 let failures = 0
 function check(label, actual, expected) {
@@ -208,13 +213,14 @@ async function main() {
   check('hidden, never opened: no ping, no /me', asked, { me: 0, musicbrainz: 0, slskd: 0, navidrome: 0 })
 
   console.log('\n/deadwax/me asked with the pings, and asked again')
-  meAnswers.push(failsWith('deadwax is restarting'))
+  meAnswers.push(failsOffline())
   draw({ shown: true, current: true, ...LOOK })
   check('shown: /me and the three pings, once each', asked, { me: 1, musicbrainz: 1, slskd: 1, navidrome: 1 })
   await settle()
   draw({ shown: true, current: true, ...LOOK })
   check('/me failed: the version and logins say they are not known', about(), { Version: 'unknown', Logins: 'unknown' })
-  check('...the failure is said', failure(), ["deadwax didn't answer: deadwax is restarting"])
+  //? (2.0.4) in a listener's words, and (logins off: everyone runs deadwax) fetch's own under them
+  check('...the failure is said', failure(), ["Can't connect to deadwax. Check your connection, then try again.Failed to fetch"])
   check('...and the identity line claims nothing', identity(), [])
   check('drawn again, nothing is asked again by itself', asked.me, 1)
 
@@ -228,11 +234,11 @@ async function main() {
   check('deadwax back: the version and logins, and nothing failed', [about(), failure()], [{ Version: '2.0.0-player.9', Logins: 'Off' }, []])
   check('...and the identity line says what deadwax said', identity(), ['Logins are off'])
 
-  meAnswers.push(failsWith('no answer'))
+  meAnswers.push(failsWithAnswer(502))
   checkAgain().props.onClick()
   await settle()
   draw({ shown: true, current: true, ...LOOK })
-  check('a failed ask after a good one keeps the version, and says it failed', [about().Version, failure()], ['2.0.0-player.9', ["deadwax didn't answer: no answer"]])
+  check('a failed ask after a good one keeps the version, and says it failed', [about().Version, failure()], ['2.0.0-player.9', ["deadwax can't do that right now. Try again in a minute.GET /me failed"]])
 
   console.log('\neach connection row is read whole')
   const list = find((node) => node.type === 'ul' && byClass('app-group')(node))[0]
@@ -241,9 +247,26 @@ async function main() {
   check('every row is one, polite and atomic', rows.map((row) => [row.props['aria-live'], row.props['aria-atomic']]), [['polite', 'true'], ['polite', 'true'], ['polite', 'true']])
   check('...holding its service with its answer', rows.map(text), [
     'MusicBrainzConnected',
-    'slskdNOT_LOGGED_INslskd is not logged in to Soulseek',
+    //? (2.0.4) a word for the code, never the code; slskd's sentence under it
+    'slskdNot on Soulseekslskd is not logged in to Soulseek',
     'NavidromeNavidrome 0.64.2',
   ])
+  {
+    //? (review) the ask itself failing: "Couldn't check", its sentence - and the route's own words, for the admin and
+    //? Settings holder these rows are drawn for (it was "Something went wrong. Try again." alone)
+    const { ApiError } = require(path.join(OUT, 'api/http.js'))
+    globalThis.__you.pingFailure = { slskd: new ApiError(500, 'Error pinging slskd: boom', 'GET /monitor_slskd/ping failed', false, null, null, '/monitor_slskd/ping') }
+    checkAgain().props.onClick()
+    await settle()
+    draw({ shown: true, current: true, ...LOOK })
+    globalThis.__you.pingFailure = null
+    check('a ping that fails itself: the row\'s word, its sentence, and the route\'s own words after it',
+      find((node) => node.type === 'li' && byClass('app-status-row')(node)).map(text)[1],
+      "slskdCouldn't checkSomething went wrong. Try again. (Error pinging slskd: boom)")
+    checkAgain().props.onClick()
+    await settle()
+    draw({ shown: true, current: true, ...LOOK })
+  }
 
   console.log('\nPlayback: Gapless, then Now Playing opens as, then Pause winds the record down, then Maximum quality')
   const named = (name) => find((node) => typeof node.type === 'function' && node.type.name === name)
@@ -310,15 +333,15 @@ async function main() {
     check('under them, "Confirm before cancelling" - this device\'s, on as it ships - and its note says so',
       [!!confirm, confirm?.props.on, find((node) => node.props?.id === 'app-confirm-cancel-note').map(text)],
       [true, true, ['The ✕ on a download in Requests asks first. Kept on this device.']])
-    check('nothing failed, nothing said', failure().filter((line) => !line.startsWith("deadwax didn't answer")), [])
+    check('nothing failed, nothing said', failure().filter((line) => !line.startsWith("deadwax can't do that right now")), [])
     //? the connection rows are live regions too, but list items; this one is the section's own div
     const problemRegion = () => find((node) => node.type === 'div' && node.props?.['aria-live'] === 'polite' && node.props?.['aria-atomic'] === 'true')
     check('a save\'s failure has a live region always in the page, empty while nothing failed', [problemRegion().length, text(problemRegion()[0])], [1, ''])
-    globalThis.__you.getting = { settings: null, canSave: false, problem: 'Not saved: the database is locked' }
+    globalThis.__you.getting = { settings: null, canSave: false, problem: 'Not saved. the database is locked' }
     draw({ shown: true, current: true, ...LOOK })
-    check('a database that can\'t keep them, and a save that failed, are said', failure().filter((line) => !line.startsWith("deadwax didn't answer")),
-      ["deadwax can't keep these: its database isn't writable.", 'Not saved: the database is locked'])
-    check('...the failure inside that region, so VoiceOver hears why the choice went back', text(problemRegion()[0]), 'Not saved: the database is locked')
+    check('a database that can\'t keep them, and a save that failed, are said', failure().filter((line) => !line.startsWith("deadwax can't do that right now")),
+      ["deadwax can't keep these: its database isn't writable.", 'Not saved. the database is locked'])
+    check('...the failure inside that region, so VoiceOver hears why the choice went back', text(problemRegion()[0]), 'Not saved. the database is locked')
     //? (review) in the section, in order: what went wrong keeping the three sits right under them and their
     //? note, never under this device's own setting - "can't keep these" read as being about it
     const section = find((node) => node.type === 'section' && node.props?.['aria-labelledby'] === 'app-getting-title')[0]
@@ -413,7 +436,7 @@ exports.readDownloadDefaults = () => globalThis.__getting.downloadDefaults
       format_preference: server.stored.format_preference ?? 'prefer_lossless', stored: Object.keys(server.stored).sort(),
       seeded: server.seeded, unseeded: server.seeded ? server.unseeded : KEYS, can_save: server.canSave })
     const take = (values) => {
-      if (!server.canSave || server.refuse) throw new Error("deadwax can't keep preferences: its database isn't writable")
+      if (!server.canSave || server.refuse) throw new (require(path.join(OUT2, 'api/http.js')).ApiError)(503, "deadwax can't keep preferences: its database isn't writable", 'PUT /me/preferences failed', false, null, null, '/me/preferences')
       Object.assign(server.stored, values)
       server.seeded = true
       server.unseeded = []
@@ -427,7 +450,7 @@ exports.readDownloadDefaults = () => globalThis.__getting.downloadDefaults
         server.puts.push(values)
         if (server.hold) {
           return new Promise((resolve, reject) => server.held.push({ values, let: (refuse) => {
-            try { if (refuse) throw new Error('the database is locked'); resolve(take(values)) } catch (error) { reject(error) }
+            try { if (refuse) throw new (require(path.join(OUT2, 'api/http.js')).ApiError)(503, 'the database is locked', 'PUT /me/preferences failed', false, null, null, '/me/preferences'); resolve(take(values)) } catch (error) { reject(error) }
           } }))
         }
         try { return Promise.resolve(take(values)) } catch (error) { return Promise.reject(error) }
@@ -554,7 +577,7 @@ exports.readDownloadDefaults = () => globalThis.__getting.downloadDefaults
     server.refuse = true
     await G.chooseGetSettings({ quality_floor: '320' })
     check('one deadwax won\'t keep goes back to what the server holds, and says so',
-      [G.getSettingsNow().quality_floor, G.useGetSettings(false).problem], ['lossless', "Not saved: deadwax can't keep preferences: its database isn't writable"])
+      [G.getSettingsNow().quality_floor, G.useGetSettings(false).problem], ['lossless', "Not saved. deadwax can't keep preferences: its database isn't writable"])
     server.refuse = false
     await G.chooseGetSettings({ quality_floor: '24bit' })
     check('...said until the next choice, which clears it', G.useGetSettings(false).problem, null)
@@ -586,11 +609,11 @@ exports.readDownloadDefaults = () => globalThis.__getting.downloadDefaults
     server.held.shift().let(true)
     await mode
     check('an older choice refused goes back - to the server\'s, saying so - and the newer one still shows',
-      [G.getSettingsNow(), G.useGetSettings(false).problem], [{ get_mode: 'sources', quality_floor: 'lossless', format_preference: 'prefer_lossless' }, 'Not saved: the database is locked'])
+      [G.getSettingsNow(), G.useGetSettings(false).problem], [{ get_mode: 'sources', quality_floor: 'lossless', format_preference: 'prefer_lossless' }, 'Not saved. the database is locked'])
     server.held.shift().let()
     await floor
     check('...the newer one saved, and what was refused said still', [G.getSettingsNow(), server.stored, G.useGetSettings(false).problem],
-      [{ get_mode: 'sources', quality_floor: 'lossless', format_preference: 'prefer_lossless' }, { get_mode: 'sources', quality_floor: 'lossless' }, 'Not saved: the database is locked'])
+      [{ get_mode: 'sources', quality_floor: 'lossless', format_preference: 'prefer_lossless' }, { get_mode: 'sources', quality_floor: 'lossless' }, 'Not saved. the database is locked'])
 
     fresh({ get_mode: 'sources', quality_floor: 'any' })
     await G.askGetSettings()
@@ -677,11 +700,32 @@ exports.readDownloadDefaults = () => globalThis.__getting.downloadDefaults
     await settle()
     draw(props)
     check('not an admin: no Managing section, no row', [find((node) => node.props?.id === 'app-managing-title').length, find(byClass('app-queue-link-row')).length], [0, 0])
+    //? (2.0.4) nor Connections: what slskd's key or Navidrome's address is doing is whoever runs deadwax's - nothing asked
+    const pinged = asked.slskd
+    check('...nor Connections, nor its Check again', [find((node) => node.props?.id === 'app-connections-title').length, checkAgain()], [0, undefined])
+    //? (review) Getting albums' database line: a listener told who can fix it - an admin's (above) isn't
+    const keeps = globalThis.__you.getting
+    globalThis.__you.getting = { settings: null, canSave: false, problem: null }
+    draw(props)
+    check('...a database that can\'t keep Getting albums: said, and to tell whoever runs deadwax',
+      failure().filter((line) => line.startsWith("deadwax can't keep")), ["deadwax can't keep these: its database isn't writable. Tell whoever runs deadwax."])
+    globalThis.__you.getting = keeps
+    draw(props)
+    //? You shown again (the only way, with no Check again): /me and the pings asked as it comes back
     meAnswers.push(answersWith(ME))
-    checkAgain().props.onClick()
+    draw({ ...props, shown: false })
+    draw(props)
+    check('...and no ping asked for them', asked.slskd, pinged)
     await settle()
     draw(props)
-    check('...and back once deadwax says so: the four rows', find(byClass('app-queue-link-row')).length, 4)
+    check('...and back once deadwax says so: the four rows, and Connections', [find(byClass('app-queue-link-row')).length, find((node) => node.props?.id === 'app-connections-title').length], [4, 1])
+    //? (review) and asked now - not left on "Checking…" with Check again disabled until You is opened again
+    check('...its pings asked the moment it is drawn', asked.slskd, pinged + 1)
+    await settle()
+    draw(props)
+    check('...answered: no row still checking, and Check again offered',
+      [find((node) => node.type === 'li' && byClass('app-status-row')(node)).map(text).filter((row) => row.includes('Checking')), checkAgain()?.props.disabled],
+      [[], false])
   }
 
   console.log('\nChange password (2.0.2): in About, before Sign out - a Navidrome sign-in\'s alone')
@@ -700,10 +744,11 @@ exports.readDownloadDefaults = () => globalThis.__getting.downloadDefaults
       visit(section)
       return parts
     }
+    //? (2.0.4) asked as You is shown again - "Check again" is Connections', which isn't drawn for everyone now
     const asWho = async (who) => {
       meAnswers.push(answersWith(who))
+      draw({ ...props, shown: false })
       draw(props)
-      checkAgain().props.onClick()
       await settle()
       draw(props)
     }

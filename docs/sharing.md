@@ -242,8 +242,9 @@ Over plain `http://` a password typed in People crosses your network readable, a
 does - fine on your own network or over a VPN; anywhere else, put HTTPS in front of deadwax first. People
 says so under each password field.
 
-**The first time**, they see the app without any managing: no **Managing deadwax** in You, no
-**Edit** on an album. Their Library says **Nothing in your library yet.**, with **Browse the store**,
+**The first time**, they see the app without any managing: no **Managing deadwax** or **Connections**
+in You, no **Edit** on an album; when something fails they're told what happened and what to do -
+try again, or tell whoever runs deadwax - never an error's own words. Their Library says **Nothing in your library yet.**, with **Browse the store**,
 where the whole store is. Home has no pins yet; their Getting albums settings are the defaults, or what the old page at `/` had
 left in that browser, carried over once ([configuration](configuration.md#your-settings-in-the-app-per-user-on-deadwax)). From
 there they search, **Get** what they want, or add what the store already has. They stay signed in on
@@ -320,7 +321,7 @@ else can do what the left column says, and an admin can give any of them more, b
 | **Edit albums**: apply a release, tags, cover, CD art, lyrics (one album, or Library care's runs), an artist's pictures, **Which artist is this?** | no | **Edit albums** | yes |
 | **Look after the library**: delete an album, move an artist's albums under their current name, **Needs a look**, **Rescan**, **Held by nobody** | no | **Look after the library** | yes |
 | **Everyone's downloads**: see who asked ("Asked by ethan"), cancel or retry anyone's, clear everyone's finished | no | **Everyone's downloads** | yes |
-| **Settings and the log**: the server settings and the event log | no | **Settings and the log** | yes |
+| **Settings and the log**: the server settings and the event log - and You's **Connections**, and the words behind what went wrong (Navidrome's or slskd's own, a setting's name) under each error | no | **Settings and the log** | yes |
 | **People**: make, reset and remove Navidrome accounts, make admins, give permissions | no | never - it comes with being a Navidrome admin | yes |
 | **Info → Debug** on the now-playing screen: how each song is sent, the last song changes and seek, the turntable's readouts and recording, the test bench link, the fields Navidrome sent | no - **Info** is **About** alone, with a **Playing** group (the file's format, Gapless, Normalization) | never - it comes with being an admin | yes |
 

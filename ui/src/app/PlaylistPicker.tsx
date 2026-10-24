@@ -9,6 +9,7 @@ import { NewPlaylistForm } from './NewPlaylistForm'
 import { askPlaylists, announcePlaylistChanged, usePlaylists } from './usePlaylists'
 import { sayPins } from './usePins'
 import { useSheet } from './useSheet'
+import { sayError } from './sayError'
 
 /** Some of the songs are in the playlist already: the question, in place of the list. */
 interface Question {
@@ -120,10 +121,11 @@ export function PlaylistPicker({
       (caught: unknown) => {
         writing.current = false
         setAdding(null)
-        const why = caught instanceof Error ? caught.message : String(caught)
+        //? (2.0.4) in a listener's words (sayError)
+        const why = sayError(caught)
         if (caught instanceof ApiError && caught.status === 404) askPlaylists({ fresh: true })
         if (showing.current !== key) {
-          sayPins(`Couldn't add to ${playlist.name}: ${why}`)
+          sayPins(`Couldn't add to ${playlist.name}. ${why}`)
           return
         }
         if (fromQuestion) backToList.current = true

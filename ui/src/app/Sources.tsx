@@ -22,6 +22,7 @@ import { SourceCard } from './SourceCard'
 import { StoreState } from './StoreState'
 import { askGetSettings, formatPreferenceNow, getSettingsNow, useGetSettings } from './useGetSettings'
 import { useSheet } from './useSheet'
+import { errorLine } from './ErrorNote'
 
 /** A Get: what it downloads, and what the sheet's heading says it is for. */
 export interface GetRequest {
@@ -545,7 +546,7 @@ export function Sources({
             </div>
           ) : search.error ? (
             <div class="app-sources-state">
-              <p class="app-sources-state-text is-warning">{search.error}</p>
+              {errorLine(search.error, search.detail, { class: 'app-sources-state-text is-warning' })}
               <button
                 type="button"
                 class="app-button"

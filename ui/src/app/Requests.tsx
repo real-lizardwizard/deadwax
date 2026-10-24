@@ -12,6 +12,9 @@ import { queued, warmAlbum } from '../player/levelling'
 import { readConfirmCancel } from '../state/persisted'
 import { usePlayerActions } from './context'
 import { AttentionCard, DoneRow, DownloadingCard, WaitingCard } from './JobCard'
+import { errorWords, TELL } from '../lib/errorWords'
+import { seesDetail, useAccess } from './access'
+import { errorLine } from './ErrorNote'
 
 /** How many Done rows have their album asked for ahead of a tap, so their ▶ plays at once - the
  *  newest first, as they are listed. A tap on any other opens the album, where Play is. */
@@ -26,6 +29,19 @@ export const NOT_IN_STORE = "deadwax can't tell which album in your library this
 
 /** ...when deadwax itself didn't answer the look. */
 export const NOT_LOOKED_UP = "Couldn't look it up just now - tap to try again"
+
+/** (2.0.4) A Done row that can't open its album because of the music server - App's navidromeProblem. */
+export const CANT_OPEN_UNSET = "Can't open this album yet - the music server isn't set up."
+export const CANT_OPEN_DOWN = "Can't open this album right now - the music server can't be reached. Try again in a minute."
+/** (2.0.4, review) ...when deadwax ITSELF didn't answer the check (NavidromeStatus offline): the music server may be fine */
+export const CANT_OPEN_OFFLINE = "Can't open this album right now - can't connect to deadwax. Check your connection, then try again."
+
+/** (2.0.4) Over what went wrong asking for the downloads - the rows below stay as the last answer had them. */
+export const REQUESTS_UNREACHED = "Can't update your requests right now"
+/** (2.0.4) deadwax's database can't keep track of downloads: the heading, and what anyone but whoever runs deadwax
+ *  reads under it (they get DB_PATH). */
+export const UNTRACKED = "Downloads aren't being kept track of"
+export const UNTRACKED_TEXT = `Requests can't be shown right now: deadwax can't keep track of downloads. ${TELL}`
 
 const without = <V,>(map: ReadonlyMap<string, V>, key: string): Map<string, V> => {
   const next = new Map(map)
@@ -82,6 +98,7 @@ export function Requests({
   answered = true,
   trackingEnabled,
   error,
+  failure = null,
   active = false,
   navidromeProblem = null,
   onCancel,
@@ -96,6 +113,8 @@ export function Requests({
   trackingEnabled: boolean
   /** why the last look at the downloads failed; the rows stay as they were meanwhile */
   error: string | null
+  /** (2.0.4) ...the error itself, said in a listener's words (lib/errorWords.ts) - `error` alone is said as it is */
+  failure?: unknown
   /** the tab's root is what shows (App's watching, and no sheet over it): the Done rows' albums are
    *  asked for, and looked for again, only then */
   active?: boolean
@@ -109,6 +128,9 @@ export function Requests({
   onOpenAlbum?: (album: Album) => void
 }) {
   const actions = usePlayerActions()
+  //? (2.0.4) whoever runs deadwax reads what went wrong in its own words too, and DB_PATH
+  const runs = seesDetail(useAccess())
+  const failed = errorWords(failure ?? (error ? new Error(error) : null), { admin: runs, service: 'downloads' })
   //? the card asking "cancel it?", by its row's key - one at a time
   const [asking, setAsking] = useState<string | null>(null)
   //? the tab shows, read when an answer lands
@@ -325,7 +347,7 @@ export function Requests({
   const cancelNow = (row: RequestRow) => {
     setAsking(null)
     if (row.jobId === null || row.cancel !== 'ready') return
-    void onCancel(row.jobId).catch((caught: unknown) => console.error(`Cancel error: ${message(caught)}`))
+    void onCancel(row.jobId).catch((caught: unknown) => console.error('Cancel error:', caught))
   }
 
   //? the ✕: cancel, or ask first; a second tap on the ✕ asking closes the question
@@ -344,7 +366,7 @@ export function Requests({
   }
 
   const clear = () => {
-    void onClear().catch((caught: unknown) => console.error(`Clear jobs error: ${message(caught)}`))
+    void onClear().catch((caught: unknown) => console.error('Clear jobs error:', caught))
   }
 
   const card = (section: Section, row: RequestRow): JSX.Element => {
@@ -378,8 +400,10 @@ export function Requests({
 
       {error && (
         <div class="app-card app-placeholder-body" role="status">
-          <p class="app-placeholder-lead">Can't get your requests from deadwax</p>
-          <p class="app-placeholder-text app-error">{error}</p>
+          <p class="app-placeholder-lead">{REQUESTS_UNREACHED}</p>
+          {/* (2.0.4) what went wrong in a listener's words, its own under it for whoever runs deadwax - no "try
+              again": it asks again by itself, as the line under says */}
+          {errorLine(failed.text, failed.detail, { class: 'app-placeholder-text app-error' })}
           <p class="app-placeholder-text">
             {view.empty
               ? 'It keeps asking while this tab is open.'
@@ -390,11 +414,15 @@ export function Requests({
 
       {!trackingEnabled ? (
         <div class="app-card app-placeholder-body">
-          <p class="app-placeholder-lead">Downloads aren't being kept track of</p>
-          <p class="app-placeholder-text">
-            deadwax can't write its database. Downloads still arrive in slskd's folder, but they can't be
-            listed here or filed into your library. Check <span class="app-mono">DB_PATH</span>.
-          </p>
+          <p class="app-placeholder-lead">{UNTRACKED}</p>
+          {runs ? (
+            <p class="app-placeholder-text">
+              deadwax can't write its database. Downloads still arrive in slskd's folder, but they can't be
+              listed here or filed into your library. Check <span class="app-mono">DB_PATH</span>.
+            </p>
+          ) : (
+            <p class="app-placeholder-text">{UNTRACKED_TEXT}</p>
+          )}
         </div>
       ) : view.empty ? (
         !answered ? (
@@ -434,4 +462,3 @@ export function Requests({
   )
 }
 
-const message = (caught: unknown) => (caught instanceof Error ? caught.message : String(caught))

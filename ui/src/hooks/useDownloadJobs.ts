@@ -11,6 +11,8 @@ import {
 import { onDownloadsChanged } from '../lib/downloadRequests'
 import { announceAlbumsFiled, newlyOrganized, statusesOf } from '../lib/libraryEvents'
 import { sampleSpeeds, type SpeedSamples } from '../lib/speed'
+import { errorWords, rawWords } from '../lib/errorWords'
+import type { RetryProblem } from '../lib/requestsView'
 
 /*
  * Fast while you're watching, slow in the background just to keep the badge honest.
@@ -50,6 +52,8 @@ export interface DownloadJobsState {
   finishedCount: number
   /** Set when the last poll failed. Polling continues regardless. */
   error: string | null
+  /** (2.0.4) ...and the error itself, for Requests to say in a listener's words (app/ErrorNote.tsx) */
+  failure: unknown
   /**
    * Jobs whose cancel has been asked for but not yet confirmed by the server.
    *
@@ -65,7 +69,7 @@ export interface DownloadJobsState {
   /** Which of `retrying` are asking the SAME peer again rather than moving to the next. */
   retryingSame: ReadonlySet<number>
   /** Why the last retry didn't start a job, by job id - every peer refused, say. */
-  retryProblems: ReadonlyMap<number, string>
+  retryProblems: ReadonlyMap<number, RetryProblem>
   /**
    * Start a failed or cancelled job again: by default on the next peer from the list it was
    * picked from, or with `samePeer` from the same peer, for the files that didn't arrive (v1.0.7).
@@ -106,6 +110,7 @@ export function useDownloadJobs(open: boolean): DownloadJobsState {
   const [trackingEnabled, setTrackingEnabled] = useState(true)
   const [speeds, setSpeeds] = useState<Map<number, number>>(() => new Map())
   const [error, setError] = useState<string | null>(null)
+  const [failure, setFailure] = useState<unknown>(null)
 
   // a rolling measurement rather than UI state, so it lives in a ref and never triggers a
   // render on its own
@@ -168,10 +173,13 @@ export function useDownloadJobs(open: boolean): DownloadJobsState {
 
         setTrackingEnabled(response.tracking_enabled)
         setError(null)
+        setFailure(null)
       } catch (caught) {
         if (cancelled) return
         // keep trying rather than dying silently on one bad response
-        setError(caught instanceof Error ? caught.message : 'failed to fetch download jobs')
+        //? (2.0.4) the error's own words - whether the last look failed (stallsOn); Requests says it from `failure`
+        setError(rawWords(caught) || 'failed to fetch download jobs')
+        setFailure(caught)
       }
 
       if (cancelled) return
@@ -223,7 +231,7 @@ export function useDownloadJobs(open: boolean): DownloadJobsState {
   )
 
   const pendingKey = useRef(0)
-  const [retryProblems, setRetryProblems] = useState<ReadonlyMap<number, string>>(() => new Map())
+  const [retryProblems, setRetryProblems] = useState<ReadonlyMap<number, RetryProblem>>(() => new Map())
 
   const [retryingSame, setRetryingSame] = useState<ReadonlySet<number>>(() => new Set())
 
@@ -237,7 +245,7 @@ export function useDownloadJobs(open: boolean): DownloadJobsState {
       return next
     })
 
-    const giveUp = (problem: string) => {
+    const giveUp = (problem: RetryProblem) => {
       setOverlays((current) => ({ ...current, retrying: withRemoved(current.retrying, [jobId]) }))
       setRetryProblems((current) => new Map(current).set(jobId, problem))
     }
@@ -253,7 +261,9 @@ export function useDownloadJobs(open: boolean): DownloadJobsState {
         else giveUp(outcome.problem ?? 'no other peer would take it')
       }
     } catch (caught) {
-      giveUp(caught instanceof Error ? caught.message : 'the retry failed')
+      //? (2.0.4) said in a listener's words, the error's own beside them for whoever runs deadwax (JobCard)
+      const words = errorWords(caught, { service: 'downloads', failed: "That didn't work.", admin: true })
+      giveUp({ text: words.text, detail: words.detail })
     }
   }, [refresh])
 
@@ -284,8 +294,10 @@ export function useDownloadJobs(open: boolean): DownloadJobsState {
       refresh()
       return result
     } catch (caught) {
-      const error = caught instanceof Error ? caught.message : 'slskd refused the download'
-      setOverlays((current) => settlePending(current, key, { error }))
+      //? (2.0.4) in a listener's words - deadwax's own where they're fit ("already in your library"), else what
+      //? didn't happen - with the error's own beside them for whoever runs deadwax (JobCard)
+      const words = errorWords(caught, { service: 'downloads', failed: "The download couldn't be started.", admin: true })
+      setOverlays((current) => settlePending(current, key, { error: words.text, ...(words.detail ? { detail: words.detail } : {}) }))
       throw caught
     }
   }, [refresh])
@@ -321,6 +333,7 @@ export function useDownloadJobs(open: boolean): DownloadJobsState {
     activeCount: active,
     finishedCount: shown.length + pending.length - active,
     error,
+    failure,
     cancelling: overlays.cancelling,
     pending,
     retrying: overlays.retrying,

@@ -690,9 +690,11 @@ def test_an_unusable_navidrome_url_gets_no_sign_in_nor_recheck_sent_to_it(on, mo
 
     response = sign_in(TestClient(on.app), "james", PASSWORDS["james"])
     assert response.status_code == 503
-    detail = response.json()["detail"]
-    assert "NAVIDROME_URL is unusable" in detail and said in detail and "isn't answering" not in detail
-    assert "hunter2" not in detail
+    #? (2.0.4) the address problem for whoever runs deadwax (`why`), the sentence for anyone (`detail`)
+    detail, why = response.json()["detail"], response.json()["why"]
+    assert detail == auth.NAVIDROME_UNSET
+    assert "NAVIDROME_URL is unusable" in why and said in why and "isn't answering" not in why
+    assert "hunter2" not in detail and "hunter2" not in why
 
     run(auth.check_sessions(on.store, now=time.time() + auth.RECHECK_SECONDS + 1))
     assert ethan.get(ME).json()["user"] == "ethan"   # the address being wrong ends nobody's session
@@ -1286,7 +1288,9 @@ def test_no_secret_key_is_a_503_everywhere_but_the_health_check(on, monkeypatch)
     for value in (None, "too-short"):
         monkeypatch.setattr(Config, "DEADWAX_SECRET_KEY", value)
         for response in (on.client.get(ME), sign_in(on.client, "ethan", PASSWORDS["ethan"])):
-            assert response.status_code == 503 and "DEADWAX_SECRET_KEY" in response.json()["detail"]
+            #? (2.0.4) the key named for whoever runs deadwax (`why`), never in the sentence anyone reads
+            assert response.status_code == 503 and "DEADWAX_SECRET_KEY" in response.json()["why"]
+            assert response.json()["detail"] == auth.CANT_SIGN_IN
         assert on.client.get("/deadwax/health").status_code == 200
         assert on.client.get("/player/").status_code == 200
     assert on.fake.asks() == 0

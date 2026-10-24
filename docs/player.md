@@ -70,7 +70,9 @@ itself.
 Then open `http://your-server:8080/player/`. If something's wrong, Home and the Library tab say
 what, in place of the albums: **Connect Navidrome** when the settings aren't all there - deadwax
 needs Navidrome for your library, set up in deadwax's settings (Connections) - or **Can't reach
-Navidrome** with the reason and a **Try again** button. The tab bar and You work without
+Navidrome** with the reason and a **Try again** button. Anyone who doesn't run deadwax reads **Your
+music isn't available yet** or **…right now** instead, with what they can do - try again, or tell
+whoever runs deadwax - never Navidrome's address or a setting. The tab bar and You work without
 Navidrome, so You's **Connections** can say what deadwax can and can't reach. [Troubleshooting](troubleshooting.md#the-player-says-connect-navidrome-or-cant-reach-navidrome)
 goes through each one.
 
@@ -167,7 +169,9 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
   **Gapless** ([below](#gapless-playback)), **Now Playing opens as** and
   **Pause winds the record down** ([the turntable](#the-turntable)), **Maximum quality**
   ([below](#maximum-quality-hi-res-at-48-khz)) and **Normalization** ([below](#normalization)) under **Playback**;
-  **Connections**, whether deadwax can reach MusicBrainz, slskd and Navidrome, checked the first
+  **Connections** (for an admin, and anyone given **Settings and the log**), whether deadwax can reach
+  MusicBrainz, slskd and Navidrome - a word for each (**Connected**, **Not on Soulseek**, **Can't reach
+  it**…) and a sentence under it saying where to put it right - checked the first
   time you open You and again with **Check again** (which asks for the version again too); the
   version, and whether logins are on - with them on, who you're signed in as, **Change password**
   (signed in with your own Navidrome account: your current password and the new one twice; this device
@@ -620,7 +624,7 @@ your finger.
 **Pin** at the top right of **an artist's page** (it says **Pinned** once they are), and **Pin album to
 Home** in the now-playing screen's **•••** menu, for the song's album. Tap again to unpin. A new pin
 goes first. The pin shows straight away and is saved behind it; if deadwax can't keep it, it goes
-back, and a note at the top of the screen says which album or artist and why ("Couldn't pin Dummy:
+back, and a note at the top of the screen says which album or artist and why ("Couldn't pin Dummy.
 Home holds up to 50 pins - unpin one first"). The ••• menu closes as you tap it, so the note says
 what happened either way ("Pinned Dummy to Home"). A page's pin waits, greyed, until deadwax has said
 what is pinned, so it never shows an album as unpinned that is pinned; when deadwax can't keep pins
@@ -2064,6 +2068,12 @@ for you - ask an admin."). A change an admin makes to what you may do is in forc
 deadwax couldn't check your account as you signed in, You says the extra permissions are off until you
 sign in again ([Sharing deadwax](sharing.md#admins-permissions-and-everyone-else)).
 
+When a sign-in can't go through, the screen says why in words for anyone - "That user name and password
+didn't work.", "Can't reach deadwax. Check you're on the right network (or your VPN is on) and try
+again." - and where only whoever runs deadwax can fix it, says so ("…nobody can use it just now. Tell
+whoever runs deadwax."). What they need - the setting's name, Navidrome's own answer - is folded under
+it, behind **For whoever runs deadwax** ([troubleshooting](troubleshooting.md#signing-in)).
+
 If your session ends while you're using the app - you changed your Navidrome password in Navidrome, say
 (or with **You → Change password** on another device), or your account was removed, which deadwax notices within about six minutes - the sign-in screen comes back
 **over** whatever was showing, saying why: as soon as the app next asks deadwax for something, as it
@@ -2242,7 +2252,8 @@ lists at all (**Not in Navidrome**). With logins off nothing here changes: one a
   answer - so a page's burst of covers and pins after the change is one refused login, not one each.
   Each device you're signed in on costs one. Sign in with the new password and carry on.
 - **If `DEADWAX_SECRET_KEY` changes** (and deadwax restarts), each session ends at its next request,
-  the sign-in screen saying **deadwax's DEADWAX_SECRET_KEY has changed since you signed in**.
+  the sign-in screen saying **deadwax's sign-ins have been reset since you signed in - sign in again**
+  (the event log names the key).
 
 ## Using it away from home
 

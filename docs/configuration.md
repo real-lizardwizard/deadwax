@@ -88,7 +88,7 @@ three Navidrome settings are saved, the app asks Navidrome again by itself.
 All three, for the library (deadwax needs Navidrome for it): the app - [its guide](player.md) - on a phone, and on a computer laid
 out for a desktop - shows and plays your library from Navidrome, so its Home shelves, Library,
 albums and artists you have, and Search's look in your library say **Connect Navidrome** until every
-one is set; Server settings marks whichever is missing. Searching MusicBrainz, getting albums,
+one is set (**Your music isn't available yet** to anyone who doesn't run deadwax); Server settings marks whichever is missing. Searching MusicBrainz, getting albums,
 **Requests** and **You** work without them. With them set, and an address that passes the check
 below, deadwax also checks every album folder against the albums Navidrome lists, raising one it
 doesn't as [Not in Navidrome](library.md#not-in-navidrome), and applying a release asks Navidrome

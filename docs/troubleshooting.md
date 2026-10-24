@@ -40,7 +40,8 @@ When it goes on **", no track was filed"**, none of its music reached the librar
 have: that makes a folder, but no album, and nothing is marked **New**), which usually means the
 library folder can't be written (see [Downloads finish, but nothing appears in my
 library](#downloads-finish-but-nothing-appears-in-my-library)). Requests says **Partly filed** for
-the first and **Not filed** for the second.
+the first, and **"It downloaded, but none of its songs could be added to your library"** for the second
+([below](#requests-says-why-a-download-stopped-or-wasnt-added)).
 
 ## A download says "deadwax stopped while filing this"
 
@@ -49,6 +50,65 @@ Look at the album in the library (**Library care → Rescan** first) and in slsk
 in move mode, whatever hadn't been filed yet is still in slskd's folder, and in copy mode all of it
 is. Anything missing is dealt with as in the section above. In Requests it reads **Interrupted while
 filing**, and **Clear done** removes the row.
+
+## Requests says why a download stopped, or wasn't added
+
+Under **Needs attention** (and on a **Done** row that wasn't added) Requests says why in a listener's
+words. An admin, or someone with **Settings and the log**, also sees the download's own words under
+it, as the log has them - those are what the entries above and below are found by. Where only whoever
+runs deadwax can put it right, everyone else is told **"Tell whoever runs deadwax."**
+
+- **"The person sharing it refused to send it."** / **"…stopped responding."** / **"The download broke
+  off."** / **"The download was cancelled before it finished."** / **"The download didn't finish."**:
+  the user refused the transfer, stopped answering, the transfer errored, or it ended some other way
+  (slskd's own "Rejected", "TimedOut", "Errored", "Cancelled"). **"3 of 10 files arrived."** after it
+  says how far it got. Use **Ask again** for a user who was briefly away, **Next peer** for someone
+  else ([downloading](downloading.md#when-a-download-fails)).
+- **"deadwax lost track of this download - the person sharing it may have gone offline, or downloads
+  stopped working for a while."**: slskd reported none of its transfers for about two minutes. Usually
+  the user went offline before it started; but slskd being down, or restarted (it forgets its
+  transfers), looks the same to deadwax, even mid-download - if every download says it at once, see
+  [below](#requests-shows-nothing-moving-or-cant-update-your-requests-right-now).
+- **"Cancelled."**: you (or someone) cancelled it with its ✕.
+- **"It downloaded, but deadwax couldn't find its files to add them to your library."**: nothing could
+  be organized - almost always `SLSKD_DOWNLOAD_PATH` not pointing at the files slskd writes
+  ([Downloads finish, but nothing appears in my library](#downloads-finish-but-nothing-appears-in-my-library)).
+- **"It downloaded, but couldn't be added to your library."**: filing failed with an error (the log
+  and the row's own words say which - most often permissions, or a full disk).
+- **"It downloaded, but none of its songs could be added to your library."** / **"2 files couldn't be
+  added to your library."**: some or all of its files failed to organize ([above](#a-download-says-n-files-failed-to-organize)).
+- **"Downloaded, but not added to your library: deadwax is set to try filing without moving
+  anything."**: organizing is in dry run (`ORGANIZE_MODE` `dry_run`).
+- **"Its files were already in the collection, so nothing was added."** / **"Every song was already in
+  the collection, so nothing was added."**: every file was already in the album's folder.
+- **"The download couldn't be started."** under a refused **Get**, **Next peer** or **Ask again**:
+  slskd wouldn't queue it; an admin sees slskd's reason under it. **"That didn't work."** under **Next
+  peer** or **Ask again**: deadwax answered the retry with an error of its own (an admin sees it under). **"The last try is still stopping -
+  try again in a moment."**: the attempt before it hasn't been cleared out of slskd yet.
+
+## An error says to tell whoever runs deadwax
+
+Wherever something fails the app says what happened and what you can do, never the error itself:
+
+- **"Can't connect to deadwax. Check your connection, then try again."**: the phone or browser didn't
+  reach deadwax at all - off your network, the VPN off, or deadwax restarting.
+- **"Can't reach the music server right now."**: deadwax answered, but Navidrome didn't (or isn't set
+  up) - see [the player says "Connect Navidrome"](#the-player-says-connect-navidrome-or-cant-reach-navidrome).
+- **"Downloads aren't working right now."**: slskd didn't answer, or refused - see
+  [You's Connections says slskd isn't connected](#yous-connections-says-slskd-isnt-connected).
+- **"That took too long. Try again."** / **"Something went wrong. Try again."**: a request timed out,
+  or failed in a way deadwax had no words for.
+- **"deadwax can't do that right now."**, or deadwax's own words (its database can't be written, say).
+
+To anyone who doesn't run deadwax the music server's, the downloads', "Something went wrong" and
+deadwax's own add **"if it keeps happening, tell whoever runs deadwax"** - the connection and the
+timeout ones don't, since a try again is the whole answer - or **"Tell whoever runs deadwax."** where
+only they can fix it. Where the line has a **Try again** button beside it, the sentence leaves trying
+again to the button ("Can't connect to deadwax. Check your connection.", "Something went wrong. If it
+keeps happening, tell whoever runs deadwax."). An admin - and anyone an
+admin gave **Settings and the log** - sees the error's own words too, in a smaller line under the
+sentence (or in brackets after it, in a one-line notice): Navidrome's address and its answer, slskd's
+reason, the exception. That, and the **Log**, is where to look.
 
 ## Get says "Already downloading", but nothing is
 
@@ -119,14 +179,16 @@ been cleared from the list since". Get it again: the page then says what's true 
 library, or nothing on its way, so the sources are searched. "That download brings only part of this
 pressing" is a download of one disc's folder, which can't be joined: Get the pressing as usual.
 
-## Get shows "slskd isn't logged in…", or nothing to choose from
+## Get shows "Downloads aren't working right now", or nothing to choose from
 
 The sources ask slskd to search Soulseek, so these stop it:
 
-- **slskd's own words, in amber, with Try again** - "slskd isn't logged in to Soulseek, so it can't
-  search", "it's waiting for its VPN", or that it can't be reached: see [A search fails with "not
-  logged in"](#a-search-fails-with-not-logged-in-or-slskd-refused-it) and [You's Connections
-  says slskd isn't connected](#yous-connections-says-slskd-isnt-connected).
+- **"Downloads aren't working right now", in amber, with Try again**: slskd couldn't search - it isn't
+  logged in to Soulseek, it's waiting for its VPN, or it can't be reached. An admin, or someone with
+  **Settings and the log**, sees slskd's own words under it ("slskd isn't logged in to Soulseek, so it
+  can't search"); everyone else is told to try again, and to tell whoever runs deadwax if it keeps
+  happening. See [A search fails with "not logged in"](#a-search-fails-with-not-logged-in-or-slskd-refused-it)
+  and [You's Connections says slskd isn't connected](#yous-connections-says-slskd-isnt-connected).
 - **"Soulseek found nothing for …"**: as [A search finds nothing](#a-search-finds-nothing) - edit the
   query under it (to the album title alone, say) and **Re-search**.
 - **"Nothing lossless on Soulseek for …"**: your **Format** (You → Getting
@@ -155,33 +217,49 @@ The sources ask slskd to search Soulseek, so these stop it:
 
 ## You's Connections says slskd isn't connected
 
-**You → Connections** shows each service's word - **Connected**, or the reason as deadwax got it -
-with slskd's or deadwax's sentence under it:
+**You → Connections** is shown to admins and to anyone given **Settings and the log** - the people who
+can do something about it; nobody else's You has it, and nothing is asked for them. Each row shows a
+short word - **Connected**, or what's wrong - with a sentence under it saying where to put it right:
 
-- **`CONNECTION_ERROR`**: slskd can't be reached at `SLSKD_URL` from inside the container. Use
-  the address the *container* would use (`http://slskd:5030` on a shared Docker network), with
-  the `http://`.
-- **`NOT_LOGGED_IN` / `NOT_CONNECTED` / `CONNECTING`**: slskd is running but isn't signed in
-  to Soulseek. Check slskd's own page. If slskd runs behind a VPN container, it may be waiting
+- **Can't reach it** - "deadwax can't reach slskd at its address": slskd can't be reached at
+  `SLSKD_URL` from inside the container. Check slskd is running, and use the address the *container*
+  would use (`http://slskd:5030` on a shared Docker network), with the `http://`.
+- **Not on Soulseek** / **Connecting…**: slskd is running but isn't signed in to Soulseek, in slskd's
+  own words ("slskd is not connected to the Soulseek server", "slskd has reached the Soulseek server but
+  is not logged in"). Check slskd's own page. If slskd runs behind a VPN container, it may be waiting
   for the VPN, and the row says so.
-- **`401`**: slskd rejected the API key. Check `SLSKD_APIKEY` against the key in slskd's
-  configuration.
-- **`UNKNOWN_ERROR`** with **"SLSKD_URL is unusable (…)"** in the **Log**: the address isn't set
-  (**"not set"** - give it in Settings → Connections), or the one in your `.env` or compose file
-  fails the check Server settings makes on save - a user name or
-  password in it, a `?` or `#`, a space, no `http://` - and the brackets say which. deadwax won't
-  send slskd anything at such an address, the API key least of all. Fix it in Settings →
-  Connections or in compose. A reverse proxy in front of slskd that asks for a login of its own
-  can't be reached this way; point deadwax at slskd directly.
-- **`UNKNOWN_HTTP_ERROR` / `UNKNOWN_ERROR` / `UNEXPECTED`** otherwise: slskd answered with
-  something unexpected. The log has the details.
+- **Key refused** - "slskd turned down deadwax's API key": check `SLSKD_APIKEY` against the key in
+  slskd's configuration.
+- **Not running** - "slskd's address answers, but slskd itself isn't running behind it": something
+  (a reverse proxy, the VPN container) answered for slskd with a 502.
+- **Not set up** - "SLSKD_URL is unusable (…) - set it in Server settings (Connections)", or
+  "SLSKD_APIKEY is not configured": the address in your compose file or `.env` fails the check Server
+  settings makes on save - a user name or password in it, a `?` or `#`, a space, no `http://` - and the
+  brackets say which; or there's no API key. deadwax won't send slskd anything at such an address, the
+  API key least of all. Fix it in Settings → Connections or in compose. A reverse proxy in front of
+  slskd that asks for a login of its own can't be reached this way; point deadwax at slskd directly.
+- **Unclear** - "slskd answered, but didn't say whether it's connected to Soulseek".
+- **Unexpected answer** / **Unexpected problem** otherwise: slskd answered with something deadwax
+  doesn't know, or asking it failed some other way. The log has the details.
+- **Couldn't check**, with what went wrong under it and the check's own words in brackets after it
+  ("Error pinging slskd: …"): deadwax itself didn't answer the check - see
+  [an error that says to tell whoever runs deadwax](#an-error-says-to-tell-whoever-runs-deadwax).
+
+`SLSKD_URL` and `SLSKD_APIKEY` are an admin's alone to change (Server settings locks them for anyone
+else), so someone with Settings and the log who isn't an admin reads them that way: **Can't reach
+it** as "...its address (SLSKD_URL) only an admin can change, in Server settings (Connections).",
+**Key refused** as "...only an admin can change it, in Server settings (Connections)." and **Not set
+up** as "...only an admin can set it, in Server settings (Connections).": what's wrong is theirs to
+see, the fix an admin's.
 
 ## You's Connections says MusicBrainz isn't connected
 
-- **`VALUE_ERROR`**: no contact is set. Set `MUSICBRAINZ_EMAIL` (Settings → Connections).
-- **`CONNECTION_ERROR` / `MAX_RETRIES_EXCEEDED` / `UNKNOWN_ERROR`**: MusicBrainz couldn't be
-  reached, or kept failing. It goes away for minutes at a time now and then (below); if it
-  persists, check the container can reach the internet.
+- **Not set up** - "No contact is set for MusicBrainz": set `MUSICBRAINZ_EMAIL` (Settings → Connections).
+- **Can't reach it** / **No answer** / **Unexpected problem**: MusicBrainz couldn't be reached, or
+  kept failing ("MusicBrainz didn't answer after a few tries"). It goes away for minutes at a time now
+  and then (below); if it persists, check the container can reach the internet.
+- **Busy** - MusicBrainz is overloaded, or asking deadwax to slow down: it answers again shortly.
+- **Refused** - "MusicBrainz turned deadwax away": usually the contact in `MUSICBRAINZ_EMAIL`.
 
 ## A search fails with "not logged in", or slskd refused it
 
@@ -211,7 +289,7 @@ queue"). A user with a **free slot** starts straight away. If slskd stops report
 altogether, the download fails after about two minutes. Use **Ask again** to ask the same user
 again, or **Next peer** to move it to someone else.
 
-## Requests shows nothing moving, or "Can't get your requests from deadwax"
+## Requests shows nothing moving, or "Can't update your requests right now"
 
 The Requests tab (and Home's Arriving, and the count on the tab) shows what deadwax knows of each
 download, and the progress as slskd reports it.
@@ -219,23 +297,28 @@ download, and the progress as slskd reports it.
 - **slskd can't be reached** (it refuses the connection, or isn't there): every download is still
   listed, but nothing moves - "0 of 10 files", no speed, queued ones "starting". After about two
   minutes of slskd reporting nothing,
-  deadwax gives up on them and they move to **Needs attention** as "no transfers reported by
-  slskd". **Next peer** and **Ask again** can't get anywhere until slskd is back, and the row says
+  deadwax gives up on them and they move to **Needs attention** as "deadwax lost track of this
+  download - the person sharing it may have gone offline, or downloads stopped working for a while".
+  **Next peer** and **Ask again** can't get anywhere until slskd is back, and the row says
   why, in red. A download slskd still lists but can't move - slskd signed out of Soulseek, or
   waiting for its VPN - just stops where it is until slskd is back. You's **Connections** says
   whether slskd answers, and [You's Connections says slskd isn't connected](#yous-connections-says-slskd-isnt-connected)
   goes through the reasons. **slskd up but not answering** (it takes the connection and then says nothing) is
   slower to show: deadwax waits on it, so the tab keeps its spinner, or the last answer, until the
-  phone gives up on the request, and then says it can't get your requests.
-- **"Can't get your requests from deadwax"**, with the reason under it: deadwax itself didn't
-  answer (restarting under Komodo, say, or the phone off your network or VPN). What's below is
-  from the last answer, and it keeps asking while the tab is open. Home's Arriving says the same
-  ("Can't reach deadwax just now") and keeps asking while something is on its way.
+  phone gives up on the request, and then says it can't update your requests.
+- **"Can't update your requests right now"**, with what went wrong under it - "Can't connect to
+  deadwax." when deadwax itself didn't answer (restarting under Komodo, say, or the phone off your
+  network or VPN), "Something went wrong." when it answered but couldn't list them - or deadwax's
+  own words for why, such as that it can't read its database. An
+  admin, or someone with Settings and the log, also sees the error's own words under that. What's
+  below is from the last answer, and it keeps asking while the tab is open. Home's Arriving says the
+  same ("Can't reach deadwax just now") and keeps asking while something is on its way.
 - **A spinner, and nothing else**: the app hasn't had deadwax's first answer yet. It never says
   "Nothing requested yet" before it knows.
 - **"Downloads aren't being kept track of"**: deadwax can't write its database, so it can't list
   or file downloads. They still arrive in slskd's folder. Check `DB_PATH` and that the folder it's
-  in can be written as `PUID`/`PGID`.
+  in can be written as `PUID`/`PGID`. Anyone who doesn't run deadwax reads "Requests can't be shown
+  right now: deadwax can't keep track of downloads. Tell whoever runs deadwax." instead of the setting.
 - **A download started on another device doesn't show**: the app looks again when Home or Requests
   comes into view and when you come back to it. Switch to Requests, or pull it back up from the
   background.
@@ -251,8 +334,11 @@ download, and the progress as slskd reports it.
   that has no MusicBrainz tags (an old rip): nothing was written into it, so nothing ties it to the
   release, and a rescan won't change that. Apply the release to that album (**Edit → Release**, from
   its page or **Needs a look**) and the row opens it. It can also mean the album's folder has gone since.
-- **A done download says "Navidrome isn't set up" or "isn't answering just now"**: the album can't
-  be opened in the app until it is - see [below](#the-player-says-connect-navidrome-or-cant-reach-navidrome).
+- **A done download says "Can't open this album yet - the music server isn't set up"** or **"Can't open
+  this album right now - the music server can't be reached"**: Navidrome isn't set up, or isn't
+  answering, and the album can't be opened in the app until it is - see [below](#the-player-says-connect-navidrome-or-cant-reach-navidrome).
+  **"Can't open this album right now - can't connect to deadwax"** means the phone or browser didn't reach
+  deadwax itself: check your connection, then try again.
   **"Couldn't look it up just now"** means deadwax itself didn't answer: tap it again.
 - **A done download has no ▶**: only a download that filed something has one. "Already in your
   library, nothing filed" opens the album you already had - when its folder is tagged with the
@@ -397,7 +483,7 @@ ask MusicBrainz through deadwax, so the same slow minutes reach them.
   open (the last 20 albums), so going back to the album is instant - and
   deadwax saves them too, so the album opens at once next time, after a reload or a restart as well
   ([saved answers](configuration.md#musicbrainzs-saved-answers-settings--connections)).
-- **None of your library in Search, or "Can't reach Navidrome" above the list**: your rows come from
+- **None of your library in Search, or "Can't reach Navidrome" ("Your music isn't available right now") above the list**: your rows come from
   Navidrome's search, and need Navidrome as Home does ([below](#the-player-says-connect-navidrome-or-cant-reach-navidrome));
   its notice sits once above the list, and MusicBrainz's rows still fill every section under it.
 - **An album you have is offered with Get under Albums**: only albums whose files carry MusicBrainz's id for
@@ -511,7 +597,15 @@ wins.
 ## Signing in
 
 With logins on ([sharing deadwax](sharing.md)). What each message
-on the sign-in screen means, and what to do about it:
+on the sign-in screen means, and what to do about it. The screen can't tell who is reading it, so
+it says what is wrong in words for anyone; where whoever runs deadwax needs a setting's name or
+Navidrome's own answer to fix it, that is folded under the message, behind **For whoever runs
+deadwax** - tap it to read it.
+
+- **"Can't reach deadwax. Check you're on the right network (or your VPN is on) and try again."**:
+  the phone or browser didn't reach deadwax at all.
+- **"Something went wrong on the server - try again in a moment."**: deadwax (or something in front of
+  it) answered with an error and no words of its own; the log says what.
 
 ### Locked out: nobody can sign in
 
@@ -520,6 +614,17 @@ on the sign-in screen means, and what to do about it:
   name `deadwax`, password `DEADWAX_ADMIN_PASSWORD`. It needs neither Navidrome nor deadwax's database,
   and lasts 12 hours. If it isn't set, set it in `.env` (or compose) and recreate the container. Sessions already
   signed in carry on while Navidrome is down - only new sign-ins need it.
+- **"deadwax can't reach the music server, so nobody can sign in just now. Tell whoever runs
+  deadwax."**: Navidrome isn't set up, or `NAVIDROME_URL` fails deadwax's check - **For whoever runs
+  deadwax** says which ("Navidrome isn't set up - fill in NAVIDROME_URL…", "NAVIDROME_URL is unusable
+  (…)"). Fix it in compose (Server settings can't be reached without signing in: use break-glass).
+- **"Navidrome couldn't check your password just now - try again in a moment."**: Navidrome answered
+  the check with an error deadwax doesn't know; **For whoever runs deadwax** has Navidrome's own words.
+- **"This account can't sign in to deadwax: it's an LDAP account…"**: Navidrome can't check an LDAP
+  account with a token, which is all deadwax signs in with. Use a local Navidrome account.
+- **"deadwax isn't ready for signing in, so nobody can use it just now. Tell whoever runs deadwax."**,
+  with one of the two below under **For whoever runs deadwax** - every page of the app says it too,
+  since everything but the health check and the pages answers 503 until it's put right:
 - **"Logins are on, but ORGANIZE_MODE is 'dry_run', so nothing downloaded would ever be filed into
   the library"** (or `'off'`, or "LIBRARY_PATH is not set"): with logins on,
   each download is the person's who asked for it once it's filed, so organizing has to be on -
@@ -532,12 +637,14 @@ on the sign-in screen means, and what to do about it:
   refuses to switch organizing off ("they need organizing to stay on").
 - **"Logins are on, but DEADWAX_SECRET_KEY isn't set"** (or "is shorter than 32 characters"): logins
   don't work without the key: the pages load, but everything they ask deadwax for (the health check
-  aside) answers 503 until it's set, and the sign-in screen says so. Make one with
+  aside) answers 503 until it's set, and the sign-in screen says so (under **For whoever runs
+  deadwax**). Make one with
   `openssl rand -hex 32`, put it in `.env` as `DEADWAX_SECRET_KEY=<the key>` and recreate the
   container. If it's in `.env` already, look for a `DEADWAX_SECRET_KEY` line under compose's
   `environment:` too - uncommented, even an empty one, it beats `.env` - and delete it.
-- **"deadwax can't read its database, so it can't check who you are"**: nothing is let in while the
-  database can't be read - check `DB_PATH` is on a volume the container can write. The health check
+- **"deadwax can't read its database just now, so it can't check who you are. Tell whoever runs
+  deadwax."** (under **For whoever runs deadwax**: "Check DB_PATH points at a writable volume"): nothing
+  is let in while the database can't be read - check `DB_PATH` is on a volume the container can write. The health check
   stays healthy, since restarting doesn't fix a missing volume. The break-glass sign-in still works.
   A volume that's full or has gone read-only signs nobody out - devices already signed in carry on
   (their 30 days just stop moving on) - but a new sign-in answers this until it's fixed.
@@ -626,6 +733,13 @@ Navidrome newer than deadwax knows may have changed how it takes a password, or 
 account off for a moment after several refused logins. deadwax changed nothing; try signing in to Navidrome
 itself with each password, and change it there if need be.
 
+### Change password says "Navidrome changed your password, but deadwax couldn't keep the new one"
+
+Navidrome took the new password, and then deadwax couldn't write it into its database (the log says why -
+most often a database that can't be written, `DB_PATH`). Your password HAS changed: sign out and sign in
+again with the new one. Trying the change again won't work: the old password isn't your current one any
+more.
+
 ### Signed out after changing your Navidrome password
 
 (Changed in deadwax, under **You → Change password**, the device you changed it on stays signed in and the
@@ -648,8 +762,8 @@ device has already fetched it (with Gapless on, a few seconds), and then the pla
 rest of the queue as it does with any song that won't play - **Skipped "…" - it wouldn't play**, one
 song after another - and stops at the end with a reason that blames the song. Nothing is wrong with the
 songs: once you've signed in, play the album again. Changing `DEADWAX_SECRET_KEY` (and recreating
-the container) signs everyone out too, each session at its next request ("DEADWAX_SECRET_KEY has changed since
-you signed in").
+the container) signs everyone out too, each session at its next request ("deadwax's sign-ins have been reset
+since you signed in - sign in again."; the log names the key).
 
 ### Your library says deadwax can't star albums for you
 
@@ -1046,14 +1160,17 @@ than taking it out of your library.
 ## A pin won't stay, or the app says "Couldn't pin …" or "Not saved"
 
 Pins are kept in deadwax's database. A pin or an unpin deadwax couldn't keep goes back, and a note at
-the top of the screen says which album or artist and why ("Couldn't pin Dummy: …"); a change made in
-Home's **Edit** says **Not saved: …** under the list instead. The reasons:
+the top of the screen says which album or artist and why ("Couldn't pin Dummy. …"); a change made in
+Home's **Edit** says **Not saved. …** under the list instead. The reasons (deadwax's own words; when
+deadwax wasn't reached at all it says "Can't connect to deadwax", and an admin also sees the error's
+own words in brackets after it):
 
 - **"Home holds up to 50 pins - unpin one first"**: Home is full. Unpin something in **Edit**.
 - **"its database refused the write"** or **"isn't writable"**: check `DB_PATH`, and that the folder
   it's in can be written as `PUID`/`PGID`. When deadwax can't keep pins at all, the pin buttons are
-  greyed, and a tap on one says so.
-- **"deadwax couldn't read its pins just now"** (or Home's Pinned saying **Couldn't get your pins: …**
+  greyed, and a tap on one says so ("deadwax can't keep pins just now: its database isn't writable" -
+  with "Tell whoever runs deadwax." to anyone who doesn't).
+- **"deadwax couldn't read its pins just now"** (or Home's Pinned saying **Couldn't get your pins. …**
   with nothing pinned shown): the database didn't answer in time - usually something else holding it
   a while. Your pins are still there; Home asks again each time it's shown, and keeps what it last had.
 - **"deadwax couldn't ask Navidrome about this album just now - try again"**: pinning from the now-
@@ -1075,8 +1192,9 @@ the line.
 
 ## Done says the songs were saved, but…
 
-"The songs were saved, but Navidrome didn't take the name, description or sharing: …", or "Saved - but
-Navidrome didn't answer when deadwax asked for the playlist again: …": part of the save, or all of it,
+"The songs were saved, but Navidrome didn't take the name, description or sharing.", or "Saved - but
+Navidrome didn't answer when deadwax asked for the playlist again." (an admin also sees Navidrome's own
+answer, in brackets after it): part of the save, or all of it,
 went through before Navidrome refused or stopped answering - a busy database ("database is locked"), a
 restart. **Edit** stays open with your changes: press **Done** again once Navidrome is answering and it
 finishes the rest (it knows the songs it sent may be there already, so it doesn't take them for a change
@@ -1279,6 +1397,12 @@ shown twice.
 
 ## The player says "Connect Navidrome" or "Can't reach Navidrome"
 
+Or, to anyone who doesn't run deadwax, **"Your music isn't available right now"** ("Can't reach the
+music server right now. If it keeps happening, tell whoever runs deadwax.", with **Try again** - or, when it
+was deadwax itself the phone couldn't reach, "Can't connect to deadwax. Check your connection.") or **"Your music isn't available yet"** ("deadwax hasn't been connected to a music
+server yet. Tell whoever runs deadwax."): what follows is for whoever runs deadwax - an admin, or
+someone with **Settings and the log** - who sees Navidrome's own reason.
+
 [The app](player.md) shows one of these on Home and in the Library tab, in place of your
 albums, and in Search in place of what's in your library, with the reason under it - and, since
 deadwax needs Navidrome for the app's library, that it does: **Connect Navidrome**
@@ -1291,6 +1415,8 @@ says "deadwax needs Navidrome for your library" and to set it up in deadwax's se
   `NAVIDROME_USER` and `NAVIDROME_PASSWORD` in Settings → Connections, which marks the one
   that's missing. The container's log also names it at start-up. In the app, **Set up Navidrome**
   under the reason opens the app's own **Server settings** at **Connections** (on a phone too); once the three are saved there the app asks Navidrome again by itself.
+  It's an admin's alone - Navidrome's rows in Server settings are - so someone with **Settings and
+  the log** reads "An admin can set it up in Server settings (Connections)." in its place.
 - **"NAVIDROME_URL is unusable (…), so deadwax sends nothing to it"**: the address in your
   compose file or `.env` fails the check Server settings makes on save - a user name or
   password in it, a `?` or `#`, a space, no `http://` - and the brackets say which. deadwax won't

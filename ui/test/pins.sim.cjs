@@ -117,6 +117,11 @@ const settle = async () => { for (let i = 0; i < 6; i++) await new Promise((reso
 const hooks = require(path.join(OUT, 'node_modules/preact/hooks.js'))
 const P = require(path.join(OUT, 'lib/pins.js'))
 const S = require(path.join(OUT, 'app/usePins.js'))
+//? (2.0.4) the errors as the page meets them: fetch's own TypeError, and deadwax's answers as api/http.ts throws them
+const { ApiError } = require(path.join(OUT, 'api/http.js'))
+const A = require(path.join(OUT, 'app/access.js'))
+const offline = () => new TypeError('Failed to fetch')
+const refusedBy = (status, detail) => new ApiError(status, detail, 'PUT /me/pins failed', false, null, null, '/me/pins')
 const { Pinned, NOTHING_PINNED } = require(path.join(OUT, 'app/Pinned.js'))
 const { PinToggle, PINS_UNSAVED } = require(path.join(OUT, 'app/PinToggle.js'))
 const { PinNotice, PIN_NOTICE_MS } = require(path.join(OUT, 'app/PinNotice.js'))
@@ -265,17 +270,28 @@ async function run() {
     S.askPins(true)
     await settle()
     check('Home asks afresh whatever is in hand', W.asks.length, 2)
-    answer('get', new Error('Failed to fetch'))
+    answer('get', offline())
     await settle()
     check('a failed ask with an answer in hand: the answer stands, nothing said', [S.pinsNow().map((pin) => pin.ref), hooks.root(S.usePins)(false).problem], [['store:1'], null])
     S.forgetPins(); W.open.length = 0
     S.askPins(true)
     await settle()
-    answer('get', new Error('Failed to fetch'))
+    answer('get', offline())
     await settle()
     const render = hooks.root(S.usePins)
+    //? (2.0.4) in a listener's words - and, with logins off (everyone runs deadwax), fetch's own in brackets after them
     check('...with none: the hook says why there are none - and they count as known, so no pin waits for ever', [render(false).problem, render(false).known],
-      ["Couldn't get your pins: Failed to fetch", true])
+      ["Couldn't get your pins. Can't connect to deadwax. Check your connection, then try again. (Failed to fetch)", true])
+    //? ...and someone who doesn't run deadwax reads the sentence alone
+    A.noteAccess({ auth: 'on', user: 'ethan', admin: false, permissions: ['request'] })
+    S.forgetPins(); W.open.length = 0
+    S.askPins(true)
+    await settle()
+    answer('get', offline())
+    await settle()
+    check('...a listener: the sentence and what to do, never fetch\'s words', render(false).problem,
+      "Couldn't get your pins. Can't connect to deadwax. Check your connection, then try again.")
+    A.forgetAccess()
   }
 
   console.log('\nthe store: the hook asks as it turns on')
@@ -324,17 +340,17 @@ async function run() {
     S.askPins(true); await settle(); answer('get', answerOf([albumPin('store:1')])); await settle()
     const going = S.setPinned(ARTIST, true)
     await settle()
-    answer('toggle', new Error('Home holds up to 50 pins - unpin one first'))
+    answer('toggle', refusedBy(409, 'Home holds up to 50 pins - unpin one first'))
     await going
     const render = hooks.root(S.usePins)
     check('a pin refused: gone again, said in the app\'s notice naming it - and not left on Home, naming nothing',
       [S.pinsNow().map((pin) => pin.ref), S.pinNotice()?.text, render(false).problem],
-      [['store:1'], "Couldn't pin Portishead: Home holds up to 50 pins - unpin one first", null])
+      [['store:1'], "Couldn't pin Portishead. Home holds up to 50 pins - unpin one first", null])
     const unpinning = S.setPinned(DUMMY, false)
     await settle()
-    answer('toggle', new Error('Failed to fetch'))
+    answer('toggle', offline())
     await unpinning
-    check('...an unpin refused: back, and said', [S.pinsNow().map((pin) => pin.ref), S.pinNotice()?.text], [['store:1'], "Couldn't unpin Dummy: Failed to fetch"])
+    check('...an unpin refused: back, and said', [S.pinsNow().map((pin) => pin.ref), S.pinNotice()?.text], [['store:1'], "Couldn't unpin Dummy. Can't connect to deadwax. Check your connection, then try again. (Failed to fetch)"])
     const quiet = S.pinNotice().id
     const next = S.setPinned(ARTIST, true)
     await settle()
@@ -360,9 +376,10 @@ async function run() {
     //? Edit's: said on Home, under the list, until the next change or a read
     const moving = S.movePin('album:store:1', 1)
     await settle()
-    answer('put', new Error('deadwax couldn\'t save that'))
+    answer('put', refusedBy(503, 'deadwax couldn\'t save that: its database refused the write'))
     await moving
-    check('one of Edit\'s refused: back, and "Not saved: …" for Home', [S.pinsNow().map((pin) => pin.ref), render(false).problem], [['store:1', 'mb:p'], "Not saved: deadwax couldn't save that"])
+    check('one of Edit\'s refused: back, and "Not saved." for Home - deadwax\'s own words, which are fit to be read',
+      [S.pinsNow().map((pin) => pin.ref), render(false).problem], [['store:1', 'mb:p'], "Not saved. deadwax couldn't save that: its database refused the write"])
     S.askPins(true); await settle(); answer('get', answerOf([albumPin('store:1'), artistPin('mb:p')])); await settle()
     check('...until a read: the server\'s word, read afresh, is what shows', render(false).problem, null)
     const again = S.removePin('artist:mb:p')

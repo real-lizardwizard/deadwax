@@ -589,7 +589,11 @@ exports.applyArtistImages = (name, choices, options) => globalThis.__page.ask('i
 exports.searchArtists = (query, signal) => globalThis.__page.ask('artistSearch', query, !!signal)
 `)
 //? (2.0.0-player.61) what this person may do - the page reads it from the access store: a mount's `admin` says which
-write('app/access.js', `exports.useAccess = () => ({ permissions: globalThis.__page.permissions, on: true, unverified: false })\n`)
+write('app/access.js', `exports.useAccess = () => ({ permissions: globalThis.__page.permissions, on: true, unverified: false })
+exports.accessNow = exports.useAccess
+//? (2.0.4) whether this reader runs deadwax (an error's own words, under its sentence): a listener's page unless a case says
+exports.seesDetail = () => globalThis.__page.runs === true
+`)
 write('app/useOwned.js', `
 exports.ownedNow = () => globalThis.__page.owned
 exports.useOwned = () => globalThis.__page.owned
@@ -639,7 +643,7 @@ const fire = (ms) => {
 }
 
 const hooks = require(path.join(PAGE, 'node_modules/preact/hooks.js'))
-const { ArtistPage, PREFETCH_AT_ONCE, forgetKeptArtist } = require(path.join(PAGE, 'app/ArtistPage.js'))
+const { ArtistPage, ARTIST_GONE, PREFETCH_AT_ONCE, forgetKeptArtist } = require(path.join(PAGE, 'app/ArtistPage.js'))
 const { PINS_UNSAVED: P_UNSAVED } = require(path.join(PAGE, 'app/PinToggle.js'))
 
 let tree = null
@@ -817,13 +821,26 @@ async function page() {
     ownedAnswers(O.buildOwnedIndex([]))
     const failing = mount({ id: 'mb:aaaaaaaa-0000-4000-8000-000000000002' })
     failing.draw()
-    answer('libraryArtists', new Error('Navidrome is restarting'))
+    //? (2.0.4) as api/http.ts throws Navidrome's 502: said in a listener's words, never its address or its error
+    answer('libraryArtists', new (require(path.join(PAGE, 'api/http.js')).ApiError)(502, "Navidrome couldn't be reached at http://navidrome:4533: All connection attempts failed", 'GET /navidrome/artists failed', false, null, null, '/navidrome/artists'))
     await failing.settled()
     const retry = find((node) => node.type === 'button' && words(node) === 'Try again' && byClass('pl-text-button')(node))
-    check('the look failing: why, and Try again', [words(classed('pl-notice')[0]).startsWith('Navidrome is restarting'), retry.length], [true, 1])
+    check('the look failing: why, in a listener\'s words, and Try again', [words(classed('pl-notice')[0]), retry.length],
+      ["Can't reach the music server right now. If it keeps happening, tell whoever runs deadwax.Try again", 1])
     retry[0].props.onClick()
     await failing.settled()
     check('...which looks again', asked('libraryArtists').length, 2)
+
+    //? (review) an artist the music server no longer has - an old pin or link: a sentence for anyone, never
+    //? "Navidrome has nothing by that id", and no Try again, which can't find them
+    reset()
+    const gone = mount({ id: 'nosuchartist' })
+    gone.draw()
+    answer('artistAlbums', new (require(path.join(PAGE, 'api/http.js')).ApiError)(404, 'Navidrome has nothing by that id', 'GET /navidrome/artists/nosuchartist failed', false, null, null, '/navidrome/artists/nosuchartist'))
+    await gone.settled()
+    check('an artist that\'s gone: said so, with no Try again',
+      [words(classed('pl-notice')[0]), find((node) => node.type === 'button' && words(node) === 'Try again' && byClass('pl-text-button')(node)).length],
+      [ARTIST_GONE, 0])
 
     reset()
     const away = mount({ id: 'mb:aaaaaaaa-0000-4000-8000-000000000003', navidromeOk: false })
@@ -913,7 +930,8 @@ async function page() {
     one.draw()
     check('deadwax can\'t keep pins: not live', pin().props['aria-disabled'], true)
     pin().props.onClick()
-    check('...a tap says why in the app\'s notice, and pins nothing', [W.said, W.pinned.length], [[P_UNSAVED], 2])
+    //? (2.0.4) and, to someone who doesn't run deadwax, to tell whoever does
+    check('...a tap says why in the app\'s notice, and pins nothing', [W.said, W.pinned.length], [[`${P_UNSAVED}. Tell whoever runs deadwax.`], 2])
     W.pins = { pins: null, known: true, canSave: true, problem: "Couldn't get your pins: Failed to fetch" }
     one.draw()
     check('the pins couldn\'t be had: live all the same (not held for ever), reading "Pin"', [pin().props['aria-disabled'], words(pin())], [false, 'Pin'])

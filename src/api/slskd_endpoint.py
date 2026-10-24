@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import re
 import traceback
 import slskd_api
-from requests.exceptions import HTTPError, ConnectionError
+from requests.exceptions import HTTPError, ConnectionError, RequestException
 from src.config import Config, describe_slskd_url
 from src.logger import logger
 
@@ -52,6 +52,31 @@ def build_search_query(artist: str, album: str) -> str:
 
     #? split()/join() rather than a whitespace regex - it collapses runs and strips the ends
     return " ".join(combined.split())
+
+
+#? (2.0.4) The sentence under each of the ping's codes, in You -> Connections - drawn only for an admin and someone with
+#? Settings and the log, so a setting is named where it is the thing to change. Until 2.0.4 they were the log's own
+#? lines ("slskd ping failed with connection error, functionality enabled, but couldnt connect..."). slskd's state
+#? (NOT_LOGGED_IN, NOT_CONNECTED, CONNECTING) keeps describe_server_state's words, which quote slskd.
+PING_WORDS = {
+    "NO_STATE": "slskd answered, but didn't say whether it's connected to Soulseek.",
+    401: "slskd turned down deadwax's API key - check SLSKD_APIKEY in Server settings (Connections).",
+    502: "slskd's address answers, but slskd itself isn't running behind it.",
+    "UNKNOWN_HTTP_ERROR": "slskd answered with an error deadwax doesn't know (HTTP {status}) - the log has the details.",
+    "CONNECTION_ERROR": ("deadwax can't reach slskd at its address - check slskd is running, and SLSKD_URL in Server "
+                         "settings (Connections)."),
+    "NOT_SET_UP": "{problem} - set it in Server settings (Connections).",
+    "UNKNOWN_ERROR": "Asking slskd failed in a way deadwax doesn't know - the log has the details.",
+}
+#? ...and the three that send the reader to a setting, as someone with Settings and the log reads them: SLSKD_URL and
+#? SLSKD_APIKEY are an admin's alone (src/routes/settings.py ADMINS_ONLY), locked on their page (review)
+PING_WORDS_NOT_ADMIN = {
+    401: "slskd turned down deadwax's API key (SLSKD_APIKEY) - only an admin can change it, in Server settings "
+         "(Connections).",
+    "CONNECTION_ERROR": ("deadwax can't reach slskd at its address - check slskd is running; its address (SLSKD_URL) "
+                         "only an admin can change, in Server settings (Connections)."),
+    "NOT_SET_UP": "{problem} - only an admin can set it, in Server settings (Connections).",
+}
 
 
 class SlskdSearchRefused(Exception):
@@ -671,7 +696,16 @@ class SlskdClient:
             raise
 
 
-    async def ping(self) -> dict:
+    async def ping(self, admin: bool = True) -> dict:
+        """
+        Whether deadwax can search through slskd now - You's Connections row (an admin's, and someone's with Settings
+        and the log, since 2.0.4). `status` ok, or failed with `code`, the short name the app keys its word on
+        (NOT_LOGGED_IN, 401, CONNECTION_ERROR...), and `error`, the sentence under it: what is wrong, and where to
+        put it right (PING_WORDS; slskd's own state in describe_server_state's words). The log keeps its own lines.
+        `admin`: the reader may change slskd's address and key - anyone else is told only an admin can
+        (PING_WORDS_NOT_ADMIN).
+        """
+        words = {**PING_WORDS, **({} if admin else PING_WORDS_NOT_ADMIN)}
         logger.info("pinging slskd to check connectivity")
 
         try:
@@ -680,7 +714,7 @@ class SlskdClient:
 
             if not state:
                 logger.error("slskd ping didnt return a state")
-                return {"status": "failed", "error": "slskd ping didnt return a state", "code": "NO_STATE"}
+                return {"status": "failed", "error": PING_WORDS["NO_STATE"], "code": "NO_STATE"}
 
             #? slskd's API answering says the container is up and the key is right. It says
             #? NOTHING about the connection to Soulseek, which is the one a search needs - so a
@@ -705,25 +739,35 @@ class SlskdClient:
 
             if status == 401:
                 logger.error("slskd http 401, slskd functionality enabled, connection possible, but auth invalid")
-                return {"status": "failed", "error": "slskd http 401, slskd functionality enabled, connection possible, but auth invalid", "code": 401}
+                return {"status": "failed", "error": words[401], "code": 401}
 
             if status == 502:
                 logger.error("slskd http 502, slskd functionality enabled, connection not made cause backend is down")
-                return {"status": "failed", "error": "slskd http 502, slskd functionality enabled, connection not made cause backend is down", "code": 502}
+                return {"status": "failed", "error": PING_WORDS[502], "code": 502}
 
             else:
                 logger.error(f"slskd uncaught HTTP error {status}, unknown")
-                return {"status": "failed", "error": f"slskd uncaught HTTP error {status}, unknown", "code": "UNKNOWN_HTTP_ERROR"}
+                return {"status": "failed", "error": PING_WORDS["UNKNOWN_HTTP_ERROR"].format(status=status),
+                        "code": "UNKNOWN_HTTP_ERROR"}
     
 
         except ConnectionError:
             logger.error("slskd ping failed with connection error, functionality enabled, but couldnt connect to the url provided (no auth checked)")
-            return {"status": "failed", "error": "slskd ping failed with connection error, functionality enabled, but couldnt connect to the url provided (no auth checked)", "code": "CONNECTION_ERROR"}
+            return {"status": "failed", "error": words["CONNECTION_ERROR"], "code": "CONNECTION_ERROR"}
+
+        except ValueError as e:
+            #? (2.0.4) get_client's own refusals - SLSKD_URL unusable, SLSKD_APIKEY not set: said, not "unknown".
+            #? requests' own ValueErrors (an InvalidURL) are the unknown below, as they always were
+            if isinstance(e, RequestException):
+                logger.error("slskd ping failed unexpectedly")
+                logger.error(traceback.format_exc())
+                return {"status": "failed", "error": PING_WORDS["UNKNOWN_ERROR"], "code": "UNKNOWN_ERROR"}
+            return {"status": "failed", "error": words["NOT_SET_UP"].format(problem=e), "code": "NOT_SET_UP"}
 
         except Exception:
             logger.error("slskd ping failed unexpectedly")
             logger.error(traceback.format_exc())
-            return {"status": "failed", "error": "slskd ping failed unexpectedly", "code": "UNKNOWN_ERROR"}
+            return {"status": "failed", "error": PING_WORDS["UNKNOWN_ERROR"], "code": "UNKNOWN_ERROR"}
 
 
 

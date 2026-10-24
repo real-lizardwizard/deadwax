@@ -7,6 +7,8 @@ import { requestDownload } from '../lib/downloadRequests'
 import { notPickedLine } from '../lib/getSettings'
 import { isAbort, latestOnly } from '../lib/latest'
 import { candidateQuality } from '../lib/perPerson'
+import { DOWN, errorWords, said } from '../lib/errorWords'
+import { accessNow, seesDetail } from '../app/access'
 
 /**
  * One Soulseek search for a release, and a download from it - the app's Sources sheet's
@@ -48,8 +50,12 @@ export interface CandidateSearch {
   release: DownloadRelease
   pending: boolean
   result: FindCandidatesResponse | null
-  /** what went wrong, in the server's words where it gave some (slskd logged out: its 409's) */
+  /** what went wrong - (2.0.4) in a listener's words (lib/errorWords.ts): "Downloads aren't working right now." for
+   *  slskd down or refusing, never its traceback; deadwax's own words where they're fit ("Could not build a search
+   *  query") */
   error: string | null
+  /** (2.0.4) ...and the server's own words (slskd logged out: its 409's), for whoever runs deadwax - null for anyone else */
+  detail?: string | null
   /**
    * the Format it was scored by (2.0.0-player.41) - null until deadwax's word on it is in. Lossless only
    * can leave nothing of an answer Soulseek did give, and the sheet says so (lib/candidates.ts
@@ -167,7 +173,9 @@ export function useCandidateSearch({ picking, onPicked, formatPreference }: {
       setNotPicked(notPickedLine(blocked))
     } catch (caught) {
       if (!request.current() || isAbort(caught)) return
-      setSearch({ release, pending: false, result: null, error: caught instanceof Error ? caught.message : 'the search failed', format: null })
+      //? (2.0.4) in a listener's words, slskd's own for whoever runs deadwax (app/access.ts seesDetail)
+      const words = errorWords(caught, { service: 'downloads', failed: DOWN.downloads, admin: seesDetail(accessNow()), retry: true })
+      setSearch({ release, pending: false, result: null, error: said(words), detail: words.detail, format: null })
     }
   }
 

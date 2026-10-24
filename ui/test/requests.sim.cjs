@@ -185,6 +185,7 @@ const { Arriving } = require(path.join(OUT, 'app/Arriving.js'))
 const { TabBar } = require(path.join(OUT, 'app/TabBar.js'))
 const { Home } = require(path.join(OUT, 'app/Home.js'))
 const H = require(path.join(OUT, 'node_modules/preact/hooks.js'))
+const Access = require(path.join(OUT, 'app/access.js'))
 
 let failures = 0
 function check(label, actual, expected) {
@@ -596,10 +597,12 @@ console.log('\nDone: how it ended, and how long ago')
   check('some files didn\'t file', words('partly_filed', '2 file(s) failed to organize'), { text: 'Partly filed: 2 file(s) failed to organize', tone: 'warning' })
   check('a stop caught it filing', words('interrupted', "deadwax stopped while filing this - check the library and slskd's folder"),
     { text: "Interrupted while filing: check the library and slskd's folder", tone: 'warning' })
-  check('any other ending, in the row\'s own words', words(null, 'dry run - not organized'), { text: 'Not filed: dry run - not organized', tone: 'warning' })
+  //? (2.0.4) the row's own words in a listener's (lib/errorWords.ts jobErrorWords) - never "check SLSKD_DOWNLOAD_PATH"
+  check('any other ending, in the row\'s words, as a listener reads them - and the tell and its own words, for the row to draw',
+    words(null, 'dry run - not organized'), { text: 'Downloaded, but not added to your library: deadwax is set to try filing without moving anything.', tone: 'warning', tell: true, detail: 'dry run - not organized' })
   check('finished with organizing off', words(null, null), { text: 'Downloaded, not filed', tone: 'warning' })
   check('never read out of the error text: "already in the store" with no outcome is its own words',
-    words(null, 'already in the store: all 3 track(s)').text, 'Not filed: already in the store: all 3 track(s)')
+    words(null, 'already in the store: all 3 track(s)').text, 'already in the store: all 3 track(s)')
 
   const done = view([job('organized', { outcome: 'filed', updated_at: ago(12 * 60) })]).sections.done[0]
   check('the line, as the board has it', [done.line, done.lineTone], ['In your library · 12 minutes ago', 'plain'])
@@ -626,16 +629,37 @@ console.log('\npersonal libraries (2.0.0-player.51): what a filing gave, and a d
     { text: 'Partly filed: 2 file(s) failed to organize · in your library, marked incomplete', tone: 'warning' })
   check('logins off (no `library`): the words it always had', [words('filed', null, undefined).text, words('already_there', 'x', undefined).text],
     ['In your library', 'Already in your library, nothing filed'])
-  check('...and nothing given says its own words', words(null, 'dry run - not organized', null, true).text, 'Not filed: dry run - not organized')
+  check('...and nothing given says its own words, as a listener reads them', words(null, 'dry run - not organized', null, true).text, 'Downloaded, but not added to your library: deadwax is set to try filing without moving anything.')
 
   const notFiled = job('complete', { outcome: 'not_filed', error: 'nothing could be organized, check SLSKD_DOWNLOAD_PATH', alternatives_left: 2 })
   const v = view([notFiled])
   const [row] = v.sections.attention
   check('nothing of it could be filed (logins on): under Needs attention, saying why, the next peer offered - not Ask again',
-    [v.sections.done.length, row.reason, row.nextPeer.label, row.askAgain], [0, 'nothing could be organized, check SLSKD_DOWNLOAD_PATH', 'Next peer · 2 left', null])
+    [v.sections.done.length, row.reason, row.nextPeer.label, row.askAgain], [0, "It downloaded, but deadwax couldn't find its files to add them to your library.", 'Next peer · 2 left', null])
+  check('...only whoever runs deadwax can put it right (JobCard tells anyone else so), and the job\'s own words kept for them',
+    [row.reasonTell, row.reasonDetail], [true, 'nothing could be organized, check SLSKD_DOWNLOAD_PATH'])
   const off = view([job('complete', { outcome: null, error: 'nothing could be organized, check SLSKD_DOWNLOAD_PATH' })])
-  check('...with logins off (no such outcome): Done, as it always was', [off.sections.done.length, off.sections.attention.length, off.sections.done[0].line.startsWith('Not filed: nothing could be organized')],
+  check('...with logins off (no such outcome): Done, as it always was', [off.sections.done.length, off.sections.attention.length, off.sections.done[0].line.startsWith("It downloaded, but deadwax couldn't find its files")],
     [1, 0, true])
+  //? (review) the Done row keeps the job's own words for whoever runs deadwax - with logins off, everyone - and the
+  //? tell for anyone else, as a Needs-attention card does
+  const offRow = off.sections.done[0]
+  check('...its own words and the tell carried onto the Done row', [offRow.reasonTell, offRow.reasonDetail], [true, 'nothing could be organized, check SLSKD_DOWNLOAD_PATH'])
+  const offDrawn = deep(H.root(Cards.DoneRow)({ row: offRow }))
+  check('...drawn for whoever runs deadwax (logins off): the setting under the line, no tell',
+    [byClass(offDrawn, 'app-error-detail').map(text), byClass(offDrawn, 'app-job-line').map(text).some((t) => t.includes('Tell whoever'))],
+    [['nothing could be organized, check SLSKD_DOWNLOAD_PATH'], false])
+  const failedFiling = view([job('complete', { outcome: null, error: "organize failed: [Errno 13] Permission denied: '/music/x'" })]).sections.done[0]
+  check('...an exception the filing raised, the same way', byClass(deep(H.root(Cards.DoneRow)({ row: failedFiling })), 'app-error-detail').map(text),
+    ["organize failed: [Errno 13] Permission denied: '/music/x'"])
+  Access.noteAccess({ auth: 'on', user: 'ethan', admin: false, permissions: ['request'] })
+  const offListener = deep(H.root(Cards.DoneRow)({ row: offRow }))
+  check('...a listener: the tell under the line, and no setting anywhere',
+    [byClass(offListener, 'app-job-line').map(text).slice(1), byClass(offListener, 'app-error-detail').length, JSON.stringify(offListener).includes('SLSKD_DOWNLOAD_PATH')],
+    [['Tell whoever runs deadwax.'], 0, false])
+  Access.forgetAccess()
+  const filedRow = view([job('organized', { outcome: 'filed' })]).sections.done[0]
+  check('...a filed row carries neither', [filedRow.reasonTell, filedRow.reasonDetail], [false, null])
 }
 
 /* ========================================================================== */
@@ -769,7 +793,8 @@ console.log('\nwhat a screen reader hears as rows change')
   check('...or "trying next peer…"', said(failedView, trying).said, 'Heligoland: trying next peer…')
   const refused = view([f], { retryProblems: new Map([[f.id, 'slskd is still stopping the last attempt - try again in a moment']]) })
   check('a retry\'s refusal, which is otherwise only a red line', said(asking, refused),
-    { said: 'Heligoland: slskd is still stopping the last attempt - try again in a moment', moved: [] })
+    //? (2.0.4) the retry route's words that name slskd, in a listener's (RETRY_WORDS)
+    { said: 'Heligoland: The last try is still stopping - try again in a moment.', moved: [] })
   const moved = view([{ ...f, status: 'queued', error: null, queue_position: 2 }])
   check('a row under another heading: what it is now, and that it moved', said(trying, moved),
     { said: 'Heligoland: waiting', moved: [`job-${f.id}`] })
@@ -960,15 +985,47 @@ console.log('\nthe Requests tab as a whole')
     [byClass(waiting, 'pl-spinner').length, all(waiting, (n) => text(n) === 'Nothing requested yet').length], [1, 0])
   const empty = page(view([]))
   check('nothing yet, once it has answered: says so, and draws no heading', [text(byClass(empty, 'app-placeholder-lead')), headings(empty), byClass(empty, 'pl-spinner').length], ['Nothing requested yet', [], 0])
-  const failing = page(view([down]), { error: 'Failed to fetch' })
-  check('deadwax not answering: says so, and keeps the rows from the last answer',
-    [text(byClass(failing, 'app-placeholder-lead')), text(byClass(failing, 'app-error')), headings(failing)],
-    ["Can't get your requests from deadwax", 'Failed to fetch', ['Downloading']])
+  //? (2.0.4) the error itself, as fetch throws it: in a listener's words, fetch's own under them for whoever runs deadwax
+  const failing = page(view([down]), { error: 'Failed to fetch', failure: new TypeError('Failed to fetch') })
+  check('deadwax not answering: says so in a listener\'s words, and keeps the rows from the last answer',
+    [text(byClass(failing, 'app-placeholder-lead')), text(byClass(failing, 'app-error')), text(byClass(failing, 'app-error-detail')), headings(failing)],
+    ["Can't update your requests right now", "Can't connect to deadwax.Failed to fetch", 'Failed to fetch', ['Downloading']])
   check('...and with nothing to show, no "Nothing requested yet" under the failure',
     all(page(view([]), { error: 'Failed to fetch' }), (n) => text(n) === 'Nothing requested yet').length, 0)
   const untracked = page(view([]), { trackingEnabled: false })
   check('a database deadwax can\'t write: says so, and where to look', [text(byClass(untracked, 'app-placeholder-lead')), text(byClass(untracked, 'app-mono'))],
     ["Downloads aren't being kept track of", 'DB_PATH'])
+  //? (2.0.4) to someone who doesn't run deadwax: no DB_PATH, and to tell whoever does - and no fetch words under a failure
+  Access.noteAccess({ auth: 'on', user: 'ethan', admin: false, permissions: ['request'] })
+  const untrackedListener = page(view([]), { trackingEnabled: false })
+  const failingListener = page(view([down]), { error: 'Failed to fetch', failure: new TypeError('Failed to fetch') })
+  check('...a listener: no DB_PATH, and to tell whoever runs deadwax; a failure with no detail under it',
+    [text(byClass(untrackedListener, 'app-placeholder-text')), byClass(untrackedListener, 'app-mono').length, text(byClass(failingListener, 'app-error')), byClass(failingListener, 'app-error-detail').length],
+    [Q.UNTRACKED_TEXT, 0, "Can't connect to deadwax.", 0])
+  check('...which says so', Q.UNTRACKED_TEXT, "Requests can't be shown right now: deadwax can't keep track of downloads. Tell whoever runs deadwax.")
+  //? (2.0.4) a download filing couldn't use, drawn: a listener reads why and to tell whoever runs deadwax - never
+  //? SLSKD_DOWNLOAD_PATH; whoever runs it reads the job's own words under the reason instead
+  const unfiled = view([job('complete', { outcome: 'not_filed', error: 'nothing could be organized, check SLSKD_DOWNLOAD_PATH', alternatives_left: 1 })]).sections.attention[0]
+  const reasonOf = (drawn) => byClass(drawn, 'app-job-reason').map(text)
+  check('...a listener\'s card: the reason and the tell, no setting',
+    reasonOf(deep(H.root(Cards.AttentionCard)({ row: unfiled, onRetry() {} }))),
+    ["It downloaded, but deadwax couldn't find its files to add them to your library. Tell whoever runs deadwax."])
+  Access.forgetAccess()
+  check('...whoever runs deadwax\'s: the reason, and the job\'s own words under it',
+    [reasonOf(deep(H.root(Cards.AttentionCard)({ row: unfiled, onRetry() {} }))), text(byClass(deep(H.root(Cards.AttentionCard)({ row: unfiled, onRetry() {} })), 'app-error-detail'))],
+    [["It downloaded, but deadwax couldn't find its files to add them to your library.nothing could be organized, check SLSKD_DOWNLOAD_PATH"], 'nothing could be organized, check SLSKD_DOWNLOAD_PATH'])
+  //? (review) a retry that couldn't start, its own words plumbing: a listener reads the sentence alone, whoever runs
+  //? deadwax the words under it
+  const stuck = job('failed', { error: 'offline', alternatives_left: 1 })
+  const stuckRow = view([stuck], { retryProblems: new Map([[stuck.id, 'slskd refused the enqueue: HTTP 500 from POST /api/v0/transfers']]) }).sections.attention[0]
+  const detailOf = (drawn) => byClass(drawn, 'app-error-detail').map(text)
+  Access.noteAccess({ auth: 'on', user: 'ethan', admin: false, permissions: ['request'] })
+  const stuckListener = deep(H.root(Cards.AttentionCard)({ row: stuckRow, onRetry() {} }))
+  check('...a retry that couldn\'t start, to a listener: the sentence, never the retry\'s own words',
+    [reasonOf(stuckListener), detailOf(stuckListener), JSON.stringify(stuckListener).includes('HTTP 500')], [['offline', "The download couldn't be started."], [], false])
+  Access.forgetAccess()
+  check('...to whoever runs deadwax: the retry\'s own words under it', detailOf(deep(H.root(Cards.AttentionCard)({ row: stuckRow, onRetry() {} }))),
+    ['slskd refused the enqueue: HTTP 500 from POST /api/v0/transfers'])
 
   //? the live region says what changed between two views
   const speak = H.root(Requests)

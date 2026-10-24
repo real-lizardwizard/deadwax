@@ -14,6 +14,7 @@ import {
   httpNote,
   type OwnPasswordForm,
 } from '../lib/ownPassword'
+import { sayError } from './sayError'
 
 /**
  * You > About's Change password (2.0.2, src/routes/own_password.py) - drawn by You only with logins on and a
@@ -88,7 +89,8 @@ export function ChangePassword({ user }: { user: string }) {
         sending.current = false
         setBusy(false)
         setForm(typed)
-        setProblem(reason instanceof Error ? reason.message : String(reason))
+        //? (2.0.4) deadwax's own words where they're fit, a listener's otherwise (sayError)
+        setProblem(sayError(reason))
         if (reason instanceof ApiError && reason.kind === 'not_your_password') {
           setForm({ ...typed, current: '' })
           currentField.current?.focus({ preventScroll: true })

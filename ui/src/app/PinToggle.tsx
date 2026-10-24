@@ -1,7 +1,14 @@
+import { TELL } from '../lib/errorWords'
 import { PinIcon } from '../player/icons'
 
-/** What a pin control says while deadwax's database can't keep pins. */
+/** What a pin control says while deadwax's database can't keep pins - (2.0.4) and, to anyone who doesn't run
+ *  deadwax, who can't put the volume right, to tell whoever does (pinsUnsaved). */
 export const PINS_UNSAVED = "deadwax can't keep pins just now: its database isn't writable"
+
+/** (2.0.4) PINS_UNSAVED as `runs` (app/access.ts seesDetail) reads it. */
+export function pinsUnsaved(runs: boolean): string {
+  return runs ? PINS_UNSAVED : `${PINS_UNSAVED}. ${TELL}`
+}
 
 /**
  * The pin on an album page and an artist page (2.0.0-player.18): a toggle button, `aria-pressed`

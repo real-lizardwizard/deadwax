@@ -1,4 +1,5 @@
 import type { NavidromeStatus } from '../player/api'
+import { isOffline } from './errorWords'
 import { latestOnly } from './latest'
 
 /**
@@ -38,7 +39,9 @@ export function navidromeChecks(
         if (ticket.current()) show(() => status)
       },
       (reason: unknown) => {
-        if (ticket.current()) show(() => ({ configured: true, ok: false, server: null, problem: String(reason) }))
+        //? (2.0.4, review) fetch's own failure is deadwax not answering, not Navidrome: the gate says so (offline)
+        const offline = isOffline(reason) ? { offline: true } : {}
+        if (ticket.current()) show(() => ({ configured: true, ok: false, server: null, problem: String(reason), ...offline }))
       },
     )
   }

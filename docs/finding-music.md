@@ -274,8 +274,10 @@ answer at all, as each try waits up to half a minute for an answer. If nothing a
 a new search.* - never when MusicBrainz wasn't asked yet.
 
 If Navidrome isn't set up or can't be reached, its notice (**Connect Navidrome** or **Can't reach
-Navidrome**, as Home shows) sits once above the list, and MusicBrainz's rows still fill every section below
-it. If your library's search fails, it says why at the top, with **Try again** - which **Search**, or Navidrome
+Navidrome**, as Home shows - **Your music isn't available** to anyone who doesn't run deadwax) sits once
+above the list, and MusicBrainz's rows still fill every section below
+it. If your library's search fails, it says why at the top in plain words ("Can't reach the music server
+right now", "Can't connect to deadwax"), with **Try again** - which **Search**, or Navidrome
 coming back, does too: the list is drawn afresh with your library in it.
 
 **With logins on** your library's rows are the **store's** - Navidrome's search finds

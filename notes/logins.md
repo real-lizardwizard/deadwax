@@ -1807,3 +1807,11 @@ costs at most one failed login, so it takes five devices of the person's asking 
 milliseconds (it would read as `DIDNT_TAKE` though the change took - the re-check then ends this session and the new
 password signs in); the iPhone (the keyboard over the form, a password manager offering
 to save the new password against the right name); a real page walk (the orchestrator's).
+
+### The sign-in's words, for anyone (2.0.4)
+
+The sign-in's and a session's refusals were reworded for whoever reads them in 2.0.4 (UX batch 1): no setting,
+address, exception or WireGuard in the line anyone reads; where whoever runs deadwax needs one, src/auth.py
+answers an **Explained** (`{"detail", "why"}`, the status unchanged) and the sign-in screen folds the why under
+**For whoever runs deadwax**. The whole write-up - the words, the classes the app says errors by, who sees the
+detail - is notes/app.md's "Errors and connections in a listener's words (2.0.4)".

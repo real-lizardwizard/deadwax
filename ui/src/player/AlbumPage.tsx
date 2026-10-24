@@ -7,7 +7,7 @@ import type { StoreAlbumResponse } from '../api/types'
 import type { ViewerImage } from '../components/ArtViewer'
 import { AlbumProperties } from '../app/AlbumProperties'
 import { CoverViewer } from '../app/CoverViewer'
-import { PINS_UNSAVED, PinToggle } from '../app/PinToggle'
+import { pinsUnsaved, PinToggle } from '../app/PinToggle'
 import { keepJoinFocus } from '../app/StoreState'
 import { hasLibrary } from '../app/useMyLibrary'
 import { takeOpener } from '../app/useSheet'
@@ -27,6 +27,8 @@ import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, MoreIcon, PlayIcon, Playi
 import { Cover } from './Cover'
 import { queued, warmAlbum } from './levelling'
 import type { Player } from './usePlayer'
+import { accessNow, seesDetail } from '../app/access'
+import { errorNote } from '../app/ErrorNote'
 
 /**
  * One album: its cover, Play and Shuffle, and its songs.
@@ -106,6 +108,9 @@ import type { Player } from './usePlayer'
  * Next, Play Last) through `onQueueMenu`, with the songs in hand: the album's ••• is aria-disabled until they
  * are. This page names no Up Next action - the menu plays them, in its tap.
  */
+/** (2.0.4) An album page whose album Navidrome no longer has (a 404). */
+export const ALBUM_GONE = "This album isn't here any more - it may have been moved or deleted."
+
 export function AlbumPage({
   id,
   preview,
@@ -144,7 +149,8 @@ export function AlbumPage({
   onQueueMenu?: ((event: MouseEvent, pick: QueuePick<AlbumWithSongs>) => void) | undefined
 }) {
   const [album, setAlbum] = useState<AlbumWithSongs | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  //? (2.0.4) the errors themselves, said by errorNote (app/ErrorNote.tsx) in a listener's words
+  const [error, setError] = useState<unknown>(null)
   const requests = useMemo(latestOnly, [])
   //? what the store holds of this album, and its other pressings - the id bridge
   const [store, setStore] = useState<StoreAlbumResponse | null>(null)
@@ -158,7 +164,7 @@ export function AlbumPage({
   //? (2.0.0-player.52) Add to my library / Remove from my library: what this page just did, the ask out, a refusal
   const [changed, setChanged] = useState<'added' | 'removed' | null>(null)
   const [mineBusy, setMineBusy] = useState(false)
-  const [mineRefused, setMineRefused] = useState<string | null>(null)
+  const [mineRefused, setMineRefused] = useState<unknown>(null)
   const mineButton = useRef<HTMLButtonElement | null>(null)
 
   //? the refresh last asked for: a new one is an edit's (2.0.0-player.21), asked afresh and drawn over
@@ -180,7 +186,7 @@ export function AlbumPage({
       },
       (reason: unknown) => {
         if (!request.current() || isAbort(reason) || again) return
-        setError(reason instanceof Error ? reason.message : String(reason))
+        setError(reason)
       },
     )
     return () => requests.supersede()
@@ -278,7 +284,7 @@ export function AlbumPage({
       },
       (caught: unknown) => {
         setMineBusy(false)
-        setMineRefused(caught instanceof Error ? caught.message : String(caught))
+        setMineRefused(caught)
       },
     )
   }
@@ -332,7 +338,7 @@ export function AlbumPage({
             ready={storeDone && !!release && pinsKnown}
             unsaved={!canSave}
             onToggle={() => void setPinned(pinTarget, !pinned)}
-            onRefused={() => sayPins(PINS_UNSAVED)}
+            onRefused={() => sayPins(pinsUnsaved(seesDetail(accessNow())))}
           />
         )}
       </header>
@@ -446,7 +452,7 @@ export function AlbumPage({
           </button>
         </div>
       )}
-      {(mine.action || mine.note || mineRefused) && (
+      {(mine.action || mine.note || !!mineRefused) && (
         <div class="app-album-mine" tabIndex={-1}>
           {mine.note && (
             <p class="app-store-line" role="status">
@@ -464,15 +470,15 @@ export function AlbumPage({
               {mine.action === 'add' ? (mineBusy ? 'Adding…' : 'Add to my library') : mineBusy ? 'Removing…' : 'Remove from my library'}
             </button>
           )}
-          {mineRefused && (
+          {!!mineRefused && (
             <p class="app-store-line is-refused" role="alert">
-              {mineRefused}
+              {errorNote(mineRefused, { as: 'span' })}
             </p>
           )}
         </div>
       )}
 
-      {error && <p class="pl-notice">{error}</p>}
+      {error ? errorNote(error, { class: 'pl-notice', gone: ALBUM_GONE }) : null}
       {!album && !error && <div class="pl-spinner" aria-label="Loading" />}
 
       <ol class="pl-tracks">

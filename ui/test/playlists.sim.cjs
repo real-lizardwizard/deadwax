@@ -87,7 +87,13 @@ exports.editPlaylist = (id, body) => globalThis.__pl.ask('edit', { id, body })
 exports.deletePlaylist = (id) => globalThis.__pl.ask('delete', id)
 `)
 write('api/http.js', `
-class ApiError extends Error { constructor(status, detail) { super(detail); this.name = 'ApiError'; this.status = status; this.detail = detail } }
+//? (2.0.4) api/http.ts's shape: the route it answered (a playlist route: the music server's - lib/errorWords.ts), and
+//? deadwax's own split (why), as the real one has them
+class ApiError extends Error {
+  constructor(status, detail, fallback = 'failed', busy = false, kind = null, why = null, path = '/navidrome/playlists') {
+    super(detail || fallback); this.name = 'ApiError'; this.status = status; this.detail = detail; this.why = why; this.path = path
+  }
+}
 exports.ApiError = ApiError
 `)
 write('app/usePins.js', `exports.sayPins = (text) => globalThis.__pl.calls.push(['sayPins', text])\n`)
@@ -296,9 +302,10 @@ console.log('\nthe store: one list, asked as it is wanted')
   await settle()
   check('...the older answer landing late draws nothing', S.playlistsNow().list.map((p) => p.id), ['road'])
   S.askPlaylists({ fresh: true })
-  answer('list', new Error('Navidrome answered 502'))
+  answer('list', new ApiError(502, 'Navidrome answered 502'))
   await settle()
-  check('a failure keeps the last list and says why', [S.playlistsNow().list.map((p) => p.id), S.playlistsNow().problem], [['road'], 'Navidrome answered 502'])
+  //? (2.0.4) in a listener's words - the music server can't be reached - with (logins off: everyone runs deadwax) Navidrome's own in brackets
+  check('a failure keeps the last list and says why', [S.playlistsNow().list.map((p) => p.id), S.playlistsNow().problem], [['road'], "Can't reach the music server right now. Try again in a minute. (Navidrome answered 502)"])
   S.announcePlaylistChanged('late')
   check('a write here: the list asked again, a page of that id told', [W.asks.slice(-1), told], [[['list']], ['late']])
   answer('list', { playlists: [LATE, ROAD] })
@@ -447,7 +454,7 @@ console.log('\nthe picker')
   tree = render(fifth)
   render.commit()
   check('...refused from the question: the list back, the words on the card, focus to its first row', [rows().length, words(find(byClass('app-playlist-picker-problem'), find(byClass('app-playlist-picker-head'), tree))), landed],
-    [4, 'Navidrome answered 502', ['first row']])
+    [4, "Can't reach the music server right now. Try again in a minute. (Navidrome answered 502)", ['first row']])
   answer('list', { playlists: LIST }, 'last')
   await settle()
 }
@@ -472,10 +479,10 @@ console.log('\nNew playlist\'s form, and the question asked in place')
   find(byType('form'), tree)[0].props.onSubmit({ preventDefault() {} })
   tree = render(props)
   check('Enter (the form\'s submit) creates it trimmed - once, Creating… while it is out', [asked, words(create()), create().props['aria-disabled']], [['Late night'], 'Creating…', true])
-  rejectIt(new Error('Navidrome answered 502'))
+  rejectIt(new ApiError(502, 'Navidrome answered 502'))
   await settle()
   tree = render(props)
-  check('refused: the form stays, the reason under it as an alert', [words(find(byClass('is-refused'), tree)), find(byClass('is-refused'), tree)[0].props.role, words(create())], ['Navidrome answered 502', 'alert', 'Create'])
+  check('refused: the form stays, the reason under it as an alert', [words(find(byClass('is-refused'), tree)), find(byClass('is-refused'), tree)[0].props.role, words(create())], ["Can't reach the music server right now. Try again in a minute. (Navidrome answered 502)", 'alert', 'Create'])
   let prevented = false
   field().props.onKeyDown({ key: 'Escape', preventDefault: () => { prevented = true } })
   check('Escape cancels the form and nothing else (preventDefault - the sheet around it stays)', [cancelled, prevented], [1, true])
@@ -545,10 +552,10 @@ console.log('\nthe Playlists page')
   const fresh = hooks.root(FreshPage)
   fresh(props)
   fresh.commit()
-  answer('list', new Error('Navidrome isn\'t answering'), 'last')
+  answer('list', new ApiError(502, 'Navidrome isn\'t answering'), 'last')
   await settle()
   let failed = fresh(props)
-  check('nothing held and the ask failed: why, and Try again', words(find(byClass('pl-notice'), failed)), "Couldn't list your playlists: Navidrome isn't answering" + 'Try again')
+  check('nothing held and the ask failed: why, and Try again', words(find(byClass('pl-notice'), failed)), "Couldn't list your playlists. Navidrome isn't answering" + 'Try again')
   find(byClass('pl-text-button'), failed)[0].props.onClick()
   check('...Try again asks afresh', W.asks.slice(-1), [['list']])
   answer('list', { playlists: [ROAD] }, 'last')
@@ -716,7 +723,7 @@ console.log('\na playlist\'s page: the preview, theirs, from a file, hidden song
   await settle()
   tree = cold.draw()
   check('nothing in hand and the first ask failed: why, Try again, no hero', [words(find(byClass('app-playlist-failed'), tree)), find(byClass('pl-album-hero'), tree).length, find(byClass('app-playlist-line'), tree).length],
-    ["Couldn't open this playlist: Navidrome answered 502Try again", 0, 0])
+    ["Couldn't open this playlist. Can't reach the music server right now. Try again in a minute. (Navidrome answered 502)Try again", 0, 0])
   find(byClass('pl-text-button'), find(byClass('app-playlist-failed'), tree))[0].props.onClick()
   tree = cold.draw()
   check('...Try again asks again, the spinner meanwhile', [W.asks.slice(-1), find(byClass('pl-spinner'), tree).length], [[['one', 'cold']], 1])
@@ -809,8 +816,8 @@ console.log('\na playlist\'s page: Edit')
   await settle()
   tree = draw()
   check('refused: Edit stays with the changes and the reason, as an alert', [find(byClass('app-playlist-edit-row'), tree).length, find(byClass('app-playlist-input'), tree)[0].props.value, words(find((node) => node.props?.role === 'alert', tree))],
-    [2, 'Later', 'Navidrome answered 502'])
-  check('...the reason in the bar, which stays in view', words(find((node) => node.props?.role === 'alert', find(byType('header'), tree))), 'Navidrome answered 502')
+    [2, 'Later', "Can't reach the music server right now. Try again in a minute. (Navidrome answered 502)"])
+  check('...the reason in the bar, which stays in view', words(find((node) => node.props?.role === 'alert', find(byType('header'), tree))), "Can't reach the music server right now. Try again in a minute. (Navidrome answered 502)")
   find(byClass('app-playlist-edit-toggle'), tree)[0].props.onClick()
   check('Done again: `tried`, the songs the refused one sent - Navidrome may have taken them', W.asks.filter(([name]) => name === 'edit').slice(-1)[0][1].body.tried, ['a', 'b'])
   scrolled.length = 0
@@ -853,7 +860,7 @@ console.log('\na playlist\'s page: Edit')
   find(byClass('app-pin-remove'), tree)[0].props.onClick()
   tree = draw()
   find(byClass('app-playlist-edit-toggle'), tree)[0].props.onClick()
-  answer('edit', new ApiError(502, 'The songs were saved, but Navidrome didn\'t take the name, description or sharing: locked'))
+  answer('edit', new ApiError(502, 'The songs were saved, but Navidrome didn\'t take the name, description or sharing.', 'failed', false, null, 'Navidrome said: locked'))
   await settle()
   tree = draw()
   const asked = W.asks.filter(([name]) => name === 'one').length

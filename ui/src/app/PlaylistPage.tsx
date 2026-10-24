@@ -18,6 +18,7 @@ import { CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronUpIcon, CloseIcon, 
 import type { Player } from '../player/usePlayer'
 import { ConfirmLine } from './ConfirmLine'
 import { announcePlaylistChanged, forgetPlaylist, keepPlaylist, keptPlaylist, onPlaylistChanged } from './usePlaylists'
+import { sayError } from './sayError'
 
 /** A row being dragged in Edit: which, from where, the pointer's start and now, the page's scroll at the start,
  *  the rows' pitch, and the pointer. */
@@ -144,7 +145,7 @@ export function PlaylistPage({
           setGone(true)
           return
         }
-        setRefreshFailed(reason instanceof Error ? reason.message : String(reason))
+        setRefreshFailed(sayError(reason))
       },
     )
     return () => requests.supersede()
@@ -275,7 +276,7 @@ export function PlaylistPage({
           return
         }
         tried.current = body.song_ids
-        setEditProblem(caught instanceof Error ? caught.message : String(caught))
+        setEditProblem(sayError(caught))
       },
     )
   }
@@ -384,7 +385,7 @@ export function PlaylistPage({
       },
       (caught: unknown) => {
         setDeleting(false)
-        setDeleteProblem(caught instanceof Error ? caught.message : String(caught))
+        setDeleteProblem(sayError(caught))
       },
     )
   }
@@ -482,7 +483,7 @@ export function PlaylistPage({
       )}
 
       {hidden > 0 && !editing && <p class="app-store-line app-playlist-line">{hiddenWords(hidden)}</p>}
-      {refreshFailed && !gone && answer && <p class="app-store-line is-refused app-playlist-line">{`Couldn't ask Navidrome for it again: ${refreshFailed}`}</p>}
+      {refreshFailed && !gone && answer && <p class="app-store-line is-refused app-playlist-line">{`Couldn't update this playlist - showing it as it was. ${refreshFailed}`}</p>}
       {note && !editing && <p class="app-store-line app-playlist-line" role="status">{note}</p>}
       {/* what an Edit changed, read out - always in the page, as iOS reads only a region already there */}
       <p class="app-visually-hidden" role="status" aria-live="polite" aria-atomic="true">{said}</p>
@@ -493,7 +494,7 @@ export function PlaylistPage({
         refreshFailed ? (
           //? (review) nothing in hand and the first ask failed: why, and Try again - never an empty page saying "again"
           <div class="pl-notice app-playlist-failed">
-            <p>{`Couldn't open this playlist: ${refreshFailed}`}</p>
+            <p>{`Couldn't open this playlist. ${refreshFailed}`}</p>
             <button type="button" class="pl-text-button" onClick={() => {
               setRefreshFailed(null)
               setAsks((n) => n + 1)

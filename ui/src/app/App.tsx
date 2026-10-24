@@ -49,7 +49,7 @@ import { NeedsALook } from './NeedsALook'
 import { NeedsNavidrome } from './NeedsNavidrome'
 import { setUpNavidromeBy } from './navidromeSetUp'
 import { ReleaseGroupPage } from './ReleaseGroupPage'
-import { Requests } from './Requests'
+import { CANT_OPEN_DOWN, CANT_OPEN_OFFLINE, CANT_OPEN_UNSET, Requests } from './Requests'
 import { Search } from './Search'
 import { ServerSettings, onServerSettingsSaved, showServerSettingsTab } from './ServerSettings'
 import { Sidebar } from './Sidebar'
@@ -494,7 +494,7 @@ export function App() {
   const [stalled, setStalled] = useState(false)
   const downloads = useDownloadJobs(watching === 'requests' || stalled)
   const { jobs, pending, speeds, cancelling, retrying, retryingSame, retryProblems } = downloads
-  const { refresh, enqueue, cancel, retry, clearFinished, trackingEnabled, error: downloadsError } = downloads
+  const { refresh, enqueue, cancel, retry, clearFinished, trackingEnabled, error: downloadsError, failure: downloadsFailure } = downloads
 
   //? Whether deadwax has answered yet, or failed to: until then Requests knows nothing, empty or
   //? not. The hook's jobs are one array until its first answer replaces them.
@@ -1265,8 +1265,9 @@ export function App() {
   //? why Navidrome can't be asked for an album just now, for a Done row that can't open: unknown
   //? (null) until its status is in
   const navidromeProblem = !status ? null
-    : !status.configured ? "Navidrome isn't set up, so deadwax can't open the album here"
-    : !status.ok ? "Navidrome isn't answering just now, so deadwax can't open the album here"
+    : !status.configured ? CANT_OPEN_UNSET
+    : status.offline ? CANT_OPEN_OFFLINE
+    : !status.ok ? CANT_OPEN_DOWN
     : null
   //? Home is what shows: its pins are asked again as it comes into view (2.0.0-player.18)
   const homeShown = watching === 'home'
@@ -1316,6 +1317,7 @@ export function App() {
         answered={answered.current}
         trackingEnabled={trackingEnabled}
         error={downloadsError}
+        failure={downloadsFailure}
         active={requestsActive}
         navidromeProblem={navidromeProblem}
         onCancel={cancel}
@@ -1324,7 +1326,7 @@ export function App() {
         onOpenAlbum={openAlbum}
       />
     ),
-    [view, answered.current, trackingEnabled, downloadsError, cancel, retry, clearFinished, requestsActive, navidromeProblem],
+    [view, answered.current, trackingEnabled, downloadsError, downloadsFailure, cancel, retry, clearFinished, requestsActive, navidromeProblem],
   )
   const library = useMemo(
     () => (

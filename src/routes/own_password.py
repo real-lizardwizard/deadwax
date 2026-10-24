@@ -42,6 +42,7 @@ input (src/api/app.py). Refusals are People's (`Refused`: {detail, kind, fix}).
 """
 
 import asyncio
+import re
 import secrets
 import time
 from collections import deque
@@ -93,7 +94,9 @@ DIDNT_TAKE = ("Navidrome said it changed your password, but the new one doesn't 
 UNCHECKED = "deadwax couldn't check that the new password works - Navidrome didn't answer that one question."
 NOT_RENEWED = ("deadwax couldn't give this device a new sign-in, so a copy of its old one would still work - sign out "
                "and in again here to be sure none does.")
-NOT_KEPT = ("Navidrome changed your password, but deadwax couldn't keep the new one ({}) - sign out and sign in again "
+#? (2.0.4) no exception's name in it: the person changing their own password reads it (lib/errorWords.ts plumbing), and
+#? the log line beside the raise has the exception
+NOT_KEPT = ("Navidrome changed your password, but deadwax couldn't keep the new one - sign out and sign in again "
             "with the new password.")
 TOO_MANY = "That's a lot of tries in a minute - wait {seconds} seconds and try again."
 NO_DATABASE = "deadwax can't read its database, so it can't change your password right now."
@@ -163,6 +166,17 @@ def _detail(error: navidrome_admin.NativeError) -> str:
     return error.words.split("(", 1)[1].split(")", 1)[0] if "(" in error.words else "?"
 
 
+def _unknown_words(template: str, error: navidrome_admin.NativeError) -> str:
+    """(2.0.4) UNKNOWN or UNKNOWN_SAVED with what Navidrome's answer was in brackets - but never an exception's name
+    ("RemoteProtocolError"): the person changing their password reads these words, and the app shows deadwax's own
+    words only when they hold no plumbing (lib/errorWords.ts). The exception goes to the log instead."""
+    named = _detail(error)
+    if re.search(r"(Error|Exception)$", named):
+        logger.warning(f"Navidrome's answer to a password change couldn't be read: {named}", extra={"frontend": True})
+        return template.replace(" ({})", "")
+    return template.format(named)
+
+
 def _refused(error: navidrome_admin.NativeError, user: str) -> Refused:
     """A native API failure before Navidrome took the change, in this page's words - nothing changed."""
     kind = error.kind
@@ -182,7 +196,7 @@ def _refused(error: navidrome_admin.NativeError, user: str) -> Refused:
     if kind == "locked":
         return Refused(409, LOCKED, "locked_out")
     if kind == "unknown_shape":
-        return Refused(502, UNKNOWN.format(_detail(error)), "unknown_shape")
+        return Refused(502, _unknown_words(UNKNOWN, error), "unknown_shape")
     return Refused(error.status, error.words, kind, error.fix, error.retry_after)
 
 
@@ -257,7 +271,7 @@ async def change_own_password(request: Request, body: OwnPasswordBody, user: str
                     if took is None:
                         logger.warning(f"{user}'s password change was answered in a way deadwax doesn't know, and the new "
                                        f"one couldn't be tried", extra={"frontend": True})
-                        raise Refused(502, UNKNOWN_SAVED.format(_detail(e)), "unknown_shape") from e
+                        raise Refused(502, _unknown_words(UNKNOWN_SAVED, e), "unknown_shape") from e
                     raise _refused(e, user) from e
                 logger.info(f"{user}'s password change got no answer deadwax could read, but the new one works",
                             extra={"frontend": True})
@@ -274,7 +288,7 @@ async def change_own_password(request: Request, body: OwnPasswordBody, user: str
             except Exception as e:
                 logger.error(f"{user} changed their Navidrome password, but deadwax couldn't keep the new one "
                              f"({type(e).__name__}: {e})", extra={"frontend": True})
-                raise Refused(500, NOT_KEPT.format(type(e).__name__), "not_kept") from e
+                raise Refused(500, NOT_KEPT, "not_kept") from e
             #? (review 3) and this device's session under a new id, its cookie set on the answer as a sign-in's is: a copy
             #? of the old cookie - the reason someone changes a password - is signed out with the other devices. A failure
             #? here leaves the session standing under its old id, with the new login, and says so

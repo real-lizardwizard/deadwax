@@ -33,7 +33,8 @@ NOT_YOURS = "That playlist is {owner}'s - only they can change it."
 FROM_FILE = "Navidrome made that playlist from a file in the music folders, so it can't be changed here."
 CHANGED = "That playlist changed in another app since you started editing it - nothing was saved."
 TOO_LONG = "deadwax edits playlists of up to 2,000 songs - edit this one in Amperfy or Navidrome."
-PART_SAVED = "The songs were saved, but Navidrome didn't take the name, description or sharing: {why}"
+#? (2.0.4) both answered as an Explained (src/auth.py): the sentence for anyone, Navidrome's own words as its `why`
+PART_SAVED = "The songs were saved, but Navidrome didn't take the name, description or sharing."
 ONLY_REARRANGES = "An edit can only remove and reorder a playlist's songs - add songs with Add to a playlist."
 NOT_THE_OWNER = "Navidrome says only the playlist's owner can change it"
 BLANK_NAME = "A playlist needs a name."
@@ -45,7 +46,7 @@ SONGS_TOO_MANY = "deadwax adds up to 2,000 songs at a time - add fewer, or use A
 NAME_TOO_LONG = "A playlist's name can be up to 200 characters."
 COMMENT_TOO_LONG = "A description can be up to 1,000 characters."
 #? (review) everything was written, and only the read that follows failed: Done again shows it
-SAVED_UNREAD = "Saved - but Navidrome didn't answer when deadwax asked for the playlist again: {why}"
+SAVED_UNREAD = "Saved - but Navidrome didn't answer when deadwax asked for the playlist again."
 
 #? what a description may hold of the control characters: new lines and tabs
 COMMENT_CONTROLS = frozenset("\n\r\t")

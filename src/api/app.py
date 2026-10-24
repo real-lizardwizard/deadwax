@@ -456,6 +456,13 @@ def start() -> FastAPI:
     async def signed_out(request, error: SignedOut):
         return JSONResponse(status_code=401, content={"detail": str(error)})
 
+    #? (2.0.4) a refusal in two halves (src/auth.py Explained): the sentence anyone reads, and what whoever runs
+    #? deadwax needs beside it - the app shows `why` only to them
+    @app.exception_handler(auth.Explained)
+    async def explained(request, error: auth.Explained):
+        return JSONResponse(status_code=error.status_code, content={"detail": error.detail, "why": error.why},
+                            headers=error.headers)
+
     #? (2.0.0-player.58, review) a playlist route's body refused by its own validators: the refusal in deadwax's words
     #? as a plain `detail` (routes/navidrome.py validation_words) - FastAPI's list of errors reached the page as
     #? "POST ... failed". Every other route's 422 is FastAPI's own, as it always was.

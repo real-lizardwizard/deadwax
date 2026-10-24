@@ -392,6 +392,35 @@ def test_an_unreadable_put_that_cant_be_proved_says_it_cant_tell(own, monkeypatc
     assert "nothing changed" not in answer.json()["detail"]
 
 
+@pytest.mark.parametrize("land", [True, False])
+def test_an_unreadable_answer_never_names_its_exception_to_the_person_changing_it(own, monkeypatch, land):
+    """(2.0.4) The person changing their own password reads UNKNOWN / UNKNOWN_SAVED, and the app shows deadwax's words
+    only when they hold no exception's name (lib/errorWords.ts plumbing) - so an httpx exception goes to the log, and
+    the sentence keeps its advice."""
+    async def unreadable(unlock_, navidrome_id, record):
+        raise navidrome_admin._error("unknown_shape", "RemoteProtocolError")
+    monkeypatch.setattr(navidrome_admin, "save_user", unreadable)
+    if land:
+        async def unanswered(name, pw):
+            return None
+        monkeypatch.setattr(routes, "_signs_in_with", unanswered)
+    ethan = signed_in(own, "ethan")
+    answer = change(own, ethan, "ethan")
+    template = routes.UNKNOWN_SAVED if land else routes.UNKNOWN
+    assert answer.status_code == 502 and answer.json()["detail"] == template.replace(" ({})", "")
+    assert "Error" not in answer.json()["detail"] and "(" not in answer.json()["detail"]
+
+
+def test_a_change_deadwax_couldnt_keep_says_so_without_the_exception(own, monkeypatch):
+    """(2.0.4) NOT_KEPT is read by the person whose password just changed: its instruction (sign in again with the new
+    one) reaches them only with no exception's name in it."""
+    _not_kept(own, monkeypatch)
+    ethan = signed_in(own, "ethan")
+    answer = change(own, ethan, "ethan")
+    assert answer.status_code == 500 and answer.json()["detail"] == routes.NOT_KEPT
+    assert "RuntimeError" not in routes.NOT_KEPT and "sign in again with the new password" in routes.NOT_KEPT
+
+
 def test_navidrome_unable_to_answer_the_proof_still_keeps_the_change_with_a_warning(own, monkeypatch):
     async def unanswered(name, pw):
         return None

@@ -40,7 +40,7 @@ import { keep, kept, songGet, usualGet } from './pressingLists'
 import { keptAnswer, keptOr } from './searchAnswers'
 import { onSearchSubmitted, onSearchTyped, shareSearchText } from './searchBox'
 import { head, sectionId, sectionRow, slot, topPlace, topRow, type RowContext, type SlotState } from './SearchRows'
-import { useAccess } from './access'
+import { accessNow, seesDetail, useAccess } from './access'
 import type { GetRequest } from './Sources'
 import { useFrame } from './useFrame'
 import { useGetSettings } from './useGetSettings'
@@ -48,6 +48,7 @@ import { hasLibrary } from './useMyLibrary'
 import { ownedNow, refreshOwned, useOwned } from './useOwned'
 import { takeOpener } from './useSheet'
 import { useYourAlbumsGeneration, yourAlbums } from './useYourAlbums'
+import { noticeWords } from '../lib/errorWords'
 
 /** How many albums MusicBrainz is asked for: a screenful, with room for the ones you hold. */
 export const MUSICBRAINZ_LIMIT = 12
@@ -58,7 +59,10 @@ export const MUSICBRAINZ_LIMIT = 12
  */
 export const OWNED_WAIT_MS = 1500
 
-const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
+//? (2.0.4) what went wrong in a listener's words - its own, in brackets, for whoever runs deadwax - but for a refusal
+//? (below), whose words are MusicBrainz's answer to the search itself and are kept as they are
+const message = (error: unknown) =>
+  refusal(error) ? (error as ApiError).detail ?? '' : noticeWords('', error, { admin: seesDetail(accessNow()), retry: true })
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 /** A search MusicBrainz refused as malformed: a 422 with words (src/routes/search_musicbrainz.py) - the words
  *  again would be refused again, so it offers no Try again, turns no Behind on, and is never "isn't answering". */

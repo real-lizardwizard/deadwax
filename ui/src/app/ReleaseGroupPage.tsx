@@ -29,11 +29,12 @@ import { PressingPicker } from './PressingPicker'
 import { keep, kept } from './pressingLists'
 import type { GetRequest } from './Sources'
 import { StoreState } from './StoreState'
-import { useAccess } from './access'
+import { accessNow, seesDetail, useAccess } from './access'
 import { useGetSettings } from './useGetSettings'
 import { takeOpener } from './useSheet'
 import { hasLibrary } from './useMyLibrary'
 import { refreshOwned, useOwned } from './useOwned'
+import { noticeWords } from '../lib/errorWords'
 
 export { PRESSINGS_KEPT } from './pressingLists'
 
@@ -312,7 +313,8 @@ export function ReleaseGroupPage({
       },
       (reason: unknown) => {
         if (!request.current() || isAbort(reason)) return
-        setTrouble({ message: reason instanceof Error ? reason.message : String(reason), unavailable: reason instanceof MusicBrainzUnavailable })
+        //? (2.0.4) in a listener's words - its own, in brackets, for whoever runs deadwax
+        setTrouble({ message: noticeWords('', reason, { admin: seesDetail(accessNow()), gone: "This album can't be found." }), unavailable: reason instanceof MusicBrainzUnavailable })
       },
     )
   }

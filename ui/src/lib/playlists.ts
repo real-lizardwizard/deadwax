@@ -136,9 +136,9 @@ export function deleteQuestion(name: string): string {
   return `Delete "${name}"? It goes from Navidrome for good - from Amperfy and every other app too, and for everyone it's shared with. The songs stay in the library.`
 }
 
-/** "Couldn't list your playlists: <why>" */
+/** "Couldn't list your playlists. <why>" - (2.0.4) `why` a listener's words (app/ErrorNote.tsx sayError) */
 export function listFailed(why: string): string {
-  return `Couldn't list your playlists: ${why}`
+  return `Couldn't list your playlists. ${why}`
 }
 
 /* ===== playing one ===== */

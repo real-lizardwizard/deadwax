@@ -79,7 +79,10 @@ exports.heldByNobody = (signal) => globalThis.__lib.ask('held', signal)
 exports.addFlagged = (id) => globalThis.__lib.ask('add', null, id)
 exports.dismissFlag = (id) => globalThis.__lib.ask('putflag', null, id)
 `)
-write('app/session.js', `exports.sessionMe = () => globalThis.__lib.me\n`)
+write('app/session.js', `exports.sessionMe = () => globalThis.__lib.me
+//? (2.0.4) access.ts's word before /me answers - read by ErrorNote and the database lines (who runs deadwax)
+exports.permissionsUntilAsked = () => new Set()
+`)
 write('lib/libraryEvents.js', `
 exports.onAlbumsFiled = (listener) => { globalThis.__lib.filedListeners.push(listener); return () => {} }
 exports.onAddedToLibrary = (listener) => { globalThis.__lib.addedListeners.push(listener); return () => {} }
@@ -336,7 +339,9 @@ async function run() {
     answer('library', { on: true, library: true, kept: false })
     await settle()
     tree = draw({ current: true })
-    check('deadwax can\'t read its database: said', words(find(byClass('app-error'), tree)), "deadwax can't read its database, so it can't say what your library holds.")
+    //? (2.0.4) to someone who doesn't run deadwax, with what they can do about it
+    check('deadwax can\'t read its database: said, and to tell whoever runs deadwax', words(find(byClass('app-error'), tree)),
+      "deadwax can't read its database, so it can't say what your library holds. Tell whoever runs deadwax.")
     store.askMyLibrary()
     answer('library', { on: true, library: false, kept: false })
     await settle()

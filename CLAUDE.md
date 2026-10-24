@@ -251,6 +251,9 @@ ui/                Preact + Vite + TypeScript: the app (src/player/main.tsx -> s
                    since 2.0.0-player.24 lib/deckClock.ts, its one time base; the voice ends
                    in a peak limiter since 2.0.0-player.35) - see "The turntable, part two",
                    "The record's sound follows the hand" and "The record's sound never clips".
+                   lib/errorWords.ts says every error in a listener's words (the pure classes and
+                   sentences), app/ErrorNote.tsx and app/sayError.ts draw them - see "Errors and
+                   connections in a listener's words".
                    app/NeedsALook.tsx is the review queue (both frames), its rules the pure
                    lib/needsLook.ts and its count app/useQueueSummary.ts - see "Needs a look".
                    app/ArtistPanel.tsx is the artist page's managing on both frames (Artist
@@ -302,7 +305,7 @@ ui/                Preact + Vite + TypeScript: the app (src/player/main.tsx -> s
                    ui/src/lab/ is the turntable's test bench at /player/lab/, a third page built
                    in a pass of its own: the real Turntable and deck over signals it makes, set
                    beside an ideal turntable - see notes/turntable-bench.md.
-tests/             3740 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             3783 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ```
 
 API routes are prefixed **`/deadwax/`** (renamed from `/lidbrainz/`, then from `/jimbrainz/`
@@ -340,7 +343,7 @@ section of that title in notes/: `grep -rn "### X" notes/` finds it.
 | one stream for FLAC, hi-res resampled to 48 kHz | `notes/player-stream-hires.md` |
 | normalization: the level rule, the measurement, the levelled copy | `notes/player-normalization.md` |
 | the store index and the "already have it" checks | `notes/store-index.md` |
-| the one app: routes, the gesture rule, the restyle, Now Playing, Info, resume what was playing | `notes/app.md` |
+| the one app: routes, the gesture rule, the restyle, Now Playing, Info, resume what was playing, errors in a listener's words | `notes/app.md` |
 | Requests, Search, the album you don't have, Sources and Get, song search, search like Apple Music | `notes/app-requests-search-get.md` |
 | artists, the id bridge, pins, Home | `notes/app-artists-pins.md` |
 | the desktop frame, the Edit panel, Needs a look (and Not in Navidrome), server settings and the log, Library care - and all of them on a phone | `notes/app-desktop.md` |
@@ -379,6 +382,11 @@ table above), never here. Add to this file only a rule that holds everywhere.
   randomUUID, clipboard, service workers). localhost IS a secure context, so test from a non-local
   name too: Chromium with `--host-resolver-rules="MAP deadwax.test 127.0.0.1"`.
 - **Only the newest answer draws**: every fetch-then-draw goes through `latestOnly()` (`lib/latest.ts`).
+- **Errors in a listener's words**: a page a listener reads (the files `ui/test/errors.sim.cjs` scans) says an
+  error through `lib/errorWords.ts` (`errorNote`, `sayError`), never its own text; its own words only for whoever
+  runs deadwax (`access.ts seesDetail`). The managing pages (People, Server settings, the log, Needs a look,
+  Library care, the editors) still show raw words - UX batch 5's. A server refusal that needs a setting named
+  answers `auth.Explained` (`detail` for anyone, `why` for them).
 - **Tokens only in CSS** (`interface/styles/theme.css`; section 10's `--dw-*` for the app); a raw value
   in a rule is a bug. `app-desktop.css` rules live only inside its desktop media queries.
 - **Links out of the app open beside it** (`target="_blank" rel="noopener"`): following one in the page
@@ -505,7 +513,7 @@ phone's sheet.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 3740 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 3783 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see `notes/tooling.md`:
@@ -541,7 +549,7 @@ deliberately not in it.
 
 ## What the tests cannot tell you
 
-All 3740 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 3783 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

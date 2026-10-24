@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'preact/hooks'
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { pingMusicBrainz, pingSlskd, type PingAnswer } from '../api/connections'
 import { me as fetchMe, type Me } from '../api/me'
@@ -20,11 +20,17 @@ import { QualityChoice } from './QualityChoice'
 import { askGetSettings, chooseGetSettings, useGetSettings } from './useGetSettings'
 import { WindDownChoice } from './WindDownChoice'
 import { managing as managingOf, UNVERIFIED } from '../lib/permissions'
-import { noteAccess, useAccess } from './access'
+import { accessNow, noteAccess, seesDetail, useAccess } from './access'
+import { errorNote } from './ErrorNote'
+import { PING_UNANSWERED, pingWords, TELL, unansweredLine } from '../lib/errorWords'
 import { SignOutRow } from './SignOutRow'
 import { ChangePassword } from './ChangePassword'
 import { changeOffered } from '../lib/ownPassword'
 import { YourLibrary } from './YourLibrary'
+
+/** (2.0.4) Getting albums' three, when deadwax's database can't keep them - "Tell whoever runs deadwax." after it for
+ *  anyone else, who can't put the volume right. */
+export const GETTING_UNSAVED = "deadwax can't keep these: its database isn't writable."
 
 type CheckState = { state: 'pending' | 'ok' | 'failed'; text: string; detail?: string }
 
@@ -38,13 +44,13 @@ type Service = (typeof SERVICES)[number]['id']
 
 const PENDING: CheckState = { state: 'pending', text: 'Checking…' }
 
-const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
-/** A ping's answer as a row says it: the code is the short word, the error the sentence under it. */
-function fromPing(answer: PingAnswer): CheckState {
+/** A ping's answer as a row says it: (2.0.4) a short word for its code, and the sentence under it - slskd's from the
+ *  server (PING_WORDS), MusicBrainz's from lib/errorWords.ts - never the code itself, nor the log's own line. */
+function fromPing(service: 'musicbrainz' | 'slskd', answer: PingAnswer): CheckState {
   if (String(answer.status).toLowerCase() === 'ok') return { state: 'ok', text: 'Connected' }
-  const code = answer.code === undefined || answer.code === null ? '' : String(answer.code)
-  return { state: 'failed', text: code || 'Not connected', ...(answer.error ? { detail: answer.error } : {}) }
+  const words = pingWords(service, answer.code, answer.error)
+  return { state: 'failed', text: words.text, ...(words.line ? { detail: words.line } : {}) }
 }
 
 function fromNavidrome(status: NavidromeStatus): CheckState {
@@ -66,7 +72,7 @@ function fromNavidrome(status: NavidromeStatus): CheckState {
  * - Getting albums (2.0.0-player.15, GettingChoices.tsx): "When I tap Get" (Show me the sources, the
  *   default, or Pick the best source for me), the quality floor and Format (2.0.0-player.41) - kept per USER on the server
  *   (useGetSettings.ts), asked each time You's tab is opened and on "Check again", so one changed on
- *   another device shows here without the app being killed. A choice not kept ("Not saved: …") is
+ *   another device shows here without the app being killed. A choice not kept ("Not saved. …") is
  *   said in a live region that is always in the page, so VoiceOver hears why the choice went back.
  *   Under them (2.0.0-player.41, ConfirmCancelChoice.tsx) "Confirm before cancelling", which is this
  *   DEVICE's - Requests' ✕ reads it at the tap - with a note saying so: after the three's note and
@@ -82,7 +88,12 @@ function fromNavidrome(status: NavidromeStatus): CheckState {
  * - Connections: the three pings the main page had, asked the first time You shows (not at start-up: the
  *   MusicBrainz ping is a real request to a rate-limited service), and again on "Check again". Each
  *   row is its own live region, read whole ("slskd, Connected"): the three answers land in any
- *   order, and a bare "Connected" says nothing about which service it is.
+ *   order, and a bare "Connected" says nothing about which service it is. (2.0.4) Whoever runs
+ *   deadwax's alone - an admin, or someone with Settings and the log (access.ts seesDetail): nobody
+ *   else is shown slskd's key refused or Navidrome's address, nor asked about them. A row says a word
+ *   for its code ("Not on Soulseek", lib/errorWords.ts pingWords), never the code, with a sentence
+ *   under it saying where to put it right - slskd's from the server (PING_WORDS), MusicBrainz's from
+ *   pingWords - never the log's own line.
  * - About: from `GET /deadwax/me` - the version, and logins (on: who, Change password (2.0.2, ChangePassword.tsx - a
  *   Navidrome sign-in's, never break-glass's) and Sign out). Asked with the pings, and
  *   again on "Check again": deadwax restarting under Komodo while You first opened must not leave
@@ -139,10 +150,13 @@ export function You({
   const player = usePlayerState()
   const actions = usePlayerActions()
   const [who, setWho] = useState<Me | null>(null)
-  const [whoFailed, setWhoFailed] = useState<string | null>(null)
+  //? (2.0.4) the error itself, said by errorNote (app/ErrorNote.tsx): a listener's words, and its own for whoever runs deadwax
+  const [whoFailed, setWhoFailed] = useState<unknown>(null)
   const [checks, setChecks] = useState<Record<Service, CheckState> | null>(null)
   const meRequests = useMemo(latestOnly, [])
   const pingRequests = useMemo(latestOnly, [])
+  //? whether this showing of You has asked the pings yet
+  const pinged = useRef(false)
   //? Getting albums: the server's answer, asked each time the tab is opened (the first time too)
   const getting = useGetSettings(current)
   //? "Confirm before cancelling": this device's (2.0.0-player.41) - Requests reads it at the tap
@@ -160,7 +174,7 @@ export function You({
       },
       (reason: unknown) => {
         //? what deadwax said before stays (the version didn't change); the failure is said under it
-        if (request.current() && !isAbort(reason)) setWhoFailed(message(reason))
+        if (request.current() && !isAbort(reason)) setWhoFailed(reason)
       },
     )
   }
@@ -169,16 +183,30 @@ export function You({
     askWho()
     //? Getting albums too: changed on another device, they show here (what's in hand stands meanwhile)
     void askGetSettings()
+    pingRequests.supersede()
+    pinged.current = false
+    //? (2.0.4) the rows are for whoever runs deadwax alone - nobody else is asked about, nor shown, slskd's key
+    if (!seesDetail(accessNow())) {
+      setChecks(null)
+      return
+    }
+    pingAll()
+  }
+
+  function pingAll() {
     const request = pingRequests.begin()
+    pinged.current = true
     setChecks({ musicbrainz: PENDING, slskd: PENDING, navidrome: PENDING })
     const settle = (service: Service, state: CheckState) => {
       if (request.current()) setChecks((now) => ({ ...(now ?? { musicbrainz: PENDING, slskd: PENDING, navidrome: PENDING }), [service]: state }))
     }
+    //? the ask itself failing: its sentence, and the route's own words after it - the rows are only ever drawn for
+    //? whoever runs deadwax, who needs them (review: "Something went wrong" alone told them nothing)
     const failed = (service: Service) => (reason: unknown) => {
-      if (!isAbort(reason)) settle(service, { state: 'failed', text: 'No answer', detail: message(reason) })
+      if (!isAbort(reason)) settle(service, { state: 'failed', text: PING_UNANSWERED, detail: unansweredLine(reason) })
     }
-    pingMusicBrainz(request.signal).then((answer) => settle('musicbrainz', fromPing(answer)), failed('musicbrainz'))
-    pingSlskd(request.signal).then((answer) => settle('slskd', fromPing(answer)), failed('slskd'))
+    pingMusicBrainz(request.signal).then((answer) => settle('musicbrainz', fromPing('musicbrainz', answer)), failed('musicbrainz'))
+    pingSlskd(request.signal).then((answer) => settle('slskd', fromPing('slskd', answer)), failed('slskd'))
     navidromeStatus(request.signal).then((status) => settle('navidrome', fromNavidrome(status)), failed('navidrome'))
   }
 
@@ -194,6 +222,13 @@ export function You({
   //? (2.0.0-player.61) each Managing row by its permission - with logins off everyone has them all; on, the
   //? session's word until /me answers (access.ts). People only with logins on
   const access = useAccess()
+  const runsDeadwax = seesDetail(access)
+  //? (review) deadwax saying, while You is shown, that this person runs deadwax after all (an admin gave them Settings
+  //? and the log since the session began): Connections is drawn now, so its rows are asked now - never left on
+  //? "Checking…" with Check again disabled until You is opened again
+  useEffect(() => {
+    if (shown && runsDeadwax && !pinged.current) pingAll()
+  }, [shown, runsDeadwax])
   const managing = managingOf(access.permissions, access.on)
   //? only what deadwax has said: nothing while it hasn't answered, "…" while it is being asked
   const identity = who ? (who.auth === 'off' ? 'Logins are off' : who.user) : whoFailed ? null : '…'
@@ -228,7 +263,7 @@ export function You({
         {/* what went wrong keeping those three, right under them and their note - never under this
             device's own setting below, which deadwax's database has no part in */}
         {!getting.canSave && (
-          <p class="app-footnote app-error">deadwax can't keep these: its database isn't writable.</p>
+          <p class="app-footnote app-error">{GETTING_UNSAVED}{runsDeadwax ? '' : ` ${TELL}`}</p>
         )}
         {/* always in the page, so VoiceOver hears a choice that wasn't kept (it reads a region only
             once it is already there) - and, empty or not, the gap before the next choice */}
@@ -281,31 +316,35 @@ export function You({
         </p>
       </section>
 
-      <section class="app-section" aria-labelledby="app-connections-title">
-        <div class="app-section-head">
-          <h2 id="app-connections-title" class="app-section-title">
-            Connections
-          </h2>
-          <button type="button" class="app-text-button" onClick={checkAll} disabled={!checks}>
-            Check again
-          </button>
-        </div>
-        <ul class="app-group">
-          {SERVICES.map((service) => {
-            const check = checks?.[service.id] ?? PENDING
-            return (
-              <li key={service.id} class="app-row app-status-row" aria-live="polite" aria-atomic="true">
-                <span class="app-row-label">{service.label}</span>
-                <span class="app-row-value">
-                  <span class={`app-dot is-${check.state}`} aria-hidden="true" />
-                  <span class="app-status-text">{check.text}</span>
-                </span>
-                {check.detail && <span class="app-row-detail">{check.detail}</span>}
-              </li>
-            )
-          })}
-        </ul>
-      </section>
+      {/* (2.0.4) whoever runs deadwax's alone - an admin, or someone with Settings and the log (access.ts seesDetail):
+          what slskd's key or Navidrome's address is doing is nothing anyone else can act on */}
+      {runsDeadwax && (
+        <section class="app-section" aria-labelledby="app-connections-title">
+          <div class="app-section-head">
+            <h2 id="app-connections-title" class="app-section-title">
+              Connections
+            </h2>
+            <button type="button" class="app-text-button" onClick={checkAll} disabled={!checks}>
+              Check again
+            </button>
+          </div>
+          <ul class="app-group">
+            {SERVICES.map((service) => {
+              const check = checks?.[service.id] ?? PENDING
+              return (
+                <li key={service.id} class="app-row app-status-row" aria-live="polite" aria-atomic="true">
+                  <span class="app-row-label">{service.label}</span>
+                  <span class="app-row-value">
+                    <span class={`app-dot is-${check.state}`} aria-hidden="true" />
+                    <span class="app-status-text">{check.text}</span>
+                  </span>
+                  {check.detail && <span class="app-row-detail">{check.detail}</span>}
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      )}
 
       {access.unverified && <p class="app-footnote app-you-unverified">{UNVERIFIED}</p>}
 
@@ -373,7 +412,7 @@ export function You({
             <dd class="app-row-value">{who ? (who.auth === 'off' ? 'Off' : 'On') : whoFailed ? 'unknown' : '…'}</dd>
           </div>
         </dl>
-        {whoFailed && <p class="app-footnote app-error">deadwax didn't answer: {whoFailed}</p>}
+        {whoFailed ? errorNote(whoFailed, { class: 'app-footnote app-error' }) : null}
         {/* (2.0.2) your own Navidrome password - logins on and a Navidrome sign-in only (never break-glass) */}
         {who && changeOffered(who) && <ChangePassword user={who.user} />}
         {/* (2.0.0-player.48) only with logins on - off, there is nobody to sign out */}

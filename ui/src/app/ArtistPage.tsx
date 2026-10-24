@@ -27,15 +27,17 @@ import { Cover } from '../player/Cover'
 import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, PlayIcon, ShuffleIcon } from '../player/icons'
 import { ArchiveCover } from './ArchiveCover'
 import type { ArtistManageMode, ArtistManageRequest } from './ArtistPanel'
-import { useAccess } from './access'
+import { accessNow, seesDetail, useAccess } from './access'
 import { usePlayerActions } from './context'
-import { PINS_UNSAVED, PinToggle } from './PinToggle'
+import { pinsUnsaved, PinToggle } from './PinToggle'
 import { keep, kept as keptPressings, usualGet } from './pressingLists'
 import type { GetRequest } from './Sources'
 import { hasLibrary } from './useMyLibrary'
 import { ownedNow, useOwned, whenOwned } from './useOwned'
 import { sayPins, setPinned, usePins } from './usePins'
 import { takeOpener } from './useSheet'
+import { errorNote } from './ErrorNote'
+import { errorKind } from '../lib/errorWords'
 
 /** What an artist page shows before anything has answered: what the row that opened it knew. */
 export interface ArtistPreview {
@@ -46,7 +48,8 @@ export interface ArtistPreview {
 type Library =
   | { state: 'asking' }
   | { state: 'done'; artist: ArtistWithAlbums | null }
-  | { state: 'failed'; message: string }
+  //? (2.0.4) the error itself, said by errorNote (app/ErrorNote.tsx) in a listener's words
+  | { state: 'failed'; error: unknown }
 
 /** MusicBrainz's albums for the artist: the last answer stays on screen while another is asked for
  *  (`of` says which question it answered - "<mbid>|<studio only>"), so nothing under a finger moves
@@ -57,13 +60,17 @@ interface Discography {
   truncated: boolean
   of: string | null
   message?: string
+  /** (2.0.4) the error itself, when one was thrown - said by errorNote (app/ErrorNote.tsx) */
+  error?: unknown
   unavailable?: boolean
 }
 
-const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 /** What a link to an artist that isn't one says, with nothing to try again. */
 export const NOT_AN_ARTIST_LINK = "That isn't a link to an artist."
+/** (2.0.4, review) an artist the music server no longer has (an old pin or link): said for a listener, never as
+ *  "Navidrome has nothing by that id" - and with no Try again, which can't find them */
+export const ARTIST_GONE = "This artist isn't here any more - their albums may have been moved or deleted."
 
 /** How long the albums wait for the library and MusicBrainz to answer before they are drawn with
  *  what has - as Search waits for the library (OWNED_WAIT_MS), so a row isn't drawn and moved. */
@@ -391,7 +398,7 @@ export function ArtistPage({
         return libraryArtists(true).then((again) => settle(look(again)))
       })
       .catch((reason: unknown) => {
-        if (request.current() && !isAbort(reason)) setLibrary({ state: 'failed', message: message(reason) })
+        if (request.current() && !isAbort(reason)) setLibrary({ state: 'failed', error: reason })
       })
     return () => findRequests.supersede()
   }, [ref.mbid, navidromeOk, owned, factsName, finds])
@@ -409,7 +416,7 @@ export function ArtistPage({
         setLibrary({ state: 'done', artist: answer })
       },
       (reason: unknown) => {
-        if (request.current() && !isAbort(reason) && !quiet) setLibrary({ state: 'failed', message: message(reason) })
+        if (request.current() && !isAbort(reason) && !quiet) setLibrary({ state: 'failed', error: reason })
       },
     )
   }
@@ -523,10 +530,10 @@ export function ArtistPage({
     const request = discRequests.begin()
     setDiscography((before) => ({ ...before, state: 'asking' }))
     //? a failure keeps what was on screen only when it answered this same question
-    const failed = (problem: string, unavailable: boolean) =>
+    const failed = (problem: string, unavailable: boolean, error?: unknown) =>
       setDiscography((before) => ({
         state: 'failed', groups: before.of === key ? before.groups : null, truncated: before.of === key && before.truncated,
-        of: before.of === key ? key : null, message: problem, unavailable,
+        of: before.of === key ? key : null, message: problem, unavailable, ...(error === undefined ? {} : { error }),
       }))
     getDiscography(mbid, studioOnly, request.signal).then(
       (answer) => {
@@ -543,7 +550,8 @@ export function ArtistPage({
       },
       (reason: unknown) => {
         if (!request.current() || isAbort(reason)) return
-        failed(message(reason), reason instanceof MusicBrainzUnavailable)
+        //? (2.0.4) the error itself, said by errorNote - never its words as the line
+        failed('', reason instanceof MusicBrainzUnavailable, reason)
       },
     )
   }
@@ -922,7 +930,7 @@ export function ArtistPage({
               ready={pinReady}
               unsaved={!canSave}
               onToggle={() => void setPinned(pinTarget, !pinned)}
-              onRefused={() => sayPins(PINS_UNSAVED)}
+              onRefused={() => sayPins(pinsUnsaved(seesDetail(accessNow())))}
             />
           )}
         </div>
@@ -961,10 +969,12 @@ export function ArtistPage({
 
           {library.state === 'failed' && (
             <div class="pl-notice">
-              <p>{library.message}</p>
-              <button type="button" class="pl-text-button" onClick={tryLibraryAgain}>
-                Try again
-              </button>
+              {errorNote(library.error, { gone: ARTIST_GONE, retry: true })}
+              {errorKind(library.error) !== 'not-found' && (
+                <button type="button" class="pl-text-button" onClick={tryLibraryAgain}>
+                  Try again
+                </button>
+              )}
             </div>
           )}
 
@@ -1028,11 +1038,14 @@ export function ArtistPage({
               </div>
             ) : discography.state === 'failed' ? (
               <div class="app-search-problem">
-                <p class="app-search-empty">
-                  {discography.unavailable
-                    ? "MusicBrainz isn't answering just now, so the albums you don't have aren't here - it often goes away for a few minutes."
-                    : discography.message}
-                </p>
+                {discography.unavailable ? (
+                  <p class="app-search-empty">
+                    MusicBrainz isn't answering just now, so the albums you don't have aren't here - it often goes away for a few minutes.
+                  </p>
+                ) : (
+                  //? (2.0.4) anything else in a listener's words (errorNote), its own for whoever runs deadwax
+                  errorNote(discography.error ?? new Error(discography.message ?? ''), { class: 'app-search-empty', retry: true })
+                )}
                 <button type="button" class="app-button" onClick={() => browse(true)}>
                   Try again
                 </button>

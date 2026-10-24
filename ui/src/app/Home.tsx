@@ -9,6 +9,7 @@ import { Arriving } from './Arriving'
 import { NeedsNavidrome } from './NeedsNavidrome'
 import { Pinned, type PinnedArtist } from './Pinned'
 import { movePin, removePin, usePins } from './usePins'
+import { errorNote } from './ErrorNote'
 
 /** How many albums the shelf shows. */
 export const RECENT_COUNT = 20
@@ -22,8 +23,6 @@ const NONE_NEW: readonly Album[] = []
 /** How long Home's shelves wait for the pins to answer before they are drawn without them - Pinned
  *  is at the top, and arriving after the shelves under it would move them under a finger. */
 export const PINNED_WAIT_MS = 1500
-
-const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 /**
  * A row of album tiles you swipe along. A tile OPENS the album - it never plays it, since Play has to
@@ -58,7 +57,8 @@ function Tiles({ albums, onOpen }: { albums: readonly Album[]; onOpen: (album: A
 /** "Recently added": Navidrome's newest albums (getAlbumList2 `newest`). */
 function RecentlyAdded({ onOpen }: { onOpen: (album: Album) => void }) {
   const [albums, setAlbums] = useState<Album[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  //? (2.0.4) the error itself, said by errorNote (app/ErrorNote.tsx) in a listener's words
+  const [error, setError] = useState<unknown>(null)
   const requests = useMemo(latestOnly, [])
 
   function load() {
@@ -69,7 +69,7 @@ function RecentlyAdded({ onOpen }: { onOpen: (album: Album) => void }) {
         if (request.current()) setAlbums(page)
       },
       (reason: unknown) => {
-        if (request.current() && !isAbort(reason)) setError(message(reason))
+        if (request.current() && !isAbort(reason)) setError(reason)
       },
     )
   }
@@ -86,7 +86,7 @@ function RecentlyAdded({ onOpen }: { onOpen: (album: Album) => void }) {
       </h2>
       {error ? (
         <div class="pl-notice">
-          <p>{error}</p>
+          {errorNote(error, { service: 'music', retry: true })}
           <button type="button" class="pl-text-button" onClick={load}>
             Try again
           </button>

@@ -133,6 +133,17 @@ html.has-signin { overflow: hidden; }
     line-height: var(--dw-leading-note);
 }
 
+/* (2.0.4) under what went wrong, or why the screen shows: "For whoever runs deadwax" and what they need - a setting,
+   Navidrome's own words - folded away, since nobody signed in can be told apart from whoever runs it */
+.app-signin-why {
+    margin: var(--app-signin-label-gap) 0 0;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+}
+.app-signin-why summary { cursor: pointer; }
+.app-signin-why p { margin: var(--app-signin-label-gap) 0 0; overflow-wrap: anywhere; }
+
 .app-signin-submit {
     display: block;
     width: 100%;

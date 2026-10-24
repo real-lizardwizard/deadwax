@@ -3,7 +3,9 @@ import { useState } from 'preact/hooks'
 import { GET_OFF, gets } from '../lib/permissions'
 import type { RequestRow } from '../lib/requestsView'
 import { CloseIcon, PlayIcon } from '../player/icons'
-import { useAccess } from './access'
+import { TELL } from '../lib/errorWords'
+import { seesDetail, useAccess } from './access'
+import { errorLine } from './ErrorNote'
 
 /**
  * A download, drawn as the Requests board draws it (2.0.0-player.12): a card for one on its way or
@@ -173,7 +175,10 @@ export function AttentionCard({
   onRetry: (row: RequestRow, samePeer: boolean) => void
 }) {
   //? (2.0.0-player.61) Next peer and Ask again start a download: Get albums' - without it, its words in their place
-  const getsAlbums = gets(useAccess().permissions)
+  const access = useAccess()
+  const getsAlbums = gets(access.permissions)
+  //? (2.0.4) the job's own words under its reason for whoever runs deadwax; "Tell whoever runs deadwax." for anyone else
+  const runs = seesDetail(access)
   const nextPeer = getsAlbums ? row.nextPeer : null
   const askAgain = getsAlbums ? row.askAgain : null
   return (
@@ -184,8 +189,9 @@ export function AttentionCard({
           <span class="app-job-title">{row.title}</span>
           {row.line && <span class="app-job-line">{row.line}</span>}
           {row.askedBy && <span class="app-job-line">{row.askedBy}</span>}
-          {row.reason && <span class="app-job-reason">{row.reason}</span>}
-          {row.problem && <span class="app-job-reason">{row.problem}</span>}
+          {row.reason &&
+            errorLine(row.reasonTell && !runs ? `${row.reason} ${TELL}` : row.reason, runs ? row.reasonDetail : null, { as: 'span', class: 'app-job-reason' })}
+          {row.problem && errorLine(row.problem, runs ? row.problemDetail : null, { as: 'span', class: 'app-job-reason' })}
           {!getsAlbums && (row.nextPeer || row.askAgain) && <span class="app-job-line app-get-off">{GET_OFF}</span>}
         </div>
       </div>
@@ -242,12 +248,17 @@ export function DoneRow({
   opening?: boolean
   note?: string | null
 }) {
+  //? (2.0.4) a download that wasn't added: the job's own words under its line for whoever runs deadwax (the setting,
+  //? the exception - what they fix it from); "Tell whoever runs deadwax." for anyone else, where only they can
+  const runs = seesDetail(useAccess())
   const body = (
     <>
       <JobCover src={row.cover} />
       <span class="app-job-body">
         <span class="app-job-title">{row.title}</span>
         <span class={`app-job-line${toneClass(row)}`}>{row.line}</span>
+        {runs && row.reasonDetail && <span class="app-error-detail">{row.reasonDetail}</span>}
+        {!runs && row.reasonTell && <span class="app-job-line">{TELL}</span>}
         {row.askedBy && <span class="app-job-line">{row.askedBy}</span>}
         {note && <span class="app-job-line is-warning">{note}</span>}
       </span>

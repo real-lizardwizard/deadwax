@@ -1031,3 +1031,212 @@ says everything goes through deadwax's account; configuration.md's Normalization
 bit-perfect" keep Maximum quality's exception; .env.example names Next peer in Requests, never "Try next peer". you.sim scans
 everything You draws (About's version taken out) and pins the new notes word for word; settings.sim scans the
 choices' labels and notes and pins Maximum quality's and Normalization's word for word.
+
+### Errors and connections in a listener's words (2.0.4)
+
+James, 2026-10-23: "apply that same review to the info panel and everything else. I want to make sure it all
+provides a good user experience." The words-and-UX review of every screen (~225 findings) found the worst
+problem to be listeners shown raw server errors, settings and plumbing where they needed a sentence; he chose
+to build its five words batches in order, and this is **batch 1, errors and connections**, with the review's
+"error classification" and "server reason codes" (its "Bigger than wording" B1, B7). Words and small UX only:
+no route's status changed, nothing heard changed, and the engine files have no diff (the player's own
+playback-error words live in usePlayer.ts and are batch 4's).
+
+**One helper, `lib/errorWords.ts`** (pure). `errorKind` classes an error by what it is - never by its words, but
+for one test: **offline** (fetch's TypeError: "Failed to fetch", Safari's "Load failed", Firefox's
+"NetworkError…"), **timeout** (408, 504, a TimeoutError), **unreachable** (a 502/503 with no words fit for
+anyone), **not-found** (404), **not-allowed** (401, 403), **refused** (a 4xx - or a 502/503 - whose words are
+fit for anyone, or an answer deadwax split in two), **other** (a 500, an error of the page's own). The one test
+of words is `plumbing`: a setting's name (`[A-Z]+_[A-Z_]+`), an address, an exception's name, an errno, a path,
+http.ts's "GET /x failed", a status ("answered 502"), slskd, "Navidrome said" - such words never become a
+listener's line. `errorWords(error, {admin, service, gone, failed})` gives the sentence (`text`), what to do
+(`advice`) and, for whoever runs deadwax only, the error's own words (`detail`; the server's `why` first). The
+sentences: "Can't connect to deadwax." + "Check your connection, then try again."; "That took too long." +
+"Try again."; unreachable by whose answer it was - `serviceOf`, from the route ApiError now carries (`path`):
+the Navidrome routes "Can't reach the music server right now.", the downloads' and slskd's "Downloads aren't
+working right now.", anything else "deadwax can't do that right now." - + "Try again in a minute"; a 404 the
+caller's sentence (`gone`), else deadwax's words, never FastAPI's bare "Not Found"; a 401 "Your sign-in has
+ended - sign in again."; a 403 deadwax's words ("That needs Edit albums…"); refused the server's words AS
+WRITTEN (a user's name in them is never re-cased; "deadwax" and "slskd" never capitalised); other "Something
+went wrong." + "Try again". To someone who doesn't run deadwax the advice adds "- if it keeps happening, tell
+whoever runs deadwax." (unreachable, other), "If it keeps happening, tell whoever runs deadwax." (deadwax's own
+5xx in words) or **"Tell whoever runs deadwax."** (deadwax's split 503); whoever runs it is never told to tell
+themselves, and gets the detail instead.
+
+**Who runs deadwax** (`access.ts seesDetail`): an admin, or someone given **Settings and the log** - they read
+the event log anyway. They see the error's own words in a smaller line under the sentence (`.app-error-detail`)
+or, in a one-line notice, in brackets after it.
+
+**How a page says it.** `app/ErrorNote.tsx`'s `errorNote(error, opts)` and `errorLine(text, detail, opts)` are
+FUNCTIONS returning the page's own `<p>`/`<span>`, not components: a page's words stay its own (every sim reads
+them as it reads the rest), and they call no hook, so `{error ? errorNote(error) : null}` changes no hook order;
+who reads is what /me last said (`accessNow`). `app/sayError.ts`'s `sayError(error, lead)` is the one-line form
+for stores that keep words (the pins, the playlists, Getting albums, Search's halves, a notice) - no JSX, so a
+store needs nothing of Preact's. Pages that kept `x instanceof Error ? x.message : String(x)` in state now keep
+the error itself (`unknown`) and say it at render: Home's Recently added, the Library root and sections and
+Songs (usePaged), the album page (its 404 "This album isn't here any more - it may have been moved or
+deleted.", and Add/Remove's refusal), the artist page (the library half; the albums-you-don't-have half's
+non-MusicBrainz failures), Search's library halves and the album you don't have (via sayError), Sources (the
+search's error - "Downloads aren't working right now." with slskd's words for whoever runs deadwax, never
+"Error searching slskd: HTTPConnectionPool…"), the store box's Join and Add, the pins (read, pin, Edit - "Couldn't
+pin Dummy. …", "Not saved. …"), the playlists (list, open, refresh "Couldn't update this playlist - showing it as
+it was.", edit, delete, add, create), You's /me failure, Getting albums' saves, Change password, Your library's
+Put away, and the Library sections' "Couldn't update this list - showing it as it was." (was "Couldn't refresh:
+<raw>").
+
+**Requests' reasons** (`jobErrorWords`): every string the server writes into a job's `error` - store.py's
+TRANSFER_FAILURE_REASONS, poller.py's `_fail` and filing messages, routes/download.py's cancel - has a sentence
+("The person sharing it refused to send it.", "deadwax lost track of this download - the person sharing
+it may have gone offline, or downloads stopped working for a while." - slskd down or restarted looks the same as a
+peer gone, since get_downloads answers [] on any failure, "It downloaded, but deadwax couldn't find its files to add them to your library." for
+`NOTHING_ORGANIZED`, "…couldn't be added to your library." for `organize failed: <exception>`, a dry run's, the
+already-there and failed-to-organize counts; "3 of 10 files arrived." after a failure's reason). A RequestRow
+carries `reason` (everyone's), `reasonTell` (JobCard adds "Tell whoever runs deadwax." for anyone else) and
+`reasonDetail` (the job's own words, for whoever runs it); a retry's problem `problemDetail` likewise
+(RETRY_WORDS says slskd's "still stopping the last attempt" in a listener's words; plumbing becomes "The
+download couldn't be started."). A Done row that wasn't added says the sentence instead of "Not filed: <raw>" -
+and (after review) keeps the tell and the job's own words too: outcomeWords returns them, the row carries them as
+reasonTell / reasonDetail, and DoneRow draws the words under the line for whoever runs deadwax (with logins off,
+everyone - the SLSKD_DOWNLOAD_PATH hint is theirs) and "Tell whoever runs deadwax." for anyone else.
+Words that are fit as written ("reel2reel went offline after 4 of 10 files") pass as written. The ending words
+themselves - Partly filed, Interrupted while filing, organizing, peer - are batch 3's. The failure banner is
+"Can't update your requests right now" over the error in a listener's words (no "try again": it asks again
+itself), the database line "Requests can't be shown right now: deadwax can't keep track of downloads. Tell
+whoever runs deadwax." to anyone but whoever runs deadwax (they keep DB_PATH); a Done row that can't open says
+"Can't open this album yet - the music server isn't set up." / "Can't open this album right now - the music
+server can't be reached. Try again in a minute." (App's navidromeProblem).
+
+**The Navidrome gate** (NeedsNavidrome): a listener reads "Your music isn't available right now" / "…yet" and
+what to do (Try again; or to tell whoever runs deadwax) - never Navidrome's address, its error or a setting;
+whoever runs deadwax keeps "Connect Navidrome" / "Can't reach Navidrome" and the reason (troubleshooting's
+titles); **Set up Navidrome** is an admin's alone (Navidrome's rows are), a Settings holder reading "An admin
+can set it up in Server settings (Connections)." It reads `accessNow()`, not a hook: a leaf the sims call as a
+function, drawn again with every status.
+
+**You -> Connections** is for whoever runs deadwax only: nobody else's You draws it, and nothing is asked for
+them (no MusicBrainz ping either). Each row says a word for its code (`PING_STATUS`: "Can't reach it", "Not on
+Soulseek", "Key refused", "Not running", "Not set up", "Unclear", "No answer", "Busy"…) - never the code - over a
+sentence: slskd's from the server (slskd_endpoint.py `PING_WORDS`, in place of the log's own lines - "slskd ping
+failed with connection error, functionality enabled, but couldnt connect…"; slskd's state keeps
+describe_server_state's words; get_client's own refusals, SLSKD_URL unusable or no SLSKD_APIKEY, are a new code
+`NOT_SET_UP` with their words, where they were UNKNOWN_ERROR), MusicBrainz's from `MUSICBRAINZ_LINES` (its ping
+answers with request_with_retries's error dict, shared with every MusicBrainz question, so its words are the
+app's). A ping deadwax didn't answer is "Couldn't check". You's "Check again" goes with Connections (/me is asked
+again as You shows).
+
+**The sign-in and a session's words** (src/auth.py): **`Explained`**, an HTTPException with a `why`, answered
+by app.py's handler as `{"detail", "why"}` with its own status: `detail` for anyone, `why` for whoever runs
+deadwax. Logins that can't work (`unusable()`: the key, organizing off) answer `CANT_SIGN_IN` "deadwax isn't
+ready for signing in, so nobody can use it just now." with unusable()'s words as the why; a database that can't
+be read `NO_DATABASE` "deadwax can't read its database just now, so it can't check who you are." with
+`NO_DATABASE_WHY` (DB_PATH); Navidrome not set up or its address unusable at a sign-in `NAVIDROME_UNSET`
+(was "deadwax can't ask Navidrome: {e}"); Navidrome answering oddly `NAVIDROME_REFUSED` (was "Navidrome couldn't
+check your password: {e}"); an LDAP account `LDAP_ACCOUNT`. `KEY_CHANGED` is "deadwax's sign-ins have been reset
+since you signed in - sign in again." (the log names the key, as it did). Navidrome down at a sign-in keeps its
+words, with no why. The app (`lib/signIn.ts`): `signInProblem` shows deadwax's words only when they hold no
+plumbing - a split 503 with " Tell whoever runs deadwax." after it - else "Something went wrong on the server -
+try again in a moment." (was "deadwax answered 500"); no answer at all "Can't reach deadwax. Check you're on the
+right network (or your VPN is on) and try again." (was "…over WireGuard…"); `signInWhy` is the why (or a
+detail too technical for the line), drawn folded under **For whoever runs deadwax** (a `<details>`, signin.css)
+- the screen can't tell who is reading, at the gate's failed /me as on a failed sign-in. The playlist route's
+part-saved answers (PART_SAVED, SAVED_UNREAD) are Explained too: the sentence, with Navidrome's words as the why
+(they were ": {why}" on the end).
+
+**The database-down lines** add "Tell whoever runs deadwax." for anyone who doesn't run it: Getting albums'
+(`GETTING_UNSAVED`), Your library's (`LIBRARY_UNREAD`), a pin's (`pinsUnsaved`), Requests' (above). Needs a
+look's IGNORES_UNSAVED is a managing page's, read by those who run it, and is left (batch 5).
+
+**Left for later batches, on purpose**: the managing pages (People, Server settings, the event log, Needs a
+look, Library care, Held by nobody, the Edit panel's editors and inspector, the artist panel) still show their
+errors' own words - their readers are those who run deadwax (batch 5); the player's playback errors
+(usePlayer.ts, an engine file - batch 4); the vocabulary inside fit server words ("in the store", "MusicBrainz
+release id", Navidrome by name - batches 2 and 3); Home's Arriving line ("Can't reach deadwax just now"); a
+"Server: everything's working" row for listeners in You (the review's #2 offered it; batch 1 as the review
+defines it doesn't build it).
+
+**Pinned**: ui/test/errors.sim.cjs (new) - every class and sentence, for a listener and for whoever runs deadwax;
+THE SCAN: every raw error the app is known to meet (slskd's traceback line, Navidrome's address, NOT_CONFIGURED,
+an errno, http.ts's fallback, fetch's words…) put through every way the app says an error, for a listener -
+no plumbing, no raw words, no detail; every job error read out of the Python with a sentence of its own; a word
+for every ping code read out of the Python; the gate for each reader; and the listener pages and stores holding
+no catch that keeps an error's raw words (`x instanceof Error ? x.message`, `String(caught)`) off a console line.
+signin.sim, you.sim, requests.sim, sources.sim, search.sim, pins.sim, playlists.sim, artist.sim, mylibrary.sim
+and app-rules.sim were updated on purpose - their fakes throw what api/http.ts throws (an ApiError with its
+status and route, fetch's TypeError) where they threw a bare Error - and pin the listener's words beside the
+admin's. tests/test_error_words.py (new): no sign-in or session sentence anyone but an admin reads holds a
+setting, an exception or WireGuard; the key, organizing, the database, Navidrome unset, odd and LDAP answered
+in two halves with their statuses; every slskd ping branch a sentence with its code kept, NOT_SET_UP naming the
+setting; the part-saved playlist sentences. test_logins.py, test_downloads_per_person.py and test_playlists.py
+now read the setting from `why`.
+
+**Verified** (as built, before review): 3757 Python tests (3755 passed, 2 skipped; tests/test_error_words.py new - 36), pyflakes, tsc, the
+build, and all 64 sims (errors.sim new). Mutation-checked (each broken, its test seen failing, restored byte for
+byte): fetch's TypeError as offline; a 502/503's words passing only when fit; no detail for a listener; a job
+error's sentence; the gate's listener branch; Connections and its pings for whoever runs deadwax; a catch keeping
+raw words (the page scan); seesDetail taking Settings and the log; the sign-in hiding plumbing; JobCard's tell;
+RETRY_WORDS; "deadwax" never capitalised; KEY_CHANGED holding no setting; no key answered as an Explained; slskd's
+ping sentence; the Explained handler's `why`. Seen in a real page (headless Chromium as deadwax.test, 390x844,
+logins on, a stand-in Navidrome, slskd absent): ethan's You has no Connections and his Home and Library, Navidrome
+down, say "Your music isn't available right now" and the music server sentence; james's You shows Connections'
+"Can't reach it" over slskd's sentence, and his Home keeps "Can't reach Navidrome" with the address; Sources with
+slskd down says "Downloads aren't working right now." - with the traceback's line under it for james only; a
+server with no DEADWAX_SECRET_KEY shows the sign-in's sentence and tell, the key folded under For whoever runs
+deadwax; a sign-in that can't reach deadwax says so without WireGuard.
+
+**After review.**
+- "no transfers reported by slskd" said "It never started - the person sharing it has probably gone offline." -
+  but get_downloads answers [] on ANY failure, so slskd down or restarted (mid-download too) ends every open job
+  the same way. Now "deadwax lost track of this download - the person sharing it may have gone offline, or
+  downloads stopped working for a while.", true of both (troubleshooting and downloading.md say when it's slskd).
+- A refusal deadwax named a `kind` of (people.py's Refused - People's and Change password's `{detail, kind}`) is
+  `refused` whatever its status, its words passing plumbing: Change password's TIMED_OUT (504) and NOT_KEPT (500)
+  had become "That took too long. Try again." / "Something went wrong.", losing "sign in again with the new
+  password" - and a try again then fails. Server side NOT_KEPT holds no exception's name now, and UNKNOWN /
+  UNKNOWN_SAVED put what wasn't read in brackets only when it isn't one (`_unknown_words`; the log has it).
+- Done rows that weren't added (above) keep the tell and the job's words.
+- Connections: a "Couldn't check" row says the ask's own words in brackets after the sentence (`unansweredLine`,
+  noticeWords as an admin), not "Something went wrong. Try again." alone; access growing while You is shown (a
+  Settings-and-log grant landing with /me) asks the pings at once (an effect on seesDetail, a `pinged` ref so the
+  first show isn't asked twice) - they sat on "Checking…" with Check again disabled; slskd's 401, CONNECTION_ERROR
+  and NOT_SET_UP sentences are said for the reader - the ping route passes `is_admin(user)`, and anyone else reads
+  PING_WORDS_NOT_ADMIN (Key refused "...only an admin can change it", Can't reach it "...its address (SLSKD_URL)
+  only an admin can change", Not set up "...only an admin can set it", each "in Server settings (Connections)."):
+  SLSKD_URL and SLSKD_APIKEY are ADMINS_ONLY.
+- The artist page for an artist the music server no longer has (an old pin or link) says ARTIST_GONE, never
+  "Navidrome has nothing by that id", and offers no Try again on a not-found.
+- Download sentences say "your library" (an album added) and "the collection" (already there), the decided words.
+- The sign-in answered with the very words the screen came up with says them once, as the answer (the live region
+  reads it), with one fold.
+- `retry` (ErrorOptions): where the page draws its own Try again (Home, the Library root, sections and songs, the
+  artist page, Sources, Search's halves, the gate's MUSIC_UNREACHED) the advice leaves trying again to the button -
+  "Check your connection.", the tell alone for a listener, nothing for whoever runs deadwax.
+- errors.sim pins the whole JOB_ERRORS table (words and tell) and that it holds exactly the fixed strings the server
+  writes, and the formatted ones whole; its page scan also catches `(x as Error).message`, `.message` of a caught
+  error and `${error}` interpolation (checked by putting each back).
+- The CLAUDE.md rule is scoped to the pages errors.sim scans; the managing pages are batch 5's.
+
+**Verified after review**: 3764 Python tests (3762 passed, 2 skipped; test_error_words.py 40, test_own_password.py
++3), pyflakes, tsc, the build, all 64 sims; the engine files no diff. Mutation-checked (each broken, its check seen
+failing, restored and compared): the no-transfers sentence (errors.sim's table), the `kind` rule (errors.sim, and
+NOT_KEPT's name back in test_own_password), the Done row's detail and tell (requests.sim), the "Couldn't check"
+detail and the pings on access growing (you.sim), the reader's slskd sentence (test_error_words), ARTIST_GONE and
+its hidden Try again (artist.sim), the sign-in's single sentence (signin.sim), `retry` (errors.sim, sources.sim),
+the tell of a dry run and of an interrupted filing (errors.sim's table), and the two scan forms
+(`(error as Error).message`, `${error}`) put back into Home.tsx. Not seen in a real page after review.
+
+**After the second review.**
+- deadwax ITSELF not answering the gate's Navidrome check (fetch's TypeError: off the network, the VPN off, deadwax
+  restarting) told a listener "Can't reach the music server right now. If it keeps happening, tell whoever runs
+  deadwax." - the music server may be fine. lib/navidromeCheck.ts marks that status `offline` (a field the route
+  never sends, on NavidromeStatus), and the gate's listener line is then DEADWAX_UNREACHED, "Can't connect to
+  deadwax. Check your connection." beside its Try again; a Done row's can't-open line likewise CANT_OPEN_OFFLINE
+  ("Can't open this album right now - can't connect to deadwax. Check your connection, then try again."). Whoever runs
+  deadwax keeps "Can't reach Navidrome" over the error's own words, as before (batch 5's).
+- test_error_words pins each slskd ping code's sentence whole (it let anything starting "slskd" through).
+- requests.sim pins a retry's problemDetail by reader; you.sim the Getting albums database line's tell for a listener.
+- Docs quote the three not-an-admin ping sentences as written, and the README counts Settings-and-log holders in.
+
+**Verified after the second review**: 3764 Python tests (3762 passed, 2 skipped - no new test, the ping one now
+exact), pyflakes, tsc, the build, all 64 sims; the engine files no diff. Mutation-checked: the gate's offline line and its
+`offline` mark (errors.sim), the can't-open line (errors.sim), the ping sentence back to a log line (test_error_words),
+the retry's detail shown to anyone (requests.sim), the Getting albums tell dropped (you.sim).

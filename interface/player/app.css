@@ -646,6 +646,18 @@ html:has(.app-shell.has-mini) { scroll-padding-bottom: var(--app-chrome-bottom-m
 
 .app-error { color: var(--dw-danger-text); }
 
+/* (2.0.4) an error's own words, under its sentence - for someone who runs deadwax (app/ErrorNote.tsx) */
+.app-error-detail {
+    display: block;
+    margin-top: var(--pl-gap-xs);
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    font-weight: var(--dw-weight-regular);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
+
 /* "Maximum quality": a radio group in the Playback card */
 .app-choice-title {
     margin: 0 0 var(--app-heading-gap);

@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'preact/hooks'
 
 import { signIn } from '../api/auth'
 import type { Me } from '../api/me'
-import { reasonShown, signInProblem } from '../lib/signIn'
+import { FOR_WHOEVER, reasonShown, signInProblem, signInWhy } from '../lib/signIn'
 
 /**
  * The sign-in screen (2.0.0-player.48): deadwax's name, a user name and a password - their Navidrome
@@ -19,11 +19,22 @@ import { reasonShown, signInProblem } from '../lib/signIn'
  * home-screen app keeps it clear of the notch and the home bar (signin.css). The password is held only
  * until the sign-in it is sent with has answered.
  */
-export function SignIn({ reason, onSignedIn }: { reason: string | null; onSignedIn: (me: Me) => void }) {
+export function SignIn({
+  reason,
+  reasonWhy = null,
+  onSignedIn,
+}: {
+  reason: string | null
+  /** (2.0.4) what whoever runs deadwax needs beside `reason` (lib/signIn.ts signInWhy) - folded under it */
+  reasonWhy?: string | null
+  onSignedIn: (me: Me) => void
+}) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
+  //? (2.0.4) what whoever runs deadwax needs beside the problem, folded under it
+  const [problemWhy, setProblemWhy] = useState<string | null>(null)
   const first = useRef<HTMLInputElement>(null)
 
   //? the user name field takes focus as the screen comes up - it is the only thing to do here
@@ -40,10 +51,12 @@ export function SignIn({ reason, onSignedIn }: { reason: string | null; onSigned
     const secret = (form.elements.namedItem('password') as HTMLInputElement | null)?.value ?? password
     if (!name || !secret) {
       setProblem('Type your user name and your password.')
+      setProblemWhy(null)
       return
     }
     setBusy(true)
     setProblem(null)
+    setProblemWhy(null)
     signIn(name, secret).then(
       (me) => {
         setPassword('')
@@ -54,11 +67,15 @@ export function SignIn({ reason, onSignedIn }: { reason: string | null; onSigned
         setPassword('')
         setBusy(false)
         setProblem(signInProblem(error))
+        setProblemWhy(signInWhy(error))
       },
     )
   }
 
-  const why = reasonShown(reason)
+  //? (review) a sign-in answered with the very words the screen came up with (no secret key, say): said once - as the
+  //? answer, which the live region reads out - and not again above the form, with a second fold
+  const shown = reasonShown(reason)
+  const why = shown !== null && shown === problem ? null : shown
 
   return (
     <div
@@ -83,6 +100,7 @@ export function SignIn({ reason, onSignedIn }: { reason: string | null; onSigned
             {why}
           </p>
         )}
+        {why && reasonWhy && <ForWhoever why={reasonWhy} />}
         <label class="app-signin-label" for="app-signin-user">
           User name
         </label>
@@ -116,10 +134,25 @@ export function SignIn({ reason, onSignedIn }: { reason: string | null; onSigned
         <div class="app-signin-problem" aria-live="assertive" aria-atomic="true">
           {problem && <p class="app-error">{problem}</p>}
         </div>
+        {problem && problemWhy && <ForWhoever why={problemWhy} />}
         <button type="submit" class="app-signin-submit" disabled={busy}>
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
       </form>
     </div>
+  )
+}
+
+/**
+ * (2.0.4) What whoever runs deadwax needs - a setting, Navidrome's own words - folded under the sentence everyone
+ * reads: the sign-in screen can't tell a listener from whoever runs it, so the sentence is the listener's and this
+ * is one tap away.
+ */
+function ForWhoever({ why }: { why: string }) {
+  return (
+    <details class="app-signin-why">
+      <summary>{FOR_WHOEVER}</summary>
+      <p>{why}</p>
+    </details>
   )
 }

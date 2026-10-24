@@ -198,6 +198,11 @@ const hooks = require(path.join(OUT, 'node_modules/preact/hooks.js'))
 const { Sources, SignalsChip, RateChip } = require(path.join(OUT, 'app/Sources.js'))
 const { SourceCard } = require(path.join(OUT, 'app/SourceCard.js'))
 const { JoinDownload, StoreState } = require(path.join(OUT, 'app/StoreState.js'))
+//? (2.0.4) deadwax's answers as api/http.ts throws them - their status and route are what the words are chosen by
+const { ApiError } = require(path.join(OUT, 'api/http.js'))
+const Access = require(path.join(OUT, 'app/access.js'))
+const answered = (status, detail, route) => new ApiError(status, detail, `POST ${route} failed`, false, null, null, route)
+const LISTENER = { auth: 'on', user: 'ethan', admin: false, permissions: ['request'] }
 
 let tree = null
 function find(test, within = tree) {
@@ -399,15 +404,26 @@ async function main() {
   check('an edited one is searched as typed', asks[10]?.body.query_override, 'Portishead - Third (2008)')
   globalThis.__sources.settings = { get_mode: 'sources', quality_floor: 'any' }
 
-  console.log('\nslskd unable to search: its own words, and Try again')
+  //? (2.0.4) a listener's words, and slskd's own under them for whoever runs deadwax (here logins are off: everyone)
+  console.log('\nslskd unable to search: in a listener\'s words, its own under them, and Try again')
   draw({ request: { release: RELEASE, subtitle: 'Third', key: 10 } })
-  asks[11].reject(new Error("slskd isn't logged in to Soulseek, so it can't search. It's waiting for its VPN."))
+  asks[11].reject(answered(502, "slskd isn't logged in to Soulseek, so it can't search. It's waiting for its VPN.", '/download/find_candidates'))
   await settle()
   draw()
-  check('the server\'s words, in amber', [text(classed('app-sources-state-text')[0]), classed('app-sources-state-text')[0]?.props.class.includes('is-warning')],
-    ["slskd isn't logged in to Soulseek, so it can't search. It's waiting for its VPN.", true])
+  check('what is wrong in amber, and slskd\'s words under it', [text(classed('app-sources-state-text')[0]), text(classed('app-error-detail')[0]), classed('app-sources-state-text')[0]?.props.class.includes('is-warning')],
+    ["Downloads aren't working right now.slskd isn't logged in to Soulseek, so it can't search. It's waiting for its VPN.",
+      "slskd isn't logged in to Soulseek, so it can't search. It's waiting for its VPN.", true])
   find((node) => node.type === 'button' && text(node) === 'Try again')[0].props.onClick()
   check('Try again asks again, for the same release', [asks.length, asks[12]?.body.release_mbid], [13, 'rel-third'])
+  //? someone who doesn't run deadwax: the sentence and what to do - never slskd's words, nor its traceback
+  Access.noteAccess(LISTENER)
+  asks[12].reject(answered(500, "Error searching slskd: HTTPConnectionPool(host='127.0.0.1', port=5030): Max retries exceeded with url: /api/v0/searches", '/download/find_candidates'))
+  await settle()
+  draw()
+  check('...a listener: no traceback, no slskd - the sentence, and to tell whoever runs deadwax if it keeps on',
+    [text(classed('app-sources-state-text')[0]), classed('app-error-detail').length],
+    ["Downloads aren't working right now. If it keeps happening, tell whoever runs deadwax.", 0])
+  Access.forgetAccess()
   asks[12].resolve(answer([]))
   await settle()
 
@@ -469,10 +485,10 @@ async function main() {
 
     console.log('\nTry again after slskd failed is the Get again: it picks (review)')
     fresh.draw({ request: { release: RELEASE, subtitle: 'Third', key: 2 } })
-    asks.at(-1).reject(new Error("slskd isn't logged in to Soulseek, so it can't search."))
+    asks.at(-1).reject(answered(502, "slskd isn't logged in to Soulseek, so it can't search.", '/download/find_candidates'))
     await settle()
     fresh.draw()
-    check('the refusal said in the live region', text(find((node) => node.props?.role === 'status')[0]), "slskd isn't logged in to Soulseek, so it can't search.")
+    check('the refusal said in the live region, as the page says it', text(find((node) => node.props?.role === 'status')[0]), "Downloads aren't working right now.")
     const scroll = find(byClass('app-sources-scroll'))[0]
     const focused = []
     scroll.props.ref.current = { focus: (options) => focused.push(options), scrollTop: 0 }
@@ -695,7 +711,7 @@ async function main() {
     check('the tap asks at once, and the button waits - still in the tab order', [asked, text(button()), button().props['aria-disabled']], [[7], 'Joining…', true])
     button().props.onClick()
     check('...a second tap asks nothing more', asked, [7])
-    answerJoin.reject(new Error('that download has been filed into the library since - get it again to see where it stands'))
+    answerJoin.reject(answered(409, 'that download has been filed into the library since - get it again to see where it stands', '/download/join'))
     await settle()
     tree = drawJoin({ jobId: 7, onJoin })
     check('refused: deadwax\'s words in an alert, and Join there to try again',
@@ -785,7 +801,7 @@ async function main() {
     tree = drawAdd({ onAdd })
     check('the tap asks at once, the button waiting - still in the tab order; a second tap asks nothing more',
       [(button().props.onClick(), asked), text(button()), button().props['aria-disabled']], [['add'], 'Adding…', true])
-    answerAdd.reject(new Error("That pressing isn't in the store now - Get it instead."))
+    answerAdd.reject(answered(409, "That pressing isn't in the store now - Get it instead.", '/me/library'))
     await settle()
     tree = drawAdd({ onAdd })
     check('refused: deadwax\'s words in an alert, Add back', [find((node) => node.props?.role === 'alert').map(text), text(button())],

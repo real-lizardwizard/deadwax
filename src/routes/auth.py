@@ -53,7 +53,7 @@ async def login(body: SignIn, request: Request):
         raise HTTPException(status_code=409, detail="Logins are off, so there's nothing to sign in to: deadwax lets everyone in.")
     problem = auth.unusable()
     if problem:
-        raise HTTPException(status_code=503, detail=problem)
+        raise auth.cant_sign_in(problem)
     if not body.username.strip() or not body.password:
         raise HTTPException(status_code=400, detail="Type your user name and your password.")
 

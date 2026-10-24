@@ -269,17 +269,21 @@ phone and a desktop alike (on a desktop it's the sidebar's **Requests**):
   its files while the rest wait, it says so in amber ("#4 in their queue · 3 failed"): those files
   won't come, and the download will end as failed unless you move it to another user.
 - **Needs attention**: a failed or cancelled download, with why in red - or a Get that slskd or
-  deadwax refused, as **refused**, in their own words - with **Next peer** and **Ask again**
-  ([below](#when-a-download-fails)).
+  deadwax refused, as **refused** - with **Next peer** and **Ask again**
+  ([below](#when-a-download-fails)). Why is said in plain words; deadwax's own refusals ("already in
+  your library") as they are, and slskd's under them only for an admin or someone with **Settings and
+  the log** - anyone else reads "The download couldn't be started."
 - **Done**: how it ended, and how long ago ("In your library · 12 minutes ago"). The other endings:
   **Already in your library, nothing filed** (every track was already in the album's folder; the
   download itself is still in slskd's folder), **Partly filed** (some files couldn't be written into
   the library and some tracks were; see
   [troubleshooting](troubleshooting.md#a-download-says-n-files-failed-to-organize)), **Interrupted
   while filing** (deadwax stopped part-way; see
-  [troubleshooting](troubleshooting.md#a-download-says-deadwax-stopped-while-filing-this)), **Not
-  filed** with the reason (organizing in dry run, say, or "no track was filed"), and **Downloaded,
-  not filed** when organizing is off - `ORGANIZE_MODE` set to `off`, or `LIBRARY_PATH` or
+  [troubleshooting](troubleshooting.md#a-download-says-deadwax-stopped-while-filing-this)), the
+  reason it wasn't added, in plain words ("Downloaded, but not added to your library: deadwax is set to
+  try filing without moving anything." for a dry run, say, or "It downloaded, but none of its songs
+  could be added to your library."; [every one](troubleshooting.md#requests-says-why-a-download-stopped-or-wasnt-added)),
+  and **Downloaded, not filed** when organizing is off - `ORGANIZE_MODE` set to `off`, or `LIBRARY_PATH` or
   `SLSKD_DOWNLOAD_PATH` not set (Settings → Library names which; see
   [troubleshooting](troubleshooting.md#downloads-finish-but-nothing-appears-in-my-library)).
   A done download whose album is in your library - filed, partly filed, or already there - **opens
@@ -316,8 +320,12 @@ shows is deadwax's last answer.
 
 ### When a download fails
 
-The reason is shown on the row: the user refused the transfer, stopped responding, the transfer
-errored, or slskd never reported the transfers at all (after about two minutes of looking).
+The reason is shown on the row, in plain words: the user refused the transfer ("The person sharing it
+refused to send it."), stopped responding, the transfer broke off, or slskd reported none of its transfers
+for about two minutes ("deadwax lost track of this download - the person sharing it may have gone offline,
+or downloads stopped working for a while." - the user gone, usually, or slskd down or restarted). An admin, or someone with **Settings and the log**, also sees slskd's or deadwax's own words
+under it; [troubleshooting](troubleshooting.md#requests-says-why-a-download-stopped-or-wasnt-added) has
+every reason and what to do about it.
 
 **Ask again** asks the same user again. Only the files that didn't arrive are asked for, and
 slskd can pick a partly downloaded file up where it stopped (unless a cancel deleted it; see

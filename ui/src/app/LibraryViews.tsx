@@ -7,6 +7,7 @@ import { SONGS_PAGE, dropPrefetch, librarySongs, prefetchAlbum, type Album, type
 import { Cover } from '../player/Cover'
 import { MoreIcon } from '../player/icons'
 import { usePaged } from './usePaged'
+import { errorNote } from './ErrorNote'
 
 /**
  * (2.0.0-player.52) Your library empty - Ethan's, at first: `lead` (what is empty), how to fill it, and Browse
@@ -121,14 +122,14 @@ export function SongsView({ onOpen, onCount, onSongMenu }: {
           </li>
         ))}
       </ul>
-      {songs.error && (
+      {songs.error ? (
         <div class="pl-notice">
-          <p>{songs.error}</p>
+          {errorNote(songs.error, { retry: true })}
           <button type="button" class="pl-text-button" onClick={songs.retry}>
             Try again
           </button>
         </div>
-      )}
+      ) : null}
       {!songs.error && !songs.loading && !songs.items.length && <p class="pl-notice">No songs in Navidrome yet.</p>}
       {songs.loading && <div class="pl-spinner" aria-label="Loading" />}
       <div ref={songs.sentinel} class="pl-sentinel" />

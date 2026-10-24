@@ -4,6 +4,7 @@ import { formatSpeed } from './format'
 import { isActive } from './jobs'
 import { grantWords } from './myLibrary'
 import { CANCEL_WORDS, askedByText, cancelWords, type CancelWords } from './perPerson'
+import { jobErrorWords, safeWords } from './errorWords'
 
 /**
  * The app's Requests tab and Home's Arriving (2.0.0-player.12): which download goes under which
@@ -69,10 +70,16 @@ export interface RequestRow {
   /** under the title: who and from where ("Massive Attack · from mellotron"), or how it ended and when */
   line: string
   lineTone: Tone
-  /** Needs attention: why it stopped, in red */
+  /** Needs attention: why it stopped, in red - (2.0.4) in a listener's words (lib/errorWords.ts jobErrorWords) */
   reason: string | null
+  /** (2.0.4) ...only whoever runs deadwax can put it right: JobCard adds "Tell whoever runs deadwax." for anyone else */
+  reasonTell: boolean
+  /** (2.0.4) ...and the job's own words, which JobCard shows only to whoever runs deadwax - null when they're the reason */
+  reasonDetail: string | null
   /** Needs attention: why the last retry didn't start it, in red, under the reason */
   problem: string | null
+  /** (2.0.4) ...its own words, for whoever runs deadwax, when they weren't fit for the line */
+  problemDetail: string | null
   /** the bar, 0-100 */
   progress: number
   /** Downloading: the monospace line, "6 of 10 files · 1.8 MB/s" */
@@ -114,7 +121,30 @@ export interface RequestsInput {
   cancelling: ReadonlySet<number>
   retrying: ReadonlySet<number>
   retryingSame: ReadonlySet<number>
-  retryProblems: ReadonlyMap<number, string>
+  /** why a retry didn't start: deadwax's words, or (2.0.4) the hook's own sentence with the error's words beside it */
+  retryProblems: ReadonlyMap<number, RetryProblem>
+}
+
+/** (2.0.4) Why a retry didn't start: the retry route's own words, or a sentence with the error's own beside it. */
+export type RetryProblem = string | { text: string; detail: string | null }
+
+/** What a retry that couldn't start is said with when its words aren't fit for a listener's line. */
+export const RETRY_FAILED = "The download couldn't be started."
+
+/** (2.0.4) The retry routes' own words (src/poller.py) that name slskd, in a listener's - the rest are fit as written. */
+export const RETRY_WORDS: Readonly<Record<string, string>> = {
+  'slskd is still stopping the last attempt - try again in a moment': 'The last try is still stopping - try again in a moment.',
+}
+
+/** A retry's problem as the row says it, and its own words where they weren't fit to be (lib/errorWords.ts). */
+export function retryProblemWords(problem: RetryProblem | undefined): { text: string | null; detail: string | null } {
+  if (problem === undefined) return { text: null, detail: null }
+  if (typeof problem !== 'string') return problem
+  const known = RETRY_WORDS[problem]
+  if (known) return { text: known, detail: problem }
+  const safe = safeWords(problem, RETRY_FAILED)
+  //? fit as they are: the retry route's own words (and the hook's), kept as written
+  return safe.detail === null ? { text: problem, detail: null } : safe
 }
 
 export interface RequestsView {
@@ -156,7 +186,14 @@ export function ageText(iso: string | null | undefined, now: number): string {
  * How a finished download ended, in words, from the server's `outcome` - never read out of the
  * error text, which is shown only as the row's own words where no outcome names it.
  */
-export function outcomeWords(job: Pick<DownloadJob, 'outcome' | 'error' | 'library' | 'mine'>): { text: string; tone: Tone } {
+export function outcomeWords(job: Pick<DownloadJob, 'outcome' | 'error' | 'library' | 'mine'>): {
+  text: string
+  tone: Tone
+  /** (2.0.4) only whoever runs deadwax can put it right: DoneRow tells anyone else so (jobErrorWords' tell) */
+  tell?: boolean
+  /** (2.0.4) the job's own words, which DoneRow draws under the line for whoever runs deadwax */
+  detail?: string | null
+} {
   //? (2.0.0-player.51, logins on) what its filing gave those who asked, where the server says
   const granted = grantWords(job)
   if (granted) return granted
@@ -171,9 +208,16 @@ export function outcomeWords(job: Pick<DownloadJob, 'outcome' | 'error' | 'libra
     case 'interrupted':
       return { text: "Interrupted while filing: check the library and slskd's folder", tone: 'warning' }
     default:
-      //? a dry run, nothing that could be filed, no track filed: the row's words. With no words at
-      //? all, organizing is off - ORGANIZE_MODE 'off', or LIBRARY_PATH or SLSKD_DOWNLOAD_PATH not set
-      return job.error ? { text: `Not filed: ${job.error}`, tone: 'warning' } : { text: 'Downloaded, not filed', tone: 'warning' }
+      //? a dry run, nothing that could be filed, no track filed: (2.0.4) the row's words in a listener's
+      //? (jobErrorWords - never "check SLSKD_DOWNLOAD_PATH" or an exception). With no words at all,
+      //? organizing is off - ORGANIZE_MODE 'off', or LIBRARY_PATH or SLSKD_DOWNLOAD_PATH not set
+      //? - their own words (SLSKD_DOWNLOAD_PATH, the exception) kept for whoever runs deadwax, the one who fixes it,
+      //? as a Needs-attention reason keeps them (review: a Done row lost them)
+      if (!job.error) return { text: 'Downloaded, not filed', tone: 'warning' }
+      {
+        const why = jobErrorWords(job.error)
+        return { text: why.text, tone: 'warning', tell: why.tell, detail: why.detail }
+      }
   }
 }
 
@@ -211,7 +255,8 @@ export function sectionOf(job: Pick<DownloadJob, 'status' | 'progress' | 'outcom
 }
 
 const blank = (key: string, jobId: number | null, section: Section, title: string, artist: string, album = ''): RequestRow => ({
-  key, jobId, section, title, artist, cover: null, line: '', lineTone: 'plain', reason: null, problem: null,
+  key, jobId, section, title, artist, cover: null, line: '', lineTone: 'plain', reason: null, reasonTell: false,
+  reasonDetail: null, problem: null, problemDetail: null,
   progress: 0, data: null, brief: '', cancel: null, nextPeer: null, askAgain: null, busy: false, dimmed: false,
   arriving: false, album, release: null, plays: false, askedBy: null, cancelWords: CANCEL_WORDS,
 })
@@ -270,8 +315,14 @@ function jobRow(job: DownloadJob, input: RequestsInput, now: number): RequestRow
     const same = retrying && input.retryingSame.has(job.id)
     const left = job.alternatives_left ?? 0
     row.line = who(row.artist, job.username, tryText(job))
-    row.reason = job.error || (job.status === 'cancelled' ? 'Cancelled' : 'It stopped without saying why')
-    row.problem = input.retryProblems.get(job.id) ?? null
+    //? (2.0.4) the server's words in a listener's (jobErrorWords), its own kept for whoever runs deadwax
+    const why = jobErrorWords(job.error)
+    row.reason = why.text || (job.status === 'cancelled' ? 'Cancelled' : 'It stopped without saying why')
+    row.reasonTell = why.tell
+    row.reasonDetail = why.detail
+    const retried = retryProblemWords(input.retryProblems.get(job.id))
+    row.problem = retried.text
+    row.problemDetail = retried.detail
     row.nextPeer = left > 0
       ? { left, primary: false, label: retrying && !same ? 'Trying next peer…' : `Next peer · ${left} left` }
       : null
@@ -289,6 +340,9 @@ function jobRow(job: DownloadJob, input: RequestsInput, now: number): RequestRow
   const age = ageText(job.updated_at, now)
   row.line = age ? `${outcome.text} · ${age}` : outcome.text
   row.lineTone = outcome.tone
+  //? (2.0.4) a Done row that wasn't added: the tell and the job's own words, drawn under the line (JobCard DoneRow)
+  row.reasonTell = outcome.tell === true
+  row.reasonDetail = outcome.detail ?? null
   row.progress = 100
   //? the album it brought, where the library has it: the row opens it, and plays what was filed
   const release = (job.release_mbid ?? '').trim()
@@ -304,7 +358,9 @@ function pendingRow(pending: PendingDownload): RequestRow {
   const row = blank(pending.key, null, refused ? 'attention' : 'waiting', titleOf(pending.album), pending.artist || '', pending.album || '')
   if (refused) {
     row.line = who(row.artist, pending.username, 'refused')
-    row.reason = pending.error || 'slskd refused it'
+    //? (2.0.4) the hook's sentence for it (lib/errorWords.ts), the error's own words for whoever runs deadwax
+    row.reason = pending.error || RETRY_FAILED
+    row.reasonDetail = pending.detail ?? null
     return row
   }
   row.line = who(row.artist, pending.username, 'asking slskd…')

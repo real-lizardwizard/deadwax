@@ -35,6 +35,7 @@ from src.api.navidrome_endpoint import (CLIENT_NAME, NOT_CONFIGURED, NavidromeEr
                                         client_for)
 from src.config import Config
 from src.logger import logger
+from src.auth import Explained
 from src.routes.download import ClientGone, unless_abandoned
 from src.users import current_user
 
@@ -1268,7 +1269,7 @@ async def edit_playlist(playlist_id: PlaylistIdPath, edit: PlaylistEdit, request
             await client.call("updatePlaylist", {"playlistId": playlist_id, **changes}, form=True)
         except NavidromeError as e:
             if songs_written and not (isinstance(e, SignedOut) or e.status == 401):
-                raise HTTPException(status_code=502, detail=playlist_rules.PART_SAVED.format(why=str(e)))
+                raise Explained(502, playlist_rules.PART_SAVED, str(e))
             raise _playlist_fail(e)
 
     try:
@@ -1276,7 +1277,7 @@ async def edit_playlist(playlist_id: PlaylistIdPath, edit: PlaylistEdit, request
     except HTTPException as e:
         #? (review) written, and only the read after failing: said so - never a bare 502 the page takes for nothing saved
         if (songs_written or changes) and e.status_code != 404:
-            raise HTTPException(status_code=502, detail=playlist_rules.SAVED_UNREAD.format(why=e.detail))
+            raise Explained(502, playlist_rules.SAVED_UNREAD, str(e.detail))
         raise
     return _answer(found, counter, asker)
 

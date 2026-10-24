@@ -37,7 +37,10 @@ export interface PendingDownload {
   album: string
   username: string
   jobId?: number
+  /** refused: why, in a listener's words (lib/errorWords.ts) - its being here is what makes the row a refusal */
   error?: string
+  /** (2.0.4) ...and the error's own words, for whoever runs deadwax */
+  detail?: string
 }
 
 export interface Overlays {
@@ -67,7 +70,7 @@ export function withPending(overlays: Overlays, pending: PendingDownload): Overl
 
 /** Record slskd's answer on one pending download. */
 export function settlePending(
-  overlays: Overlays, key: string, outcome: { jobId: number } | { error: string },
+  overlays: Overlays, key: string, outcome: { jobId: number } | { error: string; detail?: string },
 ): Overlays {
   return {
     ...overlays,

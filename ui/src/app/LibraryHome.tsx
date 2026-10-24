@@ -14,11 +14,11 @@ import { EmptyLibrary } from './LibraryViews'
 import { ShuffleSongs } from './ShuffleSongs'
 import { useMyLibrary } from './useMyLibrary'
 import { useYourAlbumsGeneration } from './useYourAlbums'
+import { errorNote } from './ErrorNote'
 
 /** How many albums the root's Recently added shows - See all opens the rest. */
 export const RECENT_ON_ROOT = 12
 
-const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 /**
  * The Library tab's root on a phone (2.0.0-player.59, a better Library) - Apple's list of categories with Recently
@@ -54,7 +54,7 @@ export function LibraryHome({ personal, hasSongs, shown, onOpen, onOpenSection, 
   const yours = libraryItems(hasSongs, personal).filter((item) => item.id !== 'recent')
   const browse = browseItems(hasSongs, personal)
   const [recent, setRecent] = useState<{ albums: Album[]; empty: boolean } | null>(null)
-  const [problem, setProblem] = useState<string | null>(null)
+  const [problem, setProblem] = useState<unknown>(null)
   const asks = useMemo(latestOnly, [])
   const generation = useYourAlbumsGeneration()
   const mine = useMyLibrary()
@@ -75,7 +75,7 @@ export function LibraryHome({ personal, hasSongs, shown, onOpen, onOpenSection, 
         setRecent(found)
       },
       (reason: unknown) => {
-        if (request.current() && !isAbort(reason)) setProblem(message(reason))
+        if (request.current() && !isAbort(reason)) setProblem(reason)
       },
     )
   }
@@ -134,7 +134,7 @@ export function LibraryHome({ personal, hasSongs, shown, onOpen, onOpenSection, 
         {!recent ? (
           problem ? (
             <div class="pl-notice">
-              <p>{problem}</p>
+              {errorNote(problem, { retry: true })}
               <button type="button" class="pl-text-button" onClick={load}>
                 Try again
               </button>

@@ -21,11 +21,12 @@ import { Shelf } from './Shelf'
 import { ShuffleSongs } from './ShuffleSongs'
 import { useMyLibrary } from './useMyLibrary'
 import { useYourAlbumsGeneration, yourAlbums } from './useYourAlbums'
+import { errorNote } from './ErrorNote'
 
-const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 /** What the Library says above a list it couldn't refresh - the list it has stays drawn. */
-export const COULDNT_REFRESH = "Couldn't refresh"
+/** (2.0.4) over what went wrong asking again - the list below stays as it was */
+export const COULDNT_REFRESH = "Couldn't update this list - showing it as it was."
 /** ...and above a list cut at the route's cap (src/routes/navidrome.py INDEX_MAX). */
 export const TRUNCATED_NOTICE = 'Showing the first 10000 albums - deadwax reads at most that many.'
 
@@ -211,7 +212,7 @@ function AlbumSection({ id, personal, shown, onOpen, onBrowse, page, titleRef }:
   const storeGeneration = useIndexGeneration('store')
   const generation = scope === 'yours' ? yoursGeneration : storeGeneration
   const [index, setIndex] = useState<AlbumIndex | null>(() => keptIndex(scope))
-  const [problem, setProblem] = useState<string | null>(null)
+  const [problem, setProblem] = useState<unknown>(null)
   const asks = useMemo(latestOnly, [])
   const sorts = useSorts()
   //? Recently added has its own order, and no choice of another
@@ -228,7 +229,7 @@ function AlbumSection({ id, personal, shown, onOpen, onBrowse, page, titleRef }:
         if (request.current()) setIndex(list)
       },
       (reason: unknown) => {
-        if (request.current() && !isAbort(reason)) setProblem(message(reason))
+        if (request.current() && !isAbort(reason)) setProblem(reason)
       },
     )
   }
@@ -254,7 +255,7 @@ function AlbumSection({ id, personal, shown, onOpen, onBrowse, page, titleRef }:
   if (!albums) {
     body = problem ? (
       <div class="pl-notice">
-        <p>{problem}</p>
+        {errorNote(problem, { retry: true })}
         <button type="button" class="pl-text-button" onClick={load}>
           Try again
         </button>
@@ -306,7 +307,8 @@ function AlbumSection({ id, personal, shown, onOpen, onBrowse, page, titleRef }:
       {personal && id === 'albums' && <ShuffleSongs scope="yours" shown={shown} actions={actions} count />}
       {albums && problem && (
         <div class="pl-notice app-library-problem">
-          <p>{`${COULDNT_REFRESH}: ${problem}`}</p>
+          <p>{COULDNT_REFRESH}</p>
+          {errorNote(problem, { retry: true })}
           <button type="button" class="pl-text-button" onClick={load}>
             Try again
           </button>
@@ -326,7 +328,7 @@ function ArtistSection({ id, personal, shown, onOpenArtist, onBrowse, page, titl
   const yours = personal && id === 'artists'
   const inStore = personal && id === 'storeArtists'
   const [artists, setArtists] = useState<Artist[] | null>(null)
-  const [problem, setProblem] = useState<string | null>(null)
+  const [problem, setProblem] = useState<unknown>(null)
   const asks = useMemo(latestOnly, [])
   const generation = useYourAlbumsGeneration()
   const sorts = useSorts()
@@ -344,7 +346,7 @@ function ArtistSection({ id, personal, shown, onOpenArtist, onBrowse, page, titl
         if (request.current()) setArtists(list)
       },
       (reason: unknown) => {
-        if (request.current() && !isAbort(reason)) setProblem(message(reason))
+        if (request.current() && !isAbort(reason)) setProblem(reason)
       },
     )
   }
@@ -370,7 +372,7 @@ function ArtistSection({ id, personal, shown, onOpenArtist, onBrowse, page, titl
   if (!artists) {
     body = problem ? (
       <div class="pl-notice">
-        <p>{problem}</p>
+        {errorNote(problem, { retry: true })}
         <button type="button" class="pl-text-button" onClick={load}>
           Try again
         </button>
@@ -411,7 +413,8 @@ function ArtistSection({ id, personal, shown, onOpenArtist, onBrowse, page, titl
       />
       {artists && problem && (
         <div class="pl-notice app-library-problem">
-          <p>{`${COULDNT_REFRESH}: ${problem}`}</p>
+          <p>{COULDNT_REFRESH}</p>
+          {errorNote(problem, { retry: true })}
           <button type="button" class="pl-text-button" onClick={load}>
             Try again
           </button>

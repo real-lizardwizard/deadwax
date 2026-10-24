@@ -116,9 +116,12 @@ dry run nobody can reach Server settings to set it again, and without Navidrome 
      is only ever sent to the address from `.env`, so a new address saved in the app takes the key again.
    - **`MUSICBRAINZ_EMAIL`**, your contact address for MusicBrainz.
 
-   Then **check You → Connections**: MusicBrainz, slskd and Navidrome. **Connected** means
-   connected; otherwise it names the problem, such as `NOT_LOGGED_IN` when slskd is running but not
-   signed in to Soulseek, or `CONNECTION_ERROR` when it can't be reached at all.
+   Then **check You → Connections**: MusicBrainz, slskd and Navidrome. **Connected** means connected;
+   otherwise it says what's wrong in a word, with a sentence under it saying where to put it right -
+   **Not on Soulseek** when slskd is running but not signed in to Soulseek, **Can't reach it** when it
+   can't be reached at all ([troubleshooting](troubleshooting.md#yous-connections-says-slskd-isnt-connected)).
+   Connections is for whoever runs deadwax: with logins on, only admins and anyone given **Settings and
+   the log** see it.
 3. **Open Settings → Library**. Every configured path is shown as the container sees it,
    checked for whether it exists and can be read and written. There's also a plain statement
    of whether organizing is ready, listing everything that's stopping it. If a path is wrong,
@@ -144,7 +147,9 @@ dry run nobody can reach Server settings to set it again, and without Navidrome 
 
 **What the app shows without Navidrome.** Home's shelves, the Library tab, the albums and artists
 you have and Search's look in your library each say **Connect Navidrome** (or **Can't reach
-Navidrome**, with the reason and **Try again**) and how to set it up, in place of your albums. The
+Navidrome**, with the reason and **Try again**) and how to set it up, in place of your albums -
+and, to anyone who doesn't run deadwax, **Your music isn't available yet** (or **right now**) and to
+tell whoever does, never Navidrome's address or a setting. The
 rest works without it: Search's MusicBrainz rows, an album you don't have and its **Get**,
 **Requests**, Home's arriving downloads and **You**. An album folder Navidrome doesn't list - not
 scanned yet, unreadable, or outside Navidrome's music folder - is never out of reach: **Needs a
@@ -202,7 +207,8 @@ row: [Configuration → Logins](configuration.md#logins-environment-only). If yo
 
 **Your library now comes from Navidrome.** 1.x browsed `LIBRARY_PATH` itself; the app's Library
 tab, album and artist pages, Home's shelves and the player show what Navidrome lists, and say
-**Connect Navidrome** until it's set up ([setting it up](player.md#setting-it-up)). Search's
+**Connect Navidrome** until it's set up ([setting it up](player.md#setting-it-up)) - with logins on,
+**Your music isn't available yet** to anyone who doesn't run deadwax. Search's
 MusicBrainz results, Get, Requests, Needs a look and Library care work without it.
 
 The old page at `/` retired in 2.0.0: `/` opens the app. With Navidrome set up, everything it did is

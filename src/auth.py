@@ -135,11 +135,24 @@ SIGNED_OUT = "You've been signed out - sign in again."
 EXPIRED = "Your sign-in ran out after 30 days without use - sign in again."
 LOGIN_GONE = ("Navidrome no longer accepts the login you signed in with - if you changed your Navidrome "
               "password, sign in with the new one.")
-KEY_CHANGED = "deadwax's DEADWAX_SECRET_KEY has changed since you signed in - sign in again."
+#? (2.0.4) a listener's words: the setting behind it (another DEADWAX_SECRET_KEY) is said in the event log, as
+#? _end_unopenable and the re-check say it
+KEY_CHANGED = "deadwax's sign-ins have been reset since you signed in - sign in again."
 BREAK_GLASS_ENDED = ("The break-glass sign-in has ended - it lasts 12 hours, and ends when "
                      "DEADWAX_ADMIN_PASSWORD changes. Sign in again.")
-NO_DATABASE = ("deadwax can't read its database, so it can't check who you are - nothing is let in until "
-               "it can. Check DB_PATH points at a writable volume.")
+#? (2.0.4) what anyone reads when the database can't be read, and (NO_DATABASE_WHY) what whoever runs deadwax
+#? needs - answered as an Explained, so the app shows the second to an admin, and on the sign-in screen under
+#? "For whoever runs deadwax", never as the line everyone reads
+NO_DATABASE = "deadwax can't read its database just now, so it can't check who you are."
+NO_DATABASE_WHY = ("deadwax can't read its database, so nothing is let in until it can. Check DB_PATH points at a "
+                   "writable volume.")
+#? (2.0.4) ...and when logins can't work at all (unusable(): the key, or organizing off) - its why is unusable()'s
+CANT_SIGN_IN = "deadwax isn't ready for signing in, so nobody can use it just now."
+#? (2.0.4) the sign-in's own words for Navidrome not letting it check a password - its why Navidrome's or the setting's
+NAVIDROME_UNSET = "deadwax can't reach the music server, so nobody can sign in just now."
+NAVIDROME_REFUSED = "Navidrome couldn't check your password just now - try again in a moment."
+LDAP_ACCOUNT = ("This account can't sign in to deadwax: it's an LDAP account, and deadwax needs a local Navidrome "
+                "account. Ask an admin for one.")
 WRONG_LOGIN = "That user name and password didn't work."
 #? (2.0.0-player.61) What the next request of a session People ended is told
 PASSWORD_RESET = "An admin reset your password - sign in with the new one."
@@ -151,6 +164,29 @@ PASSWORD_CHANGED = "Your password was changed from another device - sign in with
 #? break-glass (JobStore.init also deletes such rows, once, as the upgrade's migration).
 RESERVED_SESSION = ("deadwax keeps that user name for itself now, so the sign-in it had has ended - sign in with "
                     "another Navidrome account.")
+
+
+class Explained(HTTPException):
+    """
+    (2.0.4) A refusal in two halves: `detail`, the sentence anyone reads - no setting, no exception, no address -
+    and `why`, what whoever runs deadwax needs to fix it. Answered as {"detail", "why"} (src/api/app.py); the app
+    (ui/src/lib/errorWords.ts) shows `why` only to an admin or someone with Settings and the log, and the sign-in
+    screen under "For whoever runs deadwax" - it can't know who is reading there. The status is the HTTPException's.
+    """
+
+    def __init__(self, status_code: int, detail: str, why: str, headers: dict[str, str] | None = None):
+        super().__init__(status_code=status_code, detail=detail, headers=headers)
+        self.why = why
+
+
+def cant_sign_in(problem: str) -> Explained:
+    """The 503 every request is answered with while unusable() says logins can't work."""
+    return Explained(503, CANT_SIGN_IN, problem)
+
+
+def no_database() -> Explained:
+    """The 503 for a database that can't be read (a session, a sign-in)."""
+    return Explained(503, NO_DATABASE, NO_DATABASE_WHY)
 
 
 def unusable() -> str | None:
@@ -613,7 +649,7 @@ def user_for(request) -> str:
     """
     problem = unusable()
     if problem:
-        raise HTTPException(status_code=503, detail=problem)
+        raise cant_sign_in(problem)
     raw = request.cookies.get(COOKIE)
     if not raw:
         raise signed_out(SIGN_IN)
@@ -627,14 +663,14 @@ def user_for(request) -> str:
 
     store = getattr(request.app.state, "store", None)
     if store is None or not getattr(store, "available", False):
-        raise HTTPException(status_code=503, detail=NO_DATABASE)
+        raise no_database()
     try:
         key, held = _session(store, raw)
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"could not read a session from the database, so the request was refused ({type(e).__name__}: {e})")
-        raise HTTPException(status_code=503, detail=NO_DATABASE) from e
+        raise no_database() from e
     user = held.user
     _remember_login(request, PlayerLogin(key, user, held.credential, store, held.navidrome_id))
     #? (2.0.0-player.61) a Navidrome admin, as the session holds it - deadwax's admin
@@ -1184,7 +1220,7 @@ async def sign_in(store, typed: str, password: str, address: str | None = None) 
         if name in RESERVED_NAMES:
             raise HTTPException(status_code=400, detail=f"'{name}' is a name deadwax keeps for itself - nobody signs in as it.")
         if store is None or not getattr(store, "available", False):
-            raise HTTPException(status_code=503, detail=NO_DATABASE)
+            raise no_database()
 
         salt = secrets.token_hex(16)
         token = subsonic_token(password, salt)
@@ -1199,14 +1235,16 @@ async def sign_in(store, typed: str, password: str, address: str | None = None) 
                 logger.info(f"a sign-in as {name[:60]} was refused: Navidrome didn't take the password", extra={"frontend": True})
                 raise HTTPException(status_code=401, detail=WRONG_LOGIN) from e
             if e.code == 41:
-                raise HTTPException(status_code=502, detail=(
-                    "Navidrome can't check this account with a token (LDAP accounts can't), and deadwax only "
-                    "signs in with tokens - use a local Navidrome account.")) from e
-            if e.unreachable or e.status == 503:
+                raise Explained(502, LDAP_ACCOUNT, "Navidrome can't check this account with a token (LDAP accounts "
+                                "can't), and deadwax only signs in with tokens.") from e
+            if e.unreachable:
                 raise HTTPException(status_code=503, detail=(
                     "Navidrome isn't answering, so deadwax can't check your password right now - try again "
-                    "in a moment." if e.unreachable else f"deadwax can't ask Navidrome: {e}")) from e
-            raise HTTPException(status_code=502, detail=f"Navidrome couldn't check your password: {e}") from e
+                    "in a moment.")) from e
+            if e.status == 503:
+                #? not set up, or NAVIDROME_URL unusable: the sentence for anyone, the setting for whoever runs it
+                raise Explained(503, NAVIDROME_UNSET, str(e)) from e
+            raise Explained(502, NAVIDROME_REFUSED, f"Navidrome couldn't check the password: {e}") from e
         throttle.succeeded(name)
 
         #? the identity is the Navidrome user name, lowercased - the one Navidrome answered with where it
@@ -1229,7 +1267,7 @@ async def sign_in(store, typed: str, password: str, address: str | None = None) 
                 await asyncio.to_thread(set_role, store, user, admin)
         except Exception as e:
             logger.error(f"could not keep {user}'s session ({type(e).__name__}: {e})", extra={"frontend": True})
-            raise HTTPException(status_code=503, detail=NO_DATABASE) from e
+            raise no_database() from e
         #? in the thread pool, as every write here is: SQLite waiting on another writer's lock must not
         #? hold the event loop - and every request and stream with it (review)
         await asyncio.to_thread(_keep_for_library, store, user, sealed, now)

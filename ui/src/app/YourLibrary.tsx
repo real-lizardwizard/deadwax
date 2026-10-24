@@ -4,6 +4,9 @@ import { dismissRemoved } from '../api/me'
 import type { MyLibrary } from '../api/types'
 import { REMOVED_WORDS, entryName, libraryLine, loginWords, nextFocus, waitingGroups, waitingText } from '../lib/myLibrary'
 import { askMyLibrary, hasLibrary, useMyLibrary } from './useMyLibrary'
+import { TELL } from '../lib/errorWords'
+import { accessNow, seesDetail } from './access'
+import { sayError } from './sayError'
 
 /** Focus fell to the page (or was never taken) - the only time a row leaving moves it. */
 const focusLost = (): boolean => {
@@ -11,6 +14,10 @@ const focusLost = (): boolean => {
   const active = document.activeElement
   return !active || active === document.body
 }
+
+/** (2.0.4) Your library when deadwax can't read its database - "Tell whoever runs deadwax." after it for anyone who
+ *  doesn't run it. */
+export const LIBRARY_UNREAD = "deadwax can't read its database, so it can't say what your library holds."
 
 /**
  * You > Your library (2.0.0-player.51, personal libraries): with logins on, how many albums your library
@@ -66,7 +73,7 @@ export function YourLibrary({
     return (
       <section class="app-section" aria-labelledby="app-mylibrary-title">
         <h2 id="app-mylibrary-title" class="app-section-title">Your library</h2>
-        <p class="app-footnote app-error">deadwax can't read its database, so it can't say what your library holds.</p>
+        <p class="app-footnote app-error">{LIBRARY_UNREAD}{seesDetail(accessNow()) ? '' : ` ${TELL}`}</p>
       </section>
     )
   }
@@ -93,7 +100,8 @@ export function YourLibrary({
       (caught: unknown) => {
         acting.current = null
         setPutting(null)
-        setProblem(caught instanceof Error ? caught.message : String(caught))
+        //? (2.0.4) in a listener's words (sayError)
+        setProblem(sayError(caught))
       },
     )
   }
