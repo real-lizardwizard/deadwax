@@ -1517,25 +1517,25 @@ def test_a_path_naming_a_file_is_refused_and_the_file_never_touched(app, tmp_pat
     assert not [p for p in tmp_path.iterdir() if p.name.startswith("notes.txt.")], "nothing set aside"
 
 
-def test_the_example_compose_file_and_env_name_both_settings():
-    """James's addendum: the compose example carries MUSICBRAINZ_CACHE_PATH beside PLAYER_CACHE_PATH,
-    commented out, pointing at the same /cache mount, the mount's comment naming both - and .env.example
-    both settings, as it lists PLAYER_CACHE_PATH."""
+def test_the_example_compose_file_mounts_one_cache_for_both_settings():
+    """James's addendum: one /cache mount holds both caches. (2.0.3, the compose prune) Both settings are set in Server
+    settings now, not in the compose file: the compose example's commented-out /cache mount names both, and where in
+    the app each is set; neither the compose example nor .env.example sets either, and the docs' list of variables
+    carries both with the default."""
     from src.config import DEFAULT_MUSICBRAINZ_CACHE_MB
 
     compose = [line.strip() for line in (REPO / "docker-compose.example.yml").read_text().splitlines()]
-    settings = [line.split("  #")[0].strip() for line in compose]
-    player = settings.index("#- PLAYER_CACHE_PATH=/cache")
-    beside = settings[player:player + 4]
-    assert "#- MUSICBRAINZ_CACHE_PATH=/cache" in beside
-    assert f"#- MUSICBRAINZ_CACHE_MB={DEFAULT_MUSICBRAINZ_CACHE_MB}" in beside
     #? (2.0.0-player.68) the compose example's comments sit on their own setting's line, never on a line of their own
     mount = next(line for line in compose if line.startswith("#- /path/to/fast/disk/deadwax-cache:/cache"))
-    assert "PLAYER_CACHE_PATH" in mount and "MUSICBRAINZ_CACHE_PATH" in mount
+    assert "PLAYER_CACHE_PATH (Library)" in mount and "MUSICBRAINZ_CACHE_PATH (Connections)" in mount
+    assert "Server settings" in mount
+    env = (REPO / ".env.example").read_text()
+    for name in ("PLAYER_CACHE_PATH", "PLAYER_CACHE_MB", "MUSICBRAINZ_CACHE_PATH", "MUSICBRAINZ_CACHE_MB"):
+        assert f"{name}=" not in "\n".join(compose) and f"{name}=" not in env, name
 
-    env = [line.strip() for line in (REPO / ".env.example").read_text().splitlines()]
-    assert "#PLAYER_CACHE_PATH=" in env
-    assert "#MUSICBRAINZ_CACHE_PATH=" in env and f"#MUSICBRAINZ_CACHE_MB={DEFAULT_MUSICBRAINZ_CACHE_MB}" in env
+    listed = (REPO / "docs/configuration.md").read_text().split("## Environment variables", 1)[1]
+    assert f"| `MUSICBRAINZ_CACHE_MB` | `{DEFAULT_MUSICBRAINZ_CACHE_MB}` |" in listed
+    assert "| `MUSICBRAINZ_CACHE_PATH` |" in listed and "| `PLAYER_CACHE_PATH` |" in listed
 
 
 # ---------------------------------------------------------------- never in the way

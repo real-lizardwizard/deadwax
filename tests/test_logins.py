@@ -1914,24 +1914,26 @@ def test_break_glass_is_still_an_admin_with_every_permission(on):
 
 def test_the_example_files_logins_lines_lock_nobody_out():
     """(2.0.0-player.65, the 2.0.0 release review) The compose example offered `#- DEADWAX_SECRET_KEY=` to uncomment:
-    an empty line under environment: beats .env, and then nobody can sign in. It names no such line now, says logins
-    need ORGANIZE_MODE copy or move, and points at .env - which carries the three login lines, commented out."""
+    an empty line under environment: beats .env, and then nobody can sign in. (2.0.3, the compose prune) The compose
+    example has no environment: block at all now, so no line of it can beat .env, and it names no login setting; it
+    points at .env, which carries the three login lines, commented out, saying logins need organizing set to copy or move
+    first and the key in .env only."""
     repo = Path(__file__).resolve().parent.parent
     compose = (repo / "docker-compose.example.yml").read_text()
     env = (repo / ".env.example").read_text()
-    lines = [line.strip() for line in compose.splitlines()]
-    assert not any(line.lstrip("#").strip().startswith("- DEADWAX_SECRET_KEY") for line in lines)
-    assert not any(line.lstrip("#").strip().startswith("- DEADWAX_ADMIN_PASSWORD") for line in lines)
-    auth_line = next(line for line in lines if line.startswith("#- AUTH_MODE=on"))
-    assert "ORGANIZE_MODE copy or move" in auth_line and ".env" in auth_line
+    assert "environment:" not in compose
+    for name in ("AUTH_MODE", "DEADWAX_SECRET_KEY", "DEADWAX_ADMIN_PASSWORD"):
+        assert f"{name}=" not in compose, name
+    env_file = next(line for line in compose.splitlines() if line.strip().startswith("env_file:"))
+    assert "logins" in env_file and ".env.example" in env_file
     for line in ("#AUTH_MODE=on", "#DEADWAX_SECRET_KEY=", "#DEADWAX_ADMIN_PASSWORD="):
         assert line in env.splitlines(), line
-    assert "ORGANIZE_MODE copy or move" in env
-    #? the figures they quote: MusicBrainz's 200 MB about 1,100 artists (measured in .56); and (2.0.0-player.68) no
-    #? prerelease history - a reader comes from 1.1.8 and never ran those versions
+    #? (2.0.3, after review) and to set it BEFORE turning logins on: after, nothing can be reached to set it
+    assert "BEFORE you turn it" in env and "Organizing set to copy or move" in env
+    assert "beats this file even when it's empty" in env
+    #? (2.0.0-player.68) no prerelease history - a reader comes from 1.1.8 and never ran those versions
     for text in (compose, env):
         assert "2.0.0-player" not in text
-        assert "4,000 artists" not in text and "1,100 artists" in text
 
 
 def test_the_compose_example_has_no_line_that_is_only_a_comment():

@@ -15,9 +15,11 @@ In order of likelihood:
    to be the same one slskd writes finished downloads into. If they differ, the files are
    downloaded but deadwax can't find them. Compare the two containers' volume lines. See
    [the three folders](getting-started.md#the-three-folders).
-3. **`LIBRARY_PATH` isn't set, or isn't writable.** Settings → Library shows whether it
-   exists and can be written, as the container sees it. A path that exists on the host but
-   isn't mounted into the container looks perfectly correct from outside.
+3. **Nothing is mounted at `/music`, or it isn't writable.** The image looks for your library at
+   `/music` (`LIBRARY_PATH`); mounted somewhere else, set `LIBRARY_PATH` to that path. Settings →
+   Library shows whether it exists and can be written, as the container sees it ("nothing exists at
+   /music" when the mount is missing). A path that exists on the host but isn't mounted into the
+   container looks perfectly correct from outside.
 4. **Permissions.** Files are written as `PUID`/`PGID`. If the library folder belongs to someone
    else, writing fails and the log says so.
 5. **The album was already there.** A track the album's folder already has (in any format) is
@@ -164,8 +166,9 @@ with slskd's or deadwax's sentence under it:
   for the VPN, and the row says so.
 - **`401`**: slskd rejected the API key. Check `SLSKD_APIKEY` against the key in slskd's
   configuration.
-- **`UNKNOWN_ERROR`** with **"SLSKD_URL is unusable (…)"** in the **Log**: the address in your
-  compose file or `.env` fails the check Server settings makes on save - a user name or
+- **`UNKNOWN_ERROR`** with **"SLSKD_URL is unusable (…)"** in the **Log**: the address isn't set
+  (**"not set"** - give it in Settings → Connections), or the one in your `.env` or compose file
+  fails the check Server settings makes on save - a user name or
   password in it, a `?` or `#`, a space, no `http://` - and the brackets say which. deadwax won't
   send slskd anything at such an address, the API key least of all. Fix it in Settings →
   Connections or in compose. A reverse proxy in front of slskd that asks for a login of its own
@@ -500,7 +503,10 @@ finishes, and the scan at start-up runs again at the next start.
 A value saved in Server settings **overrides** compose and `.env`, and the row says so. Press
 **Revert** on it to go back to the compose value. Also check you didn't write
 `SETTING=${SETTING}` in `environment:`, which quietly sets it to empty when compose has no such
-variable of its own; the log warns about this at start-up.
+variable of its own; the log warns about this at start-up. After changing compose or `.env`, recreate
+the container (`docker compose up -d --force-recreate`): a restart keeps the environment it was
+created with. [Every variable](configuration.md#environment-variables) lists how each is given and which
+wins.
 
 ## Signing in
 
@@ -641,8 +647,8 @@ session ends, the player can't fetch any more of it. The song playing goes on on
 device has already fetched it (with Gapless on, a few seconds), and then the player skips through the
 rest of the queue as it does with any song that won't play - **Skipped "…" - it wouldn't play**, one
 song after another - and stops at the end with a reason that blames the song. Nothing is wrong with the
-songs: once you've signed in, play the album again. Changing `DEADWAX_SECRET_KEY` (and restarting
-deadwax) signs everyone out too, each session at its next request ("DEADWAX_SECRET_KEY has changed since
+songs: once you've signed in, play the album again. Changing `DEADWAX_SECRET_KEY` (and recreating
+the container) signs everyone out too, each session at its next request ("DEADWAX_SECRET_KEY has changed since
 you signed in").
 
 ### Your library says deadwax can't star albums for you
@@ -1221,7 +1227,8 @@ up ([above](#an-album-says-not-in-navidrome)) - that one the line doesn't say.
 open it (`DB_PATH` - the log says "could not open the job store" as deadwax starts), nothing can be
 kept: the album comes back on the next read. **Needs a look** says so above its list ("Ignores can't be
 saved: deadwax couldn't open its job store (DB_PATH)…"). Check `DB_PATH` and that the folder it's in
-can be written as `PUID`/`PGID`, then restart deadwax.
+can be written as `PUID`/`PGID`, then restart deadwax (or recreate the container, if you changed
+`DB_PATH`, `PUID` or `PGID`: a restart keeps the old values).
 
 ## Library care's runs don't do what I expect
 

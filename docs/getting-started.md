@@ -40,16 +40,16 @@ host: /srv/media/slskd/downloads ──┬── mounted into slskd  as its down
                                    └── mounted into deadwax as /downloads
 ```
 
-A fourth folder is optional: slskd's **incomplete** folder, mounted at `/incomplete` with
-`SLSKD_INCOMPLETE_PATH=/incomplete` set. With it, cancelling a download also deletes the
+A fourth folder is optional: slskd's **incomplete** folder, mounted at `/incomplete`, with
+`SLSKD_INCOMPLETE_PATH` set to `/incomplete` in Settings → Library. With it, cancelling a download also deletes the
 half-finished file slskd kept, and the empty folders slskd leaves behind in there are cleared
 every ten minutes. Without it, slskd's own behaviour stands: it keeps partial files so a retried
 download can resume.
 
 ## The compose file
 
-Start from [`docker-compose.example.yml`](../docker-compose.example.yml) in the repository.
-The essentials look like this:
+Start from [`docker-compose.example.yml`](../docker-compose.example.yml) in the repository. It holds
+only what Docker needs - everything else is set in the app once it's running:
 
 ```yaml
 services:
@@ -57,15 +57,9 @@ services:
     image: ghcr.io/real-lizardwizard/deadwax:latest
     container_name: deadwax
     restart: unless-stopped
-    environment:
-      - SLSKD_DOWNLOAD_PATH=/downloads
-      - LIBRARY_PATH=/music
-      - DB_PATH=/config/deadwax.db
-      - SLSKD_URL=http://slskd:5030
-      - SLSKD_APIKEY=your-slskd-api-key
-      - MUSICBRAINZ_EMAIL=you@example.com
-      - PUID=1000
-      - PGID=1000
+    env_file:
+      - path: .env
+        required: false
     volumes:
       - /srv/media/slskd/downloads:/downloads
       - /srv/media/music:/music
@@ -76,33 +70,56 @@ services:
 
 A few things to know:
 
-- **`SLSKD_URL` is the address of slskd as seen from inside this container**, which is often not
-  the one you type into a browser. If slskd is another container on the same Docker network, use
-  its service name and internal port: `http://slskd:5030`. Include the `http://`; deadwax says
-  exactly what's wrong with a URL it can't use.
+- **Change only the left side of each volume** - your host's folders. The right side is where the image
+  looks: it sets `SLSKD_DOWNLOAD_PATH=/downloads` and `LIBRARY_PATH=/music` itself, and keeps its
+  database in `/config`.
+- **`.env` sits beside the compose file**, and is optional: with `required: false` compose starts
+  deadwax without one (that form of `env_file` needs Docker Compose 2.24 or newer - `docker compose
+  version` says which you have). Start from [`.env.example`](../.env.example). It's the place for
+  what you'd rather not keep in deadwax's database or can't set in the app: slskd's API key and
+  Navidrome's password if you like, **`PUID` and `PGID`**, and the logins.
 - **`PUID` and `PGID`** are the user and group the app runs as, and so who owns every file it
   writes into your library. Set them to the same values as slskd and your other media
-  containers. `id yourname` on the host prints them.
-- **Settings can go in `environment:` or in a `.env` file** beside the compose file (start from
-  [`.env.example`](../.env.example)), or both. If a setting is in both, `environment:` wins.
-  A `.env` keeps your API key out of a file you might paste somewhere.
-- **Write literal values in `environment:`.** `SLSKD_URL=${SLSKD_URL}` reads compose's *own*
-  environment, and when that's empty it still counts as set, so it quietly overrides your
-  `.env`. The log warns about this at start-up if it happens.
+  containers. `id yourname` on the host prints them. Both are 1000 unless `.env` says otherwise.
+- **Everything else** - slskd's address and key, MusicBrainz's email, Navidrome, organizing, cover art,
+  lyrics, the caches - starts at a default and is set in **Server settings** after the first start
+  ([below](#the-first-run)). Any of it can be an environment variable instead:
+  [every variable deadwax reads](configuration.md#environment-variables), with its default, where it's
+  set in the app, and how to give one (literal values, and why a line under `environment:` beats `.env`
+  even when it's empty).
 - **Which image tag.** `:latest` is the current release. `:experimental` is rebuilt on every push
   to `main`, so it runs ahead of `:latest` and moves under you. `:0.2.1` and older are the original
   Lidarr-based app, which doesn't understand any of these settings.
 
-Every setting is described in [Configuration](configuration.md).
+**Already have a longer compose file?** It goes on working exactly as it is - a setting it gives still
+applies, and one saved in Server settings still beats it. To trim it, take a setting's line out,
+recreate the container, and set the setting again in Server settings. It can't be saved there first:
+Server settings saves only a value that differs from the one it shows, so typing in the one compose
+already gives saves nothing, and taking the line out would then lose it. An address goes with its key
+or password - take both out, and type both in the same save. Leave `DB_PATH` and any path you mounted
+somewhere other than `/downloads` and `/music` where they are. **With logins on, leave `ORGANIZE_MODE`
+and the three `NAVIDROME_` lines too** (or switch logins off while you trim): with organizing back at
+dry run nobody can reach Server settings to set it again, and without Navidrome only the break-glass
+`deadwax` can sign in.
 
 ## The first run
 
 1. **Start it** and open `http://your-server:8080` - that opens the app, at `/player/`.
-2. **Check You → Connections**: MusicBrainz, slskd and Navidrome. **Connected** means connected;
-   otherwise it names the problem, such as `NOT_LOGGED_IN` when slskd is running but not signed in
-   to Soulseek, or `CONNECTION_ERROR` when it can't be reached at all.
-3. **Open Settings → Library** - the desktop sidebar's **Settings**, or **You → Server settings** on
-   a phone. Every configured path is shown as the container sees it,
+2. **Fill in Settings → Connections** - the desktop sidebar's **Settings**, or **You → Server
+   settings** on a phone - and **Save changes**; it applies at once:
+   - **`SLSKD_URL`**, slskd's address **as seen from inside this container**, which is often not the
+     one you type into a browser: for another container on the same Docker network, its service name
+     and internal port, `http://slskd:5030`. Include the `http://`; deadwax says exactly what's wrong
+     with an address it can't use.
+   - **`SLSKD_APIKEY`**, an API key from slskd's configuration, in the same save. If you'd rather keep
+     the key in `.env`, put `SLSKD_URL` there with it and leave both out of the app: a key from `.env`
+     is only ever sent to the address from `.env`, so a new address saved in the app takes the key again.
+   - **`MUSICBRAINZ_EMAIL`**, your contact address for MusicBrainz.
+
+   Then **check You → Connections**: MusicBrainz, slskd and Navidrome. **Connected** means
+   connected; otherwise it names the problem, such as `NOT_LOGGED_IN` when slskd is running but not
+   signed in to Soulseek, or `CONNECTION_ERROR` when it can't be reached at all.
+3. **Open Settings → Library**. Every configured path is shown as the container sees it,
    checked for whether it exists and can be read and written. There's also a plain statement
    of whether organizing is ready, listing everything that's stopping it. If a path is wrong,
    this is where it shows.
@@ -118,8 +135,8 @@ Every setting is described in [Configuration](configuration.md).
    straight away, with no restart.
 7. **Set up Navidrome.** Point Navidrome at the same music folder you mounted at `/music`, then fill
    in `NAVIDROME_URL` (Navidrome's address as this container sees it, such as
-   `http://navidrome:4533`), `NAVIDROME_USER` and `NAVIDROME_PASSWORD` in Settings → Connections (or
-   uncomment the three lines waiting for them in `docker-compose.example.yml` or `.env.example`) -
+   `http://navidrome:4533`), `NAVIDROME_USER` and `NAVIDROME_PASSWORD` in Settings → Connections (or uncomment the three
+   `NAVIDROME_` lines in your `.env`, copied from `.env.example`, and recreate the container) -
    [the app's setup](player.md#setting-it-up) has the details. Then Home and the Library show your
    albums from Navidrome (with
    logins on, the Library is each person's own and **Browse** is the store - [sharing
@@ -155,17 +172,16 @@ look** raises it as **Not in Navidrome** (see [the library](library.md#not-in-na
 To share deadwax with other people, turn logins on: everyone then signs in with their own
 **Navidrome** account and has their own requests, library, plays and playlists, over the one store,
 and Navidrome's admins are deadwax's admins (an admin can give anyone else a part of that, in People). Up to
-three settings, in the container's environment (compose's
-`environment:` block or `.env` - not Server settings, which only shows them). The secret key goes in
-`.env` only, as `DEADWAX_SECRET_KEY=` and a key made with `openssl rand -hex 32` - a line for it in
-`environment:` as well, even an empty one, beats `.env`
-([Sharing deadwax, step 1](sharing.md#turning-logins-on)):
+three settings, in the container's environment - `.env`, where `.env.example` has them waiting, not
+Server settings, which only shows them. The secret key is a key made with `openssl rand -hex 32`, and
+goes in `.env` only - a line for it under compose's `environment:` as well, even an empty one, beats
+`.env` ([Sharing deadwax, step 1](sharing.md#turning-logins-on)):
 
-```yaml
-      - AUTH_MODE=on
-      # DEADWAX_SECRET_KEY is in .env - not here as well
-      # optional - signs in `deadwax` with no Navidrome, for when Navidrome is down:
-      #- DEADWAX_ADMIN_PASSWORD=...
+```bash
+AUTH_MODE=on
+DEADWAX_SECRET_KEY=<the key>
+# optional - signs in `deadwax` with no Navidrome, for when Navidrome is down:
+#DEADWAX_ADMIN_PASSWORD=
 ```
 
 To manage deadwax you sign in as a **Navidrome admin** account - make yours one in Navidrome's own Users

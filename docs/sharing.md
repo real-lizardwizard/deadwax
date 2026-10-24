@@ -117,16 +117,15 @@ beat compose, so a wrong one could lock everyone out with no way back from the p
    ```
 
    That's `.env` beside the compose file, which compose passes in through `env_file:` (the example
-   compose does). Put the key in one place only: a `DEADWAX_SECRET_KEY` line in `environment:` beats
-   `.env`, even an empty one or a `...` copied as written, and then nobody can sign in.
-2. **Add the other settings** to deadwax's compose:
+   compose does, and [`.env.example`](../.env.example) has all three login lines waiting). Put the key
+   in one place only: a `DEADWAX_SECRET_KEY` line under compose's `environment:` beats `.env`, even an
+   empty one or a `...` copied as written, and then nobody can sign in.
+2. **Add the other settings** beside it, in `.env` (or, for these two, compose's `environment:`):
 
-   ```yaml
-       environment:
-         - AUTH_MODE=on
-         # DEADWAX_SECRET_KEY is in .env (step 1) - not here as well
-         # optional - signs in `deadwax` with no Navidrome, for when Navidrome is down:
-         #- DEADWAX_ADMIN_PASSWORD=...
+   ```bash
+   AUTH_MODE=on
+   # optional - signs in `deadwax` with no Navidrome, for when Navidrome is down:
+   #DEADWAX_ADMIN_PASSWORD=
    ```
 
    - `AUTH_MODE` - `off` (the default) or `on`. Anything else is read as **on**, so a typo never leaves
@@ -137,7 +136,8 @@ beat compose, so a wrong one could lock everyone out with no way back from the p
      library**, and in Amperfy (or any Subsonic app signed in as it) **everyone's playlists, private ones
      included**.
    - `DEADWAX_SECRET_KEY` - the key. **Losing it costs nothing but sign-ins**: make a new one, and
-     everyone is signed out at their next request after the restart and signs in again. Until each
+     everyone is signed out at their next request once the container is recreated with it, and signs in
+     again. Until each
      person does, deadwax can't star new albums for them - those wait, and are starred once they've
      signed in again.
    - `DEADWAX_ADMIN_PASSWORD` - optional, the **break-glass** sign-in: user name `deadwax` and this

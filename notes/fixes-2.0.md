@@ -229,4 +229,5 @@ filling the file in needs there; the longer explanations already live in docs/co
 commented, not set to their defaults, because a line under `environment:` beats `.env` even when its value is empty.
 `test_the_compose_example_has_no_line_that_is_only_a_comment` keeps it that way; the two tests that read the old
 comment blocks read the setting lines now. The prerelease history ("since 2.0.0-player.46") left the compose example
-and `.env.example`. `.env.example` keeps its comment lines: it is a file of comments by nature.
+and `.env.example`. `.env.example` keeps its comment lines: it is a file of comments by nature. Since 2.0.3 the example is shorter still - no `environment:` block, every setting set in the app - see "A short
+compose file, and every environment variable in one list" in notes/backend-gotchas.md.

@@ -16,6 +16,12 @@ There are three kinds of setting:
 
 ## Where a server setting comes from
 
+**Most of them are meant to be set in the app.** The [compose example](../docker-compose.example.yml)
+holds only what Docker needs - the image, the folders and the port - and everything else starts at a
+sensible default: open deadwax after its first start and set slskd, MusicBrainz's email and Navidrome
+in Server settings → Connections, and organizing under Library. Any of them can be an environment
+variable instead; [the list](#environment-variables) has every one, with how to give it.
+
 A server setting can be given in three places. The first one found wins:
 
 1. **Server settings.** A value saved there is stored in deadwax's database and applies
@@ -24,14 +30,17 @@ A server setting can be given in three places. The first one found wins:
 2. **The `environment:` block** of your compose file.
 3. **A `.env` file** next to the compose file.
 
-If none of them sets it, the default below applies. On start-up, the log names the source of
-each setting it read, which helps when a value isn't the one you expected. Settings → Library
-also shows every path as the container sees it, and whether it exists and can be read and
-written.
+If none of them sets it, the default below applies - for `SLSKD_DOWNLOAD_PATH` and `LIBRARY_PATH`, the
+image's own `/downloads` and `/music` ([the image's own](#the-images-own)). On start-up, the log names
+the source of each setting it read, which helps when a value isn't the one you expected, and each row
+in Server settings says where its value came from (one the image sets counts as the container
+environment). Settings → Library also shows every path as the
+container sees it, and whether it exists and can be read and written.
 
-Two settings can't be changed from Server settings, and it says why: `DB_PATH` is where its own
-overrides are stored, and `PUID`/`PGID` are used before the app starts. Nor can the three
-[logins](#logins-environment-only) settings: they're shown, locked, under Connections.
+A few settings can't be changed from Server settings: `DB_PATH` is where its own overrides are stored,
+and it says so; `PUID`/`PGID` are used before the app starts; and `TRUSTED_ORIGINS` guards that page's
+own save. Nor can the three [logins](#logins-environment-only) settings: they're shown, locked, under
+Connections.
 
 ### In the app
 
@@ -143,9 +152,9 @@ answer in memory for an hour, as it always did.)
 
 | setting | default | what it does |
 | --- | --- | --- |
-| `SLSKD_DOWNLOAD_PATH` | | where slskd's **finished** downloads appear inside this container, usually `/downloads`. It must be the same files slskd writes; see [the three folders](getting-started.md#the-three-folders). |
+| `SLSKD_DOWNLOAD_PATH` | `/downloads` in the image | where slskd's **finished** downloads appear inside this container: mount slskd's downloads folder at `/downloads` and the image's default is right. It must be the same files slskd writes; see [the three folders](getting-started.md#the-three-folders). |
 | `SLSKD_INCOMPLETE_PATH` | | optional: slskd's **incomplete** folder inside this container. Setting it turns on two clean-ups: a cancelled download's half-finished file is deleted, and the empty folders slskd leaves in there are cleared every ten minutes. Leave it unset to keep slskd's own behaviour, which keeps partial files so a retry can resume. |
-| `LIBRARY_PATH` | | your music library inside this container, usually `/music`. Organized albums are filed here, and Needs a look, Library care, the Edit panel and the "already have it" checks read it. The Library tab shows what Navidrome has scanned, not this folder. Everything else works without it. |
+| `LIBRARY_PATH` | `/music` in the image | your music library inside this container: mount it at `/music` and the image's default is right. Organized albums are filed here, and Needs a look, Library care, the Edit panel and the "already have it" checks read it. The Library tab shows what Navidrome has scanned, not this folder. Everything else works without it. |
 | `DB_PATH` | `/config/deadwax.db` | deadwax's database. An install from before the rename keeps using `/config/jimbrainz.db` if that's where its data is. |
 | `PLAYER_CACHE_PATH` | *(the container's temporary space)* | where [the player](player.md#seeking-and-where-safari-lands) keeps the FLAC songs it repackages: as MP4s for Safari and iPhones, whose seeks only land where you asked in an MP4, and as the fragmented MP4s [Gapless](player.md#one-stream-for-flac) joins into one stream, in any browser, including hi-res songs resampled to 48 kHz for [Maximum quality](player.md#maximum-quality-hi-res-at-48-khz) (a resampled copy is kept apart from the song's original, and is about a quarter of its size). deadwax makes a folder of its own inside it, `deadwax-player`, private to the user it runs as, and touches nothing else there, so it can be a folder other things use too. **It's only a cache**: nothing in it needs backing up, deleting it is always safe, and a song that isn't in it is made again from Navidrome the next time it's played, which only makes that first play start a moment later. Left empty, it's the container's temporary space, which starts empty whenever the container is recreated. Best on a fast disk (an SSD); see below. A change applies to the next song, with no restart. |
 | `PLAYER_CACHE_MB` | `1024` | the most that cache holds, in MB, from 64 to 1048576. A CD-quality song is 20 to 60 MB, so the default is a few albums. The songs played longest ago are cleared first. While a song is being made its download sits beside it until it's done, so the folder can briefly hold one song more than this. A song another song is waiting behind is never cleared while it's being played (it was served in the last two minutes), so a song that doesn't fit beside the ones playing waits: Safari is sent it as FLAC, and the gapless stream plays it the ordinary way. A single song bigger than the whole setting is made only while nothing else in the cache is being played, and is then kept on its own. The MP4 and the fragmented MP4 of one song are two files, and both count. With the player's [Normalization](player.md#normalization) on (the default) most FLAC songs are kept as levelled 24-bit copies, about 1.5 times a CD song's file, so the default holds fewer albums: a few GB on an SSD suits it better. Songs being measured for it are downloaded into this folder too, a few at a time, and deleted once measured. deadwax also leaves the disk 128 MB spare and needs room for two copies of the song being made: when there isn't, older songs are cleared to make room, and if there still isn't enough, Safari is sent the FLAC and the gapless stream plays that song the ordinary way. Nothing is cleared for a song clearing couldn't make room for. The desktop's [visualizer](player.md#the-visualizer) (and the phone's turntable) cut their stretches from a song's MP4 here when there is one - with Normalization on, a levelled song's own levelled copy - and otherwise - in a browser that plays the FLAC as it is, Chrome, Firefox or Edge with Gapless off and Normalization off - straight from the FLAC on Navidrome, adding nothing to the cache; only where that can't be done (the log says so once a song) is an MP4 made and kept for them, as Safari's would be. |
@@ -153,12 +162,11 @@ answer in memory for an hour, as it always did.)
 **Putting the caches on a fast disk.** deadwax keeps two caches: the player's songs
 (`PLAYER_CACHE_PATH`) and [MusicBrainz's saved answers](#musicbrainzs-saved-answers-settings--connections)
 (`MUSICBRAINZ_CACHE_PATH`). One folder on a fast disk (an SSD) can hold both: mount it into the
-container and point both settings at it, as `docker-compose.example.yml` shows:
+container, as the commented-out `/cache` line in `docker-compose.example.yml` does, and set both
+settings to `/cache` - `PLAYER_CACHE_PATH` in Settings → Library, `MUSICBRAINZ_CACHE_PATH` in Settings →
+Connections, or as [environment variables](#environment-variables):
 
 ```yaml
-    environment:
-      - PLAYER_CACHE_PATH=/cache
-      - MUSICBRAINZ_CACHE_PATH=/cache
     volumes:
       - /path/to/fast/disk/deadwax-cache:/cache
 ```
@@ -217,7 +225,7 @@ can land seconds off.
 
 | setting | default | what it does |
 | --- | --- | --- |
-| `PUID` / `PGID` | `1000` / `1000` | the user and group the app runs as, and so the owner of every file it writes. Match them to slskd and your other media containers. |
+| `PUID` / `PGID` | `1000` / `1000` | environment only (`.env`, say). The user and group the app runs as, and so the owner of every file it writes. Match them to slskd and your other media containers. |
 | `TRUSTED_ORIGINS` | | environment only. Changes that another website sends are refused, by checking each request's `Origin` against the address it's being reached at. Behind a reverse proxy that rewrites the `Host` header (nginx does unless told `proxy_set_header Host $http_host`), every change looks foreign, the phone player's plays included. List the address you open deadwax at here, comma-separated with the scheme, e.g. `https://music.example.com`. It can't be set in Server settings, because it guards that page's own save. [Sharing deadwax](sharing.md#turning-logins-on) has a sample nginx block that passes the `Host` through instead. |
 
 ### Logins (environment only)
@@ -229,12 +237,14 @@ through turning them on, what each person gets, and turning them off again. All 
 environment (compose's `environment:` block or `.env`) and nowhere else: Server settings, and the
 app's **Managing → Settings**, show them under **Connections**, locked, saying so - a value saved
 there would beat your compose file, so a wrong one could lock everyone out with no way back from the
-page that saved it. Change one in compose and restart deadwax.
+page that saved it. Change one in `.env` (or compose) and recreate the container - `docker compose up -d
+--force-recreate`, or deploy the Komodo stack again: a restart keeps the old values
+([how to give one](#how-to-give-one)).
 
 | setting | default | what it does |
 | --- | --- | --- |
 | `AUTH_MODE` | `off` | `off`: deadwax as it always was - no sign-in, and anyone who can reach the port can use it, as its one admin. `on`: everyone signs in. Anything else is read as `on`, so a typo never leaves deadwax open, and the log says so. With logins on, `/docs` and `/openapi.json` (the API's own pages) are switched off. |
-| `DEADWAX_SECRET_KEY` | | **required with logins on**: at least 32 characters - make one with `openssl rand -hex 32`. Signing in keeps a token made from your Navidrome password in deadwax's database, `DB_PATH` (on Navidrome's API it is as good as the password, for as long as the password stands), encrypted with this key. Without it nobody can sign in: everything but the health check and the pages themselves answers 503, saying why, and the sign-in screen shows it. Changing it (deadwax reads it at a restart) signs everyone out, each at their next request, and deadwax can't star albums for anyone until they've signed in again. |
+| `DEADWAX_SECRET_KEY` | | **required with logins on**: at least 32 characters - make one with `openssl rand -hex 32`. Signing in keeps a token made from your Navidrome password in deadwax's database, `DB_PATH` (on Navidrome's API it is as good as the password, for as long as the password stands), encrypted with this key. Without it nobody can sign in: everything but the health check and the pages themselves answers 503, saying why, and the sign-in screen shows it. Changing it (deadwax reads it when the container is recreated - [how to give one](#how-to-give-one)) signs everyone out, each at their next request, and deadwax can't star albums for anyone until they've signed in again. |
 | `DEADWAX_ADMIN_PASSWORD` | | optional: the **break-glass** sign-in. User name `deadwax`, this password - an admin who needs neither Navidrome nor the database, for when Navidrome is down or nobody else can sign in (nobody being a Navidrome admin, say). It lasts 12 hours, and ends at once if this password changes. Unset, there is no such sign-in. **Make it long and random** - `openssl rand -base64 18`: the name is public, and wrong guesses are held off per address - three a minute from each, after which even the right password waits out the minute there - so a stranger's guesses hold off only the stranger, and you still get in from another address. Someone with many addresses still gets many guesses, which leaves its length as what keeps strangers out. Behind a reverse proxy every sign-in may come from the proxy's address, and then guesses through the proxy hold off yours through it too: sign in at deadwax's own address on your network instead. One shorter than 16 characters still works, but with logins on the log says so at start-up and its row in Server settings is marked. Since `deadwax` is this sign-in's name, a Navidrome account called `deadwax` can't sign in to deadwax; Navidrome's own `admin` account signs in as itself, like anyone. |
 
 **Who can do what.** An admin - a Navidrome admin - can do everything. Anyone else signed in can
@@ -283,6 +293,99 @@ key: a copy of both is as good as the passwords on Navidrome's API until they ch
 in Navidrome - every download they asked for is added and starred as them, an album the store holds can
 be added without a download, and starring or unstarring in Amperfy is read back every five minutes. No
 setting: it follows `AUTH_MODE`. See [the app's guide](player.md#your-library-with-logins-on).
+
+## Environment variables
+
+Every environment variable deadwax reads, in one list. **None of them is needed to start it**: the
+[compose example](../docker-compose.example.yml) sets only the image, the folders and the port, and
+every setting with a place in the app is set there once deadwax is running - in Server settings, on
+the page the **In the app** column names - and applies at once, with no restart. Give one as an
+environment variable instead when you'd rather set a container up in one go, keep a secret out of
+deadwax's database, or for the few the app can't set (**environment only**).
+
+### How to give one
+
+- **In `.env`**, beside your compose file: the compose example passes it into the container with
+  `env_file: .env`, and [`.env.example`](../.env.example) is a start. One per line, `NAME=value`,
+  with no quotes, and any note on a line of its own - a comment after the value isn't read the
+  same way everywhere, and can end up in the value. The example marks it `required: false`, so an empty `.env`, or none,
+  is fine (that form of `env_file` needs Docker Compose 2.24 or newer).
+- **Or in compose's `environment:` block**, which the example leaves out - add it under the service:
+
+  ```yaml
+      environment:
+        - ORGANIZE_MODE=copy
+        - TRUSTED_ORIGINS=https://music.example.com
+  ```
+
+  Write literal values, never `NAME=${NAME}`: compose fills that in from its own environment, and
+  when that has no such variable the line is still set, to nothing.
+- **Which wins.** A value saved in Server settings beats both, until **Revert to the environment**
+  on its row. A line under `environment:` beats the same name in `.env` - **even an empty one**, which
+  is why a secret goes in one place only. The image's own defaults (the last table) come after both.
+- **Leave a variable out rather than empty.** `NAME=` with nothing after it is still set, to nothing:
+  `LIBRARY_PATH=` takes away the image's `/music`, and organizing stays off until it's set again;
+  most others fall back to their default, some with an error in the log.
+- **A change needs the container recreated**: `docker compose up -d --force-recreate` (or deploy
+  the Komodo stack again). A restart keeps the environment the container was created with. A change
+  in Server settings needs neither.
+
+### Set in the app (or here)
+
+| variable | default | in the app | what it does | example |
+| --- | --- | --- | --- | --- |
+| `SLSKD_URL` | *(none - searching and downloading need it)* | Connections | slskd's address as this container reaches it, with the scheme; [more](#connections). A new address saved in the app takes the key again, typed in the same save. | `http://slskd:5030` |
+| `SLSKD_APIKEY` | *(none - needed with `SLSKD_URL`)* | Connections | an API key from slskd's configuration; never shown in the app. Keep it with `SLSKD_URL`: a key from the environment is only ever sent to the environment's address. | `a long key from slskd` |
+| `MUSICBRAINZ_EMAIL` | *(none - recommended)* | Connections | your contact address, sent to MusicBrainz in deadwax's user agent; without one MusicBrainz may throttle it. | `you@example.com` |
+| `MUSICBRAINZ_USERAGENT` | *(none)* | Connections, only while it's set | the old way: a whole user agent by hand. Its contact is used when `MUSICBRAINZ_EMAIL` isn't set. | `myapp/1.0 ( you@example.com )` |
+| `THEAUDIODB_KEY` | *(none)* | Connections | optional: artist banners, logos and backgrounds from TheAudioDB. | `your key` |
+| `FANARTTV_KEY` | *(none)* | Connections | optional: a fanart.tv **project** key, for artist pictures and CD art. | `your key` |
+| `FANARTTV_PERSONAL_KEY` | *(none)* | Connections | optional, with the project key: fanart.tv's images from the last week too. | `your key` |
+| `NAVIDROME_URL` | *(none - the app's library needs it)* | Connections | Navidrome's address as this container reaches it, plus its base path if it has one; [more](#navidrome-settings--connections). A new address saved in the app takes the password again. | `http://navidrome:4533` |
+| `NAVIDROME_USER` | *(none)* | Connections | the Navidrome account deadwax plays and asks as - your own, not an admin. | `james` |
+| `NAVIDROME_PASSWORD` | *(none)* | Connections | that account's password; never shown in the app. Keep it with `NAVIDROME_URL`, as for slskd's key. | `its password` |
+| `MUSICBRAINZ_CACHE_PATH` | *(the database's folder, `/config`)* | Connections → MusicBrainz's saved answers | the **folder** MusicBrainz's answers are saved in, as `musicbrainz-cache.db`; [more](#musicbrainzs-saved-answers-settings--connections). | `/cache` |
+| `MUSICBRAINZ_CACHE_MB` | `200` | Connections → MusicBrainz's saved answers | the most those answers take, in MB, 0 to 1048576; `0` turns saving off. | `500` |
+| `SLSKD_DOWNLOAD_PATH` | `/downloads` in the image *(none outside it)* | Library → Paths | where slskd's finished downloads are inside this container - mount slskd's downloads folder there; [more](#paths). | `/downloads` |
+| `LIBRARY_PATH` | `/music` in the image *(none outside it)* | Library → Paths | your library inside this container, where albums are filed - mount it there. | `/music` |
+| `SLSKD_INCOMPLETE_PATH` | *(none - clean-up off)* | Library → Paths | slskd's incomplete folder inside this container: a cancel then deletes its partial file, and slskd's empty folders there are cleared. | `/incomplete` |
+| `PLAYER_CACHE_PATH` | *(the container's temporary space)* | Library → Paths | where the player keeps the copies of songs it makes; only a cache, best on an SSD. | `/cache` |
+| `PLAYER_CACHE_MB` | `1024` | Library → Paths | the most that cache holds, in MB, 64 to 1048576. | `4096` |
+| `ORGANIZE_MODE` | `dry_run` | Library → Organizing | `off`, `dry_run`, `copy` or `move`: what happens when a download finishes; [more](#organizing). | `copy` |
+| `ALBUM_FOLDER_TEMPLATE` | `{album} ({year}) [{edition}]` | Library → Organizing | how an album's folder is named ([folder names](organizing.md#folder-names)). | `{album} ({year})` |
+| `COUNTRY_IN_FOLDER` | `off` | Library → Organizing | `on` lets a pressing's country name its folder when nothing else tells it apart. | `on` |
+| `RETAG_RENAME_WAIT` | `20` | Library → Organizing | seconds between an apply's new tags and its folder rename, 0 to 300 (with Navidrome set up it asks instead). | `30` |
+| `COVER_ART_SIZE` | `500` | Library → Cover art | `250`, `500`, `1200` or `full`: the size of cover saved. | `1200` |
+| `FETCH_LYRICS` | `on` | Library → Lyrics | `off` stops lyrics being fetched from LRCLIB as albums are filed. | `off` |
+| `LYRICS_LEAD_MS` | `0` | Library → Lyrics | milliseconds to move synced lyrics earlier (negative: later), −5000 to 5000. | `300` |
+| `SLSKD_SEARCH_TIMEOUT` | `8` | Downloads → Soulseek searches | seconds each Soulseek search listens for answers, 3 to 60. | `15` |
+| `AUTO_RETRY_PEER` | `off` | Downloads → When a download fails | `on` moves a failed download to the next peer by itself. | `on` |
+
+### Environment only
+
+| variable | default | in the app | what it does | example |
+| --- | --- | --- | --- | --- |
+| `AUTH_MODE` | `off` | shown, locked: Connections → Logins | `on`: everyone signs in with their Navidrome account. Anything but `off` or `on` is read as `on`. Needs `DEADWAX_SECRET_KEY`, and `ORGANIZE_MODE` `copy` or `move` - set that first: with logins on and organizing off, nothing can be reached to set it; [logins](#logins-environment-only). | `on` |
+| `DEADWAX_SECRET_KEY` | *(none - required with logins on)* | shown, locked: Connections → Logins | encrypts the Navidrome logins deadwax keeps; at least 32 characters, from `openssl rand -hex 32`. In `.env` only. | `openssl rand -hex 32`'s output |
+| `DEADWAX_ADMIN_PASSWORD` | *(none - no such sign-in)* | shown, locked: Connections → Logins | the break-glass sign-in, as `deadwax`, for when Navidrome is down; make it long and random. | `openssl rand -base64 18`'s output |
+| `TRUSTED_ORIGINS` | *(none)* | no | behind a reverse proxy that rewrites the `Host` header, the address you open deadwax at, with the scheme, comma-separated for more; [the container](#the-container). | `https://music.example.com` |
+| `DB_PATH` | `/config/deadwax.db` *(or an older `/config/jimbrainz.db`, where that's the one there)* | shown, locked: Library → Paths | deadwax's database, which holds what Server settings saves - so it can't be moved from there. Never rename a `jimbrainz.db` to match. | `/config/deadwax.db` |
+| `DEADWAX_ADMINS` | - | no | **no longer read** (Navidrome's admins are deadwax's); while it's set, start-up says so. Take it out. | - |
+
+### The image's own
+
+The image sets these itself, so the compose file needn't; set one only to change it.
+
+| variable | the image's value | in the app | what it does | example |
+| --- | --- | --- | --- | --- |
+| `PUID` / `PGID` | `1000` / `1000` | no | the user and group deadwax runs as, and so the owner of every file it writes - read by the image's start-up script, before deadwax itself starts. Match slskd and your other media containers (`id yourname` on the host prints them). | `1000` / `100` |
+
+It also sets `SLSKD_DOWNLOAD_PATH=/downloads` and `LIBRARY_PATH=/music` (in the first table), the
+container's side of the compose example's two mounts. Mounted your library somewhere else, as
+`/library`, with `LIBRARY_PATH=/library` set? That goes on working as it is: a value you give
+replaces the image's. Run outside the image - `python -m src.main` - neither has a default, and
+organizing stays off until both are set. `PYTHONUNBUFFERED=1` is the image's too, for Python: it
+sends deadwax's log straight to `docker logs`.
 
 ## The phone player's settings (per device)
 

@@ -163,7 +163,7 @@ def unusable() -> str | None:
     problem = describe_secret_key(Config.DEADWAX_SECRET_KEY)
     if problem:
         return (f"Logins are on, but DEADWAX_SECRET_KEY {problem}, so deadwax can't sign anyone in. "
-                f"Set it in the container's environment and restart deadwax.")
+                f"Set it in the container's environment and recreate the container (a restart keeps the old values).")
     organizing = Config.describe_logins_organizing()
     if organizing:
         return f"Logins are on, but {organizing}"

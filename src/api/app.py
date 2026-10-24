@@ -100,7 +100,9 @@ async def lifespan(app: FastAPI):
     Config.apply_overrides(app.state.store.stored_settings())
 
     #? Here rather than in Config.check(), which runs before the overrides exist - an email set
-    #? in the settings tab would otherwise be reported missing on every single restart.
+    #? in the settings tab would otherwise be reported missing on every single restart (and, until
+    #? 2.0.3, slskd's address and key were, to the app's Log, while slskd worked).
+    Config.report_slskd()
     Config.report_musicbrainz()
     Config.report_navidrome()
     #? after the overrides too: whether a sign-in can reach Navidrome depends on NAVIDROME_URL, which can be one

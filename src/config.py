@@ -365,7 +365,7 @@ DEADWAX_ADMINS_IGNORED = (
 LOGINS_LOCKED = (
     "Logins are set in the container's environment and nowhere else: a value saved here would beat "
     "your compose file, so a wrong one could lock everyone out with no way back from this page. "
-    "Change it in compose and restart deadwax."
+    "Change it in .env (or compose) and recreate the container: a restart keeps the old values."
 )
 
 #? The shortest DEADWAX_SECRET_KEY taken: a key is only as strong as it is long, and `openssl rand
@@ -826,6 +826,73 @@ class Config:
         )
 
     @classmethod
+    def report_slskd(cls) -> None:
+        """
+        Say whether deadwax can reach slskd, where its address came from, and what organizing will do.
+
+        Called once the settings tab's overrides are in, beside report_musicbrainz() and
+        report_navidrome() and for the same reason (2.0.3, the compose prune's review): from check(), an
+        slskd set up in Server settings - the way the short compose example leaves it to be set - was
+        logged as "SLSKD_URL is unusable (not set)" to the app's Log on every restart while it worked,
+        and the line told the reader to put it back in compose. The paths and the organize mode can be
+        saved there too, so they are said here as well. Never logs the key - only whether one is set.
+        """
+        def source(name: str) -> str:
+            return ("Server settings" if name in cls.OVERRIDDEN
+                    else setting_source(name) or "the environment")
+
+        url_problem = describe_slskd_url(cls.SLSKD_URL)
+        if url_problem:
+            where = (
+                "Fix it in Server settings (Connections), where it is saved."
+                if "SLSKD_URL" in cls.OVERRIDDEN else
+                "Set it in Server settings (Connections), or in your .env (a compose `environment:` "
+                "block, if you keep one, wins over .env; a value saved in Server settings beats both)."
+            )
+            logger.error(
+                f"SLSKD_URL is unusable ({url_problem}) - searching and downloading will fail. {where}",
+                extra={"frontend": True},
+            )
+
+        else: logger.info(f"SLSKD_URL found! (from {source('SLSKD_URL')})")
+
+        if not cls.SLSKD_APIKEY:
+            logger.error(
+                "SLSKD_APIKEY is not set, so searching and downloading will not work - set it in Server "
+                "settings (Connections), or in your .env",
+                extra={"frontend": True},
+            )
+
+        else: logger.info(f"SLSKD_APIKEY found! (from {source('SLSKD_APIKEY')})")
+
+        if not cls.SLSKD_DOWNLOAD_PATH:
+            logger.warning("SLSKD_DOWNLOAD_PATH is not set, so organizing downloaded files is disabled")
+
+        else: logger.info(f"SLSKD_DOWNLOAD_PATH found! (from {source('SLSKD_DOWNLOAD_PATH')})")
+
+        if cls.SLSKD_INCOMPLETE_PATH:
+            logger.info(
+                "SLSKD_INCOMPLETE_PATH found! cancelled downloads will take their partial files "
+                "with them, and empty folders left in it are cleared"
+            )
+
+        else:
+            logger.info(
+                "SLSKD_INCOMPLETE_PATH not set, so cancelling a download leaves its partial "
+                "file in slskd's incomplete folder (which is what lets slskd resume it)"
+            )
+
+        if not cls.LIBRARY_PATH:
+            logger.warning("LIBRARY_PATH is not set, so organizing downloaded files is disabled")
+
+        else: logger.info(f"LIBRARY_PATH found! (from {source('LIBRARY_PATH')})")
+
+        if cls.organizing_enabled():
+            logger.info(f"organizing enabled in '{cls.ORGANIZE_MODE}' mode")
+
+        else: logger.info("organizing disabled (needs SLSKD_DOWNLOAD_PATH + LIBRARY_PATH, and ORGANIZE_MODE not 'off')")
+
+    @classmethod
     def exists(cls, env_var: str):
         value = os.getenv(env_var)
 
@@ -836,9 +903,9 @@ class Config:
 
     @classmethod
     def check(cls):
-        #? MusicBrainz and Navidrome are reported separately, by report_musicbrainz() and
-        #? report_navidrome(), once the settings tab's overrides are in - see their docstrings
-        #? for why it can't happen here.
+        #? MusicBrainz, Navidrome, slskd and organizing are reported separately - by
+        #? report_musicbrainz(), report_navidrome() and report_slskd() - once the settings tab's
+        #? overrides are in; see their docstrings for why it can't happen here.
 
         if cls.DB_PATH == LEGACY_DB_PATH and not _env("DB_PATH"):
             logger.info(
@@ -860,44 +927,6 @@ class Config:
                     extra={"frontend": True},
                 )
 
-        url_problem = describe_slskd_url(cls.SLSKD_URL)
-        if url_problem:
-            logger.error(
-                f"SLSKD_URL is unusable ({url_problem}) - searching and downloading will fail. "
-                f"Set it in your compose file's `environment:` block, or in the .env named by "
-                f"`env_file:`; a value in `environment:` wins if you use both.",
-                extra={"frontend": True},
-            )
-
-        else: logger.info(f"SLSKD_URL found! (from {setting_source('SLSKD_URL')})")
-
-        if not cls.SLSKD_APIKEY:
-            logger.error("SLSKD_APIKEY not found in environment, downloads will not work", extra={"frontend": True})
-
-        else: logger.info(f"SLSKD_APIKEY found! (from {setting_source('SLSKD_APIKEY')})")
-
-        if not cls.SLSKD_DOWNLOAD_PATH:
-            logger.warning("SLSKD_DOWNLOAD_PATH not found in environment, organizing downloaded files will be disabled")
-
-        else: logger.info("SLSKD_DOWNLOAD_PATH found!")
-
-        if cls.SLSKD_INCOMPLETE_PATH:
-            logger.info(
-                "SLSKD_INCOMPLETE_PATH found! cancelled downloads will take their partial files "
-                "with them, and empty folders left in it are cleared"
-            )
-
-        else:
-            logger.info(
-                "SLSKD_INCOMPLETE_PATH not set, so cancelling a download leaves its partial "
-                "file in slskd's incomplete folder (which is what lets slskd resume it)"
-            )
-
-        if not cls.LIBRARY_PATH:
-            logger.warning("LIBRARY_PATH not found in environment, organizing downloaded files will be disabled")
-
-        else: logger.info("LIBRARY_PATH found!")
-
         if cls.ORGANIZE_MODE not in ("off", "dry_run", "copy", "move"):
             logger.error(
                 f"ORGANIZE_MODE is '{cls.ORGANIZE_MODE}', expected one of off/dry_run/copy/move. "
@@ -914,10 +943,6 @@ class Config:
             )
             cls.COVER_ART_SIZE = "500"
 
-        if cls.organizing_enabled():
-            logger.info(f"organizing enabled in '{cls.ORGANIZE_MODE}' mode")
-
-        else: logger.info("organizing disabled (needs SLSKD_DOWNLOAD_PATH + LIBRARY_PATH, and ORGANIZE_MODE not 'off')")
 
     @classmethod
     def logins_on(cls) -> bool:
@@ -1004,7 +1029,7 @@ class Config:
                 "it's saved in Server settings, which beats the environment: switch logins off "
                 "(AUTH_MODE=off), set Organize mode there to copy or move, and switch them on again"
                 if "ORGANIZE_MODE" in cls.OVERRIDDEN
-                else "set ORGANIZE_MODE=copy or move in the container's environment and restart deadwax"
+                else "set ORGANIZE_MODE=copy or move in the container's environment and recreate the container"
             )
             return (f"ORGANIZE_MODE is '{cls.ORGANIZE_MODE}', so nothing downloaded would ever be filed into "
                     f"the library - and with logins on each download is the person's who asked for it, which "
@@ -1014,7 +1039,7 @@ class Config:
             return (f"{' and '.join(missing)} {'is' if len(missing) == 1 else 'are'} not set, so nothing "
                     f"downloaded would ever be filed into the library - and with logins on each download is the "
                     f"person's who asked for it, which needs it filed. Until organizing is on nobody can use "
-                    f"deadwax: set {' and '.join(missing)} and restart deadwax (or set "
+                    f"deadwax: set {' and '.join(missing)} and recreate the container (or set "
                     f"{'it' if len(missing) == 1 else 'them'} in Server settings with logins off).")
         return None
 
