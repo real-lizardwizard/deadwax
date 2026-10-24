@@ -22,7 +22,8 @@ at the head of the first group - the amendment), the first group - .58's Playlis
 (`button.app-row.app-link-row.app-library-row.app-library-playlists`, still `onOpenPlaylists`, its page never a
 section) then `libraryItems(hasSongs, personal)` without `recent` - and with a library of your own a **Browse** group
 (`browseItems`), then Recently added: the 12 newest with See all (the `recent` section). Yours come from the album
-index sorted by `created`; with logins off ONE `albumPage('newest', 0, signal, 12)` - the store's whole list is asked
+index sorted by `created` (since 2.0.11 by when each entered your library - see "Recently added means added to
+your library (2.0.11)"); with logins off ONE `albumPage('newest', 0, signal, 12)` - the store's whole list is asked
 only as a store section opens (Choice 17: with logins on the first show fetches your whole list, which Albums and
 Search then share). Your library empty: `EmptyLibrary`, whose Browse the store opens the store's section. .58's
 `div.app-group.app-library-playlists` wrapper went with the chips, and with it its desktop rule (`.app-desk
@@ -248,3 +249,59 @@ has since .58: `AlbumIcon` (a record - its edge, the label round the spindle hol
 `ArtistIcon` (a head and shoulders) and `SongIcon` (the playlist glyph's own note), in `player/icons.tsx`'s line set
 (stroke 2.2, round caps), sized and coloured as `.app-library-playlists-icon` (`.app-library-row-icon`, the same
 declarations - test_app_css holds the two equal). The desktop sidebar's items stay text, as its Playlists group does.
+
+### Recently added means added to your library (2.0.11)
+
+James (2026-10-24): "Recently added should be for the user's library, not deadwax's". Since 2.0.5, with logins on,
+Home's and the Library's Recently added were the listener's own albums - but in order of Navidrome's `created`, when
+the COLLECTION got each one, so an album someone had just added (Add to my library, a download of theirs, a star in
+Amperfy) that the collection had held for months sat far down, or on neither shelf.
+
+**The date is a per-list choice** (`lib/shelves.ts`): `sortAlbums(albums, sort, by)` and `groupAlbums(sorted, sort,
+by)` take `AddedBy` - `'collection'` (the default) or `'you'` - and only the `newest` sort reads it. Your albums
+(`'you'`) go by `starred`, which album_index already passed through (INDEX_FIELDS), now in `AlbumKeys`; an album
+without one (never in the `yours` list itself - a fixture's) by `created`. The collection's lists - the store's
+section, and everything with logins off - stay on `created` and never read a star: a store album carries `starred`
+only when the asker starred it, so mixed keys would scramble the list (shelves.sim pins it with a store list whose
+starred albums would lead if read). It is an option rather than a new sort id so the one sort picker keeps its seven,
+and **Recently added** in it means the right thing for the list it sorts. The callers: Home's `recentlyAddedAlbums`,
+the root's 12 (`app/LibraryHome.tsx`), and `AlbumSection` (`app/LibrarySection.tsx`), whose `by` is `'you'` exactly
+when its scope is `yours` - so the Recently added section, and Your albums under the Recently added sort, with their
+month headers. Labels unchanged. No route change: the list and its fields were already there.
+
+**Moments.** Stars no more than `SAME_MOMENT_MS` (30 s) apart, one to the next, are ONE moment, and inside a moment
+`created` decides (newest first, missing last), then the star, then the list's order. The spec said "albums starred at
+the same moment (the first admin's seed) fall back to `created`" - but the seed is never one instant: the worker stars
+25 to a pass, a full pass asking for another at once, each album its own find, getAlbum, star and getAlbum, so a seed
+of the whole collection is a run of stars a second or so apart over minutes. Equal-only ties would have ordered it by
+the order the worker took the entries (`ledger_due`: next_try, added_at - all equal - then the table's), which is
+nobody's order. Chaining by the gap to the next star keeps a whole seed one moment however long it runs, as long as
+no gap passes 30 s. The cost: two Adds of your own within 30 s of each other are drawn in the collection's order
+between themselves, not the order you added them - both are at the top either way. The month header of a moment is
+its newest star's month, so one moment over a month's end is never split into two headers (pinned). **Find doesn't
+re-cut them (review):** taking albums out of a run of stars only widens its gaps, so moments cut again from what Find
+left would split a seed over a month's end into headers out of order ("August" above "September", two blocks keyed
+alike). `groupAlbums(found, sort, by, sorted)` takes the whole sorted list too and reads each album's month from the
+whole list's moments - made once per list (a WeakMap on the array), not per keystroke - so Find never changes an
+album's header. `moments()` runs once for the sort and once for the months, each an O(n log n) sort - nothing beside
+a 3,000-album list's own sort.
+
+**The star is not reset by deadwax's own re-checks.** `stars.star_entry` asks `getAlbum` before `star` (2.0.0-player.65,
+the 2.0.0 release review, "Re-starring" in notes/fixes-2.0.md; `test_an_album_already_starred_is_never_starred_again`),
+because `star` on an album already starred sets its starred date to now; `_star_now` (Add's) goes through
+`star_entry`; the read-back (`sync_user`) never calls `star` at all - a star it finds lost is put back WAITING, and
+starred again through `star_entry` at its turn; `star_entry`'s one `star` call is the only one in src/. So an album's
+place in Recently added moves only when its star does. **Where it does move, on purpose or not:** a star truly lost
+(the album gone from Navidrome a while, or an apply that gave it a new Navidrome id - `ledger_restar` after a release
+is applied) is starred again as new, so that album reads as just added; and Remove then Add again is a new star. A
+seed laid over stars you made in Amperfy before deadwax keeps their older dates, so those come after the seed's
+moment, which is newer.
+
+Pinned: shelves.sim (yours by the star, a moment in `created` order - a seed 38 s end to end, no gap over 30 s, plus a
+moment of two equal stars, and a moment's same-`created` pair handed in oldest star first drawn newest first - no
+date last, the other sorts indifferent to `by`, the month headers, a moment over a month's end, the same moment with
+Find leaving out its middle album still one header, the collection by `created` with stars present, and the same store list read as yours ordering by them);
+home.sim (Home's shelf leading with an album the collection has had since 2019, starred last); whose.sim's "your
+library" orders read with `'you'`; app-rules (Home's and the root's `sortAlbums(index.albums, 'newest', 'you')` - the
+only sortAlbums call in each - AlbumSection's `by` from its scope and passed to both the sort and the groups, the groups given the whole sorted list, the
+logins-off asks still `albumPage('newest', ...)`). Mutation-checked: each pin broken, seen to fail, restored.

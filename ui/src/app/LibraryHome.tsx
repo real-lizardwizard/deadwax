@@ -31,7 +31,8 @@ export const RECENT_ON_ROOT = 12
  *    Library group, one list in one order (Recently added is the grid below);
  *  - with a library of your own (hasLibrary), a second group under "Browse": browseItems - the store's Albums,
  *    Artists and Songs, the sidebar's Browse group - in place of the "Your library | Browse" chips;
- *  - Recently added: the newest 12 - yours by `created` from app/albumIndex.ts's list, or with logins off (and for
+ *  - Recently added: the newest 12 - yours by when each entered your library (2.0.11: its star, lib/shelves.ts's
+ *    `'you'`; it was the collection's `created`) from app/albumIndex.ts's list, or with logins off (and for
  *    the break-glass admin) ONE getAlbumList2 newest of 12 (the store's whole list is asked for only as a store
  *    section opens) - with See all opening the `recent` section; your library empty, EmptyLibrary. Kept up to date
  *    as the sections are: yours follows the `yours` generation (App's refreshIfOld as the tab shows moves it); the
@@ -66,7 +67,7 @@ export function LibraryHome({ personal, hasSongs, shown, onOpen, onOpenSection, 
     const request = asks.begin()
     setProblem(null)
     const asking = personal
-      ? albumIndex('yours').then((index) => ({ albums: sortAlbums(index.albums, 'newest').slice(0, RECENT_ON_ROOT), empty: !index.albums.length }))
+      ? albumIndex('yours').then((index) => ({ albums: sortAlbums(index.albums, 'newest', 'you').slice(0, RECENT_ON_ROOT), empty: !index.albums.length }))
       : albumPage('newest', 0, request.signal, RECENT_ON_ROOT).then((albums) => ({ albums, empty: !albums.length }))
     asking.then(
       (found) => {

@@ -334,14 +334,18 @@ async function run() {
     let tree = home.draw(props({ personal: true }))
     check('it asks the Library\'s own list of your albums - never the collection\'s newest - beside Not played',
       W.asks.map((one) => one.slice(0, 3)), [['index', 'yours'], ['albums', 'recent', 500]])
-    const mine = (id, created) => ({ id, name: id, artist: 'x', ...(created ? { created } : {}) })
-    const many = Array.from({ length: RECENT_COUNT + 5 }, (_, i) => mine(`m${String(i).padStart(2, '0')}`, `2026-0${1 + (i % 9)}-1${i % 10}T00:00:00Z`))
-    answer('index', { albums: [mine('undated'), mine('older', '2025-01-02T00:00:00Z'), mine('newest', '2026-10-01T00:00:00Z'), ...many], truncated: false })
+    const mine = (id, created, starred) => ({ id, name: id, artist: 'x', ...(created ? { created } : {}), ...(starred ? { starred } : {}) })
+    const many = Array.from({ length: RECENT_COUNT + 5 }, (_, i) => mine(`m${String(i).padStart(2, '0')}`, `2026-0${1 + (i % 9)}-1${i % 10}T00:00:00Z`,
+      `2026-0${1 + (i % 9)}-1${i % 10}T12:00:00Z`))
+    //? (2.0.11) `justAdded` the collection has had since 2019, starred into your library last: it leads; `newest`, the
+    //? collection's newest, you added long ago
+    answer('index', { albums: [mine('undated'), mine('older', '2025-01-02T00:00:00Z', '2025-01-03T00:00:00Z'),
+      mine('newest', '2026-10-01T00:00:00Z', '2026-10-02T00:00:00Z'), mine('justAdded', '2019-05-05T00:00:00Z', '2026-10-23T08:00:00Z'), ...many], truncated: false })
     await settle()
     tree = home.draw(props({ personal: true }))
     const titles = find(byClass('app-tile-title'), find((node) => node.props?.['aria-labelledby'] === 'app-recent-title', tree)[0]).map(words)
-    check('...newest first by when it was added, at most RECENT_COUNT, the undated never ahead of a dated one',
-      [titles.length, titles[0], titles.includes('undated'), titles.includes('older')], [RECENT_COUNT, 'newest', false, false])
+    check('...newest first by when it was added to YOUR library (2.0.11: its star, not the collection\'s created), at most RECENT_COUNT, the undated never ahead of a dated one',
+      [titles.length, titles[0], titles[1], titles.includes('undated'), titles.includes('older')], [RECENT_COUNT, 'justAdded', 'newest', false, false])
     const Y = require(path.join(OUT, 'app/useYourAlbums.js'))
     Y.forgetYourAlbums()
     tree = home.draw(props({ personal: true }))

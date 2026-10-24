@@ -38,7 +38,8 @@ deadwax too, in **People**. Then, for each person:
   all this in their words, not Navidrome's: **Added to your library.**, "waiting to be added", "Your library is
   also in your other music apps, such as Amperfy, as your favourite albums." - and the music everyone shares
   is **All music** in the Library, "the collection" in a sentence. Home's **Recently added** is their own
-  albums the collection got most recently (since 2.0.5), as the Library's is.
+  albums, the ones they added to their library most recently first (since 2.0.11; since 2.0.5 their own
+  albums, by when the collection got them), as the Library's is.
   ([Your library](player.md#your-library-with-logins-on).)
 - **Their own player.** The app plays as them, so their plays, play counts, **Recently played** and
   **Not played in a while** are theirs, and plays go on to their own Last.fm or ListenBrainz if they

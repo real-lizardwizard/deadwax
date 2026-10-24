@@ -63,9 +63,11 @@ function Tiles({ albums, onOpen }: { albums: readonly Album[]; onOpen: (album: A
  * library"): with a library of your own (`personal`), YOURS, newest first - the very list the Library's Recently added
  * draws (app/albumIndex.ts's `yours`, put in order by lib/shelves.ts, as LibraryHome does), so the two never differ;
  * with logins off (one library, the collection) Navidrome's newest (getAlbumList2 `newest`), as it always was.
+ * (2.0.11 - James: "Recently added should be for the user's library, not deadwax's") yours newest by when each
+ * entered YOUR library, its star (`'you'`), not by when the collection got it.
  */
 export function recentlyAddedAlbums(personal: boolean, signal?: AbortSignal): Promise<Album[]> {
-  if (personal) return albumIndex('yours').then((index) => sortAlbums(index.albums, 'newest').slice(0, RECENT_COUNT))
+  if (personal) return albumIndex('yours').then((index) => sortAlbums(index.albums, 'newest', 'you').slice(0, RECENT_COUNT))
   return albumPage('newest', 0, signal, RECENT_COUNT)
 }
 

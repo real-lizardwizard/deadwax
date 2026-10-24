@@ -7,7 +7,7 @@ import { isAbort, latestOnly } from '../lib/latest'
 import { newMarks } from '../lib/myLibrary'
 import {
   ALBUM_SORTS, albumSortFrom, artistOrderFrom, filterAlbums, filterArtists, filteredCountText, finding, groupAlbums, groupArtists,
-  indexEntries, indexKind, noMatchText, showsIndex, sortAlbums, sortArtistsBy, type AlbumSort,
+  indexEntries, indexKind, noMatchText, showsIndex, sortAlbums, sortArtistsBy, type AddedBy, type AlbumSort,
 } from '../lib/shelves'
 import { EMPTY_LIBRARY, NOTHING_OF_YOURS_PLAYED, NO_ALBUMS, NO_ARTISTS, NO_ARTISTS_OF_YOURS, yourArtists, yourEmptyNotice } from '../lib/yourLibrary'
 import { libraryArtists, type Album, type Artist, type Song } from '../player/api'
@@ -217,6 +217,9 @@ function AlbumSection({ id, personal, shown, onOpen, onBrowse, page, titleRef }:
   const sorts = useSorts()
   //? Recently added has its own order, and no choice of another
   const sort: AlbumSort = id === 'recent' ? 'newest' : sorts.album
+  //? (2.0.11) Recently added over your albums is when each entered YOUR library (its star); the collection's lists
+  //? keep when the collection got it - never your stars, which only some of its albums carry
+  const by: AddedBy = scope === 'yours' ? 'you' : 'collection'
   const [typed, setTyped] = useState('')
   const mine = useMyLibrary()
   const marks = useMemo(() => newMarks(mine), [mine])
@@ -241,9 +244,9 @@ function AlbumSection({ id, personal, shown, onOpen, onBrowse, page, titleRef }:
   useEffect(() => () => asks.supersede(), [])
 
   const albums = index?.albums ?? null
-  const sorted = useMemo(() => (albums ? sortAlbums(albums, sort) : []), [albums, sort])
+  const sorted = useMemo(() => (albums ? sortAlbums(albums, sort, by) : []), [albums, sort, by])
   const found = useMemo(() => (finding(typed) ? filterAlbums(sorted, typed) : sorted), [sorted, typed])
-  const groups = useMemo(() => groupAlbums(found, sort), [found, sort])
+  const groups = useMemo(() => groupAlbums(found, sort, by, sorted), [found, sort, by, sorted])
   const entries = useMemo(() => (showsIndex(sort, sorted.length, typed) ? indexEntries(groups, sort) : null), [groups, sort, sorted.length, typed])
   const item = useCallback((album: Album) => <AlbumTile key={album.id} album={album} marks={marks} onOpen={onOpen} />, [marks, onOpen])
   const itemKey = useCallback((album: Album) => album.id, [])

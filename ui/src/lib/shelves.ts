@@ -11,6 +11,14 @@
  *
  * KEYS ONCE. Every album's fold keys are made once per album object (a WeakMap) - about 3,000 foldName calls for a
  * library of 3,000 where folding inside the comparator made about 70,000.
+ *
+ * WHOSE "RECENTLY ADDED" (2.0.11 - James: "Recently added should be for the user's library, not deadwax's"). The
+ * date is a per-list choice, `AddedBy`: the collection's lists (the store's, and everything with logins off) go by
+ * `created`, when the COLLECTION got the album; your albums (`you`) by `starred`, when it entered YOUR library -
+ * deadwax stars an album as you when it is yours (src/stars.py), and a star you make in Amperfy is the same. Stars
+ * made within SAME_MOMENT_MS of each other are one moment - a batch deadwax starred in one go, the first admin's seed
+ * above all - and inside one, `created` decides, then the order the list came in. Never `starred` over the
+ * collection: a store album carries it only when the asker starred it, so the keys would be mixed.
  */
 
 import type { Album, Artist } from '../player/api'
@@ -69,6 +77,16 @@ const time = (value: unknown): number | null => {
   return Number.isNaN(parsed) ? null : parsed
 }
 
+/** Whose Recently added a list is (2.0.11): the collection's - when the collection got each album, Navidrome's
+ *  `created` - or yours, when each entered your library, its `starred` (see the note at the top). */
+export type AddedBy = 'collection' | 'you'
+
+/** Stars this close together are one moment (2.0.11): deadwax stars a batch one album after another - the first
+ *  admin's seed is the whole collection, 25 to a pass, a pass after another at once - so no two share an instant,
+ *  but the gaps between them are a second or two. A person's own Adds are further apart than this as a rule; two
+ *  that aren't land in the collection's order between themselves. */
+export const SAME_MOMENT_MS = 30_000
+
 /** What a sort compares an album by, made once per album. */
 export interface AlbumKeys {
   artist: string
@@ -78,6 +96,8 @@ export interface AlbumKeys {
   /** null: no year, or 0 */
   year: number | null
   created: number | null
+  /** (2.0.11) when the asker starred it - when it entered their library; null without one */
+  starred: number | null
   played: number | null
   plays: number
 }
@@ -96,6 +116,7 @@ export function albumKeys(album: Album): AlbumKeys {
       titleInitial: initialOf(title),
       year: typeof album.year === 'number' && album.year > 0 ? album.year : null,
       created: time(album.created),
+      starred: time(album.starred),
       played: time(album.played),
       plays: typeof album.playCount === 'number' && album.playCount > 0 ? album.playCount : 0,
     }
@@ -112,9 +133,47 @@ const byName = (a: string, aInitial: string, b: string, bInitial: string) =>
 const missingLast = (a: number | null, b: number | null, descending: boolean) =>
   a === null || b === null ? (a === b ? 0 : a === null ? 1 : -1) : descending ? b - a : a - b
 
+/** When one of YOUR albums was added: its star (an album without one - never in your library's own list - by
+ *  `created`). The collection's lists never ask it: they read `created` alone. */
+function addedAt(keys: AlbumKeys): number | null {
+  return keys.starred ?? keys.created
+}
+
+interface Moment {
+  /** the newest star in it - what its month header says */
+  at: number | null
+  members: { album: Album; index: number; keys: AlbumKeys }[]
+}
+
+/**
+ * Your albums cut into the moments they were added (2.0.11), newest first: each run of stars no more than
+ * SAME_MOMENT_MS apart, one after the next, is one; the albums with no date at all one last moment. Inside each, as
+ * the list is to be drawn: `created` newest first (missing last), then the star, then the order handed in.
+ */
+function moments(albums: readonly Album[]): Moment[] {
+  const listed = albums.map((album, index) => ({ album, index, keys: albumKeys(album) }))
+  listed.sort((a, b) => missingLast(addedAt(a.keys), addedAt(b.keys), true) || a.index - b.index)
+  const cut: Moment[] = []
+  let last: number | null = null
+  for (const entry of listed) {
+    const at = addedAt(entry.keys)
+    const current = cut[cut.length - 1]
+    if (current && (at === null ? current.at === null : last !== null && last - at <= SAME_MOMENT_MS)) current.members.push(entry)
+    else cut.push({ at, members: [entry] })
+    last = at
+  }
+  for (const moment of cut) {
+    moment.members.sort((a, b) => missingLast(a.keys.created, b.keys.created, true)
+      || missingLast(addedAt(a.keys), addedAt(b.keys), true) || a.index - b.index)
+  }
+  return cut
+}
+
 /** The albums in `sort` - a new list, the one handed in left as it is. Recently played and Most played leave out
- *  what hasn't been played (as Navidrome's own `recent` does). */
-export function sortAlbums(albums: readonly Album[], sort: AlbumSort): Album[] {
+ *  what hasn't been played (as Navidrome's own `recent` does). Recently added goes by `by` (2.0.11): the collection's
+ *  `created` unless the list is yours. */
+export function sortAlbums(albums: readonly Album[], sort: AlbumSort, by: AddedBy = 'collection'): Album[] {
+  if (sort === 'newest' && by === 'you') return moments(albums).flatMap((moment) => moment.members.map((entry) => entry.album))
   const listed = albums.map((album, index) => ({ album, index, keys: albumKeys(album) }))
   type Entry = (typeof listed)[number]
   const compare: (a: Entry, b: Entry) => number =
@@ -141,12 +200,15 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
 export const DATE_UNKNOWN = 'Date unknown'
 export const NO_YEAR = 'No year'
 
-/** The month an album was added, in English from a fixed table (never toLocaleString): "October 2026". */
-export function monthLabel(created: unknown): string {
-  const at = time(created)
+function monthOf(at: number | null): string {
   if (at === null) return DATE_UNKNOWN
   const date = new Date(at)
   return `${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`
+}
+
+/** The month an album was added, in English from a fixed table (never toLocaleString): "October 2026". */
+export function monthLabel(created: unknown): string {
+  return monthOf(time(created))
 }
 
 /** Consecutive runs of the same key, each a group. */
@@ -166,13 +228,35 @@ export function albumSortHeads(sort: AlbumSort): boolean {
   return sort !== 'recent' && sort !== 'frequent'
 }
 
+//? each whole list of yours -> the month of the moment each album in it was added, made once per list
+const addedMonths = new WeakMap<readonly Album[], Map<Album, string>>()
+
+function addedMonthsOf(whole: readonly Album[]): Map<Album, string> {
+  let month = addedMonths.get(whole)
+  if (!month) {
+    month = new Map()
+    for (const moment of moments(whole)) for (const entry of moment.members) month.set(entry.album, monthOf(moment.at))
+    addedMonths.set(whole, month)
+  }
+  return month
+}
+
 /** Sorted albums cut into their headers' groups: the artist's or the title's first letter, the year ("No year"
- *  last), the month added ("Date unknown" last) - or one unlabelled group for Recently played and Most played. */
-export function groupAlbums(sorted: readonly Album[], sort: AlbumSort): Group<Album>[] {
+ *  last), the month added ("Date unknown" last) - or one unlabelled group for Recently played and Most played.
+ *  The month added follows `by`, as the sort did (2.0.11): yours the month of the moment it entered your library
+ *  (its moment's newest star, so one moment is never split between two months), the collection's its `created`.
+ *  `whole` is the sorted list before Find narrowed it to `sorted`: your moments are cut from it, never from what
+ *  Find left - taking albums out of a run of stars only widens its gaps, and a moment cut again would split over a
+ *  month's end into headers out of order. */
+export function groupAlbums(sorted: readonly Album[], sort: AlbumSort, by: AddedBy = 'collection', whole: readonly Album[] = sorted): Group<Album>[] {
   if (!sorted.length) return []
   if (!albumSortHeads(sort)) return [{ key: 'all', label: null, items: [...sorted] }]
   if (sort === 'alphabeticalByArtist') return runs(sorted, (album) => albumKeys(album).initial, (album) => albumKeys(album).initial)
   if (sort === 'alphabeticalByName') return runs(sorted, (album) => albumKeys(album).titleInitial, (album) => albumKeys(album).titleInitial)
+  if (sort === 'newest' && by === 'you') {
+    const month = addedMonthsOf(whole)
+    return runs(sorted, (album) => month.get(album) ?? DATE_UNKNOWN, (album) => month.get(album) ?? DATE_UNKNOWN)
+  }
   if (sort === 'newest') {
     return runs(sorted, (album) => monthLabel(album.created), (album) => monthLabel(album.created))
   }

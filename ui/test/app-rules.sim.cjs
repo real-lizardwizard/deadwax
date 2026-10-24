@@ -1428,7 +1428,7 @@ console.log('\npins: deadwax\'s own, asked when asked, and nothing about them pl
   check('(2.0.5) Home\'s Recently added is YOURS with a library of your own - App hands Home hasLibrary(), and asks your list again as Home shows, as the Library does',
     [/const personal = hasLibrary\(\)/.test(app), /<Home\b[^>]*?personal=\{personal\}/.test(app.replace(/\n\s*/g, ' ')),
       /if \(homeShown && hasLibrary\(\)\) refreshIfOld\('yours'\)/.test(app),
-      /if \(personal\) return albumIndex\('yours'\)\.then\(\(index\) => sortAlbums\(index\.albums, 'newest'\)\.slice\(0, RECENT_COUNT\)\)/.test(home)],
+      /if \(personal\) return albumIndex\('yours'\)\.then\(\(index\) => sortAlbums\(index\.albums, 'newest', 'you'\)\.slice\(0, RECENT_COUNT\)\)/.test(home)],
     [true, true, true, true])
   check('...the shelves drawn once the pins have answered, or failed, or the wait - counted only while Home shows - is over',
     //? (2.0.0-player.51) and, as the pins are, what is new in your library - so its shelf never moves those under it
@@ -2695,7 +2695,17 @@ console.log('\na better Library (2.0.0-player.59): one list per scope, asked in 
       (section.match(/<ShuffleSongs\b/g) ?? []).length, (home.match(/<ShuffleSongs\b/g) ?? []).length],
     [true, true, true, 2, 1])
   check('...the root\'s Recently added is your newest 12; the notice at 10,000',
-    [/albums: sortAlbums\(index\.albums, 'newest'\)\.slice\(0, RECENT_ON_ROOT\)/.test(home), /\{index\?\.truncated && <p class="pl-notice">\{TRUNCATED_NOTICE\}<\/p>\}/.test(section)], [true, true])
+    [/albums: sortAlbums\(index\.albums, 'newest', 'you'\)\.slice\(0, RECENT_ON_ROOT\)/.test(home), /\{index\?\.truncated && <p class="pl-notice">\{TRUNCATED_NOTICE\}<\/p>\}/.test(section)], [true, true])
+  //? (2.0.11 - James: "Recently added should be for the user's library, not deadwax's") every Recently added over YOUR
+  //? albums goes by when each entered your library (lib/shelves.ts 'you', its star) - Home's shelf, the root's 12, the
+  //? section and Your albums' sort with its month headers (cut from the whole list, never from what Find left - review) - and the collection's lists never by a star
+  const homeShelf = code(read('app/Home.tsx'))
+  check('(2.0.11) Recently added over your albums is by when you added each - Home, the root, the section\'s sort and its headers; the collection\'s by created',
+    [(homeShelf.match(/sortAlbums\([^)]*\)/g) ?? []), (home.match(/sortAlbums\([^)]*\)/g) ?? []),
+      /const by: AddedBy = scope === 'yours' \? 'you' : 'collection'/.test(section),
+      /sortAlbums\(albums, sort, by\) : \[\]\), \[albums, sort, by\]\)/.test(section), /groupAlbums\(found, sort, by, sorted\), \[found, sort, by, sorted\]\)/.test(section),
+      /albumPage\('newest', 0, signal, RECENT_COUNT\)/.test(homeShelf), /albumPage\('newest', 0, request\.signal, RECENT_ON_ROOT\)/.test(home)],
+    [["sortAlbums(index.albums, 'newest', 'you')"], ["sortAlbums(index.albums, 'newest', 'you')"], true, true, true, true, true])
   check('(review) the logins-off root\'s 12 asked again as the root shows, once over a minute old - their grid kept meanwhile',
     [/useEffect\(\(\) => \{\s*if \(shown && !personal && landedAt\.current && Date\.now\(\) - landedAt\.current > INDEX_FRESH_MS\) load\(\)\s*\}, \[shown\]\)/.test(home),
       /if \(!request\.current\(\)\) return\s*landedAt\.current = Date\.now\(\)\s*setRecent\(found\)/.test(home), /setRecent\(null\)/.test(home)], [true, true, false])

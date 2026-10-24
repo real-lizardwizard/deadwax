@@ -335,7 +335,7 @@ console.log('\nyour library: your starred albums, in the order chosen')
   ]
   //? (2.0.0-player.59) the four orders that existed, now lib/shelves.ts sortAlbums - the same answers, Artist's year rule
   //? included (the other three, and the headers, in shelves.sim)
-  const order = (name) => SH.sortAlbums(albums, name).map((album) => album.id)
+  const order = (name) => SH.sortAlbums(albums, name, 'you').map((album) => album.id)
   check('Recently added: newest first, the undated last', order('newest'), ['b', 'a', 'c', 'd'])
   check('Recently played: only what you played, latest first', order('recent'), ['c', 'a'])
   check('Artist: by name folded ("The Beatles" as Beatles), then year', order('alphabeticalByArtist'), ['d', 'b', 'c', 'a'])

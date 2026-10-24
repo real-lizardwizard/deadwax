@@ -1284,7 +1284,8 @@ songs yet." (`lib/yourLibrary.ts` NO_ALBUMS, NO_ARTISTS, NO_SONGS) - never "in N
 
 **Home's Recently added is yours** (#9, James's choice of the review's behaviour option): `app/Home.tsx`
 `recentlyAddedAlbums(personal)` - with a library of your own the Library's own list (app/albumIndex.ts `yours`, sorted
-`newest` by lib/shelves.ts and cut at RECENT_COUNT, as LibraryHome does), so the two shelves never differ; with logins
+`newest` by lib/shelves.ts and cut at RECENT_COUNT, as LibraryHome does - since 2.0.11 by when each entered your
+library, "Recently added means added to your library (2.0.11)" in notes/app-library.md), so the two shelves never differ; with logins
 off (one library, the collection) getAlbumList2 `newest` at 20 as ever. It is keyed on the `yours` generation
 (useYourAlbumsGeneration - an Add, a Remove, your count moving), and App now calls `refreshIfOld('yours')` as Home
 comes into view too, as it does for the Library tab. App hands Home `personal={hasLibrary()}`. Your library empty, the

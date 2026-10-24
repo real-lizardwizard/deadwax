@@ -104,9 +104,9 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
   on Requests - only while something is on its way: otherwise Home has no Arriving at all. If
   deadwax stops answering meanwhile, Arriving says what it shows is deadwax's last answer, and the
   app keeps asking until it answers. Then **Pinned**, the albums and artists you pinned, two to a
-  row, with **Edit** to reorder and unpin them; **Recently added**, the 20 albums of your library that came into the
-  collection most recently, in a row you swipe along (with logins on, yours - the same albums the Library's
-  Recently added starts with; with logins off, the newest in the collection, which is your library then); and **Not played in a while**, the albums you last played longest ago (more
+  row, with **Edit** to reorder and unpin them; **Recently added**, the 20 albums added most recently, in a row you swipe along (with logins on, the
+  ones you added to your library most recently - the same albums the Library's Recently added starts with;
+  with logins off, the newest in the collection, which is your library then); and **Not played in a while**, the albums you last played longest ago (more
   than 30 days), when there are at least four. Tap an album to open it, an artist for their page.
   [Home and pins](#home-and-pins) has the details.
 - **Library** (laid out as Apple Music's - [the Library](#the-library) has the details): a
@@ -630,14 +630,16 @@ haven't heard for a while. In order:
   by an admin after a look), or starred in Amperfy - once Navidrome has them. An album you add yourself
   with **Add to my library** isn't marked new: you were looking at it. Opening one, from here or
   anywhere in the app, takes it off. With nothing new, or logins off, there's no such section.
-- **Recently added**, the 20 albums of your library that came into the collection most recently. With
-  logins on that is **yours** - the same albums, in the same order, as the Library's own Recently added (it
-  was the whole collection's newest until 2.0.5, so it could lead with albums that weren't yours). It goes by
-  when the collection got each album, not when it joined your library: an album you add with **Add to my
-  library** that the collection has had for a while keeps its old place, so it may be on neither Home shelf -
-  it's in the Library's **Your albums**; with your library empty it says so,
-  "Nothing in your library yet." and how to fill it. With logins off there is one library, so it is the
-  collection's 20 newest, as it always was.
+- **Recently added**, the 20 albums added most recently. With logins on that is **yours**, by when each
+  album came into **your library** - the same albums, in the same order, as the Library's own Recently added
+  (it was the whole collection's newest until 2.0.5, so it could lead with albums that weren't yours; until
+  2.0.11 it went by when the collection got each album). So an album you add with **Add to my library**, or
+  that a download of yours files, or that you star in Amperfy, comes first - even one the collection has had
+  for years. The date is the album's star in Navidrome, which deadwax sets as you when the album becomes
+  yours; albums that came in together - the whole collection, put in the first admin's library at once - are
+  in the collection's order between themselves. With your library empty it says so, "Nothing in your
+  library yet." and how to fill it. With logins off there is one library, so it is the collection's 20
+  newest, as it always was.
 - **Not played in a while**: the albums you last played more than 30 days ago, the longest ago
   first, up to 20 - made from Navidrome's list of the albums played most recently (its first 500),
   by when each was last played. With fewer than four, or a Navidrome that doesn't say when an album
@@ -705,8 +707,8 @@ Laid out as Apple Music's Library is.
 library](#shuffling-the-whole-library)), then **Playlists**, **Albums**, **Artists** and - with logins off -
 **Songs** (left out when Navidrome won't list songs). With logins on, the first group's rows are yours - **Your
 albums** and **Your artists** - and a group headed **All music** under them has the whole collection: **All
-albums**, **All artists** and **All songs**. Under both, **Recently added**: the 12 newest albums,
-with **See all** for the rest. Each row opens its page - swipe from the edge or tap **‹ Library** to come
+albums**, **All artists** and **All songs**. Under both, **Recently added**: the 12 albums added most
+recently (with logins on, to your library), with **See all** for the rest. Each row opens its page - swipe from the edge or tap **‹ Library** to come
 back, and a tap on the Library tab goes back to the list (on the list, to its top).
 
 **A page** has its title, a **Find in albums** (or **Find in artists**) field, the sort and how many there are
@@ -717,7 +719,7 @@ artists (always a list):
 | --- | --- | --- |
 | **Artist** (the default) - by the artist's name, each artist's albums oldest first | the name's first letter | A-Z and # |
 | **Title** | the title's first letter | A-Z and # |
-| **Recently added** - when the album came into Navidrome, newest first | the month ("October 2026") | none |
+| **Recently added** - when the album came into Navidrome, newest first; your albums (with logins on) by when each came into your library | the month ("October 2026") | none |
 | **Year, newest first** / **Year, oldest first** | the year (albums with none last, under "No year") | the decades |
 | **Recently played** - only what's been played | - | none |
 | **Most played** - only what's been played, most first | - | none |
@@ -903,7 +905,8 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
   Top results as tiles three across (two across beside a side panel), then Artists, Albums and Songs, yours first in each, with the chips under
   the large title - and Enter asks at once. It keeps saying what you searched
   for while an album you found is open. (Search's own box isn't drawn on a desktop.)
-- **Recently added** in the sidebar is Navidrome's albums newest first, a view of its own beside
+- **Recently added** in the sidebar is Navidrome's albums newest first (with logins on, yours, by when you
+  added each), a view of its own beside
   **Albums**, so Albums keeps the order you chose for it (the seven of [the Library](#the-library), from the
   button at the title's right). A phone has it as the Library's grid and its **See all**.
 - **The Library's views** are drawn in the main area as the sidebar picks them: the view's name, then on the
@@ -2234,7 +2237,8 @@ lists at all (**Not in Navidrome**). With logins off nothing here changes: one a
 - **Library is your albums** - your starred albums in Navidrome, the same ones Amperfy shows as
   starred - in the Library's seven orders (**Recently played** and **Most played** are the ones you've
   played, your own plays), and the root's **Recently added** is yours - and so, since 2.0.5, is Home's: the
-  same albums of your library, newest to the collection first, never the whole collection's. **Your artists** is the artists of your
+  same albums of your library, the ones you added most recently first (since 2.0.11 - by when the
+  collection got them before), never the whole collection's. **Your artists** is the artists of your
   albums, each row counting your albums of theirs ("2 albums" - the list is your library already). **All
   music** is the whole collection: **All albums**, **All artists** (counting the collection's albums of
   theirs: "2 albums in the collection") and **All songs**, as the Library always listed them. On a phone the
@@ -2295,8 +2299,8 @@ lists at all (**Not in Navidrome**). With logins off nothing here changes: one a
   MusicBrainz's songs say **in your library** or **in the collection** of a song, and of
   each album it's on, the same way - and **a pressing in your library** (or **a pressing in the collection**) of
   an album held as a pressing nothing yet says has the song or hasn't.
-- **Home**: Recently added is your albums, newest to the collection first (2.0.5 - it was the whole collection's, so a listener's
-  Home led with albums that weren't theirs), Not played in a while is asked as you (so "not played" is what
+- **Home**: Recently added is your albums, the ones you added most recently first (2.0.5 - it was the whole collection's, so a listener's
+  Home led with albums that weren't theirs; 2.0.11 - it went by when the collection got them), Not played in a while is asked as you (so "not played" is what
   *you* haven't played); **New in your library** is as before.
 - **A Navidrome that gives users libraries of their own** (its multi-library setting): deadwax only ever
   hands you a song Navidrome would give you. Its cache holds one copy of a song for every phone, so
