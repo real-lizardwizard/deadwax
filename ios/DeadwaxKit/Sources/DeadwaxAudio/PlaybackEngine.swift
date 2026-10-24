@@ -33,8 +33,8 @@ public struct EngineState: Equatable {
     /// The heard song's own rate and channels - what it was decoded at.
     public var fileRate: Double?
     public var fileChannels: Int?
-    /// The rate the engine's output runs at (the route's). The engine's main mixer converts each
-    /// song to it when the rates differ - see the class comment.
+    /// The rate the engine's output runs at (the route's). A song's lane converts it to this when
+    /// the rates differ - see the class comment.
     public var outputRate: Double?
     /// The start time asked of the last song started from silence: output latency plus one IO buffer.
     public var lastStartLead: Double?
@@ -558,8 +558,8 @@ public final class PlaybackEngine {
     /// One buffer onto the lane's node. Its completion is `.dataRendered`: the moment the render
     /// has taken the buffer's last sample, which is what the engine's bookkeeping needs (the lane fed,
     /// the next lane started in time, a lane known to be done). `.dataPlayedBack` comes the output's
-    /// latency later - offline, a fixed half second or so (ios.yml's first macOS run), longer than a
-    /// short song in another format, so the song after it started late.
+    /// latency later - offline, later than a half-second song in another format lasted (ios.yml's
+    /// first macOS run), so the song after it started late.
     private func enqueue(_ buffer: AVAudioPCMBuffer, on lane: Lane, key: LaneKey) {
         guard buffer.frameLength > 0 else { return }
         lane.pending += 1

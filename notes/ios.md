@@ -117,9 +117,10 @@ The plan's section 3, as Phase 0 needs it:
   when the fetch failed. Mono and stereo only in Phase 0.
 - **`StreamFetch`**: one URLSession (cookies off) writing the song into the stream cache file, read by
   any number of sources; complete -> later opens are FileSources.
-- **`PlaybackEngine`**: AVAudioEngine, one AVAudioPlayerNode per **lane** (rate x channels) connected
-  to the main mixer in that format. About 2 s scheduled ahead in 0.5 s buffers, refilled from each
-  buffer's `.dataPlayedBack`. **The next song in the same format is scheduled straight after the last
+- **`PlaybackEngine`**: AVAudioEngine, one AVAudioPlayerNode per **lane** (a file format: rate x
+  channels), its node connected to the main mixer at the output's rate (see "The rate conversion").
+  About 2 s scheduled ahead in 0.5 s buffers, refilled from each buffer's `.dataRendered` completion
+  (see "First run on macOS"). **The next song in the same format is scheduled straight after the last
   buffer on the same node** (sample-exact; nothing trimmed or crossfaded). Another format goes on its
   own lane, started with `play(at:)` the host time the first lane's last sample plays (offline: the
   render's sample count). A song that would begin on a lane still holding songs that play before the
@@ -150,15 +151,24 @@ The plan's section 3, as Phase 0 needs it:
 - **Play after a failure or a stop**: a failure keeps where the song was (`held`), so play opens it
   again from there; with nothing to go on from (after stop, as at sign-out) play stays idle and lets
   the output stop - it used to sit at Loading for good with the output running.
-- **The rate conversion is the main mixer's, inside the app**: each lane is connected to the main
-  mixer in its file's format, and the mixer's output runs at the route's rate (48 kHz on the speaker
-  and AirPods), so the mixer converts a 44.1 kHz CD or a 96/192 kHz file. Any app must convert for a
-  48 kHz output; how well AVAudioMixerNode does is undocumented and can't be set, so
-  `theMixersRateConversionMeasured` renders 1 kHz (192/96/44.1 kHz -> 48 kHz) and a 30 kHz tone
-  (aliasing) and prints the numbers on ios.yml's macOS job (bounds 60 dB and -40 dB catch only a
-  broken conversion). If they fall short of James's fidelity rule, the fix is one AVAudioConverter per
-  lane at `.max` quality, kept across buffers so joins stay continuous, with the lane connected at
-  the output's rate. (The words used to say iOS converted "after the app"; corrected in review.) `conform` copies a
+- **The rate conversion is each lane's own AVAudioConverter** (since the first macOS run; it was the
+  main mixer's, which failed - see "First run on macOS"): when a file's rate isn't the output's (48 kHz
+  on the speaker and AirPods: a 44.1 kHz CD, a 96/192 kHz file) the lane converts with the
+  **mastering** algorithm at quality **`.max`**, primed `.normal` (output frame 0 is input frame 0,
+  nothing ahead of the song), one converter per lane kept across its songs so a join within a format
+  stays continuous, and its node is connected at the output's rate, so the mixer converts nothing.
+  When the rates agree there is no converter at all. The input is handed over as the converter asks
+  for it; what its filter still holds is **flushed** (end of stream, then reset) when the lane's last
+  song for now has been decoded - at the end of the queue, when the next song is known to be in
+  another format, when another lane's first buffer is decoded, or when the lane's buffers run out with
+  it still holding. A lane's end, for the next lane's start, is the node's exact frame count once
+  flushed. Positions stay in the songs' own frames (the node's count at the rates' ratio). A lane that
+  runs dry mid-song keeps its converter, so the song goes on unbroken (the position reads up to the
+  filter's hold, under a millisecond, ahead). A configuration change makes the lanes again, since the
+  output's rate may be another. `theRateConversionMeasured` renders 1 kHz (192/96/44.1 kHz -> 48 kHz)
+  and a 30 kHz tone (aliasing) and prints the numbers (bounds 60 dB and -40 dB catch only a broken
+  conversion): see "First run on macOS" for them. (The words used to say iOS converted "after the
+  app"; corrected in review.) `conform` copies a
   buffer into the lane's own AVAudioFormat object when only the channel layout differs - a player node
   throws on any other format.
 - The **app** owns AVAudioSession (`.playback`, `.default`, `.longFormAudio`, active at the first play),
@@ -240,6 +250,38 @@ are within 1 LSB of make.py's (libsndfile's float scaling); the noise differs (a
 - **Not compiled here**: everything in App/ (SwiftUI, UIKit, MediaPlayer, Security) and DeadwaxAudio
   (AVFAudio, AudioToolbox). Their first compile is ios.yml's macOS job after the push - read failures
   with `gh run view --log-failed`. The engine's 12 offline-render tests run there too.
+
+### First run on macOS (ios.yml, 2026-10-24)
+
+The engine's tests and the app's device build had never run before the push. What the first runs
+found, each fixed:
+
+- **A failed `==` on two arrays killed the test process** (no message, exit 1, the remaining tests
+  never run): Swift Testing diffs two collections to report the failure, quadratic in time and
+  memory, and the short-song test compared runs of 18,000 samples. Every sample comparison goes
+  through `firstDifference()` now (the first sample that parts, and both values), and the short-song
+  test prints its output's energy per 2048 frames and the engine's trace, so a failure shows where
+  each song landed. ios.yml prints macOS's crash reports when the tests fail, and builds the app
+  whether or not a test failed (one run shows both).
+- **The main mixer's conversion from 192 kHz aliased**: a 30 kHz tone came out at **-21.8 dB** (96 kHz
+  -64.7 dB; 1 kHz 154.9 / 148.0 / 100.9 dB clean from 192 / 96 / 44.1 kHz). With each lane's own
+  converter (above): 30 kHz at **-160.4 dB** from 192 kHz and **-167.5 dB** from 96 kHz; 1 kHz **153.5 /
+  151.9 / 146.6 dB** clean from 192 / 96 / 44.1 kHz.
+- **A lane's start given in another rate's samples**: offline, the next lane's start is a sample time
+  at the render's rate, and a node running at its file's 96 kHz took it as its own - the 96 kHz song
+  began at frame 10129, not 22050, over the first. With every node at the output's rate a node's
+  sample time is the render's (on the phone starts are host times, which this never touched).
+- **`.dataPlayedBack` came late** - offline, the third song started at the start of a render (45056),
+  not 44100: it is scheduled from the first lane's last completion, and that can only have come after
+  the half second the song between lasted (inferred from where it began; the trace came after the fix).
+  Completions are **`.dataRendered`** now: the render has taken the buffer, which is what the
+  bookkeeping needs (the lane fed, the next lane started in time, a lane known to be done); nothing
+  is stopped before it is rendered. The trace shows each completion in the render that took it.
+- The join test: **largest difference 0.0 in the first 4096 frames** on both channels (no start ramp,
+  offline). The device build: Xcode 26.6 (17F113) on macOS 26.6.2, Swift 6.3.3, the iphoneos26.5 SDK;
+  the icons copied to the app's root (`AppIcon60x60@2x.png`, `@3x.png`, by copypng), no `Assets.car`.
+  The runner's Simulator runtimes could not be deleted (`simctl runtime delete all` left all of them),
+  so the build ran with them present - no stand-in for check 1 on James's Mac.
 
 ### Gotchas found building it
 
@@ -338,5 +380,6 @@ check 4 hears a ramp, and AirPlay's route picker.
   the team, its project-file check, the album's CRC-16 and its sample count, Hi-res's page size and the
   cover's size past the server's bounds, and the sign-in's answer without `admin`.
 - install.sh run end to end on Linux against stubbed Apple tools (see "install.sh").
-- NOT run anywhere yet: the engine's 12 offline-render tests and the app's device build (ios.yml's macOS
-  job, after the push), and everything on the phone.
+- NOT run anywhere yet (at the push): the engine's 12 offline-render tests and the app's device build.
+  They have since, on ios.yml's macOS job - see "First run on macOS". Everything on the phone is still
+  to run.
