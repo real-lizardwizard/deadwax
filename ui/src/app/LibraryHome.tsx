@@ -6,7 +6,7 @@ import { newMarks } from '../lib/myLibrary'
 import { sortAlbums } from '../lib/shelves'
 import { EMPTY_LIBRARY, NO_ALBUMS } from '../lib/yourLibrary'
 import { albumPage, type Album } from '../player/api'
-import { ChevronRightIcon, PlaylistIcon } from '../player/icons'
+import { AlbumIcon, ArtistIcon, ChevronRightIcon, PlaylistIcon, SongIcon } from '../player/icons'
 import { AlbumTile } from './AlbumTile'
 import { albumIndex, INDEX_FRESH_MS } from './albumIndex'
 import { usePlayerActions } from './context'
@@ -86,13 +86,19 @@ export function LibraryHome({ personal, hasSongs, shown, onOpen, onOpenSection, 
   }, [shown])
   useEffect(() => () => asks.supersede(), [])
 
-  //? the sidebar's own items (lib/appFrame.ts), each a Library view
-  const row = (item: SidebarItem) => (
-    <button key={item.id} type="button" class="app-row app-link-row app-library-row" onClick={() => onOpenSection(item.id as LibraryPick)}>
-      <span class="app-row-label">{item.label}</span>
-      <ChevronRightIcon class="app-chevron" />
-    </button>
-  )
+  //? the sidebar's own items (lib/appFrame.ts), each a Library view - (2.0.10) with its glyph beside Playlists': a record
+  //? for albums, a head and shoulders for artists, a note for songs
+  const RowIcon = (pick: string) => (pick === 'artists' || pick === 'storeArtists' ? ArtistIcon : pick === 'songs' ? SongIcon : AlbumIcon)
+  const row = (item: SidebarItem) => {
+    const Icon = RowIcon(item.id)
+    return (
+      <button key={item.id} type="button" class="app-row app-link-row app-library-row" onClick={() => onOpenSection(item.id as LibraryPick)}>
+        <Icon class="app-library-row-icon" />
+        <span class="app-row-label">{item.label}</span>
+        <ChevronRightIcon class="app-chevron" />
+      </button>
+    )
+  }
 
   return (
     <section class="pl-library app-library-home">

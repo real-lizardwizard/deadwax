@@ -238,3 +238,13 @@ Reproduced and fixed before it shipped:
   the view the item named. Pinned: routes.sim (the move) and whose.sim (App applying it before the tab).
 - **Two refresh rules were unpinned**: the root's Recently added keyed on the `yours` generation, and Your artists'
   `refreshIfOld('yours')` as it shows. Either could be dropped with every sim passing; app-rules pins both now.
+
+### Icons on the Library's rows (2.0.10)
+
+James (2026-10-24): "Can we add some icons to match the playlist icon? Like maybe a record for albums and a
+silhouette for artists". The phone Library root's rows (Your albums / Your artists and All music's All albums, All
+artists, All songs; with logins off Albums, Artists, Songs) each draw a glyph beside the label, as the Playlists row
+has since .58: `AlbumIcon` (a record - its edge, the label round the spindle hole, one groove catching the light),
+`ArtistIcon` (a head and shoulders) and `SongIcon` (the playlist glyph's own note), in `player/icons.tsx`'s line set
+(stroke 2.2, round caps), sized and coloured as `.app-library-playlists-icon` (`.app-library-row-icon`, the same
+declarations - test_app_css holds the two equal). The desktop sidebar's items stay text, as its Playlists group does.

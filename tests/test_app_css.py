@@ -2085,6 +2085,10 @@ def test_the_librarys_root_rows_are_yous_managing_rows():
     home = (ui / "app" / "LibraryHome.tsx").read_text()
     assert 'class="app-row app-link-row app-library-row" onClick={() => onOpenSection(item.id as LibraryPick)}' in home
     assert '<ChevronRightIcon class="app-chevron" />' in home
+    #? (2.0.10) every row its glyph, drawn as the Playlists row's: a record, a head and shoulders, a note
+    assert '<Icon class="app-library-row-icon" />' in home
+    assert "pick === 'artists' || pick === 'storeArtists' ? ArtistIcon : pick === 'songs' ? SongIcon : AlbumIcon" in home
+    assert declarations(APP, ".app-library-row-icon") == declarations(APP, ".app-library-playlists-icon")
     assert '<div class="app-section-head app-library-recent-head">' in home and 'class="app-text-button app-see-all"' in home
     row = declarations(APP, ".app-library-row")
     assert (row["width"], row["flex-wrap"], row["justify-content"]) == ("100%", "nowrap", "flex-start")

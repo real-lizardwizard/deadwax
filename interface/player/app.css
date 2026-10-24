@@ -4965,6 +4965,8 @@ html.app-picker-open { overflow: hidden; }
 /* --- the Library's Playlists row: since 2.0.0-player.59 the first row of the phone root's first group, laid out as
    its other rows are (.app-library-row) - its glyph in the accent --- */
 .app-library-playlists-icon { flex: none; width: var(--app-playlist-art-icon); height: var(--app-playlist-art-icon); color: var(--dw-accent); }
+/* (2.0.10) the other rows' glyphs - a record, a head and shoulders, a note - drawn as the Playlists row's is */
+.app-library-row-icon { flex: none; width: var(--app-playlist-art-icon); height: var(--app-playlist-art-icon); color: var(--dw-accent); }
 
 /* --- a playlist's cover, or the empty square with the glyph on it --- */
 .app-playlist-art,
