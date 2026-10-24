@@ -173,7 +173,10 @@ func samples(_ buffer: AVAudioPCMBuffer, channel: Int) -> [Float] {
         engine.settle()
         let out = try engine.renderOffline(48_000)
         let left = samples(out, channel: 0)
-        let energy = { (range: Range<Int>) in left[range].map { $0 * $0 }.reduce(0, +) / Float(range.count) }
+        let energy = { (range: Range<Int>) -> Float in
+            let squares: [Float] = left[range].map { (sample: Float) -> Float in sample * sample }
+            return squares.reduce(0, +) / Float(range.count)
+        }
         #expect(energy(2_000..<12_000) > 0.01, "the first song")
         #expect(energy(17_000..<27_000) > 0.01, "the second song, on its own lane")
         #expect(energy(40_000..<48_000) == 0, "silence after both")
@@ -204,7 +207,9 @@ func samples(_ buffer: AVAudioPCMBuffer, channel: Int) -> [Float] {
         let margin = 4_096
         #expect(Array(left[margin..<22_050]) == Array(first[0][margin...]), "the first song")
         let middle = (22_050 + margin)..<(44_100 - margin)
-        #expect(left[middle].map { $0 * $0 }.reduce(0, +) / Float(middle.count) > 0.01, "the 96 kHz song, second")
+        let squares: [Float] = left[middle].map { (sample: Float) -> Float in sample * sample }
+        let middleEnergy: Float = squares.reduce(0, +) / Float(middle.count)
+        #expect(middleEnergy > 0.01, "the 96 kHz song, second")
         #expect(Array(left[middle]) != Array(third[0][(middle.lowerBound - 22_050)..<(middle.upperBound - 22_050)]),
                 "not the third song laid straight after the first")
         #expect(Array(left[(44_100 + margin)..<66_150]) == Array(third[0][margin...]),
