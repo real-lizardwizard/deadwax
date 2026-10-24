@@ -666,7 +666,7 @@ export function Search({
           if (focused && page.length < wanted) handFocus.current = { key: fresh[0] ? `${kind === 'artists' ? 'artist' : kind === 'albums' ? 'album' : 'song'}:${fresh[0].id}` : null, kind }
           return { ...now, rows: [...now.rows, ...fresh], full: page.length >= wanted && fresh.length > 0, more: 'idle' }
         })
-        setSaid(`${page.length} more ${page.length === 1 ? kind.slice(0, -1) : kind} ${personal ? 'from the store' : 'from your library'}`)
+        setSaid(`${page.length} more ${page.length === 1 ? kind.slice(0, -1) : kind} ${personal ? 'from the collection' : 'from your library'}`)
       },
       (reason: unknown) => {
         if (!request.current() || isAbort(reason)) return
@@ -1825,7 +1825,7 @@ export function Search({
     const tiles = drawn.frame === 'desktop'
     const late = drawn.libraryLate && library?.text === drawn.text ? library : null
     const lateSlot: SlotState | null = !drawn.libraryLate ? null
-      : !late || late.state === 'asking' || late.state === 'waiting' ? { state: 'asking', words: personal ? 'Searching the store…' : 'Searching your library…' }
+      : !late || late.state === 'asking' || late.state === 'waiting' ? { state: 'asking', words: personal ? 'Searching the collection…' : 'Searching your library…' }
         : late.state === 'failed' ? { state: 'failed', failure: { message: late.message, unavailable: false, busy: false, refused: false }, onRetry: tryLibraryAgain }
           : late.state === 'answered' ? (() => {
             const said = libraryLateWords({ artists: late.results.artists.length, albums: late.results.albums.length, songs: late.results.songs.length }, personal, drawn.text)
@@ -1889,7 +1889,7 @@ export function Search({
               {/* only when something of the library's IS drawn above - what's saved isn't (review: "What's in your library is
                   above." under saved rows alone) */}
               {drawn.top.some((row) => !fromSaved(row)) || sections.some((each) => each.rows.some((row) => !fromSaved(row)))
-                ? ` ${personal ? "What's in the store is above." : "What's in your library is above."}` : ''}
+                ? ` ${personal ? "What's in the collection is above." : "What's in your library is above."}` : ''}
             </p>
             <button type="button" class="app-button" onClick={(event) => tryAgain(event)}>
               Try again
@@ -2028,12 +2028,12 @@ export function Search({
         : null
     const asksMore = kind === 'albums' ? askMore : kind === 'artists' ? askMoreArtists : askMoreSongs
     const lateSlot: SlotState | null = !late ? null
-      : !lib || lib.state === 'asking' || lib.state === 'waiting' ? { state: 'asking', words: personal ? 'Searching the store…' : 'Searching your library…' }
+      : !lib || lib.state === 'asking' || lib.state === 'waiting' ? { state: 'asking', words: personal ? 'Searching the collection…' : 'Searching your library…' }
         : lib.state === 'failed' ? { state: 'failed', failure: { message: lib.message, unavailable: false, busy: false, refused: false }, onRetry: (event) => askKindLibraryAgain(kind, event) }
           //? Navidrome known not OK: the library wasn't searched - never "nothing in your library" (review)
           : lib.state === 'skipped' ? { state: 'said', words: librarySkippedWords(personal) }
             : lib.rows.length ? {
-              state: 'button', words: `${lib.rows.length} ${personal ? 'in the store' : 'in your library'} - Show them`,
+              state: 'button', words: `${lib.rows.length} ${personal ? 'in the collection' : 'in your library'} - Show them`,
               onPress: (event) => {
                 handOn(event, kind, answeredRows[0]?.key ?? null)
                 setKindShown(lateKey)
@@ -2069,7 +2069,7 @@ export function Search({
               aria-disabled={lib.more === 'asking'}
               onClick={askMoreLibrary}
             >
-              {lib.more === 'asking' ? (personal ? 'Asking the store…' : 'Asking your library…') : lib.more === 'failed' ? 'Try again' : personal ? 'More from the store' : 'More from your library'}
+              {lib.more === 'asking' ? (personal ? 'Asking the collection…' : 'Asking your library…') : lib.more === 'failed' ? 'Try again' : personal ? 'More from the collection' : 'More from your library'}
             </button>
           )}
           {!noMusicBrainz && (!musicBrainz && !mine ? (

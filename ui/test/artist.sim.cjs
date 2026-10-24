@@ -265,11 +265,11 @@ console.log('\nthe lines')
   check('Plays the 2 albums you have', A.playsLine(2, 2, true), 'Plays the 2 albums you have')
   check('...the one album', A.playsLine(1, 1, true), 'Plays the album you have')
   check('...while their songs are asked for', A.playsLine(2, 1, false), 'Getting the songs of the 2 albums you have…')
-  check('...some not sent', A.playsLine(3, 2, true), "Plays 2 of the 3 albums you have - Navidrome didn't send the rest")
-  check('...none sent', A.playsLine(2, 0, true), "Navidrome didn't send the songs")
+  check('...some not sent', A.playsLine(3, 2, true), "Plays 2 of the 3 albums you have - the rest didn't load")
+  check('...none sent', A.playsLine(2, 0, true), "Couldn't load their songs.")
   check('...nothing to play: what Navidrome said - still looking, none of theirs, or nothing when it failed',
     [A.playsLine(0, 0, true, 'asking'), A.playsLine(0, 0, true), A.playsLine(0, 0, true, 'failed')],
-    ['Looking for their albums in your library…', 'Navidrome has none of their albums to play', ''])
+    ['Looking for their albums in your library…', 'None of their albums are here to play.', ''])
   const facts = { type: 'Group', area: 'United Kingdom', begin_area: 'Bristol', country: 'GB', began: '1991', ended_on: '', ended: false, disambiguation: '' }
   check('who they are: type, where from, since when', A.factsLine(facts), 'Group · Bristol · since 1991')
   check('...ended, with its dates', A.factsLine({ ...facts, begin_area: 'London', began: '1965-01-01', ended: true, ended_on: '2014-11-10' }), 'Group · London · 1965 to 2014')
@@ -815,7 +815,7 @@ async function page() {
     answer('libraryArtists', [])
     await none.settled()
     check('nobody of theirs in Navidrome (a list just asked for): said under the buttons, which stay', [asked('libraryArtists'), pills().length, playsWords()],
-      [[[false]], 2, 'Navidrome has none of their albums to play'])
+      [[[false]], 2, 'None of their albums are here to play.'])
 
     reset()
     ownedAnswers(O.buildOwnedIndex([]))
@@ -988,7 +988,7 @@ async function manage() {
     await one.settled()
     check('everything answered: drawn, under the albums - In your library, About, Line-up', titles(), ['Albums', 'In your library', 'About', 'Line-up'])
     check('In your library: albums, tracks, size, years, the folder', factRows().slice(0, 5),
-      [['Albums', '3'], ['Tracks', '33'], ['Size', '400 MB'], ['Years', '1994–2008'], ['Folder', 'Portishead']])
+      [['Albums', '3'], ['Songs', '33'], ['Size', '400 MB'], ['Years', '1994–2008'], ['Folder', 'Portishead']])
     check('About: what tells them apart, then type, where from, founded, other names - no "Now" (the library files them as MusicBrainz names them)',
       [words(classed('app-artist-disambiguation')[0]), factRows().slice(5)],
       ['Bristol trip hop band', [['Type', 'Group'], ['From', 'Bristol'], ['Founded', '1991'], ['Other names', 'Portis Head']]])
@@ -1065,7 +1065,7 @@ async function manage() {
       [factRows().slice(0, 1), words(classed('is-folder')[0])],
       [[['Albums', '2']], 'FoldersKanye West\nYeTheir albums are filed under 2 names - Kanye West and Ye'])
     check('About: "Now: Ye" first - Move albums to Ye on its row - then type and where from', [factRows().slice(5, 8).map((row) => row.join(': ')), words(classed('is-now')[0])],
-      [['Now: Ye', 'Type: Person', 'From: Atlanta'], 'NowYeMove albums to Ye'])
+      [['Now known as: Ye', 'Type: Person', 'From: Atlanta'], 'Now known asYeMove albums to Ye'])
     check('...and Born', factRows().find((row) => row[0] === 'Born'), ['Born', '8 June 1977'])
     check('an admin\'s: Artist images… (their pictures into Ye\'s folder) and Move albums to Ye', manageButtons().map((one) => one[0]), ['Artist images…', 'Move albums to Ye'])
     find((node) => byClass('app-artist-manage-button')(node) && words(node) === 'Move albums to Ye')[0].props.onClick({ currentTarget: null })
@@ -1097,7 +1097,7 @@ async function manage() {
     answer('summary', summaryOf('Ye', 'Ye', { first_year: '2025', last_year: '2025' }), (name) => name === 'Ye')
     await one.settled()
     check('Navidrome\'s "Ye", Donda still filed as Kanye West: never "Now: Ye" on Ye\'s own page - the name still in use, with Move albums to Ye',
-      [words(classed('is-now')[0]), manageButtons().map((one) => one[0])], ['Also filed asKanye WestMove albums to Ye', ['Artist images…', 'Move albums to Ye']])
+      [words(classed('is-now')[0]), manageButtons().map((one) => one[0])], ['Also known here asKanye WestMove albums to Ye', ['Artist images…', 'Move albums to Ye']])
     find((node) => byClass('app-artist-manage-button')(node) && words(node) === 'Move albums to Ye')[0].props.onClick({ currentTarget: null })
     check('...Move moves the other name\'s albums, from this page', [managed[0].page, managed[0].name, managed[0].moveNames, managed[0].currentName], ['ar-ye', 'Ye', ['Kanye West'], 'Ye'])
     managed[0].onMoved({ mbid: YE, name: 'Ye', moved: 1, emptied: ['Kanye West'] })

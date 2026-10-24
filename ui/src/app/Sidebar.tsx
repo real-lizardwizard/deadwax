@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'preact/hooks'
 
-import { SIDEBAR_CARE, SIDEBAR_LOG, SIDEBAR_PEOPLE, SIDEBAR_PLAYLISTS, SIDEBAR_QUEUE, SIDEBAR_SETTINGS, SIDEBAR_TOP, type SidebarId, type SidebarItem } from '../lib/appFrame'
+import { ALL_MUSIC, SIDEBAR_CARE, SIDEBAR_LOG, SIDEBAR_PEOPLE, SIDEBAR_PLAYLISTS, SIDEBAR_QUEUE, SIDEBAR_SETTINGS, SIDEBAR_TOP, type SidebarId, type SidebarItem } from '../lib/appFrame'
 import { needsLookLabel } from '../lib/needsLook'
 import { managing as managingOf, ALL, type Managing } from '../lib/permissions'
 import { badgeLabel, badgeText } from '../lib/requestsView'
@@ -133,7 +133,9 @@ export function Sidebar({
               if (next.trim()) onSearch()
             }}
             maxLength={SEARCH_MAX_CHARS}
-            placeholder="Search everything"
+            //? (2.0.5) "Search" - "Search everything" said "everything" for the collection, and Search's own
+            //? "Artists, albums and songs" doesn't fit the sidebar's field; its name (aria-label) says what it searches
+            placeholder="Search"
             aria-label={searchWords(personal).label}
             enterKeyHint="search"
             autoComplete="off"
@@ -155,7 +157,7 @@ export function Sidebar({
       {browse.length > 0 && (
         <section class="app-side-group" aria-labelledby="app-side-browse">
           <h2 id="app-side-browse" class="app-side-label">
-            Browse
+            {ALL_MUSIC}
           </h2>
           <ul class="app-side-list">{browse.map(item)}</ul>
         </section>

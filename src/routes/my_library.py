@@ -40,7 +40,8 @@ router = APIRouter()
 
 #? said for the break-glass admin, who has no Navidrome account behind them
 NO_ACCOUNT = "The break-glass admin has no Navidrome account, so there's no library to add to - sign in as yourself."
-LOGINS_OFF = "Logins are off, so there's one library and everything in the store is in it."
+#? (2.0.5, UX batch 2) the shared music is "the collection" in a sentence (James's word), never "the store"
+LOGINS_OFF = "Logins are off, so there's one library and everything in the collection is in it."
 
 
 def has_library(user: str) -> bool:
@@ -134,10 +135,10 @@ async def add_to_my_library(request: Request, body: FindCandidatesRequest, user:
     if not _usable(store):
         raise HTTPException(status_code=503, detail="deadwax can't read its database, so it can't keep your library")
     if not body.release_mbid:
-        raise HTTPException(status_code=409, detail="That pressing has no MusicBrainz release id, so the store can't be asked for it.")
+        raise HTTPException(status_code=409, detail="That pressing isn't matched to a release on MusicBrainz, so it can't be added from here.")
     held = await held_copy(store, Config.LIBRARY_PATH or "", body.release_mbid, body.model_dump())
     if held is None or not held.get("album_ids"):
-        raise HTTPException(status_code=409, detail="That pressing isn't in the store now - Get it instead.")
+        raise HTTPException(status_code=409, detail="That pressing isn't in the collection now - Get it instead.")
     already = await store.ledger_holds(user, held["album_ids"])
     added = await store.grant_albums([user], held["album_ids"], rules.FROM_STORE, incomplete=not held["complete"], seen=True)
     if not added:
@@ -215,12 +216,12 @@ class Remove(BaseModel):
 
 
 #? what the page says once it is done - and what the event log says
-REMOVED = "Removed from your library - it's still in the store, and nothing was deleted."
+REMOVED = "Removed from your library - it's still in the collection, and nothing was deleted."
 #? (review) Navidrome unstarred it, and deadwax's own record of your library couldn't be written: said, not
 #? "Removed" - an entry still waiting would be starred again by the worker. Remove again is safe: unstarring
 #? what isn't starred changes nothing.
-REMOVE_UNWRITTEN = ("Navidrome has unstarred it, but deadwax couldn't write that to its database, so it may come "
-                    "back - try Remove again in a moment.")
+REMOVE_UNWRITTEN = ("It's out of your library, but deadwax couldn't save that, so it may come back - try Remove "
+                    "again in a moment.")
 
 
 @router.post("/remove")
@@ -251,7 +252,7 @@ async def remove_from_my_library(request: Request, body: Remove, user: str = Dep
             raise
         raise HTTPException(status_code=e.status, detail=str(e)) from e
     if isinstance(after, dict) and after.get("starred"):
-        raise HTTPException(status_code=502, detail="Navidrome kept the star - try Remove again in a moment.")
+        raise HTTPException(status_code=502, detail="It's still in your library - try Remove again in a moment.")
     album = album if isinstance(album, dict) else {}
     release = album.get("musicBrainzId")
     release = release.strip().lower() if isinstance(release, str) else ""
@@ -262,5 +263,5 @@ async def remove_from_my_library(request: Request, body: Remove, user: str = Dep
     if starred_as is None or dropped is None:
         raise HTTPException(status_code=503, detail=REMOVE_UNWRITTEN)
     logger.info(f"{user} removed {album.get('artist') or 'an album'} - {album.get('name') or body.navidrome_id} from their "
-                f"library (it stays in the store)", extra={"frontend": True})
+                f"library (it stays in the collection)", extra={"frontend": True})
     return {"removed": True, "entries": dropped, "words": REMOVED}

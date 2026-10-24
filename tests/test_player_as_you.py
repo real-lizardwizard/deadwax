@@ -1077,7 +1077,7 @@ def test_remove_says_so_when_navidrome_keeps_the_star_and_leaves_the_library_as_
 
     navidrome.client = httpx.AsyncClient(transport=httpx.MockTransport(keeps), base_url=f"{NAVIDROME}/rest")
     answer = signed_in(player, "ethan").post(f"{LIBRARY}/remove", json={"navidrome_id": "nd-dummy"})
-    assert answer.status_code == 502 and "kept the star" in answer.json()["detail"]
+    assert answer.status_code == 502 and answer.json()["detail"] == "It's still in your library - try Remove again in a moment."
     #? unstarred first, the ledger after: a Remove Navidrome refused takes nothing out of it
     assert entries(player, "ethan")[album]["state"] == "starred"
 

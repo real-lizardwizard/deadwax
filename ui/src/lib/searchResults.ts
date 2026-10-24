@@ -26,10 +26,10 @@ export function searchWords(personal: boolean): {
 } {
   return personal
     ? {
-      hint: "Artists, albums and songs: yours first, then the store's, then MusicBrainz's.",
-      label: 'Search the store and MusicBrainz',
-      searching: (musicBrainz) => (musicBrainz ? 'Searching the store and MusicBrainz…' : 'Searching the store…'),
-      allHeld: 'Everything MusicBrainz found is in the store already.',
+      hint: "Artists, albums and songs: yours first, then the collection's, then MusicBrainz's.",
+      label: 'Search the collection and MusicBrainz',
+      searching: (musicBrainz) => (musicBrainz ? 'Searching the collection and MusicBrainz…' : 'Searching the collection…'),
+      allHeld: 'Everything MusicBrainz found is in the collection already.',
     }
     : {
       hint: "Artists, albums and songs: yours first, then MusicBrainz's.",

@@ -21,7 +21,8 @@
  *    the size only when every folder said (a set's added); the release linked - "not tagged" only once
  *    the album's own answer from Navidrome has SAID there is none ('' - review: the bridge's null is also
  *    its answer for an album id Navidrome doesn't have, or a Navidrome it couldn't ask); the earliest
- *    first seen, filed by deadwax when any folder was.
+ *    first seen ("Added" since 2.0.5), downloaded here when any folder was; the release as "MusicBrainz: View this
+ *    pressing" (2.0.5), and the no-release line only for whoever can Edit albums.
  *  - (review) BACK TO THE LIST: the least scroll that brings the track focus goes back to into view
  *    (lib/trackInspector.ts revealBy) - nothing for a row in view, down to its bottom, up to its top.
  *  - THE INSPECTOR, RENDERED: its title, place and count; for a screen reader, a polite status line always
@@ -282,31 +283,35 @@ console.log('\nan album page\'s Properties')
   const answer = (present, release = 'f5804905-6e8d-45dc-bae9-b36c64ccc99b') => ({ release_mbid: release, release_group_mbid: null, navidrome_id: 'nd', present, other_pressings: [] })
   check('nothing until the bridge has answered or failed', [P.albumProperties(null, false, 'x'), P.albumProperties(null, true, undefined)], [null, []])
   const vinyl = answer([row({ original_year: '1994', size: 45 * 1024 * 1024, first_seen: '2026-10-14T12:24:29+00:00', imported: true })])
-  check('the year against this pressing\'s, the size, the release linked, when deadwax first saw it and that it filed it',
+  //? (2.0.5, UX batch 2) in a listener's words: "MusicBrainz: View this pressing ↗" - a link, never the raw id - and
+  //? "Added", ", downloaded here" for one deadwax filed
+  check('the year against this pressing\'s, the size, the release linked (its words, never its id), when it was added and that deadwax downloaded it',
     P.albumProperties(vinyl, false, 'ignored', 'en-GB'),
     [{ label: 'Year', text: '1994 (this pressing 2014)' }, { label: 'Size', text: '45 MB' },
-      { label: 'Release', text: 'f5804905-6e8d-45dc-bae9-b36c64ccc99b', release: 'f5804905-6e8d-45dc-bae9-b36c64ccc99b' },
-      { label: 'First seen', text: '14 October 2026, filed by deadwax' }])
+      { label: 'MusicBrainz', text: 'View this pressing \u2197', release: 'f5804905-6e8d-45dc-bae9-b36c64ccc99b' },
+      { label: 'Added', text: '14 October 2026, downloaded here' }])
   const set = answer([row({ path: 'A (Disc 1)', size: 10 * 1024 * 1024, first_seen: '2026-10-14T12:00:00+00:00', imported: false, original_year: '' }),
     row({ path: 'A (Disc 2)', size: 20 * 1024 * 1024, first_seen: '2025-01-02T12:00:00+00:00', imported: true, original_year: '' })])
-  check('a set kept one folder per disc: its sizes added, the earliest first seen, filed by deadwax when any folder was',
-    P.albumProperties(set, false, undefined, 'en-GB').filter((one) => one.label !== 'Release'),
-    [{ label: 'Year', text: '2014' }, { label: 'Size', text: '30 MB' }, { label: 'First seen', text: '2 January 2025, filed by deadwax' }])
+  check('a set kept one folder per disc: its sizes added, the earliest added, downloaded here when any folder was',
+    P.albumProperties(set, false, undefined, 'en-GB').filter((one) => one.label !== 'MusicBrainz'),
+    [{ label: 'Year', text: '2014' }, { label: 'Size', text: '30 MB' }, { label: 'Added', text: '2 January 2025, downloaded here' }])
   const half = answer([row({ size: 10 }), row({ path: 'B', size: null })])
   check('...no size when a folder of it didn\'t say - half a set is no size', P.albumProperties(half, false, undefined).some((one) => one.label === 'Size'), false)
-  check('found by a scan: first seen, not filed', P.albumProperties(answer([row({ first_seen: '2026-01-05T12:00:00+00:00', imported: false })]), false, undefined, 'en-GB').at(-1),
-    { label: 'First seen', text: '5 January 2026' })
-  check('no release - the album\'s own answer saying none (Navidrome\'s \'\'), the bridge with none too: said, quietly', P.albumProperties(answer([], null), false, ''),
-    [{ label: 'Release', text: 'Not tagged with a MusicBrainz release', quiet: true }])
+  check('found by a scan: added, not downloaded here', P.albumProperties(answer([row({ first_seen: '2026-01-05T12:00:00+00:00', imported: false })]), false, undefined, 'en-GB').at(-1),
+    { label: 'Added', text: '5 January 2026' })
+  const NONE = [{ label: 'MusicBrainz', text: 'Not matched to a release - match it in Edit album', quiet: true }]
+  check('no release - the album\'s own answer saying none (Navidrome\'s \'\'), the bridge with none too: said, quietly, to whoever can Edit albums (2.0.5)',
+    P.albumProperties(answer([], null), false, '', undefined, true), NONE)
+  check('...and to nobody else: a listener can do nothing about it (2.0.5)', [P.albumProperties(answer([], null), false, ''), P.albumProperties(answer([], null), false, '', undefined, false)], [[], []])
   //? (review) the bridge's null is also what it answers when Navidrome couldn't be asked, or has no album by
   //? that id (an old address after a rescan, "Navidrome has nothing by that id" above it): not a "none"
   check('(review) the bridge answering with none, the album\'s own answer not come or failed: nothing said of the release',
     [P.albumProperties(answer([], null), false, undefined), P.albumProperties(answer([], null), false, null)], [[], []])
   check('(review) ...and the album\'s own release, once it comes, linked over the bridge\'s null',
-    P.albumProperties(answer([], null), false, 'mb-own'), [{ label: 'Release', text: 'mb-own', release: 'mb-own' }])
+    P.albumProperties(answer([], null), false, 'mb-own'), [{ label: 'MusicBrainz', text: 'View this pressing \u2197', release: 'mb-own' }])
   check('the bridge failed: the album\'s own release, its own "none" (\'\'), or nothing said while its answer hasn\'t come',
-    [P.albumProperties(null, true, 'mb-own'), P.albumProperties(null, true, ''), P.albumProperties(null, true, undefined)],
-    [[{ label: 'Release', text: 'mb-own', release: 'mb-own' }], [{ label: 'Release', text: 'Not tagged with a MusicBrainz release', quiet: true }], []])
+    [P.albumProperties(null, true, 'mb-own', undefined, true), P.albumProperties(null, true, '', undefined, true), P.albumProperties(null, true, undefined, undefined, true)],
+    [[{ label: 'MusicBrainz', text: 'View this pressing \u2197', release: 'mb-own' }], NONE, []])
   check('the year in words', [P.yearWords('2014', '1994'), P.yearWords('1994', '1994'), P.yearWords('1994', ''), P.yearWords('', '1994'), P.yearWords('', '')],
     ['1994 (this pressing 2014)', '1994', '1994', '1994', ''])
   check('a first seen that isn\'t a date says nothing', [P.firstSeenWords('soon', true), P.firstSeenWords(null, false)], ['', ''])
@@ -316,14 +321,15 @@ console.log('\nan album page\'s Properties')
 console.log('\nProperties, rendered')
 {
   check('no rows, nothing drawn', [AlbumProperties({ rows: null }), AlbumProperties({ rows: [] })], [null, null])
-  const tree = expand(AlbumProperties({ rows: [{ label: 'Year', text: '1994' }, { label: 'Release', text: 'abc', release: 'abc' }, { label: 'Release', text: 'none', quiet: true }] }), 'p')
+  const tree = expand(AlbumProperties({ rows: [{ label: 'Year', text: '1994' }, { label: 'MusicBrainz', text: 'View this pressing', release: 'abc' }, { label: 'Release', text: 'none', quiet: true }] }), 'p')
   check('its heading, and each line a label and a value', [words(one('app-props-title', tree)), classed('app-props-label', tree).map(words), classed('app-props-value', tree).map(words)],
-    ['Properties', ['Year', 'Release', 'Release'], ['1994', 'abc', 'none']])
+    ['Properties', ['Year', 'MusicBrainz', 'Release'], ['1994', 'View this pressing', 'none']])
   const link = find((node) => node.type === 'a', tree)
   check('the release a link to its page, opening beside the app', link.map((node) => [node.props.href, node.props.target, node.props.rel]),
     [['https://musicbrainz.org/release/abc', '_blank', 'noopener']])
-  check('...in the data face; a line saying what isn\'t there quieter', classed('app-props-value', tree).map((node) => node.props.class),
-    ['app-props-value', 'app-props-value is-mono', 'app-props-value is-quiet'])
+  //? (2.0.5) the link is words now ("View this pressing"), so it is in the text's own face, not the data face
+  check('...in the text\'s face; a line saying what isn\'t there quieter', classed('app-props-value', tree).map((node) => node.props.class),
+    ['app-props-value', 'app-props-value', 'app-props-value is-quiet'])
 }
 
 /* ===== the inspector, rendered ===== */

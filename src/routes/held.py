@@ -69,7 +69,7 @@ async def add_flagged(request: Request, flag_id: int):
     found = (await store.index_follow([flags[flag_id].get("album_id")]) or {}) if flags[flag_id].get("album_id") else {}
     row = found.get(flags[flag_id].get("album_id"))
     if row is None or row.get("state") != "present":
-        raise HTTPException(status_code=409, detail="That album isn't in the store any more - put the flag away.")
+        raise HTTPException(status_code=409, detail="That album isn't in the collection any more - dismiss it.")
     flag = await store.flag_close(flag_id, "added")
     if flag is None:
         raise HTTPException(status_code=409, detail="That has been dealt with already.")

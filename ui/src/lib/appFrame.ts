@@ -167,11 +167,24 @@ export const SIDEBAR_LIBRARY: readonly SidebarItem[] = [
   { id: 'songs', label: 'Songs' },
 ]
 
-/** Browse's views under their own group label (2.0.0-player.52) - the store's. */
+/** (2.0.5, UX batch 2) ...with a library of your own: yours, named so - the same names the views' titles have
+ *  (PERSONAL_TITLES), so "Albums" never stands for two lists in one frame. */
+export const SIDEBAR_YOURS: readonly SidebarItem[] = [
+  { id: 'recent', label: 'Recently added' },
+  { id: 'albums', label: 'Your albums' },
+  { id: 'artists', label: 'Your artists' },
+]
+
+/** The heading over the collection's views - everything the server holds, with a library of your own (2.0.5:
+ *  "All music", James's word; it was "Browse"). */
+export const ALL_MUSIC = 'All music'
+
+/** All music's views under their own group label (2.0.0-player.52) - the collection's, each named for what it
+ *  lists (2.0.5: they were "Albums", "Artists" and "Songs" under "Browse", the same names as yours). */
 export const SIDEBAR_BROWSE: readonly SidebarItem[] = [
-  { id: 'store', label: 'Albums' },
-  { id: 'storeArtists', label: 'Artists' },
-  { id: 'songs', label: 'Songs' },
+  { id: 'store', label: 'All albums' },
+  { id: 'storeArtists', label: 'All artists' },
+  { id: 'songs', label: 'All songs' },
 ]
 
 /** What the Library's title says on a desktop, for each view - the sidebar's own words. */
@@ -185,14 +198,15 @@ export const LIBRARY_TITLES: Readonly<Record<LibraryPick, string>> = {
   storeArtists: 'Artists',
 }
 
-/** ...and with a library of your own (2.0.0-player.52): yours, and the store's. */
+/** ...and with a library of your own (2.0.0-player.52): yours, and the collection's - the sidebar's own words
+ *  (2.0.5: "Albums in the store" and the rest). */
 export const PERSONAL_TITLES: Readonly<Record<LibraryPick, string>> = {
   recent: 'Recently added',
   albums: 'Your albums',
   artists: 'Your artists',
-  songs: 'Songs in the store',
-  store: 'Albums in the store',
-  storeArtists: 'Artists in the store',
+  songs: 'All songs',
+  store: 'All albums',
+  storeArtists: 'All artists',
 }
 
 /** The desktop Library's title for a view. */
@@ -222,7 +236,7 @@ export const SIDEBAR_LOG: SidebarItem = { id: 'log', label: 'Log' }
  *  too, Recently added aside (2.0.0-player.59). With a library of your own (2.0.0-player.52) the Library's
  *  are yours - Recently added, Albums, Artists - and Songs is Browse's. */
 export function libraryItems(hasSongs: boolean | null, personal = false): SidebarItem[] {
-  if (personal) return SIDEBAR_LIBRARY.filter((item) => item.id !== 'songs')
+  if (personal) return [...SIDEBAR_YOURS]
   return SIDEBAR_LIBRARY.filter((item) => item.id !== 'songs' || hasSongs !== false)
 }
 

@@ -359,7 +359,7 @@ function KnownOnlyRow({ entry, onChanged, onLocked }: { entry: KnownOnly; onChan
       <p class="app-people-fact">{knownWords(entry)}</p>
       {asking ? (
         <ConfirmLine
-          words={`Forget what deadwax keeps for ${entry.user}? Their library list, pins, settings and permissions go - the albums stay in the store.`}
+          words={`Forget what deadwax keeps for ${entry.user}? Their library list, pins, settings and permissions go - the albums stay in the collection.`}
           confirm="Forget"
           keep="Keep it"
           danger

@@ -14,13 +14,14 @@ import type { DeletionSummary, DownloadJob, HeldPressing, LibraryEntry, MyLibrar
  */
 
 /** The store line's last line for a pressing the store holds that isn't in your library. */
-export const ADD_NOTE = "Add it to your library to have it starred for you in Navidrome - nothing is downloaded."
+//? (2.0.5, UX batch 2) as what the listener sees - the album page says the same (lib/whose.ts ADD_FROM_PAGE)
+export const ADD_NOTE = "It's already here - add it to your library to keep it with your music."
 
 /** ...and once added. */
-export const ADDED_WORDS = "Added - it's in your library, and deadwax stars it for you in Navidrome."
+export const ADDED_WORDS = 'Added to your library.'
 
 /** The title of the store line for a pressing held whole that isn't yours. */
-export const IN_THE_STORE = 'In the store, not in your library'
+export const IN_THE_STORE = 'In the collection, not in your library'
 
 /** Whether a held pressing is somebody else's to you - logins on, and not in your library. */
 export function heldNotYours(held: Pick<HeldPressing, 'yours'> | null | undefined): boolean {
@@ -47,13 +48,13 @@ export function grantWords(
     return { text: job.mine === false ? 'Filed - in their library' : 'In your library', tone: 'plain' }
   }
   if (job.outcome === 'already_there') {
-    if (job.library === 'added') return { text: `Already in the store, added to ${whose} library`, tone: 'plain' }
+    if (job.library === 'added') return { text: `Already in the collection, added to ${whose} library`, tone: 'plain' }
     if (job.library === 'flagged') {
-      return { text: 'Already in the store as another copy, so not added - an admin has been asked to look', tone: 'warning' }
+      return { text: 'Already in the collection as another copy, so not added - an admin has been asked to look', tone: 'warning' }
     }
     //? the admin looked and put the flag away (Add for them makes it 'added' - review: the row kept saying
     //? an admin had been asked)
-    if (job.library === 'looked') return { text: 'Already in the store as another copy, so not added - an admin has looked at it', tone: 'warning' }
+    if (job.library === 'looked') return { text: 'Already in the collection as another copy, so not added - an admin has looked at it', tone: 'warning' }
   }
   if (job.outcome === 'partly_filed' && job.library === 'incomplete') {
     const why = job.error ? `Partly filed: ${job.error}` : 'Partly filed'
@@ -62,19 +63,21 @@ export function grantWords(
   return null
 }
 
-/** "12 albums", "12 albums · 2 waiting to be starred" - You's line for your library. */
+/** "12 albums", "12 albums · 2 waiting to be added" - You's line for your library. */
 export function libraryLine(answer: MyLibrary): string {
   const count = answer.count ?? 0
   const waiting = answer.waiting ?? 0
   const albums = `${count} ${plural(count, 'album', 'albums')}`
-  return waiting ? `${albums} · ${waiting} waiting to be starred` : albums
+  return waiting ? `${albums} · ${waiting} waiting to be added` : albums
 }
 
-/** Why deadwax can't star for you now - the login Navidrome no longer takes - or null. */
+/** Why nothing new can be added to your library now - the login the music server no longer takes - or null.
+ *  (2.0.5) Said as what the listener sees and does, never the server's own words for why (`login_problem`: auth.py's
+ *  LOGIN_GONE, which names Navidrome, or KEY_CHANGED): sign out, sign in again - nothing is lost meanwhile (the ledger
+ *  keeps what waits). */
 export function loginWords(answer: MyLibrary): string | null {
   if (answer.login !== 'dead') return null
-  const why = answer.login_problem || 'Navidrome no longer accepts the login you signed in with.'
-  return `deadwax can't star albums for you: ${why} Your albums wait until you sign in again - sign out, and sign in with your Navidrome password.`
+  return "New albums can't be added to your library until you sign in again. Sign out, then sign in - with your new password if you changed it. Nothing is lost meanwhile."
 }
 
 /** How many albums a waiting group names before "and N more" - the count is on the Albums row already. */
@@ -84,7 +87,7 @@ export const WAITING_NAMED = 3
 export function waitingGroups(answer: MyLibrary): { words: string; albums: string[] }[] {
   const groups = new Map<string, string[]>()
   for (const entry of answer.waiting_albums ?? []) {
-    const words = entry.words || 'Waiting for its turn to be starred.'
+    const words = entry.words || 'Waiting its turn to be added.'
     const albums = groups.get(words) ?? []
     albums.push(entryName(entry))
     groups.set(words, albums)
@@ -121,8 +124,8 @@ export function entryName(entry: Pick<LibraryEntry, 'album' | 'artist'>): string
   return entry.artist ? `${album} by ${entry.artist}` : album
 }
 
-/** The removed-by-the-admin line under an album the admin deleted. */
-export const REMOVED_WORDS = 'Removed by the admin - request it again to have it back.'
+/** The removed-by-an-admin line under an album an admin deleted - Get it again beside it. */
+export const REMOVED_WORDS = 'Removed by an admin.'
 
 /**
  * What the delete dialog says of who holds the album (logins on: the summary's `holders` - everyone else -
@@ -132,7 +135,7 @@ export const REMOVED_WORDS = 'Removed by the admin - request it again to have it
  */
 export function holdersText(summary: Pick<DeletionSummary, 'holders' | 'yours' | 'holders_unknown'> | null | undefined): string | null {
   if (summary?.holders_unknown) {
-    return "deadwax couldn't read who has it in their library - whoever does will find it was removed by the admin."
+    return "deadwax couldn't read who has it in their library - whoever does will find it was removed by an admin."
   }
   const holders = summary?.holders
   if (holders === undefined) return null
@@ -140,9 +143,9 @@ export function holdersText(summary: Pick<DeletionSummary, 'holders' | 'yours' |
   if (!holders.length) return yours ? 'In your library: deleting it takes it out.' : 'Nobody has it in their library.'
   const others = listed([...holders])
   if (yours) {
-    return `In ${listed(['your library', ...holders.map((holder) => `${holder}'s`)])}: deleting it takes it out, and ${others} will see it was removed by the admin.`
+    return `In ${listed(['your library', ...holders.map((holder) => `${holder}'s`)])}: deleting it takes it out, and ${others} will see it was removed by an admin.`
   }
-  return `In ${others}'s ${plural(holders.length, 'library', 'libraries')}: deleting it takes it out, and they'll see it was removed by the admin.`
+  return `In ${others}'s ${plural(holders.length, 'library', 'libraries')}: deleting it takes it out, and they'll see it was removed by an admin.`
 }
 
 /** The Navidrome album ids and release ids of what is new in your library - Home's shelf, the Library's marks. */
@@ -178,7 +181,7 @@ export function newShelf(answer: MyLibrary | null): { id: string; name: string; 
 
 /** "Held by nobody · 3" - Library care's heading for what nobody has in their library. */
 export function heldByNobodyLine(count: number): string {
-  return count ? `${count} ${plural(count, 'album', 'albums')} nobody has in their library` : "Every album in the store is in somebody's library."
+  return count ? `${count} ${plural(count, 'album', 'albums')} nobody has in their library` : "Every album in the collection is in somebody's library."
 }
 
 /** A flagged download's line: who asked, and why nobody was given it. */

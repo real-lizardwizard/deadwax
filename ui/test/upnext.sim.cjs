@@ -455,7 +455,9 @@ console.log('\n(Part B) a library\'s shuffle, fed a page at a time')
   check('...Repeat One as ever', after(U.toppedUp(first, 'one')).slice(0, 2), ['p1', 'p1'])
   const view = U.upNextView(first, 'off')
   check('Up Next counts what is still to come, and names it', [view.list.title, view.list.more, U.upNextView({ ...first, upNext: { ...first.upNext, paged: { ...paged, scope: 'yours' } } }, 'all').then],
-    ['Everything, shuffled', 447, 'Then your library again, in a new order.'])
+    ['All music, shuffled', 447, 'Then your library again, in a new order.'])
+  //? (2.0.5 review) the collection's round named as its heading names it - "all music", never "everything"
+  check('...and of all music, Repeat All: then all music again', U.upNextView(first, 'all').then, 'Then all music again, in a new order.')
 }
 
 /* ===== the components: Up Next and the song menu ===== */
@@ -748,7 +750,7 @@ console.log('\nthe player bar\'s Shuffle, Repeat and Up Next, rendered (2.0.0-pl
   tree = bar({ ...paged })
   button(tree, 'app-playbar-shuffle').props.onClick()
   check('...a whole library\'s shuffle: on, aria-disabled and named for it, the click doing nothing',
-    [shuffleOf(tree), button(tree, 'app-playbar-shuffle').props['aria-label'], paged.calls], [[true, true, true], 'Shuffle - shuffling everything', []])
+    [shuffleOf(tree), button(tree, 'app-playbar-shuffle').props['aria-label'], paged.calls], [[true, true, true], 'Shuffle - shuffling all music', []])
   //? (second review) named by its scope, in Up Next's words: Browse's Songs (store) is everything, your albums yours
   const yours = upNextPlayer(U.startUpNext(album(3), 0, false, Math.random, { token: 't', total: 9, fetched: 3, scope: 'yours' }))
   check('...of your albums: named for your library',

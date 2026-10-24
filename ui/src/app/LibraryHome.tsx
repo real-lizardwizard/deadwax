@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
-import { browseItems, libraryItems, type LibraryPick, type SidebarItem } from '../lib/appFrame'
+import { ALL_MUSIC, browseItems, libraryItems, type LibraryPick, type SidebarItem } from '../lib/appFrame'
 import { isAbort, latestOnly } from '../lib/latest'
 import { newMarks } from '../lib/myLibrary'
 import { sortAlbums } from '../lib/shelves'
-import { EMPTY_LIBRARY } from '../lib/yourLibrary'
+import { EMPTY_LIBRARY, NO_ALBUMS } from '../lib/yourLibrary'
 import { albumPage, type Album } from '../player/api'
 import { ChevronRightIcon, PlaylistIcon } from '../player/icons'
 import { AlbumTile } from './AlbumTile'
@@ -112,11 +112,12 @@ export function LibraryHome({ personal, hasSongs, shown, onOpen, onOpenSection, 
         {yours.map(row)}
       </div>
 
-      {/* (2.0.0-player.52) with a library of your own: the store, Browse - the one way to all of it */}
+      {/* (2.0.0-player.52) with a library of your own: the collection, All music (2.0.5: it was "Browse", over the
+          same "Albums, Artists" as yours) - the one way to all of it */}
       {browse.length > 0 && (
         <section class="app-library-browse" aria-labelledby="app-library-browse-title">
           <h2 id="app-library-browse-title" class="app-section-title">
-            Browse
+            {ALL_MUSIC}
           </h2>
           <div class="app-group app-library-group">{browse.map(row)}</div>
         </section>
@@ -141,7 +142,7 @@ export function LibraryHome({ personal, hasSongs, shown, onOpen, onOpenSection, 
             </div>
           ) : <div class="pl-spinner" aria-label="Loading" />
         ) : recent.empty ? (
-          personal ? <EmptyLibrary lead={EMPTY_LIBRARY} onBrowse={() => onOpenSection('store')} /> : <p class="pl-notice">No albums in Navidrome yet.</p>
+          personal ? <EmptyLibrary lead={EMPTY_LIBRARY} onBrowse={() => onOpenSection('store')} /> : <p class="pl-notice">{NO_ALBUMS}</p>
         ) : (
           <div class="pl-grid">
             {recent.albums.map((album) => <AlbumTile key={album.id} album={album} marks={marks} onOpen={onOpen} />)}

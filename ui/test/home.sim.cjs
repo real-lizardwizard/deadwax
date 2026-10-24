@@ -20,6 +20,11 @@
  *  - New in your library (2.0.0-player.51, logins on): under Pinned and over Recently added, its tiles
  *    opening their albums; none, no shelf; waited for as the pins are (null: not said yet), never past
  *    the wait; a Home handed nothing (logins off) draws none and waits for none.
+ *  - (2.0.5, UX batch 2 - James: Home's Recently added shows the listener's OWN library) with a library of your
+ *    own (`personal`) Recently added is YOURS: the Library's own list (app/albumIndex.ts `yours`, never getAlbumList2
+ *    `newest`, which is the whole collection's), newest first by `created`, at most RECENT_COUNT; asked again as your
+ *    albums' generation moves (an Add, a Remove, your library's count); empty, your library's own empty words. With
+ *    logins off it is `newest` at 20, as it always was (the first case above).
  *  - The pins are asked afresh each time Home comes into view, and not while it doesn't show; the
  *    shelves are drawn only once the pins have answered (or failed, or PINNED_WAIT_MS has passed while
  *    Home showed - the wait counts only while it shows, afresh each time it comes into view until it
@@ -74,6 +79,7 @@ exports.root = (component) => {
 const write = (file, body) => fs.writeFileSync(path.join(OUT, file), body)
 write('player/api.js', `
 exports.albumPage = (order, offset, signal, size) => globalThis.__home.ask('albums', order, size)
+exports.albumIndexOf = (scope) => globalThis.__home.ask('index', scope)
 exports.prefetchAlbum = (id) => { globalThis.__home.prefetched.push(id); return new Promise(() => {}) }
 exports.dropPrefetch = () => {}
 `)
@@ -318,6 +324,46 @@ async function run() {
     check('...and never said: drawn without it once the wait is over', [find(byClass('app-home-shelves'), tree)[0]?.props.hidden, headings(tree)], [false, ['Pinned', 'Recently added']])
     tree = mount(Home).draw(props())
     check('a Home handed nothing (logins off): no shelf, and nothing waited for', headings(tree).includes('New in your library'), false)
+  }
+
+  console.log('\nHome: Recently added is YOURS with a library of your own (2.0.5, UX batch 2)')
+  {
+    reset()
+    W.pins = { pins: [], canSave: true, problem: null }
+    const home = mount(Home)
+    let tree = home.draw(props({ personal: true }))
+    check('it asks the Library\'s own list of your albums - never the collection\'s newest - beside Not played',
+      W.asks.map((one) => one.slice(0, 3)), [['index', 'yours'], ['albums', 'recent', 500]])
+    const mine = (id, created) => ({ id, name: id, artist: 'x', ...(created ? { created } : {}) })
+    const many = Array.from({ length: RECENT_COUNT + 5 }, (_, i) => mine(`m${String(i).padStart(2, '0')}`, `2026-0${1 + (i % 9)}-1${i % 10}T00:00:00Z`))
+    answer('index', { albums: [mine('undated'), mine('older', '2025-01-02T00:00:00Z'), mine('newest', '2026-10-01T00:00:00Z'), ...many], truncated: false })
+    await settle()
+    tree = home.draw(props({ personal: true }))
+    const titles = find(byClass('app-tile-title'), find((node) => node.props?.['aria-labelledby'] === 'app-recent-title', tree)[0]).map(words)
+    check('...newest first by when it was added, at most RECENT_COUNT, the undated never ahead of a dated one',
+      [titles.length, titles[0], titles.includes('undated'), titles.includes('older')], [RECENT_COUNT, 'newest', false, false])
+    const Y = require(path.join(OUT, 'app/useYourAlbums.js'))
+    Y.forgetYourAlbums()
+    tree = home.draw(props({ personal: true }))
+    check('your albums changing (an Add, a Remove, your count moving) asks your list again - the tiles kept meanwhile',
+      [W.asks.filter((one) => one[0] === 'index').length, find(byClass('app-tile-title'), find((node) => node.props?.['aria-labelledby'] === 'app-recent-title', tree)[0]).length],
+      [2, RECENT_COUNT])
+    answer('index', { albums: [], truncated: false })
+    await settle()
+    tree = home.draw(props({ personal: true }))
+    check('...your library empty: its own words, never the collection\'s albums',
+      words(find(byClass('app-library-empty'), tree)[0]), 'Nothing in your library yet.Look through All music and add the albums you like, or find new ones in Search and Get them.')
+    check('...and nothing ever asked of the collection\'s newest', W.asks.some((one) => one[0] === 'albums' && one[1] === 'newest'), false)
+    reset()
+    W.pins = { pins: [], canSave: true, problem: null }
+    const off = mount(Home)
+    off.draw(props({ personal: false }))
+    answer('albums', [], (order) => order === 'newest')
+    await settle()
+    tree = off.draw(props({ personal: false }))
+    check('logins off: the collection IS your library - newest at 20, as ever, and its empty words',
+      [W.asks.map((one) => one.slice(0, 3))[0], words(find((node) => node.props?.['aria-labelledby'] === 'app-recent-title', tree)[0]).endsWith('No albums yet.')],
+      [['albums', 'newest', RECENT_COUNT], true])
   }
 
   console.log('\nHome: all of it inside the Navidrome gate')

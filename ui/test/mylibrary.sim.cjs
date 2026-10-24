@@ -7,7 +7,7 @@
  *
  * What it pins:
  *
- *  - The words: your library's line ("12 albums · 2 waiting to be starred"); a login Navidrome no longer
+ *  - The words: your library's line ("12 albums · 2 waiting to be added", 2.0.5's words); a login Navidrome no longer
  *    takes said with "sign in again"; what waits grouped by why, the most first; an entry's name; who holds
  *    an album, for the delete dialog (nobody said too; nothing with logins off); the New marks by Navidrome
  *    id and by release (any case); Home's shelf - only what Navidrome has, as its albums; held by nobody's
@@ -17,10 +17,10 @@
  *    deadwax is told by its release, else - one reached by its address, only its Navidrome id known - by
  *    the store's ids; one that isn't new tells deadwax nothing.
  *  - You > Your library: nothing with logins off; the count, the login's words, what waits and why, an
- *    album the admin deleted with Request it again (its album page by the release group) and Put away
+ *    album an admin deleted with Get it again (its album page by the release group) and Dismiss
  *    (which asks again once deadwax has it); deadwax unable to read its database said.
  *  - Held by nobody: asked as the page shows, through latestOnly; the line, the albums (the first 20, then
- *    Show all), the flags with Add for them and Put away - each asking again once answered, a refusal said.
+ *    Show all), the flags with Add for them and Dismiss - each asking again once answered, a refusal said.
  *
  * A script for the same reason as the other sims: there is no JS test runner here.
  *
@@ -165,15 +165,16 @@ async function run() {
   console.log('\nthe words')
   {
     check('your library\'s line', [W.libraryLine(LIBRARY), W.libraryLine({ ...LIBRARY, count: 1, waiting: 0 }), W.libraryLine({ on: true })],
-      ['12 albums · 2 waiting to be starred', '1 album', '0 albums'])
+      ['12 albums · 2 waiting to be added', '1 album', '0 albums'])
     check('a login Navidrome no longer takes: why, and sign in again', W.loginWords({ ...LIBRARY, login: 'dead', login_problem: 'Navidrome no longer accepts the login you signed in with - if you changed your Navidrome password, sign in with the new one.' }),
-      "deadwax can't star albums for you: Navidrome no longer accepts the login you signed in with - if you changed your Navidrome password, sign in with the new one. Your albums wait until you sign in again - sign out, and sign in with your Navidrome password.")
+      //? (2.0.5) what the listener does, never the server's why (which names Navidrome and starring)
+      "New albums can't be added to your library until you sign in again. Sign out, then sign in - with your new password if you changed it. Nothing is lost meanwhile.")
     check('...nothing while it works', [W.loginWords(LIBRARY), W.loginWords({ ...LIBRARY, login: 'none' })], [null, null])
     const many = { waiting_albums: [
       { ...entry(1, 'A'), words: 'one' }, { ...entry(2, 'B'), words: 'two' }, { ...entry(3, 'C'), words: 'two' }, { ...entry(4, 'D'), words: null }] }
     check('what waits, grouped by why, the most first (no words: waiting its turn)', W.waitingGroups(many),
       [{ words: 'two', albums: ['B by Portishead', 'C by Portishead'] }, { words: 'one', albums: ['A by Portishead'] },
-        { words: 'Waiting for its turn to be starred.', albums: ['D by Portishead'] }])
+        { words: 'Waiting its turn to be added.', albums: ['D by Portishead'] }])
     const sixty = W.waitingGroups({ waiting_albums: Array.from({ length: 60 }, (_, n) => ({ ...entry(n, `Album ${n}`), words: 'no id' })) })
     check('a group said: two named in full, three named, sixty - three named then "and 57 more" (review: never a paragraph of names)',
       [W.waitingText({ words: 'why', albums: ['A', 'B'] }), W.waitingText({ words: 'why', albums: ['A', 'B', 'C'] }), W.waitingText(sixty[0]), W.WAITING_NAMED],
@@ -184,24 +185,24 @@ async function run() {
     check('the delete dialog: who else holds it - one, two, three, nobody, and nothing with logins off',
       [W.holdersText({ holders: ['ethan'], yours: false }), W.holdersText({ holders: ['james', 'ethan'] }), W.holdersText({ holders: ['james', 'ethan', 'sam'], yours: false }),
         W.holdersText({ holders: [], yours: false }), W.holdersText({}), W.holdersText(null)],
-      ["In ethan's library: deleting it takes it out, and they'll see it was removed by the admin.",
-        "In james and ethan's libraries: deleting it takes it out, and they'll see it was removed by the admin.",
-        "In james, ethan and sam's libraries: deleting it takes it out, and they'll see it was removed by the admin.",
+      ["In ethan's library: deleting it takes it out, and they'll see it was removed by an admin.",
+        "In james and ethan's libraries: deleting it takes it out, and they'll see it was removed by an admin.",
+        "In james, ethan and sam's libraries: deleting it takes it out, and they'll see it was removed by an admin.",
         'Nobody has it in their library.', null, null])
     check('...the admin deleting it holds it too: "your library" first, and only the others told it was removed (review)',
       [W.holdersText({ holders: [], yours: true }), W.holdersText({ holders: ['ethan'], yours: true }), W.holdersText({ holders: ['ethan', 'sam'], yours: true })],
       ['In your library: deleting it takes it out.',
-        "In your library and ethan's: deleting it takes it out, and ethan will see it was removed by the admin.",
-        "In your library, ethan's and sam's: deleting it takes it out, and ethan and sam will see it was removed by the admin."])
+        "In your library and ethan's: deleting it takes it out, and ethan will see it was removed by an admin.",
+        "In your library, ethan's and sam's: deleting it takes it out, and ethan and sam will see it was removed by an admin."])
     check('...deadwax couldn\'t read who holds it: said so - never "nobody" on a guess (review)',
-      W.holdersText({ holders_unknown: true }), "deadwax couldn't read who has it in their library - whoever does will find it was removed by the admin.")
+      W.holdersText({ holders_unknown: true }), "deadwax couldn't read who has it in their library - whoever does will find it was removed by an admin.")
     const marks = W.newMarks(LIBRARY)
     check('the New marks: by Navidrome id, or by release whatever its case', [W.isNew(marks, { id: 'nd-dummy' }), W.isNew(marks, { id: 'nd-x', musicBrainzId: 'REL-3' }),
       W.isNew(marks, { id: 'nd-x', musicBrainzId: 'rel-4' }), W.isNew(W.newMarks(null), { id: 'nd-dummy' })], [true, true, false, false])
     check('Home\'s shelf: only what Navidrome has (starred, so its id is known), as its albums', W.newShelf(LIBRARY),
       [{ id: 'nd-dummy', name: 'Dummy', artist: 'Portishead', coverArt: 'nd-dummy', musicBrainzId: 'rel-1' }])
     check('held by nobody\'s line', [W.heldByNobodyLine(3), W.heldByNobodyLine(1), W.heldByNobodyLine(0)],
-      ['3 albums nobody has in their library', '1 album nobody has in their library', "Every album in the store is in somebody's library."])
+      ['3 albums nobody has in their library', '1 album nobody has in their library', "Every album in the collection is in somebody's library."])
     check('a flag\'s words', W.flagWords({ users: ['ethan', 'sam'], path: 'Portishead/Third (2008)' }),
       'ethan and sam asked for it. Every file was already in Portishead/Third (2008), which holds another pressing or an untagged copy - so nobody was given it.')
   }
@@ -299,19 +300,29 @@ async function run() {
     const opened = []
     tree = draw({ current: true, onRequestAgain: (group) => opened.push(group) })
     check('the count, and how many are incomplete', [words(find(byClass('app-row-value'), tree)), words(find(byClass('app-row-detail'), tree)[0])],
-      ['12 albums · 2 waiting to be starred', '1 of them is incomplete - some of its files failed to file.'])
+      ['12 albums · 2 waiting to be added', '1 of them is missing some songs.'])
+    //? (2.0.5 review) Amperfy named once, in the footnote - "also in your other music apps, such as Amperfy"
+    const amperfy = (node) => (words(node).match(/Amperfy/g) ?? []).length
+    check('Amperfy named once on the whole page, and that in the footnote', [amperfy(tree), find(byClass('app-footnote'), tree).map(amperfy).filter(Boolean)], [1, [1]])
     check('what waits, and why - each line one that breaks anywhere (a stranger\'s one-word title)', find(byClass('app-mylib-waiting'), tree).map(words),
       ["Third by Portishead: Navidrome hasn't got it yet (it may still be scanning) - deadwax asks again by itself.",
         "Roseland NYC Live by Portishead: It has no MusicBrainz release id, so deadwax can't find it in Navidrome - an admin can apply a release to it."])
+    //? (2.0.5 review) Get it again only for someone who may Get: the page it opens says "Getting albums is off for you"
+    //? to anyone else - so with no Get albums, only Dismiss
+    check('an album an admin deleted, for someone who may not Get: said so, and only Dismiss',
+      buttons(find(byClass('app-mylib-removed'), tree)[0]).map(words), ['Dismiss'])
+    const access = require(path.join(OUT, 'app/access.js'))
+    access.noteAccess({ ...L.me, permissions: ['request'] })
+    tree = draw({ current: true, onRequestAgain: (group) => opened.push(group) })
     const removed = find(byClass('app-mylib-removed'), tree)[0]
-    check('an album the admin deleted: said so, Request it again and Put away', [words(find(byClass('app-row-label'), removed)), words(find(byClass('app-row-detail'), removed)), buttons(removed).map(words)],
-      ['Portishead by Portishead', 'Removed by the admin - request it again to have it back.', ['Request it again', 'Put away']])
+    check('an album an admin deleted: said so, Get it again and Dismiss (2.0.5\'s words)', [words(find(byClass('app-row-label'), removed)), words(find(byClass('app-row-detail'), removed)), buttons(removed).map(words)],
+      ['Portishead by Portishead', 'Removed by an admin.', ['Get it again', 'Dismiss']])
     buttons(removed)[0].props.onClick()
-    check('Request it again: its album page, by the release group', opened, [{ id: 'grp-9', title: 'Portishead' }])
+    check('Get it again: its album page, by the release group', opened, [{ id: 'grp-9', title: 'Portishead' }])
     L.asks.length = 0
     buttons(removed)[1].props.onClick()
     tree = draw({ current: true, onRequestAgain: () => {} })
-    check('Put away: asked, waiting', [L.asks, words(buttons(find(byClass('app-mylib-removed'), tree)[0])[1])], [[['dismiss', 9]], 'Putting away…'])
+    check('Dismiss: asked, waiting', [L.asks, words(buttons(find(byClass('app-mylib-removed'), tree)[0])[1])], [[['dismiss', 9]], 'Dismissing…'])
     answer('dismiss', { dismissed: true })
     await settle()
     check('...and your library asked again once deadwax has it', L.asks.map((a) => a[0]), ['dismiss', 'library'])
@@ -330,10 +341,10 @@ async function run() {
     tree = draw({ current: true })
     draw.commit()
     check('...the last row gone: its focus to the heading, never the page - and said', [focused, words(find((node) => node.props?.['aria-live'] === 'polite', tree))],
-      [['heading'], 'Portishead by Portishead put away'])
+      [['heading'], 'Portishead by Portishead dismissed'])
     delete globalThis.document
     tree = draw({ current: true })
-    check('a login Navidrome no longer takes: said in red; nothing removed, no list', [words(find(byClass('app-error'), tree)).startsWith("deadwax can't star albums for you"), find(byClass('app-mylib-removed'), tree).length],
+    check('a login Navidrome no longer takes: said in red; nothing removed, no list', [words(find(byClass('app-error'), tree)).startsWith("New albums can't be added to your library until you sign in again"), find(byClass('app-mylib-removed'), tree).length],
       [true, 0])
     store.askMyLibrary()
     answer('library', { on: true, library: true, kept: false })
@@ -371,22 +382,22 @@ async function run() {
     check('...all of them, once asked - and the same button, Show fewer, so its focus stays (review)',
       [find(byClass('app-care-held-path'), tree).length - 1, words(buttons(tree)[0]), buttons(tree)[0].props['aria-expanded']], [23, 'Show fewer', true])
     const flag = find(byClass('app-care-held-actions'), tree)[0]
-    check('a flag: its words, Add for them, Put away', [words(find(byClass('app-care-held-path'), tree).at(-1)), buttons(flag).map(words)],
-      ['ethan asked for it. Every file was already in Portishead/Third (2008), which holds another pressing or an untagged copy - so nobody was given it.', ['Add for them', 'Put away']])
+    check('a flag: its words, Add for them, Dismiss', [words(find(byClass('app-care-held-path'), tree).at(-1)), buttons(flag).map(words)],
+      ['ethan asked for it. Every file was already in Portishead/Third (2008), which holds another pressing or an untagged copy - so nobody was given it.', ['Add for them', 'Dismiss']])
     L.asks.length = 0
     buttons(flag)[0].props.onClick()
     buttons(flag)[1].props.onClick()
-    check('Add for them asks once - Put away waits for it', L.asks, [['add', 5]])
-    answer('add', new Error('That album isn\'t in the store any more - put the flag away.'))
+    check('Add for them asks once - Dismiss waits for it', L.asks, [['add', 5]])
+    answer('add', new Error('That album isn\'t in the collection any more - dismiss it.'))
     await settle()
     tree = draw({ live: true })
     check('...refused: deadwax\'s words, and the list asked again', [words(find(byClass('app-care-problem'), tree)), L.asks.map((a) => a[0])],
-      ["That album isn't in the store any more - put the flag away.", ['add', 'held']])
+      ["That album isn't in the collection any more - dismiss it.", ['add', 'held']])
     answer('held', { count: 0, albums: [], flags: [] })
     await settle()
     tree = draw({ live: true })
     check('...nothing left: said - and the refusal still there to read', [words(find(byClass('app-care-note'), tree)), words(find(byClass('app-care-problem'), tree))],
-      ["Every album in the store is in somebody's library.", "That album isn't in the store any more - put the flag away."])
+      ["Every album in the collection is in somebody's library.", "That album isn't in the collection any more - dismiss it."])
 
     //? two flags: Add for the first; it leaves, and its focus goes to the second's first button - and is said
     const two = [flags[0], { ...flags[0], id: 6, album: 'Dummy', users: ['sam'] }]

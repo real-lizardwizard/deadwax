@@ -887,8 +887,14 @@ def test_an_album_pages_artist_link_and_also_chips():
     #? the chip itself keeps no overflow, so its 44px reach isn't clipped (it is an .app-chip)
     assert "overflow" not in declarations(APP, ".app-also")
     badge = declarations(APP, ".app-held-badge")
+    #? (2.0.5, UX batch 2) a badge, as the tracklist's are - shorter than the chips beside it, label-sized, centred on
+    #? their row - never a chip's own box, which read as a button
     assert (badge["flex"], badge["height"], badge["color"], badge["background"]) == (
-        "none", "var(--app-chip)", "var(--dw-badge-green-text)", "var(--dw-badge-green-bg)")
+        "none", "var(--app-held-badge)", "var(--dw-badge-green-text)", "var(--dw-badge-green-bg)")
+    assert (badge["padding"], badge["font-size"], badge["align-self"]) == ("0 var(--app-held-badge-pad)", "var(--dw-text-label)", "center")
+    assert ALL_TOKENS["--app-held-badge"] == "var(--app-rg-chip)" and ALL_TOKENS["--app-held-badge-pad"] == "var(--app-rg-chip-pad)"
+    assert px("--app-rg-chip") < px("--app-chip")
+    assert declarations(APP, ".app-rg-chip")["height"] == "var(--app-rg-chip)"
 
 
 def test_the_librarys_chips_and_sort():
@@ -1202,33 +1208,39 @@ def test_a_sources_signals_and_edition_words_are_drawn_in_their_bands_colours():
 
 
 def test_other_pressings_never_gives_way_and_a_held_pressing_is_marked_green():
-    #? the album page's chip row stays one line; "Other pressings" never shortens - the Also chips do
+    #? the album page's chip row stays one line; "Pressings" (its one name since 2.0.5) never shortens - the Also chips do
     assert "flex-wrap" not in declarations(APP, ".app-album-chips")
     assert declarations(APP, ".app-album-chips > .app-other-pressings") == {"flex": "none"}
     #? ...and is a chip, its reach unclipped
     assert "overflow" not in declarations(APP, ".app-other-pressings")
-    #? beside an Also chip, in a row too narrow for the three whole: "Pressings", and the badge's words read
-    #? but never shown (the visually-hidden rule's own declarations) - so the Also chip keeps room to say
-    #? which pressing it is. By the ROW's width, a container query on the row itself (review: by the frame,
-    #? a desktop's column narrowed by the Edit panel crushed the Also chip to a bare "›", and a phone on
-    #? its side gave up words it had the room for)
+    #? beside an Also chip, in a row too narrow for the three whole - a phone's (2.0.5: under 420px, where 119 + 182 +
+    #? 99 + two gaps don't fit; it was any row under 600px, a desktop's column narrowed by Info too) - the badge gives
+    #? way WHOLE, yours or the collection's: read but never shown (the visually-hidden rule's own declarations), out of
+    #? the row, so the Also chip keeps room to say which pressing it is. (2.0.5 review) its tick alone, kept at first,
+    #? was a bare mark beside the Also chip, read as that pressing ticked - so no rule leaves the badge's box or tick
+    #? showing without its words. By the ROW's width, a container query on the row itself (review: by the frame, a
+    #? desktop's column narrowed by the Edit panel crushed the Also chip to a bare "›", and a phone on its side gave up
+    #? words it had the room for). (2.0.5) "Pressings" is the chip's one name: no long and short spans.
     assert declarations(APP, ".app-album-chips")["container"] == "app-album-chips / inline-size"
-    assert declarations(APP, ".app-other-short") == {"display": "none"}
-    narrow = "@container app-album-chips (max-width: 600px)"
-    assert declarations(APP, ".app-album-chips:has(.app-also) .app-other-long", narrow) == {"display": "none"}
-    assert declarations(APP, ".app-album-chips:has(.app-also) .app-other-short", narrow) == {"display": "inline"}
-    #? ...(2.0.0-player.52 review) and "In the store", which has no tick to keep, gives way whole - its words left
-    #? alone it was an empty box; shown, the Also chip said "Also: t…" at 320px
-    assert declarations(APP, ".app-album-chips:has(.app-also):has(.app-other-pressings) .app-held-badge:not(.is-store) .app-held-badge-text", narrow) == declarations(APP, ".app-visually-hidden")
-    assert declarations(APP, ".app-album-chips:has(.app-also):has(.app-other-pressings) .app-held-badge.is-store", narrow) == declarations(APP, ".app-visually-hidden")
-    #? ...which is said in the line's grey with no box - never one more chip beside "Other pressings ›"
-    assert declarations(APP, ".app-held-badge.is-store") == {"padding": "0", "border-color": "transparent", "background": "transparent",
-                                                           "color": "var(--dw-text-2)"}
-    #? ...never by the frame: no rule outside that query shortens them, and the desktop's stylesheet has none
+    assert ".app-other-short" not in APP and ".app-other-long" not in APP
+    narrow = "@container app-album-chips (max-width: 420px)"
+    assert declarations(APP, ".app-album-chips:has(.app-also):has(.app-other-pressings) .app-held-badge", narrow) == declarations(APP, ".app-visually-hidden")
+    assert [selector for context, selector, _values in rules(APP) if context == narrow] == [
+        ".app-album-chips:has(.app-also):has(.app-other-pressings) .app-held-badge"]
     desk = (PLAYER / "app-desktop.css").read_text()
     for css in (APP, desk):
+        assert not [selector for _context, selector, _values in rules(css) if ".app-held-badge-text" in selector]
+    #? (2.0.5 review) the row holds a chip's height from the first frame: the badge is shorter than a chip, so the
+    #? row drawn with it alone grew as "Pressings ›" landed with the bridge's answer, and the songs moved
+    assert declarations(APP, ".app-album-chips")["min-height"] == "var(--app-chip)"
+    assert length("--app-held-badge") < px("--app-chip")
+    #? ...which is said in the line's grey with no box - never one more chip beside "Pressings ›"
+    assert declarations(APP, ".app-held-badge.is-store") == {"padding": "0", "border-color": "transparent", "background": "transparent",
+                                                           "color": "var(--dw-text-2)"}
+    #? ...never by the frame: no rule outside that query hides the badge, and the desktop's stylesheet has none
+    for css in (APP, desk):
         for context, selector, _values in rules(css):
-            if any(name in selector for name in (".app-other-long", ".app-held-badge-text")) or ".app-other-short" in selector and selector != ".app-other-short":
+            if ":has(.app-other-pressings) .app-held-badge" in selector:
                 assert context == narrow, (context, selector)
     #? the row's place held from the first frame, nothing in it shown until the bridge has answered - so
     #? the badge first shows where it stays, never sliding along a phone's centred row (review)

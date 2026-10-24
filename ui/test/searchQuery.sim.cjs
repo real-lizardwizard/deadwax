@@ -149,7 +149,7 @@ check('...what MusicBrainz doesn\'t say is left out', [R.groupLine({ id: 'x', 'p
 check('an artist\'s line in a section: the count alone - nothing when Navidrome counted none', [R.artistLine(2), R.artistLine(1), R.artistLine(0), R.artistLine(undefined)],
   ['2 albums in your library', '1 album in your library', '', ''])
 check('...in Top results, "Artist" first - alone when there is no count', [R.artistLine(2, false, true), R.artistLine(1, true, true), R.artistLine(0, false, true)],
-  ['Artist · 2 albums in your library', 'Artist · 1 album in the store', 'Artist'])
+  ['Artist · 2 albums in your library', 'Artist · 1 album in the collection', 'Artist'])
 check('(the top result as an artist alone went: Top results rank every kind - lib/searchList.ts)', R.topArtist, undefined)
 
 console.log('\na song plays within its album, once that album is in hand')

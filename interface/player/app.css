@@ -260,6 +260,10 @@
     --app-album-mine-gap: 6px;       /* (2.0.0-player.52) Add/Remove's line to its button */
     --app-held-badge-gap: 5px;
     --app-held-badge-icon: 13px;
+    /* (2.0.5) a badge, as the tracklist's are (.app-rg-chip, STYLE.md's): shorter than a chip, so it never reads as
+       one more button beside "Pressings ›" */
+    --app-held-badge: var(--app-rg-chip);
+    --app-held-badge-pad: var(--app-rg-chip-pad);
     /* the Library's chips, as Library.dc.html draws them: 32px, reaching 44 */
     --app-library-view: 32px;
     --app-library-view-pad: 14px;
@@ -3215,6 +3219,9 @@ button.app-result:active { background: var(--dw-pressed); }
     justify-content: center;
     gap: var(--app-chip-gap);
     width: 100%;
+    /* (2.0.5 review) a chip's height from the first frame: the badge is shorter than a chip since 2.0.5, so the row
+       drawn with it alone (unseen, until the bridge answers) grew as "Pressings ›" landed, and the songs moved */
+    min-height: var(--app-chip);
     margin-top: var(--app-album-chips-gap);
     container: app-album-chips / inline-size;
 }
@@ -3225,25 +3232,29 @@ button.app-result:active { background: var(--dw-pressed); }
    pressings" landed beside it - now it first shows where it stays (2.0.0-player.41) */
 .app-album-chips.is-waiting > * { visibility: hidden; }
 
+/* (2.0.5, UX batch 2) "In your library" is a BADGE, styled as the app's others are (the tracklist's Bonus chip,
+   .app-rg-chip): shorter than the chips beside it, label-sized, centred on their row - it had a chip's own box,
+   height and padding, and read as a button that did nothing (the review's AP8) */
 .app-held-badge {
     display: inline-flex;
     flex: none;
     align-items: center;
+    align-self: center;
     gap: var(--app-held-badge-gap);
     box-sizing: border-box;
-    height: var(--app-chip);
-    padding: 0 var(--app-chip-pad);
+    height: var(--app-held-badge);
+    padding: 0 var(--app-held-badge-pad);
     border: var(--dw-hairline) solid var(--dw-badge-green-border);
     border-radius: var(--dw-radius-control);
     background: var(--dw-badge-green-bg);
     color: var(--dw-badge-green-text);
-    font-size: var(--dw-text-footnote);
+    font-size: var(--dw-text-label);
     font-weight: var(--dw-weight-semibold);
     white-space: nowrap;
 }
 
 .app-held-badge-icon { flex: none; width: var(--app-held-badge-icon); height: var(--app-held-badge-icon); }
-/* (2.0.0-player.52) "In the store": in the store but not yours - said in the line's grey with no box, no
+/* (2.0.0-player.52) "In the collection" (2.0.5's word; it was "In the store"): in the collection but not yours - said in the line's grey with no box, no
    green and no tick, as the pressing list says it (.app-picker-held.is-store): in the chip's own box it read
    as one more button beside "Other pressings ›" (review) */
 .app-held-badge.is-store {
@@ -3274,32 +3285,22 @@ button.app-result:active { background: var(--dw-pressed); }
 .app-also-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .app-chip-icon { flex: none; width: var(--app-chip-icon); height: var(--app-chip-icon); }
 .app-album-chips > .app-other-pressings { flex: none; }
-/* ...and beside an Also chip, in a row too narrow for the three whole - "In your library" and "Other
-   pressings" take 288px between them, which leaves an Also chip under 312px of a 600px row - it says
-   "Pressings" (its name stays "Other pressings") and "In your library" keeps its green tick and gives
-   up its words - still read, never shown - leaving the Also chip room to say which pressing it is (at
-   320px it was a bare "›"). By the row's own width, so a phone on its side or a tablet says every word,
-   and a desktop's column narrowed by the Edit panel shortens too (at 1280px the Also chip was a bare
-   "›" there). Where container queries aren't known every word shows, and the Also chip gives way. */
-.app-other-short { display: none; }
-
-@container app-album-chips (max-width: 600px) {
-    .app-album-chips:has(.app-also) .app-other-long { display: none; }
-    .app-album-chips:has(.app-also) .app-other-short { display: inline; }
-
-    .app-album-chips:has(.app-also):has(.app-other-pressings) .app-held-badge:not(.is-store) .app-held-badge-text {
-        position: absolute;
-        width: var(--dw-hairline);
-        height: var(--dw-hairline);
-        overflow: hidden;
-        clip-path: inset(50%);
-        white-space: nowrap;
-    }
-
-    /* ...and "In the store", with no tick to keep, gives way WHOLE - still read, never shown, and out of the
-       row, so it leaves neither an empty box nor a gap: the Also chip keeps its room (at 320px its words beside
-       it left "Also: t…"), and the line under Play says the album isn't yours (2.0.0-player.52 review) */
-    .app-album-chips:has(.app-also):has(.app-other-pressings) .app-held-badge.is-store {
+/* ...and beside an Also chip, in a row too narrow for all three whole. (2.0.5, UX batch 2) "Pressings ›" is its one
+   name on every frame (it was "Other pressings" where there was room, "Pressings" where not), and the badge keeps its
+   words wherever the three fit whole - a desktop's column narrowed by Info or the Edit panel included, where it gave
+   them up at any row under 600px and left a bare tick in a chip-sized box, which read as an unlabelled button (the
+   review's M3). Only a row too narrow for "In your library", "Also: the 2014 pressing" and "Pressings" side by side -
+   a phone's: 119 + 182 + 99 + two gaps is 416px, and a 390px phone's row is 350 - gives way, and the badge gives way
+   WHOLE, "In your library" as "In the collection" always has: still read, never shown, and out of the row, so it leaves
+   neither a box nor a gap, and the Also chip keeps the room to say which pressing it is (with the words the Also chip
+   said "Also: the 2014…" at 390px and "A…" at 320). Its tick alone, kept at first, was a bare mark beside the Also
+   chip that read as that pressing ticked, or as nothing (2.0.5 review); the line under Play still says whose the
+   album is - Remove from my library with logins on, and with logins off every album is in your library. The row never
+   wraps instead: a second line landing with the bridge's answer would push the songs down under a finger. By the
+   row's own width (a container), so a phone on its side or a tablet says every word. Where container queries aren't
+   known every word shows, and the Also chip gives way. */
+@container app-album-chips (max-width: 420px) {
+    .app-album-chips:has(.app-also):has(.app-other-pressings) .app-held-badge {
         position: absolute;
         width: var(--dw-hairline);
         height: var(--dw-hairline);
@@ -4467,7 +4468,6 @@ html.app-viewer-open { overflow: hidden; }
 
 /* a release id is one 36-character word: broken anywhere, never run off a phone */
 .app-props-value { min-width: 0; margin: 0; color: var(--dw-text); overflow-wrap: anywhere; }
-.app-props-value.is-mono { font-family: var(--dw-font-mono); }
 .app-props-value.is-quiet { color: var(--dw-text-3); }
 
 /* the release's page, opening beside the app - its target a finger's height, its line's height unmoved.

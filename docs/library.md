@@ -261,11 +261,11 @@ leaves **Needs a look** straight away. **Cancel** (or Escape) goes back to **Rel
 someone whose panel has only **Delete**, closes it.
 
 With logins on the confirmation also says **whose libraries it is in** - "In
-ethan and sam's libraries: deleting it takes it out, and they'll see it was removed by the admin", or,
+ethan and sam's libraries: deleting it takes it out, and they'll see it was removed by an admin", or,
 when it is in yours too, "In your library and ethan's: deleting it takes it out, and ethan will see it
-was removed by the admin" - or that nobody has it. When deadwax can't read who has it (its database
+was removed by an admin" - or that nobody has it. When deadwax can't read who has it (its database
 unavailable) it says that instead, never "nobody". Each of the others then finds it in **You → Your
-library** as **Removed by the admin**, to get again or put away
+library** as **Removed by an admin.**, with **Get it again** (when they may Get albums) and **Dismiss**
 ([the app guide](player.md#your-library-with-logins-on)); it simply leaves yours, since you chose to
 delete it.
 
@@ -399,7 +399,7 @@ Managing deadwax** on a phone, where the page is laid out for it - holds:
   album in the scan's count and two folders here.
 - **Held by nobody** - with logins on, under the runs: the albums nobody has in their
   library (the first 20, then **Show all** - and **Show fewer**), and the flagged downloads with **Add for
-  them** and **Put away** - see [who has an album](#who-has-an-album-with-logins-on).
+  them** and **Dismiss** - see [who has an album](#who-has-an-album-with-logins-on).
 
 The runs are offered once the library has been read from the disk - with the saved copy on screen
 the page says *Checking the library…* first, since the saved copy can be behind.
@@ -450,7 +450,7 @@ it would still name the old artist, and Navidrome would show them as two artists
 
 ## Who has an album, with logins on
 
-With logins on ([sharing deadwax](sharing.md)), every album in the store is in the libraries of the people who
+With logins on ([sharing deadwax](sharing.md)), every album in the collection is in the libraries of the people who
 asked for it - their starred albums in Navidrome ([the app guide](player.md#your-library-with-logins-on)).
 deadwax keeps that true as you look after the library:
 
@@ -464,9 +464,9 @@ deadwax keeps that true as you look after the library:
 - **Moving an artist's albums** under their current name changes only where they are: whoever had them
   still has them.
 - **Deleting an album** takes it out of everyone's library, telling each of the others ([above](#delete)).
-- **Library care → Held by nobody** (an admin's) lists every album in the store that is in
+- **Library care → Held by nobody** (an admin's) lists every album in the collection that is in
   nobody's library - copied in by hand or by another program, or unstarred by everyone who had it - and
   the downloads **flagged** for you: ones whose every file was already in the folder they'd have been
   filed into, but that folder holds another pressing or an untagged rip, so deadwax gave the album to
-  nobody on a guess. **Add for them** gives it to the people who asked after all; **Put away** leaves it.
+  nobody on a guess. **Add for them** gives it to the people who asked after all; **Dismiss** leaves it.
   Either way their row in Requests says what you did.

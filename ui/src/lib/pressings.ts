@@ -194,7 +194,7 @@ export function filterPressings(rows: readonly PressingRow[], typed: string): Pr
   const words = foldText(typed).split(' ').filter(Boolean)
   if (!words.length) return [...rows]
   return rows.filter((row) => {
-    const text = foldText([row.label, row.facts, row.note, row.held ? (row.inStore ? 'in the store' : 'in your library') : ''].join(' '))
+    const text = foldText([row.label, row.facts, row.note, row.held ? (row.inStore ? 'in the collection' : 'in your library') : ''].join(' '))
     const closed = text.replace(/ /g, '')
     return words.every((word) => text.includes(word) || closed.includes(word))
   })

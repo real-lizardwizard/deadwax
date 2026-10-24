@@ -88,9 +88,9 @@
  * sends its folder's quality, and each runner-up's, as candidateQuality puts it.
  *
  * And personal libraries (2.0.0-player.51): a pressing the store holds whole that isn't yours (`yours`
- * false, logins on) is "In the store, not in your library" with a line saying adding downloads nothing,
+ * false, logins on) is "In the collection, not in your library" with a line saying adding downloads nothing,
  * and offers Add to my library - yours, or logins off, is "Already in your library" word for word; a part
- * the store holds that isn't yours is "The store has". AddToLibrary drawn: only where offered and the page
+ * the store holds that isn't yours is "The collection has". AddToLibrary drawn: only where offered and the page
  * gives a way; the tap asks at once and waits (aria-disabled), a second tap asks nothing; refused in an
  * alert with Add back; added, said, its focus handed to the box.
  *
@@ -752,10 +752,10 @@ async function main() {
     const held = { path: 'Portishead/Third (2008)', paths: ['Portishead/Third (2008)'], artist: 'Portishead', album: 'Third', edition: '',
       track_count: 11, expected_tracks: 11, formats: ['flac'], complete: true, fills_gaps: false, filed_to: null }
     const notYours = storeStatusFor({ held: { ...held, yours: false }, downloading: null }, 'Requests')
-    check('held whole, not yours: "In the store, not in your library", what it is, that adding downloads nothing - and Add',
+    check('held whole, not yours: "In the collection, not in your library", what it is, that it is already here - and Add',
       [notYours.title, notYours.lines, notYours.add],
-      ['In the store, not in your library', ['Portishead/Third (2008)', '11 of 11 tracks · FLAC',
-        'Add it to your library to have it starred for you in Navidrome - nothing is downloaded.'], true])
+      ['In the collection, not in your library', ['Portishead/Third (2008)', '11 of 11 tracks · FLAC',
+        "It's already here - add it to your library to keep it with your music."], true])
     const yours = storeStatusFor({ held: { ...held, yours: true }, downloading: null }, 'Requests')
     const off = storeStatusFor({ held, downloading: null }, 'Requests')
     check('...yours, or logins off (no `yours`): "Already in your library" as it always was, no Add',
@@ -764,7 +764,7 @@ async function main() {
     check('a part the store holds that isn\'t yours is the store\'s; yours (or logins off) is yours',
       [storeNotes({ held: { ...part, yours: false }, downloading_part: null, other_pressings: [] })[0].slice(0, 40),
         storeNotes({ held: part, downloading_part: null, other_pressings: [] })[0].slice(0, 40)],
-      ['The store has 9 of 11 tracks of this pre', 'You have 9 of 11 tracks of this pressing'])
+      ['The collection has 9 of 11 tracks of this pressing', 'You have 9 of 11 tracks of this pressing'].map((line) => line.slice(0, 40)))
 
     const { AddToLibrary } = require(path.join(OUT, 'app/StoreState.js'))
     const asked = []
@@ -801,11 +801,11 @@ async function main() {
     tree = drawAdd({ onAdd })
     check('the tap asks at once, the button waiting - still in the tab order; a second tap asks nothing more',
       [(button().props.onClick(), asked), text(button()), button().props['aria-disabled']], [['add'], 'Adding…', true])
-    answerAdd.reject(answered(409, "That pressing isn't in the store now - Get it instead.", '/me/library'))
+    answerAdd.reject(answered(409, "That pressing isn't in the collection now - Get it instead.", '/me/library'))
     await settle()
     tree = drawAdd({ onAdd })
     check('refused: deadwax\'s words in an alert, Add back', [find((node) => node.props?.role === 'alert').map(text), text(button())],
-      [["That pressing isn't in the store now - Get it instead."], 'Add to my library'])
+      [["That pressing isn't in the collection now - Get it instead."], 'Add to my library'])
     const focused = []
     const fakeButton = { closest: (selector) => (selector === '.app-store-box' ? { focus: () => focused.push('box') } : null) }
     globalThis.document = { body: {}, activeElement: fakeButton }
@@ -815,7 +815,7 @@ async function main() {
     await settle()
     tree = drawAdd({ onAdd })
     check('added: said, the button gone, its focus handed to the box', [find((node) => node.type === 'button').length, find((node) => node.props?.role === 'status').map(text), focused],
-      [0, ["Added - it's in your library, and deadwax stars it for you in Navidrome."], ['box']])
+      [0, ['Added to your library.'], ['box']])
     delete globalThis.document
   }
 

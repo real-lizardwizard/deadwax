@@ -541,11 +541,12 @@ export function upNextView(queue: UpNextQueue, repeat: Repeat, limit: number = U
   const paged = state.paged
   const pending = paged ? Math.max(0, paged.total - paged.fetched) : 0
   const again = shown > passPlaying(state, queue.index)
-  const title = paged ? `${paged.scope === 'yours' ? 'Your library' : 'Everything'}, shuffled${again ? ', again' : ''}` : listTitle(state.source, again)
+  const title = paged ? `${paged.scope === 'yours' ? 'Your library' : 'All music'}, shuffled${again ? ', again' : ''}` : listTitle(state.source, again)
   const list = listed.length || pending
     ? { title, rows: listed.slice(0, limit).map(row), more: Math.max(0, listed.length - limit) + pending }
     : null
-  const name = paged ? (paged.scope === 'yours' ? 'your library' : 'everything') : oneAlbum(state.source) ?? 'the list'
+  //? (2.0.5) the collection's shuffle is "all music" here too, as its heading says - never "everything"
+  const name = paged ? (paged.scope === 'yours' ? 'your library' : 'all music') : oneAlbum(state.source) ?? 'the list'
   const then = repeat === 'all'
     ? state.shuffle ? `Then ${name} again, in a new order.` : `Then ${name} again from the top.`
     : repeat === 'off' && queue.index >= queue.tracks.length - 1 ? 'Nothing after this song.' : null

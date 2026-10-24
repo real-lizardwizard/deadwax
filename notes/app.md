@@ -1240,3 +1240,183 @@ the tell of a dry run and of an interrupted filing (errors.sim's table), and the
 exact), pyflakes, tsc, the build, all 64 sims; the engine files no diff. Mutation-checked: the gate's offline line and its
 `offline` mark (errors.sim), the can't-open line (errors.sim), the ping sentence back to a log line (test_error_words),
 the retry's detail shown to anyone (requests.sim), the Getting albums tell dropped (you.sim).
+
+### Your library, Home and the Library in one vocabulary (2.0.5)
+
+James, 2026-10-23: "I want to make sure it all provides a good user experience." This is **batch 2** of the words-and-UX
+review's five (`work/ux-audit/words-ux.md` in the scratch folder: its "Batches" section, the findings X2, #7, #8, #9,
+shot 15, and the A1-A3, A7, A9, A11 and B8 sections), with James's binding decisions (`work/ux-audit/decisions.md`):
+the shared music on the server is **"All music"** as a heading and **"the collection"** in a sentence - never "the
+store", "Browse", "Navidrome" or "everything" in listener text - and **Home's Recently added shows the listener's OWN
+library**. The rest is the review's recommended vocabulary: "your library", "added to your library" (not filed or
+starred), "Dismiss" (not "Put away"), "Get it again", "an admin", "songs" on listener pages, one label for pressings.
+Words and three small UX changes - Home's source, the Properties role check, the badge; no route or status changed,
+nothing heard changed, and the engine files have no diff.
+
+**"The collection", everywhere a person reads it.** `lib/whose.ts` `IN_THE_STORE` is "in the collection" (the
+identifier stays), so every line built on it changed at once: the album page's badge, the album you don't have's line
+and its **Pressing** list, Search's rows and region and late place ("Searching the collection…", "More from the
+collection", "The collection can't be searched just now."), songs' "a pressing in the collection", the artist page
+(its facts headed **In the collection**, "Plays the 2 albums in the collection", "Looking in the collection…"), Info's
+folder heading and artist count, the store box (`lib/myLibrary.ts` "In the collection, not in your library", "The
+collection has 9 of 11 tracks…", "The collection also has another pressing…", the Done rows' "Already in the
+collection…"), Held by nobody's "Every album in the collection is in somebody's library.", People's "the albums stay in
+the collection", the listen-only warning ("They can still play, look through and add what the collection has."). The
+server's own: routes/my_library.py (LOGINS_OFF, the two Add refusals - "That pressing isn't matched to a release on
+MusicBrainz, so it can't be added from here.", "That pressing isn't in the collection now - Get it instead." - REMOVED,
+REMOVE_UNWRITTEN "It's out of your library, but deadwax couldn't save that, so it may come back - try Remove again in
+a moment.", Navidrome keeping the star "It's still in your library - try Remove again in a moment.") and
+routes/held.py's flag refusal ("…isn't in the collection any more - dismiss it."). "Everything" for the collection:
+Up Next's "All music, shuffled", the player bar's "Shuffle - shuffling all music"; the sidebar's "Search everything"
+placeholder is **Search** (Search's own "Artists, albums and songs" didn't fit the field; its aria-label says what it
+searches). Left on purpose: poller.py's job error "already in the store" (a key old rows carry, which the app says in a
+sentence since 2.0.4, and admins' detail), the log's lines, and "the store index" in the docs - a mechanism's name.
+
+**The Library root** (#8): with a library of your own the first group is yours, named so - `SIDEBAR_YOURS`: Recently
+added, **Your albums**, **Your artists** - and the second, headed **All music** (`ALL_MUSIC`, was "Browse"), is the
+collection's: **All albums**, **All artists**, **All songs** (`SIDEBAR_BROWSE`'s labels). No label appears twice across
+the two (whose.sim pins it), the desktop's sidebar has the same two groups and headings, and each page's title is its
+row's own word (`PERSONAL_TITLES`: "All albums" where it was "Albums in the store"). With logins off nothing changed:
+one group, Albums, Artists, Songs. The empty states say "Nothing in your library yet." and "Look through All music and
+add the albums you like, or find new ones in Search and Get them." with **See All music** (was Browse the store);
+"You haven't played anything from your library yet."; with logins off "No albums yet." / "No artists yet." / "No
+songs yet." (`lib/yourLibrary.ts` NO_ALBUMS, NO_ARTISTS, NO_SONGS) - never "in Navidrome".
+
+**Home's Recently added is yours** (#9, James's choice of the review's behaviour option): `app/Home.tsx`
+`recentlyAddedAlbums(personal)` - with a library of your own the Library's own list (app/albumIndex.ts `yours`, sorted
+`newest` by lib/shelves.ts and cut at RECENT_COUNT, as LibraryHome does), so the two shelves never differ; with logins
+off (one library, the collection) getAlbumList2 `newest` at 20 as ever. It is keyed on the `yours` generation
+(useYourAlbumsGeneration - an Add, a Remove, your count moving), and App now calls `refreshIfOld('yours')` as Home
+comes into view too, as it does for the Library tab. App hands Home `personal={hasLibrary()}`. Your library empty, the
+shelf says the Library's two lines. The review saw ethan's Home lead with Dummy and Mezzanine, which weren't in his
+library, while his Library led with his own (shot 16); in a real page now his Home and his Library show the same two.
+
+**Your library in what the person sees** (#7). The album page: "It's already here - add it to your library to keep
+it with your music." over **Add to my library**, "Added to your library." after it; "This album can't be added from
+here - make it a favourite in another music app, and it joins your library." (no release id) and "…from here yet - …"
+(a folder deadwax hasn't found); after a Remove Add can't undo, "To add it back, make it a favourite in another music
+app." You > Your library: "12 albums · 2 waiting to be added"; "N of them is/are missing some songs."; the dead login
+"New albums can't be added to your library until you sign in again. Sign out, then sign in - with your new password if
+you changed it. Nothing is lost meanwhile." (never the server's `login_problem`, which names Navidrome; it also covers
+KEY_CHANGED); waiting with no words "Waiting its turn to be added."; the footnote, Amperfy's one mention: "Your library
+is also in your other music apps, such as Amperfy, as your favourite albums. Making an album a favourite there, or
+taking it out, adds it here or takes it out within a few minutes."; an album an admin deleted "Removed by an admin."
+with **Get it again** and **Dismiss** ("Dismissing…", "<album> dismissed" said), and Held by nobody's **Dismiss** too.
+The delete dialog's holders "…removed by an admin." The server's waiting reasons (src/library_ledger.py PROBLEM_WORDS):
+"The music server hasn't picked it up yet - it's added as soon as it has.", "An admin needs to match it to a release
+on MusicBrainz before it can be added.", "Its files aren't there just now - it's added once they are.", "The music
+server isn't answering - it's added once it does.", "Being added again - nothing for you to do." (not confirmed), "It
+was moved or re-tagged, so it's being added again - nothing for you to do." (a star lost). Saying "Apply a release to
+it in Edit album" to the admin reading it is batch 5's (M8).
+
+**Pins** (H8-H10): "Removed from the collection" - with logins off "Removed from your library" (`pinLine(pin,
+personal)`, Pinned reading hasLibrary()) - "Can't be found right now", "Not ready to play yet".
+
+**The artist page**: "None of their albums are here to play.", "Couldn't load their songs.", "…- the rest didn't load"
+(AR1); its facts' **Songs** (was Tracks); **Now known as** / **Also known here as** (was Now / Also filed as). Artist
+rows count only inside your own library (shot 15): Your artists - and every artist with logins off - "3 albums";
+All artists keeps "3 albums in the collection" (`albumCountLine(count, '')`). Its MusicBrainz words are batch 3's.
+
+**The album page.** The cover viewer's missing words "No cover for this album" (AP10). **Properties** (AP11-AP13): the
+release is **MusicBrainz: View this pressing ↗** - the same link, words not the raw id (so not in the data face: the
+`is-mono` rule went); **Added** (was First seen), ", downloaded here" (was ", filed by deadwax"); the no-release line
+"Not matched to a release - match it in Edit album" only for whoever can Edit albums - `albumProperties(…, edits)`,
+AlbumPage reading `albumEdit(useAccess().permissions).editors` (an admin, an Edit-albums holder, everyone with logins
+off). **Pressings ›** is the chip's one name on every frame (was "Other pressings", "Pressings" in a narrow row; the
+page it opens lists every pressing, as the picker's own "Pressings" does) - `PRESSINGS`, and no long/short spans.
+
+**"In your library" is a badge** (AP8, M3): label-sized (`--dw-text-label`), as tall as the tracklist's Bonus badge
+(`--app-held-badge: var(--app-rg-chip)`, 22px against a chip's 30, its padding `--app-rg-chip-pad`), centred on the
+chips' row - it had a chip's own height, padding and box and read as a button that did nothing. It keeps its words
+wherever "In your library", the Also chip and "Pressings" fit whole: the narrow rule is now a row of 420px or less
+(was 600), measured in a real page - badge 119px + "Also: the 2014 pressing" 182 + "Pressings" 99 + two gaps is 416,
+a 390px phone's row 350, a 1024px desktop's 524, a 1440px desktop's with Info or the Edit panel open 470. There - a
+phone held upright, with an Also chip - it gives way whole, as "In the collection" always has (still read; after
+review - as built it kept a bare tick with no box, which read as the Also pressing ticked); M3 was a desktop with Info
+open, which keeps its words now. With the words kept on a phone the Also chip read "Also: the 2014…" at 390 and "A…"
+at 320.
+
+**Pinned**: ui/test/vocabulary.sim.cjs (new) - a small tokenizer reads what a listener reads in each file (string
+literals that are words, JSX text; comments, imports, class lists, scopes and regex literals left out, nested
+templates followed) and checks the batch's own files say none of "store", "Browse", "Navidrome", starring, "Subsonic",
+"Put away", "Request it again", "the admin", "First seen", "Other pressings", and that no file of the app says "the
+store" - each rule first shown catching a sample. home.sim: Home's shelf source both ways, its order and count, the
+generation, the empty words, never `newest` with a library of your own. app-rules.sim: App's `personal` and
+refreshIfOld for Home, Pressings' one name, Properties' role from useAccess. inspector.sim: the Properties rows and the
+role. whose.sim: the badge's tokens and its narrow rule, the groups' labels (none twice) and titles, the album page's
+lines holding no starring, Subsonic or Navidrome. tests/test_personal_libraries.py: every waiting reason and every
+Add/Remove answer free of store/Navidrome/star/Subsonic, and REMOVED the page's own REMOVED_FROM_PAGE. Updated on
+purpose for the new words: app-rules, artist, group, inspector, mylibrary, people, permissions, pins, requests,
+searchList, searchQuery, search, songs, sources, upnext and whose sims; test_app_css (the badge, the narrow rule),
+test_personal_libraries, test_player_as_you.
+
+**Verified** (as built, before review): 3785 Python tests (3783 passed, 2 skipped; two new in test_personal_libraries),
+pyflakes, tsc, the build, all 65 sims (vocabulary.sim new); the engine files no diff. Mutation-checked (each broken, its
+check seen failing, restored byte for byte): Home's source ignoring `personal` (home.sim, app-rules), App's
+refreshIfOld for Home and its `personal` prop (app-rules), "Not in Navidrome yet", "More from the store", "(starred)"
+in the footnote, a "Browse" heading, "No albums in Navidrome yet.", "Put away", "Other pressings" and a Subsonic line
+each put back (vocabulary.sim, and pins / mylibrary / whose / app-rules where they pin it), the scanner skipping no
+regex literal (vocabulary.sim), the no-release line shown to everyone and AlbumPage passing no role (inspector,
+app-rules), the badge's chip height and the narrow row keeping its box (test_app_css, whose.sim), "All albums" or "Your
+albums" named "Albums" (whose.sim), "Navidrome" in a waiting reason and "the store" in an Add refusal and REMOVED
+differing from the page (test_personal_libraries), Your artists' "in your library" back (whose.sim), pinLine ignoring
+`personal` (pins.sim), the old dead-login sentence (mylibrary, vocabulary). Seen in a real page (headless Chromium as
+deadwax.test, a stand-in Navidrome, logins on and off, 390x844 and 1440x900): ethan (a listener) - Home and the
+Library's Recently added the same two albums of his, the root's Your albums / Your artists / All music (All albums,
+All artists, All songs), the empty states, You's "Your library" and its one footnote, album pages' badge ("In the
+collection" grey; "In your library" a small badge, its tick alone beside an Also chip at 390, 430 and 320 and its words
+at 800, 1024 and 1440 - and at 1440 with Info or the Edit panel open beside the page, the row 470px: M3's case), "Pressings ›", Properties' "MusicBrainz View this pressing ↗" with no no-release line; james
+(an admin) - the no-release line "Not matched to a release - match it in Edit album", All artists' "3 albums in the
+collection", Your artists' "3 albums", the desktop sidebar's Library and All music groups; logins off - one group,
+"3 albums", the collection's newest on Home. No console errors.
+
+**After review** (eleven findings, nine once duplicates are merged; each reproduced by tracing the code or refuted):
+- **"N still being added" said progress for albums that only an admin can move** (a NO_RELEASE entry waits for ever):
+  You > Your library says **"12 albums · 2 waiting to be added"**, true of every waiting state (`libraryLine`;
+  mylibrary.sim pins it), and the docs quoting it changed - troubleshooting.md's heading too (no link pointed at it).
+- **Home's Recently added was described as "what was added to your library recently"** (README, player.md, sharing.md),
+  but it is ordered by Navidrome's `created` - when the COLLECTION got each album - as the Library's own Recently added
+  is (the spec's "same source"; kept). The docs now say so, and that an album you Add that the collection has had a
+  while keeps its old place, so it may be on neither Home shelf (New in your library leaves an Add out on purpose) -
+  it is in Your albums. Ordering by when it joined your library would be a new order for the Library too: James's call.
+- **The bare tick**: on a phone's row with an Also chip the badge kept its tick with no box and no words, which read as
+  the Also pressing ticked. It now gives way whole there, as "In the collection" always has (still read); the line under
+  Play says whose the album is (Add or Remove, logins on - with logins off every album is in your library). The
+  review's alternative, letting the row wrap, was not taken: the second line lands with the bridge's answer and pushes
+  the songs down under a finger, which 2.0.0-player.41 and .52 fixed. And a regression of the badge's own found
+  meanwhile: shorter than a chip (22px against 30), the row drawn with it alone - unseen, until the bridge answers -
+  grew by 8px as "Pressings ›" landed, moving the songs; `.app-album-chips` now holds `min-height: var(--app-chip)`
+  from the first frame (test_app_css, whose.sim).
+- **Get it again offered to someone who may not Get** (its page then says "Getting albums is off for you"): shown only
+  with Get albums (`gets(useAccess().permissions)`, as Search, ReleaseGroupPage and JobCard gate Get); Dismiss stays
+  for everyone (mylibrary.sim, both ways).
+- **Stale words in the docs**: README's "Other pressings" is **Pressings**; downloading.md's "Put away" is **Dismiss**;
+  player.md's and troubleshooting.md's "**Now** row" is **Now known as**.
+- **held.py's reworded refusal unpinned**: test_add_and_remove_answer_in_the_collections_words reads routes/held.py's
+  answers too, each free of store/Navidrome/star/Subsonic and of "put … away".
+- **Not changed - New in your library and Recently added can show one album twice** (a Get filed for you is both new
+  and newest): true, but not 2.0.5's - the collection's newest, the shelf until now, led with that same album too.
+
+Verified after review: 3785 Python tests (3783 passed, 2 skipped), pyflakes, tsc, the build, all 65 sims; the engine
+files no diff. Mutation-checked (each broken, its check seen failing, restored byte for byte): "still being added" back
+(mylibrary.sim), Get it again ungated (mylibrary.sim), the row's min-height gone and the bare tick put back
+(test_app_css, whose.sim), held.py's "put the flag away." back (test_personal_libraries).
+
+**Second review** (four findings, all real; each fix with a check that fails without it):
+- **Up Next still said "everything"**: with Repeat All on a shuffle of all music, its last line read "Then everything
+  again, in a new order." - it is **"Then all music again, in a new order."** now (lib/upNext.ts; upnext.sim). The
+  vocabulary scan missed it because it reads a one-word literal as an identifier (`'everything'`, like `'store'` or a
+  scope), so it now has an "everything" rule for what it does read (a placeholder "Search everything" fails it) and
+  upnext.sim pins the sentence itself.
+- **Held by nobody was outside the scan**: its "Put away" became Dismiss in this batch, but app/HeldByNobody.tsx was
+  not in vocabulary.sim's BATCH; it is now ("Put away" or "put away" back fails it).
+- **Pinned's own wiring was unpinned**: pins.sim checked pinLine both ways but nothing that Pinned hands it
+  `hasLibrary()`. pins.sim now signs in (setSessionMe) and reads a deleted album's card and its Edit row: both
+  "Removed from the collection".
+- **"Amperfy once" was unpinned**: mylibrary.sim counts Amperfy in everything You > Your library draws - once, and
+  that in the footnote.
+
+Verified after the second review: 3785 Python tests (3783 passed, 2 skipped), pyflakes, tsc, the build, all 65 sims;
+the engine files no diff. Mutation-checked: Held by nobody's spoken "put away" and its "Put away" label back
+(vocabulary.sim), `const personal = false` and Edit's row calling pinLine without it (pins.sim), a second Amperfy in
+the footnote (mylibrary.sim), Up Next's 'everything' back (upnext.sim), the sidebar's "Search everything" (vocabulary.sim).

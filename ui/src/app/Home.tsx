@@ -2,13 +2,17 @@ import { useEffect, useMemo, useState } from 'preact/hooks'
 
 import { RECENT_LISTED, notPlayedInAWhile } from '../lib/home'
 import { isAbort, latestOnly } from '../lib/latest'
+import { sortAlbums } from '../lib/shelves'
+import { EMPTY_LIBRARY, EMPTY_LIBRARY_HOW, NO_ALBUMS } from '../lib/yourLibrary'
 import type { RequestRow } from '../lib/requestsView'
 import { albumPage, dropPrefetch, prefetchAlbum, type Album, type NavidromeStatus } from '../player/api'
 import { Cover } from '../player/Cover'
+import { albumIndex } from './albumIndex'
 import { Arriving } from './Arriving'
 import { NeedsNavidrome } from './NeedsNavidrome'
 import { Pinned, type PinnedArtist } from './Pinned'
 import { movePin, removePin, usePins } from './usePins'
+import { useYourAlbumsGeneration } from './useYourAlbums'
 import { errorNote } from './ErrorNote'
 
 /** How many albums the shelf shows. */
@@ -54,17 +58,31 @@ function Tiles({ albums, onOpen }: { albums: readonly Album[]; onOpen: (album: A
   )
 }
 
-/** "Recently added": Navidrome's newest albums (getAlbumList2 `newest`). */
-function RecentlyAdded({ onOpen }: { onOpen: (album: Album) => void }) {
+/**
+ * The albums Home's Recently added shows (2.0.5, UX batch 2 - James: "Home's Recently added shows the listener's OWN
+ * library"): with a library of your own (`personal`), YOURS, newest first - the very list the Library's Recently added
+ * draws (app/albumIndex.ts's `yours`, put in order by lib/shelves.ts, as LibraryHome does), so the two never differ;
+ * with logins off (one library, the collection) Navidrome's newest (getAlbumList2 `newest`), as it always was.
+ */
+export function recentlyAddedAlbums(personal: boolean, signal?: AbortSignal): Promise<Album[]> {
+  if (personal) return albumIndex('yours').then((index) => sortAlbums(index.albums, 'newest').slice(0, RECENT_COUNT))
+  return albumPage('newest', 0, signal, RECENT_COUNT)
+}
+
+/** "Recently added": the newest albums - yours with a library of your own (recentlyAddedAlbums). */
+function RecentlyAdded({ personal, onOpen }: { personal: boolean; onOpen: (album: Album) => void }) {
   const [albums, setAlbums] = useState<Album[] | null>(null)
   //? (2.0.4) the error itself, said by errorNote (app/ErrorNote.tsx) in a listener's words
   const [error, setError] = useState<unknown>(null)
   const requests = useMemo(latestOnly, [])
+  //? (2.0.5) yours asked again as your albums can have changed - an Add, a Remove, your library's count moving -
+  //? as every reader of the list is (app/useYourAlbums.ts); nothing moves it with logins off
+  const generation = useYourAlbumsGeneration()
 
   function load() {
     const request = requests.begin()
     setError(null)
-    albumPage('newest', 0, request.signal, RECENT_COUNT).then(
+    recentlyAddedAlbums(personal, request.signal).then(
       (page) => {
         if (request.current()) setAlbums(page)
       },
@@ -74,10 +92,8 @@ function RecentlyAdded({ onOpen }: { onOpen: (album: Album) => void }) {
     )
   }
 
-  useEffect(() => {
-    load()
-    return () => requests.supersede()
-  }, [requests])
+  useEffect(load, [requests, personal, personal ? generation : 0])
+  useEffect(() => () => requests.supersede(), [requests])
 
   return (
     <section class="app-section app-shelf-section" aria-labelledby="app-recent-title">
@@ -95,8 +111,13 @@ function RecentlyAdded({ onOpen }: { onOpen: (album: Album) => void }) {
         <div class="pl-spinner" aria-label="Loading" />
       ) : albums.length ? (
         <Tiles albums={albums} onOpen={onOpen} />
+      ) : personal ? (
+        <div class="pl-notice app-library-empty">
+          <p>{EMPTY_LIBRARY}</p>
+          <p>{EMPTY_LIBRARY_HOW}</p>
+        </div>
       ) : (
-        <p class="pl-notice">No albums in Navidrome yet.</p>
+        <p class="pl-notice">{NO_ALBUMS}</p>
       )}
     </section>
   )
@@ -165,11 +186,13 @@ function NewInYourLibrary({ albums, onOpen }: { albums: readonly Album[]; onOpen
  * Each shelf is a memoised element, so the pins changing leaves twenty tiles alone.
  */
 function Shelves({
+  personal,
   shown,
   onOpen,
   onOpenArtist,
   newAlbums,
 }: {
+  personal: boolean
   shown: boolean
   onOpen: (album: Album) => void
   onOpenArtist: (artist: PinnedArtist) => void
@@ -185,7 +208,7 @@ function Shelves({
     const timer = setTimeout(() => setWaited(true), PINNED_WAIT_MS)
     return () => clearTimeout(timer)
   }, [shown])
-  const recent = useMemo(() => <RecentlyAdded onOpen={onOpen} />, [onOpen])
+  const recent = useMemo(() => <RecentlyAdded personal={personal} onOpen={onOpen} />, [personal, onOpen])
   const notPlayed = useMemo(() => <NotPlayedInAWhile onOpen={onOpen} />, [onOpen])
   //? (2.0.0-player.51) waited for as the pins are, so its shelf landing never moves the ones under it
   const ready = (pins !== null || problem !== null || waited) && (newAlbums !== null || waited)
@@ -223,6 +246,7 @@ export function Home({
   arrivingTrouble = false,
   shown = false,
   newAlbums = NONE_NEW,
+  personal = false,
 }: {
   status: NavidromeStatus | null
   onRetry: () => void
@@ -240,14 +264,16 @@ export function Home({
   /** (2.0.0-player.51) what is new in your library, as Navidrome albums - null while deadwax hasn't said
    *  (logins on); none with logins off */
   newAlbums?: readonly Album[] | null
+  /** (2.0.5) a library of your own (logins on, signed in through Navidrome): Recently added is yours */
+  personal?: boolean
 }) {
   const shelves = useMemo(
     () => (
       <NeedsNavidrome status={status} onRetry={onRetry}>
-        <Shelves shown={shown} onOpen={onOpen} onOpenArtist={onOpenArtist} newAlbums={newAlbums} />
+        <Shelves personal={personal} shown={shown} onOpen={onOpen} onOpenArtist={onOpenArtist} newAlbums={newAlbums} />
       </NeedsNavidrome>
     ),
-    [status, onRetry, onOpen, onOpenArtist, shown, newAlbums],
+    [status, onRetry, onOpen, onOpenArtist, shown, newAlbums, personal],
   )
 
   return (

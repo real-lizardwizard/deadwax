@@ -67,11 +67,11 @@
  * and the first pressing, and empty again once the list closes - by a pick or by the Pressing button.
  *
  * And with logins on and a library of your own (2.0.0-player.52, second review), drawn as ethan: an album the
- * store holds that isn't his is "in the store" in the meta line, "In the store, not in your library" under Get
- * and "In the store" in the pressing list - the page taking `personal` from the session, never drawn as logins
+ * store holds that isn't his is "in the collection" in the meta line, "In the collection, not in your library" under Get
+ * and "In the collection" in the pressing list - the page taking `personal` from the session, never drawn as logins
  * off; the library asked again every time the page shows; and a library answer kept from earlier in the
  * session (an unstar in Amperfy since, read back) giving way to the store line's fresh word once it lands - the
- * meta line never "in your library" over "In the store, not in your library", nor the other way round. Logins
+ * meta line never "in your library" over "In the collection, not in your library", nor the other way round. Logins
  * off after it: "in your library" and "Already in your library", as ever.
  *
  * Run it with:  node ui/test/group.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
@@ -870,13 +870,13 @@ async function main() {
     first.draw()
     await settle()
     first.draw()
-    check('ethan, Dummy the store\'s and not his: the library asked as the page shows, the meta line "in the store"',
-      [globalThis.__group.ownedAsks, meta()], [1, '1994 · in the store'])
+    check('ethan, Dummy the store\'s and not his: the library asked as the page shows, the meta line "in the collection"',
+      [globalThis.__group.ownedAsks, meta()], [1, '1994 · in the collection'])
     stateAsks.at(-1).resolve(heldLine(false))
     await settle()
     first.draw()
-    check('...under "In the store, not in your library", the pressing on screen marked "In the store"',
-      [meta(), storeLine(), mark()], ['1994 · in the store', 'In the store, not in your library', [true, true, true]])
+    check('...under "In the collection, not in your library", the pressing on screen marked "In the collection"',
+      [meta(), storeLine(), mark()], ['1994 · in the collection', 'In the collection, not in your library', [true, true, true]])
     first.draw({ shown: false })
     const hidden = globalThis.__group.ownedAsks
     first.draw({ shown: true })
@@ -892,8 +892,8 @@ async function main() {
     stateAsks.at(-1).resolve(heldLine(false))
     await settle()
     stale.draw()
-    check('...and the store line\'s fresh word wins: "in the store" over "In the store, not in your library" - never "in your library" over it',
-      [meta(), storeLine(), mark(), / · in your library$/.test(meta())], ['1994 · in the store', 'In the store, not in your library', [true, true, true], false])
+    check('...and the store line\'s fresh word wins: "in the collection" over "In the collection, not in your library" - never "in your library" over it',
+      [meta(), storeLine(), mark(), / · in your library$/.test(meta())], ['1994 · in the collection', 'In the collection, not in your library', [true, true, true], false])
     //? ...and the other way: starred in Amperfy since, read back into his library
     globalThis.__group.owned = owns(false)
     const starred = page({ id: dummy.group.id })

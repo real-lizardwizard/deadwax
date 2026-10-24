@@ -12,6 +12,13 @@ import { formatSize } from './format'
  * one album: its sizes added, the earliest first seen, filed by deadwax when any folder was.
  */
 
+/**
+ * (2.0.5, UX batch 2) In a listener's words: the release is "MusicBrainz: View this pressing ↗" - a link, never the
+ * raw id; "First seen" is "Added" (", downloaded here" for one deadwax filed, never "filed by deadwax"); and the line
+ * saying the album has no release to link to is for those who can do something about it - whoever can Edit albums
+ * (an admin, or someone given Edit albums; everyone with logins off), who match it in Edit album - and nobody else.
+ */
+
 /** One line of Properties: its label, its words, and the release it links to (musicbrainz.org) when it does. */
 export interface PropertyRow {
   label: string
@@ -25,8 +32,12 @@ export interface PropertyRow {
 /** The release's page on musicbrainz.org. */
 export const releaseUrl = (release: string): string => `https://musicbrainz.org/release/${encodeURIComponent(release)}`
 
-/** What the release line says of an album with none to link to. */
-export const NO_RELEASE = 'Not tagged with a MusicBrainz release'
+/** What the release line says of an album with none to link to - to whoever can Edit albums only. */
+export const NO_RELEASE = 'Not matched to a release - match it in Edit album'
+
+/** The release line's link words: the label says where it goes. */
+export const RELEASE_LABEL = 'MusicBrainz'
+export const VIEW_PRESSING = 'View this pressing \u2197'
 
 /** "1994 (this pressing 2014)" when the album's original year isn't this pressing's - the main page's
  *  "(this press …)" - else the one year; '' for neither. */
@@ -37,13 +48,13 @@ export function yearWords(year: string | null | undefined, original: string | nu
   return first || pressing
 }
 
-/** "14 October 2026, filed by deadwax" - a date in the reader's own words, '' for one that isn't a date. */
+/** "14 October 2026, downloaded here" - a date in the reader's own words, '' for one that isn't a date. */
 export function firstSeenWords(iso: string | null | undefined, imported: boolean, locale?: string): string {
   if (!iso) return ''
   const when = new Date(iso)
   if (Number.isNaN(when.getTime())) return ''
   const date = when.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })
-  return `${date}${imported ? ', filed by deadwax' : ''}`
+  return `${date}${imported ? ', downloaded here' : ''}`
 }
 
 /**
@@ -63,6 +74,8 @@ export function albumProperties(
   failed: boolean,
   musicBrainzId: string | null | undefined,
   locale?: string,
+  /** (2.0.5) whoever can Edit albums - the only readers of the no-release line */
+  edits = false,
 ): PropertyRow[] | null {
   if (!store && !failed) return null
   const present = store?.present ?? []
@@ -77,13 +90,13 @@ export function albumProperties(
   if (sizes.length && sizes.length === present.length) rows.push({ label: 'Size', text: formatSize(sizes.reduce((sum, size) => sum + size, 0)) })
 
   const release = (store?.release_mbid || musicBrainzId || '').trim()
-  if (release) rows.push({ label: 'Release', text: release, release })
-  else if (musicBrainzId === '') rows.push({ label: 'Release', text: NO_RELEASE, quiet: true })
+  if (release) rows.push({ label: RELEASE_LABEL, text: VIEW_PRESSING, release })
+  else if (musicBrainzId === '' && edits) rows.push({ label: RELEASE_LABEL, text: NO_RELEASE, quiet: true })
 
   const seen = present.map((row) => row.first_seen).filter((when): when is string => !!when).sort()
   const filed = present.some((row) => row.imported)
   const seenWords = seen.length ? firstSeenWords(seen[0], filed, locale) : ''
-  if (seenWords) rows.push({ label: 'First seen', text: seenWords })
+  if (seenWords) rows.push({ label: 'Added', text: seenWords })
 
   return rows
 }

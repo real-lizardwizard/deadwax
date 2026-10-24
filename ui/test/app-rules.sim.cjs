@@ -1416,7 +1416,12 @@ console.log('\npins: deadwax\'s own, asked when asked, and nothing about them pl
   check('Home asks afresh as it comes into view, and App says when that is - never as the app starts',
     [/const \{ pins, problem \} = usePins\(shown \? 'fresh' : false\)/.test(home), /const homeShown = watching === 'home'/.test(app), /<Home\b[^>]*?shown=\{homeShown\}/.test(app.replace(/\n\s*/g, ' ')),
       //? (2.0.0-player.51) and what is new in your library, which it draws too
-      /\[status, arriving, arrivingTrouble, homeShown, newAlbums\]/.test(app)],
+      /\[status, arriving, arrivingTrouble, homeShown, newAlbums, personal\]/.test(app)],
+    [true, true, true, true])
+  check('(2.0.5) Home\'s Recently added is YOURS with a library of your own - App hands Home hasLibrary(), and asks your list again as Home shows, as the Library does',
+    [/const personal = hasLibrary\(\)/.test(app), /<Home\b[^>]*?personal=\{personal\}/.test(app.replace(/\n\s*/g, ' ')),
+      /if \(homeShown && hasLibrary\(\)\) refreshIfOld\('yours'\)/.test(app),
+      /if \(personal\) return albumIndex\('yours'\)\.then\(\(index\) => sortAlbums\(index\.albums, 'newest'\)\.slice\(0, RECENT_COUNT\)\)/.test(home)],
     [true, true, true, true])
   check('...the shelves drawn once the pins have answered, or failed, or the wait - counted only while Home shows - is over',
     //? (2.0.0-player.51) and, as the pins are, what is new in your library - so its shelf never moves those under it
@@ -2336,7 +2341,10 @@ console.log('\ninside a track (2.0.0-player.44): the track inspector, the cover 
       /window\.removeEventListener\('popstate', moved\)\s*window\.removeEventListener\('hashchange', moved\)/.test(viewer)],
     [true, true])
   check('an album page\'s Properties: from the bridge answer it asks already - no new request - drawn under the songs',
-    [(page.match(/storeAlbum\(/g) ?? []).length, /<AlbumProperties rows=\{albumProperties\(store, storeFailed, releaseSaid\)\} \/>/.test(page),
+    [(page.match(/storeAlbum\(/g) ?? []).length,
+      //? (2.0.5) the no-release line for whoever can Edit albums, as /me last said it (useAccess - drawn again as it changes)
+      /<AlbumProperties rows=\{albumProperties\(store, storeFailed, releaseSaid, undefined, albumEdit\(access\.permissions\)\.editors\)\} \/>/.test(page)
+        && /const access = useAccess\(\)/.test(page),
       page.indexOf('<AlbumProperties') > page.indexOf('class="pl-album-footer"')],
     [1, true, true])
   //? (review) "not tagged" only on Navidrome's own word for the album - the bridge's null is also its answer for
@@ -2484,10 +2492,11 @@ console.log('\nGet, as the main page had it (2.0.0-player.41)')
   const sheet = code(read('app/Sources.tsx'))
   const hook = code(read('hooks/useCandidateSearch.ts'))
   //? another pressing of an album you hold: the album page's last chip, to the group's page with no preview
-  check('the album you have: "Other pressings" last in the chip row drawn from the first frame, opening its group',
+  check('the album you have: "Pressings" (2.0.5: one name on every frame) last in the chip row drawn from the first frame, opening its group',
     [album.indexOf('<div class={`app-album-chips') >= 0 && album.indexOf('<div class={`app-album-chips') < album.indexOf('{chips.map(') && album.indexOf('{chips.map(') < album.indexOf('app-other-pressings')
       && album.indexOf('app-other-pressings') < album.indexOf('<div class="pl-hero-actions">'),
-      /\{group && onOpenGroup && \(\s*<button\s+type="button"\s+class="app-chip app-other-pressings"\s+aria-label="Other pressings"\s+onClick=\{\(\) => onOpenGroup\(\{ id: group, title: shown\?\.name \?\? '' \}\)\}/.test(album),
+      /\{group && onOpenGroup && \(\s*<button\s+type="button"\s+class="app-chip app-other-pressings"\s+onClick=\{\(\) => onOpenGroup\(\{ id: group, title: shown\?\.name \?\? '' \}\)\}\s*>[\s\S]{0,400}?\{PRESSINGS\}\s*<ChevronRightIcon/.test(album)
+        && /export const PRESSINGS = 'Pressings'/.test(album) && !/app-other-(long|short)|Other pressings<\/span>/.test(album),
       /const group = otherPressingsGroup\(store\)/.test(album), /onOpenGroup=\{openHeldGroup\}/.test(app)],
     [true, true, true, true])
   const held = /const openHeldGroup = useCallback\(\(group: \{ id: string; title: string \}\) => \{([\s\S]*?)\n  \}, \[\]\)/.exec(app)?.[1] ?? ''
@@ -2500,7 +2509,7 @@ console.log('\nGet, as the main page had it (2.0.0-player.41)')
       //? (2.0.0-player.52) and which of those are yours: "In the store" for one that isn't, with a library of your own
       //? (2.0.0-player.53) the pressing asked for: the address's, else - opened from a song - one with the song
       /pressingsView\(releases, asked, heldIds, yoursIds\)/.test(page),
-      /\{row\.held && <span class=\{`app-picker-held\$\{row\.inStore \? ' is-store' : ''\}`\}>\{row\.inStore \? 'In the store' : 'In your library'\}<\/span>\}/.test(code(read('app/PressingPicker.tsx')))],
+      /\{row\.held && <span class=\{`app-picker-held\$\{row\.inStore \? ' is-store' : ''\}`\}>\{row\.inStore \? 'In the collection' : 'In your library'\}<\/span>\}/.test(code(read('app/PressingPicker.tsx')))],
     [true, true, true])
   //? James's decision kept (pin both): Search's MusicBrainz half leaves held groups out, and the artist
   //? page's held rows still open the album you have - the way to another pressing is the album page's

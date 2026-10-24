@@ -32,9 +32,13 @@ deadwax too, in **People**. Then, for each person:
   ([Downloading → downloads per person](downloading.md#with-logins-on-downloads-per-person).)
 - **Their own library.** Each person's library is **their favourites in Navidrome** - their starred
   albums - so Amperfy, or any other Subsonic app signed in as them, shows the same albums. What they
-  get is starred for them once it's filed; an album the store already has is a tap away
+  get is starred for them once it's filed; an album the collection already has is a tap away
   (**Add to my library**, nothing downloaded); starring or unstarring an album in Amperfy is read
-  back within five minutes. **Remove from my library** only unstars it - nothing is deleted.
+  back within five minutes. **Remove from my library** only unstars it - nothing is deleted. The app says
+  all this in their words, not Navidrome's: **Added to your library.**, "waiting to be added", "Your library is
+  also in your other music apps, such as Amperfy, as your favourite albums." - and the music everyone shares
+  is **All music** in the Library, "the collection" in a sentence. Home's **Recently added** is their own
+  albums the collection got most recently (since 2.0.5), as the Library's is.
   ([Your library](player.md#your-library-with-logins-on).)
 - **Their own player.** The app plays as them, so their plays, play counts, **Recently played** and
   **Not played in a while** are theirs, and plays go on to their own Last.fm or ListenBrainz if they
@@ -55,8 +59,9 @@ deadwax too, in **People**. Then, for each person:
 
 **What stays shared:**
 
-- **One store.** Everything anyone gets is filed into the same music folder, once. Everyone can look
-  through all of it (**Browse** in the Library) and add any of it to their own library. There is no
+- **One collection.** Everything anyone gets is filed into the same music folder, once. Everyone can look
+  through all of it (**All music** in the Library: All albums, All artists, All songs) and add any of it to
+  their own library. There is no
   per-person storage or quota.
 - **One slskd.** Every download comes through your slskd and your Soulseek account. Searches start
   one at a time across everyone (each waits a moment for its turn), so two people searching at once
@@ -196,9 +201,9 @@ You were deadwax's one user until now (deadwax calls that user `local`). When lo
   albums settings, and every download made before (they show in that admin's Requests). What that admin
   had already set wins over the old. If an admin is still signed in from earlier - a session lasts 30
   days and outlives a restart - it's taken over on their first visit instead.
-- **The store goes into the first Navidrome admin's library**, once ever: every album already in it is
+- **The collection goes into the first Navidrome admin's library**, once ever: every album already in it is
   put in that admin's library and **starred for them in Navidrome** - so their Navidrome favourites, and
-  Amperfy's, fill with the whole store. There's no undo for all of them at once: unstar them in Amperfy,
+  Amperfy's, fill with the whole collection. There's no undo for all of them at once: unstar them in Amperfy,
   or **Remove from my library** in deadwax, one album at a time. So sign in first with the account you
   listen on (made a Navidrome admin), not a separate managing account. An album already starred is only
   checked, never starred again, so the date Navidrome shows for it stays. That's yours - it was all yours
@@ -206,14 +211,14 @@ You were deadwax's one user until now (deadwax calls that user `local`). When lo
   which is theirs. If deadwax hasn't scanned the library yet (a new install, or an upgrade from a
   version whose saved scan it can't read), this waits for its first scan - which deadwax starts by
   itself, in the background, as it starts (a search or **Library care → Rescan** starts one too). Both wait for a
-  **Navidrome admin's** sign-in: on an install where nobody signing in is one, the store goes into
+  **Navidrome admin's** sign-in: on an install where nobody signing in is one, the collection goes into
   nobody's library until someone is made one. Once done, neither happens again for a second admin - an
   admin who signs in later starts as anyone new does.
 - **Everyone else starts with an empty library**, apart from albums they had already starred in
-  Navidrome that the store holds: those are read back and added (without a **New** mark - they were
+  Navidrome that the collection holds: those are read back and added (without a **New** mark - they were
   theirs already).
 - **Plays, playlists and favourites** are Navidrome's, and stay where they are - the first admin's
-  favourites gaining the store's albums, above, is the one thing added to them. With logins off, the
+  favourites gaining the collection's albums, above, is the one thing added to them. With logins off, the
   player played as `NAVIDROME_USER`; with logins on, it plays as whoever is signed in. So if
   `NAVIDROME_USER` is your own account, your play counts and playlists carry on as yours; if it was a
   separate account, what it played and made stays that account's.
@@ -244,10 +249,10 @@ says so under each password field.
 
 **The first time**, they see the app without any managing: no **Managing deadwax** or **Connections**
 in You, no **Edit** on an album; when something fails they're told what happened and what to do -
-try again, or tell whoever runs deadwax - never an error's own words. Their Library says **Nothing in your library yet.**, with **Browse the store**,
-where the whole store is. Home has no pins yet; their Getting albums settings are the defaults, or what the old page at `/` had
+try again, or tell whoever runs deadwax - never an error's own words. Their Library - and Home's Recently added - says **Nothing in your library yet.**, with **See All music** in
+the Library, where the whole collection is. Home has no pins yet; their Getting albums settings are the defaults, or what the old page at `/` had
 left in that browser, carried over once ([configuration](configuration.md#your-settings-in-the-app-per-user-on-deadwax)). From
-there they search, **Get** what they want, or add what the store already has. They stay signed in on
+there they search, **Get** what they want, or add what the collection already has. They stay signed in on
 that device for 30 days from the last time they used it; **You → About → Sign out** signs them out.
 
 To make someone an admin, use **Make admin** on their row in People, or tick **Admin** for them in
@@ -259,7 +264,7 @@ admin's job, tick it under their **Permissions** instead ([below](#admins-permis
 - **Removing a person.** In People, **Remove…** on their row opens a dialog saying exactly what goes:
   in Navidrome, for good, their account, play counts and history, favourites, every playlist they own
   (shared ones too) and their Last.fm or ListenBrainz link; in deadwax, their sign-ins, library list,
-  pins, play queue, Getting albums settings and permissions. Every album stays in the store, and a download only
+  pins, play queue, Getting albums settings and permissions. Every album stays in the collection, and a download only
   they were waiting for carries on, filed for nobody (cancel it in Requests first if nobody wants it).
   There's no undo: type their user name to remove them. They're signed out on every device at once.
   If they may come back, reset their password instead.
@@ -287,7 +292,7 @@ admin's job, tick it under their **Permissions** instead ([below](#admins-permis
   other app they use need it too. Their library stays. (You can't reset your own there - change it in
   **You → Change password**, which needs the one you have; a forgotten admin password needs another admin's
   People, or Navidrome itself.) A password changed in Navidrome itself signs them out within about six
-  minutes, and **You → Your library** says in red that deadwax can't star albums for them until they
+  minutes, and **You → Your library** says in red that new albums can't be added to their library until they
   sign in again; nothing waiting is lost.
 - **Making someone an admin, or no longer one**: **Make admin** / **No longer admin** in People, which
   says first what it gives (or that they keep every library Navidrome gave them as an admin), and is in
@@ -335,8 +340,8 @@ else can do what the left column says, and an admin can give any of them more, b
   deadwax's own, which People won't touch - set to someone's own account, it would put them out of People's
   reach; and slskd's API key, which goes to slskd's address, is full control of slskd. For anyone else they
   show locked ("Only an admin can change this").
-- **A listen-only account**: untick **Get albums** for them. They can still play, browse and add what
-  the store has; Get becomes "Getting albums is off for you - ask an admin."
+- **A listen-only account**: untick **Get albums** for them. They can still play, look through and add what
+  the collection has; Get becomes "Getting albums is off for you - ask an admin."
 - **Bound to the account**: a permission is given to that Navidrome account, not just the name - an
   account removed and made again under the same name doesn't inherit it. deadwax checks the account
   as they sign in (one Navidrome sign-in as them, only for someone given something); if it can't, what
@@ -354,7 +359,7 @@ starts a download). Library care shows with Edit albums or Look after the librar
 The app doesn't show anyone what they can't use - Managing in You and the sidebar shows a row per
 permission, an album's **Edit** its editors or its Delete, an artist's page its managing - and deadwax
 refuses it if asked anyway ("That needs Edit albums, which an admin hasn't given you."). Everyone can
-still look at everything in the store: albums, their tracks, covers, lyrics and artists. A download
+still look at everything in the collection: albums, their tracks, covers, lyrics and artists. A download
 that fails says why on the asker's own row in Requests; the event log, which also records who signed
 in and every change made in People, is Settings and the log's.
 
@@ -369,8 +374,8 @@ something else that asks for a password.
   pins, and Getting albums starts again from its defaults (or what the old page at `/` had left in
   that browser, carried over once, as on a first visit). Each person's library, pins and kept login stay too,
   untouched, and the stars in Navidrome stay as they are (deadwax unstars nothing).
-- **Back to one**: there's one library again - the whole store - and "in your library" means the
-  store. Every download is listed, and **Clear done** in Requests
+- **Back to one**: there's one library again - the whole collection - and "in your library" means the
+  collection. Every download is listed, and **Clear done** in Requests
   forgets every finished one. The player
   plays as `NAVIDROME_USER` again, so plays, playlists and the play queue are that account's, shared by
   everyone.
@@ -385,8 +390,8 @@ something else that asks for a password.
   (**You → Change password**); forgotten, an admin resets it in People.
 - **No choosing a person's Navidrome libraries**: People warns when a new account got none - tick them
   in Navidrome's own Users page.
-- **No per-person storage or quotas**: there's one store, and one copy of each album in it.
-- **No private albums**: anyone signed in can browse the whole store. Your library is which albums
+- **No per-person storage or quotas**: there's one collection, and one copy of each album in it.
+- **No private albums**: anyone signed in can look through the whole collection. Your library is which albums
   are yours, not who may see them - unless Navidrome itself gives users separate libraries, in which
   case deadwax only ever plays someone a song Navidrome would give them.
 - **No roles beyond admin**: someone is a Navidrome admin or they aren't - what an ordinary person may

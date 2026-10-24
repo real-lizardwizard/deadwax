@@ -97,7 +97,7 @@ export function HeldByNobody({ live }: { live: boolean }) {
     ;(how === 'add' ? addFlagged(flagId) : dismissFlag(flagId)).then(
       (result) => {
         const users = 'users' in result ? result.users : []
-        setSaid(how === 'add' ? (users.length ? `${name}: given to ${users.join(', ')}` : `${name}: nobody to give it to`) : `${name}: put away`)
+        setSaid(how === 'add' ? (users.length ? `${name}: given to ${users.join(', ')}` : `${name}: nobody to give it to`) : `${name}: dismissed`)
         done()
       },
       (caught: unknown) => {
@@ -147,7 +147,7 @@ export function HeldByNobody({ live }: { live: boolean }) {
                         Add for them
                       </button>
                       <button type="button" class="app-text-button" aria-disabled={busy === flag.id} onClick={() => act(flag.id, 'dismiss')}>
-                        Put away
+                        Dismiss
                       </button>
                     </span>
                   </li>

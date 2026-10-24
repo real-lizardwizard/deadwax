@@ -23,8 +23,9 @@ In order of likelihood:
 4. **Permissions.** Files are written as `PUID`/`PGID`. If the library folder belongs to someone
    else, writing fails and the log says so.
 5. **The album was already there.** A track the album's folder already has (in any format) is
-   never filed again, so a second copy of an album is left in slskd's folder, and the download
-   reads *already in the store*. See [organizing](organizing.md).
+   never filed again, so a second copy of an album is left in slskd's folder, and the download's
+   row in Requests says it was already there ("Already in your library, nothing filed" - with logins
+   on, "Already in the collection, added to your library"). See [organizing](organizing.md).
 
 ## A download says "N file(s) failed to organize"
 
@@ -565,7 +566,7 @@ with **Try again** (what it said before stays on screen meanwhile); if it keeps 
 isn't answering deadwax, or its last scan doesn't list them yet - see
 [the library is empty](#needs-a-look-or-library-care-says-the-library-is-empty-or-doesnt-show-a-change). **Move albums to …**
 shows only when MusicBrainz's name for them differs from a name your library files their albums
-under (the **Now** row), and only once MusicBrainz has answered; both are an admin's. A move that says
+under (the **Now known as** row), and only once MusicBrainz has answered; both are an admin's. A move that says
 an album stays names why - a collaboration, one tagged as another artist, a folder of that name
 already there under the new name (or another of their albums moving there), or a track that can't be
 read ("'03 Three.flac' can't be read, so its tags can't be written": a file cut short or damaged, or
@@ -748,7 +749,7 @@ What follows is a password changed in Navidrome itself, or in Amperfy.) Every fe
 Navidrome whether the login you signed in with still stands. After you
 change your Navidrome password - or your account is deleted - that answer is no, and within about six
 minutes deadwax signs you out on every device. The player asks Navidrome as you, so it is often
-sooner: the first thing the app asks of Navidrome with the old login - opening Browse or
+sooner: the first thing the app asks of Navidrome with the old login - opening All music or
 an album, a cover, the next song - is refused, and that session ends there and then (another device
 ends at its own first refusal, or at the six-minute check). Nothing more is asked with the old login,
 and until Navidrome has taken a login in the last few seconds the app's requests go to it one at a time,
@@ -765,16 +766,17 @@ songs: once you've signed in, play the album again. Changing `DEADWAX_SECRET_KEY
 the container) signs everyone out too, each session at its next request ("deadwax's sign-ins have been reset
 since you signed in - sign in again."; the log names the key).
 
-### Your library says deadwax can't star albums for you
+### Your library says new albums can't be added until you sign in again
 
-With logins on, deadwax stars what goes into your library **as you**, with the login you last signed in
-with. After you change your Navidrome password in Navidrome or Amperfy that login stops working (changed in
-deadwax's **You → Change password**, deadwax keeps the new one and this doesn't happen), and
-**You → Your library** says so in red: "deadwax can't star albums for you: Navidrome no longer accepts
-the login you signed in with". Nothing is lost - what you get meanwhile is kept, waiting. Sign out
-(**You → About → Sign out**) and sign in with your new password: deadwax keeps the new login and stars
-everything waiting within a few seconds. Changing `DEADWAX_SECRET_KEY` does the same ("DEADWAX_SECRET_KEY
-has changed since you signed in"). Signing out by itself doesn't stop deadwax starring for you.
+With logins on, deadwax stars what goes into your library **as you** in Navidrome, with the login you last
+signed in with. After you change your Navidrome password in Navidrome or Amperfy that login stops working
+(changed in deadwax's **You → Change password**, deadwax keeps the new one and this doesn't happen), and
+**You → Your library** says so in red: "New albums can't be added to your library until you sign in again.
+Sign out, then sign in - with your new password if you changed it. Nothing is lost meanwhile." Nothing is
+lost - what you get meanwhile is kept, waiting. Sign out (**You → About → Sign out**) and sign in with your
+new password: deadwax keeps the new login and stars everything waiting within a few seconds. Changing
+`DEADWAX_SECRET_KEY` does the same (the sign-in says "deadwax's sign-ins have been reset since you signed in
+- sign in again."). Signing out by itself doesn't stop deadwax starring for you.
 
 ### "Too many tries for … - wait N seconds and try again"
 
@@ -835,8 +837,8 @@ if you were signed out, or "That needs Settings and the log…" if it was taken 
 
 ### "Getting albums is off for you - ask an admin."
 
-An admin unticked **Get albums** for you in People: you can still play, browse and add what the store has
-to your library, but not search Soulseek or download. Only an admin can give it back.
+An admin unticked **Get albums** for you in People: you can still play, look through and add what the
+collection has to your library, but not search Soulseek or download. Only an admin can give it back.
 
 ### "...the extra permissions an admin gave you are off until you sign in again"
 
@@ -1020,8 +1022,9 @@ needs to know which MusicBrainz artist it is.
 - **Play and Shuffle stay grey**: they wait until every album of theirs you have has come from
   Navidrome, and until your library has said which of Navidrome's albums are copies of one album
   (so both of a pressing you hold twice aren't played). If Navidrome didn't send some, the line
-  under them says so, with **Try again**; "Navidrome has none of their albums to play" means just
-  that - an album only your library has, Navidrome hasn't found yet.
+  under them says so ("Couldn't load their songs.", or "Plays 2 of the 3 albums you have - the rest didn't
+  load"), with **Try again**; "None of their albums are here to play." means Navidrome has none of their
+  albums - an album only your library has, Navidrome hasn't found yet.
 - **An album on an artist's page says neither "in" nor "not in your library", with no Get**: your
   library hasn't answered yet (the first look after deadwax restarts walks the whole library). It
   says once it does.
@@ -1059,27 +1062,28 @@ first time (an estimate: it hasn't been timed on one yet); within ten minutes of
 ## The app's Library looks empty
 
 With logins on the **Library** tab is **your** library - your starred albums
-in Navidrome - not the whole store. An account that hasn't starred anything yet, and hasn't had
-anything filed for it, sees **Nothing in your library yet** - in any order, Recently played too - and
-the same under Artists: tap **Browse the store** (or a row of the Library's **Browse** group - on a desktop,
-the sidebar's **Browse** group) for every album deadwax holds, and open one to **Add to my library**. A few
-more things that make your library look short:
+in Navidrome - not the whole collection, and so is Home's **Recently added** (since 2.0.5). An account that
+hasn't starred anything yet, and hasn't had anything filed for it, sees **Nothing in your library yet.** - in
+any order, Recently played too, and on Home - and the same under Your artists: tap **See All music** (or a row of
+the Library's **All music** group - on a desktop, the sidebar's **All music** group) for every album deadwax
+holds, and open one to **Add to my library**. A few more things that make your library look short:
 
-- **An album waiting to be starred** isn't there yet: your Library lists what Navidrome has starred for
+- **An album waiting to be added** isn't there yet: your Library lists what Navidrome has starred for
   you, and a download is starred once Navidrome has scanned it. **You → Your library** says what's
-  waiting, and why.
+  waiting to be added, and why.
 - **An album with no MusicBrainz release id** can't be added from its page (deadwax keeps your library
-  by release, and the page says so). Star it in Amperfy - your Library is your Navidrome favourites, so
-  it shows there - or have an admin match its release.
-- **The break-glass `deadwax`** has no library of its own: its Library is the whole store.
+  by release, and the page says so: "This album can't be added from here - make it a favourite in another
+  music app, and it joins your library."). Star it in Amperfy - your Library is your Navidrome favourites,
+  so it shows there - or have an admin match its release.
+- **The break-glass `deadwax`** has no library of its own: its Library is the whole collection.
 
 ## The Library shows the first 10000 albums
 
-The app's Library has each list - your albums, or the store's - from deadwax in one
+The app's Library has each list - your albums, or the collection's - from deadwax in one
 answer, which reads Navidrome's albums 500 at a time and stops at 10,000 (twenty pages), so a page of it
 says **Showing the first 10000 albums - deadwax reads at most that many.** and counts 10000. The rest are
 still in Navidrome and in deadwax: **Search** finds them, and an artist's page lists all of theirs. For your
-albums it's the 10,000 you starred most recently; for the store's, the 10,000 Navidrome had most recently.
+albums it's the 10,000 you starred most recently; for the collection's, the 10,000 Navidrome had most recently.
 
 ## The Library's albums are in a different order
 
@@ -1087,7 +1091,7 @@ The app's Library opens **Albums** by **Artist** (each artist's albums oldest fi
 chose an order - **Recently added** has its own place, as the Library list's grid and its **See all**. Choose
 another from the sort at the top of the page: it's remembered on that device, and so is the artists' order. Names are sorted the way
 deadwax compares them - "The" at the front set aside, accents and case aside, digits and symbols under **#**
-after Z - in the store's lists too, so an album or two can sit where Navidrome's own web page wouldn't put it
+after Z - in the collection's lists too, so an album or two can sit where Navidrome's own web page wouldn't put it
 (Navidrome also sets aside "La", "El" and others, and puts compilations last).
 
 ## The app's Home has no "Not played in a while"
@@ -1101,57 +1105,65 @@ ones Navidrome counts for the account the player asks as - `NAVIDROME_USER` with
 with them on - so plays made in another app under another Navidrome user don't
 count.
 
-## A pinned album says "Removed from the store", "Not on disk just now" or "Not in Navidrome yet"
+## A pinned album says "Removed from your library", "Can't be found right now" or "Not ready to play yet"
 
-- **Removed from the store**: the album was deleted (**Edit → Delete**). Unpin it from Home's **Edit**,
-  or get it again - the pin opens the new copy of the same pressing once it's filed.
-- **Not on disk just now**: its folder isn't where deadwax last saw it - usually a share or
+- **Removed from your library** (with logins on, **Removed from the collection**): the album was deleted
+  (**Edit → Delete**). Unpin it from Home's **Edit**, or get it again - the pin opens the new copy of the
+  same pressing once it's filed.
+- **Can't be found right now**: its folder isn't where deadwax last saw it - usually a share or
   disk that isn't mounted. It opens again once the folder is back and deadwax has looked at your
   library again: **Library care → Rescan** scans at once. A
   folder moved by hand outside deadwax is matched up by that scan too, and the pin follows it.
-- **Not in Navidrome yet**: deadwax has the album, but Navidrome doesn't, or not as that
+- **Not ready to play yet**: deadwax has the album, but Navidrome doesn't, or not as that
   release - it may still be scanning after a download or a re-file. Come back to Home in a moment:
   it asks again each time it's shown. If it stays, check that Navidrome can see the folder and that
   the album's files carry its MusicBrainz release id (Navidrome's `musicBrainzId` on the album).
 
-## An album in my library isn't starred in Amperfy, or "waiting to be starred"
+## An album in my library isn't starred in Amperfy, or is "waiting to be added"
 
 With logins on your library is your starred albums in Navidrome, and **You →
-Your library** says how many are still waiting to be starred, and why:
+Your library** says how many are waiting to be added ("12 albums · 2 waiting to be added") - albums deadwax
+hasn't starred for you yet, some of which only an admin can move along - and why:
 
-- **"Navidrome hasn't got it yet"** - it was filed, and Navidrome hasn't scanned it. Navidrome's watcher
+- **"The music server hasn't picked it up yet - it's added as soon as it has."** - it was filed, and
+  Navidrome hasn't scanned it. Navidrome's watcher
   usually picks a new folder up within a minute; deadwax asks again after 30 seconds, a minute, two, and
   so on up to every half hour, until the star holds. If it never comes: Navidrome isn't reading the
   folder deadwax files into (`LIBRARY_PATH` and Navidrome's music folder must be the same folder), or
   the folder's files don't carry the release id Navidrome is asked for. **Needs a look** raises a folder
   Navidrome doesn't list as **Not in Navidrome**.
-- **"It has no MusicBrainz release id"** - deadwax finds an album in Navidrome by its release id, so an
+- **"An admin needs to match it to a release on MusicBrainz before it can be added."** - it has no
+  MusicBrainz release id: deadwax finds an album in Navidrome by its release id, so an
   untagged album can't be starred by deadwax. An admin can apply a release to it (its Edit panel's
   **Release**); it is starred once it has one. Or star it yourself in Amperfy: deadwax then matches it
   by its album artist and name (when exactly one starred album without a release id has them, and only
   one of your waiting albums without one does - two pressings of one album by the same name both stay
   waiting, since which you starred can't be told) and counts it as starred within five minutes.
-- **"Its folder isn't there just now"** - the album's folder is missing (an unmounted share, say).
-  deadwax asks again once it's back.
-- **"Navidrome isn't answering"** - deadwax asks again by itself.
-- **"Navidrome took the star but didn't keep it"** - Navidrome said yes, and the album didn't come back
-  starred. deadwax tries again; if it keeps happening, look in Navidrome's log.
-- **In red, "deadwax can't star albums for you"** - see [Signing in](#your-library-says-deadwax-cant-star-albums-for-you).
+- **"Its files aren't there just now - it's added once they are."** - the album's folder is missing (an
+  unmounted share, say). deadwax asks again once it's back.
+- **"The music server isn't answering - it's added once it does."** - Navidrome isn't answering; deadwax
+  asks again by itself.
+- **"Being added again - nothing for you to do."** - Navidrome said yes to the star, and the album didn't
+  come back starred. deadwax tries again; if it keeps happening, look in Navidrome's log. **"It was moved or
+  re-tagged, so it's being added again - nothing for you to do."** is a star Navidrome lost (the album came
+  back under another id after a re-file or a retag): deadwax puts it back.
+- **In red, "New albums can't be added to your library until you sign in again"** - see
+  [Signing in](#your-library-says-new-albums-cant-be-added-until-you-sign-in-again).
 
 **The first admin's library is empty after signing in** (a new install, or an upgrade from a version
-whose saved scan deadwax can't read): the albums already in the store go into it after deadwax's first
+whose saved scan deadwax can't read): the albums already in the collection go into it after deadwax's first
 scan of the library, which the event log says ("deadwax hasn't scanned the library yet…"). deadwax starts
 that scan by itself, in the background, as it starts ("reading every album's tags once now"); on a big
 library it takes a few minutes. Once it's done, the event log says how many albums went into the library,
 and deadwax stars them. If the log says the scan at start-up failed, search for something or press
 **Library care → Rescan** to scan again.
 
-**An album page says "deadwax hasn't found this album's folder in the store"** just after the upgrade:
+**An album page says "This album can't be added from here yet"** just after the upgrade:
 the same first scan hasn't finished yet - album pages can offer **Add** once it has. Give it a few
 minutes (the event log says when it's done), or press **Library care → Rescan**.
 
 An album you **unstar** in Amperfy is taken out of your library at deadwax's next look (every five
-minutes) - deadwax never stars it back. An album you star there is added the same way, if the store
+minutes) - deadwax never stars it back. An album you star there is added the same way, if the collection
 holds it: deadwax finds it by its release id, so a starred album Navidrome reads no release id from
 isn't added. After an admin applies a release to an album, Navidrome may show it unstarred for a moment:
 deadwax notices it is the same album under a new id, or missing mid-scan, and stars it again rather
@@ -1261,7 +1273,7 @@ finds it](library.md#which-folder-and-after-an-edit)). What it says when it can'
   Navidrome**, or **Ignored** once accepted).
 - **"Which one is it?"**, with a list of folders: more than one untagged folder has the album's name
   and artist (its number of tracks didn't tell them apart). Pick the one this page plays.
-- **"The library's scan doesn't list … yet"**: the store knows the folder but the library's last scan
+- **"The library's scan doesn't list … yet"**: the store index knows the folder but the library's last scan
   doesn't. **Look again** scans it.
 - **"deadwax couldn't read the library: …"**: reading the library failed - often a reverse proxy
   giving up on a first scan of a large or sleeping library, or a moment without the network. **Look

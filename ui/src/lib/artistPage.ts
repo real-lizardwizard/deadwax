@@ -351,12 +351,13 @@ export function playsLine(
 ): string {
   //? (2.0.0-player.52) with a library of your own, Play plays their albums in the store - Navidrome's, whoever asks
   const had = personal ? IN_THE_STORE : 'you have'
-  if (!albums) return library === 'asking' ? `Looking for their albums ${personal ? IN_THE_STORE : IN_YOUR_LIBRARY}…` : library === 'done' ? 'Navidrome has none of their albums to play' : ''
+  //? (2.0.5, UX batch 2) what the listener sees - none to play, songs that didn't load - never Navidrome by name
+  if (!albums) return library === 'asking' ? `Looking for their albums ${personal ? IN_THE_STORE : IN_YOUR_LIBRARY}…` : library === 'done' ? 'None of their albums are here to play.' : ''
   const all = albums === 1 ? `Plays the album ${had}` : `Plays the ${albums} albums ${had}`
   if (!settled) return `Getting the songs of the ${albums === 1 ? 'album' : `${albums} albums`} ${had}…`
   if (inHand >= albums) return all
-  if (!inHand) return "Navidrome didn't send the songs"
-  return `Plays ${inHand} of the ${albums} albums ${had} - Navidrome didn't send the rest`
+  if (!inHand) return "Couldn't load their songs."
+  return `Plays ${inHand} of the ${albums} albums ${had} - the rest didn't load`
 }
 
 /** Who they are, in a line: "Group · Bristol · since 1991", "Group · London · 1965 to 2014". */
@@ -388,7 +389,8 @@ export function inTurns<T>(items: readonly T[], limit: number, start: (item: T) 
  *  "in the store" for a count of the store's, with a library of your own (lib/whose.ts storeCountPlace). */
 export function albumCountLine(count: number | null | undefined, place = 'in your library'): string {
   const albums = count ?? 0
-  return albums > 0 ? `${albums} ${albums === 1 ? 'album' : 'albums'} ${place}` : ''
+  //? (2.0.5) '' for no place: a row inside your own library says the count alone (app/LibraryViews.tsx ArtistRow)
+  return albums > 0 ? `${albums} ${albums === 1 ? 'album' : 'albums'}${place ? ` ${place}` : ''}` : ''
 }
 
 /**

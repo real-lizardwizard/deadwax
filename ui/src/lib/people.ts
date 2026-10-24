@@ -185,7 +185,7 @@ export function removeLines(person: Pick<Person, 'user' | 'admin' | 'library' | 
   return {
     navidrome: `In Navidrome, for good: ${person.user}'s account, their play counts and play history, their favourites${favourites}, all their playlists - shared ones too - and their Last.fm or ListenBrainz link${role}.`,
     deadwax: `In deadwax: their sign-ins${devices}, their library list, their pins, their play queue, Getting albums settings and permissions.`,
-    stays: `Stays: every album in the store.${waiting}`,
+    stays: `Stays: every album in the collection.${waiting}`,
     undo: "There's no undo. If they might come back, reset their password instead.",
   }
 }

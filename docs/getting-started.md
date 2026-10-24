@@ -142,7 +142,7 @@ dry run nobody can reach Server settings to set it again, and without Navidrome 
    `NAVIDROME_` lines in your `.env`, copied from `.env.example`, and recreate the container) -
    [the app's setup](player.md#setting-it-up) has the details. Then Home and the Library show your
    albums from Navidrome (with
-   logins on, the Library is each person's own and **Browse** is the store - [sharing
+   logins on, the Library is each person's own and **All music** is the collection - [sharing
    deadwax](sharing.md)).
 
 **What the app shows without Navidrome.** Home's shelves, the Library tab, the albums and artists
@@ -175,7 +175,7 @@ look** raises it as **Not in Navidrome** (see [the library](library.md#not-in-na
 ## Turning logins on
 
 To share deadwax with other people, turn logins on: everyone then signs in with their own
-**Navidrome** account and has their own requests, library, plays and playlists, over the one store,
+**Navidrome** account and has their own requests, library, plays and playlists, over the one collection,
 and Navidrome's admins are deadwax's admins (an admin can give anyone else a part of that, in People). Up to
 three settings, in the container's environment - `.env`, where `.env.example` has them waiting, not
 Server settings, which only shows them. The secret key is a key made with `openssl rand -hex 32`, and

@@ -639,7 +639,7 @@ export function storeNotes(
   const held = result?.held
   if (held && !held.complete) {
     //? (2.0.0-player.51, logins on) a part the store holds that isn't in your library is the store's
-    const who = held.yours === false ? 'The store has' : 'You have'
+    const who = held.yours === false ? 'The collection has' : 'You have'
     notes.push(
       `${who} ${held.track_count} of ${held.expected_tracks} tracks of this pressing, in `
       + `${listed(held.paths?.length ? held.paths : [held.path])}. ${whatADownloadDoes(held)}`,
@@ -648,7 +648,7 @@ export function storeNotes(
   for (const pressing of result?.other_pressings ?? []) {
     const parts = [pressing.edition || pressing.year, formatNames(pressing.formats), pressing.path].filter(Boolean)
     //? (2.0.0-player.52, logins on) one the store holds that isn't in your library is the store's
-    const who = pressing.yours === false ? 'The store also has' : 'You also have'
+    const who = pressing.yours === false ? 'The collection also has' : 'You also have'
     notes.push(`${who} another pressing: ${parts.join(' · ')}`)
   }
   return notes

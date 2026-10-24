@@ -264,7 +264,8 @@ export function ArtistPage({
   //? (2.0.0-player.52) a library of your own: the page lists the STORE's albums of theirs - Navidrome's, asked as
   //? you - each row saying whether it is yours (lib/artistPage.ts rowLine), and its library facts are the store's
   const personal = hasLibrary()
-  const where = personal ? 'the store' : 'your library'
+  //? (2.0.5) the collection - James's word - never "the store"
+  const where = personal ? 'the collection' : 'your library'
   //? /library/owned has answered once, or failed to: what isn't held can be said only after
   const [ownedKnown, setOwnedKnown] = useState(() => ownedNow() !== null)
   //? the page shows, read when an answer lands
@@ -834,7 +835,7 @@ export function ArtistPage({
    *  once it has something to say; once drawn, it stays. */
   const librarySection = !libraryOnScreen.current ? null : (
     <section class="app-artist-section" aria-labelledby="app-artist-library-title" aria-busy={!libraryHalfKnown}>
-      <h2 id="app-artist-library-title" class="app-section-title">{personal ? 'In the store' : 'In your library'}</h2>
+      <h2 id="app-artist-library-title" class="app-section-title">{personal ? 'In the collection' : 'In your library'}</h2>
       {shownLibrary && summariesFailed && (
         <p class="app-footnote app-artist-stale">
           deadwax couldn't read {where} just now - this is what it said before.{' '}
@@ -850,7 +851,7 @@ export function ArtistPage({
             <dd class="app-row-value">{shownLibrary.albums}</dd>
           </div>
           <div class="app-row app-artist-fact">
-            <dt class="app-row-label">Tracks</dt>
+            <dt class="app-row-label">Songs</dt>
             <dd class="app-row-value">{shownLibrary.tracks}</dd>
           </div>
           {shownLibrary.size && (
@@ -1056,7 +1057,7 @@ export function ArtistPage({
               <div class="app-artist-unknown">
                 <p class="app-search-empty">
                   {held.length
-                    ? `MusicBrainz doesn't know who this is from ${personal ? 'the files' : 'your files'}, so only the albums ${personal ? 'in the store' : 'you have'} are here.`
+                    ? `MusicBrainz doesn't know who this is from ${personal ? 'the files' : 'your files'}, so only the albums ${personal ? 'in the collection' : 'you have'} are here.`
                     : `Nothing of theirs in ${where}, and MusicBrainz doesn't know who this is.`}
                 </p>
                 {/* (2.0.0-player.45) the picker's MusicBrainz search, for a shared name or files that don't say */}
@@ -1109,7 +1110,7 @@ export function ArtistPage({
                         <dl class="app-group app-artist-list">
                           {renamed && (
                             <div class="app-row app-artist-fact is-now">
-                              <dt class="app-row-label">{ownName ? 'Also filed as' : 'Now'}</dt>
+                              <dt class="app-row-label">{ownName ? 'Also known here as' : 'Now known as'}</dt>
                               <dd class="app-row-value">{ownName ? listed(moveNames) : facts.name}</dd>
                               {/* the fix for an artist filed under an old name (v0.9.14) */}
                               {managesMove && (

@@ -75,7 +75,7 @@ box" finds Glory Box at once, from Dummy's tracklist, before MusicBrainz has bee
 - An album you have is left out of what's saved as it is out of MusicBrainz's rows. Until deadwax knows what
   your library holds - the first look after deadwax restarts can take a while on a sleeping disk - saved
   albums wait (saved artists and songs don't); MusicBrainz's albums come as ever.
-- In **Top results** what's saved ranks after yours (and, with logins on, the store's) and before
+- In **Top results** what's saved ranks after yours (and, with logins on, the collection's) and before
   MusicBrainz's answer, so a saved match can be drawn the moment your library answers, and never moves after
   - for "glory box": Glory Box, Dummy, Portishead, at once.
 - It shows only the kinds MusicBrainz is asked for, read as the box is read: an artist you have typed alone
@@ -101,7 +101,7 @@ box" finds Glory Box at once, from Dummy's tracklist, before MusicBrainz has bee
   match** - an artist named what you typed, an album or song titled it (case, accents, brackets and a
   leading "The" aside) - before one that is **by the artist you typed** before one that only **starts
   with** it. When two are as exact, **yours comes before MusicBrainz's** (with logins on, yours before the
-  store's before MusicBrainz's), and [what deadwax has saved](#what-deadwax-has-saved) before MusicBrainz's
+  collection's before MusicBrainz's), and [what deadwax has saved](#what-deadwax-has-saved) before MusicBrainz's
   answer. Then what the best match belongs to, as Apple pulls it in: for "glory box"
   the song, then **Dummy**, then **Portishead**. Then one of each kind in turn. An artist you have, typed
   alone ("portishead"), is them first, then their albums and songs - their self-titled album is by them, not
@@ -114,7 +114,7 @@ box" finds Glory Box at once, from Dummy's tracklist, before MusicBrainz has bee
   many of yours. **See all**, in each heading, shows that kind in full. A section with nothing to show is
   left out.
 - **Every row of yours says where it is**: "in your library" at the end of its line (with logins on, "in
-  your library" or "in the store", or nothing while that isn't known yet).
+  your library" or "in the collection", or nothing while that isn't known yet).
 
 **Artists**: yours, with how many of their albums you have, then MusicBrainz's, so anyone can look an
 artist up on MusicBrainz. Each MusicBrainz artist says who it is: "as Kanye
@@ -163,7 +163,7 @@ the artist's page).
   2015)" counts as the song itself. Each row is the song's title, then who it's by, its length on the album
   it names and that album: "Portishead · 4:56 · Dummy". When you have the song - a pressing of one of its
   albums that it's on - the row names that album and ends **in your library** (with logins on, **in the
-  store** when only the store has it). deadwax knows you have it when the pressing you hold is one
+  collection** when only the collection has it). deadwax knows you have it when the pressing you hold is one
   MusicBrainz's answer lists the song on, when your library's own search finds the song by that artist on
   that album, or when it already has the album's pressings from earlier (its page opened, say) and yours has
   the song in its tracklist. A pressing of the album without the song isn't having it: with The Slow Rush's
@@ -184,8 +184,8 @@ the artist's page).
   and when ("Live album · Bootleg · 1997"), who it's by when that isn't the song's artist ("Compilation ·
   Various Artists · 2015"), the song's length there when it's another performance's ("· 5:36"), and **·
   in your library** when you have it with the song on it - **· a pressing in your library** when you have
-  a pressing of it that nothing yet says has the song or hasn't (**· a pressing in the store** with logins
-  on, when it's only the store's). That happens because MusicBrainz often keeps one song as several
+  a pressing of it that nothing yet says has the song or hasn't (**· a pressing in the collection** with logins
+  on, when it's only the collection's). That happens because MusicBrainz often keeps one song as several
   recordings across an album's pressings, and its answer names only some of them. Tap the song again to
   close it. (In Top results a MusicBrainz song goes straight to the album it names instead, the song
   marked.)
@@ -211,7 +211,7 @@ alone finds tribute bands and string quartets, and no Beatles in its first pages
 
 **All** (pressed as you start typing) is the list above. **Artists**, **Albums** and **Songs** each show that
 kind **in full**, with no Top results: first your library's (its own search for that kind - 50 artists,
-50 albums or 100 songs - with **More from your library**, **More from the store** with logins on, for the
+50 albums or 100 songs - with **More from your library**, **More from the collection** with logins on, for the
 next page when that one came back full; *Searching your library and MusicBrainz…* stands where its rows will
 go while it's asked), then MusicBrainz's, added at the foot as they arrive and never before your library's,
 with **More from MusicBrainz** (artists and albums) or **More songs** for the next
@@ -280,11 +280,11 @@ it. If your library's search fails, it says why at the top in plain words ("Can'
 right now", "Can't connect to deadwax"), with **Try again** - which **Search**, or Navidrome
 coming back, does too: the list is drawn afresh with your library in it.
 
-**With logins on** your library's rows are the **store's** - Navidrome's search finds
-everything deadwax holds - so yours come first, then the store's, each saying which; an artist's count is
-yours when you have albums of theirs ("1 album in your library"), else the store's ("3 albums in the
-store"); and adding an album to your library on its page re-marks its row here in place. A row whose
-whose-it-is isn't known yet sits among yours and may say "in the store" there once known, rather than move.
+**With logins on** your library's rows are the **collection's** - Navidrome's search finds
+everything deadwax holds - so yours come first, then the collection's, each saying which; an artist's count is
+yours when you have albums of theirs ("1 album in your library"), else the collection's ("3 albums in the
+collection"); and adding an album to your library on its page re-marks its row here in place. A row whose
+whose-it-is isn't known yet sits among yours and may say "in the collection" there once known, rather than move.
 See [the player as you](player.md#the-player-as-you-with-logins-on).
 
 ## How the box is read
@@ -311,16 +311,16 @@ pressing shown, else for the album), the title, the artist (a link to
 [their page](player.md#artist-pages) when the album is credited to one artist; a collaboration's
 names stay plain), and "2008 · Album ·
 not in your library" - "in your library" if you have some pressing of it after all (with logins on, "in
-the store" when the store has a pressing of it but none is yours, and "another pressing in your library"
-when one is but the pressing chosen is the store's - the line speaks of the album, the one under Get of
-the pressing, so it never says "in your library" over **In the store, not in your library**; the
-**Pressing** list marks each pressing **In your library** or **In the store**). That last part
+the collection" when the collection has a pressing of it but none is yours, and "another pressing in your library"
+when one is but the pressing chosen is the collection's - the line speaks of the album, the one under Get of
+the pressing, so it never says "in your library" over **In the collection, not in your library**; the
+**Pressing** list marks each pressing **In your library** or **In the collection**). That last part
 appears once deadwax has said what you have, never before, so it can't claim you don't have an
 album you do; and it counts a folder tagged with any of the album's pressings, the .m4a albums
 above included. When nothing is tagged as the album but a folder **with no
 MusicBrainz ids at all** has its name and its artist's (as credited, or the name they go by now), it
 says **maybe in your library**, in a dashed box (with logins on,
-**maybe in the store** when that folder isn't in your library) - the name can't tell which album that
+**maybe in the collection** when that folder isn't in your library) - the name can't tell which album that
 folder is, let alone which pressing. Point at it (on a computer) for the folder;
 matching its release in **Edit → Release** settles it ([the library](library.md#editing-an-album)). Opened from a saved link or after a reload it
 says the same, since the album's
@@ -330,7 +330,7 @@ Shuffle; then **Get the album**, the page's one purple button, which gets **the 
 ([Get, and choosing a source](downloading.md#choosing-a-source)); under it,
 what you already have of that pressing, if anything ("Already in your library", "Already
 downloading", "You have 9 of 10 tracks of this pressing…", "You also have another pressing…" - or,
-with logins on, "The store also has another pressing…" for one that isn't yours -
+with logins on, "The collection also has another pressing…" for one that isn't yours -
 asked of deadwax without searching Soulseek, for the pressing chosen, and again as you come back to
 the page); and then **that pressing's tracklist**.
 
@@ -429,7 +429,7 @@ it is on it. The address keeps the song (`?song=`), so a reload or a link opens 
 ## Another pressing of an album you have
 
 An album you have - its own page in the app, played from your library - ends
-its row of chips under the meta line with **Other pressings ›** (after **In your library** and any
+its row of chips under the meta line with **Pressings ›** (after **In your library** and any
 **Also: …** chips for other pressings you hold). It opens [the album you don't
 have](#the-album-you-dont-have) for that album: every pressing MusicBrainz lists, the ones you have
 marked **In your library**, and **Get the album** for whichever you choose - the deluxe beside the
@@ -442,10 +442,8 @@ folder's tags. Its row (**In your library** and the chips beside it) has its pla
 start and shows once deadwax has answered, so nothing in it or under it moves as the chip lands. A
 folder tagged with no album id (an .m4a deadwax filed carries the pressing's id but not the
 album's) has no chip. Beside an **Also** chip, in a row too narrow for all three whole - a phone
-held upright, or a computer's album page with a panel open beside it - it reads **Pressings** and
-**In your library** keeps only its green tick, so the Also chip has room to say which pressing it
-is; a screen reader still hears "Other pressings" and "In your library". With logins on, **In the
-store** - grey words with no tick to keep - gives way whole there instead, and a screen reader still
-hears it. It's the row's own width
-that decides (600 pixels or less shortens), so a phone on its side, a tablet and a wide computer
-window say every word.
+held upright - the badge gives way, **In your library** or **In the collection** alike, so the Also chip has
+room to say which pressing it is; a screen reader still hears it, and the page still says whose the album is
+(with logins on, **Remove from my library** or **Add to my library** under Play). It's the row's own width that decides (420 pixels or less shortens), so a phone on its side, a
+tablet and a computer - an album page with Info or the Edit panel open beside it included - say every word.
+(Since 2.0.5 the chip is **Pressings** on every frame; it was "Other pressings" where there was room.)

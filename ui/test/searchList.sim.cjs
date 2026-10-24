@@ -332,9 +332,9 @@ console.log('\nthe sections: yours, the store\'s, MusicBrainz\'s - each capped o
   check('logins on: yours before the store\'s - Third (the store\'s) after Dummy (yours by your albums\' ids)', keys(L.sectionRows(store.albums)), ['album:nd-dummy', 'album:nd-third'])
   check('...a song whose album isn\'t known yet ranks as yours: Humming and Mysterons, then Machine Gun (on Third, the store\'s)', keys(L.sectionRows(store.songs)),
     ['song:s-rose', 'song:s-mys', 'song:s-machine'])
-  check('...its whose known later reads "in the store" in place, never re-sorted (rows decided at the draw)',
+  check('...its whose known later reads "in the collection" in place, never re-sorted (rows decided at the draw)',
     [L.rowLine(L.songRow(unknown), { marks: on }).place, L.rowLine(L.songRow(unknown), { marks: { ...on, albumOf: (id) => (id === 'nd-unknown' ? { musicBrainzId: 'rel-third' } : null) } }).place],
-    ['', 'in the store'])
+    ['', 'in the collection'])
   check('...an album among your albums\' ids is yours whatever search3\'s starred said (asked before an Add)', L.albumYours({ id: 'nd-third', musicBrainzId: 'rel-third' }, { ...on, yourAlbums: new Set(['nd-third']) }), true)
   //? a late kind's rows: held ones first
   const late = L.pool({ reading: plan, library: lib(), artistList: null, index, marks: off, artists: null, albums: { groups: [THIRD, DUMMY], shown: [THIRD] }, songs: null })
@@ -365,7 +365,7 @@ console.log('\nthe words: lines and places, logins off and on')
   check('a library artist: the count in a section, "Artist · " + it in Top results', [line(L.artistRow(P)), line(L.artistRow(P), off, true)],
     [{ line: '', place: '3 albums in your library' }, { line: 'Artist', place: '3 albums in your library' }])
   check('...with a library of your own, your count when you have any, else the store\'s', [line(L.artistRow(P), on).place, line(L.artistRow({ ...P, id: 'ar-x' }), { ...on }).place],
-    ['2 albums in your library', '3 albums in the store'])
+    ['2 albums in your library', '3 albums in the collection'])
   check('a MusicBrainz artist: matchLine ("as Kanye West · formerly Kanye West · Person · US"), "Artist · " first in Top results',
     [line(L.mbArtistRow(kanye[0])).line, line(L.mbArtistRow(kanye[0]), off, true).line], ['as Kanye West · formerly Kanye West · Person · US', 'Artist · as Kanye West · formerly Kanye West · Person · US'])
   check('a library album: "Portishead · 1994" + "in your library" with logins off (new: no half title says it any more)', [line(L.albumRow(dummy)), line(L.albumRow(dummy), off, true).line],
@@ -377,14 +377,14 @@ console.log('\nthe words: lines and places, logins off and on')
     [{ line: 'Portishead · Dummy', place: 'in your library' }, 'Song · Portishead · Dummy'])
   check('a MusicBrainz song: step 7\'s line, its held words its place; "Song · Portishead · Dummy" in Top results',
     [line(L.mbSongRow(roadsSongs[0]), { ...off, index: songIndex }), line(L.mbSongRow(roadsSongs[0]), off, true).line], [{ line: 'Portishead · 4:56 · Dummy', place: 'in your library' }, 'Song · Portishead · Dummy'])
-  check('a tile\'s third line: "In your library", "On MusicBrainz"; with logins on "In the store", blank while unknown',
+  check('a tile\'s third line: "In your library", "On MusicBrainz"; with logins on "In the collection", blank while unknown',
     [L.placeLabel(L.albumRow(dummy), off), L.placeLabel(L.groupRow(THIRD), off), L.placeLabel(L.albumRow({ ...dummy, musicBrainzId: 'rel-none' }), { ...on, index: buildOwnedIndex([]) }),
       L.placeLabel(L.albumRow(dummy), { ...on, index: null })],
-    ['In your library', 'On MusicBrainz', 'In the store', ''])
-  check('the region: "In your library: 1 artist, 2 albums, 11 songs." ("In the store" with logins on); MusicBrainz\'s, or that it isn\'t answering',
+    ['In your library', 'On MusicBrainz', 'In the collection', ''])
+  check('the region: "In your library: 1 artist, 2 albums, 11 songs." ("In the collection" with logins on); MusicBrainz\'s, or that it isn\'t answering',
     [L.libraryWords({ artists: 1, albums: 2, songs: 11 }, false), L.libraryWords({ albums: 1 }, true), L.libraryWords({}, false),
       L.musicBrainzWords({ artists: 2, albums: 3, songs: 3 }, true), L.musicBrainzWords({}, false)],
-    ['In your library: 1 artist, 2 albums, 11 songs.', 'In the store: 1 album.', '', 'From MusicBrainz: 2 artists, 3 albums, 3 songs.', "MusicBrainz isn't answering."])
+    ['In your library: 1 artist, 2 albums, 11 songs.', 'In the collection: 1 album.', '', 'From MusicBrainz: 2 artists, 3 albums, 3 songs.', "MusicBrainz isn't answering."])
   check('a fold: "Show 3 albums from MusicBrainz", said "3 albums from MusicBrainz - Show them to see them."', L.foldWords('albums', 3),
     { button: 'Show 3 albums from MusicBrainz', said: '3 albums from MusicBrainz - Show them to see them.' })
   check('an empty late kind, a chip, no results', [L.emptyWords('artists', 'zz'), L.viewWords('albums'), L.viewWords('all'), L.nothingWords('all', 'zz'), L.nothingWords('songs', 'zz')],
@@ -393,7 +393,7 @@ console.log('\nthe words: lines and places, logins off and on')
     L.failureWords({ refused: false, busy: true, unavailable: true, message: 'x' }), L.failureWords({ refused: false, busy: false, unavailable: true, message: 'x' }, true)],
     ["MusicBrainz couldn't read that search - try other words", 'MusicBrainz is busy just now - try again in a moment.', "MusicBrainz isn't answering."])
   check('the library\'s late place: how many, with Show them - or that it found nothing', [L.libraryLateWords({ artists: 1, albums: 2 }, false, 'x').button, L.libraryLateWords({}, true, 'x').line],
-    ['3 in your library - Show them', 'Nothing in the store for “x”.'])
+    ['3 in your library - Show them', 'Nothing in the collection for “x”.'])
 }
 
 console.log('\nmore of each rule, one case at a time')
@@ -429,10 +429,10 @@ console.log('\nmore of each rule, one case at a time')
   check('nothing out: every pick decided, no place', [L.decidedTop(L.candidatesOf(many, 'zz', reading('zz')), [], 3, family(lib(), [], null)).prefix.length, L.decidedTop(L.candidatesOf(many, 'zz', reading('zz')), [], 3, family(lib(), [], null)).place], [3, false])
   //? lines with a library of your own, each row type
   check('logins on: a library album yours, the store\'s, not known', [L.rowLine(L.albumRow(dummy), { marks: on }).place, L.rowLine(L.albumRow({ ...dummy, id: 'x', musicBrainzId: 'rel-x' }), { marks: on }).place,
-    L.rowLine(L.albumRow({ ...dummy, id: 'x', musicBrainzId: 'rel-x' }), { marks: { ...on, index: null } }).place], ['in your library', 'in the store', ''])
+    L.rowLine(L.albumRow({ ...dummy, id: 'x', musicBrainzId: 'rel-x' }), { marks: { ...on, index: null } }).place], ['in your library', 'in the collection', ''])
   check('...a song by its album\'s whose: among your albums yours, its album unknown nothing', [L.rowLine(L.songRow(roads), { marks: on }).place, L.rowLine(L.songRow({ ...roads, albumId: 'nd-x' }), { marks: on }).place], ['in your library', ''])
-  check('...an artist with none of yours: the store\'s count, true either way', L.rowLine(L.artistRow({ ...P, id: 'other' }), { marks: on }).place, '3 albums in the store')
-  check('...an artist before your albums have answered: the store\'s count too', L.rowLine(L.artistRow(P), { marks: { ...on, yourArtists: null } }).place, '3 albums in the store')
+  check('...an artist with none of yours: the store\'s count, true either way', L.rowLine(L.artistRow({ ...P, id: 'other' }), { marks: on }).place, '3 albums in the collection')
+  check('...an artist before your albums have answered: the store\'s count too', L.rowLine(L.artistRow(P), { marks: { ...on, yourArtists: null } }).place, '3 albums in the collection')
   check('...whose is "yours" for every library row with logins off', [L.rowYours(L.albumRow({ ...dummy, musicBrainzId: 'rel-x' }), off), L.rowYours(L.songRow(roads), off), L.rowYours(L.artistRow(P), off)], [true, true, true])
   check('a MusicBrainz album held: its place groupPlace\'s; a tile says "In your library"', [L.rowLine(L.groupRow(DUMMY), { marks: off }).place, L.placeLabel(L.groupRow(DUMMY), off)], ['in your library', 'In your library'])
   check('a song-album relative: its kind first in Top results, its year; Get-able when not held', [L.rowLine(L.songAlbumRow(roadsSongs[0], roadsSongs[0].albums[0]), { marks: { ...off, index: null } }, true)],
@@ -466,7 +466,7 @@ console.log('\nafter review: an album made of a song\'s fields, a held named alb
   //? Top results' family for a library song search3 listed without its album: Dummy built from the song's own fields
   const built = L.familyOf(L.songRow(roads), family(lib([], [], [roads])))[0]
   check('(the album built from the song\'s fields: no star, no release id)', [built.key, 'starred' in built.album, 'musicBrainzId' in built.album], ['album:nd-dummy', false, false])
-  check('logins on, your albums not in yet, neither search3 nor `ready` holding it: unknown - never "in the store" on a guess',
+  check('logins on, your albums not in yet, neither search3 nor `ready` holding it: unknown - never "in the collection" on a guess',
     [L.rowLine(built, { marks: { ...on, albumOf: () => null } }, true).place, L.placeLabel(built, { ...on, albumOf: () => null })], ['', ''])
   check('...read as `ready` has it once it lands: held by a folder of yours, "in your library"',
     L.rowLine(built, { marks: { ...on, albumOf: (id) => (id === 'nd-dummy' ? dummy : null) } }, true).place, 'in your library')
@@ -493,7 +493,7 @@ console.log('\nafter review: an album made of a song\'s fields, a held named alb
     keys(L.sectionRows(L.pool({ reading: free('bristol trip'), library: lib(), artistList: null, index: heldNow, marks: { ...off, index: heldNow }, artists: null, albums: { groups, shown: notInLibrary(groups, null) }, songs: null }).albums)),
     [`group:${THIRD.id}`, `group:${DUMMY.id}`, `group:${SELF.id}`])
   check('the library\'s place when Navidrome turned out not reachable: it wasn\'t searched, and says so', [L.librarySkippedWords(false), L.librarySkippedWords(true)],
-    ["Your library can't be searched just now.", "The store can't be searched just now."])
+    ["Your library can't be searched just now.", "The collection can't be searched just now."])
 }
 
 console.log('\nsearch what\'s saved (2.0.0-player.56): saved rows lead MusicBrainz\'s, ranked between the store\'s and MusicBrainz\'s')

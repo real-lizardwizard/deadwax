@@ -31,10 +31,12 @@ What these hold (every rule decided with James on 2026-09-27):
 
 import asyncio
 import hashlib
+import re
 import logging
 import shutil
 import sqlite3
 import time
+from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlparse
 
@@ -50,6 +52,7 @@ from src.config import Config
 from src.library_ledger import ADDED, FLAGGED, INCOMPLETE, grant_for
 from src.poller import poll_downloads_once
 from src.routes import library as library_routes
+from src.routes import my_library
 from src.routes.store_album import forget_navidrome_ids
 from src.store import JobStore
 from src.store_index import index_folder
@@ -321,6 +324,40 @@ def credential(on, user: str) -> dict | None:
 ])
 def test_what_each_way_a_download_ends_gives(results, same, given):
     assert grant_for(results, same) == given
+
+
+#? (2.0.5, UX batch 2) the words a person reads of their own library: what they see - the album being added, the music
+#? server - never the store, Navidrome by name, starring or Subsonic (James: "the collection", "your library")
+PLUMBING = re.compile(r"\bstore\b|Navidrome|\bstar(?:s|red|ring)?\b|Subsonic", re.IGNORECASE)
+
+
+def test_why_an_album_still_waits_is_said_as_what_the_person_sees():
+    assert set(library_ledger.PROBLEM_WORDS) == {library_ledger.NOT_IN_NAVIDROME, library_ledger.NO_RELEASE, library_ledger.MISSING,
+                                                 library_ledger.NAVIDROME_DOWN, library_ledger.NOT_CONFIRMED, library_ledger.STAR_LOST}
+    for problem, words in library_ledger.PROBLEM_WORDS.items():
+        assert not PLUMBING.search(words), (problem, words)
+        assert words[0].isupper() and words.endswith("."), words
+    assert library_ledger.problem_text(library_ledger.NOT_IN_NAVIDROME) == "The music server hasn't picked it up yet - it's added as soon as it has."
+    assert library_ledger.problem_text(library_ledger.NO_RELEASE) == "An admin needs to match it to a release on MusicBrainz before it can be added."
+
+
+def test_add_and_remove_answer_in_the_collections_words():
+    """What Add and Remove to my library say - each refusal, and Remove's own words - holds none of the old words;
+    and Remove's words are the album page's own (lib/whose.ts REMOVED_FROM_PAGE says the same, at once)."""
+    routes = Path(__file__).parent.parent / "src" / "routes"
+    source = (routes / "my_library.py").read_text()
+    said = re.findall(r'detail="([^"]+)"', source) + [my_library.LOGINS_OFF, my_library.REMOVED, my_library.REMOVE_UNWRITTEN]
+    assert len(said) >= 8
+    #? (2.0.5 review) and Held by nobody's own answers (routes/held.py) - its flag refusal was reworded too ("…put the
+    #? flag away." to "…dismiss it."), and nothing held it to the app's word for the button, Dismiss
+    held = re.findall(r'detail="([^"]+)"', (routes / "held.py").read_text())
+    assert len(held) >= 6 and "That album isn't in the collection any more - dismiss it." in held
+    #? (the break-glass admin's NO_ACCOUNT names Navidrome on purpose: its reader runs deadwax, and it is a name, not a literal)
+    for words in said + held:
+        assert not PLUMBING.search(words), words
+        assert not re.search(r"\bput\b.*\baway\b", words, re.IGNORECASE), words
+    page = (Path(__file__).parent.parent / "ui" / "src" / "lib" / "whose.ts").read_text()
+    assert f'export const REMOVED_FROM_PAGE = "{my_library.REMOVED}"' in page
 
 
 def test_a_waiting_star_is_tried_again_sooner_then_later_and_for_ever():
@@ -1054,7 +1091,7 @@ def test_adding_a_part_held_marks_it_incomplete(on):
 def test_add_to_my_library_is_refused_in_words_when_there_is_nothing_to_add(on, monkeypatch):
     ethan = signed_in(on, "ethan")
     answer = ethan.post(f"{LIBRARY}/add", json=release_body("rel-nowhere"))
-    assert answer.status_code == 409 and "isn't in the store" in answer.json()["detail"]
+    assert answer.status_code == 409 and "isn't in the collection" in answer.json()["detail"]
     held(on)
     glass = signed_in(on, auth.BREAK_GLASS_USER)
     answer = glass.post(f"{LIBRARY}/add", json=release_body())
@@ -1075,7 +1112,8 @@ def test_your_library_says_what_waits_and_why_and_what_is_new(on):
     assert (mine["on"], mine["count"], mine["starred"], mine["waiting"], mine["login"]) == (True, 2, 1, 1, "ok")
     [waiting] = mine["waiting_albums"]
     assert (waiting["album_id"], waiting["problem"]) == (third, "not_in_navidrome")
-    assert "hasn't got it yet" in waiting["words"]
+    #? (2.0.5) said as what the person sees - the music server, the album added - never Navidrome or starring
+    assert waiting["words"] == "The music server hasn't picked it up yet - it's added as soon as it has."
     assert {n["album_id"]: n["navidrome_id"] for n in mine["new"]} == {dummy: "nd-dummy", third: None}
 
     assert ethan.post(f"{LIBRARY}/seen", json={"release_mbid": "rel-dummy"}).json() == {"cleared": 1}
@@ -1110,7 +1148,7 @@ def test_a_flag_can_be_put_away_and_a_flag_for_an_album_gone_isnt_given(on):
     assert james.post(f"{HELD}/flags/{first}/dismiss").json() == {"dismissed": True}
     run(on.store.index_gone(on.root, THIRD, "deleted"))
     answer = james.post(f"{HELD}/flags/{second}/add")
-    assert answer.status_code == 409 and "isn't in the store" in answer.json()["detail"]
+    assert answer.status_code == 409 and "isn't in the collection" in answer.json()["detail"]
     assert ("sam", third) not in entries(on)
 
 

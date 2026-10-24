@@ -51,7 +51,7 @@ export const ADMINS_EVERYTHING = 'Admins can do everything.'
 //? (2.0.0-player.65) not slskd or Navidrome: their rows stay an admin's (ADMINS_ONLY in src/routes/settings.py)
 export const WARN_SERVER = 'Settings can point deadwax at other folders and change how it downloads and files - give it only to someone you\'d trust as an admin.'
 export const WARN_LIBRARY = 'This includes deleting albums from disk, which can\'t be undone.'
-export const WARN_NO_REQUEST = 'They can still play, browse and add what the store has.'
+export const WARN_NO_REQUEST = 'They can still play, look through and add what the collection has.'
 
 /** In Get's place, without Get albums. */
 export const GET_OFF = 'Getting albums is off for you - ask an admin.'

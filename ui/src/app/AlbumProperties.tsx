@@ -19,7 +19,7 @@ export function AlbumProperties({ rows }: { rows: PropertyRow[] | null }) {
         {rows.map((row) => (
           <Fragment key={row.label}>
             <dt class="app-props-label">{row.label}</dt>
-            <dd class={`app-props-value${row.release ? ' is-mono' : ''}${row.quiet ? ' is-quiet' : ''}`}>
+            <dd class={`app-props-value${row.quiet ? ' is-quiet' : ''}`}>
               {row.release ? (
                 <a class="app-props-link" href={releaseUrl(row.release)} target="_blank" rel="noopener">
                   {row.text}

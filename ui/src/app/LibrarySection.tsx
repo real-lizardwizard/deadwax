@@ -9,7 +9,7 @@ import {
   ALBUM_SORTS, albumSortFrom, artistOrderFrom, filterAlbums, filterArtists, filteredCountText, finding, groupAlbums, groupArtists,
   indexEntries, indexKind, noMatchText, showsIndex, sortAlbums, sortArtistsBy, type AlbumSort,
 } from '../lib/shelves'
-import { EMPTY_LIBRARY, NOTHING_OF_YOURS_PLAYED, NO_ARTISTS_OF_YOURS, yourArtists, yourEmptyNotice } from '../lib/yourLibrary'
+import { EMPTY_LIBRARY, NOTHING_OF_YOURS_PLAYED, NO_ALBUMS, NO_ARTISTS, NO_ARTISTS_OF_YOURS, yourArtists, yourEmptyNotice } from '../lib/yourLibrary'
 import { libraryArtists, type Album, type Artist, type Song } from '../player/api'
 import { ChevronDownIcon, ChevronLeftIcon, SearchIcon } from '../player/icons'
 import { readPlayerArtistOrder, readPlayerOrder, writePlayerArtistOrder, writePlayerOrder } from '../state/persisted'
@@ -269,7 +269,7 @@ function AlbumSection({ id, personal, shown, onOpen, onBrowse, page, titleRef }:
         : notice === 'unplayed' ? <p class="pl-notice">{NOTHING_OF_YOURS_PLAYED}</p>
           : <span />
     ) : (
-      <p class="pl-notice">{albums.length && (sort === 'recent' || sort === 'frequent') ? 'Nothing played yet.' : 'No albums in Navidrome yet.'}</p>
+      <p class="pl-notice">{albums.length && (sort === 'recent' || sort === 'frequent') ? 'Nothing played yet.' : NO_ALBUMS}</p>
     )
   } else if (!found.length) {
     body = <p class="pl-notice">{noMatchText('albums', typed)}</p>
@@ -379,7 +379,7 @@ function ArtistSection({ id, personal, shown, onOpenArtist, onBrowse, page, titl
       </div>
     ) : <div class="pl-spinner" aria-label="Loading" />
   } else if (!sorted.length) {
-    body = yours ? <EmptyLibrary lead={NO_ARTISTS_OF_YOURS} onBrowse={onBrowse} /> : <p class="pl-notice">No artists in Navidrome yet.</p>
+    body = yours ? <EmptyLibrary lead={NO_ARTISTS_OF_YOURS} onBrowse={onBrowse} /> : <p class="pl-notice">{NO_ARTISTS}</p>
   } else if (!found.length) {
     body = <p class="pl-notice">{noMatchText('artists', typed)}</p>
   } else {

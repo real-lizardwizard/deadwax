@@ -5,7 +5,8 @@ import type { MyLibrary } from '../api/types'
 import { REMOVED_WORDS, entryName, libraryLine, loginWords, nextFocus, waitingGroups, waitingText } from '../lib/myLibrary'
 import { askMyLibrary, hasLibrary, useMyLibrary } from './useMyLibrary'
 import { TELL } from '../lib/errorWords'
-import { accessNow, seesDetail } from './access'
+import { gets } from '../lib/permissions'
+import { accessNow, seesDetail, useAccess } from './access'
 import { sayError } from './sayError'
 
 /** Focus fell to the page (or was never taken) - the only time a row leaving moves it. */
@@ -23,13 +24,14 @@ export const LIBRARY_UNREAD = "deadwax can't read its database, so it can't say 
  * You > Your library (2.0.0-player.51, personal libraries): with logins on, how many albums your library
  * holds - your starred albums in Navidrome - and how far deadwax has got starring them: what still waits
  * and why (a few named a reason, then "and N more"), above all that Navidrome no longer takes the login
- * you signed in with ("sign in again"); and the albums the admin deleted ("removed by the admin, request it
- * again"), each with Request it again (its album page, where Get is) and Put away. Asked each time You's
+ * you signed in with ("sign in again"); and the albums an admin deleted ("Removed by an admin."), each with
+ * Get it again (its album page, where Get is - only for someone who may Get) and Dismiss (2.0.5's words: Request it
+ * again, Put away). Asked each time You's
  * tab comes into view (`current`). Nothing at all with logins off, or for the break-glass admin (no
  * Navidrome account, no library).
  *
- * A row put away leaves the page once deadwax answers; its focus goes to the row now in its place (else
- * the one before it, else the section's heading), and "<album> put away" is said - never dropped to the
+ * A row dismissed leaves the page once deadwax answers; its focus goes to the row now in its place (else
+ * the one before it, else the section's heading), and "<album> dismissed" is said - never dropped to the
  * page (review; the app's rule, as Pinned's unpin).
  */
 export function YourLibrary({
@@ -41,6 +43,10 @@ export function YourLibrary({
   onRequestAgain?: ((group: { id: string; title: string }) => void) | undefined
 }) {
   const library = useMyLibrary()
+  //? (2.0.5 review) Get it again only for someone who may Get - for anyone else its page says "Getting albums is off
+  //? for you", so the button promised what they can't do; Dismiss stays for everyone (as Search, ReleaseGroupPage and
+  //? JobCard gate Get)
+  const getsAlbums = gets(useAccess().permissions)
   const [putting, setPutting] = useState<number | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
   const [said, setSaid] = useState('')
@@ -94,7 +100,7 @@ export function YourLibrary({
         acting.current = null
         setPutting(null)
         refocus.current = { gone: albumId, to: nextFocus(removed.map((each) => each.album_id), albumId), answer: asked }
-        setSaid(`${entry ? entryName(entry) : 'The album'} put away`)
+        setSaid(`${entry ? entryName(entry) : 'The album'} dismissed`)
         askMyLibrary()
       },
       (caught: unknown) => {
@@ -115,7 +121,7 @@ export function YourLibrary({
           <span class="app-row-value">{libraryLine(library)}</span>
           {(library.incomplete ?? 0) > 0 && (
             <span class="app-row-detail">
-              {library.incomplete} of them {library.incomplete === 1 ? 'is' : 'are'} incomplete - some of its files failed to file.
+              {library.incomplete} of them {library.incomplete === 1 ? 'is' : 'are'} missing some songs.
             </span>
           )}
         </div>
@@ -127,23 +133,23 @@ export function YourLibrary({
         </p>
       ))}
       {removed.length > 0 && (
-        <ul ref={list} class="app-group app-mylib-removed" aria-label="Removed by the admin">
+        <ul ref={list} class="app-group app-mylib-removed" aria-label="Removed by an admin">
           {removed.map((entry) => (
             <li key={entry.album_id} class="app-row" data-album={String(entry.album_id)}>
               <span class="app-row-label">{entryName(entry)}</span>
               <span class="app-row-detail">{REMOVED_WORDS}</span>
               <span class="app-mylib-actions">
-                {entry.release_group_mbid && onRequestAgain && (
+                {entry.release_group_mbid && onRequestAgain && getsAlbums && (
                   <button
                     type="button"
                     class="app-text-button"
                     onClick={() => onRequestAgain({ id: entry.release_group_mbid!, title: entry.album })}
                   >
-                    Request it again
+                    Get it again
                   </button>
                 )}
                 <button type="button" class="app-text-button" aria-disabled={putting === entry.album_id} onClick={() => putAway(entry.album_id)}>
-                  {putting === entry.album_id ? 'Putting away…' : 'Put away'}
+                  {putting === entry.album_id ? 'Dismissing…' : 'Dismiss'}
                 </button>
               </span>
             </li>
@@ -154,9 +160,8 @@ export function YourLibrary({
         {problem ? <p class="app-footnote app-error">{problem}</p> : said && <p class="app-visually-hidden">{said}</p>}
       </div>
       <p class="app-footnote">
-        Your library is your starred albums in Navidrome, so Amperfy shows them too. What you get here is
-        starred for you once Navidrome has it; starring or unstarring an album in Amperfy adds it here or
-        takes it out within a few minutes.
+        Your library is also in your other music apps, such as Amperfy, as your favourite albums.
+        Making an album a favourite there, or taking it out, adds it here or takes it out within a few minutes.
       </p>
     </section>
   )

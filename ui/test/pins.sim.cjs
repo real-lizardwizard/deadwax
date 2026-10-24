@@ -10,8 +10,9 @@
  *    album by its release, or by Navidrome's id where either side has none; an artist by MusicBrainz
  *    id where both have one, by a `name:` pin's folded name where the page has none (foldArtistName,
  *    held to tests/fixtures/name_folds.json, which test_pins.py holds the server's fold to), else by
- *    Navidrome's id. What a card says ("Artist", the album's artist, "Removed from the store", "Not on
- *    disk just now", "Not in Navidrome yet") and whether it opens. What a toggle sends - what the thing
+ *    Navidrome's id. What a card says ("Artist", the album's artist, "Removed from the collection" - or
+ *    with logins off "Removed from your library" -, "Can't be found right now", "Not ready to play yet";
+ *    2.0.5's words) and whether it opens. What a toggle sends - what the thing
  *    is, and only to pin, its card.
  *  - Edit's operations: a new pin first, an unpin by what it is, a move to a place, a removal by key,
  *    a drag landing where its rows say, and the PUT's whole list - never a pin not saved yet - with
@@ -120,6 +121,7 @@ const S = require(path.join(OUT, 'app/usePins.js'))
 //? (2.0.4) the errors as the page meets them: fetch's own TypeError, and deadwax's answers as api/http.ts throws them
 const { ApiError } = require(path.join(OUT, 'api/http.js'))
 const A = require(path.join(OUT, 'app/access.js'))
+const Session = require(path.join(OUT, 'app/session.js'))
 const offline = () => new TypeError('Failed to fetch')
 const refusedBy = (status, detail) => new ApiError(status, detail, 'PUT /me/pins failed', false, null, null, '/me/pins')
 const { Pinned, NOTHING_PINNED } = require(path.join(OUT, 'app/Pinned.js'))
@@ -205,8 +207,12 @@ console.log('\nwhich pin is the thing on screen')
 console.log('\nwhat a card says, and whether it opens')
 {
   const lines = [artistPin('a'), albumPin('b'), albumPin('c', { state: 'gone', navidrome_id: null }), albumPin('d', { state: 'missing', navidrome_id: null }), albumPin('e', { navidrome_id: null })]
-  check('"Artist", the album\'s artist, or why it won\'t open', lines.map(P.pinLine),
-    ['Artist', 'Portishead', 'Removed from the store', 'Not on disk just now', 'Not in Navidrome yet'])
+  //? (2.0.5, UX batch 2) in a listener's words - never the store, the disk or Navidrome; a deleted album gone from
+  //? the collection with a library of your own, from your library with logins off (the one library)
+  check('"Artist", the album\'s artist, or why it won\'t open - with logins off', lines.map((pin) => P.pinLine(pin)),
+    ['Artist', 'Portishead', 'Removed from your library', "Can't be found right now", 'Not ready to play yet'])
+  check('...and with a library of your own', lines.map((pin) => P.pinLine(pin, true)),
+    ['Artist', 'Portishead', 'Removed from the collection', "Can't be found right now", 'Not ready to play yet'])
   check('...and whether each opens', lines.map(P.pinOpens), [true, true, false, false, false])
   check('an artist opens by MusicBrainz id alone', P.pinOpens(artistPin('f', { navidrome_id: null })), true)
 }
@@ -449,7 +455,17 @@ async function run() {
     check('the heading and Edit', [words(find((node) => node.type === 'h2', tree)), words(find(byClass('app-pinned-edit'), tree))], ['Pinned', 'Edit'])
     const cards = find(byClass('app-pin-card'), tree)
     check('a card each: a button where it opens, words where it doesn\'t', cards.map((card) => [card.type, words(card)]),
-      [['button', 'DummyPortishead'], ['button', 'PortisheadArtist'], ['div', 'ThirdRemoved from the store'], ['button', 'MezzanineMassive Attack']])
+      [['button', 'DummyPortishead'], ['button', 'PortisheadArtist'], ['div', 'ThirdRemoved from your library'], ['button', 'MezzanineMassive Attack']])
+    //? (2.0.5 review) signed in with a library of your own, Pinned says the collection's words - it hands pinLine
+    //? hasLibrary(), on its cards and in Edit's rows alike - and with logins off (above) "your library"
+    Session.setSessionMe({ user: 'ethan', admin: false, auth: 'on', version: 'x' })
+    const mine = mountPinned({ pins: four })
+    const cardsOn = find(byClass('app-pin-card'), mine.draw()).map(words)
+    find(byClass('app-pinned-edit'), mine.draw())[0].props.onClick()
+    const rowsOn = find(byClass('app-pin-line'), mine.draw()).map(words)
+    Session.setSessionMe(null)
+    check('...signed in: a deleted album\'s card and its Edit row both say "Removed from the collection"', [cardsOn[2], rowsOn[2]],
+      ['ThirdRemoved from the collection', 'Removed from the collection'])
     check('an artist\'s picture round, an album\'s square', find(byClass('app-pin-thumb'), tree).map((node) => node.props.class), ['app-pin-thumb', 'app-pin-thumb is-round', 'app-pin-thumb', 'app-pin-thumb'])
     cards[0].props.onPointerDown(); cards[0].props.onClick(); cards[1].props.onPointerDown(); cards[1].props.onClick()
     check('an album opens as a tile does, its songs asked for as the finger lands; an artist\'s page by their MusicBrainz id (Navidrome\'s, kept since the pin was made, may name nobody now) - nothing plays',

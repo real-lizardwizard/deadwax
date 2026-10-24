@@ -26,9 +26,15 @@ export function yourArtists(artists: readonly Artist[], albums: readonly Album[]
 
 /** What the Library says with nothing in your library: your library is empty, and the two ways to fill it. */
 export const EMPTY_LIBRARY = 'Nothing in your library yet.'
-export const EMPTY_LIBRARY_HOW = "Browse the store, or search, and add an album from its page - or Get one deadwax doesn't have."
+export const EMPTY_LIBRARY_HOW = "Look through All music and add the albums you like, or find new ones in Search and Get them."
 /** ...in Recently played, with albums of yours but none played. */
-export const NOTHING_OF_YOURS_PLAYED = 'Nothing in your library played yet.'
+export const NOTHING_OF_YOURS_PLAYED = "You haven't played anything from your library yet."
+
+/** (2.0.5, UX batch 2) The empty states with logins off (the library IS the collection), and of All music - never
+ *  "in Navidrome": the music server is the reader's only through what it shows. */
+export const NO_ALBUMS = 'No albums yet.'
+export const NO_ARTISTS = 'No artists yet.'
+export const NO_SONGS = 'No songs yet.'
 
 /**
  * What an empty view of your albums says (review): 'empty' - your library empty, whatever the order (the order

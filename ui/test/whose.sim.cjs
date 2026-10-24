@@ -2,17 +2,17 @@
  * "In your library" meaning YOURS, and the Library as yours with Browse for the store (2.0.0-player.52, step 6
  * of the multi-user plan) - the pure rules, pinned:
  *
- *  - lib/whose.ts: the words ("in your library" / "in the store"), whose a Navidrome album is (starred by you,
+ *  - lib/whose.ts: the words ("in your library" / "in the collection"), whose a Navidrome album is (starred by you,
  *    or held by your library), and the album page's badge and what it offers (Add, Remove, a line saying why
  *    neither) - logins off as it always was;
  *  - THE CONTRADICTION step 5 saw on the real page never again: an album page's meta line saying "in your
- *    library" above a store line saying "In the store, not in your library" - with one pressing in the store
- *    (none yours: "in the store") and with two (review: one yours, the store's on screen: "another pressing in
+ *    library" above a store line saying "In the collection, not in your library" - with one pressing in the collection
+ *    (none yours: "in the collection") and with two (review: one yours, the store's on screen: "another pressing in
  *    your library"), the page passing the meta line that place (read off ReleaseGroupPage.tsx) - and (second
  *    review) a library answer kept from earlier in the session never outvoting the store line's fresh word
  *    (withStoreLine; group.sim renders it, logins on);
  *  - Search's words and rows, the pressing picker's marks and its filter, the artist page's rows and its play
- *    line, "The store also has another pressing", Info's count - each "in the store" for what isn't yours, and
+ *    line, "The collection also has another pressing", Info's count - each "in the collection" for what isn't yours, and
  *    each as it was with logins off - except (2.0.0-player.55) Search's library rows, which say "in your library"
  *    with logins off too (libraryPlace): the half titles that said it are gone;
  *  - lib/yourLibrary.ts and lib/shelves.ts: your albums in the orders that existed (2.0.0-player.59: shelves.sim
@@ -80,9 +80,9 @@ const index = O.buildOwnedIndex([DUMMY, THIRD])
 const offIndex = O.buildOwnedIndex([{ ...DUMMY, yours: undefined }, { ...THIRD, yours: undefined }])
 
 console.log('the words: yours, the store - and with logins off, your library as ever')
-check('a held album not yours, with a library of your own, is in the store; yours, in your library',
+check('a held album not yours, with a library of your own, is in the collection; yours, in your library',
   [W.heldPhrase(true, false), W.heldPhrase(true, true), W.heldLabel(true, false), W.heldLabel(true, true)],
-  ['in the store', 'in your library', 'In the store', 'In your library'])
+  ['in the collection', 'in your library', 'In the collection', 'In your library'])
 check('...with logins off (or break-glass) everything the store has is in your library',
   [W.heldPhrase(false, false), W.heldPhrase(false, true), W.heldLabel(false, false)], ['in your library', 'in your library', 'In your library'])
 check('...and a `yours` the server left out (it couldn\'t read your library) never reads "not yours"',
@@ -90,7 +90,7 @@ check('...and a `yours` the server left out (it couldn\'t read your library) nev
 //? (2.0.0-player.53, review) a song's album held only as a pressing nothing says has the song or hasn't: "a pressing", in the same words
 check('a pressing held that nothing says has a song\'s song or hasn\'t: "a pressing in your library", the store\'s with a library of your own - never "another" (second review)',
   [W.pressingHeldPhrase(true, false), W.pressingHeldPhrase(true, true), W.pressingHeldPhrase(false, false), W.pressingHeldPhrase(true, undefined)],
-  ['a pressing in the store', 'a pressing in your library', 'a pressing in your library', 'a pressing in your library'])
+  ['a pressing in the collection', 'a pressing in your library', 'a pressing in your library', 'a pressing in your library'])
 
 console.log('\nwhose an album as Navidrome answers it is: starred by you, or held by your library')
 check('starred by you is yours, whatever the library says - Amperfy\'s star before deadwax reads it back',
@@ -102,7 +102,7 @@ check('...nothing said while the library hasn\'t answered - and a folder whose `
   [W.navidromeYours({ musicBrainzId: REL_THIRD }, null), W.navidromeYours({ musicBrainzId: REL_THIRD }, offIndex)], [null, true])
 check('a row\'s place: said only with a library of your own, and only once it can be told',
   [W.navidromePlace(true, true), W.navidromePlace(true, false), W.navidromePlace(true, null), W.navidromePlace(false, false)],
-  ['in your library', 'in the store', '', ''])
+  ['in your library', 'in the collection', '', ''])
 
 console.log('\nthe album page: whose it is, and Add or Remove')
 const page = (over) => W.albumMine({ personal: true, starred: false, storeDone: true, bridgeFailed: false, bridgeYours: false, present: 1,
@@ -111,29 +111,29 @@ const mine = (yours, badge, action, note, pending = false) => ({ yours, badge, a
 check('logins off: "In your library", nothing offered - as it always was',
   W.albumMine({ personal: false, starred: null, storeDone: false, bridgeYours: undefined, present: 1, release: 'r', changed: null }),
   mine(true, 'In your library', null, null))
-check('the store\'s, not yours: "In the store" and Add to my library, with what Add does',
-  page({}), mine(false, 'In the store', 'add', W.ADD_FROM_PAGE))
+check('the store\'s, not yours: "In the collection" and Add to my library, with what Add does',
+  page({}), mine(false, 'In the collection', 'add', W.ADD_FROM_PAGE))
 check('yours by the bridge, or starred by you: "In your library" and Remove',
   [page({ bridgeYours: true }), page({ starred: true })].map((m) => [m.badge, m.action]), [['In your library', 'remove'], ['In your library', 'remove']])
 check('...starred by the album\'s own answer even before the bridge has answered', page({ starred: true, storeDone: false, bridgeYours: undefined }),
   mine(true, 'In your library', 'remove', null))
 check('not yours with no release id to keep it by: no Add, and the line says why',
-  page({ release: null, releaseSaid: '', present: 0, bridgeYours: undefined }), mine(false, 'In the store', null, W.NO_RELEASE_TO_ADD))
+  page({ release: null, releaseSaid: '', present: 0, bridgeYours: undefined }), mine(false, 'In the collection', null, W.NO_RELEASE_TO_ADD))
 check('...nor with a release the store has no folder of - and the line says that, never "no release id" (review)',
   [page({ present: 0, bridgeYours: undefined }), page({ present: 0, bridgeYours: false })],
-  [mine(false, 'In the store', null, W.NOT_FOUND_TO_ADD), mine(false, 'In the store', null, W.NOT_FOUND_TO_ADD)])
-check('the bridge unable to say (a folder, no `yours`): "In the store" - true either way - and nothing offered',
-  page({ bridgeYours: undefined }), mine(null, 'In the store', null, null))
+  [mine(false, 'In the collection', null, W.NOT_FOUND_TO_ADD), mine(false, 'In the collection', null, W.NOT_FOUND_TO_ADD)])
+check('the bridge unable to say (a folder, no `yours`): "In the collection" - true either way - and nothing offered',
+  page({ bridgeYours: undefined }), mine(null, 'In the collection', null, null))
 check('...nor once the bridge has FAILED - never the "no release id" line for a check that couldn\'t be made (review)',
   [page({ bridgeFailed: true, release: null, present: 0, bridgeYours: undefined }), page({ bridgeFailed: true, release: null, releaseSaid: null, present: 0, bridgeYours: undefined }),
     page({ bridgeFailed: true, release: null, releaseSaid: '', present: 0, bridgeYours: undefined })],
-  [mine(null, 'In the store', null, null), mine(null, 'In the store', null, null), mine(null, 'In the store', null, null)])
+  [mine(null, 'In the collection', null, null), mine(null, 'In the collection', null, null), mine(null, 'In the collection', null, null)])
 check('...nor when the bridge found no release where Navidrome names one',
-  page({ release: null, releaseSaid: 'rel-third', present: 0, bridgeYours: undefined }), mine(null, 'In the store', null, null))
+  page({ release: null, releaseSaid: 'rel-third', present: 0, bridgeYours: undefined }), mine(null, 'In the collection', null, null))
 check('...nor before the bridge has answered - said to be on its way, so its place is held',
-  page({ storeDone: false, bridgeYours: undefined }), mine(null, 'In the store', null, null, true))
+  page({ storeDone: false, bridgeYours: undefined }), mine(null, 'In the collection', null, null, true))
 check('...nor before the album\'s own answer - a list\'s tile is never read for `starred` (review: one from before a Remove)',
-  [page({ starred: null }), page({ starred: null, bridgeYours: false, storeDone: true })], [mine(null, 'In the store', null, null, true), mine(null, 'In the store', null, null, true)])
+  [page({ starred: null }), page({ starred: null, bridgeYours: false, storeDone: true })], [mine(null, 'In the collection', null, null, true), mine(null, 'In the collection', null, null, true)])
 {
   const album = read('player/AlbumPage.tsx')
   check('the page passes the album\'s own answer\'s `starred`, the failed bridge and Navidrome\'s release - no preview',
@@ -143,23 +143,37 @@ check('...nor before the album\'s own answer - a list\'s tile is never read for 
     [/\{mine\.pending && album && !mineRefused && \(\s*<div class="app-album-mine is-waiting" aria-hidden="true">/.test(album),
       /<div class=\{`app-album-chips\$\{storeDone && !mine\.pending \? '' : ' is-waiting'\}`\}>/.test(album)], [true, true])
   const css = fs.readFileSync(path.join(UI, '..', 'interface', 'player', 'app.css'), 'utf8')
-  check('...the held place unseen; "In the store" no box - and beside an Also chip it gives way whole, never an empty box',
+  //? (2.0.5, UX batch 2) "In your library" is a badge, as the app's others are (the tracklist's .app-rg-chip): its
+  //? tokens theirs, label-sized - and it keeps its words wherever the three fit whole; only a row under 420px (a
+  //? phone's, with an Also chip) gives it way WHOLE, as "In the collection" always has - (2.0.5 review) its tick alone,
+  //? kept at first, was a bare mark beside the Also chip that read as that pressing ticked. The row holds a chip's
+  //? height from the first frame, so "Pressings" landing beside the shorter badge moves nothing below
+  const narrow = css.slice(css.indexOf('@container app-album-chips (max-width: 420px) {'))
+  const narrowBlock = narrow.slice(0, narrow.indexOf('\n}\n') + 2)
+  check('...the held place unseen; "In the collection" no box - and beside an Also chip in a phone\'s row the badge, yours or not, gives way whole, never a bare tick; a badge that keeps its words everywhere else',
     [/\.app-album-mine\.is-waiting \{ visibility: hidden; \}/.test(css), /\.app-held-badge\.is-store \{\s*padding: 0;\s*border-color: transparent;\s*background: transparent;/.test(css),
-      /\.app-held-badge:not\(\.is-store\) \.app-held-badge-text \{/.test(css), /:has\(\.app-other-pressings\) \.app-held-badge\.is-store \{\s*position: absolute;/.test(css)],
-    [true, true, true, true])
+      !/\.app-held-badge-text \{/.test(css) && !/:not\(\.is-store\)/.test(narrowBlock)
+        && !/@container app-album-chips \(max-width: 600px\)/.test(css),
+      /^@container app-album-chips \(max-width: 420px\) \{\s*\.app-album-chips:has\(\.app-also\):has\(\.app-other-pressings\) \.app-held-badge \{\s*position: absolute;[^}]*clip-path: inset\(50%\);[^}]*\}\s*\}$/.test(narrowBlock),
+      /--app-held-badge: var\(--app-rg-chip\);\s*--app-held-badge-pad: var\(--app-rg-chip-pad\);/.test(css),
+      /\.app-held-badge \{[^}]*height: var\(--app-held-badge\);\s*padding: 0 var\(--app-held-badge-pad\);[^}]*font-size: var\(--dw-text-label\);/.test(css),
+      /\.app-album-chips \{[^}]*min-height: var\(--app-chip\);/.test(css)],
+    [true, true, true, true, true, true, true])
 }
 check('an Add just taken: "In your library", the added words, Remove to undo it',
   page({ changed: 'added' }), mine(true, 'In your library', 'remove', W.ADDED_FROM_PAGE))
-check('a Remove just taken: "In the store", saying nothing was deleted, Add to undo it - even over a stale `starred`',
-  page({ changed: 'removed', starred: true, bridgeYours: true }), mine(false, 'In the store', 'add', W.REMOVED_FROM_PAGE))
+check('a Remove just taken: "In the collection", saying nothing was deleted, Add to undo it - even over a stale `starred`',
+  page({ changed: 'removed', starred: true, bridgeYours: true }), mine(false, 'In the collection', 'add', W.REMOVED_FROM_PAGE))
 check('...but no Add after removing an album deadwax can\'t keep - and the line says how to have it back (review)',
   [page({ changed: 'removed', release: null, releaseSaid: '', present: 0, bridgeYours: undefined, starred: true }), page({ changed: 'removed', present: 0, bridgeYours: undefined, starred: true })],
-  [mine(false, 'In the store', null, W.REMOVED_STAR_TO_RETURN), mine(false, 'In the store', null, W.REMOVED_STAR_TO_RETURN)])
-check('Remove\'s words say it deletes nothing, and the way back names Amperfy',
-  [/still in the store, and nothing was deleted/.test(W.REMOVED_FROM_PAGE), W.REMOVED_STAR_TO_RETURN.startsWith(W.REMOVED_FROM_PAGE), /star it in a Subsonic app such as Amperfy/.test(W.REMOVED_STAR_TO_RETURN)],
-  [true, true, true])
+  [mine(false, 'In the collection', null, W.REMOVED_STAR_TO_RETURN), mine(false, 'In the collection', null, W.REMOVED_STAR_TO_RETURN)])
+//? (2.0.5) the way back said as the listener does it - a favourite in another music app - never "star", "Subsonic"
+check('Remove\'s words say it deletes nothing, and the way back is a favourite in another music app',
+  [/still in the collection, and nothing was deleted/.test(W.REMOVED_FROM_PAGE), W.REMOVED_STAR_TO_RETURN.startsWith(W.REMOVED_FROM_PAGE), /make it a favourite in another music app/.test(W.REMOVED_STAR_TO_RETURN),
+    /\bstar|Subsonic|Navidrome|the store/.test([W.ADD_FROM_PAGE, W.ADDED_FROM_PAGE, W.REMOVED_FROM_PAGE, W.REMOVED_STAR_TO_RETURN, W.NO_RELEASE_TO_ADD, W.NOT_FOUND_TO_ADD].join(' '))],
+  [true, true, true, false])
 
-console.log('\nTHE CONTRADICTION, never again: "in your library" above "In the store, not in your library"')
+console.log('\nTHE CONTRADICTION, never again: "in your library" above "In the collection, not in your library"')
 {
   //? Third: the store holds it whole, ethan doesn't - the store line and the meta line read the same folders
   const holding = O.ownedForGroup(index, { groupId: 'rg-third' }).held
@@ -167,19 +181,19 @@ console.log('\nTHE CONTRADICTION, never again: "in your library" above "In the s
     formats: ['flac'], complete: true, fills_gaps: false, filed_to: null, yours: false }
   const store = PP.storeStatusFor({ held, downloading: null })
   const meta = P.metaLine({ year: '2008', kind: 'Album' }, holding.length > 0, W.heldPhrase(true, W.anyYours(holding)))
-  check('the store line says "In the store, not in your library" and offers Add', [store.title, store.add], ['In the store, not in your library', true])
-  check('...and the meta line above it says "in the store" - never "in your library"', [meta, meta.includes('in your library')], ['2008 · Album · in the store', false])
+  check('the store line says "In the collection, not in your library" and offers Add', [store.title, store.add], ['In the collection, not in your library', true])
+  check('...and the meta line above it says "in the collection" - never "in your library"', [meta, meta.includes('in your library')], ['2008 · Album · in the collection', false])
   const page = read('app/ReleaseGroupPage.tsx')
   check('...the page passes its meta line the place of the folders it holds, and the pressing on screen',
     [/const place = groupPagePlace\(personal, holding \?\? \[\], view\?\.chosenId\)/.test(page), /metaLine\(header, held, place\)/.test(page)], [true, true])
-  //? and the album you have, by its own badge: an album the store has that isn't yours says "In the store"
+  //? and the album you have, by its own badge: an album the store has that isn't yours says "In the collection"
   check('the album page\'s badge is albumMine\'s, never the words alone', /<span class="app-held-badge-text">\{mine\.badge\}<\/span>/.test(read('player/AlbumPage.tsx')), true)
   const off = P.metaLine({ year: '2008', kind: 'Album' }, true, W.heldPhrase(false, W.anyYours(O.ownedForGroup(offIndex, { groupId: 'rg-third' }).held)))
   check('logins off: the meta line says "in your library", and the store line "Already in your library", as ever',
     [off, PP.storeStatusFor({ held: { ...held, yours: undefined }, downloading: null }).title], ['2008 · Album · in your library', 'Already in your library'])
 }
 {
-  //? (review) two pressings of Dummy in the store: the CD yours, the remaster the store's - the remaster on screen
+  //? (review) two pressings of Dummy in the collection: the CD yours, the remaster the store's - the remaster on screen
   const CD = { path: 'Portishead/Dummy (1994)', release_mbid: 'rel-cd', release_group_mbid: 'rg-dummy', yours: true }
   const REMASTER = { path: 'Portishead/Dummy (2014)', release_mbid: 'rel-remaster', release_group_mbid: 'rg-dummy', yours: false }
   const two = O.buildOwnedIndex([CD, REMASTER])
@@ -188,15 +202,15 @@ console.log('\nTHE CONTRADICTION, never again: "in your library" above "In the s
     formats: ['flac'], complete: true, fills_gaps: false, filed_to: null, yours: false }
   const store = PP.storeStatusFor({ held, downloading: null })
   const meta = (chosen) => P.metaLine({ year: '1994', kind: 'Album' }, true, W.groupPagePlace(true, holding, chosen))
-  check('two pressings, the store\'s on screen: the store line "In the store, not in your library"...', store.title, 'In the store, not in your library')
+  check('two pressings, the store\'s on screen: the store line "In the collection, not in your library"...', store.title, 'In the collection, not in your library')
   check('...and the meta line "another pressing in your library" - never a bare "in your library" over it',
     [meta('rel-remaster'), meta('REL-REMASTER'), / · in your library$/.test(meta('rel-remaster'))],
     ['1994 · Album · another pressing in your library', '1994 · Album · another pressing in your library', false])
   check('...yours on screen, or a pressing the store doesn\'t hold, "in your library" - the album is',
     [meta('rel-cd'), meta('rel-vinyl'), meta(null)], ['1994 · Album · in your library', '1994 · Album · in your library', '1994 · Album · in your library'])
-  check('...none of them yours: "in the store"; logins off: "in your library", whichever is on screen',
+  check('...none of them yours: "in the collection"; logins off: "in your library", whichever is on screen',
     [W.groupPagePlace(true, [REMASTER], 'rel-remaster'), W.groupPagePlace(false, holding, 'rel-remaster'), W.groupPagePlace(false, [REMASTER], 'rel-remaster')],
-    ['in the store', 'in your library', 'in your library'])
+    ['in the collection', 'in your library', 'in your library'])
 }
 
 {
@@ -206,15 +220,15 @@ console.log('\nTHE CONTRADICTION, never again: "in your library" above "In the s
   const REMASTER = { path: 'Portishead/Dummy (2014)', release_mbid: 'rel-remaster', release_group_mbid: 'rg-dummy', yours: false }
   const line = (paths, yours, others = []) => ({ held: { paths, yours }, other_pressings: others })
   const place = (holding, said, chosen) => W.groupPagePlace(true, W.withStoreLine(holding, said), chosen)
-  check('a kept "yours" outvoted by the store line\'s fresh word: the meta line "in the store" under "In the store, not in your library"',
+  check('a kept "yours" outvoted by the store line\'s fresh word: the meta line "in the collection" under "In the collection, not in your library"',
     [place([CD], line([CD.path], false), 'rel-cd'), PP.storeStatusFor({ held: { path: CD.path, paths: [CD.path], track_count: 11, expected_tracks: 11, formats: ['flac'], complete: true, yours: false }, downloading: null }).title],
-    ['in the store', 'In the store, not in your library'])
+    ['in the collection', 'In the collection, not in your library'])
   check('...and the other way: starred in Amperfy since, "in your library" under "Already in your library"',
     place([{ ...CD, yours: false }], line([CD.path], true), 'rel-cd'), 'in your library')
   check('...an other pressing the line names takes its word too; one it doesn\'t name keeps the library\'s',
     [place([CD, REMASTER], line([REMASTER.path], false, [{ path: CD.path, yours: false }]), 'rel-remaster'),
       place([CD, REMASTER], line([REMASTER.path], false), 'rel-remaster')],
-    ['in the store', 'another pressing in your library'])
+    ['in the collection', 'another pressing in your library'])
   check('...a line that says nothing of whose (logins off, the ledger unread), or no line yet: the library\'s answer as it was',
     [W.withStoreLine([CD], line([CD.path], undefined, [{ path: CD.path }])), W.withStoreLine([CD], null), W.withStoreLine([CD], { held: null, other_pressings: [] })],
     [[CD], [CD], [CD]])
@@ -238,8 +252,8 @@ console.log('\nSearch: the store first, its rows marked; MusicBrainz for what th
 //? (2.0.0-player.55) one list, no half titles: the hint, the field's label, the asking line, the all-held words
 check('the words with a library of your own: yours, then the store\'s, then MusicBrainz\'s',
   (({ hint, allHeld, label, searching }) => [hint, allHeld, label, searching(true), searching(false)])(S.searchWords(true)),
-  ["Artists, albums and songs: yours first, then the store's, then MusicBrainz's.", 'Everything MusicBrainz found is in the store already.', 'Search the store and MusicBrainz',
-    'Searching the store and MusicBrainz…', 'Searching the store…'])
+  ["Artists, albums and songs: yours first, then the collection's, then MusicBrainz's.", 'Everything MusicBrainz found is in the collection already.', 'Search the collection and MusicBrainz',
+    'Searching the collection and MusicBrainz…', 'Searching the collection…'])
 check('...and with logins off, yours then MusicBrainz\'s - the field\'s label as it was',
   (({ hint, allHeld, label, searching }) => [hint, allHeld, label, searching(true), searching(false)])(S.searchWords(false)),
   ["Artists, albums and songs: yours first, then MusicBrainz's.", 'Everything MusicBrainz found is in your library already.', 'Search your library and MusicBrainz',
@@ -248,20 +262,20 @@ check('...the half titles gone', Object.keys(S.searchWords(true)).sort(), ['allH
 //? (2.0.0-player.55) a library row's place in Search: said in both modes now - the half titles that said it are gone
 check('a library row\'s place in Search (libraryPlace): "in your library" with logins off too - reversing navidromePlace\'s silence there; with a library of your own whose it is, nothing while unknown',
   [W.libraryPlace(false, null), W.libraryPlace(false, false), W.libraryPlace(true, true), W.libraryPlace(true, false), W.libraryPlace(true, null)],
-  ['in your library', 'in your library', 'in your library', 'in the store', ''])
+  ['in your library', 'in your library', 'in your library', 'in the collection', ''])
 const group = { id: 'rg-third', title: 'Third', 'primary-type': 'Album', 'first-release-date': '2008-04-28', 'artist-credit': [{ name: 'Portishead' }] }
 check('a MusicBrainz row the store turns out to hold says whose it is',
   [S.groupLine(group, true, S.groupPlace(index, 'rg-third', true)), S.groupLine({ ...group, id: 'rg-dummy' }, true, S.groupPlace(index, 'rg-dummy', true)),
     S.groupLine(group, true, S.groupPlace(index, 'rg-third', false)), S.groupLine(group, true)],
-  ['Album · Portishead · 2008 · in the store', 'Album · Portishead · 2008 · in your library', 'Album · Portishead · 2008 · in your library', 'Album · Portishead · 2008 · in your library'])
+  ['Album · Portishead · 2008 · in the collection', 'Album · Portishead · 2008 · in your library', 'Album · Portishead · 2008 · in your library', 'Album · Portishead · 2008 · in your library'])
 check('an artist\'s count is the store\'s with a library of your own', [S.artistLine(2, true), S.artistLine(1, false), S.artistLine(0, true), S.artistLine(2, true, true)],
-  ['2 albums in the store', '1 album in your library', '', 'Artist · 2 albums in the store'])
+  ['2 albums in the collection', '1 album in your library', '', 'Artist · 2 albums in the collection'])
 check('"More from MusicBrainz" says the store has them', [S.morePageWords(0, 2, true).note, S.morePageWords(0, 1, false).note],
-  ['The next 2 albums MusicBrainz found are all in the store already.', 'The next album MusicBrainz found is in your library already.'])
+  ['The next 2 albums MusicBrainz found are all in the collection already.', 'The next album MusicBrainz found is in your library already.'])
 {
   const list = read('lib/searchList.ts')
   //? (2.0.0-player.55) replaces the half-titles pin: every library row says its place, by libraryPlace over whose it is - an
-  //? album row made of a song's own fields read as search3 or `ready` has it, unknown without (review: "in the store" on a guess)
+  //? album row made of a song's own fields read as search3 or `ready` has it, unknown without (review: "in the collection" on a guess)
   check('Search\'s library rows carry their place - albums and songs by libraryPlace, over your albums\' ids and the one /library/owned answer',
     [/line: join\(top \? 'Album' : '', row\.album\.artist, year\), place: libraryPlace\(marks\.personal, albumYours\(row\.album, marks\)\)/.test(list),
       /place: libraryPlace\(marks\.personal, songYours\(row\.song, marks\)\)/.test(list),
@@ -269,7 +283,7 @@ check('"More from MusicBrainz" says the store has them', [S.morePageWords(0, 2, 
     [true, true, true])
 }
 
-console.log('\nthe pressing picker: yours marked "In your library", the store\'s "In the store"')
+console.log('\nthe pressing picker: yours marked "In your library", the store\'s "In the collection"')
 {
   const releases = [
     { id: 'rel-dummy', title: 'Dummy', date: '1994-08-22', media: [{ format: 'CD', tracks: [{ title: 'Mysterons', length: 300000 }] }] },
@@ -278,11 +292,11 @@ console.log('\nthe pressing picker: yours marked "In your library", the store\'s
   const both = new Set(['rel-dummy', 'rel-vinyl'])
   const view = P.pressingsView(releases, null, both, new Set(['rel-dummy']))
   const marks = Object.fromEntries([...view.shown, ...view.more].map((row) => [row.id, [row.held, !!row.inStore]]))
-  check('held and yours: no store mark; held and not yours: "In the store"', marks, { 'rel-dummy': [true, false], 'rel-vinyl': [true, true] })
+  check('held and yours: no store mark; held and not yours: "In the collection"', marks, { 'rel-dummy': [true, false], 'rel-vinyl': [true, true] })
   const off = P.pressingsView(releases, null, both, null)
   check('...with logins off (no `yours` set) nothing is marked the store\'s', [...off.shown, ...off.more].some((row) => row.inStore), false)
-  check('the picker\'s filter finds "in the store" and "in your library" as they are marked',
-    [P.filterPressings([...view.shown, ...view.more], 'in the store').map((row) => row.id), P.filterPressings([...view.shown, ...view.more], 'your library').map((row) => row.id)],
+  check('the picker\'s filter finds "in the collection" and "in your library" as they are marked',
+    [P.filterPressings([...view.shown, ...view.more], 'in the collection').map((row) => row.id), P.filterPressings([...view.shown, ...view.more], 'your library').map((row) => row.id)],
     [['rel-vinyl'], ['rel-dummy']])
 }
 
@@ -292,23 +306,23 @@ console.log('\nthe artist page: a row the store holds that isn\'t yours says so'
   const navidrome = [{ id: 'nd-dummy', name: 'Dummy', musicBrainzId: REL_DUMMY, year: 1994 }, { id: 'nd-third', name: 'Third', musicBrainzId: REL_THIRD, year: 2008 }]
   const rows = A.artistRows(navidrome, groups, index)
   check('Dummy is yours, Third the store\'s', rows.map((row) => [row.title, row.yours]), [['Dummy', true], ['Third', false]])
-  check('...in the rows\' words with a library of your own', rows.map((row) => A.rowLine(row, true)), ['1994 · in your library', '2008 · in the store'])
+  check('...in the rows\' words with a library of your own', rows.map((row) => A.rowLine(row, true)), ['1994 · in your library', '2008 · in the collection'])
   check('...and with logins off both in your library', rows.map((row) => A.rowLine(row)), ['1994 · in your library', '2008 · in your library'])
   const starred = A.artistRows([navidrome[0], { ...navidrome[1], starred: '2026-10-15T09:00:00Z' }], groups, index)
   check('an album of it you starred makes a row yours before deadwax reads the star back', starred[1].yours, true)
   check('Play says the store\'s albums with a library of your own', [A.playsLine(2, 2, true, 'done', true), A.playsLine(1, 1, true, 'done', false), A.playsLine(0, 0, false, 'asking', true)],
-    ['Plays the 2 albums in the store', 'Plays the album you have', 'Looking for their albums in the store…'])
+    ['Plays the 2 albums in the collection', 'Plays the album you have', 'Looking for their albums in the collection…'])
   check('...a store\'s count of their albums, as Browse\'s artists and Info say it', [A.albumCountLine(3, W.storeCountPlace(true)), A.albumCountLine(1)],
-    ['3 albums in the store', '1 album in your library'])
+    ['3 albums in the collection', '1 album in your library'])
 }
 
-console.log('\n"The store also has another pressing"')
+console.log('\n"The collection also has another pressing"')
 {
   const pressing = (yours) => ({ path: 'Portishead/Dummy (2014)', release_mbid: 'r2', edition: 'Remaster', year: '2014', track_count: 11, formats: ['flac'], ...(yours === undefined ? {} : { yours }) })
   check('one not yours is the store\'s; one yours, and one with logins off, yours',
     [C.storeNotes({ held: null, downloading_part: null, other_pressings: [pressing(false)] })[0], C.storeNotes({ held: null, downloading_part: null, other_pressings: [pressing(true)] })[0],
       C.storeNotes({ held: null, downloading_part: null, other_pressings: [pressing()] })[0]].map((note) => note.split(':')[0]),
-    ['The store also has another pressing', 'You also have another pressing', 'You also have another pressing'])
+    ['The collection also has another pressing', 'You also have another pressing', 'You also have another pressing'])
 }
 
 console.log('\nyour library: your starred albums, in the order chosen')
@@ -331,7 +345,7 @@ console.log('\nyour library: your starred albums, in the order chosen')
   const mine = [{ id: 'x', name: 'Dummy', artistId: 'ar-p' }, { id: 'y', name: 'Third', artistId: 'ar-p' }, { id: 'z', name: 'Currents', artistId: 'ar-t' }]
   check('your artists: the artists of your albums, counting YOUR albums of theirs, in Navidrome\'s order',
     Y.yourArtists(artists, mine).map((artist) => [artist.name, artist.albumCount]), [['Portishead', 2], ['Tame Impala', 1]])
-  check('an empty library says so, and what to do: browse the store, or search', [Y.EMPTY_LIBRARY, /Browse the store, or search/.test(Y.EMPTY_LIBRARY_HOW)],
+  check('an empty library says so, and what to do: look through All music, or Search and Get', [Y.EMPTY_LIBRARY, /^Look through All music and add the albums you like, or find new ones in Search/.test(Y.EMPTY_LIBRARY_HOW)],
     ['Nothing in your library yet.', true])
   check('...in ANY order, Recently played too (review: the order is the device\'s, shared with Browse); "nothing played" only over albums - Most played too',
     [Y.yourEmptyNotice('recent', 0), Y.yourEmptyNotice('newest', 0), Y.yourEmptyNotice('alphabeticalByName', 0), Y.yourEmptyNotice('recent', 3), Y.yourEmptyNotice('recent', null),
@@ -358,11 +372,14 @@ check('logins off: the sidebar lists the Library as it always did, and no Browse
 check('...titles as they were', ['recent', 'albums', 'artists', 'songs'].map((pick) => F.libraryTitle(pick)), ['Recently added', 'Albums', 'Artists', 'Songs'])
 check('...and Browse\'s views, kept on a device, show as the albums and the artists',
   [F.shownPick('store', true, 'phone'), F.shownPick('storeArtists', true, 'desktop'), F.sidebarCurrent('library', 'store', true)], ['albums', 'artists', 'albums'])
-check('a library of your own: yours in the Library group, the store\'s in Browse - Songs is Browse\'s',
-  [F.libraryItems(true, true).map((item) => item.id), F.browseItems(true, true).map((item) => [item.id, item.label]), F.browseItems(false, true).map((item) => item.id)],
-  [['recent', 'albums', 'artists'], [['store', 'Albums'], ['storeArtists', 'Artists'], ['songs', 'Songs']], ['store', 'storeArtists']])
-check('...titled yours and the store\'s', ['recent', 'albums', 'artists', 'store', 'storeArtists', 'songs'].map((pick) => F.libraryTitle(pick, true)),
-  ['Recently added', 'Your albums', 'Your artists', 'Albums in the store', 'Artists in the store', 'Songs in the store'])
+//? (2.0.5, UX batch 2) never "Albums, Artists" twice: yours named so, the collection's under All music named All -
+//? the titles the sidebar's own words
+check('a library of your own: yours in the Library group, the collection\'s under All music - Songs is All music\'s',
+  [F.libraryItems(true, true).map((item) => [item.id, item.label]), F.browseItems(true, true).map((item) => [item.id, item.label]), F.browseItems(false, true).map((item) => item.id), F.ALL_MUSIC],
+  [[['recent', 'Recently added'], ['albums', 'Your albums'], ['artists', 'Your artists']], [['store', 'All albums'], ['storeArtists', 'All artists'], ['songs', 'All songs']], ['store', 'storeArtists'], 'All music'])
+check('...no label twice across the two groups', (() => { const labels = [...F.libraryItems(true, true), ...F.browseItems(true, true)].map((item) => item.label); return labels.length === new Set(labels).size })(), true)
+check('...titled yours and the collection\'s - the sidebar\'s own words', ['recent', 'albums', 'artists', 'store', 'storeArtists', 'songs'].map((pick) => F.libraryTitle(pick, true)),
+  ['Recently added', 'Your albums', 'Your artists', 'All albums', 'All artists', 'All songs'])
 check('...Browse\'s picks stay Browse\'s, Songs falling back to the store\'s albums, a phone\'s Recently added to yours',
   [F.shownPick('store', true, 'phone', true), F.shownPick('songs', false, 'phone', true), F.shownPick('recent', true, 'phone', true), F.isBrowse('store', true), F.isBrowse('store', false), F.isBrowse('albums', true)],
   ['store', 'store', 'albums', true, false, false])
@@ -397,13 +414,13 @@ console.log('\nthe wiring: every page takes `personal` from hasLibrary() and han
     [/const scope: Scope = id === 'store' \|\| !personal \? 'store' : 'yours'/.test(section), /const yours = personal && id === 'artists'/.test(section),
       /personal=\{personal\}/.test(library), /personal=\{hasLibrary\(\)\}/.test(app), /id=\{shownPick\(page\.id as LibraryPick, hasSongs, 'desktop', hasLibrary\(\)\)\}/.test(app)],
     [true, true, true, true, true])
-  check('...and Browse\'s two the store\'s: every album, and artists counted "in the store"',
+  check('...and Browse\'s two the store\'s: every album, and artists counted "in the collection"',
     [/const inStore = personal && id === 'storeArtists'/.test(section), /<ArtistRow artist=\{artist\} inStore=\{inStore\} onOpenArtist=\{onOpenArtist\} \/>/.test(section),
-      /\{albumCountLine\(artist\.albumCount, inStore \? IN_THE_STORE : undefined\) && \(\s*<span class="app-result-line">\{albumCountLine\(artist\.albumCount, inStore \? IN_THE_STORE : undefined\)\}<\/span>/.test(read('app/LibraryViews.tsx'))],
+      /\{albumCountLine\(artist\.albumCount, inStore \? IN_THE_STORE : ''\) && \(\s*<span class="app-result-line">\{albumCountLine\(artist\.albumCount, inStore \? IN_THE_STORE : ''\)\}<\/span>/.test(read('app/LibraryViews.tsx'))],
     [true, true, true])
   const sidebar = read('app/Sidebar.tsx')
   check('a desktop\'s sidebar: a Browse group whenever App gives it Browse\'s views, and App gives them - and the Library\'s - by hasLibrary()',
-    [/\{browse\.length > 0 && \(\s*<section class="app-side-group" aria-labelledby="app-side-browse">\s*<h2 id="app-side-browse" class="app-side-label">\s*Browse\s*<\/h2>\s*<ul class="app-side-list">\{browse\.map\(item\)\}<\/ul>/.test(sidebar),
+    [/\{browse\.length > 0 && \(\s*<section class="app-side-group" aria-labelledby="app-side-browse">\s*<h2 id="app-side-browse" class="app-side-label">\s*\{ALL_MUSIC\}\s*<\/h2>\s*<ul class="app-side-list">\{browse\.map\(item\)\}<\/ul>/.test(sidebar),
       /library=\{libraryItems\(hasSongs, hasLibrary\(\)\)\}\s*browse=\{browseItems\(hasSongs, hasLibrary\(\)\)\}\s*personal=\{hasLibrary\(\)\}/.test(app),
       /sidebarMove\(item, libraryPick\(\), librarySongs\(\), hasLibrary\(\), router\.nav\.stacks\.library\[0\] \?\? null\)\s*if \(move\.how === 'tab'\) \{\s*(?:\/\/[^\n]*\n\s*)?if \(move\.pick\) chooseLibrary\(move\.pick\)\s*chooseTab\(move\.tab\)/.test(app), /aria-label=\{searchWords\(personal\)\.label\}/.test(sidebar)],
     [true, true, true, true])
@@ -417,15 +434,15 @@ console.log('\nthe wiring: every page takes `personal` from hasLibrary() and han
   check('...and no half titles any more (2.0.0-player.55): one list in sections', [/words\.libraryTitle|words\.musicbrainzTitle/.test(search), /<h2 id="app-search-top"/.test(search)], [false, true])
   const artist = read('app/ArtistPage.tsx')
   check('the artist page: its facts headed, its waits and empties said, its rows worded and ticked, Play\'s line - each by `personal`',
-    [/<h2 id="app-artist-library-title" class="app-section-title">\{personal \? 'In the store' : 'In your library'\}<\/h2>/.test(artist),
-      /const where = personal \? 'the store' : 'your library'\n/.test(artist), /Looking in \{where\}…/.test(artist), /Nothing of theirs in \{where\}\./.test(artist),
+    [/<h2 id="app-artist-library-title" class="app-section-title">\{personal \? 'In the collection' : 'In your library'\}<\/h2>/.test(artist),
+      /const where = personal \? 'the collection' : 'your library'\n/.test(artist), /Looking in \{where\}…/.test(artist), /Nothing of theirs in \{where\}\./.test(artist),
       /\{row\.held === true && \(!personal \|\| row\.yours !== false\) && <CheckIcon class="app-artist-held" \/>\}/.test(artist),
       /<span class="app-artist-line-text">\{rowLine\(row, personal\)\}<\/span>/.test(artist),
       /\{playsLine\(playing\.length, inHand\.length, settled, library\.state, personal\)\}/.test(artist)],
     [true, true, true, true, true, true, true])
   const info = read('app/InfoSheet.tsx')
-  check('Info: the album\'s rows by hasLibrary(), and its folder headed "In the store" with a library of your own',
-    [/aboutRows\(track, album, details, hasLibrary\(\)\)/.test(info), /<h3 id="app-info-where" class="app-section-title">[\s\S]{0,200}?\{hasLibrary\(\) \? 'In the store' : 'In your library'\}\s*<\/h3>/.test(info)],
+  check('Info: the album\'s rows by hasLibrary(), and its folder headed "In the collection" with a library of your own',
+    [/aboutRows\(track, album, details, hasLibrary\(\)\)/.test(info), /<h3 id="app-info-where" class="app-section-title">[\s\S]{0,200}?\{hasLibrary\(\) \? 'In the collection' : 'In your library'\}\s*<\/h3>/.test(info)],
     [true, true])
 }
 

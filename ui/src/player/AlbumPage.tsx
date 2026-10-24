@@ -15,6 +15,7 @@ import { sayPins, setPinned, usePins } from '../app/usePins'
 import { discHeadings } from '../lib/discTitles'
 import { formatDuration, sharedFormat, trackTime } from '../lib/format'
 import { editAlbum, type EditAlbum } from '../lib/albumEdit'
+import { albumEdit } from '../lib/permissions'
 import { albumProperties } from '../lib/albumProperties'
 import { alsoChips, otherPressingsGroup } from '../lib/idBridge'
 import { isAbort, latestOnly } from '../lib/latest'
@@ -27,7 +28,7 @@ import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, MoreIcon, PlayIcon, Playi
 import { Cover } from './Cover'
 import { queued, warmAlbum } from './levelling'
 import type { Player } from './usePlayer'
-import { accessNow, seesDetail } from '../app/access'
+import { accessNow, seesDetail, useAccess } from '../app/access'
 import { errorNote } from '../app/ErrorNote'
 
 /**
@@ -54,7 +55,7 @@ import { errorNote } from '../app/ErrorNote'
  * own latestOnly) says which. The row is drawn from the first frame, so a chip arriving moves
  * nothing a finger is reaching for; a chip opens that pressing's page over this one.
  *
- * Since 2.0.0-player.41 the row ends with "Other pressings ›" once the bridge says which MusicBrainz
+ * Since 2.0.0-player.41 the row ends with "Pressings ›" (2.0.5's one name) once the bridge says which MusicBrainz
  * album this is (the release group its folders carry): the album you don't have's page for it, over
  * this one - every pressing in its list, the ones you hold marked, Get on any - so the deluxe beside
  * the standard you have can be got (v0.9.1's ask). It lands with the Also chips, in the row drawn from
@@ -62,9 +63,9 @@ import { errorNote } from '../app/ErrorNote'
  * bridge has answered (or failed) - its place held, so nothing below moves - and so what is in it,
  * the badge too, first shows where it stays: a phone's row is centred, and the badge slid sideways as
  * the chip landed. Beside an Also chip, in a row too narrow for all three whole (its own width, by a
- * container query - a phone, or a desktop's column narrowed by the Edit panel), it says "Pressings"
- * (its name still "Other pressings") and "In your library" keeps its green tick and gives its words
- * up (still read, never shown), leaving the Also chip room to say which pressing it is.
+ * container query - a phone, or a desktop's column narrowed by the Edit panel), the Also chip gives way.
+ * (2.0.5, UX batch 2) The chip is "Pressings ›" on every frame (it was "Other pressings" with room), and the
+ * badge is a badge (app.css), keeping its words - in a narrow row it had left a bare tick in a box.
  *
  * Since 2.0.0-player.18 the bar's top right has the pin (Album.dc.html's): it pins the album to Home
  * by its release - the bridge's answer says which - and deadwax keys the pin on the store's row for
@@ -111,6 +112,9 @@ import { errorNote } from '../app/ErrorNote'
 /** (2.0.4) An album page whose album Navidrome no longer has (a 404). */
 export const ALBUM_GONE = "This album isn't here any more - it may have been moved or deleted."
 
+/** (2.0.5) The chip to every pressing of the album - one name, on a phone and a desktop alike. */
+export const PRESSINGS = 'Pressings'
+
 export function AlbumPage({
   id,
   preview,
@@ -154,6 +158,8 @@ export function AlbumPage({
   const requests = useMemo(latestOnly, [])
   //? what the store holds of this album, and its other pressings - the id bridge
   const [store, setStore] = useState<StoreAlbumResponse | null>(null)
+  //? (2.0.5) Properties' no-release line is for whoever can Edit albums (lib/albumProperties.ts)
+  const access = useAccess()
   //? the bridge failed to answer - so, answered or not, whether the album can be pinned is known
   const [storeFailed, setStoreFailed] = useState(false)
   const storeRequests = useMemo(latestOnly, [])
@@ -356,7 +362,7 @@ export function AlbumPage({
               setViewing([{
                 label: shown.name ?? '',
                 sources: [coverFullUrl(shown.coverArt), coverUrl(shown.coverArt, 800)].filter((source): source is string => !!source),
-                missing: 'Navidrome has no cover for this album',
+                missing: 'No cover for this album',
               }])
             }}
           >
@@ -403,13 +409,11 @@ export function AlbumPage({
             <button
               type="button"
               class="app-chip app-other-pressings"
-              aria-label="Other pressings"
               onClick={() => onOpenGroup({ id: group, title: shown?.name ?? '' })}
             >
-              {/* "Pressings" where an Also chip shares a row too narrow for all three whole (app.css's
-                  container query), so the Also chip keeps what room there is */}
-              <span class="app-other-long">Other pressings</span>
-              <span class="app-other-short">Pressings</span>
+              {/* (2.0.5) one name on every frame - it was "Other pressings" where there was room, "Pressings" where
+                  not; the page it opens lists every pressing, this one too, as the picker's own "Pressings" does */}
+              {PRESSINGS}
               <ChevronRightIcon class="app-chip-icon" />
             </button>
           )}
@@ -530,7 +534,7 @@ export function AlbumPage({
       )}
 
       {/* what the main page's details pane said of the album (2.0.0-player.44), once the bridge has answered */}
-      <AlbumProperties rows={albumProperties(store, storeFailed, releaseSaid)} />
+      <AlbumProperties rows={albumProperties(store, storeFailed, releaseSaid, undefined, albumEdit(access.permissions).editors)} />
 
       <CoverViewer images={viewing} onClose={() => setViewing(null)} opener={viewOpener} />
     </section>

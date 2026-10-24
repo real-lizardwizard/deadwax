@@ -47,7 +47,7 @@
  *  - After the late recheck: Enter after a failure in All (a slot, the foot, the library) asking again AND drawing
  *    afresh; Navidrome back after the library failed; a kind view's library failing (no "No albums for" under it); the
  *    Artists view under album-by-artist with nothing named; the Albums view's held album its search3 didn't list;
- *    Back to All said; a 422 said as refused; More from the store; a late kind all held; kept answers refreshing
+ *    Back to All said; a 422 said as refused; More from the collection; a late kind all held; kept answers refreshing
  *    holding; two characters' asking line.
  *  - Song search's own (2.0.0-player.53): the disclosure and its fold, an album you have opening the album you have
  *    (the id bridge, the pressings asked first for a pressing nothing vouches for), called off as the box changes.
@@ -1324,11 +1324,11 @@ async function main() {
     asked.albums[0].resolve({ 'release-groups': [], count: 0 })
     asked.songs[0].resolve({ recordings: [], count: 0 })
     await answerOwned(storeOwned)
-    check('the store\'s rows, yours first - Dummy (yours) before Third (in the store), each saying so', rowsOf('albums'),
-      [['Dummy', 'Portishead · 1994 · in your library'], ['Third', 'Portishead · 2008 · in the store']])
-    check('...a song by its album: on Third, "in the store"', rowsOf('songs'), [['Machine Gun', 'Portishead · Third · in the store']])
+    check('the store\'s rows, yours first - Dummy (yours) before Third (in the collection), each saying so', rowsOf('albums'),
+      [['Dummy', 'Portishead · 1994 · in your library'], ['Third', 'Portishead · 2008 · in the collection']])
+    check('...a song by its album: on Third, "in the collection"', rowsOf('songs'), [['Machine Gun', 'Portishead · Third · in the collection']])
     check('...an artist\'s count your own', rowsOf('artists'), [['Portishead', '1 album in your library']])
-    check('...the region says the store at the library\'s moment', atTheLibrary, 'In the store: 1 artist, 2 albums, 1 song.')
+    check('...the region says the store at the library\'s moment', atTheLibrary, 'In the collection: 1 artist, 2 albums, 1 song.')
     //? an Add on Third's page: your albums asked again, and the rows re-marked in place - never moved
     globalThis.__search.generation += 1
     draw()
@@ -1339,7 +1339,7 @@ async function main() {
     check('...Third now "in your library", in its place: nothing re-sorted', rowsOf('albums'),
       [['Dummy', 'Portishead · 1994 · in your library'], ['Third', 'Portishead · 2008 · in your library']])
     check('...the hint before typing, with a library of your own', (() => { type(''); return text(find(byClass('app-search-hint'))[0]) })(),
-      "Artists, albums and songs: yours first, then the store's, then MusicBrainz's.")
+      "Artists, albums and songs: yours first, then the collection's, then MusicBrainz's.")
     Session.setSessionMe(null)
     draw()
   }
@@ -2450,7 +2450,7 @@ async function main() {
     chip('All').props.onClick()
     draw()
 
-    //? 6. the rules nothing pinned: (a) More from the store, logins on
+    //? 6. the rules nothing pinned: (a) More from the collection, logins on
     Session.setSessionMe({ user: 'ethan', admin: false, auth: 'on', version: '2.0.0-player.55' })
     await remount()
     asks.yours.at(-1)?.resolve([ndDummy])
@@ -2462,7 +2462,7 @@ async function main() {
     asks.library.at(-1).resolve({ artists: [], albums: Array.from({ length: 50 }, (_, at) => ({ id: `nd-s${at}`, name: `Store Album ${at}`, artist: 'Somebody', year: 2001 })), songs: [] })
     await settle()
     draw()
-    check('logins on, a library of your own: a kind view\'s full page offers More from the store', text(find(byClass('app-search-more-library'))[0]), 'More from the store')
+    check('logins on, a library of your own: a kind view\'s full page offers More from the collection', text(find(byClass('app-search-more-library'))[0]), 'More from the collection')
     chip('All').props.onClick()
     Session.setSessionMe(null)
     draw()

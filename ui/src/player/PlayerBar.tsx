@@ -105,7 +105,7 @@ export function PlayerBar({
             onClick={() => {
               if (!paged) player.setShuffle(!player.shuffle)
             }}
-            aria-label={paged ? `Shuffle - shuffling ${pagedScope === 'store' ? 'everything' : 'your whole library'}` : 'Shuffle'}
+            aria-label={paged ? `Shuffle - shuffling ${pagedScope === 'store' ? 'all music' : 'your whole library'}` : 'Shuffle'}
             aria-pressed={player.shuffle}
             aria-disabled={paged}
           >

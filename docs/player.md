@@ -104,8 +104,9 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
   on Requests - only while something is on its way: otherwise Home has no Arriving at all. If
   deadwax stops answering meanwhile, Arriving says what it shows is deadwax's last answer, and the
   app keeps asking until it answers. Then **Pinned**, the albums and artists you pinned, two to a
-  row, with **Edit** to reorder and unpin them; **Recently added**, Navidrome's 20 newest albums in
-  a row you swipe along; and **Not played in a while**, the albums you last played longest ago (more
+  row, with **Edit** to reorder and unpin them; **Recently added**, the 20 albums of your library that came into the
+  collection most recently, in a row you swipe along (with logins on, yours - the same albums the Library's
+  Recently added starts with; with logins off, the newest in the collection, which is your library then); and **Not played in a while**, the albums you last played longest ago (more
   than 30 days), when there are at least four. Tap an album to open it, an artist for their page.
   [Home and pins](#home-and-pins) has the details.
 - **Library** (laid out as Apple Music's - [the Library](#the-library) has the details): a
@@ -123,10 +124,11 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
   and its **•••** has [Play Next and Play Last](#up-next-shuffle-and-repeat). The Songs row isn't there at
   all when Navidrome won't list songs that way (it is asked once, for a single song). **Shuffle** plays every
   song in your library once, in a random order, until all have played; Songs has one at its top too (with
-  logins on, so do your albums), and Browse's Songs one for everything in the store -
+  logins on, so do your albums), and **All songs** one for the whole collection -
   [shuffling the whole library](#shuffling-the-whole-library). Both orders are remembered on that device;
-  back from an album, a page is where you left it. With logins on, the Library is **yours** and **Browse**
-  is the whole store, a second group of rows - [the player as you](#the-player-as-you-with-logins-on).
+  back from an album, a page is where you left it. With logins on, the Library's rows are yours - **Your
+  albums**, **Your artists** - and a second group headed **All music** has the whole collection: **All
+  albums**, **All artists**, **All songs** - [the player as you](#the-player-as-you-with-logins-on).
 - **An album**: its cover, **Play** and **Shuffle**, and its songs, under "Disc 1", "Disc 2"
   headings for a set. A disc with a title of its own shows it beside its number: "Disc 4 · Live at
   Wembley". The titles are the ones deadwax writes into your files from MusicBrainz (or you set by
@@ -139,25 +141,27 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
   **Play Last** ([Up Next](#up-next-shuffle-and-repeat)) and **Add to a playlist…**
   ([Playlists](#playlists)). The back button
   names the tab it goes back to. The artist's name under the title opens [their page](#artist-pages).
-  Under it, **In your library** (with logins on, **In the store** for an album that isn't yours, and
+  Under it, **In your library** - a small green badge (with logins on, **In the collection** for an album that isn't yours, and
   **Add to my library** under Play - [the player as you](#the-player-as-you-with-logins-on)), and an **Also: …** chip for each other pressing of the album you
   have that Navidrome has found ("Also: 20th Anniversary Reissue 180gram", or the year when a
-  pressing has no edition of its own) - tap it for that pressing's page - and **Other pressings ›**: every pressing of the album as MusicBrainz lists them, the
+  pressing has no edition of its own) - tap it for that pressing's page - and **Pressings ›**: every pressing of the album as MusicBrainz lists them, the
   ones you have marked **In your library**, with **Get the album** for another - the deluxe beside the
   standard ([finding music](finding-music.md#another-pressing-of-an-album-you-have)). The row shows
   once deadwax has said what you hold, in a place kept for it, so nothing in it moves as it fills.
-  Beside an Also chip, in a row too narrow for all three whole (a phone held upright), it reads
-  **Pressings**, and In your library keeps only its tick, to leave the Also chip room - with logins on,
-  **In the store**, which has no tick to keep, gives way whole there (a screen reader still hears it). The pin at the top right pins the album to Home ([Home and pins](#home-and-pins)).
+  Beside an Also chip, in a row too narrow for all three whole (a phone held upright), the badge - In your
+  library or **In the collection** - gives way, to leave the Also chip room (a screen reader still hears it,
+  and Add or Remove under Play still says whose the album is, with logins on). On a desktop, Info or the Edit
+  panel open beside the page included, the badge keeps its words. The pin at the top right pins the album to Home ([Home and pins](#home-and-pins)).
   Beside it, for an admin (everyone, with logins off), **Edit** opens the album's editors in a sheet over
   the whole screen ([below](#looking-after-deadwax-from-a-phone)), as a panel beside the page on a desktop.
   Tap the **cover** to see it full size - Navidrome's own picture, unresized - in
   [the cover viewer](library.md#the-cover-viewer): tap to zoom in where you touch, pinch, drag to move,
   ✕ or **Close** to put it away (going back puts it away too, as it goes back). And at the foot of the page, under the songs, **Properties**: the
   album's **Year** - "1994 (this pressing 2014)" when this pressing's year isn't the album's own -
-  its **Size**, its **Release** on musicbrainz.org (a link that opens beside the app, so the music
-  keeps playing; "Not tagged with a MusicBrainz release" when Navidrome says its files carry none) and **First seen**, when
-  deadwax first found it, "filed by deadwax" when it was a download. They're what deadwax's own scan
+  its **Size**, **MusicBrainz: View this pressing ↗** (a link to the pressing's page on musicbrainz.org that opens
+  beside the app, so the music keeps playing - for whoever can edit albums, "Not matched to a release - match it in
+  Edit album" when its files carry none) and **Added**, when deadwax first found it, ", downloaded here" when it was a
+  download. They're what deadwax's own scan
   of the folder says, so they show once deadwax has answered, and a line deadwax can't say is left
   out.
 - **A mini player** along the bottom, just above the tabs, while something is playing, with
@@ -213,7 +217,7 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
   MusicBrainz's, a few of each with **See all** in its heading. The chips **All**, **Artists**, **Albums**
   and **Songs** over the list narrow it to one kind, in full, with **More from your library** and **More from
   MusicBrainz** (**More songs**) for the next pages. Your rows say "in your library" (with logins on, "in
-  your library" or "in the store"). An artist opens [their page](#artist-pages) - one only MusicBrainz knows
+  your library" or "in the collection"). An artist opens [their page](#artist-pages) - one only MusicBrainz knows
   by its MusicBrainz id, even with Navidrome down - an album opens it, and a song of yours plays from there
   through its album once that album has been fetched (a ▶ at its right says so - the albums of the songs in
   Top results and then of the first songs are fetched as the answer arrives), and otherwise opens its album.
@@ -287,16 +291,16 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
   Navidrome says wrote it; the album's cover, title, year, label, format and number of songs, then
   **This pressing:** its edition, year and format as deadwax holds it (tap the card to go to the
   album); the artist - who they are, from MusicBrainz ("Group · London · 1965 to 2014"), and how
-  many of their albums you have (with logins on and a library of your own, how many the store has:
-  "3 albums in the store") - with the album's own artist beside it when that's someone else,
+  many of their albums you have (with logins on and a library of your own, how many the collection has:
+  "3 albums in the collection") - with the album's own artist beside it when that's someone else,
   as on a compilation; tap it for their page. It's the song's own artist: a Portishead track on a
   compilation goes to Portishead, not Various Artists, and only an old credit of a renamed artist
   (Kanye West on a Ye album, one MusicBrainz artist under two names) goes to the page the album is
   filed under. Then **Playing**, three rows about how it's playing: **Format**,
   the file as Navidrome read it (`FLAC, 24-bit, 192 kHz, stereo`); **Gapless**, `Off`, `On`, or `On, in
   one stream`; and **Normalization**, the song's [level](#normalization) (`Album, -7.42 dB · the album at
-  -10.6 LUFS`, or `Off`) - the same words as the rows of those names in Debug. Last, **In your library → Folder** (headed **In the store** with logins on and a
-  library of your own - the folder is the store's, whoever it's in the library of): where the album is on disk, a folder a line for
+  -10.6 LUFS`, or `Off`) - the same words as the rows of those names in Debug. Last, **In your library → Folder** (headed **In the collection** with logins on and a
+  library of your own - the folder is the collection's, whoever it's in the library of): where the album is on disk, a folder a line for
   a set kept one folder per disc - text you can select and copy. Info asks Navidrome, deadwax and
   MusicBrainz for these as it opens, so they appear a moment after it does (the song's and the
   pressing's together, so a card doesn't grow under your finger). Anything not sent is left out,
@@ -396,7 +400,7 @@ comes back when the app is opened again, paused where it stopped
 
 **Shuffle** at the head of the Library's list (and at the top of its Songs; with logins on, at the top of your
 albums too: every song of every album you've starred) plays your **whole** library - every song once, in a random order deadwax makes,
-nothing repeated until every one has played. Browse's Songs has the same for everything in the store. The
+nothing repeated until every one has played. **All songs** has the same for the whole collection. The
 button says **Getting ready…** while deadwax reads the list (a big library's first time can take several
 seconds; within ten minutes a new order is instant) - and above your albums, how many songs there are under
 it once it knows (on Songs, the list's own count at the top says it already). With no songs to shuffle - no
@@ -486,7 +490,7 @@ have, and Info's artist card.
   [Home and pins](#home-and-pins).
 - **Play** and **Shuffle** play every album of theirs you have, one copy of each (the plain edition
   when you have several), in the order the page lists them - with logins on, every album of theirs in
-  the store, yours or not ("Plays the 2 albums in the store" -
+  the collection, yours or not ("Plays the 2 albums in the collection" -
   [the player as you](#the-player-as-you-with-logins-on)). They wait - greyed - until every
   album's songs have come from Navidrome - fetched a few at a time as soon as the page knows them -
   so a tap plays at once; the line under them says what they'll play, that Navidrome is still being asked or has
@@ -495,13 +499,13 @@ have, and Info's artist card.
 - **Albums** is their albums as MusicBrainz lists them - every one, not a search's best matches -
   oldest first, those with no date last: the ones you have marked **✓ in your library** (and "2
   editions" when you have more than one pressing - with logins on the ✓ is for yours alone, and one the
-  store holds that isn't yours reads "2008 · in the store", with no ✓ and no Get: it opens its page,
+  collection holds that isn't yours reads "2008 · in the collection", with no ✓ and no Get: it opens its page,
   which has **Add to my library**), the others **not in your library** with a
   **Get** chip that opens the sources for the album's usual pressing, as Search's does. Every album
   of theirs you have that MusicBrainz's list doesn't match (an untagged rip, an EP, a live album) is
   listed too, one row per album, so nothing you have is left off. The list waits a moment for
   Navidrome, MusicBrainz and your library to answer and is then drawn once - "Looking in your
-  library…" ("Looking in the store…" with logins on) or "Asking MusicBrainz…" meanwhile - and what isn't
+  library…" ("Looking in the collection…" with logins on) or "Asking MusicBrainz…" meanwhile - and what isn't
   in your library is only said once
   your library has answered. **Studio only** (on to begin with) leaves out MusicBrainz's live
   albums, compilations and the like - never one you have; toggling it keeps the list on screen
@@ -533,11 +537,12 @@ looking, and fills in where it is:
   files carry, so two artists your files give the same name (two bands called
   Nirvana) are counted together. If deadwax couldn't read your library for them just then, it says so,
   with **Try again** - over what it said before, when it had said anything - rather than claiming
-  there's nothing of theirs. With logins on it's headed **In the store** and counts what the store holds
-  of theirs, whoever's library it's in ("Nothing of theirs in the store.", "Looking in the store…").
+  there's nothing of theirs. With logins on it's headed **In the collection** and counts what the collection holds
+  of theirs, whoever's library it's in ("Nothing of theirs in the collection.", "Looking in the collection…").
+  Its rows are **Albums**, **Songs** (how many), **Size**, **Years** and **Folder**.
 - **About**, from MusicBrainz: what tells them apart from others of the name ("formerly Kanye West"),
-  **Now: …** when your library files their albums under a name that isn't theirs now (on their page by
-  the name they have now, **Also filed as: …** names the others instead), then **Type**,
+  **Now known as: …** when your library files their albums under a name that isn't theirs now (on their page by
+  the name they have now, **Also known here as: …** names the others instead), then **Type**,
   **From**, when they began and ended in words - **Born** and **Died** for a person, **Founded** and
   **Dissolved** for a group, **Began** and **Ended** otherwise ("8 June 1977") - and **Other names**;
   their genres; and their links, the first eight with the rest behind "N more links", each opening
@@ -565,7 +570,7 @@ Look after the library (**Move albums to …**):
   being looked for, or if that look fails, **Save** waits (and **Try again** looks for that artist
   again). It needs one folder: greyed, it says why - their albums filed under two names (move them
   first, below), or in two places, or that deadwax couldn't read their folder just then.
-- **Move albums to …** (in About's **Now** row, when your library files their albums under a name
+- **Move albums to …** (in About's **Now known as** row, when your library files their albums under a name
   that isn't theirs now) previews every album that would move - where it is, where it goes, how many
   tracks and how many are retagged - every album that stays and why (a collaboration, one tagged as
   another artist, a folder of that name already there or another album moving there, a track deadwax
@@ -607,7 +612,14 @@ haven't heard for a while. In order:
   by an admin after a look), or starred in Amperfy - once Navidrome has them. An album you add yourself
   with **Add to my library** isn't marked new: you were looking at it. Opening one, from here or
   anywhere in the app, takes it off. With nothing new, or logins off, there's no such section.
-- **Recently added**, Navidrome's 20 newest albums.
+- **Recently added**, the 20 albums of your library that came into the collection most recently. With
+  logins on that is **yours** - the same albums, in the same order, as the Library's own Recently added (it
+  was the whole collection's newest until 2.0.5, so it could lead with albums that weren't yours). It goes by
+  when the collection got each album, not when it joined your library: an album you add with **Add to my
+  library** that the collection has had for a while keeps its old place, so it may be on neither Home shelf -
+  it's in the Library's **Your albums**; with your library empty it says so,
+  "Nothing in your library yet." and how to fill it. With logins off there is one library, so it is the
+  collection's 20 newest, as it always was.
 - **Not played in a while**: the albums you last played more than 30 days ago, the longest ago
   first, up to 20 - made from Navidrome's list of the albums played most recently (its first 500),
   by when each was last played. With fewer than four, or a Navidrome that doesn't say when an album
@@ -652,12 +664,12 @@ name), or - when nobody can say one - by their name and Navidrome's id for them.
 way that differ only in how they were typed (accents, case, which dash) are one pin: "Björk" and
 "Bjork" show as pinned on both pages. A card can say why it won't open, in two lines under its title:
 
-- **Removed from the store** - the album was deleted in deadwax (**Edit → Delete**). If you get it
-  again, the pin opens the new copy.
-- **Not on disk just now** - its folder isn't where deadwax last saw it: usually a share that isn't
+- **Removed from your library** (with logins on, **Removed from the collection**) - the album was deleted in
+  deadwax (**Edit → Delete**). If you get it again, the pin opens the new copy.
+- **Can't be found right now** - its folder isn't where deadwax last saw it: usually a share that isn't
   mounted. It comes back once the folder is back and deadwax has looked at your library again
   (**Library care → Rescan** scans at once).
-- **Not in Navidrome yet** - deadwax has it, but Navidrome doesn't (yet): it may still be scanning.
+- **Not ready to play yet** - deadwax has it, but Navidrome doesn't (yet): it may still be scanning.
 
 **Where they're kept.** On deadwax, for you - not on the phone, and **never as stars in Navidrome**
 (stars belong to each Navidrome user and mean something else there). With logins off (the default)
@@ -673,8 +685,9 @@ Laid out as Apple Music's Library is.
 
 **On a phone the Library is a short list**: **Shuffle** at its head ([shuffling the whole
 library](#shuffling-the-whole-library)), then **Playlists**, **Albums**, **Artists** and - with logins off -
-**Songs** (left out when Navidrome won't list songs). With logins on, a **Browse** group under them has the
-whole store's **Albums**, **Artists** and **Songs**. Under both, **Recently added**: the 12 newest albums,
+**Songs** (left out when Navidrome won't list songs). With logins on, the first group's rows are yours - **Your
+albums** and **Your artists** - and a group headed **All music** under them has the whole collection: **All
+albums**, **All artists** and **All songs**. Under both, **Recently added**: the 12 newest albums,
 with **See all** for the rest. Each row opens its page - swipe from the edge or tap **‹ Library** to come
 back, and a tap on the Library tab goes back to the list (on the list, to its top).
 
@@ -694,7 +707,7 @@ artists (always a list):
 **Artists** are by **Name** (letters and the index) or **Most albums**. Names are compared without a leading
 "The", accents or case ("The Beatles" is under B, "Björk" beside "bjork"); a name that starts with a digit, a
 symbol or another script goes under **#**, after Z. One album order is used everywhere (your albums and the
-store's), and it and the artists' order are remembered on that device - a device that never chose an order
+collection's), and it and the artists' order are remembered on that device - a device that never chose an order
 opens on **Artist** (Recently added has its own place: the list's grid and **See all**).
 
 - **Find** filters the page as you type: every word you type must be in the album's title or artist (or the
@@ -730,7 +743,7 @@ other Subsonic app signed in as you) shows the same ones, and a playlist made or
 same playlist in the other. deadwax keeps none of its own.
 
 **Where they are.** On a phone, **Playlists** is the first row of the Library's list. On a
-desktop it's the sidebar's **Playlists** group, under the Library's (and Browse's): **All playlists**, then
+desktop it's the sidebar's **Playlists** group, under the Library's (and All music's): **All playlists**, then
 up to 20 of them by name - yours, then the ones shared with you.
 
 **Whose.** The Playlists page lists three groups, each by name:
@@ -850,8 +863,9 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
 - **A sidebar** down the left instead of the tab bar: **deadwax**, the **search field**, **Home**
   and **Requests** (with the count of what's arriving, as the tab has), the Library's views -
   **Recently added**, **Albums**, **Artists** and **Songs** (Songs left out when Navidrome won't list
-  songs, as on a phone; with logins on, the Library's three are yours and a **Browse** group under
-  them has the store's Albums, Artists and Songs - [the player as you](#the-player-as-you-with-logins-on))
+  songs, as on a phone; with logins on, the Library's three are yours - **Recently added**, **Your albums**,
+  **Your artists** - and an **All music** group under them has the collection's **All albums**, **All artists**
+  and **All songs** - [the player as you](#the-player-as-you-with-logins-on))
   - then **Playlists**: **All playlists**, and up to 20 playlists by name, yours
   then those shared with you, each opening its page ([Playlists](#playlists)) - then **Managing**: **Needs a look**, with how many albums need one, the
   library's review queue in the app, an album folder Navidrome doesn't list among them (**Not in
@@ -2107,14 +2121,15 @@ favourites, the same ones Amperfy (or any Subsonic app) shows as starred - and d
   takes. You needn't be signed in: deadwax keeps the login you last signed in with (encrypted, as your
   session's is) so an album filed at 3am is starred all the same. Signing out leaves it; signing in
   again replaces it.
-- **Add to my library.** An album the store already holds that isn't in your library says **In the
-  store, not in your library** under **Get the album** (and in the Sources sheet) with **Add to my
-  library**: it goes into your library and is starred for you, and
-  nothing is downloaded. It's offered for a pressing the store holds whole; of a part the store holds
-  the line says **The store has 9 of 11 tracks of this pressing**, and a download fills it in, as before.
+- **Add to my library.** An album the collection already holds that isn't in your library says **In the
+  collection, not in your library** under **Get the album** (and in the Sources sheet), "It's already here -
+  add it to your library to keep it with your music.", with **Add to my library**: it goes into your library
+  and is starred for you, and nothing is downloaded. It's offered for a pressing the collection holds whole; of
+  a part the collection holds the line says **The collection has 9 of 11 tracks of this pressing**, and a
+  download fills it in, as before.
   **Already in your library** now means yours.
 - **Two-way with Amperfy.** Every five minutes deadwax reads your starred albums back: an album you
-  star in Amperfy (and the store holds) is added to your library, one you unstar is taken out. A star
+  star in Amperfy (and the collection holds) is added to your library, one you unstar is taken out. A star
   Navidrome loses rather than you taking it away - the album missing from Navidrome for a moment while
   an admin applies a release to it, or coming back under a new Navidrome id after its tags changed - is
   put back instead. Only albums count: starring a song or an artist stays an ordinary favourite. Pins on
@@ -2124,24 +2139,30 @@ favourites, the same ones Amperfy (or any Subsonic app) shows as starred - and d
   waits for deadwax to have scanned the library once (it does so by itself as it starts, the first
   time): until then every read counts as the first, so a star you make before that isn't marked new
   either.
-- **You → Your library** says how many albums your library holds and how many are still waiting to be
-  starred, and why - a few albums named for each reason, then how many more: "Navidrome hasn't got it
-  yet", "It has no MusicBrainz release id" (an admin can apply a release to it), "Its folder isn't there
-  just now", "Navidrome isn't answering". **If you
+- **You → Your library** says how many albums your library holds and how many are waiting to be added
+  ("12 albums · 2 waiting to be added"), and why - a few albums named for each reason, then how many more:
+  "The music server hasn't picked it up yet - it's added as soon as it has.", "An admin needs to match it
+  to a release on MusicBrainz before it can be added." (it has no MusicBrainz release id; an admin applies
+  one in Edit album), "Its files aren't there just now - it's added once they are.", "The music server isn't
+  answering - it's added once it does.", and "Being added again - nothing for you to do." when Navidrome took
+  a star but didn't keep it. Under them, once: "Your library is also in your other music apps, such as
+  Amperfy, as your favourite albums." **If you
   change your Navidrome password** in Navidrome or Amperfy, the login deadwax kept for you stops working: it
-  says so in red - deadwax can't star albums for you until you sign in again - and what you get meanwhile
+  says so in red - "New albums can't be added to your library until you sign in again. Sign out, then sign in
+  - with your new password if you changed it. Nothing is lost meanwhile." - and what you get meanwhile
   waits, then is starred once you've signed in with the new password. (Changed in deadwax, with **You →
   Change password**, deadwax keeps the new login at once: no red line, and what was waiting is starred
   within a few seconds.) An album an admin deleted is listed there as
-  **Removed by the admin - request it again to have it back**, with **Request it again** (its album
-  page, where **Get** is) and **Put away**; getting it again puts it away by itself.
+  **Removed by an admin.**, with **Get it again** (its album page, where **Get** is - shown only to someone
+  allowed to Get albums) and **Dismiss**;
+  getting it again dismisses it by itself.
 - **New** marks: Home's **New in your library**, and a **New** badge on an album's tile in the Library,
   until you open it - from a tile, a link, or its address.
-- **The Library tab** is your starred albums, with the whole store under
-  **Browse**, and "in your library" everywhere in the app means yours - [the player as
+- **The Library tab** is your starred albums, with the whole collection under
+  **All music**, and "in your library" everywhere in the app means yours - [the player as
   you](#the-player-as-you-with-logins-on).
 - **The first admin** to use deadwax once logins are on - at their sign-in, or at their first visit
-  if a session of theirs outlived the restart - has every album already in the store put into their
+  if a session of theirs outlived the restart - has every album already in the collection put into their
   library and starred for them, once: it was all theirs before anyone else had a library. If deadwax
   hasn't scanned the library yet at that moment - a new install, or one upgraded from a version whose saved scan it can't read - that waits for
   its first scan (deadwax starts one by itself, in the background, as it starts; a search or **Library care →
@@ -2150,11 +2171,11 @@ favourites, the same ones Amperfy (or any Subsonic app) shows as starred - and d
   in: that is theirs. An album somebody else had starred in Amperfy, or added, goes into both libraries.
   Anyone else's library starts with only the albums they'd already starred. An album that arrives
   without anyone asking for it - copied in by hand, or by another program - is nobody's: it stays in the
-  store for anyone to add, and an admin sees it under **Library care → Held by nobody**.
+  collection for anyone to add, and an admin sees it under **Library care → Held by nobody**.
 - **The break-glass `deadwax`** has no Navidrome account, so no library: nothing it downloads goes into
   one, its store line reads as it always did, and **Add to my library** isn't offered to it. Its player
   plays as the shared `NAVIDROME_USER` account ([below](#the-player-as-you-with-logins-on)).
-- **With logins off** nothing of this shows: there is one library, and everything in the store is in
+- **With logins off** nothing of this shows: there is one library, and everything in the collection is in
   it.
 
 ## The player as you, with logins on
@@ -2171,61 +2192,71 @@ lists at all (**Not in Navidrome**). With logins off nothing here changes: one a
 
 - **Library is your albums** - your starred albums in Navidrome, the same ones Amperfy shows as
   starred - in the Library's seven orders (**Recently played** and **Most played** are the ones you've
-  played, your own plays), and the root's **Recently added** is yours. **Artists** is the artists of your albums, counting your albums of
-  theirs. **Browse** is the whole store: every album, every artist (counting the store's albums of
-  theirs: "2 albums in the store") and every song, as the Library always listed them. On a phone the
-  Library's list has both: its first group is yours (Playlists, Albums, Artists), and a **Browse** group under
-  it the store's (Albums, Artists, Songs); on a desktop the sidebar lists both, **Library** (Recently added,
-  Albums, Artists - yours) and **Browse** (Albums, Artists, Songs). Songs is Browse's: Navidrome lists songs
-  from the whole store.
-- **An empty library says so** - Ethan's, at first: "Nothing in your library yet", with **Browse the
-  store** - in whichever order the albums are in (**Recently played** too: it says "Nothing in your
-  library played yet" only over a library that has albums, none played), and under **Artists** as well;
-  search, or open an album in Browse, and add it from its page - or **Get** one deadwax doesn't have.
+  played, your own plays), and the root's **Recently added** is yours - and so, since 2.0.5, is Home's: the
+  same albums of your library, newest to the collection first, never the whole collection's. **Your artists** is the artists of your
+  albums, each row counting your albums of theirs ("2 albums" - the list is your library already). **All
+  music** is the whole collection: **All albums**, **All artists** (counting the collection's albums of
+  theirs: "2 albums in the collection") and **All songs**, as the Library always listed them. On a phone the
+  Library's list has both: its first group is yours (Playlists, **Your albums**, **Your artists**), and a group
+  headed **All music** under it the collection's (**All albums**, **All artists**, **All songs**); on a desktop
+  the sidebar lists both, **Library** (Recently added, Your albums, Your artists) and **All music** (All
+  albums, All artists, All songs) - each page titled as its row is. All songs is All music's: Navidrome lists
+  songs from the whole collection.
+- **An empty library says so** - Ethan's, at first: "Nothing in your library yet." and "Look through All
+  music and add the albums you like, or find new ones in Search and Get them.", with **See All music** - in
+  whichever order the albums are in (**Recently played** too: it says "You haven't played anything from your
+  library yet." only over a library that has albums, none played), and under **Your artists** as well; Home's
+  Recently added says the same two lines.
 - **In your library means yours**: an album page says **In your library** for an album you starred (in
-  deadwax or in Amperfy) or that your library holds, and **In the store** - in grey, with no box - for
-  one the store has that isn't yours; it waits for the album's own answer and deadwax's before it says
+  deadwax or in Amperfy) or that your library holds, and **In the collection** - in grey, with no box - for
+  one the collection has that isn't yours; it waits for the album's own answer and deadwax's before it says
   either. So does the album you don't have's line and its **Pressing** list, Search's rows, the artist
-  page's rows ("2008 · in the store", the ✓ for yours alone) and "The store also has another pressing";
-  the artist page's facts are headed **In the store**, and its Play plays their albums in the store
-  ("Plays the 2 albums in the store"), yours or not. Info's folder heading
-  and its artist count describe the store - **In the store**, "3 albums in the store" - whichever
+  page's rows ("2008 · in the collection", the ✓ for yours alone) and "The collection also has another pressing";
+  the artist page's facts are headed **In the collection**, and its Play plays their albums in the collection
+  ("Plays the 2 albums in the collection"), yours or not. Info's folder heading
+  and its artist count describe the collection - **In the collection**, "3 albums in the collection" - whichever
   library the album is in. The album you don't have's line speaks of the album, and the line under
-  **Get** of the pressing chosen: when a pressing of it is yours but the one chosen is the store's, the
+  **Get** of the pressing chosen: when a pressing of it is yours but the one chosen is the collection's, the
   line says **another pressing in your library**, so a page never says "in your library" over **In the
-  store, not in your library** - nor the other way round: the album you don't have asks deadwax again
+  collection, not in your library** - nor the other way round: the album you don't have asks deadwax again
   each time it shows, and takes the line under Get's word for the pressing it's about, so once deadwax
   has read back an album you unstarred in Amperfy (or removed on another device), both lines say so.
-- **Add to my library**, on an album page under **Play** for an album in the store that isn't yours
-  (Browse, Search or an artist's page take you there): it goes into your library and is starred for you
-  in Navidrome at once, nothing downloaded, and it's in your Library when you go back. An album with no
-  MusicBrainz release id can't be added - deadwax keeps your library by release - and its page says so:
-  star it in Amperfy to have it there. So does one whose folder deadwax hasn't found in the store (not
-  scanned yet, or outside the folder it looks after). When deadwax couldn't be asked, the page offers
-  neither, rather than guess.
+- **Add to my library**, on an album page under **Play** for an album in the collection that isn't yours
+  (All music, Search or an artist's page take you there), under "It's already here - add it to your library
+  to keep it with your music.": it goes into your library and is starred for you in Navidrome at once,
+  nothing downloaded, the line says "Added to your library.", and it's in your Library when you go back. An
+  album with no MusicBrainz release id can't be added - deadwax keeps your library by release - and its page
+  says so: "This album can't be added from here - make it a favourite in another music app, and it joins
+  your library." (starred in Amperfy, say, it is read back into your library). So does one whose folder
+  deadwax hasn't found in the collection (not scanned yet, or outside the folder it looks after): "This
+  album can't be added from here yet - …". When deadwax couldn't be asked, the page offers neither, rather
+  than guess.
 - **Remove from my library**, on the album page of one of yours: it's unstarred for you and taken out of
-  your library. **Nothing is deleted** - the store keeps the album and its files, and anyone else who
-  has it keeps it - and the page says so: "Removed from your library - it's still in the store, and
+  your library. **Nothing is deleted** - the collection keeps the album and its files, and anyone else who
+  has it keeps it - and the page says so: "Removed from your library - it's still in the collection, and
   nothing was deleted." It asks no "are you sure?": nothing is lost, and **Add to my library** puts it
   straight back - or, for an album Add can't put back (no release id, or a folder deadwax hasn't found),
-  the line after it says how: star it in Amperfy. It isn't listed as "removed by the admin" in You
-  either - you removed it. If deadwax can't write the Remove down (its database refusing a write), it
-  says so - Navidrome has unstarred it, and Remove again finishes it.
+  the line after it says how: "To add it back, make it a favourite in another music app." It isn't listed
+  as "Removed by an admin." in You either - you removed it. If deadwax can't write the Remove down (its
+  database refusing a write), it says so - "It's out of your library, but deadwax couldn't save that, so it
+  may come back - try Remove again in a moment." (Navidrome has unstarred it, and Remove again finishes it);
+  if Navidrome keeps the star, "It's still in your library - try Remove again in a moment."
 - **Playlists are yours**: made as you in Navidrome, so they're yours in Amperfy too.
   Ethan sees only the ones you share (Edit → **Shared with everyone**), under **Shared with you** -
   playable, not changeable - and you see his the same way; neither sees the other's private ones
   ([Playlists](#playlists)).
-- **Search** (one list): in each section yours first, then the store's, then
-  MusicBrainz's - each row of the store's saying **in your library** or **in the store** (nothing while
-  that isn't known yet: such a row sits among yours and may say "in the store" there once known, rather
+- **Search** (one list): in each section yours first, then the collection's, then
+  MusicBrainz's - each row of the collection's saying **in your library** or **in the collection** (nothing while
+  that isn't known yet: such a row sits among yours and may say "in the collection" there once known, rather
   than move), an artist's count your own when you have albums of theirs ("1 album in your library"), else
-  the store's; an album you add on its page says **in your library** in its row when you come back. With
+  the collection's; an album you add on its page says **in your library** in its row when you come back. With
   logins off every row of yours says **in your library** now too, since the half titles that said it went.
-  MusicBrainz's songs say **in your library** or **in the store** of a song, and of
-  each album it's on, the same way - and **a pressing in your library** (or **a pressing in the store**) of
+  MusicBrainz's songs say **in your library** or **in the collection** of a song, and of
+  each album it's on, the same way - and **a pressing in your library** (or **a pressing in the collection**) of
   an album held as a pressing nothing yet says has the song or hasn't.
-- **Home**: Recently added and Not played in a while are asked as you (so "not played" is what *you*
-  haven't played); **New in your library** is as before.
+- **Home**: Recently added is your albums, newest to the collection first (2.0.5 - it was the whole collection's, so a listener's
+  Home led with albums that weren't theirs), Not played in a while is asked as you (so "not played" is what
+  *you* haven't played); **New in your library** is as before.
 - **A Navidrome that gives users libraries of their own** (its multi-library setting): deadwax only ever
   hands you a song Navidrome would give you. Its cache holds one copy of a song for every phone, so
   before answering from it deadwax asks Navidrome, as you, whether you may have that song - once every
@@ -2236,7 +2267,7 @@ lists at all (**Not in Navidrome**). With logins off nothing here changes: one a
   ([troubleshooting](troubleshooting.md#a-song-in-the-player-wont-start-or-cant-be-skipped-through)).
 - **The break-glass `deadwax`** has no Navidrome account, so its player plays as the shared
   `NAVIDROME_USER` account (its plays are that account's) and sees deadwax as it is with logins off:
-  the Library is the store, "in your library" means the store, and Add and Remove aren't offered. It is
+  the Library is the collection, "in your library" means the collection, and Add and Remove aren't offered. It is
   there to get you in when your own login won't, and the shared account is the one deadwax was set up
   with.
 - **If your Navidrome password changes** while you're signed in - in Navidrome or Amperfy; changed in

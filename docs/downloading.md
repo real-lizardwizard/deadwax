@@ -11,7 +11,7 @@ a desktop. The **Requests** tab then follows the download until it's filed.
   under the **Pressing** button. It gets **the pressing chosen there** - the usual one unless you
   picked another - and the sources are matched against that pressing's tracks. That page is
   reached from Search, from an artist's page, and - for **another pressing of an album you have**,
-  the deluxe beside the standard, say - from **Other pressings** on the album's own page (see
+  the deluxe beside the standard, say - from **Pressings** on the album's own page (see
   [finding music](finding-music.md#another-pressing-of-an-album-you-have)). Its **Pressing** list
   marks every pressing you already have **In your library**.
 - **Get**, the small button at the end of an album MusicBrainz offers in the **Search** tab - in Top
@@ -63,7 +63,7 @@ album**, without searching Soulseek, as you choose a pressing:
   library holds of it.
 - **Part of it held**: the library has some of its tracks but not all. The search runs as usual,
   with a note above the sources: "You have 9 of 10 tracks of this pressing, in *folder*." - with
-  logins on, "The store has 9 of 10 tracks…" when that folder isn't in your library. The note then
+  logins on, "The collection has 9 of 10 tracks…" when that folder isn't in your library. The note then
   says what a download would do, because that depends on where it would be filed:
   - "Downloading it files only the tracks that folder doesn't have yet": the part you have is
     in the folder a download of it is filed into, so the tracks already there aren't filed a
@@ -73,8 +73,8 @@ album**, without searching Soulseek, as you choose a pressing:
     template), so a download is filed as a separate folder, tracks you have included.
 - **Another pressing of the same album held**: the search runs, with a note for each pressing
   you have, "You also have another pressing:" and its edition (or year), format and folder. With
-  logins on, one the store holds that isn't in your library says "The store also has another
-  pressing:" instead, and a pressing the store holds whole that isn't yours says **In the store,
+  logins on, one the collection holds that isn't in your library says "The collection also has another
+  pressing:" instead, and a pressing the collection holds whole that isn't yours says **In the collection,
   not in your library**, with **Add to my library** ([the player as you](player.md#the-player-as-you-with-logins-on)).
 
 The album's page asks again when you choose another pressing, when an album is filed, and when you
@@ -427,13 +427,13 @@ rather than joined.
   left it, nor the break-glass `deadwax`, which has no library), and its row in Requests says so:
   - **filed** - added: **In your library** (an admin's row of somebody else's: **Filed - in their library**);
   - **every file was already there**, in the folder of that same release - a second copy isn't filed
-    beside the first, and it's added: **Already in the store, added to your library**;
+    beside the first, and it's added: **Already in the collection, added to your library**;
   - **every file was already there** in a folder of **another pressing or an untagged rip** - given to
     nobody on a guess, and an admin is asked to look (**Library care → Held by nobody**):
-    **Already in the store as another copy, so not added - an admin has been asked to look**. Once the
-    admin has looked, the row says so: **Already in the store, added to your library** after their **Add
-    for them**, **Already in the store as another copy, so not added - an admin has looked at it** after
-    their **Put away**;
+    **Already in the collection as another copy, so not added - an admin has been asked to look**. Once the
+    admin has looked, the row says so: **Already in the collection, added to your library** after their **Add
+    for them**, **Already in the collection as another copy, so not added - an admin has looked at it** after
+    their **Dismiss**;
   - **some files failed to file** - added, marked incomplete: **Partly filed: … · in your library,
     marked incomplete**;
   - **a dry run**, or organizing off (with logins off only - on, organizing must be on), **failed**, or
@@ -441,7 +441,7 @@ rather than joined.
     of which nothing could be filed (nothing found where `SLSKD_DOWNLOAD_PATH` says, filing that failed,
     no track filed) is under **Needs attention** with **Next peer** - not **Ask again**, since the same
     files would fail the same way. With logins off it stays under Done.
-- **A pressing the store already holds** that isn't in your library says **In the store, not in your
+- **A pressing the collection already holds** that isn't in your library says **In the collection, not in your
   library** with **Add to my library** instead of **Already in your library** - see
   [the app's guide](player.md#your-library-with-logins-on).
 

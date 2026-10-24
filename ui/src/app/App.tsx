@@ -1278,6 +1278,9 @@ export function App() {
   const libraryShown = pageShown && nav.tab === 'library'
   useEffect(() => {
     if (homeShown || libraryShown) askMyLibrary()
+    //? (2.0.5) Home's Recently added is your albums' list too (app/Home.tsx): asked again as Home shows, if over a
+    //? minute old, as the Library's is
+    if (homeShown && hasLibrary()) refreshIfOld('yours')
     //? (2.0.0-player.59) and the Library's album lists asked again if over a minute old (app/albumIndex.ts)
     if (!libraryShown) return
     refreshIfOld('store')
@@ -1294,6 +1297,8 @@ export function App() {
     seenAlbum({ id: topAlbum, ...(preview?.musicBrainzId ? { musicBrainzId: preview.musicBrainzId } : {}) })
   }, [topAlbum, pageShown, myLibrary])
   const newAlbums = useMemo(() => (!hasLibrary() ? NOTHING_NEW : myLibrary ? newShelf(myLibrary) : null), [myLibrary])
+  //? (2.0.5) Home's Recently added is yours with a library of your own (app/Home.tsx recentlyAddedAlbums)
+  const personal = hasLibrary()
   const home = useMemo(
     () => (
       <Home
@@ -1306,9 +1311,10 @@ export function App() {
         arrivingTrouble={arrivingTrouble}
         shown={homeShown}
         newAlbums={newAlbums}
+        personal={personal}
       />
     ),
-    [status, arriving, arrivingTrouble, homeShown, newAlbums],
+    [status, arriving, arrivingTrouble, homeShown, newAlbums, personal],
   )
   const requests = useMemo(
     () => (

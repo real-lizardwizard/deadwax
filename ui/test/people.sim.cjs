@@ -95,12 +95,12 @@ const lines = L.removeLines(person({ signed_in: 2, waiting_alone: 1 }))
 check('what goes, what stays, from the server\'s numbers', [lines.navidrome, lines.deadwax, lines.stays, lines.undo], [
   "In Navidrome, for good: ethan's account, their play counts and play history, their favourites (the 312 albums in their library), all their playlists - shared ones too - and their Last.fm or ListenBrainz link.",
   'In deadwax: their sign-ins (2 devices), their library list, their pins, their play queue, Getting albums settings and permissions.',
-  'Stays: every album in the store. 1 download only they are waiting for carries on and is filed for nobody - cancel it in Requests first if nobody wants it.',
+  'Stays: every album in the collection. 1 download only they are waiting for carries on and is filed for nobody - cancel it in Requests first if nobody wants it.',
   "There's no undo. If they might come back, reset their password instead."])
 check('...no numbers where there are none - never "the 0 albums" or "(0 devices)"', [L.removeLines(person({ library: 0 })).navidrome.includes('their favourites, all'), L.removeLines(person()).deadwax.startsWith('In deadwax: their sign-ins, their')],
   [true, true])
 check('...an admin\'s role named; nothing waiting, nothing said of it', [L.removeLines(person({ admin: true })).navidrome.endsWith(', and their admin role.'), L.removeLines(person()).stays],
-  [true, 'Stays: every album in the store.'])
+  [true, 'Stays: every album in the collection.'])
 check('the typed name: exactly it - another case, a space, nothing, never', ['ethan', 'Ethan', 'ethan ', ' ethan', '', 'etha'].map((typed) => L.removeReady(typed, 'ethan')),
   [true, false, false, false, false, false])
 

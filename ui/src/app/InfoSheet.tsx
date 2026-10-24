@@ -359,7 +359,7 @@ export function InfoSheet({
                 <section class="app-info-section" aria-labelledby="app-info-where">
                   <h3 id="app-info-where" class="app-section-title">
                     {/* (2.0.0-player.52) the album's folder in the store - with a library of your own, said so */}
-                    {hasLibrary() ? 'In the store' : 'In your library'}
+                    {hasLibrary() ? 'In the collection' : 'In your library'}
                   </h3>
                   <dl class="app-group app-kv">
                     <div class="app-kv-row">

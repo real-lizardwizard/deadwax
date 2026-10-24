@@ -618,13 +618,13 @@ console.log('\npersonal libraries (2.0.0-player.51): what a filing gave, and a d
   check('filed, into your library', words('filed', null, 'added', true), { text: 'In your library', tone: 'plain' })
   check('...an admin\'s row of somebody else\'s', words('filed', null, 'added', false), { text: 'Filed - in their library', tone: 'plain' })
   check('a second copy not filed, given', words('already_there', 'already in the store: all 10 track(s) were already there, nothing was filed', 'added', true),
-    { text: 'Already in the store, added to your library', tone: 'plain' })
-  check('...given to them', words('already_there', 'x', 'added', false).text, 'Already in the store, added to their library')
+    { text: 'Already in the collection, added to your library', tone: 'plain' })
+  check('...given to them', words('already_there', 'x', 'added', false).text, 'Already in the collection, added to their library')
   check('everything already in another copy\'s folder: not added, an admin looks - amber', words('already_there', 'x', 'flagged', true),
-    { text: 'Already in the store as another copy, so not added - an admin has been asked to look', tone: 'warning' })
+    { text: 'Already in the collection as another copy, so not added - an admin has been asked to look', tone: 'warning' })
   check('...the admin\'s Add for them makes it added; their Put away says the admin has looked (review: it kept saying an admin had been asked)',
     [words('already_there', 'x', 'added', true).text, words('already_there', 'x', 'looked', true)],
-    ['Already in the store, added to your library', { text: 'Already in the store as another copy, so not added - an admin has looked at it', tone: 'warning' }])
+    ['Already in the collection, added to your library', { text: 'Already in the collection as another copy, so not added - an admin has looked at it', tone: 'warning' }])
   check('some files failed: added, marked incomplete', words('partly_filed', '2 file(s) failed to organize', 'incomplete', true),
     { text: 'Partly filed: 2 file(s) failed to organize · in your library, marked incomplete', tone: 'warning' })
   check('logins off (no `library`): the words it always had', [words('filed', null, undefined).text, words('already_there', 'x', undefined).text],

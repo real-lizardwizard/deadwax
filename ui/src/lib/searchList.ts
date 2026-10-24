@@ -919,9 +919,9 @@ export function nextBehind(was: boolean, outcome: Outcome): boolean {
 export function placeLabel(row: Row, marks: Marks, evidence: SongEvidence = {}): string {
   const library = row.type === 'artist' || row.type === 'album' || row.type === 'song'
   const yours = rowYours(row, marks, evidence)
-  if (library) return yours === null ? '' : yours ? 'In your library' : 'In the store'
+  if (library) return yours === null ? '' : yours ? 'In your library' : 'In the collection'
   if (yours === null) return isSaved(row) ? SAVED_PLACE : 'On MusicBrainz'
-  return yours ? 'In your library' : 'In the store'
+  return yours ? 'In your library' : 'In the collection'
 }
 
 /** Whether a row is from what's saved (2.0.0-player.56). */
@@ -1014,7 +1014,7 @@ export function countWords(counts: Partial<Record<Kind, number>>): string {
  *  library of your own) - '' when it found nothing. */
 export function libraryWords(counts: Partial<Record<Kind, number>>, personal: boolean): string {
   const said = countWords(counts)
-  return said ? `${personal ? 'In the store' : 'In your library'}: ${said}.` : ''
+  return said ? `${personal ? 'In the collection' : 'In your library'}: ${said}.` : ''
 }
 
 /** ...and for MusicBrainz, once every kind asked has settled: "From MusicBrainz: 2 artists, 3 albums, 3 songs." - or
@@ -1074,7 +1074,7 @@ export function libraryLateWords(counts: Partial<Record<Kind, number>>, personal
 /** The library's place kept at the list's top when Navidrome turned out not to be reachable: it wasn't searched, so it
  *  says so - never that it found nothing (review). */
 export function librarySkippedWords(personal: boolean): string {
-  return personal ? "The store can't be searched just now." : "Your library can't be searched just now."
+  return personal ? "The collection can't be searched just now." : "Your library can't be searched just now."
 }
 
 /** The words of a kind's MusicBrainz failure: refused (a 422 with words - the words, no Try again), busy, or away. */

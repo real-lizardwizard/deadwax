@@ -4,6 +4,7 @@ import { dragOffset, dropIndex, pinKey, pinLine, pinOpens, type Pin } from '../l
 import { dropPrefetch, prefetchAlbum, type Album } from '../player/api'
 import { Cover } from '../player/Cover'
 import { ChevronDownIcon, ChevronUpIcon, CloseIcon, GripIcon } from '../player/icons'
+import { hasLibrary } from './useMyLibrary'
 
 /** An artist a card opens: Navidrome's id for them, or their MusicBrainz id - App's openArtist. */
 export interface PinnedArtist {
@@ -69,6 +70,8 @@ export function Pinned({
   onMove: (key: string, to: number) => void
   onRemove: (key: string) => void
 }) {
+  //? (2.0.5) a deleted album's card: gone from the collection - or with logins off, from your library
+  const personal = hasLibrary()
   const [editing, setEditing] = useState(false)
   const [drag, setDrag] = useState<Drag | null>(null)
   const [said, setSaid] = useState('')
@@ -204,7 +207,7 @@ export function Pinned({
               >
                 <span class="app-pin-text">
                   <span class="app-pin-title">{pin.label}</span>
-                  <span class="app-pin-line">{pinLine(pin)}</span>
+                  <span class="app-pin-line">{pinLine(pin, personal)}</span>
                 </span>
                 <button
                   type="button"
@@ -262,7 +265,7 @@ export function Pinned({
                 <Cover id={pin.cover} size={96} class={`app-pin-thumb${pin.kind === 'artist' ? ' is-round' : ''}`} />
                 <span class="app-pin-text">
                   <span class="app-pin-title">{pin.label}</span>
-                  <span class="app-pin-line">{pinLine(pin)}</span>
+                  <span class="app-pin-line">{pinLine(pin, personal)}</span>
                 </span>
               </>
             )

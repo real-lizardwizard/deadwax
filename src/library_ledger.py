@@ -55,14 +55,15 @@ NOT_CONFIRMED = "not_confirmed"
 #? Navidrome lost a star it had (the album came back under another id, or went missing mid-retag)
 STAR_LOST = "star_lost"
 
+#? (2.0.5, UX batch 2) said as what the person sees - the album being added to their library - never starring or
+#? Navidrome by name (the music server); You groups the waiting albums by these words (lib/myLibrary.ts)
 PROBLEM_WORDS = {
-    NOT_IN_NAVIDROME: "Navidrome hasn't got it yet (it may still be scanning) - deadwax asks again by itself.",
-    NO_RELEASE: ("It has no MusicBrainz release id, so deadwax can't find it in Navidrome - an admin can "
-                 "apply a release to it."),
-    MISSING: "Its folder isn't there just now - deadwax asks again once it is.",
-    NAVIDROME_DOWN: "Navidrome isn't answering - deadwax asks again by itself.",
-    NOT_CONFIRMED: "Navidrome took the star but didn't keep it - deadwax tries again by itself.",
-    STAR_LOST: "Navidrome lost its star (the album moved or was re-tagged) - deadwax is putting it back.",
+    NOT_IN_NAVIDROME: "The music server hasn't picked it up yet - it's added as soon as it has.",
+    NO_RELEASE: "An admin needs to match it to a release on MusicBrainz before it can be added.",
+    MISSING: "Its files aren't there just now - it's added once they are.",
+    NAVIDROME_DOWN: "The music server isn't answering - it's added once it does.",
+    NOT_CONFIRMED: "Being added again - nothing for you to do.",
+    STAR_LOST: "It was moved or re-tagged, so it's being added again - nothing for you to do.",
 }
 
 #? The backoff between tries of one entry: 30 s, doubling, at most half an hour - and on for ever: the
