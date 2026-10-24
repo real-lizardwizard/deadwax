@@ -14,6 +14,11 @@ import { ArrivingCard } from './JobCard'
  * `trouble`: deadwax didn't answer the last look. The cards are the last answer, and say so - a bar
  * that has stopped must not pass for one still moving - while App keeps asking (stallsOn).
  */
+
+/** (2.0.6, UX batch 3) Over the last progress while the downloads can't be asked for (it said "Can't reach deadwax just
+ *  now: this is its last answer, and it keeps asking."). */
+export const ARRIVING_STALE = "Can't update downloads right now - showing the last progress. Trying again…"
+
 export function Arriving({
   rows,
   onSeeAll,
@@ -36,7 +41,7 @@ export function Arriving({
         </button>
       </div>
       {trouble && (
-        <p class="app-arriving-note">Can't reach deadwax just now: this is its last answer, and it keeps asking.</p>
+        <p class="app-arriving-note">{ARRIVING_STALE}</p>
       )}
       <ul class="app-jobs">
         {rows.map((row) => (

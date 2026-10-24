@@ -270,7 +270,8 @@ export const JOB_ERRORS: Readonly<Record<string, { text: string; tell?: boolean 
   //? routes/download.py: the ✕
   'cancelled from deadwax': { text: 'Cancelled.' },
   //? poller.py: downloaded, and nothing filed
-  'dry run - not organized': { text: 'Downloaded, but not added to your library: deadwax is set to try filing without moving anything.', tell: true },
+  //? (2.0.6, UX batch 3) "adding", never "filing"
+  'dry run - not organized': { text: 'Downloaded, but not added to your library: deadwax is set to rehearse adding albums, without moving any files.', tell: true },
   'nothing could be organized, check SLSKD_DOWNLOAD_PATH': { text: "It downloaded, but deadwax couldn't find its files to add them to your library.", tell: true },
   [`deadwax stopped while filing this - check the library and slskd's folder`]: { text: 'deadwax stopped while it was adding this to your library.', tell: true },
 }

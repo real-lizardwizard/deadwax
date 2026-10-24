@@ -137,7 +137,7 @@ console.log('\nthe albums, in order')
   check('...each Navidrome album claimed once - neither copy of Dummy listed again',
     rows.map((row) => row.key), ['group:rg-dummy', 'group:rg-portishead', 'group:rg-third'])
   check('...the releases you hold of each, for the bridge', rows.map((row) => row.releases), [[CD, VINYL], [SELFTITLED], []])
-  check('the lines, as the board has them', rows.map(A.rowLine), ['1994 · in your library · 2 editions', '1997 · in your library', '2008 · not in your library'])
+  check('the lines, as the board has them', rows.map(A.rowLine), ['1994 · in your library · 2 pressings', '1997 · in your library', '2008 · not in your library'])
   check('Play plays one copy of each album you have, in the page\'s order - the plain edition', A.playOrder(rows), ['nd-cd', 'nd-self'])
   const plainLater = O.buildOwnedIndex([owned('Portishead/Dummy (1994) [Deluxe]', CD, 'rg-dummy', { edition: 'Deluxe', year: '1994' }), owned('Portishead/Dummy plain', VINYL, 'rg-dummy', { edition: '', year: '2016' })])
   check('...the plain edition, whatever its year or its folder\'s name', A.artistRows(HELD, [DUMMY_G], plainLater)[0].albumId, 'nd-vinyl')
@@ -728,7 +728,7 @@ async function page() {
     waitOver()
     await one.settled()
     check('the wait over: drawn - every row MusicBrainz has, Navidrome\'s albums claimed by title', rowKeys(), ['group:rg-dummy', 'group:rg-portishead', 'group:rg-third'])
-    check('...and no verdict, and no Get, where only the library could say', [rowLines(), getChips()], [['1994 · in your library · 2 editions', '1997 · in your library', '2008'], []])
+    check('...and no verdict, and no Get, where only the library could say', [rowLines(), getChips()], [['1994 · in your library · 2 pressings', '1997 · in your library', '2008'], []])
     check('...Play still disabled: which copies are one album is the library\'s to say', pills().map((pill) => pill[1]), [true, true])
     ownedAnswers(LIBRARY)
     await one.settled()
@@ -768,7 +768,7 @@ async function page() {
     waitOver()
     await one.settled()
     check('the wait over, MusicBrainz still out: one row per album you have, Dummy once', [rowKeys(), rowLines()],
-      [['group:rg-dummy', 'group:rg-portishead'], ['1994 · in your library · 2 editions', '1997 · in your library']])
+      [['group:rg-dummy', 'group:rg-portishead'], ['1994 · in your library · 2 pressings', '1997 · in your library']])
     check('...and Play asks for one copy of Dummy', asked('prefetch').map((one) => one[0]).sort(), ['nd-cd', 'nd-self'])
     answer('discography', DISCOGRAPHY)
     await one.settled()
@@ -858,7 +858,7 @@ async function page() {
     await one.settled()
     answer('discography', { 'release-groups': [DUMMY_G] })
     await one.settled()
-    check('held by the store\'s word, Navidrome having no artist for them: in your library', rowLines(), ['1994 · in your library · 2 editions'])
+    check('held by the store\'s word, Navidrome having no artist for them: in your library', rowLines(), ['1994 · in your library · 2 pressings'])
     find((node) => byClass('app-artist-album')(node))[0].props.onClick()
     one.draw()
     check('the tap asks the bridge, the row faded while it looks', [asked('bridge'), classed('app-artist-album')[0].props.class], [[[[CD, VINYL]]], 'app-artist-album is-busy'])
@@ -894,7 +894,7 @@ async function page() {
     check('Navidrome has no id for them, the library hasn\'t answered: nothing claimed', words(classed('app-search-empty')[0]), '')
     ownedAnswers(O.buildOwnedIndex([]))
     await one.settled()
-    check('...it has, and can\'t say either: said', words(classed('app-search-empty')[0]), "MusicBrainz doesn't know who this is from your files, so only the albums you have are here.")
+    check('...it has, and can\'t say either: said', words(classed('app-search-empty')[0]), "Only the albums you have are shown - their other albums can't be found.")
   }
 
   console.log('\nthe page: the pin (2.0.0-player.18)')
@@ -1134,7 +1134,7 @@ async function manage() {
     await one.settled()
     waitOver()
     await one.settled()
-    check('said, and for an admin, Which artist is this?', [words(classed('app-search-empty')[0]).startsWith("MusicBrainz doesn't know who this is"), manageButtons().map((one) => one[0]).includes('Which artist is this?')],
+    check('said, and for an admin, Which artist is this?', [words(classed('app-search-empty')[0]).startsWith('Only the albums you have are shown'), manageButtons().map((one) => one[0]).includes('Which artist is this?')],
       [true, true])
     find((node) => words(node) === 'Which artist is this?' && node.type === 'button')[0].props.onClick({ currentTarget: null })
     check('...its tap opens the panel to choose, with the page\'s name to search for', [managed[0].mode, managed[0].name, managed[0].mbid], ['who', 'Nirvana', null])
@@ -1165,12 +1165,12 @@ async function manage() {
     check('another chosen (Change): asked for by its id - and meanwhile nothing of the last one\'s said as theirs, Change still there',
       [asked('facts').slice(-1), classed('app-artist-disambiguation').length, classed('app-artist-facts').length, words(find(byClass('app-asking-text'), aboutOf())[0]),
         find((node) => byClass('app-artist-change')(node)).length],
-      [[[NIRVANA_UK]], 0, 0, 'Asking MusicBrainz…', 1])
+      [[[NIRVANA_UK]], 0, 0, 'Loading…', 1])
     answer('facts', new Error('MusicBrainz is unreachable right now'), (mbid) => mbid === NIRVANA_UK)
     await one.settled()
     check('...MusicBrainz failing for them: said, with Try again - and Change, the way to another', [words(find(byClass('app-search-empty'), aboutOf())[0]),
       find((node) => node.type === 'button' && words(node) === 'Try again', aboutOf()).length, find((node) => byClass('app-artist-change')(node)).length, classed('app-artist-disambiguation').length],
-      ["MusicBrainz isn't answering just now, so who they are isn't here.", 1, 1, 0])
+      ["Artist details can't be loaded right now.", 1, 1, 0])
 
     reset()
     ownedAnswers(O.buildOwnedIndex([]))
@@ -1178,7 +1178,7 @@ async function manage() {
     plain.draw()
     answer('artistAlbums', { id: 'ar-nirvana-2', name: 'Nirvana', album: [nd('nd-bleach', 'Bleach', 1989)] })
     await plain.settled()
-    check('not an admin: said, and no way to choose', [words(classed('app-search-empty')[0]).startsWith("MusicBrainz doesn't know"), manageButtons()], [true, []])
+    check('not an admin: said, and no way to choose', [words(classed('app-search-empty')[0]).startsWith('Only the albums you have are shown'), manageButtons()], [true, []])
   }
 
   console.log('\n...MusicBrainz not answering for who they are')
@@ -1195,13 +1195,13 @@ async function manage() {
     await one.settled()
     const about = find((node) => node.type === 'section' && node.props['aria-labelledby'] === 'app-artist-about-title')[0]
     check('About says so, with Try again - the albums and the library half drawn all the same',
-      [words(find((node) => byClass('app-search-empty')(node), about)[0]), titles()], ["MusicBrainz isn't answering just now, so who they are isn't here.", ['Albums', 'In your library', 'About']])
+      [words(find((node) => byClass('app-search-empty')(node), about)[0]), titles()], ["Artist details can't be loaded right now.", ['Albums', 'In your library', 'About']])
     find((node) => node.type === 'button' && words(node) === 'Try again', about)[0].props.onClick()
     await one.settled()
     //? review: only the second ask was pinned - the failure could have stayed on screen while it asked
     const aboutNow = find((node) => node.type === 'section' && node.props['aria-labelledby'] === 'app-artist-about-title')[0]
     check('...which asks again - the failure giving way to "Asking MusicBrainz…" while it does',
-      [asked('facts').length, words(find(byClass('app-asking-text'), aboutNow)[0]), find(byClass('app-search-empty'), aboutNow).length], [2, 'Asking MusicBrainz…', 0])
+      [asked('facts').length, words(find(byClass('app-asking-text'), aboutNow)[0]), find(byClass('app-search-empty'), aboutNow).length], [2, 'Loading…', 0])
   }
 
   console.log('\n...the sections\' wait: under the albums once they are drawn, for MusicBrainz and the library, or ABOUT_WAIT_MS (review: none of it was pinned)')
@@ -1239,7 +1239,7 @@ async function manage() {
     await slowmb.settled()
     check('...ABOUT_WAIT_MS over: drawn with what has answered - In your library first, About saying it is asking',
       [titles(), words(find(byClass('app-asking-text'), find((node) => node.type === 'section' && node.props['aria-labelledby'] === 'app-artist-about-title')[0])[0])],
-      [['Albums', 'In your library', 'About'], 'Asking MusicBrainz…'])
+      [['Albums', 'In your library', 'About'], 'Loading…'])
     //? the names change once drawn (a folder of theirs filed under another name): what it said stays while it is asked
     W.owned = { index: O.buildOwnedIndex([...A.everyOwned(LIBRARY), { path: 'Portishead Live/Roseland (1998)', artist: 'Portishead Live', album: 'Roseland', release_mbid: ROSELAND, albumartist_mbids: [PORTISHEAD] }]), artists: [] }
     await slowmb.settled()

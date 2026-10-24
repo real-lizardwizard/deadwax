@@ -170,7 +170,7 @@ export function useCandidateSearch({ picking, onPicked, formatPreference }: {
         pickedNow.current()
         return
       }
-      setNotPicked(notPickedLine(blocked))
+      setNotPicked(notPickedLine(blocked, result.candidates.length))
     } catch (caught) {
       if (!request.current() || isAbort(caught)) return
       //? (2.0.4) in a listener's words, slskd's own for whoever runs deadwax (app/access.ts seesDetail)

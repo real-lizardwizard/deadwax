@@ -14,27 +14,36 @@ import { usePlayerActions } from './context'
 import { AttentionCard, DoneRow, DownloadingCard, WaitingCard } from './JobCard'
 import { errorWords, TELL } from '../lib/errorWords'
 import { seesDetail, useAccess } from './access'
+import { GET_OFF, gets } from '../lib/permissions'
 import { errorLine } from './ErrorNote'
 
 /** How many Done rows have their album asked for ahead of a tap, so their ▶ plays at once - the
  *  newest first, as they are listed. A tap on any other opens the album, where Play is. */
 export const DONE_PREFETCHED = 5
 
-/** What a Done row says when Navidrome has no album for it (yet). */
-export const NOT_IN_NAVIDROME = "Navidrome hasn't found it yet - it may still be scanning"
+/** What a Done row says when Navidrome has no album for it (yet) - (2.0.6, UX batch 3) in a listener's words (it said
+ *  "Navidrome hasn't found it yet - it may still be scanning"). */
+export const NOT_IN_NAVIDROME = 'Not ready to play yet - it may still be scanning.'
 
 /** ...when no folder of the library is tagged with its release - an untagged copy it matched, or a
- *  folder since gone - so nothing can say which album in Navidrome it is. */
-export const NOT_IN_STORE = "deadwax can't tell which album in your library this is - its folder has no MusicBrainz release id"
+ *  folder since gone - so nothing can say which album in Navidrome it is. (2.0.6: it said "deadwax can't tell which
+ *  album in your library this is - its folder has no MusicBrainz release id".) */
+export const NOT_IN_STORE = "Can't find this album to open it - it may have moved, or isn't matched to a pressing."
 
 /** ...when deadwax itself didn't answer the look. */
-export const NOT_LOOKED_UP = "Couldn't look it up just now - tap to try again"
+export const NOT_LOOKED_UP = "Couldn't open it - tap to try again."
 
 /** (2.0.4) A Done row that can't open its album because of the music server - App's navidromeProblem. */
 export const CANT_OPEN_UNSET = "Can't open this album yet - the music server isn't set up."
 export const CANT_OPEN_DOWN = "Can't open this album right now - the music server can't be reached. Try again in a minute."
 /** (2.0.4, review) ...when deadwax ITSELF didn't answer the check (NavidromeStatus offline): the music server may be fine */
 export const CANT_OPEN_OFFLINE = "Can't open this album right now - can't connect to deadwax. Check your connection, then try again."
+
+/** (2.0.6) Requests with nothing in it: for someone who can Get, and for anyone else, who can only join. */
+export const REQUESTS_EMPTY = "Albums you get show here while they download, and once they've arrived - find one in Search and tap Get."
+//? ...without Get albums nothing is offered - no Get, no Join (ReleaseGroupPage, Sources): "find one and tap Get" was a
+//? dead end, so they read what they can do instead (the review's "Albums you join show here" - but Join is Get's too)
+export const REQUESTS_EMPTY_JOIN = GET_OFF
 
 /** (2.0.4) Over what went wrong asking for the downloads - the rows below stay as the last answer had them. */
 export const REQUESTS_UNREACHED = "Can't update your requests right now"
@@ -129,7 +138,9 @@ export function Requests({
 }) {
   const actions = usePlayerActions()
   //? (2.0.4) whoever runs deadwax reads what went wrong in its own words too, and DB_PATH
-  const runs = seesDetail(useAccess())
+  const access = useAccess()
+  const runs = seesDetail(access)
+  const getsAlbums = gets(access.permissions)
   const failed = errorWords(failure ?? (error ? new Error(error) : null), { admin: runs, service: 'downloads' })
   //? the card asking "cancel it?", by its row's key - one at a time
   const [asking, setAsking] = useState<string | null>(null)
@@ -418,7 +429,7 @@ export function Requests({
           {runs ? (
             <p class="app-placeholder-text">
               deadwax can't write its database. Downloads still arrive in slskd's folder, but they can't be
-              listed here or filed into your library. Check <span class="app-mono">DB_PATH</span>.
+              listed here or added to your library. Check <span class="app-mono">DB_PATH</span>.
             </p>
           ) : (
             <p class="app-placeholder-text">{UNTRACKED_TEXT}</p>
@@ -431,10 +442,8 @@ export function Requests({
           !error && (
             <div class="app-card app-placeholder-body">
               <p class="app-placeholder-lead">Nothing requested yet</p>
-              <p class="app-placeholder-text">
-                Albums you get show here while they download, and once they've arrived - find one in
-                Search and tap Get.
-              </p>
+              {/* (2.0.6, UX batch 3) "tap Get" only to someone who can Get - anyone else's list holds what they join */}
+              <p class="app-placeholder-text">{getsAlbums ? REQUESTS_EMPTY : REQUESTS_EMPTY_JOIN}</p>
             </div>
           )
         )

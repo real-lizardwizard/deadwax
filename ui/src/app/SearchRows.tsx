@@ -166,7 +166,7 @@ function getChip(row: Row, context: RowContext) {
         aria-disabled={asking}
         onClick={(event) => context.onGetGroup(row.group, event)}
       >
-        {asking ? 'Get…' : 'Get'}
+        {asking ? 'Getting…' : 'Get'}
       </button>
     )
   }
@@ -185,7 +185,7 @@ function getChip(row: Row, context: RowContext) {
       aria-disabled={asking}
       onClick={(event) => context.onGetSong(pair.song, pair.album, event)}
     >
-      {asking ? 'Get…' : 'Get'}
+      {asking ? 'Getting…' : 'Get'}
     </button>
   )
 }
@@ -248,7 +248,10 @@ export function topRow(row: Row, context: RowContext, tile: boolean) {
         {tile ? (
           <>
             <span class="app-result-line">{line}</span>
-            <span class="app-result-line app-top-place">{placeLabel(row, context.marks, context.evidence)}</span>
+            {/* (2.0.6, review) beside a Get a tile's text has ~60px: "Not in your library" was cut to "Not in y…".
+                The Get already says it isn't here, so a tile with one leaves its third line empty (its height kept);
+                the section row below, and the album's page, say "maybe" where a folder may hold it */}
+            <span class="app-result-line app-top-place">{get ? '' : placeLabel(row, context.marks, context.evidence)}</span>
           </>
         ) : (
           <span class="app-result-line app-result-split">
@@ -414,7 +417,7 @@ export function slot(state: SlotState, key: string) {
         <div key={key} class="app-search-slot">
           <div class="app-asking">
             <span class="app-sweep" aria-hidden="true" />
-            <span class="app-asking-text">{state.words ?? 'Asking MusicBrainz…'}</span>
+            <span class="app-asking-text">{state.words ?? 'Searching…'}</span>
           </div>
         </div>
       )

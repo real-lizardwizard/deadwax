@@ -283,11 +283,11 @@ async function main() {
   const region = () => find((node) => node.props?.role === 'status')
   check('one live region, always in the sheet, polite and read whole - saying what it asks for',
     [region().length, region()[0]?.props['aria-live'], region()[0]?.props['aria-atomic'], region()[0]?.props.class, text(region()[0])],
-    [1, 'polite', 'true', 'app-visually-hidden', 'Asking Soulseek for “Third” by Portishead…'])
-  check('asking: the sweep, and the album and its artist', [classed('app-sweep').length, text(classed('app-sources-state-text')[0])], [1, 'Asking Soulseek for “Third” by Portishead…'])
+    [1, 'polite', 'true', 'app-visually-hidden', 'Looking for “Third” by Portishead…'])
+  check('asking: the sweep, and the album and its artist', [classed('app-sweep').length, text(classed('app-sources-state-text')[0])], [1, 'Looking for “Third” by Portishead…'])
   check('the sheet is a sheet by the one hook, its own scroll lock, focus in to Cancel', [globalThis.__sources.sheet?.lockClass, globalThis.__sources.sheet?.first?.current === undefined],
     ['app-sources-open', false])
-  check('the chips start as the quality floor (Lossless), then the sort', chips(), [['Lossless', true], ['24-bit', false], ['Free slot', false], ['Complete albums only', false]])
+  check('the chips start as the quality floor (Lossless), then the sort', chips(), [['Lossless', true], ['24-bit', false], ['Starts now', false], ['Complete albums only', false]])
   check('...the settings asked as it opened', globalThis.__sources.settingsAsked.at(-1), true)
 
   console.log('\nthe answer: cards in the order shown, the first the best match')
@@ -302,9 +302,9 @@ async function main() {
   draw()
   check('Lossless pressed: the MP3 folder left out', cards().map((card) => card.props.candidate.username), ['vinylhead', 'bob', 'crate_dig'])
   check('...the first card the best match', cards().map((card) => card.props.best), [true, false, false])
-  check('...and the live region says how many', text(find((node) => node.props?.role === 'status')[0]), '3 sources')
+  check('...and the live region says how many', text(find((node) => node.props?.role === 'status')[0]), '3 sources.')
   check('under them: what was searched, how many folders, how many pass', text(classed('app-sources-footer')[0]),
-    'Searched Soulseek for “Portishead Third” · 4 folders, 3 match your filters')
+    'Searched for “Portishead Third” · 4 sources, 3 match your filters')
   chip('Lossless').props.onClick()
   draw()
   check('Lossless off: all four', cards().length, 4)
@@ -351,7 +351,7 @@ async function main() {
   asks[3].resolve(answer([source('mp3guy', { formats: ['mp3'], bitrates: [320], bit_depths: [], sample_rates: [] })]))
   await settle()
   draw()
-  check('one folder, none passes Lossless', text(classed('app-sources-state-text')[0]), '1 folder on Soulseek, none pass your filters')
+  check('one folder, none passes Lossless', text(classed('app-sources-state-text')[0]), '1 source found - none matches your filters.')
   find((node) => node.type === 'button' && text(node) === 'Clear filters')[0].props.onClick()
   draw()
   check('Clear filters: every chip off, and the card shows', [chips().every(([, on]) => on === false), cards().length], [true, 1])
@@ -360,7 +360,7 @@ async function main() {
   globalThis.__sources.settings = { get_mode: 'pick', quality_floor: '24bit' }
   const before = requested.length
   draw({ request: { release: RELEASE, subtitle: 'Third', key: 5 } })
-  check('the chips start as the 24-bit floor', chips(), [['Lossless', false], ['24-bit', true], ['Free slot', false], ['Complete albums only', false]])
+  check('the chips start as the 24-bit floor', chips(), [['Lossless', false], ['24-bit', true], ['Starts now', false], ['Complete albums only', false]])
   asks[4].resolve(answer([source('cd', { score: 0.95 }), source('hires', { score: 0.8, bit_depths: [24], sample_rates: [96000] })]))
   await settle()
   draw()
@@ -372,14 +372,14 @@ async function main() {
   draw()
   check('the 24/96 under 75: nothing picked, the cards shown, and why',
     [requested.length - before, text(classed('app-sources-not-picked')[0]), cards().map((card) => card.props.candidate.username)],
-    [1, "Didn't pick a source for you: none scores 75 or more and passes your filters.", ['hires']])
+    [1, "No close match that passes your filters - choose a source yourself.", ['hires']])
   const held = { path: 'Portishead/Third (2008)', paths: ['Portishead/Third (2008)'], artist: 'Portishead', album: 'Third', edition: '', track_count: 9, expected_tracks: 11, formats: ['flac'], complete: false, fills_gaps: true, filed_to: 'Portishead/Third (2008)' }
   draw({ request: { release: RELEASE, subtitle: 'Third', key: 7 } })
   asks[6].resolve(answer([source('hires', { score: 0.99, bit_depths: [24], sample_rates: [96000] })], { held }))
   await settle()
   draw()
   check('part held: never picked, whatever scores well - and the note says how much is held',
-    [requested.length - before, text(classed('app-sources-not-picked')[0]), find((node) => node.type === StoreState)[0]?.props.notes.length], [1, "Didn't pick a source for you: you already have part of it.", 1])
+    [requested.length - before, text(classed('app-sources-not-picked')[0]), find((node) => node.type === StoreState)[0]?.props.notes.length], [1, "You already have part of it - choose a source yourself.", 1])
 
   console.log('\nRe-search: an edited query only, and never a pick')
   draw({ request: { release: RELEASE, subtitle: 'Third', key: 8 } })
@@ -387,7 +387,7 @@ async function main() {
   await settle()
   draw()
   check('nothing found: said, with every query, and the query to edit', [text(classed('app-sources-state-text')[0]), find((node) => node.type === 'input')[0]?.props.value],
-    ['Soulseek found nothing for “Portishead Third”.', 'Portishead Third'])
+    ['Nothing found for “Portishead Third”.', 'Portishead Third'])
   find((node) => node.type === 'form')[0].props.onSubmit({ preventDefault() {} })
   check('an unedited Re-search overrides nothing - it would drop every other name', asks[8]?.body.query_override, '')
   asks[8].resolve(answer([source('hires', { score: 0.99, bit_depths: [24], sample_rates: [96000] })]))
@@ -441,7 +441,7 @@ async function main() {
   await settle()
   draw()
   check('"Already downloading", from whom, and to cancel it in Requests', find((node) => node.type === StoreState)[0]?.props.status,
-    { kind: 'downloading', title: 'Already downloading', lines: ['From bob · queued', 'Open Requests to cancel it if you want another peer.'] })
+    { kind: 'downloading', title: 'Already downloading', lines: ['From bob · queued', 'To get it from another source, cancel it in Requests first.'] })
 
   console.log('\nCancel, the backdrop and Escape let the search go in the gesture (review)')
   {
@@ -479,9 +479,9 @@ async function main() {
     fresh.draw()
     check('nothing picked, the cards shown, and why',
       [requested.length - before, cards().length, text(classed('app-sources-not-picked')[0])],
-      [0, 1, "Didn't pick a source for you: with no tracklist to match the folders against, no score can be trusted."])
+      [0, 1, "This pressing has no tracklist to check the sources against - choose a source yourself."])
     check('...the live region says it too', text(find((node) => node.props?.role === 'status')[0]),
-      "1 source. Didn't pick a source for you: with no tracklist to match the folders against, no score can be trusted.")
+      "1 source. This pressing has no tracklist to check the sources against - choose a source yourself.")
 
     console.log('\nTry again after slskd failed is the Get again: it picks (review)')
     fresh.draw({ request: { release: RELEASE, subtitle: 'Third', key: 2 } })
@@ -519,17 +519,17 @@ async function main() {
     console.log('\nthe settings landing after the sheet opened re-seed the chips - unless they were tapped')
     globalThis.__sources.settings = null
     fresh.draw({ request: { release: RELEASE, subtitle: 'Third', key: 4 } })
-    check('no settings yet: the defaults\' chips, none pressed', chips(), [['Lossless', false], ['24-bit', false], ['Free slot', false], ['Complete albums only', false]])
+    check('no settings yet: the defaults\' chips, none pressed', chips(), [['Lossless', false], ['24-bit', false], ['Starts now', false], ['Complete albums only', false]])
     globalThis.__sources.settings = { get_mode: 'sources', quality_floor: 'lossless' }
     fresh.draw()
-    check('the settings landing: the chips become the floor', chips(), [['Lossless', true], ['24-bit', false], ['Free slot', false], ['Complete albums only', false]])
+    check('the settings landing: the chips become the floor', chips(), [['Lossless', true], ['24-bit', false], ['Starts now', false], ['Complete albums only', false]])
     globalThis.__sources.settings = null
     fresh.draw({ request: { release: RELEASE, subtitle: 'Third', key: 5 } })
-    chip('Free slot').props.onClick()
+    chip('Starts now').props.onClick()
     fresh.draw()
     globalThis.__sources.settings = { get_mode: 'sources', quality_floor: 'lossless' }
     fresh.draw()
-    check('...but a chip already tapped stands: the settings re-seed nothing', chips(), [['Lossless', false], ['24-bit', false], ['Free slot', true], ['Complete albums only', false]])
+    check('...but a chip already tapped stands: the settings re-seed nothing', chips(), [['Lossless', false], ['24-bit', false], ['Starts now', true], ['Complete albums only', false]])
     globalThis.__sources.settings = { get_mode: 'sources', quality_floor: 'any' }
   }
 
@@ -559,7 +559,7 @@ async function main() {
     //? its label growing as a minimum was set, or Complete pressed and bolder, wrapped it and its popover
     //? out from under the slider being dragged; after Free slot it keeps the place it always had)
     check('the chips gain Signals right after Free slot - then Complete albums only and the sample-rate floor (2.0.0-player.50) - before the sort',
-      chipRow(), ['Lossless', '24-bit', 'Free slot', 'Signals', 'Complete albums only', 'Sample rate', 'sort'])
+      chipRow(), ['Lossless', '24-bit', 'Starts now', 'Signals', 'Complete albums only', 'Sample rate', 'sort'])
     const signalsChip = () => find((node) => node.type === SignalsChip)[0]
     check('...none set to begin with', Object.values(signalsChip().props.minimums).filter(Boolean).length, 0)
     check('the panel\'s box takes focus from a click on what can\'t (a tab stop of -1) - a sheet\'s has none',
@@ -576,7 +576,7 @@ async function main() {
 
     //? the panel stays (on a desktop App keeps it while you look): set a chip and a minimum, then the
     //? album page's pressing changes - searched again, `again`
-    chip('Free slot').props.onClick()
+    chip('Starts now').props.onClick()
     signalsChip().props.onChange({ ...signalsChip().props.minimums, title_match: 50 })
     desk.draw()
     check('a minimum set: the chip counts it, and the card under it is left out', [Object.values(signalsChip().props.minimums).filter(Boolean).length, cards().map((card) => card.props.candidate.username)],
@@ -584,21 +584,21 @@ async function main() {
     chip('Complete albums only').props.onClick()
     desk.draw()
     check('...Signals still right after Free slot with a minimum set and Complete albums only pressed (review)',
-      chipRow(), ['Lossless', '24-bit', 'Free slot', 'Signals', 'Complete albums only', 'Sample rate', 'sort'])
+      chipRow(), ['Lossless', '24-bit', 'Starts now', 'Signals', 'Complete albums only', 'Sample rate', 'sort'])
     chip('Complete albums only').props.onClick()
     desk.draw()
     const before = asks.length
     desk.draw({ request: { release: OTHER, subtitle: 'Third · 2×12" Vinyl · 2008', key: 21, from: 'rg-third', again: true } })
     check('another pressing chosen beside it: Soulseek asked again, for that pressing', [asks.length - before, asks.at(-1)?.body.release_mbid], [1, 'rel-dummy'])
     check('...the chips and the minimum as they were set - never re-seeded from the floor',
-      [chips(), signalsChip().props.minimums.title_match], [[['Lossless', true], ['24-bit', false], ['Free slot', true], ['Complete albums only', false]], 50])
+      [chips(), signalsChip().props.minimums.title_match], [[['Lossless', true], ['24-bit', false], ['Starts now', true], ['Complete albums only', false]], 50])
     asks.at(-1).resolve(answer([source('vinylhead', { score: 0.95 })]))
     await settle()
     desk.draw()
     check('...and nothing picked for you: you are choosing', [desk.queued.length, cards().map((card) => card.props.candidate.username)], [1, ['vinylhead']])
 
     //? Clear filters takes the minimums with the chips - shown for a minimum alone, no chip pressed
-    chip('Free slot').props.onClick()
+    chip('Starts now').props.onClick()
     chip('Lossless').props.onClick()
     desk.draw({ request: { release: RELEASE, subtitle: 'Third', key: 22, from: 'rg-third', again: true } })
     asks.at(-1).resolve(answer([source('weak', { score: 0.8, signals: { title_match: 0.4, track_count: 1, duration_match: 1, edition: 0.5, format: 1, peer: 0.2 } })]))
@@ -641,7 +641,7 @@ async function main() {
     desk.draw({ panel: 'sheet' })
     check('...the window narrowed into a phone\'s sheet: no Signals chip, and nothing filtered by it - every card, the footer saying so',
       [find((node) => node.type === SignalsChip).length, cards().map((card) => card.props.candidate.username), text(classed('app-sources-footer')[0]), globalThis.__sources.sheet.modal],
-      [0, ['vinylhead', 'weak'], 'Searched Soulseek for “Portishead Third” · 2 folders, all match your filters', true])
+      [0, ['vinylhead', 'weak'], 'Searched for “Portishead Third” · 2 sources, all match your filters', true])
     desk.draw({ panel: 'drawer' })
     check('...and back on the panel the minimum is as it was set', [signalsChip().props.minimums.title_match, cards().map((card) => card.props.candidate.username)], [50, ['vinylhead']])
     desk.draw({ open: false, panel: 'column' })
@@ -654,13 +654,13 @@ async function main() {
     tree = render(props)
     const button = find((node) => node.type === 'button' && node.props['aria-controls'])[0]
     check('the chip: pressed with a minimum set, counting it, and closed', [text(button), button.props.class.includes('is-on'), button.props['aria-expanded'], find((node) => node.props?.role === 'group')[0].props.hidden],
-      ['Signals · 1', true, false, true])
+      ['Match details · 1', true, false, true])
     button.props.onClick()
     tree = render(props)
     const rows = classed('app-signals-row')
     check('opened: a slider each - the score\'s six signals - with what it is set to', [find((node) => node.props?.role === 'group')[0].props.hidden,
       rows.map((row) => [text(row.props.children[0]), text(row.props.children[2])])],
-      [false, [['Titles', 'any'], ['Count', '60'], ['Lengths', 'any'], ['Edition', 'any'], ['Format', 'any'], ['Peer', 'any']]])
+      [false, [['Track names', 'any'], ['Track count', '60'], ['Track lengths', 'any'], ['Edition', 'any'], ['Format', 'any'], ['Availability', 'any']]])
     rows[0].props.children[1].props.onInput({ currentTarget: { value: '75' } })
     check('...a slider moved: that minimum, the rest kept', changes.at(-1), { title_match: 75, track_count: 60, duration_match: 0, edition: 0, format: 0, peer: 0 })
     const reset = classed('app-signals-reset')[0]
@@ -826,7 +826,7 @@ async function main() {
     check('the score, the folder, who from, and Get - the best match\'s the solid purple, named for its folder and peer',
       [text(classed('app-source-score')[0]), classed('app-source-score')[0].props.class.includes('is-good'), text(classed('app-source-folder')[0]), text(classed('app-source-peer')[0]),
         classed('app-source-get')[0].props.class, classed('app-source-get')[0].props['aria-label']],
-      ['90', true, 'Portishead - Third [vinylhead]', 'from vinylhead', 'app-source-get is-primary', 'Get Portishead - Third [vinylhead] from vinylhead'])
+      ['90%', true, 'Portishead - Third [vinylhead]', 'from vinylhead', 'app-source-get is-primary', 'Get Portishead - Third [vinylhead] from vinylhead'])
     //? one peer, two folders of the album (FLAC and MP3): two Gets VoiceOver's rotor can tell apart
     const label = (fields) => { drawCard({ candidate: source('bob', fields), best: false, onGet() {} }); return classed('app-source-get')[0].props['aria-label'] }
     check('...so one peer\'s two folders are two different buttons', [label({ directory_name: 'Third [FLAC]' }), label({ directory_name: 'Third [MP3 320]' })],
@@ -842,11 +842,11 @@ async function main() {
     check('another: amber score, tinted Get, no speed, amber Tracks and Starts, and what is missing',
       [classed('app-source-score')[0].props.class.includes('is-low'), classed('app-source-get')[0].props.class, text(classed('app-source-speed-text')[0]), text(classed('app-source-speed-note')[0]),
         classed('app-source-value').filter((value) => value.props.class.includes('is-warning')).map(text), text(classed('app-source-missing')[0]), text(classed('app-source-peer')[0])],
-      [true, 'app-source-get is-tinted', 'Unknown', 'no speed reported yet', ['10 of 11', '3 ahead'], 'Missing “Threads”', 'from crate_dig · 2 disc folders'])
+      [true, 'app-source-get is-tinted', 'Unknown', 'no speed reported yet', ['10 of 11', 'after 3 others'], 'Missing “Threads”', 'from crate_dig · in 2 parts, one per disc'])
     drawCard({ candidate: source('bob', { upload_speed: 1.2 * MB }), best: false, onGet() {} })
     check('the peer\'s own average is never the download speed: grey, and says whose it is',
       [text(classed('app-source-speed-text')[0]), classed('app-source-speed-text')[0].props.class.includes('is-advertised'), text(classed('app-source-speed-note')[0])],
-      ['1.2 MB/s', true, 'their own average'])
+      ['1.2 MB/s', true, 'their usual speed'])
   }
 
   console.log('\na card\'s reasons (2.0.0-player.41): why it scored what it did, as the main page shows it')
@@ -860,10 +860,13 @@ async function main() {
     const score = () => classed('app-source-score')[0]
     check('a phone\'s: the score is a button, closed, controlling the reasons - which are there, hidden',
       [score().type, score().props['aria-expanded'], score().props['aria-controls'] === reasons().props.id, reasons().props.hidden, score().props['aria-label']],
-      ['button', false, true, true, 'Match score 90'])
+      ['button', false, true, true, '90% match'])
     check('...the reasons last on the card, so opening them moves nothing above',
       find((node) => node.type === 'li' && byClass('app-source')(node))[0].props.children.filter(Boolean).at(-1)?.props.class, 'app-source-reasons')
-    check('...named for what they are, a group', [reasons().props.role, reasons().props['aria-label']], ['group', 'Why it scored 90'])
+    //? (2.0.6, UX batch 3) named by a heading anyone reads, not a label only VoiceOver did ("Why it scored 90")
+    check('...named for what they are, a group under a heading saying the match', [reasons().props.role, reasons().props['aria-labelledby'] === classed('app-source-reasons-title')[0]?.props.id,
+      text(classed('app-source-reasons-title')[0])], ['group', true, "Why it's a 90% match"])
+    check('...the score says itself as a percentage', text(score()).trim(), '90%')
     score().props.onClick()
     tree = render({ candidate: REASONED, best: false, onGet() {}, reasons: 'tap' })
     check('a tap on the score opens them', [score().props['aria-expanded'], reasons().props.hidden], [true, false])
@@ -871,8 +874,13 @@ async function main() {
       classed('app-source-tag').map((tag) => [text(tag), tag.props.class]), [['DELUXE', 'app-source-tag is-purple'], ['REMASTER', 'app-source-tag is-amber']])
     check('the signals: each judged one a chip - its word, its number, its band - the unjudged left out',
       classed('app-source-signal').map((chip) => [text(chip), chip.props.class]),
-      [['Titles 100', 'app-source-signal is-good'], ['Count 100', 'app-source-signal is-good'], ['Edition 50', 'app-source-signal is-mid'],
-       ['Format 45', 'app-source-signal is-mid'], ['Peer 20', 'app-source-signal is-bad']])
+      [['Track names 100%', 'app-source-signal is-good'], ['Track count 100%', 'app-source-signal is-good'], ['Edition 50%', 'app-source-signal is-mid'],
+       ['Format 45%', 'app-source-signal is-mid'], ['Availability 20%', 'app-source-signal is-bad']])
+    //? (2.0.6, UX batch 3) what each measures, written beside its chip - a phone has no tooltip
+    check('...each beside what it measures, in words', classed('app-source-signal-meaning').map(text),
+      ["the pressing's tracks it has, found by their names", "how near its number of files is to the pressing's tracks",
+       'whether its name says the same edition (deluxe, remaster…) - its year there helps', 'lossless or not, as your Format asks',
+       'how soon it can start: a free slot, a short queue, their speed'])
     score().props.onClick()
     tree = render({ candidate: REASONED, best: false, onGet() {}, reasons: 'tap' })
     check('...a second tap closes them', [score().props['aria-expanded'], reasons().props.hidden], [false, true])
@@ -957,7 +965,7 @@ async function main() {
   console.log('\nLossless only, and Soulseek answered with nothing lossless: said so, and why (review)')
   {
     const status = () => text(find((node) => node.props?.role === 'status')[0])
-    const NOTE = 'Soulseek answered, but your Format is Lossless only, which leaves out folders with no lossless files. You can change it in You, under Getting albums.'
+    const NOTE = 'Some were found, but none with lossless files - your Format is Lossless only, which leaves the rest out. You can change it in You, under Getting albums.'
     const phone = sheet()
     globalThis.__sources.settings = { get_mode: 'sources', quality_floor: 'any', format_preference: 'lossless_only' }
     phone.draw({ open: true, request: { release: RELEASE, subtitle: 'Third', key: 440 } })
@@ -966,22 +974,22 @@ async function main() {
     phone.draw()
     check('nothing lossless on Soulseek - never "found nothing" - with the Format named, and where it is',
       [text(classed('app-sources-state-text')[0]), text(classed('app-sources-state-note')[0])],
-      ['Nothing lossless on Soulseek for “Portishead Third”.', NOTE])
+      ['Nothing lossless found for “Portishead Third”.', NOTE])
     check('...the query still there to edit, and Re-search', [find((node) => node.type === 'form').length, find((node) => node.type === 'input')[0]?.props.value], [1, 'Portishead Third'])
-    check('...and VoiceOver told the same', status(), `Nothing lossless on Soulseek for “Portishead Third”. ${NOTE}`)
+    check('...and VoiceOver told the same', status(), `Nothing lossless found for “Portishead Third”. ${NOTE}`)
     phone.draw({ request: { release: RELEASE, subtitle: 'Third', key: 441 } })
     asks.at(-1).resolve(answer([], { response_count: 0 }))
     await settle()
     phone.draw()
     check('Lossless only, and no peer answered at all: Soulseek found nothing, as ever', [text(classed('app-sources-state-text')[0]), classed('app-sources-state-note').length],
-      ['Soulseek found nothing for “Portishead Third”.', 0])
+      ['Nothing found for “Portishead Third”.', 0])
     globalThis.__sources.settings = { get_mode: 'sources', quality_floor: 'any', format_preference: 'prefer_lossless' }
     phone.draw({ request: { release: RELEASE, subtitle: 'Third', key: 442 } })
     asks.at(-1).resolve(answer([], { response_count: 4 }))
     await settle()
     phone.draw()
     check('another Format, answers in and nothing left: Soulseek found nothing, as ever', [text(classed('app-sources-state-text')[0]), status()],
-      ['Soulseek found nothing for “Portishead Third”.', 'Soulseek found nothing for “Portishead Third”.'])
+      ['Nothing found for “Portishead Third”.', 'Nothing found for “Portishead Third”.'])
     //? the Format the search was SENT with, as the store answered it - not what the settings said before
     let answerFormat = null
     globalThis.__sources.format = () => new Promise((resolve) => { answerFormat = resolve })
@@ -992,7 +1000,7 @@ async function main() {
     asks.at(-1).resolve(answer([], { response_count: 2 }))
     await settle()
     phone.draw()
-    check('...and it is that Format the sheet speaks of', text(classed('app-sources-state-text')[0]), 'Nothing lossless on Soulseek for “Portishead Third”.')
+    check('...and it is that Format the sheet speaks of', text(classed('app-sources-state-text')[0]), 'Nothing lossless found for “Portishead Third”.')
     globalThis.__sources.format = () => globalThis.__sources.settings?.format_preference ?? 'prefer_lossless'
     globalThis.__sources.settings = { get_mode: 'sources', quality_floor: 'any' }
     phone.draw({ open: false })
@@ -1053,7 +1061,7 @@ async function main() {
     await settle()
     fresh.draw()
     check('none passing your filters: Search again under Clear filters', [text(classed('app-sources-state-text')[0]), !!again(), forms().length],
-      ['1 folder on Soulseek, none pass your filters', true, 0])
+      ['1 source found - none matches your filters.', true, 0])
     globalThis.__sources.settings = { get_mode: 'sources', quality_floor: 'any' }
 
     //? nothing found: the query form is already there - no Search again beside it
@@ -1124,7 +1132,7 @@ async function main() {
       [['Complete albums only', false], 0])
     check('...the sheet\'s row: the three, Complete albums only, then the sort - no Signals there to keep a place for',
       find(byClass('app-sources-chips'))[0].props.children.flat().filter(Boolean).map((child) => child.props?.class?.includes('app-sources-sort') ? 'sort' : text(child)),
-      ['Lossless', '24-bit', 'Free slot', 'Complete albums only', 'sort'])
+      ['Lossless', '24-bit', 'Starts now', 'Complete albums only', 'sort'])
     asks.at(-1).resolve(answer(FOUR))
     await settle()
     phone.draw()
@@ -1133,7 +1141,7 @@ async function main() {
     phone.draw()
     check('pressed: the folder missing a track left out - the whole CD of a CD+DVD kept, as its card counts it', [chip('Complete albums only').props['aria-pressed'], names()],
       [true, ['cddvd', 'hires', 'unsaid']])
-    check('...the footer counting what passes', text(classed('app-sources-footer')[0]), 'Searched Soulseek for “Portishead Third” · 4 folders, 3 match your filters')
+    check('...the footer counting what passes', text(classed('app-sources-footer')[0]), 'Searched for “Portishead Third” · 4 sources, 3 match your filters')
     phone.draw({ request: { release: RELEASE, subtitle: 'Third', key: 501 } })
     check('a fresh Get: it starts off again', chip('Complete albums only').props['aria-pressed'], false)
     asks.at(-1).resolve(answer([FOUR[1]]))
@@ -1142,7 +1150,7 @@ async function main() {
     chip('Complete albums only').props.onClick()
     phone.draw()
     check('none passing it: said, with Clear filters', [text(classed('app-sources-state-text')[0]), !!find((node) => node.type === 'button' && text(node) === 'Clear filters')[0]],
-      ['1 folder on Soulseek, none pass your filters', true])
+      ['1 source found - none matches your filters.', true])
     find((node) => node.type === 'button' && text(node) === 'Clear filters')[0].props.onClick()
     phone.draw()
     check('...which turns it off', [chip('Complete albums only').props['aria-pressed'], names()], [false, ['short']])

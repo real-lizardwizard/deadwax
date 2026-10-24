@@ -335,7 +335,11 @@ console.log('\nDone rows open, and play, their album (2.0.0-player.17)')
     openButtons(drawLost())[0].props.onClick()
     bridgeSays(null)
     await tick()
-    check('Navidrome hasn\'t got it: the row says so, and opens nothing', [notes(drawLost()), opened.length], [["Navidrome hasn't found it yet - it may still be scanning"], 2])
+    check('Navidrome hasn\'t got it: the row says so, and opens nothing', [notes(drawLost()), opened.length], [[Q.NOT_IN_NAVIDROME], 2])
+    check('(2.0.6) ...in a listener\'s words, never the music server\'s name', Q.NOT_IN_NAVIDROME, 'Not ready to play yet - it may still be scanning.')
+    //? (2.0.6, review) hedged as the code can know: a folder Navidrome never lists won't be ready in a minute, and a
+    //? present-less store answer is also a filed folder since moved or deleted outside deadwax
+    check('(2.0.6) ...and the store\'s miss says it may have moved, not only that it isn\'t matched', Q.NOT_IN_STORE, "Can't find this album to open it - it may have moved, or isn't matched to a pressing.")
     openButtons(drawLost())[0].props.onClick()
     bridgeSays('nd-lost')
     await tick()
@@ -514,12 +518,12 @@ console.log('\nwhat each row says')
   const refused = job('downloading', { files_done: 3, files_failed: 1, attempt: 2 })
   const r2 = view([refused]).sections.downloading[0]
   check('files refused while the rest move, no speed yet, and which try', [r2.data, r2.line],
-    ['3 of 10 files · 1 failed', 'Massive Attack · from mellotron · try 2'])
+    ['3 of 10 files · 1 failed', 'Massive Attack · from mellotron · 2nd try'])
   check('one file is a file', view([job('downloading', { files_total: 1 })]).sections.downloading[0].data, '0 of 1 file')
 
   const filing = view([job('organizing', { files_done: 10 })]).sections.downloading[0]
   check('being filed: the bar full, "organizing", and nothing left to cancel',
-    [filing.progress, filing.data, filing.brief, filing.cancel], [100, '10 of 10 files · organizing', 'organizing', null])
+    [filing.progress, filing.data, filing.brief, filing.cancel], [100, '10 of 10 files · adding to your library…', 'adding…', null])
 
   const going = job('downloading', { files_done: 2 })
   const cancelling = view([going], { cancelling: new Set([going.id]) }).sections.downloading[0]
@@ -532,24 +536,39 @@ console.log('\nwhat each row says')
     ['Portishead · from vinylhead · starting', 'starting', 'ready'])
   const placed = view([job('queued', { queue_position: 4, attempt: 3 })]).sections.waiting[0]
   check('its place in the peer\'s queue, and which try', [placed.line, placed.brief],
-    ['Massive Attack · from mellotron · #4 in their queue · try 3', '#4 in queue'])
+    ['Massive Attack · from mellotron · 4th in their queue · 3rd try', '4th in line'])
+  //? (2.0.6, UX batch 3) a place or a try as a listener says it - "4th", never "#4" or "try 4"
+  check('(2.0.6) ordinals: 1st, 2nd, 3rd, 4th, the teens th, then 21st, 22nd, 23rd, 101st, 111th, 112th',
+    [1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 101, 111, 112].map(V.ordinal), ['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '23rd', '101st', '111th', '112th'])
   const q = job('queued')
   check('a queued one being cancelled', view([q], { cancelling: new Set([q.id]) }).sections.waiting[0].line,
     'Massive Attack · from mellotron · cancelling…')
   const partRefused = view([job('queued', { queue_position: 4, files_failed: 3 })]).sections.waiting[0]
   check('files the peer already refused while the rest wait: said now, in amber, as the downloads panel says',
-    [partRefused.line, partRefused.lineTone, partRefused.section], ['Massive Attack · from mellotron · #4 in their queue · 3 failed', 'warning', 'waiting'])
+    [partRefused.line, partRefused.lineTone, partRefused.section], ['Massive Attack · from mellotron · 4th in their queue · 3 failed', 'warning', 'waiting'])
   const startingRefused = view([job('queued', { files_failed: 1 })]).sections.waiting[0]
   check('...before slskd says where too', [startingRefused.line, startingRefused.lineTone], ['Massive Attack · from mellotron · starting · 1 failed', 'warning'])
   check('...and an ordinary wait stays plain', placed.lineTone, 'plain')
 
   const asking = view([], { pending: [{ key: 'pending-9', artist: 'Portishead', album: 'Third', username: 'vinylhead' }] }).sections.waiting[0]
   check('asking slskd: no job yet, so nothing to cancel', [asking.line, asking.brief, asking.cancel, asking.jobId],
-    ['Portishead · from vinylhead · asking slskd…', 'asking slskd…', null, null])
+    ['Portishead · from vinylhead · starting…', 'starting…', null, null])
 
   const refusal = view([], { pending: [{ key: 'pending-3', artist: 'Portishead', album: 'Dummy', username: 'bob', error: 'User bob appears to be offline' }] }).sections.attention[0]
   check('refused: slskd\'s own words in red, and no buttons', [refusal.line, refusal.reason, refusal.nextPeer, refusal.askAgain],
-    ['Portishead · from bob · refused', 'User bob appears to be offline', null, null])
+    ['Portishead · from bob · didn\'t start', 'User bob appears to be offline', null, null])
+  //? (2.0.6, review) /enqueue's 409 carries already_have's words - a folder's path, "being filed" - said as a listener's,
+  //? the route's own the detail for whoever runs deadwax; "your library" the collection with logins on
+  const refusedAs = (error, more = {}) => view([], { pending: [{ key: 'pending-4', artist: 'Portishead', album: 'Dummy', username: 'bob', error }], ...more }).sections.attention[0]
+  check('(2.0.6) ...a 409 already_have wrote: no path, no "filed" - its own words the detail',
+    [[refusedAs('already in your library: Portishead/Dummy (1994)').reason, refusedAs('already in your library: Portishead/Dummy (1994)').reasonDetail],
+      refusedAs('already downloaded from bob, and being filed now').reason, refusedAs('already in your library: Portishead/Dummy (1994)', { personal: true }).reason],
+    [["It's already in your library.", 'already in your library: Portishead/Dummy (1994)'], "It's already downloaded, and being added now.", "It's already in the collection."])
+  const failedHeld = job('failed', { error: 'the peer went offline' })
+  const heldRetry = (personal) => view([failedHeld], { personal, retryProblems: new Map([[failedHeld.id, 'already in your library: Portishead/Dummy (1994)']]) }).sections.attention[0]
+  check('(2.0.6) ...and a retry refused for it: the collection\'s copy with a library of your own, the path the detail',
+    [heldRetry(false).problem, heldRetry(true).problem, heldRetry(true).problemDetail],
+    ["It's already in your library.", "It's already in the collection.", 'already in your library: Portishead/Dummy (1994)'])
 
   check('the edition on the title, and an album with no name',
     [view([job('organized', { album: 'Dummy', edition: '2014 vinyl' })]).sections.done[0].title,
@@ -568,17 +587,17 @@ console.log('\nNeeds attention: the two ways on, and one primary on the screen')
   const v = view([first, second, lone])
   const [a, b, c] = v.sections.attention
   check('the reason in red, "Cancelled" when a cancel gave none', [a.reason, b.reason], ['reel2reel went offline after 4 of 10 files', 'Cancelled'])
-  check('Next peer says how many are left, Ask again always', [a.nextPeer.label, b.nextPeer.label, a.askAgain.label], ['Next peer · 2 left', 'Next peer · 1 left', 'Ask again'])
+  check('Next peer says how many are left, Ask again always', [a.nextPeer.label, b.nextPeer.label, a.askAgain.label], ['Another source · 2 left', 'Another source · 1 left', 'Same source again'])
   check('only the FIRST Next peer is the solid purple one', v.sections.attention.map((row) => row.nextPeer && row.nextPeer.primary), [true, false, null])
-  check('no runners-up: no Next peer, still Ask again', [c.nextPeer, c.askAgain.label], [null, 'Ask again'])
+  check('no runners-up: no Next peer, still Ask again', [c.nextPeer, c.askAgain.label], [null, 'Same source again'])
 
   const next = view([first], { retrying: new Set([first.id]) }).sections.attention[0]
   check('trying the next peer: its words on its button, both waiting, and arriving again',
     [next.nextPeer.label, next.askAgain.label, next.busy, next.arriving, next.brief],
-    ['Trying next peer…', 'Ask again', true, true, 'retrying…'])
+    ['Trying another source…', 'Same source again', true, true, 'retrying…'])
   const same = view([first], { retrying: new Set([first.id]), retryingSame: new Set([first.id]) }).sections.attention[0]
   check('asking the same peer again', [same.nextPeer.label, same.askAgain.label, same.busy, same.brief],
-    ['Next peer · 2 left', 'Asking again…', true, 'retrying…'])
+    ['Another source · 2 left', 'Trying again…', true, 'retrying…'])
   check('an Arriving card\'s word for either is short, so the album\'s name keeps its room', next.brief.length <= 'retrying…'.length, true)
   const refusedRetry = view([first], { retryProblems: new Map([[first.id, 'no other peer would take it']]) }).sections.attention[0]
   check('a retry nobody would take: its words under the reason', [refusedRetry.problem, refusedRetry.busy], ['no other peer would take it', false])
@@ -593,21 +612,24 @@ console.log('\nDone: how it ended, and how long ago')
   const words = (outcome, error) => V.outcomeWords({ outcome, error })
   check('filed', words('filed', null), { text: 'In your library', tone: 'plain' })
   check('every track already there', words('already_there', 'already in the store: all 10 track(s) were already there, nothing was filed'),
-    { text: 'Already in your library, nothing filed', tone: 'plain' })
-  check('some files didn\'t file', words('partly_filed', '2 file(s) failed to organize'), { text: 'Partly filed: 2 file(s) failed to organize', tone: 'warning' })
+    { text: 'You already had it', tone: 'plain' })
+  check('some files didn\'t file', words('partly_filed', '2 file(s) failed to organize'), { text: "In your library - 2 files couldn't be added", tone: 'warning', detail: '2 file(s) failed to organize' })
+  //? (2.0.6, review) without a count in the job's words, still a listener's: never the old "failed" wording back
+  check('...and without a count, "some files"', [words('partly_filed', null).text, words('partly_filed', 'organize failed: x').text, words('partly_filed', '1 file(s) failed to organize').text],
+    ["In your library - some files couldn't be added", "In your library - some files couldn't be added", "In your library - 1 file couldn't be added"])
   check('a stop caught it filing', words('interrupted', "deadwax stopped while filing this - check the library and slskd's folder"),
-    { text: "Interrupted while filing: check the library and slskd's folder", tone: 'warning' })
+    { text: 'Stopped while being added to your library', tone: 'warning', tell: true, detail: "deadwax stopped while filing this - check the library and slskd's folder" })
   //? (2.0.4) the row's own words in a listener's (lib/errorWords.ts jobErrorWords) - never "check SLSKD_DOWNLOAD_PATH"
   check('any other ending, in the row\'s words, as a listener reads them - and the tell and its own words, for the row to draw',
-    words(null, 'dry run - not organized'), { text: 'Downloaded, but not added to your library: deadwax is set to try filing without moving anything.', tone: 'warning', tell: true, detail: 'dry run - not organized' })
-  check('finished with organizing off', words(null, null), { text: 'Downloaded, not filed', tone: 'warning' })
+    words(null, 'dry run - not organized'), { text: 'Downloaded, but not added to your library: deadwax is set to rehearse adding albums, without moving any files.', tone: 'warning', tell: true, detail: 'dry run - not organized' })
+  check('finished with organizing off', words(null, null), { text: 'Downloaded, but not added to your library', tone: 'warning', tell: true })
   check('never read out of the error text: "already in the store" with no outcome is its own words',
     words(null, 'already in the store: all 3 track(s)').text, 'already in the store: all 3 track(s)')
 
   const done = view([job('organized', { outcome: 'filed', updated_at: ago(12 * 60) })]).sections.done[0]
   check('the line, as the board has it', [done.line, done.lineTone], ['In your library · 12 minutes ago', 'plain'])
   const unknown = view([job('complete', { outcome: 'partly_filed', error: '1 file(s) failed to organize', updated_at: 'nonsense' })]).sections.done[0]
-  check('an age that can\'t be read is left off', [unknown.line, unknown.lineTone], ['Partly filed: 1 file(s) failed to organize', 'warning'])
+  check('an age that can\'t be read is left off', [unknown.line, unknown.lineTone], ["In your library - 1 file couldn't be added", 'warning'])
   check('a done row is not arriving, and has no ✕', [done.arriving, done.cancel], [false, null])
 }
 
@@ -616,26 +638,26 @@ console.log('\npersonal libraries (2.0.0-player.51): what a filing gave, and a d
 {
   const words = (outcome, error, library, mine) => V.outcomeWords({ outcome, error, library, ...(mine === undefined ? {} : { mine }) })
   check('filed, into your library', words('filed', null, 'added', true), { text: 'In your library', tone: 'plain' })
-  check('...an admin\'s row of somebody else\'s', words('filed', null, 'added', false), { text: 'Filed - in their library', tone: 'plain' })
+  check('...an admin\'s row of somebody else\'s', words('filed', null, 'added', false), { text: 'In their library', tone: 'plain' })
   check('a second copy not filed, given', words('already_there', 'already in the store: all 10 track(s) were already there, nothing was filed', 'added', true),
     { text: 'Already in the collection, added to your library', tone: 'plain' })
   check('...given to them', words('already_there', 'x', 'added', false).text, 'Already in the collection, added to their library')
   check('everything already in another copy\'s folder: not added, an admin looks - amber', words('already_there', 'x', 'flagged', true),
-    { text: 'Already in the collection as another copy, so not added - an admin has been asked to look', tone: 'warning' })
+    { text: "Not added - the collection's copy may be another pressing, so an admin has been asked to check it", tone: 'warning' })
   check('...the admin\'s Add for them makes it added; their Put away says the admin has looked (review: it kept saying an admin had been asked)',
     [words('already_there', 'x', 'added', true).text, words('already_there', 'x', 'looked', true)],
-    ['Already in the collection, added to your library', { text: 'Already in the collection as another copy, so not added - an admin has looked at it', tone: 'warning' }])
+    ['Already in the collection, added to your library', { text: "Not added - the collection's copy may be another pressing; an admin has checked it", tone: 'warning' }])
   check('some files failed: added, marked incomplete', words('partly_filed', '2 file(s) failed to organize', 'incomplete', true),
-    { text: 'Partly filed: 2 file(s) failed to organize · in your library, marked incomplete', tone: 'warning' })
+    { text: "In your library - 2 files couldn't be added", tone: 'warning', detail: '2 file(s) failed to organize' })
   check('logins off (no `library`): the words it always had', [words('filed', null, undefined).text, words('already_there', 'x', undefined).text],
-    ['In your library', 'Already in your library, nothing filed'])
-  check('...and nothing given says its own words, as a listener reads them', words(null, 'dry run - not organized', null, true).text, 'Downloaded, but not added to your library: deadwax is set to try filing without moving anything.')
+    ['In your library', 'You already had it'])
+  check('...and nothing given says its own words, as a listener reads them', words(null, 'dry run - not organized', null, true).text, 'Downloaded, but not added to your library: deadwax is set to rehearse adding albums, without moving any files.')
 
   const notFiled = job('complete', { outcome: 'not_filed', error: 'nothing could be organized, check SLSKD_DOWNLOAD_PATH', alternatives_left: 2 })
   const v = view([notFiled])
   const [row] = v.sections.attention
   check('nothing of it could be filed (logins on): under Needs attention, saying why, the next peer offered - not Ask again',
-    [v.sections.done.length, row.reason, row.nextPeer.label, row.askAgain], [0, "It downloaded, but deadwax couldn't find its files to add them to your library.", 'Next peer · 2 left', null])
+    [v.sections.done.length, row.reason, row.nextPeer.label, row.askAgain], [0, "It downloaded, but deadwax couldn't find its files to add them to your library.", 'Another source · 2 left', null])
   check('...only whoever runs deadwax can put it right (JobCard tells anyone else so), and the job\'s own words kept for them',
     [row.reasonTell, row.reasonDetail], [true, 'nothing could be organized, check SLSKD_DOWNLOAD_PATH'])
   const off = view([job('complete', { outcome: null, error: 'nothing could be organized, check SLSKD_DOWNLOAD_PATH' })])
@@ -725,7 +747,7 @@ console.log('\nArriving: exactly what the badge counts, at most three, and nothi
   check('no note while deadwax answers', byClass(drawn, 'app-arriving-note').length, 0)
   const troubled = deep(H.root(Arriving)({ rows: V.arrivingCards(v), onSeeAll() {}, trouble: true }))
   check('deadwax not answering: the cards say they are its last answer, and it keeps asking',
-    text(byClass(troubled, 'app-arriving-note')), "Can't reach deadwax just now: this is its last answer, and it keeps asking.")
+    text(byClass(troubled, 'app-arriving-note')), "Can't update downloads right now - showing the last progress. Trying again…")
 
   //? Home rendered with Navidrome unset, down and still being asked: Arriving is deadwax's, and the
   //? gate draws in place of the shelf only - an Arriving inside the gate would show nowhere here
@@ -788,9 +810,9 @@ console.log('\nwhat a screen reader hears as rows change')
   check('nothing to say the first time, or for the same view', [said(null, failedView), said(failedView, failedView)],
     [{ said: '', moved: [] }, { said: '', moved: [] }])
   const asking = view([f], { retrying: new Set([f.id]), retryingSame: new Set([f.id]) })
-  check('a tap\'s answer starting: "asking again…"', said(failedView, asking).said, 'Heligoland: asking again…')
+  check('a tap\'s answer starting: "asking again…"', said(failedView, asking).said, 'Heligoland: trying again…')
   const trying = view([f], { retrying: new Set([f.id]) })
-  check('...or "trying next peer…"', said(failedView, trying).said, 'Heligoland: trying next peer…')
+  check('...or "trying next peer…"', said(failedView, trying).said, 'Heligoland: trying another source…')
   const refused = view([f], { retryProblems: new Map([[f.id, 'slskd is still stopping the last attempt - try again in a moment']]) })
   check('a retry\'s refusal, which is otherwise only a red line', said(asking, refused),
     //? (2.0.4) the retry route's words that name slskd, in a listener's (RETRY_WORDS)
@@ -859,7 +881,7 @@ console.log('\nthe cards: taps go to the hook\'s actions, and what each draws')
   const question = byClass(asked, 'app-job-confirm')[0]
   const askedCross = all(asked, (n) => n.props.class === 'app-job-cancel')[0]
   check('asking: the question in the card, the ✕ saying it is open and naming it', [text(byClass(question, 'app-job-confirm-text')), askedCross.props['aria-expanded'], askedCross.props['aria-controls'] === question.props.id, byClass(asked, 'is-asking').length],
-    ["Cancel this download? You'll lose your place in this peer's queue.", true, true, 1])
+    ["Cancel this download? You'll lose your place in their queue.", true, true, 1])
   const [keepButton, cancelButton] = all(question, (n) => n.type === 'button')
   check('..."Keep it" secondary, "Cancel download" secondary in red - neither the solid purple', [text(keepButton), keepButton.props.class, text(cancelButton), cancelButton.props.class],
     ['Keep it', 'app-job-action is-secondary', 'Cancel download', 'app-job-action is-secondary is-danger'])
@@ -877,7 +899,7 @@ console.log('\nthe cards: taps go to the hook\'s actions, and what each draws')
   check('Next peer is primary, Ask again secondary', [nextButton.props.class, againButton.props.class],
     ['app-job-action is-primary', 'app-job-action is-secondary'])
   check('...each label a span inside its button, where the ellipsis goes (clipping the button would clip its reach)',
-    [byClass(nextButton, 'app-job-action-label').length, text(byClass(againButton, 'app-job-action-label'))], [1, 'Ask again'])
+    [byClass(nextButton, 'app-job-action-label').length, text(byClass(againButton, 'app-job-action-label'))], [1, 'Same source again'])
   nextButton.props.onClick()
   againButton.props.onClick()
   check('Next peer is retry on the next peer, Ask again on the same one', retried, [[failed.id, false], [failed.id, true]])
@@ -975,7 +997,7 @@ console.log('\nthe Requests tab as a whole')
   stored.delete('deadwax-preferences')
   check('and never a blocking dialog, all along', confirms.length, 0)
 
-  const buttons = all(tree, (n) => n.type === 'button' && /^(Next peer|Ask again)/.test(text(n)))
+  const buttons = all(tree, (n) => n.type === 'button' && /^(Another source|Same source again)/.test(text(n)))
   buttons[0].props.onClick()
   buttons[1].props.onClick()
   check('clear, and the retries, reach the hook\'s actions', calls.filter((c) => c[0] !== 'cancel'), [['clear'], ['retry', f1.id, false], ['retry', f1.id, true]])
@@ -996,6 +1018,13 @@ console.log('\nthe Requests tab as a whole')
   check('a database deadwax can\'t write: says so, and where to look', [text(byClass(untracked, 'app-placeholder-lead')), text(byClass(untracked, 'app-mono'))],
     ["Downloads aren't being kept track of", 'DB_PATH'])
   //? (2.0.4) to someone who doesn't run deadwax: no DB_PATH, and to tell whoever does - and no fetch words under a failure
+  Access.noteAccess({ auth: 'on', user: 'ethan', admin: false, permissions: ['request'] })
+  //? (2.0.6, UX batch 3) "find one in Search and tap Get" only to someone who can Get: anyone else is told Getting is off
+  check('(2.0.6) ...how to fill it, for someone who can Get', text(byClass(page(view([])), 'app-placeholder-text')),
+    "Albums you get show here while they download, and once they've arrived - find one in Search and tap Get.")
+  Access.noteAccess({ auth: 'on', user: 'ethan', admin: false, permissions: [] })
+  check('(2.0.6) ...and without Get albums, never "tap Get": Getting is off for them', text(byClass(page(view([])), 'app-placeholder-text')),
+    'Getting albums is off for you - ask an admin.')
   Access.noteAccess({ auth: 'on', user: 'ethan', admin: false, permissions: ['request'] })
   const untrackedListener = page(view([]), { trackingEnabled: false })
   const failingListener = page(view([down]), { error: 'Failed to fetch', failure: new TypeError('Failed to fetch') })
@@ -1044,7 +1073,7 @@ console.log('\ndownloads per person (2.0.0-player.49): who asked, what a cancel 
   //? logins off - none of the fields - and a user's own row: no line, and the question as it was
   const plain = view([job('queued')]).sections.waiting[0]
   check('logins off: no "asked by", the cancel as it always was', [plain.askedBy, plain.cancelWords],
-    [null, { question: "Cancel this download? You'll lose your place in this peer's queue.", action: 'Cancel download', leaves: false }])
+    [null, { question: "Cancel this download? You'll lose your place in their queue.", action: 'Cancel download', leaves: false }])
   const own = view([job('queued', { mine: true, shared: false })]).sections.waiting[0]
   check('a user\'s own, nobody else waiting: the same', [own.askedBy, own.cancelWords.action], [null, 'Cancel download'])
 
@@ -1110,7 +1139,7 @@ console.log('\ndownloads per person (2.0.0-player.49): who asked, what a cancel 
   check('...below your floor: said, with no copy of your own offered yet', P.storeStatusFor(answerWith(theirsInFlight()), 'Requests', '24bit').lines[1],
     "It's below your quality floor (24-bit), and getting a copy of your own isn't offered yet.")
   check('...a floor its folder doesn\'t answer: said as unknown, not as below', P.storeStatusFor(answerWith(theirsInFlight({ bit_depths: [] })), 'Requests', '24bit').lines[1],
-    "Its folder doesn't say whether it meets your quality floor (24-bit), and getting a copy of your own isn't offered yet.")
+    "Its quality isn't known, so it may be below your quality floor (24-bit), and getting a copy of your own isn't offered yet.")
   check('the floor\'s own rules: lossless meets Lossless and 320; a 320 MP3 meets 320 but not Lossless; Any always',
     [P.floorVerdict(theirsInFlight(), 'lossless'), P.floorVerdict(theirsInFlight(), '320'), P.floorVerdict(theirsInFlight({ formats: ['mp3'], bitrates: [320], bit_depths: [] }), '320'),
       P.floorVerdict(theirsInFlight({ formats: ['mp3'], bitrates: [320], bit_depths: [] }), 'lossless'), P.floorVerdict(theirsInFlight({ formats: [] }), 'any')],
@@ -1118,20 +1147,20 @@ console.log('\ndownloads per person (2.0.0-player.49): who asked, what a cancel 
   check('...and a copy known only by its files\' names: the format alone', P.copyText({ job_id: 1, status: 'queued', username: 'bob', files: 2, formats: ['flac'] }), 'FLAC')
   check('your own, or logins off (no `yours`): the store line word for word as it was', [P.storeStatusFor(answerWith(theirsInFlight({ yours: true })), 'Requests').title,
     P.storeStatusFor(answerWith({ job_id: 3, status: 'queued', username: 'bob', files: 11 }), 'Requests').lines],
-    ['Already downloading', ['From bob · queued', 'Open Requests to cancel it if you want another peer.']])
+    ['Already downloading', ['From bob · queued', 'To get it from another source, cancel it in Requests first.']])
 
   //? your own that somebody else waits for too: a user's cancel only leaves it - no peer is a cancel away
   check('your own, shared, as a user: what a cancel does there instead of "another peer"', P.storeStatusFor(answerWith(theirsInFlight({ yours: true, shared: true })), 'Requests').lines,
-    ['From bob · queued', "Someone else asked for it too, so cancelling it in Requests only takes it off your list - another peer isn't offered for a download you share."])
+    ['From bob · queued', "Someone else asked for it too, so cancelling it in Requests only takes it off your list - another source isn't offered for a download you share."])
   check('...an admin\'s (their cancel is for everyone): as it was', P.storeStatusFor(answerWith(theirsInFlight({ yours: true, shared: true, requested_by: ['ethan'] })), 'Requests').lines,
-    ['From bob · queued', 'Open Requests to cancel it if you want another peer.'])
+    ['From bob · queued', 'To get it from another source, cancel it in Requests first.'])
 
   //? failed, its retry pending (AUTO_RETRY_PEER): moving to the next peer by itself - logins on or off
   const moving = { job_id: 4, status: 'failed', username: 'bob', files: 11 }
   check('a download moving to its next peer: said so, and nothing about cancelling it for one', P.storeStatusFor(answerWith(moving), 'Requests'),
-    { kind: 'downloading', title: 'Already downloading', lines: ['From bob · failed - moving to the next peer'] })
+    { kind: 'downloading', title: 'Already downloading', lines: ["From bob · didn't work - trying another source"] })
   check('...the same when it\'s somebody else\'s', P.storeStatusFor(answerWith({ ...theirsInFlight(), status: 'failed' }), 'Requests').lines[0],
-    'From bob · FLAC 16/44.1 · failed - moving to the next peer')
+    "From bob · FLAC 16/44.1 · didn't work - trying another source")
 
   //? leaving: the overlay, what is heard, and where focus goes once the card has gone from the list
   const leavingNow = view([sharedJob], { cancelling: new Set([sharedJob.id]) })

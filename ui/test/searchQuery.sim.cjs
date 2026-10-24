@@ -182,10 +182,10 @@ console.log('\nMore from MusicBrainz (2.0.0-player.50): the next page appended, 
   check('...a held album with a repeat beside it: the one held, the repeat not counted', counts(R.appendPage(first, first, [{ id: 'g-held' }, { id: 'g1' }], owned)), [0, 1])
   check('what a page brought, in words: rows only to VoiceOver; every new album held, said by how many; nothing new said as that',
     [R.morePageWords(10, 2), R.morePageWords(1, 0), R.morePageWords(0, 1), R.morePageWords(0, 12), R.morePageWords(0, 0)],
-    [{ note: null, said: '10 more albums from MusicBrainz' }, { note: null, said: '1 more album from MusicBrainz' },
-      { note: 'The next album MusicBrainz found is in your library already.', said: 'The next album is in your library already' },
-      { note: 'The next 12 albums MusicBrainz found are all in your library already.', said: 'The next 12 albums are all in your library already' },
-      { note: 'MusicBrainz sent nothing new.', said: 'MusicBrainz sent nothing new' }])
+    [{ note: null, said: '10 more albums found' }, { note: null, said: '1 more album found' },
+      { note: 'The next album found is in your library already.', said: 'The next album is in your library already' },
+      { note: 'The next 12 albums found are all in your library already.', said: 'The next 12 albums are all in your library already' },
+      { note: 'No more results.', said: 'No more results' }])
   check('more to ask for by MusicBrainz\'s count; none once every answer is in', [R.morePages(12, 30, 12, 12), R.morePages(24, 30, 12, 12), R.morePages(30, 30, 6, 12)], ['more', 'more', 'end'])
   check('...no count from the server: a full last page may have more, a short one hasn\'t', [R.morePages(12, null, 12, 12), R.morePages(7, null, 7, 12), R.morePages(12, undefined, 12, 12)], ['more', 'end', 'more'])
   check('...a page that brought nothing ends it, whatever the count says', R.morePages(12, 500, 0, 12), 'end')

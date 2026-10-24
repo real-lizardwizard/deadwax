@@ -16,7 +16,7 @@ the tour; this is the manual.
 | page | covers |
 | --- | --- |
 | [Finding music](finding-music.md) | Search: one box, your library first, then MusicBrainz's artists, albums and songs; what deadwax has saved; the album you don't have and its pressings, and "in your library" marks |
-| [Downloading](downloading.md) | Get, and choosing a source: what the scores mean, the chips and Signals, Requests, cancelling and retrying a failed download, downloads per person |
+| [Downloading](downloading.md) | Get, and choosing a source: what the scores mean, the chips and Match details, Requests, cancelling and retrying a failed download, downloads per person |
 | [Organizing](organizing.md) | what happens when a download finishes: dry run, copy or move, folder names and templates, editions, tags, covers, lyrics, and clean-up |
 | [The library](library.md) | looking after it: what needs attention, the Edit panel (release, tags, artwork, lyrics, delete), Needs a look, Library care, artist pages |
 | [Sharing deadwax](sharing.md) | letting other people use it: logins through their own Navidrome accounts, what each person gets and what stays shared, admins and everyone else, adding and removing people, turning logins off again |

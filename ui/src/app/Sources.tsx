@@ -7,8 +7,8 @@ import { useCandidateSearch } from '../hooks/useCandidateSearch'
 import { useDismiss } from '../hooks/useDismiss'
 import { panelIsModal, type PanelStyle } from '../lib/appFrame'
 import {
-  NOTHING_LOSSLESS_NOTE, SIGNAL_LABELS, SORT_LABELS, candidateKey, noSignalMinimums, nothingLossless, nothingLosslessLine, passesFilters,
-  queriesText, searchedLine, searchingLine, sortCandidates, sourcesAnnouncement, storeNotes, type CandidateSort,
+  NOTHING_LOSSLESS_NOTE, SIGNAL_LABELS, SORT_LABELS, candidateKey, noSignalMinimums, noneMatchLine, nothingFoundLine, nothingLossless, nothingLosslessLine,
+  passesFilters, searchedLine, searchingLine, sortCandidates, sourcesAnnouncement, storeNotes, type CandidateSort,
 } from '../lib/candidates'
 import { joinDownload } from '../lib/downloadRequests'
 import { announceAddedToLibrary } from '../lib/libraryEvents'
@@ -44,6 +44,10 @@ export interface GetRequest {
 
 //? each Signals chip's list its own id
 let signalLists = 0
+/** (2.0.6, UX batch 3) The desktop's Signals chip's name: the least each part of the match may be. */
+export const MATCH_DETAILS = 'Match details'
+/** (2.0.6) What the sheet says under its asking line (it said "slskd listens for answers for a few seconds."). */
+export const SEARCH_TAKES = 'This takes a few seconds.'
 //? each sheet's query form its own id, for Search again's aria-controls
 let queryForms = 0
 /**
@@ -86,9 +90,9 @@ export function SignalsChip({
         aria-controls={id}
         onClick={() => setOpen((was) => !was)}
       >
-        {set ? `Signals · ${set}` : 'Signals'}
+        {set ? `${MATCH_DETAILS} · ${set}` : MATCH_DETAILS}
       </button>
-      <div id={id} class="app-signals-popover" role="group" aria-label="The least each signal may score" hidden={!open}>
+      <div id={id} class="app-signals-popover" role="group" aria-label="The least each part of the match may score" hidden={!open}>
         {Object.entries(SIGNAL_LABELS).map(([signal, name]) => {
           const value = minimums[signal] ?? 0
           return (
@@ -384,7 +388,7 @@ export function Sources({
     >
       {said}
       <label class="app-sources-query">
-        <span class="app-sources-query-label">Search Soulseek for</span>
+        <span class="app-sources-query-label">Search for</span>
         <input
           {...(id ? { ref: againField } : {})}
           class="app-sources-query-input"
@@ -398,7 +402,7 @@ export function Sources({
         />
       </label>
       <button type="submit" class="app-button">
-        Re-search
+        Search
       </button>
     </form>
   )
@@ -542,7 +546,7 @@ export function Sources({
             <div class="app-sources-state">
               <span class="app-sweep app-sources-sweep" aria-hidden="true" />
               <p class="app-sources-state-text">{searchingLine(search.release)}</p>
-              <p class="app-sources-state-note">slskd listens for answers for a few seconds.</p>
+              <p class="app-sources-state-note">{SEARCH_TAKES}</p>
             </div>
           ) : search.error ? (
             <div class="app-sources-state">
@@ -576,14 +580,12 @@ export function Sources({
                     </>,
                   )
                 ) : (
-                  queryForm(<p class="app-sources-state-text">Soulseek found nothing for {queriesText(result!)}.</p>)
+                  queryForm(<p class="app-sources-state-text">{nothingFoundLine(result!)}</p>)
                 )
               ) : !shown.length ? (
                 <>
                   <div class="app-sources-state">
-                    <p class="app-sources-state-text">
-                      {result!.candidates.length} {result!.candidates.length === 1 ? 'folder' : 'folders'} on Soulseek, none pass your filters
-                    </p>
+                    <p class="app-sources-state-text">{noneMatchLine(result!.candidates.length)}</p>
                     {pressedCount(filters, minimums, minRate) > 0 && (
                       <button
                         type="button"

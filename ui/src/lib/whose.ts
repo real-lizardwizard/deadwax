@@ -235,3 +235,16 @@ export function albumMine({
   if (present > 0) return said(null, null, null)
   return said(false, null, why)
 }
+
+/**
+ * (2.0.6, UX batch 3) What the album you don't have says, in a line anyone can read, when the library has an album of
+ * its name held by no id (the dashed "maybe"): that you may have it already, and why it can't be told - before, only
+ * the maybe's tooltip said it, with the folders and "the metadata editor", which a phone never shows. `inCollection`:
+ * the folders are the collection's, none yours (logins on); `editors`: whoever can Edit albums, told how to settle it.
+ */
+export function maybeLine(inCollection: boolean, editors: boolean): string {
+  const lead = inCollection
+    ? 'It may already be here - an album with this name is in the collection, but it isn\'t matched to a pressing.'
+    : 'You may already have this - an album with this name is in your library, but it isn\'t matched to a pressing.'
+  return editors ? `${lead} Match it to a pressing in Edit album.` : lead
+}

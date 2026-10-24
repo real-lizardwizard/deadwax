@@ -187,7 +187,7 @@ export function PressingPicker({ view, onPick }: { view: PressingsView; onPick: 
               onInput={(event) => setTyped((event.currentTarget as HTMLInputElement).value)}
               //? what works, as the rows say it - a country by its code, as MusicBrainz gives it (review:
               //? "country" asked for "Japan", which no row says)
-              placeholder="JP, CD, a label or cat. no."
+              placeholder="JP, CD, a label or catalogue no."
               aria-controls={listId}
               enterKeyHint="search"
               autoComplete="off"

@@ -91,7 +91,8 @@ for (const [name, expected] of Object.entries(artist)) {
   const a = P.artistManaging(name === 'none' ? P.NONE : set(name))
   check(`the artist page's managing with ${name} (images, which artist, move, any)`, [a.images, a.whichArtist, a.move, a.any], expected)
 }
-check('Get, Sources, Next peer and Ask again: Get albums\'', [P.gets(set('request')), P.gets(set('edit', 'library', 'downloads', 'server')), P.gets(P.ALL)], [true, false, true])
+check('Get, Sources, Another source and Same source again: Get albums\'', [P.gets(set('request')), P.gets(set('edit', 'library', 'downloads', 'server')), P.gets(P.ALL)], [true, false, true])
+check('...and People\'s line under it names the retry buttons as Requests shows them (2.0.6)', P.LINES.request, 'Search Soulseek and download - Get, Sources, Another source, Same source again.')
 check('...without it, said in Get\'s place', P.GET_OFF, 'Getting albums is off for you - ask an admin.')
 check('the queue count asked only with Look after the library', [P.asksQueueSummary(set('library')), P.asksQueueSummary(set('edit')), P.asksQueueSummary(P.NONE)], [true, false, false])
 check('a Managing page refused, in words', P.NO_PERMISSION, "You don't have permission for this page.")

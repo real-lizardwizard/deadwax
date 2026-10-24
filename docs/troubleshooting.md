@@ -24,12 +24,13 @@ In order of likelihood:
    else, writing fails and the log says so.
 5. **The album was already there.** A track the album's folder already has (in any format) is
    never filed again, so a second copy of an album is left in slskd's folder, and the download's
-   row in Requests says it was already there ("Already in your library, nothing filed" - with logins
+   row in Requests says it was already there ("You already had it" - with logins
    on, "Already in the collection, added to your library"). See [organizing](organizing.md).
 
-## A download says "N file(s) failed to organize"
+## A download says "N files couldn't be added"
 
-Some of its files couldn't be written into the library. The ones that could are there, and the
+Requests says **In your library - 2 files couldn't be added** (an admin also sees the download's own
+words, "2 file(s) failed to organize"). Some of its files couldn't be written into the library. The ones that could are there, and the
 album shows as **New** in **Needs a look** like any other filed download. The rest are still in
 slskd's folder (a move never clears that folder out while anything failed). The container's own
 log names each file and why, most often permissions or a full disk. Fix that, then either copy
@@ -40,17 +41,18 @@ ones are added.
 When it goes on **", no track was filed"**, none of its music reached the library (a cover may
 have: that makes a folder, but no album, and nothing is marked **New**), which usually means the
 library folder can't be written (see [Downloads finish, but nothing appears in my
-library](#downloads-finish-but-nothing-appears-in-my-library)). Requests says **Partly filed** for
-the first, and **"It downloaded, but none of its songs could be added to your library"** for the second
+library](#downloads-finish-but-nothing-appears-in-my-library)). Requests says **In your library - N
+files couldn't be added** for the first, and **"It downloaded, but none of its songs could be added to your library"** for the second
 ([below](#requests-says-why-a-download-stopped-or-wasnt-added)).
 
-## A download says "deadwax stopped while filing this"
+## A download says it stopped while being added to your library
 
-deadwax was stopped or restarted while it was filing that album, so it can't tell how far it got.
+Requests says **Stopped while being added to your library** (with "Tell whoever runs deadwax." to anyone
+else; an admin sees the download's own words, "deadwax stopped while filing this - check the library and
+slskd's folder"). deadwax was stopped or restarted while it was filing that album, so it can't tell how far it got.
 Look at the album in the library (**Library care → Rescan** first) and in slskd's downloads folder:
 in move mode, whatever hadn't been filed yet is still in slskd's folder, and in copy mode all of it
-is. Anything missing is dealt with as in the section above. In Requests it reads **Interrupted while
-filing**, and **Clear done** removes the row.
+is. Anything missing is dealt with as in the section above. **Clear done** removes the row.
 
 ## Requests says why a download stopped, or wasn't added
 
@@ -63,8 +65,8 @@ runs deadwax can put it right, everyone else is told **"Tell whoever runs deadwa
   off."** / **"The download was cancelled before it finished."** / **"The download didn't finish."**:
   the user refused the transfer, stopped answering, the transfer errored, or it ended some other way
   (slskd's own "Rejected", "TimedOut", "Errored", "Cancelled"). **"3 of 10 files arrived."** after it
-  says how far it got. Use **Ask again** for a user who was briefly away, **Next peer** for someone
-  else ([downloading](downloading.md#when-a-download-fails)).
+  says how far it got. Use **Same source again** for a user who was briefly away, **Another source** for
+  someone else ([downloading](downloading.md#when-a-download-fails)).
 - **"deadwax lost track of this download - the person sharing it may have gone offline, or downloads
   stopped working for a while."**: slskd reported none of its transfers for about two minutes. Usually
   the user went offline before it started; but slskd being down, or restarted (it forgets its
@@ -77,15 +79,20 @@ runs deadwax can put it right, everyone else is told **"Tell whoever runs deadwa
 - **"It downloaded, but couldn't be added to your library."**: filing failed with an error (the log
   and the row's own words say which - most often permissions, or a full disk).
 - **"It downloaded, but none of its songs could be added to your library."** / **"2 files couldn't be
-  added to your library."**: some or all of its files failed to organize ([above](#a-download-says-n-files-failed-to-organize)).
-- **"Downloaded, but not added to your library: deadwax is set to try filing without moving
-  anything."**: organizing is in dry run (`ORGANIZE_MODE` `dry_run`).
+  added to your library."**: some or all of its files failed to organize ([above](#a-download-says-n-files-couldnt-be-added)).
+- **"Downloaded, but not added to your library: deadwax is set to rehearse adding albums, without
+  moving any files."**: organizing is in dry run (`ORGANIZE_MODE` `dry_run`).
+- **"Downloaded, but not added to your library"** on a Done row, alone: organizing is off
+  ([Downloads finish, but nothing appears in my library](#downloads-finish-but-nothing-appears-in-my-library)).
 - **"Its files were already in the collection, so nothing was added."** / **"Every song was already in
   the collection, so nothing was added."**: every file was already in the album's folder.
-- **"The download couldn't be started."** under a refused **Get**, **Next peer** or **Ask again**:
-  slskd wouldn't queue it; an admin sees slskd's reason under it. **"That didn't work."** under **Next
-  peer** or **Ask again**: deadwax answered the retry with an error of its own (an admin sees it under). **"The last try is still stopping -
-  try again in a moment."**: the attempt before it hasn't been cleared out of slskd yet.
+- **"The download couldn't be started."** under a refused **Get**, **Another source** or **Same source
+  again**: slskd wouldn't queue it; an admin sees slskd's reason under it. **"That didn't work."** under
+  **Another source** or **Same source again**: deadwax answered the retry with an error of its own (an
+  admin sees it under). **"The last try is still stopping - try again in a moment."**: the attempt before
+  it hasn't been cleared out of slskd yet. **"No other source to try - Get it again to search for
+  more."**: every source on the list has been tried; **"They refused - try another source."** / **"No other
+  source would send it."**: the retry was turned down.
 
 ## An error says to tell whoever runs deadwax
 
@@ -124,11 +131,11 @@ wait for it too (see [downloading](downloading.md#with-logins-on-downloads-per-p
 admin, whose cancel is for everyone. If it's below your quality floor, getting a copy of your own
 instead isn't offered yet.
 
-"Already downloaded", with "being filed into your library now", means every file has arrived and
+"Already downloaded", with "being added to your library now", means every file has arrived and
 it's being filed. That takes seconds. A download that finished while organizing was off is never
 filed later, and stops counting two minutes after it finished. One that deadwax was stopped or
 restarted part-way through filing stops counting as soon as deadwax starts again, which marks it
-"deadwax stopped while filing this" (above).
+**Stopped while being added to your library** (above).
 
 ## Get says you have only some of a pressing you have all of
 
@@ -145,13 +152,15 @@ deadwax won't fetch a second copy of a pressing you have complete. It names the 
 replace it, delete the album first (**Edit → Delete**), then **Get** again. A different pressing
 of the same album is searched as usual, with a note that you have the other one.
 
-## Get says "refused: already downloading from …" or "already in your library"
+## Get says "It's already downloading" or "It's already in your library"
 
 A **Get** on a source is checked once more as it's queued, and
 deadwax refuses a second download of a pressing that is already downloading whole, already being
 filed, or already in your library complete - with a `409`. The row in **Requests**, under Needs
-attention, reads "refused", with deadwax's words in red under it: "already downloading from bob",
-"already downloaded from bob, and being filed now", "already in your library: *folder*". It happens
+attention, reads "didn't start", with why in red under it: "It's already downloading.", "It's already
+downloaded, and being added now.", "It's already in your library." ("in the collection" with logins on). Whoever
+runs deadwax also reads deadwax's own words beside it - "already downloading from bob", "already in your library:
+*folder*" - naming the source and the folder. It happens
 when the album was
 started or filed somewhere else - another tab, another phone - after the app last
 looked: the album page's line under Get, and the sources sheet, said what they knew when
@@ -161,7 +170,7 @@ too: your cancel then only takes it off your list), and an album you have is in 
 removes the refused row. A download of only part of a pressing - one disc's folder - refuses nothing.
 
 With logins on, a download somebody else started isn't refused: your Get
-joins it, and it shows in your Requests. "already downloading from bob" then means you're already
+joins it, and it shows in your Requests. "It's already downloading." then means you're already
 waiting for that download yourself.
 
 ## I cancelled a download, and it's still downloading
@@ -190,24 +199,24 @@ The sources ask slskd to search Soulseek, so these stop it:
   can't search"); everyone else is told to try again, and to tell whoever runs deadwax if it keeps
   happening. See [A search fails with "not logged in"](#a-search-fails-with-not-logged-in-or-slskd-refused-it)
   and [You's Connections says slskd isn't connected](#yous-connections-says-slskd-isnt-connected).
-- **"Soulseek found nothing for …"**: as [A search finds nothing](#a-search-finds-nothing) - edit the
-  query under it (to the album title alone, say) and **Re-search**.
-- **"Nothing lossless on Soulseek for …"**: your **Format** (You → Getting
+- **"Nothing found for …"**: as [A search finds nothing](#a-search-finds-nothing) - edit the
+  query under it (to the album title alone, say) and **Search**.
+- **"Nothing lossless found for …"**: your **Format** (You → Getting
   albums) is **Lossless only**, and every folder Soulseek found had no lossless file, so all of them
-  were left out - a Re-search is scored the same way and finds the same. Choose **Prefer lossless**
+  were left out - searching again is scored the same way and finds the same. Choose **Prefer lossless**
   or **Any** there and **Get** again to see them, or edit the query in case a lossless copy is shared
   under other words. Format can be Lossless only without your choosing it in the app: the first time
   the app asks, it carries over the Format the old page at `/` had left in that browser.
-- **"N folders on Soulseek, none pass your filters"**: the chips above the list are hiding them -
+- **"N sources found - none match your filters."**: the chips above the list are hiding them -
   **Lossless** and **24-bit** start pressed when your quality floor (You → Getting albums) says so.
   **Clear filters**, or tap the chip, to see them all. **Complete albums only** leaves out every folder
-  missing one of the pressing's tracks. On a computer a **Signals** minimum and the sample-rate floor
+  missing one of the pressing's tracks. On a computer a **Match details** minimum and the sample-rate floor
   leave folders out too - and no folder passes the floor when its user's client reported no sample
   rate, which many don't.
-- **"Didn't pick a source for you: …"** with **Pick the best source for me** on: nothing scored 75 or
-  more through the chips, or you already have part of the pressing (or part of it is downloading),
-  or it was the album as a whole (below), with no tracklist to judge the folders by. The sources
-  are there to choose from yourself.
+- **"… - choose a source yourself."** with **Pick the best source for me** on: "No close match that
+  passes your filters" (nothing scored 75% or more through the chips), "You already have part of it" or
+  "Part of it is already downloading", or "This pressing has no tracklist to check the sources against"
+  (the album as a whole, below). The sources are there to choose from yourself.
 - **Get's sheet says "… · the album as a whole"**: a row's Get chip couldn't get the album's
   pressings from MusicBrainz, so it searched for the album with no tracklist to match against - so
   it never picks one for you, whatever your setting.
@@ -273,22 +282,23 @@ own page, another app) still can.
 
 ## A search finds nothing
 
-- Soulseek only returns folders whose paths contain **every word** of the query. Under **Soulseek
-  found nothing for …** the query is there to edit: cut it to fewer words (the album title alone, say)
-  and press **Re-search**.
+- Soulseek only returns folders whose paths contain **every word** of the query. Under **Nothing found
+  for …** the query is there to edit (**Search for**): cut it to fewer words (the album title alone,
+  say) and press **Search**.
 - Try a longer `SLSKD_SEARCH_TIMEOUT` (Settings → Downloads): slow and firewalled peers answer
   last.
 - An artist with more than one name is searched under each of them (the credit, the name they go by
   now, and names MusicBrainz marks as ended); an edited query searches exactly what you typed.
 - **Format** set to **Lossless only** leaves out every folder with no lossless file, and the sources
-  say "Nothing lossless on Soulseek for …". Prefer lossless or Any (You → Getting albums) shows them.
+  say "Nothing lossless found for …". Prefer lossless or Any (You → Getting albums) shows them.
 
 ## A download sits at "queued"
 
-It's waiting in the user's upload queue: Requests says how far back you are ("#4 in their
-queue"). A user with a **free slot** starts straight away. If slskd stops reporting the transfers
-altogether, the download fails after about two minutes. Use **Ask again** to ask the same user
-again, or **Next peer** to move it to someone else.
+It's waiting in the user's upload queue: Requests says how far back you are ("4th in their
+queue"). A user with a free upload slot starts straight away (the sources' **Starts now** chip shows
+only those). If slskd stops reporting the transfers altogether, the download fails after about two
+minutes. Use **Same source again** to ask the same user again, or **Another source** to move it to
+someone else.
 
 ## Requests shows nothing moving, or "Can't update your requests right now"
 
@@ -300,7 +310,7 @@ download, and the progress as slskd reports it.
   minutes of slskd reporting nothing,
   deadwax gives up on them and they move to **Needs attention** as "deadwax lost track of this
   download - the person sharing it may have gone offline, or downloads stopped working for a while".
-  **Next peer** and **Ask again** can't get anywhere until slskd is back, and the row says
+  **Another source** and **Same source again** can't get anywhere until slskd is back, and the row says
   why, in red. A download slskd still lists but can't move - slskd signed out of Soulseek, or
   waiting for its VPN - just stops where it is until slskd is back. You's **Connections** says
   whether slskd answers, and [You's Connections says slskd isn't connected](#yous-connections-says-slskd-isnt-connected)
@@ -313,7 +323,8 @@ download, and the progress as slskd reports it.
   own words for why, such as that it can't read its database. An
   admin, or someone with Settings and the log, also sees the error's own words under that. What's
   below is from the last answer, and it keeps asking while the tab is open. Home's Arriving says the
-  same ("Can't reach deadwax just now") and keeps asking while something is on its way.
+  same ("Can't update downloads right now - showing the last progress. Trying again…") and keeps asking
+  while something is on its way.
 - **A spinner, and nothing else**: the app hasn't had deadwax's first answer yet. It never says
   "Nothing requested yet" before it knows.
 - **"Downloads aren't being kept track of"**: deadwax can't write its database, so it can't list
@@ -323,15 +334,15 @@ download, and the progress as slskd reports it.
 - **A download started on another device doesn't show**: the app looks again when Home or Requests
   comes into view and when you come back to it. Switch to Requests, or pull it back up from the
   background.
-- **A done download says "Navidrome hasn't found it yet - it may still be scanning"** when tapped:
+- **A done download says "Not ready to play yet - it may still be scanning."** when tapped:
   deadwax asked Navidrome for the album by the pressing's MusicBrainz id, and by its title, and
   Navidrome has no album carrying that id yet. Navidrome scans a few seconds after a folder changes,
   so tap it again in a moment (the note goes once it opens; with Requests open, the app keeps
   looking by itself). If it never opens: Navidrome may not have rescanned yet (start a scan from
   Navidrome's own pages), or the account deadwax uses can't see that library folder.
-- **A done download says "deadwax can't tell which album in your library this is"**: no folder in
-  your library is tagged with that pressing's MusicBrainz release id. That happens to **Already in
-  your library, nothing filed** when the tracks were already in a folder deadwax didn't file and
+- **A done download says "Can't find this album to open it - it may have moved, or isn't matched to a pressing."**: no folder in
+  your library is tagged with that pressing's MusicBrainz release id. That happens to **You already
+  had it** when the tracks were already in a folder deadwax didn't file and
   that has no MusicBrainz tags (an old rip): nothing was written into it, so nothing ties it to the
   release, and a rescan won't change that. Apply the release to that album (**Edit → Release**, from
   its page or **Needs a look**) and the row opens it. It can also mean the album's folder has gone since.
@@ -340,9 +351,9 @@ download, and the progress as slskd reports it.
   answering, and the album can't be opened in the app until it is - see [below](#the-player-says-connect-navidrome-or-cant-reach-navidrome).
   **"Can't open this album right now - can't connect to deadwax"** means the phone or browser didn't reach
   deadwax itself: check your connection, then try again.
-  **"Couldn't look it up just now"** means deadwax itself didn't answer: tap it again.
-- **A done download has no ▶**: only a download that filed something has one. "Already in your
-  library, nothing filed" opens the album you already had - when its folder is tagged with the
+  **"Couldn't open it - tap to try again."** means deadwax itself didn't answer: tap it again.
+- **A done download has no ▶**: only a download that filed something has one. "You already had
+  it" opens the album you already had - when its folder is tagged with the
   pressing, as above - with no ▶; an interrupted or unfiled download has neither, as nothing of it
   is known to be in the library.
 
@@ -394,7 +405,8 @@ fetched behind it for the next time.
 ## Search shows an old name, or misses something new
 
 The app's Search shows [what deadwax has saved](finding-music.md#what-deadwax-has-saved)
-of MusicBrainz's answers first, marked **saved**, under any words - before MusicBrainz is asked. What's saved
+of MusicBrainz's answers first, under any words - before MusicBrainz is asked (nothing on a row says it
+was saved: it is drawn as MusicBrainz's own row would be). What's saved
 is what MusicBrainz said when it was saved: an artist renamed since (still under the old name), an album
 added since (missing), a correction (not shown) - until MusicBrainz's own answer for the words arrives, a
 second or so later, and adds what it found below the saved rows. What's saved for these exact words is
@@ -417,33 +429,35 @@ refreshed behind itself once it's old (a search after 7 days, the rest after 30)
   saved-search index wasn't kept*) and reads every answer into it again, in the background - until it is
   done, Search finds less of what's saved. Nothing needs doing.
 
-## The app's Search says MusicBrainz isn't answering, or keeps asking
+## The app's Search says it can't search for more, or keeps searching
 
 The phone app's [Search tab](finding-music.md) and its album pages
 ask MusicBrainz through deadwax, so the same slow minutes reach them.
 
-- **"MusicBrainz isn't answering just now - it often goes away for a few minutes."** at the foot of
-  Search's list (every kind it asked failed), **"MusicBrainz isn't answering."** in one section's place
-  (that kind alone) - or, on an album you don't have, **"MusicBrainz isn't answering just now, so this
-  album's pressings couldn't be loaded - it often goes away for a few minutes."**: deadwax couldn't get an
+- **"Searching for more isn't working right now - try again in a few minutes."** at the foot of
+  Search's list (every kind it asked MusicBrainz for failed), **"Can't search for more right now."** in one
+  section's place (that kind alone) - or, on an album you don't have, **"This album's details can't be
+  loaded right now - try again in a few minutes."**, and on an artist's page **"Their other albums can't be
+  shown right now - try again in a few minutes."** or **"Artist details can't be loaded right now."**:
+  MusicBrainz is away for a while, and deadwax couldn't get an
   answer (a search tries three times - about eight seconds when MusicBrainz is turning searches away, up to
   about a minute and a half when its connection hangs, each try waiting half a minute; an album page for a
   while longer). That's not
-  the same as **No albums on MusicBrainz for "…"** or **No results for "…"**, which are answers.
+  the same as **No other albums for "…"** or **No results for "…".**, which are answers.
   Tap **Try again** in a minute; the album page never shows part of a pressing list as if it were
   all of it. You's **Connections** says whether deadwax can reach MusicBrainz at all, and [You's
   Connections says MusicBrainz isn't connected](#yous-connections-says-musicbrainz-isnt-connected) goes
   through why it might not.
-- **"MusicBrainz isn't answering just now - these are what deadwax has saved from it."** (or **"Saved -
-  MusicBrainz is away."** / **"Saved - MusicBrainz is busy."** in a section's place): the same, under rows [deadwax had saved](finding-music.md#what-deadwax-has-saved) -
+- **"Showing earlier results - searching for more isn't working right now."** (or **"Showing earlier
+  results."** in a section's place): the same, under rows [deadwax had saved](finding-music.md#what-deadwax-has-saved) -
   those stay, and **Try again** asks MusicBrainz again.
-- **"MusicBrainz is busy just now - try again in a moment."**: MusicBrainz answered,
+- **"Too many searches just now - try again in a moment."**: MusicBrainz answered,
   saying it is turning searches away for a moment - it does, often, for a few minutes at a time, and asking
   for artists, albums and songs at once makes it likelier. **Try again** (or **Search** pressed again) draws the
   list afresh for the same words and asks only what failed. After a search MusicBrainz was too slow for, or away for, the next ones
   draw your library's rows at once and MusicBrainz's arrive in the places kept for them, until it answers in
   time again.
-- **"MusicBrainz couldn't read that search - try other words"**: MusicBrainz refused the words as a search
+- **"That search couldn't be read - try other words"**: MusicBrainz refused the words as a search
   (unusual punctuation can do it; a slash, as in "AC/DC", is fine). There's no Try again - the same words would
   be refused again; change them.
 - **A song I know isn't among MusicBrainz's songs, or only covers of it are**: words with no artist you
@@ -454,10 +468,10 @@ ask MusicBrainz through deadwax, so the same slow minutes reach them.
   albums of the next 25 to it - the studio album can take a page or two to arrive.
 - **An album opened from a song shows a pressing that isn't its usual one**: on purpose - the usual one
   hasn't got the song (a bonus track, say), so it opens on one that has. Choose another in **Pressing**.
-- **"Show 3 albums from MusicBrainz"** (or artists, or songs) where a section's rows would be: that answer
+- **"Show 3 more albums"** (or artists, or songs) where a section's rows would be: that answer
   arrived after the list was drawn, with something below it, so it waits in the place kept for it rather than
   pushing what's under your finger down. Tap it. (Song search's "Show songs" became this, for every kind.)
-- **Only studio albums under Albums for an artist** - "MusicBrainz's studio albums and EPs - See all for
+- **Only studio albums under Albums for an artist** - "Studio albums and EPs - See all for
   everything they made." under them: for an artist's name alone All asks MusicBrainz for their studio albums
   and EPs, since otherwise its first answers are live albums, interviews and compilations. **See all** (the
   Albums chip) asks for everything they made, unfiltered.
@@ -478,7 +492,7 @@ ask MusicBrainz through deadwax, so the same slow minutes reach them.
   it. When your library's own search finds the song by that artist on that album, it
   says **in your library** straight away. If it opened the album you don't have because MusicBrainz
   couldn't list the pressings, the page tries again itself.
-- **"Asking MusicBrainz…" for a long time**: on a bad day MusicBrainz takes 30-60 seconds a
+- **"Searching…" or "Loading…" for a long time**: on a bad day MusicBrainz takes 30-60 seconds a
   request. An album page fetches every pressing's tracklist, which for an album with hundreds of
   pressings is several requests one after another. Once it has them it keeps them while the app is
   open (the last 20 albums), so going back to the album is instant - and
@@ -1005,15 +1019,17 @@ album to see where it stands.
 The app's [artist page](player.md#artist-pages) lists an artist's albums from MusicBrainz, which
 needs to know which MusicBrainz artist it is.
 
-- **"MusicBrainz doesn't know who this is from your files, so only the albums you have are
-  here."**: neither Navidrome nor your files say. Navidrome reads an artist's MusicBrainz id from
+- **"Only the albums you have are shown - their other albums can't be found."** (with nothing of theirs:
+  **"Nothing of theirs in your library, and their albums can't be found."**): MusicBrainz doesn't know
+  who this is from your files - neither Navidrome nor your files say. Navidrome reads an artist's MusicBrainz id from
   the album artist's `musicbrainz_albumartistid` tag, which deadwax writes on every album it files
   or you apply a release to (since v0.6.15); albums tagged by something else, or long ago, may lack
   it. Applying the album's release (**Edit → Release**) writes it, and the page finds them once
   Navidrome has rescanned. Meanwhile **Which artist is this?** under the words (an admin's) lets you
   choose who they are for this visit ([Managing an artist](player.md#managing-an-artist)).
-- **"MusicBrainz isn't answering just now"**, with **Try again**: MusicBrainz is slow or down (see
-  [below](#musicbrainz-is-slow-or-searches-fail)). The albums you have are still listed.
+- **"Their other albums can't be shown right now - try again in a few minutes."**, with **Try again**:
+  MusicBrainz is slow or down (see [below](#musicbrainz-is-slow-or-searches-fail)). The albums you have
+  are still listed.
 - **An artist opened from an album you don't have shows none of your albums**: deadwax looks for
   them as the Navidrome artist carrying that MusicBrainz id, else the artist your library files
   their albums under, else - only for an artist Navidrome has no id for - one whose name is

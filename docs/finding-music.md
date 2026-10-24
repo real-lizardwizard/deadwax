@@ -6,8 +6,10 @@ That pressing is what **Get** downloads, what the sources found on Soulseek are 
 what the album is tagged as when it's filed ([Downloading](downloading.md)).
 
 It is **one list, as Apple Music shows one**: **Top results** first - the best artist, album or song,
-yours or not - then **Artists**, **Albums** and **Songs**, each with **yours first, then
-MusicBrainz's**. Chips over the list narrow it to one kind. An album MusicBrainz offers has **Get** at
+yours or not - then **Artists**, **Albums** and **Songs**, each with **yours first, then what you
+don't have yet** (MusicBrainz's). Before you type, the box says so: *Search your library and albums you
+don't have yet.* (with logins on, *Search your library, the collection, and albums nobody has yet.*).
+Chips over the list narrow it to one kind. An album MusicBrainz offers has **Get** at
 the end of its row, and opens as [the album you don't have](#the-album-you-dont-have), with **Get the
 album** under its **Pressing** button; **Requests** then follows the download.
 
@@ -15,7 +17,7 @@ On a desktop (a window 1024 pixels wide or more) the box is the sidebar's **sear
 shows these results in the main area, the chips under the large title, and Enter asks at once, as
 **Search** on the keyboard does. Top results are tiles there, three across - two across beside a side
 panel (Sources from a Get, or Info), so each keeps room for its title. An album you don't have shows its
-tracklist as a table, with an **Against the usual tracklist** column whenever any pressing differs - see
+tracklist as a table, with a **Compared with the usual** column whenever any pressing differs - see
 [the app on a desktop](player.md#on-a-desktop).
 
 An artist's name opens [their page](player.md#artist-pages): their albums as MusicBrainz lists them,
@@ -34,7 +36,7 @@ portishead"), up to 200 characters.
   typing once there are 3 characters or more - for its albums, then its artists, then its songs, at the
   same moment, read the way the box read as it was asked (an artist your library names only afterwards
   changes nothing already asked; **Search** reads it again). Fewer than 3, and it waits for Search: where its
-  rows would go the list says *Type a little more, or press Search, to ask MusicBrainz too.* - and cutting the
+  rows would go the list says *Type a little more, or press Search, to find albums you don't have yet.* - and cutting the
   box back below 3 clears what
   MusicBrainz found for the longer text (and calls off a search still on its way). MusicBrainz allows about
   one request a second, so it isn't asked on every key, and a search you have moved on from is called off
@@ -62,14 +64,13 @@ box" finds Glory Box at once, from Dummy's tracklist, before MusicBrainz has bee
   Björk). A name typed exactly comes first ("bjork": Björk before Hera Björk; "kanye west": Ye, who went by
   it), words in the title before words only in the credit, and of songs with one title, the one on the most
   pressings (Portishead's Glory Box before a cover). At most 10 artists, 12 albums and 25 recordings.
-- What it finds **leads each kind's MusicBrainz rows**, marked **saved** at the end of its line - a desktop
-  tile's third line says *Saved from MusicBrainz* - unless the line says you have it. It is the row
-  MusicBrainz's answer would draw, and does what that row does: an album opens its page, an artist theirs, a
+- What it finds **leads each kind's MusicBrainz rows**, drawn exactly as MusicBrainz's own row would be -
+  nothing on it says it was saved (until 2.0.6 a **saved** mark did, which read as "you saved this"). It is
+  the row MusicBrainz's answer would draw, and does what that row does: an album opens its page, an artist theirs, a
   song the albums it's on (in Top results the album it names, the song marked), and Get gets the same - and
   those pages are saved answers too, so they open at once. MusicBrainz's own answer, when it lands, adds what
   it found that isn't there yet **below** them: nothing drawn moves, and the same artist, album or song is
-  never shown twice. When it brings nothing new, a kind's place says *No more albums on MusicBrainz for
-  "…".* In a chip's view the same holds whatever answers first: something saved that turns up after
+  never shown twice. When it brings nothing new, a kind's place says *No more albums for "…".* In a chip's view the same holds whatever answers first: something saved that turns up after
   MusicBrainz's rows are drawn goes below them, and what's saved is looked up once for the words - a chip's
   tap, **Search** or **Try again** asks MusicBrainz again, not it.
 - An album you have is left out of what's saved as it is out of MusicBrainz's rows. Until deadwax knows what
@@ -83,10 +84,10 @@ box" finds Glory Box at once, from Dummy's tracklist, before MusicBrainz has bee
   else the words find: the studio ones, as the line under them says, earliest first, at most 12 - and no
   songs; a title and an artist you have ("roads portishead") no saved artists. (Saved first, then
   MusicBrainz's: the two blocks each read earliest first, not the section as a whole.)
-- **When MusicBrainz is away** what's saved stays, with one line saying so: *MusicBrainz isn't answering just
-  now - these are what deadwax has saved from it.* (*MusicBrainz is busy just now - …* when it is shedding
-  searches; in a kind's place, short enough for a small phone, *Saved - MusicBrainz is away.* or *Saved -
-  MusicBrainz is busy.*), with **Try again**.
+- **When MusicBrainz is away** what's saved stays, with one line saying so: *Showing earlier results -
+  searching for more isn't working right now.* (*Showing earlier results - try again in a moment for more.* when it is
+  shedding searches; in a kind's place, short enough for a small phone, *Showing earlier results.*), with
+  **Try again**.
 - It's shared by everyone signed in: MusicBrainz's data is nobody's own, and nothing in it says who looked
   something up. With nothing saved for the words the list is exactly as it was. Your library's moment waits
   for it a little while at most (0.4 seconds); slower than that - a busy disk - it's left out for those words
@@ -106,7 +107,12 @@ box" finds Glory Box at once, from Dummy's tracklist, before MusicBrainz has bee
   the song, then **Dummy**, then **Portishead**. Then one of each kind in turn. An artist you have, typed
   alone ("portishead"), is them first, then their albums and songs - their self-titled album is by them, not
   an exact match. Each row says what it is first: "Artist · 3 albums in your library", "Album · Portishead ·
-  1994", "Song · Portishead · Dummy". A song of yours plays from its tap (▶ once its album is in hand), and
+  1994", "Song · Portishead · Dummy" - and on a desktop's tile a third line saying where it is: *In your
+  library*, *In the collection*, or for something nobody here has *Not in your library* (*Not in the
+  collection* with logins on; *Maybe in your library* for an album a folder of its name may be, which its row
+  in Albums says too). An artist's tile says *Not in your library* only when no artist in your library has
+  that name - otherwise it says nothing, since it may be the one you have, untagged. A tile with a **Get**
+  leaves that line empty: there is no room for it beside the Get, which says it already. A song of yours plays from its tap (▶ once its album is in hand), and
   its **•••** has Play Next and Play Last ([Up Next](player.md#up-next-shuffle-and-repeat));
   a MusicBrainz song opens the album it's on, the song marked; everything else opens.
 - **Artists**, **Albums**, **Songs**: a few of each - on a phone your first 2 artists and MusicBrainz's 2,
@@ -138,11 +144,11 @@ out you have stays where it is and says "in your library" at the end of its line
 from under your finger. An album you have that your library's own search didn't list (it finds 8, and
 matches words its own way) is still shown, among yours, marked, with no Get, opening the album you have -
 so an album you hold never shows nowhere. **Get**, at the end of a row MusicBrainz offers, gets the
-album's usual pressing without opening it (it reads "Get…" while it asks MusicBrainz for the pressings,
+album's usual pressing without opening it (it reads "Getting…" while it asks MusicBrainz for the pressings,
 and gives up if you type, open something or switch tab meanwhile). For an **artist's name alone**, All
 asks MusicBrainz for their **studio albums and EPs** - otherwise Portishead's first twelve are live albums,
 an interview, compilations and singles, with no Dummy and no Third - and says so in one line under them:
-*MusicBrainz's studio albums and EPs - See all for everything they made.* **See all** (the Albums chip)
+*Studio albums and EPs - See all for everything they made.* **See all** (the Albums chip)
 asks for everything, unfiltered. Various Artists ("va") is never filtered: its records are compilations by
 nature.
 
@@ -169,10 +175,10 @@ the artist's page).
   the song in its tracklist. A pressing of the album without the song isn't having it: with The Slow Rush's
   usual CD in your library, Tame Impala's "Patience" (a bonus track on its Japanese CD alone) says nothing of
   the sort. A song MusicBrainz lists on no release at all isn't shown - there'd be nothing to get; when every
-  song it found is like that, it says *MusicBrainz has songs for "…", but on no release yet - nothing to
-  get.*
+  song it found is like that, it says *Found songs called "…", but none is on an album yet - there's
+  nothing to get.*
 - **Get**, at the end of a MusicBrainz song you don't have, gets **the album it names, on a pressing that
-  has the song** ("Get The Slow Rush, with Patience" gets its Japanese CD). It reads "Get…" while it asks
+  has the song** ("Get The Slow Rush, with Patience" gets its Japanese CD). It reads "Getting…" while it asks
   MusicBrainz for the album's pressings; if MusicBrainz can't list them, the album's page opens instead,
   the song marked, and its own Get takes over.
 - **Tap a song** in the Songs section and it opens in place onto **the albums it's on**: albums and EPs
@@ -201,7 +207,7 @@ the artist's page).
 **Why "portishead" alone shows no MusicBrainz songs**: an artist's name alone asks MusicBrainz for no songs
 - every recording they ever made, in no useful order (Portishead's first 25 are remixes, live and
 compilation takes), is no answer to it; their songs in your library still show, and the Songs chip says
-*Type a song's title with the artist ("roads portishead") to find their songs on MusicBrainz.* A title
+*Type a song's title with the artist ("roads portishead") to find songs you don't have yet.* A title
 beside an artist you have is that song by them ("roads portishead" is Roads by Portishead), and if that
 finds nothing it's asked again as the words you typed taken as **one title**. **Words with no artist you
 have are matched against song titles only**, so a famous title alone mostly finds covers: "hey jude"
@@ -212,23 +218,22 @@ alone finds tribute bands and string quartets, and no Beatles in its first pages
 **All** (pressed as you start typing) is the list above. **Artists**, **Albums** and **Songs** each show that
 kind **in full**, with no Top results: first your library's (its own search for that kind - 50 artists,
 50 albums or 100 songs - with **More from your library**, **More from the collection** with logins on, for the
-next page when that one came back full; *Searching your library and MusicBrainz…* stands where its rows will
+next page when that one came back full, *Loading…* while it asks; *Searching…* stands where its rows will
 go while it's asked), then MusicBrainz's, added at the foot as they arrive and never before your library's,
-with **More from MusicBrainz** (artists and albums) or **More songs** for the next
+with **More artists**, **More albums** or **More songs** for the next
 page of the same search. In the Albums view an album you have that your library's search didn't list is
 among MusicBrainz's rows at its place, marked, with no Get. A chip asks MusicBrainz only for the kind it
 shows that nobody has asked for these words.
 
 **More** adds the next page below, so nothing you were looking at moves - leaving out the albums you have,
-as the first page does. It reads **Asking MusicBrainz…** while it asks; if MusicBrainz isn't answering it
+as the first page does. It reads **Loading…** while it asks; if MusicBrainz isn't answering it
 says so and reads **Try again**. When every new album of the next 12 is one you have it says so; when
-MusicBrainz sends nothing new, *MusicBrainz sent nothing new.* More songs says when a page brought only
+MusicBrainz sends nothing new, *No more results.* More songs says when a page brought only
 albums ("No new songs - 7 more albums for the songs above."). The button goes once MusicBrainz has nothing
 more, and if it had keyboard focus, focus moves to the first row the last page added - as **Show them**,
-**Show 3 albums from MusicBrainz** and any **Try again** hand it on as they go: to the first row they brought,
+**Show 3 more albums** and any **Try again** hand it on as they go: to the first row they brought,
 else a heading the list has drawn, never back to the top of the page. No page starts more
-than 1,000 answers in; past that, *That's as far into one search as deadwax goes - add a word to narrow
-it.*
+than 1,000 answers in; past that, *That's all for this search - add a word to narrow it.*
 
 **See all**, in each section's heading, presses that kind's chip and brings the chips into view; pressed
 from a keyboard, focus goes to the chip. The chip you chose stays while you type other words, goes back to
@@ -243,34 +248,34 @@ place already drawn for it, one fixed height.**
 
 - As your library answers, Top results are drawn as far as your library - and what deadwax has saved - can
   already tell (all three for "portishead" or "roads", or "glory box" once Dummy's page is saved); a row
-  still waiting on MusicBrainz keeps a place with a moving bar, and *Asking MusicBrainz…* stands where the
+  still waiting on MusicBrainz keeps a place with a moving bar, and *Searching…* stands where the
   sections will go.
 - When every kind MusicBrainz was asked for has answered - or a second and a half after it was asked,
   whichever is first - Top results are completed and the sections drawn, in one go.
-- A kind still out then gets a **place** at the end of its section, one fixed height, saying *Asking
-  MusicBrainz…*. When its answer comes: if nothing you can tap is below that section, its rows are drawn
-  straight in; otherwise they wait in that place as **Show 3 albums from MusicBrainz** (a tap opens them),
-  or the place says why there are none (*No artists on MusicBrainz for "…".*).
+- A kind still out then gets a **place** at the end of its section, one fixed height, saying
+  *Searching…*. When its answer comes: if nothing you can tap is below that section, its rows are drawn
+  straight in; otherwise they wait in that place as **Show 3 more albums** (a tap opens them),
+  or the place says why there are none (*No other artists for "…".*).
 - After a search MusicBrainz was too slow for, or away for, the next searches draw your library's rows at
   once, MusicBrainz's arriving in those places - until it answers in time again.
 - If your library itself is slow (a second and a half), the list is drawn without it, with a place at the
-  top: *Searching your library…*, then **3 in your library - Show them** - or, if Navidrome turns out not to
+  top: *Searching your library…*, then **Show 3 from your library** - or, if Navidrome turns out not to
   be reachable, *Your library can't be searched just now.* (never that it found nothing).
 
 ## MusicBrainz busy or away
 
-When MusicBrainz is shedding searches (it often does, for a few minutes) a kind's place says *MusicBrainz is
-busy just now - try again in a moment.*; when it isn't answering at all, *MusicBrainz isn't answering.* -
-each with its own **Try again**, which draws the list afresh for the same words and asks only what failed.
-When every kind failed, one block at the foot says so - *MusicBrainz isn't answering just now - it often goes
-away for a few minutes. What's in your library is above.* - with **Try again** (the last sentence only when
-something of your library is drawn above). Under rows
-[deadwax has saved](#what-deadwax-has-saved) the words say these are saved instead. Pressing **Search** again (or
+When MusicBrainz is shedding searches (it often does, for a few minutes) a kind's place says *Too many
+searches just now - try again in a moment.*; when it isn't answering at all, *Can't search for more
+right now.* - each with its own **Try again**, which draws the list afresh for the same words and asks only
+what failed. When every kind failed, one block at the foot says so - *Searching for more isn't working
+right now - try again in a few minutes. What's in your library is above.* - with **Try again** (the
+last sentence only when something of your library is drawn above). Under rows
+[deadwax has saved](#what-deadwax-has-saved) the words say these are earlier results instead. Pressing **Search** again (or
 Enter in the desktop's field) does what Try again does. If MusicBrainz can't read
-what you typed as a search, it says *MusicBrainz couldn't read that search - try other words*, with no Try
+what you typed as a search, it says *That search couldn't be read - try other words*, with no Try
 again (the same words would be refused again). A search gives up after three tries: about eight seconds
 when MusicBrainz is turning searches away; longer when it doesn't
-answer at all, as each try waits up to half a minute for an answer. If nothing at all was found, *No results for "…"* and *Check the spelling or try
+answer at all, as each try waits up to half a minute for an answer. If nothing at all was found, *No results for "…".* and *Check the spelling or try
 a new search.* - never when MusicBrainz wasn't asked yet.
 
 If Navidrome isn't set up or can't be reached, its notice (**Connect Navidrome** or **Can't reach
@@ -301,8 +306,8 @@ See [the player as you](player.md#the-player-as-you-with-logins-on).
 - **Anything else** goes to MusicBrainz as you typed it, for albums, artists and songs.
 
 If reading it as an artist and a title finds nothing (an artist's name that happens to begin a title),
-it's asked again as the words you typed. *Everything MusicBrainz found is in your library already* means
-just that.
+it's asked again as the words you typed. *You already have everything found.* (*Everything found is in
+the collection already.* with logins on) means just that.
 
 ## The album you don't have
 
@@ -321,11 +326,14 @@ above included. When nothing is tagged as the album but a folder **with no
 MusicBrainz ids at all** has its name and its artist's (as credited, or the name they go by now), it
 says **maybe in your library**, in a dashed box (with logins on,
 **maybe in the collection** when that folder isn't in your library) - the name can't tell which album that
-folder is, let alone which pressing. Point at it (on a computer) for the folder;
+folder is, let alone which pressing - and a line under **Get the album** says so in words: *You may
+already have this - an album with this name is in your library, but it isn't matched to a pressing.* (*It
+may already be here - … in the collection …* when the folder isn't yours). Whoever can Edit albums also
+reads *Match it to a pressing in Edit album.*, and on a computer can point at the dashed box for the folder;
 matching its release in **Edit → Release** settles it ([the library](library.md#editing-an-album)). Opened from a saved link or after a reload it
 says the same, since the album's
 title, kind and year come with its pressings. A link whose address isn't a MusicBrainz album says
-*That isn't a link to an album on MusicBrainz.* Under it is the **Pressing** button, where an album you have has Play and
+*That link isn't an album.* Under it is the **Pressing** button, where an album you have has Play and
 Shuffle; then **Get the album**, the page's one purple button, which gets **the pressing chosen**
 ([Get, and choosing a source](downloading.md#choosing-a-source)); under it,
 what you already have of that pressing, if anything ("Already in your library", "Already
@@ -338,8 +346,9 @@ the page); and then **that pressing's tracklist**.
 
 It needs only MusicBrainz, so it works with Navidrome down. To work out the differences it fetches
 **every pressing's tracklist** at once, which for an album with a lot of pressings can take
-several seconds (**Asking MusicBrainz…**); after that it's kept for as long as the app is open (the
-last 20 albums you opened), so going back to it asks nothing again. If MusicBrainz isn't answering, it says so with **Try again**
+several seconds (**Loading…**); after that it's kept for as long as the app is open (the
+last 20 albums you opened), so going back to it asks nothing again. If MusicBrainz isn't answering, it says
+*This album's details can't be loaded right now - try again in a few minutes.* with **Try again**
 rather than showing part of the list as if it were all of it.
 
 **The Pressing button** says which pressing you're looking at: its format, year, country (left out
@@ -366,7 +375,7 @@ player (it's never taller than that, and scrolls inside itself past that):
   is a tap away);
 - every pressing that differs, its note in amber: **+1 bonus track: Patience**, **Without It's a
   Fire**, **1 other version: Borderline, 4:34**, **2 tracks renamed**;
-- **No tracklist on MusicBrainz** for one nobody has entered the tracks of;
+- **No tracklist listed** for one nobody has entered the tracks of;
 - then **N more pressings with the usual tracklist**, folded away - tap it to show them.
 
 Each pressing in the list says its facts under its label, the same ones as the

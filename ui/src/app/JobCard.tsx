@@ -161,8 +161,8 @@ export function WaitingCard({ row, onCancel, asking = false, onKeep, onConfirm }
 }
 
 /**
- * Needs attention: why it stopped, in red, and the two ways on - "Next peer · N left" (primary
- * only on the first such card) and "Ask again". While one runs both wait, the one tapped saying
+ * Needs attention: why it stopped, in red, and the two ways on - "Another source · N left" (primary
+ * only on the first such card) and "Same source again" (2.0.6: "Next peer", "Ask again"). While one runs both wait, the one tapped saying
  * what it's doing - aria-disabled, the tap refused here, so the focus on the one tapped stays put;
  * a refusal is the red line under the reason. Each label is a span inside its button, which is
  * where the ellipsis goes: clipping the button would clip its reach to 44px away too.
@@ -174,7 +174,7 @@ export function AttentionCard({
   row: RequestRow
   onRetry: (row: RequestRow, samePeer: boolean) => void
 }) {
-  //? (2.0.0-player.61) Next peer and Ask again start a download: Get albums' - without it, its words in their place
+  //? (2.0.0-player.61) Another source and Same source again start a download: Get albums' - without it, its words in their place
   const access = useAccess()
   const getsAlbums = gets(access.permissions)
   //? (2.0.4) the job's own words under its reason for whoever runs deadwax; "Tell whoever runs deadwax." for anyone else
@@ -232,7 +232,7 @@ export function AttentionCard({
  * (`row.release`: filed, partly filed, or already there) OPENS it - the row is a button - and one this
  * download filed (`row.plays`) has the board's round ▶, which plays it: the page decides, in the tap,
  * whether the album's songs are in hand to play, and opens the album otherwise. `note` is the page's
- * own word for a row it couldn't open ("Navidrome hasn't found it yet"); `opening` while it looks,
+ * own word for a row it couldn't open ("Not ready to play yet - it may still be scanning."); `opening` while it looks,
  * faded so the tap shows it was taken.
  */
 export function DoneRow({

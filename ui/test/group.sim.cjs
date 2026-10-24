@@ -233,8 +233,8 @@ async function main() {
     const { draw } = page({ id: slowRush.group.id, preview: PREVIEW })
     draw()
     check('one ask, for the group', asked, [slowRush.group.id])
-    check('"Asking MusicBrainz…", as a status, with the sweep', [text(classed('app-asking')[0]), classed('app-asking')[0]?.props.role, classed('app-sweep').length],
-      ['Asking MusicBrainz…', 'status', 1])
+    check('(2.0.6) "Loading…", as a status, with the sweep', [text(classed('app-asking')[0]), classed('app-asking')[0]?.props.role, classed('app-sweep').length],
+      ['Loading…', 'status', 1])
     check('the header: title, artist, and what it is - and nothing about the library before it answers',
       [text(classed('pl-hero-title')[0]), text(classed('pl-hero-artist')[0]), text(classed('pl-hero-meta')[0])],
       ['The Slow Rush', 'Tame Impala', '2020 · Album'])
@@ -265,7 +265,7 @@ async function main() {
     draw()
     await settle()
     draw()
-    check('it says MusicBrainz isn\'t answering, and offers to ask again', [text(classed('app-rg-trouble')[0]).startsWith("MusicBrainz isn't answering just now"),
+    check('(2.0.6) it says the album\'s details can\'t be loaded, and offers to ask again', [text(classed('app-rg-trouble')[0]).startsWith("This album's details can't be loaded right now - try again in a few minutes."),
       find((node) => node.type === 'button' && text(node) === 'Try again').length], [true, 1])
     check('...and draws no tracklist', classed('app-rg-tracks').length, 0)
     answers.push(answering(slowRush, 'MusicBrainz failed part way'))
@@ -357,7 +357,7 @@ async function main() {
     empty.draw()
     await settle()
     empty.draw()
-    check('no pressings at all says so', text(classed('pl-notice')[0]), 'MusicBrainz lists no pressings of this album.')
+    check('no pressings at all says so', text(classed('pl-notice')[0]), 'There are no pressings of this album to get.')
   }
 
   console.log('\na cold link, with the group MusicBrainz sends beside each pressing')
@@ -459,7 +459,7 @@ async function main() {
     await settle()
     draw()
     check('the answer drawn under the pressing: already downloading, cancelled in Requests', find((node) => node.type === StoreState)[0]?.props.status,
-      { kind: 'downloading', title: 'Already downloading', lines: ['From bob · queued', 'Open Requests to cancel it if you want another peer.'] })
+      { kind: 'downloading', title: 'Already downloading', lines: ['From bob · queued', 'To get it from another source, cancel it in Requests first.'] })
     check('...in a polite live region that is always there', classed('app-rg-store')[0]?.props['aria-live'], 'polite')
     check('...UNDER Get, where an answer landing late moves nothing a finger is reaching for (the pressing\'s facts, 2.0.0-player.50, under its picker)',
       classed('app-rg-actions')[0]?.props.children.filter(Boolean).map((child) => child.type === 'button' ? child.props.class : child.props?.class ?? child.type?.name), ['PressingPicker', 'app-rg-facts', 'app-rg-get', 'app-rg-store'].map((name) => name))
@@ -550,7 +550,7 @@ async function main() {
     draw()
     check('...and it does: yours now, a cancel only taking it off your list', find((node) => node.type === StoreState)[0]?.props.status,
       { kind: 'downloading', title: 'Already downloading', lines: ['From glassbeads · queued',
-        "Someone else asked for it too, so cancelling it in Requests only takes it off your list - another peer isn't offered for a download you share."] })
+        "Someone else asked for it too, so cancelling it in Requests only takes it off your list - another source isn't offered for a download you share."] })
   }
 
   console.log('\na cold link: Get builds from the group the pressings carry, the pressing\'s credit where it has none')
@@ -586,7 +586,7 @@ async function main() {
     check('...Get not pressed: the panel isn\'t showing this page\'s sources', classed('app-rg-get')[0].props['aria-pressed'], false)
     check('the tracklist: "Tracklist", the line, and a table - its "Against the usual tracklist" column, since some pressings differ',
       [text(find(byClass('app-rg-desk-title'), table())[0]), text(find(byClass('app-rg-summary'), table())[0]), find((node) => node.type === 'th', table()).map(text), classed('app-rg-list').length],
-      ['Tracklist', 'The usual tracklist, shared by 9 of 10 pressings', ['#', 'Title', 'Against the usual tracklist', 'Length'], 0])
+      ['Tracklist', 'The usual tracklist, shared by 9 of 10 pressings', ['#', 'Title', 'Compared with the usual', 'Length'], 0])
     check('...the usual pressing\'s twelve rows, none marked, their against cells empty',
       [find(byClass('app-rg-row'), table()).length, find(byClass('is-marked'), table()).length, find(byClass('app-rg-against'), table()).map(text).join('')], [12, 0, ''])
     const japan = byPrefix(slowRush, '452ccdb4')
@@ -746,7 +746,19 @@ async function main() {
     const maybe = classed('app-rg-maybe')[0]
     check('a folder of its name with no ids: "maybe in your library", dashed - the year and kind still before it',
       [text(classed('pl-hero-meta')[0]), text(maybe), maybe?.type], ['2020 · Album · maybe in your library', 'maybe in your library', 'span'])
-    check('...its folders in its tooltip, as the main page\'s card says them', maybe?.props.title.includes('Old Rips/Tame Impala - The Slow Rush (MP3)') && maybe.props.title.startsWith('A folder with this name, not tagged with MusicBrainz ids'), true)
+    check('...its folders in its tooltip, as the main page\'s card says them (logins off: everyone can Edit albums)', maybe?.props.title.includes('Old Rips/Tame Impala - The Slow Rush (MP3)') && maybe.props.title.startsWith('A folder with this name, not matched to a pressing'), true)
+    //? (2.0.6, UX batch 3: RG5) ...and said in words anyone reads, under Get - the tooltip was its only explanation, which a phone never shows
+    check('(2.0.6) ...and why, in a line under Get, how to settle it for whoever can Edit albums', [text(classed('app-rg-maybe-note')[0]), classed('app-rg-maybe-note')[0]?.props.class],
+      ["You may already have this - an album with this name is in your library, but it isn't matched to a pressing. Match it to a pressing in Edit album.", 'app-footnote app-rg-maybe-note'])
+    {
+      const session = require(path.join(OUT, 'app/session.js'))
+      session.setSessionMe({ user: 'ethan', auth: 'on', admin: false })
+      draw()
+      check('(2.0.6) ...a listener who can\'t Edit albums: the line without the how, and no folders in a tooltip', [text(classed('app-rg-maybe-note')[0]), classed('app-rg-maybe')[0]?.props.title],
+        ["You may already have this - an album with this name is in your library, but it isn't matched to a pressing.", undefined])
+      session.setSessionMe(null)
+      draw()
+    }
     globalThis.__group.owned = owning([{ path: 'Old Rips/Tame Impala - The Slow Rush', artist: 'Tame Impala', album: 'The Slow Rush' },
       { path: 'Tame Impala/The Slow Rush (2020)', release_mbid: usual.id, release_group_mbid: slowRush.group.id }])
     draw()
@@ -787,7 +799,7 @@ async function main() {
       [many.length, !!field(), find(byClass('app-picker-filter'), listbox()).length, text(find(byClass('app-visually-hidden'), classed('app-picker-filter')[0])[0]), field()?.props['aria-controls'] === listbox()?.props.id],
       [40, true, 0, 'Filter the pressings', true])
     check('...its placeholder saying what works, as the rows say it - a country by its code (review: "country" asked for "Japan")',
-      field()?.props.placeholder, 'JP, CD, a label or cat. no.')
+      field()?.props.placeholder, 'JP, CD, a label or catalogue no.')
     //? (review: "No pressing matches" was a region made with its words, which VoiceOver doesn't read, and
     //? nothing said how many matched) one region, there before a word is typed, saying what's left
     check('...and a polite live region in the list before anything is typed, read out but never drawn, empty',

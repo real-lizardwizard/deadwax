@@ -626,10 +626,12 @@ def test_a_retry_button_waiting_on_its_retry_stays_legible():
 
 def test_next_peer_and_ask_again_stack_where_a_pair_wouldnt_hold_their_words():
     #? at 320px a column was 105px of text, and "Next peer · 2 left" (121px of 15px Noto Sans 600)
-    #? lost its count to the ellipsis; a column narrower than "Next peer · 10 left" whole stacks
+    #? lost its count to the ellipsis; a column narrower than "Next peer · 10 left" whole stacks. (2.0.6, UX batch 3)
+    #? Their words are "Another source · 2 left" / "Same source again", "Trying another source…" while it runs -
+    #? 174px of that font, measured in a real page, so a column narrower than 192px stacks (a 390px phone's do)
     actions = declarations(APP, ".app-job-actions")
     assert actions["grid-template-columns"] == "repeat(auto-fit, minmax(min(var(--app-job-action-min), 100%), 1fr))"
-    assert ALL_TOKENS["--app-job-action-min"] == "150px"
+    assert ALL_TOKENS["--app-job-action-min"] == "192px"
     #? stacked, the two reaches don't overlap
     assert actions["gap"] == "var(--app-job-actions-row-gap) var(--app-job-gap)"
     assert ALL_TOKENS["--app-job-actions-row-gap"] == "calc(2 * var(--app-job-action-reach))"
@@ -917,6 +919,10 @@ def test_the_librarys_chips_and_sort():
 def test_a_done_row_opens_from_the_whole_row_and_plays_from_its_round_button():
     assert declarations(APP, ".app-done-open")["min-height"] == "var(--app-done-row)"
     assert declarations(APP, ".app-done-open")["flex"] == "1"
+    #? (2.0.6, review) a row of two or three lines (Stopped while being added..., its tell) keeps air above its hairline:
+    #? padded, by a token that leaves a one-line row its 56px (the cover plus the padding twice)
+    assert declarations(APP, ".app-done-open")["padding-block"] == "var(--app-done-pad-y)"
+    assert px("--app-job-cover") + 2 * px("--app-done-pad-y") == px("--app-done-row")
     play = declarations(APP, ".app-done-play")
     assert (play["width"], play["height"]) == ("var(--pl-hit)", "var(--pl-hit)")
     face = declarations(APP, ".app-done-play-face")
@@ -1183,6 +1189,22 @@ def test_a_sources_reasons_open_from_a_tap_target_on_the_score_and_hide_while_cl
                 assert "display" not in values, selector
     #? on a desktop's panel, across the card under the facts
     assert declarations(desk, ".app-desk .app-layer.is-panel .app-source-reasons", "@media (min-width: 1024px)") == {"grid-column": "1 / -1"}
+
+
+def test_a_sources_signals_say_what_each_measures_beside_its_chip_and_the_score_its_percentage():
+    """(2.0.6, UX batch 3) Each signal a row - its chip in one column, what it measures beside it, so the words line up -
+    under "Why it's a 70% match"; a desktop's score box grows to hold "100%" rather than clip it."""
+    signals = declarations(APP, ".app-source-signals")
+    assert (signals["display"], signals["grid-template-columns"], signals["column-gap"]) == (
+        "grid", "max-content minmax(0, 1fr)", "var(--app-source-meaning-gap)")
+    assert declarations(APP, ".app-source-signal-row") == {"display": "contents"}
+    meaning = declarations(APP, ".app-source-signal-meaning")
+    assert (meaning["color"], meaning["font-size"], meaning["min-width"]) == ("var(--dw-text-2)", "var(--dw-text-label)", "0")
+    title = declarations(APP, ".app-source-reasons-title")
+    assert (title["margin"], title["color"], title["font-size"]) == ("0", "var(--dw-text-2)", "var(--dw-text-label)")
+    desk = (PLAYER / "app-desktop.css").read_text()
+    score = declarations(desk, ".app-desk .app-layer.is-panel .app-source-score", "@media (min-width: 1024px)")
+    assert (score["width"], score["min-width"], score["padding"]) == ("auto", "var(--app-desk-source-score-w)", "0 var(--app-desk-source-score-pad)")
 
 
 def test_a_sources_signals_and_edition_words_are_drawn_in_their_bands_colours():

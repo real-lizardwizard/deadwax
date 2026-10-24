@@ -207,14 +207,22 @@ def test_the_guide_s_normalization_off_keeps_maximum_quality_s_exception():
     assert "unless Maximum quality converts it" in paragraph
 
 
-def test_the_retry_setting_names_the_button_as_requests_has_it():
-    """AUTO_RETRY_PEER's words name the button an admin goes looking for: it is Next peer, on a failed download in
-    Requests - there is no "Try next peer" and no downloads panel since the main page retired. (2.0.3, the compose
-    prune) .env.example no longer carries the setting - it is set in Server settings - so configuration.md's row is
-    what says it."""
+def test_the_retry_setting_names_the_button_as_requests_has_it(monkeypatch):
+    """AUTO_RETRY_PEER's words name the button an admin goes looking for: it is Another source (2.0.6, UX batch 3 - it
+    was Next peer), on a failed download in Requests - there is no "Try next peer" and no downloads panel since the main
+    page retired. (2.0.3, the compose prune) .env.example no longer carries the setting - it is set in Server settings -
+    so configuration.md's row, and Server settings' own line, are what say it."""
     env = (REPO / ".env.example").read_text(encoding="utf-8")
     assert "AUTO_RETRY_PEER" not in env
     row = next(line for line in (REPO / "docs/configuration.md").read_text(encoding="utf-8").splitlines()
                if line.startswith("| `AUTO_RETRY_PEER` | `off` | `on` moves"))
     assert "Try next peer" not in row and "downloads panel" not in row
-    assert "**Next peer** on a failed download, in Requests, works either way" in row
+    assert "**Another source** on a failed download, in Requests, works either way" in row
+    assert "Next peer" not in row and "next peer" not in row
+    #? (2.0.6) and Server settings' own line under it, while it is off
+    from src.config import Config
+    from src.routes import settings as settings_route
+    monkeypatch.setattr(Config, "AUTO_RETRY_PEER", "off")
+    effect = settings_route._auto_retry_row()["effect"]
+    assert effect.startswith("A failed download waits for you - Another source, on it in Requests, moves it on.")
+    assert "Next peer" not in effect and "next peer" not in effect

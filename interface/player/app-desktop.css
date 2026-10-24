@@ -128,9 +128,9 @@
         --app-desk-chip-h: 26px;
         --app-desk-chip-pad-x: 10px;
         --app-desk-chip-text: 12px;
-        --app-desk-signals: 260px;
+        --app-desk-signals: 300px;       /* (2.0.6) "Track lengths", "Availability" on one line */
         --app-desk-signals-gap: 8px;
-        --app-desk-signals-name: 64px;
+        --app-desk-signals-name: 100px;
         --app-desk-signals-value: 30px;
         /* a source, as its board draws it: the facts in five columns, Speed the first */
         --app-desk-source-pad-top: 10px;
@@ -138,6 +138,7 @@
         --app-desk-source-pad-bottom: 12px;
         --app-desk-source-gap: 10px;
         --app-desk-source-score-w: 34px;
+        --app-desk-source-score-pad: 5px;  /* (2.0.6) its sides, now it says "100%" */
         --app-desk-source-score-h: 26px;
         --app-desk-source-get: 26px;
         --app-desk-source-get-pad: 16px;
@@ -1059,8 +1060,10 @@
     }
 
     .app-desk .app-layer.is-panel .app-source-score {
-        width: var(--app-desk-source-score-w);
+        width: auto;
+        min-width: var(--app-desk-source-score-w);
         height: var(--app-desk-source-score-h);
+        padding: 0 var(--app-desk-source-score-pad);
         font-size: var(--app-desk-text-sm);
     }
 

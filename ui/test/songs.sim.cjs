@@ -227,10 +227,10 @@ console.log('\nMore songs: a later page merged in')
   check('...real takes: DJ Tripp\'s mash-up, bare on the first page, comes after the six drawn', [real.songs.slice(0, drawnFirst.length).map((song) => song.credit), real.songs[drawnFirst.length].credit],
     [drawnFirst, 'DJ Tripp'])
   check('what a page said: new songs to VoiceOver only; albums alone; nothing', [S.moreSongsWords(3, 9), S.moreSongsWords(1, 0), S.moreSongsWords(0, 7), S.moreSongsWords(0, 1), S.moreSongsWords(0, 0)], [
-    { note: null, said: '3 more songs from MusicBrainz' }, { note: null, said: '1 more song from MusicBrainz' },
+    { note: null, said: '3 more songs found' }, { note: null, said: '1 more song found' },
     { note: 'No new songs - 7 more albums for the songs above.', said: 'No new songs - 7 more albums for the songs above' },
     { note: 'No new songs - 1 more album for the songs above.', said: 'No new songs - 1 more album for the songs above' },
-    { note: 'MusicBrainz sent nothing new.', said: 'MusicBrainz sent nothing new' }])
+    { note: 'No more results.', said: 'No more results' }])
 }
 
 console.log('\nwhat you have of it')

@@ -563,7 +563,7 @@ async function main() {
   check('...which is the route\'s bound', SEARCH_MAX_CHARS, 200)
   check('the list\'s one live region is there from the first render, saying nothing yet (iOS reads only regions already in the page)', [region().length, said()], [1, ''])
   check('before typing: no chips, the hint saying what is searched', [chipsOf(), text(find(byClass('app-search-hint'))[0])],
-    [undefined, "Artists, albums and songs: yours first, then MusicBrainz's."])
+    [undefined, "Search your library and albums you don't have yet."])
   check('the library\'s whole list of artists asked once as Search first shows, Navidrome OK', asks.lists.length, 1)
   asks.lists[0].resolve([P, { id: 'ar-teb', name: 'Third Eye Blind' }])
   await settle()
@@ -577,7 +577,7 @@ async function main() {
     ['app-library-views app-search-kinds', 'group', 'Show', [['All', true, 'app-chip app-library-view is-on'], ['Artists', false, 'app-chip app-library-view'],
       ['Albums', false, 'app-chip app-library-view'], ['Songs', false, 'app-chip app-library-view']], 0])
   check('before the library lands: one asking line - "Searching your library and MusicBrainz…" - and no spinner', [text(asking()[0]), find(byClass('pl-spinner')).length],
-    ['Searching your library and MusicBrainz…', 0])
+    ['Searching…', 0])
   invariant('typed')
   await advance(199)
   check('Navidrome is asked once typing has paused', asks.library.length, 0)
@@ -594,7 +594,7 @@ async function main() {
     [['top:artist:ar1', 'top:album:nd-dummy', 'top:song:s-roads'], 0])
   check('...each saying what it is first, its place in its own span', find((node) => node.type === 'button' && node.props['data-row'], top()).map(lineOf),
     ['Artist · 3 albums in your library', 'Album · Portishead · 1994 · in your library', 'Song · Portishead · Dummy · in your library'])
-  check('...then one asking line where the sections will go, no region of its own', [kinds(), text(asking()[0]), asking()[0]?.props.role], [[], 'Asking MusicBrainz…', undefined])
+  check('...then one asking line where the sections will go, no region of its own', [kinds(), text(asking()[0]), asking()[0]?.props.role], [[], 'Searching…', undefined])
   check('the region says what the library found', said(), 'In your library: 1 artist, 1 album, 3 songs.')
   check('the albums of Top results\' songs asked first, then the first songs\' - KEPT, so a scroll can\'t call them off',
     asks.prefetch.map((ask) => [ask.id, ask.keep]), [['nd-dummy', true], ['nd-third', true]])
@@ -628,11 +628,11 @@ async function main() {
   check('Albums: yours, then MusicBrainz\'s studio albums in the studio order, Dummy (held) left out, three on a phone',
     rowsOf('albums'), [['Dummy', 'Portishead · 1994 · in your library'], ['Portishead', 'Portishead · 1997'], ['Third', 'Portishead · 2008'], ['R.A.R.E (Reliving a Real Experience)', 'Mixtape · Nickelus F & Portishead · 2009']])
   check('...under them, the active filter: one quiet line', text(find(byClass('app-search-filter-note'), sectionOf('app-search-albums'))[0]),
-    "MusicBrainz's studio albums and EPs - See all for everything they made.")
+    'Studio albums and EPs - See all for everything they made.')
   check('Songs: yours, three on a phone', keysOf('songs'), ['song:s-roads', 'song:s-glory', 'song:s-rip'])
   check('each section headed, its See all always drawn - a text button labelled for its kind', ['artists', 'albums', 'songs'].map((kind) => seeAll(kind)?.props['aria-label']),
     ['See all artists', 'See all albums', 'See all songs'])
-  check('the region says what MusicBrainz brought, once every kind asked has settled', said(), 'From MusicBrainz: 3 albums.')
+  check('the region says what MusicBrainz brought, once every kind asked has settled', said(), 'Also found: 3 albums.')
   check('a MusicBrainz album has Get; one you have doesn\'t', [text(getOf(`group:${THIRD.id}`)), getOf('album:nd-dummy')], ['Get', undefined])
 
 
@@ -672,7 +672,7 @@ async function main() {
     check('then the view\'s library rows, More from your library under them (a full page), then MusicBrainz\'s - all twelve, unfiltered',
       [keysOf('albums').slice(0, 2), keysOf('albums').length, text(find(byClass('app-search-more-library'))[0]), rowsOf('albums').slice(50).map(([title]) => title)],
       [['album:nd-dummy', 'album:nd-a0'], 62, 'More from your library', unfiltered['release-groups'].map((group) => group.title)])
-    check('...More from MusicBrainz under them (the count says 90)', text(find((node) => byClass('app-search-more')(node) && !byClass('app-search-more-library')(node))[0]), 'More from MusicBrainz')
+    check('...More from MusicBrainz under them (the count says 90)', text(find((node) => byClass('app-search-more')(node) && !byClass('app-search-more-library')(node))[0]), 'More albums')
     find(byClass('app-search-more-library'))[0].props.onClick()
     draw()
     check('More from your library asks the next page of albums by offset, the other counts 0', asks.library.at(-1).page,
@@ -688,7 +688,7 @@ async function main() {
     draw()
     check('Back to All: drawn whole at once - Top results and every section - the studio answer kept from before, nothing asked of MusicBrainz',
       [topKeys(), kinds(), asks.musicbrainz.length - kept, asking().length, said()], [['top:artist:ar1', 'top:album:nd-dummy', 'top:song:s-roads'], ['artists', 'albums', 'songs'], 0, 0,
-        'Showing everything. In your library: 1 artist, 1 album, 3 songs. From MusicBrainz: 3 albums.'])
+        'Showing everything. In your library: 1 artist, 1 album, 3 songs. Also found: 3 albums.'])
     freshInvariant()
     invariant('back to All')
   }
@@ -786,7 +786,7 @@ async function main() {
     await advance(1)
     invariant('the cap')
     check('the cap (1.5 s after MusicBrainz was asked): the sections drawn, Songs\' slot asking for MusicBrainz\'s songs - aria-busy',
-      [kinds(), slotText('songs'), sectionOf('app-search-songs').props['aria-busy'], keysOf('songs')], [['albums', 'songs'], 'Asking MusicBrainz…', true, ['song:s-roads']])
+      [kinds(), slotText('songs'), sectionOf('app-search-songs').props['aria-busy'], keysOf('songs')], [['albums', 'songs'], 'Searching…', true, ['song:s-roads']])
     check('...a section with nothing to show left out (no artist anywhere)', sectionOf('app-search-artists'), undefined)
     await advance(800)
     asked.songs[0].resolve({ recordings: [recording('r-roads2', 'Roads', 'Someone', SOMEBODY, SOMEONE_ALBUM)], count: 1 })
@@ -801,7 +801,7 @@ async function main() {
     const from = await search('roads portishead', { artists: [], albums: [], songs: [libSong('s-roads', 'Roads')] })
     check('the next search draws at the library\'s moment: Top results from the library alone, a slot for each kind - Portishead leads Artists (the named artist)',
       [topKeys(), kinds(), keysOf('artists'), slotText('albums'), slotText('songs')],
-      [['top:song:s-roads', 'top:album:nd-dummy', 'top:artist:ar1'], ['artists', 'albums', 'songs'], ['artist:ar1'], 'Asking MusicBrainz…', 'Asking MusicBrainz…'])
+      [['top:song:s-roads', 'top:album:nd-dummy', 'top:artist:ar1'], ['artists', 'albums', 'songs'], ['artist:ar1'], 'Searching…', 'Searching…'])
     await advance(500)
     const asked = newAsks(from)
     check('...album-by-artist: no artists asked - the artist is yours; albums and songs fielded', [asked.artists.length, asked.albums.map((ask) => ask.query), asked.songs.map((ask) => ask.query)],
@@ -811,8 +811,8 @@ async function main() {
     await answerOwned(holding(DUMMY))
     invariant('Behind\'s kinds landing in time')
     check('...landing: Albums (not last) folds the album you hold that search3 didn\'t list - brought in (the held-groups rule extended); Songs, last, loses its slot - the MusicBrainz Roads is yours',
-      [slotText('albums'), keysOf('songs'), slotOf('songs')], ['Show 1 album from MusicBrainz', ['song:s-roads'], undefined])
-    const show = buttonText('Show 1 album from MusicBrainz')
+      [slotText('albums'), keysOf('songs'), slotOf('songs')], ['Show 1 more album', ['song:s-roads'], undefined])
+    const show = buttonText('Show 1 more album')
     show.props.onClick({ currentTarget: show })
     draw()
     check('...shown: Dummy, marked "in your library", no Get - its tap opens the album you have', [rowsOf('albums'), getOf(`group:${DUMMY.id}`)], [[['Dummy', 'Portishead · 1994 · in your library']], undefined])
@@ -829,13 +829,13 @@ async function main() {
     await answerOwned(holding(DUMMY))
     await advance(1500)
     invariant('the cap, albums out')
-    check('albums past the cap: Albums drawn with its slot, Songs below it', [kinds(), slotText('albums')], [['albums', 'songs'], 'Asking MusicBrainz…'])
+    check('albums past the cap: Albums drawn with its slot, Songs below it', [kinds(), slotText('albums')], [['albums', 'songs'], 'Searching…'])
     asked.albums[0].resolve({ 'release-groups': [ROSELAND, THIRD], count: 2 })
     await answerOwned(holding(DUMMY))
     invariant('albums landing late')
     check('...landing with something tappable below: folded into its slot - "Show 2 albums from MusicBrainz" - nothing below moves',
-      [slotText('albums'), keysOf('albums'), said()], ['Show 2 albums from MusicBrainz', ['album:nd-dummy'], '2 albums from MusicBrainz - Show them to see them. From MusicBrainz: 2 albums, 1 song.'])
-    const show = buttonText('Show 2 albums from MusicBrainz')
+      [slotText('albums'), keysOf('albums'), said()], ['Show 2 more albums', ['album:nd-dummy'], '2 more albums found - Show them to see them. Also found: 2 albums, 1 song.'])
+    const show = buttonText('Show 2 more albums')
     show.props.onClick({ currentTarget: show })
     draw()
     check('...a tap opens them in place (your own act)', [keysOf('albums'), slotOf('albums')], [['album:nd-dummy', `group:${ROSELAND.id}`, `group:${THIRD.id}`], undefined])
@@ -843,7 +843,7 @@ async function main() {
     //? Behind is on: the next search draws at the library's moment, MusicBrainz's kinds in slots
     const next = await search('sour times', { artists: [], albums: [], songs: [libSong('s-sour', 'Sour Times')] })
     check('Behind: the next search draws at the library\'s moment - Top results from the library alone, every section with a slot for MusicBrainz\'s kinds',
-      [topKeys(), kinds(), slotText('artists'), slotText('songs')], [['top:song:s-sour', 'top:album:nd-dummy', 'top:artist:ar1'], ['artists', 'albums', 'songs'], 'Asking MusicBrainz…', 'Asking MusicBrainz…'])
+      [topKeys(), kinds(), slotText('artists'), slotText('songs')], [['top:song:s-sour', 'top:album:nd-dummy', 'top:artist:ar1'], ['artists', 'albums', 'songs'], 'Searching…', 'Searching…'])
     invariant('Behind\'s draw')
     await advance(500)
     const behindAsked = newAsks(next)
@@ -854,7 +854,7 @@ async function main() {
     invariant('Behind\'s kinds landing')
     check('...kinds landing empty: Artists (no library rows, something below) keeps its slot saying why; Albums the same; Songs, last, loses its slot',
       [kinds(), slotText('artists'), slotText('albums'), slotOf('songs')],
-      [['artists', 'albums', 'songs'], 'No artists on MusicBrainz for “sour times”.', 'No albums on MusicBrainz for “sour times”.', undefined])
+      [['artists', 'albums', 'songs'], 'No other artists for “sour times”.', 'No other albums for “sour times”.', undefined])
     //? that search answered in time: Behind ends - the next draws by its moments again
     await search('sour', { artists: [], albums: [], songs: [libSong('s-sour', 'Sour Times')] })
     check('...that search answered in time: Behind ends - the next shows Top results and the asking line', [kinds(), asking().length], [[], 1])
@@ -865,8 +865,8 @@ async function main() {
 
 
   const away = () => new MusicBrainzUnavailable('MusicBrainz is unreachable right now')
-  const busy = () => new MusicBrainzUnavailable('MusicBrainz is busy just now - try again in a moment.', true)
-  const refused = () => new ApiError(422, "MusicBrainz couldn't read that search - try other words", 'refused')
+  const busy = () => new MusicBrainzUnavailable('Too many searches just now - try again in a moment.', true)
+  const refused = () => new ApiError(422, "That search couldn't be read - try other words", 'refused')
 
   console.log('\nMusicBrainz failing: per kind, all of them, busy, refused')
   {
@@ -881,7 +881,7 @@ async function main() {
     const failed = slotOf('artists')
     check('one kind failed, the others answered: its own section, its slot one line with a text-button Try again (no foot block)',
       [kinds(), failed?.props.class, text(find(byClass('app-search-empty'), failed)[0]), text(find((node) => node.type === 'button', failed)[0]), find(byClass('app-search-foot')).length],
-      [['artists', 'albums', 'songs'], 'app-search-slot is-row', "MusicBrainz isn't answering.", 'Try again', 0])
+      [['artists', 'albums', 'songs'], 'app-search-slot is-row', "Can't search for more right now.", 'Try again', 0])
     const before = { albums: asks.musicbrainz.length, artists: asks.artists.length, songs: asks.songs.length }
     find((node) => node.type === 'button', failed)[0].props.onClick({ currentTarget: {} })
     draw()
@@ -902,7 +902,7 @@ async function main() {
     const foot = find((node) => byClass('app-search-problem')(node) && byClass('app-search-foot')(node))[0]
     check('every kind asked failed by moment 2: one block at the foot - isn\'t answering, what\'s in your library is above, a full-width Try again',
       [kinds(), text(find((node) => node.type === 'p', foot)[0]), find((node) => node.type === 'button', foot)[0]?.props.class, said()],
-      [['albums'], "MusicBrainz isn't answering just now - it often goes away for a few minutes. What's in your library is above.", 'app-button', "MusicBrainz isn't answering."])
+      [['albums'], "Searching for more isn't working right now - try again in a few minutes. What's in your library is above.", 'app-button', "Can't search for more right now."])
 
     //? that turned Behind on; busy said as busy
     const busyFrom = await search('wandering star', { artists: [], albums: [], songs: [libSong('s-ws', 'Wandering Star')] })
@@ -915,7 +915,7 @@ async function main() {
     await answerOwned(holding(DUMMY))
     invariant('busy')
     check('MusicBrainz shedding: its slots say busy, read from the 503\'s body (`busy`), never from its words', [slotText('artists'), slotText('albums')],
-      ['MusicBrainz is busy just now - try again in a moment.Try again', 'MusicBrainz is busy just now - try again in a moment.Try again'])
+      ['Too many searches just now - try again in a moment.Try again', 'Too many searches just now - try again in a moment.Try again'])
     //? Try again while Behind is on follows its own moments: Top results decided, the asking line - not slots
     find((node) => node.type === 'button' && text(node) === 'Try again', slotOf('artists')).at(0).props.onClick({ currentTarget: {} })
     draw()
@@ -932,8 +932,8 @@ async function main() {
     await answerOwned(holding(DUMMY))
     check('a 422 with words: each kind\'s slot says them - no Try again - and no "isn\'t answering" foot',
       [kinds(), slotText('artists'), find((node) => node.type === 'button' && text(node) === 'Try again').length, find(byClass('app-search-foot')).length],
-      [['artists', 'albums', 'songs'], "MusicBrainz couldn't read that search - try other words", 0, 0])
-    check('...and the region says the refusal\'s words - never "MusicBrainz isn\'t answering." (late review)', said(), "MusicBrainz couldn't read that search - try other words")
+      [['artists', 'albums', 'songs'], "That search couldn't be read - try other words", 0, 0])
+    check('...and the region says the refusal\'s words - never "MusicBrainz isn\'t answering." (late review)', said(), "That search couldn't be read - try other words")
   }
 
   console.log('\na text searched before: drawn whole at the library\'s moment, MusicBrainz asked nothing (kept answers)')
@@ -992,8 +992,8 @@ async function main() {
     await settle()
     draw()
     invariant('the library landing late')
-    check('...its answer landing in that place: "1 in your library - Show them"', text(find(byClass('app-search-slot'))[0]), '1 in your library - Show them')
-    const show = buttonText('1 in your library - Show them')
+    check('...its answer landing in that place: "1 in your library - Show them"', text(find(byClass('app-search-slot'))[0]), 'Show 1 from your library')
+    const show = buttonText('Show 1 from your library')
     show.props.onClick({ currentTarget: show })
     draw()
     check('...Show them: the list drawn afresh, whole - the library in it', [topKeys()[0], kinds()], ['top:artist:ar-tw', ['artists', 'albums']])
@@ -1034,7 +1034,7 @@ async function main() {
   {
     await search('po', { artists: [P], albums: [ndDummy], songs: [] })
     check('the library alone - MusicBrainz isn\'t asked - and the foot line where its rows would go; never "No results"',
-      [topKeys(), text(find(byClass('app-search-foot'))[0]), find((node) => text(node) === 'No results for “po”').length], [['top:artist:ar1', 'top:album:nd-dummy'], 'Type a little more, or press Search, to ask MusicBrainz too.', 0])
+      [topKeys(), text(find(byClass('app-search-foot'))[0]), find((node) => text(node) === 'No results for “po”').length], [['top:artist:ar1', 'top:album:nd-dummy'], "Type a little more, or press Search, to find albums you don't have yet.", 0])
     await advance(700)
     check('...nothing asked of MusicBrainz at the pause', asks.order.at(-1) !== undefined, true)
     const mbBefore = asks.musicbrainz.length
@@ -1050,13 +1050,13 @@ async function main() {
     await answerOwned(holding(DUMMY))
     await search('pq', { artists: [], albums: [], songs: [] })
     check('a one- or two-letter box finding nothing in the library: the foot line alone, no "No results"', [text(find(byClass('app-search-foot'))[0]), find((node) => /No results/.test(text(node))).length],
-      ['Type a little more, or press Search, to ask MusicBrainz too.', 0])
+      ["Type a little more, or press Search, to find albums you don't have yet.", 0])
     chip('Songs').props.onClick()
     draw()
     asks.library.at(-1).resolve({ artists: [], albums: [], songs: [] })
     await settle()
     draw()
-    check('...a kind view the same: the foot line where MusicBrainz\'s rows would go', text(find(byClass('app-search-foot'))[0]), 'Type a little more, or press Search, to ask MusicBrainz too.')
+    check('...a kind view the same: the foot line where MusicBrainz\'s rows would go', text(find(byClass('app-search-foot'))[0]), "Type a little more, or press Search, to find albums you don't have yet.")
     chip('All').props.onClick()
     draw()
   }
@@ -1104,14 +1104,14 @@ async function main() {
     check('the Artists view: your Kanye West (Ye is yours - by id), then MusicBrainz\'s, appended at the foot', rowsOf('artists').map(([title]) => title),
       ['Kanye West', '¥$', 'Kanye West Tribute Band', 'Kanye West & Hatsune Miku'])
     const more = find((node) => byClass('app-search-more')(node))[0]
-    check('...More from MusicBrainz (MusicBrainz counts more)', text(more), 'More from MusicBrainz')
+    check('...More from MusicBrainz (MusicBrainz counts more)', text(more), 'More artists')
     more.props.onClick()
     draw()
     check('...which asks the next page of the same name by offset', [asks.artists.at(-1).name, asks.artists.at(-1).offset], ['kanye west', 4])
     asks.artists.at(-1).resolve({ matches: [{ mbid: '00000000-0000-4000-8000-0000000000k9', name: 'Kanye', disambiguation: '', country: '', type: '', matched_as: '' }], count: 14 })
     await settle()
     draw()
-    check('...its page appended below, said', [rowsOf('artists').map(([title]) => title).at(-1), said()], ['Kanye', '1 more artist from MusicBrainz'])
+    check('...its page appended below, said', [rowsOf('artists').map(([title]) => title).at(-1), said()], ['Kanye', '1 more artist found'])
     const rowMb = rowButton('mb-artist:00000000-0000-4000-8000-0000000000k9')
     rowMb.props.onClick()
     check('a MusicBrainz artist\'s tap: their page by MusicBrainz id (`mb:` - outside the Navidrome gate)', mbArtists.at(-1), { mbid: '00000000-0000-4000-8000-0000000000k9', name: 'Kanye' })
@@ -1120,7 +1120,7 @@ async function main() {
     chip('All').props.onClick()
     draw()
     check('Back to All: everything at once, no phantom - the kind All needs and nobody asked for these words (albums: an artist you have, so no songs) in a slot',
-      [topKeys()[0], kinds(), slotText('albums')], ['top:artist:ar-k', ['artists', 'albums'], 'Asking MusicBrainz…'])
+      [topKeys()[0], kinds(), slotText('albums')], ['top:artist:ar-k', ['artists', 'albums'], 'Searching…'])
     asks.musicbrainz.at(-1).resolve({ 'release-groups': [], count: 0 })
     await answerOwned(holding(DUMMY))
 
@@ -1147,7 +1147,7 @@ async function main() {
     asks.songs.at(-1).resolve({ recordings: [recording('r-new', 'Roads (Dub)', 'Portishead', '8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11', OTHER_ALBUM)], count: 60 })
     await settle()
     draw()
-    check('...merged in below, said', [keysOf('songs').at(-1), said()], ['mb-song:8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11\nroads (dub)', '1 more song from MusicBrainz'])
+    check('...merged in below, said', [keysOf('songs').at(-1), said()], ['mb-song:8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11\nroads (dub)', '1 more song found'])
     //? Get on a song row: the album it names, on a pressing with the song
     const remixKey = 'mb-song:8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11\nroads (max cooper remix)'
     const get = getOf(remixKey)
@@ -1155,7 +1155,7 @@ async function main() {
     get.props.onClick({ currentTarget: { chip: 'song' } })
     draw()
     check('...a tap asks for the album\'s pressings, the chip busy and aria-disabled - never disabled', [asks.pressings.at(-1).id, text(getOf(remixKey)), getOf(remixKey).props['aria-busy'], getOf(remixKey).props['aria-disabled'], getOf(remixKey).props.disabled],
-      [SOMEONE_ALBUM.id, 'Get…', true, true, undefined])
+      [SOMEONE_ALBUM.id, 'Getting…', true, true, undefined])
     const track = (title, recordingId) => ({ title, position: 1, length: 240000, recording: { id: recordingId, title, length: 240000 } })
     asks.pressings.at(-1).resolve({ id: SOMEONE_ALBUM.id, problem: null, releases: [
       { id: 'rel-usual', title: 'Somebody\'s Album', status: 'Official', date: '2001-01-01', country: 'GB', media: [{ format: 'CD', position: 1, tracks: [track('Other Song', 'x-1')] }], 'release-group': { id: SOMEONE_ALBUM.id, title: 'Somebody\'s Album', 'first-release-date': '2001-01-01' }, 'artist-credit': [{ name: 'Somebody', artist: { id: SOMEBODY, name: 'Somebody' } }] },
@@ -1190,7 +1190,7 @@ async function main() {
     await settle()
     draw()
     check('the Songs view for an artist\'s name alone: their songs in your library, then how to find theirs on MusicBrainz',
-      [keysOf('songs'), text(find(byClass('app-search-foot'))[0])], [['song:s-roads'], "Type a song's title with the artist (“roads portishead”) to find their songs on MusicBrainz."])
+      [keysOf('songs'), text(find(byClass('app-search-foot'))[0])], [['song:s-roads'], "Type a song's title with the artist (“roads portishead”) to find songs you don't have yet."])
     chip('All').props.onClick()
     draw()
   }
@@ -1208,7 +1208,7 @@ async function main() {
     asked.albums[0].resolve({ 'release-groups': [THIRD], count: 1 })
     await answerOwned(holding(DUMMY))
     dom.use()
-    dom.press(buttonText('Show 1 album from MusicBrainz'))
+    dom.press(buttonText('Show 1 more album'))
     check('Show N tapped from the keyboard: focus to the first row it brought', [dom.focused, document.activeElement?.key], [[`row:group:${THIRD.id}`], `row:group:${THIRD.id}`])
     //? a finger's tap on WebKit gives the control no focus: focus left alone, so the page isn't scrolled
     const second = await search('only you!', { artists: [], albums: [ndDummy], songs: [libSong('s-ou', 'Only You')] })
@@ -1221,7 +1221,7 @@ async function main() {
     secondAsked.albums[0].resolve({ 'release-groups': [ROSELAND], count: 1 })
     await answerOwned(holding(DUMMY))
     dom.use()
-    const tapped = buttonText('Show 1 album from MusicBrainz')
+    const tapped = buttonText('Show 1 more album')
     tapped.props.onClick({ currentTarget: dom.el(tapped) })
     draw()
     check('...tapped by a finger (WebKit focuses nothing): focus left alone', [dom.focused, document.activeElement === dom.body], [[], true])
@@ -1277,7 +1277,7 @@ async function main() {
     await settle()
     draw()
     dom.use()
-    dom.press(buttonText('1 in your library - Show them'))
+    dom.press(buttonText('Show 1 from your library'))
     check('the library\'s Show them from the keyboard: focus to the first row it brought', dom.focused, ['row:top:album:nd-dummy'])
     dom.leave()
   }
@@ -1295,7 +1295,13 @@ async function main() {
     await answerOwned(holding(DUMMY))
     const tiles = find(byClass('app-top-tile'))
     check('on a desktop, up to six tinted lockups three across - each with the place on its own third line', [find(byClass('app-top-tiles')).length, tiles.length,
-      find(byClass('app-top-place'), top()).map(text)], [1, 6, ['In your library', 'In your library', 'In your library', 'In your library', 'In your library', 'On MusicBrainz']])
+      find(byClass('app-top-place'), top()).map(text)], [1, 6, ['In your library', 'In your library', 'In your library', 'In your library', 'In your library', '']])
+    //? (2.0.6, review) a tile with a Get has ~60px of text beside it at 1440 - "Not in your library" was cut to "Not in
+    //? y…": its third line is left empty (its height kept), the Get saying it isn't here; a tile without one says it
+    check('(2.0.6) ...a tile with a Get leaves its third line empty, there to keep the height; one without says where it is',
+      tiles.map((tile) => [find(byClass('app-result-get'), tile).length > 0, text(find(byClass('app-top-place'), tile)[0]) !== '']),
+      tiles.map((tile) => { const get = find(byClass('app-result-get'), tile).length > 0; return [get, !get] }))
+    check('(2.0.6) ...and one of them here has a Get', tiles.some((tile) => find(byClass('app-result-get'), tile).length > 0), true)
     check('...and the sections\' previews the desktop\'s: albums 4 + 4', keysOf('albums').length, 4)
     //? (2.0.0-player.57 review) a song's tile has no room beside its cover and ▶ for a •••: the Songs row below has it
     const songTiles = tiles.filter((tile) => find((node) => typeof node.props?.['aria-label'] === 'string' && /^Play /.test(node.props['aria-label']), tile).length || /Roads|Sour Times|Glory Box/.test(text(tile)))
@@ -1339,7 +1345,7 @@ async function main() {
     check('...Third now "in your library", in its place: nothing re-sorted', rowsOf('albums'),
       [['Dummy', 'Portishead · 1994 · in your library'], ['Third', 'Portishead · 2008 · in your library']])
     check('...the hint before typing, with a library of your own', (() => { type(''); return text(find(byClass('app-search-hint'))[0]) })(),
-      "Artists, albums and songs: yours first, then the collection's, then MusicBrainz's.")
+      'Search your library, the collection, and albums nobody has yet.')
     Session.setSessionMe(null)
     draw()
   }
@@ -1366,7 +1372,7 @@ async function main() {
     const getsBefore = gets.length
     tap()
     draw()
-    check('a tap asks for the album\'s pressings, the chip busy meanwhile', [asks.pressings.at(-1)?.id, text(chipOf(ROSELAND)), chipOf(ROSELAND).props['aria-busy']], [ROSELAND.id, 'Get…', true])
+    check('a tap asks for the album\'s pressings, the chip busy meanwhile', [asks.pressings.at(-1)?.id, text(chipOf(ROSELAND)), chipOf(ROSELAND).props['aria-busy']], [ROSELAND.id, 'Getting…', true])
     const first = asks.pressings.at(-1)
     tap()
     check('a second tap calls the first ask off', first.signal.aborted, true)
@@ -1544,7 +1550,7 @@ async function main() {
     answerAll(none)
     await answerOwned(holding(DUMMY))
     check('no results - the library found nothing and every kind asked answered empty: "No results for “…”", and what to do',
-      find(byClass('app-search-foot')).map((node) => text(node)), ['No results for “zzyzx qwerty”Check the spelling or try a new search.'])
+      find(byClass('app-search-foot')).map((node) => text(node)), ['No results for “zzyzx qwerty”.Check the spelling or try a new search.'])
     chip('Albums').props.onClick()
     draw()
     asks.library.at(-1).resolve({ artists: [], albums: [], songs: [] })
@@ -1601,7 +1607,7 @@ async function main() {
     lateAsked.albums[0].resolve({ 'release-groups': [{ id: '00000000-0000-4000-8000-0000000000e1', title: 'Eliminator', 'primary-type': 'Album', 'first-release-date': '1983' }], count: 1 })
     await answerOwned(holding(DUMMY))
     await advance(1500)
-    check('(the songs past the cap: a Songs section with only its slot)', [kinds(), slotText('songs'), keysOf('songs')], [['albums', 'songs'], 'Asking MusicBrainz…', []])
+    check('(the songs past the cap: a Songs section with only its slot)', [kinds(), slotText('songs'), keysOf('songs')], [['albums', 'songs'], 'Searching…', []])
     lateAsked.songs[0].resolve({ recordings: [], count: 0 })
     await answerOwned(holding(DUMMY))
     invariant('an empty late kind, last')
@@ -1620,11 +1626,11 @@ async function main() {
     invariant('the cap, albums out')
     const note = () => find(byClass('app-search-filter-note')).map(text)
     check('albums late at the cap: Albums drawn with its slot and - its request carrying the studio clause - the studio line already under it, Songs below',
-      [kinds(), slotText('albums'), note()], [['artists', 'albums', 'songs'], 'Asking MusicBrainz…', ["MusicBrainz's studio albums and EPs - See all for everything they made."]])
+      [kinds(), slotText('albums'), note()], [['artists', 'albums', 'songs'], 'Searching…', ['Studio albums and EPs - See all for everything they made.']])
     asked.albums[0].resolve(studio)
     await answerOwned(holding(DUMMY))
     invariant('the studio answer landing late')
-    check('...the answer landing folds into the slot; the line was there all along - nothing below moved', [slotText('albums'), note().length], ['Show 3 albums from MusicBrainz', 1])
+    check('...the answer landing folds into the slot; the line was there all along - nothing below moved', [slotText('albums'), note().length], ['Show 3 more albums', 1])
   }
 
   console.log('\nMore from MusicBrainz in the Albums view; See all without focus; Show them and the last More handing focus on')
@@ -1647,7 +1653,7 @@ async function main() {
     asks.library.at(-1).resolve({ artists: [], albums: [], songs: [] })
     await settle()
     draw()
-    check('the Albums view: the twelve, More from MusicBrainz under them', [keysOf('albums').length, text(find(byClass('app-search-more'))[0])], [12, 'More from MusicBrainz'])
+    check('the Albums view: the twelve, More from MusicBrainz under them', [keysOf('albums').length, text(find(byClass('app-search-more'))[0])], [12, 'More albums'])
     const more = find(byClass('app-search-more'))[0]
     dom.use()
     dom.press(more)
@@ -1656,7 +1662,7 @@ async function main() {
     await settle()
     draw()
     check('...its last page appended below, the button gone - focus (it had it) to the first album it brought', [keysOf('albums').length, find(byClass('app-search-more')).length, dom.focused, said()],
-      [18, 0, [`row:group:${albums(12, 13)[0].id}`], '6 more albums from MusicBrainz'])
+      [18, 0, [`row:group:${albums(12, 13)[0].id}`], '6 more albums found'])
     dom.leave()
     void rootRef
     chip('All').props.onClick()
@@ -1670,7 +1676,7 @@ async function main() {
   }
   const PID = '8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11'
   const down = { configured: true, ok: false, server: null, problem: 'connection refused' }
-  const TYPE_MORE_WORDS = 'Type a little more, or press Search, to ask MusicBrainz too.'
+  const TYPE_MORE_WORDS = "Type a little more, or press Search, to find albums you don't have yet."
 
   console.log('\na box cut back below three characters, and the same words typed again (the review trap, kept)')
   {
@@ -1781,10 +1787,10 @@ async function main() {
     check('...a moment before the cap, counted from the letter taken back: the asking line', kinds(), [])
     await advance(1)
     check('...the cap: the sections drawn, the albums still out in their slot - never waiting on the slowest kind',
-      [kinds(), slotText('albums'), keysOf('artists'), keysOf('songs')], [['artists', 'albums', 'songs'], 'Asking MusicBrainz…', ['artist:ar1'], ['song:s-roads']])
+      [kinds(), slotText('albums'), keysOf('artists'), keysOf('songs')], [['artists', 'albums', 'songs'], 'Searching…', ['artist:ar1'], ['song:s-roads']])
     asked.albums[0].resolve(studio)
     await answerOwned(holding(DUMMY))
-    check('...the albums landing in their slot', slotText('albums'), 'Show 3 albums from MusicBrainz')
+    check('...the albums landing in their slot', slotText('albums'), 'Show 3 more albums')
 
     //? the library's own Try again for words MusicBrainz was asked for: its run's cap counts from the Try again too
     await remount()
@@ -1807,7 +1813,7 @@ async function main() {
     draw()
     check('the library\'s Try again, the albums still out: moment 1 again (the asking line, no sections)', [kinds(), asking().length], [[], 1])
     await advance(1500)
-    check('...the cap counted from the Try again: the sections drawn, the albums in their slot - never waiting on the slowest kind', [kinds(), slotText('albums')], [['albums'], 'Asking MusicBrainz…'])
+    check('...the cap counted from the Try again: the sections drawn, the albums in their slot - never waiting on the slowest kind', [kinds(), slotText('albums')], [['albums'], 'Searching…'])
     slowAlbums.resolve({ 'release-groups': [], count: 0 })
     await answerOwned(holding(DUMMY))
   }
@@ -1832,7 +1838,7 @@ async function main() {
     await answerOwned(holding(DUMMY))
     check('every kind failing at once: the foot says MusicBrainz isn\'t answering, with Try again - no "No results", no "Type a little more"',
       [find(byClass('app-search-foot')).map(text), find((node) => node.type === 'p' && /No results|Type a little more/.test(text(node))).length],
-      [["MusicBrainz isn't answering just now - it often goes away for a few minutes.Try again"], 0])
+      [["Searching for more isn't working right now - try again in a few minutes.Try again"], 0])
     //? the albums failing first, the others answering: the failure in its own slot, the artist drawn
     const second = { albums: asks.musicbrainz.length, artists: asks.artists.length, songs: asks.songs.length, order: asks.order.length }
     type('U3')
@@ -1850,7 +1856,7 @@ async function main() {
     await answerOwned(holding(DUMMY))
     check('...the albums failing alone: their slot says so with Try again, the artist MusicBrainz found drawn - never "No results"',
       [kinds(), slotText('albums'), keysOf('artists'), find((node) => node.type === 'p' && /No results/.test(text(node))).length],
-      [['artists', 'albums'], "MusicBrainz isn't answering.Try again", ['mb-artist:00000000-0000-4000-8000-0000000000u3'], 0])
+      [['artists', 'albums'], "Can't search for more right now.Try again", ['mb-artist:00000000-0000-4000-8000-0000000000u3'], 0])
     //? Search pressed before the library settled, the albums failing at once: never "press Search" after Search was pressed
     const third = { albums: asks.musicbrainz.length, order: asks.order.length, artists: asks.artists.length, songs: asks.songs.length }
     type('U4')
@@ -1930,7 +1936,7 @@ async function main() {
     await answerOwned(holding(DUMMY))
     check('the status not known yet: the Albums view\'s library waits - none asked - MusicBrainz\'s row not drawn before it, one asking line, busy',
       [asks.library.filter((ask) => ask.text === 'protection').length, keysOf('albums'), find(byClass('app-asking'), sectionOf('app-search-albums')).map(text), sectionOf('app-search-albums').props['aria-busy']],
-      [0, [], ['Searching your library and MusicBrainz…'], true])
+      [0, [], ['Searching…'], true])
     draw({ status })
     check('...the status OK: All\'s search3 and the view\'s own asked', asks.library.filter((ask) => ask.text === 'protection').map((ask) => ask.page?.counts ?? null),
       [null, { artistCount: 0, albumCount: 50, songCount: 0 }])
@@ -1964,16 +1970,16 @@ async function main() {
     chip('Albums').props.onClick()
     draw()
     check('the Albums view before its library lands: one asking line where its rows go - not its heading alone',
-      [find(byClass('app-asking'), sectionOf('app-search-albums')).map(text), keysOf('albums'), said()], [['Searching your library and MusicBrainz…'], [], 'Showing albums.'])
+      [find(byClass('app-asking'), sectionOf('app-search-albums')).map(text), keysOf('albums'), said()], [['Searching…'], [], 'Showing albums.'])
     asks.library.at(-1).resolve({ artists: [], albums: [{ id: 'nd-mezz', name: 'Mezzanine', artist: 'Massive Attack', year: 1998 }], songs: [] })
     await settle()
     draw()
     check('...its rows drawn: the line gone, the region saying what the library found', [find(byClass('app-asking'), sectionOf('app-search-albums')).map(text), keysOf('albums'), said()],
-      [['Asking MusicBrainz…'], ['album:nd-mezz'], 'Showing albums. In your library: 1 album.'])
+      [['Searching…'], ['album:nd-mezz'], 'Showing albums. In your library: 1 album.'])
     await advance(500)
     asks.musicbrainz.at(-1).resolve({ 'release-groups': [{ id: '00000000-0000-4000-8000-00000000me22', title: 'Mezzanine', 'primary-type': 'Album', 'first-release-date': '1998' }], count: 1 })
     await answerOwned(holding(DUMMY))
-    check('...then MusicBrainz\'s, said as they draw', said(), 'From MusicBrainz: 1 album.')
+    check('...then MusicBrainz\'s, said as they draw', said(), 'Also found: 1 album.')
     chip('All').props.onClick()
     draw()
   }
@@ -2044,7 +2050,7 @@ async function main() {
     asks.library.at(-1).resolve({ artists: [], albums: [], songs: [libSong('s-roads', 'Roads')] })
     await settle()
     draw()
-    check('...its answer landing in that place', libraryPlaceText(), ['1 in your library - Show them'])
+    check('...its answer landing in that place', libraryPlaceText(), ['Show 1 from your library'])
   }
 
   console.log('\na kind view whose library was late, after a chip round trip: drawn afresh from what is in hand (review)')
@@ -2057,7 +2063,7 @@ async function main() {
     asks.library.at(-1).resolve({ artists: [], albums: [ndDummy], songs: [] })
     await settle()
     draw()
-    check('(the view\'s library late: its place says Show them)', slotText('albums'), '1 in your library - Show them')
+    check('(the view\'s library late: its place says Show them)', slotText('albums'), 'Show 1 from your library')
     chip('All').props.onClick()
     draw()
     chip('Albums').props.onClick()
@@ -2094,7 +2100,7 @@ async function main() {
     await answerOwned(holding(DUMMY))
     const moreButton = () => find(byClass('app-search-more-musicbrainz'))[0]
     const note = () => find(byClass('app-search-more-note')).map(text)
-    for (const [kind, label, asked] of [['Albums', 'More from MusicBrainz', () => asks.musicbrainz], ['Artists', 'More from MusicBrainz', () => asks.artists], ['Songs', 'More songs', () => asks.songs]]) {
+    for (const [kind, label, asked] of [['Albums', 'More albums', () => asks.musicbrainz], ['Artists', 'More artists', () => asks.artists], ['Songs', 'More songs', () => asks.songs]]) {
       chip(kind).props.onClick()
       draw()
       asks.library.at(-1).resolve({ artists: [], albums: [], songs: [] })
@@ -2106,7 +2112,7 @@ async function main() {
       draw()
       const page = asked().at(-1)
       check(`${kind}: More asking - the button busy, aria-disabled, never disabled`, [text(moreButton()), moreButton().props['aria-busy'], moreButton().props['aria-disabled'], moreButton().props.disabled],
-        ['Asking MusicBrainz…', true, true, undefined])
+        ['Loading…', true, true, undefined])
       moreButton().props.onClick()
       draw()
       check(`...a second tap while it asks asks nothing`, asked().at(-1) === page, true)
@@ -2114,7 +2120,7 @@ async function main() {
       await settle()
       draw()
       check(`...MusicBrainz away: said, the rows kept, the button trying again`, [note(), keysOf(kind.toLowerCase()).length, text(moreButton())],
-        [["MusicBrainz isn't answering just now - it often goes away for a few minutes."], rows, 'Try again'])
+        [["Searching for more isn't working right now - try again in a few minutes."], rows, 'Try again'])
       moreButton().props.onClick()
       draw()
       check(`...Try again asks the same page`, [asked().at(-1) !== page, asked().at(-1).offset], [true, page.offset])
@@ -2155,7 +2161,7 @@ async function main() {
     await settle()
     draw()
     dom.use()
-    dom.press(buttonText('1 in your library - Show them', sectionOf('app-search-albums')))
+    dom.press(buttonText('Show 1 from your library', sectionOf('app-search-albums')))
     check('...the view\'s late library\'s Show them: focus to the first row it brought', dom.focused, ['row:album:nd-dummy'])
     dom.leave()
     chip('All').props.onClick()
@@ -2289,7 +2295,7 @@ async function main() {
     newAsks(failedSlot).artists[0].resolve(ARTISTS_NONE)
     newAsks(failedSlot).songs[0].resolve({ recordings: [], count: 0 })
     await answerOwned(holding(DUMMY))
-    check('(the albums failed busy, the others answered: Albums\' slot says so)', [kinds(), slotText('albums')], [['albums', 'songs'], 'MusicBrainz is busy just now - try again in a moment.Try again'])
+    check('(the albums failed busy, the others answered: Albums\' slot says so)', [kinds(), slotText('albums')], [['albums', 'songs'], 'Too many searches just now - try again in a moment.Try again'])
     const enterFrom = asksNow()
     enter()
     check('Enter after a failed slot: only the failed kind asked again - and the list drawn afresh by its moments (the asking line), as Try again draws it',
@@ -2350,7 +2356,7 @@ async function main() {
     asks.library.at(-1).resolve({ artists: [], albums: [ndDummy], songs: [] })
     await settle()
     draw()
-    check('...its answer landing in that place', libraryPlaceText(), ['1 in your library - Show them'])
+    check('...its answer landing in that place', libraryPlaceText(), ['Show 1 from your library'])
 
     //? 2. Navidrome coming back after the library failed: asked again, and the list drawn afresh with it
     await remount()
@@ -2384,8 +2390,8 @@ async function main() {
     await answerOwned(holding(DUMMY))
     const albumsSection = sectionOf('app-search-albums')
     check('a kind view whose library failed, MusicBrainz finding nothing: the failure with Try again and MusicBrainz\'s own words - no "No albums for" under them',
-      [text(find((node) => node.type === 'p', find(byClass('app-search-problem'), albumsSection)[0])[0]), find((node) => node.type === 'p', albumsSection).map(text).filter((each) => /^No albums/.test(each))],
-      ['Navidrome had a problem', ['No albums on MusicBrainz for “zzqx”.']])
+      [text(find((node) => node.type === 'p', find(byClass('app-search-problem'), albumsSection)[0])[0]), find((node) => node.type === 'p', albumsSection).map(text).filter((each) => /^No (?:other )?albums/.test(each))],
+      ['Navidrome had a problem', ['No other albums for “zzqx”.']])
     chip('All').props.onClick()
     draw()
 
@@ -2475,11 +2481,11 @@ async function main() {
     newAsks(heldLate).songs[0].resolve({ recordings: [], count: 0 })
     await answerOwned(holding(DUMMY))
     await advance(1500)
-    check('(albums past the cap: its slot, Songs below it)', [kinds(), slotText('albums')], [['albums', 'songs'], 'Asking MusicBrainz…'])
+    check('(albums past the cap: its slot, Songs below it)', [kinds(), slotText('albums')], [['albums', 'songs'], 'Searching…'])
     newAsks(heldLate).albums[0].resolve({ 'release-groups': [DUMMY], count: 1 })
     await answerOwned(holding(DUMMY))
     check('a late albums kind landing with all it found held, something below: its slot says everything is in your library - not "No albums on MusicBrainz"',
-      slotText('albums'), 'Everything MusicBrainz found is in your library already.')
+      slotText('albums'), 'You already have everything found.')
 
     //? (d) under three characters, before the library answers: it alone is said to be searched
     await remount()
@@ -2509,7 +2515,7 @@ async function main() {
     check('asked as the words settle, beside the library - the box\'s words, once', asks.saved.filter((ask) => ask.words === 'the rip').length, 1)
     check('the library\'s moment, MusicBrainz not yet asked: a song seen only on a saved album page is Top results\' first - its album and its artist after it (Apple\'s family)',
       [topKeys(), find(byClass('app-search-top-place')).length, asking().length], [[`top:${RIP}`, `top:group:${THIRD.id}`, 'top:artist:ar1'], 0, 1])
-    check('...marked as saved - its place words, the facts as MusicBrainz\'s row says them', lineOf(rowButton(`top:${RIP}`)), 'Song · Portishead · Third · saved')
+    check('...marked as saved - its place words, the facts as MusicBrainz\'s row says them', lineOf(rowButton(`top:${RIP}`)), 'Song · Portishead · Third')
     rowButton(`top:${RIP}`).props.onClick()
     check('...and its tap is a MusicBrainz song\'s: its album, the song marked', songAlbums.at(-1), [{ id: THIRD.id, title: 'Third' }, ['r-rip']])
     await advance(500)
@@ -2522,8 +2528,8 @@ async function main() {
     invariant('moment 2, what\'s saved in hand')
     check('moment 2: Songs - what\'s saved first, then MusicBrainz\'s, its own take of the same song left out (by its key)',
       [kinds(), keysOf('songs'), topKeys()], [['songs'], [RIP, OTHER_RIP], [`top:${RIP}`, `top:group:${THIRD.id}`, 'top:artist:ar1']])
-    check('...the region: what\'s saved, then what MusicBrainz added', said(), 'Saved from MusicBrainz: 1 song. More from MusicBrainz: 1 song.')
-    check('...the saved row a MusicBrainz row, marked; MusicBrainz\'s not', [lineOf(rowButton(RIP)), lineOf(rowButton(OTHER_RIP))], ['Portishead · 4:00 · Third · saved', 'Somebody · 4:00 · Somebody\'s Album'])
+    check('...the region: what\'s saved, then what MusicBrainz added', said(), 'Found earlier: 1 song. More found: 1 song.')
+    check('...the saved row a MusicBrainz row, marked; MusicBrainz\'s not', [lineOf(rowButton(RIP)), lineOf(rowButton(OTHER_RIP))], ['Portishead · 4:00 · Third', 'Somebody · 4:00 · Somebody\'s Album'])
 
     //? MusicBrainz's songs past the cap: the saved row drawn at the cap, MusicBrainz's landing below it - drawn in (last)
     const late = await search('the rip', null)
@@ -2542,8 +2548,8 @@ async function main() {
     await advance(1500)
     invariant('the cap, songs out')
     check('at the cap, songs still out: Albums - Third (saved) first, then MusicBrainz\'s Roseland, Third once; Songs - the saved row, its slot under it',
-      [kinds(), keysOf('albums'), keysOf('songs'), slotText('songs')], [['artists', 'albums', 'songs'], [`group:${THIRD.id}`, `group:${ROSELAND.id}`], [RIP], 'Asking MusicBrainz…'])
-    check('...the region says what\'s saved as the sections draw', said(), 'Saved from MusicBrainz: 1 album, 1 song.')
+      [kinds(), keysOf('albums'), keysOf('songs'), slotText('songs')], [['artists', 'albums', 'songs'], [`group:${THIRD.id}`, `group:${ROSELAND.id}`], [RIP], 'Searching…'])
+    check('...the region says what\'s saved as the sections draw', said(), 'Found earlier: 1 album, 1 song.')
     cappedAsks.songs[0].resolve({ recordings: [recording('r-rip2', 'The Rip', 'Portishead', PID, THIRD), recording('r-rip3', 'The Rip', 'Somebody', SOMEBODY, SOMEONE_ALBUM)], count: 2 })
     await answerOwned(holding(DUMMY))
     invariant('songs landing after the cap')
@@ -2559,12 +2565,12 @@ async function main() {
     foldAsks.songs[0].resolve({ recordings: [], count: 0 })
     await answerOwned(holding(DUMMY))
     await advance(1500)
-    check('(at the cap: Albums with the saved row and a slot, Songs below it)', [kinds(), keysOf('albums'), slotText('albums')], [['artists', 'albums', 'songs'], [`group:${THIRD.id}`], 'Asking MusicBrainz…'])
+    check('(at the cap: Albums with the saved row and a slot, Songs below it)', [kinds(), keysOf('albums'), slotText('albums')], [['artists', 'albums', 'songs'], [`group:${THIRD.id}`], 'Searching…'])
     foldAsks.albums[0].resolve({ 'release-groups': [THIRD], count: 1 })
     await answerOwned(holding(DUMMY))
     invariant('albums landing with nothing new')
     check('MusicBrainz\'s albums bring nothing that isn\'t drawn: its slot says so - never that MusicBrainz has none', [keysOf('albums'), slotText('albums')],
-      [[`group:${THIRD.id}`], 'No more albums on MusicBrainz for “third portishead”.'])
+      [[`group:${THIRD.id}`], 'No more albums for “third portishead”.'])
 
     //? MusicBrainz away: what's saved stays, with one line saying so
     globalThis.__search.savedHolds = (words) => (words === 'the rip live' ? savedAnswer({ recordings: [recording('r-ripl', 'The Rip Live', 'Portishead', PID, ROSELAND)] }) : null)
@@ -2579,8 +2585,8 @@ async function main() {
         find((node) => node.type === 'button' && text(node) === 'Try again', find(byClass('app-search-foot'))[0]).length],
       //? the whole line (after review) - "What's in your library is above." only because it is: the song's artist, Portishead,
       //? is the library's (Top results' third)
-      [[`mb-song:${PID}\nthe rip live`], "MusicBrainz isn't answering just now - these are what deadwax has saved from it. What's in your library is above.Try again", 1])
-    check('...the region says it the same way', said().includes("MusicBrainz isn't answering - these are what deadwax has saved."), true)
+      [[`mb-song:${PID}\nthe rip live`], "Showing earlier results - searching for more isn't working right now. What's in your library is above.Try again", 1])
+    check('...the region says it the same way', said().includes("Showing earlier results - searching for more isn't working right now."), true)
     //? (after review) nothing of the library's drawn - the artist isn't in it: the foot never says the library's is above
     await remount({}, [])
     const bare = await search('the rip live', nothing)
@@ -2590,7 +2596,7 @@ async function main() {
     await answerOwned(holding(DUMMY))
     check('MusicBrainz away, only what\'s saved drawn (its artist not the library\'s): the foot one line - never "What\'s in your library is above."',
       [topKeys().every((key) => key.startsWith('top:mb-') || key.startsWith('top:group:')), text(find(byClass('app-search-foot'))[0])],
-      [true, "MusicBrainz isn't answering just now - these are what deadwax has saved from it.Try again"])
+      [true, "Showing earlier results - searching for more isn't working right now.Try again"])
 
     //? one kind failing under a saved row while another answers: its slot says these are saved (a fresh Search: no Behind)
     await remount()
@@ -2604,7 +2610,7 @@ async function main() {
     halfAsks.songs[0].resolve({ recordings: [recording('r-ros2', 'Roseland Intro', 'Portishead', PID, ROSELAND)], count: 1 })
     await answerOwned(holding(DUMMY))
     check('one kind failing under its saved rows: its slot says MusicBrainz isn\'t answering and these are saved, with Try again',
-      [keysOf('albums'), slotText('albums')], [[`group:${ROSELAND.id}`], 'Saved - MusicBrainz is away.Try again'])
+      [keysOf('albums'), slotText('albums')], [[`group:${ROSELAND.id}`], 'Showing earlier results.Try again'])
 
     //? nothing saved for the words: today's behaviour exactly - the asks, the moments, the rows
     await remount()
@@ -2618,7 +2624,7 @@ async function main() {
     plainAsks.songs[0].resolve({ recordings: [], count: 0 })
     await answerOwned(holding(DUMMY))
     check('...and moment 2 as before - no row marked saved, the region as before', [topKeys(), kinds(), lineOf(rowButton(`group:${THIRD.id}`)), said()],
-      [[`top:group:${THIRD.id}`, 'top:artist:ar1', 'top:artist:ar-teb'], ['artists', 'albums'], 'Portishead · 2008', 'From MusicBrainz: 1 album.'])
+      [[`top:group:${THIRD.id}`, 'top:artist:ar1', 'top:artist:ar-teb'], ['artists', 'albums'], 'Portishead · 2008', 'Also found: 1 album.'])
 
     //? the artist reading: only their albums, the studio ones (the line under them says so), saved artists by id once
     globalThis.__search.savedHolds = (words) => (words === 'portishead' ? savedAnswer({
@@ -2643,8 +2649,8 @@ async function main() {
     const RADIOHEAD = radioheadArtists.matches[0]
     globalThis.__search.savedHolds = (words) => (words === 'radiohead' ? savedAnswer({ artists: [{ ...RADIOHEAD }] }) : null)
     const rh = await search('radiohead', nothing)
-    check('a saved artist nobody\'s library has: Top results\' first at the library\'s moment, marked saved', [topKeys()[0], lineOf(rowButton(`top:mb-artist:${RADIOHEAD.mbid}`)).endsWith('· saved')],
-      [`top:mb-artist:${RADIOHEAD.mbid}`, true])
+    check('a saved artist nobody\'s library has: Top results\' first at the library\'s moment - (2.0.6) unmarked, MusicBrainz\'s row as it would be', [topKeys()[0], lineOf(rowButton(`top:mb-artist:${RADIOHEAD.mbid}`)).endsWith('· saved')],
+      [`top:mb-artist:${RADIOHEAD.mbid}`, false])
     rowButton(`top:mb-artist:${RADIOHEAD.mbid}`).props.onClick()
     check('...its tap their page by mb: - a MusicBrainz artist\'s', mbArtists.at(-1), { mbid: RADIOHEAD.mbid, name: RADIOHEAD.name })
     await advance(500)
@@ -2669,7 +2675,7 @@ async function main() {
     await settle()
     draw()
     check('the Albums view, MusicBrainz still out: what\'s saved drawn at once, the asking line under it',
-      [keysOf('albums'), find(byClass('app-asking-text'), sectionOf('app-search-albums')).map(text)], [[`group:${THIRD.id}`], ['Asking MusicBrainz…']])
+      [keysOf('albums'), find(byClass('app-asking-text'), sectionOf('app-search-albums')).map(text)], [[`group:${THIRD.id}`], ['Searching…']])
     viewAsks.albums.at(-1).resolve({ 'release-groups': [THIRD, ROSELAND], count: 2 })
     await answerOwned(holding(DUMMY))
     check('...MusicBrainz\'s added below it, Third once', keysOf('albums'), [`group:${THIRD.id}`, `group:${ROSELAND.id}`])
@@ -2739,7 +2745,7 @@ async function main() {
     draw()
     check('...its answer landing after: nothing drawn moves or changes - Third MusicBrainz\'s row in its place, its line as it was; the new saved album BELOW',
       [keysOf('albums'), drawnBack.map((key) => lineOf(rowButton(key))), lineOf(rowButton(`group:${SOMEONE_ALBUM.id}`)).endsWith('· saved')],
-      [[`group:${ROSELAND.id}`, `group:${THIRD.id}`, `group:${SOMEONE_ALBUM.id}`], linesBack, true])
+      [[`group:${ROSELAND.id}`, `group:${THIRD.id}`, `group:${SOMEONE_ALBUM.id}`], linesBack, false])
     //? asked once for the words: a chip's tap, Enter and Try again never ask it again (the review's first catch)
     const savedAsks = asks.saved.length
     chip('Songs').props.onClick()
@@ -2794,7 +2800,7 @@ async function main() {
     await settle()
     draw()
     check('the view\'s library in, what\'s saved still asked: MusicBrainz\'s kept rows held - the asking line where they go',
-      [keysOf('albums'), find(byClass('app-asking-text'), sectionOf('app-search-albums')).map(text)], [[], ['Asking MusicBrainz…']])
+      [keysOf('albums'), find(byClass('app-asking-text'), sectionOf('app-search-albums')).map(text)], [[], ['Searching…']])
     asks.saved.at(-1).resolve(savedAnswer({ groups: [THIRD] }))
     await settle()
     draw()
@@ -2833,7 +2839,7 @@ async function main() {
     draw()
     check('...its answer landing after: the failure and its Try again stay where they were, the saved album BELOW them',
       [order(), keysOf('albums')], [['PROBLEM', 'row'], [`group:${THIRD.id}`]])
-    check('...the failure\'s words as they were drawn (nothing saved above it)', find(byClass('app-search-problem'), sectionOf('app-search-albums')).map(text).join(' ').includes('Saved -'), false)
+    check('...the failure\'s words as they were drawn (nothing saved above it)', find(byClass('app-search-problem'), sectionOf('app-search-albums')).map(text).join(' ').includes('Showing earlier results'), false)
     globalThis.__search.savedByHand = false
     chip('All').props.onClick()
     draw()
@@ -2864,7 +2870,7 @@ async function main() {
     await settle()
     draw()
     check('MusicBrainz failing, the view\'s library in, what\'s saved still asked: no failure drawn yet - the asking line where it goes',
-      [asks.saved.at(-1).words, order(), find(byClass('app-asking-text'), sectionOf('app-search-albums')).map(text)], ['zork held', [], ['Asking MusicBrainz…']])
+      [asks.saved.at(-1).words, order(), find(byClass('app-asking-text'), sectionOf('app-search-albums')).map(text)], ['zork held', [], ['Searching…']])
     asks.saved.at(-1).resolve(savedAnswer({ groups: [THIRD] }))
     await settle()
     draw()
@@ -2899,8 +2905,8 @@ async function main() {
       urls.map((url) => [new URL(url, 'http://deadwax.test').pathname.replace(/^.*\/search_musicbrainz/, ''), query(url)]),
       [['/artists', { name: 'kanye west', limit: '10' }], ['/artists', { name: 'kanye west', limit: '10', offset: '10' }], ['/songs', { query: 'recording:"roads"', limit: '25', offset: '25' }]])
     //? busy: the 503's body says `busy: true` beside its words - read from the body, never the words
-    const answers = [{ status: 503, body: { detail: 'MusicBrainz is busy just now - try again in a moment.', busy: true } }, { status: 503, body: { detail: 'MusicBrainz is unreachable right now (busy)' } },
-      { status: 422, body: { detail: "MusicBrainz couldn't read that search - try other words" } }]
+    const answers = [{ status: 503, body: { detail: 'Too many searches just now - try again in a moment.', busy: true } }, { status: 503, body: { detail: 'MusicBrainz is unreachable right now (busy)' } },
+      { status: 422, body: { detail: "That search couldn't be read - try other words" } }]
     globalThis.fetch = () => { const next = answers.shift(); return Promise.resolve({ ok: false, status: next.status, json: async () => next.body }) }
     const caught = []
     for (let n = 0; n < 3; n++) await MB.searchArtists('x', 10).catch((error) => caught.push([error.constructor.name, error.status, error.busy]))

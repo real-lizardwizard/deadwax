@@ -513,9 +513,10 @@ export function App() {
     if (asksAgain(before, watching)) refresh()
   }, [watching])
 
+  const personalRequests = hasLibrary()
   const view = useMemo(
-    () => requestsView({ jobs, pending, speeds, cancelling, retrying, retryingSame, retryProblems }, Date.now()),
-    [jobs, pending, speeds, cancelling, retrying, retryingSame, retryProblems],
+    () => requestsView({ jobs, pending, speeds, cancelling, retrying, retryingSame, retryProblems, personal: personalRequests }, Date.now()),
+    [jobs, pending, speeds, cancelling, retrying, retryingSame, retryProblems, personalRequests],
   )
   const arriving = view.arriving.length ? arrivingCards(view) : NOTHING_ARRIVING
 

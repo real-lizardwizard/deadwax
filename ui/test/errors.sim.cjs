@@ -310,7 +310,7 @@ console.log('\na download\'s reasons: every one the server writes, in a listener
     'the transfer failed': ["The download didn't finish.", false],
     'no transfers reported by slskd': [NOT_RUN, false],
     'cancelled from deadwax': ['Cancelled.', false],
-    'dry run - not organized': ['Downloaded, but not added to your library: deadwax is set to try filing without moving anything.', true],
+    'dry run - not organized': ['Downloaded, but not added to your library: deadwax is set to rehearse adding albums, without moving any files.', true],
     'nothing could be organized, check SLSKD_DOWNLOAD_PATH': ["It downloaded, but deadwax couldn't find its files to add them to your library.", true],
     "deadwax stopped while filing this - check the library and slskd's folder": ['deadwax stopped while it was adding this to your library.', true],
   })
@@ -326,7 +326,7 @@ console.log('\na download\'s reasons: every one the server writes, in a listener
     ["It downloaded, but couldn't be added to your library.", true], ["2 files couldn't be added to your library.", true], ["1 file couldn't be added to your library.", true],
     ['It downloaded, but none of its songs could be added to your library.', true], ['Its files were already in the collection, so nothing was added.', false],
     ['Every song was already in the collection, so nothing was added.', false], ['The person sharing it stopped responding. 1 of 1 file arrived.', false],
-    ['Downloaded, but not added to your library: deadwax is set to try filing without moving anything. 3 of 10 files arrived.', true], ["It stopped, and deadwax couldn't say why.", true],
+    ['Downloaded, but not added to your library: deadwax is set to rehearse adding albums, without moving any files. 3 of 10 files arrived.', true], ["It stopped, and deadwax couldn't say why.", true],
   ])
   check('words the server writes that are fit to be read pass as written; plumbing never',
     [E.jobErrorWords('reel2reel went offline after 4 of 10 files').text, E.jobErrorWords("couldn't reach slskd to queue it: HTTPConnectionPool(host='x')").text],
@@ -334,8 +334,24 @@ console.log('\na download\'s reasons: every one the server writes, in a listener
   check('a retry\'s problem: the route\'s words as written, slskd\'s in a listener\'s, plumbing replaced',
     [V.retryProblemWords('no other peers to try - search again for more'), V.retryProblemWords('slskd is still stopping the last attempt - try again in a moment'),
       V.retryProblemWords("slskd couldn't queue it: bob is offline"), V.retryProblemWords({ text: "That didn't work.", detail: 'x' })],
-    [{ text: 'no other peers to try - search again for more', detail: null }, { text: 'The last try is still stopping - try again in a moment.', detail: 'slskd is still stopping the last attempt - try again in a moment' },
+    [{ text: 'No other source to try - Get it again to search for more.', detail: 'no other peers to try - search again for more' }, { text: 'The last try is still stopping - try again in a moment.', detail: 'slskd is still stopping the last attempt - try again in a moment' },
       { text: V.RETRY_FAILED, detail: "slskd couldn't queue it: bob is offline" }, { text: "That didn't work.", detail: 'x' }])
+  //? (2.0.6, review) the retry routes' other words, read out of the Python: in_flight_words and already_have carry a
+  //? source's name, "being filed" and a library folder's path; MOVED_ON and CLEARED "retried", "search again". Each in a
+  //? listener's words, the route's own kept as the detail (whoever runs deadwax), "your library" the collection with logins on
+  const storeIndex = read('src/store_index.py')
+  const flight = [...storeIndex.matchAll(/return f"(already download[^"]*)"/g)].map((m) => m[1].replace('{peer}', 'bob'))
+  const have = /return f"(already in your library: )\{held\['path'\]\}"/.exec(storeIndex)?.[1]
+  const raws = [...flight, `${have}Portishead/Dummy (1994)`, constant('MOVED_ON'), constant('CLEARED')]
+  check('(2.0.6) the retry routes\' named and pathed words are found in the Python', [flight.length, !!have, raws.every(Boolean)], [2, true, true])
+  check('(2.0.6) ...each in a listener\'s words - no source\'s name, no path, no "filed", "retried" or "search again" - its own the detail',
+    raws.map((raw) => V.retryProblemWords(raw)),
+    [{ text: "It's already downloaded, and being added now.", detail: 'already downloaded from bob, and being filed now' },
+     { text: "It's already downloading.", detail: 'already downloading from bob' },
+     { text: "It's already in your library.", detail: 'already in your library: Portishead/Dummy (1994)' },
+     { text: "It's already been tried again meanwhile.", detail: constant('MOVED_ON') },
+     { text: "It's been cleared from the list - Get it again to download it.", detail: constant('CLEARED') }])
+  check('(2.0.6) ...the store\'s copy is the collection\'s with a library of your own', V.retryProblemWords(`${have}Portishead/Dummy (1994)`, true).text, "It's already in the collection.")
 }
 
 console.log('\nYou -> Connections: a word for each code, never the code; the sentence under it')

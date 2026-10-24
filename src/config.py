@@ -463,7 +463,7 @@ class Config:
     #? on | off. When a download fails, move it to the next peer from the list it was picked
     #? from, by itself (v0.9.12). Off by default: the next peer down is ranked against the same
     #? release but may be a different pressing or a worse rip, and that is a choice somebody
-    #? should see being made. "Next peer" on a failed download, in Requests, works either way.
+    #? should see being made. "Another source" on a failed download, in Requests, works either way.
     AUTO_RETRY_PEER = _env("AUTO_RETRY_PEER", "off")
 
     #? Seconds slskd listens for answers to a Soulseek search (v0.9.16). Peers answer over

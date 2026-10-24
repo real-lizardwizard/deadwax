@@ -109,10 +109,10 @@ check('the Japanese CD adds a track - drawn amber', P.summaryLine(P.pressingsVie
 check('the single mix', P.summaryLine(P.pressingsView(slowRush.releases, byPrefix(slowRush, '3a12923d').id), 10).text, 'This pressing has another version of 1 track')
 check('Dummy\'s vinyl: two things, joined', P.summaryLine(P.pressingsView(dummy.releases, byPrefix(dummy, 'f5804905').id), 20).text, 'This pressing leaves out 1 track and has another version of 1 track')
 check('all alike says "all"', P.sharedBy({ count: 4, total: 4 }), 'shared by all 4 pressings')
-check('the one pressing there is', P.summaryLine(P.pressingsView(wywh.releases), 1), { text: 'The only pressing MusicBrainz lists', differs: false })
+check('the one pressing there is', P.summaryLine(P.pressingsView(wywh.releases), 1), { text: 'The only pressing', differs: false })
 const noTracks = { id: 'empty', title: 'Third', media: [{ position: 1, format: 'CD', tracks: [] }] }
 check('a pressing MusicBrainz lists no tracks for', [P.pressingsView([...third.releases, noTracks], 'empty').shown.at(-1).note,
-  P.summaryLine(P.pressingsView([...third.releases, noTracks], 'empty'), 18).text], ['No tracklist on MusicBrainz', 'MusicBrainz lists no tracks for this pressing'])
+  P.summaryLine(P.pressingsView([...third.releases, noTracks], 'empty'), 18).text], ['No tracklist listed', 'No tracks are listed for this pressing'])
 
 console.log('\nthe tracklist, and what differs in it')
 const japan = byPrefix(slowRush, '452ccdb4')

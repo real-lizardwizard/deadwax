@@ -1283,7 +1283,7 @@ console.log('\nGet: the Sources sheet, a download from the tap, and Requests')
     [true, true, true, true, true])
   check('a pick only on a fresh Get, never for a pressing held or on its way, and said when it isn\'t made',
     [/if \(!fresh \|\| !rule\.pick\) return/.test(run), /const blocked = autoPickBlocked\(result, release\)/.test(run), /autoGrabPick\(result\.candidates, rule\.filters, rule\.sort\)/.test(run),
-      /setNotPicked\(notPickedLine\(blocked\)\)/.test(run), /requery\(\) \{\s*if \(search\) void run\(search\.release, queryOverride\(query, shownQuery\), false\)/.test(hook)],
+      /setNotPicked\(notPickedLine\(blocked, result\.candidates\.length\)\)/.test(run), /requery\(\) \{\s*if \(search\) void run\(search\.release, queryOverride\(query, shownQuery\), false\)/.test(hook)],
     [true, true, true, true, true])
   check('...the settings read as the answer lands, the safe default until they\'re in',
     /pick: getSettingsNow\(\)\.get_mode === 'pick'/.test(sheet), true)
@@ -1418,6 +1418,13 @@ console.log('\npins: deadwax\'s own, asked when asked, and nothing about them pl
       //? (2.0.0-player.51) and what is new in your library, which it draws too
       /\[status, arriving, arrivingTrouble, homeShown, newAlbums, personal\]/.test(app)],
     [true, true, true, true])
+  //? (2.0.6, review) Requests' retry refusals say "the collection" with logins on: App hands requestsView
+  //? hasLibrary(), and asks it again when that changes - requests.sim only ever sets it by hand
+  check('(2.0.6) Requests\' words follow whose library: App passes requestsView personal from hasLibrary(), in the memo\'s deps',
+    [/const personalRequests = hasLibrary\(\)/.test(app),
+      /requestsView\(\{[^}]*\bpersonal: personalRequests \}, Date\.now\(\)\)/.test(app),
+      /requestsView\([\s\S]*?\),\s*\[[^\]]*\bpersonalRequests\]/.test(app)],
+    [true, true, true])
   check('(2.0.5) Home\'s Recently added is YOURS with a library of your own - App hands Home hasLibrary(), and asks your list again as Home shows, as the Library does',
     [/const personal = hasLibrary\(\)/.test(app), /<Home\b[^>]*?personal=\{personal\}/.test(app.replace(/\n\s*/g, ' ')),
       /if \(homeShown && hasLibrary\(\)\) refreshIfOld\('yours'\)/.test(app),

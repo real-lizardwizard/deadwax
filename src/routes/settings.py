@@ -646,8 +646,9 @@ def _auto_retry_row() -> dict:
             "A download that fails moves to the next peer from the list you picked it from, "
             "up to three asks each time, skipping any peer already tried"
             if value == "on"
-            else "A failed download waits for you - Next peer, on it in Requests, moves it on. The "
-                 "next peer down may be a different pressing or a worse rip, which is why this "
+            #? (2.0.6) the button as Requests names it since UX batch 3 - it was "Next peer"
+            else "A failed download waits for you - Another source, on it in Requests, moves it on. The "
+                 "next source down may be a different pressing or a worse rip, which is why this "
                  "is off unless you turn it on"
         ),
         status="ok" if known else "error",

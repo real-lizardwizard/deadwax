@@ -1024,7 +1024,7 @@ export function ArtistPage({
                         aria-busy={resolving === row.group.id}
                         onClick={(event) => void getAlbum(row.group!, event)}
                       >
-                        {resolving === row.group.id ? 'Get…' : 'Get'}
+                        {resolving === row.group.id ? 'Getting…' : 'Get'}
                       </button>
                     )}
                   </li>
@@ -1035,13 +1035,13 @@ export function ArtistPage({
             {asking ? (
               <div class="app-asking" role="status">
                 <span class="app-sweep" aria-hidden="true" />
-                <span class="app-asking-text">{discography.state === 'asking' ? 'Asking MusicBrainz…' : `Looking in ${where}…`}</span>
+                <span class="app-asking-text">{discography.state === 'asking' ? 'Loading their albums…' : `Looking in ${where}…`}</span>
               </div>
             ) : discography.state === 'failed' ? (
               <div class="app-search-problem">
                 {discography.unavailable ? (
                   <p class="app-search-empty">
-                    MusicBrainz isn't answering just now, so the albums you don't have aren't here - it often goes away for a few minutes.
+                    Their other albums can't be shown right now - try again in a few minutes.
                   </p>
                 ) : (
                   //? (2.0.4) anything else in a listener's words (errorNote), its own for whoever runs deadwax
@@ -1052,13 +1052,13 @@ export function ArtistPage({
                 </button>
               </div>
             ) : discography.state === 'done' && discography.truncated ? (
-              <p class="app-search-empty">MusicBrainz lists more albums than the first 500 shown here.</p>
+              <p class="app-search-empty">Showing their first 500 albums.</p>
             ) : !mbid && library.state === 'done' && ownedKnown ? (
               <div class="app-artist-unknown">
                 <p class="app-search-empty">
                   {held.length
-                    ? `MusicBrainz doesn't know who this is from ${personal ? 'the files' : 'your files'}, so only the albums ${personal ? 'in the collection' : 'you have'} are here.`
-                    : `Nothing of theirs in ${where}, and MusicBrainz doesn't know who this is.`}
+                    ? `Only the albums ${personal ? 'in the collection' : 'you have'} are shown - their other albums can't be found.`
+                    : `Nothing of theirs in ${where}, and their albums can't be found.`}
                 </p>
                 {/* (2.0.0-player.45) the picker's MusicBrainz search, for a shared name or files that don't say */}
                 {managesWho && (
@@ -1073,7 +1073,7 @@ export function ArtistPage({
                 )}
               </div>
             ) : discography.state === 'done' && !rows.length ? (
-              <p class="app-search-empty">{studioOnly ? 'No studio albums on MusicBrainz.' : 'No albums on MusicBrainz.'}</p>
+              <p class="app-search-empty">{studioOnly ? 'No studio albums found - turn off Studio only to see them all.' : 'No other albums found.'}</p>
             ) : null}
           </section>
 
@@ -1162,7 +1162,7 @@ export function ArtistPage({
                     </>
                   ) : factsFailed ? (
                     <div class="app-search-problem">
-                      <p class="app-search-empty">MusicBrainz isn't answering just now, so who they are isn't here.</p>
+                      <p class="app-search-empty">Artist details can't be loaded right now.</p>
                       <button type="button" class="app-button" onClick={() => setFactsAsks((count) => count + 1)}>
                         Try again
                       </button>
@@ -1170,7 +1170,7 @@ export function ArtistPage({
                   ) : (
                     <div class="app-asking" role="status">
                       <span class="app-sweep" aria-hidden="true" />
-                      <span class="app-asking-text">Asking MusicBrainz…</span>
+                      <span class="app-asking-text">Loading…</span>
                     </div>
                   )}
                 </section>

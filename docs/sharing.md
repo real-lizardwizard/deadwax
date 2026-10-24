@@ -322,7 +322,7 @@ else can do what the left column says, and an admin can give any of them more, b
 | --- | --- | --- | --- |
 | play, playlists, their own library (Add, Remove), pins, Getting albums settings | yes | - | yes |
 | their own downloads: see, cancel, **Clear done** | yes | - | yes |
-| **Get albums**: search Soulseek, **Get**, the sources, join a download, **Next peer**, **Ask again** | yes - an admin can take it away | - | yes |
+| **Get albums**: search Soulseek, **Get**, the sources, join a download, **Another source**, **Same source again** | yes - an admin can take it away | - | yes |
 | **Edit albums**: apply a release, tags, cover, CD art, lyrics (one album, or Library care's runs), an artist's pictures, **Which artist is this?** | no | **Edit albums** | yes |
 | **Look after the library**: delete an album, move an artist's albums under their current name, **Needs a look**, **Rescan**, **Held by nobody** | no | **Look after the library** | yes |
 | **Everyone's downloads**: see who asked ("Asked by ethan"), cancel or retry anyone's, clear everyone's finished | no | **Everyone's downloads** | yes |

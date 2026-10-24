@@ -28,7 +28,7 @@ class MusicBrainzUnavailable(Exception):
 class MusicBrainzRejected(Exception):
     """
     A QUICK search (2.0.0-player.55, the app's Search) MusicBrainz refused as malformed - a 400. Said as
-    "MusicBrainz couldn't read that search - try other words", never as an outage: the same words
+    "That search couldn't be read - try other words", never as an outage: the same words
     would be refused again, so the page offers no Try again. Every other path keeps a 400 as it was.
     """
 

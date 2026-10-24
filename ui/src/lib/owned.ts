@@ -134,12 +134,16 @@ export function describeFolders(albums: readonly OwnedAlbum[]): string {
   }).join('\n')
 }
 
-/** The chip a release group carries, or null. */
+/**
+ * The chip a release group carries, or null. `title` is the folders, for a tooltip beside the words - never the only
+ * place a thing is said (2.0.6, UX batch 3: the "maybe" was explained by its tooltip alone, which a phone never shows;
+ * the album you don't have now says it in a line under Get - lib/whose.ts maybeLine).
+ */
 export function describeGroupOwnership({ held, guessed }: GroupHolding): { kind: 'held' | 'maybe'; label: string; title: string } | null {
   if (held.length) {
     return {
       kind: 'held',
-      label: held.length === 1 ? 'In your library' : `In your library · ${held.length} editions`,
+      label: held.length === 1 ? 'In your library' : `In your library · ${held.length} pressings`,
       title: `Already in your library:\n${describeFolders(held)}`,
     }
   }
@@ -147,9 +151,9 @@ export function describeGroupOwnership({ held, guessed }: GroupHolding): { kind:
     return {
       kind: 'maybe',
       label: 'Maybe in your library',
-      title: `A folder with this name, not tagged with MusicBrainz ids - so which edition it is `
+      title: `A folder with this name, not matched to a pressing - so which one it is `
         + `(or whether it is this album at all) can't be told:\n${describeFolders(guessed)}\n`
-        + 'Matching its release in the metadata editor would settle it.',
+        + 'Matching it to a pressing in Edit album would settle it.',
     }
   }
   return null

@@ -206,7 +206,7 @@ can land seconds off.
 
 | setting | default | what it does |
 | --- | --- | --- |
-| `AUTO_RETRY_PEER` | `off` | `on` moves a failed download to the next peer from the list you picked it from, by itself. It's off by default because the next peer down may be a different pressing or a worse rip. **Next peer** on a failed download, in Requests, works either way. |
+| `AUTO_RETRY_PEER` | `off` | `on` moves a failed download to the next source from the list you picked it from, by itself. It's off by default because the next source down may be a different pressing or a worse rip. **Another source** on a failed download, in Requests, works either way. |
 
 ### Cover art
 
@@ -359,7 +359,7 @@ deadwax's database, or for the few the app can't set (**environment only**).
 | `FETCH_LYRICS` | `on` | Library → Lyrics | `off` stops lyrics being fetched from LRCLIB as albums are filed. | `off` |
 | `LYRICS_LEAD_MS` | `0` | Library → Lyrics | milliseconds to move synced lyrics earlier (negative: later), −5000 to 5000. | `300` |
 | `SLSKD_SEARCH_TIMEOUT` | `8` | Downloads → Soulseek searches | seconds each Soulseek search listens for answers, 3 to 60. | `15` |
-| `AUTO_RETRY_PEER` | `off` | Downloads → When a download fails | `on` moves a failed download to the next peer by itself. | `on` |
+| `AUTO_RETRY_PEER` | `off` | Downloads → When a download fails | `on` moves a failed download to the next source by itself. | `on` |
 
 ### Environment only
 
@@ -424,15 +424,15 @@ is saved behind it, and if deadwax can't keep it (its database isn't writable) i
 deadwax has and You says so. Choices made quickly are saved one after another, in the order you made
 them, so the last one is what stays. The app asks deadwax for them each time You is opened, on
 **Check again** under Connections, and before every search the sources start - a Get, another Get or
-pressing while a desktop's Sources panel stays open, **Try again**, **Re-search** - so a change made
+pressing while a desktop's Sources panel stays open, **Try again**, **Search** under Search again - so a change made
 on another device shows without closing the app. Until deadwax has first answered, nothing shows as
 chosen and nothing can be, and a Get shows the sources.
 
 | setting | default | what it does |
 | --- | --- | --- |
-| When I tap Get | Show me the sources | **Show me the sources**: Get opens the list of folders found on Soulseek, and you choose. **Pick the best source for me**: Get takes the best match itself when it scores 75 or more and passes your quality floor, queues it and shows Requests - and shows you the sources, saying why, when nothing does, when you already have the pressing (whole or in part) or it is already downloading, or when it is the album as a whole (a row's Get when MusicBrainz couldn't list the pressings: with no tracklist, no score can be trusted). Never on a Re-search. |
+| When I tap Get | Show me the sources | **Show me the sources**: Get opens the list of folders found on Soulseek, and you choose. **Pick the best source for me**: Get takes the best match itself when it scores 75 or more and passes your quality floor, queues it and shows Requests - and shows you the sources, saying why, when nothing does, when you already have the pressing (whole or in part) or it is already downloading, or when it is the album as a whole (a row's Get when MusicBrainz couldn't list the pressings: with no tracklist, no score can be trusted) - with a line ending "- choose a source yourself.". Never on a search you edit and run from Search again. |
 | Quality floor | Any | what a source must at least be: **Any**, **320 kbps** (lossless passes too), **Lossless** (every file lossless; a folder whose format couldn't be told doesn't pass) or **24-bit**. It's what a pick must pass, and what the sources start filtered by - as a chip pressed above them (Lossless, 24-bit, or a 320 kbps chip, shown only while that's your floor), so it's never a filter on out of sight: tap the chip to see everything. |
-| Format | Prefer lossless | what every Get's search is scored by: **Any** - format doesn't count; **Prefer lossless** - a folder with no lossless file scores lower on the score's Format part (0.45 of it, where a folder with one scores all of it), still offered; **Lossless only** - such folders are left out of the sources altogether. It changes the score; the quality floor doesn't - it only filters what was found. Every search waits for deadwax's answer to the ask it starts with (above), so a Format changed on another device is the one the search is scored by. With Lossless only, an album Soulseek has only in lossy formats says "Nothing lossless on Soulseek for …", naming this setting, rather than that nothing was found. |
+| Format | Prefer lossless | what every Get's search is scored by: **Any** - format doesn't count; **Prefer lossless** - a folder with no lossless file scores lower on the score's Format part (0.45 of it, where a folder with one scores all of it), still offered; **Lossless only** - such folders are left out of the sources altogether. It changes the score; the quality floor doesn't - it only filters what was found. Every search waits for deadwax's answer to the ask it starts with (above), so a Format changed on another device is the one the search is scored by. With Lossless only, an album Soulseek has only in lossy formats says "Nothing lossless found for …", naming this setting, rather than that nothing was found. |
 
 **Carried over once.** The first time a browser that the old page at `/` was used in (before 2.0.0)
 asks for these, with nothing saved for you yet, its choices there are carried over: its minimum bit

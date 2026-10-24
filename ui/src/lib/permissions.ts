@@ -35,7 +35,7 @@ export const LABELS: Readonly<Record<Permission, string>> = {
 
 /** What each one opens, under its checkbox. */
 export const LINES: Readonly<Record<Category, string>> = {
-  request: 'Search Soulseek and download - Get, Sources, Next peer, Ask again.',
+  request: 'Search Soulseek and download - Get, Sources, Another source, Same source again.',
   edit: 'Tags, covers, CD art, lyrics, artist pictures, applying a release - one album or Library care\'s runs.',
   library: 'Delete albums, move an artist\'s albums, Needs a look, Rescan, Held by nobody.',
   downloads: 'See who asked for what, cancel or retry anyone\'s, clear everyone\'s finished.',
@@ -156,7 +156,7 @@ export function artistManaging(perms: Permissions): ArtistManaging {
   return { images: edit, whichArtist: edit, move: library, any: edit || library }
 }
 
-/** Get, the Sources sheet, Next peer and Ask again: Get albums'. */
+/** Get, the Sources sheet, Another source and Same source again: Get albums'. */
 export function gets(perms: Permissions): boolean {
   return perms.has('request')
 }

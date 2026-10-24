@@ -41,13 +41,13 @@ import { matchLine } from './artistManage'
 import { libraryArtistFor, mbidOf, soleCredit } from './artistPage'
 import { heldReleases } from './idBridge'
 import { foldName, ownedForGroup, type OwnedIndex } from './owned'
-import { creditName } from './release'
+import { creditName, currentName } from './release'
 import { NOISY_SECONDARY_TYPES, VARIOUS_ARTISTS, quoteTerm, typeFilter, withTypeFilter, type SearchPlan } from './searchQuery'
 import { artistLine, groupHeld, groupKind, groupPlace, groupYear, notInLibrary } from './searchResults'
 import {
   heldWords, namedAlbum, songAlbumHeld, songAlbumHolding, songAlbumWords, titleKey, type Song as FoundSong, type SongAlbum, type SongEvidence,
 } from './songs'
-import { anyYours, IN_THE_STORE, IN_YOUR_LIBRARY, libraryPlace, navidromeYours } from './whose'
+import { anyYours, heldPhrase, IN_THE_STORE, IN_YOUR_LIBRARY, libraryPlace, navidromeYours } from './whose'
 
 /* ===== the constants ===== */
 
@@ -147,6 +147,9 @@ export interface Marks {
   yourArtists: ReadonlyMap<string, number> | null
   /** an album as search3 or the album's own answer has it, by id - its `starred` and release */
   albumOf?: (id: string) => Pick<Album, 'starred' | 'musicBrainzId'> | null
+  /** (2.0.6) the library's whole list of artists (getArtists) - null until it has answered: a MusicBrainz artist is
+   *  said to be nowhere here only against it (placeLabel) */
+  artists?: readonly Pick<Artist, 'name'>[] | null
 }
 
 /** Whose a library album is: one among your albums' ids is yours, whatever search3's `starred` said (it was asked
@@ -856,7 +859,7 @@ export function studioOrder(groups: readonly ReleaseGroup[]): ReleaseGroup[] {
 }
 
 /** The line under an artist read's Albums in All when the studio clause asked them: the active filter, always shown. */
-export const STUDIO_NOTE = "MusicBrainz's studio albums and EPs - See all for everything they made."
+export const STUDIO_NOTE = 'Studio albums and EPs - See all for everything they made.'
 
 /* ===== the moments ===== */
 
@@ -914,25 +917,51 @@ export function nextBehind(was: boolean, outcome: Outcome): boolean {
 
 /* ===== the words ===== */
 
-/** A row's place, as a Top results tile's third line says it: "In your library", "In the store", "On MusicBrainz" -
- *  '' while it can't be told. */
+/** A row's place, as a Top results tile's third line says it: "In your library", "In the collection", and for an
+ *  album, artist or song nobody here has (MusicBrainz's) "Not in your library" - "Not in the collection" with a
+ *  library of your own, where your library is only part of what is here (2.0.6, UX batch 3: it said "On MusicBrainz",
+ *  or "Saved from MusicBrainz"). '' while it can't be told: a library row whose holder isn't known, an album or song
+ *  while the index of what is held hasn't come (it might be held), and a MusicBrainz artist until the library's artist
+ *  list has come - or when a library artist has their name: a MusicBrainz row only means it wasn't tied to one (two
+ *  "Nirvana"s answering stay MusicBrainz's beside the library's own), never that nothing of theirs is here (review). */
 export function placeLabel(row: Row, marks: Marks, evidence: SongEvidence = {}): string {
   const library = row.type === 'artist' || row.type === 'album' || row.type === 'song'
   const yours = rowYours(row, marks, evidence)
   if (library) return yours === null ? '' : yours ? 'In your library' : 'In the collection'
-  if (yours === null) return isSaved(row) ? SAVED_PLACE : 'On MusicBrainz'
+  if (yours === null) {
+    if (!marks.index) return ''
+    if (row.type === 'mb-artist') return marks.artists && !namedHere(row.match, marks.artists) ? notHere(marks.personal) : ''
+    //? an album a folder here may be by its name alone, untagged - "maybe", as its page says it (owned.ts)
+    const maybe = row.type === 'group' ? groupMaybe(row.group, marks) : ''
+    if (maybe) return maybe.charAt(0).toUpperCase() + maybe.slice(1)
+    return notHere(marks.personal)
+  }
   return yours ? 'In your library' : 'In the collection'
 }
 
-/** Whether a row is from what's saved (2.0.0-player.56). */
+/** Whether a library artist answers to a MusicBrainz artist's name, or the name it was matched as (foldName). */
+function namedHere(match: Pick<ArtistMatch, 'name' | 'matched_as'>, artists: readonly Pick<Artist, 'name'>[]): boolean {
+  const names = new Set([foldName(match.name), match.matched_as ? foldName(match.matched_as) : ''].filter(Boolean))
+  return artists.some((artist) => names.has(foldName(artist.name)))
+}
+
+/** (2.0.6) A MusicBrainz album no folder holds by its ids, but a folder here may be by its name alone, untagged:
+ *  "maybe in your library" / "maybe in the collection", as its page says it (owned.ts) - '' otherwise. One rule for a
+ *  Top results tile (placeLabel) and its section row (rowLine), so the two never disagree. */
+export function groupMaybe(group: ReleaseGroup, marks: Pick<Marks, 'index' | 'personal'>): string {
+  if (!marks.index || groupHeld(marks.index, group.id)) return ''
+  const guessed = ownedForGroup(marks.index, { groupId: group.id, title: group.title ?? '', artists: [creditName(group['artist-credit']), currentName(group['artist-credit'])] }).guessed
+  return guessed.length ? `maybe ${heldPhrase(marks.personal, anyYours(guessed))}` : ''
+}
+
+/** What a Top results tile says of something nobody here has (2.0.6). */
+export const notHere = (personal: boolean) => (personal ? 'Not in the collection' : 'Not in your library')
+
+/** Whether a row is from what's saved (2.0.0-player.56) - MusicBrainz's answers kept on disk. Drawn as MusicBrainz's
+ *  own row would be: since 2.0.6 (UX batch 3) nothing on the row says it was saved - "saved" read as "you saved this
+ *  album", and a listener has no use for where an answer was kept; only a failure under such rows says that these are
+ *  earlier results (savedAwayWords). */
 export const isSaved = (row: Row) => 'saved' in row && row.saved === true
-
-/** What marks a row from what's saved: a section row's place words, and a Top results tile's third line. */
-export const SAVED_MARK = 'saved'
-export const SAVED_PLACE = 'Saved from MusicBrainz'
-
-/** What's saved's place on a row, unless the row already says where it is (held: "in your library"). */
-const savedPlace = (row: Row, place: string) => (place || !isSaved(row) ? place : SAVED_MARK)
 
 /** A MusicBrainz group's kind word in a section, said only when it isn't a plain album ("EP", "Live album"), as Apple
  *  adds " - EP". */
@@ -966,7 +995,7 @@ export function rowLine(row: Row, context: LineContext, top = false): { line: st
     }
     case 'mb-artist': {
       const said = matchLine(row.match)
-      return { line: top ? join('Artist', said) : said, place: savedPlace(row, '') }
+      return { line: top ? join('Artist', said) : said, place: '' }
     }
     case 'album': {
       const year = row.album.year && row.album.year > 0 ? String(row.album.year) : ''
@@ -977,7 +1006,7 @@ export function rowLine(row: Row, context: LineContext, top = false): { line: st
       const word = top ? groupKind(row.group) : groupWord(row.group)
       return {
         line: join(word, creditName(row.group['artist-credit']), groupYear(row.group)),
-        place: savedPlace(row, held ? groupPlace(marks.index, row.group.id, marks.personal) : ''),
+        place: held ? groupPlace(marks.index, row.group.id, marks.personal) : groupMaybe(row.group, marks),
       }
     }
     case 'song':
@@ -987,14 +1016,14 @@ export function rowLine(row: Row, context: LineContext, top = false): { line: st
       const length = album.length === null ? '' : clock(Math.round(album.length / 1000))
       return {
         line: top ? join('Song', row.song.credit, album.title) : join(row.song.credit, length, album.title),
-        place: savedPlace(row, heldWords(held, marks.personal)),
+        place: heldWords(held, marks.personal),
       }
     }
     case 'song-album': {
       const word = row.album.kind && row.album.kind !== 'Album' ? row.album.kind : 'Album'
       return {
         line: join(top ? word : '', row.album.credit, yearOfDate(row.album.date)),
-        place: savedPlace(row, songAlbumWords(songAlbumHolding(marks.index, row.album, row.song, evidence), marks.personal)),
+        place: songAlbumWords(songAlbumHolding(marks.index, row.album, row.song, evidence), marks.personal),
       }
     }
   }
@@ -1017,49 +1046,53 @@ export function libraryWords(counts: Partial<Record<Kind, number>>, personal: bo
   return said ? `${personal ? 'In the collection' : 'In your library'}: ${said}.` : ''
 }
 
-/** ...and for MusicBrainz, once every kind asked has settled: "From MusicBrainz: 2 artists, 3 albums, 3 songs." - or
- *  that it isn't answering, when no kind did. `saved` (2.0.0-player.56): what's saved is drawn above - what
- *  MusicBrainz adds is more, and when it isn't answering, what is drawn is what's saved. */
+/** ...and for MusicBrainz (what nobody here has yet), once every kind asked has settled: "Also found: 2 artists, 3
+ *  albums, 3 songs." - or that searching for more isn't working, when no kind answered. `saved` (2.0.0-player.56):
+ *  what's saved is drawn above - what MusicBrainz adds is more, and when it isn't answering, what is drawn is earlier
+ *  results. (2.0.6, UX batch 3: said "From MusicBrainz: …", "Saved from MusicBrainz: …".) */
 export function musicBrainzWords(counts: Partial<Record<Kind, number>>, answered: boolean, saved = false): string {
-  if (!answered) return saved ? SAVED_AWAY_SAID : "MusicBrainz isn't answering."
+  if (!answered) return saved ? SAVED_AWAY_SAID : MORE_UNSEARCHED
   const said = countWords(counts)
-  if (saved) return said ? `More from MusicBrainz: ${said}.` : 'Nothing more from MusicBrainz.'
-  return said ? `From MusicBrainz: ${said}.` : 'Nothing from MusicBrainz.'
+  if (saved) return said ? `More found: ${said}.` : 'Nothing more found.'
+  return said ? `Also found: ${said}.` : 'Nothing more found.'
 }
 
-/** The region's words for what's saved, as the sections that hold it are drawn: "Saved from MusicBrainz: 1 song." */
+/** The region's words for what's saved, as the sections that hold it are drawn: "Found earlier: 1 song." */
 export function savedWords(counts: Partial<Record<Kind, number>>): string {
   const said = countWords(counts)
-  return said ? `Saved from MusicBrainz: ${said}.` : ''
+  return said ? `Found earlier: ${said}.` : ''
 }
 
-const SAVED_AWAY_SAID = "MusicBrainz isn't answering - these are what deadwax has saved."
+/** (2.0.6) What a kind's slot says, beside its Try again, when searching for what you don't have failed - short, to
+ *  fit a 320-wide phone's one row. */
+const MORE_UNSEARCHED = "Can't search for more right now."
+const SAVED_AWAY_SAID = "Showing earlier results - searching for more isn't working right now."
 
-/** A MusicBrainz failure's words where what's saved is drawn above it (2.0.0-player.56): MusicBrainz isn't answering
- *  (or is busy), and these are what deadwax has saved - one line; a refusal is the words', as ever. */
+/** A MusicBrainz failure's words where what's saved is drawn above it (2.0.0-player.56): searching for more isn't
+ *  working (or is busy), and what is drawn are earlier results - one line; a refusal is the words', as ever. */
 export function savedAwayWords(failure: { refused: boolean; busy: boolean; message: string; unavailable: boolean }, short = false): string {
   if (failure.refused) return failure.message
   //? `short`: a kind's slot, one fixed-height row beside Try again - the point first, so it fits a 320-wide phone
   //? (the review measured "MusicBrainz isn't answering - these are saved." cut to "…these are sa…" at 375 and 320)
-  if (failure.busy) return short ? 'Saved - MusicBrainz is busy.' : 'MusicBrainz is busy just now - these are what deadwax has saved from it.'
-  if (failure.unavailable) return short ? 'Saved - MusicBrainz is away.' : "MusicBrainz isn't answering just now - these are what deadwax has saved from it."
+  if (failure.busy) return short ? 'Showing earlier results.' : 'Showing earlier results - try again in a moment for more.'
+  if (failure.unavailable) return short ? 'Showing earlier results.' : SAVED_AWAY_SAID
   return failure.message
 }
 
 /** What a late kind's slot says when MusicBrainz's answer brought nothing that isn't drawn above it already. */
 export function nothingMoreWords(kind: Kind, text: string): string {
-  return `No more ${KIND_WORDS[kind][1]} on MusicBrainz for “${text}”.`
+  return `No more ${KIND_WORDS[kind][1]} for “${text}”.`
 }
 
 /** A late kind folded into its slot: the button's words, and what the region says of it. */
 export function foldWords(kind: Kind, count: number): { button: string; said: string } {
-  const what = plural(count, ...KIND_WORDS[kind])
-  return { button: `Show ${what} from MusicBrainz`, said: `${what} from MusicBrainz - Show them to see them.` }
+  const what = `${count} more ${KIND_WORDS[kind][count === 1 ? 0 : 1]}`
+  return { button: `Show ${what}`, said: `${what} found - Show them to see them.` }
 }
 
 /** What a late kind's slot says when its answer brought no row to draw (`text`: the words searched). */
 export function emptyWords(kind: Kind, text: string): string {
-  return `No ${KIND_WORDS[kind][1]} on MusicBrainz for “${text}”.`
+  return `No other ${KIND_WORDS[kind][1]} for “${text}”.`
 }
 
 /** The library's place kept at the list's top, its answer landing after the list was drawn without it: how many it
@@ -1068,7 +1101,7 @@ export function libraryLateWords(counts: Partial<Record<Kind, number>>, personal
   const total = KINDS.reduce((sum, kind) => sum + (counts[kind] ?? 0), 0)
   const where = personal ? IN_THE_STORE : IN_YOUR_LIBRARY
   if (!total) return { button: null, line: `Nothing ${where} for “${text}”.` }
-  return { button: `${total} ${where} - Show them`, line: '' }
+  return { button: `Show ${total} from ${personal ? 'the collection' : 'your library'}`, line: '' }
 }
 
 /** The library's place kept at the list's top when Navidrome turned out not to be reachable: it wasn't searched, so it
@@ -1077,11 +1110,12 @@ export function librarySkippedWords(personal: boolean): string {
   return personal ? "The collection can't be searched just now." : "Your library can't be searched just now."
 }
 
-/** The words of a kind's MusicBrainz failure: refused (a 422 with words - the words, no Try again), busy, or away. */
+/** The words of a kind's MusicBrainz failure: refused (a 422 with words - the words, no Try again), busy, or away -
+ *  (2.0.6, UX batch 3) as what can't be done, never MusicBrainz's name. */
 export function failureWords(failure: { refused: boolean; busy: boolean; message: string; unavailable: boolean }, short = false): string {
   if (failure.refused) return failure.message
-  if (failure.busy) return 'MusicBrainz is busy just now - try again in a moment.'
-  if (failure.unavailable) return short ? "MusicBrainz isn't answering." : "MusicBrainz isn't answering just now - it often goes away for a few minutes."
+  if (failure.busy) return 'Too many searches just now - try again in a moment.'
+  if (failure.unavailable) return short ? MORE_UNSEARCHED : "Searching for more isn't working right now - try again in a few minutes."
   return failure.message
 }
 
@@ -1092,10 +1126,10 @@ export function viewWords(view: View): string {
 
 /** A kind view's "No albums for “…”." when nothing at all was found. */
 export function nothingWords(view: View, text: string): string {
-  return view === 'all' ? `No results for “${text}”` : `No ${view} for “${text}”.`
+  return view === 'all' ? `No results for “${text}”.` : `No ${view} for “${text}”.`
 }
 
 /** Where MusicBrainz's rows would go when it won't be asked yet. */
-export const TYPE_MORE = 'Type a little more, or press Search, to ask MusicBrainz too.'
+export const TYPE_MORE = "Type a little more, or press Search, to find albums you don't have yet."
 /** ...in the Songs view, for an artist's name alone: MusicBrainz is asked for no songs. */
-export const SONGS_NEED_A_TITLE = 'Type a song\'s title with the artist (“roads portishead”) to find their songs on MusicBrainz.'
+export const SONGS_NEED_A_TITLE = "Type a song's title with the artist (“roads portishead”) to find songs you don't have yet."

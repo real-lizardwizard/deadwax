@@ -1,34 +1,43 @@
 # How matching works
 
-Every folder a Soulseek search finds is scored against the release you picked, from 0 to 100.
-The score is a weighted average of six signals. Each source card shows each one as a chip, under
-**Why it scored what it did** ([downloading](downloading.md#choosing-a-source)), so you can see
-*why* a folder scored what it did rather than just trusting the number.
+Every source a search finds - one user's folder of the album on Soulseek - is scored against the
+release you picked, and its card shows the score as a percentage: **70%** is a 70% match. The score
+is a weighted average of six signals. Each source card shows each one as a chip with its own
+percentage, and what it measures written beside it, under **Why it's a 70% match**
+([downloading](downloading.md#choosing-a-source)), so you can see *why* a source scored what it did
+rather than just trusting the number.
 
-| signal | weight | measures |
+| signal (as the card names it) | weight | measures |
 | --- | --- | --- |
-| **titles** | 30% | how many of the release's tracks have a file in the folder whose name matches the track's title |
-| **count** | 20% | whether the folder has as many audio files as the release has tracks |
-| **lengths** | 15% | of the tracks matched by title, how many files are within 8 seconds of the release's track length |
-| **edition** | 15% | whether the folder's name agrees with the edition you picked, and mentions its year |
-| **format** | 12% | lossless or lossy, against your format preference |
-| **peer** | 8% | how soon you'd actually get the files: a free slot, a short queue, a fast connection |
+| **Track names** | 30% | how many of the release's tracks have a file in the folder whose name matches the track's title |
+| **Track count** | 20% | whether the folder has as many audio files as the release has tracks |
+| **Track lengths** | 15% | of the tracks matched by title, how many files are within 8 seconds of the release's track length |
+| **Edition** | 15% | whether the folder's name agrees with the edition you picked - mentioning its year helps |
+| **Format** | 12% | lossless or lossy, against your format preference |
+| **Availability** | 8% | how soon you'd actually get the files: a free slot, a short queue, a fast connection |
+
+The lines beside the chips say the same in a few words: *the pressing's tracks it has, found by
+their names*; *how near its number of files is to the pressing's tracks*; *the tracks found whose
+length is right, to within 8 seconds*; *whether its name says the same edition (deluxe, remaster…) - its
+year there helps*; *lossless or not, as your Format asks*; *how soon it can start: a free slot, a short
+queue, their speed*. (Until 2.0.6 the chips were *Titles*, *Count*, *Lengths* and *Peer*, with
+bare numbers.)
 
 ## Each signal
 
-**Titles.** Every track of the release is paired with the folder file whose name looks most
+**Track names.** Every track of the release is paired with the folder file whose name looks most
 like its title. A name that contains the title outright ("03 - Strangers (remaster).flac"
 contains "Strangers") is a perfect match; otherwise it's a fuzzy comparison, and anything below
 60% similar doesn't count. Each file is used once. The signal is the share of tracks that found
-a file. The same pairing is what later names and tags each file when the download is filed, so
+a file. The same pairing is what later names and tags each file when the download is added to your library, so
 a folder of `Track 04.mp3`s still gets proper titles. In a set shared one folder per disc, a
 track only pairs with a file from its own disc's folder, because discs often repeat titles: a
 second disc's "Wish You Were Here" is a different recording from the first's.
 
-**Count.** An exact match scores full marks. Each track more or fewer takes off a share: one
+**Track count.** An exact match scores full marks. Each track more or fewer takes off a share: one
 missing track out of twelve is a small penalty, and half the album missing is a large one.
 
-**Lengths.** The lengths MusicBrainz lists for the release, against the lengths the files
+**Track lengths.** The lengths MusicBrainz lists for the release, against the lengths the files
 report. Different masterings drift by a second or two, and that's within tolerance; a live take
 or a different recording won't line up. This is what catches a folder that has the right titles
 but is the wrong recording.
@@ -43,7 +52,7 @@ gets a bonus, because reissues usually carry their year.
 format scores full marks and an all-lossy one scores less, but still counts. **Lossless only**
 drops lossy folders from the list entirely. **Any format** ignores it.
 
-**Peer.** Half the signal is a free upload slot, then a short queue, then the user's advertised
+**Availability.** Half the signal is a free upload slot, then a short queue, then the user's advertised
 speed. It carries the least weight on purpose: it's an availability tiebreaker, not a measure
 of whether the files are right. The advertised speed is the user's average to everyone over
 their whole history, so it isn't a prediction of your download.
@@ -52,9 +61,9 @@ their whole history, so it isn't a prediction of your download.
 
 A signal with no information is **left out**, not scored as zero, and the weights of the others
 are rescaled. With a **Get** of the album as a whole (MusicBrainz couldn't list its pressings) there's no
-tracklist, so titles, count and lengths
-all drop out, and the score comes from edition, format and peer. With a release whose lengths
-MusicBrainz doesn't know, lengths drops out.
+tracklist, so track names, track count and track lengths
+all drop out, and the score comes from edition, format and availability. With a release whose
+lengths MusicBrainz doesn't know, track lengths drops out. A signal left out has no chip on the card.
 
 ## Why edition is never a filter
 

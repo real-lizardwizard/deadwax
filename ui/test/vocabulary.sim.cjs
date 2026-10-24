@@ -1,5 +1,6 @@
 /**
- * One vocabulary for your library, Home and the Library (2.0.5, UX batch 2) - a scan of the words a listener reads.
+ * One vocabulary for your library, Home and the Library (2.0.5, UX batch 2) - a scan of the words a listener reads -
+ * and for Search, the album you don't have, Sources and Requests (2.0.6, UX batch 3).
  *
  * James (2026-10-23) decided the shared music on the server is "All music" as a heading and "the collection" in a
  * sentence - never "the store", "Browse", "Navidrome" or "everything" - and that a person's own library is said as
@@ -10,7 +11,14 @@
  *  - in the batch's own files (BATCH): no "store", no "Browse", no "Navidrome", no "star"/"starred"/"starring",
  *    no "Subsonic", no "Put away", no "Request it again", no "the admin", no "First seen", no "Other pressings", no "everything";
  *  - in EVERY file of the app (app/, lib/, player/, hooks/, components/): no "the store" or "in the store" - the
- *    rename was the whole app's, and a new line saying it would undo it.
+ *    rename was the whole app's, and a new line saying it would undo it;
+ *  - (2.0.6) in batch 3's files (BATCH3): James's "source" for where a download comes from - never "peer", "folder",
+ *    "Soulseek" or "slskd"; "added to your library", never "filed" or "organizing"; "pressing", never "editions" or
+ *    "release id"; albums you don't have, never "MusicBrainz" (but its own ↗ links); no "saved" mark; "Searching…" and
+ *    "Loading…", never "Asking…"; "Getting…", never "Get…"; and none of the old Sources and Requests words - Signals,
+ *    Titles, Lengths, Free slot, their own average, Re-search, "#3 in", Next peer, Ask again, "3 ahead", and Navidrome's
+ *    name ("try 2" is a template's "try " the scanner can't tell from code - requests.sim pins "2nd try"). A line left on
+ *    purpose is in ALLOW3, with why.
  *
  * Each rule is checked on a sample that breaks it, so a scan that finds nothing is known to look.
  *
@@ -109,6 +117,8 @@ function readable(src) {
     //? code that happens to sit between a ">" and a "<" (a comparison, an arrow) is not text; words in brackets are
     if (!wordy(text) || /=>|&&|\|\||[=!]==|[;=[\]]|\?\s|\(\)/.test(text)) continue
     if (/^(else|return|catch|as |while|from|function|const|let|if |case |default)/.test(text)) continue
+    //? (2.0.6) code that sits between a ">" and a "{" too: a type annotation, a loop's head, a spread
+    if (/\bvoid\b|\(const |\.\.\.\(|^\||^[\w.]+\.\w+\($/.test(text)) continue
     found.push([lineOf(m.index + 1), text])
   }
   return found
@@ -141,6 +151,50 @@ const BATCH_RULES = [
 /** ...and the whole app never says "the store" (2.0.5: "the collection"). */
 const APP_RULE = ['"the store"', /\b(?:the|in the|from the) store\b/i, 'Searching the store…']
 
+/** (2.0.6, UX batch 3) Search, the album you don't have, Sources and Requests - and the artist page's MusicBrainz words
+ *  and "2 editions", which batch 2 left to this one. */
+const BATCH3 = [
+  'app/Search.tsx', 'app/SearchRows.tsx', 'lib/searchList.ts', 'lib/searchResults.ts', 'lib/songs.ts',
+  'app/ReleaseGroupPage.tsx', 'lib/pressings.ts', 'app/PressingPicker.tsx', 'lib/owned.ts',
+  'app/Sources.tsx', 'app/SourceCard.tsx', 'lib/candidates.ts', 'lib/getSettings.ts', 'app/StoreState.tsx', 'hooks/useCandidateSearch.ts',
+  'app/Requests.tsx', 'app/JobCard.tsx', 'lib/requestsView.ts', 'lib/perPerson.ts', 'hooks/useDownloadJobs.ts', 'app/Arriving.tsx', 'lib/myLibrary.ts',
+  'lib/artistPage.ts', 'app/ArtistPage.tsx',
+]
+
+/** The words batch 3's files never say to a listener - each with a sample that says it. */
+const BATCH3_RULES = [
+  ['"MusicBrainz"', /MusicBrainz/, 'Asking MusicBrainz…'],
+  ['"Soulseek"', /Soulseek/, '41 folders on Soulseek, none pass your filters'],
+  ['"slskd"', /slskd/, 'slskd listens for answers for a few seconds.'],
+  ['"peer"', /\bpeers?\b/i, 'Trying next peer…'],
+  ['"folder" for a source', /\bfolders?\b/i, '2 disc folders'],
+  ['"filed" / "filing"', /\bfil(?:ed|ing)\b/i, 'Partly filed: 2 file(s) failed to organize'],
+  ['"organizing"', /organi[sz]/i, '12 of 12 files · organizing'],
+  ['"release id"', /release id/i, 'its folder has no MusicBrainz release id'],
+  ['"editions"', /\beditions\b/i, '1994 · in your library · 2 editions'],
+  ['the "saved" mark', /\bsaved\b/i, 'Saved - MusicBrainz is away.'],
+  ['"Asking…"', /\bAsking\b/, 'Asking the collection…'],
+  ['the code\'s signal names', /\b(?:Signals|Titles|Lengths)\b/, 'Signals · 2'],
+  ['"Free slot"', /\bFree slot\b/, 'Free slot'],
+  ['"their own average"', /own average/, 'their own average'],
+  ['"Re-search"', /Re-search/, 'Re-search'],
+  ['"#3 in"', /#\s*in\b/, '#3 in their queue'.replace('3', ' ')],
+  ['"Next peer" / "Ask again"', /Next peer|\bAsk(?:ing)? again\b/, 'Next peer · 3 left'],
+  ['"Get…"', /\bGet…/, 'Get…'],
+  ['"ahead"', /\bahead\b/, '3 ahead'],
+  ['"Navidrome"', /Navidrome/, "Navidrome hasn't found it yet - it may still be scanning"],
+]
+
+/** Lines batch 3's rules leave on purpose: [file, the line's words, why]. */
+const ALLOW3 = [
+  ['app/ReleaseGroupPage.tsx', /^On MusicBrainz$/, 'the label over its own links to musicbrainz.org - the one place the name stays (the review\'s X2)'],
+  ['lib/owned.ts', /^A folder with this name, not matched to a pressing/, "the maybe's tooltip, drawn only for whoever can Edit albums - its folders' paths; anyone reads the line under Get"],
+  ['lib/candidates.ts', /^(?:those folders|that folder|Getting it adds only the tracks that folder doesn't have yet\.)$/, "a library folder, named by its path beside it (the store box's notes) - not a source"],
+  ['app/Requests.tsx', /Downloads still arrive in slskd/, 'the database line for whoever runs deadwax only (it names DB_PATH); anyone else reads UNTRACKED_TEXT'],
+  ['app/ArtistPage.tsx', /^Folders?$/, "the artist's facts' folder paths - the review's AR7, flagged beyond the batches (B6)"],
+  ['lib/myLibrary.ts', /^its folder$/, "Held by nobody's flag line, a managing page's (batch 5)"],
+]
+
 function filesUnder(dir) {
   return fs.readdirSync(path.join(SRC, dir)).filter((name) => /\.tsx?$/.test(name)).map((name) => `${dir}/${name}`)
 }
@@ -163,7 +217,7 @@ console.log('\nthe scanner sees what a listener reads, and only that')
   const words = readable(sample).map(([, text]) => text.trim())
   check("a string, a template and JSX text are read; comments, imports, classes, scopes and a regex's quotes are not",
     words, ['Removed from the store', 'albums in the store', 'Then the end', 'Browse the store', 'Your favourite (starred) albums.'])
-  for (const [name, rule, said] of [...BATCH_RULES, APP_RULE]) {
+  for (const [name, rule, said] of [...BATCH_RULES, APP_RULE, ...BATCH3_RULES]) {
     check(`the ${name} rule catches "${said}"`, readable(`const x = ${JSON.stringify(said)}`).some(([, text]) => rule.test(text)), true)
   }
 }
@@ -174,6 +228,26 @@ for (const file of BATCH) {
   const broken = []
   for (const [line, text] of found) for (const [name, rule] of BATCH_RULES) if (rule.test(text)) broken.push(`${file}:${line} ${name}: ${text.trim().slice(0, 120)}`)
   check(`${file}: none of the old words a listener reads (${found.length} lines read)`, broken, [])
+}
+
+console.log('\nbatch 3\'s files (2.0.6): Search, the album you don\'t have, Sources, Requests - source, added, pressing, and no plumbing')
+{
+  const allowed = new Set()
+  for (const file of BATCH3) {
+    const found = readable(fs.readFileSync(path.join(SRC, file), 'utf8'))
+    const broken = []
+    for (const [line, text] of found) {
+      for (const [name, rule] of BATCH3_RULES) {
+        if (!rule.test(text)) continue
+        const allow = ALLOW3.find(([where, words]) => where === file && words.test(text.trim()))
+        if (allow) allowed.add(allow)
+        else broken.push(`${file}:${line} ${name}: ${text.trim().slice(0, 120)}`)
+      }
+    }
+    check(`${file}: none of batch 3's old words a listener reads (${found.length} lines read)`, broken, [])
+  }
+  //? an allowance nothing needs any more is a hole a new line could slip through: each must still be used
+  check('every line left on purpose is still there - none of ALLOW3 stale', ALLOW3.filter((allow) => !allowed.has(allow)).map(([file, words]) => `${file} ${words}`), [])
 }
 
 console.log('\nthe whole app: "the collection", never "the store"')

@@ -9,11 +9,11 @@ import type { ReleaseGroup, ReleaseGroupResponse, StoreStateResponse } from '../
 import { storeNotes } from '../lib/candidates'
 import { joinDownload } from '../lib/downloadRequests'
 import { isAbort, latestOnly } from '../lib/latest'
-import { GET_OFF, gets } from '../lib/permissions'
+import { GET_OFF, albumEdit, gets } from '../lib/permissions'
 import { announceAddedToLibrary, onAddedToLibrary, onAlbumsFiled } from '../lib/libraryEvents'
 import { releaseUrl } from '../lib/albumProperties'
 import { describeGroupOwnership, ownedForGroup, type OwnedAlbum } from '../lib/owned'
-import { anyYours, groupPagePlace, heldPhrase, isYours, withStoreLine } from '../lib/whose'
+import { anyYours, groupPagePlace, heldPhrase, isYours, maybeLine, withStoreLine } from '../lib/whose'
 import {
   anyPressingDiffers, chosenPressingId, coverAddresses, getGroup, groupMbid, holdingOf, leftOut, metaLine, pageHeader, pressingLabel, pressingsView,
   releaseGroupUrl, summaryLine, trackRows, type PageRelease, type TrackRow,
@@ -42,7 +42,7 @@ export { PRESSINGS_KEPT } from './pressingLists'
 type Trouble = { message: string; unavailable: boolean; final?: boolean }
 
 /** What a link that isn't a MusicBrainz album says, with nothing to try again. */
-export const NOT_AN_ALBUM_LINK = "That isn't a link to an album on MusicBrainz."
+export const NOT_AN_ALBUM_LINK = "That link isn't an album."
 
 /** What a screen reader hears on the song an album was opened from (2.0.0-player.53) - its row marked. */
 export const SONG_WORDS = ', the song you searched for'
@@ -88,7 +88,7 @@ function DeskTracklist({
           <tr>
             <th scope="col" class="app-rg-number">#</th>
             <th scope="col">Title</th>
-            {against && <th scope="col">Against the usual tracklist</th>}
+            {against && <th scope="col">Compared with the usual</th>}
             <th scope="col" class="app-rg-length">Length</th>
           </tr>
         </thead>
@@ -269,7 +269,10 @@ export function ReleaseGroupPage({
   onCloseSources?: () => void
 }) {
   //? (2.0.0-player.61) Get albums: without it, its words in Get's place (and no join)
-  const getsAlbums = gets(useAccess().permissions)
+  const access = useAccess()
+  const getsAlbums = gets(access.permissions)
+  //? (2.0.6) whoever can Edit albums is told how a "maybe" is settled, and sees its folders in its tooltip
+  const editors = albumEdit(access.permissions).editors
   //? the id as MusicBrainz writes it, or null for an address that isn't an album's
   const mbid = groupMbid(id)
   const [answer, setAnswer] = useState<ReleaseGroupResponse | null>(() => (mbid && kept(mbid)) || null)
@@ -496,13 +499,14 @@ export function ReleaseGroupPage({
           <p class="pl-hero-artist app-hero-plain">{header.artist}</p>
         )}
         {/* said once something is known - a cold link has nothing to say until the pressings come; a
-            folder of this name with no ids is a dashed "maybe", its folders in the tooltip */}
+            folder of this name with no ids is a dashed "maybe" - why, in a line under Get (2.0.6), its folders in
+            the tooltip for whoever can Edit albums */}
         <p class="pl-hero-meta">
           {!(preview || answer) ? '' : maybe ? (
             <>
               {metaLine(header, null)}
               {metaLine(header, null) ? ' · ' : ''}
-              <span class="app-rg-maybe" title={maybe.title}>
+              <span class="app-rg-maybe" title={editors ? maybe.title : undefined}>
                 maybe {heldPhrase(personal, anyYours(ownership?.guessed ?? []))}
               </span>
             </>
@@ -527,6 +531,11 @@ export function ReleaseGroupPage({
           {desktop && facts}
           <div class="app-rg-store" aria-live="polite">
             {known && <StoreState status={storeStatusFor(known, 'Requests', floor)} notes={storeNotes(known)} {...(getsAlbums ? { onJoin: join } : {})} onAdd={add} />}
+            {/* (2.0.6, UX batch 3) the maybe said in words - under Get, where a line landing late moves nothing a
+                finger is reaching for; it was its tooltip's alone */}
+            {(preview || answer) && maybe && (
+              <p class="app-footnote app-rg-maybe-note">{maybeLine(personal && !anyYours(ownership?.guessed ?? []), editors)}</p>
+            )}
           </div>
         </div>
       </div>
@@ -535,7 +544,7 @@ export function ReleaseGroupPage({
         <div class="pl-notice app-rg-trouble">
           <p>
             {trouble.unavailable
-              ? "MusicBrainz isn't answering just now, so this album's pressings couldn't be loaded - it often goes away for a few minutes."
+              ? "This album's details can't be loaded right now - try again in a few minutes."
               : trouble.message}
           </p>
           {!trouble.final && (
@@ -547,10 +556,10 @@ export function ReleaseGroupPage({
       ) : !answer ? (
         <div class="app-asking app-rg-asking" role="status">
           <span class="app-sweep" aria-hidden="true" />
-          <span class="app-asking-text">Asking MusicBrainz…</span>
+          <span class="app-asking-text">Loading…</span>
         </div>
       ) : !releases.length ? (
-        <p class="pl-notice">MusicBrainz lists no pressings of this album.</p>
+        <p class="pl-notice">There are no pressings of this album to get.</p>
       ) : desktop ? (
         <DeskTracklist
           rows={rows}

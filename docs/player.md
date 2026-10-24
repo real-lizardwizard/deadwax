@@ -191,8 +191,8 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
 - **Requests**: your downloads, under **Downloading** (a bar, "6 of 10 files · 1.8 MB/s", who it's
   from, and **✕** to cancel, which asks in the card first - **Keep it** or **Cancel download** -
   unless You's **Confirm before cancelling** is off),
-  **Waiting** (its place in the user's queue, or "starting"), **Needs attention** (why it stopped,
-  in red, with **Next peer · N left** and **Ask again**) and **Done** (how it ended and how long
+  **Waiting** (its place in the user's queue - "4th in their queue" - or "starting"), **Needs attention**
+  (why it stopped, in red, with **Another source · N left** and **Same source again**) and **Done** (how it ended and how long
   ago: "In your library · 12 minutes ago"), each heading only when it has something under it, and
   **Clear done** at the top. Until deadwax first answers it shows a spinner, never "Nothing
   requested yet". With VoiceOver, what changes is read out: a retry starting or refused, a
@@ -234,32 +234,36 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
   library", and opens the album you have), and one you have that your library's own search didn't list is
   shown among yours. **Nothing drawn moves under your finger**: what your library can already tell is drawn
   at once, the sections when MusicBrainz has answered (a second and a half at most), and a kind still out
-  lands in a place kept for it - drawn straight in when nothing is below it, else behind **Show 3 albums
-  from MusicBrainz**. Tap an album MusicBrainz offers for **the album you don't have**: laid out like an
+  lands in a place kept for it - drawn straight in when nothing is below it, else behind **Show 3 more
+  albums**. Tap an album MusicBrainz offers for **the album you don't have**: laid out like an
   album you have - its artist a link to their page when it's credited to one artist - with a **Pressing**
   button where Play would be, starting on the usual pressing - its status, date, labels, catalogue number
   and barcode under it, every pressing's in the list, and a filter there for an album of more than 30 - and
   that pressing's tracklist, with its bonus tracks, other versions and renamed or missing tracks marked;
   "maybe in your library", dashed, when only a folder with no MusicBrainz ids has its name ("maybe in the
-  store" with logins on, when that folder isn't in your library); and the album and the pressing on
+  collection" with logins on, when that folder isn't in your library), with a line under Get saying why
+  ("You may already have this - an album with this name is in your library, but it isn't matched to a
+  pressing."); and the album and the pressing on
   musicbrainz.org at its foot. MusicBrainz isn't asked for anything until you search, and the album page
   works with Navidrome down. **What deadwax has saved** of MusicBrainz's answers is
   searched too, under any words, the moment your library is: its rows lead each kind's MusicBrainz rows,
-  marked **saved** - search "portishead", open Dummy, and "glory box" later finds Glory Box at once, after a
+  drawn as MusicBrainz's own would be - search "portishead", open Dummy, and "glory box" later finds Glory Box at once, after a
   restart, with MusicBrainz away - and MusicBrainz's own answer adds what isn't there yet below them. When
-  MusicBrainz is away the saved rows stay, with a line saying these are what deadwax has saved.
+  MusicBrainz is away the saved rows stay, with a line saying so ("Showing earlier results - searching for
+  more isn't working right now.").
   [Finding music](finding-music.md) has how the box is read, how Top
   results are chosen, [what's saved](finding-music.md#what-deadwax-has-saved) and what every note means.
 - **Get**: **Get the album** on the album you don't have - under the Pressing button, with a line
   under it saying what you already have of that pressing, if anything - gets the pressing chosen;
   **Get** at the end of an album MusicBrainz offers in Search gets its usual pressing, and at the end of a
   MusicBrainz song the album it names, on a pressing that has the song. Each opens
-  **Choose a source**, a sheet of the folders found on Soulseek, one card each: the score, the
-  folder and who it's from, then **Speed** first and large (what you got from that user before, in
-  green, or their own average, or none reported), Tracks, Quality, Size and when it **Starts**, and
-  what it's missing in amber - and, behind a tap on the score, why it scored
-  what it did: the score's six parts as chips and the edition words in the folder's name.
-  **Lossless**, **24-bit**, **Free slot**, **Complete albums only** and the sort narrow the list,
+  **Choose a source**, a sheet of the sources found on Soulseek, one card each: the score as a
+  percentage ("70%"), the folder and who it's from, then **Speed** first and large (what you got from
+  that user before, in green, or their usual speed, or none reported), Tracks, Quality, Size and when it
+  **Starts**, and what it's missing in amber - and, behind a tap on the score, **Why it's a 70% match**:
+  the score's six parts as chips (**Track names**, **Track count**, **Track lengths**, **Edition**,
+  **Format**, **Availability**), each with what it measures beside it, and the edition words in the
+  folder's name. **Lossless**, **24-bit**, **Starts now**, **Complete albums only** and the sort narrow the list,
   and **Search again** under it opens the query to edit. The search is scored by You's **Format**.
   A card's **Get** queues it and switches to Requests, where it already shows. With **Pick the best
   source for me** in You, Get queues the best match itself when one scores 75 or more under your
@@ -505,7 +509,7 @@ have, and Info's artist card.
   of theirs you have that MusicBrainz's list doesn't match (an untagged rip, an EP, a live album) is
   listed too, one row per album, so nothing you have is left off. The list waits a moment for
   Navidrome, MusicBrainz and your library to answer and is then drawn once - "Looking in your
-  library…" ("Looking in the collection…" with logins on) or "Asking MusicBrainz…" meanwhile - and what isn't
+  library…" ("Looking in the collection…" with logins on) or "Loading their albums…" meanwhile - and what isn't
   in your library is only said once
   your library has answered. **Studio only** (on to begin with) leaves out MusicBrainz's live
   albums, compilations and the like - never one you have; toggling it keeps the list on screen
@@ -515,8 +519,8 @@ have, and Info's artist card.
   Ye) side by side, since MusicBrainz lists an artist's albums under every name they've used.
 - **Which artist** it is on MusicBrainz comes from Navidrome (the album artist's MusicBrainz id it
   reads from your files), else from the MusicBrainz ids deadwax wrote into the albums of theirs you
-  have. With neither - files tagged by something else, or not at all - the page says MusicBrainz
-  doesn't know who this is and lists only what you have, with **Which artist is this?** to choose
+  have. With neither - files tagged by something else, or not at all - the page says "Only the albums
+  you have are shown - their other albums can't be found." and lists only what you have, with **Which artist is this?** to choose
   ([below](#managing-an-artist)). An artist opened from MusicBrainz is
   matched to Navidrome's the same way, and by name only when exactly one artist in your library
   goes by it.
@@ -934,7 +938,7 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
   Escape closes that first, back to the track or to its tab).
 - **The album you don't have** has its cover beside its title, then **Get the album** with the
   **Pressing** button beside it, what you already have of that pressing under them, and the
-  tracklist as a table - #, Title, Length - with an **Against the usual tracklist** column whenever
+  tracklist as a table - #, Title, Length - with a **Compared with the usual** column whenever
   any pressing of the album differs (the bonus track, the other version, the renamed one, each
   marked there with a short note: "only on this pressing", "usually 3:58"). A title or note too long
   for its column ends in "…" - point at it to read it whole. From 1280 pixels wide **Get the album**
@@ -945,13 +949,13 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
   panel beside the page, and shows pressed while the panel shows that pressing's sources: click it
   again to close them.
 - **The Sources panel** is the same cards as on a phone - the score, the folder and who it's from,
-  then Speed first, Tracks, Quality, Size and Starts in a row, and the score's parts as chips, always
-  showing - with **Search again** under them, and **Lossless**, **24-bit**,
-  **Free slot**, **Signals**, **Complete albums only**, a sample-rate floor (any, 44.1, 48, 88.2 or
-  96 kHz and up, by the folder's worst file) and the sort. **Signals** sets
+  then Speed first, Tracks, Quality, Size and Starts in a row, and the score's parts as chips with what
+  each measures, always showing - with **Search again** under them, and **Lossless**, **24-bit**,
+  **Starts now**, **Match details**, **Complete albums only**, a sample-rate floor (any, 44.1, 48, 88.2 or
+  96 kHz and up, by the folder's worst file) and the sort. **Match details** sets
   the least each part of the match score
-  may be - **Titles**, **Count**, **Lengths**, **Edition**, **Format** and **Peer**, a slider each -
-  and its chip counts how many are set. Signals and the
+  may be - **Track names**, **Track count**, **Track lengths**, **Edition**, **Format** and
+  **Availability**, a slider each - and its chip counts how many are set. Match details and the
   sample-rate floor are the panel's alone: narrow the window to a phone's with the panel open and
   they stop filtering (neither
   chip is drawn on a phone), until it's wide again. The page stays usable beside the panel:

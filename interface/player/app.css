@@ -112,13 +112,16 @@
     --app-job-action: 36px;          /* Next peer and Ask again, as the board draws them... */
     /* ...44px to a finger: the reach starts at the button's padding box, inside its border */
     --app-job-action-reach: calc((var(--pl-hit) - var(--app-job-action)) / 2 + var(--dw-hairline));
-    --app-job-action-min: 150px;     /* narrower than this, the pair stack: "Next peer · 10 left" whole */
+    --app-job-action-min: 192px;     /* narrower than this, the pair stack: "Trying another source…" whole -
+                                        174px of words, its padding and border (2.0.6; 150px held "Next peer") */
     --app-job-actions-row-gap: calc(2 * var(--app-job-action-reach));  /* stacked, the reaches don't overlap */
     --app-job-attention-gap: 10px;   /* a Needs attention card's words to its buttons */
     --app-job-dimmed: 0.55;          /* a download being cancelled, until the server agrees: its cover, title
                                         and bar - never the words saying "cancelling…" */
     --app-job-busy: 0.75;            /* a button waiting on its retry: faded, and still legible */
     --app-done-row: 56px;
+    --app-done-pad-y: 6px;           /* (2.0.6) a Done row's words off its hairlines when they run to more lines -
+                                        the 44px cover plus this twice is the 56px row, so a one-line row is as it was */
     --app-arriving-pad-y: 9px;       /* an Arriving card, as the Home board has it */
     --app-arriving-pad-x: 11px;
     --app-arriving-body-min: 96px;   /* the album's name keeps this much; the state word gives way first */
@@ -231,6 +234,7 @@
     --app-source-signal-pad: 7px;
     --app-source-signal-inner: 4px;  /* its word to its number */
     --app-source-tag-pad: 6px;       /* an edition word's sides, as the main page's tag had them */
+    --app-source-meaning-gap: 8px;   /* (2.0.6) a signal's chip to what it measures */
     /* Search again, when folders were found (2.0.0-player.41): the query opens under it */
     --app-sources-again-pad: 0;      /* the query form under it starts at once, no state's gap above */
     /* the artist page (2.0.0-player.17), as Artist.dc.html draws it */
@@ -2703,6 +2707,32 @@ button.app-result:active { background: var(--dw-pressed); }
 .app-source-tag.is-purple { border-color: var(--dw-badge-purple-border); background: var(--dw-badge-purple-bg); color: var(--dw-accent-text); }
 .app-source-tag.is-green { border-color: var(--dw-badge-green-border); background: var(--dw-badge-green-bg); color: var(--dw-badge-green-text); }
 
+/* (2.0.6, UX batch 3) "Why it's a 70% match", over the signals */
+.app-source-reasons-title {
+    margin: 0;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-label);
+    font-weight: var(--dw-weight-semibold);
+}
+
+/* ...each a row: its chip, then what it measures - the chips in one column, so the words line up */
+.app-source-signals {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--app-source-meaning-gap);
+}
+
+.app-source-signal-row { display: contents; }
+.app-source-signal-row > .app-source-signal { justify-self: start; }
+
+.app-source-signal-meaning {
+    min-width: 0;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-label);
+    line-height: var(--dw-leading-note);
+}
+
 /* a signal: its word and its number, in its band's colour - green from 75, amber from 40, red under */
 .app-source-signal {
     display: inline-flex;
@@ -3479,6 +3509,7 @@ button.app-result:active { background: var(--dw-pressed); }
     gap: var(--app-job-inner);
     min-width: 0;
     min-height: var(--app-done-row);
+    padding-block: var(--app-done-pad-y);
     color: var(--dw-text);
     text-align: left;
 }

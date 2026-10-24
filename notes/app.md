@@ -1420,3 +1420,150 @@ Verified after the second review: 3785 Python tests (3783 passed, 2 skipped), py
 the engine files no diff. Mutation-checked: Held by nobody's spoken "put away" and its "Put away" label back
 (vocabulary.sim), `const personal = false` and Edit's row calling pinLine without it (pins.sim), a second Amperfy in
 the footnote (mylibrary.sim), Up Next's 'everything' back (upnext.sim), the sidebar's "Search everything" (vocabulary.sim).
+
+### Search, the album you don't have, Sources and Requests in one vocabulary (2.0.6)
+
+James, 2026-10-23: "I want to make sure it all provides a good user experience." This is **batch 3** of the words-and-UX
+review's five (`work/ux-audit/words-ux.md` in the scratch folder: its "Batches" section, findings #3, #10, #11, RG5 and the
+A4-A6 and A8 sections - and the artist page's MusicBrainz words and "2 editions", which batch 2 left to this one), with
+James's decisions (`work/ux-audit/decisions.md`): **"source"** for where a download comes from, never peer, folder,
+Soulseek or slskd; **Get** the verb and **Requests** the list; **"added to your library"**, never filed or organizing;
+**"pressing"** for one release of an album. Words and the small UX the batch names (the maybe box's tooltip made visible
+text, the score as a percentage with each chip's meaning beside it) - no route, status or behaviour changed, nothing heard
+changed, the engine files have no diff. Batch 1's errorWords and batch 2's words are kept; batch 2's vocabulary sim is
+extended.
+
+**Search** (#3, S1-S23). The **"saved" mark is gone**: a row from MusicBrainz's answers kept on disk is drawn exactly as
+MusicBrainz's own row would be - "· saved" read as "you saved this album", and nothing a listener does needs to know
+where an answer was kept. Only a failure under such rows says what they are: *Showing earlier results - searching for
+more isn't working right now.* (*Showing earlier results.* in a kind's one-row slot, which must fit 320). A desktop tile's
+third line for something nobody here has is **Not in your library** (**Not in the collection** with logins on, where
+your library is only part of what's here; was "On MusicBrainz" / "Saved from MusicBrainz"), **Maybe in your library** for
+a group a folder of its name may be (ownedForGroup's `guessed`, the album page's own "maybe" - `groupMaybe`, shared with
+the group's section row, which says *maybe in your library* too, so tile and row never disagree), and nothing for an album
+or song while the owned index hasn't come (lib/searchList.ts `placeLabel`, `notHere`). A MusicBrainz ARTIST tile says
+*Not in your library* only once the library's artist list (getArtists, `Marks.artists`) has come and no artist in it has
+that name or the name it was matched as: an mb-artist row only means newArtists or creditedRow didn't tie it to a library
+artist - two Nirvanas answering stay MusicBrainz's beside the library's untagged Nirvana - and is blank otherwise (review).
+A tile with a **Get** (SearchRows `topRow`) leaves its third line empty, its height kept: at 1440 with no side panel a tile
+is 224px and its text 62px beside the Get, so the line read "Not in y…" (measured, review) - the Get says it isn't here,
+and the group's section row and its page carry the "maybe". MusicBrainz's name is out of
+every line: the hint *Search your library and albums you don't have yet.* (*Search your library, the collection, and
+albums nobody has yet.*), the field's label *Search for artists, albums and songs*, the busy lines *Searching…* (was
+"Asking MusicBrainz…", "Searching your library and MusicBrainz…") and *Loading…* for a More button (was "Asking your
+library…"), the region's *Also found: 3 albums.* / *Found earlier: 1 song.* / *More found: …* / *Nothing more found.*,
+*Show 3 more albums* (a fold), *No other albums for "…".*, *No more albums for "…".*, *Show 12 from your library*,
+*Can't search for more right now.*, *Searching for more isn't working right now - try again in a few minutes.*,
+*Too many searches just now - try again in a moment.*, *Studio albums and EPs - See all for everything they
+made.*, *Type a little more, or press Search, to find albums you don't have yet.*, *…to find songs you don't have yet.*,
+*Found songs called "…", but none is on an album yet - there's nothing to get.*, *No more results.* (was "MusicBrainz
+sent nothing new."), *You already have everything found.*, **More artists** / **More albums** (was "More from
+MusicBrainz"), *That's all for this search - add a word to narrow it.*, *No results for "…".* with its full stop. The
+server's 422 for words MusicBrainz can't read is *That search couldn't be read - try other words* (routes/
+search_musicbrainz.py REJECTED_WORDS). A row's Get reads **Getting…** while it asks (Search and the artist page).
+
+**The album you don't have** (A5): *Loading…*, *This album's details can't be loaded right now - try again in a few
+minutes.*, *There are no pressings of this album to get.*, *That link isn't an album.*, the desktop table's **Compared
+with the usual** column, the pressing notes *No tracklist listed* / *The only tracklist listed* / *No tracks are listed
+for this pressing* / *The only pressing (with a tracklist)*, the filter's placeholder *JP, CD, a label or catalogue no.*
+(the review's "Country, format…" was not taken: the code's own comment says a country is typed as its code, as the rows
+show it). **RG5**: the dashed maybe's explanation was its tooltip alone (folders' paths and "the metadata editor"), which a
+phone never shows - now a line under Get, where a late line moves nothing a finger is reaching for (lib/whose.ts
+`maybeLine`): *You may already have this - an album with this name is in your library, but it isn't matched to a
+pressing.* (*It may already be here - … in the collection …* when the folders aren't yours), plus *Match it to a pressing
+in Edit album.* for whoever can Edit albums - who alone keeps the tooltip, its words now "not matched to a pressing …
+Edit album". The "· 2 editions" of the artist page and owned.ts' label are **2 pressings**. **The artist page**:
+*Loading their albums…*, *Their other albums can't be shown right now - try again in a few minutes.*, *Only the albums you
+have are shown - their other albums can't be found.*, *Showing their first 500 albums.*, *No other albums found.* / *No
+studio albums found - turn off Studio only to see them all.*, *Artist details can't be loaded right now.*, *Loading…*.
+Its "Which artist is this?" panel stays MusicBrainz's (an admin's, batch 5); **On MusicBrainz** stays over the ↗ links.
+
+**Sources** (#11, A6). *Looking for "Third" by Portishead…* over *This takes a few seconds.* (was "Asking Soulseek…" and
+"slskd listens for answers…"); **Search for** / **Search** under Search again (was "Search Soulseek for" / "Re-search");
+*Nothing found for "…".*, *Nothing lossless found for "…".* over *Some were found, but none with lossless files - your
+Format is Lossless only, which leaves the rest out. …* (never how many lossy ones: `response_count` counts answers);
+*41 sources found - none match your filters.*; under the cards *Searched for "…" · 41 sources, 4 match your filters*;
+the region's lines now each end in a full stop (it said "…Getting albums.. Didn't pick…" before). The **Starts now** chip
+(was Free slot); a card's Speed note *their usual speed* (was "their own average"); Starts *now* / *after 3 others* / *soon*
+(was "3 ahead" / "next" - queue_length counts those ahead, so "3rd in their queue" would have been wrong); a set shared
+one folder per disc *in 2 parts, one per disc*. **The score is a percentage**, "70%" (VoiceOver "70% match"; the
+desktop panel's box grows to hold "100%": `width: auto`, min-width and `--app-desk-source-score-pad`), and its reasons
+are headed **Why it's a 70% match** (a visible heading, the group labelled by it). **The six signals** have names a
+listener reads and what each measures written beside its chip (lib/candidates.ts SIGNAL_LABELS, SIGNAL_MEANINGS - each
+read against src/matching.py): **Track names** (title_match: "the pressing's tracks it has, found by their names"),
+**Track count** ("how near its number of files is to the pressing's tracks"), **Track lengths** ("the tracks found whose
+length is right, to within 8 seconds" - DURATION_TOLERANCE_SEC), **Edition** ("whether its name says the same edition
+(deluxe, remaster…) - its year there helps": score_edition only adds for the year), **Format** ("lossless or not, as your Format asks"), **Availability** (score_peer: "how
+soon it can start: a free slot, a short queue, their speed" - the review's "Their speed" would have been untrue, speed is
+a fifth of it). Each chip says its value with "%". Drawn as rows (app.css: `.app-source-signals` a two-column grid, chips
+in one column so the words line up, `.app-source-signal-row` `display: contents`). The desktop's **Match details** chip
+(was Signals) has the same six names; its popover is 300px with a 100px name column so they stay on one line. A pick not
+made says what to do: *No close match that passes your filters - choose a source yourself.*, *You already have part of
+it - choose a source yourself.*, *This pressing has no tracklist to check the sources against - …*, *It can't be told
+whether you already have this pressing - …*; with no source found at all there is no such line (nothing to choose:
+`notPickedLine(blocked, found)` is null at 0, and the empty state speaks - review). The store box: *To get it from another source, cancel it in Requests first.*,
+*being added to your library now*, *didn't work - trying another source*, *Getting it adds only the tracks that folder
+doesn't have yet.* / *Getting it would add a separate copy, in …*, *Its quality isn't known, so it may be below your
+quality floor (…)*, *…another source isn't offered for a download you share.* Its folder paths stay (B6, beyond the batches).
+
+**Requests and Arriving** (#10, A8). *starting…* (was "asking slskd…"), *didn't start* (was "refused"), *adding to your
+library…* / Arriving's *adding…* (was "organizing"), *4th in their queue* / *4th in line* (was "#4 in their queue" / "#4 in
+queue"), *2nd try* (was "try 2") - `ordinal()`. The buttons **Another source · 2 left** / **Same source again**, busy
+*Trying another source…* / *Trying again…* (was Next peer / Ask again / Trying next peer… / Asking again…): 174px of words at
+their size, so `--app-job-action-min` is 192px and the pair stacks on a 390px phone (measured in a real page - "Next peer"
+fitted two across; a shorter "Next source · 10 left" still didn't). The other places naming the buttons say them too (review): People's line under Get albums
+(permissions.ts LINES.request, pinned by permissions.sim), Server settings' AUTO_RETRY_PEER line while it is off (pinned by
+test_settings_words), configuration.md's row and README. The retry problems *They refused - try another source.*,
+*No other source would send it.*, and RETRY_WORDS turns the server's "no other peers to try - search again for more" into
+*No other source to try - Get it again to search for more.*, MOVED_ON into *It's already been tried again meanwhile.* and
+CLEARED into *It's been cleared from the list - Get it again to download it.*; and by how they start (`retryWordsStarting`,
+review) store_index's in_flight_words and already_have, which name a source, say "being filed" and carry a library folder's
+path (safeWords catches only a path from the root): *It's already downloading.*, *It's already downloaded, and being added
+now.*, *It's already in your library.* (*…in the collection.* with logins on - RequestsInput's `personal`, App's
+hasLibrary()). The same goes for /enqueue's 409 on a pending row's *didn't start*. The route's own words stay the detail,
+for whoever runs deadwax (errors.sim reads them out of the Python; requests.sim the pending row). Done rows: *You already had it* (was "Already in your library,
+nothing filed"), *In your library - 2 files couldn't be added* (was "Partly filed: 2 file(s) failed to organize";
+`partlyWords`, the job's own words for whoever runs deadwax), *Stopped while being added to your library* with the tell
+(was "Interrupted while filing: check the library and slskd's folder" to everyone - that is now the detail), *Downloaded,
+but not added to your library* with the tell (organizing off), with logins on *In their library* (was "Filed - in their
+library"), *Not added - the collection's copy may be another pressing, so an admin has been asked to check it* / *…; an
+admin has checked it* (grant_for's FLAGGED is another pressing OR an untagged rip, so "may be"), *In your library - 2
+files couldn't be added* for an incomplete grant. The dry run's sentence says "rehearse adding albums" (errorWords). A row
+that can't open: *Not ready to play yet - it may still be scanning.*, *Can't find this album to open it - it may have moved, or isn't
+matched to a pressing.*, *Couldn't open it - tap to try again.* (R19). The ✕ asks *…You'll lose your place in their queue.* Empty
+Requests says "tap Get" only to someone who can Get; anyone else reads GET_OFF (the review's "Albums you join show here"
+was not true: Join is Get albums' too). Arriving's stale line *Can't update downloads right now - showing the last
+progress. Trying again…* (H4). The database line for whoever runs deadwax keeps slskd's folder and DB_PATH.
+
+**Pinned**: vocabulary.sim reads batch 3's files (BATCH3: Search, SearchRows, searchList, searchResults, songs,
+ReleaseGroupPage, pressings, PressingPicker, owned, Sources, SourceCard, candidates, getSettings, StoreState,
+useCandidateSearch, Requests, JobCard, requestsView, perPerson, useDownloadJobs, Arriving, myLibrary, artistPage,
+ArtistPage) for "MusicBrainz", "Soulseek", "slskd", peer, folder, filed/filing, organizing, "release id", "editions", the
+saved mark, "Asking", Signals/Titles/Lengths, Free slot, their own average, Re-search, "#N in", Next peer/Ask again, "Get…",
+"ahead" and Navidrome - each rule shown catching a sample; six lines left on purpose in ALLOW3 with why (the ↗ links'
+label, the maybe tooltip, the store box's library folders, the database line for whoever runs deadwax, the artist facts'
+Folder row, Held by nobody's flag line), and a check that none of ALLOW3 is stale. Its tokenizer also skips JSX "text" that
+is code (a type annotation, a loop's head, a spread, a call). A one-word template part ("${n} editions", "try ${n}") reads
+as an identifier to it, so those two are pinned by artist.sim and requests.sim instead. candidates.sim: the six names and
+meanings read against matching.py (WEIGHTS, DURATION_TOLERANCE_SEC), Starts' words, the not-picked lines; sources.sim: the
+"%" score, the heading, each chip beside its meaning, Match details; requests.sim: every row's new words, `ordinal`, the
+empty line by reader, the tell on a stopped filing; group.sim: the maybe line for an editor and a listener (no tooltip);
+searchList.sim: Not in your library / the collection / Maybe, no saved mark; test_app_css: the signal rows' grid, the
+desktop score box, the 192px stacking point. Updated on purpose: artist, candidates, errors, group, owned (its fixture's
+"2 pressings"), pressings, requests, search, searchList, searchQuery, songs, sources, vocabulary, whose sims;
+test_app_css, test_musicbrainz_routes.
+
+**Verified** (as built, before review): 3786 Python tests (3784 passed, 2 skipped; one new in test_app_css), pyflakes,
+tsc, the build, all 65 sims; the engine files no diff. 35 mutations, each caught and restored byte for byte (sha256
+checked; `work/uxb3-builder/mut/mutate.py`) - among them the tile's "On MusicBrainz", the saved mark, the maybe tile, a
+MusicBrainz word in Search / the album page / the artist page, "Get…", the old hint, "peer" as a signal's name, the 8 s
+meaning, the meaning or "%" not drawn, Free slot, slskd in the asking note, "#4", Partly filed, the interrupted tell,
+Next peer, the ordinals' teens, "as another copy", the empty line ungated, "the peer refused", Navidrome in a Done note,
+Arriving's old line, the maybe tooltip for everyone, the maybe line not drawn or ungated, "2 editions", the retry words,
+a stale ALLOW3, the code filter, the 150px stacking point, the signal grid, the desktop score box, the server's 422
+words. Seen in a real page (headless Chromium as deadwax.test, logins off, my own deadwax on 8110 over a stand-in
+Navidrome and slskd, real MusicBrainz; 390x844, 320x640, 1440x900): Search's hint and rows, Requests' four sections and
+Arriving in the new words, the retry pair stacked at 390 and 320 and side by side at 1440 with no label clipped, the
+album you don't have's "not in your library", Sources' asking lines, chips, "65%" scores (55px with the chevron on a
+phone, 35px on the desktop panel), "Why it's a 65% match" with each chip beside its meaning (two lines each at 390), the
+footer, and Match details' six sliders on one line each inside the panel; no horizontal scroll, no console errors.

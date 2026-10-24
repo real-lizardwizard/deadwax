@@ -77,7 +77,7 @@ export function floorNote(download: DownloadInFlight, floor: QualityFloor | null
   const own = "getting a copy of your own isn't offered yet"
   return verdict === 'below'
     ? `It's below your quality floor (${floorLabel(floor)}), and ${own}.`
-    : `Its folder doesn't say whether it meets your quality floor (${floorLabel(floor)}), and ${own}.`
+    : `Its quality isn't known, so it may be below your quality floor (${floorLabel(floor)}), and ${own}.`
 }
 
 /** The last line of a download somebody else asked for: what Join does - in the page's own place for
@@ -107,9 +107,9 @@ export function leavesOnCancel(job: { shared?: boolean; requested_by?: string[] 
 }
 
 /** The store line's last line for a download of yours somebody else waits for too - instead of
- *  "cancel it if you want another peer", which a cancel that only leaves can't give. */
+ *  "to get it from another source, cancel it", which a cancel that only leaves can't give. (2.0.6: "another peer".) */
 export const sharedNote = (place: 'Downloads' | 'Requests') =>
-  `Someone else asked for it too, so cancelling it in ${place} only takes it off your list - another peer isn't offered for a download you share.`
+  `Someone else asked for it too, so cancelling it in ${place} only takes it off your list - another source isn't offered for a download you share.`
 
 /**
  * The store's status for a pressing (lib/candidates.ts storeStatus) - every page's (the main page's
@@ -210,7 +210,7 @@ export interface CancelWords {
 }
 
 export const CANCEL_WORDS: CancelWords = {
-  question: "Cancel this download? You'll lose your place in this peer's queue.",
+  question: "Cancel this download? You'll lose your place in their queue.",
   action: 'Cancel download',
   leaves: false,
 }

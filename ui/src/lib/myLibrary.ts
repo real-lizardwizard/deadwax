@@ -36,29 +36,41 @@ function listed(items: readonly string[]): string {
   return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`
 }
 
+/** (2.0.6) A partly filed download's files that didn't make it: "2 files couldn't be added" from the job's
+ *  "2 file(s) failed to organize" (poller.py FAILED_TO_ORGANIZE), "some files couldn't be added" without a count. */
+export function partlyWords(error: string | null | undefined): string {
+  const count = /^(\d+) file\(s\) failed to organize/.exec((error ?? '').trim())
+  if (!count) return "some files couldn't be added"
+  const n = Number(count[1])
+  return `${n} ${n === 1 ? "file couldn't" : "files couldn't"} be added`
+}
+
 /**
  * How a finished download's row says what its filing gave (the server's `library`, logins on) - or null
  * for the words it always had. `mine` false: an admin's row of somebody else's download.
  */
 export function grantWords(
   job: Pick<DownloadJob, 'outcome' | 'error' | 'library' | 'mine'>,
-): { text: string; tone: 'plain' | 'warning' } | null {
+): { text: string; tone: 'plain' | 'warning'; detail?: string | null } | null {
   const whose = job.mine === false ? 'their' : 'your'
   if (job.outcome === 'filed' && job.library === 'added') {
-    return { text: job.mine === false ? 'Filed - in their library' : 'In your library', tone: 'plain' }
+    return { text: job.mine === false ? 'In their library' : 'In your library', tone: 'plain' }
   }
   if (job.outcome === 'already_there') {
     if (job.library === 'added') return { text: `Already in the collection, added to ${whose} library`, tone: 'plain' }
+    //? (2.0.6, UX batch 3) the folder it would have filed into holds another pressing or an untagged rip (grant_for):
+    //? said as "may be another pressing" - it said "as another copy"
     if (job.library === 'flagged') {
-      return { text: 'Already in the collection as another copy, so not added - an admin has been asked to look', tone: 'warning' }
+      return { text: "Not added - the collection's copy may be another pressing, so an admin has been asked to check it", tone: 'warning' }
     }
     //? the admin looked and put the flag away (Add for them makes it 'added' - review: the row kept saying
     //? an admin had been asked)
-    if (job.library === 'looked') return { text: 'Already in the collection as another copy, so not added - an admin has looked at it', tone: 'warning' }
+    if (job.library === 'looked') return { text: "Not added - the collection's copy may be another pressing; an admin has checked it", tone: 'warning' }
   }
+  //? (2.0.6) in their library, not whole - it said "Partly filed: 2 file(s) failed to organize · in your library, marked
+  //? incomplete"; the job's own words for whoever runs deadwax (DoneRow)
   if (job.outcome === 'partly_filed' && job.library === 'incomplete') {
-    const why = job.error ? `Partly filed: ${job.error}` : 'Partly filed'
-    return { text: `${why} · in ${whose} library, marked incomplete`, tone: 'warning' }
+    return { text: `In ${whose} library - ${partlyWords(job.error)}`, tone: 'warning', detail: job.error || null }
   }
   return null
 }

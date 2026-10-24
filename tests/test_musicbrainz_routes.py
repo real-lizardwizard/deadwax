@@ -831,7 +831,7 @@ def test_a_quick_400_is_a_422_with_words_asked_once(app_client, musicbrainz, ins
         musicbrainz[1]["fake"] = fake
         answer = app_client.get(f"/deadwax/search_musicbrainz/{route}", params=params)
         assert answer.status_code == 422, route
-        assert answer.json() == {"detail": "MusicBrainz couldn't read that search - try other words"}, route
+        assert answer.json() == {"detail": "That search couldn't be read - try other words"}, route
         assert len(fake.calls) == 1, route
 
 
@@ -920,4 +920,4 @@ def test_songs_400_is_now_a_422_not_an_outage(app_client, musicbrainz):
 
     answer = app_client.get("/deadwax/search_musicbrainz/songs", params={"query": ROADS_QUERY})
 
-    assert answer.status_code == 422 and "couldn't read that search" in answer.json()["detail"]
+    assert answer.status_code == 422 and "search couldn't be read" in answer.json()["detail"]

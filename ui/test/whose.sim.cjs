@@ -250,14 +250,14 @@ console.log('\nTHE CONTRADICTION, never again: "in your library" above "In the c
 
 console.log('\nSearch: the store first, its rows marked; MusicBrainz for what the store doesn\'t have')
 //? (2.0.0-player.55) one list, no half titles: the hint, the field's label, the asking line, the all-held words
-check('the words with a library of your own: yours, then the store\'s, then MusicBrainz\'s',
+check('the words with a library of your own: yours, then the collection, then (2.0.6) albums nobody has yet - never MusicBrainz by name',
   (({ hint, allHeld, label, searching }) => [hint, allHeld, label, searching(true), searching(false)])(S.searchWords(true)),
-  ["Artists, albums and songs: yours first, then the collection's, then MusicBrainz's.", 'Everything MusicBrainz found is in the collection already.', 'Search the collection and MusicBrainz',
-    'Searching the collection and MusicBrainz…', 'Searching the collection…'])
-check('...and with logins off, yours then MusicBrainz\'s - the field\'s label as it was',
+  ['Search your library, the collection, and albums nobody has yet.', 'Everything found is in the collection already.', 'Search for artists, albums and songs',
+    'Searching…', 'Searching the collection…'])
+check('...and with logins off, yours then albums you don\'t have yet - the field\'s label the same',
   (({ hint, allHeld, label, searching }) => [hint, allHeld, label, searching(true), searching(false)])(S.searchWords(false)),
-  ["Artists, albums and songs: yours first, then MusicBrainz's.", 'Everything MusicBrainz found is in your library already.', 'Search your library and MusicBrainz',
-    'Searching your library and MusicBrainz…', 'Searching your library…'])
+  ["Search your library and albums you don't have yet.", 'You already have everything found.', 'Search for artists, albums and songs',
+    'Searching…', 'Searching your library…'])
 check('...the half titles gone', Object.keys(S.searchWords(true)).sort(), ['allHeld', 'hint', 'label', 'searching'])
 //? (2.0.0-player.55) a library row's place in Search: said in both modes now - the half titles that said it are gone
 check('a library row\'s place in Search (libraryPlace): "in your library" with logins off too - reversing navidromePlace\'s silence there; with a library of your own whose it is, nothing while unknown',
@@ -271,7 +271,7 @@ check('a MusicBrainz row the store turns out to hold says whose it is',
 check('an artist\'s count is the store\'s with a library of your own', [S.artistLine(2, true), S.artistLine(1, false), S.artistLine(0, true), S.artistLine(2, true, true)],
   ['2 albums in the collection', '1 album in your library', '', 'Artist · 2 albums in the collection'])
 check('"More from MusicBrainz" says the store has them', [S.morePageWords(0, 2, true).note, S.morePageWords(0, 1, false).note],
-  ['The next 2 albums MusicBrainz found are all in the collection already.', 'The next album MusicBrainz found is in your library already.'])
+  ['The next 2 albums found are all in the collection already.', 'The next album found is in your library already.'])
 {
   const list = read('lib/searchList.ts')
   //? (2.0.0-player.55) replaces the half-titles pin: every library row says its place, by libraryPlace over whose it is - an
@@ -429,7 +429,7 @@ console.log('\nthe wiring: every page takes `personal` from hasLibrary() and han
   check('Search: its words, its artists\' counts, More\'s note and its MusicBrainz rows\' places, each by `personal`',
     [/const personal = hasLibrary\(\)\n {2}const words = searchWords\(personal\)\n/.test(search), /artistLine\(row\.artist\.albumCount, marks\.personal\)/.test(list),
       /morePageWords\(more\.added, more\.held, personal\)/.test(search),
-      /place: savedPlace\(row, held \? groupPlace\(marks\.index, row\.group\.id, marks\.personal\) : ''\)/.test(list)],
+      /place: held \? groupPlace\(marks\.index, row\.group\.id, marks\.personal\) : groupMaybe\(row\.group, marks\),/.test(list)],
     [true, true, true, true])
   check('...and no half titles any more (2.0.0-player.55): one list in sections', [/words\.libraryTitle|words\.musicbrainzTitle/.test(search), /<h2 id="app-search-top"/.test(search)], [false, true])
   const artist = read('app/ArtistPage.tsx')

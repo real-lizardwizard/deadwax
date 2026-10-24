@@ -30,7 +30,7 @@
  * answered, or can't - are ONE row per album the library's folders say they are (their release
  * group), keyed as MusicBrainz's row for it would be (`group:<id>`): so its answer landing neither
  * splits Dummy's two pressings into two rows nor changes a row's key under a finger (review), and
- * Play never plays both. "2 editions" counts the releases held, not the folders: a set kept one
+ * Play never plays both. "2 pressings" counts the releases held, not the folders: a set kept one
  * folder per disc, or a FLAC and an MP3 of one release, is one.
  *
  * Until /library/owned has answered (`index` null), a row only Navidrome claims is "in your library";
@@ -181,7 +181,7 @@ export interface ArtistRow {
   /** (2.0.0-player.52) held, and yours: a folder of it in your library, or an album of it you starred - with
    *  logins on and a library of your own, a held row not yours says "in the store" (rowLine) */
   yours?: boolean
-  /** how many releases of it the library holds: "2 editions" past one */
+  /** how many releases of it the library holds: "2 pressings" past one */
   editions: number
   /** the releases the library holds of it - what the id bridge asks Navidrome about when the row
    *  has no album id */
@@ -324,7 +324,7 @@ export function artistRows(
     || a.key.localeCompare(b.key))
 }
 
-/** A row's second line, the board's: "1994 · in your library · 2 editions", "2008 · not in your
+/** A row's second line, the board's: "1994 · in your library · 2 pressings", "2008 · not in your
  *  library", "1998 · Live album · not in your library" - and neither while the library hasn't said.
  *  `personal` (2.0.0-player.52): a held row not yours says "in the store" (lib/whose.ts). */
 export function rowLine(row: Pick<ArtistRow, 'year' | 'held' | 'editions' | 'kind' | 'yours'>, personal = false): string {
@@ -332,7 +332,8 @@ export function rowLine(row: Pick<ArtistRow, 'year' | 'held' | 'editions' | 'kin
     row.year,
     row.kind,
     row.held === null ? null : row.held ? heldPhrase(personal, row.yours) : 'not in your library',
-    row.held && row.editions > 1 ? `${row.editions} editions` : null,
+    //? (2.0.6, UX batch 3) "pressings", the app's one word for them (it said "2 editions")
+    row.held && row.editions > 1 ? `${row.editions} pressings` : null,
   ].filter(Boolean).join(' · ')
 }
 

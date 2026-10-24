@@ -975,7 +975,7 @@ export function Search({
         }
         return next
       })
-      setSaid(`${page.length} more ${page.length === 1 ? 'artist' : 'artists'} from MusicBrainz`)
+      setSaid(`${page.length} more ${page.length === 1 ? 'artist' : 'artists'} found`)
     } catch (reason) {
       if (!request.current() || isAbort(reason)) return
       setArtists((now) => (asking(now) ? { ...now, more: { state: 'failed', failure: failureOf(reason) } } : now))
@@ -1190,6 +1190,7 @@ export function Search({
       yourAlbums: personal ? yourIds : null,
       yourArtists: personal ? yourCounts : null,
       albumOf: (id) => albums.get(id) ?? ready.get(id) ?? null,
+      artists: artistList,
     }
   }
   const marks = marksNow()
@@ -1371,7 +1372,7 @@ export function Search({
     return emptyWords(kind, term)
   }
 
-  const noReleaseWords = (term: string) => `MusicBrainz has songs for “${term}”, but on no release yet - nothing to get.`
+  const noReleaseWords = (term: string) => `Found songs called “${term}”, but none is on an album yet - there's nothing to get.`
 
   /** The region's words for MusicBrainz once every kind asked has settled: what it brought to the list, as drawn -
    *  more than what's saved above it, when that is drawn (`sections`). */
@@ -1612,7 +1613,7 @@ export function Search({
   /**
    * Get on a MusicBrainz song (2.0.0-player.55): the album it names, on a pressing that has the song (songGet) -
    * its pressings from the session's lists, else asked, through getRequests (only the newest tap opens), the chip
-   * "Get…" meanwhile. MusicBrainz unable to list them: the album page opens instead, the song marked, and its Get
+   * "Getting…" meanwhile. MusicBrainz unable to list them: the album page opens instead, the song marked, and its Get
    * takes over - a download is never filed without a year.
    */
   async function getSong(song: FoundSong, album: SongAlbum, event: MouseEvent) {
@@ -1807,7 +1808,7 @@ export function Search({
     if (now.state === 'show') return { state: 'show', kind: section.kind, count: now.rows.length, onShow: (event) => showFolded(section.kind, event) }
     if (now.state === 'said') return { state: 'said', words: now.words }
     const answer = answerOf(section.kind)
-    const failure = answer.state === 'failed' ? answer : { message: "MusicBrainz isn't answering.", unavailable: true, busy: false, refused: false }
+    const failure = answer.state === 'failed' ? answer : { message: "Can't search for more right now.", unavailable: true, busy: false, refused: false }
     //? (2.0.0-player.56) under what's saved: MusicBrainz isn't answering, and these are what deadwax has saved
     return { state: 'failed', failure, onRetry: (event) => tryAgain(event, section.kind), ...(section.saved ? { words: savedAwayWords(failure, true) } : {}) }
   }
@@ -1863,7 +1864,7 @@ export function Search({
           //? where the sections will go: one asking line, no region of its own
           <div class="app-asking app-search-asking">
             <span class="app-sweep" aria-hidden="true" />
-            <span class="app-asking-text">Asking MusicBrainz…</span>
+            <span class="app-asking-text">Searching…</span>
           </div>
         ) : (
           sections.map((section) => {
@@ -2033,7 +2034,7 @@ export function Search({
           //? Navidrome known not OK: the library wasn't searched - never "nothing in your library" (review)
           : lib.state === 'skipped' ? { state: 'said', words: librarySkippedWords(personal) }
             : lib.rows.length ? {
-              state: 'button', words: `${lib.rows.length} ${personal ? 'in the collection' : 'in your library'} - Show them`,
+              state: 'button', words: `Show ${lib.rows.length} from ${personal ? 'the collection' : 'your library'}`,
               onPress: (event) => {
                 handOn(event, kind, answeredRows[0]?.key ?? null)
                 setKindShown(lateKey)
@@ -2069,7 +2070,7 @@ export function Search({
               aria-disabled={lib.more === 'asking'}
               onClick={askMoreLibrary}
             >
-              {lib.more === 'asking' ? (personal ? 'Asking the collection…' : 'Asking your library…') : lib.more === 'failed' ? 'Try again' : personal ? 'More from the collection' : 'More from your library'}
+              {lib.more === 'asking' ? 'Loading…' : lib.more === 'failed' ? 'Try again' : personal ? 'More from the collection' : 'More from your library'}
             </button>
           )}
           {!noMusicBrainz && (!musicBrainz && !mine ? (
@@ -2082,7 +2083,7 @@ export function Search({
           {mine?.state === 'searching' || (!mine && musicBrainz) || mbHeld ? (<>
             <div class="app-asking">
               <span class="app-sweep" aria-hidden="true" />
-              <span class="app-asking-text">Asking MusicBrainz…</span>
+              <span class="app-asking-text">Searching…</span>
             </div>
             {/* what's saved that landed below a failure stays drawn while it is asked again (its Try again) */}
             {mbRows.length > 0 && <ul class="app-results">{mbRows.map((row, at) => sectionRow(row, context, libraryRows.length + savedRows.length + at))}</ul>}
@@ -2118,10 +2119,10 @@ export function Search({
                   aria-disabled={more?.state === 'asking'}
                   onClick={() => void asksMore()}
                 >
-                  {more?.state === 'asking' ? 'Asking MusicBrainz…' : more?.state === 'failed' ? 'Try again' : kind === 'songs' ? 'More songs' : 'More from MusicBrainz'}
+                  {more?.state === 'asking' ? 'Loading…' : more?.state === 'failed' ? 'Try again' : kind === 'songs' ? 'More songs' : kind === 'artists' ? 'More artists' : 'More albums'}
                 </button>
               ) : pages === 'far' ? (
-                <p class="app-search-empty app-search-more-note" tabIndex={-1}>{"That's as far into one search as deadwax goes - add a word to narrow it."}</p>
+                <p class="app-search-empty app-search-more-note" tabIndex={-1}>{"That's all for this search - add a word to narrow it."}</p>
               ) : null}
             </>
           ) : null}

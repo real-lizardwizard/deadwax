@@ -377,23 +377,53 @@ console.log('\nthe words: lines and places, logins off and on')
     [{ line: 'Portishead · Dummy', place: 'in your library' }, 'Song · Portishead · Dummy'])
   check('a MusicBrainz song: step 7\'s line, its held words its place; "Song · Portishead · Dummy" in Top results',
     [line(L.mbSongRow(roadsSongs[0]), { ...off, index: songIndex }), line(L.mbSongRow(roadsSongs[0]), off, true).line], [{ line: 'Portishead · 4:56 · Dummy', place: 'in your library' }, 'Song · Portishead · Dummy'])
-  check('a tile\'s third line: "In your library", "On MusicBrainz"; with logins on "In the collection", blank while unknown',
+  check('a tile\'s third line: "In your library", (2.0.6) "Not in your library" for MusicBrainz\'s; with logins on "In the collection", blank while unknown',
     [L.placeLabel(L.albumRow(dummy), off), L.placeLabel(L.groupRow(THIRD), off), L.placeLabel(L.albumRow({ ...dummy, musicBrainzId: 'rel-none' }), { ...on, index: buildOwnedIndex([]) }),
       L.placeLabel(L.albumRow(dummy), { ...on, index: null })],
-    ['In your library', 'On MusicBrainz', 'In the collection', ''])
+    ['In your library', 'Not in your library', 'In the collection', ''])
+  check('(2.0.6) ...with a library of your own, nobody here has it: "Not in the collection"; no index yet, nothing said of an album',
+    [L.placeLabel(L.groupRow(THIRD), { ...on, index: buildOwnedIndex([]) }), L.placeLabel(L.groupRow(THIRD), { ...off, index: null })], ['Not in the collection', ''])
+  check('(2.0.6) ...an album of that name held by no id: "Maybe in your library", as its page says it',
+    L.placeLabel(L.groupRow(THIRD), { ...off, index: buildOwnedIndex([{ path: 'Portishead/Third', artist: 'Portishead', album: 'Third', formats: ['flac'] }]) }), 'Maybe in your library')
+  //? (2.0.6, review) the section row of that same album says it too - one rule (groupMaybe), so tile and row agree
+  const guessedThird = buildOwnedIndex([{ path: 'Portishead/Third', artist: 'Portishead', album: 'Third', formats: ['flac'] }])
+  check('(2.0.6) ...and its section row says "maybe in your library" ("maybe in the collection" with logins on), as the tile does',
+    [L.rowLine(L.groupRow(THIRD), { marks: { ...off, index: guessedThird } }).place,
+      L.rowLine(L.groupRow(THIRD), { marks: { ...on, index: buildOwnedIndex([{ path: 'Portishead/Third', artist: 'Portishead', album: 'Third', formats: ['flac'], yours: false }]) } }).place,
+      L.rowLine(L.groupRow(THIRD), { marks: off }).place],
+    ['maybe in your library', 'maybe in the collection', ''])
+  //? (2.0.6, review) a MusicBrainz artist row means only that it wasn't tied to a library artist: two Nirvanas
+  //? answering stay MusicBrainz's beside the library's untagged Nirvana - said "not here" only when no library
+  //? artist has the name, and only once the library's artist list has answered
+  const nirvanaMb = L.mbArtistRow({ mbid: 'mb-nirvana', name: 'Nirvana', disambiguation: 'US grunge band', country: 'US', type: 'Group', matched_as: '' })
+  check('(2.0.6) a MusicBrainz artist: "Not in your library" only once the artist list is in and no library artist has the name',
+    [L.placeLabel(nirvanaMb, off), L.placeLabel(nirvanaMb, { ...off, artists: [{ name: 'Nirvana' }] }), L.placeLabel(nirvanaMb, { ...off, artists: [{ name: 'Portishead' }] }),
+      L.placeLabel(nirvanaMb, { ...on, artists: [{ name: 'Portishead' }] }), L.placeLabel(nirvanaMb, { ...off, index: null, artists: [] })],
+    ['', '', 'Not in your library', 'Not in the collection', ''])
+  //? ...and the name it was matched as counts too: Ye found under a former name, the library filing him as Kanye West
+  const yeMb = L.mbArtistRow({ mbid: 'mb-ye', name: 'Ye', disambiguation: 'US rapper', country: 'US', type: 'Person', matched_as: 'Kanye West' })
+  check('(2.0.6) ...a MusicBrainz artist the library files under the name it was matched as is not "Not in your library"',
+    [L.placeLabel(yeMb, { ...off, artists: [{ name: 'Kanye West' }] }), L.placeLabel(yeMb, { ...off, artists: [{ name: 'kanye  west' }] }),
+      L.placeLabel(yeMb, { ...off, artists: [{ name: 'Portishead' }] }), L.placeLabel(yeMb, { ...on, artists: [{ name: 'Portishead' }] })],
+    ['', '', 'Not in your library', 'Not in the collection'])
   check('the region: "In your library: 1 artist, 2 albums, 11 songs." ("In the collection" with logins on); MusicBrainz\'s, or that it isn\'t answering',
     [L.libraryWords({ artists: 1, albums: 2, songs: 11 }, false), L.libraryWords({ albums: 1 }, true), L.libraryWords({}, false),
       L.musicBrainzWords({ artists: 2, albums: 3, songs: 3 }, true), L.musicBrainzWords({}, false)],
-    ['In your library: 1 artist, 2 albums, 11 songs.', 'In the collection: 1 album.', '', 'From MusicBrainz: 2 artists, 3 albums, 3 songs.', "MusicBrainz isn't answering."])
-  check('a fold: "Show 3 albums from MusicBrainz", said "3 albums from MusicBrainz - Show them to see them."', L.foldWords('albums', 3),
-    { button: 'Show 3 albums from MusicBrainz', said: '3 albums from MusicBrainz - Show them to see them.' })
+    ['In your library: 1 artist, 2 albums, 11 songs.', 'In the collection: 1 album.', '', 'Also found: 2 artists, 3 albums, 3 songs.', "Can't search for more right now."])
+  check('a fold: "Show 3 more albums", said "3 more albums found - Show them to see them."', [L.foldWords('albums', 3), L.foldWords('songs', 1).button],
+    [{ button: 'Show 3 more albums', said: '3 more albums found - Show them to see them.' }, 'Show 1 more song'])
   check('an empty late kind, a chip, no results', [L.emptyWords('artists', 'zz'), L.viewWords('albums'), L.viewWords('all'), L.nothingWords('all', 'zz'), L.nothingWords('songs', 'zz')],
-    ['No artists on MusicBrainz for “zz”.', 'Showing albums.', 'Showing everything.', 'No results for “zz”', 'No songs for “zz”.'])
-  check('a failure: refused says its words; busy and away their own', [L.failureWords({ refused: true, busy: false, unavailable: false, message: "MusicBrainz couldn't read that search - try other words" }),
+    ['No other artists for “zz”.', 'Showing albums.', 'Showing everything.', 'No results for “zz”.', 'No songs for “zz”.'])
+  check('a failure: refused says its words; busy and away their own', [L.failureWords({ refused: true, busy: false, unavailable: false, message: "That search couldn't be read - try other words" }),
     L.failureWords({ refused: false, busy: true, unavailable: true, message: 'x' }), L.failureWords({ refused: false, busy: false, unavailable: true, message: 'x' }, true)],
-    ["MusicBrainz couldn't read that search - try other words", 'MusicBrainz is busy just now - try again in a moment.', "MusicBrainz isn't answering."])
+    ["That search couldn't be read - try other words", 'Too many searches just now - try again in a moment.', "Can't search for more right now."])
+  //? (2.0.6, review) the long away words are drawn for every kind's view (Artists, Songs, More songs, All's foot) - so
+  //? they name no kind: "Albums you don't have can't be searched" was said when artists or songs failed
+  check('(2.0.6) ...away at length names no kind, and saved rows\' busy line is English', [L.failureWords({ refused: false, busy: false, unavailable: true, message: 'x' }),
+    L.savedAwayWords({ refused: false, busy: true, unavailable: true, message: 'x' })],
+    ["Searching for more isn't working right now - try again in a few minutes.", 'Showing earlier results - try again in a moment for more.'])
   check('the library\'s late place: how many, with Show them - or that it found nothing', [L.libraryLateWords({ artists: 1, albums: 2 }, false, 'x').button, L.libraryLateWords({}, true, 'x').line],
-    ['3 in your library - Show them', 'Nothing in the collection for “x”.'])
+    ['Show 3 from your library', 'Nothing in the collection for “x”.'])
 }
 
 console.log('\nmore of each rule, one case at a time')
@@ -454,9 +484,9 @@ console.log('\nmore of each rule, one case at a time')
   const late = L.pool({ reading: reading('x'), library: lib(), artistList: null, index, marks: off, artists: null, albums: { groups: studio, shown: studio }, songs: null })
   check('a late kind\'s rows capped as the section\'s preview would be', L.lateRows(late.albums, [0, 3]).length, 3)
   check('the region says nothing of a kind with none', L.countWords({ artists: 0, albums: 2 }), '2 albums')
-  check('nothing at all from MusicBrainz said as that', L.musicBrainzWords({}, true), 'Nothing from MusicBrainz.')
+  check('nothing at all from MusicBrainz said as that', L.musicBrainzWords({}, true), 'Nothing more found.')
   check('the songs\' words for an artist alone; the foot line', [L.SONGS_NEED_A_TITLE, L.TYPE_MORE],
-    ["Type a song's title with the artist (“roads portishead”) to find their songs on MusicBrainz.", 'Type a little more, or press Search, to ask MusicBrainz too.'])
+    ["Type a song's title with the artist (“roads portishead”) to find songs you don't have yet.", "Type a little more, or press Search, to find albums you don't have yet."])
 }
 
 console.log('\nafter review: an album made of a song\'s fields, a held named album\'s tile, a group held since its answer landed, the library not searched')
@@ -478,7 +508,7 @@ console.log('\nafter review: an album made of a song\'s fields, a held named alb
   check('...held with the song: a desktop tile\'s third line says "In your library", as its row\'s place does - never "On MusicBrainz"',
     [L.placeLabel(songAlbum, { ...off, index: songIndex }), L.rowLine(songAlbum, { marks: { ...off, index: songIndex } }, true).place, L.rowYours(songAlbum, { ...off, index: songIndex })],
     ['In your library', 'in your library', true])
-  check('...not held: "On MusicBrainz"', L.placeLabel(songAlbum, { ...off, index: buildOwnedIndex([]) }), 'On MusicBrainz')
+  check('...not held: (2.0.6) "Not in your library"', L.placeLabel(songAlbum, { ...off, index: buildOwnedIndex([]) }), 'Not in your library')
   //? a group held only since MusicBrainz's answer landed (filed meanwhile, or /library/owned answering late)
   const groups = [THIRD, DUMMY, SELF]
   const shownThen = notInLibrary(groups, index)
@@ -598,7 +628,7 @@ console.log('\nsearch what\'s saved (2.0.0-player.56): saved rows lead MusicBrai
   const yoursToo = L.familyOf(savedSong, { library: lib(), artistList: [P], index: buildOwnedIndex([]), groups: [] })
   check('Top results\' family of a saved song: its album and its MusicBrainz artist marked saved; the library\'s artist as ever',
     [relatives.map((row) => [row.type, row.saved === true]), yoursToo.map((row) => [row.type, row.saved === true]), L.rowLine(relatives[0], { marks: { ...off, index: buildOwnedIndex([]) } }, true).place],
-    [[['song-album', true], ['mb-artist', true]], [['song-album', true], ['artist', false]], 'saved'])
+    [[['song-album', true], ['mb-artist', true]], [['song-album', true], ['artist', false]], ''])
   check('...a saved group in the family\'s groups marks its relative even under a MusicBrainz song', ((row) => [row.type, row.saved === true])(L.familyOf(L.mbSongRow(glorySaved[0]),
     { library: lib(), artistList: [], index: buildOwnedIndex([]), groups: [DUMMY], saved: new Set([DUMMY.id]) })[0]), ['group', true])
 
@@ -640,18 +670,19 @@ console.log('\nsearch what\'s saved (2.0.0-player.56): saved rows lead MusicBrai
   //? the words
   const savedThird = L.savedRow(L.groupRow(THIRD))
   const savedDummy = L.savedRow(L.groupRow(DUMMY))
-  check('a saved row\'s place says "saved" - unless it says where you hold it; a tile\'s third line "Saved from MusicBrainz"',
+  //? (2.0.6, UX batch 3) nothing marks a saved row: "saved" read as "you saved this album"
+  check('a saved row says nothing of being saved: its place where you hold it, else none; its tile\'s third line MusicBrainz\'s row\'s own',
     [L.rowLine(savedThird, { marks: off }).place, L.rowLine(savedDummy, { marks: off }).place, L.placeLabel(savedThird, off), L.placeLabel(L.groupRow(THIRD), off), L.rowLine(L.groupRow(THIRD), { marks: off }).place],
-    ['saved', 'in your library', 'Saved from MusicBrainz', 'On MusicBrainz', ''])
+    ['', 'in your library', 'Not in your library', 'Not in your library', ''])
   check('...its facts MusicBrainz\'s row\'s own', L.rowLine(savedThird, { marks: off }).line, L.rowLine(L.groupRow(THIRD), { marks: off }).line)
   check('the region\'s words: what\'s saved; MusicBrainz\'s as more; away, what is drawn is what\'s saved',
     [L.savedWords({ albums: 1, songs: 2 }), L.musicBrainzWords({ albums: 1 }, true, true), L.musicBrainzWords({}, true, true), L.musicBrainzWords({}, false, true), L.musicBrainzWords({}, true)],
-    ['Saved from MusicBrainz: 1 album, 2 songs.', 'More from MusicBrainz: 1 album.', 'Nothing more from MusicBrainz.', "MusicBrainz isn't answering - these are what deadwax has saved.", 'Nothing from MusicBrainz.'])
+    ['Found earlier: 1 album, 2 songs.', 'More found: 1 album.', 'Nothing more found.', "Showing earlier results - searching for more isn't working right now.", 'Nothing more found.'])
   const away = { refused: false, busy: false, message: 'x', unavailable: true }
   check('...a failure under what\'s saved: one line, MusicBrainz away and these saved; busy said as busy; a refusal its words',
-    [L.savedAwayWords(away), L.savedAwayWords(away, true), L.savedAwayWords({ ...away, busy: true }, true), L.savedAwayWords({ ...away, refused: true, message: 'MusicBrainz couldn\'t read that search - try other words' })],
-    ["MusicBrainz isn't answering just now - these are what deadwax has saved from it.", 'Saved - MusicBrainz is away.', 'Saved - MusicBrainz is busy.', 'MusicBrainz couldn\'t read that search - try other words'])
-  check('...a late kind adding nothing new under saved rows', L.nothingMoreWords('albums', 'third'), 'No more albums on MusicBrainz for “third”.')
+    [L.savedAwayWords(away), L.savedAwayWords(away, true), L.savedAwayWords({ ...away, busy: true }, true), L.savedAwayWords({ ...away, refused: true, message: 'That search couldn\'t be read - try other words' })],
+    ["Showing earlier results - searching for more isn't working right now.", 'Showing earlier results.', 'Showing earlier results.', 'That search couldn\'t be read - try other words'])
+  check('...a late kind adding nothing new under saved rows', L.nothingMoreWords('albums', 'third'), 'No more albums for “third”.')
   check('SAVED_WAIT_MS: the library\'s moment waits for what\'s saved at most this long', L.SAVED_WAIT_MS, 400)
 }
 

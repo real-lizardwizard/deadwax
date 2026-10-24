@@ -24,18 +24,20 @@ import { IN_THE_STORE, IN_YOUR_LIBRARY, anyYours, heldPhrase } from './whose'
 export function searchWords(personal: boolean): {
   hint: string; label: string; searching: (musicBrainz: boolean) => string; allHeld: string
 } {
+  //? (2.0.6, UX batch 3) said as what is searched - your library, the collection, albums you don't have - never
+  //? MusicBrainz's name; the busy line is "Searching…" once MusicBrainz is in it
   return personal
     ? {
-      hint: "Artists, albums and songs: yours first, then the collection's, then MusicBrainz's.",
-      label: 'Search the collection and MusicBrainz',
-      searching: (musicBrainz) => (musicBrainz ? 'Searching the collection and MusicBrainz…' : 'Searching the collection…'),
-      allHeld: 'Everything MusicBrainz found is in the collection already.',
+      hint: 'Search your library, the collection, and albums nobody has yet.',
+      label: 'Search for artists, albums and songs',
+      searching: (musicBrainz) => (musicBrainz ? 'Searching…' : 'Searching the collection…'),
+      allHeld: 'Everything found is in the collection already.',
     }
     : {
-      hint: "Artists, albums and songs: yours first, then MusicBrainz's.",
-      label: 'Search your library and MusicBrainz',
-      searching: (musicBrainz) => (musicBrainz ? 'Searching your library and MusicBrainz…' : 'Searching your library…'),
-      allHeld: 'Everything MusicBrainz found is in your library already.',
+      hint: "Search your library and albums you don't have yet.",
+      label: 'Search for artists, albums and songs',
+      searching: (musicBrainz) => (musicBrainz ? 'Searching…' : 'Searching your library…'),
+      allHeld: 'You already have everything found.',
     }
 }
 
@@ -150,10 +152,10 @@ export function appendPage(
 export function morePageWords(added: number, held: number, personal = false): { note: string | null; said: string } {
   //? (2.0.0-player.52) with a library of your own, what MusicBrainz's half leaves out is what the store has
   const place = personal ? IN_THE_STORE : IN_YOUR_LIBRARY
-  if (added) return { note: null, said: `${added} more ${added === 1 ? 'album' : 'albums'} from MusicBrainz` }
-  if (held === 1) return { note: `The next album MusicBrainz found is ${place} already.`, said: `The next album is ${place} already` }
-  if (held) return { note: `The next ${held} albums MusicBrainz found are all ${place} already.`, said: `The next ${held} albums are all ${place} already` }
-  return { note: 'MusicBrainz sent nothing new.', said: 'MusicBrainz sent nothing new' }
+  if (added) return { note: null, said: `${added} more ${added === 1 ? 'album' : 'albums'} found` }
+  if (held === 1) return { note: `The next album found is ${place} already.`, said: `The next album is ${place} already` }
+  if (held) return { note: `The next ${held} albums found are all ${place} already.`, said: `The next ${held} albums are all ${place} already` }
+  return { note: 'No more results.', said: 'No more results' }
 }
 
 /**

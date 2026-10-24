@@ -2,7 +2,7 @@ import type { DownloadJob } from '../api/types'
 import type { PendingDownload } from './downloadOverlay'
 import { formatSpeed } from './format'
 import { isActive } from './jobs'
-import { grantWords } from './myLibrary'
+import { grantWords, partlyWords } from './myLibrary'
 import { CANCEL_WORDS, askedByText, cancelWords, type CancelWords } from './perPerson'
 import { jobErrorWords, safeWords } from './errorWords'
 
@@ -13,21 +13,23 @@ import { jobErrorWords, safeWords } from './errorWords'
  *
  * The input is exactly what useDownloadJobs gives - the polled jobs with the overlays laid on
  * (lib/downloadOverlay.ts), the downloads still asking slskd, the derived speeds - so every state
- * the main page's downloads panel showed has its words here too: asking slskd…, refused,
- * cancelling… (leaving… for a cancel that only withdraws your request - 2.0.0-player.49), trying next
- * peer…, asking again…, try N, organizing.
+ * the main page's downloads panel showed has its words here too. (2.0.6, UX batch 3) In a listener's
+ * words, never the pipeline's: starting… (was "asking slskd…"), didn't start (was "refused"),
+ * cancelling… (leaving… for a cancel that only withdraws your request - 2.0.0-player.49), trying
+ * another source… (was "trying next peer…"), trying again… (was "asking again…"), 2nd try (was "try 2"),
+ * adding to your library… (was "organizing").
  *
  * - Downloading: bytes are moving (downloading, or queued with progress slskd reports before the
  *   poller has moved it on), or it is being filed (organizing).
- * - Waiting: queued in the peer's queue ("#4 in their queue", or "starting" before slskd says
+ * - Waiting: queued in the peer's queue ("4th in their queue", or "starting" before slskd says
  *   where; "3 failed" in amber beside it when the peer has already refused some files), or asked
- *   for and slskd hasn't answered yet ("asking slskd…").
- * - Needs attention: failed or cancelled - with "Next peer · N left" when the list it was picked
- *   from has runners-up and "Ask again" always, the two routes the downloads panel's buttons use -
- *   and a request slskd refused, which isn't a job at all and has neither.
+ *   for and slskd hasn't answered yet ("starting…").
+ * - Needs attention: failed or cancelled - with "Another source · N left" when the list it was picked
+ *   from has runners-up and "Same source again" always, the two routes the downloads panel's buttons
+ *   use - and a request slskd refused, which isn't a job at all and has neither.
  * - Done: finished, newest first, said by how it ended (the server's `outcome`) and how long ago.
  *
- * ONE solid purple button on the screen (STYLE.md): only the first "Next peer" is primary, and any
+ * ONE solid purple button on the screen (STYLE.md): only the first "Another source" is primary, and any
  * after it is tinted.
  *
  * ARRIVING - Home's section, and the Requests tab's badge - is the set the old Downloads badge
@@ -84,7 +86,7 @@ export interface RequestRow {
   progress: number
   /** Downloading: the monospace line, "6 of 10 files · 1.8 MB/s" */
   data: string | null
-  /** an Arriving card's words at its right end: "6 of 10", "starting", "organizing" */
+  /** an Arriving card's words at its right end: "6 of 10", "starting", "adding…" */
   brief: string
   /** the ✕: ready, waiting on the server (disabled), or none - nothing to cancel */
   cancel: 'ready' | 'cancelling' | null
@@ -123,6 +125,8 @@ export interface RequestsInput {
   retryingSame: ReadonlySet<number>
   /** why a retry didn't start: deadwax's words, or (2.0.4) the hook's own sentence with the error's words beside it */
   retryProblems: ReadonlyMap<number, RetryProblem>
+  /** (2.0.6) logins on with libraries of their own: what the server calls "your library" is the collection */
+  personal?: boolean
 }
 
 /** (2.0.4) Why a retry didn't start: the retry route's own words, or a sentence with the error's own beside it. */
@@ -131,16 +135,41 @@ export type RetryProblem = string | { text: string; detail: string | null }
 /** What a retry that couldn't start is said with when its words aren't fit for a listener's line. */
 export const RETRY_FAILED = "The download couldn't be started."
 
-/** (2.0.4) The retry routes' own words (src/poller.py) that name slskd, in a listener's - the rest are fit as written. */
+/** (2.0.4) The retry routes' own words (src/poller.py) that name slskd - (2.0.6) or a peer - in a listener's; the rest
+ *  are fit as written. */
 export const RETRY_WORDS: Readonly<Record<string, string>> = {
   'slskd is still stopping the last attempt - try again in a moment': 'The last try is still stopping - try again in a moment.',
+  'no other peers to try - search again for more': 'No other source to try - Get it again to search for more.',
+  //? (2.0.6, review) src/poller.py MOVED_ON and CLEARED
+  "this download has already moved on - it's been retried or restarted meanwhile": "It's already been tried again meanwhile.",
+  'this download has been cleared from the list - search again to download it': "It's been cleared from the list - Get it again to download it.",
 }
 
+/** (2.0.6, review) The retry routes' words that carry a name or a path (src/store_index.py in_flight_words and
+ *  already_have), by how they start: a source's name, "being filed", and a library folder's path - shown to a listener
+ *  until now (safeWords catches only a path from the root) - in a listener's words; the route's own kept as the
+ *  detail, for whoever runs deadwax. "your library" is the server's word for the whole store: with a library of your
+ *  own it is the collection. */
+function retryWordsStarting(problem: string, personal: boolean): string | null {
+  if (problem.startsWith('already downloading from ')) return "It's already downloading."
+  if (problem.startsWith('already downloaded from ')) return "It's already downloaded, and being added now."
+  if (problem.startsWith('already in your library')) return personal ? "It's already in the collection." : "It's already in your library."
+  return null
+}
+
+/** (2.0.6, UX batch 3) Needs attention's two buttons, and what each says while it runs: another source from the list
+ *  it was picked from (was "Next peer · N left" / "Trying next peer…"), and the same source again ("Ask again" /
+ *  "Asking again…"). */
+export const ANOTHER_SOURCE = (left: number) => `Another source · ${left} left`
+export const TRYING_ANOTHER = 'Trying another source…'
+export const SAME_SOURCE = 'Same source again'
+export const TRYING_SAME = 'Trying again…'
+
 /** A retry's problem as the row says it, and its own words where they weren't fit to be (lib/errorWords.ts). */
-export function retryProblemWords(problem: RetryProblem | undefined): { text: string | null; detail: string | null } {
+export function retryProblemWords(problem: RetryProblem | undefined, personal = false): { text: string | null; detail: string | null } {
   if (problem === undefined) return { text: null, detail: null }
   if (typeof problem !== 'string') return problem
-  const known = RETRY_WORDS[problem]
+  const known = RETRY_WORDS[problem] ?? retryWordsStarting(problem, personal)
   if (known) return { text: known, detail: problem }
   const safe = safeWords(problem, RETRY_FAILED)
   //? fit as they are: the retry route's own words (and the hook's), kept as written
@@ -202,18 +231,22 @@ export function outcomeWords(job: Pick<DownloadJob, 'outcome' | 'error' | 'libra
       return { text: 'In your library', tone: 'plain' }
     case 'already_there':
       //? every track was already in the folder; the download happened, and nothing new was filed
-      return { text: 'Already in your library, nothing filed', tone: 'plain' }
+      return { text: 'You already had it', tone: 'plain' }
     case 'partly_filed':
-      return { text: job.error ? `Partly filed: ${job.error}` : 'Partly filed', tone: 'warning' }
+      //? (2.0.6, UX batch 3) in your library, but not whole: how many files didn't make it, in a listener's words
+      //? (partlyWords - it said "Partly filed: 2 file(s) failed to organize"), the job's own for whoever runs deadwax
+      return { text: `In your library - ${partlyWords(job.error)}`, tone: 'warning', detail: job.error || null }
     case 'interrupted':
-      return { text: "Interrupted while filing: check the library and slskd's folder", tone: 'warning' }
+      //? deadwax stopped while filing it: only whoever runs deadwax can look (it said "Interrupted while filing:
+      //? check the library and slskd's folder" to everyone) - that, as the job's own words, is theirs
+      return { text: 'Stopped while being added to your library', tone: 'warning', tell: true, detail: job.error || null }
     default:
       //? a dry run, nothing that could be filed, no track filed: (2.0.4) the row's words in a listener's
       //? (jobErrorWords - never "check SLSKD_DOWNLOAD_PATH" or an exception). With no words at all,
       //? organizing is off - ORGANIZE_MODE 'off', or LIBRARY_PATH or SLSKD_DOWNLOAD_PATH not set
       //? - their own words (SLSKD_DOWNLOAD_PATH, the exception) kept for whoever runs deadwax, the one who fixes it,
       //? as a Needs-attention reason keeps them (review: a Done row lost them)
-      if (!job.error) return { text: 'Downloaded, not filed', tone: 'warning' }
+      if (!job.error) return { text: 'Downloaded, but not added to your library', tone: 'warning', tell: true }
       {
         const why = jobErrorWords(job.error)
         return { text: why.text, tone: 'warning', tell: why.tell, detail: why.detail }
@@ -235,7 +268,14 @@ export function badgeLabel(tab: string, count: number): string {
 const who = (artist: string, username: string, ...more: (string | null | false | undefined)[]) =>
   [artist, username ? `from ${username}` : '', ...more].filter(Boolean).join(' · ')
 
-const tryText = (job: DownloadJob) => ((job.attempt ?? 1) > 1 ? `try ${job.attempt}` : null)
+/** "2nd", "3rd", "11th", "21st" - (2.0.6) a place or a try, as a listener says it. */
+export function ordinal(count: number): string {
+  const tens = count % 100
+  const suffix = tens >= 11 && tens <= 13 ? 'th' : count % 10 === 1 ? 'st' : count % 10 === 2 ? 'nd' : count % 10 === 3 ? 'rd' : 'th'
+  return `${count}${suffix}`
+}
+
+const tryText = (job: DownloadJob) => ((job.attempt ?? 1) > 1 ? `${ordinal(job.attempt!)} try` : null)
 
 const titleOf = (album: string | null | undefined, edition?: string | null) =>
   `${album || 'Unknown album'}${edition ? ` · ${edition}` : ''}`
@@ -284,10 +324,10 @@ function jobRow(job: DownloadJob, input: RequestsInput, now: number): RequestRow
     row.line = who(row.artist, job.username, tryText(job))
     row.progress = organizing ? 100 : Math.min(100, Math.max(0, job.progress || 0))
     row.data = cancelling ? going
-      : organizing ? `${files(done, total)} · organizing`
+      : organizing ? `${files(done, total)} · adding to your library…`
       : [files(done, total), job.files_failed ? `${job.files_failed} failed` : null, speed ? formatSpeed(speed) : null]
         .filter(Boolean).join(' · ')
-    row.brief = cancelling ? going : organizing ? 'organizing' : `${done} of ${total}`
+    row.brief = cancelling ? going : organizing ? 'adding…' : `${done} of ${total}`
     //? nothing in slskd is left to cancel once it is being filed, and the filing can't be stopped
     row.cancel = organizing ? null : cancelling ? 'cancelling' : 'ready'
     row.dimmed = cancelling
@@ -297,13 +337,13 @@ function jobRow(job: DownloadJob, input: RequestsInput, now: number): RequestRow
 
   if (section === 'waiting') {
     const place = job.queue_position ?? null
-    const state = cancelling ? going : place !== null ? `#${place} in their queue` : 'starting'
+    const state = cancelling ? going : place !== null ? `${ordinal(place)} in their queue` : 'starting'
     //? files the peer already refused while the rest wait in its queue, said now, in amber - as the
     //? downloads panel says it: otherwise it reads as an ordinary wait right up until it fails
     const failed = !cancelling && job.files_failed ? `${job.files_failed} failed` : null
     row.line = who(row.artist, job.username, state, failed, tryText(job))
     if (failed) row.lineTone = 'warning'
-    row.brief = cancelling ? going : place !== null ? `#${place} in queue` : 'starting'
+    row.brief = cancelling ? going : place !== null ? `${ordinal(place)} in line` : 'starting'
     row.cancel = cancelling ? 'cancelling' : 'ready'
     row.dimmed = cancelling
     row.arriving = !cancelling
@@ -320,14 +360,14 @@ function jobRow(job: DownloadJob, input: RequestsInput, now: number): RequestRow
     row.reason = why.text || (job.status === 'cancelled' ? 'Cancelled' : 'It stopped without saying why')
     row.reasonTell = why.tell
     row.reasonDetail = why.detail
-    const retried = retryProblemWords(input.retryProblems.get(job.id))
+    const retried = retryProblemWords(input.retryProblems.get(job.id), input.personal)
     row.problem = retried.text
     row.problemDetail = retried.detail
     row.nextPeer = left > 0
-      ? { left, primary: false, label: retrying && !same ? 'Trying next peer…' : `Next peer · ${left} left` }
+      ? { left, primary: false, label: retrying && !same ? TRYING_ANOTHER : ANOTHER_SOURCE(left) }
       : null
     //? the same peer again is for a download that stopped - not one filing couldn't use (not_filed)
-    row.askAgain = job.outcome === 'not_filed' ? null : { label: same ? 'Asking again…' : 'Ask again' }
+    row.askAgain = job.outcome === 'not_filed' ? null : { label: same ? TRYING_SAME : SAME_SOURCE }
     row.busy = retrying
     //? short, for an Arriving card's end, where a long word would squeeze the album's name
     row.brief = retrying ? 'retrying…' : ''
@@ -353,18 +393,21 @@ function jobRow(job: DownloadJob, input: RequestsInput, now: number): RequestRow
   return row
 }
 
-function pendingRow(pending: PendingDownload): RequestRow {
+function pendingRow(pending: PendingDownload, personal = false): RequestRow {
   const refused = pending.error !== undefined
   const row = blank(pending.key, null, refused ? 'attention' : 'waiting', titleOf(pending.album), pending.artist || '', pending.album || '')
   if (refused) {
-    row.line = who(row.artist, pending.username, 'refused')
+    row.line = who(row.artist, pending.username, "didn't start")
     //? (2.0.4) the hook's sentence for it (lib/errorWords.ts), the error's own words for whoever runs deadwax
-    row.reason = pending.error || RETRY_FAILED
-    row.reasonDetail = pending.detail ?? null
+    //? (2.0.6, review) /enqueue's 409 is already_have's words, as the retries' are: a source's name, "being filed", a
+    //? folder's path - said as a retry's refusal is, the route's own kept for whoever runs deadwax
+    const known = pending.error ? retryWordsStarting(pending.error, personal) : null
+    row.reason = known ?? (pending.error || RETRY_FAILED)
+    row.reasonDetail = known ? pending.error ?? null : pending.detail ?? null
     return row
   }
-  row.line = who(row.artist, pending.username, 'asking slskd…')
-  row.brief = 'asking slskd…'
+  row.line = who(row.artist, pending.username, 'starting…')
+  row.brief = 'starting…'
   row.arriving = true
   return row
 }
@@ -379,7 +422,7 @@ export function requestsView(input: RequestsInput, now: number): RequestsView {
   const jobs = [...input.jobs]
   const byId = new Map(jobs.map((job) => [job.id, job]))
   const rows = jobs.map((job) => jobRow(job, input, now))
-  const pending = input.pending.map(pendingRow)
+  const pending = input.pending.map((each) => pendingRow(each, input.personal))
   const of = (section: Section, list: RequestRow[]) => list.filter((row) => row.section === section)
 
   const doneRows = of('done', rows).sort((a, b) => {
@@ -472,8 +515,8 @@ function sectionWords(row: RequestRow): string {
  *
  * - A row under another heading: "Heligoland: waiting", "...: needs attention: <why>",
  *   "...: In your library · just now".
- * - A retry's refusal appearing: "Heligoland: no other peer would take it".
- * - A tap's answer starting: "Heligoland: trying next peer…", "...: asking again…",
+ * - A retry's refusal appearing: "Heligoland: No other source would send it.".
+ * - A tap's answer starting: "Heligoland: trying another source…", "...: trying again…",
  *   "...: cancelling…" ("...: leaving…" for a cancel that only withdraws your request) - the button
  *   tapped says it too, but its new name isn't read by itself.
  * - A row you were leaving gone from your list (2.0.0-player.49): "Heligoland: left - it carries on
@@ -501,7 +544,7 @@ export function changes(before: RequestsView | null, now: RequestsView): { said:
       } else if (row.problem && row.problem !== prev.problem) {
         phrases.push(`${row.title}: ${row.problem}`)
       } else if (row.busy && !prev.busy) {
-        const label = row.askAgain?.label === 'Asking again…' ? 'asking again…' : 'trying next peer…'
+        const label = row.askAgain?.label === TRYING_SAME ? 'trying again…' : 'trying another source…'
         phrases.push(`${row.title}: ${label}`)
       } else if (row.cancel === 'cancelling' && prev.cancel !== 'cancelling') {
         phrases.push(`${row.title}: ${row.cancelWords.leaves ? 'leaving…' : 'cancelling…'}`)

@@ -254,11 +254,11 @@ export function useDownloadJobs(open: boolean): DownloadJobsState {
       if (samePeer) {
         const outcome = await api.retryJobSamePeer(jobId)
         if (outcome.retried) refresh()
-        else giveUp(outcome.problem ?? 'the peer refused')
+        else giveUp(outcome.problem ?? 'They refused - try another source.')
       } else {
         const outcome = await api.retryJob(jobId)
         if (outcome.moved) refresh()
-        else giveUp(outcome.problem ?? 'no other peer would take it')
+        else giveUp(outcome.problem ?? 'No other source would send it.')
       }
     } catch (caught) {
       //? (2.0.4) said in a listener's words, the error's own beside them for whoever runs deadwax (JobCard)

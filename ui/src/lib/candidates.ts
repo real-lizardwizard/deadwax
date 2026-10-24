@@ -7,13 +7,34 @@ import { formatSpeed } from './format'
  * retired in 2.0.0-player.66; the app's Sources (app/Sources.tsx, app/SourceCard.tsx) draws it now.
  */
 
+/**
+ * The score's six signals by name (2.0.6, UX batch 3: "titles", "count", "lengths", "peer" said what the code calls
+ * them - "track names", "track count", "track lengths", "availability" say what each measures), and what each one
+ * measures, in a line a source card draws beside its chip - true to src/matching.py score_candidate:
+ *  - title_match: the share of the pressing's tracks paired with a file by its name (match_tracks_to_files);
+ *  - track_count: how near the number of files is to the number of tracks (score_track_count);
+ *  - duration_match: the share of paired tracks whose length agrees, to within DURATION_TOLERANCE_SEC (8 s);
+ *  - edition: the edition words in its name (deluxe, remaster...) against the pressing's; its year in the name only
+ *    ever adds (+0.25, capped), so a wrong year costs nothing and the line never says the year must match (score_edition);
+ *  - format: lossless against the Format setting (score_format);
+ *  - peer: a free upload slot, the queue ahead, their advertised speed (score_peer).
+ */
 export const SIGNAL_LABELS: Readonly<Record<string, string>> = {
-  title_match: 'titles',
-  track_count: 'count',
-  duration_match: 'lengths',
+  title_match: 'track names',
+  track_count: 'track count',
+  duration_match: 'track lengths',
   edition: 'edition',
   format: 'format',
-  peer: 'peer',
+  peer: 'availability',
+}
+
+export const SIGNAL_MEANINGS: Readonly<Record<string, string>> = {
+  title_match: "the pressing's tracks it has, found by their names",
+  track_count: "how near its number of files is to the pressing's tracks",
+  duration_match: 'the tracks found whose length is right, to within 8 seconds',
+  edition: 'whether its name says the same edition (deluxe, remaster…) - its year there helps',
+  format: 'lossless or not, as your Format asks',
+  peer: 'how soon it can start: a free slot, a short queue, their speed',
 }
 
 export interface CandidateFilters {
@@ -203,7 +224,7 @@ export function scoreClass(percent: number): 'good' | 'mid' | 'bad' {
   return percent >= 75 ? 'good' : percent >= 40 ? 'mid' : 'bad'
 }
 
-/** A candidate's identity within one result - a peer's folder. */
+/** A candidate's identity within one result - a peer's folder (a source, as the app says it). */
 export function candidateKey(candidate: Candidate): string {
   return `${candidate.username}\n${candidate.directory}`
 }
@@ -256,18 +277,21 @@ export function speedFact(candidate: Candidate): SpeedFact {
     return { kind: 'measured', text: `${hedge}${formatSpeed(candidate.measured_speed)}`, note: 'what you got from them', percent: bar(candidate.measured_speed) }
   }
   if (candidate.upload_speed) {
-    return { kind: 'advertised', text: formatSpeed(candidate.upload_speed), note: 'their own average', percent: bar(candidate.upload_speed) }
+    //? (2.0.6) "their usual speed" - it said "their own average"
+    return { kind: 'advertised', text: formatSpeed(candidate.upload_speed), note: 'their usual speed', percent: bar(candidate.upload_speed) }
   }
   return { kind: 'unknown', text: 'Unknown', note: 'no speed reported yet', percent: 0 }
 }
 
 /**
- * The card's Starts: "now" with a free upload slot; "3 ahead" in the peer's queue; "next" with no
- * free slot and nobody ahead (it starts when a slot frees). `waits` draws it amber.
+ * The card's Starts: "now" with a free upload slot; "after 3 others" waiting in the peer's queue ahead of you; "soon"
+ * with no free slot and nobody ahead (it starts when a slot frees). `waits` draws it amber. (2.0.6, UX batch 3: it
+ * said "3 ahead" and "next".)
  */
 export function startsFact(candidate: Candidate): { text: string; waits: boolean } {
   if (candidate.has_free_slot) return { text: 'now', waits: false }
-  return candidate.queue_length > 0 ? { text: `${candidate.queue_length} ahead`, waits: true } : { text: 'next', waits: true }
+  const ahead = candidate.queue_length
+  return ahead > 0 ? { text: `after ${ahead} ${ahead === 1 ? 'other' : 'others'}`, waits: true } : { text: 'soon', waits: true }
 }
 
 /**
@@ -311,11 +335,12 @@ export function tracksText(candidate: Candidate): string {
 
 /**
  * A source card's reasoning (2.0.0-player.41): the score's signals, each as a chip the way the main
- * page's candidates panel draws them - its word (SIGNAL_LABELS, capitalised as the desktop's Signals
- * chip names them: "Titles", "Count", "Lengths", "Edition", "Format", "Peer"), its value as a
- * percentage, and its band (scoreClass: good from 75, mid from 40, bad under). A signal that couldn't
- * be judged (null - no tracklist to match, no lengths reported) is left out, as the panel leaves it
- * out; one the panel doesn't name keeps its own name, after the six.
+ * page's candidates panel drew them - its word (SIGNAL_LABELS, capitalised as the desktop's Match details
+ * chip names them: "Track names", "Track count", "Track lengths", "Edition", "Format", "Availability"), its
+ * value as a percentage, its band (scoreClass: good from 75, mid from 40, bad under) and (2.0.6) what it
+ * measures (SIGNAL_MEANINGS), drawn beside it. A signal that couldn't be judged (null - no tracklist to
+ * match, no lengths reported) is left out, as the panel left it out; one the panel doesn't name keeps its
+ * own name, after the six, with no meaning to draw.
  */
 export interface SignalChip {
   signal: string
@@ -323,6 +348,8 @@ export interface SignalChip {
   /** 0-100 */
   value: number
   band: 'good' | 'mid' | 'bad'
+  /** what it measures, or '' for a signal deadwax doesn't name */
+  meaning: string
 }
 
 export function signalChips(candidate: Pick<Candidate, 'signals'>): SignalChip[] {
@@ -334,7 +361,7 @@ export function signalChips(candidate: Pick<Candidate, 'signals'>): SignalChip[]
     if (typeof raw !== 'number' || !Number.isFinite(raw)) continue
     const value = Math.round(raw * 100)
     const word = SIGNAL_LABELS[signal] ?? signal
-    chips.push({ signal, label: word.charAt(0).toUpperCase() + word.slice(1), value, band: scoreClass(value) })
+    chips.push({ signal, label: word.charAt(0).toUpperCase() + word.slice(1), value, band: scoreClass(value), meaning: SIGNAL_MEANINGS[signal] ?? '' })
   }
   return chips
 }
@@ -371,9 +398,9 @@ export function missingLine(candidate: Candidate): string | null {
 }
 
 /**
- * What the sheet says while Soulseek is asked: 'Asking Soulseek for “Third” by Portishead…' - and
+ * What the sheet says while Soulseek is asked: 'Looking for “Third” by Portishead…' - and
  * 'by Kanye West or Ye…' where the album is shared under two names (the credit and the current
- * name, both searched - routes/download.py search_names).
+ * name, both searched - routes/download.py search_names). (2.0.6, UX batch 3: "Asking Soulseek for".)
  */
 export function searchingLine(release: { artist: string; album_artist?: string | null; album: string }): string {
   const names: string[] = []
@@ -381,7 +408,7 @@ export function searchingLine(release: { artist: string; album_artist?: string |
     const trimmed = name.trim()
     if (trimmed && trimmed !== 'N/A' && !names.some((known) => known.toLowerCase() === trimmed.toLowerCase())) names.push(trimmed)
   }
-  return `Asking Soulseek for “${release.album}”${names.length ? ` by ${names.join(' or ')}` : ''}…`
+  return `Looking for “${release.album}”${names.length ? ` by ${names.join(' or ')}` : ''}…`
 }
 
 /** "“Portishead Third”", or "“Kanye West Donda” and “Ye Donda”" - every query a search ran. */
@@ -406,21 +433,31 @@ export function nothingLossless(
   return format === 'lossless_only' && !result.candidates.length && result.response_count > 0
 }
 
-/** What the sheet says then: 'Nothing lossless on Soulseek for “Portishead Third”.' */
+/** What the sheet says then: 'Nothing lossless found for “Portishead Third”.' (2.0.6: "…on Soulseek for…") */
 export function nothingLosslessLine(result: Pick<FindCandidatesResponse, 'query' | 'queries'>): string {
-  return `Nothing lossless on Soulseek for ${queriesText(result)}.`
+  return `Nothing lossless found for ${queriesText(result)}.`
 }
 
-/** ...and under it, why - and where the setting is. */
+/** ...and under it, why - and where the setting is. Never how many lossy copies there were: `response_count` counts
+ *  answers, one holding no music among them. */
 export const NOTHING_LOSSLESS_NOTE =
-  'Soulseek answered, but your Format is Lossless only, which leaves out folders with no lossless files. You can change it in You, under Getting albums.'
+  'Some were found, but none with lossless files - your Format is Lossless only, which leaves the rest out. You can change it in You, under Getting albums.'
 
-/** The line under the cards: 'Searched Soulseek for “Portishead Third” · 41 folders, 4 match your filters'. */
+/** "41 sources", "1 source" - (2.0.6, UX batch 3) a source is what the sheet lists: one sharer's copy of the album
+ *  (it said "folders on Soulseek"). */
+export const sourcesCount = (count: number) => `${count} ${count === 1 ? 'source' : 'sources'}`
+
+/** What the sheet says when sources were found and none passes the chips: "41 sources found - none match your filters." */
+export const noneMatchLine = (count: number) => `${sourcesCount(count)} found - none ${count === 1 ? 'matches' : 'match'} your filters.`
+
+/** ...and when nothing at all was: 'Nothing found for “Portishead Third”.' */
+export const nothingFoundLine = (result: Pick<FindCandidatesResponse, 'query' | 'queries'>) => `Nothing found for ${queriesText(result)}.`
+
+/** The line under the cards: 'Searched for “Portishead Third” · 41 sources, 4 match your filters'. */
 export function searchedLine(result: Pick<FindCandidatesResponse, 'query' | 'queries' | 'candidates'>, shown: number): string {
   const total = result.candidates.length
-  const folders = `${total} ${total === 1 ? 'folder' : 'folders'}`
   const matching = shown === total ? (total === 1 ? 'it matches your filters' : 'all match your filters') : `${shown} ${shown === 1 ? 'matches' : 'match'} your filters`
-  return `Searched Soulseek for ${queriesText(result)} · ${folders}, ${matching}`
+  return `Searched for ${queriesText(result)} · ${sourcesCount(total)}, ${matching}`
 }
 
 /**
@@ -440,12 +477,15 @@ export function autoPickBlocked(
   release?: { release_mbid?: string | null; tracks?: readonly unknown[] } | null,
 ): string | null {
   if (!result) return null
-  if (result.downloading) return 'it is already downloading'
-  if (result.held?.complete) return 'it is already in your library'
-  if (result.downloading_part) return 'a download of part of it is already running'
-  if (result.held) return 'you already have part of it'
-  if (release && !release.tracks?.length) return 'with no tracklist to match the folders against, no score can be trusted'
-  if (release && !release.release_mbid) return "with no release id, deadwax can't tell whether you already have it"
+  //? (2.0.6, UX batch 3) each a sentence's start, getSettings.ts notPickedLine ending it "- choose a source yourself."
+  if (result.downloading) return "It's already downloading"
+  if (result.held?.complete) return "It's already in your library"
+  if (result.downloading_part) return 'Part of it is already downloading'
+  if (result.held) return 'You already have part of it'
+  //? no tracklist: nothing to match the sources against, so no score can be trusted
+  if (release && !release.tracks?.length) return 'This pressing has no tracklist to check the sources against'
+  //? no release id: whether you have it already can't be told
+  if (release && !release.release_mbid) return "It can't be told whether you already have this pressing"
   return null
 }
 
@@ -474,11 +514,11 @@ export function sourcesAnnouncement(state: {
   const line = !total
     ? nothingLossless(state.result, state.format)
       ? `${nothingLosslessLine(state.result)} ${NOTHING_LOSSLESS_NOTE}`
-      : `Soulseek found nothing for ${queriesText(state.result)}.`
+      : nothingFoundLine(state.result)
     : !state.shown
-      ? `${total} ${total === 1 ? 'folder' : 'folders'} on Soulseek, none pass your filters`
-      : `${state.shown} ${state.shown === 1 ? 'source' : 'sources'}`
-  return state.notPicked ? `${line}. ${state.notPicked}` : line
+      ? noneMatchLine(total)
+      : `${sourcesCount(state.shown)}.`
+  return state.notPicked ? `${line} ${state.notPicked}` : line
 }
 
 /** The "good" band of the score colours - below it, auto-grab leaves the choice to you. */
@@ -535,7 +575,7 @@ export function beingFiled(download: DownloadInFlight): boolean {
 
 /** How far a download in flight has got, in a few words. */
 export function downloadProgressText(download: DownloadInFlight): string {
-  if (beingFiled(download)) return 'being filed into your library now'
+  if (beingFiled(download)) return 'being added to your library now'
   switch (download.status) {
     case 'queued':
       return 'queued'
@@ -543,7 +583,7 @@ export function downloadProgressText(download: DownloadInFlight): string {
       return download.done_files === undefined ? 'downloading' : `${download.done_files} of ${download.files} files`
     case 'failed':
       //? only ever in flight while it moves to its next peer by itself (2.0.0-player.49)
-      return 'failed - moving to the next peer'
+      return "didn't work - trying another source"
     default:
       return download.status
   }
@@ -581,7 +621,7 @@ export function storeStatus(
       : {
           kind: 'downloading',
           title: 'Already downloading',
-          lines: [line, `Open ${cancelIn} to cancel it if you want another peer.`],
+          lines: [line, `To get it from another source, cancel it in ${cancelIn} first.`],
         }
   }
   const held = result?.held
@@ -611,12 +651,12 @@ function whatADownloadDoes(held: HeldPressing): string {
   const those = folders.length > 1 ? 'those folders' : 'that folder'
   if (held.fills_gaps && held.filed_to) {
     return folders.length > 1
-      ? `Downloading it files only the tracks ${held.filed_to} doesn't have yet.`
-      : "Downloading it files only the tracks that folder doesn't have yet."
+      ? `Getting it adds only the tracks ${held.filed_to} doesn't have yet.`
+      : "Getting it adds only the tracks that folder doesn't have yet."
   }
   return held.filed_to
-    ? `A download would be filed separately, in ${held.filed_to}, rather than fill in ${those}.`
-    : `A download may be filed separately rather than fill in ${those}.`
+    ? `Getting it would add a separate copy, in ${held.filed_to}, rather than fill in ${those}.`
+    : `Getting it may add a separate copy rather than fill in ${those}.`
 }
 
 /**
