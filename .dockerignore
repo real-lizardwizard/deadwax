@@ -14,3 +14,5 @@ interface/dist
 tests
 assets
 docs
+# the iPhone app is built on a Mac, never in the image
+ios

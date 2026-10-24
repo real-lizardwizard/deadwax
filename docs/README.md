@@ -21,6 +21,7 @@ the tour; this is the manual.
 | [The library](library.md) | looking after it: what needs attention, the Edit panel (release, tags, artwork, lyrics, delete), Needs a look, Library care, artist pages |
 | [Sharing deadwax](sharing.md) | letting other people use it: logins through their own Navidrome accounts, what each person gets and what stays shared, admins and everyone else, adding and removing people, turning logins off again |
 | [The app](player.md) | the app itself: setting up Navidrome, adding it to the home screen, the tabs, the player and the turntable, how plays are counted, looking after deadwax from a phone, the desktop layout, and what it can't do yet |
+| [The iPhone app](ios.md) | the native app, early: Phase 0's test screen, installing it from a Mac with a free Apple account, the weekly re-install, and the checks it answers on the phone |
 | [How matching works](matching.md) | the six signals a candidate is scored on, and why edition is never a filter |
 | [Troubleshooting](troubleshooting.md) | what to do when something doesn't work, by symptom |
 

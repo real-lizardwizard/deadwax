@@ -1999,3 +1999,9 @@ on, play it again.
 
 Reload it. The page is never cached without checking, but a tab left open across an upgrade
 keeps the old page until it's reloaded.
+
+## The iPhone app (early)
+
+The native app's own problems - it can't reach deadwax, "Untrusted Developer", it won't open after
+a week, install.sh can't find the iPhone or the build fails signing - are in
+[the iPhone app's page](ios.md#when-something-goes-wrong), with what to do about each.

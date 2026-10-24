@@ -333,6 +333,12 @@ It plays from <strong>Navidrome</strong>, and its library is Navidrome's, so dea
 
 </details>
 
+### An iPhone app, on the way
+<details>
+<summary style="font-style:italic">Native, for offline, seamless joins and a start never lost on AirPods</summary>
+A native iPhone app is being built in phases, with its own audio engine: each song decoded on the phone at its own rate, the next one joined on the very next sample, and downloads to play offline. It's built on a Mac and installed with a free Apple account, which means installing it again each week with one command, <code>ios/scripts/install.sh</code>. <strong>Phase 0 is here</strong>: a test screen that proves the install, the connection to deadwax and the audio engine on a real iPhone, with a test album of beeps and a tone. It isn't a player for every day yet. <a href="docs/ios.md">The iPhone app's guide</a> has the steps.
+</details>
+
 ### On a desktop
 <details>
 <summary style="font-style:italic">The same app, in a wide window</summary>

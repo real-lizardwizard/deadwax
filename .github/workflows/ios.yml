@@ -1,0 +1,100 @@
+name: iOS
+
+# The iPhone app (ios/, notes/ios.md): DeadwaxKit's tests on Linux and on macOS, and an UNSIGNED
+# device build of the app - the only place the Apple-only code (SwiftUI, AVFAudio, MediaPlayer) is
+# compiled before James builds it, since nothing on Linux can. Signing happens only on James's Mac
+# (ios/scripts/install.sh), which asks this workflow's result for the commit it builds.
+#
+# Only for commits that touch the app: the server's own checks are tests.yml's (which also runs
+# tests/test_ios_*.py - the app's contract with the server's routes and the install helper).
+# `branches` beside `paths` keeps tags out: GitHub never applies a paths filter to a tag push, so
+# without it every server release tag (v*) would run this too.
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios.yml'
+  pull_request:
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # DeadwaxCore built and tested with Swift for Linux, as on tokay-gecko (ios/scripts/check-linux.sh).
+  # DeadwaxAudio compiles to nothing here: every file of it is inside `#if canImport(AVFAudio)`.
+  linux:
+    runs-on: ubuntu-latest
+    container: swift:6.4.1-noble
+    steps:
+      - uses: actions/checkout@v7
+      - run: swift --version
+      - name: DeadwaxKit
+        run: swift test --package-path ios/DeadwaxKit
+
+  # The .pbxproj, the scheme, the xcconfigs, Info.plist and the icons, read without Xcode; no asset
+  # catalog or storyboard anywhere (they need a Simulator runtime James's Mac doesn't have).
+  project:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: python3 ios/scripts/check_project.py
+      - name: the scripts parse
+        run: for script in ios/scripts/*.sh; do bash -n "$script"; done
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # printed so the label and the Xcode can be pinned once seen (the plan's risk R15)
+      - name: Xcode
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+          ls -d /Applications/Xcode*.app || true
+
+      # Core again, and the engine rendered offline, sample by sample: a join is the two songs end to
+      # end, a 24-bit file decodes exactly, a stream decodes what the file does
+      - name: DeadwaxKit, with the engine's offline renders
+        run: swift test --package-path ios/DeadwaxKit
+
+      # GitHub's macOS runners come with iOS Simulator runtimes, which James's Mac doesn't have; a
+      # build tool that needs one (actool, ibtool - the plan's R2) would pass here and fail there.
+      # So the runtimes go first, as far as the runner lets them (both lists are printed). Even so
+      # this is no stand-in for check 1, install.sh on James's Mac.
+      - name: No Simulator runtimes, as on James's Mac
+        run: |
+          xcrun simctl list runtimes || true
+          xcrun simctl runtime delete all || sudo xcrun simctl runtime delete all || true
+          xcrun simctl list runtimes || true
+
+      - name: The app, an unsigned device build
+        run: |
+          xcodebuild -project ios/Deadwax.xcodeproj -scheme Deadwax -configuration Release \
+            -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+
+      - name: What the build made
+        run: |
+          app=build/Build/Products/Release-iphoneos/Deadwax.app
+          ls -la "$app"
+          plutil -p "$app/Info.plist"
+          # one test a line: bash -e doesn't stop for a failure inside an && list
+          test -f "$app/AppIcon60x60@2x.png"
+          test -f "$app/AppIcon60x60@3x.png"
+          test ! -e "$app/Assets.car"
+          test "$(plutil -extract CFBundleIdentifier raw "$app/Info.plist")" = net.lizardlounge.deadwax
+          test "$(plutil -extract CFBundleShortVersionString raw "$app/Info.plist")" = 0.1
+          test "$(plutil -extract UIBackgroundModes.0 raw "$app/Info.plist")" = audio
+          test "$(plutil -extract NSAppTransportSecurity.NSAllowsArbitraryLoads raw "$app/Info.plist")" = true
+          python3 ios/scripts/check_project.py

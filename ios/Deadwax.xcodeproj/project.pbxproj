@@ -1,0 +1,226 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		DA0000000000000000000018 /* DeadwaxCore in Frameworks */ = {isa = PBXBuildFile; productRef = DA0000000000000000000016 /* DeadwaxCore */; };
+		DA0000000000000000000019 /* DeadwaxAudio in Frameworks */ = {isa = PBXBuildFile; productRef = DA0000000000000000000017 /* DeadwaxAudio */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		DA0000000000000000000005 /* Deadwax.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Deadwax.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		DA0000000000000000000007 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
+		DA0000000000000000000008 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		DA0000000000000000000009 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+		DA000000000000000000000A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		DA0000000000000000000006 /* App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = App;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		DA000000000000000000000D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DA0000000000000000000018 /* DeadwaxCore in Frameworks */,
+				DA0000000000000000000019 /* DeadwaxAudio in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		DA0000000000000000000002 = {
+			isa = PBXGroup;
+			children = (
+				DA0000000000000000000006 /* App */,
+				DA0000000000000000000004 /* Config */,
+				DA0000000000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		DA0000000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				DA0000000000000000000005 /* Deadwax.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		DA0000000000000000000004 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				DA0000000000000000000007 /* Base.xcconfig */,
+				DA0000000000000000000008 /* Debug.xcconfig */,
+				DA0000000000000000000009 /* Release.xcconfig */,
+				DA000000000000000000000A /* Info.plist */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		DA000000000000000000000B /* Deadwax */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DA0000000000000000000010 /* Build configuration list for PBXNativeTarget "Deadwax" */;
+			buildPhases = (
+				DA000000000000000000000C /* Sources */,
+				DA000000000000000000000D /* Frameworks */,
+				DA000000000000000000000E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				DA0000000000000000000006 /* App */,
+			);
+			name = Deadwax;
+			packageProductDependencies = (
+				DA0000000000000000000016 /* DeadwaxCore */,
+				DA0000000000000000000017 /* DeadwaxAudio */,
+			);
+			productName = Deadwax;
+			productReference = DA0000000000000000000005 /* Deadwax.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		DA0000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2710;
+				LastUpgradeCheck = 2710;
+				TargetAttributes = {
+					DA000000000000000000000B = {
+						CreatedOnToolsVersion = 27.1;
+					};
+				};
+			};
+			buildConfigurationList = DA000000000000000000000F /* Build configuration list for PBXProject "Deadwax" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = DA0000000000000000000002;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				DA0000000000000000000015 /* XCLocalSwiftPackageReference "DeadwaxKit" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = DA0000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				DA000000000000000000000B /* Deadwax */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		DA000000000000000000000E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		DA000000000000000000000C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		DA0000000000000000000011 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = DA0000000000000000000008 /* Debug.xcconfig */;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		DA0000000000000000000012 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = DA0000000000000000000009 /* Release.xcconfig */;
+			buildSettings = {
+			};
+			name = Release;
+		};
+		DA0000000000000000000013 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		DA0000000000000000000014 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		DA000000000000000000000F /* Build configuration list for PBXProject "Deadwax" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DA0000000000000000000011 /* Debug */,
+				DA0000000000000000000012 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DA0000000000000000000010 /* Build configuration list for PBXNativeTarget "Deadwax" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DA0000000000000000000013 /* Debug */,
+				DA0000000000000000000014 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		DA0000000000000000000015 /* XCLocalSwiftPackageReference "DeadwaxKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = DeadwaxKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		DA0000000000000000000016 /* DeadwaxCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DA0000000000000000000015 /* XCLocalSwiftPackageReference "DeadwaxKit" */;
+			productName = DeadwaxCore;
+		};
+		DA0000000000000000000017 /* DeadwaxAudio */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DA0000000000000000000015 /* XCLocalSwiftPackageReference "DeadwaxKit" */;
+			productName = DeadwaxAudio;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = DA0000000000000000000001 /* Project object */;
+}

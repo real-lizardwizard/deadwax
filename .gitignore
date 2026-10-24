@@ -28,3 +28,13 @@ node_modules/
 interface/dist/
 
 .DS_Store
+
+# the iPhone app (ios/): Swift's build folder, Xcode's per-user state, and what is James's alone -
+# his team id (Local.xcconfig) and his iPhone's name (device), both written by install.sh
+ios/DeadwaxKit/.build/
+ios/DeadwaxKit/.swiftpm/
+ios/build/
+xcuserdata/
+*.xcworkspace/xcuserdata/
+ios/Config/Local.xcconfig
+ios/Config/device

@@ -1,0 +1,46 @@
+// deadwax for iPhone - the build settings, as text, so they are edited and reviewed like code.
+// The .pbxproj holds almost nothing; everything a build needs is here (and in Info.plist).
+// See notes/ios.md.
+
+// The app's identity. NEVER change the bundle id once the app is on the phone: a new one is a new,
+// empty app (downloads and all gone), and spends one of a free account's App IDs.
+PRODUCT_NAME = Deadwax
+PRODUCT_BUNDLE_IDENTIFIER = net.lizardlounge.deadwax
+
+// The app's own version, apart from the server's (src/__init__.py): 0.1 is Phase 0.
+MARKETING_VERSION = 0.1
+CURRENT_PROJECT_VERSION = 1
+
+// A device build only: James's Mac has no Simulator runtime, and none is needed.
+SDKROOT = iphoneos
+SUPPORTED_PLATFORMS = iphoneos
+SUPPORTS_MACCATALYST = NO
+SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO
+SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO
+TARGETED_DEVICE_FAMILY = 1
+IPHONEOS_DEPLOYMENT_TARGET = 17.0
+
+// Info.plist is a plain file (Config/Info.plist), not generated. No asset catalog and no storyboard
+// anywhere: actool and ibtool need a Simulator runtime (the plan's risk R2). The icon is loose PNGs.
+INFOPLIST_FILE = Config/Info.plist
+GENERATE_INFOPLIST_FILE = NO
+ASSETCATALOG_COMPILER_APPICON_NAME =
+ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME =
+ENABLE_PREVIEWS = NO
+
+// Swift 5 language mode, as the package's audio target: nothing of the app compiles on Linux, so a
+// strict-concurrency error would only show on the Mac.
+SWIFT_VERSION = 5.0
+SWIFT_EMIT_LOC_STRINGS = NO
+STRING_CATALOG_GENERATE_SYMBOLS = NO
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks
+ENABLE_USER_SCRIPT_SANDBOXING = YES
+DEAD_CODE_STRIPPING = YES
+CLANG_ENABLE_MODULES = YES
+ALWAYS_SEARCH_USER_PATHS = NO
+
+// Signing: automatic, with James's free Personal Team. DEVELOPMENT_TEAM comes from Local.xcconfig,
+// which is his alone (gitignored; copy Local.xcconfig.example). CI builds with signing off.
+CODE_SIGN_STYLE = Automatic
+CODE_SIGN_IDENTITY = Apple Development
+#include? "Local.xcconfig"

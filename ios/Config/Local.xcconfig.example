@@ -1,0 +1,4 @@
+// Copy this file to Local.xcconfig (beside it; gitignored, so it stays yours) and put your
+// Personal Team's id in it - ten letters and digits. install.sh offers to write it for you: it
+// reads the teams Xcode knows (Xcode > Settings > Accounts, once your Apple ID is added there).
+DEVELOPMENT_TEAM = XXXXXXXXXX
