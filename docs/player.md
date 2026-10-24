@@ -515,7 +515,7 @@ have, and Info's artist card.
   none of theirs, or that it didn't send some (with **Try again**). They're there from the moment
   the page opens, whenever Navidrome could have albums of theirs, so nothing moves when it answers.
 - **Albums** is their albums as MusicBrainz lists them - every one, not a search's best matches -
-  oldest first, those with no date last: the ones you have marked **✓ in your library** (and "2
+  newest first, those with no date last (Play and Shuffle go in the same order): the ones you have marked **✓ in your library** (and "2
   editions" when you have more than one pressing - with logins on the ✓ is for yours alone, and one the
   collection holds that isn't yours reads "2008 · in the collection", with no ✓ and no Get: it opens its page,
   which has **Add to my library**), the others **not in your library** with a

@@ -128,10 +128,10 @@ One box, one list as Apple Music shows it: <em>Top results</em> - the best artis
 <br><br>
 Everything MusicBrainz has answered before is saved on disk and searched too, under any words, its finds drawn first, as MusicBrainz's own rows would be - search "portishead", open Dummy, and "glory box" later finds Glory Box at once, even with MusicBrainz away.
 <br><br>
-An artist's name opens their page, with everything they've released, oldest first - <em>Studio only</em> on to start with - because sorting fifty search results by year gives you the oldest of the fifty most <em>relevant</em>, which for most artists is bootlegs with the actual albums scattered among them. Asking for everything credited to one artist is the only way "oldest first" means what it says.
+An artist's name opens their page, with everything they've released, newest first - <em>Studio only</em> on to start with - because a search's fifty best matches are only the fifty most <em>relevant</em>, which for most artists means bootlegs with the actual albums scattered among them. Asking for everything credited to one artist is the only way the list is really theirs, in order.
 <br><br>
 
-![Dance Gavin Dance's albums on their artist page, oldest first](assets/images/discography.png)
+![Dance Gavin Dance's albums on their artist page](assets/images/discography.png)
 
 </details>
 
@@ -239,7 +239,7 @@ A track's name opens what's inside it: every field deadwax reads, the pictures e
 
 ### Artist pages, with pictures
 
-An artist's page has their picture, a <em>Pin</em>, Play and Shuffle over every album of theirs you have, their albums as MusicBrainz lists them - every one, oldest first, with what you have marked and a Get on the rest (a renamed artist's albums under both names together) - and under them what your library holds of them, and who MusicBrainz says they are: their other names, where they're from, how long they've been going, what MusicBrainz tags them as, the line-up with instruments, and their official site and socials named after where they actually go (two of a kind say which is which: <em>Official site · portishead.co.uk</em>, and <em>(archived)</em> for one the Wayback Machine kept).
+An artist's page has their picture, a <em>Pin</em>, Play and Shuffle over every album of theirs you have, their albums as MusicBrainz lists them - every one, newest first, with what you have marked and a Get on the rest (a renamed artist's albums under both names together) - and under them what your library holds of them, and who MusicBrainz says they are: their other names, where they're from, how long they've been going, what MusicBrainz tags them as, the line-up with instruments, and their official site and socials named after where they actually go (two of a kind say which is which: <em>Official site · portishead.co.uk</em>, and <em>(archived)</em> for one the Wayback Machine kept).
 
 Their own pictures: **MusicBrainz has none** — the Cover Art Archive is for releases, and what musicbrainz.org shows on an artist page is a Wikimedia Commons photo reached through Wikidata. deadwax uses that too, and adds <strong>fanart.tv</strong> and <strong>TheAudioDB</strong> if you give either a key in Server settings — between them they have the banners, logos, backgrounds and wide shots an artist page is actually made of. fanart.tv's artwork is voted on by the people using it, so deadwax offers the most-liked of each kind first; its key is issued per application rather than per person, so you register your own at fanart.tv. <em>Artist images…</em> shows every candidate each source offered, so you choose which belongs at the top of the page, and they're written into the artist's folder, so <em>other things read them too</em>:
 
@@ -254,7 +254,7 @@ Their own pictures: **MusicBrainz has none** — the Cover Art Archive is for re
 
 Finding the right artist copes with them having **renamed**, which is commoner than it sounds. MusicBrainz keeps one current name per artist and every previous one as an alias, while each release keeps the name it was *credited* under — so Ye's albums are credited Kanye West, your folder is called Kanye West, and MusicBrainz's artist is called Ye. deadwax searches aliases as well as current names, and compares them ignoring how a name happened to be typed, so `Motorhead` finds Motörhead and a plain hyphen finds JAŸ‐Z. The page says "Now: Ye" when MusicBrainz calls them something other than your folder does, and <em>Move albums to …</em> moves the old name's albums under the new one. Two artists genuinely sharing a name are refused rather than guessed at — that's what <em>Which artist is this?</em> is for.
 
-![Pink Floyd's artist page: what MusicBrainz says about them, and their albums from MusicBrainz, oldest first, with Get on the ones not in the library](assets/images/artist.png)
+![Pink Floyd's artist page: what MusicBrainz says about them, and their albums from MusicBrainz, with Get on the ones not in the library](assets/images/artist.png)
 
 ### CD art, and the pictures inside your files
 <details>

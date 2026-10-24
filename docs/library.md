@@ -442,7 +442,7 @@ portishead.co.uk**, and **(archived)** for a page kept on the Wayback Machine) a
 an admin (or someone given Edit albums, or Look after the library for the move) it has the
 looking after too - [Managing an artist](player.md#managing-an-artist) has every step:
 
-![Pink Floyd's artist page: what MusicBrainz says about them, and their albums from MusicBrainz, oldest first, with Get on the ones not in the library](../assets/images/artist.png)
+![Pink Floyd's artist page: what MusicBrainz says about them, and their albums from MusicBrainz, with Get on the ones not in the library](../assets/images/artist.png)
 
 **Artist images…** shows every picture found, from Wikimedia Commons, TheAudioDB (with a key)
 and fanart.tv (with a key), and saves your choices into the artist's folder:

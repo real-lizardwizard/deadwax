@@ -24,7 +24,7 @@
  * folders tagged with its group or release ids) and opened as the Navidrome album holding one of
  * those releases - in idBridge.ts's heldInOrder: its plain edition first, then its oldest; a
  * Navidrome album no folder ties to a group is claimed by a group of its exact title, the only one
- * of that title. In order of year, oldest first, the undated last; then by title.
+ * of that title. In order of year, newest first (2.0.12; it was oldest first), the undated last; then by title.
  *
  * Albums Navidrome has that no MusicBrainz row claims - every one of them while MusicBrainz hasn't
  * answered, or can't - are ONE row per album the library's folders say they are (their release
@@ -317,9 +317,10 @@ export function artistRows(
     })
   }
 
+  //? (2.0.12, James: "on the artists page let's sort newest to oldest") the newest year first, the undated still last
   return rows.sort((a, b) =>
     (a.year === null ? 1 : 0) - (b.year === null ? 1 : 0)
-    || (a.year ?? '').localeCompare(b.year ?? '')
+    || (b.year ?? '').localeCompare(a.year ?? '')
     || foldName(a.title).localeCompare(foldName(b.title))
     || a.key.localeCompare(b.key))
 }

@@ -735,3 +735,13 @@ the whole screen on a phone. The spec: `uplan/slice-artists-manage.md`.
   what it had until it is opened again). The second review's fixes were not run in a real page: a
   /library/artist that fails (the note, Try again, the stepped-back Artist images…), the panel with
   the same artist on top of two tabs, and the scroll put back with another tab's artist page drawing.
+
+### An artist's albums newest first (2.0.12)
+
+James (2026-10-24): "on the artists page let's sort newest to oldest". `artistRows` (lib/artistPage.ts) orders the
+rows by year newest first; albums with no year still sink to the end, a year's albums still by title, folded, then
+steadily. Play and Shuffle play in the page's order, so Play now starts from the newest album you have; the copies of
+one album you hold (`heldInOrder`: the plain edition, then the oldest) are unchanged - that is which copy a row opens,
+not the page's order. artist.sim's order checks were rewritten for it (and two that read rows[0] for Dummy now find
+its row by key; one called `rowLine` through `map`, which passed the index as `personal`). The Library's "Artist" sort
+(each artist's albums oldest first) is a different list and stays as it was.

@@ -9,7 +9,7 @@
  *  - THE ORDER of the albums (`artistRows`): MusicBrainz's albums with what the library holds of each
  *    - by the store's word (/library/owned's folders, by group id), opened as the Navidrome album
  *    holding one of those releases, "2 editions" past one - and every album Navidrome has that no
- *    row claimed as a row of its own; oldest first, the undated last whichever kind, then by title,
+ *    row claimed as a row of its own; newest first (2.0.12), the undated last whichever kind, then by title,
  *    then steady. An untagged rip claimed only by the ONE album of its exact title. Studio only never
  *    hides an album you have. MusicBrainz down: the albums you have are the whole list. A renamed
  *    artist's albums under either name, together.
@@ -132,30 +132,30 @@ console.log('\nthe page\'s id')
 console.log('\nthe albums, in order')
 {
   const rows = A.artistRows(HELD, [THIRD_G, DUMMY_G, PORTISHEAD_G], LIBRARY)
-  check('oldest first; what you have marked, opened as the album you have; what you don\'t, not',
-    summary(rows), [['Dummy', '1994', 'nd-cd', true, 2], ['Portishead', '1997', 'nd-self', true, 1], ['Third', '2008', null, false, 0]])
+  check('newest first (2.0.12); what you have marked, opened as the album you have; what you don\'t, not',
+    summary(rows), [['Third', '2008', null, false, 0], ['Portishead', '1997', 'nd-self', true, 1], ['Dummy', '1994', 'nd-cd', true, 2]])
   check('...each Navidrome album claimed once - neither copy of Dummy listed again',
-    rows.map((row) => row.key), ['group:rg-dummy', 'group:rg-portishead', 'group:rg-third'])
-  check('...the releases you hold of each, for the bridge', rows.map((row) => row.releases), [[CD, VINYL], [SELFTITLED], []])
-  check('the lines, as the board has them', rows.map(A.rowLine), ['1994 · in your library · 2 pressings', '1997 · in your library', '2008 · not in your library'])
-  check('Play plays one copy of each album you have, in the page\'s order - the plain edition', A.playOrder(rows), ['nd-cd', 'nd-self'])
+    rows.map((row) => row.key), ['group:rg-third', 'group:rg-portishead', 'group:rg-dummy'])
+  check('...the releases you hold of each, for the bridge', rows.map((row) => row.releases), [[], [SELFTITLED], [CD, VINYL]])
+  check('the lines, as the board has them', rows.map((row) => A.rowLine(row)), ['2008 · not in your library', '1997 · in your library', '1994 · in your library · 2 pressings'])
+  check('Play plays one copy of each album you have, in the page\'s order - the plain edition', A.playOrder(rows), ['nd-self', 'nd-cd'])
   const plainLater = O.buildOwnedIndex([owned('Portishead/Dummy (1994) [Deluxe]', CD, 'rg-dummy', { edition: 'Deluxe', year: '1994' }), owned('Portishead/Dummy plain', VINYL, 'rg-dummy', { edition: '', year: '2016' })])
-  check('...the plain edition, whatever its year or its folder\'s name', A.artistRows(HELD, [DUMMY_G], plainLater)[0].albumId, 'nd-vinyl')
+  check('...the plain edition, whatever its year or its folder\'s name', A.artistRows(HELD, [DUMMY_G], plainLater).find((row) => row.key === 'group:rg-dummy').albumId, 'nd-vinyl')
   const labelled = O.buildOwnedIndex([owned('Portishead/Dummy (1994) [Anniversary]', VINYL, 'rg-dummy', { edition: 'Anniversary', year: '2014' }), owned('Portishead/Dummy (1994) [Original]', CD, 'rg-dummy', { edition: 'Original', year: '1994' })])
-  check('...two editions with labels: the older, whatever its folder\'s name', A.artistRows(HELD, [DUMMY_G], labelled)[0].albumId, 'nd-cd')
+  check('...two editions with labels: the older, whatever its folder\'s name', A.artistRows(HELD, [DUMMY_G], labelled).find((row) => row.key === 'group:rg-dummy').albumId, 'nd-cd')
 
   const undated = A.artistRows([nd('nd-x', 'Demo Tape', 0)], [group('rg-u', 'Unknown Date', ''), THIRD_G, DUMMY_G], LIBRARY)
-  check('the undated sink to the end, whichever kind - MusicBrainz\'s or one you have', undated.map((row) => row.title), ['Dummy', 'Third', 'Demo Tape', 'Unknown Date'])
+  check('the undated sink to the end, whichever kind - MusicBrainz\'s or one you have', undated.map((row) => row.title), ['Third', 'Dummy', 'Demo Tape', 'Unknown Date'])
   const ties = A.artistRows([], [group('rg-b', 'B side', '2001'), group('rg-a', 'a side', '2001'), group('rg-a2', 'A Side', '2001')], null)
   check('a year\'s albums by title, folded, then steadily', ties.map((row) => row.key), ['group:rg-a', 'group:rg-a2', 'group:rg-b'])
 
   const rip = nd('nd-rip', 'Dummy', 1994)
   const NONE = O.buildOwnedIndex([])
   check('an untagged rip claimed by the one album of its exact title',
-    summary(A.artistRows([rip], [DUMMY_G, THIRD_G], NONE)), [['Dummy', '1994', 'nd-rip', true, 1], ['Third', '2008', null, false, 0]])
+    summary(A.artistRows([rip], [DUMMY_G, THIRD_G], NONE)), [['Third', '2008', null, false, 0], ['Dummy', '1994', 'nd-rip', true, 1]])
   check('...the library not having answered: Navidrome\'s claim stands, every other row says neither',
-    [summary(A.artistRows([rip], [DUMMY_G, THIRD_G], null)), A.artistRows([rip], [DUMMY_G, THIRD_G], null).map(A.rowLine)],
-    [[['Dummy', '1994', 'nd-rip', true, 1], ['Third', '2008', null, null, 0]], ['1994 · in your library', '2008']])
+    [summary(A.artistRows([rip], [DUMMY_G, THIRD_G], null)), A.artistRows([rip], [DUMMY_G, THIRD_G], null).map((row) => A.rowLine(row))],
+    [[['Third', '2008', null, null, 0], ['Dummy', '1994', 'nd-rip', true, 1]], ['2008', '1994 · in your library']])
   check('...never by an album sharing its title with another - its own row then',
     A.artistRows([rip], [DUMMY_G, group('rg-dummy-2', 'Dummy', '2010')], null).map((row) => row.key).sort(),
     ['album:nd-rip', 'group:rg-dummy', 'group:rg-dummy-2'])
@@ -169,21 +169,21 @@ console.log('\nthe albums, in order')
   check('Studio only never hides an album you have: a live album held is its own row',
     summary(A.artistRows([...HELD, nd('nd-rose', 'Roseland NYC Live', 1998, ROSELAND)], [DUMMY_G, PORTISHEAD_G, THIRD_G],
       O.buildOwnedIndex([...LIBRARY.byRelease.values()].flat().concat(owned('Portishead/Roseland NYC Live (1998)', ROSELAND, 'rg-roseland'))))),
-    [['Dummy', '1994', 'nd-cd', true, 2], ['Portishead', '1997', 'nd-self', true, 1], ['Roseland NYC Live', '1998', 'nd-rose', true, 1], ['Third', '2008', null, false, 0]])
+    [['Third', '2008', null, false, 0], ['Roseland NYC Live', '1998', 'nd-rose', true, 1], ['Portishead', '1997', 'nd-self', true, 1], ['Dummy', '1994', 'nd-cd', true, 2]])
   check('...and with it off, a live album says so', A.rowLine(A.artistRows([], [ROSELAND_G], NONE)[0]), '1998 · Live album · not in your library')
 
   const down = A.artistRows(HELD, null, LIBRARY)
   check('MusicBrainz down (or not knowing who this is): the albums you have are the whole list - one row per album the folders say',
-    summary(down), [['Dummy', '1994', 'nd-cd', true, 2], ['Portishead', '1997', 'nd-self', true, 1]])
+    summary(down), [['Portishead', '1997', 'nd-self', true, 1], ['Dummy', '1994', 'nd-cd', true, 2]])
   check('...keyed as MusicBrainz\'s rows will be, opening the same copy: its answer moves no key',
     [down.map((row) => [row.key, row.albumId]), A.artistRows(HELD, [THIRD_G, DUMMY_G, PORTISHEAD_G], LIBRARY).filter((row) => row.held).map((row) => [row.key, row.albumId])],
-    [[['group:rg-dummy', 'nd-cd'], ['group:rg-portishead', 'nd-self']], [['group:rg-dummy', 'nd-cd'], ['group:rg-portishead', 'nd-self']]])
-  check('...and Play plays Dummy once', A.playOrder(down), ['nd-cd', 'nd-self'])
+    [[['group:rg-portishead', 'nd-self'], ['group:rg-dummy', 'nd-cd']], [['group:rg-portishead', 'nd-self'], ['group:rg-dummy', 'nd-cd']]])
+  check('...and Play plays Dummy once', A.playOrder(down), ['nd-self', 'nd-cd'])
   check('...an album the folders say nothing of is a row of its own',
     A.artistRows([nd('nd-rip', 'Old Rip', 1990)], null, LIBRARY).map((row) => row.key), ['album:nd-rip'])
-  check('...before the library answers, Navidrome\'s copies of one album claimed by title stay apart, oldest first',
-    summary(A.artistRows(HELD, null, null)).map((row) => row[2]), ['nd-cd', 'nd-self', 'nd-vinyl'])
-  check('...and MusicBrainz\'s row claims both by title, the older opened', A.artistRows(HELD, [DUMMY_G], null)[0].albumId, 'nd-cd')
+  check('...before the library answers, Navidrome\'s copies of one album claimed by title stay apart, newest first',
+    summary(A.artistRows(HELD, null, null)).map((row) => row[2]), ['nd-vinyl', 'nd-self', 'nd-cd'])
+  check('...and MusicBrainz\'s row claims both by title, the older opened', A.artistRows(HELD, [DUMMY_G], null).find((row) => row.key === 'group:rg-dummy').albumId, 'nd-cd')
   check('held by the store\'s word, not found by Navidrome: in your library, opened by the bridge',
     A.artistRows([], [DUMMY_G], LIBRARY).map((row) => [row.held, row.albumId, row.releases.length, row.editions]), [[true, null, 2, 2]])
   check('...and Play has nothing of it to play', A.playOrder(A.artistRows([], [DUMMY_G], LIBRARY)), [])
@@ -196,22 +196,22 @@ console.log('\nthe albums, in order')
   check('a renamed artist: the albums credited to their old name and their new, together, in order',
     summary(A.artistRows([nd('nd-bully', 'BULLY', 2025, BULLY), nd('nd-donda', 'Donda', 2021, DONDA)],
       [group('rg-bully', 'BULLY', '2025-03-28', { 'artist-credit': credited('Ye') }), group('rg-donda', 'Donda', '2021-08-29', { 'artist-credit': credited('Kanye West') })], ye)),
-    [['Donda', '2021', 'nd-donda', true, 1], ['BULLY', '2025', 'nd-bully', true, 1]])
+    [['BULLY', '2025', 'nd-bully', true, 1], ['Donda', '2021', 'nd-donda', true, 1]])
   check('a group twice in MusicBrainz\'s answer is one row', A.artistRows([], [THIRD_G, THIRD_G], null).length, 1)
 
   const split = O.buildOwnedIndex([owned('Portishead/Dummy (1994) (Disc 1)', CD, 'rg-dummy'), owned('Portishead/Dummy (1994) (Disc 2)', CD, 'rg-dummy')])
   const twice = O.buildOwnedIndex([owned('Portishead/Dummy (1994) [FLAC]', CD, 'rg-dummy'), owned('Portishead/Dummy (1994) [MP3]', CD, 'rg-dummy')])
   check('"2 editions" counts releases: a set kept one folder per disc, or one release twice, is one',
-    [A.artistRows([nd('nd-cd', 'Dummy', 1994, CD)], [DUMMY_G], split)[0].editions, A.artistRows([], [DUMMY_G], twice)[0].editions, A.artistRows(HELD, [DUMMY_G], LIBRARY)[0].editions],
+    [A.artistRows([nd('nd-cd', 'Dummy', 1994, CD)], [DUMMY_G], split).find((row) => row.key === 'group:rg-dummy').editions, A.artistRows([], [DUMMY_G], twice).find((row) => row.key === 'group:rg-dummy').editions, A.artistRows(HELD, [DUMMY_G], LIBRARY).find((row) => row.key === 'group:rg-dummy').editions],
     [1, 1, 2])
   const untaggedToo = O.buildOwnedIndex([owned('Portishead/Dummy (1994)', CD, 'rg-dummy'), owned('Portishead/Dummy rip', '', 'rg-dummy')])
-  check('...a folder naming no release counts once of its own', A.artistRows([], [DUMMY_G], untaggedToo)[0].editions, 2)
+  check('...a folder naming no release counts once of its own', A.artistRows([], [DUMMY_G], untaggedToo).find((row) => row.key === 'group:rg-dummy').editions, 2)
   const asScanned = O.buildOwnedIndex([
     owned('Portishead/Dummy (1994) [20th Anniversary Reissue 180gram]', VINYL, 'rg-dummy', { edition: '20th Anniversary Reissue 180gram', year: '2014' }),
     owned('Portishead/Dummy (1994)', CD, 'rg-dummy', { edition: 'Standard', year: '1994' }),
   ])
   check('the scan names the plain copy "Standard" beside another, and lists it after: still the plain edition, for the page and for Search',
-    [A.artistRows(HELD, [DUMMY_G], asScanned)[0].albumId, B.heldReleases(asScanned, 'rg-dummy')], ['nd-cd', [CD, VINYL]])
+    [A.artistRows(HELD, [DUMMY_G], asScanned).find((row) => row.key === 'group:rg-dummy').albumId, B.heldReleases(asScanned, 'rg-dummy')], ['nd-cd', [CD, VINYL]])
   check('the copies in order: plain, then oldest, a year nobody wrote last, then by folder',
     B.heldInOrder([{ path: 'c', edition: 'Deluxe', year: '1990' }, { path: 'b', edition: '', year: '' }, { path: 'a', edition: 'standard', year: '2001' }, { path: 'd', edition: '', year: '2001' }]).map((x) => x.path),
     ['a', 'd', 'b', 'c'])
@@ -727,33 +727,33 @@ async function page() {
     check('MusicBrainz answered, the library not: still waiting', rowKeys(), [])
     waitOver()
     await one.settled()
-    check('the wait over: drawn - every row MusicBrainz has, Navidrome\'s albums claimed by title', rowKeys(), ['group:rg-dummy', 'group:rg-portishead', 'group:rg-third'])
-    check('...and no verdict, and no Get, where only the library could say', [rowLines(), getChips()], [['1994 · in your library · 2 pressings', '1997 · in your library', '2008'], []])
+    check('the wait over: drawn - every row MusicBrainz has, Navidrome\'s albums claimed by title', rowKeys(), ['group:rg-third', 'group:rg-portishead', 'group:rg-dummy'])
+    check('...and no verdict, and no Get, where only the library could say', [rowLines(), getChips()], [['2008', '1997 · in your library', '1994 · in your library · 2 pressings'], []])
     check('...Play still disabled: which copies are one album is the library\'s to say', pills().map((pill) => pill[1]), [true, true])
     ownedAnswers(LIBRARY)
     await one.settled()
     check('the library answered: the same rows, the same keys, Third "not in your library" with its Get',
-      [rowKeys(), rowLines()[2], getChips()], [['group:rg-dummy', 'group:rg-portishead', 'group:rg-third'], '2008 · not in your library', ['Get Third']])
+      [rowKeys(), rowLines()[0], getChips()], [['group:rg-third', 'group:rg-portishead', 'group:rg-dummy'], '2008 · not in your library', ['Get Third']])
     check('the albums Play plays asked for, one copy of Dummy', asked('prefetch').map((one) => one[0]).sort(), ['nd-cd', 'nd-self'])
     while (outstanding('prefetch').length) answer('prefetch', songsOf)
     await one.settled()
     check('every album in hand: Play and Shuffle live', [pills(), playsWords()], [[['Play', false], ['Shuffle', false]], 'Plays the 2 albums you have'])
     classed('pl-pill')[0].props.onClick()
     check('Play: every album remembered for Info and the turntable, then the queue - Dummy once', [W.remembered, W.plays.map((p) => [p[0].map((t) => t.id), p[1], p[2]])],
-      [[['nd-cd', 'nd-self']], [[['nd-cd-1', 'nd-cd-2', 'nd-self-1', 'nd-self-2'], 0, false]]])
+      [[['nd-self', 'nd-cd']], [[['nd-self-1', 'nd-self-2', 'nd-cd-1', 'nd-cd-2'], 0, false]]])
 
     find((node) => node.type === 'button' && words(node) === 'Studio only')[0].props.onClick()
     one.draw()
     one.draw()
     check('Studio only off: asked again - the rows on screen meanwhile, busy', [asked('discography').slice(-1), rowKeys(), classed('app-artist-albums')[0].props['aria-busy']],
-      [[[PORTISHEAD, false]], ['group:rg-dummy', 'group:rg-portishead', 'group:rg-third'], true])
+      [[[PORTISHEAD, false]], ['group:rg-third', 'group:rg-portishead', 'group:rg-dummy'], true])
     answer('discography', { 'release-groups': [...DISCOGRAPHY['release-groups'], ROSELAND_G] })
     await one.settled()
-    check('...its answer drawn', rowKeys(), ['group:rg-dummy', 'group:rg-portishead', 'group:rg-roseland', 'group:rg-third'])
+    check('...its answer drawn', rowKeys(), ['group:rg-third', 'group:rg-roseland', 'group:rg-portishead', 'group:rg-dummy'])
 
     const again = mount()
     again.draw()
-    check('the page come back to (Back): its rows on the first frame, from the session', rowKeys(), ['group:rg-dummy', 'group:rg-portishead', 'group:rg-roseland', 'group:rg-third'])
+    check('the page come back to (Back): its rows on the first frame, from the session', rowKeys(), ['group:rg-third', 'group:rg-roseland', 'group:rg-portishead', 'group:rg-dummy'])
     check('...asking MusicBrainz nothing again', asked('discography').length, 2)
   }
 
@@ -768,11 +768,11 @@ async function page() {
     waitOver()
     await one.settled()
     check('the wait over, MusicBrainz still out: one row per album you have, Dummy once', [rowKeys(), rowLines()],
-      [['group:rg-dummy', 'group:rg-portishead'], ['1994 · in your library · 2 pressings', '1997 · in your library']])
+      [['group:rg-portishead', 'group:rg-dummy'], ['1997 · in your library', '1994 · in your library · 2 pressings']])
     check('...and Play asks for one copy of Dummy', asked('prefetch').map((one) => one[0]).sort(), ['nd-cd', 'nd-self'])
     answer('discography', DISCOGRAPHY)
     await one.settled()
-    check('MusicBrainz answering adds what you don\'t have and moves no key', rowKeys(), ['group:rg-dummy', 'group:rg-portishead', 'group:rg-third'])
+    check('MusicBrainz answering adds what you don\'t have and moves no key', rowKeys(), ['group:rg-third', 'group:rg-portishead', 'group:rg-dummy'])
   }
 
   console.log('\nthe page: a few albums asked for at a time')
@@ -784,10 +784,10 @@ async function page() {
     one.draw()
     answer('artistAlbums', { id: 'ar-many', name: 'Many', album: many })
     await one.settled()
-    check(`at most ${PREFETCH_AT_ONCE} out at once, in the page's order`, outstanding('prefetch').map((one) => one.args[0]), ['nd-0', 'nd-1', 'nd-2', 'nd-3'])
+    check(`at most ${PREFETCH_AT_ONCE} out at once, in the page's order`, outstanding('prefetch').map((one) => one.args[0]), ['nd-8', 'nd-7', 'nd-6', 'nd-5'])
     answer('prefetch', songsOf)
     await one.settled()
-    check('...the next as one answers', outstanding('prefetch').map((one) => one.args[0]), ['nd-1', 'nd-2', 'nd-3', 'nd-4'])
+    check('...the next as one answers', outstanding('prefetch').map((one) => one.args[0]), ['nd-7', 'nd-6', 'nd-5', 'nd-4'])
     while (outstanding('prefetch').length) { answer('prefetch', songsOf); await one.settled() }
     classed('pl-pill')[1].props.onClick()
     check('Shuffle: all nine remembered, every song queued, shuffled', [W.remembered[0]?.length, W.plays[0]?.[0].length, W.plays[0]?.[1], W.plays[0]?.[2]], [9, 18, null, true])

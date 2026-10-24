@@ -305,9 +305,9 @@ console.log('\nthe artist page: a row the store holds that isn\'t yours says so'
   const groups = [{ id: 'rg-dummy', title: 'Dummy', 'primary-type': 'Album', 'first-release-date': '1994' }, { id: 'rg-third', title: 'Third', 'primary-type': 'Album', 'first-release-date': '2008' }]
   const navidrome = [{ id: 'nd-dummy', name: 'Dummy', musicBrainzId: REL_DUMMY, year: 1994 }, { id: 'nd-third', name: 'Third', musicBrainzId: REL_THIRD, year: 2008 }]
   const rows = A.artistRows(navidrome, groups, index)
-  check('Dummy is yours, Third the store\'s', rows.map((row) => [row.title, row.yours]), [['Dummy', true], ['Third', false]])
-  check('...in the rows\' words with a library of your own', rows.map((row) => A.rowLine(row, true)), ['1994 · in your library', '2008 · in the collection'])
-  check('...and with logins off both in your library', rows.map((row) => A.rowLine(row)), ['1994 · in your library', '2008 · in your library'])
+  check('Dummy is yours, Third the store\'s', rows.map((row) => [row.title, row.yours]), [['Third', false], ['Dummy', true]])
+  check('...in the rows\' words with a library of your own', rows.map((row) => A.rowLine(row, true)), ['2008 · in the collection', '1994 · in your library'])
+  check('...and with logins off both in your library', rows.map((row) => A.rowLine(row)), ['2008 · in your library', '1994 · in your library'])
   const starred = A.artistRows([navidrome[0], { ...navidrome[1], starred: '2026-10-15T09:00:00Z' }], groups, index)
   check('an album of it you starred makes a row yours before deadwax reads the star back', starred[1].yours, true)
   check('Play says the store\'s albums with a library of your own', [A.playsLine(2, 2, true, 'done', true), A.playsLine(1, 1, true, 'done', false), A.playsLine(0, 0, false, 'asking', true)],
