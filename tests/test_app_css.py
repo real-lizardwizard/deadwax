@@ -1986,10 +1986,12 @@ def test_up_next_and_the_song_menu_lock_the_page_and_reuse_infos_look():
     #? the album bar: the ••• beside the pin, their 44px reaches meeting and no more
     assert declarations(APP, ".app-album-bar .app-album-more + .app-pin-toggle")["margin-left"] == "var(--app-album-more-room)"
     assert ALL_TOKENS["--app-album-more-room"] == "calc(2 * var(--app-pin-toggle-reach) - var(--pl-gap-sm))"
-    #? Now Playing's footer unchanged - one fixed height, its icons at the right end - and its Up next tinted when on
+    #? Now Playing's footer unchanged - one fixed height, its icons at the right end - and its Up next no longer tinted
+    #? when on (2.0.14: Shuffle and Repeat are lit on the transport - see the test after the last of these)
     footer = declarations(PLAYER_CSS, ".pl-sheet-footer")
     assert footer["height"] == "var(--pl-hit)" and footer["justify-content"] == "flex-end"
-    assert declarations(APP, ".pl-sheet-footer .app-upnext-button.is-on")["color"] == "var(--dw-accent)"
+    assert declarations(APP, ".pl-sheet-footer .app-upnext-button.is-on") == {}
+    assert "Up Next tinted while Shuffle or Repeat is on" not in APP, "the .57 section's header says the tint is gone"
     #? Up Next's head: Edit at the left in Done's look, the chips' row inside the gutter
     edit = declarations(APP, ".app-upnext-edit")
     assert (edit["grid-column"], edit["justify-self"], edit["color"]) == ("1", "start", "var(--dw-accent)")
@@ -2148,3 +2150,63 @@ def test_an_artists_subtitle_lands_in_a_line_kept_for_it():
     kept = declarations(APP, ".app-artist-names:not(:has(.app-artist-subtitle))::before")
     assert (kept["content"], kept["display"]) == ("''", "block")
     assert kept["height"] == "calc({} + {} * {})".format(line["margin"].split()[0], line["font-size"], line["line-height"])
+
+
+def test_now_playings_shuffle_and_repeat_sit_on_the_transport_as_tap_targets():
+    """(2.0.14) Shuffle and Repeat at the ends of Now Playing's transport row: tap targets (pl-icon-button, 44px every
+    way, never shrunk), their glyphs the icon row's size in its grey, in the accent while on and dimmed while they can't
+    be used, as Up Next's chips are; each target reaching past the body's edge by as much as it is wider than its glyph,
+    so the glyphs sit under the scrubber's ends; the row's height left alone. At 320 wide the row holds five targets of
+    44px or more - the middle three giving up width only, never below a tap target - and from 375 the three keep their
+    72px."""
+    icon_button = declarations(PLAYER_CSS, ".pl-icon-button")
+    assert (icon_button["width"], icon_button["height"], icon_button["flex"]) == ("var(--pl-hit)", "var(--pl-hit)", "none")
+    mode_icon = declarations(APP, ".pl-transport .app-np-mode .pl-icon")
+    assert (mode_icon["width"], mode_icon["height"]) == ("var(--app-np-mode-icon)", "var(--app-np-mode-icon)")
+    assert px("--app-np-mode-icon") < px("--pl-hit")
+    #? the icon row's size (AirPlay, Up Next and ••• just below): player.css's .pl-icon, so the two can't drift apart
+    assert ALL_TOKENS["--app-np-mode-icon"] == declarations(PLAYER_CSS, ".pl-icon")["width"] == declarations(PLAYER_CSS, ".pl-icon")["height"]
+    assert ALL_TOKENS["--app-np-mode-reach"] == "calc((var(--pl-hit) - var(--app-np-mode-icon)) / 2)"
+    assert declarations(APP, ".pl-transport .app-np-mode")["color"] == "var(--pl-text-2)"
+    assert declarations(APP, ".pl-transport .app-np-mode.is-on")["color"] == "var(--dw-accent)"
+    assert declarations(APP, ".pl-transport .app-np-mode[aria-disabled='true']")["opacity"] == "var(--app-pin-off)"
+    #? dimmed during a whole library's shuffle, its tap doing nothing: no press fill either (player.css's
+    #? .pl-icon-button:active draws one, unguarded)
+    assert declarations(PLAYER_CSS, ".pl-icon-button:active")["background"] == "var(--pl-pressed)"
+    assert declarations(APP, ".pl-transport .app-np-mode[aria-disabled='true']:active") == {"background": "none"}
+    #? the middle three's press stays a circle at any width - at 320 they are narrower than tall, so a fill on the
+    #? button itself (player.css's, round by 50%) would be an oval: it is drawn on a square of the button's width
+    #? in the button's one grid cell instead, the glyph laid over it in the same cell
+    assert declarations(PLAYER_CSS, ".pl-transport-button")["display"] == "grid"
+    assert declarations(PLAYER_CSS, ".pl-transport-button:active")["background"] == "var(--pl-pressed)"
+    assert declarations(APP, ".pl-transport .pl-transport-button:active") == {"background": "none"}
+    fill = declarations(APP, ".pl-transport .pl-transport-button::before")
+    assert (fill["content"], fill["grid-area"], fill["width"], fill["aspect-ratio"], fill["border-radius"]) == (
+        "''", "1 / 1", "100%", "1", "var(--pl-radius-round)")
+    assert "height" not in fill
+    assert declarations(APP, ".pl-transport .pl-transport-button > *") == {"grid-area": "1 / 1"}
+    assert declarations(APP, ".pl-transport .pl-transport-button:active::before") == {"background": "var(--pl-pressed)"}
+    row = declarations(APP, ".pl-sheet-body .pl-transport")
+    assert row == {
+        "justify-content": "space-between",
+        "margin-right": "calc(-1 * var(--app-np-mode-reach))",
+        "margin-left": "calc(-1 * var(--app-np-mode-reach))",
+    }
+    #? the row's height is still the transport buttons': nothing here sets a height or a vertical margin
+    assert declarations(PLAYER_CSS, ".pl-transport-button")["height"] == "72px"
+    assert declarations(APP, ".pl-transport .pl-transport-button") == {"min-width": "var(--pl-hit)"}
+    #? the arithmetic, at the phone widths James's iPhone and the narrowest have
+    side = float(declarations(PLAYER_CSS, ".pl-sheet-body")["padding"].split()[1].removesuffix("px"))
+    hit, glyph = px("--pl-hit"), px("--app-np-mode-icon")
+    middle = float(declarations(PLAYER_CSS, ".pl-transport-button")["width"].removesuffix("px"))
+    def row_width(screen: float) -> float:
+        return screen - 2 * side + 2 * (hit - glyph) / 2
+    assert row_width(320) >= 2 * hit + 3 * hit, "five tap targets at 320"
+    assert row_width(320) < 2 * hit + 3 * middle, "at 320 the middle three do give up width - say so if that changes"
+    assert row_width(375) >= 2 * hit + 3 * middle and row_width(390) >= 2 * hit + 3 * middle
+    #? ...and Now Playing draws them so, outside the transport buttons' class (the turntable sim counts those)
+    ui = Path(__file__).resolve().parent.parent / "ui" / "src"
+    sheet = (ui / "player" / "NowPlaying.tsx").read_text()
+    assert "class={`pl-icon-button app-np-mode app-np-shuffle${player.shuffle ? ' is-on' : ''}`}" in sheet
+    assert "class={`pl-icon-button app-np-mode app-np-repeat${player.repeat === 'off' ? '' : ' is-on'}`}" in sheet
+

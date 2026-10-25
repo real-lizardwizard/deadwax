@@ -502,7 +502,9 @@ engine files changed, as that spec said they would: `ui/src/player/usePlayer.ts`
   means.
 - **The controls.** Now Playing gains ONE button, Up next (`app-upnext-button`, QueueIcon), between AirPlay's place and •••,
   tinted while Shuffle or Repeat is on and named for it ("Up next - Shuffle and Repeat all"); Shuffle and Repeat are in Up
-  Next, where the iPhone's Music app has them, so nothing else on the screen moves. Up Next (`app/UpNext.tsx`) is Info's
+  Next, where the iPhone's Music app has them, so nothing else on the screen moves. *(Changed in 2.0.14 at James's request:
+  Shuffle and Repeat are on Now Playing's transport too, and the tint is gone - "Shuffle and Repeat on Now Playing's main
+  screen (2.0.14)" below.)* Up Next (`app/UpNext.tsx`) is Info's
   shell: a sheet over Now Playing (App's `over` gains 'upnext') and on a desktop the side panel (`lib/appFrame.ts`'s `Side`
   gains 'upnext', `closesOnCrossing` returns `upNextPanel`, the one-panel rule both ways). It draws `upNextView`: the song
   playing, the chips, Playing Next with Clear, the shown round's rows (`UP_NEXT_DRAWN` 100, then "And N more songs."), what
@@ -1924,3 +1926,65 @@ Manage → …** (configuration.md, getting-started.md, downloading.md, troubles
 player.md's wrapped "You → Change password" **You → Account → Change password**; vocabulary.sim reads every guide, a
 wrapped path as one line, for each old way. Seven mutations (`work/uxb5-fixer2/mutate.py`), each caught and restored
 byte for byte (sha256).
+
+### Shuffle and Repeat on Now Playing's main screen (2.0.14)
+
+James, 2026-10-24: **"in the mobile I need the shuffle and loop buttons on the main player page"**. Choice 2 of .57 (Up
+Next, shuffle and repeat, above: Shuffle and Repeat only inside Up Next on a phone, "Now Playing's main screen gets nothing
+but the Up next icon") is changed at his request; the desktop's player bar already had them beside previous and next
+(choice 3), and keeps them as they were.
+
+- **Where.** On Now Playing's transport row (player/NowPlaying.tsx): Shuffle first, before Previous, and Repeat last, after
+  Next - the desktop bar's order and Music's on a Mac - on both looks (cover and turntable) and on a phone on its side,
+  since the row is the same element in all of them. Up Next keeps its own chips; it is one setting, so a change in either
+  place shows in the other (the real page: Repeat All set on Now Playing, Up Next's chip reads "Repeat all", pressed).
+- **The same controls**: `player.shuffle`/`player.setShuffle`, `player.repeat`/`player.setRepeat(nextRepeat(...))`, called
+  straight from the tap (app-rules.sim's `ALLOWED` gives NowPlaying.tsx setShuffle and setRepeat, as PlayerBar's). Shuffle
+  is aria-pressed, and during a whole library's shuffle (Part B) reads on, is aria-disabled and its tap does nothing,
+  named for why - "Shuffle - shuffling all music" / "...your whole library", now `shuffleLabel()` in lib/upNext.ts, which
+  the player bar calls too (its words unchanged; upnext.sim holds them). Repeat cycles off, all, one, aria-pressed while
+  on, Repeat One's glyph on One, named in Up Next's words (`repeatLabel`: "Repeat", "Repeat all", "Repeat one") - an
+  icon's name, read by VoiceOver with its pressed state. Both in the icon row's grey, the accent while on, dimmed
+  (`--app-pin-off`) while disabled, as Up Next's chips and the bar's buttons are. Neither wakes the turntable's sound
+  (they move no song), so the wakeDeckAudio list in app-rules.sim is unchanged.
+- **The Up Next button's tint goes**: with both modes lit a few pixels above it, a third purple mark for the same state
+  read as noise, and "so a song repeating isn't a mystery" no longer needs it. Its name still says what is on
+  (`upNextLabel`). The rule `.pl-sheet-footer .app-upnext-button.is-on` is removed; test_app_css holds it gone.
+- **The layout** (app.css's "Shuffle and Repeat on Now Playing's transport (2.0.14)", above the phone frame's section).
+  Shuffle and Repeat are `pl-icon-button`s (44px every way, `flex: none`), never `pl-transport-button`s (the turntable
+  sim counts those). The row is `space-between` and reaches past the body's 28px padding by `--app-np-mode-reach`
+  (`(--pl-hit - --app-np-mode-icon) / 2`, 10px), so the 24px glyphs sit exactly under the scrubber's two ends (measured:
+  0px off at every size). Nothing sets a height: the row stays the transport buttons' 72px, so the title, the scrubber,
+  the icon row, the cover, the turntable and the fader are where they were, to the tenth of a pixel, at all four sizes
+  below. **At 320 wide** the row is 284px and two 44px targets plus three 72px buttons are 304 - so there, and only
+  that narrow, the middle three give up width (flex's own shrink, floored at `min-width: var(--pl-hit)`): 65.3px wide,
+  still 72 tall, the five touching edge to edge with no overlap. From 375 they keep their 72px.
+- **The press stays round at any width** (after review). player.css draws the transport's press on the button itself,
+  round by 50% - so at 320, a 65x72 button pressed a 65x72 oval. app.css now clears that fill
+  (`.pl-transport .pl-transport-button:active { background: none }`) and draws it on a `::before` laid in the button's
+  one grid cell (`grid-area: 1 / 1`, the glyph laid in the same cell over it): `width: 100%; aspect-ratio: 1`, so a
+  circle of the button's width, centred by the button's `place-items: center` - 65.3px at 320, and the 72px circle
+  player.css always drew from 375 up. Measured (CSS.forcePseudoState :active, both looks, 320x568, 375x812, 844x390):
+  the fill 65.3x65.3 / 72x72, the button's own background transparent, the scale(0.92) as before, glyphs where they
+  were, and the row, scrubber, title and icon row at the same place to 0.1px as before the fix.
+- **The dimmed Shuffle doesn't flash a press** (after review): player.css's `.pl-icon-button:active` fill is unguarded,
+  so during a whole library's shuffle the tap that does nothing still looked taken. `.pl-transport
+  .app-np-mode[aria-disabled='true']:active { background: none }`, as the pin and a job's Cancel skip theirs (measured:
+  aria-disabled and :active, background transparent, opacity 0.45; enabled and :active, the 0.06 fill).
+- **Measured in the real page** (headless Chromium, mobile emulation, `http://deadwax.test`, this branch against 2.0.13
+  side by side): 320x568 - Shuffle 18-62, Previous/Pause/Next 65.3 wide, Repeat 258-302, gaps 0; 375x812 - all at
+  full size, gaps 8.8; 390x844 - gaps 12.5; 844x390 - gaps 45, the row 484 wide inside the 520px body. Every target
+  44px or more, no page scroll sideways, no console error; the states lit and named as above (Shuffle on, Repeat all,
+  one, off), the Up Next button grey throughout.
+- **Verified**: info.sim (the transport drawn on both looks - Shuffle, Previous, Pause, Next, Repeat - each state's name,
+  pressed, lit and glyph, each tap's call, a whole library's shuffle from either scope, on the turntable too; the Up Next
+  button no longer tinted), app-rules.sim (the allowlist; the five in one row in that order, nothing added under it; the
+  handlers straight from the tap), upnext.sim (`shuffleLabel`), turntable.sim (its stand-in player gains the fields),
+  test_app_css (the tokens, the reach, the floor, the arithmetic at 320, 375 and 390, the tint gone, the round press and
+  the dimmed Shuffle's no-press); 18 mutations, each caught and restored byte for byte, and 6 more after review. Python 3852 collected (3850 passed, 2 skipped; one new). The engine files have no
+  diff.
+- **NOT verified - the iPhone's**: the five under a thumb at 375/390 in the home-screen app, VoiceOver's reading of the
+  Repeat button's name changing as it is double-tapped (iOS reads a pressed state's change; whether it reads the new name
+  too is not known - Up Next's chips say it in a live region, these don't), and the round press at 320 on a real SE
+  (WebKit's `aspect-ratio` on a grid item; measured in Chromium only).
+

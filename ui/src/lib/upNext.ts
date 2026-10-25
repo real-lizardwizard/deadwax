@@ -566,9 +566,18 @@ export function queuedWords(how: 'next' | 'last', label: string): string {
   return how === 'next' ? `Playing next: ${label}` : `Added to Up Next: ${label}`
 }
 
-/** What the Repeat chip and the player bar's button say. */
+/** What the Repeat chip says - and (2.0.14) Now Playing's Repeat button on a phone, an icon whose name it is. */
 export function repeatLabel(repeat: Repeat): string {
   return repeat === 'all' ? 'Repeat all' : repeat === 'one' ? 'Repeat one' : 'Repeat'
+}
+
+/** The Shuffle buttons that are an icon alone - the desktop's player bar's and (2.0.14) Now Playing's on a phone -
+ *  named: "Shuffle", or during a whole library's shuffle (Part B; `scope`, the queue's `upNext.paged.scope`), whose
+ *  order IS the shuffle so it can't be turned off, named for why in Up Next's words - all music (Browse's Songs) or
+ *  your whole library (your albums). */
+export function shuffleLabel(scope: Paged['scope'] | undefined): string {
+  if (!scope) return 'Shuffle'
+  return `Shuffle - shuffling ${scope === 'store' ? 'all music' : 'your whole library'}`
 }
 
 /** The Repeat button's next setting: off -> all -> one -> off. */

@@ -1125,6 +1125,8 @@ console.log('\nNow Playing opens as the setting says; the button switches it whi
   const player = {
     ...fakePlayer(), buffering: false, error: null, airplay: false, gapless: false,
     previous() {}, next() {}, showAirPlay() {},
+    //? (2.0.14) what Now Playing's Shuffle and Repeat on the transport read: neither on, no whole library's shuffle
+    shuffle: false, repeat: 'off', queue: { tracks: [], index: 0 }, setShuffle() {}, setRepeat() {},
     track: { id: 'd2t3', title: 'Wish You Were Here (Live at Wembley)', artist: 'Pink Floyd', album: 'Wish You Were Here', albumId: 'wywh', coverArt: 'cover-wywh', duration: 308 },
   }
   //? the album the queue was played from, as the album page remembers it in the tap

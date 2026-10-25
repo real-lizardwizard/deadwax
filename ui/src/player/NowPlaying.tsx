@@ -3,13 +3,14 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
 import { useSheet } from '../app/useSheet'
 import { clock, dragEnd, dragFor, dragMove, dragStart, keyTarget, shownTime, timeAt, type Drag } from '../lib/scrub'
 import { lookButtonLabel, otherLook, playingDisc, type Look } from '../lib/turntable'
-import { upNextLabel } from '../lib/upNext'
+import { nextRepeat, repeatLabel, shuffleLabel, upNextLabel } from '../lib/upNext'
 import { discArtUrl, playedAlbum } from './api'
 import { Cover } from './Cover'
 import { wakeDeckAudio, type Deck } from './deck'
 import { SpeedChip } from './SpeedChip'
 import {
-  AirPlayIcon, ChevronDownIcon, MoreIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon, QueueIcon, RecordIcon, SquareIcon,
+  AirPlayIcon, ChevronDownIcon, MoreIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon, QueueIcon, RecordIcon, RepeatIcon,
+  RepeatOneIcon, ShuffleIcon, SquareIcon,
 } from './icons'
 import { Turntable, TurntableTime, type TurntablePreview } from './Turntable'
 import { usePosition, type Player } from './usePlayer'
@@ -133,9 +134,18 @@ export function Scrubber({ player }: { player: Player }) {
  * control: how the song was sent and how the last changes and seek went are in Info > Debug
  * (app/InfoSheet.tsx), and Gapless is a setting, in You > Playback (app/GaplessChoice.tsx). The
  * board's Lyrics icon isn't drawn until there is something for it to open; Up Next opens app/UpNext.tsx
- * (2.0.0-player.57) - the queue, with Shuffle and Repeat at its top, where the iPhone's Music app has them,
- * so nothing else on this screen changes - and is tinted while Shuffle or Repeat is on, so a song
- * repeating isn't a mystery.
+ * (2.0.0-player.57) - the queue, with Shuffle and Repeat at its top, where the iPhone's Music app has them.
+ *
+ * SHUFFLE AND REPEAT ON THE TRANSPORT (2.0.14) - James: "in the mobile I need the shuffle and loop buttons
+ * on the main player page". Shuffle before Previous and Repeat after Next, as the desktop's player bar has
+ * them: the same controls as Up Next's chips and the bar's buttons - Shuffle on and off (aria-pressed), and
+ * during a whole library's shuffle on and aria-disabled, its tap doing nothing (that order is the shuffle);
+ * Repeat cycling off, all, one (nextRepeat), its glyph Repeat One's while on One - both in the accent while
+ * on, named in Up Next's words (lib/upNext shuffleLabel, repeatLabel). Called straight from the tap, as the
+ * transport is (app-rules.sim allows this file setShuffle and setRepeat); neither wakes the turntable's sound,
+ * which a song's playing state alone moves. Tap targets in a row that was already 72px tall, so nothing's
+ * height changes. With them showing on this screen, the Up Next button is no longer tinted while either is
+ * on - one control lit for one state; its name still says what is on.
  *
  * THE BODY IS ANCHORED TO THE BOTTOM of the sheet, so a change in the height of anything in it
  * moves what is above it and nothing below. Everything from the title down is therefore a fixed
@@ -290,6 +300,13 @@ export function NowPlaying({
     if (turntable) wakeDeckAudio()
     player.next()
   }
+  //? (2.0.14) Shuffle and Repeat, as the player bar has them: a whole library's shuffle (Part B) can't be turned off
+  const pagedScope = player.queue.upNext?.paged?.scope
+  const paged = !!pagedScope
+  const onShuffle = () => {
+    if (!paged) player.setShuffle(!player.shuffle)
+  }
+  const onRepeat = () => player.setRepeat(nextRepeat(player.repeat))
   //? switching TO the turntable is a gesture too: its deck's sound can start as it appears
   const onLook = () => {
     if (look === 'cover') wakeDeckAudio()
@@ -373,7 +390,18 @@ export function NowPlaying({
 
         {turntable ? <TurntableTime player={player} previewing={previewing} /> : <Scrubber player={player} />}
 
+        {/* (2.0.14) Shuffle first and Repeat last: tap targets of their own, never pl-transport-buttons */}
         <div class="pl-transport">
+          <button
+            type="button"
+            class={`pl-icon-button app-np-mode app-np-shuffle${player.shuffle ? ' is-on' : ''}`}
+            onClick={onShuffle}
+            aria-label={shuffleLabel(pagedScope)}
+            aria-pressed={player.shuffle}
+            aria-disabled={paged}
+          >
+            <ShuffleIcon class="pl-icon" />
+          </button>
           <button type="button" class="pl-transport-button" onClick={onPrevious} aria-label="Previous">
             <PreviousIcon class="pl-transport-icon" />
           </button>
@@ -387,6 +415,15 @@ export function NowPlaying({
           </button>
           <button type="button" class="pl-transport-button" onClick={onNext} aria-label="Next">
             <NextIcon class="pl-transport-icon" />
+          </button>
+          <button
+            type="button"
+            class={`pl-icon-button app-np-mode app-np-repeat${player.repeat === 'off' ? '' : ' is-on'}`}
+            onClick={onRepeat}
+            aria-label={repeatLabel(player.repeat)}
+            aria-pressed={player.repeat !== 'off'}
+          >
+            {player.repeat === 'one' ? <RepeatOneIcon class="pl-icon" /> : <RepeatIcon class="pl-icon" />}
           </button>
         </div>
 
@@ -403,9 +440,10 @@ export function NowPlaying({
           )}
           <button
             type="button"
-            class={`pl-icon-button app-upnext-button${player.shuffle || player.repeat !== 'off' ? ' is-on' : ''}`}
+            class="pl-icon-button app-upnext-button"
             onClick={onUpNext}
-            //? what is on, named: "Up Next - Shuffle and Repeat all"
+            //? what is on, named: "Up Next - Shuffle and Repeat all" - no longer tinted for it (2.0.14): Shuffle and
+            //? Repeat are lit on the transport above
             aria-label={upNextLabel(player.shuffle, player.repeat)}
             aria-haspopup="dialog"
             aria-expanded={upNextOpen}

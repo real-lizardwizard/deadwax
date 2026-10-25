@@ -277,11 +277,13 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
   [Downloading](downloading.md#choosing-a-source) has every state of the sheet.
 - **Now playing**: a large cover (a grey square for an album without one), the song's title, and
   under it the artist and the album on one line ("Pink Floyd — Wish You Were Here"): tap that line
-  to go to the album. Then the scrubber; previous, play/pause and next; and a row of buttons: at its
+  to go to the album. Then the scrubber; **Shuffle**, previous, play/pause, next and **Repeat** - Shuffle
+  and Repeat purple while on, Repeat going off → all → one with each tap and showing a small 1 while on One,
+  as [Up Next's](#up-next-shuffle-and-repeat) do (it's the same setting), and the same five on the
+  turntable and on a phone on its side; and a row of buttons: at its
   left end, wherever the speed isn't 1x, [the speed's chip](#the-speed-fader) (`1.25x`; tap it for
   1x), then an **AirPlay** button when there's a speaker on the network to send to, **Up Next** (what
-  plays next, with Shuffle and Repeat - [below](#up-next-shuffle-and-repeat); purple while Shuffle or
-  Repeat is on) and **•••**.
+  plays next - [below](#up-next-shuffle-and-repeat)) and **•••**.
   The button at its top right, a round record, shows it as [a turntable](#the-turntable) instead.
   Drag it down by its top half, or tap the arrow at its top, to close it (Escape closes it too). While
   it's open nothing behind it can be reached by the keyboard or VoiceOver; opening it moves to its
@@ -357,8 +359,9 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
 
 **Up Next** on the now-playing screen (beside •••) opens **Up Next**, a sheet over it,
 the way Info opens: what plays after the song playing, with the two settings an iPhone's Music app keeps
-there - so nothing else on the now-playing screen changes. On a desktop it is the player bar's **Up Next**,
-and opens as a panel beside the page, as Info does ([on a desktop](#on-a-desktop)).
+there. Shuffle and Repeat are on the now-playing screen itself too, at the two ends of previous, play/pause
+and next - one setting each, so a change in either place shows in the other. On a desktop, Up Next is the
+player bar's **Up Next** button, and opens as a panel beside the page, as Info does ([on a desktop](#on-a-desktop)).
 
 - **At its top**, the song playing - and with Repeat One on, "Repeat one: this song plays again until you
   skip it." Under it two chips, **Shuffle** and **Repeat**, purple while on; a change is read out by
@@ -432,8 +435,9 @@ snapshot: a song deleted since is skipped when its turn comes, and one added sin
 shuffle. If deadwax restarts mid-shuffle - or a day passes without the shuffle being played, as when one is
 picked up again later - deadwax no longer has its order, and the shuffle starts over with a fresh one (it says
 so, once: "Your shuffle started over - deadwax no longer had its order"), so songs already heard can come again. Turning Repeat off (or to One) once the next order has started coming
-lets that order go, and the shuffle ends after the one playing. Up Next's Shuffle chip, and the desktop
-player bar's Shuffle, read on and can't be turned off for it - the order is the shuffle.
+lets that order go, and the shuffle ends after the one playing. Up Next's Shuffle chip, the now-playing
+screen's Shuffle and the desktop player bar's read on and can't be turned off for it - the order is the
+shuffle.
 
 ## Picking up where you left off
 

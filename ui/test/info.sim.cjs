@@ -99,7 +99,8 @@ exports.root = (component) => {
 fs.writeFileSync(path.join(OUT, 'player/Cover.js'), 'exports.Cover = function Cover() { return null }\n')
 fs.writeFileSync(path.join(OUT, 'player/icons.js'), `
 const glyph = (name) => { const f = function () { return null }; Object.defineProperty(f, 'name', { value: name }); return f }
-for (const name of ['ChevronRightIcon', 'ChevronDownIcon', 'AirPlayIcon', 'MoreIcon', 'NextIcon', 'PauseIcon', 'PlayIcon', 'PreviousIcon', 'CheckIcon', 'RecordIcon', 'SquareIcon']) exports[name] = glyph(name)
+for (const name of ['ChevronRightIcon', 'ChevronDownIcon', 'AirPlayIcon', 'MoreIcon', 'NextIcon', 'PauseIcon', 'PlayIcon', 'PreviousIcon', 'CheckIcon', 'RecordIcon', 'SquareIcon',
+  'ShuffleIcon', 'RepeatIcon', 'RepeatOneIcon']) exports[name] = glyph(name)
 `)
 fs.writeFileSync(path.join(OUT, 'player/usePlayer.js'), 'exports.usePosition = () => 0\n')
 
@@ -200,6 +201,18 @@ function text(node) {
 }
 const byClass = (name) => (node) => typeof node.props?.class === 'string' && node.props.class.split(' ').includes(name)
 const one = (view, test) => view.find(test)[0]
+/** What in one drawn node's own tree passes a test (2.0.14: the icon row's buttons, now the transport has icon buttons too). */
+const within = (root, test) => {
+  const hits = []
+  const visit = (node) => {
+    if (!node || typeof node !== 'object') return
+    if (Array.isArray(node)) { node.forEach(visit); return }
+    if (test(node)) hits.push(node)
+    visit(node.props?.children)
+  }
+  visit(root)
+  return hits
+}
 
 /* ===== the songs ===== */
 
@@ -465,8 +478,8 @@ const player = {
   track: queueTrack(), gapless: true, maxRate: '48000', gaps: [], lastSeek: null,
   wrapped: { id: 'd2t3', got: 'stream', resampled: null, hiRes: null },
   playing: true, buffering: false, duration: 308, error: null, airplay: false,
-  //? (2.0.0-player.57) Up Next's: neither on
-  shuffle: false, repeat: 'off',
+  //? (2.0.0-player.57) Up Next's: neither on - and (2.0.14) the queue Now Playing's Shuffle reads a whole library's shuffle from
+  shuffle: false, repeat: 'off', queue: { tracks: [], index: 0 },
   toggle() {}, previous() {}, showAirPlay() {}, seek() {}, position: () => 0, onPosition: () => () => {},
 }
 
@@ -910,10 +923,11 @@ console.log('\nNow Playing is a sheet too, and deaf under the others')
   draw(false)
   check('...and focus goes back to the mini player', [document.activeElement === opener, locks()], [true, []])
   check('the album line goes to the album', one(view, (node) => node.type === 'button' && byClass('pl-sheet-artist')(node)).props['aria-label'], 'Go to the album: Pink Floyd — Wish You Were Here')
-  check('the icon row: Up Next and •••, with no speaker to send to (2.0.0-player.57: Up Next always there)', view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['Up Next', 'More: info, add to a playlist, go to album, pin'])
+  const iconRow = () => within(one(view, byClass('pl-sheet-footer')), (node) => node.type === 'button' && byClass('pl-icon-button')(node))
+  check('the icon row: Up Next and •••, with no speaker to send to (2.0.0-player.57: Up Next always there)', iconRow().map((button) => button.props['aria-label']), ['Up Next', 'More: info, add to a playlist, go to album, pin'])
   view.render({ player, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum() {}, openAs: 'cover', pinnable: false })
   check('...an album the menu has no pin for (no release id, or deadwax can\'t keep pins): ••• doesn\'t promise one',
-    view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['Up Next', 'More: info, add to a playlist, go to album'])
+    iconRow().map((button) => button.props['aria-label']), ['Up Next', 'More: info, add to a playlist, go to album'])
   let albums = 0
   view.render({ player, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum: () => { albums += 1 }, openAs: 'cover' })
   one(view, (node) => node.type === 'button' && byClass('pl-sheet-artist')(node)).props.onClick()
@@ -925,17 +939,63 @@ console.log('\nNow Playing is a sheet too, and deaf under the others')
     [view.find((node) => node.type === 'button' && byClass('pl-sheet-artist')(node)).length, one(view, (node) => node.type === 'p' && byClass('pl-sheet-artist')(node)) && text(one(view, byClass('pl-sheet-byline')))],
     [0, 'Pink Floyd — Wish You Were Here'])
   check('...••• says the menu holds only Info, and AirPlay sits before it with a speaker there',
-    view.find((node) => node.type === 'button' && byClass('pl-icon-button')(node)).map((button) => button.props['aria-label']), ['AirPlay', 'Up Next', 'More: info, add to a playlist'])
+    iconRow().map((button) => button.props['aria-label']), ['AirPlay', 'Up Next', 'More: info, add to a playlist'])
   //? (2.0.0-player.57) Up next: named and tinted by what is on, opening Up Next from its tap, expanded while it is over
   let upNexts = 0
   view.render({ player: { ...player, shuffle: true, repeat: 'all' }, open: true, covered: true, opener: openerRef, onClose() {}, onMore() {}, onAlbum() {}, openAs: 'cover', onUpNext: () => { upNexts += 1 }, upNextOpen: true })
   const upNext = one(view, (node) => node.type === 'button' && byClass('app-upnext-button')(node))
   upNext.props.onClick()
-  check('Up Next with Shuffle and Repeat All on: named so, tinted, expanded while Up Next is over it - and ••• not, its tap App\'s',
-    [upNext.props['aria-label'], byClass('is-on')(upNext), upNext.props['aria-expanded'], upNext.props['aria-haspopup'], one(view, (node) => node.type === 'button' && byClass('pl-icon-button')(node) && !byClass('app-upnext-button')(node)).props['aria-expanded'], upNexts],
-    ['Up Next - Shuffle and Repeat all', true, true, 'dialog', false, 1])
+  //? (2.0.14) no longer tinted for it: Shuffle and Repeat are lit on the transport, one control for one state
+  const footerButtons = () => within(one(view, byClass('pl-sheet-footer')), (node) => node.type === 'button' && byClass('pl-icon-button')(node))
+  check('Up Next with Shuffle and Repeat All on: named so, not tinted (2.0.14), expanded while Up Next is over it - and ••• not, its tap App\'s',
+    [upNext.props['aria-label'], byClass('is-on')(upNext), upNext.props['aria-expanded'], upNext.props['aria-haspopup'], footerButtons().find((node) => !byClass('app-upnext-button')(node)).props['aria-expanded'], upNexts],
+    ['Up Next - Shuffle and Repeat all', false, true, 'dialog', false, 1])
   view.render({ player, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum() {}, openAs: 'cover', onUpNext() {} })
   check('...neither on: plain, and not tinted', [one(view, byClass('app-upnext-button')).props['aria-label'], byClass('is-on')(one(view, byClass('app-upnext-button')))], ['Up Next', false])
+
+  //? (2.0.14) Shuffle and Repeat on the transport - James: "in the mobile I need the shuffle and loop buttons on the main
+  //? player page" - the player bar's and Up Next's controls, wired to the player's own actions, on either look
+  //? the glyph drawn, by the stand-in's name (2.0.14's three are among the stand-ins above)
+  const glyphOf = (button) => button.props.children.type?.name ?? null
+  const asked = []
+  const modes = (over = {}) => ({ ...player, ...over, setShuffle: (on) => asked.push(['setShuffle', on]), setRepeat: (mode) => asked.push(['setRepeat', mode]) })
+  const drawModes = (over, openAs = 'cover') => view.render({ player: modes(over), open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum() {}, openAs, onUpNext() {} })
+  const transport = () => within(one(view, byClass('pl-transport')), (node) => node.type === 'button')
+  const shuffle = () => one(view, byClass('app-np-shuffle'))
+  const repeat = () => one(view, byClass('app-np-repeat'))
+  const stateOf = (button) => [button.props['aria-label'], button.props['aria-pressed'], byClass('is-on')(button), button.props['aria-disabled'] ?? null]
+  for (const look of ['cover', 'turntable']) {
+    drawModes({}, look)
+    check(`the transport on the ${look}: Shuffle, Previous, Pause, Next, Repeat - the two ends tap targets, not transport buttons`,
+      [transport().map((button) => button.props['aria-label']), [shuffle(), repeat()].map((button) => [byClass('pl-icon-button')(button), byClass('pl-transport-button')(button)])],
+      [['Shuffle', 'Previous', 'Pause', 'Next', 'Repeat'], [[true, false], [true, false]]])
+  }
+  drawModes({})
+  check('both off: Shuffle not pressed, Repeat not pressed with its plain glyph, neither lit', [stateOf(shuffle()), stateOf(repeat()), glyphOf(shuffle()), glyphOf(repeat())],
+    [['Shuffle', false, false, false], ['Repeat', false, false, null], 'ShuffleIcon', 'RepeatIcon'])
+  shuffle().props.onClick()
+  repeat().props.onClick()
+  check('...a tap on each: setShuffle(true), and Repeat the next of off, all, one - setRepeat(\'all\')', asked.splice(0), [['setShuffle', true], ['setRepeat', 'all']])
+  drawModes({ shuffle: true, repeat: 'all' })
+  check('Shuffle on and Repeat All: both pressed and lit in the accent, Repeat named "Repeat all", its plain glyph',
+    [stateOf(shuffle()), stateOf(repeat()), glyphOf(repeat())], [['Shuffle', true, true, false], ['Repeat all', true, true, null], 'RepeatIcon'])
+  shuffle().props.onClick()
+  repeat().props.onClick()
+  check('...a tap on each: setShuffle(false), setRepeat(\'one\')', asked.splice(0), [['setShuffle', false], ['setRepeat', 'one']])
+  drawModes({ repeat: 'one' })
+  repeat().props.onClick()
+  check('Repeat One: "Repeat one", pressed and lit, Repeat One\'s glyph - and its tap back to off',
+    [stateOf(repeat()), glyphOf(repeat()), asked.splice(0)], [['Repeat one', true, true, null], 'RepeatOneIcon', [['setRepeat', 'off']]])
+  //? a whole library's shuffle (Part B): its order IS the shuffle - on, aria-disabled, named for why in Up Next's words
+  const pagedQueue = (scope) => ({ tracks: [], index: 0, upNext: { paged: { token: 't', total: 9, fetched: 3, scope } } })
+  drawModes({ shuffle: true, queue: pagedQueue('store') })
+  shuffle().props.onClick()
+  check('a whole library\'s shuffle, from Browse\'s Songs: on, aria-disabled, named for it, its tap doing nothing',
+    [stateOf(shuffle()), asked.splice(0)], [['Shuffle - shuffling all music', true, true, true], []])
+  drawModes({ shuffle: true, queue: pagedQueue('yours') })
+  check('...from your albums: named for your library', shuffle().props['aria-label'], 'Shuffle - shuffling your whole library')
+  drawModes({ shuffle: true, queue: pagedQueue('yours') }, 'turntable')
+  check('...and the same on the turntable', stateOf(shuffle()), ['Shuffle - shuffling your whole library', true, true, true])
   view.render({ player: { ...player, error: 'Skipped "Shine On" - it wouldn\'t play' }, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum() {}, openAs: 'cover' })
   const titles = one(view, byClass('pl-sheet-titles')).props.children.filter(Boolean)
   check('a failure is drawn above the title, never under it', titles.map((node) => node.props.class.split(' ')[0]), ['pl-sheet-error', 'pl-sheet-title', 'pl-sheet-artist'])

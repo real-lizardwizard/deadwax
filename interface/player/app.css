@@ -4839,7 +4839,7 @@ html.app-viewer-open { overflow: hidden; }
    Up Next is Info's shell - .app-layer, .app-info, its head, its scroller, its card, and on a desktop Info's panel
    by app-desktop.css's .app-layer.is-panel .app-info rules - its rows Search's results and, in Edit, Home's Pinned
    rows; the song menu is ActionMenu's sheet. What is new here: the two sheets' locks, the Edit at the head's left,
-   the row of Shuffle and Repeat, a group's gutter, Now Playing's Up Next tinted while Shuffle or Repeat is on, and
+   the row of Shuffle and Repeat, a group's gutter (Now Playing's Up Next was tinted here until 2.0.14), and
    the ••• at the end of a song's row - a full tap target, its glyph's right edge on an album page where the row's
    time ended - and the album bar's ••• beside the pin, their reaches kept apart. */
 :root {
@@ -4890,8 +4890,8 @@ html.app-queue-menu-open { overflow: hidden; }
 .app-upnext-group,
 .app-upnext .app-store-line { margin-top: var(--app-shelf-gap); }
 
-/* Now Playing's Up Next while Shuffle or Repeat is on, so a song repeating isn't a mystery */
-.pl-sheet-footer .app-upnext-button.is-on { color: var(--dw-accent); }
+/* (Now Playing's Up Next was tinted here while Shuffle or Repeat was on, until 2.0.14 put the two on its
+   transport - "Shuffle and Repeat on Now Playing's transport (2.0.14)" below) */
 
 /* the ••• at the end of a song's row: a tap target, the glyph drawn small inside it */
 .app-row-more {
@@ -5572,6 +5572,51 @@ html.app-picker-open { overflow: hidden; }
     outline-offset: var(--app-ring);
     border-radius: var(--dw-radius-control);
 }
+
+/* ===== Shuffle and Repeat on Now Playing's transport (2.0.14) =====
+   James: "in the mobile I need the shuffle and loop buttons on the main player page". Shuffle first and Repeat
+   last on the transport row (player/NowPlaying.tsx), Up Next's and the player bar's controls: a tap target each,
+   their glyphs the icon row's size in its grey, in the accent while on, dimmed while they can't be used (a whole
+   library's shuffle), as Up Next's chips are. Each target reaches past the body's edge by as much as it is wider
+   than its glyph, so the glyphs sit under the two ends of the scrubber; the row keeps its 72px height, so nothing
+   above or below it moves. At 320 wide the row is 284px, and two 44px targets and three 72px buttons are 304: there
+   (and only that narrow) the middle three give up width - never height, and never below a tap target. */
+
+:root {
+    --app-np-mode-icon: 24px;      /* Shuffle's and Repeat's glyphs, the icon row's size */
+    --app-np-mode-reach: calc((var(--pl-hit) - var(--app-np-mode-icon)) / 2);
+}
+
+.pl-sheet-body .pl-transport {
+    justify-content: space-between;
+    margin-right: calc(-1 * var(--app-np-mode-reach));
+    margin-left: calc(-1 * var(--app-np-mode-reach));
+}
+
+.pl-transport .pl-transport-button { min-width: var(--pl-hit); }
+
+/* ...and their press stays a circle at any width (player.css: "the press shows a circle, not a card's corners"):
+   the fill is drawn on a square of the button's width laid in the button's one grid cell under the glyph, not on
+   the button, so the 65px-wide middle three at 320 press a 65px circle, not a 65x72 oval - and at 72 wide, the
+   72px circle player.css has always drawn */
+.pl-transport .pl-transport-button:active { background: none; }
+.pl-transport .pl-transport-button::before {
+    content: '';
+    grid-area: 1 / 1;
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: var(--pl-radius-round);
+    transition: background-color var(--duration-fast) var(--ease-out);
+}
+.pl-transport .pl-transport-button > * { grid-area: 1 / 1; }
+.pl-transport .pl-transport-button:active::before { background: var(--pl-pressed); }
+
+.pl-transport .app-np-mode { color: var(--pl-text-2); }
+.pl-transport .app-np-mode .pl-icon { width: var(--app-np-mode-icon); height: var(--app-np-mode-icon); }
+.pl-transport .app-np-mode.is-on { color: var(--dw-accent); }
+.pl-transport .app-np-mode[aria-disabled='true'] { opacity: var(--app-pin-off); }
+/* dimmed, its tap does nothing - so it doesn't flash a press either, as the pin's and a job's Cancel don't */
+.pl-transport .app-np-mode[aria-disabled='true']:active { background: none; }
 
 /* ===== looking after deadwax from a phone (2.0.0-player.47) =====
    The phone gets every managing page the desktop has: the Edit panel as a sheet over the whole screen

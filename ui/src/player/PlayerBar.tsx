@@ -1,6 +1,6 @@
 import { Cover } from './Cover'
 import { SpeedChip } from './SpeedChip'
-import { nextRepeat } from '../lib/upNext'
+import { nextRepeat, shuffleLabel } from '../lib/upNext'
 import { AirPlayIcon, InfoIcon, NextIcon, PauseIcon, PlayIcon, PlaylistAddIcon, PreviousIcon, QueueIcon, RepeatIcon, RepeatOneIcon, ShuffleIcon, VisualizerIcon } from './icons'
 import { Scrubber } from './NowPlaying'
 import type { Player } from './usePlayer'
@@ -72,8 +72,8 @@ export function PlayerBar({
   }
 
   //? a whole library's shuffle (Part B): its order IS the shuffle - Shuffle reads on and can't be turned off, as
-  //? Up Next's chip has it: aria-disabled (focus stays), named for why in Up Next's own words (upNextView: your
-  //? library, or everything - Browse's Songs), the click doing nothing
+  //? Up Next's chip has it: aria-disabled (focus stays), named for why in Up Next's own words (lib/upNext shuffleLabel,
+  //? Now Playing's too since 2.0.14: your library, or all music - Browse's Songs), the click doing nothing
   const pagedScope = player.queue.upNext?.paged?.scope
   const paged = !!pagedScope
   //? "Artist — Album", as Now Playing has it; either alone when the other isn't known
@@ -105,7 +105,7 @@ export function PlayerBar({
             onClick={() => {
               if (!paged) player.setShuffle(!player.shuffle)
             }}
-            aria-label={paged ? `Shuffle - shuffling ${pagedScope === 'store' ? 'all music' : 'your whole library'}` : 'Shuffle'}
+            aria-label={shuffleLabel(pagedScope)}
             aria-pressed={player.shuffle}
             aria-disabled={paged}
           >

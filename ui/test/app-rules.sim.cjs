@@ -309,7 +309,8 @@ const APP_SIDE = (file) => file.startsWith('app/') || file.startsWith('player/')
 const ALLOWED = {
   'player/AlbumPage.tsx': ['playTracks'],
   'player/MiniPlayer.tsx': ['toggle', 'next'],
-  'player/NowPlaying.tsx': ['toggle', 'next', 'previous', 'showAirPlay'],
+  //? (2.0.14: and Shuffle and Repeat, on its transport as the player bar has them)
+  'player/NowPlaying.tsx': ['toggle', 'next', 'previous', 'showAirPlay', 'setRepeat', 'setShuffle'],
   //? the Gapless checkbox in You > Playback, since 2.0.0-player.10: its click calls setGapless
   'app/GaplessChoice.tsx': ['setGapless'],
   //? the turntable's record, since 2.0.0-player.11: its click plays or pauses (a tap)
@@ -424,7 +425,7 @@ console.log('\nthe playback actions only from the files allowed')
     'app/useShuffleFeed.ts': ['extendQueue'],
     'player/AlbumPage.tsx': ['playTracks'],
     'player/MiniPlayer.tsx': ['next', 'toggle'],
-    'player/NowPlaying.tsx': ['next', 'previous', 'showAirPlay', 'toggle'],
+    'player/NowPlaying.tsx': ['next', 'previous', 'setRepeat', 'setShuffle', 'showAirPlay', 'toggle'],
     'player/PlayerBar.tsx': ['next', 'previous', 'setRepeat', 'setShuffle', 'showAirPlay', 'toggle'],
     'player/SpeedChip.tsx': ['setSpeed'],
     'player/SpeedFader.tsx': ['setSpeed'],
@@ -717,6 +718,17 @@ console.log('\nnothing below the title in Now Playing can change height')
     [/\{player\.airplay && \(\s*<button[^>]*onClick=\{player\.showAirPlay\}/.test(footer), /onClick=\{onMore\}/.test(footer), /onClick=\{onUpNext\}/.test(footer), /Lyrics/.test(footer),
       footer.indexOf('onClick={player.showAirPlay}') < footer.indexOf('onClick={onUpNext}') && footer.indexOf('onClick={onUpNext}') < footer.indexOf('onClick={onMore}')],
     [true, true, true, false, true])
+  //? (2.0.14) Shuffle and Repeat on the transport row - its first and last - so they add no row and no height
+  const transport = body.slice(at('class="pl-transport"'), at('class="pl-sheet-footer"'))
+  const buttons = [...transport.matchAll(/onClick=\{(\w+)\}/g)].map((match) => match[1])
+  check('the transport: Shuffle, Previous, play or pause, Next, Repeat - in that one row, nothing added under it',
+    [buttons, (body.match(/class="pl-transport"/g) ?? []).length], [['onShuffle', 'onPrevious', 'onToggle', 'onNext', 'onRepeat'], 1])
+  check('...Shuffle and Repeat straight from the tap, nothing awaited: Shuffle flips it (not during a whole library\'s), Repeat steps it',
+    [/const onShuffle = \(\) => \{\s*if \(!paged\) player\.setShuffle\(!player\.shuffle\)\s*\}/.test(sheet),
+      /const onRepeat = \(\) => player\.setRepeat\(nextRepeat\(player\.repeat\)\)\n/.test(sheet),
+      /const paged = !!pagedScope\n/.test(sheet) && /const pagedScope = player\.queue\.upNext\?\.paged\?\.scope\n/.test(sheet),
+      /\bawait\b|\.then\(/.test(sheet)],
+    [true, true, true, false])
   const css = fs.readFileSync(path.resolve(SRC, '../../interface/player/player.css'), 'utf8')
   check('...a fixed height, so AirPlay coming and going moves nothing', /\.pl-sheet-footer \{[^}]*(?<![-\w])height: var\(--pl-hit\);/.test(css), true)
   const appCss = fs.readFileSync(path.resolve(SRC, '../../interface/player/app.css'), 'utf8')
