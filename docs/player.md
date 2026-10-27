@@ -104,7 +104,8 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
   on Requests - only while something is on its way: otherwise Home has no Arriving at all. If
   deadwax stops answering meanwhile, Arriving says what it shows is deadwax's last answer, and the
   app keeps asking until it answers. Then **Pinned**, the albums and artists you pinned, two to a
-  row, with **Edit** to reorder and unpin them; **Recently added**, the 20 albums added most recently, in a row you swipe along (with logins on, the
+  row, with **Edit** to reorder and unpin them; **Recently played**, the 20 albums you played most recently (with logins on, your
+  own plays); **Recently added**, the 20 albums added most recently, in a row you swipe along (with logins on, the
   ones you added to your library most recently - the same albums the Library's Recently added starts with;
   with logins off, the newest in the collection, which is your library then); and **Not played in a while**, the albums you last played longest ago (more
   than 30 days), when there are at least four. Tap an album to open it, an artist for their page.
@@ -660,8 +661,8 @@ on a desktop, from inside it.
 
 ## Home and pins
 
-**Home** is the player's: what's on its way, what you keep coming back to, what's new, and what you
-haven't heard for a while. In order:
+**Home** is the player's: what's on its way, what you keep coming back to, what you just played, what's
+new, and what you haven't heard for a while. In order:
 
 - **Arriving**, only while a download is on its way ([above](#what-it-does)).
 - **Pinned** - the albums and artists you pinned, two to a row (one to a row on a phone narrower
@@ -673,6 +674,20 @@ haven't heard for a while. In order:
   by an admin after a look), or starred in Amperfy - once Navidrome has them. An album you add yourself
   with **Add to my library** isn't marked new: you were looking at it. Opening one, from here or
   anywhere in the app, takes it off. With nothing new, or logins off, there's no such section.
+- **Recently played** - the 20 albums you played most recently, the latest first, from Navidrome's own
+  list of albums played. The plays are the ones Navidrome counts for the account the player asks as: your
+  own with logins on ([the player as you](#the-player-as-you-with-logins-on)), `NAVIDROME_USER`'s with
+  logins off (and for the break-glass `deadwax`). What you played is what you played, so an album from
+  **All music** that isn't in your library is here too once you've played it - as in Apple Music. Home asks
+  again each time you come back to it, so an album you just played moves to the front; the albums already
+  showing stay until the new list arrives. With nothing played yet - a new account - there's no such
+  section. If Home is already on screen when Navidrome's answer comes, the shelf keeps its place rather than
+  moving Recently added under your finger: until the answer, a row the height of the albums with a spinner in
+  it; then the albums in it, or one line - "You haven't played anything yet.", or why Navidrome couldn't be
+  asked - which goes the next time you leave Home. Likewise a first play, found while Home is on screen,
+  appears the next time you come back. On a computer the albums are a grid six across, so more than six take
+  more rows: while Home is on screen it fills only the rows already showing, and the rest are there the next
+  time you come back to Home.
 - **Recently added**, the 20 albums added most recently. With logins on that is **yours**, by when each
   album came into **your library** - the same albums, in the same order, as the Library's own Recently added
   (it was the whole collection's newest until 2.0.5, so it could lead with albums that weren't yours; until
@@ -690,10 +705,10 @@ haven't heard for a while. In order:
   account the player asks as - `NAVIDROME_USER` with logins off, your own with them on
   ([the player as you](#the-player-as-you-with-logins-on)).
 
-Home waits a moment for your pins before it draws the shelves under them (a second and a half at
-most while Home is on screen - counted again if you leave it before then and come back, until your
-pins have once arrived or the wait has once run out), so Pinned arriving never pushes them down under
-your finger.
+Home waits a moment for your pins - and, with logins on, what's new in your library, and Recently played -
+before it draws the shelves under them (a second and a half at most while Home is on screen - counted again if
+you leave it before then and come back, until your pins have once arrived or the wait has once run out), so
+none of them arriving pushes the rest down under your finger.
 
 **Pinning.** Three places pin something to Home: the pin at the top right of **an album** you have,
 **Pin** at the top right of **an artist's page** (it says **Pinned** once they are), and **Pin album to
@@ -2343,8 +2358,9 @@ lists at all (**Not in Navidrome**). With logins off nothing here changes: one a
   each album it's on, the same way - and **a pressing in your library** (or **a pressing in the collection**) of
   an album held as a pressing nothing yet says has the song or hasn't.
 - **Home**: Recently added is your albums, the ones you added most recently first (2.0.5 - it was the whole collection's, so a listener's
-  Home led with albums that weren't theirs; 2.0.11 - it went by when the collection got them), Not played in a while is asked as you (so "not played" is what
-  *you* haven't played); **New in your library** is as before.
+  Home led with albums that weren't theirs; 2.0.11 - it went by when the collection got them), Recently played
+  (2.0.15) and Not played in a while are asked as you (so "played" is what *you* played - All music's albums
+  included - and "not played" what *you* haven't); **New in your library** is as before.
 - **A Navidrome that gives users libraries of their own** (its multi-library setting): deadwax only ever
   hands you a song Navidrome would give you. Its cache holds one copy of a song for every phone, so
   before answering from it deadwax asks Navidrome, as you, whether you may have that song - once every
@@ -2526,7 +2542,8 @@ question the whole player existed to answer. Still to find out:
   whether it sends a song's play count and writers and an album's label (Info → About), and an
   artist's picture as the page's hero;
 - **Pins and Home**: whether your Navidrome sends `played` on its "recently
-  played" list (Home's **Not played in a while** shows only if it does), dragging a row in **Edit**
+  played" list (Home's **Not played in a while** shows only if it does), whether Home's **Recently played**
+  follows your own plays on your Navidrome with logins on, and how soon a play moves an album to its front, dragging a row in **Edit**
   by its grip under a real finger without the page scrolling, the pin on an album page, an artist
   page and in the ••• menu, and a pinned album still opening after you re-file it in the Edit panel;
 - **Get** against your slskd and real Soulseek folders: the sources sheet

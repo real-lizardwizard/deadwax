@@ -30,6 +30,18 @@
  *    Home showed - the wait counts only while it shows, afresh each time it comes into view until it
  *    has once run out) - Recently added asking all the while, out of sight - so Pinned landing never
  *    moves the shelves under a finger.
+ *  - (2.0.15) Recently played: getAlbumList2 `recent` at RECENT_COUNT (never Not played's 500, which stays an ask of
+ *    its own), an album once, in Navidrome's order; under New in your library and over Recently added (Pinned, New in
+ *    your library, Recently played, Recently added, Not played in a while); its tiles opening their album, never
+ *    playing it; waited for as the pins are. Its rules (lib/home.ts playedLanded) never move Recently added once Home
+ *    is drawn: a slow answer holds the shelf's height (heading, and one tile's shape unseen) until it lands; an empty
+ *    answer or a failure known before Home was drawn is no shelf at all, and after it one line in that same height
+ *    (errorNote's words for a failure) until Home is next out of view; a shelf that wasn't there finding albums on
+ *    screen appears only once Home is out of view; and (review) on the desktop, whose grid wraps six across, an answer
+ *    on screen keeps the rows drawn - more albums than they hold wait for Home to be out of view, fewer leave the drawn
+ *    tiles (lib/home.ts playedRows; the phone's one sideways row is always one). Asked again each time Home comes into view, the tiles kept
+ *    meanwhile (no spinner, no held row) and a failed ask again leaving them; an unchanged answer the very state it
+ *    found (so the memo holds); a download moving on Home (Arriving) asks nothing.
  *
  * A script for the same reason as the other sims: there is no JS test runner here.
  *
@@ -103,6 +115,15 @@ const W = globalThis.__home = {
 }
 function answer(name, value, which = () => true) {
   const at = W.open.findIndex((one) => one.name === name && which(...one.args))
+  if (at < 0) throw new Error(`nothing asked of ${name}`)
+  const [one] = W.open.splice(at, 1)
+  if (value instanceof Error) one.reject(value)
+  else one.resolve(value)
+}
+//? the newest ask that matches - Recently played is asked again as Home comes into view, the older ask called off
+function answerLast(name, value, which = () => true) {
+  let at = -1
+  W.open.forEach((one, i) => { if (one.name === name && which(...one.args)) at = i })
   if (at < 0) throw new Error(`nothing asked of ${name}`)
   const [one] = W.open.splice(at, 1)
   if (value instanceof Error) one.reject(value)
@@ -184,6 +205,13 @@ function words(node) {
 }
 const byClass = (name) => (node) => typeof node.props?.class === 'string' && node.props.class.split(' ').includes(name)
 const headings = (tree) => find((node) => node.type === 'h2', tree).map(words)
+//? one shelf's section, by its heading's id
+const shelfOf = (tree, id) => find((node) => node.props?.['aria-labelledby'] === id, tree)[0]
+const PLAYED_ID = 'app-played-title', ADDED_ID = 'app-recent-title', NOT_PLAYED_ID = 'app-not-played-title'
+const tilesIn = (tree, id) => find(byClass('app-tile-title'), shelfOf(tree, id)).map(words)
+//? the asks of `recent`: Recently played's at RECENT_COUNT, Not played's at 500
+const PLAYED_ASK = (order, size) => order === 'recent' && size === 20
+const NOT_PLAYED_ASK = (order, size) => order === 'recent' && size === 500
 
 /* ===== the rule ===== */
 
@@ -217,6 +245,79 @@ console.log('\nNot played in a while: which albums')
     [Date.parse('2026-08-23T12:00:00Z'), null, null])
 }
 
+console.log('\nRecently played: which albums, and what the shelf draws (2.0.15)')
+{
+  const tile = (id, more = {}) => ({ id, name: id, artist: 'x', ...more })
+  check('recent\'s order, an album once, up to the count',
+    [R.recentlyPlayed([tile('b'), tile('a'), tile('b'), tile('c')], 20).map((a) => a.id), R.recentlyPlayed(Array.from({ length: 30 }, (_, i) => tile(`p${i}`)), 20).length],
+    [['b', 'a', 'c'], 20])
+  const two = [tile('a'), tile('b')]
+  const ASKING = R.PLAYED_ASKING, NONE = { shelf: { kind: 'none' }, later: null }
+  const kinds = (state) => [state.shelf.kind, state.later?.kind ?? null]
+  check('before Home is drawn: albums are tiles, nothing played and a failure are no shelf at all',
+    [kinds(R.playedLanded(ASKING, { albums: two }, false, 20)), kinds(R.playedLanded(ASKING, { albums: [] }, false, 20)), kinds(R.playedLanded(ASKING, { error: new Error('x') }, false, 20))],
+    [['tiles', null], ['none', null], ['none', null]])
+  check('the held row on screen: albums are tiles in its place; nothing played one line in it, a failure its words - each gone once Home is out of view',
+    [kinds(R.playedLanded(ASKING, { albums: two }, true, 20)), kinds(R.playedLanded(ASKING, { albums: [] }, true, 20)), kinds(R.playedLanded(ASKING, { error: new Error('x') }, true, 20))],
+    [['tiles', null], ['nothing', 'none'], ['failed', 'none']])
+  check('no shelf on screen finding albums: still none until Home is out of view, then the tiles',
+    [kinds(R.playedLanded(NONE, { albums: two }, true, 20)), kinds(R.playedOutOfView(R.playedLanded(NONE, { albums: two }, true, 20))),
+      kinds(R.playedLanded(NONE, { albums: two }, false, 20))],
+    [['none', 'tiles'], ['tiles', null], ['tiles', null]])
+  const drawn = R.playedLanded(ASKING, { albums: two }, true, 20)
+  check('an unchanged answer is the very state it found - the memo holds, the tiles aren\'t redrawn',
+    [R.playedLanded(drawn, { albums: [tile('a'), tile('b')] }, true, 20) === drawn, R.playedLanded(drawn, { albums: [tile('a'), tile('b')] }, false, 20) === drawn], [true, true])
+  check('...a new order, a new cover or a new name is a new answer', [
+    R.playedLanded(drawn, { albums: [tile('b'), tile('a')] }, true, 20).shelf.albums.map((a) => a.id),
+    R.playedLanded(drawn, { albums: [tile('a', { coverArt: 'c' }), tile('b')] }, true, 20) === drawn,
+    R.playedLanded(drawn, { albums: [tile('a', { name: 'A' }), tile('b')] }, true, 20) === drawn], [['b', 'a'], false, false])
+  check('a failed ask again leaves the tiles; tiles finding nothing played on screen keep their height',
+    [R.playedLanded(drawn, { error: new Error('x') }, true, 20) === drawn, kinds(R.playedLanded(drawn, { albums: [] }, true, 20)), kinds(R.playedLanded(drawn, { albums: [] }, false, 20))],
+    [true, ['nothing', 'none'], ['none', null]])
+  check('out of view with nothing waiting: the very state', R.playedOutOfView(drawn) === drawn, true)
+  //? (review) a failure heard by a shelf not asking - none, or the held row's one line - changes nothing: a failed ask
+  //? again after an empty first answer never puts a heading over Recently added
+  const NOTHING = R.playedLanded(ASKING, { albums: [] }, true, 20)
+  check('a failure heard by no shelf, or by the held row saying nothing was played: the very state, on screen or not',
+    [R.playedLanded(NONE, { error: new Error('x') }, true, 20) === NONE, R.playedLanded(NONE, { error: new Error('x') }, false, 20) === NONE,
+      R.playedLanded(NOTHING, { error: new Error('x') }, true, 20) === NOTHING], [true, true, true])
+  check('...a new artist line, or more albums after the same ones, is a new answer too', [
+    R.playedLanded(drawn, { albums: [tile('a', { artist: 'y' }), tile('b')] }, true, 20).shelf.albums[0].artist,
+    R.playedLanded(drawn, { albums: [tile('a'), tile('b'), tile('c')] }, true, 20).shelf.albums.map((a) => a.id),
+    R.samePlayed([tile('a'), tile('b')], [tile('a')])], ['y', ['a', 'b', 'c'], false])
+
+  //? (review) the desktop's shelf is a grid six across that wraps: on screen what lands keeps the ROWS drawn
+  const many = (n) => Array.from({ length: n }, (_, i) => tile(`d${i}`))
+  const ids = (state) => state.shelf.kind === 'tiles' ? state.shelf.albums.length : state.shelf.kind
+  const later = (state) => state.later?.kind === 'tiles' ? state.later.albums.length : state.later?.kind ?? null
+  check('how many rows: the held row one, no shelf none, tiles by the row - and the phone\'s sideways row always one',
+    [R.playedRows({ kind: 'asking' }, 6), R.playedRows({ kind: 'none' }, 6), R.playedRows({ kind: 'tiles', albums: many(6) }, 6),
+      R.playedRows({ kind: 'tiles', albums: many(7) }, 6), R.playedRows({ kind: 'tiles', albums: many(20) }, 6), R.playedRows({ kind: 'tiles', albums: many(20) }, Infinity)],
+    [1, 0, 1, 2, 4, 1])
+  const late = R.playedLanded(ASKING, { albums: many(20) }, true, 20, 6)
+  check('a slow answer of twenty landing on the desktop\'s held row: six now (one row, the held row\'s), all twenty once Home is out of view',
+    [ids(late), later(late), ids(R.playedOutOfView(late))], [6, 20, 20])
+  check('...the phone\'s row (and before Home is drawn, any frame): all twenty at once',
+    [ids(R.playedLanded(ASKING, { albums: many(20) }, true, 20)), later(R.playedLanded(ASKING, { albums: many(20) }, true, 20)),
+      ids(R.playedLanded(ASKING, { albums: many(20) }, false, 20, 6))], [20, null, 20])
+  const six = R.playedLanded(ASKING, { albums: many(6) }, false, 20, 6)
+  const seven = R.playedLanded(six, { albums: [tile('new'), ...many(6)] }, true, 20, 6)
+  check('six played (one row), a seventh landing on screen: the first row\'s six now - the new one first - all seven out of view',
+    [ids(seven), seven.shelf.albums[0].id, later(seven), ids(R.playedOutOfView(seven))], [6, 'new', 7, 7])
+  const four = R.playedLanded(ASKING, { albums: many(4) }, false, 20, 6)
+  check('...four going to five on screen stays one row: drawn at once', [ids(R.playedLanded(four, { albums: many(5) }, true, 20, 6)), later(R.playedLanded(four, { albums: many(5) }, true, 20, 6))], [5, null])
+  const twenty = R.playedLanded(ASKING, { albums: many(20) }, false, 20, 6)
+  const fewer = R.playedLanded(twenty, { albums: many(7) }, true, 20, 6)
+  check('fewer rows on screen (four going to two): the drawn tiles stay, the new ones out of view',
+    [fewer.shelf === twenty.shelf, later(fewer), ids(R.playedOutOfView(fewer))], [true, 7, 7])
+  const emptied = R.playedLanded(twenty, { albums: [] }, true, 20, 6)
+  check('...four rows finding nothing played on screen: the tiles stay, no shelf out of view; one row says it in the row',
+    [emptied.shelf === twenty.shelf, later(emptied), kinds(R.playedLanded(six, { albums: [] }, true, 20, 6))], [true, 'none', ['nothing', 'none']])
+  const again = R.playedLanded(late, { albums: many(20) }, true, 20, 6)
+  check('the first row drawn and the same twenty again on screen: the very tiles kept (the memo holds), twenty still waiting',
+    [again.shelf === late.shelf, later(again)], [true, 20])
+}
+
 /* ===== Home ===== */
 
 const OK = { configured: true, ok: true, server: 'Navidrome 0.64.2', problem: null }
@@ -231,28 +332,32 @@ async function run() {
     check('not showing: the pins aren\'t asked', W.pinAsks.every((ask) => ask === false), true)
     const outside = (tree) => find(byClass('pl-spinner'), tree).length - find(byClass('pl-spinner'), find(byClass('app-home-shelves'), tree)[0]).length
     check('...and the shelves wait out of sight, a spinner in their place', [find(byClass('app-home-shelves'), tree)[0]?.props.hidden, outside(tree)], [true, 1])
-    check('Recently added asks newest at 20, and Not played recent at 500, out of sight all the while',
-      W.asks.map((one) => one.slice(0, 3)), [['albums', 'newest', RECENT_COUNT], ['albums', 'recent', 500]])
+    check('Recently played asks recent at 20, Recently added newest at 20, and Not played recent at 500, out of sight all the while',
+      W.asks.map((one) => one.slice(0, 3)), [['albums', 'recent', RECENT_COUNT], ['albums', 'newest', RECENT_COUNT], ['albums', 'recent', 500]])
     check('...and the wait has not started while Home doesn\'t show', timers.length, 0)
     tree = home.draw(props({ shown: true }))
     check('coming into view: the pins asked afresh', W.pinAsks.slice(-1), ['fresh'])
     check('...and the wait starts', [timers.length, PINNED_WAIT_MS], [1, 1500])
     W.pins = { pins: [], canSave: true, problem: null }
     tree = home.draw(props())
-    check('the pins answered: the shelves drawn, no spinner in their place', [find(byClass('app-home-shelves'), tree)[0]?.props.hidden, outside(tree)], [false, 0])
-    check('...Pinned at the top, then Recently added', headings(tree), ['Pinned', 'Recently added'])
+    check('the pins answered, Recently played not yet: the shelves still wait (2.0.15)', [find(byClass('app-home-shelves'), tree)[0]?.props.hidden, outside(tree)], [true, 1])
+    answerLast('albums', [{ id: 'nd-third', name: 'Third', artist: 'Portishead' }], PLAYED_ASK)
+    await settle()
+    tree = home.draw(props())
+    check('...and it answered: the shelves drawn, no spinner in their place', [find(byClass('app-home-shelves'), tree)[0]?.props.hidden, outside(tree)], [false, 0])
+    check('...Pinned at the top, then Recently played, then Recently added', headings(tree), ['Pinned', 'Recently played', 'Recently added'])
     answer('albums', [{ id: 'nd-dummy', name: 'Dummy', artist: 'Portishead' }], (order) => order === 'newest')
     await settle()
     tree = home.draw(props())
-    check('Recently added drawn', find(byClass('app-tile'), tree).length, 1)
+    check('Recently added drawn', tilesIn(tree, ADDED_ID), ['Dummy'])
     const stub = [played('donda', 3), played('slow-rush', 41), played('dummy', 64), played('third', 95), played('wywh', 210)]
-    answer('albums', stub, (order) => order === 'recent')
+    answer('albums', stub, NOT_PLAYED_ASK)
     await settle()
     tree = home.draw(props())
-    check('Not played in a while LAST, with the rule\'s four in its order', [headings(tree), find(byClass('app-tile-title'), tree).slice(1).map(words)],
-      [['Pinned', 'Recently added', 'Not played in a while'], ['wywh', 'third', 'dummy', 'slow-rush']])
-    find(byClass('app-tile'), tree)[2].props.onClick()
-    find(byClass('app-tile'), tree)[2].props.onPointerDown()
+    check('Not played in a while LAST, with the rule\'s four in its order', [headings(tree), tilesIn(tree, NOT_PLAYED_ID)],
+      [['Pinned', 'Recently played', 'Recently added', 'Not played in a while'], ['wywh', 'third', 'dummy', 'slow-rush']])
+    find(byClass('app-tile'), shelfOf(tree, NOT_PLAYED_ID))[1].props.onClick()
+    find(byClass('app-tile'), shelfOf(tree, NOT_PLAYED_ID))[1].props.onPointerDown()
     check('a tile opens its album, asking for its songs as the finger lands - it plays nothing', [W.opened.map((a) => a.id), W.prefetched], [['third'], ['third']])
     W.pinAsks.length = 0
     tree = home.draw(props({ shown: false }))
@@ -271,7 +376,7 @@ async function run() {
     W.pins = { pins: [], canSave: true, problem: null }
     const home = mount(Home)
     home.draw(props())
-    answer('albums', list, (order) => order === 'recent')
+    answer('albums', list, NOT_PLAYED_ASK)
     await settle()
     const tree = home.draw(props())
     check(`${label}: no section, no heading`, headings(tree).includes('Not played in a while'), false)
@@ -285,7 +390,8 @@ async function run() {
     check('the pins not in yet: the shelves wait', find(byClass('app-home-shelves'), tree)[0]?.props.hidden, true)
     waitOver()
     tree = home.draw(props())
-    check('PINNED_WAIT_MS on: drawn without them - no Pinned until they come', [find(byClass('app-home-shelves'), tree)[0]?.props.hidden, headings(tree)], [false, ['Recently added']])
+    check('PINNED_WAIT_MS on: drawn without them - no Pinned until they come (Recently played, unanswered too, holding its place)',
+      [find(byClass('app-home-shelves'), tree)[0]?.props.hidden, headings(tree)], [false, ['Recently played', 'Recently added']])
     reset(); timers.length = 0
     const away = mount(Home)
     away.draw(props())
@@ -295,7 +401,11 @@ async function run() {
       [timers.map((timer) => timer.live), find(byClass('app-home-shelves'), tree)[0]?.props.hidden], [[false, true], true])
     reset()
     W.pins = { pins: null, canSave: true, problem: "Couldn't get your pins: refused" }
-    tree = mount(Home).draw(props())
+    const failedPins = mount(Home)
+    failedPins.draw(props())
+    answerLast('albums', [], PLAYED_ASK)
+    await settle()
+    tree = failedPins.draw(props())
     check('the pins failed: drawn at once, Pinned saying why', [find(byClass('app-home-shelves'), tree)[0]?.props.hidden, words(find(byClass('app-pinned-note'), tree))],
       [false, "Couldn't get your pins: refused"])
   }
@@ -305,6 +415,9 @@ async function run() {
     reset(); W.opened = []
     W.pins = { pins: [], canSave: true, problem: null }
     const home = mount(Home)
+    home.draw(props({ newAlbums: null }))
+    answerLast('albums', [], PLAYED_ASK)
+    await settle()
     let tree = home.draw(props({ newAlbums: null }))
     check('what is new not said yet: the shelves wait for it, as for the pins', find(byClass('app-home-shelves'), tree)[0]?.props.hidden, true)
     const fresh = [{ id: 'nd-third', name: 'Third', artist: 'Portishead', coverArt: 'nd-third' }]
@@ -319,11 +432,20 @@ async function run() {
     W.pins = { pins: [], canSave: true, problem: null }
     const slow = mount(Home)
     slow.draw(props({ newAlbums: null }))
+    answerLast('albums', [], PLAYED_ASK)
+    await settle()
     waitOver()
     tree = slow.draw(props({ newAlbums: null }))
     check('...and never said: drawn without it once the wait is over', [find(byClass('app-home-shelves'), tree)[0]?.props.hidden, headings(tree)], [false, ['Pinned', 'Recently added']])
-    tree = mount(Home).draw(props())
-    check('a Home handed nothing (logins off): no shelf, and nothing waited for', headings(tree).includes('New in your library'), false)
+    reset()
+    W.pins = { pins: [], canSave: true, problem: null }
+    const handedNothing = mount(Home)
+    handedNothing.draw(props())
+    answerLast('albums', [], PLAYED_ASK)
+    await settle()
+    tree = handedNothing.draw(props())
+    check('a Home handed nothing (logins off): no shelf, and nothing waited for',
+      [headings(tree).includes('New in your library'), find(byClass('app-home-shelves'), tree)[0]?.props.hidden], [false, false])
   }
 
   console.log('\nHome: Recently added is YOURS with a library of your own (2.0.5, UX batch 2)')
@@ -332,8 +454,10 @@ async function run() {
     W.pins = { pins: [], canSave: true, problem: null }
     const home = mount(Home)
     let tree = home.draw(props({ personal: true }))
-    check('it asks the Library\'s own list of your albums - never the collection\'s newest - beside Not played',
-      W.asks.map((one) => one.slice(0, 3)), [['index', 'yours'], ['albums', 'recent', 500]])
+    check('it asks the Library\'s own list of your albums - never the collection\'s newest - beside Recently played and Not played',
+      W.asks.map((one) => one.slice(0, 3)), [['albums', 'recent', RECENT_COUNT], ['index', 'yours'], ['albums', 'recent', 500]])
+    answerLast('albums', [], PLAYED_ASK)
+    await settle()
     const mine = (id, created, starred) => ({ id, name: id, artist: 'x', ...(created ? { created } : {}), ...(starred ? { starred } : {}) })
     const many = Array.from({ length: RECENT_COUNT + 5 }, (_, i) => mine(`m${String(i).padStart(2, '0')}`, `2026-0${1 + (i % 9)}-1${i % 10}T00:00:00Z`,
       `2026-0${1 + (i % 9)}-1${i % 10}T12:00:00Z`))
@@ -363,11 +487,172 @@ async function run() {
     const off = mount(Home)
     off.draw(props({ personal: false }))
     answer('albums', [], (order) => order === 'newest')
+    answerLast('albums', [], PLAYED_ASK)
     await settle()
     tree = off.draw(props({ personal: false }))
     check('logins off: the collection IS your library - newest at 20, as ever, and its empty words',
-      [W.asks.map((one) => one.slice(0, 3))[0], words(find((node) => node.props?.['aria-labelledby'] === 'app-recent-title', tree)[0]).endsWith('No albums yet.')],
+      [W.asks.map((one) => one.slice(0, 3)).find((one) => one[1] === 'newest'), words(find((node) => node.props?.['aria-labelledby'] === 'app-recent-title', tree)[0]).endsWith('No albums yet.')],
       [['albums', 'newest', RECENT_COUNT], true])
+  }
+
+  console.log('\nHome: Recently played (2.0.15)')
+  {
+    reset(); W.opened = []
+    W.pins = { pins: [], canSave: true, problem: null }
+    const home = mount(Home)
+    home.draw(props({ newAlbums: null }))
+    check('it asks recent at RECENT_COUNT, through the page - Not played\'s 500 an ask of its own',
+      W.asks.filter((one) => one[1] === 'recent').map((one) => one.slice(0, 3)), [['albums', 'recent', RECENT_COUNT], ['albums', 'recent', 500]])
+    const list = [{ id: 'nd-dummy', name: 'Dummy', artist: 'Portishead' }, { id: 'nd-third', name: 'Third', artist: 'Portishead' }, { id: 'nd-dummy', name: 'Dummy', artist: 'Portishead' }]
+    answerLast('albums', list, PLAYED_ASK)
+    await settle()
+    let tree = home.draw(props({ newAlbums: null }))
+    check('...its answer in, what is new not yet: still waiting', find(byClass('app-home-shelves'), tree)[0]?.props.hidden, true)
+    tree = home.draw(props({ newAlbums: [{ id: 'nd-new', name: 'New', artist: 'x' }] }))
+    answer('albums', [{ id: 'nd-added', name: 'Added', artist: 'x' }], (order) => order === 'newest')
+    answer('albums', [played('a', 40), played('b', 50), played('c', 60), played('d', 70)], NOT_PLAYED_ASK)
+    await settle()
+    tree = home.draw(props({ newAlbums: [{ id: 'nd-new', name: 'New', artist: 'x' }] }))
+    check('the order: Pinned, New in your library, Recently played, Recently added, Not played in a while', headings(tree),
+      ['Pinned', 'New in your library', 'Recently played', 'Recently added', 'Not played in a while'])
+    check('...Navidrome\'s order, an album once', tilesIn(tree, PLAYED_ID), ['Dummy', 'Third'])
+    const tiles = find(byClass('app-tile'), shelfOf(tree, PLAYED_ID))
+    tiles[1].props.onPointerDown()
+    tiles[1].props.onClick()
+    check('a tile opens its album, its songs asked for as the finger lands - a button that plays nothing',
+      [W.opened.map((a) => a.id), W.prefetched, tiles[1].type, Object.keys(tiles[1].props).filter((key) => key.startsWith('on')).sort()],
+      [['nd-third'], ['nd-third'], 'button', ['onClick', 'onPointerCancel', 'onPointerDown']])
+
+    const asksBefore = W.asks.length
+    tree = home.draw(props({ newAlbums: [{ id: 'nd-new', name: 'New', artist: 'x' }], arriving: [{ id: 1 }] }))
+    check('a download moving on Home (Arriving) asks nothing again', W.asks.length, asksBefore)
+    home.draw(props({ shown: false, newAlbums: [{ id: 'nd-new', name: 'New', artist: 'x' }] }))
+    check('out of view: nothing asked', W.asks.length, asksBefore)
+    tree = home.draw(props({ shown: true, newAlbums: [{ id: 'nd-new', name: 'New', artist: 'x' }] }))
+    check('coming into view: asked again - the tiles kept meanwhile, no spinner, no held row',
+      [W.asks.slice(asksBefore).map((one) => one.slice(0, 3)), tilesIn(tree, PLAYED_ID), find(byClass('pl-spinner'), shelfOf(tree, PLAYED_ID)).length, find(byClass('app-shelf-held'), tree).length],
+      [[['albums', 'recent', RECENT_COUNT]], ['Dummy', 'Third'], 0, 0])
+    answerLast('albums', [{ id: 'nd-third', name: 'Third', artist: 'Portishead' }, { id: 'nd-dummy', name: 'Dummy', artist: 'Portishead' }], PLAYED_ASK)
+    await settle()
+    tree = home.draw(props({ newAlbums: [{ id: 'nd-new', name: 'New', artist: 'x' }] }))
+    check('...a play moved the list: the new order lands in place', tilesIn(tree, PLAYED_ID), ['Third', 'Dummy'])
+    home.draw(props({ shown: false, newAlbums: [{ id: 'nd-new', name: 'New', artist: 'x' }] }))
+    home.draw(props({ shown: true, newAlbums: [{ id: 'nd-new', name: 'New', artist: 'x' }] }))
+    answerLast('albums', new Error("Navidrome isn't answering"), PLAYED_ASK)
+    await settle()
+    tree = home.draw(props({ newAlbums: [{ id: 'nd-new', name: 'New', artist: 'x' }] }))
+    check('...a failed ask again leaves the tiles as they were', [tilesIn(tree, PLAYED_ID), headings(tree)[2]], [['Third', 'Dummy'], 'Recently played'])
+  }
+
+  //? what Home's shelves draw, as the sections' order (Recently added's place is the count of sections over it) and
+  //? the held row's shape: one tile's, the cover and both lines, unseen
+  const place = (tree) => headings(tree).indexOf('Recently added')
+  const heldShape = (tree) => {
+    const held = find(byClass('app-shelf-held'), shelfOf(tree, PLAYED_ID))[0]
+    if (!held) return null
+    const ghost = find(byClass('app-shelf-ghost'), held)[0]
+    return [ghost?.type, ghost?.props['aria-hidden'], find(byClass('app-shelf-item'), ghost).length, find(byClass('app-tile-cover'), ghost).length,
+      find(byClass('app-tile-title'), ghost).map(words), find(byClass('app-tile-artist'), ghost).map(words)]
+  }
+  const SHAPE = ['ul', 'true', 1, 1, ['\u00a0'], ['\u00a0']]
+
+  console.log('\nHome: Recently played never moves Recently added once Home is drawn')
+  {
+    //? slow: the wait ran out before it answered
+    reset(); timers.length = 0
+    W.pins = { pins: [], canSave: true, problem: null }
+    const slow = mount(Home)
+    slow.draw(props())
+    waitOver()
+    let tree = slow.draw(props())
+    const before = place(tree)
+    check('slow: Home drawn without its answer - its heading over a row held at a tile\'s shape, a spinner in it',
+      [find(byClass('app-home-shelves'), tree)[0]?.props.hidden, headings(tree), heldShape(tree), find(byClass('pl-spinner'), shelfOf(tree, PLAYED_ID)).length, shelfOf(tree, PLAYED_ID)?.props['aria-busy']],
+      [false, ['Pinned', 'Recently played', 'Recently added'], SHAPE, 1, true])
+    answerLast('albums', [{ id: 'nd-dummy', name: 'Dummy', artist: 'Portishead' }], PLAYED_ASK)
+    await settle()
+    tree = slow.draw(props())
+    check('...its answer lands in the held row\'s place: Recently added where it was', [place(tree), before, tilesIn(tree, PLAYED_ID), shelfOf(tree, PLAYED_ID)?.props['aria-busy']], [2, 2, ['Dummy'], false])
+
+    //? empty after it was drawn
+    reset(); timers.length = 0
+    W.pins = { pins: [], canSave: true, problem: null }
+    const empty = mount(Home)
+    empty.draw(props())
+    waitOver()
+    empty.draw(props())
+    answerLast('albums', [], PLAYED_ASK)
+    await settle()
+    tree = empty.draw(props())
+    check('nothing played, said after Home was drawn: one line in the held row - Recently added where it was',
+      [place(tree), heldShape(tree), words(find(byClass('app-shelf-held-say'), tree)[0])], [2, SHAPE, R.NOTHING_PLAYED])
+    empty.draw(props({ shown: false }))
+    tree = empty.draw(props({ shown: false }))
+    check('...gone once Home is out of view', headings(tree).includes('Recently played'), false)
+    tree = empty.draw(props({ shown: true }))
+    check('...and coming back, drawn without it from the start, asked again', [headings(tree).includes('Recently played'), W.asks.filter((one) => PLAYED_ASK(one[1], one[2])).length], [false, 2])
+    answerLast('albums', [{ id: 'nd-first', name: 'First', artist: 'x' }], PLAYED_ASK)
+    await settle()
+    tree = empty.draw(props())
+    check('...the first play found on screen: no shelf appears over Recently added under a finger', [headings(tree).includes('Recently played'), place(tree)], [false, 1])
+    empty.draw(props({ shown: false }))
+    tree = empty.draw(props({ shown: false }))
+    check('...it appears once Home is out of view', [headings(tree), tilesIn(tree, PLAYED_ID)], [['Pinned', 'Recently played', 'Recently added'], ['First']])
+
+    //? an ask that lands while Home is out of view is drawn at once - nothing is under a finger there
+    reset(); timers.length = 0
+    W.pins = { pins: [], canSave: true, problem: null }
+    const away = mount(Home)
+    away.draw(props())
+    answerLast('albums', [], PLAYED_ASK)
+    await settle()
+    away.draw(props())
+    away.draw(props({ shown: false }))
+    away.draw(props({ shown: true }))
+    away.draw(props({ shown: false }))
+    answerLast('albums', [{ id: 'nd-played', name: 'Played', artist: 'x' }], PLAYED_ASK)
+    await settle()
+    tree = away.draw(props({ shown: true }))
+    check('an answer landing while Home is out of view: drawn as it comes back, nothing waiting for another visit',
+      [headings(tree), tilesIn(tree, PLAYED_ID)], [['Pinned', 'Recently played', 'Recently added'], ['Played']])
+
+    //? a failure after it was drawn
+    reset(); timers.length = 0
+    W.pins = { pins: [], canSave: true, problem: null }
+    const failing = mount(Home)
+    failing.draw(props())
+    waitOver()
+    failing.draw(props())
+    //? a listener reading: someone who doesn't run deadwax (access.ts seesDetail) - the error's own words are never theirs
+    const Access = require(path.join(OUT, 'app/access.js'))
+    Access.noteAccess({ auth: 'on', user: 'ethan', admin: false, permissions: ['request'] })
+    const raw = new Error("Navidrome isn't answering: ConnectError http://127.0.0.1:4533")
+    answerLast('albums', raw, PLAYED_ASK)
+    await settle()
+    tree = failing.draw(props())
+    const note = find(byClass('pl-notice'), find(byClass('app-shelf-held-say'), tree)[0])
+    const E = require(path.join(OUT, 'lib/errorWords.js'))
+    check('a failure after Home was drawn: errorNote\'s words in the held row - never the raw error - Recently added where it was',
+      [place(tree), heldShape(tree), note.length, words(note[0]), /ConnectError|http|127\.0/.test(words(note[0]))],
+      [2, SHAPE, 1, E.said(E.errorWords(raw, { service: 'music', admin: false })), false])
+    Access.forgetAccess()
+    failing.draw(props({ shown: false }))
+    tree = failing.draw(props({ shown: false }))
+    check('...gone once Home is out of view', headings(tree).includes('Recently played'), false)
+
+    //? known before Home was drawn
+    for (const [label, value] of [['nothing played', []], ['a failure', new Error('refused')]]) {
+      reset(); timers.length = 0
+      const early = mount(Home)
+      early.draw(props())
+      answerLast('albums', value, PLAYED_ASK)
+      await settle()
+      early.draw(props())
+      W.pins = { pins: [], canSave: true, problem: null }
+      tree = early.draw(props())
+      check(`${label}, known before Home was drawn: no shelf at all, heading included`, [find(byClass('app-home-shelves'), tree)[0]?.props.hidden, headings(tree)],
+        [false, ['Pinned', 'Recently added']])
+    }
   }
 
   console.log('\nHome: all of it inside the Navidrome gate')

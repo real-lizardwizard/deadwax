@@ -1445,7 +1445,8 @@ console.log('\npins: deadwax\'s own, asked when asked, and nothing about them pl
     [true, true, true, true])
   check('...the shelves drawn once the pins have answered, or failed, or the wait - counted only while Home shows - is over',
     //? (2.0.0-player.51) and, as the pins are, what is new in your library - so its shelf never moves those under it
-    [/const ready = \(pins !== null \|\| problem !== null \|\| waited\) && \(newAlbums !== null \|\| waited\)/.test(home), /<div class="app-home-shelves" hidden=\{!ready\}>/.test(home), /if \(!shown \|\| waited\) return/.test(home)], [true, true, true])
+    //? (2.0.15) and Recently played's answer - it sits over Recently added
+    [/const ready =\s*\(pins !== null \|\| problem !== null \|\| waited\) && \(newAlbums !== null \|\| waited\) && \(playedShelf\.kind !== 'asking' \|\| waited\)/.test(home), /<div class="app-home-shelves" hidden=\{!ready\}>/.test(home), /if \(!shown \|\| waited\) return/.test(home)], [true, true, true])
   check('...New in your library (2.0.0-player.51) under Pinned and over Recently added, drawn only with something new; App asks for it as Home - or the Library tab, whose tiles carry the marks - comes into view, and an album opened is new no longer',
     [home.indexOf('<Pinned ') < home.indexOf('<NewInYourLibrary ') && home.indexOf('<NewInYourLibrary ') < home.indexOf('{recent}'),
       /\{!!newAlbums\?\.length && <NewInYourLibrary albums=\{newAlbums\} onOpen=\{onOpen\} \/>\}/.test(home),
@@ -1461,8 +1462,35 @@ console.log('\npins: deadwax\'s own, asked when asked, and nothing about them pl
     /const newAlbums = useMemo\(\(\) => \(!hasLibrary\(\) \? NOTHING_NEW : myLibrary \? newShelf\(myLibrary\) : null\), \[myLibrary\]\)/.test(app), true)
   check('...and Library care draws Held by nobody only with logins on (2.0.0-player.61: and Look after the library)',
     /\{sessionMe\(\)\?\.auth === 'on' && parts\.held && <HeldByNobody live=\{live\} \/>\}/.test(code(read('app/LibraryCare.tsx'))), true)
-  check('...Pinned first, then Recently added, then Not played in a while, all inside the gate',
-    /<NeedsNavidrome\b[^>]*>\s*<Shelves\b/.test(home) && home.indexOf('<Pinned ') < home.indexOf('{recent}') && home.indexOf('{recent}') < home.indexOf('{notPlayed}'), true)
+  check('...Pinned first, then New in your library, (2.0.15) Recently played, Recently added, then Not played in a while, all inside the gate',
+    /<NeedsNavidrome\b[^>]*>\s*<Shelves\b/.test(home) && home.indexOf('<Pinned ') < home.indexOf('<NewInYourLibrary ') && home.indexOf('<NewInYourLibrary ') < home.indexOf('{played}')
+      && home.indexOf('{played}') < home.indexOf('{recent}') && home.indexOf('{recent}') < home.indexOf('{notPlayed}'), true)
+  //? (2.0.15) Recently played: recent at RECENT_COUNT through latestOnly, asked as Home is drawn and again each time it
+  //? comes into view, what lands put through lib/home.ts's rules with whether the shelves are on screen; its element
+  //? memoised on what it draws, so a download moving (App re-rendering Home) or the pins changing redraws no tile
+  const playedHook = home.slice(home.indexOf('function useRecentlyPlayed('), home.indexOf('function RecentlyPlayed('))
+  check('(2.0.15) Recently played: recent at RECENT_COUNT, only the newest answer drawn, asked again as Home comes into view, never by a timer',
+    [/const requests = useMemo\(latestOnly, \[\]\)/.test(playedHook), /albumPage\('recent', 0, request\.signal, RECENT_COUNT\)/.test(playedHook),
+      /if \(request\.current\(\)\) setState\(\(now\) => playedLanded\(now, \{ albums: page \}, onScreen\.current, RECENT_COUNT, tilesPerRow\(drawn\.current\)\)\)/.test(playedHook),
+      /if \(request\.current\(\) && !isAbort\(reason\)\) setState\(\(now\) => playedLanded\(now, \{ error: reason \}, onScreen\.current, RECENT_COUNT, tilesPerRow\(drawn\.current\)\)\)/.test(playedHook),
+      /if \(asked\.current && !shown\) \{[\s\S]{0,160}setState\(playedOutOfView\)\s*return\s*\}/.test(playedHook), /\}, \[shown\]\)/.test(playedHook),
+      /setInterval|setTimeout/.test(playedHook)],
+    [true, true, true, true, true, true, false])
+  check('...its element memoised on what it draws; whether the shelves show set as `ready` is known',
+    [/const played = useMemo\(\(\) => <RecentlyPlayed shelf=\{playedShelf\} onOpen=\{onOpen\} drawn=\{playedDrawn\} \/>, \[playedShelf, onOpen\]\)/.test(home),
+      /onScreen\.current = ready && shown/.test(home),
+      //? Home's own memo, which App re-renders as downloads move, never keyed on what is arriving
+      /\[status, onRetry, onOpen, onOpenArtist, shown, newAlbums, personal\],/.test(home)],
+    [true, true, true])
+  //? (review) the desktop's shelf is a grid that wraps, so what lands is told how many tiles a row holds - read from
+  //? the drawn shelf's own grid, the phone's sideways row (no grid) Infinity - and lib/home.ts keeps the rows drawn
+  const perRow = home.slice(home.indexOf('function tilesPerRow('), home.indexOf('function RecentlyPlayed('))
+  check('...told how many tiles a row of the drawn shelf holds: the grid\'s columns, read from the section the shelf draws; no grid, Infinity',
+    [/const list = section\?\.querySelector\('\.app-shelf'\)/.test(perRow), /if \(style\.display !== 'grid'\) return Infinity/.test(perRow),
+      /const columns = style\.gridTemplateColumns\.split\(' '\)\.filter\(Boolean\)\.length\s*return columns >= 1 \? columns : Infinity/.test(perRow),
+      /<section ref=\{drawn\} class="app-section app-shelf-section" aria-labelledby="app-played-title"/.test(home),
+      /const playedShelf = useRecentlyPlayed\(shown, onScreen, playedDrawn\)/.test(home)],
+    [true, true, true, true, true])
   const notPlayed = home.slice(home.indexOf('function NotPlayedInAWhile('), home.indexOf('function Shelves('))
   check('Not played in a while: recent at 500, only the newest answer drawn',
     [/const requests = useMemo\(latestOnly, \[\]\)/.test(notPlayed), /albumPage\('recent', 0, request\.signal, RECENT_LISTED\)/.test(notPlayed), /if \(request\.current\(\)\) setAlbums\(notPlayedInAWhile\(/.test(notPlayed)],

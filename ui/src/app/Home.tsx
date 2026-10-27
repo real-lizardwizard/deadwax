@@ -1,6 +1,9 @@
-import { useEffect, useMemo, useState } from 'preact/hooks'
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
-import { RECENT_LISTED, notPlayedInAWhile } from '../lib/home'
+import {
+  NOTHING_PLAYED, PLAYED_ASKING, RECENT_LISTED, notPlayedInAWhile, playedLanded, playedOutOfView,
+  type PlayedShelf, type PlayedState,
+} from '../lib/home'
 import { isAbort, latestOnly } from '../lib/latest'
 import { sortAlbums } from '../lib/shelves'
 import { EMPTY_LIBRARY, EMPTY_LIBRARY_HOW, NO_ALBUMS } from '../lib/yourLibrary'
@@ -163,6 +166,104 @@ function NotPlayedInAWhile({ onOpen }: { onOpen: (album: Album) => void }) {
 }
 
 /**
+ * "Recently played" (2.0.15): the albums you played, the most recently played first - getAlbumList2 `recent` at
+ * RECENT_COUNT, asked as you with logins on - through the rules in lib/home.ts (playedLanded), which keep it from
+ * ever moving Recently added under a finger. Shelves asks for it, since Home waits for its answer as for the pins'.
+ *
+ * Asked as Home is first drawn - out of sight too, as Recently added is - and again each time Home comes into view,
+ * since plays move it; the tiles drawn stay until the new answer lands, and an answer that changes nothing leaves
+ * the very state it found (the shelf's memo holds). Home going out of view draws what was waiting for it (`later`).
+ * Not played in a while's `recent` at RECENT_LISTED is a request of its own: this shelf is waited for, and asking
+ * for 500 albums to show 20 would hold Home up - while Not played, last, waits for nobody.
+ */
+function useRecentlyPlayed(shown: boolean, onScreen: { current: boolean }, drawn: { current: HTMLElement | null }): PlayedShelf<Album> {
+  const [state, setState] = useState<PlayedState<Album>>(PLAYED_ASKING)
+  const requests = useMemo(latestOnly, [])
+  const asked = useRef(false)
+
+  useEffect(() => {
+    if (asked.current && !shown) {
+      //? out of view: an ask still on its way lands out of view, so it is left to land
+      setState(playedOutOfView)
+      return
+    }
+    asked.current = true
+    const request = requests.begin()
+    albumPage('recent', 0, request.signal, RECENT_COUNT).then(
+      (page) => {
+        if (request.current()) setState((now) => playedLanded(now, { albums: page }, onScreen.current, RECENT_COUNT, tilesPerRow(drawn.current)))
+      },
+      (reason: unknown) => {
+        if (request.current() && !isAbort(reason)) setState((now) => playedLanded(now, { error: reason }, onScreen.current, RECENT_COUNT, tilesPerRow(drawn.current)))
+      },
+    )
+  }, [shown])
+  useEffect(() => () => requests.supersede(), [requests])
+
+  return state.shelf
+}
+
+/**
+ * How many tiles a row of the drawn shelf holds now: the desktop's grid's columns (six, or as many as fit beside a
+ * third column), read from the grid itself; Infinity for the phone's one sideways row, or with nothing drawn.
+ */
+function tilesPerRow(section: HTMLElement | null): number {
+  const list = section?.querySelector('.app-shelf')
+  if (!list || typeof getComputedStyle !== 'function') return Infinity
+  const style = getComputedStyle(list)
+  if (style.display !== 'grid') return Infinity
+  const columns = style.gridTemplateColumns.split(' ').filter(Boolean).length
+  return columns >= 1 ? columns : Infinity
+}
+
+/**
+ * The shelf itself (lib/home.ts PlayedShelf): its tiles; or, while it has no answer yet - or says nothing was played,
+ * or that it couldn't ask - its heading over a row held at the tiles' own height (one tile's shape, unseen), the
+ * spinner or the one line inside it; or nothing at all.
+ */
+function RecentlyPlayed({ shelf, onOpen, drawn }: {
+  shelf: PlayedShelf<Album>
+  onOpen: (album: Album) => void
+  /** the section, for its grid's columns as an answer lands (tilesPerRow) */
+  drawn: { current: HTMLElement | null }
+}) {
+  if (shelf.kind === 'none') return null
+  return (
+    <section ref={drawn} class="app-section app-shelf-section" aria-labelledby="app-played-title" aria-busy={shelf.kind === 'asking'}>
+      <h2 id="app-played-title" class="app-section-title app-shelf-title">
+        Recently played
+      </h2>
+      {shelf.kind === 'tiles' ? (
+        <Tiles albums={shelf.albums} onOpen={onOpen} />
+      ) : (
+        <div class="app-shelf-held">
+          <ul class="app-shelf app-shelf-ghost" aria-hidden="true">
+            <li class="app-shelf-item">
+              <span class="app-tile">
+                <span class="app-tile-cover is-empty" />
+                <span class="app-tile-text">
+                  <span class="app-tile-title" dir="auto">{'\u00a0'}</span>
+                  <span class="app-tile-artist" dir="auto">{'\u00a0'}</span>
+                </span>
+              </span>
+            </li>
+          </ul>
+          <div class="app-shelf-held-say">
+            {shelf.kind === 'asking' ? (
+              <div class="pl-spinner" aria-label="Loading" />
+            ) : shelf.kind === 'failed' ? (
+              errorNote(shelf.error, { service: 'music', class: 'pl-notice' })
+            ) : (
+              <p class="pl-notice">{NOTHING_PLAYED}</p>
+            )}
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
+/**
  * "New in your library" (2.0.0-player.51, personal libraries): with logins on, the albums added to your
  * library since you last opened them - filed for you (or by an admin's Add for them), starred in Amperfy -
  * that Navidrome has (a starred one); opening one takes it off (App's openAlbum). Add to my library is
@@ -180,11 +281,12 @@ function NewInYourLibrary({ albums, onOpen }: { albums: readonly Album[]; onOpen
 }
 
 /**
- * What Home draws from Navidrome, inside its gate: Pinned at the top, then Recently added, then Not
- * played in a while. The pins are asked afresh each time Home comes into view (`shown`); the shelves
+ * What Home draws from Navidrome, inside its gate: Pinned at the top, then (logins on) New in your library, then
+ * (2.0.15) Recently played, then Recently added, then Not played in a while. The pins are asked afresh each time Home comes into view (`shown`); the shelves
  * are drawn once the pins have answered, or failed to, or PINNED_WAIT_MS has passed WHILE Home showed
  * - Recently added already asking, out of sight, meanwhile - so Pinned landing never moves the
- * shelves under a finger.
+ * shelves under a finger. Recently played's answer is waited for the same way, and is asked again each time Home
+ * comes into view (useRecentlyPlayed).
  * Each shelf is a memoised element, so the pins changing leaves twenty tiles alone.
  */
 function Shelves({
@@ -210,10 +312,18 @@ function Shelves({
     const timer = setTimeout(() => setWaited(true), PINNED_WAIT_MS)
     return () => clearTimeout(timer)
   }, [shown])
+  //? (2.0.15) whether the shelves are drawn and showing, as an answer lands - set below, once `ready` is known
+  const onScreen = useRef(false)
+  const playedDrawn = useRef<HTMLElement | null>(null)
+  const playedShelf = useRecentlyPlayed(shown, onScreen, playedDrawn)
+  const played = useMemo(() => <RecentlyPlayed shelf={playedShelf} onOpen={onOpen} drawn={playedDrawn} />, [playedShelf, onOpen])
   const recent = useMemo(() => <RecentlyAdded personal={personal} onOpen={onOpen} />, [personal, onOpen])
   const notPlayed = useMemo(() => <NotPlayedInAWhile onOpen={onOpen} />, [onOpen])
-  //? (2.0.0-player.51) waited for as the pins are, so its shelf landing never moves the ones under it
-  const ready = (pins !== null || problem !== null || waited) && (newAlbums !== null || waited)
+  //? (2.0.0-player.51) waited for as the pins are, so its shelf landing never moves the ones under it - and
+  //? (2.0.15) Recently played's answer too
+  const ready =
+    (pins !== null || problem !== null || waited) && (newAlbums !== null || waited) && (playedShelf.kind !== 'asking' || waited)
+  onScreen.current = ready && shown
 
   return (
     <>
@@ -221,6 +331,7 @@ function Shelves({
       <div class="app-home-shelves" hidden={!ready}>
         <Pinned pins={pins} problem={problem} onOpenAlbum={onOpen} onOpenArtist={onOpenArtist} onMove={movePin} onRemove={removePin} />
         {!!newAlbums?.length && <NewInYourLibrary albums={newAlbums} onOpen={onOpen} />}
+        {played}
         {recent}
         {notPlayed}
       </div>
@@ -231,7 +342,8 @@ function Shelves({
 /**
  * Home, the first tab, as Home.dc.html draws it: what's arriving - only while something is
  * (2.0.0-player.12) - then, since 2.0.0-player.18, what you pinned, (2.0.0-player.51, logins on) what is
- * new in your library, what was added recently, and what you haven't played in a while. James: Home is the PLAYER's, not the librarian's; none of it is
+ * new in your library, (2.0.15) what you played recently, what was added recently, and what you haven't played in
+ * a while. James: Home is the PLAYER's, not the librarian's; none of it is
  * faked, and each part with nothing to say draws nothing (Pinned says how to pin something).
  *
  * Arriving is deadwax's, not Navidrome's, so it draws whatever Navidrome says; the rest open albums in
@@ -261,7 +373,7 @@ export function Home({
   onSeeAll: () => void
   /** deadwax didn't answer the last look: Arriving says its cards are the last answer */
   arrivingTrouble?: boolean
-  /** Home is what shows (App's watching): the pins are asked again as it comes into view */
+  /** Home is what shows (App's watching): the pins, and Recently played, are asked again as it comes into view */
   shown?: boolean
   /** (2.0.0-player.51) what is new in your library, as Navidrome albums - null while deadwax hasn't said
    *  (logins on); none with logins off */

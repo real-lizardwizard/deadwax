@@ -536,6 +536,21 @@ html:has(.app-shell.has-mini) { scroll-padding-bottom: var(--app-chrome-bottom-m
 .app-tile-title { font-weight: var(--dw-weight-medium); }
 .app-tile-artist { color: var(--dw-text-2); }
 
+/* (2.0.15) Recently played before its answer - or saying nothing was played, or that it couldn't ask - holds the
+   shelf's own height, so Recently added under it never moves: one tile's shape, unseen, sized as a tile is on
+   either frame (the phone's row, the desktop's grid), with what it says laid over it */
+.app-shelf-held { position: relative; }
+.app-shelf-ghost { visibility: hidden; }
+.app-shelf-held-say {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+.app-shelf-held-say .pl-spinner { margin: 0; }
+
 /* ===== You ===== */
 
 .app-you { padding: 0 var(--app-edge-grouped-right) 0 var(--app-edge-grouped-left); }

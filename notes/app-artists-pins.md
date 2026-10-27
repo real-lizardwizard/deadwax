@@ -924,3 +924,81 @@ the source), Deezer's words in it, VoiceOver on an iPhone (the disclosure), Safa
 ResizeObserver path on a real phone, a right-to-left description, the artist hero under a real iPhone's status
 bar (safe-area-inset-top) with a two-line name, the subtitle and the facts (measured with the inset set by hand
 only, after the second review).
+
+### Recently played on Home (2.0.15)
+
+James (2026-10-26): "Can we also add recently played to the homepage and then tag that". The spec:
+`uplan/slice-home-recently-played.md`. Home had no "jump back in" shelf (the Library had a Recently played sort,
+lib/shelves.ts `recent`); it now has **Recently played**, under New in your library and over Recently added - the
+shelf you reach for most sits high, as in Apple Music. Home reads Pinned, New in your library (logins on), Recently
+played, Recently added, Not played in a while.
+
+- **Source**: getAlbumList2 `recent` at `RECENT_COUNT` (20) through the existing `/navidrome/albums` route, which
+  asks through `client_for` - as the signed-in person with logins on, the shared `NAVIDROME_USER` with logins off
+  and for break-glass - so the plays are that person's own. No new route, no new Subsonic call (`recent` was on the
+  route's list already). It includes albums of All music you played that aren't in your library: what you played is
+  what you played (Apple Music does the same); the guide says so. `lib/home.ts recentlyPlayed`: Navidrome's order,
+  an album once, up to the count.
+- **Two asks of `recent`, on purpose**: this shelf's at 20 and Not played in a while's at 500 (`RECENT_LISTED`). One
+  request could feed both, but this shelf is waited for (below) and asked again each time Home comes into view, and
+  asking for 500 albums to show 20 would hold Home up for the size of the answer; Not played, last, waits for
+  nobody and is asked once per Home.
+- **Never moving Recently added under a finger** (`lib/home.ts` PlayedShelf / playedLanded / playedOutOfView, pure,
+  home.sim): its answer is waited for as the pins' and New in your library's are (Shelves' `ready`, PINNED_WAIT_MS).
+  Still unanswered once Home is drawn, it holds the shelf's height: its heading over `.app-shelf-held` - one tile's
+  shape (`.app-shelf-ghost`: the shelf, an item, an empty cover, two no-break-space lines), unseen, so it is a tile's
+  height by the tiles' own rules on the phone's row and the desktop's grid alike (no desktop rule): ONE ROW - with a
+  spinner laid over it (`.app-shelf-held-say`, absolute, inset 0). The answer then:
+  - albums: the tiles in its place - as many as its row holds. The phone's shelf is one sideways row whatever it
+    holds, so all of them; the desktop's is a grid six across that WRAPS (`app-desktop.css` `.app-desk .app-shelf`;
+    as many as fit beside a third column), so twenty would be four rows and drop Recently added three. On screen
+    `playedLanded` keeps the rows drawn (`playedRows`, told `perRow`: `tilesPerRow()` reads the drawn shelf's own
+    `grid-template-columns`, Infinity with no grid - the phone): an answer needing more rows than are drawn fills the
+    rows drawn now (the held row's one: six tiles) and waits for Home to be out of view for the rest (`later`); one
+    needing fewer leaves the drawn tiles, the new ones out of view. (Found in review, after 2.0.15 was built: the
+    stand-in's five plays fit one row, so the first real-page check couldn't see it.) Chosen over capping the
+    desktop's shelf at one row, which would hide albums the desktop has no sideways scroll to reach;
+  - **empty** (a new account): known before Home was drawn, no shelf at all - "each part with nothing to say draws
+    nothing"; after, "You haven't played anything yet." in the held row (`NOTHING_PLAYED`), which goes the next time
+    Home is out of view (`later`) - removing it under a finger would move Recently added;
+  - **a failure**: known before Home was drawn, no shelf (Recently added says a failure for both, as Not played's
+    rule has it); after, errorNote's words (`service: 'music'`) in the held row, gone the next time Home is out of
+    view - chosen over the placeholder going quietly, which would move Recently added up.
+  - A shelf that wasn't there (nothing played) finding albums while Home is on screen - the first play - appears
+    once Home is out of view, never above Recently added under a finger; an answer landing while Home is out of view
+    is drawn at once. "On screen" is `ready && shown`, set as Shelves renders (`onScreen`, a ref the answer reads).
+- **Kept in step**: asked as Home is first drawn (out of sight too, as Recently added is) and again each time `shown`
+  goes true, through latestOnly; the tiles drawn stay until the new answer lands (no spinner, no held row), a failed
+  ask again leaves them (as it leaves no shelf, and the held row's one line), and an answer drawing the same tiles (`samePlayed`: id, name, artist, cover, in order) leaves
+  the very state it found, so the shelf's memoised element (`[playedShelf, onOpen]`) holds. Home's own memo is not
+  keyed on Arriving, so a download moving re-renders no shelf. A tile is the shared `Tiles`: it opens the album
+  (prefetch on pointer down), never plays it.
+- **After review** (desktop rows, above): home.sim 85 checks - ten more: `playedRows`, a slow twenty on the
+  desktop's held row (six, then twenty out of view) and on the phone's (twenty at once), six going to seven on
+  screen (the first row's six, the new album first, seven out of view), four to five (one row, drawn at once), four
+  rows to two and to nothing played (the drawn tiles stay), the same twenty again (the very tiles); a failure heard
+  by no shelf or by the held row's line (the very state); a new artist line and more albums after the same ones (new
+  answers - `samePlayed`'s length and artist, both mutations that had survived). app-rules 514 (`tilesPerRow` and its
+  wiring). 14 mutations more, each caught and restored byte for byte. A real page (the worktree on :8126, the
+  stand-in's answer widened to 20 or 6/7 albums by CDP's Fetch at the response): at 1280x800 a 3 s answer of twenty
+  lands as six in the held row, the shelf 217.5px and Recently added's heading at 384.9 before and after, twenty
+  (835.5px) once Home was left and come back to; six drawn, a seventh landing on screen: six, Recently added unmoved,
+  seven (423.5px) after the next visit; at 390x844 both land at once, the row 204.8px throughout. Not seen: the
+  `has-side` grid (a third column open), whose columns `tilesPerRow` reads the same way.
+- **Verified**: Python 3853 collected (3851 passed, 2 skipped; one new in test_app_css.py: the held row's rules and
+  its tile-shaped markup); pyflakes; tsc; every sim - home.sim 75 checks (Recently played's pure rules, the order, the
+  ask at 20 beside Not played's 500, distinct, the tile, the slow / empty / failure answers after Home was drawn with
+  Recently added's place unchanged and the held row a tile's shape, empty and failure known before it as no shelf,
+  the first play deferred to out of view, an answer out of view drawn at once, the ask again on coming into view with
+  the tiles kept, a failed ask again, a download moving asking nothing) and app-rules 513 (the order, the ask, the
+  hook's latestOnly and `shown` wiring, the memo, `ready`); the build; the engine guard empty. 24 mutations, one per
+  rule, each caught and restored byte for byte. A real page: deadwax from the worktree on :8125 against the stand-in
+  Navidrome on :4533 (its seeded plays: Donda, The Slow Rush, Dummy, Third, Wish You Were Here), headless Chromium,
+  `recent&size=20` held by CDP's Fetch: at 390x844 and 1280x800, the shelf in its place with five tiles, no sideways
+  scroll; held 3 s, the held row 204.8px (phone) / 217.5px (desktop) - the tiles' own height - and Recently added's
+  heading at the same y before and after the answer, for albums, an empty answer and a 502; an empty answer known
+  before Home drew: no shelf; leaving for the Library and back: one ask more, the five tiles kept while it was asked;
+  no console error.
+- **NOT verified**: a real Navidrome 0.64.2's `recent` for a signed-in person (the stand-in's plays are the shared
+  account's), whether "now playing" alone moves an album in it (deadwax's submission scrobble does), and the
+  iPhone.

@@ -1146,6 +1146,14 @@ deadwax compares them - "The" at the front set aside, accents and case aside, di
 after Z - in the collection's lists too, so an album or two can sit where Navidrome's own web page wouldn't put it
 (Navidrome also sets aside "La", "El" and others, and puts compilations last).
 
+## The app's Home has no "Recently played"
+
+It shows once Navidrome has a play of an album for the account the player asks as - your own with logins on,
+`NAVIDROME_USER`'s with logins off - so a new account, or plays made in another app under another Navidrome user,
+show nothing yet. Play an album (deadwax counts a song as played once you've heard half of a song longer than 30
+seconds, or four minutes of it, whichever comes first) and come back to Home. If it was on screen when the first play was found, the shelf appears the next time you open Home rather
+than pushing the rest down under your finger.
+
 ## The app's Home has no "Not played in a while"
 
 It shows only with at least four albums you last played more than 30 days ago, and only when

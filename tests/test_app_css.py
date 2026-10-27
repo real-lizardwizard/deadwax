@@ -12,6 +12,8 @@ each held to the fix.
 - A phone on its side gets the compact tab bar.
 - Play and pause stay round (STYLE.md).
 - Home's headings sit the board's 12px above their shelf; a tile's two lines sit together.
+- (2.0.15) Recently played, over Recently added, holds a tile's height until its answer (and while it says nothing
+  was played, or that it couldn't ask): one tile's shape, unseen, what it says laid over it.
 
 And for what opens over Now Playing (2.0.0-player.10):
 
@@ -379,6 +381,28 @@ def test_home_sits_as_the_board_has_it():
     home = (Path(__file__).resolve().parent.parent / "ui" / "src" / "app" / "Home.tsx").read_text()
     assert re.search(r'<span class="app-tile-text">\s*<span class="app-tile-title" dir="auto">.*?</span>\s*'
                      r'<span class="app-tile-artist" dir="auto">.*?</span>\s*</span>', home, re.S)
+
+
+def test_recently_played_holds_the_shelfs_height_before_its_answer():
+    """(2.0.15) Recently played sits over Recently added, so before its answer - and while it says nothing was played,
+    or that it couldn't ask - it holds the shelf's own height: one tile's shape (the shelf, an item, the cover, both
+    lines), unseen, with what it says laid over it, never taking room of its own. Sized by the tile's own rules, so it
+    is a tile's height - one row - on the phone's row and on the desktop's grid alike - no rule of its own on a
+    desktop. (The desktop's grid wraps, so more albums than a row holds would take more rows: lib/home.ts
+    playedLanded keeps the rows drawn while Home is on screen - home.sim.)"""
+    assert declarations(APP, ".app-shelf-held")["position"] == "relative"
+    assert declarations(APP, ".app-shelf-ghost")["visibility"] == "hidden"
+    say = declarations(APP, ".app-shelf-held-say")
+    assert say["position"] == "absolute" and say["inset"] == "0" and say["overflow"] == "hidden"
+    #? the spinner's own margin would only push it off centre in a box of a fixed height
+    assert declarations(APP, ".app-shelf-held-say .pl-spinner")["margin"] == "0"
+    desktop = (PLAYER / "app-desktop.css").read_text()
+    assert "app-shelf-held" not in desktop and "app-shelf-ghost" not in desktop
+    home = (Path(__file__).resolve().parent.parent / "ui" / "src" / "app" / "Home.tsx").read_text()
+    #? each line a no-break space (as an escape in the source), so it is a line's height
+    assert re.search(r'<ul class="app-shelf app-shelf-ghost" aria-hidden="true">\s*<li class="app-shelf-item">\s*<span class="app-tile">\s*'
+                     r'<span class="app-tile-cover is-empty" />\s*<span class="app-tile-text">\s*'
+                     r"<span class=\"app-tile-title\" dir=\"auto\">\{'\\u00a0'\}</span>\s*<span class=\"app-tile-artist\" dir=\"auto\">\{'\\u00a0'\}</span>", home)
 
 
 def test_the_reader_reads_rules_as_the_browser_would():
