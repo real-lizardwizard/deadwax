@@ -1,0 +1,38 @@
+{
+  "about": "The words and numbers the Swift copies say, read from the web app. Written by ios/scripts/export-library-vectors.cjs.",
+  "sorts": [
+    ["alphabeticalByArtist","Artist"],
+    ["alphabeticalByName","Title"],
+    ["newest","Recently added"],
+    ["byYearDesc","Year, newest first"],
+    ["byYearAsc","Year, oldest first"]
+  ],
+  "defaultSort": "alphabeticalByArtist",
+  "sameMomentMs": 30000,
+  "indexMin": 50,
+  "otherInitial": "#",
+  "dateUnknown": "Date unknown",
+  "noYear": "No year",
+  "freshMs": 60000,
+  "allMusic": "All music",
+  "titles": {
+    "yours": "Your albums",
+    "albums": "Albums",
+    "store": "All albums",
+    "recent": "Recently added"
+  },
+  "allAlbumsRow": "All albums",
+  "emptyLibrary": "Nothing in your library yet.",
+  "emptyLibraryHow": "Look through All music and add the albums you like, or find new ones in Search and Get them.",
+  "noAlbums": "No albums yet.",
+  "couldntRefresh": "Couldn't update this list - showing it as it was.",
+  "truncated": "Showing the first 10000 albums - deadwax reads at most that many.",
+  "findPlaceholder": "Find in albums",
+  "sortLabel": "Album order",
+  "tryAgain": "Try again",
+  "loading": "Loading",
+  "seeAllMusic": "See All music",
+  "newMark": "New",
+  "newMarkSpoken": "New in your library",
+  "breakGlassUser": "deadwax"
+}
