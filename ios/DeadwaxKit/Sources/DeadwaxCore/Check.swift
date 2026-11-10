@@ -8,7 +8,7 @@ public struct CheckReport: Sendable, Equatable {
         case shared(Me)
         /// logins on and signed in
         case signedIn(Me)
-        /// logins on, and this phone has no session (or it ended)
+        /// logins on, and this phone has no session (or it ended): /me said 401
         case needsSignIn
         /// /me failed for another reason
         case unknown(String)
@@ -28,7 +28,7 @@ public struct CheckReport: Sendable, Equatable {
         switch me {
         case .success(let me):
             return CheckReport(health: health, who: me.loginsOn ? .signedIn(me) : .shared(me))
-        case .failure(.signedOut):
+        case .failure(let error) where error.isSignedOut:
             return CheckReport(health: health, who: .needsSignIn)
         case .failure(let error):
             return CheckReport(health: health, who: .unknown(error.words))

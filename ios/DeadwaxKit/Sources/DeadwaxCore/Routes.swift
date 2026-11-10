@@ -6,7 +6,7 @@ import Foundation
 /// tests/test_ios_contract.py reads the `Endpoint(...)` lines below from this file and checks each
 /// against the server's own routes, so a route renamed or a parameter dropped on the server fails
 /// in the Python suite, where the server is changed. Keep each on one line, in this exact form.
-public struct Endpoint: Sendable, Equatable {
+public struct Endpoint: Sendable, Hashable {
     public let method: String
     public let path: String
     public let query: [String]
@@ -19,6 +19,7 @@ public struct Endpoint: Sendable, Equatable {
 }
 
 public enum Routes {
+    // Phase 0's
     public static let health = Endpoint(method: "GET", path: "/deadwax/health", query: [])
     public static let me = Endpoint(method: "GET", path: "/deadwax/me", query: [])
     public static let signIn = Endpoint(method: "POST", path: "/deadwax/auth/login", query: [])
@@ -27,14 +28,76 @@ public enum Routes {
     public static let stream = Endpoint(method: "GET", path: "/deadwax/navidrome/stream/{song_id}", query: ["format"])
     public static let cover = Endpoint(method: "GET", path: "/deadwax/navidrome/cover/{cover_id}", query: ["size"])
 
+    // Phase 1's: the Library, an album, a song
+    /// Whether there is a Navidrome to play from (`{configured, ok, server, problem}`).
+    public static let navidromeStatus = Endpoint(method: "GET", path: "/deadwax/navidrome/status", query: [])
+    /// Every album of a scope (`yours`, `store`) in one answer, with an ETag - asked with 30 s to answer (`timeouts`).
+    public static let albumIndex = Endpoint(method: "GET", path: "/deadwax/navidrome/album_index", query: ["scope"])
+    /// One album with its songs (`Album`), `{}` when Navidrome has none by that id.
+    public static let album = Endpoint(method: "GET", path: "/deadwax/navidrome/albums/{album_id}", query: [])
+    /// One song as Navidrome has it now (`Song`) - play count and credits.
+    public static let song = Endpoint(method: "GET", path: "/deadwax/navidrome/songs/{song_id}", query: [])
+    /// Counts a play (`submission=true`) or says what's playing (`false`).
+    public static let scrobble = Endpoint(method: "POST", path: "/deadwax/navidrome/scrobble/{song_id}", query: ["submission", "time"])
+
+    // Phase 1's: Normalization
+    /// "This album is about to be played": deadwax measures its songs not yet measured (202, `{state}`).
+    public static let levelAlbum = Endpoint(method: "POST", path: "/deadwax/navidrome/level/album/{album_id}", query: [])
+    /// What deadwax would level one song at (`level` album or track) - Info's Normalization row.
+    public static let songLevel = Endpoint(method: "GET", path: "/deadwax/navidrome/level/{song_id}", query: ["level"])
+    /// An album's songs' measured loudness, raw (server 2.1.1).
+    public static let loudness = Endpoint(method: "GET", path: "/deadwax/navidrome/loudness/album/{album_id}", query: [])
+
+    // Phase 1's: resume what was playing
+    public static let queue = Endpoint(method: "GET", path: "/deadwax/navidrome/queue", query: [])
+    public static let saveQueue = Endpoint(method: "POST", path: "/deadwax/navidrome/queue", query: [])
+    public static let saveQueueAt = Endpoint(method: "POST", path: "/deadwax/navidrome/queue/at", query: [])
+
+    // Phase 1's: the id bridge and your library (logins on)
+    /// One album across its ids - asked by Navidrome's (`StoreAlbum`), only when there is a library (Access.hasLibrary).
+    public static let storeAlbum = Endpoint(method: "GET", path: "/deadwax/store/album", query: ["navidrome_id"])
+    public static let myLibrary = Endpoint(method: "GET", path: "/deadwax/me/library", query: [])
+    public static let libraryAdd = Endpoint(method: "POST", path: "/deadwax/me/library/add", query: [])
+    public static let libraryRemove = Endpoint(method: "POST", path: "/deadwax/me/library/remove", query: [])
+    public static let librarySeen = Endpoint(method: "POST", path: "/deadwax/me/library/seen", query: [])
+
+    /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
+    public static var warmLevels: Endpoint { levelAlbum }
+
     /// Every route the app calls - what the contract test checks.
-    public static let all: [Endpoint] = [health, me, signIn, signOut, search, stream, cover]
+    public static let all: [Endpoint] = [
+        health, me, signIn, signOut, search, stream, cover,
+        navidromeStatus, albumIndex, album, song, scrobble,
+        levelAlbum, songLevel, loudness,
+        queue, saveQueue, saveQueueAt,
+        storeAlbum, myLibrary, libraryAdd, libraryRemove, librarySeen,
+    ]
+
+    /// The routes given longer than the transport's own 8 seconds to answer, in seconds: the album index reads every
+    /// album of a scope from Navidrome, a page at a time, before it answers.
+    public static let timeouts: [Endpoint: Double] = [albumIndex: 30]
 }
 
-/// The cover size the lock screen asks for (`Routes.cover`'s `size`) - the contract test checks it is
-/// within the server's bounds, as it does the search's page sizes (`TestSounds`, `HiRes`).
+/// The cover sizes the app asks for (`Routes.cover`'s `size`) - the contract test checks each is within the server's
+/// bounds (16 to 2000), as it does the search's page sizes (`TestSounds`, `HiRes`). Navidrome resizes to and keeps
+/// each size asked, so the app asks for a few, never the pixels of whatever view it draws in.
 public enum CoverSize {
+    /// A list's row.
+    public static let row = 128
+    /// A grid's tile, and the mini player.
+    public static let tile = 400
+    /// An album page's, and Now Playing's.
+    public static let hero = 1024
+    /// The lock screen's.
     public static let lockScreen = 1024
+
+    /// The sizes asked, smallest first.
+    public static let steps = [row, tile, hero]
+
+    /// The smallest size asked that is at least `pixels`, else the largest.
+    public static func step(for pixels: Int) -> Int {
+        steps.first { $0 >= pixels } ?? hero
+    }
 }
 
 /// The fields a sign-in sends (src/routes/auth.py `SignIn`). The contract test checks them too.
