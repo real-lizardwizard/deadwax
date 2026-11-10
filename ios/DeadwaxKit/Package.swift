@@ -25,8 +25,13 @@ let package = Package(
         // and nothing here can be compiled on Linux to catch a strict-concurrency error early.
         .target(name: "DeadwaxAudio", dependencies: ["DeadwaxCore"],
                 swiftSettings: [.swiftLanguageMode(.v5)]),
-        .testTarget(name: "DeadwaxCoreTests", dependencies: ["DeadwaxCore"]),
+        // Fixtures/: what the Swift tests replay - traces recorded from the web app's own TypeScript and
+        // vectors shared with the Python suite (ios/scripts/export-traces.cjs writes them). One folder
+        // per area; read through Bundle.module.
+        .testTarget(name: "DeadwaxCoreTests", dependencies: ["DeadwaxCore"],
+                    resources: [.copy("Fixtures")]),
         .testTarget(name: "DeadwaxAudioTests", dependencies: ["DeadwaxAudio", "DeadwaxCore"],
+                    resources: [.copy("Fixtures")],
                     swiftSettings: [.swiftLanguageMode(.v5)]),
     ]
 )
