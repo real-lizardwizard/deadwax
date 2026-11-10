@@ -4,6 +4,9 @@ James's request of 2026-10-23: "let's get started on the iOS app". The plan (wri
 kept outside the repo) and James's answers to it set what follows; this file is the project's memory
 of it. The user guide is docs/ios.md.
 
+Built on the `ios` branch. **Phase 0 merged into main as deadwax 2.1.0 (2026-11-10)**, James: "go ahead
+and merge those to 2.1 on main"; the next phases are built on `ios` again.
+
 ## James's decisions (binding)
 
 - A **native SwiftUI app**, not the web app in a shell. **A free Apple account** only: each install

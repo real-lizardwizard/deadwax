@@ -35,15 +35,16 @@ the server for Phase 0: it works with deadwax 2.0.0 as it is.
 
 ## Once
 
-1. **Clone the repo outside iCloud**, to `~/Developer/deadwax`, on the app's branch (`ios` while the app
-   is new; it isn't on `main` yet):
+1. **Clone the repo outside iCloud**, to `~/Developer/deadwax`:
 
    ```
-   git clone -b ios https://github.com/real-lizardwizard/deadwax.git ~/Developer/deadwax
+   git clone https://github.com/real-lizardwizard/deadwax.git ~/Developer/deadwax
    ```
 
    Not Desktop or Documents: when iCloud syncs those, it can evict files from the Mac when space runs
-   low, which stalls builds. install.sh pulls whichever branch is checked out.
+   low, which stalls builds. install.sh pulls whichever branch is checked out: `main` has the app as
+   released with deadwax (Phase 0 since 2.1.0), and the `ios` branch has the next phase while it's
+   being built (`git switch ios` to follow it).
 2. **Open Xcode once** and let it finish installing its own components. Or run
    `xcodebuild -runFirstLaunch`. install.sh uses `/Applications/Xcode.app` by itself, so nothing
    system-wide has to change.

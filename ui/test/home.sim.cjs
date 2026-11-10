@@ -350,7 +350,10 @@ async function run() {
     await settle()
     tree = home.draw(props())
     check('Recently added drawn', tilesIn(tree, ADDED_ID), ['Dummy'])
-    const stub = [played('donda', 3), played('slow-rush', 41), played('dummy', 64), played('third', 95), played('wywh', 210)]
+    // Home reads the real clock (Home.tsx: notPlayedInAWhile(page, Date.now())), so these plays are dated
+    // from it, not from the fixed NOW: dated from NOW, donda's 3 days passed 30 on 2026-10-30.
+    const playedNow = (id, days) => ({ id, name: id, artist: 'x', played: new Date(Date.now() - days * DAY).toISOString() })
+    const stub = [playedNow('donda', 3), playedNow('slow-rush', 41), playedNow('dummy', 64), playedNow('third', 95), playedNow('wywh', 210)]
     answer('albums', stub, NOT_PLAYED_ASK)
     await settle()
     tree = home.draw(props())
