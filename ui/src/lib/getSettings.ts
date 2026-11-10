@@ -23,7 +23,7 @@
 
 import type { FormatPreference } from '../api/types'
 import type { CandidateFilters, CandidateSort } from './candidates'
-import { AUTO_GRAB_MIN_SCORE, NO_QUALITY_FILTERS, noSignalMinimums } from './candidates'
+import { NO_QUALITY_FILTERS, noSignalMinimums } from './candidates'
 
 export const GET_MODE_VALUES = ['sources', 'pick'] as const
 export const QUALITY_FLOOR_VALUES = ['any', '320', 'lossless', '24bit'] as const
@@ -178,7 +178,8 @@ export function sourceChips(floor: QualityFloor, filters: SourceFilters): { key:
   const chips: { key: keyof SourceFilters; label: string; on: boolean }[] = [
     { key: 'lossless', label: 'Lossless', on: filters.lossless },
     { key: 'bit24', label: '24-bit', on: filters.bit24 },
-    { key: 'freeSlot', label: 'Free slot', on: filters.freeSlot },
+    //? (2.0.6, UX batch 3) a free upload slot: the download starts at once - it said "Free slot"
+    { key: 'freeSlot', label: 'Starts now', on: filters.freeSlot },
   ]
   if (floor === '320' || filters.kbps320) chips.splice(2, 0, { key: 'kbps320', label: '320 kbps', on: filters.kbps320 })
   chips.push({ key: 'complete', label: 'Complete albums only', on: filters.complete })
@@ -225,8 +226,12 @@ export const PICK_SORT: CandidateSort = 'score'
  * there was no tracklist (or no release id) to judge the folders by (lib/candidates.ts
  * autoPickBlocked), or nothing scored well enough under the filters.
  */
-export function notPickedLine(blocked: string | null): string {
+export function notPickedLine(blocked: string | null, found: number): string | null {
+  //? (2.0.6, UX batch 3) what to do, not the rule: none scores AUTO_GRAB_MIN_SCORE (75) or more and passes the chips.
+  //? With no source found at all there is nothing to choose: the empty state ("Nothing found for …", "Nothing
+  //? lossless found") says it, and no line tells anyone to choose (review)
+  if (found === 0) return null
   return blocked
-    ? `Didn't pick a source for you: ${blocked}.`
-    : `Didn't pick a source for you: none scores ${AUTO_GRAB_MIN_SCORE} or more and passes your filters.`
+    ? `${blocked} - choose a source yourself.`
+    : 'No close match that passes your filters - choose a source yourself.'
 }

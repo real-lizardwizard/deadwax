@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks'
 
 import * as api from '../api/library'
 import type { TrackDetails } from '../api/types'
+import { sayError } from '../app/sayError'
 
 //? Arrow-keying down the tree selects every album it passes; only the one you stop on is worth
 //? opening a dozen files for. Short enough that stopping on one feels immediate.
@@ -61,7 +62,8 @@ export function useTrackDetails(albumPath: string | null, generation: unknown): 
           setState({
             files: null,
             loading: false,
-            error: caught instanceof Error ? caught.message : "couldn't read the files",
+            //? (2.0.8) in words (lib/errorWords.ts), its own words in brackets for whoever runs deadwax
+            error: sayError(caught, '', { failed: "Couldn't read the files." }),
           })
         }
       }

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { isAbort, latestOnly } from '../lib/latest'
 
-const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 /** A page added to the items already shown, leaving out any already there (by id). */
 export function appendPage<T extends { id: string }>(shown: readonly T[], page: readonly T[]): T[] {
@@ -13,7 +12,8 @@ export function appendPage<T extends { id: string }>(shown: readonly T[], page: 
 export interface Paged<T> {
   items: T[]
   loading: boolean
-  error: string | null
+  /** (2.0.4) the error itself, said by app/ErrorNote.tsx in a listener's words */
+  error: unknown
   /** every page is in: the list is the whole of it */
   done: boolean
   /** ask again for the page that failed */
@@ -42,7 +42,7 @@ export function usePaged<T extends { id: string }>(
 ): Paged<T> {
   const [items, setItems] = useState<T[]>([])
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<unknown>(null)
   const [done, setDone] = useState(false)
   const sentinel = useRef<HTMLDivElement>(null)
   const observer = useRef<IntersectionObserver | null>(null)
@@ -86,7 +86,7 @@ export function usePaged<T extends { id: string }>(
         if (!request.current()) return
         paging.current.loading = false
         setLoading(false)
-        if (!isAbort(reason)) setError(message(reason))
+        if (!isAbort(reason)) setError(reason)
       },
     )
   }

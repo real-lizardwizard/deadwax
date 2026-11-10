@@ -21,7 +21,9 @@
 import { ownedForRelease, type OwnedAlbum, type OwnedIndex } from './owned'
 
 export const IN_YOUR_LIBRARY = 'in your library'
-export const IN_THE_STORE = 'in the store'
+//? (2.0.5, UX batch 2) the shared music on the server is "the collection" in a sentence - "All music" as a heading
+//? (James's word) - never "the store", which read as a shop beside Get
+export const IN_THE_STORE = 'in the collection'
 
 /** Whether an album the store holds is yours - `yours` as the server said it; anything but false is. */
 export function isYours(album: { yours?: boolean | null } | null | undefined): boolean {
@@ -39,7 +41,7 @@ export function heldPhrase(personal: boolean, yours: boolean | null | undefined)
   return personal && yours === false ? IN_THE_STORE : IN_YOUR_LIBRARY
 }
 
-/** The same, as a label's words: "In your library" / "In the store". */
+/** The same, as a label's words: "In your library" / "In the collection". */
 export function heldLabel(personal: boolean, yours: boolean | null | undefined): string {
   const phrase = heldPhrase(personal, yours)
   return phrase.charAt(0).toUpperCase() + phrase.slice(1)
@@ -152,18 +154,19 @@ export function libraryPlace(personal: boolean, yours: boolean | null): string {
 }
 
 /** What the album page says under Play when the album is in the store but not yours. */
-export const ADD_FROM_PAGE = "Add it to your library to have it starred for you in Navidrome - nothing is downloaded."
+//? (2.0.5) said as what the listener sees - no starring, no Navidrome (UX batch 2)
+export const ADD_FROM_PAGE = "It's already here - add it to your library to keep it with your music."
 /** ...once Add has it - as the store line says it (lib/myLibrary.ts ADDED_WORDS). */
-export const ADDED_FROM_PAGE = "Added - it's in your library, and deadwax stars it for you in Navidrome."
+export const ADDED_FROM_PAGE = 'Added to your library.'
 /** ...once Remove has taken it out - the server's own words (routes/my_library.py REMOVED). */
-export const REMOVED_FROM_PAGE = "Removed from your library - it's still in the store, and nothing was deleted."
+export const REMOVED_FROM_PAGE = "Removed from your library - it's still in the collection, and nothing was deleted."
 /** ...once Remove has taken out an album Add can't put back (review): how to have it back. */
-export const REMOVED_STAR_TO_RETURN = `${REMOVED_FROM_PAGE} To have it back, star it in a Subsonic app such as Amperfy.`
+export const REMOVED_STAR_TO_RETURN = `${REMOVED_FROM_PAGE} To add it back, make it a favourite in another music app.`
 /** ...for an album deadwax can't keep in your library: no MusicBrainz release id to know it by. */
-export const NO_RELEASE_TO_ADD = "deadwax can't add an album with no MusicBrainz release id - star it in a Subsonic app such as Amperfy to have it in your library."
+export const NO_RELEASE_TO_ADD = "This album can't be added from here - make it a favourite in another music app, and it joins your library."
 /** ...for one with a release id whose folder deadwax hasn't found in the store (not scanned yet, or outside
  *  the folder deadwax looks after) - review: the page said nothing, or blamed the tags. */
-export const NOT_FOUND_TO_ADD = "deadwax hasn't found this album's folder in the store, so it can't add it - star it in a Subsonic app such as Amperfy to have it in your library."
+export const NOT_FOUND_TO_ADD = "This album can't be added from here yet - make it a favourite in another music app, and it joins your library."
 
 export interface AlbumMine {
   /** whether it is yours - null while that can't be told */
@@ -231,4 +234,17 @@ export function albumMine({
   //? no folder of this album by a release id, so it can't be added, and the line says why
   if (present > 0) return said(null, null, null)
   return said(false, null, why)
+}
+
+/**
+ * (2.0.6, UX batch 3) What the album you don't have says, in a line anyone can read, when the library has an album of
+ * its name held by no id (the dashed "maybe"): that you may have it already, and why it can't be told - before, only
+ * the maybe's tooltip said it, with the folders and "the metadata editor", which a phone never shows. `inCollection`:
+ * the folders are the collection's, none yours (logins on); `editors`: whoever can Edit albums, told how to settle it.
+ */
+export function maybeLine(inCollection: boolean, editors: boolean): string {
+  const lead = inCollection
+    ? 'It may already be here - an album with this name is in the collection, but it isn\'t matched to a pressing.'
+    : 'You may already have this - an album with this name is in your library, but it isn\'t matched to a pressing.'
+  return editors ? `${lead} Match it to a pressing in Edit album.` : lead
 }

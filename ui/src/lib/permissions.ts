@@ -35,9 +35,9 @@ export const LABELS: Readonly<Record<Permission, string>> = {
 
 /** What each one opens, under its checkbox. */
 export const LINES: Readonly<Record<Category, string>> = {
-  request: 'Search Soulseek and download - Get, Sources, Next peer, Ask again.',
+  request: 'Search Soulseek and download - Get, Sources, Another source, Same source again.',
   edit: 'Tags, covers, CD art, lyrics, artist pictures, applying a release - one album or Library care\'s runs.',
-  library: 'Delete albums, move an artist\'s albums, Needs a look, Rescan, Held by nobody.',
+  library: 'Delete albums, move an artist\'s albums, Needs a look, Rescan, In nobody\'s library.',
   downloads: 'See who asked for what, cancel or retry anyone\'s, clear everyone\'s finished.',
   server: 'The server settings and the event log.',
 }
@@ -51,16 +51,19 @@ export const ADMINS_EVERYTHING = 'Admins can do everything.'
 //? (2.0.0-player.65) not slskd or Navidrome: their rows stay an admin's (ADMINS_ONLY in src/routes/settings.py)
 export const WARN_SERVER = 'Settings can point deadwax at other folders and change how it downloads and files - give it only to someone you\'d trust as an admin.'
 export const WARN_LIBRARY = 'This includes deleting albums from disk, which can\'t be undone.'
-export const WARN_NO_REQUEST = 'They can still play, browse and add what the store has.'
+export const WARN_NO_REQUEST = 'They can still play, look through and add what the collection has.'
 
 /** In Get's place, without Get albums. */
 export const GET_OFF = 'Getting albums is off for you - ask an admin.'
 
 /** What a Managing page says, in place of itself, to someone without its permission. */
-export const NO_PERMISSION = "You don't have permission for this page."
+export const NO_PERMISSION = "This page needs a permission an admin hasn't given you - ask one if you need it."
+
+/** (2.0.8) ...and People's: it can't be given - it comes with being a Navidrome admin. */
+export const PEOPLE_ONLY = 'Only an admin can open People - it comes with being a Navidrome admin.'
 
 /** You, when an admin gave something this session doesn't honour (/me's `permissions_unverified`). */
-export const UNVERIFIED = "deadwax couldn't check your account with Navidrome as you signed in, so the extra permissions an admin gave you are off until you sign in again."
+export const UNVERIFIED = "Some things an admin let you do are off for now - sign out and in again to get them back."
 
 /** The set /me's answer names - only names it knows, so a stray word grants nothing. An answer with no list at
  *  all is from before 2.0.0-player.61 (a session the gate kept across the upgrade): its `admin` then says it all -
@@ -156,7 +159,7 @@ export function artistManaging(perms: Permissions): ArtistManaging {
   return { images: edit, whichArtist: edit, move: library, any: edit || library }
 }
 
-/** Get, the Sources sheet, Next peer and Ask again: Get albums'. */
+/** Get, the Sources sheet, Another source and Same source again: Get albums'. */
 export function gets(perms: Permissions): boolean {
   return perms.has('request')
 }

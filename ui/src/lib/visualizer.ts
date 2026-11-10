@@ -126,6 +126,10 @@ export function fadeMix(A: Rotation): number {
 
 export type Rgb = readonly [number, number, number]
 export type Colours = 'cover' | 'purple'
+/** (2.0.7, UX batch 4) Ambient's note where WebGL can't be had, so the 2D version draws - in a listener's words
+ *  (was "WebGL isn't available here, so Ambient is showing the simple version."). */
+export const GL_FALLBACK = "This browser can't draw the full Ambient effect, so a simpler version is showing."
+
 export const COLOURS: readonly Colours[] = ['cover', 'purple']
 
 /** deadwax's own purple, darkest to lightest. */

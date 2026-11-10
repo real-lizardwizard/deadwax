@@ -2,6 +2,8 @@ import { useEffect, useState } from 'preact/hooks'
 
 import { getPins, putPins, togglePin } from '../api/me'
 import { applyPinOp, orderBody, targetName, toggleBody, type Pin, type PinOp, type PinsAnswer, type PinTarget } from '../lib/pins'
+import { noticeWords } from '../lib/errorWords'
+import { accessNow, seesDetail } from './access'
 
 /**
  * What the user pinned to Home (2.0.0-player.18), as the server keeps them (GET/PUT /deadwax/me/pins,
@@ -19,7 +21,7 @@ import { applyPinOp, orderBody, targetName, toggleBody, type Pin, type PinOp, ty
  *    card is on Home from the tap; a change deadwax won't keep goes back to the server's word, and
  *    says so WHERE IT WAS MADE: a pin or an unpin (an album or artist page, Now Playing's ••• menu)
  *    in the app's one notice (PinNotice, naming what wasn't pinned and why); a move or a removal in
- *    Home's Edit as "Not saved: …" under the list (`problem`), until the next change or a read.
+ *    Home's Edit as "Not saved. …" under the list (`problem`), until the next change or a read.
  *  - ONE AT A TIME: every read and every change goes in turn, each sent once the one before has
  *    answered - so they reach deadwax, and come back, in the order asked, and the newest answer is
  *    always the last to land (what latestOnly() does for a fetch that draws). A move or a removal is
@@ -51,7 +53,8 @@ let line: Promise<unknown> = Promise.resolve()
 let made = 0
 const listeners = new Set<() => void>()
 
-const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
+//? (2.0.4) what went wrong, in a listener's words - and its own, in brackets, for whoever runs deadwax
+const failedWords = (lead: string, error: unknown) => noticeWords(lead, error, { admin: seesDetail(accessNow()) })
 
 function changed(): void {
   for (const listener of [...listeners]) listener()
@@ -92,7 +95,7 @@ export function askPins(fresh = true): Promise<void> {
       saveProblem = null
     } catch (reason) {
       //? an answer in hand stands, said nothing against; with none, Home says why there is none
-      if (!confirmed) readProblem = `Couldn't get your pins: ${message(reason)}`
+      if (!confirmed) readProblem = failedWords("Couldn't get your pins.", reason)
     }
   }).finally(() => {
     asking = null
@@ -112,7 +115,7 @@ export function sayPins(text: string): void {
  * One change: shown at once, sent in turn, and the server's answer - every pin - taken as its word.
  * A refusal: `refused(reason)` says so where the change was made.
  */
-async function send(op: PinOp, request: () => Promise<PinsAnswer>, refused: (reason: string) => void, kept?: () => void): Promise<void> {
+async function send(op: PinOp, request: () => Promise<PinsAnswer>, refused: (reason: unknown) => void, kept?: () => void): Promise<void> {
   pending.push(op)
   saveProblem = null
   changed()
@@ -122,7 +125,7 @@ async function send(op: PinOp, request: () => Promise<PinsAnswer>, refused: (rea
     readProblem = null
     kept?.()
   } catch (reason) {
-    refused(message(reason))
+    refused(reason)
   } finally {
     pending.splice(pending.indexOf(op), 1)
     changed()
@@ -136,7 +139,7 @@ async function send(op: PinOp, request: () => Promise<PinsAnswer>, refused: (rea
  */
 export function setPinned(target: PinTarget, on: boolean, say = false): Promise<void> {
   const name = targetName(target)
-  const refused = (reason: string) => sayPins(`Couldn't ${on ? 'pin' : 'unpin'} ${name}: ${reason}`)
+  const refused = (reason: unknown) => sayPins(failedWords(`Couldn't ${on ? 'pin' : 'unpin'} ${name}.`, reason))
   const kept = say ? () => sayPins(on ? `Pinned ${name} to Home` : `Unpinned ${name} from Home`) : undefined
   if (on) {
     made += 1
@@ -153,8 +156,8 @@ function editRequest(op: PinOp): () => Promise<PinsAnswer> {
   }
 }
 
-const editRefused = (reason: string) => {
-  saveProblem = `Not saved: ${reason}`
+const editRefused = (reason: unknown) => {
+  saveProblem = failedWords('Not saved.', reason)
 }
 
 /** Home's Edit: the pin with this key to place `to` - in the list as it shows. */

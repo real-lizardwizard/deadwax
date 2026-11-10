@@ -3,8 +3,8 @@ import { useEffect, useState } from 'preact/hooks'
 import { clearSavedAnswers, getSavedAnswers, type SavedAnswersStats } from '../api/musicbrainzCache'
 import { isAbort, latestOnly } from '../lib/latest'
 import { describeSavedAnswers } from '../lib/musicbrainzAnswers'
+import { sayError } from '../app/sayError'
 
-const message = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 
 /**
  * "Clear MusicBrainz's saved answers" (2.0.0-player.54), under MUSICBRAINZ_CACHE_PATH and
@@ -49,7 +49,7 @@ export function MusicBrainzAnswers({ unsaved, live = true }: { unsaved: boolean;
         setCleared(false)
       },
       (reason: unknown) => {
-        if (ticket.current() && !isAbort(reason)) setError(`couldn't read them - ${message(reason)}`)
+        if (ticket.current() && !isAbort(reason)) setError(sayError(reason, '', { failed: "Couldn't read MusicBrainz's saved answers." }))
       },
     )
   }, [live])
@@ -72,7 +72,7 @@ export function MusicBrainzAnswers({ unsaved, live = true }: { unsaved: boolean;
       },
       (reason: unknown) => {
         if (!ticket.current()) return
-        setError(`couldn't clear them - ${message(reason)}`)
+        setError(sayError(reason, '', { failed: "Couldn't clear MusicBrainz's saved answers." }))
         setClearing(false)
       },
     )
@@ -100,7 +100,7 @@ export function MusicBrainzAnswers({ unsaved, live = true }: { unsaved: boolean;
         {unsaved
           ? 'Save the new path first.'
           : error
-            ? `MusicBrainz's saved answers: ${error}`
+            ? error
             : stats
               ? describeSavedAnswers(stats, cleared)
               : 'Reading the saved answers…'}

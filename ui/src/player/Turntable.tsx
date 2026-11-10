@@ -6,11 +6,11 @@ import { levels, type LevelledTrack } from '../lib/loudness'
 import { isFlac, resamples } from '../lib/streamWrap'
 import {
   ARM, ARM_PARTS, PLATTER, RECORD, STAGE, across, armAngle, armMove, armStart, dragEnd, dragFor, moved, needleAt,
-  placeCircle, placePoint, preview, previewWords, recordMove, recordStart, samePreview, shownTime, timeLine,
+  placeCircle, placePoint, preview, previewWords, recordMove, recordStart, samePreview, shownTime, silentNote, soundless, timeLine,
   type Box, type Drag, type Preview, type RecordDrag,
 } from '../lib/turntable'
 import { Cover } from './Cover'
-import { Deck, wakeDeckAudio, type DeckHost } from './deck'
+import { Deck, deckReport, onDeckReport, wakeDeckAudio, type DeckHost } from './deck'
 import { SpeedFader, type SpeedPlayer } from './SpeedFader'
 import { usePosition, type Player } from './usePlayer'
 
@@ -96,7 +96,10 @@ function kindOf(track: { suffix?: string | null | undefined; contentType?: strin
  * - THE SPEED FADER (2.0.0-player.39, player/SpeedFader.tsx) stands at the right of the platter, as a
  *   deck's pitch control: the player's speed, 0.25x to 2x - which the deck's motor follows (told here as
  *   it changes), so the platter turns at it and a let-go record comes back to it.
- * - No hint and no coach mark (James: "the instructions for how to use it are a little annoying").
+ * - No hint and no coach mark (James: "the instructions for how to use it are a little annoying"). One line only
+ *   when a turn finds the record silent for good on this song (2.0.7, lib/turntable.ts silentNote): not a FLAC, or
+ *   no Web Audio here - told to Now Playing (`onSilent`), which lays it where a failure goes, from the first turn
+ *   of the song until the song changes.
  *
  * A leaf: the player and the disc art's address come as props. `onPreview` tells Now Playing what
  * the drag says, for the time line under the song's name; `deck` hands Now Playing this turntable's
@@ -111,6 +114,7 @@ export function Turntable({
   deck: deckRef,
   windowSource,
   fader,
+  onSilent,
 }: {
   player: TurntablePlayer
   /** Now Playing is open - closed, the record stops */
@@ -128,6 +132,8 @@ export function Turntable({
   /** the speed fader's player (2.0.0-player.39): Now Playing's, the app's own - the bench gives none, and
    *  draws no fader */
   fader?: SpeedPlayer | null
+  /** (2.0.7) the line for a record a turn found silent for good on this song (SILENT_WORDS), or null */
+  onSilent?: (note: string | null) => void
 }) {
   //? usePosition reads only position() and onPosition() of what it is handed
   const position = usePosition(player as Player)
@@ -161,6 +167,11 @@ export function Turntable({
   const [deckShown, setDeckShown] = useState<{ at: number; scrubbing: boolean } | null>(null)
   const deckShownRef = useRef(deckShown)
   const said = useRef<TurntablePreview>(null)
+  //? (2.0.7) the song a turn found the record silent on (not the deck's press), and whether this browser can sound
+  //? the record at all - told as the deck's report changes, a boolean, so nothing else redraws this
+  const [turnedSilent, setTurnedSilent] = useState<string | null>(null)
+  const [noAudio, setNoAudio] = useState(() => soundless(deckReport()))
+  useEffect(() => onDeckReport((report) => setNoAudio(soundless(report))), [])
   const [failedArt, setFailedArt] = useState<string | null>(null)
   const [loadedArt, setLoadedArt] = useState<string | null>(null)
 
@@ -273,6 +284,12 @@ export function Turntable({
     }
   }, [])
 
+  //? (2.0.7) the silent record's line, from the first turn of the song until the song changes - only for a silence
+  //? that lasts (not a FLAC, no Web Audio), told to Now Playing as it changes and taken back as this goes
+  const silent = turnedSilent === track && track ? silentNote(!!windows.current || (player.track ? isFlac(player.track) : false), noAudio) : null
+  useEffect(() => onSilent?.(silent), [silent])
+  useEffect(() => () => onSilent?.(null), [])
+
   //? the arm held wins: it shows where the finger has it, and is where letting go will go
   const previewing = deckShown && drag?.kind !== 'arm' ? ({ how: 'deck', at: deckShown.at, scrubbing: deckShown.scrubbing } as const) : preview(drag)
   const shown = shownTime(previewing, position, length)
@@ -336,7 +353,11 @@ export function Turntable({
     if (next === now) return
     //? a turn past a tap: the click after it is not a tap, however the drag ends - even dropped by
     //? the song changing under it, when no release says so and a mouse's click still comes
-    if (next?.kind === 'record' && moved(next)) turned.current = true
+    if (next?.kind === 'record' && moved(next)) {
+      turned.current = true
+      //? (2.0.7) .11's silent turn: the first of the song is when its silence is noticed
+      if (turnedSilent !== track) setTurnedSilent(track)
+    }
     setDrag(next)
   }
   const onRelease = (how: 'up' | 'cancel') => (event: PointerEvent) => {

@@ -6,6 +6,7 @@ import {
   GET_SETTINGS_DEFAULT, readGetSettings, seedFromPreferences, type GetSettings, type GetSettingsAnswer,
 } from '../lib/getSettings'
 import { readDownloadDefaults, readPreferences } from '../state/persisted'
+import { sayError } from './sayError'
 
 /**
  * You > Getting albums, as the server keeps them (2.0.0-player.15): "When I tap Get", the quality
@@ -56,7 +57,6 @@ let seededHere = false
 let line: Promise<unknown> = Promise.resolve()
 const listeners = new Set<() => void>()
 
-const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 function changed(): void {
   for (const listener of [...listeners]) listener()
@@ -127,7 +127,8 @@ export function askGetSettings(): Promise<void> {
       readProblem = null
     } catch (reason) {
       //? an answer in hand stands, said nothing against; with none, You says deadwax didn't answer
-      if (!confirmed) readProblem = `deadwax didn't answer: ${message(reason)}`
+      //? (2.0.4) in a listener's words (sayError) - the error's own in brackets for whoever runs deadwax
+      if (!confirmed) readProblem = sayError(reason, "Couldn't get these from deadwax.")
     }
   }).finally(() => {
     asking = null
@@ -149,7 +150,7 @@ export async function chooseGetSettings(values: Partial<GetSettings>): Promise<v
     //? the server's answer to a save is all of the settings, as they stand after it
     confirmed = readGetSettings(await inTurn(() => putPreferences(values)))
   } catch (reason) {
-    saveProblem = `Not saved: ${message(reason)}`
+    saveProblem = sayError(reason, 'Not saved.')
   } finally {
     pending.splice(pending.indexOf(choice), 1)
     changed()

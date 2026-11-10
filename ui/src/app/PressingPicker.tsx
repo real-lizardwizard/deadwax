@@ -187,7 +187,7 @@ export function PressingPicker({ view, onPick }: { view: PressingsView; onPick: 
               onInput={(event) => setTyped((event.currentTarget as HTMLInputElement).value)}
               //? what works, as the rows say it - a country by its code, as MusicBrainz gives it (review:
               //? "country" asked for "Japan", which no row says)
-              placeholder="JP, CD, a label or cat. no."
+              placeholder="JP, CD, a label or catalogue no."
               aria-controls={listId}
               enterKeyHint="search"
               autoComplete="off"
@@ -214,7 +214,7 @@ export function PressingPicker({ view, onPick }: { view: PressingsView; onPick: 
                   <span class="app-picker-option-label">{row.label}</span>
                   {row.facts && <span class="app-picker-facts">{row.facts}</span>}
                   <span class={`app-picker-note${row.kind === 'differs' ? ' is-differs' : ''}`}>{row.note}</span>
-                  {row.held && <span class={`app-picker-held${row.inStore ? ' is-store' : ''}`}>{row.inStore ? 'In the store' : 'In your library'}</span>}
+                  {row.held && <span class={`app-picker-held${row.inStore ? ' is-store' : ''}`}>{row.inStore ? 'In the collection' : 'In your library'}</span>}
                 </span>
               </button>
             )

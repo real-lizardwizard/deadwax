@@ -277,6 +277,10 @@ def test_there_is_no_general_proxy():
     savePlayQueueByIndex, with parameters deadwax builds from declared, bounded fields (the request models forbid any
     other): nothing the page sends is passed on but the ids, the index and the position. deadwax's own record of the
     queue beside it is the asker's alone, and the break-glass admin is asked nothing - see test_play_queue.py.
+
+    (2.0.13) Not a route here, on purpose: the artist and album descriptions (src/routes/describe.py) are deadwax's
+    own answers, which ask getArtistInfo2 / getAlbumInfo2 as the asker with the id alone - see test_describe.py
+    and test_player_as_you.py.
     """
     paths = sorted(route.path for route in navidrome_routes.router.routes)
 

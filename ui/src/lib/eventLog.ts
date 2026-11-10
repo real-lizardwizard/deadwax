@@ -109,5 +109,6 @@ export const STREAM_RETRY_MS = 5000
 export const STREAM_WORDS: Readonly<Record<StreamState, string>> = {
   connecting: 'Connecting…',
   live: 'Live',
-  lost: 'The stream was lost - trying again',
+  //? (2.0.8, UX batch 5) it was "The stream was lost - trying again"
+  lost: 'Lost the live feed - reconnecting…',
 }

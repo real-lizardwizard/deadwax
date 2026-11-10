@@ -7,8 +7,9 @@ the desktop's values for theme.css's tokens - read as rules, as tests/test_app_c
   App puts on the shell only in the desktop frame. The breakpoints are lib/appFrame.ts's own
   constants, so the markup's frame (matchMedia) and the styles' can never disagree.
 - The desktop's look is the same tokens redefined in a media query (theme.css section 10): labels
-  11px, headings 13px, data 12px, cards #1e1c26, the page #0b0a10 - and body text left alone, since
-  text fields read it and an iPad on its side is 1024px wide (iOS zooms into a field under 16px).
+  12px, headings 13px, data 13px, body text 14px (2.0.9's type review), cards #1e1c26, the page #0b0a10 -
+  and text fields' own token left alone, since an iPad on its side is 1024px wide (iOS zooms into a field
+  under 16px).
 - Tokens only, as app.css: no raw length, time, line height, opacity or filter in a rule.
 - The frame as DesktopLibrary.dc.html draws it: a 232px sidebar, a 72px player bar, the page given
   room for both; Sources and Info a 470px panel beside the page - never over the bar, no backdrop,
@@ -146,15 +147,18 @@ def test_the_desktop_stylesheet_draws_only_from_tokens():
 
 def test_the_desktop_redefines_the_looks_tokens_in_a_media_query_never_the_phones():
     desk = media_tokens(THEME, DESK)
-    #? the plan's three, and the rest of STYLE.md's desktop scale
-    assert desk["--dw-text-label"] == "11px"
+    #? the plan's three, and the rest of STYLE.md's desktop scale - with 2.0.9's type review: labels 12px and data
+    #? 13px (they were 11 and 12, the hardest text in the app to read), body text 14px (it was 17, a field's size)
+    assert desk["--dw-text-label"] == "12px"
     assert desk["--dw-text-heading"] == "13px"
     assert desk["--dw-card"] == "#1e1c26"
     assert desk["--dw-bg"] == "#0b0a10"
-    assert desk["--dw-text-data"] == "12px"
+    assert desk["--dw-text-data"] == "13px"
     assert (desk["--dw-text-large-title"], desk["--dw-text-title"]) == ("28px", "30px")
-    #? text fields read it: an iPad on its side is a desktop, and iOS zooms into a field under 16px
-    assert "--dw-text-body" not in desk
+    assert (desk["--dw-text-body"], desk["--dw-text-footnote"]) == ("14px", "13px")
+    #? text fields read their own token, never redefined: an iPad on its side is a desktop, and iOS zooms into a
+    #? field under 16px
+    assert "--dw-text-field" not in desk
     #? the phone's own values stand
     phone = {name: value for where, selector, values in rules(THEME) if where == "" and selector == ":root"
              for name, value in values.items()}
@@ -226,9 +230,10 @@ def test_the_tracklists_against_column_and_a_sources_five_facts():
 
 
 def test_the_sidebar_field_is_never_small_enough_for_ios_to_zoom_under_a_finger():
-    assert declarations(DESKTOP, ".app-desk .app-side-input", COARSE)["font-size"] == "var(--dw-text-body)"
-    #? a pointer you aim gets the board's 13px
-    assert media_tokens(DESKTOP, DESK)["--app-desk-field-text"] == "13px"
+    assert declarations(DESKTOP, ".app-desk .app-side-input", COARSE)["font-size"] == "var(--dw-text-field)"
+    #? a pointer you aim gets the board's 13px: the desktop's meta size (2.0.9 - it was a token of this file's own)
+    assert declarations(DESKTOP, ".app-desk .app-side-input", DESK)["font-size"] == "var(--dw-text-footnote)"
+    assert media_tokens(THEME, DESK)["--dw-text-footnote"] == "13px"
 
 
 def test_the_selection_is_explorers():
@@ -518,7 +523,7 @@ def test_the_edit_panel_is_a_fingers_where_the_pointer_is_coarse():
     assert coarse["--app-desk-edit-control"] == coarse["--app-desk-edit-apply"] == "var(--pl-hit)"
     assert declarations(DESKTOP, ".app-desk .app-edit-tab", COARSE)["min-height"] == "var(--pl-hit)"
     for field in (".app-desk .app-edit .releases-filter-input", ".app-desk .app-edit-select"):
-        assert declarations(DESKTOP, field, COARSE)["font-size"] == "var(--dw-text-body)", field
+        assert declarations(DESKTOP, field, COARSE)["font-size"] == "var(--dw-text-field)", field
     #? the cover viewer's hint for a hand that taps and pinches
     assert declarations(DESKTOP, ".app-desk .app-edit .hint-touch", COARSE)["display"] == "inline"
     assert declarations(DESKTOP, ".app-desk .app-edit .hint-pointer", COARSE)["display"] == "none"
@@ -724,7 +729,7 @@ def test_the_settings_rows_are_the_tabs_own_classes_styled_here_and_long_values_
 
 def test_where_the_pointer_is_coarse_the_settings_fields_are_17px_and_the_controls_a_finger():
     field = declarations(DESKTOP, ".app-desk .app-settings .settings-env-input", COARSE)
-    assert (field["font-size"], field["height"]) == ("var(--dw-text-body)", "var(--pl-hit)")
+    assert (field["font-size"], field["height"]) == ("var(--dw-text-field)", "var(--pl-hit)")
     for selector in (".app-desk .app-settings .settings-env-revert", ".app-desk .app-settings-save",
                      ".app-desk .app-settings-discard", ".app-desk .app-log-clear"):
         assert declarations(DESKTOP, selector, COARSE)["min-height"] == "var(--pl-hit)", selector
@@ -764,7 +769,7 @@ def test_the_artist_pages_panel_is_a_side_panel_by_the_same_rule():
     #? ...a finger's where the pointer is coarse (the token the coarse block sets), its field 17px there
     assert declarations(DESKTOP, ":root", COARSE)["--app-desk-close"] == "var(--pl-hit)"
     field = declarations(DESKTOP, ".app-desk .app-artist-search-input", COARSE)
-    assert (field["min-height"], field["font-size"]) == ("var(--pl-hit)", "var(--dw-text-body)")
+    assert (field["min-height"], field["font-size"]) == ("var(--pl-hit)", "var(--dw-text-field)")
     assert declarations(DESKTOP, ".app-desk .app-artist-panel-foot .pl-pill", COARSE)["height"] == "var(--pl-hit)"
 
 
@@ -772,7 +777,7 @@ def test_the_artist_pages_sections_stand_side_by_side_their_rows_a_desktop_rows(
     more = declarations(DESKTOP, ".app-desk .app-artist-more", DESK)
     assert (more["display"], more["grid-template-columns"]) == ("grid", "repeat(auto-fit, minmax(var(--app-desk-artist-column), 1fr))")
     rows = declarations(DESKTOP, ".app-desk .app-artist-more .app-row", DESK)
-    assert (rows["min-height"], rows["font-size"]) == ("var(--app-desk-row)", "var(--app-desk-text)")
+    assert (rows["min-height"], rows["font-size"]) == ("var(--app-desk-row)", "var(--dw-text-body)")
     assert declarations(DESKTOP, ":root", COARSE)["--app-desk-row"] == "var(--pl-hit)"
 
 
@@ -834,7 +839,7 @@ def test_library_cares_field_and_controls_are_a_fingers_where_the_pointer_is_coa
     assert (field["background"], field["height"], field["min-width"]) == ("var(--dw-well)", "var(--app-desk-control)", "0")
     assert declarations(DESKTOP, ".app-desk .app-care-button", DESK)["min-height"] == "var(--app-desk-control)"
     assert media_tokens(DESKTOP, COARSE)["--app-desk-control"] == "var(--pl-hit)"
-    assert declarations(DESKTOP, ".app-desk .app-care-input", COARSE)["font-size"] == "var(--dw-text-body)"
+    assert declarations(DESKTOP, ".app-desk .app-care-input", COARSE)["font-size"] == "var(--dw-text-field)"
     assert declarations(DESKTOP, ".app-desk .app-care .app-text-button", COARSE)["min-height"] == "var(--pl-hit)"
 
 
@@ -845,7 +850,7 @@ def test_choose_the_folders_field_is_the_panels_well_and_its_folders_a_fingers()
     well = declarations(DESKTOP, ".app-desk .app-edit-pick-input", DESK)
     assert (well["background"], well["height"]) == ("var(--dw-well)", "var(--app-desk-edit-control)")
     assert media_tokens(DESKTOP, COARSE)["--app-desk-edit-control"] == "var(--pl-hit)"
-    assert declarations(DESKTOP, ".app-desk .app-edit-pick-input", COARSE)["font-size"] == "var(--dw-text-body)"
+    assert declarations(DESKTOP, ".app-desk .app-edit-pick-input", COARSE)["font-size"] == "var(--dw-text-field)"
     assert declarations(DESKTOP, ".app-desk .app-edit-choice", COARSE)["min-height"] == "var(--pl-hit)"
     assert 'class="app-edit-choice app-edit-pick-choice"' in (SRC / "app" / "FolderPicker.tsx").read_text()
     panel = (SRC / "app" / "EditPanel.tsx").read_text()
@@ -898,8 +903,8 @@ def test_the_chosen_pressings_facts_are_one_line_the_rows_whole_width_on_a_deskt
     moves nothing under it."""
     facts = declarations(DESKTOP, ".app-desk .app-rg-facts", DESK)
     assert facts["flex-basis"] == "100%"
-    assert facts["height"] == "calc(var(--app-desk-rg-facts-lines) * var(--dw-leading-note) * var(--app-desk-text-sm))"
-    assert (facts["font-size"], facts["-webkit-line-clamp"]) == ("var(--app-desk-text-sm)", "var(--app-desk-rg-facts-lines)")
+    assert facts["height"] == "calc(var(--app-desk-rg-facts-lines) * var(--dw-leading-note) * var(--dw-text-footnote))"
+    assert (facts["font-size"], facts["-webkit-line-clamp"]) == ("var(--dw-text-footnote)", "var(--app-desk-rg-facts-lines)")
     assert media_tokens(DESKTOP, DESK)["--app-desk-rg-facts-lines"] == "1"
 
 

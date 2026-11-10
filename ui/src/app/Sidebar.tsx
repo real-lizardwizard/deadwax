@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'preact/hooks'
 
-import { SIDEBAR_CARE, SIDEBAR_LOG, SIDEBAR_PEOPLE, SIDEBAR_PLAYLISTS, SIDEBAR_QUEUE, SIDEBAR_SETTINGS, SIDEBAR_TOP, type SidebarId, type SidebarItem } from '../lib/appFrame'
+import { ALL_MUSIC, SIDEBAR_CARE, SIDEBAR_LOG, SIDEBAR_PEOPLE, SIDEBAR_PLAYLISTS, SIDEBAR_QUEUE, SIDEBAR_SETTINGS, SIDEBAR_TOP, type SidebarId, type SidebarItem } from '../lib/appFrame'
 import { needsLookLabel } from '../lib/needsLook'
 import { managing as managingOf, ALL, type Managing } from '../lib/permissions'
 import { badgeLabel, badgeText } from '../lib/requestsView'
@@ -95,9 +95,9 @@ export function Sidebar({
           {...(badge ? { 'aria-label': id === 'queue' ? needsLookLabel(label, needsLook) : badgeLabel(label, arriving) } : {})}
           onClick={() => onSelect(id)}
         >
-          <span class="app-side-item-label">{label}</span>
+          <span class="app-side-item-label" dir="auto">{label}</span>
           {badge && (
-            <span class="app-side-badge app-mono" aria-hidden="true">
+            <span class="app-side-badge" aria-hidden="true">
               {badge}
             </span>
           )}
@@ -133,7 +133,9 @@ export function Sidebar({
               if (next.trim()) onSearch()
             }}
             maxLength={SEARCH_MAX_CHARS}
-            placeholder="Search everything"
+            //? (2.0.5) "Search" - "Search everything" said "everything" for the collection, and Search's own
+            //? "Artists, albums and songs" doesn't fit the sidebar's field; its name (aria-label) says what it searches
+            placeholder="Search"
             aria-label={searchWords(personal).label}
             enterKeyHint="search"
             autoComplete="off"
@@ -155,7 +157,7 @@ export function Sidebar({
       {browse.length > 0 && (
         <section class="app-side-group" aria-labelledby="app-side-browse">
           <h2 id="app-side-browse" class="app-side-label">
-            Browse
+            {ALL_MUSIC}
           </h2>
           <ul class="app-side-list">{browse.map(item)}</ul>
         </section>
@@ -170,7 +172,7 @@ export function Sidebar({
             ? (
               <li key="playlists">
                 <button type="button" class="app-side-item" onClick={() => onSelect('playlists')}>
-                  <span class="app-side-item-label">{SIDEBAR_PLAYLISTS.label}</span>
+                  <span class="app-side-item-label" dir="auto">{SIDEBAR_PLAYLISTS.label}</span>
                 </button>
               </li>
             )
@@ -185,7 +187,7 @@ export function Sidebar({
                   {...(chosen ? { 'aria-current': 'page' as const } : {})}
                   onClick={() => onPlaylist?.(one.id)}
                 >
-                  <span class="app-side-item-label">{one.name}</span>
+                  <span class="app-side-item-label" dir="auto">{one.name}</span>
                 </button>
               </li>
             )
@@ -195,8 +197,9 @@ export function Sidebar({
 
       {managing.any && (
         <section class="app-side-group" aria-labelledby="app-side-managing">
+          {/* (2.0.8, UX batch 5) "Manage", James's word for the admin area - it was "Managing" */}
           <h2 id="app-side-managing" class="app-side-label">
-            Managing
+            Manage
           </h2>
           <ul class="app-side-list">
             {managing.queue && item(SIDEBAR_QUEUE)}
@@ -217,7 +220,7 @@ export function Sidebar({
         <span class="app-side-avatar" aria-hidden="true">
           <YouIcon class="app-side-avatar-icon" />
         </span>
-        <span class="app-side-item-label">You</span>
+        <span class="app-side-item-label" dir="auto">You</span>
       </button>
     </nav>
   )

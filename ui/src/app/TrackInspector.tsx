@@ -16,6 +16,7 @@ import {
 import { ChevronLeftIcon, ChevronRightIcon } from '../player/icons'
 import { CoverViewer } from './CoverViewer'
 import { takeOpener } from './useSheet'
+import { sayError } from './sayError'
 
 /** The inspector's line for a screen reader (one inspector at a time, the panel's). */
 const NOW_ID = 'app-inspect-now'
@@ -251,7 +252,7 @@ function InspectorLyrics({ album, filename }: { album: LibraryAlbum; filename: s
         if (ticket.current()) setState({ key, lyrics })
       },
       (reason: unknown) => {
-        if (ticket.current() && !isAbort(reason)) setState({ key, error: reason instanceof Error ? reason.message : String(reason) })
+        if (ticket.current() && !isAbort(reason)) setState({ key, error: sayError(reason, '', { failed: "Couldn't read this track's lyrics." }) })
       },
     )
     return () => requests.supersede()

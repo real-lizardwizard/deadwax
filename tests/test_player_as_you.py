@@ -96,8 +96,10 @@ class Player(Navidrome):
     #? (2.0.0-player.64) Navidrome's play queue, one per user, as server/subsonic/bookmarks.go and
     #? persistence/playqueue_repository.go keep it at 0.64.2 - see play_queue_call
     QUEUE_CALLS = frozenset({"getPlayQueue", "getPlayQueueByIndex", "savePlayQueue", "savePlayQueueByIndex"})
+    #? (2.0.13) the descriptions' fallback, Navidrome's own words - see the end of handle
+    DESCRIBE_CALLS = frozenset({"getArtistInfo2", "getAlbumInfo2"})
     PLAYER_CALLS = frozenset({"ping", "getAlbumList2", "getArtists", "getArtist", "getSong", "getCoverArt",
-                              "stream", "scrobble"}) | PLAYLIST_CALLS | QUEUE_CALLS
+                              "stream", "scrobble"}) | PLAYLIST_CALLS | QUEUE_CALLS | DESCRIBE_CALLS
 
     def __init__(self):
         super().__init__()
@@ -320,6 +322,13 @@ class Player(Navidrome):
             else:
                 self.playing[user] = q["id"]
             return httpx.Response(200, json=ok())
+        #? (2.0.13) the descriptions' fallback: Navidrome's own words for an artist or an album
+        if endpoint == "getArtistInfo2":
+            return httpx.Response(200, json=ok(artistInfo2={"biography": "Portishead are a band from Bristol.",
+                                                            "lastFmUrl": "https://www.last.fm/music/Portishead"}))
+        if endpoint == "getAlbumInfo2":
+            return httpx.Response(200, json=ok(albumInfo={"notes": "Dummy is their first album.",
+                                                          "lastFmUrl": "https://www.last.fm/music/Portishead/Dummy"}))
         if endpoint == "getCoverArt":
             return streamed(200, b"\x89PNG\r\n\x1a\n" + b"\0" * 32, {"content-type": "image/png"})
         return self.serve(request)
@@ -573,13 +582,29 @@ def test_only_the_shared_account_list_names_the_shared_client():
         if names_the_shared_client(path.read_text()):
             named.add(str(path.relative_to(ROOT)))
     assert named == set(SHARED_ACCOUNT_USES)
-    for path in ("src/routes/navidrome.py", "src/routes/store_album.py", "src/routes/pins.py", "src/routes/my_library.py"):
+    for path in ("src/routes/navidrome.py", "src/routes/store_album.py", "src/routes/pins.py", "src/routes/my_library.py",
+                 "src/routes/describe.py"):
         text = (ROOT / path).read_text()
         assert not re.search(r"\bnavidrome\.(call|open)\(", text), path
         assert "client_for" in text, path
     #? the library routes' one call as the shared account is the apply's getScanStatus
     calls = re.findall(r"\bnavidrome\.call\(\"(\w+)\"", (ROOT / "src/routes/library.py").read_text())
     assert calls == ["getScanStatus"]
+
+
+def test_the_descriptions_ask_navidrome_as_the_signed_in_user(player):
+    """(2.0.13) An artist's or an album's description: Navidrome's own words first (no MusicBrainz id here), asked AS
+    THEM - getArtistInfo2 and getAlbumInfo2 through client_for, never the shared account."""
+    ethan = signed_in(player, "ethan")
+    player.fake.forget()
+
+    artist = ethan.get("/deadwax/describe/artist", params={"navidrome_id": "ar-1"})
+    album = ethan.get("/deadwax/describe/album", params={"navidrome_id": "nd-dummy"})
+
+    assert artist.json() == {"text": "Portishead are a band from Bristol.", "source": "lastfm",
+                             "url": "https://www.last.fm/music/Portishead", "subtitle": None, "unavailable": False}
+    assert album.json()["text"] == "Dummy is their first album."
+    assert player.fake.by() == [("ethan", "getArtistInfo2"), ("ethan", "getAlbumInfo2")]
 
 
 # ----------------------------------------------------------------- the cached stream, checked per user
@@ -693,12 +718,15 @@ def test_calls_already_on_their_way_when_the_login_dies_end_it_once(player):
     assert auth.player_refused(stand_in) is False
 
 
-def test_a_refused_login_is_a_401_from_the_status_the_bridge_the_turntable_and_the_pins_too(player):
+def test_a_refused_login_is_a_401_from_the_status_the_bridge_the_turntable_the_pins_and_the_descriptions(player):
     """Each place that turns a Navidrome failure into "Navidrome didn't say" lets a refused login through."""
     asks = [("get", f"{PLAYER}/status", None), ("get", f"{BRIDGE}?navidrome_id=nd-dummy", None),
             ("get", f"{BRIDGE}?release_mbid={CD}", None),
             ("get", "/deadwax/library/disc_art/navidrome?album=nd-dummy", None),
-            ("post", "/deadwax/me/pins/toggle", {"kind": "album", "pinned": True, "navidrome_id": "nd-dummy"})]
+            ("post", "/deadwax/me/pins/toggle", {"kind": "album", "pinned": True, "navidrome_id": "nd-dummy"}),
+            #? (2.0.13) the descriptions' Navidrome side
+            ("get", "/deadwax/describe/artist?navidrome_id=ar-1", None),
+            ("get", "/deadwax/describe/album?navidrome_id=nd-dummy", None)]
     for method, path, body in asks:
         ethan = signed_in(player, "ethan")
         player.fake.passwords["ethan"] = "changed"
@@ -741,6 +769,95 @@ def test_the_users_login_goes_on_last_and_an_ended_session_asks_nothing(player):
     with pytest.raises(navidrome_endpoint.SignedOut):
         run(client.call("ping"))
     assert player.fake.by() == []
+
+
+def test_a_refusal_of_a_login_since_resealed_fails_the_call_and_never_signs_out(player):
+    """(2.0.2) A player call made with the login read before its person changed their own password from deadwax, and
+    refused after it (error 40): the session has been re-sealed with the new password (auth.own_password_changed), so
+    the call fails as itself - never a SignedOut, whose 401 would bring the sign-in screen up - and the session stands;
+    and while the change is under way (auth.changing_password) the same."""
+    client, key = ethans_client(player)
+    player.fake.passwords["ethan"] = "changed-from-deadwax"
+    with auth.changing_password(key, "ethan"):
+        with pytest.raises(navidrome_endpoint.NavidromeError) as during:
+            run(client.call("ping"))
+    assert not isinstance(during.value, navidrome_endpoint.SignedOut) and during.value.code == 40
+    assert auth.session_ended(key) is None
+    resealed = auth.seal_credential("ethan", auth.subsonic_token("changed-from-deadwax", "salt"), "salt")
+    with auth._lock:
+        auth._held[key].credential = resealed
+    with pytest.raises(navidrome_endpoint.NavidromeError) as after:
+        run(client.call("ping"))
+    assert not isinstance(after.value, navidrome_endpoint.SignedOut)
+    assert auth.session_ended(key) is None and player.store.session(key) is not None
+    #? an old login with nothing newer behind it is still the sign-out it always was
+    with auth._lock:
+        auth._held[key].credential = client.login.sealed
+    with pytest.raises(navidrome_endpoint.SignedOut):
+        run(client.call("ping"))
+    assert auth.session_ended(key) == auth.LOGIN_GONE
+
+
+def _twenty_pins(env, user: str = "ethan") -> None:
+    pins = [{"kind": "album", "ref": f"release:{uuid.uuid4()}", "label": f"Album {n}", "sub": "X",
+             "navidrome_id": f"nd-{n}", "cover": None} for n in range(20)]
+    assert run(env.store.write_pins(user, pins))
+
+
+def test_a_burst_with_the_old_login_while_the_change_runs_is_one_refused_login(player):
+    """(2.0.2 review) ethan changes his password from this session, Navidrome has taken it, and Home's pins are resolved
+    with the OLD login before the re-seal: the session stands - but the refusal never confirms the dead login, so one
+    call asks and the other nineteen fail without asking (twenty failed logins would trip Navidrome's 5-in-20-s block
+    on the name, and the change's proof with the new password would be refused)."""
+    ethan = signed_in(player, "ethan")
+    _twenty_pins(player)
+    slow(player)
+    player.fake.passwords["ethan"] = "changed-from-deadwax"
+    player.fake.forget()
+    with auth.changing_password(auth.id_hash(ethan.cookies[auth.COOKIE]), "ethan"):
+        answer = ethan.get("/deadwax/me/pins")
+    assert answer.status_code != 401
+    assert len([call for call in player.fake.by() if call[0] == "ethan"]) == 1
+    assert ethan.get("/deadwax/me").json()["user"] == "ethan"
+
+
+def test_concurrent_calls_with_a_superseded_login_ask_navidrome_once(player):
+    client, key = ethans_client(player)
+    navidrome_endpoint.forget_confirmed()                  # the last answer a while ago: the first call goes alone
+    player.fake.passwords["ethan"] = "changed-from-deadwax"
+    player.fake.forget()
+
+    async def eight():
+        with auth.changing_password(key, "ethan"):
+            return await asyncio.gather(*(client.call("ping") for _ in range(8)), return_exceptions=True)
+
+    results = run(eight())
+    assert len(player.fake.by()) == 1
+    assert all(isinstance(r, navidrome_endpoint.NavidromeError) and not isinstance(r, navidrome_endpoint.SignedOut)
+               and r.code == 40 for r in results)
+    assert auth.session_ended(key) is None
+    #? a refused login is never confirmed by its refusal
+    assert key not in navidrome_endpoint._confirmed
+
+
+def test_another_device_while_a_change_runs_ends_at_its_first_refusal_told_why(player):
+    """(2.0.2 review) The guard is the changing SESSION's, never the person's: ethan's desktop, on Home while his phone
+    changes the password, is refused once and signed out - its burst is one failed login, as in 2.0.0 - and (review 2)
+    told it is the change's doing, as the devices own_password_changed ends are. The change never took here, so once
+    it is over the reason noted is LOGIN_GONE again: that login died of something else."""
+    phone, desktop = signed_in(player, "ethan"), signed_in(player, "ethan")
+    _twenty_pins(player)
+    slow(player)
+    player.fake.passwords["ethan"] = "changed-from-deadwax"
+    player.fake.forget()
+    desktop_key = auth.id_hash(desktop.cookies[auth.COOKIE])
+    with auth.changing_password(auth.id_hash(phone.cookies[auth.COOKIE]), "ethan"):
+        answer = desktop.get("/deadwax/me/pins")
+        assert desktop.get("/deadwax/me").json()["detail"] == auth.PASSWORD_CHANGED
+    assert answer.status_code == 401 and answer.json()["detail"] == auth.PASSWORD_CHANGED
+    assert len([call for call in player.fake.by() if call[0] == "ethan"]) == 1
+    assert auth.superseded(player.store, "ethan", desktop_key, "x") is False
+    assert auth.session_ended(desktop_key) == auth.LOGIN_GONE
 
 
 def test_a_login_that_wont_open_asks_navidrome_nothing_and_ends_the_session(player, monkeypatch):
@@ -988,7 +1105,7 @@ def test_remove_says_so_when_navidrome_keeps_the_star_and_leaves_the_library_as_
 
     navidrome.client = httpx.AsyncClient(transport=httpx.MockTransport(keeps), base_url=f"{NAVIDROME}/rest")
     answer = signed_in(player, "ethan").post(f"{LIBRARY}/remove", json={"navidrome_id": "nd-dummy"})
-    assert answer.status_code == 502 and "kept the star" in answer.json()["detail"]
+    assert answer.status_code == 502 and answer.json()["detail"] == "It's still in your library - try Remove again in a moment."
     #? unstarred first, the ledger after: a Remove Navidrome refused takes nothing out of it
     assert entries(player, "ethan")[album]["state"] == "starred"
 

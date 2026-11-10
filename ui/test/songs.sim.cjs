@@ -227,10 +227,10 @@ console.log('\nMore songs: a later page merged in')
   check('...real takes: DJ Tripp\'s mash-up, bare on the first page, comes after the six drawn', [real.songs.slice(0, drawnFirst.length).map((song) => song.credit), real.songs[drawnFirst.length].credit],
     [drawnFirst, 'DJ Tripp'])
   check('what a page said: new songs to VoiceOver only; albums alone; nothing', [S.moreSongsWords(3, 9), S.moreSongsWords(1, 0), S.moreSongsWords(0, 7), S.moreSongsWords(0, 1), S.moreSongsWords(0, 0)], [
-    { note: null, said: '3 more songs from MusicBrainz' }, { note: null, said: '1 more song from MusicBrainz' },
+    { note: null, said: '3 more songs found' }, { note: null, said: '1 more song found' },
     { note: 'No new songs - 7 more albums for the songs above.', said: 'No new songs - 7 more albums for the songs above' },
     { note: 'No new songs - 1 more album for the songs above.', said: 'No new songs - 1 more album for the songs above' },
-    { note: 'MusicBrainz sent nothing new.', said: 'MusicBrainz sent nothing new' }])
+    { note: 'No more results.', said: 'No more results' }])
 }
 
 console.log('\nwhat you have of it')
@@ -265,8 +265,8 @@ console.log('\nwhat you have of it')
   check('...but never another song on it, the title by somebody else, the song on another album, or a song with no artist or no album id',
     [refused({ title: 'Sour Times' }), refused({ artist: 'Lorde' }), refused({ album: 'Roseland NYC Live' }), refused({ artist: undefined }), refused({ albumId: undefined }), S.songAlbumHolding(cd94, dummy, null, { heard }).albums],
     [[], [], [], [], [], []])
-  check('...with logins on, the store\'s Dummy: "in the store"', S.songAlbumLine(dummy, song, buildOwnedIndex([{ path: 'a', album: 'Dummy', release_group_mbid: dummy.id, release_mbid: CD_1994, yours: false }]), true, { heard }),
-    'Album · 1994 · in the store')
+  check('...with logins on, the store\'s Dummy: "in the collection"', S.songAlbumLine(dummy, song, buildOwnedIndex([{ path: 'a', album: 'Dummy', release_group_mbid: dummy.id, release_mbid: CD_1994, yours: false }]), true, { heard }),
+    'Album · 1994 · in the collection')
   //? ...or the album's pressings, kept for the session (its page opened before, a Get chip, or the tap's own look):
   //? the 1994 CD's tracklist has Roads, as another recording, known by its title
   const track = (recording, title = 'Roads') => ({ number: '8', position: 8, title, length: 302000, recording: { id: recording, title } })
@@ -298,16 +298,16 @@ console.log('\nwhat you have of it')
   ])
   check('logins on, a library of your own: the row names the album that is YOURS before one only the store has', S.songLine(song, store, true),
     'Portishead · 5:30 · Roseland NYC Live · in your library')
-  check('...and one only the store has says "in the store" - with logins off, "in your library" (its length said: the row\'s is the live take\'s)',
-    [S.songAlbumLine(dummy, song, store, true), S.songAlbumLine(dummy, song, store, false)], ['Album · 1994 · 4:56 · in the store', 'Album · 1994 · 4:56 · in your library'])
+  check('...and one only the store has says "in the collection" - with logins off, "in your library" (its length said: the row\'s is the live take\'s)',
+    [S.songAlbumLine(dummy, song, store, true), S.songAlbumLine(dummy, song, store, false)], ['Album · 1994 · 4:56 · in the collection', 'Album · 1994 · 4:56 · in your library'])
   const storeOnly = buildOwnedIndex([{ path: 'Portishead/Dummy (1994)', release_group_mbid: dummy.id, yours: false }])
-  check('...a song held only by the store says so', S.songLine(song, storeOnly, true), 'Portishead · 4:56 · Dummy · in the store')
+  check('...a song held only by the store says so', S.songLine(song, storeOnly, true), 'Portishead · 4:56 · Dummy · in the collection')
   //? (review) two albums only the store has: the row names the FIRST of them, as the albums are listed
   const twoStore = buildOwnedIndex([
     { path: 'Portishead/Dummy (1994)', release_group_mbid: dummy.id, release_mbid: UK_CD, yours: false },
     { path: 'Portishead/Roseland', release_mbid: roseland.releases[0], yours: false },
   ])
-  check('...two only the store has: the first of them named (Dummy, listed before the live album)', S.songLine(song, twoStore, true), 'Portishead · 4:56 · Dummy · in the store')
+  check('...two only the store has: the first of them named (Dummy, listed before the live album)', S.songLine(song, twoStore, true), 'Portishead · 4:56 · Dummy · in the collection')
 }
 
 console.log('\nwhat you have of it - a pressing without the song (review: the bonus-track case)')
@@ -321,10 +321,10 @@ console.log('\nwhat you have of it - a pressing without the song (review: the bo
   check('the usual CD held: the row claims nothing - you haven\'t the song - The Slow Rush\'s line says "a pressing in your library", and nothing of yours opens',
     [S.songLine(song, au), S.songAlbumLine(rushAlbum, song, au), S.songAlbumHeldReleases(au, rushAlbum, song)],
     ['Tame Impala · 4:53 · The Slow Rush', 'Album · 2020 · a pressing in your library', []])
-  check('...with logins on: "a pressing in the store" for the store\'s, "...in your library" for yours',
+  check('...with logins on: "a pressing in the collection" for the store\'s, "...in your library" for yours',
     [S.songAlbumLine(rushAlbum, song, buildOwnedIndex([{ path: 'a', release_group_mbid: rushAlbum.id, release_mbid: AU_CD, yours: false }]), true),
       S.songAlbumLine(rushAlbum, song, buildOwnedIndex([{ path: 'a', release_group_mbid: rushAlbum.id, release_mbid: AU_CD, yours: true }]), true)],
-    ['Album · 2020 · a pressing in the store', 'Album · 2020 · a pressing in your library'])
+    ['Album · 2020 · a pressing in the collection', 'Album · 2020 · a pressing in your library'])
   //? (second review) the evidence never makes a pressing without the song hold it: The Slow Rush's real pressings kept
   //? (the usual CD's tracklist hasn't Patience), and the library half showing another song of The Slow Rush
   check('...its real pressings kept - the usual CD without Patience - or the library half playing Borderline from it: still only "a pressing"',

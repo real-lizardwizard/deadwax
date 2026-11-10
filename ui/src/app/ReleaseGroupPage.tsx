@@ -9,11 +9,11 @@ import type { ReleaseGroup, ReleaseGroupResponse, StoreStateResponse } from '../
 import { storeNotes } from '../lib/candidates'
 import { joinDownload } from '../lib/downloadRequests'
 import { isAbort, latestOnly } from '../lib/latest'
-import { GET_OFF, gets } from '../lib/permissions'
+import { GET_OFF, albumEdit, gets } from '../lib/permissions'
 import { announceAddedToLibrary, onAddedToLibrary, onAlbumsFiled } from '../lib/libraryEvents'
 import { releaseUrl } from '../lib/albumProperties'
 import { describeGroupOwnership, ownedForGroup, type OwnedAlbum } from '../lib/owned'
-import { anyYours, groupPagePlace, heldPhrase, isYours, withStoreLine } from '../lib/whose'
+import { anyYours, groupPagePlace, heldPhrase, isYours, maybeLine, withStoreLine } from '../lib/whose'
 import {
   anyPressingDiffers, chosenPressingId, coverAddresses, getGroup, groupMbid, holdingOf, leftOut, metaLine, pageHeader, pressingLabel, pressingsView,
   releaseGroupUrl, summaryLine, trackRows, type PageRelease, type TrackRow,
@@ -29,11 +29,16 @@ import { PressingPicker } from './PressingPicker'
 import { keep, kept } from './pressingLists'
 import type { GetRequest } from './Sources'
 import { StoreState } from './StoreState'
-import { useAccess } from './access'
+import { accessNow, seesDetail, useAccess } from './access'
 import { useGetSettings } from './useGetSettings'
 import { takeOpener } from './useSheet'
 import { hasLibrary } from './useMyLibrary'
 import { refreshOwned, useOwned } from './useOwned'
+import { noticeWords } from '../lib/errorWords'
+import { heroTitleClass } from '../lib/titles'
+import { DESCRIPTION_WAIT_MS, inBlock } from '../lib/describe'
+import { DescriptionBlock } from './Description'
+import { useDescription } from './useDescription'
 
 export { PRESSINGS_KEPT } from './pressingLists'
 
@@ -41,7 +46,7 @@ export { PRESSINGS_KEPT } from './pressingLists'
 type Trouble = { message: string; unavailable: boolean; final?: boolean }
 
 /** What a link that isn't a MusicBrainz album says, with nothing to try again. */
-export const NOT_AN_ALBUM_LINK = "That isn't a link to an album on MusicBrainz."
+export const NOT_AN_ALBUM_LINK = "That link isn't an album."
 
 /** What a screen reader hears on the song an album was opened from (2.0.0-player.53) - its row marked. */
 export const SONG_WORDS = ', the song you searched for'
@@ -87,7 +92,7 @@ function DeskTracklist({
           <tr>
             <th scope="col" class="app-rg-number">#</th>
             <th scope="col">Title</th>
-            {against && <th scope="col">Against the usual tracklist</th>}
+            {against && <th scope="col">Compared with the usual</th>}
             <th scope="col" class="app-rg-length">Length</th>
           </tr>
         </thead>
@@ -103,7 +108,7 @@ function DeskTracklist({
               )}
               <tr class={`app-rg-row${row.mark ? ` is-marked is-${row.mark.kind}` : ''}${row.song ? ' is-song' : ''}`}>
                 <td class="app-rg-number">{row.number}</td>
-                <td class="app-rg-title" title={row.title}>
+                <td class="app-rg-title" dir="auto" title={row.title}>
                   {row.title}
                   {row.song && <span class="app-visually-hidden">{SONG_WORDS}</span>}
                 </td>
@@ -131,7 +136,7 @@ function DeskTracklist({
               {missing.map((track, index) => (
                 <tr key={`${index}:${track.title}`} class="app-rg-row is-left">
                   <td class="app-rg-number" aria-hidden="true">–</td>
-                  <td class="app-rg-title" title={track.title}>
+                  <td class="app-rg-title" dir="auto" title={track.title}>
                     {track.title}
                   </td>
                   <td class="app-rg-length">{track.length}</td>
@@ -268,7 +273,10 @@ export function ReleaseGroupPage({
   onCloseSources?: () => void
 }) {
   //? (2.0.0-player.61) Get albums: without it, its words in Get's place (and no join)
-  const getsAlbums = gets(useAccess().permissions)
+  const access = useAccess()
+  const getsAlbums = gets(access.permissions)
+  //? (2.0.6) whoever can Edit albums is told how a "maybe" is settled, and sees its folders in its tooltip
+  const editors = albumEdit(access.permissions).editors
   //? the id as MusicBrainz writes it, or null for an address that isn't an album's
   const mbid = groupMbid(id)
   const [answer, setAnswer] = useState<ReleaseGroupResponse | null>(() => (mbid && kept(mbid)) || null)
@@ -312,7 +320,8 @@ export function ReleaseGroupPage({
       },
       (reason: unknown) => {
         if (!request.current() || isAbort(reason)) return
-        setTrouble({ message: reason instanceof Error ? reason.message : String(reason), unavailable: reason instanceof MusicBrainzUnavailable })
+        //? (2.0.4) in a listener's words - its own, in brackets, for whoever runs deadwax
+        setTrouble({ message: noticeWords('', reason, { admin: seesDetail(accessNow()), gone: "This album can't be found." }), unavailable: reason instanceof MusicBrainzUnavailable })
       },
     )
   }
@@ -321,6 +330,27 @@ export function ReleaseGroupPage({
     load()
     return () => requests.supersede()
   }, [mbid, requests])
+
+  //? (2.0.13) the album's description, by its group's id (Wikipedia's words and Wikidata's subtitle - an album you
+  //? don't have has nothing of Navidrome's), asked once the pressings have answered or failed: its MusicBrainz lookup
+  //? never takes a turn of the rate limit ahead of theirs. Under the hero when it is in hand as the tracklist is
+  //? drawn - which waits for it DESCRIPTION_WAIT_MS at most once the pressings are in - else at the page's foot,
+  //? above its links. A page come back to (its pressings from the session on its first frame) draws its tracklist at
+  //? once - the scroll it is put back to needs it
+  const tracksDrawn = useRef<string | null>(null)
+  const cameBack = useRef(answer ? id : null)
+  //? (after review) the pressings' trouble drawn - its Try again where the tracklist would be - is under the top place
+  //? too: a description landing then goes to the foot, never above the button a finger is reaching for
+  const describing = useDescription('album', answer || trouble ? { mbid } : null, tracksDrawn.current === id || !!trouble, id)
+  const describedBlock = inBlock('album', describing.description)
+  const [tracksWaited, setTracksWaited] = useState<string | null>(null)
+  useEffect(() => {
+    if (!answer) return
+    const timer = setTimeout(() => setTracksWaited(id), DESCRIPTION_WAIT_MS)
+    return () => clearTimeout(timer)
+  }, [id, !!answer])
+  if (answer && (describing.settled || tracksWaited === id || cameBack.current === id)) tracksDrawn.current = id
+  const drawTracks = !!answer && tracksDrawn.current === id
 
   const releases = (answer?.releases ?? []) as PageRelease[]
   //? the album as credited - Search's group, else the one the pressings carry - for its title and the
@@ -485,22 +515,23 @@ export function ReleaseGroupPage({
 
       <div class="pl-album-hero">
         <ArchiveCover addresses={mbid ? coverAddresses(chosen?.id ?? release, mbid) : []} class="pl-hero-cover" />
-        <h1 class="pl-hero-title">{header.title || title}</h1>
+        <h1 class={heroTitleClass(header.title || title)} dir="auto">{header.title || title}</h1>
         {artistLink ? (
-          <button type="button" class="pl-hero-artist app-hero-link" onClick={() => onArtist?.(artistLink)}>
+          <button type="button" class="pl-hero-artist app-hero-link" dir="auto" onClick={() => onArtist?.(artistLink)}>
             {header.artist}
           </button>
         ) : (
-          <p class="pl-hero-artist app-hero-plain">{header.artist}</p>
+          <p class="pl-hero-artist app-hero-plain" dir="auto">{header.artist}</p>
         )}
         {/* said once something is known - a cold link has nothing to say until the pressings come; a
-            folder of this name with no ids is a dashed "maybe", its folders in the tooltip */}
+            folder of this name with no ids is a dashed "maybe" - why, in a line under Get (2.0.6), its folders in
+            the tooltip for whoever can Edit albums */}
         <p class="pl-hero-meta">
           {!(preview || answer) ? '' : maybe ? (
             <>
               {metaLine(header, null)}
               {metaLine(header, null) ? ' · ' : ''}
-              <span class="app-rg-maybe" title={maybe.title}>
+              <span class="app-rg-maybe" title={editors ? maybe.title : undefined}>
                 maybe {heldPhrase(personal, anyYours(ownership?.guessed ?? []))}
               </span>
             </>
@@ -525,15 +556,22 @@ export function ReleaseGroupPage({
           {desktop && facts}
           <div class="app-rg-store" aria-live="polite">
             {known && <StoreState status={storeStatusFor(known, 'Requests', floor)} notes={storeNotes(known)} {...(getsAlbums ? { onJoin: join } : {})} onAdd={add} />}
+            {/* (2.0.6, UX batch 3) the maybe said in words - under Get, where a line landing late moves nothing a
+                finger is reaching for; it was its tooltip's alone */}
+            {(preview || answer) && maybe && (
+              <p class="app-footnote app-rg-maybe-note">{maybeLine(personal && !anyYours(ownership?.guessed ?? []), editors)}</p>
+            )}
           </div>
         </div>
       </div>
+
+      {describedBlock && describing.at === 'top' && <DescriptionBlock description={describedBlock} at="top" />}
 
       {trouble ? (
         <div class="pl-notice app-rg-trouble">
           <p>
             {trouble.unavailable
-              ? "MusicBrainz isn't answering just now, so this album's pressings couldn't be loaded - it often goes away for a few minutes."
+              ? "This album's details can't be loaded right now - try again in a few minutes."
               : trouble.message}
           </p>
           {!trouble.final && (
@@ -542,13 +580,13 @@ export function ReleaseGroupPage({
             </button>
           )}
         </div>
-      ) : !answer ? (
+      ) : !drawTracks ? (
         <div class="app-asking app-rg-asking" role="status">
           <span class="app-sweep" aria-hidden="true" />
-          <span class="app-asking-text">Asking MusicBrainz…</span>
+          <span class="app-asking-text">Loading…</span>
         </div>
       ) : !releases.length ? (
-        <p class="pl-notice">MusicBrainz lists no pressings of this album.</p>
+        <p class="pl-notice">There are no pressings of this album to get.</p>
       ) : desktop ? (
         <DeskTracklist
           rows={rows}
@@ -569,7 +607,7 @@ export function ReleaseGroupPage({
                 <li class={`app-rg-track${row.mark ? ` is-marked is-${row.mark.kind}` : ''}${row.song ? ' is-song' : ''}`}>
                   <span class="app-rg-number">{row.number}</span>
                   <span class="app-rg-text">
-                    <span class="app-rg-title">
+                    <span class="app-rg-title" dir="auto">
                       {row.title}
                       {row.song && <span class="app-visually-hidden">{SONG_WORDS}</span>}
                     </span>
@@ -589,7 +627,7 @@ export function ReleaseGroupPage({
                   <li key={`${index}:${track.title}`} class="app-rg-track is-left">
                     <span class="app-rg-number" aria-hidden="true">–</span>
                     <span class="app-rg-text">
-                      <span class="app-rg-title">{track.title}</span>
+                      <span class="app-rg-title" dir="auto">{track.title}</span>
                     </span>
                     <span class="app-rg-length">{track.length}</span>
                   </li>
@@ -599,6 +637,9 @@ export function ReleaseGroupPage({
           )}
         </section>
       )}
+
+      {/* (2.0.13) a description that came after the tracklist was drawn: here, where it moves nothing under a finger */}
+      {describedBlock && describing.at === 'foot' && <DescriptionBlock description={describedBlock} at="foot" />}
 
       {/* on musicbrainz.org (2.0.0-player.50), opening beside the app - following a link in the page
           would unload the player: the album, and the pressing chosen */}

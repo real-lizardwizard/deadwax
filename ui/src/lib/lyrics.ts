@@ -11,7 +11,8 @@ export function lyricsOnDisk(summary: LyricsSummary): number {
 }
 
 /**
- * One sentence for what a fetch did, in the order you want to read it: what was saved, then
+ * One sentence for what a fetch did (2.0.8: a capital to start - it was the main page's lower-case status line), in
+ * the order you want to read it: what was saved, then
  * what LRCLIB simply doesn't have, then what went wrong and is worth another go.
  *
  * "Not on LRCLIB" and "failed" are never merged. The first is a fact about the track, the
@@ -23,9 +24,9 @@ export function describeLyrics(summary: LyricsSummary): string {
   const parts: string[] = []
 
   parts.push(saved
-    ? `saved lyrics for ${saved} track${saved === 1 ? '' : 's'}`
+    ? `Saved lyrics for ${saved} track${saved === 1 ? '' : 's'}`
       + (summary.synced ? ` (${summary.synced === saved ? 'all' : summary.synced} synced)` : '')
-    : 'no new lyrics')
+    : 'No new lyrics')
 
   if (summary.kept) parts.push(`${summary.kept} already had them`)
   if (summary.missing) parts.push(`${summary.missing} not on LRCLIB`)
@@ -50,7 +51,7 @@ export interface RetimeTotals {
  * somewhere else, or LRCLIB's copy has changed since - and re-timing them would undo that.
  */
 export function describeRetime(totals: RetimeTotals): string {
-  const parts = [`re-timed ${totals.retimed} track${totals.retimed === 1 ? '' : 's'}`]
+  const parts = [`Re-timed ${totals.retimed} track${totals.retimed === 1 ? '' : 's'}`]
   if (totals.unchanged) parts.push(`${totals.unchanged} already at this lead`)
   if (totals.custom) {
     parts.push(`${totals.custom} left alone - not LRCLIB's timings any more, so edited by hand or `

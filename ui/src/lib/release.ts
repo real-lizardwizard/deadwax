@@ -113,6 +113,23 @@ export function fieldedAlbumQuery(album: string, artist: string): string {
   return `releasegroup:${quote(album)} AND (artist:${quote(artist)} OR artistname:${quote(artist)})`
 }
 
+/** (2.0.8, UX batch 5) What the editor's search box shows while it is blank: the words a blank box searches for -
+ *  the album and its artist - where it showed the fielded query itself (`releasegroup:"Dummy" AND (artist:…`), which
+ *  is still what is sent. */
+export function plainAlbumQuery(album: string, artist: string): string {
+  return [album.trim(), artist.trim()].filter(Boolean).join(' ')
+}
+
+/** (2.0.8, UX batch 5) The year on the Release tab's "Now:" line: the album's first year, with this pressing's in
+ *  brackets for a reissue ("1994 (this pressing 2014)") - only when the files have a pressing year to say, since a
+ *  hand-tagged originaldate with no date read "1994 (this pressing )" - else whichever year there is, or "No year". */
+export function nowYear(album: { year: string; original_year: string }): string {
+  const year = (album.year || '').trim()
+  const first = (album.original_year || '').trim()
+  if (first && year && first !== year) return `${first} (this pressing ${year})`
+  return year || first || 'No year'
+}
+
 /** Every artist id in a credit, in the order credited - a download's and the editor's alike. */
 export function creditIds(credit: ArtistCredit[] | undefined): string[] {
   const ids: string[] = []

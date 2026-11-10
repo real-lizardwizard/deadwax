@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks'
 
-import { turntableRow, turntableTimingRow, type DebugRow } from '../lib/debugRows'
+import { turntableRows, type DebugRow } from '../lib/debugRows'
 import type { DeckReport } from '../lib/deckVoice'
 import { isAbort, latestOnly } from '../lib/latest'
 import { clock } from '../lib/scrub'
@@ -229,9 +229,10 @@ function voiceLine(report: DeckReport | null): string {
     : report?.voice === 'script' ? `The record's sound: on the main thread - ${report.voiceWhy ?? "this page isn't on HTTPS"}.` : 'The record\'s sound: not started - press Start the sound (or Play).'
 }
 
-/** Debug's two turntable rows, and which voice runs. */
+/** Debug's turntable rows (since 2.0.7 a fact a row - its own Voice row left out: the bench's says it, with what to
+ *  press while there is none), and which voice runs. */
 function Voice({ report }: { report: DeckReport | null }) {
-  return <Rows rows={[{ label: 'The voice', value: voiceLine(report) }, turntableRow(report), turntableTimingRow(report)]} />
+  return <Rows rows={[{ label: 'The voice', value: voiceLine(report) }, ...turntableRows(report).filter((row) => row.label !== 'Voice')]} />
 }
 
 /**

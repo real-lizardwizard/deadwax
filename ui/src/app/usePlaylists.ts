@@ -3,6 +3,7 @@ import { useEffect, useState } from 'preact/hooks'
 import { playlists as fetchPlaylists, type Playlist, type PlaylistWithSongs } from '../api/playlists'
 import { isAbort, latestOnly } from '../lib/latest'
 import { PLAYLISTS_FRESH_MS, PLAYLISTS_KEPT } from '../lib/playlists'
+import { sayError } from './sayError'
 
 /**
  * The app's one list of playlists (2.0.0-player.58) - GET /navidrome/playlists, kept in this module for the page's
@@ -57,7 +58,8 @@ export function askPlaylists({ fresh = false }: { fresh?: boolean } = {}): void 
     },
     (reason: unknown) => {
       if (!request.current() || isAbort(reason)) return
-      tell({ ...state, problem: reason instanceof Error ? reason.message : String(reason), asking: false })
+      //? (2.0.4) in a listener's words (app/ErrorNote.tsx sayError)
+      tell({ ...state, problem: sayError(reason), asking: false })
     },
   )
 }

@@ -9,6 +9,7 @@ import { browseItems, closesOnCrossing, libraryItems, libraryTitle, liesOver, ma
 import { createRouter, type Router, type StorageLike } from '../lib/appHistory'
 import { CARE_PAGE, LOG_PAGE, PEOPLE_PAGE, PLAYLISTS_PAGE, QUEUE_ID, QUEUE_PAGE, SETTINGS_PAGE, TAB_LABELS, TABS, backLabel, currentRoute, playlistsMove, samePage, scrollKey, type Nav, type Page, type PageKind, type Tab } from '../lib/appRoutes'
 import { handleDownloadRequests } from '../lib/downloadRequests'
+import { seesFolders } from '../lib/aboutRows'
 import { movedTo, noteMove, type EditAlbum } from '../lib/albumEdit'
 import { announceAlbumsFiled } from '../lib/libraryEvents'
 import { latestOnly } from '../lib/latest'
@@ -49,7 +50,7 @@ import { NeedsALook } from './NeedsALook'
 import { NeedsNavidrome } from './NeedsNavidrome'
 import { setUpNavidromeBy } from './navidromeSetUp'
 import { ReleaseGroupPage } from './ReleaseGroupPage'
-import { Requests } from './Requests'
+import { CANT_OPEN_DOWN, CANT_OPEN_OFFLINE, CANT_OPEN_UNSET, Requests } from './Requests'
 import { Search } from './Search'
 import { ServerSettings, onServerSettingsSaved, showServerSettingsTab } from './ServerSettings'
 import { Sidebar } from './Sidebar'
@@ -277,7 +278,7 @@ function usePageShown(): boolean {
  *
  * UP NEXT, SHUFFLE AND REPEAT (2.0.0-player.57, app/UpNext.tsx, lib/upNext.ts): the queue, with Shuffle and Repeat
  * at its top - on a phone a sheet over Now Playing (`over` 'upnext', never with the menu or Info), opened from its
- * Up next button; on a desktop the side panel, from the player bar's Up Next, by the one-panel rule (it puts Info,
+ * Up Next button; on a desktop the side panel, from the player bar's Up Next, by the one-panel rule (it puts Info,
  * Sources, Edit and the artist's away, and each of them puts it away), closed going back to the phone as Info's
  * is. It closes by itself once nothing plays. Every song row's ••• and an album page's own open the song menu
  * (QueueMenu.tsx: Play Next, Play Last) over everything - the page behind inert, a side panel too - with the songs
@@ -494,7 +495,7 @@ export function App() {
   const [stalled, setStalled] = useState(false)
   const downloads = useDownloadJobs(watching === 'requests' || stalled)
   const { jobs, pending, speeds, cancelling, retrying, retryingSame, retryProblems } = downloads
-  const { refresh, enqueue, cancel, retry, clearFinished, trackingEnabled, error: downloadsError } = downloads
+  const { refresh, enqueue, cancel, retry, clearFinished, trackingEnabled, error: downloadsError, failure: downloadsFailure } = downloads
 
   //? Whether deadwax has answered yet, or failed to: until then Requests knows nothing, empty or
   //? not. The hook's jobs are one array until its first answer replaces them.
@@ -513,9 +514,10 @@ export function App() {
     if (asksAgain(before, watching)) refresh()
   }, [watching])
 
+  const personalRequests = hasLibrary()
   const view = useMemo(
-    () => requestsView({ jobs, pending, speeds, cancelling, retrying, retryingSame, retryProblems }, Date.now()),
-    [jobs, pending, speeds, cancelling, retrying, retryingSame, retryProblems],
+    () => requestsView({ jobs, pending, speeds, cancelling, retrying, retryingSame, retryProblems, personal: personalRequests }, Date.now()),
+    [jobs, pending, speeds, cancelling, retrying, retryingSame, retryProblems, personalRequests],
   )
   const arriving = view.arriving.length ? arrivingCards(view) : NOTHING_ARRIVING
 
@@ -721,7 +723,7 @@ export function App() {
   }, [])
   const closeInfoPanel = useCallback(() => setInfoPanel(false), [])
 
-  //? Up Next (2.0.0-player.57): on a phone a sheet over Now Playing, from its Up next button - in place of the menu
+  //? Up Next (2.0.0-player.57): on a phone a sheet over Now Playing, from its Up Next button - in place of the menu
   //? or Info, never with them; on a desktop the side panel, from the player bar's Up Next, by the one-panel rule
   const openUpNext = useCallback((event: MouseEvent) => {
     upNextOpener.current = takeOpener(event)
@@ -1265,8 +1267,9 @@ export function App() {
   //? why Navidrome can't be asked for an album just now, for a Done row that can't open: unknown
   //? (null) until its status is in
   const navidromeProblem = !status ? null
-    : !status.configured ? "Navidrome isn't set up, so deadwax can't open the album here"
-    : !status.ok ? "Navidrome isn't answering just now, so deadwax can't open the album here"
+    : !status.configured ? CANT_OPEN_UNSET
+    : status.offline ? CANT_OPEN_OFFLINE
+    : !status.ok ? CANT_OPEN_DOWN
     : null
   //? Home is what shows: its pins are asked again as it comes into view (2.0.0-player.18)
   const homeShown = watching === 'home'
@@ -1277,6 +1280,9 @@ export function App() {
   const libraryShown = pageShown && nav.tab === 'library'
   useEffect(() => {
     if (homeShown || libraryShown) askMyLibrary()
+    //? (2.0.5) Home's Recently added is your albums' list too (app/Home.tsx): asked again as Home shows, if over a
+    //? minute old, as the Library's is
+    if (homeShown && hasLibrary()) refreshIfOld('yours')
     //? (2.0.0-player.59) and the Library's album lists asked again if over a minute old (app/albumIndex.ts)
     if (!libraryShown) return
     refreshIfOld('store')
@@ -1293,6 +1299,8 @@ export function App() {
     seenAlbum({ id: topAlbum, ...(preview?.musicBrainzId ? { musicBrainzId: preview.musicBrainzId } : {}) })
   }, [topAlbum, pageShown, myLibrary])
   const newAlbums = useMemo(() => (!hasLibrary() ? NOTHING_NEW : myLibrary ? newShelf(myLibrary) : null), [myLibrary])
+  //? (2.0.5) Home's Recently added is yours with a library of your own (app/Home.tsx recentlyAddedAlbums)
+  const personal = hasLibrary()
   const home = useMemo(
     () => (
       <Home
@@ -1305,9 +1313,10 @@ export function App() {
         arrivingTrouble={arrivingTrouble}
         shown={homeShown}
         newAlbums={newAlbums}
+        personal={personal}
       />
     ),
-    [status, arriving, arrivingTrouble, homeShown, newAlbums],
+    [status, arriving, arrivingTrouble, homeShown, newAlbums, personal],
   )
   const requests = useMemo(
     () => (
@@ -1316,6 +1325,7 @@ export function App() {
         answered={answered.current}
         trackingEnabled={trackingEnabled}
         error={downloadsError}
+        failure={downloadsFailure}
         active={requestsActive}
         navidromeProblem={navidromeProblem}
         onCancel={cancel}
@@ -1324,7 +1334,7 @@ export function App() {
         onOpenAlbum={openAlbum}
       />
     ),
-    [view, answered.current, trackingEnabled, downloadsError, cancel, retry, clearFinished, requestsActive, navidromeProblem],
+    [view, answered.current, trackingEnabled, downloadsError, downloadsFailure, cancel, retry, clearFinished, requestsActive, navidromeProblem],
   )
   const library = useMemo(
     () => (
@@ -1549,7 +1559,7 @@ export function App() {
   //? what fills Info > About in, asked as it opens (2.0.0-player.17)
   const infoDetails = useInfoDetails(infoOpen, playing, playedFrom)
   //? (2.0.0-player.62) and what deadwax says of the song's level, for Debug's Normalization row - and (2.0.0-player.63)
-  //? About's, in its Playing group
+  //? About's, in its Sound group (2.0.7: lib/aboutSound.ts)
   const infoLevel = useLevelAnswer(infoOpen, playing, player.maxRate)
   //? (2.0.0-player.63) Info's Debug is an admin's: /deadwax/me asked again as Info opens, on either frame, so a role
   //? given or taken away shows at the next open - through latestOnly(), a failed ask leaving it as it was
@@ -1698,6 +1708,7 @@ export function App() {
             album={playedFrom}
             sentFormat={sentFormat}
             admin={access.admin}
+            folders={seesFolders(access.admin)}
             turntable={turntableSound}
             recording={turntableRecording}
             onRecord={recordTurntable}

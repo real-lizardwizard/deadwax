@@ -220,7 +220,7 @@ async function main() {
     await settle()
     draft.draw()
     check('a failed Clear says so, and the count it had stays for the next try',
-      [note(), refusedNow(), words(clearButton())], ["MusicBrainz's saved answers: couldn't clear them - the database is locked", false, "Clear MusicBrainz's saved answers"])
+      [note(), refusedNow(), words(clearButton())], ["Couldn't clear MusicBrainz's saved answers. Try again. (the database is locked)", false, "Clear MusicBrainz's saved answers"])
     draft.unmount()
 
     reset()
@@ -229,7 +229,7 @@ async function main() {
     W.reads[0].reject(new Error('503'))
     await settle()
     failed.draw()
-    check('a read that fails says so, and offers nothing to clear', [note(), refusedNow()], ["MusicBrainz's saved answers: couldn't read them - 503", true])
+    check('a read that fails says so, and offers nothing to clear', [note(), refusedNow()], ["Couldn't read MusicBrainz's saved answers. Try again. (503)", true])
     failed.unmount()
   }
 

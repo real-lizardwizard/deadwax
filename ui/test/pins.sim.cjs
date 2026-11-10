@@ -10,8 +10,9 @@
  *    album by its release, or by Navidrome's id where either side has none; an artist by MusicBrainz
  *    id where both have one, by a `name:` pin's folded name where the page has none (foldArtistName,
  *    held to tests/fixtures/name_folds.json, which test_pins.py holds the server's fold to), else by
- *    Navidrome's id. What a card says ("Artist", the album's artist, "Removed from the store", "Not on
- *    disk just now", "Not in Navidrome yet") and whether it opens. What a toggle sends - what the thing
+ *    Navidrome's id. What a card says ("Artist", the album's artist, "Removed from the collection" - or
+ *    with logins off "Removed from your library" -, "Can't be found right now", "Not ready to play yet";
+ *    2.0.5's words) and whether it opens. What a toggle sends - what the thing
  *    is, and only to pin, its card.
  *  - Edit's operations: a new pin first, an unpin by what it is, a move to a place, a removal by key,
  *    a drag landing where its rows say, and the PUT's whole list - never a pin not saved yet - with
@@ -117,6 +118,12 @@ const settle = async () => { for (let i = 0; i < 6; i++) await new Promise((reso
 const hooks = require(path.join(OUT, 'node_modules/preact/hooks.js'))
 const P = require(path.join(OUT, 'lib/pins.js'))
 const S = require(path.join(OUT, 'app/usePins.js'))
+//? (2.0.4) the errors as the page meets them: fetch's own TypeError, and deadwax's answers as api/http.ts throws them
+const { ApiError } = require(path.join(OUT, 'api/http.js'))
+const A = require(path.join(OUT, 'app/access.js'))
+const Session = require(path.join(OUT, 'app/session.js'))
+const offline = () => new TypeError('Failed to fetch')
+const refusedBy = (status, detail) => new ApiError(status, detail, 'PUT /me/pins failed', false, null, null, '/me/pins')
 const { Pinned, NOTHING_PINNED } = require(path.join(OUT, 'app/Pinned.js'))
 const { PinToggle, PINS_UNSAVED } = require(path.join(OUT, 'app/PinToggle.js'))
 const { PinNotice, PIN_NOTICE_MS } = require(path.join(OUT, 'app/PinNotice.js'))
@@ -200,8 +207,12 @@ console.log('\nwhich pin is the thing on screen')
 console.log('\nwhat a card says, and whether it opens')
 {
   const lines = [artistPin('a'), albumPin('b'), albumPin('c', { state: 'gone', navidrome_id: null }), albumPin('d', { state: 'missing', navidrome_id: null }), albumPin('e', { navidrome_id: null })]
-  check('"Artist", the album\'s artist, or why it won\'t open', lines.map(P.pinLine),
-    ['Artist', 'Portishead', 'Removed from the store', 'Not on disk just now', 'Not in Navidrome yet'])
+  //? (2.0.5, UX batch 2) in a listener's words - never the store, the disk or Navidrome; a deleted album gone from
+  //? the collection with a library of your own, from your library with logins off (the one library)
+  check('"Artist", the album\'s artist, or why it won\'t open - with logins off', lines.map((pin) => P.pinLine(pin)),
+    ['Artist', 'Portishead', 'Removed from your library', "Can't be found right now", 'Not ready to play yet'])
+  check('...and with a library of your own', lines.map((pin) => P.pinLine(pin, true)),
+    ['Artist', 'Portishead', 'Removed from the collection', "Can't be found right now", 'Not ready to play yet'])
   check('...and whether each opens', lines.map(P.pinOpens), [true, true, false, false, false])
   check('an artist opens by MusicBrainz id alone', P.pinOpens(artistPin('f', { navidrome_id: null })), true)
 }
@@ -265,17 +276,28 @@ async function run() {
     S.askPins(true)
     await settle()
     check('Home asks afresh whatever is in hand', W.asks.length, 2)
-    answer('get', new Error('Failed to fetch'))
+    answer('get', offline())
     await settle()
     check('a failed ask with an answer in hand: the answer stands, nothing said', [S.pinsNow().map((pin) => pin.ref), hooks.root(S.usePins)(false).problem], [['store:1'], null])
     S.forgetPins(); W.open.length = 0
     S.askPins(true)
     await settle()
-    answer('get', new Error('Failed to fetch'))
+    answer('get', offline())
     await settle()
     const render = hooks.root(S.usePins)
+    //? (2.0.4) in a listener's words - and, with logins off (everyone runs deadwax), fetch's own in brackets after them
     check('...with none: the hook says why there are none - and they count as known, so no pin waits for ever', [render(false).problem, render(false).known],
-      ["Couldn't get your pins: Failed to fetch", true])
+      ["Couldn't get your pins. Can't connect to deadwax. Check your connection, then try again. (Failed to fetch)", true])
+    //? ...and someone who doesn't run deadwax reads the sentence alone
+    A.noteAccess({ auth: 'on', user: 'ethan', admin: false, permissions: ['request'] })
+    S.forgetPins(); W.open.length = 0
+    S.askPins(true)
+    await settle()
+    answer('get', offline())
+    await settle()
+    check('...a listener: the sentence and what to do, never fetch\'s words', render(false).problem,
+      "Couldn't get your pins. Can't connect to deadwax. Check your connection, then try again.")
+    A.forgetAccess()
   }
 
   console.log('\nthe store: the hook asks as it turns on')
@@ -324,17 +346,17 @@ async function run() {
     S.askPins(true); await settle(); answer('get', answerOf([albumPin('store:1')])); await settle()
     const going = S.setPinned(ARTIST, true)
     await settle()
-    answer('toggle', new Error('Home holds up to 50 pins - unpin one first'))
+    answer('toggle', refusedBy(409, 'Home holds up to 50 pins - unpin one first'))
     await going
     const render = hooks.root(S.usePins)
     check('a pin refused: gone again, said in the app\'s notice naming it - and not left on Home, naming nothing',
       [S.pinsNow().map((pin) => pin.ref), S.pinNotice()?.text, render(false).problem],
-      [['store:1'], "Couldn't pin Portishead: Home holds up to 50 pins - unpin one first", null])
+      [['store:1'], "Couldn't pin Portishead. Home holds up to 50 pins - unpin one first", null])
     const unpinning = S.setPinned(DUMMY, false)
     await settle()
-    answer('toggle', new Error('Failed to fetch'))
+    answer('toggle', offline())
     await unpinning
-    check('...an unpin refused: back, and said', [S.pinsNow().map((pin) => pin.ref), S.pinNotice()?.text], [['store:1'], "Couldn't unpin Dummy: Failed to fetch"])
+    check('...an unpin refused: back, and said', [S.pinsNow().map((pin) => pin.ref), S.pinNotice()?.text], [['store:1'], "Couldn't unpin Dummy. Can't connect to deadwax. Check your connection, then try again. (Failed to fetch)"])
     const quiet = S.pinNotice().id
     const next = S.setPinned(ARTIST, true)
     await settle()
@@ -360,9 +382,10 @@ async function run() {
     //? Edit's: said on Home, under the list, until the next change or a read
     const moving = S.movePin('album:store:1', 1)
     await settle()
-    answer('put', new Error('deadwax couldn\'t save that'))
+    answer('put', refusedBy(503, 'deadwax couldn\'t save that: its database refused the write'))
     await moving
-    check('one of Edit\'s refused: back, and "Not saved: …" for Home', [S.pinsNow().map((pin) => pin.ref), render(false).problem], [['store:1', 'mb:p'], "Not saved: deadwax couldn't save that"])
+    check('one of Edit\'s refused: back, and "Not saved." for Home - deadwax\'s own words, which are fit to be read',
+      [S.pinsNow().map((pin) => pin.ref), render(false).problem], [['store:1', 'mb:p'], "Not saved. deadwax couldn't save that: its database refused the write"])
     S.askPins(true); await settle(); answer('get', answerOf([albumPin('store:1'), artistPin('mb:p')])); await settle()
     check('...until a read: the server\'s word, read afresh, is what shows', render(false).problem, null)
     const again = S.removePin('artist:mb:p')
@@ -432,7 +455,17 @@ async function run() {
     check('the heading and Edit', [words(find((node) => node.type === 'h2', tree)), words(find(byClass('app-pinned-edit'), tree))], ['Pinned', 'Edit'])
     const cards = find(byClass('app-pin-card'), tree)
     check('a card each: a button where it opens, words where it doesn\'t', cards.map((card) => [card.type, words(card)]),
-      [['button', 'DummyPortishead'], ['button', 'PortisheadArtist'], ['div', 'ThirdRemoved from the store'], ['button', 'MezzanineMassive Attack']])
+      [['button', 'DummyPortishead'], ['button', 'PortisheadArtist'], ['div', 'ThirdRemoved from your library'], ['button', 'MezzanineMassive Attack']])
+    //? (2.0.5 review) signed in with a library of your own, Pinned says the collection's words - it hands pinLine
+    //? hasLibrary(), on its cards and in Edit's rows alike - and with logins off (above) "your library"
+    Session.setSessionMe({ user: 'ethan', admin: false, auth: 'on', version: 'x' })
+    const mine = mountPinned({ pins: four })
+    const cardsOn = find(byClass('app-pin-card'), mine.draw()).map(words)
+    find(byClass('app-pinned-edit'), mine.draw())[0].props.onClick()
+    const rowsOn = find(byClass('app-pin-line'), mine.draw()).map(words)
+    Session.setSessionMe(null)
+    check('...signed in: a deleted album\'s card and its Edit row both say "Removed from the collection"', [cardsOn[2], rowsOn[2]],
+      ['ThirdRemoved from the collection', 'Removed from the collection'])
     check('an artist\'s picture round, an album\'s square', find(byClass('app-pin-thumb'), tree).map((node) => node.props.class), ['app-pin-thumb', 'app-pin-thumb is-round', 'app-pin-thumb', 'app-pin-thumb'])
     cards[0].props.onPointerDown(); cards[0].props.onClick(); cards[1].props.onPointerDown(); cards[1].props.onClick()
     check('an album opens as a tile does, its songs asked for as the finger lands; an artist\'s page by their MusicBrainz id (Navidrome\'s, kept since the pin was made, may name nobody now) - nothing plays',

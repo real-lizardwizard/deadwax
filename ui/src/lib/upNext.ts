@@ -541,11 +541,12 @@ export function upNextView(queue: UpNextQueue, repeat: Repeat, limit: number = U
   const paged = state.paged
   const pending = paged ? Math.max(0, paged.total - paged.fetched) : 0
   const again = shown > passPlaying(state, queue.index)
-  const title = paged ? `${paged.scope === 'yours' ? 'Your library' : 'Everything'}, shuffled${again ? ', again' : ''}` : listTitle(state.source, again)
+  const title = paged ? `${paged.scope === 'yours' ? 'Your library' : 'All music'}, shuffled${again ? ', again' : ''}` : listTitle(state.source, again)
   const list = listed.length || pending
     ? { title, rows: listed.slice(0, limit).map(row), more: Math.max(0, listed.length - limit) + pending }
     : null
-  const name = paged ? (paged.scope === 'yours' ? 'your library' : 'everything') : oneAlbum(state.source) ?? 'the list'
+  //? (2.0.5) the collection's shuffle is "all music" here too, as its heading says - never "everything"
+  const name = paged ? (paged.scope === 'yours' ? 'your library' : 'all music') : oneAlbum(state.source) ?? 'the list'
   const then = repeat === 'all'
     ? state.shuffle ? `Then ${name} again, in a new order.` : `Then ${name} again from the top.`
     : repeat === 'off' && queue.index >= queue.tracks.length - 1 ? 'Nothing after this song.' : null
@@ -565,9 +566,18 @@ export function queuedWords(how: 'next' | 'last', label: string): string {
   return how === 'next' ? `Playing next: ${label}` : `Added to Up Next: ${label}`
 }
 
-/** What the Repeat chip and the player bar's button say. */
+/** What the Repeat chip says - and (2.0.14) Now Playing's Repeat button on a phone, an icon whose name it is. */
 export function repeatLabel(repeat: Repeat): string {
   return repeat === 'all' ? 'Repeat all' : repeat === 'one' ? 'Repeat one' : 'Repeat'
+}
+
+/** The Shuffle buttons that are an icon alone - the desktop's player bar's and (2.0.14) Now Playing's on a phone -
+ *  named: "Shuffle", or during a whole library's shuffle (Part B; `scope`, the queue's `upNext.paged.scope`), whose
+ *  order IS the shuffle so it can't be turned off, named for why in Up Next's words - all music (Browse's Songs) or
+ *  your whole library (your albums). */
+export function shuffleLabel(scope: Paged['scope'] | undefined): string {
+  if (!scope) return 'Shuffle'
+  return `Shuffle - shuffling ${scope === 'store' ? 'all music' : 'your whole library'}`
 }
 
 /** The Repeat button's next setting: off -> all -> one -> off. */
@@ -575,10 +585,11 @@ export function nextRepeat(repeat: Repeat): Repeat {
   return REPEATS[(REPEATS.indexOf(repeat) + 1) % REPEATS.length]!
 }
 
-/** Now Playing's Up next button, named with what is on: "Up next - Shuffle and Repeat all". */
+/** Now Playing's Up Next button, named with what is on: "Up Next - Shuffle and Repeat all" (2.0.7: "Up Next", as
+ *  the sheet, the player bar and every notice say it - it was "Up next" here). */
 export function upNextLabel(shuffle: boolean, repeat: Repeat): string {
-  if (shuffle && repeat !== 'off') return `Up next - Shuffle and ${repeatLabel(repeat)}`
-  if (shuffle) return 'Up next - Shuffle on'
-  if (repeat !== 'off') return `Up next - ${repeatLabel(repeat)}`
-  return 'Up next'
+  if (shuffle && repeat !== 'off') return `Up Next - Shuffle and ${repeatLabel(repeat)}`
+  if (shuffle) return 'Up Next - Shuffle on'
+  if (repeat !== 'off') return `Up Next - ${repeatLabel(repeat)}`
+  return 'Up Next'
 }

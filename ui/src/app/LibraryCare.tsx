@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
 import { useLibrary } from '../hooks/useLibrary'
 import { BULK_KINDS, bulkSummary, bulkTargets, type BulkKind } from '../lib/bulkTargets'
 import {
-  BULK_LABELS, BULK_TITLES, RESCAN_WORDS, careLine, narrowAlbums, planWords, scanAge, scanTotals, scopeLine,
+  BULK_LABELS, BULK_TITLES, READ_FAILED, REREAD_FAILED, RESCAN_WORDS, careLine, narrowAlbums, planWords, scanAge, scanTotals, scopeLine,
 } from '../lib/libraryCare'
 import { MANAGING_ADMINS_ONLY } from '../lib/appRoutes'
 import type { CareParts } from '../lib/permissions'
@@ -12,6 +12,8 @@ import { ChevronLeftIcon } from '../player/icons'
 import { caughtUp, libraryCareNow, setCareNarrow, startBulk, stopBulk, useLibraryCare } from './useLibraryCare'
 import { HeldByNobody } from './HeldByNobody'
 import { sessionMe } from './session'
+import { errorNote } from './ErrorNote'
+import { sayError } from './sayError'
 
 /** Focus fell to the page (or was never taken) - the only time this page moves it. */
 const focusLost = (): boolean => {
@@ -193,7 +195,8 @@ export function LibraryCare({
           <div class="pl-spinner" aria-label="Reading the library" />
         ) : library.error && !library.albums.length ? (
           <div class="app-care-state">
-            <p>deadwax couldn't read the library: {library.error}</p>
+            {/* (2.0.8, UX batch 5) in words (lib/errorWords.ts), its own words under it for whoever runs deadwax */}
+            {errorNote(library.error, { failed: READ_FAILED, retry: true })}
             <button type="button" class="app-button" aria-disabled={library.loading ? 'true' : undefined} onClick={retry}>
               Try again
             </button>
@@ -207,7 +210,6 @@ export function LibraryCare({
                   type="button"
                   class="app-button app-care-button"
                   aria-disabled={scanBusy ? 'true' : undefined}
-                  title="Re-read every file, ignoring the cache - for when something changed that deadwax couldn't see, like a retag by another program"
                   onClick={rescan}
                 >
                   {rescanning ? 'Rescanning…' : 'Rescan'}
@@ -216,14 +218,14 @@ export function LibraryCare({
               <p class="app-care-facts" role="status">
                 {[scanTotals(library.albums), scanAge(library, rescanning)].filter(Boolean).join(' · ')}
               </p>
-              {library.error && (
+              {library.error ? (
                 <p class="app-care-problem">
-                  Couldn't read the library just now: {library.error}{' '}
+                  {sayError(library.error, '', { failed: REREAD_FAILED, retry: true })}{' '}
                   <button type="button" class="app-text-button" aria-disabled={library.loading ? 'true' : undefined} onClick={retry}>
                     Try again
                   </button>
                 </p>
-              )}
+              ) : null}
               <p class="app-care-note">{RESCAN_WORDS}</p>
             </section>}
 
@@ -260,14 +262,15 @@ export function LibraryCare({
                           type="button"
                           class="app-button app-care-button is-running"
                           aria-disabled={stopping ? 'true' : undefined}
-                          title="Stop after the album being fetched"
                           ref={(element) => { runButtons.current[kind] = element }}
                           onFocus={() => { focusedRun.current = kind }}
                           onBlur={leftRun(kind)}
                           onClick={() => stopBulk(kind)}
                         >
                           <span class="app-care-spin" aria-hidden="true" />
-                          {stopping ? `Stopping after ${run.done + 1} of ${run.total}` : `Stop · ${run.done} of ${run.total}`}
+                          {/* (2.0.8, UX batch 5) what Stop does, on the button - it was only in its title, which a phone never shows;
+                              the count is the album being fetched (done + 1), as Stopping and Stopped say it */}
+                          {stopping ? `Stopping after ${run.done + 1} of ${run.total}` : `Stop after this album · ${Math.min(run.done + 1, run.total)} of ${run.total}`}
                         </button>
                       ) : targets && targets.length > 0 ? (
                         <button

@@ -11,7 +11,7 @@ router = APIRouter()
 #? carries `busy: true` beside the words, which the page reads (api/http.ts) - and a quick search
 #? MusicBrainz refused as malformed, said as the words, never as an outage.
 BUSY_WORDS = "MusicBrainz is busy just now - try again in a moment."
-REJECTED_WORDS = "MusicBrainz couldn't read that search - try other words"
+REJECTED_WORDS = "That search couldn't be read - try other words"
 UNREACHABLE_WORDS = ("MusicBrainz is unreachable right now, so this search couldn't run. "
                      "This isn't a problem with your search terms - try again shortly.")
 

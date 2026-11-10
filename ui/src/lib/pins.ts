@@ -70,12 +70,15 @@ export interface ArtistPinTarget {
 export type PinTarget = AlbumPinTarget | ArtistPinTarget
 
 /** What a card says under its name, where it doesn't say the album's artist - short enough to read
- *  whole in two lines of a phone's card (a closed card gives them two; see app.css's pins). */
+ *  whole in two lines of a phone's card (a closed card gives them two; see app.css's pins). (2.0.5, UX batch 2)
+ *  In a listener's words: the collection (or with logins off your library, the only one), never the disk or
+ *  Navidrome. */
 export const PIN_WORDS = {
   artist: 'Artist',
-  gone: 'Removed from the store',
-  missing: 'Not on disk just now',
-  unfound: 'Not in Navidrome yet',
+  gone: 'Removed from the collection',
+  goneYours: 'Removed from your library',
+  missing: "Can't be found right now",
+  unfound: 'Not ready to play yet',
 } as const
 
 /** The longest name, sub-line or name a toggle may send - src/pins.py's LABEL_MAX. */
@@ -152,10 +155,11 @@ export function pinOpens(pin: Pin): boolean {
   return pin.state === 'present' && !!pin.navidrome_id
 }
 
-/** The line under a card's name: "Artist", the album's artist - or why the album won't open. */
-export function pinLine(pin: Pin): string {
+/** The line under a card's name: "Artist", the album's artist - or why the album won't open. `personal`: a
+ *  library of your own, so a deleted album is gone from the collection; with logins off, from your library. */
+export function pinLine(pin: Pin, personal = false): string {
   if (pin.kind === 'artist') return PIN_WORDS.artist
-  if (pin.state === 'gone') return PIN_WORDS.gone
+  if (pin.state === 'gone') return personal ? PIN_WORDS.gone : PIN_WORDS.goneYours
   if (pin.state === 'missing') return PIN_WORDS.missing
   if (!pin.navidrome_id) return PIN_WORDS.unfound
   return pin.sub

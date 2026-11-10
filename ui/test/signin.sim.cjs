@@ -251,8 +251,25 @@ async function main() {
       'Too many tries for ethan - wait 42 seconds and try again.')
     check('...a wordless 401 and 429 said plainly', [rules.signInProblem(new http.ApiError(401, null, 'x')), rules.signInProblem(new http.ApiError(429, null, 'x'))],
       ["That user name and password didn't work.", 'Too many tries - wait a minute and try again.'])
+    //? (2.0.4) nothing about one person's setup (WireGuard), and no status code
     check('...no answer at all', rules.signInProblem(new TypeError('Failed to fetch')),
-      "deadwax didn't answer - check you can reach it (on your network, or over WireGuard) and try again.")
+      "Can't reach deadwax. Check you're on the right network (or your VPN is on) and try again.")
+    check('...an answer with no words of deadwax\'s, plainly - no status code', rules.signInProblem(new http.ApiError(500, null, 'x')),
+      'Something went wrong on the server - try again in a moment.')
+    //? (2.0.4) deadwax's answer in two halves (src/auth.py Explained): the sentence for anyone, with what they can do
+    //? about a 503 only whoever runs deadwax can fix; what that person needs folded under it
+    const split = new http.ApiError(503, "deadwax isn't ready for signing in, so nobody can use it just now.", 'x', false, null,
+      "Logins are on, but DEADWAX_SECRET_KEY isn't set, so deadwax can't sign anyone in. Set it in the container's environment and restart deadwax.")
+    check('...one only whoever runs deadwax can fix: the sentence, and to tell them - never the setting',
+      [rules.signInProblem(split), /DEADWAX_SECRET_KEY/.test(rules.signInProblem(split))],
+      ["deadwax isn't ready for signing in, so nobody can use it just now. Tell whoever runs deadwax.", false])
+    check('...the setting for whoever runs deadwax, folded under it', [rules.signInWhy(split), rules.FOR_WHOEVER],
+      ["Logins are on, but DEADWAX_SECRET_KEY isn't set, so deadwax can't sign anyone in. Set it in the container's environment and restart deadwax.", 'For whoever runs deadwax'])
+    check('...a detail with a setting or an exception in it never the sentence: the words for it, the detail folded',
+      [rules.signInProblem(new http.ApiError(502, 'Navidrome said: database is locked (NAVIDROME_URL)', 'x')), rules.signInWhy(new http.ApiError(502, 'Navidrome said: database is locked (NAVIDROME_URL)', 'x'))],
+      ['Something went wrong on the server - try again in a moment.', 'Navidrome said: database is locked (NAVIDROME_URL)'])
+    check('...and nothing folded for deadwax\'s own words, or no answer', [rules.signInWhy(new http.ApiError(401, "That user name and password didn't work.", 'x')), rules.signInWhy(new TypeError('Failed to fetch'))],
+      [null, null])
     check('the plain "sign in" isn\'t said again above the form; why it ended is',
       [rules.reasonShown('Sign in to use deadwax.'), rules.reasonShown(null), rules.reasonShown(' Navidrome no longer accepts it ')], [null, null, 'Navidrome no longer accepts it'])
     check('the main page\'s hand-back went with it (2.0.0-player.66): no returnTarget', 'returnTarget' in rules, false)
@@ -485,9 +502,13 @@ async function main() {
   {
     const page = await gate(() => new TypeError('Failed to fetch'))
     check('said on the sign-in screen, the app not drawn', [page.screen()[0]?.props.reason, page.app().length],
-      ["deadwax didn't answer - check you can reach it (on your network, or over WireGuard) and try again.", 0])
-    const closed = await gate(() => ({ status: 503, body: { detail: 'Logins are on, but DEADWAX_SECRET_KEY isn\'t set, so deadwax can\'t sign anyone in.' } }))
-    check('...and logins that can\'t work, in deadwax\'s words', closed.screen()[0]?.props.reason, 'Logins are on, but DEADWAX_SECRET_KEY isn\'t set, so deadwax can\'t sign anyone in.')
+      ["Can't reach deadwax. Check you're on the right network (or your VPN is on) and try again.", 0])
+    //? (2.0.4) as src/auth.py answers it now: the sentence, and the setting as its `why`
+    const closed = await gate(() => ({ status: 503, body: { detail: "deadwax isn't ready for signing in, so nobody can use it just now.",
+      why: 'Logins are on, but DEADWAX_SECRET_KEY isn\'t set, so deadwax can\'t sign anyone in.' } }))
+    check('...and logins that can\'t work: deadwax\'s sentence, to tell whoever runs it, and the setting folded under it',
+      [closed.screen()[0]?.props.reason, closed.screen()[0]?.props.reasonWhy],
+      ["deadwax isn't ready for signing in, so nobody can use it just now. Tell whoever runs deadwax.", 'Logins are on, but DEADWAX_SECRET_KEY isn\'t set, so deadwax can\'t sign anyone in.'])
   }
 
   console.log('\nthe sign-in screen')
@@ -511,6 +532,8 @@ async function main() {
       [tree.props.role, tree.props['aria-modal'], tree.props['aria-labelledby'], tree.props['aria-describedby'], find(tree, byClass('app-signin-reason'))[0]?.props.id],
       ['dialog', 'true', 'app-signin-title', 'app-signin-reason', 'app-signin-reason'])
     check('why it is showing, above the form', find(tree, byClass('app-signin-reason')).map(text), ['Navidrome no longer accepts the login you signed in with.'])
+    //? (2.0.8, UX batch 5) which account: the music server's, named once
+    check('...and which account to sign in with', find(tree, byClass('app-signin-lede')).map(text), ['Sign in with your music server (Navidrome) account.'])
     const region = find(tree, byClass('app-signin-problem'))[0]
     check('the failure\'s live region is in the page before anything failed', [region?.props['aria-live'], text(region)], ['assertive', ''])
 
@@ -536,6 +559,20 @@ async function main() {
     redraw()
     check('a wrong password in deadwax\'s words, the password gone', [find(tree, byClass('app-error')).map(text), find(tree, (node) => node.type === 'input')[1].props.value],
       [["That user name and password didn't work."], ''])
+    const folded = () => find(tree, (node) => typeof node.type === 'function' && node.type.name === 'ForWhoever').map((node) => node.props.why)
+    check('...with nothing folded under it: deadwax\'s words are all there is', folded(), [])
+
+    //? (2.0.4) a 503 only whoever runs deadwax can fix: the sentence and to tell them, the setting folded under it
+    answer = () => ({ status: 503, body: { detail: "deadwax can't read its database just now, so it can't check who you are.",
+      why: 'deadwax can\'t read its database, so nothing is let in until it can. Check DB_PATH points at a writable volume.' } })
+    submitWith('ethan', 'the-password')
+    await settle()
+    redraw()
+    check('nobody can sign in: the sentence for anyone, and to tell whoever runs deadwax - DB_PATH only folded under it',
+      [find(tree, byClass('app-error')).map(text), folded()],
+      [["deadwax can't read its database just now, so it can't check who you are. Tell whoever runs deadwax."],
+        ['deadwax can\'t read its database, so nothing is let in until it can. Check DB_PATH points at a writable volume.']])
+    answer = () => ({ status: 401, body: { detail: "That user name and password didn't work." } })
     check('...and the sign-in\'s own 401 is no "signed out"', heard, [])
 
     answer = () => ({ status: 429, body: { detail: 'Too many tries for ethan - wait 51 seconds and try again.' } })
@@ -549,6 +586,25 @@ async function main() {
     await settle()
     redraw()
     check('signed in: handed on, the failure cleared', [signedIn.map((me) => me.user), find(tree, byClass('app-error')).length], [['ethan'], 0])
+    {
+      //? (review) the screen up for a reason, and a sign-in answered with the same words: said once, as the answer
+      const NOKEY = "deadwax isn't ready for signing in, so nobody can use it just now. Tell whoever runs deadwax."
+      const NOKEY_WHY = "Logins are on, but DEADWAX_SECRET_KEY isn't set."
+      const twice = hooks.root(SignIn)
+      const twiceProps = { reason: NOKEY, reasonWhy: NOKEY_WHY, onSignedIn() {} }
+      let twiceTree = twice(twiceProps)
+      twice.commit()
+      const foldedIn = (t) => find(t, (node) => typeof node.type === 'function' && node.type.name === 'ForWhoever').map((node) => node.props.why)
+      check('...the screen up with no key: the reason and its fold', [find(twiceTree, byClass('app-signin-reason')).map(text), foldedIn(twiceTree)], [[NOKEY], [NOKEY_WHY]])
+      answer = () => ({ status: 503, body: { detail: "deadwax isn't ready for signing in, so nobody can use it just now.", why: NOKEY_WHY } })
+      const twiceForm = find(twiceTree, (node) => node.type === 'form')[0]
+      twiceForm.props.onSubmit({ preventDefault() {}, currentTarget: { elements: { namedItem: (field) => ({ value: { username: 'ethan', password: 'x' }[field] }) } } })
+      await settle()
+      twiceTree = twice(twiceProps)
+      twice.commit()
+      check('...a sign-in answered the same: the sentence once, the fold once', [find(twiceTree, byClass('app-signin-reason')).length, find(twiceTree, byClass('app-error')).map(text), foldedIn(twiceTree), twiceTree.props['aria-describedby'] ?? null],
+        [0, [NOKEY], [NOKEY_WHY], null])
+    }
     const plain = hooks.root(SignIn)({ reason: 'Sign in to use deadwax.', onSignedIn() {} })
     check('the plain "sign in" isn\'t said above the form, nor describes the dialog', [find(plain, byClass('app-signin-reason')).length, plain.props['aria-describedby'] ?? null], [0, null])
   }
@@ -604,10 +660,10 @@ async function main() {
     const footnote = (user) => text(find(hooks.root(SignOutRow)({ user }), byClass('app-footnote')).at(-1))
     check('...signed in with a Navidrome account - or, for the break-glass admin, with its password and its 12 hours',
       [footnote('ethan'), footnote('deadwax'), footnote('admin')],
-      ["Signed in as ethan, with your Navidrome account. Signing out ends this device's session and stops what's playing.",
-        "Signed in as deadwax, with the break-glass password - it lasts 12 hours. Signing out ends this device's session and stops what's playing.",
+      ["Signed in as ethan, with your music server (Navidrome) account. Signing out ends this device's session and stops what's playing.",
+        "Signed in as deadwax, with the emergency admin password - this sign-in lasts 12 hours. Signing out ends this device's session and stops what's playing.",
         //? (2.0.0-player.61) break-glass is `deadwax` now: Navidrome's own `admin` is a person like any other
-        "Signed in as admin, with your Navidrome account. Signing out ends this device's session and stops what's playing."])
+        "Signed in as admin, with your music server (Navidrome) account. Signing out ends this device's session and stops what's playing."])
     reloads = 0
     sent.length = 0
     answer = () => ({ status: 200, body: { signed_out: true } })
@@ -624,7 +680,7 @@ async function main() {
     await settle()
     tree = again({ user: 'ethan' })
     check('...no answer at all: said, and nothing started again', [find(tree, byClass('app-error')).map(text), reloads],
-      [["deadwax didn't answer, so you're still signed in - try again."], 2])
+      [["Couldn't reach deadwax, so you're still signed in - try again."], 2])
   }
 
   console.log('\nthe app drawn with logins off, and logins switched on under it')

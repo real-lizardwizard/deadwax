@@ -4,7 +4,7 @@ import { onSignedOut } from '../api/auth'
 import { ApiError, newSession } from '../api/http'
 import { me, type Me } from '../api/me'
 import { latestOnly } from '../lib/latest'
-import { afterSignIn, signInProblem } from '../lib/signIn'
+import { afterSignIn, signInProblem, signInWhy } from '../lib/signIn'
 import { App } from './App'
 import { noteAccess } from './access'
 import { sessionMe, setSessionMe } from './session'
@@ -107,7 +107,7 @@ export function startWithLogins(host: HTMLElement): void {
     }
   }
 
-  const showSignIn = (reason: string | null) => {
+  const showSignIn = (reason: string | null, why: string | null = null) => {
     asks.supersede()
     if (signInShown) return
     signInShown = true
@@ -118,7 +118,7 @@ export function startWithLogins(host: HTMLElement): void {
       host.setAttribute('aria-hidden', 'true')
     }
     document.documentElement.classList.add('has-signin')
-    render(<SignIn reason={reason} onSignedIn={signedIn} />, layer)
+    render(<SignIn reason={reason} reasonWhy={why} onSignedIn={signedIn} />, layer)
     leaveFullScreen(() => {
       if (signInShown) layer.querySelector<HTMLElement>('input')?.focus({ preventScroll: true })
     })
@@ -138,7 +138,9 @@ export function startWithLogins(host: HTMLElement): void {
         if (!request.current() || appShown) return
         //? a 401 has already brought the sign-in up (api/http.ts); anything else - deadwax down, logins
         //? that can't work - is said there too, and signing in is the way to try again
-        showSignIn(error instanceof ApiError && error.status === 401 ? error.detail : signInProblem(error))
+        //? (2.0.4) with what whoever runs deadwax needs folded under it (src/auth.py Explained's why)
+        if (error instanceof ApiError && error.status === 401) showSignIn(error.detail)
+        else showSignIn(signInProblem(error), signInWhy(error))
       },
     )
   }

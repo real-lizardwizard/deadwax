@@ -27,15 +27,20 @@ import { Cover } from '../player/Cover'
 import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, PlayIcon, ShuffleIcon } from '../player/icons'
 import { ArchiveCover } from './ArchiveCover'
 import type { ArtistManageMode, ArtistManageRequest } from './ArtistPanel'
-import { useAccess } from './access'
+import { accessNow, seesDetail, useAccess } from './access'
 import { usePlayerActions } from './context'
-import { PINS_UNSAVED, PinToggle } from './PinToggle'
+import { pinsUnsaved, PinToggle } from './PinToggle'
 import { keep, kept as keptPressings, usualGet } from './pressingLists'
 import type { GetRequest } from './Sources'
 import { hasLibrary } from './useMyLibrary'
 import { ownedNow, useOwned, whenOwned } from './useOwned'
 import { sayPins, setPinned, usePins } from './usePins'
 import { takeOpener } from './useSheet'
+import { errorNote } from './ErrorNote'
+import { errorKind } from '../lib/errorWords'
+import { DescriptionBlock } from './Description'
+import { useDescription } from './useDescription'
+import { inBlock } from '../lib/describe'
 
 /** What an artist page shows before anything has answered: what the row that opened it knew. */
 export interface ArtistPreview {
@@ -46,7 +51,8 @@ export interface ArtistPreview {
 type Library =
   | { state: 'asking' }
   | { state: 'done'; artist: ArtistWithAlbums | null }
-  | { state: 'failed'; message: string }
+  //? (2.0.4) the error itself, said by errorNote (app/ErrorNote.tsx) in a listener's words
+  | { state: 'failed'; error: unknown }
 
 /** MusicBrainz's albums for the artist: the last answer stays on screen while another is asked for
  *  (`of` says which question it answered - "<mbid>|<studio only>"), so nothing under a finger moves
@@ -57,13 +63,17 @@ interface Discography {
   truncated: boolean
   of: string | null
   message?: string
+  /** (2.0.4) the error itself, when one was thrown - said by errorNote (app/ErrorNote.tsx) */
+  error?: unknown
   unavailable?: boolean
 }
 
-const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 /** What a link to an artist that isn't one says, with nothing to try again. */
 export const NOT_AN_ARTIST_LINK = "That isn't a link to an artist."
+/** (2.0.4, review) an artist the music server no longer has (an old pin or link): said for a listener, never as
+ *  "Navidrome has nothing by that id" - and with no Try again, which can't find them */
+export const ARTIST_GONE = "This artist isn't here any more - their albums may have been moved or deleted."
 
 /** How long the albums wait for the library and MusicBrainz to answer before they are drawn with
  *  what has - as Search waits for the library (OWNED_WAIT_MS), so a row isn't drawn and moved. */
@@ -200,6 +210,12 @@ function keptArtist(id: string): KeptArtist {
  * of their names says so, with Try again, over what it said before - Artist images… stepped back,
  * saying why (review).
  *
+ * (2.0.13) Their DESCRIPTION (app/useDescription.ts, app/Description.tsx): asked once Navidrome's artist and the
+ * facts are in, the albums waiting for it as for their other answers (but not on a page come back to, which draws
+ * them on its first frame); its paragraph under Play when it is in hand as they are drawn, else the page's last
+ * thing (lib/describe.ts placeOf) - never moving the albums, nor the library's failed notice, under a finger; its
+ * subtitle under their name, in a line kept for it.
+ *
  * Every fetch that draws goes through its own latestOnly(): the library's answer, the facts, the
  * discography, the prefetches, a row's bridge and a chip's pressings - and the library's summaries.
  * A row's or a chip's lookup still out is called off when the page stops being what shows (`shown`),
@@ -257,7 +273,8 @@ export function ArtistPage({
   //? (2.0.0-player.52) a library of your own: the page lists the STORE's albums of theirs - Navidrome's, asked as
   //? you - each row saying whether it is yours (lib/artistPage.ts rowLine), and its library facts are the store's
   const personal = hasLibrary()
-  const where = personal ? 'the store' : 'your library'
+  //? (2.0.5) the collection - James's word - never "the store"
+  const where = personal ? 'the collection' : 'your library'
   //? /library/owned has answered once, or failed to: what isn't held can be said only after
   const [ownedKnown, setOwnedKnown] = useState(() => ownedNow() !== null)
   //? the page shows, read when an answer lands
@@ -391,7 +408,7 @@ export function ArtistPage({
         return libraryArtists(true).then((again) => settle(look(again)))
       })
       .catch((reason: unknown) => {
-        if (request.current() && !isAbort(reason)) setLibrary({ state: 'failed', message: message(reason) })
+        if (request.current() && !isAbort(reason)) setLibrary({ state: 'failed', error: reason })
       })
     return () => findRequests.supersede()
   }, [ref.mbid, navidromeOk, owned, factsName, finds])
@@ -409,7 +426,7 @@ export function ArtistPage({
         setLibrary({ state: 'done', artist: answer })
       },
       (reason: unknown) => {
-        if (request.current() && !isAbort(reason) && !quiet) setLibrary({ state: 'failed', message: message(reason) })
+        if (request.current() && !isAbort(reason) && !quiet) setLibrary({ state: 'failed', error: reason })
       },
     )
   }
@@ -523,10 +540,10 @@ export function ArtistPage({
     const request = discRequests.begin()
     setDiscography((before) => ({ ...before, state: 'asking' }))
     //? a failure keeps what was on screen only when it answered this same question
-    const failed = (problem: string, unavailable: boolean) =>
+    const failed = (problem: string, unavailable: boolean, error?: unknown) =>
       setDiscography((before) => ({
         state: 'failed', groups: before.of === key ? before.groups : null, truncated: before.of === key && before.truncated,
-        of: before.of === key ? key : null, message: problem, unavailable,
+        of: before.of === key ? key : null, message: problem, unavailable, ...(error === undefined ? {} : { error }),
       }))
     getDiscography(mbid, studioOnly, request.signal).then(
       (answer) => {
@@ -543,7 +560,8 @@ export function ArtistPage({
       },
       (reason: unknown) => {
         if (!request.current() || isAbort(reason)) return
-        failed(message(reason), reason instanceof MusicBrainzUnavailable)
+        //? (2.0.4) the error itself, said by errorNote - never its words as the line
+        failed('', reason instanceof MusicBrainzUnavailable, reason)
       },
     )
   }
@@ -690,10 +708,23 @@ export function ArtistPage({
   //? the albums wait for every answer, or ROWS_WAIT_MS: drawn, they don't move as one lands
   const libraryKnown = library.state !== 'asking'
   const discKnown = groups !== null || discography.state === 'failed' || (!mbid && libraryKnown)
+  //? (2.0.13) their description: asked once who they are is settled - Navidrome's artist found or not, and
+  //? MusicBrainz's facts in (or failed), so deadwax's lookup of them is the facts' own, already cached. The
+  //? paragraph under the Play row when it is in hand as the albums are drawn - they wait for it too - else at the
+  //? page's foot; the subtitle under their name, in the hero
+  const rowsDrawn = useRef(false)
+  //? (after review) the library's failed notice - its Try again drawn under the top place, before the description is
+  //? asked - counts as drawn below it: a description then goes to the foot, never above that button
+  const describing = useDescription('artist',
+    libraryKnown && (!mbid || facts !== null || factsFailed) ? { mbid, navidromeId: libraryId } : null,
+    rowsDrawn.current || library.state === 'failed', id)
+  const describedBlock = inBlock('artist', describing.description)
+  //? a page come back to with every other answer from the session draws its albums on its first frame - the
+  //? scroll it is put back to needs them - whether or not its description has come (one still out goes to the foot)
+  const cameBack = useRef(libraryKnown && discKnown && ownedKnown)
   //? ...and once drawn, they stay drawn: Navidrome asked again (an artist found later) never takes
   //? them away while it answers
-  const rowsDrawn = useRef(false)
-  if (waited || (libraryKnown && discKnown && ownedKnown)) rowsDrawn.current = true
+  if (waited || (libraryKnown && discKnown && ownedKnown && (describing.settled || cameBack.current))) rowsDrawn.current = true
   const drawRows = rowsDrawn.current
   const asking = discography.state === 'asking' || !drawRows
 
@@ -826,7 +857,7 @@ export function ArtistPage({
    *  once it has something to say; once drawn, it stays. */
   const librarySection = !libraryOnScreen.current ? null : (
     <section class="app-artist-section" aria-labelledby="app-artist-library-title" aria-busy={!libraryHalfKnown}>
-      <h2 id="app-artist-library-title" class="app-section-title">{personal ? 'In the store' : 'In your library'}</h2>
+      <h2 id="app-artist-library-title" class="app-section-title">{personal ? 'In the collection' : 'In your library'}</h2>
       {shownLibrary && summariesFailed && (
         <p class="app-footnote app-artist-stale">
           deadwax couldn't read {where} just now - this is what it said before.{' '}
@@ -842,7 +873,7 @@ export function ArtistPage({
             <dd class="app-row-value">{shownLibrary.albums}</dd>
           </div>
           <div class="app-row app-artist-fact">
-            <dt class="app-row-label">Tracks</dt>
+            <dt class="app-row-label">Songs</dt>
             <dd class="app-row-value">{shownLibrary.tracks}</dd>
           </div>
           {shownLibrary.size && (
@@ -922,14 +953,22 @@ export function ArtistPage({
               ready={pinReady}
               unsaved={!canSave}
               onToggle={() => void setPinned(pinTarget, !pinned)}
-              onRefused={() => sayPins(PINS_UNSAVED)}
+              onRefused={() => sayPins(pinsUnsaved(seesDetail(accessNow())))}
             />
           )}
         </div>
         <div class="app-artist-names">
-          <h1 class="app-artist-name">
+          <h1 class="app-artist-name" dir="auto">
             {logo ? <img class="app-artist-logo" src={logo} alt={name} decoding="async" onError={broken(logo)} /> : name}
           </h1>
+          {/* (2.0.13) Wikidata's one line ("English band"), on one line - landing in the line app.css keeps for it above
+              the name until it comes, so the hero (240px at the least, taller under a two-line name and an iPhone's
+              status bar) is as tall before it as after, and nothing below moves */}
+          {describing.description?.subtitle && (
+            <p class="app-artist-subtitle" dir="auto">
+              {describing.description.subtitle}
+            </p>
+          )}
           {about && <p class="app-artist-facts">{about}</p>}
         </div>
       </div>
@@ -959,12 +998,16 @@ export function ArtistPage({
             </div>
           )}
 
+          {describedBlock && describing.at === 'top' && <DescriptionBlock description={describedBlock} at="top" />}
+
           {library.state === 'failed' && (
             <div class="pl-notice">
-              <p>{library.message}</p>
-              <button type="button" class="pl-text-button" onClick={tryLibraryAgain}>
-                Try again
-              </button>
+              {errorNote(library.error, { gone: ARTIST_GONE, retry: true })}
+              {errorKind(library.error) !== 'not-found' && (
+                <button type="button" class="pl-text-button" onClick={tryLibraryAgain}>
+                  Try again
+                </button>
+              )}
             </div>
           )}
 
@@ -998,7 +1041,7 @@ export function ArtistPage({
                         <ArchiveCover addresses={coverAddresses(null, row.group.id, 250)} class="app-artist-cover" />
                       )}
                       <span class="app-result-text">
-                        <span class="app-result-title">{row.title}</span>
+                        <span class="app-result-title" dir="auto">{row.title}</span>
                         <span class="app-result-line app-artist-line">
                           {row.held === true && (!personal || row.yours !== false) && <CheckIcon class="app-artist-held" />}
                           <span class="app-artist-line-text">{rowLine(row, personal)}</span>
@@ -1013,7 +1056,7 @@ export function ArtistPage({
                         aria-busy={resolving === row.group.id}
                         onClick={(event) => void getAlbum(row.group!, event)}
                       >
-                        {resolving === row.group.id ? 'Get…' : 'Get'}
+                        {resolving === row.group.id ? 'Getting…' : 'Get'}
                       </button>
                     )}
                   </li>
@@ -1024,27 +1067,30 @@ export function ArtistPage({
             {asking ? (
               <div class="app-asking" role="status">
                 <span class="app-sweep" aria-hidden="true" />
-                <span class="app-asking-text">{discography.state === 'asking' ? 'Asking MusicBrainz…' : `Looking in ${where}…`}</span>
+                <span class="app-asking-text">{discography.state === 'asking' ? 'Loading their albums…' : `Looking in ${where}…`}</span>
               </div>
             ) : discography.state === 'failed' ? (
               <div class="app-search-problem">
-                <p class="app-search-empty">
-                  {discography.unavailable
-                    ? "MusicBrainz isn't answering just now, so the albums you don't have aren't here - it often goes away for a few minutes."
-                    : discography.message}
-                </p>
+                {discography.unavailable ? (
+                  <p class="app-search-empty">
+                    Their other albums can't be shown right now - try again in a few minutes.
+                  </p>
+                ) : (
+                  //? (2.0.4) anything else in a listener's words (errorNote), its own for whoever runs deadwax
+                  errorNote(discography.error ?? new Error(discography.message ?? ''), { class: 'app-search-empty', retry: true })
+                )}
                 <button type="button" class="app-button" onClick={() => browse(true)}>
                   Try again
                 </button>
               </div>
             ) : discography.state === 'done' && discography.truncated ? (
-              <p class="app-search-empty">MusicBrainz lists more albums than the first 500 shown here.</p>
+              <p class="app-search-empty">Showing their first 500 albums.</p>
             ) : !mbid && library.state === 'done' && ownedKnown ? (
               <div class="app-artist-unknown">
                 <p class="app-search-empty">
                   {held.length
-                    ? `MusicBrainz doesn't know who this is from ${personal ? 'the files' : 'your files'}, so only the albums ${personal ? 'in the store' : 'you have'} are here.`
-                    : `Nothing of theirs in ${where}, and MusicBrainz doesn't know who this is.`}
+                    ? `Only the albums ${personal ? 'in the collection' : 'you have'} are shown - their other albums can't be found.`
+                    : `Nothing of theirs in ${where}, and their albums can't be found.`}
                 </p>
                 {/* (2.0.0-player.45) the picker's MusicBrainz search, for a shared name or files that don't say */}
                 {managesWho && (
@@ -1059,7 +1105,7 @@ export function ArtistPage({
                 )}
               </div>
             ) : discography.state === 'done' && !rows.length ? (
-              <p class="app-search-empty">{studioOnly ? 'No studio albums on MusicBrainz.' : 'No albums on MusicBrainz.'}</p>
+              <p class="app-search-empty">{studioOnly ? 'No studio albums found - turn off Studio only to see them all.' : 'No other albums found.'}</p>
             ) : null}
           </section>
 
@@ -1096,7 +1142,7 @@ export function ArtistPage({
                         <dl class="app-group app-artist-list">
                           {renamed && (
                             <div class="app-row app-artist-fact is-now">
-                              <dt class="app-row-label">{ownName ? 'Also filed as' : 'Now'}</dt>
+                              <dt class="app-row-label">{ownName ? 'Also known here as' : 'Now known as'}</dt>
                               <dd class="app-row-value">{ownName ? listed(moveNames) : facts.name}</dd>
                               {/* the fix for an artist filed under an old name (v0.9.14) */}
                               {managesMove && (
@@ -1148,7 +1194,7 @@ export function ArtistPage({
                     </>
                   ) : factsFailed ? (
                     <div class="app-search-problem">
-                      <p class="app-search-empty">MusicBrainz isn't answering just now, so who they are isn't here.</p>
+                      <p class="app-search-empty">Artist details can't be loaded right now.</p>
                       <button type="button" class="app-button" onClick={() => setFactsAsks((count) => count + 1)}>
                         Try again
                       </button>
@@ -1156,7 +1202,7 @@ export function ArtistPage({
                   ) : (
                     <div class="app-asking" role="status">
                       <span class="app-sweep" aria-hidden="true" />
-                      <span class="app-asking-text">Asking MusicBrainz…</span>
+                      <span class="app-asking-text">Loading…</span>
                     </div>
                   )}
                 </section>
@@ -1170,7 +1216,7 @@ export function ArtistPage({
                       //? one person can be in a band twice - left, and back - so the place keeps keys apart
                       <li key={`${member.mbid ?? member.name}:${at}`} class={`app-row app-artist-member${member.current ? '' : ' is-past'}`}>
                         <span class="app-artist-member-text">
-                          <span class="app-artist-member-name">{member.name}</span>
+                          <span class="app-artist-member-name" dir="auto">{member.name}</span>
                           {member.roles.length > 0 && <span class="app-artist-member-roles">{memberRoles(member)}</span>}
                         </span>
                         <span class="app-row-value app-artist-member-years">{memberYears(member)}</span>
@@ -1188,6 +1234,9 @@ export function ArtistPage({
               {libraryLast.current && librarySection}
             </div>
           )}
+
+          {/* (2.0.13) a description that came after the albums were drawn: here, where it moves nothing under a finger */}
+          {describedBlock && describing.at === 'foot' && <DescriptionBlock description={describedBlock} at="foot" />}
         </div>
       )}
     </section>

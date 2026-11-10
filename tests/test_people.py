@@ -434,6 +434,8 @@ def test_the_list_joins_what_deadwax_knows_and_sends_nothing_private(nd):
     assert rows["admin"]["permissions"] is None
     assert rows["admin"]["can"] == {"reset": rules.YOUR_PASSWORD, "remove": rules.YOUR_ACCOUNT, "admin": rules.YOUR_ROLE,
                                     "permissions": rules.YOUR_PERMISSIONS}
+    #? (2.0.8) Change password is in You's Account section now, and the refusal sends you there by that path
+    assert rules.YOUR_PASSWORD.endswith("You → Account → Change password.")
     assert set(rows["demo"]["can"].values()) == {rules.SHARED_ACCOUNT}
     assert rows["ethan"]["can"] == {"reset": None, "remove": None, "admin": None, "permissions": None}
     text = json.dumps(state)
@@ -778,6 +780,10 @@ def test_navidrome_refusing_a_remove_changes_nothing_in_deadwax(nd):
     act(nd, "admin")
     answer = remove(admin, nd)
     assert answer.status_code == 502 and answer.json()["kind"] == "unknown_shape"
+    #? (2.0.8) said as People's version note is: "checked with" Navidrome 0.64, and where to go meanwhile
+    detail = answer.json()["detail"]
+    assert "People was checked with Navidrome 0.64" in detail and "made for" not in detail
+    assert detail.endswith("use Navidrome's own Users page meanwhile.")
     assert len(run(nd.store.pins("ethan"))) == 1
 
 
@@ -1147,16 +1153,16 @@ def test_a_native_errors_words_carry_no_url_body_or_header():
 def test_the_native_api_is_a_fixed_list(nd):
     """Every request the fake sees across this module is one of six shapes (each test's own walk here, and every
     test's in the `nd` fixture's teardown); the module's public names are the six
-    operations and the few around them; only routes/people.py and auth.py import it; nothing a page sends becomes a
-    path or a method (only an id that matched ID_PATTERN does)."""
+    operations and the few around them; only routes/people.py, routes/own_password.py (2.0.2) and auth.py import it;
+    nothing a page sends becomes a path or a method (only an id that matched ID_PATTERN does)."""
     tree = ast.parse((ROOT / "src/api/navidrome_admin.py").read_text())
     public = {node.name for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
               and not node.name.startswith("_")}
     assert public == {"login", "list_users", "get_user", "create_user", "save_user", "delete_user", "Unlock",
-                      "NativeError", "forget", "forget_all", "unlocked", "close_client"}
+                      "NativeError", "forget", "forget_all", "forget_user", "unlocked", "close_client"}
     importers = sorted(str(path.relative_to(ROOT)) for path in (ROOT / "src").rglob("*.py")
                        if re.search(r"navidrome_admin", path.read_text()) and path.name != "navidrome_admin.py")
-    assert importers == ["src/api/app.py", "src/auth.py", "src/routes/people.py"]
+    assert importers == ["src/api/app.py", "src/auth.py", "src/routes/own_password.py", "src/routes/people.py"]
     #? app.py only closes it, in the lifespan
     assert re.findall(r"navidrome_admin\.\w+", (ROOT / "src/api/app.py").read_text()) == ["navidrome_admin.close_client"]
     #? a walk through every route, then every request the fake saw

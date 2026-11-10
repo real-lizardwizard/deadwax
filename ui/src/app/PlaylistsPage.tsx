@@ -68,7 +68,7 @@ export function PlaylistsPage({
           {playlist.coverArt ? <Cover id={playlist.coverArt} size={112} class="app-playlist-art-img" /> : <PlaylistIcon class="app-playlist-art-icon" />}
         </span>
         <span class="app-result-text">
-          <span class="app-result-title">{playlist.name}</span>
+          <span class="app-result-title" dir="auto">{playlist.name}</span>
           <span class="app-result-line">{rowLine(playlist)}</span>
         </span>
         <ChevronRightIcon class="app-chevron" />

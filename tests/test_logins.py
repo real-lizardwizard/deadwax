@@ -199,6 +199,9 @@ ROUTES = {
     ("PUT", "/deadwax/me/pins"): "user",
     ("POST", "/deadwax/me/pins/toggle"): "user",
     ("GET", "/deadwax/store/album"): "user",
+    #? (2.0.13) the artist and album pages' descriptions
+    ("GET", "/deadwax/describe/artist"): "user",
+    ("GET", "/deadwax/describe/album"): "user",
     #? each user's own library - their starred albums - and the admin's "held by nobody" (2.0.0-player.51,
     #? step 5 - tests/test_personal_libraries.py)
     ("GET", "/deadwax/me/library"): "user",
@@ -207,6 +210,8 @@ ROUTES = {
     ("POST", "/deadwax/me/library/dismiss"): "user",
     #? (2.0.0-player.52, step 6) Remove from my library - tests/test_player_as_you.py
     ("POST", "/deadwax/me/library/remove"): "user",
+    #? (2.0.2) your own Navidrome password, changed as you - tests/test_own_password.py
+    ("POST", "/deadwax/me/password"): "user",
     ("GET", "/deadwax/library/held"): "library",
     ("POST", "/deadwax/library/held/flags/{flag_id}/add"): "library",
     ("POST", "/deadwax/library/held/flags/{flag_id}/dismiss"): "library",
@@ -688,9 +693,11 @@ def test_an_unusable_navidrome_url_gets_no_sign_in_nor_recheck_sent_to_it(on, mo
 
     response = sign_in(TestClient(on.app), "james", PASSWORDS["james"])
     assert response.status_code == 503
-    detail = response.json()["detail"]
-    assert "NAVIDROME_URL is unusable" in detail and said in detail and "isn't answering" not in detail
-    assert "hunter2" not in detail
+    #? (2.0.4) the address problem for whoever runs deadwax (`why`), the sentence for anyone (`detail`)
+    detail, why = response.json()["detail"], response.json()["why"]
+    assert detail == auth.NAVIDROME_UNSET
+    assert "NAVIDROME_URL is unusable" in why and said in why and "isn't answering" not in why
+    assert "hunter2" not in detail and "hunter2" not in why
 
     run(auth.check_sessions(on.store, now=time.time() + auth.RECHECK_SECONDS + 1))
     assert ethan.get(ME).json()["user"] == "ethan"   # the address being wrong ends nobody's session
@@ -1284,7 +1291,9 @@ def test_no_secret_key_is_a_503_everywhere_but_the_health_check(on, monkeypatch)
     for value in (None, "too-short"):
         monkeypatch.setattr(Config, "DEADWAX_SECRET_KEY", value)
         for response in (on.client.get(ME), sign_in(on.client, "ethan", PASSWORDS["ethan"])):
-            assert response.status_code == 503 and "DEADWAX_SECRET_KEY" in response.json()["detail"]
+            #? (2.0.4) the key named for whoever runs deadwax (`why`), never in the sentence anyone reads
+            assert response.status_code == 503 and "DEADWAX_SECRET_KEY" in response.json()["why"]
+            assert response.json()["detail"] == auth.CANT_SIGN_IN
         assert on.client.get("/deadwax/health").status_code == 200
         assert on.client.get("/player/").status_code == 200
     assert on.fake.asks() == 0
@@ -1891,6 +1900,8 @@ def test_deadwax_admins_still_set_is_said_once_and_grants_nobody_anything(on, mo
     Config.report_logins()
     said = [record.getMessage() for record in caplog.records if "DEADWAX_ADMINS" in record.getMessage()]
     assert said == [DEADWAX_ADMINS_IGNORED] and "no longer reads it" in said[0]
+    #? (2.0.8) the release a person knows - never a branch's build number
+    assert "(since 2.0.0)" in said[0] and "player." not in said[0]
     assert [record.levelno for record in caplog.records if "DEADWAX_ADMINS" in record.getMessage()] == [logging.ERROR]
     ethan = signed_in(on, "ethan")
     assert ethan.get(ME).json()["admin"] is False and ethan.get("/deadwax/settings").status_code == 403
@@ -1912,24 +1923,26 @@ def test_break_glass_is_still_an_admin_with_every_permission(on):
 
 def test_the_example_files_logins_lines_lock_nobody_out():
     """(2.0.0-player.65, the 2.0.0 release review) The compose example offered `#- DEADWAX_SECRET_KEY=` to uncomment:
-    an empty line under environment: beats .env, and then nobody can sign in. It names no such line now, says logins
-    need ORGANIZE_MODE copy or move, and points at .env - which carries the three login lines, commented out."""
+    an empty line under environment: beats .env, and then nobody can sign in. (2.0.3, the compose prune) The compose
+    example has no environment: block at all now, so no line of it can beat .env, and it names no login setting; it
+    points at .env, which carries the three login lines, commented out, saying logins need organizing set to copy or move
+    first and the key in .env only."""
     repo = Path(__file__).resolve().parent.parent
     compose = (repo / "docker-compose.example.yml").read_text()
     env = (repo / ".env.example").read_text()
-    lines = [line.strip() for line in compose.splitlines()]
-    assert not any(line.lstrip("#").strip().startswith("- DEADWAX_SECRET_KEY") for line in lines)
-    assert not any(line.lstrip("#").strip().startswith("- DEADWAX_ADMIN_PASSWORD") for line in lines)
-    auth_line = next(line for line in lines if line.startswith("#- AUTH_MODE=on"))
-    assert "ORGANIZE_MODE copy or move" in auth_line and ".env" in auth_line
+    assert "environment:" not in compose
+    for name in ("AUTH_MODE", "DEADWAX_SECRET_KEY", "DEADWAX_ADMIN_PASSWORD"):
+        assert f"{name}=" not in compose, name
+    env_file = next(line for line in compose.splitlines() if line.strip().startswith("env_file:"))
+    assert "logins" in env_file and ".env.example" in env_file
     for line in ("#AUTH_MODE=on", "#DEADWAX_SECRET_KEY=", "#DEADWAX_ADMIN_PASSWORD="):
         assert line in env.splitlines(), line
-    assert "ORGANIZE_MODE copy or move" in env
-    #? the figures they quote: MusicBrainz's 200 MB about 1,100 artists (measured in .56); and (2.0.0-player.68) no
-    #? prerelease history - a reader comes from 1.1.8 and never ran those versions
+    #? (2.0.3, after review) and to set it BEFORE turning logins on: after, nothing can be reached to set it
+    assert "BEFORE you turn it" in env and "Organizing set to copy or move" in env
+    assert "beats this file even when it's empty" in env
+    #? (2.0.0-player.68) no prerelease history - a reader comes from 1.1.8 and never ran those versions
     for text in (compose, env):
         assert "2.0.0-player" not in text
-        assert "4,000 artists" not in text and "1,100 artists" in text
 
 
 def test_the_compose_example_has_no_line_that_is_only_a_comment():

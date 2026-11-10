@@ -18,6 +18,8 @@ import { CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronUpIcon, CloseIcon, 
 import type { Player } from '../player/usePlayer'
 import { ConfirmLine } from './ConfirmLine'
 import { announcePlaylistChanged, forgetPlaylist, keepPlaylist, keptPlaylist, onPlaylistChanged } from './usePlaylists'
+import { sayError } from './sayError'
+import { heroTitleClass } from '../lib/titles'
 
 /** A row being dragged in Edit: which, from where, the pointer's start and now, the page's scroll at the start,
  *  the rows' pitch, and the pointer. */
@@ -144,7 +146,7 @@ export function PlaylistPage({
           setGone(true)
           return
         }
-        setRefreshFailed(reason instanceof Error ? reason.message : String(reason))
+        setRefreshFailed(sayError(reason))
       },
     )
     return () => requests.supersede()
@@ -275,7 +277,7 @@ export function PlaylistPage({
           return
         }
         tried.current = body.song_ids
-        setEditProblem(caught instanceof Error ? caught.message : String(caught))
+        setEditProblem(sayError(caught))
       },
     )
   }
@@ -384,7 +386,7 @@ export function PlaylistPage({
       },
       (caught: unknown) => {
         setDeleting(false)
-        setDeleteProblem(caught instanceof Error ? caught.message : String(caught))
+        setDeleteProblem(sayError(caught))
       },
     )
   }
@@ -457,8 +459,8 @@ export function PlaylistPage({
               <PlaylistIcon class="app-playlist-hero-icon" />
             </span>
           )}
-          <h1 class="pl-hero-title">{shownPlaylist.name}</h1>
-          <p class="pl-hero-artist app-hero-plain app-playlist-owner">{ownerLine(shownPlaylist)}</p>
+          <h1 class={heroTitleClass(shownPlaylist.name)} dir="auto">{shownPlaylist.name}</h1>
+          <p class="pl-hero-artist app-hero-plain app-playlist-owner" dir="auto">{ownerLine(shownPlaylist)}</p>
           {/* why there is no Edit, under whose it is; then the description - one slot, which a desktop's drawer places */}
           {((readOnly && !editing) || shownPlaylist.comment) && (
             <div class="app-playlist-notes">
@@ -482,7 +484,7 @@ export function PlaylistPage({
       )}
 
       {hidden > 0 && !editing && <p class="app-store-line app-playlist-line">{hiddenWords(hidden)}</p>}
-      {refreshFailed && !gone && answer && <p class="app-store-line is-refused app-playlist-line">{`Couldn't ask Navidrome for it again: ${refreshFailed}`}</p>}
+      {refreshFailed && !gone && answer && <p class="app-store-line is-refused app-playlist-line">{`Couldn't update this playlist - showing it as it was. ${refreshFailed}`}</p>}
       {note && !editing && <p class="app-store-line app-playlist-line" role="status">{note}</p>}
       {/* what an Edit changed, read out - always in the page, as iOS reads only a region already there */}
       <p class="app-visually-hidden" role="status" aria-live="polite" aria-atomic="true">{said}</p>
@@ -493,7 +495,7 @@ export function PlaylistPage({
         refreshFailed ? (
           //? (review) nothing in hand and the first ask failed: why, and Try again - never an empty page saying "again"
           <div class="pl-notice app-playlist-failed">
-            <p>{`Couldn't open this playlist: ${refreshFailed}`}</p>
+            <p>{`Couldn't open this playlist. ${refreshFailed}`}</p>
             <button type="button" class="pl-text-button" onClick={() => {
               setRefreshFailed(null)
               setAsks((n) => n + 1)
@@ -559,8 +561,8 @@ export function PlaylistPage({
                   style={offset ? { transform: `translateY(${offset}px)` } : undefined}
                 >
                   <span class="app-pin-text">
-                    <span class="app-pin-title">{row.title}</span>
-                    <span class="app-pin-line">{row.artist}</span>
+                    <span class="app-pin-title" dir="auto">{row.title}</span>
+                    <span class="app-pin-line" dir="auto">{row.artist}</span>
                   </span>
                   <button type="button" class="app-pin-move app-pin-up" aria-label={`Move ${row.title} up`} aria-disabled={index === 0 || saving} onClick={() => move(index, -1)}>
                     <span class="app-pin-move-face">
@@ -640,8 +642,8 @@ export function PlaylistPage({
                     )}
                   </span>
                   <span class="pl-track-text">
-                    <span class="pl-track-title">{song.title}</span>
-                    <span class="pl-track-artist">{[song.artist, song.album].filter(Boolean).join(' · ')}</span>
+                    <span class="pl-track-title" dir="auto">{song.title}</span>
+                    <span class="pl-track-artist" dir="auto">{[song.artist, song.album].filter(Boolean).join(' · ')}</span>
                   </span>
                   <span class="pl-track-time">{trackTime(song.duration)}</span>
                 </button>

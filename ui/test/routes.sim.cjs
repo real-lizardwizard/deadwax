@@ -772,16 +772,19 @@ console.log('\nediting an album: the panel\'s rules (2.0.0-player.21, lib/albumE
     [E.editStatus(facts({ asked: false })), E.editStatus(facts({ stale: true })), E.editStatus(facts({ loaded: false })), E.editStatus(facts({ holding: true }))],
     [{ text: "Finding the album's folder…", busy: true }, { text: "Finding the album's folder…", busy: true }, { text: "Finding the album's folder…", busy: true }, null])
   check('...the saved scan in and the real one FAILED: said, with Look again - never "Finding" for good',
-    E.editStatus(facts({ stale: true, error: 'HTTP 504' })), { text: "deadwax couldn't read the library: HTTP 504", retry: true })
+    E.editStatus(facts({ stale: true, error: "Couldn't read the library. (HTTP 504)" })), { text: "Couldn't read the library. (HTTP 504)", retry: true })
+  //? (2.0.8, UX batch 5) the panel hands editStatus the failure already said in words (lib/errorWords.ts) - never the raw words
+  check('...said as the panel worded it: errorWords\' sentence, never the read\'s own words alone',
+    /error: library\.error \? sayError\(library\.error, '', \{ failed: READ_FAILED, retry: true \}\) : null/.test(fs.readFileSync(path.join(UI, 'src/app/EditPanel.tsx'), 'utf8')), true)
   check('...a failed read with nothing to show says so too; one under an album still being edited, nothing',
-    [E.editStatus(facts({ albums: 0, error: 'down' })), E.editStatus(facts({ error: 'down', holding: true })), E.editStatus(facts({ error: 'down' }))],
-    [{ text: "deadwax couldn't read the library: down", retry: true }, null, { text: "The library's scan doesn't list P/Dummy yet.", retry: true }])
+    [E.editStatus(facts({ albums: 0, error: 'Down.' })), E.editStatus(facts({ error: 'Down.', holding: true })), E.editStatus(facts({ error: 'Down.' }))],
+    [{ text: 'Down.', retry: true }, null, { text: "The library's scan doesn't list P/Dummy yet.", retry: true }])
   check('...an album held keeps its editors, whatever a later read finds (a hand edit renamed it out of the name it was found by)',
     E.editStatus(facts({ holding: true, folders: { paths: [], from: 'none' }, release: null })), null)
   //? (2.0.0-player.42: "Choose the folder" over the scan where the main page's library was the one way on)
   check('...no folder: by release, or by name - Look again, and Choose the folder (no main page any more)',
-    [E.editStatus(facts({ folders: { paths: [], from: 'none' } })).text.startsWith('deadwax has no folder of this album'),
-      E.editStatus(facts({ folders: { paths: [], from: 'none' }, release: null })).text.startsWith("deadwax can't tell which folder"),
+    [E.editStatus(facts({ folders: { paths: [], from: 'none' } })).text.startsWith("deadwax can't find this album's folder: no folder in the library is matched to the release"),
+      E.editStatus(facts({ folders: { paths: [], from: 'none' }, release: null })).text.startsWith("deadwax can't find this album's folder: it isn't matched to a release"),
       E.editStatus(facts({ folders: null })).retry, E.editStatus(facts({ folders: null })).choose,
       E.editStatus(facts({ folders: { paths: [], from: 'none' }, release: null })).choose, 'mainPage' in E.editStatus(facts({ folders: null }))],
     [true, true, true, true, true, false])
@@ -1084,7 +1087,7 @@ console.log('\nThe server\'s settings and the log: one page each, as the queue\'
     ['#/you/settings/server', '#/you/log/all'])
   check('...a kind with no id is the tab\'s root, as any page\'s', [R.parseHash('#/you/settings').canonical, R.parseHash('#/you/log/').canonical], ['#/you', '#/you'])
   check('the pages App opens, labelled for the back button above them', [R.SETTINGS_PAGE, R.LOG_PAGE],
-    [{ kind: 'settings', id: 'server', label: 'Server settings' }, { kind: 'log', id: 'all', label: 'Log' }])
+    [{ kind: 'settings', id: 'server', label: 'Server settings' }, { kind: 'log', id: 'all', label: 'Event log' }])
   check('their scroll kept under their address; neither the same page as the other, nor as the queue',
     [R.scrollKey({ tab: 'you', page: R.SETTINGS_PAGE }), R.scrollKey({ tab: 'you', page: R.LOG_PAGE }), R.samePage(R.SETTINGS_PAGE, R.LOG_PAGE), R.samePage(R.LOG_PAGE, R.QUEUE_PAGE)],
     ['#/you/settings/server', '#/you/log/all', false, false])
@@ -1117,7 +1120,7 @@ console.log('\nThe server\'s settings and the log: one page each, as the queue\'
   check('...and back from the last leaves them all in one step', [where(d), d.index], [['you', []], 0])
 
   check('the sidebar: Settings and Log are Managing\'s items', [F.SIDEBAR_SETTINGS, F.SIDEBAR_LOG],
-    [{ id: 'settings', label: 'Settings' }, { id: 'log', label: 'Log' }])
+    [{ id: 'settings', label: 'Server settings' }, { id: 'log', label: 'Event log' }])
   check('...each current while its page is on top, whatever its tab; otherwise as before',
     [F.sidebarCurrent('you', 'albums', true, R.SETTINGS_PAGE), F.sidebarCurrent('home', 'albums', true, R.LOG_PAGE), F.sidebarCurrent('search', 'albums', true, R.SETTINGS_PAGE), F.sidebarCurrent('you', 'albums', true, R.QUEUE_PAGE), F.sidebarCurrent('you', 'albums', true)],
     ['settings', 'log', 'settings', 'queue', 'you'])
@@ -1182,7 +1185,7 @@ console.log('\nPeople: one page, a sibling of the other Managing pages (2.0.0-pl
   check('...current while its page is on top, whatever its tab', [F.sidebarCurrent('you', 'albums', true, R.PEOPLE_PAGE), F.sidebarCurrent('home', 'albums', true, R.PEOPLE_PAGE)],
     ['people', 'people'])
   check('...a tap opens its page, on You, as Library care does', F.sidebarMove('people', 'albums', true), { how: 'managing', tab: 'you', kind: 'people' })
-  check('a Managing page without its permission says so, per page', R.MANAGING_ADMINS_ONLY, "You don't have permission for this page.")
+  check('a Managing page without its permission says so, per page', R.MANAGING_ADMINS_ONLY, "This page needs a permission an admin hasn\'t given you - ask one if you need it.")
 }
 
 console.log('\nplaylists: the Playlists page and a playlist\'s, pages of their own kinds (2.0.0-player.58)')

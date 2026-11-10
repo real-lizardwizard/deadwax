@@ -3,7 +3,9 @@ import { useState } from 'preact/hooks'
 import { GET_OFF, gets } from '../lib/permissions'
 import type { RequestRow } from '../lib/requestsView'
 import { CloseIcon, PlayIcon } from '../player/icons'
-import { useAccess } from './access'
+import { TELL } from '../lib/errorWords'
+import { seesDetail, useAccess } from './access'
+import { errorLine } from './ErrorNote'
 
 /**
  * A download, drawn as the Requests board draws it (2.0.0-player.12): a card for one on its way or
@@ -126,9 +128,9 @@ export function DownloadingCard({ row, onCancel, asking = false, onKeep, onConfi
     <div class={`app-card app-job is-downloading${row.dimmed ? ' is-dimmed' : ''}${question ? ' is-asking' : ''}`}>
       <JobCover src={row.cover} large />
       <div class="app-job-body">
-        <span class="app-job-title">{row.title}</span>
-        <span class="app-job-line">{row.line}</span>
-        {row.askedBy && <span class="app-job-line">{row.askedBy}</span>}
+        <span class="app-job-title" dir="auto">{row.title}</span>
+        <span class="app-job-line" dir="auto">{row.line}</span>
+        {row.askedBy && <span class="app-job-line" dir="auto">{row.askedBy}</span>}
         <JobBar progress={row.progress} />
         <span class="app-job-data">{row.data}</span>
       </div>
@@ -148,9 +150,9 @@ export function WaitingCard({ row, onCancel, asking = false, onKeep, onConfirm }
     <div class={`app-card app-job${row.dimmed ? ' is-dimmed' : ''}${question ? ' is-asking' : ''}`}>
       <JobCover src={row.cover} />
       <div class="app-job-body">
-        <span class="app-job-title">{row.title}</span>
-        <span class={`app-job-line${toneClass(row)}`}>{row.line}</span>
-        {row.askedBy && <span class="app-job-line">{row.askedBy}</span>}
+        <span class="app-job-title" dir="auto">{row.title}</span>
+        <span class={`app-job-line${toneClass(row)}`} dir="auto">{row.line}</span>
+        {row.askedBy && <span class="app-job-line" dir="auto">{row.askedBy}</span>}
       </div>
       <CancelButton row={row} onCancel={onCancel} asking={question} />
       {question && <CancelConfirm row={row} onKeep={onKeep} onConfirm={onConfirm} />}
@@ -159,8 +161,8 @@ export function WaitingCard({ row, onCancel, asking = false, onKeep, onConfirm }
 }
 
 /**
- * Needs attention: why it stopped, in red, and the two ways on - "Next peer · N left" (primary
- * only on the first such card) and "Ask again". While one runs both wait, the one tapped saying
+ * Needs attention: why it stopped, in red, and the two ways on - "Another source · N left" (primary
+ * only on the first such card) and "Same source again" (2.0.6: "Next peer", "Ask again"). While one runs both wait, the one tapped saying
  * what it's doing - aria-disabled, the tap refused here, so the focus on the one tapped stays put;
  * a refusal is the red line under the reason. Each label is a span inside its button, which is
  * where the ellipsis goes: clipping the button would clip its reach to 44px away too.
@@ -172,8 +174,11 @@ export function AttentionCard({
   row: RequestRow
   onRetry: (row: RequestRow, samePeer: boolean) => void
 }) {
-  //? (2.0.0-player.61) Next peer and Ask again start a download: Get albums' - without it, its words in their place
-  const getsAlbums = gets(useAccess().permissions)
+  //? (2.0.0-player.61) Another source and Same source again start a download: Get albums' - without it, its words in their place
+  const access = useAccess()
+  const getsAlbums = gets(access.permissions)
+  //? (2.0.4) the job's own words under its reason for whoever runs deadwax; "Tell whoever runs deadwax." for anyone else
+  const runs = seesDetail(access)
   const nextPeer = getsAlbums ? row.nextPeer : null
   const askAgain = getsAlbums ? row.askAgain : null
   return (
@@ -181,12 +186,13 @@ export function AttentionCard({
       <div class="app-job-top">
         <JobCover src={row.cover} />
         <div class="app-job-body">
-          <span class="app-job-title">{row.title}</span>
-          {row.line && <span class="app-job-line">{row.line}</span>}
-          {row.askedBy && <span class="app-job-line">{row.askedBy}</span>}
-          {row.reason && <span class="app-job-reason">{row.reason}</span>}
-          {row.problem && <span class="app-job-reason">{row.problem}</span>}
-          {!getsAlbums && (row.nextPeer || row.askAgain) && <span class="app-job-line app-get-off">{GET_OFF}</span>}
+          <span class="app-job-title" dir="auto">{row.title}</span>
+          {row.line && <span class="app-job-line" dir="auto">{row.line}</span>}
+          {row.askedBy && <span class="app-job-line" dir="auto">{row.askedBy}</span>}
+          {row.reason &&
+            errorLine(row.reasonTell && !runs ? `${row.reason} ${TELL}` : row.reason, runs ? row.reasonDetail : null, { as: 'span', class: 'app-job-reason' })}
+          {row.problem && errorLine(row.problem, runs ? row.problemDetail : null, { as: 'span', class: 'app-job-reason' })}
+          {!getsAlbums && (row.nextPeer || row.askAgain) && <span class="app-job-line app-get-off" dir="auto">{GET_OFF}</span>}
         </div>
       </div>
       {(nextPeer || askAgain) && (
@@ -226,7 +232,7 @@ export function AttentionCard({
  * (`row.release`: filed, partly filed, or already there) OPENS it - the row is a button - and one this
  * download filed (`row.plays`) has the board's round ▶, which plays it: the page decides, in the tap,
  * whether the album's songs are in hand to play, and opens the album otherwise. `note` is the page's
- * own word for a row it couldn't open ("Navidrome hasn't found it yet"); `opening` while it looks,
+ * own word for a row it couldn't open ("Not ready to play yet - it may still be scanning."); `opening` while it looks,
  * faded so the tap shows it was taken.
  */
 export function DoneRow({
@@ -242,14 +248,19 @@ export function DoneRow({
   opening?: boolean
   note?: string | null
 }) {
+  //? (2.0.4) a download that wasn't added: the job's own words under its line for whoever runs deadwax (the setting,
+  //? the exception - what they fix it from); "Tell whoever runs deadwax." for anyone else, where only they can
+  const runs = seesDetail(useAccess())
   const body = (
     <>
       <JobCover src={row.cover} />
       <span class="app-job-body">
-        <span class="app-job-title">{row.title}</span>
-        <span class={`app-job-line${toneClass(row)}`}>{row.line}</span>
-        {row.askedBy && <span class="app-job-line">{row.askedBy}</span>}
-        {note && <span class="app-job-line is-warning">{note}</span>}
+        <span class="app-job-title" dir="auto">{row.title}</span>
+        <span class={`app-job-line${toneClass(row)}`} dir="auto">{row.line}</span>
+        {runs && row.reasonDetail && <span class="app-error-detail">{row.reasonDetail}</span>}
+        {!runs && row.reasonTell && <span class="app-job-line" dir="auto">{TELL}</span>}
+        {row.askedBy && <span class="app-job-line" dir="auto">{row.askedBy}</span>}
+        {note && <span class="app-job-line is-warning" dir="auto">{note}</span>}
       </span>
     </>
   )
@@ -279,8 +290,8 @@ export function ArrivingCard({ row, onOpen }: { row: RequestRow; onOpen: () => v
     <button type="button" class="app-card app-job app-arriving-card" onClick={onOpen}>
       <JobCover src={row.cover} />
       <span class="app-job-body">
-        <span class="app-job-title">{row.title}</span>
-        {row.artist && <span class="app-job-line">{row.artist}</span>}
+        <span class="app-job-title" dir="auto">{row.title}</span>
+        {row.artist && <span class="app-job-line" dir="auto">{row.artist}</span>}
         <JobBar progress={row.progress} />
       </span>
       <span class="app-job-brief">{row.brief}</span>

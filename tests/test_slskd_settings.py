@@ -17,6 +17,8 @@ real app's and nothing connects to anything. The store is a throwaway database p
 """
 
 import asyncio
+import inspect
+import logging
 import sys
 from pathlib import Path
 
@@ -348,7 +350,79 @@ def test_the_start_up_check_never_logs_a_login_in_the_address(env, monkeypatch, 
     for url in ("http://me:hunter2@slskd:5030", "me:hunter2@slskd:5030"):
         monkeypatch.setattr(Config, "SLSKD_URL", url)
         Config.check()
+        Config.report_slskd()
 
     assert "SLSKD_URL is unusable (has a user name or password in it" in caplog.text
     assert "SLSKD_URL is unusable (missing the scheme" in caplog.text
     assert "hunter2" not in caplog.text and ENV_KEY not in caplog.text
+
+
+# ----- the start-up report, after the overrides (2.0.3) -----
+
+def frontend_lines(caplog) -> list[str]:
+    """What start-up sent to the app's Log, as the event log's handler picks it out."""
+    return [r.getMessage() for r in caplog.records if getattr(r, "frontend", False)]
+
+
+def start_up(stored: dict[str, str]) -> None:
+    """The lifespan's order for these: check(), the overrides laid over the environment, the report."""
+    Config.check()
+    Config.apply_overrides(stored)
+    Config.report_slskd()
+
+
+def test_an_slskd_saved_in_server_settings_is_not_reported_missing_at_start_up(env, monkeypatch, caplog):
+    """(2.0.3) The short compose example leaves slskd to Server settings. From check(), which runs before the
+    overrides exist, such an slskd was logged to the app's Log as "SLSKD_URL is unusable (not set)" on every
+    start - with the advice to set it in compose - while it worked."""
+    monkeypatch.setattr(Config, "SLSKD_URL", None)
+    monkeypatch.setattr(Config, "SLSKD_APIKEY", None)
+    monkeypatch.setattr(Config, "ORGANIZE_MODE", Config.ORGANIZE_MODE)
+    monkeypatch.setattr(Config, "COVER_ART_SIZE", Config.COVER_ART_SIZE)
+
+    with caplog.at_level(logging.INFO):
+        start_up({"SLSKD_URL": "http://slskd-box:5030", "SLSKD_APIKEY": NEW_KEY})
+
+    said = frontend_lines(caplog)
+    assert not [line for line in said if "SLSKD_URL" in line or "SLSKD_APIKEY" in line], said
+    assert "SLSKD_URL found! (from Server settings)" in caplog.text
+    assert "SLSKD_APIKEY found! (from Server settings)" in caplog.text
+    assert NEW_KEY not in caplog.text
+
+
+def test_an_slskd_set_nowhere_is_reported_with_server_settings_first(env, monkeypatch, caplog):
+    monkeypatch.setattr(Config, "SLSKD_URL", None)
+    monkeypatch.setattr(Config, "SLSKD_APIKEY", None)
+    monkeypatch.setattr(Config, "ORGANIZE_MODE", Config.ORGANIZE_MODE)
+    monkeypatch.setattr(Config, "COVER_ART_SIZE", Config.COVER_ART_SIZE)
+
+    start_up({})
+
+    said = frontend_lines(caplog)
+    unusable = [line for line in said if line.startswith("SLSKD_URL is unusable (not set)")]
+    assert len(unusable) == 1, said
+    assert "Set it in Server settings (Connections), or in your .env" in unusable[0]
+    assert [line for line in said if line.startswith("SLSKD_APIKEY is not set")], said
+
+
+def test_check_leaves_slskd_and_organizing_to_the_report(env, monkeypatch, caplog):
+    """check() runs before the settings tab's overrides exist, so what can be saved there it doesn't judge."""
+    monkeypatch.setattr(Config, "SLSKD_URL", None)
+    monkeypatch.setattr(Config, "SLSKD_APIKEY", None)
+    monkeypatch.setattr(Config, "ORGANIZE_MODE", Config.ORGANIZE_MODE)
+    monkeypatch.setattr(Config, "COVER_ART_SIZE", Config.COVER_ART_SIZE)
+
+    with caplog.at_level(logging.INFO):
+        Config.check()
+
+    said = " ".join(r.getMessage() for r in caplog.records)
+    for name in ("SLSKD_URL", "SLSKD_APIKEY", "SLSKD_DOWNLOAD_PATH", "LIBRARY_PATH", "organizing"):
+        assert name not in said, f"check() judged {name} before the overrides were in"
+
+
+def test_the_lifespan_reports_slskd_after_the_overrides():
+    from src.api import app as app_module
+
+    source = inspect.getsource(app_module.lifespan)
+    assert "Config.report_slskd()" in source
+    assert source.index("Config.apply_overrides(") < source.index("Config.report_slskd()")

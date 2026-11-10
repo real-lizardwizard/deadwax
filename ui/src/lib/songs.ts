@@ -489,12 +489,12 @@ export function songAlbumLine(album: SongAlbum, song: Song, index: OwnedIndex | 
  * that brought nothing new says that.
  */
 export function moreSongsWords(added: number, grown: number): { note: string | null; said: string } {
-  if (added) return { note: null, said: `${added} more ${added === 1 ? 'song' : 'songs'} from MusicBrainz` }
+  if (added) return { note: null, said: `${added} more ${added === 1 ? 'song' : 'songs'} found` }
   if (grown) {
     const albums = `${grown} more ${grown === 1 ? 'album' : 'albums'}`
     return { note: `No new songs - ${albums} for the songs above.`, said: `No new songs - ${albums} for the songs above` }
   }
-  return { note: 'MusicBrainz sent nothing new.', said: 'MusicBrainz sent nothing new' }
+  return { note: 'No more results.', said: 'No more results' }
 }
 
 /* ===== the album opened from a song: its pressing, and the song in its tracklist ===== */

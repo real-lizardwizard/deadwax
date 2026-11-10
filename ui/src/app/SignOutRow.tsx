@@ -29,7 +29,7 @@ export function SignOutRow({ user }: { user: string }) {
           return
         }
         setBusy(false)
-        setProblem("deadwax didn't answer, so you're still signed in - try again.")
+        setProblem("Couldn't reach deadwax, so you're still signed in - try again.")
       },
     )
   }
@@ -47,8 +47,8 @@ export function SignOutRow({ user }: { user: string }) {
       </div>
       <p class="app-footnote">
         {user === BREAK_GLASS_USER
-          ? `Signed in as ${BREAK_GLASS_USER}, with the break-glass password - it lasts 12 hours. `
-          : `Signed in as ${user}, with your Navidrome account. `}
+          ? `Signed in as ${BREAK_GLASS_USER}, with the emergency admin password - this sign-in lasts 12 hours. `
+          : `Signed in as ${user}, with your music server (Navidrome) account. `}
         Signing out ends this device's session and stops what's playing.
       </p>
     </>

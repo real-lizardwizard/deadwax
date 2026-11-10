@@ -653,5 +653,21 @@ console.log('\nthe Mandala\'s lines kept clean: rings in one colour, a shorter t
   check('...and the core\'s glow, which reaches everywhere, drawn outside it', mandala.slice(close).includes('col += uCore * '), true)
 }
 
+console.log('\nthe visualizer\'s words (2.0.7, UX batch 4): a listener\'s, the reason\'s own for whoever runs deadwax')
+{
+  const viz = fs.readFileSync(path.join(UI, 'src/player/Visualizer.tsx'), 'utf8')
+  check('without WebGL: the browser can\'t draw the full effect - never "WebGL"', [V.GL_FALLBACK, /\bWebGL\b/.test(V.GL_FALLBACK), /\{GL_FALLBACK\}/.test(viz)],
+    ["This browser can't draw the full Ambient effect, so a simpler version is showing.", false, true])
+  check('the note: vizNote, the reason\'s own words only for whoever runs deadwax (seesDetail)',
+    /\{vizNote\(seeing\.why, seeing\.detail, seesDetail\(accessNow\(\)\)\)\}/.test(viz), true)
+  check('the readout: "Now showing:" and "Mood:" - never "now:" and "feel:"',
+    [/<span>Now showing: \{STYLE_NAMES\[nowStyle\]\}<\/span>/.test(viz), /<span>Mood: \{feelText\}<\/span>/.test(viz), /<span>(?:now|feel): /.test(viz)], [true, true, false])
+  //? (after review) the mood only for a song the visualizer follows: the feel is fed by a song it hears, so for one
+  //? it can't hear it was the last FLAC's mood (or newFeel()'s "lively") beside "it rests for this one"
+  check('...the mood only while the visualizer follows the song (showsMood), the readout drawn for Now showing alone too',
+    [/const mood = feelText && showsMood\(seeing\.seeing\) \? feelText : ''/.test(viz), /\{mood \? <span>Mood: \{feelText\}<\/span> : null\}/.test(viz),
+      /\{!menuOpen && \(mood \|\| \(choice === 'rotate' && nowStyle\)\) \? \(/.test(viz), /\{!menuOpen && feelText \?/.test(viz)], [true, true, true, false])
+}
+
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')
 process.exit(failures ? 1 : 0)

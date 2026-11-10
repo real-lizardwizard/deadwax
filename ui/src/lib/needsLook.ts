@@ -36,8 +36,10 @@ export const NEW_FACET = 'new'
 /** The facet for albums whose issues were all accepted as they are (2.0.0-player.66) - not an issue code either. */
 export const IGNORED_FACET = 'ignored'
 
-/** The Ignored chip's title. */
-const IGNORED_HINT = 'Albums whose issues you accepted as they are'
+/** The Marked fine chip's words and title (2.0.8, UX batch 5: James's "Marked fine" for an album accepted with
+ *  "It's fine as it is" - it was "Ignored"). */
+export const MARKED_FINE = 'Marked fine'
+const IGNORED_HINT = "Albums you marked fine as they are, with \u201cIt's fine as it is\u201d"
 
 /**
  * An album out of the queue because every issue found on it was accepted ("It's fine as it is"): one
@@ -88,7 +90,7 @@ export function facets(albums: readonly LibraryAlbum[], issueTypes: Record<strin
     { id: null, label: 'All', count: waiting.length },
     ...(fresh ? [{ id: NEW_FACET, label: 'Newly added', count: fresh }] : []),
     ...issues,
-    ...(ignored ? [{ id: IGNORED_FACET, label: 'Ignored', count: ignored, hint: IGNORED_HINT }] : []),
+    ...(ignored ? [{ id: IGNORED_FACET, label: MARKED_FINE, count: ignored, hint: IGNORED_HINT }] : []),
   ]
 }
 
@@ -116,7 +118,7 @@ export type RowMark = 'fixed' | 'ignored' | 'deleted'
 
 export const MARK_WORDS: Readonly<Record<RowMark, string>> = {
   fixed: 'Fixed',
-  ignored: 'Ignored',
+  ignored: MARKED_FINE,
   deleted: 'Deleted',
 }
 
@@ -224,14 +226,15 @@ export function leavingAtEnd(session: LookSession): string | null {
   return here && here.mark !== 'deleted' ? here.path : null
 }
 
-/** The words above the list: what the page is - Navidrome not listing an album among them (2.0.0-player.46). */
+/** The words above the list: what the page is for - Navidrome not listing an album among them (2.0.0-player.46);
+ *  (2.0.8, UX batch 5) what the page is for and what to do there, where it said what the albums "want". */
 export const NEEDS_LOOK_LINE =
-  "Albums whose tags, folder or cover want attention or that Navidrome doesn't list, and albums deadwax filed that "
-  + "you haven't looked at yet."
+  "Albums whose tags, folder or cover need fixing, albums Navidrome doesn't list, and new downloads nobody has looked "
+  + 'at yet. Open one to fix it, or to mark it fine as it is.'
 
 /** Said when ignores can't be saved (2.0.0-player.42) - the main page's warning, in the app's words. */
-export const IGNORES_UNSAVED = "Ignores can't be saved: deadwax couldn't open its job store (DB_PATH), so an album you "
-  + "accept with \u201cIt's fine as it is\u201d will come back."
+export const IGNORES_UNSAVED = "deadwax can't save to its database (check DB_PATH), so an album you mark "
+  + "\u201cIt's fine as it is\u201d will come back."
 
 /**
  * Whether to warn that ignores can't be saved (2.0.0-player.42), as the main page's queue warned: the
@@ -245,8 +248,8 @@ export function ignoresUnsaved(library: { loaded: boolean; reviewTracking: boole
 }
 
 /** Said when Navidrome isn't set up (2.0.0-player.46): nothing is checked against it. */
-export const NAVIDROME_UNSET = "Navidrome isn't set up, so no album is checked against what it lists - set it up in "
-  + "deadwax's settings (Connections)."
+export const NAVIDROME_UNSET = "Navidrome isn't set up, so no album is checked against what it lists. It's set up in "
+  + 'Server settings (Connections).'
 
 /** Said when Navidrome was scanning as it was last asked - past tense, as it stays true once the scan
  *  has ended: until a read asks again, only the albums found missing before are marked. */
@@ -257,9 +260,10 @@ export const NAVIDROME_SCANNING = 'Navidrome was scanning when last asked, so on
 export const NAVIDROME_WAITING = "Navidrome hasn't answered yet, so no album is checked against it until the library "
   + 'is read again.'
 
-/** Said when Navidrome couldn't be asked: why, as deadwax said it. */
-export const navidromeFailed = (problem: string | null): string =>
-  `Couldn't ask Navidrome which albums it has: ${problem || 'no reason given'}`
+/** Said when Navidrome couldn't be asked - (2.0.8) why, as deadwax said it, only for whoever runs deadwax (`detail`:
+ *  access.ts seesDetail); anyone else reads what to do. */
+export const navidromeFailed = (problem: string | null, detail = true): string =>
+  detail && problem ? `Couldn't ask Navidrome which albums it has: ${problem}` : "Couldn't ask Navidrome which albums it has - try again in a minute."
 
 /**
  * What the page says ONCE about the albums' check against Navidrome (2.0.0-player.46) - "Not in
@@ -268,9 +272,9 @@ export const navidromeFailed = (problem: string | null): string =>
  * answer at all). Said in the page's status line - always there, a row tall, one line of words - so
  * its coming and going moves no row, not even mid-session (2.0.0-player.46 review).
  */
-export function navidromeNote(check: NavidromeCheck | null): string | null {
+export function navidromeNote(check: NavidromeCheck | null, detail = true): string | null {
   if (check?.state === 'unset') return NAVIDROME_UNSET
-  if (check?.state === 'failed') return navidromeFailed(check.problem)
+  if (check?.state === 'failed') return navidromeFailed(check.problem, detail)
   if (check?.state === 'scanning') return NAVIDROME_SCANNING
   if (check?.state === 'checking') return NAVIDROME_WAITING
   return null

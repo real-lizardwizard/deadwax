@@ -3,6 +3,8 @@ import { useEffect, useState } from 'preact/hooks'
 import * as libraryApi from '../api/library'
 import { latestOnly } from '../lib/latest'
 import { describeRetime, type RetimeTotals } from '../lib/lyrics'
+import { asSentence } from '../lib/errorWords'
+import { sayError } from '../app/sayError'
 import { Loading } from './Loading'
 
 /** A re-time run under way, or how the last one ended. */
@@ -67,7 +69,7 @@ async function start(): Promise<void> {
     albums = (await libraryApi.listAlbums()).albums
       .filter((album) => album.lyrics_count > 0)
   } catch (caught) {
-    if (ticket.current()) keep(ended({ ...totals, total: 0, done: 0, running: false, error: `couldn't read the library - ${String(caught)}` }))
+    if (ticket.current()) keep(ended({ ...totals, total: 0, done: 0, running: false, error: sayError(caught, '', { failed: "Couldn't read the library.", retry: true }) }))
     return
   }
 
@@ -126,7 +128,9 @@ export function RetimeLyrics({ unsaved }: { unsaved: boolean }) {
     <div class="settings-retime">
       {run?.running ? (
         <button type="button" class="win-button is-running" onClick={() => { stop = true }}>
-          <Loading label={run.total ? `re-timing ${run.done}/${run.total} albums · stop` : 'reading the library'} />
+          {/* (2.0.8, UX batch 5) what Stop does, said on it: the run stops after the album it is on - counted as
+              that album (done + 1), so the number doesn't move when Stop is pressed or the run ends there */}
+          <Loading label={run.total ? `Re-timing ${Math.min(run.done + 1, run.total)} of ${run.total} albums · Stop after this album` : 'Reading the library…'} />
         </button>
       ) : (
         <button
@@ -134,7 +138,7 @@ export function RetimeLyrics({ unsaved }: { unsaved: boolean }) {
           class="win-button"
           disabled={unsaved}
           title={unsaved
-            ? 'Save the new lead first - this re-times to the lead that is saved'
+            ? 'Save the new lead first - this re-times to the lead that is saved.'
             : 'Move the timings of lyrics already saved to the lead above. Only files that are '
               + "still exactly LRCLIB's lyrics are touched."}
           onClick={() => void start()}
@@ -149,7 +153,7 @@ export function RetimeLyrics({ unsaved }: { unsaved: boolean }) {
           : run?.error
             ? run.error
             : run && !run.running
-              ? `${describeRetime(run)}${run.done < run.total ? ` (stopped at ${run.done} of ${run.total} albums)` : '.'}`
+              ? `${asSentence(describeRetime(run))}${run.done < run.total ? ` Stopped at ${run.done} of ${run.total} albums.` : ''}`
               : 'Lyrics saved before the lead changed keep their old timings until re-timed.'}
       </span>
     </div>

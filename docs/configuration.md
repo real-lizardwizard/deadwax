@@ -3,8 +3,8 @@
 There are three kinds of setting:
 
 - **Server settings** belong to the container: where slskd is, where your library is, how albums are
-  filed. They're edited in the app's **Server settings** - the desktop sidebar's **Settings**, under
-  **Managing**, or **You → Server settings** on a phone - which has three pages: **Library**,
+  filed. They're edited in the app's **Server settings** - the desktop sidebar's **Server settings**, under
+  **Manage**, or **You → Manage → Server settings** on a phone - which has three pages: **Library**,
   **Downloads** and **Connections**. "Settings → Library" in this guide means that page.
 - **Your Getting albums settings** - what **Get** does, the quality floor and Format - are
   [kept for you on deadwax](#your-settings-in-the-app-per-user-on-deadwax), so they follow you from
@@ -16,6 +16,12 @@ There are three kinds of setting:
 
 ## Where a server setting comes from
 
+**Most of them are meant to be set in the app.** The [compose example](../docker-compose.example.yml)
+holds only what Docker needs - the image, the folders and the port - and everything else starts at a
+sensible default: open deadwax after its first start and set slskd, MusicBrainz's email and Navidrome
+in Server settings → Connections, and organizing under Library. Any of them can be an environment
+variable instead; [the list](#environment-variables) has every one, with how to give it.
+
 A server setting can be given in three places. The first one found wins:
 
 1. **Server settings.** A value saved there is stored in deadwax's database and applies
@@ -24,14 +30,17 @@ A server setting can be given in three places. The first one found wins:
 2. **The `environment:` block** of your compose file.
 3. **A `.env` file** next to the compose file.
 
-If none of them sets it, the default below applies. On start-up, the log names the source of
-each setting it read, which helps when a value isn't the one you expected. Settings → Library
-also shows every path as the container sees it, and whether it exists and can be read and
-written.
+If none of them sets it, the default below applies - for `SLSKD_DOWNLOAD_PATH` and `LIBRARY_PATH`, the
+image's own `/downloads` and `/music` ([the image's own](#the-images-own)). On start-up, the log names
+the source of each setting it read, which helps when a value isn't the one you expected, and each row
+in Server settings says where its value came from (one the image sets counts as the container
+environment). Settings → Library also shows every path as the
+container sees it, and whether it exists and can be read and written.
 
-Two settings can't be changed from Server settings, and it says why: `DB_PATH` is where its own
-overrides are stored, and `PUID`/`PGID` are used before the app starts. Nor can the three
-[logins](#logins-environment-only) settings: they're shown, locked, under Connections.
+A few settings can't be changed from Server settings: `DB_PATH` is where its own overrides are stored,
+and it says so; `PUID`/`PGID` are used before the app starts; and `TRUSTED_ORIGINS` guards that page's
+own save. Nor can the three [logins](#logins-environment-only) settings: they're shown, locked, under
+Connections.
 
 ### In the app
 
@@ -40,7 +49,7 @@ overrides are stored, and `PUID`/`PGID` are used before the app starts. Nor can 
 bottom above the tab bar and the player). Changes stay drafts until **Save changes**, which saves
 every page's changes at once or, if deadwax refuses one, none of them, saying why. A change made while
 a save is still on its way stays a draft for the next save, and drafts are kept if you go to another
-page - the Log, say - and come back, until the app is reloaded. A page holding a change, or a setting
+page - the Event log, say - and come back, until the app is reloaded. A page holding a change, or a setting
 that needs attention, is marked on its tab, so neither can hide behind one you aren't looking at.
 **Re-time saved lyrics** is there too, under **Library**'s Lyrics group beside `LYRICS_LEAD_MS`: it
 is refused while the lead has an unsaved change ("Save the new lead first." - it re-times to the
@@ -66,9 +75,9 @@ three Navidrome settings are saved, the app asks Navidrome again by itself.
 
 | setting | default | what it does |
 | --- | --- | --- |
-| `SLSKD_URL` | *(required)* | slskd's address **as seen from inside this container**, with the scheme: `http://slskd:5030` for a container on the same Docker network. If slskd has a URL base, include it, as in `http://slskd:5030/slskd`. It can't hold a user name or password, a `?` or `#`, or a space, and Server settings explains exactly what's wrong with an address it can't use. One set in compose or `.env` that fails the same check is refused as well: deadwax sends slskd nothing at it, and the **Log** and the container's log say why. **Changing it takes the API key again**, typed in the same save, so the saved key is never sent to an address it wasn't entered for. Reverting it doesn't. Nor can the key from compose or `.env` be put back while the address is a new one: reverting `SLSKD_APIKEY` alone while the address in force is a different one from compose's or `.env`'s is refused, and the key's row says so before you save: type the key, or revert the address with it. With logins on, **only an admin can change it** (or the key) in Server settings, even someone given Settings and the log: the key is full control of slskd. |
+| `SLSKD_URL` | *(required)* | slskd's address **as seen from inside this container**, with the scheme: `http://slskd:5030` for a container on the same Docker network. If slskd has a URL base, include it, as in `http://slskd:5030/slskd`. It can't hold a user name or password, a `?` or `#`, or a space, and Server settings explains exactly what's wrong with an address it can't use. One set in compose or `.env` that fails the same check is refused as well: deadwax sends slskd nothing at it, and the **Event log** and the container's log say why. **Changing it takes the API key again**, typed in the same save, so the saved key is never sent to an address it wasn't entered for. Reverting it doesn't. Nor can the key from compose or `.env` be put back while the address is a new one: reverting `SLSKD_APIKEY` alone while the address in force is a different one from compose's or `.env`'s is refused, and the key's row says so before you save: type the key, or revert the address with it. With logins on, **only an admin can change it** (or the key) in Server settings, even someone given Settings and the log: the key is full control of slskd. |
 | `SLSKD_APIKEY` | *(required)* | an API key from slskd's configuration. Never shown in the page, only whether it's set. Every request to `SLSKD_URL` carries it, and it gives full control of slskd. With logins on, only an admin can change it in Server settings. |
-| `MUSICBRAINZ_EMAIL` | *(recommended)* | your contact address for MusicBrainz. The app builds its identifying user agent around it, as `deadwax/<version> ( you@example.com )`, so the version it sends is always the one running. Without a contact, MusicBrainz may refuse or throttle requests. |
+| `MUSICBRAINZ_EMAIL` | *(recommended)* | your contact address for MusicBrainz. The app builds its identifying user agent around it, as `deadwax/<version> ( you@example.com )`, so the version it sends is always the one running. Without a contact, MusicBrainz may refuse or throttle requests. The same user agent goes to Wikidata and Wikipedia, for artist pictures and the [artist and album descriptions](player.md#descriptions) - which have nothing to set up of their own. |
 | `MUSICBRAINZ_USERAGENT` | | the old way: a whole user agent written by hand. Still read, and its contact is used if `MUSICBRAINZ_EMAIL` isn't set. |
 | `THEAUDIODB_KEY` | | optional. [TheAudioDB](https://www.theaudiodb.com) is a source of artist banners, logos and backgrounds for artist pages. Without it (or a fanart.tv key), an artist page shows a photograph where Wikimedia Commons has one. |
 | `FANARTTV_KEY` | | optional. A [fanart.tv](https://fanart.tv) **project** key: artist thumbnails, banners, backgrounds, logos, and CD art, voted on by the people who use them. It has to be your own, because fanart.tv issues keys per application. |
@@ -79,7 +88,7 @@ three Navidrome settings are saved, the app asks Navidrome again by itself.
 All three, for the library (deadwax needs Navidrome for it): the app - [its guide](player.md) - on a phone, and on a computer laid
 out for a desktop - shows and plays your library from Navidrome, so its Home shelves, Library,
 albums and artists you have, and Search's look in your library say **Connect Navidrome** until every
-one is set; Server settings marks whichever is missing. Searching MusicBrainz, getting albums,
+one is set (**Your music isn't available yet** to anyone who doesn't run deadwax); Server settings marks whichever is missing. Searching MusicBrainz, getting albums,
 **Requests** and **You** work without them. With them set, and an address that passes the check
 below, deadwax also checks every album folder against the albums Navidrome lists, raising one it
 doesn't as [Not in Navidrome](library.md#not-in-navidrome), and applying a release asks Navidrome
@@ -95,7 +104,7 @@ same music `LIBRARY_PATH` reads.
 ### MusicBrainz's saved answers (Settings → Connections)
 
 Every answer MusicBrainz gives deadwax is saved on disk, so asking the same thing
-again - a search, an artist, an album's pressings, the metadata editor's lookups, a download's
+again - a search, an artist, an album's pressings, the lookups in Edit album's Release tab, a download's
 tracklist - is answered at once instead of waiting on MusicBrainz, even after deadwax restarts and even
 while MusicBrainz is away. The answers are shared by everyone using deadwax. Only answers are saved,
 never a failure: a minute when MusicBrainz is down is never remembered as an answer. (Before, they were
@@ -143,9 +152,9 @@ answer in memory for an hour, as it always did.)
 
 | setting | default | what it does |
 | --- | --- | --- |
-| `SLSKD_DOWNLOAD_PATH` | | where slskd's **finished** downloads appear inside this container, usually `/downloads`. It must be the same files slskd writes; see [the three folders](getting-started.md#the-three-folders). |
+| `SLSKD_DOWNLOAD_PATH` | `/downloads` in the image | where slskd's **finished** downloads appear inside this container: mount slskd's downloads folder at `/downloads` and the image's default is right. It must be the same files slskd writes; see [the three folders](getting-started.md#the-three-folders). |
 | `SLSKD_INCOMPLETE_PATH` | | optional: slskd's **incomplete** folder inside this container. Setting it turns on two clean-ups: a cancelled download's half-finished file is deleted, and the empty folders slskd leaves in there are cleared every ten minutes. Leave it unset to keep slskd's own behaviour, which keeps partial files so a retry can resume. |
-| `LIBRARY_PATH` | | your music library inside this container, usually `/music`. Organized albums are filed here, and Needs a look, Library care, the Edit panel and the "already have it" checks read it. The Library tab shows what Navidrome has scanned, not this folder. Everything else works without it. |
+| `LIBRARY_PATH` | `/music` in the image | your music library inside this container: mount it at `/music` and the image's default is right. Organized albums are filed here, and Needs a look, Library care, the Edit panel and the "already have it" checks read it. The Library tab shows what Navidrome has scanned, not this folder. Everything else works without it. |
 | `DB_PATH` | `/config/deadwax.db` | deadwax's database. An install from before the rename keeps using `/config/jimbrainz.db` if that's where its data is. |
 | `PLAYER_CACHE_PATH` | *(the container's temporary space)* | where [the player](player.md#seeking-and-where-safari-lands) keeps the FLAC songs it repackages: as MP4s for Safari and iPhones, whose seeks only land where you asked in an MP4, and as the fragmented MP4s [Gapless](player.md#one-stream-for-flac) joins into one stream, in any browser, including hi-res songs resampled to 48 kHz for [Maximum quality](player.md#maximum-quality-hi-res-at-48-khz) (a resampled copy is kept apart from the song's original, and is about a quarter of its size). deadwax makes a folder of its own inside it, `deadwax-player`, private to the user it runs as, and touches nothing else there, so it can be a folder other things use too. **It's only a cache**: nothing in it needs backing up, deleting it is always safe, and a song that isn't in it is made again from Navidrome the next time it's played, which only makes that first play start a moment later. Left empty, it's the container's temporary space, which starts empty whenever the container is recreated. Best on a fast disk (an SSD); see below. A change applies to the next song, with no restart. |
 | `PLAYER_CACHE_MB` | `1024` | the most that cache holds, in MB, from 64 to 1048576. A CD-quality song is 20 to 60 MB, so the default is a few albums. The songs played longest ago are cleared first. While a song is being made its download sits beside it until it's done, so the folder can briefly hold one song more than this. A song another song is waiting behind is never cleared while it's being played (it was served in the last two minutes), so a song that doesn't fit beside the ones playing waits: Safari is sent it as FLAC, and the gapless stream plays it the ordinary way. A single song bigger than the whole setting is made only while nothing else in the cache is being played, and is then kept on its own. The MP4 and the fragmented MP4 of one song are two files, and both count. With the player's [Normalization](player.md#normalization) on (the default) most FLAC songs are kept as levelled 24-bit copies, about 1.5 times a CD song's file, so the default holds fewer albums: a few GB on an SSD suits it better. Songs being measured for it are downloaded into this folder too, a few at a time, and deleted once measured. deadwax also leaves the disk 128 MB spare and needs room for two copies of the song being made: when there isn't, older songs are cleared to make room, and if there still isn't enough, Safari is sent the FLAC and the gapless stream plays that song the ordinary way. Nothing is cleared for a song clearing couldn't make room for. The desktop's [visualizer](player.md#the-visualizer) (and the phone's turntable) cut their stretches from a song's MP4 here when there is one - with Normalization on, a levelled song's own levelled copy - and otherwise - in a browser that plays the FLAC as it is, Chrome, Firefox or Edge with Gapless off and Normalization off - straight from the FLAC on Navidrome, adding nothing to the cache; only where that can't be done (the log says so once a song) is an MP4 made and kept for them, as Safari's would be. |
@@ -153,12 +162,11 @@ answer in memory for an hour, as it always did.)
 **Putting the caches on a fast disk.** deadwax keeps two caches: the player's songs
 (`PLAYER_CACHE_PATH`) and [MusicBrainz's saved answers](#musicbrainzs-saved-answers-settings--connections)
 (`MUSICBRAINZ_CACHE_PATH`). One folder on a fast disk (an SSD) can hold both: mount it into the
-container and point both settings at it, as `docker-compose.example.yml` shows:
+container, as the commented-out `/cache` line in `docker-compose.example.yml` does, and set both
+settings to `/cache` - `PLAYER_CACHE_PATH` in Settings → Library, `MUSICBRAINZ_CACHE_PATH` in Settings →
+Connections, or as [environment variables](#environment-variables):
 
 ```yaml
-    environment:
-      - PLAYER_CACHE_PATH=/cache
-      - MUSICBRAINZ_CACHE_PATH=/cache
     volumes:
       - /path/to/fast/disk/deadwax-cache:/cache
 ```
@@ -186,7 +194,7 @@ can land seconds off.
 | `ORGANIZE_MODE` | `dry_run` | what happens when a download finishes. `off`: nothing. `dry_run`: the log says where each file would go, and nothing is written. `copy`: files are tagged and copied into the library, and slskd's copies stay. `move`: files are tagged and moved, and slskd's emptied folder is removed. See [Organizing](organizing.md). With [logins](#logins-environment-only) on it has to be `copy` or `move`. |
 | `ALBUM_FOLDER_TEMPLATE` | `{album} ({year}) [{edition}]` | how an album's folder is named. The artist folder above it is always the artist. See [folder names](organizing.md#folder-names). |
 | `COUNTRY_IN_FOLDER` | `off` | `on` lets a release's country name its folder when nothing else tells the pressing apart, as in `Dummy (1994) [GB]`. Two different releases never share a folder either way. |
-| `RETAG_RENAME_WAIT` | `20` | when applying a release changes an album's tags **and** its folder, the metadata editor writes the tags first and renames the folder afterwards, because Navidrome keeps plays, ratings and favourites across either change, but not both at once. Without Navidrome set up, this is the seconds it waits between the two. **With Navidrome set up** (its three settings, [above](#navidrome-settings--connections)), it asks Navidrome instead, and renames as soon as Navidrome has finished a scan that began after the tags were written, usually a few seconds later; the number then only has to be more than 0, and is the fixed wait used if Navidrome answers from the start in a way deadwax can't use (a refused login, say). If Navidrome finishes no scan within 90 seconds, or can't be reached at all, the folder is left where it is and the editor says so; applying the album again checks with Navidrome first, and renames once it has scanned (see [troubleshooting](troubleshooting.md#applying-a-release-left-the-folder-where-it-was)). `0` renames straight away, either way. From 0 to 300. |
+| `RETAG_RENAME_WAIT` | `20` | when applying a release changes an album's tags **and** its folder, Edit album's Release tab writes the tags first and renames the folder afterwards, because Navidrome keeps plays, ratings and favourites across either change, but not both at once. Without Navidrome set up, this is the seconds it waits between the two. **With Navidrome set up** (its three settings, [above](#navidrome-settings--connections)), it asks Navidrome instead, and renames as soon as Navidrome has finished a scan that began after the tags were written, usually a few seconds later; the number then only has to be more than 0, and is the fixed wait used if Navidrome answers from the start in a way deadwax can't use (a refused login, say). If Navidrome finishes no scan within 90 seconds, or can't be reached at all, the folder is left where it is and the Release tab says so; applying the album again checks with Navidrome first, and renames once it has scanned (see [troubleshooting](troubleshooting.md#applying-a-release-left-the-folder-where-it-was)). `0` renames straight away, either way. From 0 to 300. |
 
 ### Soulseek searches (Settings → Downloads)
 
@@ -198,7 +206,7 @@ can land seconds off.
 
 | setting | default | what it does |
 | --- | --- | --- |
-| `AUTO_RETRY_PEER` | `off` | `on` moves a failed download to the next peer from the list you picked it from, by itself. It's off by default because the next peer down may be a different pressing or a worse rip. **Try next peer** on a failed download works either way. |
+| `AUTO_RETRY_PEER` | `off` | `on` moves a failed download to the next source from the list you picked it from, by itself. It's off by default because the next source down may be a different pressing or a worse rip. **Another source** on a failed download, in Requests, works either way. |
 
 ### Cover art
 
@@ -217,7 +225,7 @@ can land seconds off.
 
 | setting | default | what it does |
 | --- | --- | --- |
-| `PUID` / `PGID` | `1000` / `1000` | the user and group the app runs as, and so the owner of every file it writes. Match them to slskd and your other media containers. |
+| `PUID` / `PGID` | `1000` / `1000` | environment only (`.env`, say). The user and group the app runs as, and so the owner of every file it writes. Match them to slskd and your other media containers. |
 | `TRUSTED_ORIGINS` | | environment only. Changes that another website sends are refused, by checking each request's `Origin` against the address it's being reached at. Behind a reverse proxy that rewrites the `Host` header (nginx does unless told `proxy_set_header Host $http_host`), every change looks foreign, the phone player's plays included. List the address you open deadwax at here, comma-separated with the scheme, e.g. `https://music.example.com`. It can't be set in Server settings, because it guards that page's own save. [Sharing deadwax](sharing.md#turning-logins-on) has a sample nginx block that passes the `Host` through instead. |
 
 ### Logins (environment only)
@@ -227,21 +235,23 @@ password, and only deadwax's admins - **Navidrome's admins** - and anyone an adm
 can change the library - [Sharing deadwax](sharing.md) walks
 through turning them on, what each person gets, and turning them off again. All three are read from the container's
 environment (compose's `environment:` block or `.env`) and nowhere else: Server settings, and the
-app's **Managing → Settings**, show them under **Connections**, locked, saying so - a value saved
+app's **Manage → Server settings**, show them under **Connections**, locked, saying so - a value saved
 there would beat your compose file, so a wrong one could lock everyone out with no way back from the
-page that saved it. Change one in compose and restart deadwax.
+page that saved it. Change one in `.env` (or compose) and recreate the container - `docker compose up -d
+--force-recreate`, or deploy the Komodo stack again: a restart keeps the old values
+([how to give one](#how-to-give-one)).
 
 | setting | default | what it does |
 | --- | --- | --- |
 | `AUTH_MODE` | `off` | `off`: deadwax as it always was - no sign-in, and anyone who can reach the port can use it, as its one admin. `on`: everyone signs in. Anything else is read as `on`, so a typo never leaves deadwax open, and the log says so. With logins on, `/docs` and `/openapi.json` (the API's own pages) are switched off. |
-| `DEADWAX_SECRET_KEY` | | **required with logins on**: at least 32 characters - make one with `openssl rand -hex 32`. Signing in keeps a token made from your Navidrome password in deadwax's database, `DB_PATH` (on Navidrome's API it is as good as the password, for as long as the password stands), encrypted with this key. Without it nobody can sign in: everything but the health check and the pages themselves answers 503, saying why, and the sign-in screen shows it. Changing it (deadwax reads it at a restart) signs everyone out, each at their next request, and deadwax can't star albums for anyone until they've signed in again. |
+| `DEADWAX_SECRET_KEY` | | **required with logins on**: at least 32 characters - make one with `openssl rand -hex 32`. Signing in keeps a token made from your Navidrome password in deadwax's database, `DB_PATH` (on Navidrome's API it is as good as the password, for as long as the password stands), encrypted with this key. Without it nobody can sign in: everything but the health check and the pages themselves answers 503, saying why, and the sign-in screen shows it. Changing it (deadwax reads it when the container is recreated - [how to give one](#how-to-give-one)) signs everyone out, each at their next request, and deadwax can't star albums for anyone until they've signed in again. |
 | `DEADWAX_ADMIN_PASSWORD` | | optional: the **break-glass** sign-in. User name `deadwax`, this password - an admin who needs neither Navidrome nor the database, for when Navidrome is down or nobody else can sign in (nobody being a Navidrome admin, say). It lasts 12 hours, and ends at once if this password changes. Unset, there is no such sign-in. **Make it long and random** - `openssl rand -base64 18`: the name is public, and wrong guesses are held off per address - three a minute from each, after which even the right password waits out the minute there - so a stranger's guesses hold off only the stranger, and you still get in from another address. Someone with many addresses still gets many guesses, which leaves its length as what keeps strangers out. Behind a reverse proxy every sign-in may come from the proxy's address, and then guesses through the proxy hold off yours through it too: sign in at deadwax's own address on your network instead. One shorter than 16 characters still works, but with logins on the log says so at start-up and its row in Server settings is marked. Since `deadwax` is this sign-in's name, a Navidrome account called `deadwax` can't sign in to deadwax; Navidrome's own `admin` account signs in as itself, like anyone. |
 
 **Who can do what.** An admin - a Navidrome admin - can do everything. Anyone else signed in can
 search, find and get albums, play, pin to Home and choose their own Getting albums settings; editing
 the library (applying a release, tags, covers, lyrics, CD art, an artist's pictures), deleting and
-re-filing, rescans, the albums that need a look, the log and the server settings are an admin's - unless
-an admin gives that person the permission for them, by category, in **You → Managing deadwax →
+re-filing, rescans, Needs a look, the event log and the server settings are an admin's - unless
+an admin gives that person the permission for them, by category, in **You → Manage →
 People** - and Get albums can be taken away. **Permissions are kept in deadwax's database, per person,
 and set in People** - no setting of their own. The app doesn't show anyone what they can't use, and
 deadwax refuses it (a 403 that says what it needs) - [the full table](sharing.md#admins-permissions-and-everyone-else). **Downloads are each person's own**: you see the downloads you asked for, and join one somebody else already has
@@ -257,8 +267,10 @@ save that would switch organizing off.
 
 **Staying signed in.** Signing in keeps you signed in on that device for 30 days from when you last
 used deadwax there, through restarts. Every few minutes deadwax asks Navidrome whether the login you
-signed in with still stands, so changing your Navidrome password, or your account being deleted, signs
-you out within about six minutes; Navidrome merely being down signs nobody out. Your deadwax user is
+signed in with still stands, so changing your Navidrome password in Navidrome or Amperfy, or your account
+being deleted, signs you out within about six minutes; Navidrome merely being down signs nobody out.
+(Changed in deadwax with **You → Account → Change password**, the device you changed it on stays signed in and your
+others are signed out at once - [Sharing deadwax](sharing.md#when-something-changes).) Your deadwax user is
 your Navidrome user name, lowercased: renamed in Navidrome, you sign in again under the new name.
 Three wrong passwords for one name within a minute and deadwax stops asking Navidrome about that name
 for the rest of the minute ("Too many tries"), so a mistyped password - or someone guessing - never
@@ -278,9 +290,102 @@ replaces it, and a changed Navidrome password makes it stop working. Keep the fi
 key: a copy of both is as good as the passwords on Navidrome's API until they change.
 
 **Your library**: with logins on, each person's library is their starred albums
-in Navidrome - every download they asked for is added and starred as them, an album the store holds can
+in Navidrome - every download they asked for is added and starred as them, an album the collection holds can
 be added without a download, and starring or unstarring in Amperfy is read back every five minutes. No
 setting: it follows `AUTH_MODE`. See [the app's guide](player.md#your-library-with-logins-on).
+
+## Environment variables
+
+Every environment variable deadwax reads, in one list. **None of them is needed to start it**: the
+[compose example](../docker-compose.example.yml) sets only the image, the folders and the port, and
+every setting with a place in the app is set there once deadwax is running - in Server settings, on
+the page the **In the app** column names - and applies at once, with no restart. Give one as an
+environment variable instead when you'd rather set a container up in one go, keep a secret out of
+deadwax's database, or for the few the app can't set (**environment only**).
+
+### How to give one
+
+- **In `.env`**, beside your compose file: the compose example passes it into the container with
+  `env_file: .env`, and [`.env.example`](../.env.example) is a start. One per line, `NAME=value`,
+  with no quotes, and any note on a line of its own - a comment after the value isn't read the
+  same way everywhere, and can end up in the value. The example marks it `required: false`, so an empty `.env`, or none,
+  is fine (that form of `env_file` needs Docker Compose 2.24 or newer).
+- **Or in compose's `environment:` block**, which the example leaves out - add it under the service:
+
+  ```yaml
+      environment:
+        - ORGANIZE_MODE=copy
+        - TRUSTED_ORIGINS=https://music.example.com
+  ```
+
+  Write literal values, never `NAME=${NAME}`: compose fills that in from its own environment, and
+  when that has no such variable the line is still set, to nothing.
+- **Which wins.** A value saved in Server settings beats both, until **Revert to the environment**
+  on its row. A line under `environment:` beats the same name in `.env` - **even an empty one**, which
+  is why a secret goes in one place only. The image's own defaults (the last table) come after both.
+- **Leave a variable out rather than empty.** `NAME=` with nothing after it is still set, to nothing:
+  `LIBRARY_PATH=` takes away the image's `/music`, and organizing stays off until it's set again;
+  most others fall back to their default, some with an error in the log.
+- **A change needs the container recreated**: `docker compose up -d --force-recreate` (or deploy
+  the Komodo stack again). A restart keeps the environment the container was created with. A change
+  in Server settings needs neither.
+
+### Set in the app (or here)
+
+| variable | default | in the app | what it does | example |
+| --- | --- | --- | --- | --- |
+| `SLSKD_URL` | *(none - searching and downloading need it)* | Connections | slskd's address as this container reaches it, with the scheme; [more](#connections). A new address saved in the app takes the key again, typed in the same save. | `http://slskd:5030` |
+| `SLSKD_APIKEY` | *(none - needed with `SLSKD_URL`)* | Connections | an API key from slskd's configuration; never shown in the app. Keep it with `SLSKD_URL`: a key from the environment is only ever sent to the environment's address. | `a long key from slskd` |
+| `MUSICBRAINZ_EMAIL` | *(none - recommended)* | Connections | your contact address, sent to MusicBrainz in deadwax's user agent; without one MusicBrainz may throttle it. | `you@example.com` |
+| `MUSICBRAINZ_USERAGENT` | *(none)* | Connections, only while it's set | the old way: a whole user agent by hand. Its contact is used when `MUSICBRAINZ_EMAIL` isn't set. | `myapp/1.0 ( you@example.com )` |
+| `THEAUDIODB_KEY` | *(none)* | Connections | optional: artist banners, logos and backgrounds from TheAudioDB. | `your key` |
+| `FANARTTV_KEY` | *(none)* | Connections | optional: a fanart.tv **project** key, for artist pictures and CD art. | `your key` |
+| `FANARTTV_PERSONAL_KEY` | *(none)* | Connections | optional, with the project key: fanart.tv's images from the last week too. | `your key` |
+| `NAVIDROME_URL` | *(none - the app's library needs it)* | Connections | Navidrome's address as this container reaches it, plus its base path if it has one; [more](#navidrome-settings--connections). A new address saved in the app takes the password again. | `http://navidrome:4533` |
+| `NAVIDROME_USER` | *(none)* | Connections | the Navidrome account deadwax plays and asks as - your own, not an admin. | `james` |
+| `NAVIDROME_PASSWORD` | *(none)* | Connections | that account's password; never shown in the app. Keep it with `NAVIDROME_URL`, as for slskd's key. | `its password` |
+| `MUSICBRAINZ_CACHE_PATH` | *(the database's folder, `/config`)* | Connections → MusicBrainz's saved answers | the **folder** MusicBrainz's answers are saved in, as `musicbrainz-cache.db`; [more](#musicbrainzs-saved-answers-settings--connections). | `/cache` |
+| `MUSICBRAINZ_CACHE_MB` | `200` | Connections → MusicBrainz's saved answers | the most those answers take, in MB, 0 to 1048576; `0` turns saving off. | `500` |
+| `SLSKD_DOWNLOAD_PATH` | `/downloads` in the image *(none outside it)* | Library → Paths | where slskd's finished downloads are inside this container - mount slskd's downloads folder there; [more](#paths). | `/downloads` |
+| `LIBRARY_PATH` | `/music` in the image *(none outside it)* | Library → Paths | your library inside this container, where albums are filed - mount it there. | `/music` |
+| `SLSKD_INCOMPLETE_PATH` | *(none - clean-up off)* | Library → Paths | slskd's incomplete folder inside this container: a cancel then deletes its partial file, and slskd's empty folders there are cleared. | `/incomplete` |
+| `PLAYER_CACHE_PATH` | *(the container's temporary space)* | Library → Paths | where the player keeps the copies of songs it makes; only a cache, best on an SSD. | `/cache` |
+| `PLAYER_CACHE_MB` | `1024` | Library → Paths | the most that cache holds, in MB, 64 to 1048576. | `4096` |
+| `ORGANIZE_MODE` | `dry_run` | Library → Organizing | `off`, `dry_run`, `copy` or `move`: what happens when a download finishes; [more](#organizing). | `copy` |
+| `ALBUM_FOLDER_TEMPLATE` | `{album} ({year}) [{edition}]` | Library → Organizing | how an album's folder is named ([folder names](organizing.md#folder-names)). | `{album} ({year})` |
+| `COUNTRY_IN_FOLDER` | `off` | Library → Organizing | `on` lets a pressing's country name its folder when nothing else tells it apart. | `on` |
+| `RETAG_RENAME_WAIT` | `20` | Library → Organizing | seconds between an apply's new tags and its folder rename, 0 to 300 (with Navidrome set up it asks instead). | `30` |
+| `COVER_ART_SIZE` | `500` | Library → Cover art | `250`, `500`, `1200` or `full`: the size of cover saved. | `1200` |
+| `FETCH_LYRICS` | `on` | Library → Lyrics | `off` stops lyrics being fetched from LRCLIB as albums are filed. | `off` |
+| `LYRICS_LEAD_MS` | `0` | Library → Lyrics | milliseconds to move synced lyrics earlier (negative: later), −5000 to 5000. | `300` |
+| `SLSKD_SEARCH_TIMEOUT` | `8` | Downloads → Soulseek searches | seconds each Soulseek search listens for answers, 3 to 60. | `15` |
+| `AUTO_RETRY_PEER` | `off` | Downloads → When a download fails | `on` moves a failed download to the next source by itself. | `on` |
+
+### Environment only
+
+| variable | default | in the app | what it does | example |
+| --- | --- | --- | --- | --- |
+| `AUTH_MODE` | `off` | shown, locked: Connections → Logins | `on`: everyone signs in with their Navidrome account. Anything but `off` or `on` is read as `on`. Needs `DEADWAX_SECRET_KEY`, and `ORGANIZE_MODE` `copy` or `move` - set that first: with logins on and organizing off, nothing can be reached to set it; [logins](#logins-environment-only). | `on` |
+| `DEADWAX_SECRET_KEY` | *(none - required with logins on)* | shown, locked: Connections → Logins | encrypts the Navidrome logins deadwax keeps; at least 32 characters, from `openssl rand -hex 32`. In `.env` only. | `openssl rand -hex 32`'s output |
+| `DEADWAX_ADMIN_PASSWORD` | *(none - no such sign-in)* | shown, locked: Connections → Logins | the break-glass sign-in, as `deadwax`, for when Navidrome is down; make it long and random. | `openssl rand -base64 18`'s output |
+| `TRUSTED_ORIGINS` | *(none)* | no | behind a reverse proxy that rewrites the `Host` header, the address you open deadwax at, with the scheme, comma-separated for more; [the container](#the-container). | `https://music.example.com` |
+| `DB_PATH` | `/config/deadwax.db` *(or an older `/config/jimbrainz.db`, where that's the one there)* | shown, locked: Library → Paths | deadwax's database, which holds what Server settings saves - so it can't be moved from there. Never rename a `jimbrainz.db` to match. | `/config/deadwax.db` |
+| `DEADWAX_ADMINS` | - | no | **no longer read** (Navidrome's admins are deadwax's); while it's set, start-up says so. Take it out. | - |
+
+### The image's own
+
+The image sets these itself, so the compose file needn't; set one only to change it.
+
+| variable | the image's value | in the app | what it does | example |
+| --- | --- | --- | --- | --- |
+| `PUID` / `PGID` | `1000` / `1000` | no | the user and group deadwax runs as, and so the owner of every file it writes - read by the image's start-up script, before deadwax itself starts. Match slskd and your other media containers (`id yourname` on the host prints them). | `1000` / `100` |
+
+It also sets `SLSKD_DOWNLOAD_PATH=/downloads` and `LIBRARY_PATH=/music` (in the first table), the
+container's side of the compose example's two mounts. Mounted your library somewhere else, as
+`/library`, with `LIBRARY_PATH=/library` set? That goes on working as it is: a value you give
+replaces the image's. Run outside the image - `python -m src.main` - neither has a default, and
+organizing stays off until both are set. `PYTHONUNBUFFERED=1` is the image's too, for Python: it
+sends deadwax's log straight to `docker logs`.
 
 ## The phone player's settings (per device)
 
@@ -290,15 +395,15 @@ home-screen app keeps its storage apart from Safari's, so set them in the app it
 | setting | default | where it is | what it does |
 | --- | --- | --- | --- |
 | Maximum quality | Up to 48 kHz | **You** → Playback | whether hi-res FLAC songs are resampled to 48 kHz (or 44.1 kHz) or sent as they are - see [Maximum quality](player.md#maximum-quality-hi-res-at-48-khz). |
-| Normalization | Automatic | **You** → Playback | whether deadwax levels FLAC songs to one loudness - **Automatic** (an album you play at one level for the whole album, anything else song by song), **By song**, **By album**, or **Off** (every song sent bit for bit as before) - see [Normalization](player.md#normalization). Kept as `deadwax-player-normalization`, `song`, `album` or `off`: anything else stored there - nothing, a mistyped value, storage that can't be read - is Automatic. Used from the next thing you play. |
-| Gapless | off | **You** → Playback | joins songs into one stream, or gets the next song ready on a second player - see [Gapless playback](player.md#gapless-playback-experimental). A checkbox. |
+| Normalization | Automatic | **You** → Playback | whether deadwax levels FLAC songs to one loudness - **Automatic** (an album you play at one level for the whole album, anything else song by song), **By song**, **By album**, or **Off** (no levelling: every song played exactly as the file is, bit for bit, unless Maximum quality converts it) - see [Normalization](player.md#normalization). Kept as `deadwax-player-normalization`, `song`, `album` or `off`: anything else stored there - nothing, a mistyped value, storage that can't be read - is Automatic. Used from the next thing you play. |
+| Gapless | off | **You** → Playback | joins songs into one stream, or gets the next song ready on a second player - see [Gapless playback](player.md#gapless-playback). A checkbox. |
 | Now Playing opens as | Cover | **You** → Playback | whether the now-playing screen opens as the cover or as [the turntable](player.md#the-turntable). The button at the screen's top right switches between them for as long as it's open, without changing this. The phone layout's only: [on a desktop](player.md#on-a-desktop) there's no now-playing screen, so it changes nothing there. |
 | Pause winds the record down | on | **You** → Playback | whether pausing from [the turntable](player.md#the-turntable) slows the song's sound to a stop with the record over about a second (on), or stops it at once. The turntable's only: the cover's pause, the lock screen's and a song ending are always instant - and on a desktop, which has no turntable, it changes nothing. A checkbox. |
 | Speed | 1x | the turntable's **speed fader**, beside the platter (and the chip that shows a speed that isn't 1x, on the cover and the desktop's player bar, which puts it back to 1x) | how fast the song plays, from 0.25x to 2x, its pitch moving with it - a record deck's speed, not a time-stretch - see [the speed fader](player.md#the-speed-fader). Kept as `deadwax-player-speed`, a number from 0.25 to 2 in hundredths: anything else stored there - nothing, a word, a number out of range - plays at 1x. It holds for every song after, until you change it. |
 | Repeat | off | **Up Next**'s Repeat chip (on a desktop, the player bar's Repeat too) | off, **Repeat all** (the album or list again from the top, a new order with Shuffle on) or **Repeat one** (the song again until you skip it) - see [Up Next, shuffle and repeat](player.md#up-next-shuffle-and-repeat). Kept as `deadwax-player-repeat`, `all` or `one`: anything else stored there - nothing, a mistyped value, storage that can't be read - is off. Shuffle isn't kept: it belongs to what's playing. |
-| Library view | Albums | [on a desktop](player.md#on-a-desktop), the sidebar's Library and Browse views | which view a desktop's Library opens on: Albums, Artists or Songs, or with logins on Browse's Albums, Artists or Songs. Songs is left out where Navidrome won't list songs, and the albums show instead. A desktop's **Recently added** isn't kept: the view kept is the last of the others. Kept as `deadwax-player-library-view`. A phone doesn't use it: its Library opens on [the list](player.md#the-library), each row a page of its own. |
-| Library order | Artist | a Library page's sort, on its title's row (Albums, Browse's Albums) | **Artist**, **Title**, **Recently added**, **Year, newest first**, **Year, oldest first**, **Recently played** or **Most played** - see [the Library](player.md#the-library) - one order for your albums and the store's. Kept as `deadwax-player-order`: the four that came before (Recently added, Recently played, Artist and Title) keep the values they were saved as, so a device that chose one keeps it; anything else stored there - nothing, a mistyped value - is Artist. Recently added has its own place: the Library list's grid and its **See all**. |
-| Artists order | Name | a Library page's sort, on Artists (and Browse's Artists) | **Name** (under letters, with the index) or **Most albums**. Kept as `deadwax-player-artist-order`: `albums` is Most albums, and anything else stored there is Name. |
+| Library view | Albums | [on a desktop](player.md#on-a-desktop), the sidebar's Library and All music views | which view a desktop's Library opens on: Albums, Artists or Songs - with logins on Your albums or Your artists, or All music's All albums, All artists or All songs. Songs is left out where Navidrome won't list songs, and the albums show instead. A desktop's **Recently added** isn't kept: the view kept is the last of the others. Kept as `deadwax-player-library-view`. A phone doesn't use it: its Library opens on [the list](player.md#the-library), each row a page of its own. |
+| Library order | Artist | a Library page's sort, on its title's row (Albums, All albums) | **Artist**, **Title**, **Recently added**, **Year, newest first**, **Year, oldest first**, **Recently played** or **Most played** - see [the Library](player.md#the-library) - one order for your albums and the collection's (Recently added over your albums goes by when you added each, over the collection's by when the collection got it). Kept as `deadwax-player-order`: the four that came before (Recently added, Recently played, Artist and Title) keep the values they were saved as, so a device that chose one keeps it; anything else stored there - nothing, a mistyped value - is Artist. Recently added has its own place: the Library list's grid and its **See all**. |
+| Artists order | Name | a Library page's sort, on Artists (and All artists) | **Name** (under letters, with the index) or **Most albums**. Kept as `deadwax-player-artist-order`: `albums` is Most albums, and anything else stored there is Name. |
 | Visualizer effect | Ambient | the [visualizer](player.md#the-visualizer)'s effects, at its top right | Bars, Scope, Halo or Ambient - what it opens on next time; **V** steps through them too. The visualizer is a desktop's, so on a phone this changes nothing. |
 | Visualizer colour | From the cover | the visualizer's **Colour** | From the cover (the playing album's) or Purple (deadwax's own). |
 | Ambient style | Mandala | the visualizer's **Style** list, shown with Ambient | Mandala, Waves, Liquid, Burst, Ribbons, Smoke, Rings or Embers - or **Rotate all**, through all eight in that order. |
@@ -319,15 +424,15 @@ is saved behind it, and if deadwax can't keep it (its database isn't writable) i
 deadwax has and You says so. Choices made quickly are saved one after another, in the order you made
 them, so the last one is what stays. The app asks deadwax for them each time You is opened, on
 **Check again** under Connections, and before every search the sources start - a Get, another Get or
-pressing while a desktop's Sources panel stays open, **Try again**, **Re-search** - so a change made
+pressing while a desktop's Sources panel stays open, **Try again**, **Search** under Search again - so a change made
 on another device shows without closing the app. Until deadwax has first answered, nothing shows as
 chosen and nothing can be, and a Get shows the sources.
 
 | setting | default | what it does |
 | --- | --- | --- |
-| When I tap Get | Show me the sources | **Show me the sources**: Get opens the list of folders found on Soulseek, and you choose. **Pick the best source for me**: Get takes the best match itself when it scores 75 or more and passes your quality floor, queues it and shows Requests - and shows you the sources, saying why, when nothing does, when you already have the pressing (whole or in part) or it is already downloading, or when it is the album as a whole (a row's Get when MusicBrainz couldn't list the pressings: with no tracklist, no score can be trusted). Never on a Re-search. |
+| When I tap Get | Show me the sources | **Show me the sources**: Get opens the list of folders found on Soulseek, and you choose. **Pick the best source for me**: Get takes the best match itself when it scores 75 or more and passes your quality floor, queues it and shows Requests - and shows you the sources, saying why, when nothing does, when you already have the pressing (whole or in part) or it is already downloading, or when it is the album as a whole (a row's Get when MusicBrainz couldn't list the pressings: with no tracklist, no score can be trusted) - with a line ending "- choose a source yourself.". Never on a search you edit and run from Search again. |
 | Quality floor | Any | what a source must at least be: **Any**, **320 kbps** (lossless passes too), **Lossless** (every file lossless; a folder whose format couldn't be told doesn't pass) or **24-bit**. It's what a pick must pass, and what the sources start filtered by - as a chip pressed above them (Lossless, 24-bit, or a 320 kbps chip, shown only while that's your floor), so it's never a filter on out of sight: tap the chip to see everything. |
-| Format | Prefer lossless | what every Get's search is scored by: **Any** - format doesn't count; **Prefer lossless** - a folder with no lossless file scores lower on the score's Format part (0.45 of it, where a folder with one scores all of it), still offered; **Lossless only** - such folders are left out of the sources altogether. It changes the score; the quality floor doesn't - it only filters what was found. Every search waits for deadwax's answer to the ask it starts with (above), so a Format changed on another device is the one the search is scored by. With Lossless only, an album Soulseek has only in lossy formats says "Nothing lossless on Soulseek for …", naming this setting, rather than that nothing was found. |
+| Format | Prefer lossless | what every Get's search is scored by: **Any** - format doesn't count; **Prefer lossless** - a folder with no lossless file scores lower on the score's Format part (0.45 of it, where a folder with one scores all of it), still offered; **Lossless only** - such folders are left out of the sources altogether. It changes the score; the quality floor doesn't - it only filters what was found. Every search waits for deadwax's answer to the ask it starts with (above), so a Format changed on another device is the one the search is scored by. With Lossless only, an album Soulseek has only in lossy formats says "Nothing lossless found for …", naming this setting, rather than that nothing was found. |
 
 **Carried over once.** The first time a browser that the old page at `/` was used in (before 2.0.0)
 asks for these, with nothing saved for you yet, its choices there are carried over: its minimum bit

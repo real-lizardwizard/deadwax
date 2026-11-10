@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, RedirectResponse, Response
 from starlette.middleware.gzip import GZipMiddleware
 
 from src.routes import search_musicbrainz, interface_logs, monitor_slskd, download, library, settings, navidrome, me, pins, store_album
-from src.routes import auth as auth_routes, held, my_library, people
+from src.routes import auth as auth_routes, describe, held, my_library, own_password, people
 from src import auth, permissions, player_cache, stars
 from src.api import navidrome_admin
 from src.musicbrainz_cache import saved_answers
@@ -24,6 +24,7 @@ from src.store_index import seed_from_saved_scan
 from src.api.musicbrainz_endpoint import MusicBrainzClient
 from src.api.slskd_endpoint import SlskdClient
 from src.api.lrclib_endpoint import lrclib
+from src.api.wikipedia_endpoint import wikipedia
 from src.api.same_origin import SameOriginWrites
 from src.api.navidrome_endpoint import SignedOut, navidrome as navidrome_client
 from src.config import Config
@@ -100,7 +101,9 @@ async def lifespan(app: FastAPI):
     Config.apply_overrides(app.state.store.stored_settings())
 
     #? Here rather than in Config.check(), which runs before the overrides exist - an email set
-    #? in the settings tab would otherwise be reported missing on every single restart.
+    #? in the settings tab would otherwise be reported missing on every single restart (and, until
+    #? 2.0.3, slskd's address and key were, to the app's Log, while slskd worked).
+    Config.report_slskd()
     Config.report_musicbrainz()
     Config.report_navidrome()
     #? after the overrides too: whether a sign-in can reach Navidrome depends on NAVIDROME_URL, which can be one
@@ -174,6 +177,7 @@ async def lifespan(app: FastAPI):
     await library.coverart_client.close_client()
     await library.artist_images_client.close_client()
     await lrclib.close_client()
+    await wikipedia.close_client()
     await navidrome_client.close_client()
     await auth.login_client.close_client()
     await navidrome_admin.close_client()
@@ -437,11 +441,15 @@ def start() -> FastAPI:
     app.include_router(pins.router, prefix="/deadwax/me/pins", tags=["me"], dependencies=signed_in)
     #? (2.0.0-player.51) each user's own library - their starred albums - and the admin's "held by nobody"
     app.include_router(my_library.router, prefix="/deadwax/me/library", tags=["me"], dependencies=signed_in)
+    #? (2.0.2) your own Navidrome password, changed as you - see routes/own_password.py
+    app.include_router(own_password.router, prefix="/deadwax/me/password", tags=["me"], dependencies=signed_in)
     app.include_router(held.router, prefix="/deadwax/library/held", tags=["library"], dependencies=[Depends(require("library"))])
     #? (2.0.0-player.61) People: Navidrome's accounts, managed as the signed-in Navidrome admin - see routes/people.py
     app.include_router(people.router, prefix="/deadwax/people", tags=["people"], dependencies=[Depends(require("people"))])
     #? the id bridge (2.0.0-player.17): one album across the store index, MusicBrainz and Navidrome
     app.include_router(store_album.router, prefix="/deadwax/store", tags=["store"], dependencies=signed_in)
+    #? (2.0.13) the short descriptions on the artist and album pages - a user's, like the id bridge
+    app.include_router(describe.router, prefix="/deadwax/describe", tags=["describe"], dependencies=signed_in)
     #? signing in and out (2.0.0-player.48) - with no session, of course: see routes/auth.py
     app.include_router(auth_routes.router, prefix="/deadwax/auth", tags=["auth"])
 
@@ -451,6 +459,13 @@ def start() -> FastAPI:
     @app.exception_handler(SignedOut)
     async def signed_out(request, error: SignedOut):
         return JSONResponse(status_code=401, content={"detail": str(error)})
+
+    #? (2.0.4) a refusal in two halves (src/auth.py Explained): the sentence anyone reads, and what whoever runs
+    #? deadwax needs beside it - the app shows `why` only to them
+    @app.exception_handler(auth.Explained)
+    async def explained(request, error: auth.Explained):
+        return JSONResponse(status_code=error.status_code, content={"detail": error.detail, "why": error.why},
+                            headers=error.headers)
 
     #? (2.0.0-player.58, review) a playlist route's body refused by its own validators: the refusal in deadwax's words
     #? as a plain `detail` (routes/navidrome.py validation_words) - FastAPI's list of errors reached the page as
@@ -467,6 +482,9 @@ def start() -> FastAPI:
         #? password among it
         if request.url.path.startswith("/deadwax/people"):
             return JSONResponse(status_code=422, content={"detail": PEOPLE_FORM})
+        #? (2.0.2) nor a change of your own password's - its three fields are passwords
+        if request.url.path.startswith("/deadwax/me/password"):
+            return JSONResponse(status_code=422, content={"detail": own_password.FORM})
         #? (2.0.0-player.65, the 2.0.0 release review) nor a sign-in's: an over-long one echoed the password
         if request.url.path.startswith("/deadwax/auth"):
             return JSONResponse(status_code=422, content={"detail": auth_routes.SIGN_IN_FORM})

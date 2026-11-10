@@ -679,3 +679,120 @@ and .55 (Search's one list, notes/app-requests-search-get.md).
   - Tests: Python 3118 collected (3116 passed, 2 skipped; test_saved_search.py 82); search.sim 371 (+7),
     searchList.sim +2. Mutations: 9 rules broken one at a time, all caught (the failure's `problem` kept while asked
     again is caught by searchList.sim alone).
+
+### A short compose file, and every environment variable in one list (2.0.3)
+
+James (2026-10-23): "can we prune the docker compose a bit so that most things default to a sensible value and can
+be edited within the app? and then just a big list of available environment variables and what they do, how to use
+them, etc." - right after the compose example lost its comment-only lines (2.0.0-player.68, notes/fixes-2.0.md),
+whose rule still holds (`test_the_compose_example_has_no_line_that_is_only_a_comment`).
+
+- **`docker-compose.example.yml` is what Docker needs and nothing else**: image, container name, restart,
+  `env_file` (`.env`, `required: false` - after review, below), the three mounts (`/downloads`, `/music`, `/config`) and the optional `/incomplete` and `/cache`
+  mounts commented out (each saying which setting to set to it, and on which Server settings page), the port. **No
+  `environment:` block at all**: every setting Server settings can edit (Config.EDITABLE) starts at its default and is
+  set there; and with no block, no line of it can beat `.env` - the empty-line trap (an empty `environment:` line
+  beats `.env`) can't come from the example any more. compose refuses an `environment:` key with only a comment under
+  it ("must be a mapping"), so the single commented pointer line the plan allowed for had nowhere to go; the pointer
+  to the list rides on the `env_file` line's comment instead. Lines stay comment-on-the-line (.68's rule).
+- **The image carries the two paths**: the dockerfile's ENV gains `SLSKD_DOWNLOAD_PATH=/downloads` and
+  `LIBRARY_PATH=/music`, the container side of the example's mounts. Docker puts an image's ENV under the container's
+  environment, so a value from `env_file:` or `environment:` replaces it, and Server settings' saved value beats both
+  as for any setting - an install that mounted `/library` and set `LIBRARY_PATH=/library` reads `/library`
+  (checked on a built image, below). The CODE keeps no default for either (`_env("LIBRARY_PATH")`, pinned by
+  `test_the_code_keeps_no_default_for_the_two_paths_outside_the_image`): the dev setup and a plain
+  `python -m src.main` stay as they were, organizing off until both are set. DB_PATH needed nothing - the code
+  defaults it (and keeps an older jimbrainz.db). The entrypoint reads only PUID/PGID, and the HEALTHCHECK only the
+  port, so neither moved. A setting the image sets shows in Server settings as "From the container environment" -
+  true: the image's ENV is the container's environment, and nothing can tell it from a compose line of the same value.
+- **An install without the mounts**: before, an image run with no `LIBRARY_PATH` had organizing off; now `/music` is
+  set whether or not anything is mounted there. `ORGANIZE_MODE` still starts at `dry_run`, so nothing is written
+  unless someone chose `copy`/`move`; then Settings → Library says "nothing exists at /music as seen from inside this
+  container" and lists it among organizing's blockers, and filing would have to make `/music` at the root, which the
+  unprivileged PUID can't: each file fails ("N file(s) failed to organize, no track was filed", the download left in
+  slskd's folder) rather than landing in the container's own layer - checked on the test image, where
+  `os.makedirs("/music/a/b")` as 1000:1000 is refused. Unless PUID is 0. Not guarded further, deliberately: a guard would change filing for anyone whose LIBRARY_PATH folder
+  doesn't exist yet and is made by the first filing.
+- **`.env.example` is the secrets and the environment-only settings**, every line commented out (an uncommented empty
+  `LIBRARY_PATH=` is a value and would take the image's `/music` away): PUID/PGID, slskd's address and key, Navidrome's
+  address, user and password, the three logins, TRUSTED_ORIGINS. **The two addresses ride with their secrets, beyond
+  the plan's list, on purpose**: `_moved_without_secret` refuses a new address saved in the app without its secret
+  typed in the same save, and refuses reverting a secret to the environment's while the address is not the
+  environment's - so a key in `.env` with the address set in the app is a key that has to be typed into the app
+  anyway. Kept together, both in `.env` or both in the app, it works either way; the file, getting-started and the
+  README say so.
+- **docs/configuration.md "Environment variables"**: how to give one (`.env`, or an `environment:` block you add;
+  literal values; what wins; an empty value still counts as set, and beats `.env` and the image's default; a change
+  needs the container recreated, not restarted), then
+  three tables - set in the app (exactly Config.EDITABLE, each with its page and group), environment only (the
+  logins, TRUSTED_ORIGINS, DB_PATH, the removed DEADWAX_ADMINS), the image's own (PUID/PGID; the two paths in prose).
+  Each row: variable, default, where in the app, what it does, an example. `PYTHONUNBUFFERED` is the image's, for
+  Python, and named in prose only.
+- **Tests** (tests/test_compose_example.py, 9): the scan of what deadwax reads (`_env("X"`, `os.getenv("X"`,
+  `os.environ`, the entrypoint's `${X:-`) finds every Config setting, TRUSTED_ORIGINS, DEADWAX_ADMINS and PUID/PGID;
+  every variable read is a row of the list and every row is read; the tables split as Config.EDITABLE /
+  NOT_EDITABLE do, the locked ones "shown, locked"; the list's defaults are the code's (nine read from config.py's
+  source); no variable deadwax reads is set in the compose example, commented or not, and it has no `environment:`;
+  the mounts' container sides are the image's ENV and DEFAULT_DB_PATH's folder; the code keeps no default for the
+  two paths; `.env.example` names exactly its set, all commented. Rewritten on purpose: test_logins' example-files
+  test (no environment: block, no login line in compose, the three in .env), test_musicbrainz_disk_cache's (the
+  /cache mount names both settings and their pages, neither file sets them, the list carries both), and
+  test_settings_words' AUTO_RETRY_PEER words (read from configuration.md's row now that `.env.example` doesn't carry it).
+- **Verified**: Python 3666 collected (3664 passed, 2 skipped; 9 more than 3657); pyflakes, tsc, all 62 sims and the
+  build clean; the engine files without a diff. `docker compose config` accepts the example with an empty `.env`
+  (and, as first built, refused it with none - changed after review, below), and with `.env.example` copied in. A test image
+  (`deadwax-compose203-test:local`, removed after) carries both ENV defaults; run from the example (paths swapped for
+  scratch folders, port 8110) it came up healthy, Server settings showing `/downloads` and `/music` ok "from the
+  container environment" and organizing blocked only by dry run; run with `LIBRARY_PATH=/library` and
+  `SLSKD_DOWNLOAD_PATH=/data/downloads` under `environment:` it read those. Mutation-checked: 16 rules broken one at
+  a time (an undocumented `_env`, a setting in compose set or commented, the image's ENV dropped, a code default, an
+  uncommented or editable `.env.example` line, a wrong default, a row dropped or misspelled, a locked row as editable,
+  a mount moved, `env_file` dropped, a login line, the /cache comment's names, the retry row's words), each caught,
+  each file restored and compared. NOT verified: Komodo's own deploy of the new example (that its stack Environment
+  lands in the `.env` the example's `env_file` reads is from Komodo's documented default, not watched here).
+- **After review** (eight findings, each reproduced before its fix; tests/test_compose_example.py 9 -> 15):
+  - **A restart keeps the old environment**, so every place that said "change it in compose and restart deadwax"
+    now says recreate the container: configuration.md's Logins section and its DEADWAX_SECRET_KEY row (both link
+    `#how-to-give-one`), troubleshooting's key and DB_PATH lines, sharing's key step - and the app's own words, which
+    said the same: `LOGINS_LOCKED` (the locked logins rows), `auth.unusable()`'s missing key and
+    `describe_logins_organizing()`'s two. `test_an_environment_change_is_never_said_to_need_only_a_restart` holds
+    every doc sentence saying "restart deadwax" to also saying recreate, and those four messages to it.
+  - **`env_file` is optional** (`- path: .env` / `required: false`, Compose 2.24+): a required one stops a deploy
+    before deadwax can log a word when there's no `.env` - and a Komodo stack with an empty Environment may write
+    none (whether it does is still NOT watched). `docker compose config` (v5.3.1) accepts it with no `.env`, an
+    empty one and `.env.example` copied in, and a `.env` with values still reaches the container's environment. The
+    "compose refuses a missing one" wording is gone from the README, getting-started, configuration.md and
+    `.env.example` (`test_the_compose_example_s_env_file_is_said_to_be_optional_everywhere`); the README's Komodo
+    paragraph says so too.
+  - **Trimming an old compose file, in an order that works**: getting-started said to save each setting in Server
+    settings first, then take its line out - but `editedEnvDraft` drops a draft equal to the value shown, so typing
+    compose's value in saves nothing, and taking the line out then loses it (ORGANIZE_MODE back to dry_run, which
+    with logins on 503s every route, Server settings included). Now: the line out, recreate, set it again; an address
+    with its key; and with logins on ORGANIZE_MODE and the Navidrome lines stay (or logins off while trimming).
+    The 2.0.3 release notes' Upgrading must say the same.
+  - **.env.example's AUTH_MODE comment says to set Organizing (and Navidrome) BEFORE turning logins on** - with
+    them on and organizing dry run, nothing can be reached; configuration.md's AUTH_MODE row likewise.
+  - The README's settings paragraph named PUID/PGID as shown-but-locked; they aren't rows at all. It now names
+    DB_PATH and the three logins as locked and PUID/PGID and TRUSTED_ORIGINS as environment only.
+  - getting-started step 7 said to uncomment the Navidrome lines in `.env.example`; it's `.env`, then recreate.
+  - The defaults test now also checks the defaults the code computes (PLAYER_CACHE_MB's and MUSICBRAINZ_CACHE_MB's
+    constants, naming's DEFAULT_ALBUM_FOLDER, DEFAULT_DB_PATH) - before, a wrong PLAYER_CACHE_MB row passed.
+  - This write-up's own summary said an empty value is not set; it is (os.getenv gives "" for `NAME=`).
+  Python 3672 collected (3670 passed, 2 skipped); pyflakes, tsc, every sim and the build clean; the engine files
+  without a diff. Mutation-checked: 18 of the fixes undone one at a time, each caught by its test, each file restored.
+- **After review, second round** (one finding, reproduced first: `Config.check()` with SLSKD_URL and SLSKD_APIKEY
+  only saved in Server settings logged both as missing): **slskd was judged before the overrides existed.**
+  `check()` runs in `src/main.py` before the lifespan lays Server settings over the environment, so an slskd set up
+  in the app - the way the short example now leaves it - was logged to the app's Log as "SLSKD_URL is unusable (not
+  set) ... set it in your compose file" on every start while it worked, and troubleshooting.md then sent the reader
+  back to compose. MusicBrainz and Navidrome were moved out of `check()` for this reason long ago; slskd was not,
+  since it was normally in compose. Now `Config.report_slskd()` runs in the lifespan after `apply_overrides()`,
+  beside `report_musicbrainz()` and `report_navidrome()`, and says the address, the key, the two paths and the
+  organize mode there - with the source "Server settings" for a saved one, and Server settings named first in the
+  "not set" lines. `check()` keeps only what is the environment's alone (empty values hiding `.env`, the legacy
+  database, an unreadable ORGANIZE_MODE or COVER_ART_SIZE corrected in place). Tests in test_slskd_settings.py: no
+  slskd line in the Log at start-up with slskd only saved, the "not set" line naming Server settings first,
+  `check()` judging none of the five, and the lifespan's order.
+  Python 3676 collected (3674 passed, 2 skipped); pyflakes, tsc, every sim and the build clean; the engine files
+  without a diff. Mutation-checked: 5 of the fix undone one at a time (the lifespan call, the source, the words, the
+  report back in check(), the key line), each caught.

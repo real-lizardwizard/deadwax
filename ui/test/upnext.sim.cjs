@@ -424,8 +424,12 @@ console.log('\nwhat Up Next draws')
     ['From Mezzanine', 'From Mezzanine, again', 'Still to play, again', 'Still to play'])
   check('queuedWords', [U.queuedWords('next', 'Roads'), U.queuedWords('last', 'Dummy')], ['Playing next: Roads', 'Added to Up Next: Dummy'])
   check('repeatLabel, and the cycle', [U.REPEATS.map(U.repeatLabel), U.REPEATS.map(U.nextRepeat)], [['Repeat', 'Repeat all', 'Repeat one'], ['all', 'one', 'off']])
-  check('the Up next button\'s name', [U.upNextLabel(false, 'off'), U.upNextLabel(true, 'off'), U.upNextLabel(false, 'all'), U.upNextLabel(false, 'one'), U.upNextLabel(true, 'all')],
-    ['Up next', 'Up next - Shuffle on', 'Up next - Repeat all', 'Up next - Repeat one', 'Up next - Shuffle and Repeat all'])
+  //? (2.0.7) "Up Next", as the sheet and the player bar say it - it was "Up next" here
+  //? (2.0.14) the icon-alone Shuffle's name - the player bar's and Now Playing's - in Up Next's words
+  check('the Shuffle button\'s name: plain, or during a whole library\'s shuffle named for why',
+    [U.shuffleLabel(undefined), U.shuffleLabel('store'), U.shuffleLabel('yours')], ['Shuffle', 'Shuffle - shuffling all music', 'Shuffle - shuffling your whole library'])
+  check('the Up Next button\'s name', [U.upNextLabel(false, 'off'), U.upNextLabel(true, 'off'), U.upNextLabel(false, 'all'), U.upNextLabel(false, 'one'), U.upNextLabel(true, 'all')],
+    ['Up Next', 'Up Next - Shuffle on', 'Up Next - Repeat all', 'Up Next - Repeat one', 'Up Next - Shuffle and Repeat all'])
 }
 
 /* ===== Part B: a library's shuffle, a page at a time ===== */
@@ -455,7 +459,9 @@ console.log('\n(Part B) a library\'s shuffle, fed a page at a time')
   check('...Repeat One as ever', after(U.toppedUp(first, 'one')).slice(0, 2), ['p1', 'p1'])
   const view = U.upNextView(first, 'off')
   check('Up Next counts what is still to come, and names it', [view.list.title, view.list.more, U.upNextView({ ...first, upNext: { ...first.upNext, paged: { ...paged, scope: 'yours' } } }, 'all').then],
-    ['Everything, shuffled', 447, 'Then your library again, in a new order.'])
+    ['All music, shuffled', 447, 'Then your library again, in a new order.'])
+  //? (2.0.5 review) the collection's round named as its heading names it - "all music", never "everything"
+  check('...and of all music, Repeat All: then all music again', U.upNextView(first, 'all').then, 'Then all music again, in a new order.')
 }
 
 /* ===== the components: Up Next and the song menu ===== */
@@ -748,7 +754,7 @@ console.log('\nthe player bar\'s Shuffle, Repeat and Up Next, rendered (2.0.0-pl
   tree = bar({ ...paged })
   button(tree, 'app-playbar-shuffle').props.onClick()
   check('...a whole library\'s shuffle: on, aria-disabled and named for it, the click doing nothing',
-    [shuffleOf(tree), button(tree, 'app-playbar-shuffle').props['aria-label'], paged.calls], [[true, true, true], 'Shuffle - shuffling everything', []])
+    [shuffleOf(tree), button(tree, 'app-playbar-shuffle').props['aria-label'], paged.calls], [[true, true, true], 'Shuffle - shuffling all music', []])
   //? (second review) named by its scope, in Up Next's words: Browse's Songs (store) is everything, your albums yours
   const yours = upNextPlayer(U.startUpNext(album(3), 0, false, Math.random, { token: 't', total: 9, fetched: 3, scope: 'yours' }))
   check('...of your albums: named for your library',

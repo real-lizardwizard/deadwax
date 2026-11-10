@@ -216,6 +216,32 @@ export const PlaylistIcon = line(
   </>,
 )
 
+/** (2.0.10) the Library's other rows, in the playlist glyph's line style (James: "a record for albums and a silhouette
+ *  for artists"). An album: a record - its edge, the label round the spindle hole, and one groove catching the light */
+export const AlbumIcon = line(
+  <>
+    <circle cx="12" cy="12" r="8.5" />
+    <circle cx="12" cy="12" r="2.6" />
+    <path d="M7.4 9.6a5.2 5.2 0 0 1 2.2-2.2" />
+  </>,
+)
+
+/** ...an artist: a head and shoulders */
+export const ArtistIcon = line(
+  <>
+    <circle cx="12" cy="8.3" r="3.6" />
+    <path d="M5 20c.9-3.9 3.6-6.1 7-6.1s6.1 2.2 7 6.1" />
+  </>,
+)
+
+/** ...a song: one note, the playlist glyph's own */
+export const SongIcon = line(
+  <>
+    <path d="M14 17.5V5.5l4 1.2" />
+    <circle cx="11.9" cy="17.6" r="2.1" />
+  </>,
+)
+
 /** ...and adding to one: the list with a plus */
 export const PlaylistAddIcon = line(<path d="M4 6.5h11M4 11.5h11M4 16.5h7M17.5 13.5v7M14 17h7" />)
 

@@ -3,6 +3,7 @@ import { useRef, useState } from 'preact/hooks'
 import type { StoreStatus } from '../lib/candidates'
 import { ADDED_WORDS } from '../lib/myLibrary'
 import { withoutJoin } from '../lib/perPerson'
+import { errorNote } from './ErrorNote'
 
 /**
  * What the library and the downloads already have of a pressing (step 2's store, 2.0.0-player.7),
@@ -96,7 +97,7 @@ export function keepJoinFocus(button: HTMLElement | null, box: string): void {
  */
 export function JoinDownload({ jobId, onJoin }: { jobId: number; onJoin: (jobId: number) => Promise<unknown> }) {
   const [state, setState] = useState<'idle' | 'joining' | 'joined'>('idle')
-  const [refused, setRefused] = useState<string | null>(null)
+  const [refused, setRefused] = useState<unknown>(null)
   const button = useRef<HTMLButtonElement | null>(null)
 
   const join = () => {
@@ -110,7 +111,7 @@ export function JoinDownload({ jobId, onJoin }: { jobId: number; onJoin: (jobId:
       },
       (caught: unknown) => {
         setState('idle')
-        setRefused(caught instanceof Error ? caught.message : String(caught))
+        setRefused(caught)
       },
     )
   }
@@ -121,11 +122,11 @@ export function JoinDownload({ jobId, onJoin }: { jobId: number; onJoin: (jobId:
       <button ref={button} type="button" class="app-button app-store-join" aria-disabled={state === 'joining'} onClick={join}>
         {state === 'joining' ? 'Joining…' : 'Join this download'}
       </button>
-      {refused && (
+      {refused ? (
         <p class="app-store-line is-refused" role="alert">
-          {refused}
+          {errorNote(refused, { as: 'span' })}
         </p>
-      )}
+      ) : null}
     </>
   )
 }
@@ -137,7 +138,7 @@ export function JoinDownload({ jobId, onJoin }: { jobId: number; onJoin: (jobId:
  */
 export function AddToLibrary({ onAdd }: { onAdd: () => Promise<unknown> }) {
   const [state, setState] = useState<'idle' | 'adding' | 'added'>('idle')
-  const [refused, setRefused] = useState<string | null>(null)
+  const [refused, setRefused] = useState<unknown>(null)
   const button = useRef<HTMLButtonElement | null>(null)
 
   const add = () => {
@@ -151,7 +152,7 @@ export function AddToLibrary({ onAdd }: { onAdd: () => Promise<unknown> }) {
       },
       (caught: unknown) => {
         setState('idle')
-        setRefused(caught instanceof Error ? caught.message : String(caught))
+        setRefused(caught)
       },
     )
   }
@@ -162,11 +163,11 @@ export function AddToLibrary({ onAdd }: { onAdd: () => Promise<unknown> }) {
       <button ref={button} type="button" class="app-button app-store-join" aria-disabled={state === 'adding'} onClick={add}>
         {state === 'adding' ? 'Adding…' : 'Add to my library'}
       </button>
-      {refused && (
+      {refused ? (
         <p class="app-store-line is-refused" role="alert">
-          {refused}
+          {errorNote(refused, { as: 'span' })}
         </p>
-      )}
+      ) : null}
     </>
   )
 }

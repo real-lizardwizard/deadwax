@@ -4,7 +4,9 @@ import { ApiError } from '../api/http'
 import * as libraryApi from '../api/library'
 import type { LibraryAlbum, LyricsSummary } from '../api/types'
 import { albumArtUrl } from '../lib/format'
-import { describeLyrics, lyricsOnDisk } from '../lib/lyrics'
+import { lyricsOnDisk } from '../lib/lyrics'
+import { GETTING, getProblem, lyricsResult } from '../lib/getResults'
+import { accessNow, seesDetail } from '../app/access'
 import { Loading } from './Loading'
 
 /**
@@ -38,6 +40,14 @@ export function coverSources(album: LibraryAlbum, size: CoverSize): string[] {
 }
 
 /**
+ * (2.0.8, UX batch 5) What a Get came to, as a line under its button (lib/getResults.ts) - it was only in the button's
+ * tooltip, which a phone never shows. A live region, so VoiceOver hears it too.
+ */
+function ResultLine({ text, class: className }: { text: string | null; class: string }) {
+  return text ? <p class={className} role="status">{text}</p> : null
+}
+
+/**
  * Fetch just the cover for one album.
  *
  * Rendered only for albums that have no art but DO name a release, which is exactly the set it
@@ -45,13 +55,14 @@ export function coverSources(album: LibraryAlbum, size: CoverSize): string[] {
  * one isn't asking.
  */
 export function GetArtButton(
-  { album, onDone, class: className = 'commandbar-button' }:
-  { album: LibraryAlbum; onDone: () => void; class?: string },
+  { album, onDone, class: className = 'commandbar-button', note = 'app-edit-note' }:
+  { album: LibraryAlbum; onDone: () => void; class?: string; note?: string },
 ) {
   //? keyed to the album it ran for, like Get lyrics and Get CD art below: this one instance
-  //? serves every album you select, and "working" or "Retry cover" belonged to the last one
-  const [run, setRun] = useState<{ path: string; state: 'working' | 'failed' } | null>(null)
-  const state = run && run.path === album.path ? run.state : 'idle'
+  //? serves every album you select, and "working" or a failure belonged to the last one
+  const [run, setRun] = useState<{ path: string; state: 'working' | 'none' | 'failed'; said?: string } | null>(null)
+  const mine = run && run.path === album.path ? run : null
+  const state = mine ? mine.state : 'idle'
 
   if (album.art || !album.release_mbid) return null
 
@@ -65,33 +76,34 @@ export function GetArtButton(
       setRun((now) => (now?.path === path ? null : now))
       onDone()
     } catch (caught) {
-      setRun((now) => (now?.path === path ? { path, state: 'failed' } : now))
-      console.error(caught)
+      //? (2.0.8) said under the button - it went only to the console; a 404 is the Archive having no front cover for the
+      //? release, a fact rather than a failure, so the button is Look again, as Get CD art's is - not Try again
+      const said = getProblem(caught, 'cover', seesDetail(accessNow()))
+      const state = caught instanceof ApiError && caught.status === 404 ? 'none' : 'failed'
+      setRun((now) => (now?.path === path ? { path, state, said } : now))
     }
   }
 
   return (
-    <button
-      type="button"
-      class={`${className}${state === 'failed' ? ' failed' : ''}`}
-      /*
-       * Disabled only while a request is actually in flight. A failure leaves it clickable on
-       * purpose: the usual reason is that the Archive has no front cover for this release, but
-       * the second usual reason is that the Archive was briefly unreachable - it goes away for
-       * minutes at a time, exactly like MusicBrainz - and a button that latches off after one
-       * bad answer turns a passing outage into a permanent dead end with no way to retry.
-       */
-      disabled={state === 'working'}
-      title={
-        state === 'failed'
-          ? 'no front cover came back for this release - the Archive may not have one, or may '
-            + 'have been briefly unreachable. Click to try again.'
-          : 'download a cover for this album and change nothing else'
-      }
-      onClick={(event) => void fetchArt(event as unknown as MouseEvent)}
-    >
-      {state === 'working' ? <Loading /> : state === 'failed' ? 'Retry cover' : 'Get cover'}
-    </button>
+    <>
+      <button
+        type="button"
+        class={`${className}${state === 'failed' ? ' failed' : ''}`}
+        /*
+         * Disabled only while a request is actually in flight. A failure leaves it clickable on
+         * purpose: the usual reason is that the Archive has no front cover for this release, but
+         * the second usual reason is that the Archive was briefly unreachable - it goes away for
+         * minutes at a time, exactly like MusicBrainz - and a button that latches off after one
+         * bad answer turns a passing outage into a permanent dead end with no way to retry.
+         */
+        disabled={state === 'working'}
+        title="Download a cover for this album and change nothing else."
+        onClick={(event) => void fetchArt(event as unknown as MouseEvent)}
+      >
+        {state === 'working' ? <Loading label={GETTING.cover} /> : state === 'none' ? 'Look again' : state === 'failed' ? 'Try again' : 'Get cover'}
+      </button>
+      <ResultLine text={mine?.said ?? null} class={note} />
+    </>
   )
 }
 
@@ -99,18 +111,19 @@ export function GetArtButton(
  * Fetch lyrics for every track of one album that doesn't have them yet.
  *
  * Rendered while any track lacks a `.lrc`, and - once it has run - for as long as you stay on
- * that album, reading "Lyrics · 9 of 10" with the whole outcome in its tooltip. Without that
- * the button would either vanish (every track found) or come back looking untouched (some not
- * on LRCLIB), and both read as the click having done nothing.
+ * that album, reading "Lyrics · 9 of 10" with the whole outcome in the line under it (2.0.8 - it
+ * was in its tooltip). Without that the button would either vanish (every track found) or come back
+ * looking untouched (some not on LRCLIB), and both read as the click having done nothing.
  */
 export function GetLyricsButton(
-  { album, onDone, class: className = 'commandbar-button' }:
-  { album: LibraryAlbum; onDone: () => void; class?: string },
+  { album, onDone, class: className = 'commandbar-button', note = 'app-edit-note' }:
+  { album: LibraryAlbum; onDone: () => void; class?: string; note?: string },
 ) {
   const [run, setRun] = useState<{
     path: string
     state: 'working' | 'done' | 'failed'
     summary?: LyricsSummary
+    said?: string
   } | null>(null)
 
   //? a result belongs to the album it was fetched for, never to the next one selected
@@ -130,36 +143,31 @@ export function GetLyricsButton(
       setRun((now) => (now?.path === path ? { path, state: 'done', summary } : now))
       if (summary.written || summary.replaced) onDone()
     } catch (caught) {
-      setRun((now) => (now?.path === path ? { path, state: 'failed' } : now))
-      console.error(caught)
+      const said = getProblem(caught, 'lyrics', seesDetail(accessNow()))
+      setRun((now) => (now?.path === path ? { path, state: 'failed', said } : now))
     }
   }
 
   const summary = mine?.state === 'done' ? mine.summary : undefined
 
   return (
-    <button
-      type="button"
-      class={`${className}${mine?.state === 'failed' ? ' failed' : ''}`}
-      //? like Get cover: disabled only while in flight, so a passing outage is never a dead end
-      disabled={mine?.state === 'working'}
-      title={
-        summary
-          ? `${describeLyrics(summary)}.`
-            + (lyricsOnDisk(summary) < album.track_count ? ' Click to look again for the rest.' : '')
-          : mine?.state === 'failed'
-            ? 'the lyrics lookup failed - LRCLIB may be briefly unreachable. Click to try again.'
-            : 'look up lyrics on LRCLIB for the tracks here without them, and save each as a .lrc '
-              + 'beside the track. Nothing else about the album changes.'
-      }
-      onClick={(event) => void getLyrics(event as unknown as MouseEvent)}
-    >
-      {mine?.state === 'working'
-        ? <Loading />
-        : summary
-          ? `Lyrics · ${lyricsOnDisk(summary)} of ${album.track_count}`
-          : mine?.state === 'failed' ? 'Retry lyrics' : 'Get lyrics'}
-    </button>
+    <>
+      <button
+        type="button"
+        class={`${className}${mine?.state === 'failed' ? ' failed' : ''}`}
+        //? like Get cover: disabled only while in flight, so a passing outage is never a dead end
+        disabled={mine?.state === 'working'}
+        title="Look up lyrics on LRCLIB for the tracks here without them, and save each as a .lrc beside the track. Nothing else about the album changes."
+        onClick={(event) => void getLyrics(event as unknown as MouseEvent)}
+      >
+        {mine?.state === 'working'
+          ? <Loading label={GETTING.lyrics} />
+          : summary
+            ? `Lyrics · ${lyricsOnDisk(summary)} of ${album.track_count}`
+            : mine?.state === 'failed' ? 'Try again' : 'Get lyrics'}
+      </button>
+      <ResultLine text={summary ? lyricsResult(summary) : mine?.said ?? null} class={note} />
+    </>
   )
 }
 
@@ -171,13 +179,14 @@ export function GetLyricsButton(
  * that in every reader's order, so fetching is how a stray scan stops being what players show.
  *
  * "None found" and "couldn't reach" are told apart, and both stay clickable - an archive that
- * was briefly away is worth asking again, and nothing here should latch into a dead end.
+ * was briefly away is worth asking again, and nothing here should latch into a dead end. (2.0.8)
+ * Which it was is said under the button, where it was in the tooltip.
  */
 export function GetDiscArtButton(
-  { album, onDone, class: className = 'commandbar-button' }:
-  { album: LibraryAlbum; onDone: () => void; class?: string },
+  { album, onDone, class: className = 'commandbar-button', note = 'app-edit-note' }:
+  { album: LibraryAlbum; onDone: () => void; class?: string; note?: string },
 ) {
-  const [run, setRun] = useState<{ path: string; state: 'working' | 'none' | 'failed'; detail?: string } | null>(null)
+  const [run, setRun] = useState<{ path: string; state: 'working' | 'none' | 'failed'; said?: string } | null>(null)
   const mine = run && run.path === album.path ? run : null
 
   const hasOwn = (album.disc_art ?? []).some((name) => name.toLowerCase().startsWith('disc'))
@@ -193,28 +202,26 @@ export function GetDiscArtButton(
       setRun((now) => (now?.path === path ? null : now))
       onDone()
     } catch (caught) {
-      const detail = caught instanceof Error ? caught.message : String(caught)
+      const said = getProblem(caught, 'disc', seesDetail(accessNow()))
       const state = caught instanceof ApiError && caught.status === 404 ? 'none' : 'failed'
-      setRun((now) => (now?.path === path ? { path, state, detail } : now))
+      setRun((now) => (now?.path === path ? { path, state, said } : now))
     }
   }
 
   return (
-    <button
-      type="button"
-      class={`${className}${mine?.state === 'failed' ? ' failed' : ''}`}
-      disabled={mine?.state === 'working'}
-      title={
-        mine?.detail
-          ? `${mine.detail}. Click to try again.`
-          : 'download a picture of the disc for this release and save it as disc.jpg beside the '
-            + 'tracks - what players show for a song with a disc number. Nothing else changes.'
-      }
-      onClick={(event) => void getDiscArt(event as unknown as MouseEvent)}
-    >
-      {mine?.state === 'working'
-        ? <Loading />
-        : mine?.state === 'none' ? 'No CD art found' : mine?.state === 'failed' ? 'Retry CD art' : 'Get CD art'}
-    </button>
+    <>
+      <button
+        type="button"
+        class={`${className}${mine?.state === 'failed' ? ' failed' : ''}`}
+        disabled={mine?.state === 'working'}
+        title="Download a picture of the disc for this release and save it beside the tracks - what players show for a song with a disc number. Nothing else changes."
+        onClick={(event) => void getDiscArt(event as unknown as MouseEvent)}
+      >
+        {mine?.state === 'working'
+          ? <Loading label={GETTING.disc} />
+          : mine?.state === 'none' ? 'Look again' : mine?.state === 'failed' ? 'Try again' : 'Get CD art'}
+      </button>
+      <ResultLine text={mine?.said ?? null} class={note} />
+    </>
   )
 }

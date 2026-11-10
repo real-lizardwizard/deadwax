@@ -27,6 +27,11 @@
  * Portishead's, with Portishead's facts and count, never Various Artists' under Portishead's name
  * (review). The facts and the count are drawn only for the artist the card goes to.
  *
+ * (2.0.7, UX batch 4) "This pressing: …" is drawn only when it says something the album's line doesn't - an
+ * edition, another year, another format (idBridge pressingAdds): it repeated "1994 · FLAC" under "1994 · FLAC · 2
+ * songs". And the folder is an admin's only (`folders`): it is a path on the server, for whoever runs it (the
+ * review's #6, as the batch list says it).
+ *
  * Pure, like the rest of lib/; ui/test/info.sim.cjs holds it to the answers.
  */
 
@@ -35,7 +40,7 @@ import { albumCountLine, factsLine } from './artistPage'
 import { storeCountPlace } from './whose'
 import { discHeadings, type DiscTitleEntry } from './discTitles'
 import { sharedFormat, trackTime } from './format'
-import { folderLine, pressingLine } from './idBridge'
+import { folderLine, pressingAdds, pressingLine } from './idBridge'
 import type { QueueTrack } from './playQueue'
 
 /** A song as Navidrome's album answer carries it - only what About reads, every field optional. */
@@ -102,9 +107,11 @@ export interface About {
     coverArt: string | null
     /** "1973 · Harvest · FLAC · 10 songs" - '' when none of it is known */
     line: string
-    /** "This pressing: 20th Anniversary Reissue 180gram · 2014 · FLAC" - only when the store holds it */
+    /** "This pressing: 20th Anniversary Reissue 180gram · 2014 · FLAC" - only when the store holds it, and it
+     *  adds to `line` (2.0.7) */
     pressing?: string
-    /** its folder in the library (one per line for a set kept one per disc) - only when known */
+    /** its folder in the library (one per line for a set kept one per disc) - only when known, and only for
+     *  whoever may see it (2.0.7: `folders`) */
     folder?: string
   } | null
   /** null when nobody named one */
@@ -121,6 +128,14 @@ export interface About {
     /** "4 albums in your library" - only when Navidrome counted */
     count?: string
   } | null
+}
+
+/**
+ * (2.0.7) Whether Info's About draws the album's folder for this person: an admin's only (everyone, with logins
+ * off) - the batch 4 list's "the folder for admins only (#6)". A path on the server is for whoever runs it.
+ */
+export function seesFolders(admin: boolean): boolean {
+  return admin
 }
 
 /** Who wrote a song, as Navidrome sends it: OpenSubsonic's one line, else its composers. */
@@ -192,7 +207,7 @@ function discLine(song: AboutSongFields, album: AboutAlbumFields): string {
  * What About shows for the song playing. `album` is the answer its queue was played from, or null
  * when that isn't in hand (the lines that need it are then left out).
  */
-export function aboutRows(track: QueueTrack, album: AboutAlbumFields | null, details: AboutDetails | null = null, personal = false): About {
+export function aboutRows(track: QueueTrack, album: AboutAlbumFields | null, details: AboutDetails | null = null, personal = false, folders = false): About {
   const songs = album?.song ?? []
   const song = songs.find((candidate) => candidate.id === track.id) ?? null
   //? (2.0.0-player.58) a playlist's stub holds only the playlist's songs of the album: nothing of the album's is
@@ -209,15 +224,19 @@ export function aboutRows(track: QueueTrack, album: AboutAlbumFields | null, det
 
   const title = album?.name || track.album
   const count = all.length || whole(album?.songCount)
+  const albumYear = whole(album?.year) ? String(album!.year) : ''
+  const albumFormat = sharedFormat(all) ?? ''
   const albumLine = [
-    whole(album?.year) ? String(album!.year) : '',
+    albumYear,
     labelLine(album?.recordLabels),
-    sharedFormat(all) ?? '',
+    albumFormat,
     count ? `${count} ${count === 1 ? 'song' : 'songs'}` : '',
   ].filter(Boolean).join(' · ')
   const present = details?.store?.present ?? []
-  const pressing = pressingLine(present)
-  const folder = folderLine(present)
+  //? (2.0.7) only when it says something the album's line doesn't
+  const pressing = pressingAdds(present, { year: albumYear, format: albumFormat }) ? pressingLine(present) : null
+  //? (2.0.7) a path on the server: for whoever looks after the albums
+  const folder = folders ? folderLine(present) : null
 
   const name = song?.artist || track.artist || album?.artist || ''
   const albumArtist = album?.artist ?? ''

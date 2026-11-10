@@ -2,7 +2,7 @@
 
 By symptom. Two places answer most questions before anything else: **Settings → Library**,
 which checks every path from inside the container and says whether organizing is ready and what's
-stopping it, and the **Log**, which has the reasons behind anything that failed, in slskd's or
+stopping it, and the **Event log**, which has the reasons behind anything that failed, in slskd's or
 MusicBrainz's own words where there are any.
 
 ## Downloads finish, but nothing appears in my library
@@ -15,18 +15,22 @@ In order of likelihood:
    to be the same one slskd writes finished downloads into. If they differ, the files are
    downloaded but deadwax can't find them. Compare the two containers' volume lines. See
    [the three folders](getting-started.md#the-three-folders).
-3. **`LIBRARY_PATH` isn't set, or isn't writable.** Settings → Library shows whether it
-   exists and can be written, as the container sees it. A path that exists on the host but
-   isn't mounted into the container looks perfectly correct from outside.
+3. **Nothing is mounted at `/music`, or it isn't writable.** The image looks for your library at
+   `/music` (`LIBRARY_PATH`); mounted somewhere else, set `LIBRARY_PATH` to that path. Settings →
+   Library shows whether it exists and can be written, as the container sees it ("nothing exists at
+   /music" when the mount is missing). A path that exists on the host but isn't mounted into the
+   container looks perfectly correct from outside.
 4. **Permissions.** Files are written as `PUID`/`PGID`. If the library folder belongs to someone
    else, writing fails and the log says so.
 5. **The album was already there.** A track the album's folder already has (in any format) is
-   never filed again, so a second copy of an album is left in slskd's folder, and the download
-   reads *already in the store*. See [organizing](organizing.md).
+   never filed again, so a second copy of an album is left in slskd's folder, and the download's
+   row in Requests says it was already there ("You already had it" - with logins
+   on, "Already in the collection, added to your library"). See [organizing](organizing.md).
 
-## A download says "N file(s) failed to organize"
+## A download says "N files couldn't be added"
 
-Some of its files couldn't be written into the library. The ones that could are there, and the
+Requests says **In your library - 2 files couldn't be added** (an admin also sees the download's own
+words, "2 file(s) failed to organize"). Some of its files couldn't be written into the library. The ones that could are there, and the
 album shows as **New** in **Needs a look** like any other filed download. The rest are still in
 slskd's folder (a move never clears that folder out while anything failed). The container's own
 log names each file and why, most often permissions or a full disk. Fix that, then either copy
@@ -37,16 +41,82 @@ ones are added.
 When it goes on **", no track was filed"**, none of its music reached the library (a cover may
 have: that makes a folder, but no album, and nothing is marked **New**), which usually means the
 library folder can't be written (see [Downloads finish, but nothing appears in my
-library](#downloads-finish-but-nothing-appears-in-my-library)). Requests says **Partly filed** for
-the first and **Not filed** for the second.
+library](#downloads-finish-but-nothing-appears-in-my-library)). Requests says **In your library - N
+files couldn't be added** for the first, and **"It downloaded, but none of its songs could be added to your library"** for the second
+([below](#requests-says-why-a-download-stopped-or-wasnt-added)).
 
-## A download says "deadwax stopped while filing this"
+## A download says it stopped while being added to your library
 
-deadwax was stopped or restarted while it was filing that album, so it can't tell how far it got.
+Requests says **Stopped while being added to your library** (with "Tell whoever runs deadwax." to anyone
+else; an admin sees the download's own words, "deadwax stopped while filing this - check the library and
+slskd's folder"). deadwax was stopped or restarted while it was filing that album, so it can't tell how far it got.
 Look at the album in the library (**Library care → Rescan** first) and in slskd's downloads folder:
 in move mode, whatever hadn't been filed yet is still in slskd's folder, and in copy mode all of it
-is. Anything missing is dealt with as in the section above. In Requests it reads **Interrupted while
-filing**, and **Clear done** removes the row.
+is. Anything missing is dealt with as in the section above. **Clear done** removes the row.
+
+## Requests says why a download stopped, or wasn't added
+
+Under **Needs attention** (and on a **Done** row that wasn't added) Requests says why in a listener's
+words. An admin, or someone with **Settings and the log**, also sees the download's own words under
+it, as the log has them - those are what the entries above and below are found by. Where only whoever
+runs deadwax can put it right, everyone else is told **"Tell whoever runs deadwax."**
+
+- **"The person sharing it refused to send it."** / **"…stopped responding."** / **"The download broke
+  off."** / **"The download was cancelled before it finished."** / **"The download didn't finish."**:
+  the user refused the transfer, stopped answering, the transfer errored, or it ended some other way
+  (slskd's own "Rejected", "TimedOut", "Errored", "Cancelled"). **"3 of 10 files arrived."** after it
+  says how far it got. Use **Same source again** for a user who was briefly away, **Another source** for
+  someone else ([downloading](downloading.md#when-a-download-fails)).
+- **"deadwax lost track of this download - the person sharing it may have gone offline, or downloads
+  stopped working for a while."**: slskd reported none of its transfers for about two minutes. Usually
+  the user went offline before it started; but slskd being down, or restarted (it forgets its
+  transfers), looks the same to deadwax, even mid-download - if every download says it at once, see
+  [below](#requests-shows-nothing-moving-or-cant-update-your-requests-right-now).
+- **"Cancelled."**: you (or someone) cancelled it with its ✕.
+- **"It downloaded, but deadwax couldn't find its files to add them to your library."**: nothing could
+  be organized - almost always `SLSKD_DOWNLOAD_PATH` not pointing at the files slskd writes
+  ([Downloads finish, but nothing appears in my library](#downloads-finish-but-nothing-appears-in-my-library)).
+- **"It downloaded, but couldn't be added to your library."**: filing failed with an error (the log
+  and the row's own words say which - most often permissions, or a full disk).
+- **"It downloaded, but none of its songs could be added to your library."** / **"2 files couldn't be
+  added to your library."**: some or all of its files failed to organize ([above](#a-download-says-n-files-couldnt-be-added)).
+- **"Downloaded, but not added to your library: deadwax is set to rehearse adding albums, without
+  moving any files."**: organizing is in dry run (`ORGANIZE_MODE` `dry_run`).
+- **"Downloaded, but not added to your library"** on a Done row, alone: organizing is off
+  ([Downloads finish, but nothing appears in my library](#downloads-finish-but-nothing-appears-in-my-library)).
+- **"Its files were already in the collection, so nothing was added."** / **"Every song was already in
+  the collection, so nothing was added."**: every file was already in the album's folder.
+- **"The download couldn't be started."** under a refused **Get**, **Another source** or **Same source
+  again**: slskd wouldn't queue it; an admin sees slskd's reason under it. **"That didn't work."** under
+  **Another source** or **Same source again**: deadwax answered the retry with an error of its own (an
+  admin sees it under). **"The last try is still stopping - try again in a moment."**: the attempt before
+  it hasn't been cleared out of slskd yet. **"No other source to try - Get it again to search for
+  more."**: every source on the list has been tried; **"They refused - try another source."** / **"No other
+  source would send it."**: the retry was turned down.
+
+## An error says to tell whoever runs deadwax
+
+Wherever something fails the app says what happened and what you can do, never the error itself:
+
+- **"Can't connect to deadwax. Check your connection, then try again."**: the phone or browser didn't
+  reach deadwax at all - off your network, the VPN off, or deadwax restarting.
+- **"Can't reach the music server right now."**: deadwax answered, but Navidrome didn't (or isn't set
+  up) - see [the player says "Connect Navidrome"](#the-player-says-connect-navidrome-or-cant-reach-navidrome).
+- **"Downloads aren't working right now."**: slskd didn't answer, or refused - see
+  [You's Connections says slskd isn't connected](#yous-connections-says-slskd-isnt-connected).
+- **"That took too long. Try again."** / **"Something went wrong. Try again."**: a request timed out,
+  or failed in a way deadwax had no words for.
+- **"deadwax can't do that right now."**, or deadwax's own words (its database can't be written, say).
+
+To anyone who doesn't run deadwax the music server's, the downloads', "Something went wrong" and
+deadwax's own add **"if it keeps happening, tell whoever runs deadwax"** - the connection and the
+timeout ones don't, since a try again is the whole answer - or **"Tell whoever runs deadwax."** where
+only they can fix it. Where the line has a **Try again** button beside it, the sentence leaves trying
+again to the button ("Can't connect to deadwax. Check your connection.", "Something went wrong. If it
+keeps happening, tell whoever runs deadwax."). An admin - and anyone an
+admin gave **Settings and the log** - sees the error's own words too, in a smaller line under the
+sentence (or in brackets after it, in a one-line notice): Navidrome's address and its answer, slskd's
+reason, the exception. That, and the **Event log**, is where to look.
 
 ## Get says "Already downloading", but nothing is
 
@@ -61,11 +131,11 @@ wait for it too (see [downloading](downloading.md#with-logins-on-downloads-per-p
 admin, whose cancel is for everyone. If it's below your quality floor, getting a copy of your own
 instead isn't offered yet.
 
-"Already downloaded", with "being filed into your library now", means every file has arrived and
+"Already downloaded", with "being added to your library now", means every file has arrived and
 it's being filed. That takes seconds. A download that finished while organizing was off is never
 filed later, and stops counting two minutes after it finished. One that deadwax was stopped or
 restarted part-way through filing stops counting as soon as deadwax starts again, which marks it
-"deadwax stopped while filing this" (above).
+**Stopped while being added to your library** (above).
 
 ## Get says you have only some of a pressing you have all of
 
@@ -82,13 +152,15 @@ deadwax won't fetch a second copy of a pressing you have complete. It names the 
 replace it, delete the album first (**Edit → Delete**), then **Get** again. A different pressing
 of the same album is searched as usual, with a note that you have the other one.
 
-## Get says "refused: already downloading from …" or "already in your library"
+## Get says "It's already downloading" or "It's already in your library"
 
 A **Get** on a source is checked once more as it's queued, and
 deadwax refuses a second download of a pressing that is already downloading whole, already being
 filed, or already in your library complete - with a `409`. The row in **Requests**, under Needs
-attention, reads "refused", with deadwax's words in red under it: "already downloading from bob",
-"already downloaded from bob, and being filed now", "already in your library: *folder*". It happens
+attention, reads "didn't start", with why in red under it: "It's already downloading.", "It's already
+downloaded, and being added now.", "It's already in your library." ("in the collection" with logins on). Whoever
+runs deadwax also reads deadwax's own words beside it - "already downloading from bob", "already in your library:
+*folder*" - naming the source and the folder. It happens
 when the album was
 started or filed somewhere else - another tab, another phone - after the app last
 looked: the album page's line under Get, and the sources sheet, said what they knew when
@@ -98,7 +170,7 @@ too: your cancel then only takes it off your list), and an album you have is in 
 removes the refused row. A download of only part of a pressing - one disc's folder - refuses nothing.
 
 With logins on, a download somebody else started isn't refused: your Get
-joins it, and it shows in your Requests. "already downloading from bob" then means you're already
+joins it, and it shows in your Requests. "It's already downloading." then means you're already
 waiting for that download yourself.
 
 ## I cancelled a download, and it's still downloading
@@ -117,32 +189,34 @@ been cleared from the list since". Get it again: the page then says what's true 
 library, or nothing on its way, so the sources are searched. "That download brings only part of this
 pressing" is a download of one disc's folder, which can't be joined: Get the pressing as usual.
 
-## Get shows "slskd isn't logged in…", or nothing to choose from
+## Get shows "Downloads aren't working right now", or nothing to choose from
 
 The sources ask slskd to search Soulseek, so these stop it:
 
-- **slskd's own words, in amber, with Try again** - "slskd isn't logged in to Soulseek, so it can't
-  search", "it's waiting for its VPN", or that it can't be reached: see [A search fails with "not
-  logged in"](#a-search-fails-with-not-logged-in-or-slskd-refused-it) and [You's Connections
-  says slskd isn't connected](#yous-connections-says-slskd-isnt-connected).
-- **"Soulseek found nothing for …"**: as [A search finds nothing](#a-search-finds-nothing) - edit the
-  query under it (to the album title alone, say) and **Re-search**.
-- **"Nothing lossless on Soulseek for …"**: your **Format** (You → Getting
+- **"Downloads aren't working right now", in amber, with Try again**: slskd couldn't search - it isn't
+  logged in to Soulseek, it's waiting for its VPN, or it can't be reached. An admin, or someone with
+  **Settings and the log**, sees slskd's own words under it ("slskd isn't logged in to Soulseek, so it
+  can't search"); everyone else is told to try again, and to tell whoever runs deadwax if it keeps
+  happening. See [A search fails with "not logged in"](#a-search-fails-with-not-logged-in-or-slskd-refused-it)
+  and [You's Connections says slskd isn't connected](#yous-connections-says-slskd-isnt-connected).
+- **"Nothing found for …"**: as [A search finds nothing](#a-search-finds-nothing) - edit the
+  query under it (to the album title alone, say) and **Search**.
+- **"Nothing lossless found for …"**: your **Format** (You → Getting
   albums) is **Lossless only**, and every folder Soulseek found had no lossless file, so all of them
-  were left out - a Re-search is scored the same way and finds the same. Choose **Prefer lossless**
+  were left out - searching again is scored the same way and finds the same. Choose **Prefer lossless**
   or **Any** there and **Get** again to see them, or edit the query in case a lossless copy is shared
   under other words. Format can be Lossless only without your choosing it in the app: the first time
   the app asks, it carries over the Format the old page at `/` had left in that browser.
-- **"N folders on Soulseek, none pass your filters"**: the chips above the list are hiding them -
+- **"N sources found - none match your filters."**: the chips above the list are hiding them -
   **Lossless** and **24-bit** start pressed when your quality floor (You → Getting albums) says so.
   **Clear filters**, or tap the chip, to see them all. **Complete albums only** leaves out every folder
-  missing one of the pressing's tracks. On a computer a **Signals** minimum and the sample-rate floor
+  missing one of the pressing's tracks. On a computer a **Match details** minimum and the sample-rate floor
   leave folders out too - and no folder passes the floor when its user's client reported no sample
   rate, which many don't.
-- **"Didn't pick a source for you: …"** with **Pick the best source for me** on: nothing scored 75 or
-  more through the chips, or you already have part of the pressing (or part of it is downloading),
-  or it was the album as a whole (below), with no tracklist to judge the folders by. The sources
-  are there to choose from yourself.
+- **"… - choose a source yourself."** with **Pick the best source for me** on: "No close match that
+  passes your filters" (nothing scored 75% or more through the chips), "You already have part of it" or
+  "Part of it is already downloading", or "This pressing has no tracklist to check the sources against"
+  (the album as a whole, below). The sources are there to choose from yourself.
 - **Get's sheet says "… · the album as a whole"**: a row's Get chip couldn't get the album's
   pressings from MusicBrainz, so it searched for the album with no tracklist to match against - so
   it never picks one for you, whatever your setting.
@@ -153,32 +227,51 @@ The sources ask slskd to search Soulseek, so these stop it:
 
 ## You's Connections says slskd isn't connected
 
-**You → Connections** shows each service's word - **Connected**, or the reason as deadwax got it -
-with slskd's or deadwax's sentence under it:
+**You → Connections** is shown to admins and to anyone given **Settings and the log** - the people who
+can do something about it; nobody else's You has it, and nothing is asked for them. Each row shows a
+short word - **Connected**, or what's wrong - with a sentence under it saying where to put it right:
 
-- **`CONNECTION_ERROR`**: slskd can't be reached at `SLSKD_URL` from inside the container. Use
-  the address the *container* would use (`http://slskd:5030` on a shared Docker network), with
-  the `http://`.
-- **`NOT_LOGGED_IN` / `NOT_CONNECTED` / `CONNECTING`**: slskd is running but isn't signed in
-  to Soulseek. Check slskd's own page. If slskd runs behind a VPN container, it may be waiting
+- **Can't reach it** - "deadwax can't reach slskd at its address": slskd can't be reached at
+  `SLSKD_URL` from inside the container. Check slskd is running, and use the address the *container*
+  would use (`http://slskd:5030` on a shared Docker network), with the `http://`.
+- **Not on Soulseek** / **Connecting…**: slskd is running but isn't signed in to Soulseek, in slskd's
+  own words ("slskd is not connected to the Soulseek server", "slskd has reached the Soulseek server but
+  is not logged in"). Check slskd's own page. If slskd runs behind a VPN container, it may be waiting
   for the VPN, and the row says so.
-- **`401`**: slskd rejected the API key. Check `SLSKD_APIKEY` against the key in slskd's
-  configuration.
-- **`UNKNOWN_ERROR`** with **"SLSKD_URL is unusable (…)"** in the **Log**: the address in your
-  compose file or `.env` fails the check Server settings makes on save - a user name or
-  password in it, a `?` or `#`, a space, no `http://` - and the brackets say which. deadwax won't
-  send slskd anything at such an address, the API key least of all. Fix it in Settings →
-  Connections or in compose. A reverse proxy in front of slskd that asks for a login of its own
-  can't be reached this way; point deadwax at slskd directly.
-- **`UNKNOWN_HTTP_ERROR` / `UNKNOWN_ERROR` / `UNEXPECTED`** otherwise: slskd answered with
-  something unexpected. The log has the details.
+- **Key refused** - "slskd turned down deadwax's API key": check `SLSKD_APIKEY` against the key in
+  slskd's configuration.
+- **Not running** - "slskd's address answers, but slskd itself isn't running behind it": something
+  (a reverse proxy, the VPN container) answered for slskd with a 502.
+- **Not set up** - "SLSKD_URL is unusable (…) - set it in Server settings (Connections)", or
+  "SLSKD_APIKEY is not configured": the address in your compose file or `.env` fails the check Server
+  settings makes on save - a user name or password in it, a `?` or `#`, a space, no `http://` - and the
+  brackets say which; or there's no API key. deadwax won't send slskd anything at such an address, the
+  API key least of all. Fix it in Settings → Connections or in compose. A reverse proxy in front of
+  slskd that asks for a login of its own can't be reached this way; point deadwax at slskd directly.
+- **Unclear** - "slskd answered, but didn't say whether it's connected to Soulseek".
+- **Unexpected answer** / **Unexpected problem** otherwise: slskd answered with something deadwax
+  doesn't know, or asking it failed some other way. The log has the details.
+- **Couldn't check**, with what went wrong under it and the check's own words in brackets after it
+  ("Error pinging slskd: …"): deadwax itself didn't answer the check - see
+  [an error that says to tell whoever runs deadwax](#an-error-says-to-tell-whoever-runs-deadwax).
+
+`SLSKD_URL` and `SLSKD_APIKEY` are an admin's alone to change (Server settings locks them for anyone
+else), so someone with Settings and the log who isn't an admin reads them that way: **Can't reach
+it** as "...its address (SLSKD_URL) only an admin can change, in Server settings (Connections).",
+**Key refused** as "...only an admin can change it, in Server settings (Connections)." and **Not set
+up** as "...only an admin can set it, in Server settings (Connections).": what's wrong is theirs to
+see, the fix an admin's.
 
 ## You's Connections says MusicBrainz isn't connected
 
-- **`VALUE_ERROR`**: no contact is set. Set `MUSICBRAINZ_EMAIL` (Settings → Connections).
-- **`CONNECTION_ERROR` / `MAX_RETRIES_EXCEEDED` / `UNKNOWN_ERROR`**: MusicBrainz couldn't be
-  reached, or kept failing. It goes away for minutes at a time now and then (below); if it
-  persists, check the container can reach the internet.
+- **Not set up** - "No contact is set for MusicBrainz": set `MUSICBRAINZ_EMAIL` (Settings → Connections).
+- **Can't reach it** / **No answer** / **Unexpected problem**: MusicBrainz couldn't be reached, or
+  kept failing ("MusicBrainz didn't answer after a few tries"). It goes away for minutes at a time now
+  and then (below); if it persists, check the container can reach the internet.
+- **Busy** - MusicBrainz is overloaded, or asking deadwax to slow down: it answers again shortly.
+- **Refused** - "MusicBrainz turned deadwax away": usually the contact in `MUSICBRAINZ_EMAIL`.
+- **Not found** - MusicBrainz answered that it has nothing at the address deadwax asked. That's never the
+  connection: the container's log names the address.
 
 ## A search fails with "not logged in", or slskd refused it
 
@@ -191,24 +284,25 @@ own page, another app) still can.
 
 ## A search finds nothing
 
-- Soulseek only returns folders whose paths contain **every word** of the query. Under **Soulseek
-  found nothing for …** the query is there to edit: cut it to fewer words (the album title alone, say)
-  and press **Re-search**.
+- Soulseek only returns folders whose paths contain **every word** of the query. Under **Nothing found
+  for …** the query is there to edit (**Search for**): cut it to fewer words (the album title alone,
+  say) and press **Search**.
 - Try a longer `SLSKD_SEARCH_TIMEOUT` (Settings → Downloads): slow and firewalled peers answer
   last.
 - An artist with more than one name is searched under each of them (the credit, the name they go by
   now, and names MusicBrainz marks as ended); an edited query searches exactly what you typed.
 - **Format** set to **Lossless only** leaves out every folder with no lossless file, and the sources
-  say "Nothing lossless on Soulseek for …". Prefer lossless or Any (You → Getting albums) shows them.
+  say "Nothing lossless found for …". Prefer lossless or Any (You → Getting albums) shows them.
 
 ## A download sits at "queued"
 
-It's waiting in the user's upload queue: Requests says how far back you are ("#4 in their
-queue"). A user with a **free slot** starts straight away. If slskd stops reporting the transfers
-altogether, the download fails after about two minutes. Use **Ask again** to ask the same user
-again, or **Next peer** to move it to someone else.
+It's waiting in the user's upload queue: Requests says how far back you are ("4th in their
+queue"). A user with a free upload slot starts straight away (the sources' **Starts now** chip shows
+only those). If slskd stops reporting the transfers altogether, the download fails after about two
+minutes. Use **Same source again** to ask the same user again, or **Another source** to move it to
+someone else.
 
-## Requests shows nothing moving, or "Can't get your requests from deadwax"
+## Requests shows nothing moving, or "Can't update your requests right now"
 
 The Requests tab (and Home's Arriving, and the count on the tab) shows what deadwax knows of each
 download, and the progress as slskd reports it.
@@ -216,43 +310,52 @@ download, and the progress as slskd reports it.
 - **slskd can't be reached** (it refuses the connection, or isn't there): every download is still
   listed, but nothing moves - "0 of 10 files", no speed, queued ones "starting". After about two
   minutes of slskd reporting nothing,
-  deadwax gives up on them and they move to **Needs attention** as "no transfers reported by
-  slskd". **Next peer** and **Ask again** can't get anywhere until slskd is back, and the row says
+  deadwax gives up on them and they move to **Needs attention** as "deadwax lost track of this
+  download - the person sharing it may have gone offline, or downloads stopped working for a while".
+  **Another source** and **Same source again** can't get anywhere until slskd is back, and the row says
   why, in red. A download slskd still lists but can't move - slskd signed out of Soulseek, or
   waiting for its VPN - just stops where it is until slskd is back. You's **Connections** says
   whether slskd answers, and [You's Connections says slskd isn't connected](#yous-connections-says-slskd-isnt-connected)
   goes through the reasons. **slskd up but not answering** (it takes the connection and then says nothing) is
   slower to show: deadwax waits on it, so the tab keeps its spinner, or the last answer, until the
-  phone gives up on the request, and then says it can't get your requests.
-- **"Can't get your requests from deadwax"**, with the reason under it: deadwax itself didn't
-  answer (restarting under Komodo, say, or the phone off your network or VPN). What's below is
-  from the last answer, and it keeps asking while the tab is open. Home's Arriving says the same
-  ("Can't reach deadwax just now") and keeps asking while something is on its way.
+  phone gives up on the request, and then says it can't update your requests.
+- **"Can't update your requests right now"**, with what went wrong under it - "Can't connect to
+  deadwax." when deadwax itself didn't answer (restarting under Komodo, say, or the phone off your
+  network or VPN), "Something went wrong." when it answered but couldn't list them - or deadwax's
+  own words for why, such as that it can't read its database. An
+  admin, or someone with Settings and the log, also sees the error's own words under that. What's
+  below is from the last answer, and it keeps asking while the tab is open. Home's Arriving says the
+  same ("Can't update downloads right now - showing the last progress. Trying again…") and keeps asking
+  while something is on its way.
 - **A spinner, and nothing else**: the app hasn't had deadwax's first answer yet. It never says
   "Nothing requested yet" before it knows.
 - **"Downloads aren't being kept track of"**: deadwax can't write its database, so it can't list
   or file downloads. They still arrive in slskd's folder. Check `DB_PATH` and that the folder it's
-  in can be written as `PUID`/`PGID`.
+  in can be written as `PUID`/`PGID`. Anyone who doesn't run deadwax reads "Requests can't be shown
+  right now: deadwax can't keep track of downloads. Tell whoever runs deadwax." instead of the setting.
 - **A download started on another device doesn't show**: the app looks again when Home or Requests
   comes into view and when you come back to it. Switch to Requests, or pull it back up from the
   background.
-- **A done download says "Navidrome hasn't found it yet - it may still be scanning"** when tapped:
+- **A done download says "Not ready to play yet - it may still be scanning."** when tapped:
   deadwax asked Navidrome for the album by the pressing's MusicBrainz id, and by its title, and
   Navidrome has no album carrying that id yet. Navidrome scans a few seconds after a folder changes,
   so tap it again in a moment (the note goes once it opens; with Requests open, the app keeps
   looking by itself). If it never opens: Navidrome may not have rescanned yet (start a scan from
   Navidrome's own pages), or the account deadwax uses can't see that library folder.
-- **A done download says "deadwax can't tell which album in your library this is"**: no folder in
-  your library is tagged with that pressing's MusicBrainz release id. That happens to **Already in
-  your library, nothing filed** when the tracks were already in a folder deadwax didn't file and
+- **A done download says "Can't find this album to open it - it may have moved, or isn't matched to a pressing."**: no folder in
+  your library is tagged with that pressing's MusicBrainz release id. That happens to **You already
+  had it** when the tracks were already in a folder deadwax didn't file and
   that has no MusicBrainz tags (an old rip): nothing was written into it, so nothing ties it to the
   release, and a rescan won't change that. Apply the release to that album (**Edit → Release**, from
   its page or **Needs a look**) and the row opens it. It can also mean the album's folder has gone since.
-- **A done download says "Navidrome isn't set up" or "isn't answering just now"**: the album can't
-  be opened in the app until it is - see [below](#the-player-says-connect-navidrome-or-cant-reach-navidrome).
-  **"Couldn't look it up just now"** means deadwax itself didn't answer: tap it again.
-- **A done download has no ▶**: only a download that filed something has one. "Already in your
-  library, nothing filed" opens the album you already had - when its folder is tagged with the
+- **A done download says "Can't open this album yet - the music server isn't set up"** or **"Can't open
+  this album right now - the music server can't be reached"**: Navidrome isn't set up, or isn't
+  answering, and the album can't be opened in the app until it is - see [below](#the-player-says-connect-navidrome-or-cant-reach-navidrome).
+  **"Can't open this album right now - can't connect to deadwax"** means the phone or browser didn't reach
+  deadwax itself: check your connection, then try again.
+  **"Couldn't open it - tap to try again."** means deadwax itself didn't answer: tap it again.
+- **A done download has no ▶**: only a download that filed something has one. "You already had
+  it" opens the album you already had - when its folder is tagged with the
   pressing, as above - with no ▶; an interrupted or unfiled download has neither, as nothing of it
   is known to be in the library.
 
@@ -288,7 +391,7 @@ fetched behind it for the next time.
   tried again the next time the answer is read from the file - after the hour it is kept in memory, or
   after deadwax restarts.
 - **Or clear them now**: **Clear MusicBrainz's saved answers**, under Settings → Connections (or the
-  app's You → Server settings → Connections), empties the file and the memory, and the next answers
+  app's You → Manage → Server settings → Connections), empties the file and the memory, and the next answers
   are asked of MusicBrainz again. Only speed is lost.
 - To stop saving answers altogether, set `MUSICBRAINZ_CACHE_MB` to `0`.
 - If the line beside Clear says **Nothing is being saved**, or the `MUSICBRAINZ_CACHE_PATH` row is
@@ -304,7 +407,8 @@ fetched behind it for the next time.
 ## Search shows an old name, or misses something new
 
 The app's Search shows [what deadwax has saved](finding-music.md#what-deadwax-has-saved)
-of MusicBrainz's answers first, marked **saved**, under any words - before MusicBrainz is asked. What's saved
+of MusicBrainz's answers first, under any words - before MusicBrainz is asked (nothing on a row says it
+was saved: it is drawn as MusicBrainz's own row would be). What's saved
 is what MusicBrainz said when it was saved: an artist renamed since (still under the old name), an album
 added since (missing), a correction (not shown) - until MusicBrainz's own answer for the words arrives, a
 second or so later, and adds what it found below the saved rows. What's saved for these exact words is
@@ -314,7 +418,7 @@ refreshed behind itself once it's old (a search after 7 days, the rest after 30)
   the same artist, album or song as a saved row isn't shown twice - the saved row stands for it, as it was
   saved, until the words are searched again after the saved answers behind it are refreshed (above).
 - **Or clear them now**: **Clear MusicBrainz's saved answers** (Server settings → Connections - the desktop
-  sidebar's Settings, or You → Server settings) empties what's saved and what Search finds in it; the next searches ask
+  sidebar's Server settings, or You → Manage → Server settings) empties what's saved and what Search finds in it; the next searches ask
   MusicBrainz again.
 - **Nothing saved ever shows**: saving is off (`MUSICBRAINZ_CACHE_MB` is `0`), nothing has been saved yet,
   or the line beside Clear says why nothing is being saved ([above](#a-musicbrainz-answer-looks-out-of-date)).
@@ -327,33 +431,35 @@ refreshed behind itself once it's old (a search after 7 days, the rest after 30)
   saved-search index wasn't kept*) and reads every answer into it again, in the background - until it is
   done, Search finds less of what's saved. Nothing needs doing.
 
-## The app's Search says MusicBrainz isn't answering, or keeps asking
+## The app's Search says it can't search for more, or keeps searching
 
 The phone app's [Search tab](finding-music.md) and its album pages
 ask MusicBrainz through deadwax, so the same slow minutes reach them.
 
-- **"MusicBrainz isn't answering just now - it often goes away for a few minutes."** at the foot of
-  Search's list (every kind it asked failed), **"MusicBrainz isn't answering."** in one section's place
-  (that kind alone) - or, on an album you don't have, **"MusicBrainz isn't answering just now, so this
-  album's pressings couldn't be loaded - it often goes away for a few minutes."**: deadwax couldn't get an
+- **"Searching for more isn't working right now - try again in a few minutes."** at the foot of
+  Search's list (every kind it asked MusicBrainz for failed), **"Can't search for more right now."** in one
+  section's place (that kind alone) - or, on an album you don't have, **"This album's details can't be
+  loaded right now - try again in a few minutes."**, and on an artist's page **"Their other albums can't be
+  shown right now - try again in a few minutes."** or **"Artist details can't be loaded right now."**:
+  MusicBrainz is away for a while, and deadwax couldn't get an
   answer (a search tries three times - about eight seconds when MusicBrainz is turning searches away, up to
   about a minute and a half when its connection hangs, each try waiting half a minute; an album page for a
   while longer). That's not
-  the same as **No albums on MusicBrainz for "…"** or **No results for "…"**, which are answers.
+  the same as **No other albums for "…"** or **No results for "…".**, which are answers.
   Tap **Try again** in a minute; the album page never shows part of a pressing list as if it were
   all of it. You's **Connections** says whether deadwax can reach MusicBrainz at all, and [You's
   Connections says MusicBrainz isn't connected](#yous-connections-says-musicbrainz-isnt-connected) goes
   through why it might not.
-- **"MusicBrainz isn't answering just now - these are what deadwax has saved from it."** (or **"Saved -
-  MusicBrainz is away."** / **"Saved - MusicBrainz is busy."** in a section's place): the same, under rows [deadwax had saved](finding-music.md#what-deadwax-has-saved) -
+- **"Showing earlier results - searching for more isn't working right now."** (or **"Showing earlier
+  results."** in a section's place): the same, under rows [deadwax had saved](finding-music.md#what-deadwax-has-saved) -
   those stay, and **Try again** asks MusicBrainz again.
-- **"MusicBrainz is busy just now - try again in a moment."**: MusicBrainz answered,
+- **"Too many searches just now - try again in a moment."**: MusicBrainz answered,
   saying it is turning searches away for a moment - it does, often, for a few minutes at a time, and asking
   for artists, albums and songs at once makes it likelier. **Try again** (or **Search** pressed again) draws the
   list afresh for the same words and asks only what failed. After a search MusicBrainz was too slow for, or away for, the next ones
   draw your library's rows at once and MusicBrainz's arrive in the places kept for them, until it answers in
   time again.
-- **"MusicBrainz couldn't read that search - try other words"**: MusicBrainz refused the words as a search
+- **"That search couldn't be read - try other words"**: MusicBrainz refused the words as a search
   (unusual punctuation can do it; a slash, as in "AC/DC", is fine). There's no Try again - the same words would
   be refused again; change them.
 - **A song I know isn't among MusicBrainz's songs, or only covers of it are**: words with no artist you
@@ -364,10 +470,10 @@ ask MusicBrainz through deadwax, so the same slow minutes reach them.
   albums of the next 25 to it - the studio album can take a page or two to arrive.
 - **An album opened from a song shows a pressing that isn't its usual one**: on purpose - the usual one
   hasn't got the song (a bonus track, say), so it opens on one that has. Choose another in **Pressing**.
-- **"Show 3 albums from MusicBrainz"** (or artists, or songs) where a section's rows would be: that answer
+- **"Show 3 more albums"** (or artists, or songs) where a section's rows would be: that answer
   arrived after the list was drawn, with something below it, so it waits in the place kept for it rather than
   pushing what's under your finger down. Tap it. (Song search's "Show songs" became this, for every kind.)
-- **Only studio albums under Albums for an artist** - "MusicBrainz's studio albums and EPs - See all for
+- **Only studio albums under Albums for an artist** - "Studio albums and EPs - See all for
   everything they made." under them: for an artist's name alone All asks MusicBrainz for their studio albums
   and EPs, since otherwise its first answers are live albums, interviews and compilations. **See all** (the
   Albums chip) asks for everything they made, unfiltered.
@@ -388,13 +494,13 @@ ask MusicBrainz through deadwax, so the same slow minutes reach them.
   it. When your library's own search finds the song by that artist on that album, it
   says **in your library** straight away. If it opened the album you don't have because MusicBrainz
   couldn't list the pressings, the page tries again itself.
-- **"Asking MusicBrainz…" for a long time**: on a bad day MusicBrainz takes 30-60 seconds a
+- **"Searching…" or "Loading…" for a long time**: on a bad day MusicBrainz takes 30-60 seconds a
   request. An album page fetches every pressing's tracklist, which for an album with hundreds of
   pressings is several requests one after another. Once it has them it keeps them while the app is
   open (the last 20 albums), so going back to the album is instant - and
   deadwax saves them too, so the album opens at once next time, after a reload or a restart as well
   ([saved answers](configuration.md#musicbrainzs-saved-answers-settings--connections)).
-- **None of your library in Search, or "Can't reach Navidrome" above the list**: your rows come from
+- **None of your library in Search, or "Can't reach Navidrome" ("Your music isn't available right now") above the list**: your rows come from
   Navidrome's search, and need Navidrome as Home does ([below](#the-player-says-connect-navidrome-or-cant-reach-navidrome));
   its notice sits once above the list, and MusicBrainz's rows still fill every section under it.
 - **An album you have is offered with Get under Albums**: only albums whose files carry MusicBrainz's id for
@@ -415,15 +521,15 @@ ask MusicBrainz through deadwax, so the same slow minutes reach them.
   the container. Settings → Library shows whether the path exists.
 - **A change made by another program doesn't show up**: tags edited elsewhere don't change a
   folder's date, which is what the library watches. Press **Rescan** in **Library care** (the
-  desktop sidebar's **Managing → Library care**, or **You → Library care**).
+  desktop sidebar's **Manage → Library care**, or **You → Manage → Library care**).
 - **The Library tab** is Navidrome's: an album shows there once Navidrome has scanned it (see
   [the app's Library looks empty](#the-apps-library-looks-empty)).
 
-## Lots of albums say "Folder off-convention"
+## Lots of albums say "Folder name doesn't match the tags"
 
 Their folder names don't match what the template makes from their tags: albums filed by
 another tool, or filed before you changed `ALBUM_FOLDER_TEMPLATE`. Changing the template never
-moves anything. Applying the album's release (**Edit → Release**) re-files it.
+moves anything. Applying the album's release (**Edit → Release**) renames the folder to match.
 
 ## A downloaded reissue is filed under its reissue's year
 
@@ -433,13 +539,16 @@ instead of `(1975)`. **Needs a look** flags these as **No original year**. Open 
 release: that writes the original year and moves the folder. Downloads
 since 1.0.2 are filed under the album's year.
 
-## No cover, or "No cover on the Archive"
+## No cover, or "The Cover Art Archive has no front cover for that release"
 
-The Cover Art Archive has no front cover for that release. It's a fact about the release, not
-a failure. Pick a different release in **Edit → Release** if a sibling pressing has one. If it
-says the request **failed** (*the Cover Art Archive couldn't be reached - try again*, or *the cover
-couldn't be downloaded*), the Archive was unreachable or answered with an error - it goes away for
-minutes at a time; try again later.
+**Get cover** says what came of it in the line under the button. *The Cover Art Archive has no front
+cover for that release.* is a fact about the release, not a failure. Pick a different release in
+**Edit → Release** if a sibling pressing has one. If it says the request didn't work (*The Cover Art
+Archive couldn't be reached - try again.*, or *The cover couldn't be downloaded from the Cover Art
+Archive - try again.*), the Archive was unreachable or answered with an error - it goes away for
+minutes at a time; **Try again** later. *Couldn't get the cover.* is a problem of deadwax's own: whoever
+runs deadwax sees what went wrong after it, in brackets; anyone else is told to tell them if it keeps
+happening.
 
 ## Lyrics are missing, or land late
 
@@ -455,6 +564,34 @@ minutes at a time; try again later.
 Your player is showing a picture embedded in the file, or a disc scan (`cd.jpg`) for songs with a
 disc number. A track's **Pictures in this file** (open it from **Edit → Tags**) shows them. **Get CD art** saves a proper `disc.jpg`, which Navidrome prefers over a
 `cd.jpg`.
+
+## An artist or album has no description, or it's at the foot of the page
+
+The short description ([descriptions](player.md#descriptions)) comes from Navidrome first, else from the English
+Wikipedia article that MusicBrainz links to (through Wikidata); its one-line subtitle from Wikidata. Nothing is
+said when there's none, so if a page has no description:
+
+- **Nobody has written one** deadwax can find: Navidrome has nothing - its agents (`ND_AGENTS`, Deezer, Last.fm
+  and ListenBrainz by default; only Deezer and Last.fm write descriptions, Deezer only an artist's, and Last.fm
+  only with `ND_LASTFM_APIKEY` and `ND_LASTFM_SECRET` set) found no biography or album notes - and the artist or
+  album has no Wikidata link on MusicBrainz, the Wikidata item has no English article, or the article is a
+  disambiguation page. An album you don't have only ever has Wikipedia's.
+- **A link added on MusicBrainz isn't showing yet**: deadwax keeps MusicBrainz's answers for a month, so a
+  Wikidata link you add there (on the page's **Edit relationships**) shows once deadwax asks MusicBrainz about
+  that artist or album again - which can take up to a month. **Clear MusicBrainz's saved answers** (Server
+  settings → **Connections**) brings that within three days, when deadwax's own "there's none" for the page runs
+  out. An English article written on Wikipedia for an item MusicBrainz already links shows within three days.
+- **No MusicBrainz id**: an artist or album whose files carry no MusicBrainz ids has only Navidrome's words, and
+  no subtitle. Applying a release in **Edit → Release** writes the ids.
+- **Navidrome, Wikipedia, Wikidata or MusicBrainz didn't answer** just then: deadwax keeps nothing of a failure,
+  and the app asks again when the page next opens, from a minute on. deadwax's own log (the container's output) has a line saying which
+  of the Wikipedia side didn't answer ("no description for that artist just now - …").
+
+A description at the **foot** of the page came after what is under its place was drawn - the artist's albums, the
+album's songs, a pressing's tracklist wait for it only a moment - so it was put where it moves nothing under your
+finger - as is one that came after the page said the album's details or the library couldn't be loaded, with
+**Try again** under where it would go. Next time the page opens deadwax has it kept, and it is under the name or the
+hero.
 
 ## The artist page can't work out who this is
 
@@ -476,7 +613,7 @@ with **Try again** (what it said before stays on screen meanwhile); if it keeps 
 isn't answering deadwax, or its last scan doesn't list them yet - see
 [the library is empty](#needs-a-look-or-library-care-says-the-library-is-empty-or-doesnt-show-a-change). **Move albums to …**
 shows only when MusicBrainz's name for them differs from a name your library files their albums
-under (the **Now** row), and only once MusicBrainz has answered; both are an admin's. A move that says
+under (the **Now known as** row), and only once MusicBrainz has answered; both are an admin's. A move that says
 an album stays names why - a collaboration, one tagged as another artist, a folder of that name
 already there under the new name (or another of their albums moving there), or a track that can't be
 read ("'03 Three.flac' can't be read, so its tags can't be written": a file cut short or damaged, or
@@ -484,7 +621,7 @@ one the user deadwax runs as can't read - check its permissions, or replace it, 
 
 ## Stopping or redeploying deadwax takes a few seconds
 
-With a song playing, or the Log open, a stop waits up to 5 seconds for those to finish, then closes them and
+With a song playing, or the Event log open, a stop waits up to 5 seconds for those to finish, then closes them and
 shuts down cleanly (MusicBrainz's saved answers written, every connection closed) - well inside the 10 seconds
 Docker gives a container before killing it. The container's log then says "Cancel N running task(s), timeout
 graceful shutdown exceeded" and shows an "Exception in ASGI application" traceback for each one it closed: that
@@ -500,12 +637,23 @@ finishes, and the scan at start-up runs again at the next start.
 A value saved in Server settings **overrides** compose and `.env`, and the row says so. Press
 **Revert** on it to go back to the compose value. Also check you didn't write
 `SETTING=${SETTING}` in `environment:`, which quietly sets it to empty when compose has no such
-variable of its own; the log warns about this at start-up.
+variable of its own; the log warns about this at start-up. After changing compose or `.env`, recreate
+the container (`docker compose up -d --force-recreate`): a restart keeps the environment it was
+created with. [Every variable](configuration.md#environment-variables) lists how each is given and which
+wins.
 
 ## Signing in
 
 With logins on ([sharing deadwax](sharing.md)). What each message
-on the sign-in screen means, and what to do about it:
+on the sign-in screen means, and what to do about it. The screen can't tell who is reading it, so
+it says what is wrong in words for anyone; where whoever runs deadwax needs a setting's name or
+Navidrome's own answer to fix it, that is folded under the message, behind **For whoever runs
+deadwax** - tap it to read it.
+
+- **"Can't reach deadwax. Check you're on the right network (or your VPN is on) and try again."**:
+  the phone or browser didn't reach deadwax at all.
+- **"Something went wrong on the server - try again in a moment."**: deadwax (or something in front of
+  it) answered with an error and no words of its own; the log says what.
 
 ### Locked out: nobody can sign in
 
@@ -514,6 +662,17 @@ on the sign-in screen means, and what to do about it:
   name `deadwax`, password `DEADWAX_ADMIN_PASSWORD`. It needs neither Navidrome nor deadwax's database,
   and lasts 12 hours. If it isn't set, set it in `.env` (or compose) and recreate the container. Sessions already
   signed in carry on while Navidrome is down - only new sign-ins need it.
+- **"deadwax can't reach the music server, so nobody can sign in just now. Tell whoever runs
+  deadwax."**: Navidrome isn't set up, or `NAVIDROME_URL` fails deadwax's check - **For whoever runs
+  deadwax** says which ("Navidrome isn't set up - fill in NAVIDROME_URL…", "NAVIDROME_URL is unusable
+  (…)"). Fix it in compose (Server settings can't be reached without signing in: use break-glass).
+- **"Navidrome couldn't check your password just now - try again in a moment."**: Navidrome answered
+  the check with an error deadwax doesn't know; **For whoever runs deadwax** has Navidrome's own words.
+- **"This account can't sign in to deadwax: it's an LDAP account…"**: Navidrome can't check an LDAP
+  account with a token, which is all deadwax signs in with. Use a local Navidrome account.
+- **"deadwax isn't ready for signing in, so nobody can use it just now. Tell whoever runs deadwax."**,
+  with one of the two below under **For whoever runs deadwax** - every page of the app says it too,
+  since everything but the health check and the pages answers 503 until it's put right:
 - **"Logins are on, but ORGANIZE_MODE is 'dry_run', so nothing downloaded would ever be filed into
   the library"** (or `'off'`, or "LIBRARY_PATH is not set"): with logins on,
   each download is the person's who asked for it once it's filed, so organizing has to be on -
@@ -526,12 +685,14 @@ on the sign-in screen means, and what to do about it:
   refuses to switch organizing off ("they need organizing to stay on").
 - **"Logins are on, but DEADWAX_SECRET_KEY isn't set"** (or "is shorter than 32 characters"): logins
   don't work without the key: the pages load, but everything they ask deadwax for (the health check
-  aside) answers 503 until it's set, and the sign-in screen says so. Make one with
+  aside) answers 503 until it's set, and the sign-in screen says so (under **For whoever runs
+  deadwax**). Make one with
   `openssl rand -hex 32`, put it in `.env` as `DEADWAX_SECRET_KEY=<the key>` and recreate the
   container. If it's in `.env` already, look for a `DEADWAX_SECRET_KEY` line under compose's
   `environment:` too - uncommented, even an empty one, it beats `.env` - and delete it.
-- **"deadwax can't read its database, so it can't check who you are"**: nothing is let in while the
-  database can't be read - check `DB_PATH` is on a volume the container can write. The health check
+- **"deadwax can't read its database just now, so it can't check who you are. Tell whoever runs
+  deadwax."** (under **For whoever runs deadwax**: "Check DB_PATH points at a writable volume"): nothing
+  is let in while the database can't be read - check `DB_PATH` is on a volume the container can write. The health check
   stays healthy, since restarting doesn't fix a missing volume. The break-glass sign-in still works.
   A volume that's full or has gone read-only signs nobody out - devices already signed in carry on
   (their 30 days just stop moving on) - but a new sign-in answers this until it's fixed.
@@ -565,12 +726,77 @@ pins and settings are as they were.
 An admin removed your Navidrome account in People. Nothing of yours is left in deadwax to sign in to;
 ask them.
 
+### "Your password was changed from another device - sign in with the new one."
+
+You (or someone signed in as you) changed your password in deadwax's **You → Account → Change password** on another
+device. That device stays signed in, under a new sign-in of its own; every other one is signed out at once -
+and so is any copy of that device's old sign-in - and this message is why. Sign in with the new password -
+Amperfy and any other app you use with Navidrome need it too.
+
+### Change password says "deadwax couldn't give this device a new sign-in"
+
+The password changed, and this device is still signed in with the new one - but deadwax couldn't move it to a
+new sign-in (its database refused the write), so if someone has a copy of this browser's old sign-in, it still
+works. Your other devices are signed out as usual. Sign out here and sign in again with the new password: that
+ends the old sign-in, and any copy of it, for good. If it keeps happening, check that `/config` (where deadwax
+keeps its database) has room and isn't read-only.
+
+### Change password says "Navidrome is set not to let people change their own details"
+
+Navidrome has `EnableUserEditing` turned off (it's on unless someone set `ND_ENABLEUSEREDITING=false`), so it
+refuses to let anyone who isn't one of its admins change their own account, password included. Nothing
+changed. An admin can reset your password for you in People (**Reset password…** on your row), or turn
+`EnableUserEditing` back on in Navidrome's own configuration. Admins can always change their own.
+
+### Change password says "That isn't your current password"
+
+deadwax checks the current password you typed against the login you signed in with, before Navidrome is
+asked anything - so it's the password you used to sign in to deadwax on this device. If you've changed it
+somewhere else since (in Navidrome, Amperfy, or on another device), sign out and in again with the one you
+have now. Three wrong ones in a minute and deadwax holds off ("Too many tries"), as it does at the sign-in;
+and at most five tries a minute in all ("That's a lot of tries in a minute").
+
+### Change password says "Navidrome didn't answer in time, so deadwax can't tell whether your password changed"
+
+Navidrome was asked to change it, and its answer never came (or the connection dropped before it did). deadwax
+then tries the new password once: if Navidrome takes it, the change went through after all and carries on as
+usual - this device stays signed in, your others are signed out - and you don't see this message. You see it
+when the new password didn't work either, or Navidrome couldn't be asked: deadwax changed nothing on its side.
+If the change did take in Navidrome, this device is signed out within about six minutes and you sign in with the
+new password; if it didn't, the old one still works - try again.
+
+### Change password says "Navidrome answered your change in a way deadwax doesn't know"
+
+Navidrome answered the change itself with something deadwax can't read (a Navidrome newer than deadwax knows,
+or an error page from something in front of it), and then couldn't be asked whether the new password works -
+so deadwax can't tell whether it changed, and changed nothing on its side. Try signing in to Navidrome itself
+with the new password. If it works, deadwax signs this device out within about six minutes; sign in with the
+new one. (When the new password does work, deadwax carries on with the change as usual and you never see this;
+when it doesn't, you're told nothing changed.)
+
+### Change password says "Navidrome said it changed your password, but the new one doesn't work"
+
+Navidrome answered that it saved the change, but deadwax's check with the new password was refused - a
+Navidrome newer than deadwax knows may have changed how it takes a password, or Navidrome may be holding the
+account off for a moment after several refused logins. deadwax changed nothing; try signing in to Navidrome
+itself with each password, and change it there if need be.
+
+### Change password says "Navidrome changed your password, but deadwax couldn't keep the new one"
+
+Navidrome took the new password, and then deadwax couldn't write it into its database (the log says why -
+most often a database that can't be written, `DB_PATH`). Your password HAS changed: sign out and sign in
+again with the new one. Trying the change again won't work: the old password isn't your current one any
+more.
+
 ### Signed out after changing your Navidrome password
 
-Every few minutes deadwax asks Navidrome whether the login you signed in with still stands. After you
+(Changed in deadwax, under **You → Account → Change password**, the device you changed it on stays signed in and the
+others are signed out at once, saying so - [above](#your-password-was-changed-from-another-device---sign-in-with-the-new-one).
+What follows is a password changed in Navidrome itself, or in Amperfy.) Every few minutes deadwax asks
+Navidrome whether the login you signed in with still stands. After you
 change your Navidrome password - or your account is deleted - that answer is no, and within about six
 minutes deadwax signs you out on every device. The player asks Navidrome as you, so it is often
-sooner: the first thing the app asks of Navidrome with the old login - opening Browse or
+sooner: the first thing the app asks of Navidrome with the old login - opening All music or
 an album, a cover, the next song - is refused, and that session ends there and then (another device
 ends at its own first refusal, or at the six-minute check). Nothing more is asked with the old login,
 and until Navidrome has taken a login in the last few seconds the app's requests go to it one at a time,
@@ -583,19 +809,21 @@ session ends, the player can't fetch any more of it. The song playing goes on on
 device has already fetched it (with Gapless on, a few seconds), and then the player skips through the
 rest of the queue as it does with any song that won't play - **Skipped "…" - it wouldn't play**, one
 song after another - and stops at the end with a reason that blames the song. Nothing is wrong with the
-songs: once you've signed in, play the album again. Changing `DEADWAX_SECRET_KEY` (and restarting
-deadwax) signs everyone out too, each session at its next request ("DEADWAX_SECRET_KEY has changed since
-you signed in").
+songs: once you've signed in, play the album again. Changing `DEADWAX_SECRET_KEY` (and recreating
+the container) signs everyone out too, each session at its next request ("deadwax's sign-ins have been reset
+since you signed in - sign in again."; the log names the key).
 
-### Your library says deadwax can't star albums for you
+### Your library says new albums can't be added until you sign in again
 
-With logins on, deadwax stars what goes into your library **as you**, with the login you last signed in
-with. After you change your Navidrome password that login stops working, and
-**You → Your library** says so in red: "deadwax can't star albums for you: Navidrome no longer accepts
-the login you signed in with". Nothing is lost - what you get meanwhile is kept, waiting. Sign out
-(**You → About → Sign out**) and sign in with your new password: deadwax keeps the new login and stars
-everything waiting within a few seconds. Changing `DEADWAX_SECRET_KEY` does the same ("DEADWAX_SECRET_KEY
-has changed since you signed in"). Signing out by itself doesn't stop deadwax starring for you.
+With logins on, deadwax stars what goes into your library **as you** in Navidrome, with the login you last
+signed in with. After you change your Navidrome password in Navidrome or Amperfy that login stops working
+(changed in deadwax's **You → Account → Change password**, deadwax keeps the new one and this doesn't happen), and
+**You → Your library** says so in red: "New albums can't be added to your library until you sign in again.
+Sign out, then sign in - with your new password if you changed it. Nothing is lost meanwhile." Nothing is
+lost - what you get meanwhile is kept, waiting. Sign out (**You → Account → Sign out**) and sign in with your
+new password: deadwax keeps the new login and stars everything waiting within a few seconds. Changing
+`DEADWAX_SECRET_KEY` does the same (the sign-in says "deadwax's sign-ins have been reset since you signed in
+- sign in again."). Signing out by itself doesn't stop deadwax starring for you.
 
 ### "Too many tries for … - wait N seconds and try again"
 
@@ -635,8 +863,9 @@ permission. deadwax's admins are Navidrome's admins: if you should be one, make
 your account an admin in Navidrome's Users page - deadwax notices within about six minutes, or at once if
 another admin does it in People. Or ask an admin to tick just that permission for you in People (it's in
 force from your next tap). The app doesn't show what you can't use, and deadwax refuses it with these
-words. A Managing page reached by its address says "You don't have
-permission for this page."
+words. A Manage page reached by its address says "This page needs a permission an admin hasn't given
+you - ask one if you need it." (People: "Only an admin can open People - it comes with being a
+Navidrome admin.")
 
 ### NAVIDROME_URL, NAVIDROME_USER, NAVIDROME_PASSWORD, SLSKD_URL or SLSKD_APIKEY says "Only an admin can change this"
 
@@ -656,15 +885,15 @@ if you were signed out, or "That needs Settings and the log…" if it was taken 
 
 ### "Getting albums is off for you - ask an admin."
 
-An admin unticked **Get albums** for you in People: you can still play, browse and add what the store has
-to your library, but not search Soulseek or download. Only an admin can give it back.
+An admin unticked **Get albums** for you in People: you can still play, look through and add what the
+collection has to your library, but not search Soulseek or download. Only an admin can give it back.
 
-### "...the extra permissions an admin gave you are off until you sign in again"
+### You says "Some things an admin let you do are off for now"
 
-An admin gave you a permission, and deadwax checks it's still the same Navidrome account it was given to
+("…sign out and in again to get them back.") An admin gave you a permission, and deadwax checks it's still the same Navidrome account it was given to
 as you sign in - one Navidrome sign-in as you. That check couldn't be made this time (Navidrome was busy
 or not answering, or deadwax had just made several sign-ins), so the extra permissions are off on this
-device until you sign in again: **You → About → Sign out**, then sign in. A Get albums taken away still
+device until you sign in again: **You → Account → Sign out**, then sign in. A Get albums taken away still
 applies. An admin opening People also puts it right, from your next tap.
 
 ### People asks for my password
@@ -697,7 +926,9 @@ you one, in People or Navidrome's Users page.
 ### People says "Navidrome answered in a way deadwax doesn't know"
 
 People uses the interface Navidrome's own web pages use, which isn't documented and can change between
-Navidrome versions - People was made for Navidrome 0.64, and says so when yours is another. Nothing else in
+Navidrome versions - People was checked with Navidrome 0.64, and says so when yours is another ("Your
+Navidrome (0.65.0) isn't the one People was checked with (0.64). If something here doesn't work, use
+Navidrome's own Users page."). Nothing else in
 deadwax depends on it. Change accounts in Navidrome's own Users page meanwhile. If it says a password
 "didn't take", set that person's password in Navidrome's Users page.
 
@@ -731,7 +962,7 @@ every http sign-in's cookie is thrown away while the old one lasts. Either:
 - **Use one address**: keep to the HTTPS one (recommended away from home), or the http one - not both
   for the same host name. Two names work fine (`https://music.example.com` outside, `http://nas.lan:8080`
   at home).
-- **Or clear the cookie**: sign out at the HTTPS address (**You → About → Sign out**), or delete the
+- **Or clear the cookie**: sign out at the HTTPS address (**You → Account → Sign out**), or delete the
   site's cookies for that host in the browser's settings (on an iPhone, Settings → Safari → Advanced →
   Website Data). Then sign in over http again.
 
@@ -808,7 +1039,7 @@ alike. A very busy library can hold an apply back now and then too: Navidrome wa
 quiet seconds before it scans, and an album being filed, or a bulk cover or lyrics run, keeps
 putting that off.
 
-Two related cases don't hold the rename back, and the **Log** says which. If Navidrome keeps
+Two related cases don't hold the rename back, and the **Event log** says which. If Navidrome keeps
 answering but deadwax can't use what it says (a refused login, an error from Navidrome or a
 proxy in front of it, a scan status it can't read), there's no telling whether it has scanned.
 When that's so from the first question, deadwax waits the fixed `RETAG_RENAME_WAIT` and renames.
@@ -824,15 +1055,17 @@ album to see where it stands.
 The app's [artist page](player.md#artist-pages) lists an artist's albums from MusicBrainz, which
 needs to know which MusicBrainz artist it is.
 
-- **"MusicBrainz doesn't know who this is from your files, so only the albums you have are
-  here."**: neither Navidrome nor your files say. Navidrome reads an artist's MusicBrainz id from
+- **"Only the albums you have are shown - their other albums can't be found."** (with nothing of theirs:
+  **"Nothing of theirs in your library, and their albums can't be found."**): MusicBrainz doesn't know
+  who this is from your files - neither Navidrome nor your files say. Navidrome reads an artist's MusicBrainz id from
   the album artist's `musicbrainz_albumartistid` tag, which deadwax writes on every album it files
   or you apply a release to (since v0.6.15); albums tagged by something else, or long ago, may lack
   it. Applying the album's release (**Edit → Release**) writes it, and the page finds them once
   Navidrome has rescanned. Meanwhile **Which artist is this?** under the words (an admin's) lets you
   choose who they are for this visit ([Managing an artist](player.md#managing-an-artist)).
-- **"MusicBrainz isn't answering just now"**, with **Try again**: MusicBrainz is slow or down (see
-  [below](#musicbrainz-is-slow-or-searches-fail)). The albums you have are still listed.
+- **"Their other albums can't be shown right now - try again in a few minutes."**, with **Try again**:
+  MusicBrainz is slow or down (see [below](#musicbrainz-is-slow-or-searches-fail)). The albums you have
+  are still listed.
 - **An artist opened from an album you don't have shows none of your albums**: deadwax looks for
   them as the Navidrome artist carrying that MusicBrainz id, else the artist your library files
   their albums under, else - only for an artist Navidrome has no id for - one whose name is
@@ -841,8 +1074,9 @@ needs to know which MusicBrainz artist it is.
 - **Play and Shuffle stay grey**: they wait until every album of theirs you have has come from
   Navidrome, and until your library has said which of Navidrome's albums are copies of one album
   (so both of a pressing you hold twice aren't played). If Navidrome didn't send some, the line
-  under them says so, with **Try again**; "Navidrome has none of their albums to play" means just
-  that - an album only your library has, Navidrome hasn't found yet.
+  under them says so ("Couldn't load their songs.", or "Plays 2 of the 3 albums you have - the rest didn't
+  load"), with **Try again**; "None of their albums are here to play." means Navidrome has none of their
+  albums - an album only your library has, Navidrome hasn't found yet.
 - **An album on an artist's page says neither "in" nor "not in your library", with no Get**: your
   library hasn't answered yet (the first look after deadwax restarts walks the whole library). It
   says once it does.
@@ -880,27 +1114,28 @@ first time (an estimate: it hasn't been timed on one yet); within ten minutes of
 ## The app's Library looks empty
 
 With logins on the **Library** tab is **your** library - your starred albums
-in Navidrome - not the whole store. An account that hasn't starred anything yet, and hasn't had
-anything filed for it, sees **Nothing in your library yet** - in any order, Recently played too - and
-the same under Artists: tap **Browse the store** (or a row of the Library's **Browse** group - on a desktop,
-the sidebar's **Browse** group) for every album deadwax holds, and open one to **Add to my library**. A few
-more things that make your library look short:
+in Navidrome - not the whole collection, and so is Home's **Recently added** (since 2.0.5). An account that
+hasn't starred anything yet, and hasn't had anything filed for it, sees **Nothing in your library yet.** - in
+any order, Recently played too, and on Home - and the same under Your artists: tap **See All music** (or a row of
+the Library's **All music** group - on a desktop, the sidebar's **All music** group) for every album deadwax
+holds, and open one to **Add to my library**. A few more things that make your library look short:
 
-- **An album waiting to be starred** isn't there yet: your Library lists what Navidrome has starred for
+- **An album waiting to be added** isn't there yet: your Library lists what Navidrome has starred for
   you, and a download is starred once Navidrome has scanned it. **You → Your library** says what's
-  waiting, and why.
+  waiting to be added, and why.
 - **An album with no MusicBrainz release id** can't be added from its page (deadwax keeps your library
-  by release, and the page says so). Star it in Amperfy - your Library is your Navidrome favourites, so
-  it shows there - or have an admin match its release.
-- **The break-glass `deadwax`** has no library of its own: its Library is the whole store.
+  by release, and the page says so: "This album can't be added from here - make it a favourite in another
+  music app, and it joins your library."). Star it in Amperfy - your Library is your Navidrome favourites,
+  so it shows there - or have an admin match its release.
+- **The break-glass `deadwax`** has no library of its own: its Library is the whole collection.
 
 ## The Library shows the first 10000 albums
 
-The app's Library has each list - your albums, or the store's - from deadwax in one
+The app's Library has each list - your albums, or the collection's - from deadwax in one
 answer, which reads Navidrome's albums 500 at a time and stops at 10,000 (twenty pages), so a page of it
 says **Showing the first 10000 albums - deadwax reads at most that many.** and counts 10000. The rest are
 still in Navidrome and in deadwax: **Search** finds them, and an artist's page lists all of theirs. For your
-albums it's the 10,000 you starred most recently; for the store's, the 10,000 Navidrome had most recently.
+albums it's the 10,000 you starred most recently; for the collection's, the 10,000 Navidrome had most recently.
 
 ## The Library's albums are in a different order
 
@@ -908,8 +1143,16 @@ The app's Library opens **Albums** by **Artist** (each artist's albums oldest fi
 chose an order - **Recently added** has its own place, as the Library list's grid and its **See all**. Choose
 another from the sort at the top of the page: it's remembered on that device, and so is the artists' order. Names are sorted the way
 deadwax compares them - "The" at the front set aside, accents and case aside, digits and symbols under **#**
-after Z - in the store's lists too, so an album or two can sit where Navidrome's own web page wouldn't put it
+after Z - in the collection's lists too, so an album or two can sit where Navidrome's own web page wouldn't put it
 (Navidrome also sets aside "La", "El" and others, and puts compilations last).
+
+## The app's Home has no "Recently played"
+
+It shows once Navidrome has a play of an album for the account the player asks as - your own with logins on,
+`NAVIDROME_USER`'s with logins off - so a new account, or plays made in another app under another Navidrome user,
+show nothing yet. Play an album (deadwax counts a song as played once you've heard half of a song longer than 30
+seconds, or four minutes of it, whichever comes first) and come back to Home. If it was on screen when the first play was found, the shelf appears the next time you open Home rather
+than pushing the rest down under your finger.
 
 ## The app's Home has no "Not played in a while"
 
@@ -917,62 +1160,72 @@ It shows only with at least four albums you last played more than 30 days ago, a
 Navidrome says when each album was last played (OpenSubsonic's `played`, on its "recently played"
 list). A library you've been listening through - everything played in the last month - or a fresh
 Navidrome has nothing to show yet. A Navidrome that doesn't send `played` never shows it: Info →
-Debug's **Navidrome sent** row (an admin's - with logins on, ask one to look, playing the same album) lists the fields it sends for the album playing. The plays are the
+Debug's **Fields from Navidrome** rows (an admin's - with logins on, ask one to look, playing the same album) lists the fields it sends for the album playing. The plays are the
 ones Navidrome counts for the account the player asks as - `NAVIDROME_USER` with logins off, your own
 with them on - so plays made in another app under another Navidrome user don't
 count.
 
-## A pinned album says "Removed from the store", "Not on disk just now" or "Not in Navidrome yet"
+## A pinned album says "Removed from your library", "Can't be found right now" or "Not ready to play yet"
 
-- **Removed from the store**: the album was deleted (**Edit → Delete**). Unpin it from Home's **Edit**,
-  or get it again - the pin opens the new copy of the same pressing once it's filed.
-- **Not on disk just now**: its folder isn't where deadwax last saw it - usually a share or
+- **Removed from your library** (with logins on, **Removed from the collection**): the album was deleted
+  (**Edit → Delete**). Unpin it from Home's **Edit**, or get it again - the pin opens the new copy of the
+  same pressing once it's filed.
+- **Can't be found right now**: its folder isn't where deadwax last saw it - usually a share or
   disk that isn't mounted. It opens again once the folder is back and deadwax has looked at your
   library again: **Library care → Rescan** scans at once. A
   folder moved by hand outside deadwax is matched up by that scan too, and the pin follows it.
-- **Not in Navidrome yet**: deadwax has the album, but Navidrome doesn't, or not as that
+- **Not ready to play yet**: deadwax has the album, but Navidrome doesn't, or not as that
   release - it may still be scanning after a download or a re-file. Come back to Home in a moment:
   it asks again each time it's shown. If it stays, check that Navidrome can see the folder and that
   the album's files carry its MusicBrainz release id (Navidrome's `musicBrainzId` on the album).
 
-## An album in my library isn't starred in Amperfy, or "waiting to be starred"
+## An album in my library isn't starred in Amperfy, or is "waiting to be added"
 
 With logins on your library is your starred albums in Navidrome, and **You →
-Your library** says how many are still waiting to be starred, and why:
+Your library** says how many are waiting to be added ("12 albums · 2 waiting to be added") - albums deadwax
+hasn't starred for you yet, some of which only an admin can move along - and why:
 
-- **"Navidrome hasn't got it yet"** - it was filed, and Navidrome hasn't scanned it. Navidrome's watcher
+- **"The music server hasn't picked it up yet - it's added as soon as it has."** - it was filed, and
+  Navidrome hasn't scanned it. Navidrome's watcher
   usually picks a new folder up within a minute; deadwax asks again after 30 seconds, a minute, two, and
   so on up to every half hour, until the star holds. If it never comes: Navidrome isn't reading the
   folder deadwax files into (`LIBRARY_PATH` and Navidrome's music folder must be the same folder), or
   the folder's files don't carry the release id Navidrome is asked for. **Needs a look** raises a folder
   Navidrome doesn't list as **Not in Navidrome**.
-- **"It has no MusicBrainz release id"** - deadwax finds an album in Navidrome by its release id, so an
+- **"An admin needs to match it to a release on MusicBrainz before it can be added."** - it has no
+  MusicBrainz release id: deadwax finds an album in Navidrome by its release id, so an
   untagged album can't be starred by deadwax. An admin can apply a release to it (its Edit panel's
-  **Release**); it is starred once it has one. Or star it yourself in Amperfy: deadwax then matches it
+  **Release**); it is starred once it has one. Someone who can do that themselves - an admin, or anyone
+  given Edit albums - reads instead "It isn't matched to a release on MusicBrainz yet. Apply a release to
+  it in Edit album, and it's added after that." Or star it yourself in Amperfy: deadwax then matches it
   by its album artist and name (when exactly one starred album without a release id has them, and only
   one of your waiting albums without one does - two pressings of one album by the same name both stay
   waiting, since which you starred can't be told) and counts it as starred within five minutes.
-- **"Its folder isn't there just now"** - the album's folder is missing (an unmounted share, say).
-  deadwax asks again once it's back.
-- **"Navidrome isn't answering"** - deadwax asks again by itself.
-- **"Navidrome took the star but didn't keep it"** - Navidrome said yes, and the album didn't come back
-  starred. deadwax tries again; if it keeps happening, look in Navidrome's log.
-- **In red, "deadwax can't star albums for you"** - see [Signing in](#your-library-says-deadwax-cant-star-albums-for-you).
+- **"Its files aren't there just now - it's added once they are."** - the album's folder is missing (an
+  unmounted share, say). deadwax asks again once it's back.
+- **"The music server isn't answering - it's added once it does."** - Navidrome isn't answering; deadwax
+  asks again by itself.
+- **"Being added again - nothing for you to do."** - Navidrome said yes to the star, and the album didn't
+  come back starred. deadwax tries again; if it keeps happening, look in Navidrome's log. **"It was moved or
+  re-tagged, so it's being added again - nothing for you to do."** is a star Navidrome lost (the album came
+  back under another id after a re-file or a retag): deadwax puts it back.
+- **In red, "New albums can't be added to your library until you sign in again"** - see
+  [Signing in](#your-library-says-new-albums-cant-be-added-until-you-sign-in-again).
 
 **The first admin's library is empty after signing in** (a new install, or an upgrade from a version
-whose saved scan deadwax can't read): the albums already in the store go into it after deadwax's first
+whose saved scan deadwax can't read): the albums already in the collection go into it after deadwax's first
 scan of the library, which the event log says ("deadwax hasn't scanned the library yet…"). deadwax starts
 that scan by itself, in the background, as it starts ("reading every album's tags once now"); on a big
 library it takes a few minutes. Once it's done, the event log says how many albums went into the library,
 and deadwax stars them. If the log says the scan at start-up failed, search for something or press
 **Library care → Rescan** to scan again.
 
-**An album page says "deadwax hasn't found this album's folder in the store"** just after the upgrade:
+**An album page says "This album can't be added from here yet"** just after the upgrade:
 the same first scan hasn't finished yet - album pages can offer **Add** once it has. Give it a few
 minutes (the event log says when it's done), or press **Library care → Rescan**.
 
 An album you **unstar** in Amperfy is taken out of your library at deadwax's next look (every five
-minutes) - deadwax never stars it back. An album you star there is added the same way, if the store
+minutes) - deadwax never stars it back. An album you star there is added the same way, if the collection
 holds it: deadwax finds it by its release id, so a starred album Navidrome reads no release id from
 isn't added. After an admin applies a release to an album, Navidrome may show it unstarred for a moment:
 deadwax notices it is the same album under a new id, or missing mid-scan, and stars it again rather
@@ -981,14 +1234,17 @@ than taking it out of your library.
 ## A pin won't stay, or the app says "Couldn't pin …" or "Not saved"
 
 Pins are kept in deadwax's database. A pin or an unpin deadwax couldn't keep goes back, and a note at
-the top of the screen says which album or artist and why ("Couldn't pin Dummy: …"); a change made in
-Home's **Edit** says **Not saved: …** under the list instead. The reasons:
+the top of the screen says which album or artist and why ("Couldn't pin Dummy. …"); a change made in
+Home's **Edit** says **Not saved. …** under the list instead. The reasons (deadwax's own words; when
+deadwax wasn't reached at all it says "Can't connect to deadwax", and an admin also sees the error's
+own words in brackets after it):
 
 - **"Home holds up to 50 pins - unpin one first"**: Home is full. Unpin something in **Edit**.
 - **"its database refused the write"** or **"isn't writable"**: check `DB_PATH`, and that the folder
   it's in can be written as `PUID`/`PGID`. When deadwax can't keep pins at all, the pin buttons are
-  greyed, and a tap on one says so.
-- **"deadwax couldn't read its pins just now"** (or Home's Pinned saying **Couldn't get your pins: …**
+  greyed, and a tap on one says so ("deadwax can't keep pins just now: its database isn't writable" -
+  with "Tell whoever runs deadwax." to anyone who doesn't).
+- **"deadwax couldn't read its pins just now"** (or Home's Pinned saying **Couldn't get your pins. …**
   with nothing pinned shown): the database didn't answer in time - usually something else holding it
   a while. Your pins are still there; Home asks again each time it's shown, and keeps what it last had.
 - **"deadwax couldn't ask Navidrome about this album just now - try again"**: pinning from the now-
@@ -1010,8 +1266,9 @@ the line.
 
 ## Done says the songs were saved, but…
 
-"The songs were saved, but Navidrome didn't take the name, description or sharing: …", or "Saved - but
-Navidrome didn't answer when deadwax asked for the playlist again: …": part of the save, or all of it,
+"The songs were saved, but Navidrome didn't take the name, description or sharing.", or "Saved - but
+Navidrome didn't answer when deadwax asked for the playlist again." (an admin also sees Navidrome's own
+answer, in brackets after it): part of the save, or all of it,
 went through before Navidrome refused or stopped answering - a busy database ("database is locked"), a
 restart. **Edit** stays open with your changes: press **Done** again once Navidrome is answering and it
 finishes the rest (it knows the songs it sent may be there already, so it doesn't take them for a change
@@ -1062,26 +1319,28 @@ An album page's **Edit** (on a phone as on a desktop) finds the album's folder b
 an album Navidrome knows by no release - by its name among the library's untagged folders ([how it
 finds it](library.md#which-folder-and-after-an-edit)). What it says when it can't:
 
-- **"deadwax has no folder of this album: Navidrome knows it by a MusicBrainz release no folder in
-  the library is tagged with"**: the files Navidrome scanned carry a release id that no folder in the
+- **"deadwax can't find this album's folder: no folder in the library is matched to the release
+  Navidrome has for it"**: the files Navidrome scanned carry a release id that no folder in the
   library has - usually an album added by another program since the library was last read, or a
   Navidrome looking at a different folder from `LIBRARY_PATH`. **Look again** reads the library again.
-  If its tags were changed by another program, **Rescan** (**Managing → Library care**) first - a
+  If its tags were changed by another program, **Rescan** (**Manage → Library care**) first - a
   retag in place isn't noticed otherwise. Or **Choose the folder** and pick it from the list. If it
   isn't there at all, check the two paths point at the same music.
-- **"deadwax can't tell which folder this album is: Navidrome knows it by no MusicBrainz release, and
-  no untagged folder in the library has its name"**: the album's name or artist in Navidrome isn't the
+- **"deadwax can't find this album's folder: it isn't matched to a release, and no unmatched folder in
+  the library has its name"**: the album's name or artist in Navidrome isn't the
   one in its files' tags as deadwax reads them, or its folder does carry a release id. **Choose the
   folder** lists every folder in the library's scan; type part of its name, artist or folder to narrow
   the list, and click the one this album is - the panel edits that folder from then on (until the next
   **Edit**). A folder Navidrome doesn't list at all is opened from **Needs a look** instead (**Not in
-  Navidrome**, or **Ignored** once accepted).
-- **"Which one is it?"**, with a list of folders: more than one untagged folder has the album's name
+  Navidrome**, or **Marked fine** once marked fine).
+- **"… folders have this album's name, and none is matched to a release. Which one is it?"**, with a
+  list of folders: more than one untagged folder has the album's name
   and artist (its number of tracks didn't tell them apart). Pick the one this page plays.
-- **"The library's scan doesn't list … yet"**: the store knows the folder but the library's last scan
+- **"The library's scan doesn't list … yet"**: the store index knows the folder but the library's last scan
   doesn't. **Look again** scans it.
-- **"deadwax couldn't read the library: …"**: reading the library failed - often a reverse proxy
-  giving up on a first scan of a large or sleeping library, or a moment without the network. **Look
+- **"Couldn't read the library."** (or *Can't connect to deadwax…*, *That took too long.*): reading the
+  library failed - often a reverse proxy giving up on a first scan of a large or sleeping library, or a
+  moment without the network. Whoever runs deadwax sees what went wrong after it, in brackets. **Look
   again** reads it again.
 - **LIBRARY_PATH is not set**: the panel needs the library - see
   [the library is empty](#needs-a-look-or-library-care-says-the-library-is-empty-or-doesnt-show-a-change).
@@ -1092,8 +1351,8 @@ after **Play** and **Shuffle**.
 
 ## The "Needs a look" count changes when you open it, or has none
 
-The count beside **Needs a look** (the desktop sidebar's **Managing**, and You's **Albums that need a
-look**) is worked out from the library's **saved scan**, never by reading the disk, so it costs
+The count beside **Needs a look** (in the desktop sidebar's **Manage**, and in You's) is worked out
+from the library's **saved scan**, never by reading the disk, so it costs
 nothing to keep asking. While the page is open it shows the page's own count instead, from a fresh
 scan - so if the music changed since the library was last read (an album copied in, retagged or
 removed by another program), the number moves as the page opens. They count the same albums: every
@@ -1142,12 +1401,12 @@ album until Navidrome lists it. In turn:
   **Library care**).
 
 A folder whose files carry no album tag at all is never checked (Navidrome files those under "[Unknown
-Album]"). If an album really is fine as it is, **It's fine as it is** accepts it like any issue -
-and it leaves the queue. Accepted it, and want it back? **Needs a look → Ignored** lists every album
-whose issues you accepted: open it, and **un-ignore** brings it back to **All**.
+Album]"). If an album really is fine as it is, **It's fine as it is** marks it fine like any issue -
+and it leaves the queue. Marked it fine, and want it back? **Needs a look → Marked fine** lists every
+album you marked fine: open it, and **Ask about it again** brings it back to **All**.
 
 **No album is marked even though some should be**: the app's **Needs a look** says why in the line
-above its list - Navidrome isn't set up, couldn't be asked (with the reason; the
+above its list - Navidrome isn't set up, couldn't be asked (with the reason, for whoever runs deadwax; the
 [Navidrome messages below](#the-player-says-connect-navidrome-or-cant-reach-navidrome) are the same), was
 scanning when last asked (only the albums already found missing are marked until a read after it), or
 hadn't answered when the library was read (it's asked again the next time). A read is checked against
@@ -1156,13 +1415,15 @@ or a **Rescan**, which waits for Navidrome's answer - for the marks to follow. A
 changed in the last 15 minutes is marked only once Navidrome has scanned since, or the 15 minutes are
 up ([above](#an-album-says-not-in-navidrome)) - that one the line doesn't say.
 
-## Ignored albums come back to the review queue
+## Albums marked fine come back to Needs a look
 
-**It's fine as it is** saves which issues you accepted in deadwax's database. When deadwax couldn't
+**It's fine as it is** saves which issues you marked fine in deadwax's database. When deadwax couldn't
 open it (`DB_PATH` - the log says "could not open the job store" as deadwax starts), nothing can be
-kept: the album comes back on the next read. **Needs a look** says so above its list ("Ignores can't be
-saved: deadwax couldn't open its job store (DB_PATH)…"). Check `DB_PATH` and that the folder it's in
-can be written as `PUID`/`PGID`, then restart deadwax.
+kept: the album comes back on the next read. **Needs a look** says so above its list ("deadwax can't
+save to its database (check DB_PATH), so an album you mark "It's fine as it is" will come back.").
+Check `DB_PATH` and that the folder it's in
+can be written as `PUID`/`PGID`, then restart deadwax (or recreate the container, if you changed
+`DB_PATH`, `PUID` or `PGID`: a restart keeps the old values).
 
 ## Library care's runs don't do what I expect
 
@@ -1170,37 +1431,39 @@ can be written as `PUID`/`PGID`, then restart deadwax.
   **Narrow to** matches) needs one - each run says so - or the page is still on the saved scan
   (*Checking the library…*): the runs are offered once the disk has been read. A run that has just
   saved something says *Checking the library…* too, for the moment it takes to read the library again.
-- **"had none on the Archive"** / **"had none to find"**: the Cover Art Archive (and, for CD art,
-  fanart.tv) answered that it has no picture for that release - a fact about the release.
-  **"failed - try those again"**: the request didn't get an answer - the Archive couldn't be reached
-  or answered with an error, as it does for minutes at a time - so run it again later. Both stay in
-  the next run's count, since neither album has its picture yet.
-- **Lyrics counted in tracks**: "not on LRCLIB or instrumental" is final; "failed" is worth another
-  go. An album that already has some lyrics isn't offered - finish it from its own **Get lyrics**, in
-  its Edit panel.
+- **"2 have none in the Cover Art Archive."** / **"2 have none to find."**: the Cover Art Archive (and,
+  for CD art, fanart.tv) answered that it has no picture for that release - a fact about the release.
+  **"1 failed - run it again to try it again."**: the request didn't get an answer - the Archive couldn't
+  be reached or answered with an error, as it does for minutes at a time - so run it again later. Both
+  stay in the next run's count, since neither album has its picture yet.
+- **Lyrics counted in tracks**: "isn't on LRCLIB or is instrumental" is final; "failed" is worth another
+  go, from the album's own **Get lyrics** in Edit album - an album that already has some lyrics isn't
+  offered by the run again.
+- **"Stop after this album · 3 of 12"**: what the run's button says while it goes, counting the album
+  being fetched - pressing it lets that album finish, then stops (*Stopped at 3 of 12.*).
 - **A run's words went**: they're kept while the app stays open, also on another page; a reload
   forgets them.
 
-## The app's Log is missing lines, says "The stream was lost", or starts empty
+## The Event log is missing lines, says "Lost the live feed", or starts empty
 
-The **Log** (the desktop sidebar's **Managing → Log**, or **You → Log** on a phone or a desktop) shows
+The **Event log** (the desktop sidebar's **Manage → Event log**, or **You → Manage → Event log** on a phone or a desktop) shows
 deadwax's event log, newest first. As it opens it reads what deadwax kept: **the last 500
 lines since deadwax started** - nothing from before a restart (a Komodo redeploy starts it empty), and
 nothing older than those 500. Then it follows deadwax live, joining the two so no line is missing or
 shown twice.
 
-- **"The stream was lost - trying again"**: deadwax stopped answering (restarting, or the network
+- **"Lost the live feed - reconnecting…"**: deadwax stopped answering (restarting, or the network
   dropped). The page keeps trying by itself - also behind a reverse proxy that answers with an error
   page while deadwax is down, which makes the browser give up: the page then asks again itself every
   few seconds. When deadwax answers again the lines logged meanwhile are filled in, as long as they are
   among the last 500. If deadwax restarted, its earlier lines are gone from what it kept, but the ones
   already on screen stay.
 - **It stays on "Connecting…" behind nginx**: nginx holds a proxied answer in its buffers until they
-  fill, and a live log is a trickle. deadwax asks nginx not to buffer the Log (`X-Accel-Buffering: no`),
+  fill, and a live log is a trickle. deadwax asks nginx not to buffer the Event log (`X-Accel-Buffering: no`),
   which nginx honours unless told to ignore it; a proxy that doesn't know the header needs buffering
   turned off for deadwax - in nginx, `proxy_buffering off;`, as in [Sharing deadwax's sample
   block](sharing.md#turning-logins-on).
-- **"deadwax couldn't send the lines it kept"**: the page couldn't read the history as it opened, so it
+- **"Couldn't load the lines deadwax kept - what happens from now still shows."**: the page couldn't read the history as it opened, so it
   shows only what deadwax logs from then on. The next time it opens (leave the page and come back) it
   reads the history again and fills in the earlier lines it missed.
 - **It only follows while it is showing.** Leave the page, put the app in the background or open the
@@ -1213,10 +1476,16 @@ shown twice.
 
 ## The player says "Connect Navidrome" or "Can't reach Navidrome"
 
+Or, to anyone who doesn't run deadwax, **"Your music isn't available right now"** ("Can't reach the
+music server right now. If it keeps happening, tell whoever runs deadwax.", with **Try again** - or, when it
+was deadwax itself the phone couldn't reach, "Can't connect to deadwax. Check your connection.") or **"Your music isn't available yet"** ("deadwax hasn't been connected to a music
+server yet. Tell whoever runs deadwax."): what follows is for whoever runs deadwax - an admin, or
+someone with **Settings and the log** - who sees Navidrome's own reason.
+
 [The app](player.md) shows one of these on Home and in the Library tab, in place of your
 albums, and in Search in place of what's in your library, with the reason under it - and, since
 deadwax needs Navidrome for the app's library, that it does: **Connect Navidrome**
-says "deadwax needs Navidrome for your library" and to set it up in deadwax's settings
+says "deadwax needs Navidrome for your library" and to set it up in Server settings
 (Connections), and **Can't reach Navidrome** that your library shows once deadwax can reach it. The other tabs
 (and Search's MusicBrainz rows, and an album you don't have) work without Navidrome, and You's
 **Connections** shows Navidrome as **Not set up** or **Can't reach it**, with the same reason under it.
@@ -1225,6 +1494,8 @@ says "deadwax needs Navidrome for your library" and to set it up in deadwax's se
   `NAVIDROME_USER` and `NAVIDROME_PASSWORD` in Settings → Connections, which marks the one
   that's missing. The container's log also names it at start-up. In the app, **Set up Navidrome**
   under the reason opens the app's own **Server settings** at **Connections** (on a phone too); once the three are saved there the app asks Navidrome again by itself.
+  It's an admin's alone - Navidrome's rows in Server settings are - so someone with **Settings and
+  the log** reads "An admin can set it up in Server settings (Connections)." in its place.
 - **"NAVIDROME_URL is unusable (…), so deadwax sends nothing to it"**: the address in your
   compose file or `.env` fails the check Server settings makes on save - a user name or
   password in it, a `?` or `#`, a space, no `http://` - and the brackets say which. deadwax won't
@@ -1336,7 +1607,7 @@ Next's groups or the Shuffle chip, which only deadwax's own account of the queue
   signed in with - with logins on (the break-glass `deadwax`'s go to `NAVIDROME_USER`). Look at that account's play counts.
 - **Behind a reverse proxy that rewrites the `Host` header**, deadwax takes the player's play
   reports for requests from another website and refuses them, and the phone doesn't say so. The
-  **Log** names each refusal. Pass the original `Host` through, or set
+  **Event log** names each refusal. Pass the original `Host` through, or set
   `TRUSTED_ORIGINS`, as [below](#saving-or-pressing-a-button-says-refused-it-came-from-another-website).
 - **Counted in Navidrome, but not on Last.fm or ListenBrainz**: that part is Navidrome's. Check
   the account has them linked there, and that scrobbling is switched on for the `deadwax` player
@@ -1364,7 +1635,7 @@ asks for it once more a moment later, picking up where it stopped if it got part
 fails again it moves on to the next song and says so for a few seconds, in the mini player where
 the artist goes and above the song's title on the now-playing screen:
 **Skipped "…" - it wouldn't play**. A file that arrived but can't be decoded isn't asked for
-twice: **Skipped "…" - its file couldn't be decoded**. At the end of the queue there's nothing to
+twice: **Skipped "…" - this device couldn't play its audio**. At the end of the queue there's nothing to
 move on to, so playing stops there with the reason on screen, and if nothing was playing (you
 pressed next while paused, say) the reason is only shown. Tap play on a song that failed to ask
 for it again.
@@ -1381,11 +1652,11 @@ for it again.
 - **A limit on transcodes in Navidrome.** There's none unless you set one
   (`ND_TRANSCODING_MAXCONCURRENT`, or `ND_TRANSCODING_MAXCONCURRENTPERUSER`). With one set, a
   transcode over it is refused, and the phone can't tell that apart from audio it can't play: it
-  shows as *Couldn't play this song - Navidrome didn't send audio this device can play*, or as
+  shows as *Couldn't play this song - it didn't come as audio this device can play*, or as
   the song being skipped. Tap it again after a few seconds, or raise the limit.
-- **"Couldn't play this song - Navidrome didn't send audio this device can play"** or **"This
-  song's file couldn't be decoded"**: the file may be damaged, or in a format neither the phone
-  nor the transcode could manage. Try it in Navidrome's own web player. The first message is
+- **"Couldn't play this song - it didn't come as audio this device can play"** or **"This
+  device couldn't play this song's audio"**: the file may be damaged, or in a format neither the
+  phone nor the transcode could manage. Try it in Navidrome's own web player. The first message is
   also how any refused request looks from inside the page: a transcode limit (above), or a song
   whose album had another release applied to it while it sat in the queue, which Navidrome
   may now know by another id. For that one, open the album again from the grid.
@@ -1402,15 +1673,16 @@ for it again.
 
 **Debug is an admin's**: a Navidrome admin's, the break-glass `deadwax`'s, and with
 logins off everyone's. Anyone else's **Info** is **About** alone, with no tabs above it, and About's
-**Playing** group says what a listener can use of it: the file's **Format**, **Gapless** and
-**Normalization**, in Debug's own words. Where this guide asks for another of Debug's rows, an admin
-reads it - and where they read it matters:
+**Sound** group says what a listener can use of it: the file's **Format**, **Gapless** and
+**Normalization**, in a listener's words (Debug has the numbers). Where this guide asks for one of Debug's rows, an
+admin reads it - and where they read it matters:
 
-- **Rows about the song** - **Navidrome sent**'s **Song**, **On other songs** and **Album** - say the same
-  on any device: ask an admin to look on theirs, playing the same song.
-- **Rows about the device** - the rest: **Sent as**, **Resampled**, **Why**, **Speed**, **Gap**,
-  **Last seek**, **Turntable sound**, **Turntable timing** and **Recording** - describe the device and browser Info is open on. On an admin's own phone they're that
-  phone's, not yours. For these, an admin reads Debug on your device: **You → About → Sign out**, let them
+- **Rows about the song** - **Fields from Navidrome**'s **Song fields**, **Only on other songs** and **Album
+  fields** - say the same on any device: ask an admin to look on theirs, playing the same song.
+- **Rows about the device** - the rest: **Sent as**, **Resampled**, **Why sent this way**, **Speed**, **Last song
+  change**, **Last seek**, **Turntable sound** and the rows under it, **Turntable timing** and the rows under it, and
+  **Recording** - describe the device and browser Info is open on. On an admin's own phone they're that
+  phone's, not yours. For these, an admin reads Debug on your device: **You → Account → Sign out**, let them
   sign in there and do what went wrong again (the same song, the same turn of the record), read the row,
   then sign out and sign back in as you.
 
@@ -1484,20 +1756,20 @@ Turning the record pauses the song and plays the record's own sound; letting go 
 to speed (0.4 s from still, up to about 0.8 s after a hard flick) and then starts the song again from
 there. How long that really takes, and whether the page kept up while your finger was down, is counted
 on your device: turn the record a few times, then open **•••** > **Info** > **Debug** and read
-**Turntable timing** (an admin's, and read on the device it's about - see [Info has no Debug tab](#info-has-no-debug-tab-or-it-went)).
+**Turntable timing** and the rows under it, a fact each (an admin's, and read on the device it's about - see [Info has no Debug tab](#info-has-no-debug-tab-or-it-went)).
 
 - **`The song was back N s after the last let-go`**: the whole wait from lifting your finger to the
   song's own playback moving, with how much of it was the record's run back to speed. What is left is
   your browser starting the song again after a seek - on an iPhone that can be several tenths of a
   second, and a web page can't shorten it.
-- **`N of M blocks late`** (only where the row above says the sound is "On the main thread", which is
+- **Main-thread sound: `N of M blocks late`** (only where **Voice** says the sound is "On the main thread", which is
   every page opened over plain `http://`): the record's sound is made by the same thread that draws the
   page there, and each late block is a gap or a click in it. Over `https://` (or `localhost`) the
   browser gives it a thread of its own and this can't happen. A block counts as late when it was still being written once the browser had begun to
-  play it. In blocks of 512 (the next line says which) a late block where the record's sound is heard
+  play it. In blocks of 512 (**Delay behind the hand** says which) a late block where the record's sound is heard
   moves the page to blocks of 1024 for the rest of the visit, a little later behind your hand and with
   twice the room.
-- **`The record's sound: N ms behind the hand by design`**: 121.5 ms on its
+- **Delay behind the hand: `N ms behind the hand by design`**: 121.5 ms on its
   own thread, 142.8 in blocks of 512 and 164.2 in blocks of 1024 on the main thread - then what this
   device's own audio says it adds after that: `base` (in Chrome its hardware's own render; Safari always
   says 2.7 ms, its own 128-frame step, whatever the hardware does), `output` (from there to the speaker -
@@ -1508,11 +1780,11 @@ on your device: turn the record a few times, then open **•••** > **Info** 
   and `output`); a
   Bluetooth headset is usually the biggest part of it, and no page can shorten that - wired headphones or
   the speaker can.
-- **`N frames, K late, the longest gap G ms`**: how the picture kept up while your finger held the
+- **Frames under a hand: `N frames, K late, the longest gap G ms`**: how the picture kept up while your finger held the
   record. Late frames are the page itself stalling.
-- **`let-goes after which the song didn't start`**: the browser refused to start the song without a
+- **Not restarted: `N let-goes after which the song didn't start`**: the browser refused to start the song without a
   tap, or it took more than three seconds to load. Tap play.
-- **`The sound interrupted N times`**: something else on the phone took the audio (a call, another
+- **Interruptions: `The sound was interrupted N times`** (or `once`): something else on the phone took the audio (a call, another
   app).
 
 The record's sound also stops as soon as the song is back: before, the two
@@ -1532,9 +1804,9 @@ buzz:
   back the peaks the song has between them, and the sound's filter for the deepest bass adds to them -
   about 2 to 3 dB on a loud, hard-clipped master), and the browser cuts off whatever is over. So the
   sound ends in a limiter that turns it down smoothly, 1.5 ms ahead of a peak, just enough to keep every
-  sample half a decibel under full scale, and changes nothing at all where nothing comes near it. **Info** > **Debug** > **Turntable timing** (an admin's, and read on the device it's about - see [Info has no Debug tab](#info-has-no-debug-tab-or-it-went)) says how many peaks it has held
-  since the turntable showed and the deepest it turned the sound down (`Peaks held under full scale:
-  36 since it showed (65 samples), the deepest 1.4 dB`), brought up to date a moment after you let go
+  sample half a decibel under full scale, and changes nothing at all where nothing comes near it. **Info** > **Debug** > **Limiter** (an admin's, and read on the device it's about - see [Info has no Debug tab](#info-has-no-debug-tab-or-it-went)) says how many peaks it has held
+  since the turntable showed and the deepest it turned the sound down (`36 peaks held under full scale
+  since it showed (65 samples), the deepest 1.4 dB`), brought up to date a moment after you let go
   (the sound runs an eighth of a second behind your hand, and a coast after it is counted too). A loud
   song turned down by a decibel or so on its loudest moments is the limiter doing its job; a crackle
   with that count still at none isn't it.
@@ -1544,7 +1816,7 @@ buzz:
   down. If you hear one, the test bench below tells whether it's deadwax.
 - **A slow wobble** as you turn is your hand: the pitch follows the record's speed, as on a real deck.
 - **Clicks or crackle**, rather than a wobble, on a page opened over plain `http://`: the sound is made
-  on the page's main thread there (**Info** > **Debug** > **Turntable sound** says "On the main
+  on the page's main thread there (**Info** > **Debug** > **Voice** says "On the main
   thread"), and a very busy phone can make it late. Say so if you hear it.
 - **The record feels late under your finger**: that is the eighth of a second. It can be shortened, at
   the cost of some of the steadiness.
@@ -1577,7 +1849,10 @@ anywhere by itself; send the file with your report. On a Mac, Chromium with the 
 [The turntable](player.md#the-turntable) has its own sound: turning the record
 plays the song at the speed of your hand, a flick coasts audibly, and a pause winds down. A press only takes hold of the record when it can make that sound: whenever it can't,
 turning it works as it did before - silently, the song playing on under your finger, and no momentum -
-rather than pausing the song over silence. When it's silent, **Info → Debug**'s **Turntable sound**
+rather than pausing the song over silence. When it can never sound on a song - it isn't a FLAC, or the browser has no Web
+Audio - the first turn of the record on that song says so, in a line above the song's title: **"The record makes sound
+for FLAC songs only - this one moves silently."** or **"This browser can't make the record's sound - turning it still
+moves through the song."** (until the song changes). For anything else, **Info → Debug**'s **Turntable sound**
 row (**•••** on the now-playing screen, then **Info**, then **Debug** - an admin's, and read on the device it's about: see
 [Info has no Debug tab](#info-has-no-debug-tab-or-it-went)) says why, in the order to check:
 
@@ -1615,8 +1890,8 @@ row (**•••** on the now-playing screen, then **Info**, then **Debug** - an
 
 **Opened at a plain `http://` address?** That's fine. A browser gives the
 AudioWorklet - the part that plays this sound on an audio thread of its own - only to pages on HTTPS
-or `localhost`, so over plain `http://` deadwax plays it on the page's main thread instead, and the line
-under **Turntable sound** says so: `On the main thread - this page isn't on HTTPS, so the browser has
+or `localhost`, so over plain `http://` deadwax plays it on the page's main thread instead, and the
+**Voice** row under **Turntable sound** says so: `On the main thread - this page isn't on HTTPS, so the browser has
 no AudioWorklet`. On HTTPS it says `On its own audio thread (an AudioWorklet)`.
 
 Turning the record never touches the song's own playback: if it's silent, the music still plays
@@ -1649,29 +1924,31 @@ turn plays the song at your hand's speed. What's left is by design:
   turntable shows with its sound on, even with the record standing still, so the first grab of a paused
   record after opening the screen or coming back to the app is timed as smoothly as the rest. If the
   first moments of a turn, and only those, warble, say so.
-- **Debug's line under Turntable sound** says how far your phone's audio clock moves at a time (`Its
-  clock moves 21.3 ms at a time`) - the steps the record's sound is now timed smoothly across. If the
-  sound still warbles, say what that line says, and which browser and device.
+- **Debug's Clock step row** says how far your phone's audio clock moves at a time (`21.3 ms at a
+  time`) - the steps the record's sound is now timed smoothly across. If the sound still warbles, say what
+  that row says, and which browser and device.
 
-## The visualizer doesn't move with the music, or says a song can't be seen
+## The visualizer doesn't move with the music, or says it can't follow a song
 
 [The visualizer](player.md#the-visualizer) (the five bars at the right of the desktop's player bar)
 measures its own silent copy of the stretch of the song playing - never the song you hear - and when
 it can't, it runs the effects from a calm, slow idle pattern and says why in a plain note at the
-bottom right of the screen (move the pointer, or click or tap, if the controls have faded):
+bottom right of the screen (move the pointer, or click or tap, if the controls have faded). For an admin, or
+anyone given Settings and the log, the reason's own words follow it in brackets:
 
-- **"This song can't be seen - it isn't a FLAC file."** Only FLAC songs have that copy, as only they
+- **"The visualizer follows FLAC songs only - it rests for this one."** Only FLAC songs have that copy, as only they
   have the turntable's sound. An MP3, AAC or any other song always shows the idle pattern.
-- **"This song can't be seen just now - deadwax couldn't send its sound."** deadwax cuts the copy
+- **"The visualizer has lost the music for now - it keeps trying."** (`deadwax couldn't send its sound`) deadwax cuts the copy
   from the copy of the song the player's cache keeps, or - when the page plays the FLAC as it is -
   straight from the FLAC on Navidrome, and couldn't just then: Navidrome not answering or breaking
   off, or a copy that had to be made and couldn't - the cache unusable or its disk short of space (see
   [A song seeks to the wrong place](#a-song-seeks-to-the-wrong-place), which covers the cache). It
   tries again after ten seconds by itself.
-- **"This song can't be seen - …"** with deadwax's own words after the dash (a song deadwax won't cut
-  a stretch from - a file cut short, say) or **"this browser couldn't read its sound"**: that song stays
-  unseen until you leave the visualizer and open it again; other songs are unaffected.
-- **"This browser can't analyse sound, so the song can't be seen."** The browser has no Web Audio, or
+- **"The visualizer can't follow this song - it rests for this one."** deadwax won't cut that song a stretch (its own
+  words in the brackets - a file cut short, say) or the browser couldn't read it (`this browser couldn't read its
+  sound`): that song stays on the idle pattern until you leave the visualizer and open it again; other songs are
+  unaffected.
+- **"This browser can't follow the music, so the visualizer can't move with it."** The browser has no Web Audio, or
   wouldn't make it - every song shows the idle pattern there.
 
 **It moves, but a moment late after a seek, after opening it, or on a song you skipped to**: the
@@ -1691,35 +1968,37 @@ deadwax reads each stretch the visualizer shows straight out of the FLAC on Navi
 time, and keeps nothing of it in the player's cache. Where it can't, deadwax's log says so once for each song - `a window of song … can't be cut
 straight from its FLAC - …` - and that song's stretches are cut from a copy made in the cache, as
 before (when the cache itself can't be used, the line ends `its windows can't be had` instead, and
-the visualizer says the song can't be seen just now). The words after the dash say why: a FLAC laid
+the visualizer says it has lost the music). The words after the dash say why: a FLAC laid
 out unusually (dozens of large pictures in front of its audio, say, or a seek table that points at
 the wrong places), or something in front of Navidrome - a proxy - answering a request for part of a
 file with another part, or with more than was asked for, or with the whole file once the request is
 longer than a few bytes. (Words beginning `reading it went wrong` are a fault in deadwax itself, not
 in the file - worth reporting, with the line; the stretches still come from the copy.) A proxy should
 pass those requests on to Navidrome as they are. One that ignores every request for part of a file
-shows differently, and in more places: every FLAC song's visualizer says **"This song can't be seen -
-Navidrome didn't answer a range of the file"**, the phone's turntable is silent, Safari and iPhones
+shows differently, and in more places: every FLAC song's visualizer says **"The visualizer can't follow this song"**
+(with `Navidrome didn't answer a range of the file` in the brackets, for an admin), the phone's turntable is silent, Safari and iPhones
 are sent FLAC songs as they are (so their seeks land off again), and the gapless stream plays each
 song the ordinary way - nothing is made in the cache at all. The fix is the same.
 
-**The feel doesn't seem to match the music**: it is read from the copy over the last few seconds, so
-it settles a few seconds into a song and drifts as the song changes (it starts at "in between"). It is tuned on real music: calm music reads **smooth**, metal and other music with
-distorted guitars and cymbals filling its top end **aggressive**, and funk and other grooving music
-mostly **in between**. A sparse, clean guitar piece can read smooth, and a heavy track **in between**
+**The mood doesn't seem to match the music** (the **Mood:** line under the Style button, on a window 1280 pixels
+wide or more): it is read from the copy over the last few seconds, so
+it settles a few seconds into a song and drifts as the song changes (it starts at **lively**, `listening for the
+tempo`). It is tuned on real music: calm music reads **calm**, metal and other music with
+distorted guitars and cymbals filling its top end **intense**, and funk and other grooving music
+mostly **lively**. A sparse, clean guitar piece can read calm, and a heavy track **lively**
 when it has little top end (few cymbals, little distortion above about 2 kHz) or few, sparse beats.
 How loud the record was mastered hardly matters, and neither does a 120 Hz screen; a very quiet record
-can read a little smoother and a very loud one a little more aggressive. A screen drawing fewer than 60
+can read a little calmer and a very loud one a little more intense. A screen drawing fewer than 60
 frames a second does matter: the feel reads the music less often and misses some of its onsets, and at
 30 - which a battery saver can bring (Chrome's Energy Saver halves a page's frame rate) - about a third
-of them, so heavy music can read **in between** and grooving music **smooth**. On a laptop on battery,
+of them, so heavy music can read **lively** and grooving music **calm**. On a laptop on battery,
 turning the battery saver off (or plugging in) brings it back. Only the Mandala's shapes follow the
-feel; every style follows the tempo.
+mood; every style follows the tempo.
 
 **The colours aren't the cover's**: until the cover has loaded, and for an album with no cover, **From
 the cover** uses the purple. A black-and-white cover gives grey - that is its colour.
 
-**"WebGL isn't available here, so Ambient is showing the simple version."** Your browser has no WebGL,
+**"This browser can't draw the full Ambient effect, so a simpler version is showing."** Your browser has no WebGL,
 or has it turned off (some do when the graphics driver is blocked): Ambient shows its plain version;
 Bars, Scope and Halo don't need WebGL.
 
@@ -1728,12 +2007,12 @@ the window instead, and works the same.
 
 ## With Gapless on, there's still a pause between songs, or the player reloads by itself
 
-[Gapless](player.md#gapless-playback-experimental) (in **You**, under **Playback**) is an
-experiment, and **Info → Debug** (**•••** on the now-playing screen, then **Info**, then **Debug** - an
-admin's, and read on the device it's about: see [Info has no Debug tab](#info-has-no-debug-tab-or-it-went)) says how each song change went, in its **Gap** row. Compare it with Gapless off on the same phone
+[Gapless](player.md#gapless-playback) (in **You**, under **Playback**) depends on the
+device and the connection, and **Info → Debug** (**•••** on the now-playing screen, then **Info**, then **Debug** - an
+admin's, and read on the device it's about: see [Info has no Debug tab](#info-has-no-debug-tab-or-it-went)) says how each song change went, in its **Last song change** row. Compare it with Gapless off on the same phone
 and connection: the difference is what Gapless saves.
 
-FLAC songs are meant to play [in one stream](player.md#one-stream-for-flac), the Gap row reading
+FLAC songs are meant to play [in one stream](player.md#one-stream-for-flac), the Last song change row reading
 `0 ms, in one stream`:
 
 - **`in one stream` with a number above 0**: the stream had to wait for the next song's audio. The
@@ -1824,7 +2103,8 @@ from the next thing you play): every song is then sent bit for bit as it was.
 
 With [Normalization](player.md#normalization) on, the first time deadwax levels an album it downloads and
 measures every FLAC song of it before the first one plays - a few seconds for a CD album, longer on a NAS
-or for hi-res. Info's **Normalization** row (in About's **Playing**, and in Debug) says `Measuring its album… (7 of 12 songs)` meanwhile.
+or for hi-res. Info's **Normalization** row says `Measuring the album… (7 of 12 songs)` meanwhile in About's **Sound**
+(`Measuring its album… (7 of 12 songs)` in Debug).
 It happens once an album: the measurements are kept in deadwax's database, and a download deadwax files
 is measured as it's filed. Opening the album's page before you tap Play starts the measuring early; a play
 from Search, Requests or an artist's **Play** starts it as you tap, so the first play of an album from there
@@ -1836,9 +2116,9 @@ waits are for songs you've played before, the player's cache is too small to kee
 
 Only FLAC songs are levelled by [Normalization](player.md#normalization) - and not every FLAC: a 20- or
 32-bit one, one with more than two channels, and every song while the player's cache can't be used play as
-they are too (Info's **Normalization** row says which). Re-encoding an MP3, AAC or Opus
-file to level it would cost quality, so they play as they are. Info's **Normalization** row (in About's **Playing**, and in Debug) says
-`Not levelled - MP3 songs play as they are`.
+they are too (Info → Debug's **Normalization** row says which; About's says `Off for this song - …`). Re-encoding an MP3, AAC or Opus
+file to level it would cost quality, so they play as they are. Info's **Normalization** row says `Off for this song -
+only FLAC songs are adjusted` in About's **Sound** (`Not levelled - MP3 songs play as they are` in Debug).
 
 ## A box set's first song was louder or quieter than the rest
 
@@ -1846,8 +2126,8 @@ The first time deadwax levels a big album, measuring all of it can take longer t
 is held for (20 for a hi-res song): that first song then plays as it is, that once - and any other song of
 the album that comes up while it's still being measured plays as it is too, straight away rather than after
 a wait of its own. The rest play at the album's level once the measuring is done (it carries on regardless).
-Info's **Normalization** row (in About's **Playing**, and in Debug) says `Played as it is this time - its album was still being measured`
-for such a song, and deadwax's log says `plays as it is this time - its album is still being measured`. Play
+Info's **Normalization** row says `Not this time - the album was still being measured` in About's **Sound**
+(`Played as it is this time - its album was still being measured` in Debug) for such a song, and deadwax's log says `plays as it is this time - its album is still being measured`. Play
 the album again and every song is at the album's level.
 
 ## With Normalization on, songs are skipped one after another

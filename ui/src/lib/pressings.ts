@@ -194,7 +194,7 @@ export function filterPressings(rows: readonly PressingRow[], typed: string): Pr
   const words = foldText(typed).split(' ').filter(Boolean)
   if (!words.length) return [...rows]
   return rows.filter((row) => {
-    const text = foldText([row.label, row.facts, row.note, row.held ? (row.inStore ? 'in the store' : 'in your library') : ''].join(' '))
+    const text = foldText([row.label, row.facts, row.note, row.held ? (row.inStore ? 'in the collection' : 'in your library') : ''].join(' '))
     const closed = text.replace(/ /g, '')
     return words.every((word) => text.includes(word) || closed.includes(word))
   })
@@ -219,8 +219,8 @@ export function differs(diff: TracklistDiff): boolean {
 }
 
 function pressingNote(kind: PressingKind, diff: TracklistDiff | null, isDefault: boolean, base: Base | null): string {
-  if (kind === 'none') return 'No tracklist on MusicBrainz'
-  if (!base || !diff) return 'The only tracklist MusicBrainz has'
+  if (kind === 'none') return 'No tracklist listed'
+  if (!base || !diff) return 'The only tracklist listed'
   if (kind === 'usual') return isDefault ? `The usual tracklist · ${sharedBy(base)}` : 'Same tracklist as the usual one'
   const parts: string[] = []
   if (diff.added.length) parts.push(`+${plural(diff.added.length, 'bonus track')}: ${names(diff.added.map((t) => t.title))}`)
@@ -325,9 +325,9 @@ export function pressingsView(
 export function summaryLine(view: PressingsView, releaseCount: number): { text: string; differs: boolean } {
   const row = [...view.shown, ...view.more].find((candidate) => candidate.id === view.chosenId)
   if (!row) return { text: '', differs: false }
-  if (row.kind === 'none') return { text: 'MusicBrainz lists no tracks for this pressing', differs: false }
+  if (row.kind === 'none') return { text: 'No tracks are listed for this pressing', differs: false }
   if (!view.base) {
-    return { text: releaseCount === 1 ? 'The only pressing MusicBrainz lists' : 'The only pressing with a tracklist on MusicBrainz', differs: false }
+    return { text: releaseCount === 1 ? 'The only pressing' : 'The only pressing with a tracklist', differs: false }
   }
   if (row.kind === 'usual') {
     return { text: row.isDefault ? `The usual tracklist, ${sharedBy(view.base)}` : 'Same tracklist as the usual one', differs: false }

@@ -20,6 +20,9 @@ export interface NavidromeStatus {
   /** "Navidrome 0.55.2" */
   server: string | null
   problem: string | null
+  /** (2.0.4) never the route's: set by lib/navidromeCheck.ts when deadwax ITSELF didn't answer the ask (fetch's
+   *  TypeError) - Navidrome may be fine, and a listener is told to check their connection, not the music server */
+  offline?: boolean
 }
 
 export interface Album {

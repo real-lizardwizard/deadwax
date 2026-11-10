@@ -66,7 +66,7 @@ export function AddPerson({ onMade, onLocked }: { onMade: () => void; onLocked: 
       }}
     >
       <h2 id="app-people-add-title" class="app-people-title">Add a person</h2>
-      <p class="app-people-line">A new Navidrome account, made ordinary - making someone an admin is its own step.</p>
+      <p class="app-people-line">Makes a Navidrome account for an ordinary listener. You can make them an admin afterwards.</p>
       <label class="app-people-field">
         <span class="app-people-label">User name</span>
         <input class="app-people-input" type="text" name="new-user" value={form.user} maxLength={NAME_MAX + 8} autoComplete="off"

@@ -269,16 +269,18 @@ def plan_retag(album_path: str, release: dict, library_root: str, want_art: bool
 
     unmatched = [c["filename"] for c in changes if not c["matched"]]
     if unmatched:
+        #? (2.0.8, UX batch 5) "1 file", "2 files" - never "file(s)" - and a sentence; the editor draws every
+        #? problem as one (MetadataEditor's asSentence)
         problems.append(
-            f"{len(unmatched)} file(s) didn't match the tracklist and will keep their "
-            f"existing title and track number"
+            f"{len(unmatched)} {'file' if len(unmatched) == 1 else 'files'} didn't match the tracklist and "
+            f"will keep {'its' if len(unmatched) == 1 else 'their'} existing title and track number"
         )
 
     expected = len(release.get("tracks") or [])
     if expected and expected != len(audio_files):
         problems.append(
-            f"this release has {expected} track(s) but the folder has {len(audio_files)} - "
-            f"check it's the right edition"
+            f"this release has {expected} {'track' if expected == 1 else 'tracks'} but the folder has "
+            f"{len(audio_files)} - check it's the right edition"
         )
 
     target, move_problem, existing = _resolve_target(root, source, release)
@@ -424,7 +426,7 @@ def _plan_merge(existing: Path, entries: list[Path], audio_files: list[Path], re
     clashes = [p.name for p in audio_files if p.name in names_there]
     if clashes:
         return {"ok": False,
-                "problem": f"{refused} - {len(clashes)} file name(s) here are already taken there "
+                "problem": f"{refused} - {len(clashes)} file {'name here is' if len(clashes) == 1 else 'names here are'} already taken there "
                            f"({', '.join(clashes[:3])})",
                 "detail": None}
 

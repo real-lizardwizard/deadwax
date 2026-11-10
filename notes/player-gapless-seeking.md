@@ -14,7 +14,7 @@ first-load cost. It is the one-element design's own cost: on `ended` the element
 and Safari asks for bytes 0-1 and then the rest - two round trips over WireGuard, through deadwax to
 Navidrome - before AVFoundation starts from nothing. A research pass read WebKit's source (main, and
 the Safari 17.4/18/18.5 branches) for what iOS allows, and the switch is built on what it found. The
-guide's section is `docs/player.md#gapless-playback-experimental`.
+guide's section is `docs/player.md#gapless-playback`.
 
 - **Off by default, and off is the old player exactly.** `deadwax-player-gapless` ('on' or 'off',
   `readPlayerGapless` in persisted.ts) is the player's own, like its order: a home-screen app keeps

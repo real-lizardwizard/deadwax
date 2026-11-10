@@ -9,6 +9,7 @@ import { NewPlaylistForm } from './NewPlaylistForm'
 import { askPlaylists, announcePlaylistChanged, usePlaylists } from './usePlaylists'
 import { sayPins } from './usePins'
 import { useSheet } from './useSheet'
+import { sayError } from './sayError'
 
 /** Some of the songs are in the playlist already: the question, in place of the list. */
 interface Question {
@@ -120,10 +121,11 @@ export function PlaylistPicker({
       (caught: unknown) => {
         writing.current = false
         setAdding(null)
-        const why = caught instanceof Error ? caught.message : String(caught)
+        //? (2.0.4) in a listener's words (sayError)
+        const why = sayError(caught)
         if (caught instanceof ApiError && caught.status === 404) askPlaylists({ fresh: true })
         if (showing.current !== key) {
-          sayPins(`Couldn't add to ${playlist.name}: ${why}`)
+          sayPins(`Couldn't add to ${playlist.name}. ${why}`)
           return
         }
         if (fromQuestion) backToList.current = true
@@ -206,7 +208,7 @@ export function PlaylistPicker({
               <span class="app-playlist-pick-art is-new" aria-hidden="true">
                 <PlaylistAddIcon class="app-playlist-art-icon" />
               </span>
-              <span class="app-playlist-pick-name">New playlist…</span>
+              <span class="app-playlist-pick-name" dir="auto">New playlist…</span>
             </button>
             {rows.map((playlist) => (
               <button
@@ -220,7 +222,7 @@ export function PlaylistPicker({
                   {playlist.coverArt ? <Cover id={playlist.coverArt} size={80} class="app-playlist-pick-cover" /> : <PlaylistIcon class="app-playlist-art-icon" />}
                 </span>
                 <span class="app-playlist-pick-text">
-                  <span class="app-playlist-pick-name">{playlist.name}</span>
+                  <span class="app-playlist-pick-name" dir="auto">{playlist.name}</span>
                   <span class="app-playlist-pick-line">{adding?.id === playlist.id ? 'Adding…' : songCount(playlist.songCount)}</span>
                 </span>
               </button>

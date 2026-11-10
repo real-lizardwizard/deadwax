@@ -24,13 +24,13 @@
  * folders tagged with its group or release ids) and opened as the Navidrome album holding one of
  * those releases - in idBridge.ts's heldInOrder: its plain edition first, then its oldest; a
  * Navidrome album no folder ties to a group is claimed by a group of its exact title, the only one
- * of that title. In order of year, oldest first, the undated last; then by title.
+ * of that title. In order of year, newest first (2.0.12; it was oldest first), the undated last; then by title.
  *
  * Albums Navidrome has that no MusicBrainz row claims - every one of them while MusicBrainz hasn't
  * answered, or can't - are ONE row per album the library's folders say they are (their release
  * group), keyed as MusicBrainz's row for it would be (`group:<id>`): so its answer landing neither
  * splits Dummy's two pressings into two rows nor changes a row's key under a finger (review), and
- * Play never plays both. "2 editions" counts the releases held, not the folders: a set kept one
+ * Play never plays both. "2 pressings" counts the releases held, not the folders: a set kept one
  * folder per disc, or a FLAC and an MP3 of one release, is one.
  *
  * Until /library/owned has answered (`index` null), a row only Navidrome claims is "in your library";
@@ -181,7 +181,7 @@ export interface ArtistRow {
   /** (2.0.0-player.52) held, and yours: a folder of it in your library, or an album of it you starred - with
    *  logins on and a library of your own, a held row not yours says "in the store" (rowLine) */
   yours?: boolean
-  /** how many releases of it the library holds: "2 editions" past one */
+  /** how many releases of it the library holds: "2 pressings" past one */
   editions: number
   /** the releases the library holds of it - what the id bridge asks Navidrome about when the row
    *  has no album id */
@@ -317,14 +317,15 @@ export function artistRows(
     })
   }
 
+  //? (2.0.12, James: "on the artists page let's sort newest to oldest") the newest year first, the undated still last
   return rows.sort((a, b) =>
     (a.year === null ? 1 : 0) - (b.year === null ? 1 : 0)
-    || (a.year ?? '').localeCompare(b.year ?? '')
+    || (b.year ?? '').localeCompare(a.year ?? '')
     || foldName(a.title).localeCompare(foldName(b.title))
     || a.key.localeCompare(b.key))
 }
 
-/** A row's second line, the board's: "1994 · in your library · 2 editions", "2008 · not in your
+/** A row's second line, the board's: "1994 · in your library · 2 pressings", "2008 · not in your
  *  library", "1998 · Live album · not in your library" - and neither while the library hasn't said.
  *  `personal` (2.0.0-player.52): a held row not yours says "in the store" (lib/whose.ts). */
 export function rowLine(row: Pick<ArtistRow, 'year' | 'held' | 'editions' | 'kind' | 'yours'>, personal = false): string {
@@ -332,7 +333,8 @@ export function rowLine(row: Pick<ArtistRow, 'year' | 'held' | 'editions' | 'kin
     row.year,
     row.kind,
     row.held === null ? null : row.held ? heldPhrase(personal, row.yours) : 'not in your library',
-    row.held && row.editions > 1 ? `${row.editions} editions` : null,
+    //? (2.0.6, UX batch 3) "pressings", the app's one word for them (it said "2 editions")
+    row.held && row.editions > 1 ? `${row.editions} pressings` : null,
   ].filter(Boolean).join(' · ')
 }
 
@@ -351,12 +353,13 @@ export function playsLine(
 ): string {
   //? (2.0.0-player.52) with a library of your own, Play plays their albums in the store - Navidrome's, whoever asks
   const had = personal ? IN_THE_STORE : 'you have'
-  if (!albums) return library === 'asking' ? `Looking for their albums ${personal ? IN_THE_STORE : IN_YOUR_LIBRARY}…` : library === 'done' ? 'Navidrome has none of their albums to play' : ''
+  //? (2.0.5, UX batch 2) what the listener sees - none to play, songs that didn't load - never Navidrome by name
+  if (!albums) return library === 'asking' ? `Looking for their albums ${personal ? IN_THE_STORE : IN_YOUR_LIBRARY}…` : library === 'done' ? 'None of their albums are here to play.' : ''
   const all = albums === 1 ? `Plays the album ${had}` : `Plays the ${albums} albums ${had}`
   if (!settled) return `Getting the songs of the ${albums === 1 ? 'album' : `${albums} albums`} ${had}…`
   if (inHand >= albums) return all
-  if (!inHand) return "Navidrome didn't send the songs"
-  return `Plays ${inHand} of the ${albums} albums ${had} - Navidrome didn't send the rest`
+  if (!inHand) return "Couldn't load their songs."
+  return `Plays ${inHand} of the ${albums} albums ${had} - the rest didn't load`
 }
 
 /** Who they are, in a line: "Group · Bristol · since 1991", "Group · London · 1965 to 2014". */
@@ -388,7 +391,8 @@ export function inTurns<T>(items: readonly T[], limit: number, start: (item: T) 
  *  "in the store" for a count of the store's, with a library of your own (lib/whose.ts storeCountPlace). */
 export function albumCountLine(count: number | null | undefined, place = 'in your library'): string {
   const albums = count ?? 0
-  return albums > 0 ? `${albums} ${albums === 1 ? 'album' : 'albums'} ${place}` : ''
+  //? (2.0.5) '' for no place: a row inside your own library says the count alone (app/LibraryViews.tsx ArtistRow)
+  return albums > 0 ? `${albums} ${albums === 1 ? 'album' : 'albums'}${place ? ` ${place}` : ''}` : ''
 }
 
 /**

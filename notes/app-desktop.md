@@ -137,10 +137,13 @@ later; "Managing links to / for now".
   6px). theme.css section 10 gains the frame's surfaces (`--dw-sidebar`, `--dw-side-panel`,
   `--dw-player-bar`, `--dw-frame-border`, `--dw-row-border`, Explorer's `--dw-selection-*`,
   `--dw-selected-text`) and, in its own `@media (min-width: 1024px)` `:root`, the desktop's values
-  for the look's tokens: labels 11px, headings 13px, data 12px, titles 28/30px, the album's artist
-  18px, cards #1e1c26 on #0b0a10, the pressing list a desktop list. **`--dw-text-body` is NOT
-  redefined**: text fields read it, and an iPad on its side is a desktop where iOS zooms into a field
-  under 16px - the sidebar's field takes the board's 13px only for a fine pointer.
+  for the look's tokens: titles 28/30px, the album's artist 18px, cards #1e1c26 on #0b0a10, the
+  pressing list a desktop list - and the type scale, which since 2.0.9 is the frame's whole scale:
+  body 14px, headings, meta and data 13px, labels 12px, the brand 20px (until 2.0.9 labels were 11px,
+  data 12px and body 17px). **Text fields read `--dw-text-field` (17px), which is NEVER redefined**:
+  an iPad on its side is a desktop where iOS zooms into a field under 16px, so a field reading
+  `--dw-text-body` would now be 14px - the sidebar's field takes the board's 13px only for a fine
+  pointer. See "Fonts and type (2.0.9)" in notes/interface.md.
   **A coarse pointer gets a finger's targets** (the review: the board's 16px scrubber sat 6px under a
   22px Previous on an iPad): in `@media (min-width: 1024px) and (pointer: coarse)` the scrubber, play,
   the transport's boxes, the bar's tools, the sidebar's items, the rows, Get and the pressing, a

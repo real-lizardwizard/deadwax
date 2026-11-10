@@ -166,7 +166,7 @@ function getChip(row: Row, context: RowContext) {
         aria-disabled={asking}
         onClick={(event) => context.onGetGroup(row.group, event)}
       >
-        {asking ? 'Get…' : 'Get'}
+        {asking ? 'Getting…' : 'Get'}
       </button>
     )
   }
@@ -185,7 +185,7 @@ function getChip(row: Row, context: RowContext) {
       aria-disabled={asking}
       onClick={(event) => context.onGetSong(pair.song, pair.album, event)}
     >
-      {asking ? 'Get…' : 'Get'}
+      {asking ? 'Getting…' : 'Get'}
     </button>
   )
 }
@@ -244,11 +244,14 @@ export function topRow(row: Row, context: RowContext, tile: boolean) {
     >
       {cover(row, context, tile ? 112 : 96)}
       <span class="app-result-text">
-        <span class="app-result-title">{title(row)}</span>
+        <span class="app-result-title" dir="auto">{title(row)}</span>
         {tile ? (
           <>
             <span class="app-result-line">{line}</span>
-            <span class="app-result-line app-top-place">{placeLabel(row, context.marks, context.evidence)}</span>
+            {/* (2.0.6, review) beside a Get a tile's text has ~60px: "Not in your library" was cut to "Not in y…".
+                The Get already says it isn't here, so a tile with one leaves its third line empty (its height kept);
+                the section row below, and the album's page, say "maybe" where a folder may hold it */}
+            <span class="app-result-line app-top-place">{get ? '' : placeLabel(row, context.marks, context.evidence)}</span>
           </>
         ) : (
           <span class="app-result-line app-result-split">
@@ -300,7 +303,7 @@ function songDisclosure(row: Extract<Row, { type: 'mb-song' }>, context: RowCont
           onClick={() => context.onOpenSongAlbum(song, album)}>
           <ArchiveCover addresses={coverAddresses(null, album.id, 250)} class="app-result-cover" />
           <span class="app-result-text">
-            <span class="app-result-title">{album.title}</span>
+            <span class="app-result-title" dir="auto">{album.title}</span>
             <span class="app-result-line">{songAlbumLine(album, song, context.index, context.personal, context.evidence)}</span>
           </span>
         </button>
@@ -313,7 +316,7 @@ function songDisclosure(row: Extract<Row, { type: 'mb-song' }>, context: RowCont
         <button type="button" class="app-result app-song-row" data-row={row.key} aria-expanded={open} aria-controls={id} onClick={() => context.onToggleSong(song.key)}>
           {cover(row, context, 96)}
           <span class="app-result-text">
-            <span class="app-result-title">{song.title}</span>
+            <span class="app-result-title" dir="auto">{song.title}</span>
             <span class="app-result-line app-result-split">
               <span class="app-result-facts">{line}</span>
               {place ? <span class="app-result-place">{`${line ? ' · ' : ''}${place}`}</span> : null}
@@ -367,7 +370,7 @@ export function sectionRow(row: Row, context: RowContext, index: number) {
       >
         {cover(row, context, 96)}
         <span class="app-result-text">
-          <span class="app-result-title">{title(row)}</span>
+          <span class="app-result-title" dir="auto">{title(row)}</span>
           {line || place ? (
             <span class="app-result-line app-result-split">
               <span class="app-result-facts">{line}</span>
@@ -414,7 +417,7 @@ export function slot(state: SlotState, key: string) {
         <div key={key} class="app-search-slot">
           <div class="app-asking">
             <span class="app-sweep" aria-hidden="true" />
-            <span class="app-asking-text">{state.words ?? 'Asking MusicBrainz…'}</span>
+            <span class="app-asking-text">{state.words ?? 'Searching…'}</span>
           </div>
         </div>
       )

@@ -3,41 +3,14 @@ services:
     image: ghcr.io/real-lizardwizard/deadwax:latest  # the newest release; :2.0.0 pins one exactly; :experimental is main, rebuilt on every push
     container_name: deadwax
     restart: unless-stopped
-    env_file:  # .env beside this file - the place for secrets (slskd's key, Navidrome's password, the logins' key); see .env.example
-      - .env  # delete these two lines if you configure everything below instead: compose refuses a missing env_file
-    environment:  # a setting here beats the same one in .env; write literal values, never ${VAR}; every setting is in docs/configuration.md
-      - SLSKD_DOWNLOAD_PATH=/downloads  # fixed: the container's side of the downloads mount below
-      - LIBRARY_PATH=/music  # fixed: the container's side of the music mount below
-      - DB_PATH=/config/deadwax.db  # fixed: inside the config mount below
-      #- SLSKD_INCOMPLETE_PATH=/incomplete  # slskd's incomplete folder (mount it below): a cancel also deletes its partial file, and slskd's empty folders are cleared
-      #- PLAYER_CACHE_PATH=/cache  # where the player keeps the copies it makes (Safari's MP4s, levelled songs); a fast disk, mounted below; only a cache
-      #- PLAYER_CACHE_MB=1024  # the most the player cache holds, 64 to 1048576; the songs played longest ago go first
-      #- MUSICBRAINZ_CACHE_PATH=/cache  # the folder for MusicBrainz's saved answers (musicbrainz-cache.db); default beside the database in /config; only a cache
-      #- MUSICBRAINZ_CACHE_MB=200  # the most it holds, 0 to 1048576 (200 is about 1,100 artists explored); 0 turns saving off
-      #- SLSKD_URL=http://slskd:5030  # slskd as THIS CONTAINER reaches it (another container: its service name and internal port), with the scheme
-      #- SLSKD_APIKEY=your-slskd-api-key  # better kept in .env
-      #- MUSICBRAINZ_EMAIL=you@example.com  # your contact address, which MusicBrainz asks every app for
-      #- COVER_ART_SIZE=500  # 250 | 500 | 1200 | full - the size of cover deadwax saves; full is the original upload
-      #- FETCH_LYRICS=on  # on | off - lyrics from LRCLIB as a .lrc beside each track as it is filed; never replaces one
-      #- LYRICS_LEAD_MS=0  # milliseconds to move synced lyrics earlier (negative: later); try 300 if lines land late
-      #- COUNTRY_IN_FOLDER=off  # on | off - a regional pressing's folder named by its country: Dummy (1994) [GB]
-      #- ALBUM_FOLDER_TEMPLATE={album} ({year}) [{edition}]  # how an album folder is named; the artist folder above it is always the artist
-      #- AUTO_RETRY_PEER=off  # on | off - a failed download moves to the next peer by itself
-      #- SLSKD_SEARCH_TIMEOUT=8  # seconds each Soulseek search listens for answers, 3 to 60
-      #- RETAG_RENAME_WAIT=20  # seconds between new tags and a folder rename, so Navidrome keeps plays and favourites; with Navidrome set, it asks instead
-      #- NAVIDROME_URL=http://navidrome:4533  # NEEDED for the library and the player; Navidrome as this container reaches it, plus its base path if any
-      #- NAVIDROME_USER=your-navidrome-user  # an ordinary account is enough; Navidrome must read the same folder mounted at /music
-      #- NAVIDROME_PASSWORD=your-navidrome-password  # better kept in .env
-      #- TRUSTED_ORIGINS=https://music.example.com  # only behind a proxy that rewrites the Host header: the address you open deadwax at
-      #- AUTH_MODE=on  # logins with Navidrome accounts; needs ORGANIZE_MODE copy or move and DEADWAX_SECRET_KEY in .env (never here: an empty line here beats .env)
-      #- ORGANIZE_MODE=dry_run  # off | dry_run | copy | move - starts at dry_run; check the event log before switching to copy or move
-      #- PUID=1000  # match slskd and your other containers, so files end up consistently owned
-      #- PGID=1000
+    env_file:  # .env beside this file, for slskd's key, Navidrome's password, PUID/PGID and logins - start from .env.example
+      - path: .env  # every variable: docs/configuration.md#environment-variables
+        required: false  # no .env, or an empty one, is fine; this form needs Docker Compose 2.24 or newer
     volumes:
       - /path/to/slskd/downloads:/downloads  # the SAME folder slskd writes its finished downloads to - the likeliest first-run problem if not
-      #- /path/to/slskd/incomplete:/incomplete  # only with SLSKD_INCOMPLETE_PATH: slskd's directories.incomplete folder
-      - /path/to/music:/music  # where organized albums are filed
-      - /path/to/deadwax/config:/config  # the database, and MusicBrainz's saved answers unless MUSICBRAINZ_CACHE_PATH points elsewhere
-      #- /path/to/fast/disk/deadwax-cache:/cache  # only with PLAYER_CACHE_PATH or MUSICBRAINZ_CACHE_PATH (one mount holds both); writable by PUID/PGID; leave out of backups
+      #- /path/to/slskd/incomplete:/incomplete  # optional, slskd's incomplete folder: then set SLSKD_INCOMPLETE_PATH to /incomplete in Server settings (Library)
+      - /path/to/music:/music  # your library, where organized albums are filed - the folder Navidrome reads too
+      - /path/to/deadwax/config:/config  # the database (settings saved in the app included) and MusicBrainz's saved answers
+      #- /path/to/fast/disk/deadwax-cache:/cache  # optional, an SSD for the caches: then set PLAYER_CACHE_PATH (Library) and MUSICBRAINZ_CACHE_PATH (Connections) to /cache in Server settings; writable by PUID/PGID; leave out of backups
     ports:
-      - "8080:8080"  # change the left side to expose another port on the host
+      - "8080:8080"  # change the left side to expose another port on the host; then open http://<host>:8080 and set the rest in Server settings

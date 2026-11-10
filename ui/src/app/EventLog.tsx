@@ -17,6 +17,7 @@ import {
 import { MANAGING_ADMINS_ONLY } from '../lib/appRoutes'
 import { isAbort, latestOnly } from '../lib/latest'
 import { ChevronLeftIcon } from '../player/icons'
+import { sayError } from './sayError'
 
 /** The page's lines, beyond its own life - one page's worth, shared by every copy mounted (an address
  *  can put it on another tab too; only the copy that shows ever listens). */
@@ -156,7 +157,7 @@ export function EventLog({
           if (!ticket.current() || closed || isAbort(reason)) return
           //? the history couldn't be had: the stream still says what happens from now (and the next
           //? history read fills in what it would have)
-          setHistoryFailed(reason instanceof Error ? reason.message : String(reason))
+          setHistoryFailed(sayError(reason, '', { failed: "Couldn't load the lines deadwax kept - what happens from now still shows.", retry: true }))
           open()
         },
       )
@@ -181,7 +182,7 @@ export function EventLog({
         </button>
       </header>
       <header class="pl-large-header">
-        <h1 class="pl-large-title">Log</h1>
+        <h1 class="pl-large-title">Event log</h1>
       </header>
     </>
   )
@@ -220,11 +221,11 @@ export function EventLog({
         <p class="app-log-line">
           What deadwax has said since it started - the last 500 lines - newest first. Clear empties this view only.
         </p>
-        {historyFailed && <p class="app-log-problem">deadwax couldn't send the lines it kept: {historyFailed}</p>}
+        {historyFailed && <p class="app-log-problem">{historyFailed}</p>}
         {!log.lines.length ? (
           <p class="app-log-empty">{log.cleared ? EMPTY_WORDS.cleared : EMPTY_WORDS.never}</p>
         ) : (
-          <ol class="app-log-list" aria-label="Log, newest first">
+          <ol class="app-log-list" aria-label="Event log, newest first">
             {log.lines.map((line, index) => {
               const level = levelOf(line.event_type)
               return (

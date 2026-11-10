@@ -17,7 +17,11 @@
  *    unlabelled group cut the same way - and which of them a new list draws before the page says what is near the
  *    view (blocksNear);
  *  - keys made once per album: foldName counted through a stand-in, at most 2 x 3,000 calls for a sort and its groups;
- *  - a sort read from storage: the four old ids kept, anything else the default (Artist); the artists' order likewise.
+ *  - a sort read from storage: the four old ids kept, anything else the default (Artist); the artists' order likewise;
+ *  - (2.0.11) Recently added over YOUR albums by when you added each (`starred`), the stars SAME_MOMENT_MS apart one
+ *    moment in the collection's order then the star's (the first admin's seed), its month headers the moment's - the whole
+ *    list's, whatever Find leaves; the collection's by
+ *    `created` even where some albums carry a star.
  *
  * Run it with:  node ui/test/shelves.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
  */
@@ -97,6 +101,79 @@ console.log('\nthe headers each sort groups by')
   check('a month from UTC, never the device\'s zone or language', [S.monthLabel('2026-10-31T23:30:00-05:00'), S.monthLabel('2026-01-01T00:00:00Z'), S.monthLabel(''), S.monthLabel(undefined), S.monthLabel(1729000000.5)],
     ['November 2026', 'January 2026', 'Date unknown', 'Date unknown', 'Date unknown'])
   check('initials: a-z a capital, anything else `#`', ['beatles', 'zz', '10cc', '', 'ß', '坂本'].map(S.initialOf), ['B', 'Z', '#', '#', '#', '#'])
+}
+
+console.log('\nRecently added over YOUR albums: when you added each (2.0.11)')
+{
+  //? James (2026-10-24): "Recently added should be for the user's library, not deadwax's" - your list (Navidrome's
+  //? `starred`, its own order starred-first) ordered by the star; the collection's by `created`, stars or none
+  const yours = [
+    { id: 'late', name: 'Old in the collection, new to you', artist: 'a', starred: '2026-10-20T10:00:00Z', created: '2024-01-01T00:00:00Z' },
+    { id: 'tA', name: 'Starred together A', artist: 'a', starred: '2026-10-10T00:00:00Z', created: '2026-03-01T00:00:00Z' },
+    { id: 'tB', name: 'Starred together B', artist: 'a', starred: '2026-10-10T00:00:00Z', created: '2026-05-01T00:00:00Z' },
+    { id: 'amperfy', name: 'Starred in Amperfy', artist: 'a', starred: '2026-10-05T09:00:00Z', created: '2026-10-04T00:00:00Z' },
+    { id: 'noStar', name: 'No star (never in your list)', artist: 'a', created: '2026-09-15T00:00:00Z' },
+    { id: 'far', name: 'A minute after the seed', artist: 'a', starred: '2026-09-01T12:01:00Z', created: '2020-01-01T00:00:00Z' },
+    //? the first admin's seed: starred one after another, seconds apart - 38 s end to end, no gap over SAME_MOMENT_MS
+    { id: 's3', name: 'Seed 3', artist: 'a', starred: '2026-09-01T12:00:03Z', created: '2026-08-15T00:00:00Z' },
+    { id: 's4', name: 'Seed 4', artist: 'a', starred: '2026-09-01T12:00:03.000Z' },
+    { id: 's2', name: 'Seed 2', artist: 'a', starred: '2026-09-01T11:59:50Z', created: '2026-06-01T00:00:00Z' },
+    { id: 's1', name: 'Seed 1', artist: 'a', starred: '2026-09-01T11:59:25Z', created: '2026-08-01T00:00:00Z' },
+    { id: 'none', name: 'No date at all', artist: 'a' },
+  ]
+  check('the seed\'s window: thirty seconds between one star and the next', S.SAME_MOMENT_MS, 30000)
+  check('yours: by when it entered your library (its star) - an album the collection has had for years first when you just added it; a moment (a seed, stars together) in the collection\'s order; no date last',
+    ids(S.sortAlbums(yours, 'newest', 'you')), ['late', 'tB', 'tA', 'amperfy', 'noStar', 'far', 's3', 's1', 's2', 's4', 'none'])
+  check('...the same list as the collection\'s: by created, the stars passed over', ids(S.sortAlbums(yours, 'newest')),
+    ['amperfy', 'noStar', 's3', 's1', 's2', 'tB', 'tA', 'late', 'far', 's4', 'none'])
+  check('...and the other sorts don\'t care whose list it is', ['alphabeticalByArtist', 'alphabeticalByName', 'byYearDesc'].map((sort) => ids(S.sortAlbums(yours, sort, 'you')).join() === ids(S.sortAlbums(yours, sort)).join()),
+    [true, true, true])
+  check('...nothing left out or doubled, the list handed in untouched', [S.sortAlbums(yours, 'newest', 'you').length, ids(yours)[0]], [11, 'late'])
+  const heads = S.groupAlbums(S.sortAlbums(yours, 'newest', 'you'), 'newest', 'you').map((group) => [group.label, group.items.length])
+  check('...its month headers the month you added it ("Date unknown" last)', heads, [['October 2026', 4], ['September 2026', 6], ['Date unknown', 1]])
+  //? a moment over midnight at a month's end: headed by its newest star, never split - the album created first leading
+  const over = [
+    { id: 'm2', name: 'm2', artist: 'a', starred: '2026-09-01T00:00:05Z', created: '2025-01-01T00:00:00Z' },
+    { id: 'm1', name: 'm1', artist: 'a', starred: '2026-08-31T23:59:50Z', created: '2026-01-01T00:00:00Z' },
+    { id: 'aug', name: 'aug', artist: 'a', starred: '2026-08-20T00:00:00Z', created: '2026-01-02T00:00:00Z' },
+  ]
+  check('...one moment across a month\'s end under one header, its newest star\'s month',
+    S.groupAlbums(S.sortAlbums(over, 'newest', 'you'), 'newest', 'you').map((group) => [group.label, group.items.map((album) => album.id)]),
+    [['September 2026', ['m1', 'm2']], ['August 2026', ['aug']]])
+  //? (review) Find narrowing that moment: its headers from the WHOLE list's moments - taking an album out of a run of
+  //? stars widens its gaps, and a moment cut again from what Find left would split over the month's end, out of order
+  const seed = [
+    { id: 'a', name: 'Alpha', artist: 'x', starred: '2026-09-01T00:00:10Z', created: '2025-01-01T00:00:00Z' },
+    { id: 'b', name: 'Beta', artist: 'x', starred: '2026-08-31T23:59:50Z', created: '2026-03-01T00:00:00Z' },
+    { id: 'c', name: 'Gamma', artist: 'x', starred: '2026-08-31T23:59:30Z', created: '2026-06-01T00:00:00Z' },
+    { id: 'd', name: 'Delta', artist: 'x', starred: '2026-08-20T00:00:00Z', created: '2026-01-02T00:00:00Z' },
+  ]
+  const seedSorted = S.sortAlbums(seed, 'newest', 'you')
+  const seedFound = seedSorted.filter((album) => album.id !== 'b')
+  check('...Find leaving out its middle album: still one header, the whole list\'s month, the album under the same header as unfound',
+    [S.groupAlbums(seedFound, 'newest', 'you', seedSorted).map((group) => [group.label, group.items.map((album) => album.id)]),
+      S.groupAlbums(seedSorted, 'newest', 'you').map((group) => [group.label, group.items.map((album) => album.id)])],
+    [[['September 2026', ['c', 'a']], ['August 2026', ['d']]], [['September 2026', ['c', 'b', 'a']], ['August 2026', ['d']]]])
+  //? (review) inside a moment, `created` the same (or missing on both): the newer star first, whatever order they came in
+  const tied = [
+    { id: 'older', name: 'older', artist: 'a', starred: '2026-09-01T12:00:00Z', created: '2026-01-01T00:00:00Z' },
+    { id: 'newer', name: 'newer', artist: 'a', starred: '2026-09-01T12:00:05Z', created: '2026-01-01T00:00:00Z' },
+    { id: 'olderBare', name: 'olderBare', artist: 'a', starred: '2026-09-01T11:59:50Z' },
+    { id: 'newerBare', name: 'newerBare', artist: 'a', starred: '2026-09-01T11:59:55Z' },
+  ]
+  check('...inside a moment, the same created (or none): then the star, newest first, not the order handed in',
+    ids(S.sortAlbums(tied, 'newest', 'you')), ['newer', 'older', 'newerBare', 'olderBare'])
+  //? the store's list: a few albums carry `starred` (the asker's) - never the order
+  const store = [
+    { id: 'c1', name: 'c1', artist: 'a', created: '2026-10-01T00:00:00Z', starred: '2026-10-20T00:00:00Z' },
+    { id: 'c2', name: 'c2', artist: 'a', created: '2026-10-10T00:00:00Z' },
+    { id: 'c3', name: 'c3', artist: 'a', created: '2026-09-01T00:00:00Z', starred: '2026-10-22T00:00:00Z' },
+  ]
+  check('the collection\'s list: by created even where some albums carry your star (the default, and said)',
+    [ids(S.sortAlbums(store, 'newest')), ids(S.sortAlbums(store, 'newest', 'collection'))], [['c2', 'c1', 'c3'], ['c2', 'c1', 'c3']])
+  check('...its month headers by created too', S.groupAlbums(S.sortAlbums(store, 'newest', 'collection'), 'newest', 'collection').map((group) => [group.label, group.items.length]),
+    [['October 2026', 2], ['September 2026', 1]])
+  check('...which as yours would have read the stars', ids(S.sortAlbums(store, 'newest', 'you')), ['c3', 'c1', 'c2'])
 }
 
 console.log('\nthe artists\' two orders')

@@ -12,6 +12,8 @@ each held to the fix.
 - A phone on its side gets the compact tab bar.
 - Play and pause stay round (STYLE.md).
 - Home's headings sit the board's 12px above their shelf; a tile's two lines sit together.
+- (2.0.15) Recently played, over Recently added, holds a tile's height until its answer (and while it says nothing
+  was played, or that it couldn't ask): one tile's shape, unseen, what it says laid over it.
 
 And for what opens over Now Playing (2.0.0-player.10):
 
@@ -377,8 +379,30 @@ def test_home_sits_as_the_board_has_it():
     text = declarations(APP, ".app-tile-text")
     assert text["display"] == "flex" and "gap" not in text
     home = (Path(__file__).resolve().parent.parent / "ui" / "src" / "app" / "Home.tsx").read_text()
-    assert re.search(r'<span class="app-tile-text">\s*<span class="app-tile-title">.*?</span>\s*'
-                     r'<span class="app-tile-artist">.*?</span>\s*</span>', home, re.S)
+    assert re.search(r'<span class="app-tile-text">\s*<span class="app-tile-title" dir="auto">.*?</span>\s*'
+                     r'<span class="app-tile-artist" dir="auto">.*?</span>\s*</span>', home, re.S)
+
+
+def test_recently_played_holds_the_shelfs_height_before_its_answer():
+    """(2.0.15) Recently played sits over Recently added, so before its answer - and while it says nothing was played,
+    or that it couldn't ask - it holds the shelf's own height: one tile's shape (the shelf, an item, the cover, both
+    lines), unseen, with what it says laid over it, never taking room of its own. Sized by the tile's own rules, so it
+    is a tile's height - one row - on the phone's row and on the desktop's grid alike - no rule of its own on a
+    desktop. (The desktop's grid wraps, so more albums than a row holds would take more rows: lib/home.ts
+    playedLanded keeps the rows drawn while Home is on screen - home.sim.)"""
+    assert declarations(APP, ".app-shelf-held")["position"] == "relative"
+    assert declarations(APP, ".app-shelf-ghost")["visibility"] == "hidden"
+    say = declarations(APP, ".app-shelf-held-say")
+    assert say["position"] == "absolute" and say["inset"] == "0" and say["overflow"] == "hidden"
+    #? the spinner's own margin would only push it off centre in a box of a fixed height
+    assert declarations(APP, ".app-shelf-held-say .pl-spinner")["margin"] == "0"
+    desktop = (PLAYER / "app-desktop.css").read_text()
+    assert "app-shelf-held" not in desktop and "app-shelf-ghost" not in desktop
+    home = (Path(__file__).resolve().parent.parent / "ui" / "src" / "app" / "Home.tsx").read_text()
+    #? each line a no-break space (as an escape in the source), so it is a line's height
+    assert re.search(r'<ul class="app-shelf app-shelf-ghost" aria-hidden="true">\s*<li class="app-shelf-item">\s*<span class="app-tile">\s*'
+                     r'<span class="app-tile-cover is-empty" />\s*<span class="app-tile-text">\s*'
+                     r"<span class=\"app-tile-title\" dir=\"auto\">\{'\\u00a0'\}</span>\s*<span class=\"app-tile-artist\" dir=\"auto\">\{'\\u00a0'\}</span>", home)
 
 
 def test_the_reader_reads_rules_as_the_browser_would():
@@ -394,6 +418,13 @@ def px(token: str) -> float:
     value = ALL_TOKENS[token]
     assert value.endswith("px"), (token, value)
     return float(value[:-2])
+
+
+def ratio(token: str) -> float:
+    """(2.0.9) A token that is a plain number - a line height - or a var() of one, as a number."""
+    value = ALL_TOKENS[token]
+    found = re.fullmatch(r"var\((--[\w-]+)\)", value)
+    return ratio(found.group(1)) if found else float(value)
 
 
 def length(token: str) -> float:
@@ -471,7 +502,7 @@ def test_now_playing_has_no_readouts_or_switch_and_a_fixed_icon_row():
 def test_a_small_control_reaches_a_full_tap_target_without_reaching_the_scrubber():
     hit = px("--pl-hit")
     #? the album line: its reach up and down, and its own line (17px at the token's leading)
-    line = px("--dw-text-body") * float(ALL_TOKENS["--pl-byline-leading"])
+    line = px("--dw-text-body") * ratio("--pl-byline-leading")
     assert px("--pl-byline-reach-up") + line + px("--pl-byline-reach-down") >= hit
     assert px("--pl-byline-reach-down") < px("--pl-scrub-gap")
     reach = declarations(PLAYER_CSS, ".pl-sheet-artist.is-link::before")
@@ -552,6 +583,18 @@ def test_a_failure_line_on_the_turntable_moves_nothing_a_finger_goes_to():
     assert error["pointer-events"] == "none"
 
 
+def test_the_silent_record_line_lies_where_a_failure_does_in_a_notes_colour():
+    """(2.0.7, UX batch 4) A turn that finds the record silent for good on a song (not a FLAC, no Web Audio) says why in
+    the failure's place - laid over the plinth's foot the same way, so it moves nothing a finger goes to - in the
+    colour of a note, not of a failure."""
+    error = declarations(APP, ".app-is-turntable .pl-sheet-error")
+    silent = declarations(APP, ".app-is-turntable .app-tt-silent")
+    assert silent == error and silent["position"] == "absolute" and silent["pointer-events"] == "none"
+    look = declarations(APP, ".app-tt-silent")
+    assert look["color"] == "var(--dw-text-2)" and look["font-size"] == "var(--pl-text-footnote)"
+    assert look["margin"] == "0 0 var(--pl-error-gap)"
+
+
 def test_the_look_button_is_a_tap_target_and_the_time_line_one_line():
     button = declarations(APP, ".app-look-button")
     assert button["width"] == button["height"] == "var(--pl-hit)"
@@ -626,10 +669,12 @@ def test_a_retry_button_waiting_on_its_retry_stays_legible():
 
 def test_next_peer_and_ask_again_stack_where_a_pair_wouldnt_hold_their_words():
     #? at 320px a column was 105px of text, and "Next peer · 2 left" (121px of 15px Noto Sans 600)
-    #? lost its count to the ellipsis; a column narrower than "Next peer · 10 left" whole stacks
+    #? lost its count to the ellipsis; a column narrower than "Next peer · 10 left" whole stacks. (2.0.6, UX batch 3)
+    #? Their words are "Another source · 2 left" / "Same source again", "Trying another source…" while it runs -
+    #? 174px of that font, measured in a real page, so a column narrower than 192px stacks (a 390px phone's do)
     actions = declarations(APP, ".app-job-actions")
     assert actions["grid-template-columns"] == "repeat(auto-fit, minmax(min(var(--app-job-action-min), 100%), 1fr))"
-    assert ALL_TOKENS["--app-job-action-min"] == "150px"
+    assert ALL_TOKENS["--app-job-action-min"] == "192px"
     #? stacked, the two reaches don't overlap
     assert actions["gap"] == "var(--app-job-actions-row-gap) var(--app-job-gap)"
     assert ALL_TOKENS["--app-job-actions-row-gap"] == "calc(2 * var(--app-job-action-reach))"
@@ -668,7 +713,7 @@ def test_the_requests_tabs_live_region_is_read_and_not_drawn():
 
 def test_the_search_field_is_never_small_enough_for_ios_to_zoom():
     field = declarations(APP, ".app-search-input")
-    assert field["font-size"] == "var(--dw-text-body)" and px("--dw-text-body") >= 16
+    assert field["font-size"] == "var(--dw-text-field)" and px("--dw-text-field") >= 16
     #? the well is STYLE.md's; nothing native is drawn over it
     assert field["appearance"] == "none"
 
@@ -784,8 +829,8 @@ def test_every_control_of_get_and_the_sources_is_a_tap_target():
 
 def test_the_sources_text_fields_are_never_small_enough_for_ios_to_zoom():
     for field in (".app-sources-query-input", ".app-sources-sort-select"):
-        assert declarations(APP, field)["font-size"] == "var(--dw-text-body)", field
-    assert px("--dw-text-body") >= 16
+        assert declarations(APP, field)["font-size"] == "var(--dw-text-field)", field
+    assert px("--dw-text-field") >= 16
     #? the sort's own picker covers its chip whole, unseen - the chip shows what it says
     select = declarations(APP, ".app-sources-sort-select")
     assert (select["position"], select["inset"], select["opacity"]) == ("absolute", "0", "var(--app-chip-select)")
@@ -887,8 +932,14 @@ def test_an_album_pages_artist_link_and_also_chips():
     #? the chip itself keeps no overflow, so its 44px reach isn't clipped (it is an .app-chip)
     assert "overflow" not in declarations(APP, ".app-also")
     badge = declarations(APP, ".app-held-badge")
+    #? (2.0.5, UX batch 2) a badge, as the tracklist's are - shorter than the chips beside it, label-sized, centred on
+    #? their row - never a chip's own box, which read as a button
     assert (badge["flex"], badge["height"], badge["color"], badge["background"]) == (
-        "none", "var(--app-chip)", "var(--dw-badge-green-text)", "var(--dw-badge-green-bg)")
+        "none", "var(--app-held-badge)", "var(--dw-badge-green-text)", "var(--dw-badge-green-bg)")
+    assert (badge["padding"], badge["font-size"], badge["align-self"]) == ("0 var(--app-held-badge-pad)", "var(--dw-text-label)", "center")
+    assert ALL_TOKENS["--app-held-badge"] == "var(--app-rg-chip)" and ALL_TOKENS["--app-held-badge-pad"] == "var(--app-rg-chip-pad)"
+    assert px("--app-rg-chip") < px("--app-chip")
+    assert declarations(APP, ".app-rg-chip")["height"] == "var(--app-rg-chip)"
 
 
 def test_the_librarys_chips_and_sort():
@@ -904,13 +955,17 @@ def test_the_librarys_chips_and_sort():
     assert declarations(APP, ".app-sort")["min-height"] == "var(--pl-hit)"
     select = declarations(APP, ".app-sort-select")
     assert (select["position"], select["inset"], select["opacity"], select["font-size"]) == (
-        "absolute", "0", "var(--app-chip-select)", "var(--dw-text-body)")
-    assert px("--dw-text-body") >= 16
+        "absolute", "0", "var(--app-chip-select)", "var(--dw-text-field)")
+    assert px("--dw-text-field") >= 16
 
 
 def test_a_done_row_opens_from_the_whole_row_and_plays_from_its_round_button():
     assert declarations(APP, ".app-done-open")["min-height"] == "var(--app-done-row)"
     assert declarations(APP, ".app-done-open")["flex"] == "1"
+    #? (2.0.6, review) a row of two or three lines (Stopped while being added..., its tell) keeps air above its hairline:
+    #? padded, by a token that leaves a one-line row its 56px (the cover plus the padding twice)
+    assert declarations(APP, ".app-done-open")["padding-block"] == "var(--app-done-pad-y)"
+    assert px("--app-job-cover") + 2 * px("--app-done-pad-y") == px("--app-done-row")
     play = declarations(APP, ".app-done-play")
     assert (play["width"], play["height"]) == ("var(--pl-hit)", "var(--pl-hit)")
     face = declarations(APP, ".app-done-play-face")
@@ -978,7 +1033,7 @@ def test_what_lands_late_on_the_artist_page_moves_nothing():
     #? an album page's artist line holds its line before the album answers
     assert declarations(APP, ".app-shell .pl-hero-artist")["min-height"] == "var(--app-hero-artist-line)"
     assert ALL_TOKENS["--app-hero-artist-line"] == "1.25em"
-    assert declarations(PLAYER_CSS, ".pl-hero-artist")["line-height"] == "1.25"
+    assert declarations(PLAYER_CSS, ".pl-hero-artist")["line-height"] == "var(--pl-leading-tight)" and ratio("--pl-leading-tight") == 1.25
 
 
 def test_a_row_looking_for_its_album_fades_and_a_name_that_isnt_a_link_isnt_the_links_colour():
@@ -1179,6 +1234,22 @@ def test_a_sources_reasons_open_from_a_tap_target_on_the_score_and_hide_while_cl
     assert declarations(desk, ".app-desk .app-layer.is-panel .app-source-reasons", "@media (min-width: 1024px)") == {"grid-column": "1 / -1"}
 
 
+def test_a_sources_signals_say_what_each_measures_beside_its_chip_and_the_score_its_percentage():
+    """(2.0.6, UX batch 3) Each signal a row - its chip in one column, what it measures beside it, so the words line up -
+    under "Why it's a 70% match"; a desktop's score box grows to hold "100%" rather than clip it."""
+    signals = declarations(APP, ".app-source-signals")
+    assert (signals["display"], signals["grid-template-columns"], signals["column-gap"]) == (
+        "grid", "max-content minmax(0, 1fr)", "var(--app-source-meaning-gap)")
+    assert declarations(APP, ".app-source-signal-row") == {"display": "contents"}
+    meaning = declarations(APP, ".app-source-signal-meaning")
+    assert (meaning["color"], meaning["font-size"], meaning["min-width"]) == ("var(--dw-text-2)", "var(--dw-text-label)", "0")
+    title = declarations(APP, ".app-source-reasons-title")
+    assert (title["margin"], title["color"], title["font-size"]) == ("0", "var(--dw-text-2)", "var(--dw-text-label)")
+    desk = (PLAYER / "app-desktop.css").read_text()
+    score = declarations(desk, ".app-desk .app-layer.is-panel .app-source-score", "@media (min-width: 1024px)")
+    assert (score["width"], score["min-width"], score["padding"]) == ("auto", "var(--app-desk-source-score-w)", "0 var(--app-desk-source-score-pad)")
+
+
 def test_a_sources_signals_and_edition_words_are_drawn_in_their_bands_colours():
     #? the signals: amber in the middle band, green from 75, red under 40 - STYLE.md's badges, and a red one
     signal = declarations(APP, ".app-source-signal")
@@ -1202,33 +1273,39 @@ def test_a_sources_signals_and_edition_words_are_drawn_in_their_bands_colours():
 
 
 def test_other_pressings_never_gives_way_and_a_held_pressing_is_marked_green():
-    #? the album page's chip row stays one line; "Other pressings" never shortens - the Also chips do
+    #? the album page's chip row stays one line; "Pressings" (its one name since 2.0.5) never shortens - the Also chips do
     assert "flex-wrap" not in declarations(APP, ".app-album-chips")
     assert declarations(APP, ".app-album-chips > .app-other-pressings") == {"flex": "none"}
     #? ...and is a chip, its reach unclipped
     assert "overflow" not in declarations(APP, ".app-other-pressings")
-    #? beside an Also chip, in a row too narrow for the three whole: "Pressings", and the badge's words read
-    #? but never shown (the visually-hidden rule's own declarations) - so the Also chip keeps room to say
-    #? which pressing it is. By the ROW's width, a container query on the row itself (review: by the frame,
-    #? a desktop's column narrowed by the Edit panel crushed the Also chip to a bare "›", and a phone on
-    #? its side gave up words it had the room for)
+    #? beside an Also chip, in a row too narrow for the three whole - a phone's (2.0.5: under 420px, where 119 + 182 +
+    #? 99 + two gaps don't fit; it was any row under 600px, a desktop's column narrowed by Info too) - the badge gives
+    #? way WHOLE, yours or the collection's: read but never shown (the visually-hidden rule's own declarations), out of
+    #? the row, so the Also chip keeps room to say which pressing it is. (2.0.5 review) its tick alone, kept at first,
+    #? was a bare mark beside the Also chip, read as that pressing ticked - so no rule leaves the badge's box or tick
+    #? showing without its words. By the ROW's width, a container query on the row itself (review: by the frame, a
+    #? desktop's column narrowed by the Edit panel crushed the Also chip to a bare "›", and a phone on its side gave up
+    #? words it had the room for). (2.0.5) "Pressings" is the chip's one name: no long and short spans.
     assert declarations(APP, ".app-album-chips")["container"] == "app-album-chips / inline-size"
-    assert declarations(APP, ".app-other-short") == {"display": "none"}
-    narrow = "@container app-album-chips (max-width: 600px)"
-    assert declarations(APP, ".app-album-chips:has(.app-also) .app-other-long", narrow) == {"display": "none"}
-    assert declarations(APP, ".app-album-chips:has(.app-also) .app-other-short", narrow) == {"display": "inline"}
-    #? ...(2.0.0-player.52 review) and "In the store", which has no tick to keep, gives way whole - its words left
-    #? alone it was an empty box; shown, the Also chip said "Also: t…" at 320px
-    assert declarations(APP, ".app-album-chips:has(.app-also):has(.app-other-pressings) .app-held-badge:not(.is-store) .app-held-badge-text", narrow) == declarations(APP, ".app-visually-hidden")
-    assert declarations(APP, ".app-album-chips:has(.app-also):has(.app-other-pressings) .app-held-badge.is-store", narrow) == declarations(APP, ".app-visually-hidden")
-    #? ...which is said in the line's grey with no box - never one more chip beside "Other pressings ›"
-    assert declarations(APP, ".app-held-badge.is-store") == {"padding": "0", "border-color": "transparent", "background": "transparent",
-                                                           "color": "var(--dw-text-2)"}
-    #? ...never by the frame: no rule outside that query shortens them, and the desktop's stylesheet has none
+    assert ".app-other-short" not in APP and ".app-other-long" not in APP
+    narrow = "@container app-album-chips (max-width: 420px)"
+    assert declarations(APP, ".app-album-chips:has(.app-also):has(.app-other-pressings) .app-held-badge", narrow) == declarations(APP, ".app-visually-hidden")
+    assert [selector for context, selector, _values in rules(APP) if context == narrow] == [
+        ".app-album-chips:has(.app-also):has(.app-other-pressings) .app-held-badge"]
     desk = (PLAYER / "app-desktop.css").read_text()
     for css in (APP, desk):
+        assert not [selector for _context, selector, _values in rules(css) if ".app-held-badge-text" in selector]
+    #? (2.0.5 review) the row holds a chip's height from the first frame: the badge is shorter than a chip, so the
+    #? row drawn with it alone grew as "Pressings ›" landed with the bridge's answer, and the songs moved
+    assert declarations(APP, ".app-album-chips")["min-height"] == "var(--app-chip)"
+    assert length("--app-held-badge") < px("--app-chip")
+    #? ...which is said in the line's grey with no box - never one more chip beside "Pressings ›"
+    assert declarations(APP, ".app-held-badge.is-store") == {"padding": "0", "border-color": "transparent", "background": "transparent",
+                                                           "color": "var(--dw-text-2)"}
+    #? ...never by the frame: no rule outside that query hides the badge, and the desktop's stylesheet has none
+    for css in (APP, desk):
         for context, selector, _values in rules(css):
-            if any(name in selector for name in (".app-other-long", ".app-held-badge-text")) or ".app-other-short" in selector and selector != ".app-other-short":
+            if ":has(.app-other-pressings) .app-held-badge" in selector:
                 assert context == narrow, (context, selector)
     #? the row's place held from the first frame, nothing in it shown until the bridge has answered - so
     #? the badge first shows where it stays, never sliding along a phone's centred row (review)
@@ -1297,8 +1374,8 @@ def test_the_artist_pages_panel_is_a_fingers_and_ios_never_zooms_into_its_search
     for selector in (".app-artist-panel-inline", ".app-artist-replace", ".app-artist-change"):
         assert declarations(APP, selector)["min-height"] == "var(--pl-hit)", selector
     field = declarations(APP, ".app-artist-search-input")
-    assert (field["font-size"], field["min-height"]) == ("var(--dw-text-body)", "var(--pl-pill-height)")
-    assert px("--dw-text-body") >= 16
+    assert (field["font-size"], field["min-height"]) == ("var(--dw-text-field)", "var(--pl-pill-height)")
+    assert px("--dw-text-field") >= 16
     #? a row a match is: the grouped list's, a finger tall
     assert declarations(APP, ".app-row")["min-height"] == "var(--dw-row)" and px("--dw-row") >= px("--pl-hit")
     for selector in (".app-artist-move-path", ".app-artist-move-to", ".app-artist-match-name", ".app-artist-panel-note"):
@@ -1498,7 +1575,7 @@ def test_the_chosen_pressings_facts_hold_their_height_whatever_they_say():
 
 def test_the_pressing_lists_filter_never_zooms_and_stays_over_the_list():
     field = declarations(APP, ".app-picker-filter-input")
-    assert field["font-size"] == "var(--dw-text-body)" and px("--dw-text-body") >= 16
+    assert field["font-size"] == "var(--dw-text-field)" and px("--dw-text-field") >= 16
     assert (field["height"], field["appearance"]) == ("var(--app-field)", "none")
     holder = declarations(APP, ".app-picker-filter")
     assert (holder["position"], holder["top"], holder["background"]) == ("sticky", "calc(-1 * var(--app-picker-inset))", "var(--dw-popover)")
@@ -1532,7 +1609,7 @@ def test_the_sample_rate_chip_rings_as_the_sort_does():
     assert (ring["outline"], ring["outline-offset"]) == ("var(--app-ring) solid var(--dw-accent)", "var(--app-ring)")
     #? its picker is the sort's, covering it whole, unseen, never small enough for iOS to zoom
     select = declarations(APP, ".app-sources-sort-select")
-    assert (select["position"], select["inset"], select["font-size"]) == ("absolute", "0", "var(--dw-text-body)")
+    assert (select["position"], select["inset"], select["font-size"]) == ("absolute", "0", "var(--dw-text-field)")
 
 
 # ---------------------------------------------------------------- looking after deadwax from a phone (2.0.0-player.47)
@@ -1767,10 +1844,10 @@ def test_the_edit_panel_is_a_sheet_over_the_whole_screen_on_a_phone():
 def test_the_edit_sheets_targets_are_a_fingers_and_ios_never_zooms_into_its_fields():
     """Every field 17px and a finger tall (iOS zooms into one under 16); the close button, the tabs, a tick box's
     label, a folder to choose, a pressing, every button of the hosted editors - and Apply - 44px."""
-    assert px("--dw-text-body") >= 16 and px("--pl-hit") == 44
+    assert px("--dw-text-field") >= 16 and px("--pl-hit") == 44
     for selector in (".app-edit .releases-filter-input", ".app-edit-select", ".app-edit-pick-input"):
         field = phone(selector)
-        assert (field["font-size"], field["min-height"]) == ("var(--dw-text-body)", "var(--pl-hit)"), selector
+        assert (field["font-size"], field["min-height"]) == ("var(--dw-text-field)", "var(--pl-hit)"), selector
     close = phone(".app-edit-close")
     assert (close["width"], close["height"]) == ("var(--pl-hit)", "var(--pl-hit)")
     for selector in (".app-edit-tab", ".app-edit-choice", ".app-edit .app-edit-button", ".app-edit .columns-toggle-button", ".app-edit .win-button",
@@ -1849,7 +1926,7 @@ def test_the_managing_pages_on_a_phone_are_a_fingers_and_never_zoom():
     finger's, 17px fields; the facets the Library's chips (a finger's reach) within the page's edges."""
     for selector in (".app-settings .settings-env-input", ".app-care-input"):
         field = phone(selector)
-        assert (field["font-size"], field["min-height"]) == ("var(--dw-text-body)", "var(--pl-hit)"), selector
+        assert (field["font-size"], field["min-height"]) == ("var(--dw-text-field)", "var(--pl-hit)"), selector
     for selector in (".app-queue-row", ".app-queue-checking", ".app-settings .settings-env-revert", ".app-settings-discard", ".app-settings-save",
                      ".app-settings .settings-retime .win-button", ".app-care .app-text-button"):
         assert phone(selector)["min-height"] == "var(--pl-hit)", selector
@@ -1933,10 +2010,12 @@ def test_up_next_and_the_song_menu_lock_the_page_and_reuse_infos_look():
     #? the album bar: the ••• beside the pin, their 44px reaches meeting and no more
     assert declarations(APP, ".app-album-bar .app-album-more + .app-pin-toggle")["margin-left"] == "var(--app-album-more-room)"
     assert ALL_TOKENS["--app-album-more-room"] == "calc(2 * var(--app-pin-toggle-reach) - var(--pl-gap-sm))"
-    #? Now Playing's footer unchanged - one fixed height, its icons at the right end - and its Up next tinted when on
+    #? Now Playing's footer unchanged - one fixed height, its icons at the right end - and its Up next no longer tinted
+    #? when on (2.0.14: Shuffle and Repeat are lit on the transport - see the test after the last of these)
     footer = declarations(PLAYER_CSS, ".pl-sheet-footer")
     assert footer["height"] == "var(--pl-hit)" and footer["justify-content"] == "flex-end"
-    assert declarations(APP, ".pl-sheet-footer .app-upnext-button.is-on")["color"] == "var(--dw-accent)"
+    assert declarations(APP, ".pl-sheet-footer .app-upnext-button.is-on") == {}
+    assert "Up Next tinted while Shuffle or Repeat is on" not in APP, "the .57 section's header says the tint is gone"
     #? Up Next's head: Edit at the left in Done's look, the chips' row inside the gutter
     edit = declarations(APP, ".app-upnext-edit")
     assert (edit["grid-column"], edit["justify-self"], edit["color"]) == ("1", "start", "var(--dw-accent)")
@@ -1967,7 +2046,7 @@ def test_playlists_lock_the_page_scroll_their_picker_and_reach_a_finger():
     assert chip["inset"] == "calc(-1 * var(--app-pin-toggle-reach))" and declarations(APP, ".app-playlist-chip")["height"] == "var(--app-pin-toggle)"
     for field in (".app-playlist-input", ".app-new-playlist-input"):
         assert declarations(APP, field)["font-size"] == "var(--app-playlist-field-text)", field
-    assert ALL_TOKENS["--app-playlist-field-text"] == "var(--dw-text-body)" and px("--dw-text-body") >= 16
+    assert ALL_TOKENS["--app-playlist-field-text"] == "var(--dw-text-field)" and px("--dw-text-field") >= 16
     #? (2.0.0-player.59, on purpose) the Library's row is the first row of the phone root's first group now
     home = (ui / "app" / "LibraryHome.tsx").read_text()
     group = home.index('<div class="app-group app-library-group">')
@@ -2021,7 +2100,7 @@ def test_the_librarys_shelf_and_index_draw_from_tokens_and_hold_a_finger():
     assert declarations(APP, ".app-index-dot")["pointer-events"] == "none"
     section = (ui / "app" / "LibrarySection.tsx").read_text()
     assert '<label class="app-search-field app-library-find">' in section and 'type="search"\n              class="app-search-input"' in section
-    assert declarations(APP, ".app-search-input")["font-size"] == "var(--dw-text-body)" and px("--dw-text-body") >= 16
+    assert declarations(APP, ".app-search-input")["font-size"] == "var(--dw-text-field)" and px("--dw-text-field") >= 16
     assert declarations(APP, ".app-library-find")["flex"] == "1 0 100%"
 
 
@@ -2032,9 +2111,126 @@ def test_the_librarys_root_rows_are_yous_managing_rows():
     home = (ui / "app" / "LibraryHome.tsx").read_text()
     assert 'class="app-row app-link-row app-library-row" onClick={() => onOpenSection(item.id as LibraryPick)}' in home
     assert '<ChevronRightIcon class="app-chevron" />' in home
+    #? (2.0.10) every row its glyph, drawn as the Playlists row's: a record, a head and shoulders, a note
+    assert '<Icon class="app-library-row-icon" />' in home
+    assert "pick === 'artists' || pick === 'storeArtists' ? ArtistIcon : pick === 'songs' ? SongIcon : AlbumIcon" in home
+    assert declarations(APP, ".app-library-row-icon") == declarations(APP, ".app-library-playlists-icon")
     assert '<div class="app-section-head app-library-recent-head">' in home and 'class="app-text-button app-see-all"' in home
     row = declarations(APP, ".app-library-row")
     assert (row["width"], row["flex-wrap"], row["justify-content"]) == ("100%", "nowrap", "flex-start")
     assert declarations(APP, ".app-library-row .app-row-label")["flex"] == "1"
     #? .58's wrapper and its rules went with the scope chips, on purpose
     assert declarations(APP, ".app-library-playlists") == {} and declarations(APP, ".app-library-playlists .app-row") == {}
+
+
+def test_a_description_is_prose_clamped_to_three_lines_its_links_a_finger_tall():
+    """(2.0.13) The artist's and the album's description: in the body face at the heading size, never mono; clamped to
+    --app-about-lines (3) until More, the clamp only while `is-clamped`; never wider than a comfortable measure; More and
+    its source on one line a finger tall, each a finger's reach, the source's ring drawn outside it; an album page's at
+    the page's edges, as its songs are."""
+    text = declarations(APP, ".app-about-text")
+    assert (text["font-family"], text["font-size"], text["line-height"], text["max-width"]) == (
+        "var(--dw-font)", "var(--dw-text-heading)", "var(--dw-leading-body)", "var(--app-about-measure)")
+    assert "mono" not in " ".join(text.values())
+    clamped = declarations(APP, ".app-about-text.is-clamped")
+    assert (clamped["display"], clamped["overflow"], clamped["-webkit-box-orient"], clamped["-webkit-line-clamp"]) == (
+        "-webkit-box", "hidden", "vertical", "var(--app-about-lines)")
+    assert ALL_TOKENS["--app-about-lines"] == "3"
+    for selector in (".app-about-foot", ".app-about-more", ".app-about-source"):
+        assert declarations(APP, selector)["min-height"] == "var(--pl-hit)", selector
+    assert px("--pl-hit") >= 44
+    assert declarations(APP, ".app-about-source:focus-visible")["outline-offset"] == "var(--app-ring)"
+    assert declarations(APP, ".pl-album-page > .app-about")["padding"] == "var(--app-about-top) var(--pl-edge-right) 0 var(--pl-edge-left)"
+    #? ...and the block draws those classes, its words its own direction
+    ui = Path(__file__).resolve().parent.parent / "ui" / "src"
+    block = (ui / "app" / "Description.tsx").read_text()
+    assert "class={`app-about-text${open ? '' : ' is-clamped'}`} dir=\"auto\"" in block
+    assert 'class="app-text-button app-about-more"' in block and 'class="app-about-source"' in block
+
+
+def test_a_subtitle_is_one_small_line_of_prose():
+    """(2.0.13) Wikidata's one line - an album's heading its description's block, an artist's under their name in the
+    hero, over its picture as the facts line is: the body face, the footnote size, never mono; its own direction."""
+    for selector in (".app-about-subtitle", ".app-artist-subtitle"):
+        line = declarations(APP, selector)
+        assert (line["font-family"], line["font-size"], line["line-height"]) == (
+            "var(--dw-font)", "var(--dw-text-footnote)", "var(--dw-leading-note)"), selector
+        assert "mono" not in " ".join(line.values()), selector
+    assert declarations(APP, ".app-artist-subtitle")["color"] == declarations(APP, ".app-artist-facts")["color"]
+    ui = Path(__file__).resolve().parent.parent / "ui" / "src"
+    assert '<p class="app-about-subtitle" dir="auto">' in (ui / "app" / "Description.tsx").read_text()
+    assert '<p class="app-artist-subtitle" dir="auto">' in (ui / "app" / "ArtistPage.tsx").read_text()
+
+
+def test_an_artists_subtitle_lands_in_a_line_kept_for_it():
+    """(2.0.13, after review) The hero is 240px at the LEAST - a two-line name under an iPhone home-screen app's status
+    bar (safe-area-inset-top, about 59px) outgrows it - so an artist's subtitle, landing after Play and Shuffle are
+    drawn, would grow it and move them. Its line is kept above the name until it comes - as tall as the subtitle with
+    its gap - and the subtitle is one line, ellipsized, so it never needs more than the line kept for it."""
+    line = declarations(APP, ".app-artist-subtitle")
+    assert (line["white-space"], line["overflow"], line["text-overflow"]) == ("nowrap", "hidden", "ellipsis")
+    assert "overflow-wrap" not in line
+    assert declarations(APP, ".app-artist-hero")["min-height"] == "var(--app-artist-hero)"
+    kept = declarations(APP, ".app-artist-names:not(:has(.app-artist-subtitle))::before")
+    assert (kept["content"], kept["display"]) == ("''", "block")
+    assert kept["height"] == "calc({} + {} * {})".format(line["margin"].split()[0], line["font-size"], line["line-height"])
+
+
+def test_now_playings_shuffle_and_repeat_sit_on_the_transport_as_tap_targets():
+    """(2.0.14) Shuffle and Repeat at the ends of Now Playing's transport row: tap targets (pl-icon-button, 44px every
+    way, never shrunk), their glyphs the icon row's size in its grey, in the accent while on and dimmed while they can't
+    be used, as Up Next's chips are; each target reaching past the body's edge by as much as it is wider than its glyph,
+    so the glyphs sit under the scrubber's ends; the row's height left alone. At 320 wide the row holds five targets of
+    44px or more - the middle three giving up width only, never below a tap target - and from 375 the three keep their
+    72px."""
+    icon_button = declarations(PLAYER_CSS, ".pl-icon-button")
+    assert (icon_button["width"], icon_button["height"], icon_button["flex"]) == ("var(--pl-hit)", "var(--pl-hit)", "none")
+    mode_icon = declarations(APP, ".pl-transport .app-np-mode .pl-icon")
+    assert (mode_icon["width"], mode_icon["height"]) == ("var(--app-np-mode-icon)", "var(--app-np-mode-icon)")
+    assert px("--app-np-mode-icon") < px("--pl-hit")
+    #? the icon row's size (AirPlay, Up Next and ••• just below): player.css's .pl-icon, so the two can't drift apart
+    assert ALL_TOKENS["--app-np-mode-icon"] == declarations(PLAYER_CSS, ".pl-icon")["width"] == declarations(PLAYER_CSS, ".pl-icon")["height"]
+    assert ALL_TOKENS["--app-np-mode-reach"] == "calc((var(--pl-hit) - var(--app-np-mode-icon)) / 2)"
+    assert declarations(APP, ".pl-transport .app-np-mode")["color"] == "var(--pl-text-2)"
+    assert declarations(APP, ".pl-transport .app-np-mode.is-on")["color"] == "var(--dw-accent)"
+    assert declarations(APP, ".pl-transport .app-np-mode[aria-disabled='true']")["opacity"] == "var(--app-pin-off)"
+    #? dimmed during a whole library's shuffle, its tap doing nothing: no press fill either (player.css's
+    #? .pl-icon-button:active draws one, unguarded)
+    assert declarations(PLAYER_CSS, ".pl-icon-button:active")["background"] == "var(--pl-pressed)"
+    assert declarations(APP, ".pl-transport .app-np-mode[aria-disabled='true']:active") == {"background": "none"}
+    #? the middle three's press stays a circle at any width - at 320 they are narrower than tall, so a fill on the
+    #? button itself (player.css's, round by 50%) would be an oval: it is drawn on a square of the button's width
+    #? in the button's one grid cell instead, the glyph laid over it in the same cell
+    assert declarations(PLAYER_CSS, ".pl-transport-button")["display"] == "grid"
+    assert declarations(PLAYER_CSS, ".pl-transport-button:active")["background"] == "var(--pl-pressed)"
+    assert declarations(APP, ".pl-transport .pl-transport-button:active") == {"background": "none"}
+    fill = declarations(APP, ".pl-transport .pl-transport-button::before")
+    assert (fill["content"], fill["grid-area"], fill["width"], fill["aspect-ratio"], fill["border-radius"]) == (
+        "''", "1 / 1", "100%", "1", "var(--pl-radius-round)")
+    assert "height" not in fill
+    assert declarations(APP, ".pl-transport .pl-transport-button > *") == {"grid-area": "1 / 1"}
+    assert declarations(APP, ".pl-transport .pl-transport-button:active::before") == {"background": "var(--pl-pressed)"}
+    row = declarations(APP, ".pl-sheet-body .pl-transport")
+    assert row == {
+        "justify-content": "space-between",
+        "margin-right": "calc(-1 * var(--app-np-mode-reach))",
+        "margin-left": "calc(-1 * var(--app-np-mode-reach))",
+    }
+    #? the row's height is still the transport buttons': nothing here sets a height or a vertical margin
+    assert declarations(PLAYER_CSS, ".pl-transport-button")["height"] == "72px"
+    assert declarations(APP, ".pl-transport .pl-transport-button") == {"min-width": "var(--pl-hit)"}
+    #? the arithmetic, at the phone widths James's iPhone and the narrowest have
+    side = float(declarations(PLAYER_CSS, ".pl-sheet-body")["padding"].split()[1].removesuffix("px"))
+    hit, glyph = px("--pl-hit"), px("--app-np-mode-icon")
+    middle = float(declarations(PLAYER_CSS, ".pl-transport-button")["width"].removesuffix("px"))
+    def row_width(screen: float) -> float:
+        return screen - 2 * side + 2 * (hit - glyph) / 2
+    assert row_width(320) >= 2 * hit + 3 * hit, "five tap targets at 320"
+    assert row_width(320) < 2 * hit + 3 * middle, "at 320 the middle three do give up width - say so if that changes"
+    assert row_width(375) >= 2 * hit + 3 * middle and row_width(390) >= 2 * hit + 3 * middle
+    #? ...and Now Playing draws them so, outside the transport buttons' class (the turntable sim counts those)
+    ui = Path(__file__).resolve().parent.parent / "ui" / "src"
+    sheet = (ui / "player" / "NowPlaying.tsx").read_text()
+    assert "class={`pl-icon-button app-np-mode app-np-shuffle${player.shuffle ? ' is-on' : ''}`}" in sheet
+    assert "class={`pl-icon-button app-np-mode app-np-repeat${player.repeat === 'off' ? '' : ' is-on'}`}" in sheet
+

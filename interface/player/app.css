@@ -112,13 +112,16 @@
     --app-job-action: 36px;          /* Next peer and Ask again, as the board draws them... */
     /* ...44px to a finger: the reach starts at the button's padding box, inside its border */
     --app-job-action-reach: calc((var(--pl-hit) - var(--app-job-action)) / 2 + var(--dw-hairline));
-    --app-job-action-min: 150px;     /* narrower than this, the pair stack: "Next peer · 10 left" whole */
+    --app-job-action-min: 192px;     /* narrower than this, the pair stack: "Trying another source…" whole -
+                                        174px of words, its padding and border (2.0.6; 150px held "Next peer") */
     --app-job-actions-row-gap: calc(2 * var(--app-job-action-reach));  /* stacked, the reaches don't overlap */
     --app-job-attention-gap: 10px;   /* a Needs attention card's words to its buttons */
     --app-job-dimmed: 0.55;          /* a download being cancelled, until the server agrees: its cover, title
                                         and bar - never the words saying "cancelling…" */
     --app-job-busy: 0.75;            /* a button waiting on its retry: faded, and still legible */
     --app-done-row: 56px;
+    --app-done-pad-y: 6px;           /* (2.0.6) a Done row's words off its hairlines when they run to more lines -
+                                        the 44px cover plus this twice is the 56px row, so a one-line row is as it was */
     --app-arriving-pad-y: 9px;       /* an Arriving card, as the Home board has it */
     --app-arriving-pad-x: 11px;
     --app-arriving-body-min: 96px;   /* the album's name keeps this much; the state word gives way first */
@@ -231,6 +234,7 @@
     --app-source-signal-pad: 7px;
     --app-source-signal-inner: 4px;  /* its word to its number */
     --app-source-tag-pad: 6px;       /* an edition word's sides, as the main page's tag had them */
+    --app-source-meaning-gap: 8px;   /* (2.0.6) a signal's chip to what it measures */
     /* Search again, when folders were found (2.0.0-player.41): the query opens under it */
     --app-sources-again-pad: 0;      /* the query form under it starts at once, no state's gap above */
     /* the artist page (2.0.0-player.17), as Artist.dc.html draws it */
@@ -260,6 +264,10 @@
     --app-album-mine-gap: 6px;       /* (2.0.0-player.52) Add/Remove's line to its button */
     --app-held-badge-gap: 5px;
     --app-held-badge-icon: 13px;
+    /* (2.0.5) a badge, as the tracklist's are (.app-rg-chip, STYLE.md's): shorter than a chip, so it never reads as
+       one more button beside "Pressings ›" */
+    --app-held-badge: var(--app-rg-chip);
+    --app-held-badge-pad: var(--app-rg-chip-pad);
     /* the Library's chips, as Library.dc.html draws them: 32px, reaching 44 */
     --app-library-view: 32px;
     --app-library-view-pad: 14px;
@@ -528,6 +536,21 @@ html:has(.app-shell.has-mini) { scroll-padding-bottom: var(--app-chrome-bottom-m
 .app-tile-title { font-weight: var(--dw-weight-medium); }
 .app-tile-artist { color: var(--dw-text-2); }
 
+/* (2.0.15) Recently played before its answer - or saying nothing was played, or that it couldn't ask - holds the
+   shelf's own height, so Recently added under it never moves: one tile's shape, unseen, sized as a tile is on
+   either frame (the phone's row, the desktop's grid), with what it says laid over it */
+.app-shelf-held { position: relative; }
+.app-shelf-ghost { visibility: hidden; }
+.app-shelf-held-say {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+.app-shelf-held-say .pl-spinner { margin: 0; }
+
 /* ===== You ===== */
 
 .app-you { padding: 0 var(--app-edge-grouped-right) 0 var(--app-edge-grouped-left); }
@@ -555,6 +578,7 @@ html:has(.app-shell.has-mini) { scroll-padding-bottom: var(--app-chrome-bottom-m
 
 .app-identity-name {
     margin: 0;
+    font-family: var(--dw-font-title);
     font-size: var(--dw-text-title-2);
     font-weight: var(--dw-weight-bold);
     letter-spacing: var(--dw-tracking-title);
@@ -645,6 +669,18 @@ html:has(.app-shell.has-mini) { scroll-padding-bottom: var(--app-chrome-bottom-m
 }
 
 .app-error { color: var(--dw-danger-text); }
+
+/* (2.0.4) an error's own words, under its sentence - for someone who runs deadwax (app/ErrorNote.tsx) */
+.app-error-detail {
+    display: block;
+    margin-top: var(--pl-gap-xs);
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    font-weight: var(--dw-weight-regular);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
 
 /* "Maximum quality": a radio group in the Playback card */
 .app-choice-title {
@@ -1002,6 +1038,7 @@ html.app-viz-open { overflow: hidden; }
     font-weight: var(--dw-weight-semibold);
     line-height: var(--dw-leading-label);
     overflow-wrap: anywhere;
+    text-wrap: balance;
 }
 
 .app-info-line {
@@ -1115,7 +1152,8 @@ html.app-viz-open { overflow: hidden; }
    Two lines at most, and it takes no touch - a press through it lands on what is under it. */
 .app-is-turntable .pl-sheet-titles { position: relative; }
 
-.app-is-turntable .pl-sheet-error {
+.app-is-turntable .pl-sheet-error,
+.app-is-turntable .app-tt-silent {
     position: absolute;
     right: 0;
     bottom: 100%;
@@ -1126,6 +1164,15 @@ html.app-viz-open { overflow: hidden; }
     -webkit-line-clamp: 2;
     line-clamp: 2;
     pointer-events: none;
+}
+
+/* (2.0.7) The record a turn found silent for good on this song - not a FLAC, no Web Audio here - says why in the
+   failure's place, laid over the plinth's foot the same way (above), in the note's colour, not a failure's. */
+.app-tt-silent {
+    margin: 0 0 var(--pl-error-gap);
+    color: var(--dw-text-2);
+    font-size: var(--pl-text-footnote);
+    overflow-wrap: anywhere;
 }
 
 /* The room between the top row and the song's name. A size container, so the plinth can be as big
@@ -1438,7 +1485,6 @@ html.app-viz-open { overflow: hidden; }
     border-radius: var(--dw-radius-control);
     background: linear-gradient(var(--dw-badge-purple-bg), var(--dw-badge-purple-bg)), var(--dw-tab-bar);
     color: var(--dw-accent-text);
-    font-family: var(--dw-font-mono);
     font-size: var(--dw-text-tab);
     font-weight: var(--dw-weight-bold);
 }
@@ -1554,11 +1600,13 @@ html.app-viz-open { overflow: hidden; }
 .app-job-data,
 .app-job-brief {
     color: var(--dw-text-2);
-    font-family: var(--dw-font-mono);
     font-size: var(--dw-text-footnote);
-    font-variant-numeric: tabular-nums;
     line-height: var(--dw-leading-note);
 }
+
+/* ...the files and the speed in the data face; the brief - "6 of 10", "2nd in line", "starting" - is a
+   count or a word, in the text face (2.0.9) */
+.app-job-data { font-family: var(--dw-font-mono); }
 
 /* an Arriving card's state word gives way before the album's name does */
 .app-job-brief { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1797,7 +1845,7 @@ html.app-viz-open { overflow: hidden; }
     background: transparent;
     color: var(--dw-text);
     font: inherit;
-    font-size: var(--dw-text-body);
+    font-size: var(--dw-text-field);
     outline: none;
     -webkit-appearance: none;
     appearance: none;
@@ -2373,7 +2421,7 @@ button.app-result:active { background: var(--dw-pressed); }
     inset: 0;
     width: 100%;
     opacity: var(--app-chip-select);
-    font-size: var(--dw-text-body);
+    font-size: var(--dw-text-field);
 }
 
 .app-sources-sort-icon { flex: none; width: var(--app-chip-icon); height: var(--app-chip-icon); }
@@ -2449,7 +2497,7 @@ button.app-result:active { background: var(--dw-pressed); }
     box-shadow: var(--dw-well-inset);
     color: var(--dw-text);
     font: inherit;
-    font-size: var(--dw-text-body);
+    font-size: var(--dw-text-field);
     -webkit-appearance: none;
     appearance: none;
 }
@@ -2520,7 +2568,8 @@ button.app-result:active { background: var(--dw-pressed); }
     padding: 0 var(--app-source-get-pad);
     border: var(--dw-hairline) solid transparent;
     border-radius: var(--dw-radius-control);
-    font-size: var(--dw-text-data);
+    /* (2.0.9) a word, not data: Search's Get's size (it read --dw-text-data, 14px until the data size went to 15) */
+    font-size: var(--dw-text-heading);
     font-weight: var(--dw-weight-semibold);
 }
 
@@ -2687,6 +2736,32 @@ button.app-result:active { background: var(--dw-pressed); }
 .app-source-tag.is-purple { border-color: var(--dw-badge-purple-border); background: var(--dw-badge-purple-bg); color: var(--dw-accent-text); }
 .app-source-tag.is-green { border-color: var(--dw-badge-green-border); background: var(--dw-badge-green-bg); color: var(--dw-badge-green-text); }
 
+/* (2.0.6, UX batch 3) "Why it's a 70% match", over the signals */
+.app-source-reasons-title {
+    margin: 0;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-label);
+    font-weight: var(--dw-weight-semibold);
+}
+
+/* ...each a row: its chip, then what it measures - the chips in one column, so the words line up */
+.app-source-signals {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--app-source-meaning-gap);
+}
+
+.app-source-signal-row { display: contents; }
+.app-source-signal-row > .app-source-signal { justify-self: start; }
+
+.app-source-signal-meaning {
+    min-width: 0;
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-label);
+    line-height: var(--dw-leading-note);
+}
+
 /* a signal: its word and its number, in its band's colour - green from 75, amber from 40, red under */
 .app-source-signal {
     display: inline-flex;
@@ -2787,7 +2862,7 @@ button.app-result:active { background: var(--dw-pressed); }
     box-shadow: var(--dw-well-inset);
     color: var(--dw-text);
     font: inherit;
-    font-size: var(--dw-text-body);
+    font-size: var(--dw-text-field);
     -webkit-appearance: none;
     appearance: none;
 }
@@ -3087,11 +3162,13 @@ button.app-result:active { background: var(--dw-pressed); }
 
 .app-artist-name {
     margin: 0;
+    font-family: var(--dw-font-title);
     font-size: var(--dw-text-large-title);
     font-weight: var(--dw-weight-bold);
     line-height: var(--dw-leading-title);
     letter-spacing: var(--dw-tracking-title);
     overflow-wrap: anywhere;
+    text-wrap: balance;
 }
 
 .app-artist-facts {
@@ -3203,6 +3280,9 @@ button.app-result:active { background: var(--dw-pressed); }
     justify-content: center;
     gap: var(--app-chip-gap);
     width: 100%;
+    /* (2.0.5 review) a chip's height from the first frame: the badge is shorter than a chip since 2.0.5, so the row
+       drawn with it alone (unseen, until the bridge answers) grew as "Pressings ›" landed, and the songs moved */
+    min-height: var(--app-chip);
     margin-top: var(--app-album-chips-gap);
     container: app-album-chips / inline-size;
 }
@@ -3213,25 +3293,29 @@ button.app-result:active { background: var(--dw-pressed); }
    pressings" landed beside it - now it first shows where it stays (2.0.0-player.41) */
 .app-album-chips.is-waiting > * { visibility: hidden; }
 
+/* (2.0.5, UX batch 2) "In your library" is a BADGE, styled as the app's others are (the tracklist's Bonus chip,
+   .app-rg-chip): shorter than the chips beside it, label-sized, centred on their row - it had a chip's own box,
+   height and padding, and read as a button that did nothing (the review's AP8) */
 .app-held-badge {
     display: inline-flex;
     flex: none;
     align-items: center;
+    align-self: center;
     gap: var(--app-held-badge-gap);
     box-sizing: border-box;
-    height: var(--app-chip);
-    padding: 0 var(--app-chip-pad);
+    height: var(--app-held-badge);
+    padding: 0 var(--app-held-badge-pad);
     border: var(--dw-hairline) solid var(--dw-badge-green-border);
     border-radius: var(--dw-radius-control);
     background: var(--dw-badge-green-bg);
     color: var(--dw-badge-green-text);
-    font-size: var(--dw-text-footnote);
+    font-size: var(--dw-text-label);
     font-weight: var(--dw-weight-semibold);
     white-space: nowrap;
 }
 
 .app-held-badge-icon { flex: none; width: var(--app-held-badge-icon); height: var(--app-held-badge-icon); }
-/* (2.0.0-player.52) "In the store": in the store but not yours - said in the line's grey with no box, no
+/* (2.0.0-player.52) "In the collection" (2.0.5's word; it was "In the store"): in the collection but not yours - said in the line's grey with no box, no
    green and no tick, as the pressing list says it (.app-picker-held.is-store): in the chip's own box it read
    as one more button beside "Other pressings ›" (review) */
 .app-held-badge.is-store {
@@ -3262,32 +3346,22 @@ button.app-result:active { background: var(--dw-pressed); }
 .app-also-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .app-chip-icon { flex: none; width: var(--app-chip-icon); height: var(--app-chip-icon); }
 .app-album-chips > .app-other-pressings { flex: none; }
-/* ...and beside an Also chip, in a row too narrow for the three whole - "In your library" and "Other
-   pressings" take 288px between them, which leaves an Also chip under 312px of a 600px row - it says
-   "Pressings" (its name stays "Other pressings") and "In your library" keeps its green tick and gives
-   up its words - still read, never shown - leaving the Also chip room to say which pressing it is (at
-   320px it was a bare "›"). By the row's own width, so a phone on its side or a tablet says every word,
-   and a desktop's column narrowed by the Edit panel shortens too (at 1280px the Also chip was a bare
-   "›" there). Where container queries aren't known every word shows, and the Also chip gives way. */
-.app-other-short { display: none; }
-
-@container app-album-chips (max-width: 600px) {
-    .app-album-chips:has(.app-also) .app-other-long { display: none; }
-    .app-album-chips:has(.app-also) .app-other-short { display: inline; }
-
-    .app-album-chips:has(.app-also):has(.app-other-pressings) .app-held-badge:not(.is-store) .app-held-badge-text {
-        position: absolute;
-        width: var(--dw-hairline);
-        height: var(--dw-hairline);
-        overflow: hidden;
-        clip-path: inset(50%);
-        white-space: nowrap;
-    }
-
-    /* ...and "In the store", with no tick to keep, gives way WHOLE - still read, never shown, and out of the
-       row, so it leaves neither an empty box nor a gap: the Also chip keeps its room (at 320px its words beside
-       it left "Also: t…"), and the line under Play says the album isn't yours (2.0.0-player.52 review) */
-    .app-album-chips:has(.app-also):has(.app-other-pressings) .app-held-badge.is-store {
+/* ...and beside an Also chip, in a row too narrow for all three whole. (2.0.5, UX batch 2) "Pressings ›" is its one
+   name on every frame (it was "Other pressings" where there was room, "Pressings" where not), and the badge keeps its
+   words wherever the three fit whole - a desktop's column narrowed by Info or the Edit panel included, where it gave
+   them up at any row under 600px and left a bare tick in a chip-sized box, which read as an unlabelled button (the
+   review's M3). Only a row too narrow for "In your library", "Also: the 2014 pressing" and "Pressings" side by side -
+   a phone's: 119 + 182 + 99 + two gaps is 416px, and a 390px phone's row is 350 - gives way, and the badge gives way
+   WHOLE, "In your library" as "In the collection" always has: still read, never shown, and out of the row, so it leaves
+   neither a box nor a gap, and the Also chip keeps the room to say which pressing it is (with the words the Also chip
+   said "Also: the 2014…" at 390px and "A…" at 320). Its tick alone, kept at first, was a bare mark beside the Also
+   chip that read as that pressing ticked, or as nothing (2.0.5 review); the line under Play still says whose the
+   album is - Remove from my library with logins on, and with logins off every album is in your library. The row never
+   wraps instead: a second line landing with the bridge's answer would push the songs down under a finger. By the
+   row's own width (a container), so a phone on its side or a tablet says every word. Where container queries aren't
+   known every word shows, and the Also chip gives way. */
+@container app-album-chips (max-width: 420px) {
+    .app-album-chips:has(.app-also):has(.app-other-pressings) .app-held-badge {
         position: absolute;
         width: var(--dw-hairline);
         height: var(--dw-hairline);
@@ -3343,7 +3417,7 @@ button.app-result:active { background: var(--dw-pressed); }
     inset: 0;
     width: 100%;
     opacity: var(--app-chip-select);
-    font-size: var(--dw-text-body);
+    font-size: var(--dw-text-field);
 }
 
 .app-sort:has(.app-sort-select:focus-visible) {
@@ -3352,7 +3426,7 @@ button.app-result:active { background: var(--dw-pressed); }
     border-radius: var(--dw-radius-control);
 }
 
-.app-library-count { color: var(--dw-text-2); white-space: nowrap; }
+.app-library-count { color: var(--dw-text-2); font-size: var(--dw-text-footnote); white-space: nowrap; }
 /* (2.0.0-player.52) your library empty: what it is, what to do, and Browse the store under them */
 .app-library-empty { display: flex; flex-direction: column; align-items: center; gap: var(--app-album-mine-gap); }
 /* the Library's title takes the focus Browse the store hands on, where no Browse chip is drawn (a desktop) */
@@ -3466,6 +3540,7 @@ button.app-result:active { background: var(--dw-pressed); }
     gap: var(--app-job-inner);
     min-width: 0;
     min-height: var(--app-done-row);
+    padding-block: var(--app-done-pad-y);
     color: var(--dw-text);
     text-align: left;
 }
@@ -4072,7 +4147,7 @@ html.app-artist-panel-open { overflow: hidden; }
     background: var(--dw-well);
     box-shadow: var(--dw-well-inset);
     color: var(--dw-text);
-    font-size: var(--dw-text-body);
+    font-size: var(--dw-text-field);
 }
 
 .app-artist-search-input:focus-visible { outline: var(--app-ring) solid var(--dw-accent); outline-offset: var(--app-ring); }
@@ -4455,7 +4530,6 @@ html.app-viewer-open { overflow: hidden; }
 
 /* a release id is one 36-character word: broken anywhere, never run off a phone */
 .app-props-value { min-width: 0; margin: 0; color: var(--dw-text); overflow-wrap: anywhere; }
-.app-props-value.is-mono { font-family: var(--dw-font-mono); }
 .app-props-value.is-quiet { color: var(--dw-text-3); }
 
 /* the release's page, opening beside the app - its target a finger's height, its line's height unmoved.
@@ -4780,7 +4854,7 @@ html.app-viewer-open { overflow: hidden; }
    Up Next is Info's shell - .app-layer, .app-info, its head, its scroller, its card, and on a desktop Info's panel
    by app-desktop.css's .app-layer.is-panel .app-info rules - its rows Search's results and, in Edit, Home's Pinned
    rows; the song menu is ActionMenu's sheet. What is new here: the two sheets' locks, the Edit at the head's left,
-   the row of Shuffle and Repeat, a group's gutter, Now Playing's Up next tinted while Shuffle or Repeat is on, and
+   the row of Shuffle and Repeat, a group's gutter (Now Playing's Up Next was tinted here until 2.0.14), and
    the ••• at the end of a song's row - a full tap target, its glyph's right edge on an album page where the row's
    time ended - and the album bar's ••• beside the pin, their reaches kept apart. */
 :root {
@@ -4831,8 +4905,8 @@ html.app-queue-menu-open { overflow: hidden; }
 .app-upnext-group,
 .app-upnext .app-store-line { margin-top: var(--app-shelf-gap); }
 
-/* Now Playing's Up next while Shuffle or Repeat is on, so a song repeating isn't a mystery */
-.pl-sheet-footer .app-upnext-button.is-on { color: var(--dw-accent); }
+/* (Now Playing's Up Next was tinted here while Shuffle or Repeat was on, until 2.0.14 put the two on its
+   transport - "Shuffle and Repeat on Now Playing's transport (2.0.14)" below) */
 
 /* the ••• at the end of a song's row: a tap target, the glyph drawn small inside it */
 .app-row-more {
@@ -4897,7 +4971,7 @@ html.app-queue-menu-open { overflow: hidden; }
     --app-playlist-hero-icon: 64px;       /* ...and on an empty playlist's hero */
     --app-picker-list-max: 50dvh;         /* the picker's list scrolls past this */
     --app-playlist-edit-gap: 12px;        /* between Edit's fields, and before its rows */
-    --app-playlist-field-text: var(--dw-text-body); /* Edit's and the form's fields: 16px or more, so iOS doesn't zoom */
+    --app-playlist-field-text: var(--dw-text-field); /* Edit's and the form's fields: 16px or more, so iOS doesn't zoom */
     --app-playlists-fold-turn: 90deg;     /* From files' chevron, opened */
 }
 
@@ -4906,6 +4980,8 @@ html.app-picker-open { overflow: hidden; }
 /* --- the Library's Playlists row: since 2.0.0-player.59 the first row of the phone root's first group, laid out as
    its other rows are (.app-library-row) - its glyph in the accent --- */
 .app-library-playlists-icon { flex: none; width: var(--app-playlist-art-icon); height: var(--app-playlist-art-icon); color: var(--dw-accent); }
+/* (2.0.10) the other rows' glyphs - a record, a head and shoulders, a note - drawn as the Playlists row's is */
+.app-library-row-icon { flex: none; width: var(--app-playlist-art-icon); height: var(--app-playlist-art-icon); color: var(--dw-accent); }
 
 /* --- a playlist's cover, or the empty square with the glyph on it --- */
 .app-playlist-art,
@@ -5022,6 +5098,10 @@ html.app-picker-open { overflow: hidden; }
 
 /* a song's row: its own cover in the number's column, the playing bars over it */
 .app-playlist-track { grid-template-columns: var(--app-playlist-row-cover) minmax(0, 1fr) auto; }
+/* (2.0.9) a playlist's row aligns its title and length by their first baselines, as an album's row does
+   (player.css's .pl-track), and only its cover is centred: a baseline would sit the cover on the line, and
+   the whole row centred drew the length between the title's line and the artist's */
+.app-playlist-track-art { align-self: center; }
 
 .app-playlist-track-art {
     position: relative;
@@ -5202,7 +5282,7 @@ html.app-picker-open { overflow: hidden; }
    look's "needs Edit albums" line. */
 :root {
     --app-people-gap: 12px;                       /* between a card's parts, and between cards */
-    --app-people-field-text: var(--dw-text-body); /* every field: 17px */
+    --app-people-field-text: var(--dw-text-field); /* every field: 17px */
     --app-people-dialog-max: 480px;               /* Remove's card on a desktop */
     --app-people-dialog-height: 100dvh;           /* ...and how tall it may get, less the status bar */
     --app-people-max: 760px;                      /* the page's column on a desktop: forms a line can be read across */
@@ -5389,6 +5469,169 @@ html.app-picker-open { overflow: hidden; }
 .app-you-unverified { color: var(--dw-amber-text); }
 .app-queue-no-edit { color: var(--dw-text-2); }
 
+
+/* ===== (2.0.13) a short description: the artist's under their Play row, an album's under its hero ===== */
+
+/* app/Description.tsx: Navidrome's words (or Wikipedia's), clamped to three lines with More / Less, and where they
+   came from under them; on an album's, Wikidata's one-line subtitle heads them (an artist's is in the hero,
+   .app-artist-subtitle). Prose, in the body face (2.0.9: never mono). On the artist page it sits in the body's own
+   column (its gap and edges); on an album page, and the album you don't have, at the page's edges as the songs are.
+   At the foot - one that came after what is under its top place was drawn (lib/describe.ts) - it keeps clear of
+   the songs' footer line and the page's links. */
+:root {
+    --app-about-lines: 3;            /* clamped to this many lines until More */
+    --app-about-measure: 68ch;       /* never wider than a comfortable line, whatever the frame */
+    --app-about-top: 18px;           /* an album page's: under the hero (or the line under it) */
+    --app-about-foot-top: 6px;       /* at the foot: under the songs' line, above Properties */
+    --app-about-gap: 2px;            /* the words to the line under them */
+    --app-about-links-gap: 16px;     /* More to "From Wikipedia" */
+}
+
+.app-about {
+    display: flex;
+    flex-direction: column;
+    gap: var(--app-about-gap);
+    min-width: 0;
+}
+
+.pl-album-page > .app-about {
+    padding: var(--app-about-top) var(--pl-edge-right) 0 var(--pl-edge-left);
+}
+
+.pl-album-page > .app-about.is-foot { padding-top: var(--app-about-foot-top); }
+
+/* Wikidata's one line: "1994 studio album by Portishead" - small, in the body face, above the paragraph */
+.app-about-subtitle {
+    max-width: var(--app-about-measure);
+    margin: 0;
+    color: var(--dw-text-2);
+    font-family: var(--dw-font);
+    font-size: var(--dw-text-footnote);
+    font-weight: var(--dw-weight-medium);
+    line-height: var(--dw-leading-note);
+    overflow-wrap: anywhere;
+}
+
+/* ...an artist's, under their name in the hero, over its picture as the facts line is. ONE line, ellipsized (after
+   review): the hero is 240px at the least, not at the most - a two-line name under an iPhone's status bar outgrows it -
+   so the line it lands in is kept from the first frame (below), and a description wrapping to two would outgrow that */
+.app-artist-subtitle {
+    margin: var(--app-line-gap) 0 0;
+    overflow: hidden;
+    color: var(--dw-text-on-secondary);
+    font-family: var(--dw-font);
+    font-size: var(--dw-text-footnote);
+    font-weight: var(--dw-weight-medium);
+    line-height: var(--dw-leading-note);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* ...and its line kept, above the name, until it comes: the names block as tall before the subtitle lands as after, so
+   a hero that outgrew 240px doesn't grow again, moving Play and Shuffle under a finger; where the hero has room the
+   kept line is room it already had, the names at its foot either way */
+.app-artist-names:not(:has(.app-artist-subtitle))::before {
+    content: '';
+    display: block;
+    height: calc(var(--app-line-gap) + var(--dw-text-footnote) * var(--dw-leading-note));
+}
+
+.app-about-text {
+    max-width: var(--app-about-measure);
+    margin: 0;
+    color: var(--dw-text-2);
+    font-family: var(--dw-font);
+    font-size: var(--dw-text-heading);
+    font-weight: var(--dw-weight-regular);
+    line-height: var(--dw-leading-body);
+    overflow-wrap: anywhere;
+}
+
+.app-about-text.is-clamped {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: var(--app-about-lines);
+    line-clamp: var(--app-about-lines);
+}
+
+/* More and the source, on one line a finger tall - each a finger's reach, the words where they sit */
+.app-about-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 var(--app-about-links-gap);
+    min-height: var(--pl-hit);
+}
+
+.app-about-more {
+    min-height: var(--pl-hit);
+    padding: 0;
+    font-size: var(--dw-text-footnote);
+    font-weight: var(--dw-weight-medium);
+}
+
+.app-about-source {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--pl-hit);
+    color: var(--dw-text-2);
+    font-size: var(--dw-text-footnote);
+    text-decoration: underline;
+    text-decoration-color: var(--dw-border);
+    text-underline-offset: var(--app-ring);
+}
+
+.app-about-source:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring);
+    border-radius: var(--dw-radius-control);
+}
+
+/* ===== Shuffle and Repeat on Now Playing's transport (2.0.14) =====
+   James: "in the mobile I need the shuffle and loop buttons on the main player page". Shuffle first and Repeat
+   last on the transport row (player/NowPlaying.tsx), Up Next's and the player bar's controls: a tap target each,
+   their glyphs the icon row's size in its grey, in the accent while on, dimmed while they can't be used (a whole
+   library's shuffle), as Up Next's chips are. Each target reaches past the body's edge by as much as it is wider
+   than its glyph, so the glyphs sit under the two ends of the scrubber; the row keeps its 72px height, so nothing
+   above or below it moves. At 320 wide the row is 284px, and two 44px targets and three 72px buttons are 304: there
+   (and only that narrow) the middle three give up width - never height, and never below a tap target. */
+
+:root {
+    --app-np-mode-icon: 24px;      /* Shuffle's and Repeat's glyphs, the icon row's size */
+    --app-np-mode-reach: calc((var(--pl-hit) - var(--app-np-mode-icon)) / 2);
+}
+
+.pl-sheet-body .pl-transport {
+    justify-content: space-between;
+    margin-right: calc(-1 * var(--app-np-mode-reach));
+    margin-left: calc(-1 * var(--app-np-mode-reach));
+}
+
+.pl-transport .pl-transport-button { min-width: var(--pl-hit); }
+
+/* ...and their press stays a circle at any width (player.css: "the press shows a circle, not a card's corners"):
+   the fill is drawn on a square of the button's width laid in the button's one grid cell under the glyph, not on
+   the button, so the 65px-wide middle three at 320 press a 65px circle, not a 65x72 oval - and at 72 wide, the
+   72px circle player.css has always drawn */
+.pl-transport .pl-transport-button:active { background: none; }
+.pl-transport .pl-transport-button::before {
+    content: '';
+    grid-area: 1 / 1;
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: var(--pl-radius-round);
+    transition: background-color var(--duration-fast) var(--ease-out);
+}
+.pl-transport .pl-transport-button > * { grid-area: 1 / 1; }
+.pl-transport .pl-transport-button:active::before { background: var(--pl-pressed); }
+
+.pl-transport .app-np-mode { color: var(--pl-text-2); }
+.pl-transport .app-np-mode .pl-icon { width: var(--app-np-mode-icon); height: var(--app-np-mode-icon); }
+.pl-transport .app-np-mode.is-on { color: var(--dw-accent); }
+.pl-transport .app-np-mode[aria-disabled='true'] { opacity: var(--app-pin-off); }
+/* dimmed, its tap does nothing - so it doesn't flash a press either, as the pin's and a job's Cancel don't */
+.pl-transport .app-np-mode[aria-disabled='true']:active { background: none; }
 
 /* ===== looking after deadwax from a phone (2.0.0-player.47) =====
    The phone gets every managing page the desktop has: the Edit panel as a sheet over the whole screen
@@ -5722,7 +5965,7 @@ html.app-edit-open { overflow: hidden; }
     box-shadow: var(--dw-well-inset);
     color: var(--dw-text);
     font: inherit;
-    font-size: var(--dw-text-body);
+    font-size: var(--dw-text-field);
     outline: none;
 }
 
@@ -5908,8 +6151,6 @@ html.app-edit-open { overflow: hidden; }
     gap: var(--app-line-gap) var(--app-ph-block);
     font-size: var(--dw-text-label);
 }
-
-.app-shell:not(.app-desk) .app-edit .metadata-mbid { color: var(--dw-text-2); font-family: var(--dw-font-mono); overflow-wrap: anywhere; }
 
 .app-shell:not(.app-desk) .app-edit #metadata-search { display: flex; gap: var(--app-ph-lines); }
 .app-shell:not(.app-desk) .app-edit #metadata-search > input { flex: 1; }
@@ -6607,7 +6848,7 @@ html.app-edit-open { overflow: hidden; }
     box-shadow: var(--dw-well-inset);
     color: var(--dw-text);
     font-family: var(--dw-font-mono);
-    font-size: var(--dw-text-body);
+    font-size: var(--dw-text-field);
     outline: none;
 }
 
@@ -6887,7 +7128,7 @@ html:has(.app-shell.has-mini:not(.app-desk) .app-pane:not([hidden]) .app-setting
     box-shadow: var(--dw-well-inset);
     color: var(--dw-text);
     font: inherit;
-    font-size: var(--dw-text-body);
+    font-size: var(--dw-text-field);
     outline: none;
 }
 

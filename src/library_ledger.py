@@ -55,14 +55,15 @@ NOT_CONFIRMED = "not_confirmed"
 #? Navidrome lost a star it had (the album came back under another id, or went missing mid-retag)
 STAR_LOST = "star_lost"
 
+#? (2.0.5, UX batch 2) said as what the person sees - the album being added to their library - never starring or
+#? Navidrome by name (the music server); You groups the waiting albums by these words (lib/myLibrary.ts)
 PROBLEM_WORDS = {
-    NOT_IN_NAVIDROME: "Navidrome hasn't got it yet (it may still be scanning) - deadwax asks again by itself.",
-    NO_RELEASE: ("It has no MusicBrainz release id, so deadwax can't find it in Navidrome - an admin can "
-                 "apply a release to it."),
-    MISSING: "Its folder isn't there just now - deadwax asks again once it is.",
-    NAVIDROME_DOWN: "Navidrome isn't answering - deadwax asks again by itself.",
-    NOT_CONFIRMED: "Navidrome took the star but didn't keep it - deadwax tries again by itself.",
-    STAR_LOST: "Navidrome lost its star (the album moved or was re-tagged) - deadwax is putting it back.",
+    NOT_IN_NAVIDROME: "The music server hasn't picked it up yet - it's added as soon as it has.",
+    NO_RELEASE: "An admin needs to match it to a release on MusicBrainz before it can be added.",
+    MISSING: "Its files aren't there just now - it's added once they are.",
+    NAVIDROME_DOWN: "The music server isn't answering - it's added once it does.",
+    NOT_CONFIRMED: "Being added again - nothing for you to do.",
+    STAR_LOST: "It was moved or re-tagged, so it's being added again - nothing for you to do.",
 }
 
 #? The backoff between tries of one entry: 30 s, doubling, at most half an hour - and on for ever: the
@@ -76,7 +77,16 @@ def retry_after(attempts: int) -> float:
     return float(min(LAST_RETRY_SECONDS, FIRST_RETRY_SECONDS * 2 ** max(0, attempts - 1)))
 
 
-def problem_text(problem: str | None) -> str | None:
+#? (2.0.8, UX batch 5) NO_RELEASE said to someone who can put it right themselves - an admin, or anyone given Edit
+#? albums: applying a release writes the release id the worker looks the album up by, and its next try adds it
+NO_RELEASE_YOURS = "It isn't matched to a release on MusicBrainz yet. Apply a release to it in Edit album, and it's added after that."
+
+
+def problem_text(problem: str | None, can_apply: bool = False) -> str | None:
+    """Why an entry still waits, for its reader: `can_apply` - they may apply a release (Edit albums) - says
+    the NO_RELEASE fix as theirs to make."""
+    if can_apply and problem == NO_RELEASE:
+        return NO_RELEASE_YOURS
     return PROBLEM_WORDS.get(problem or "") if problem else None
 
 

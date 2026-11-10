@@ -16,7 +16,7 @@ the tour; this is the manual.
 | page | covers |
 | --- | --- |
 | [Finding music](finding-music.md) | Search: one box, your library first, then MusicBrainz's artists, albums and songs; what deadwax has saved; the album you don't have and its pressings, and "in your library" marks |
-| [Downloading](downloading.md) | Get, and choosing a source: what the scores mean, the chips and Signals, Requests, cancelling and retrying a failed download, downloads per person |
+| [Downloading](downloading.md) | Get, and choosing a source: what the scores mean, the chips and Match details, Requests, cancelling and retrying a failed download, downloads per person |
 | [Organizing](organizing.md) | what happens when a download finishes: dry run, copy or move, folder names and templates, editions, tags, covers, lyrics, and clean-up |
 | [The library](library.md) | looking after it: what needs attention, the Edit panel (release, tags, artwork, lyrics, delete), Needs a look, Library care, artist pages |
 | [Sharing deadwax](sharing.md) | letting other people use it: logins through their own Navidrome accounts, what each person gets and what stays shared, admins and everyone else, adding and removing people, turning logins off again |
@@ -61,10 +61,10 @@ A few words mean something specific here, and the rest of the guide leans on the
 It's one app with five tabs - **Home**, **Library**, **Search**, **Requests** and **You** - and a
 player inside them, made to be added to an iPhone's home screen and opened like an app
 ([adding it](player.md#adding-it-to-an-iphones-home-screen)). Each tab keeps its own pages, as an
-iPhone app's do, and looking after deadwax is in **You → Managing deadwax**, laid out for a phone.
+iPhone app's do, and looking after deadwax is in **You → Manage**, laid out for a phone.
 
 In a window 1024 pixels wide or more it has [a desktop's layout](player.md#on-a-desktop): a sidebar
-for the tabs and for **Managing** (Needs a look, Library care, People, Settings and Log), a player
+for the tabs and for **Manage** (Needs a look, Library care, People, Server settings and Event log), a player
 bar along the bottom, an album's sources, Info and the Edit panel beside the page, and a full-screen
 [visualizer](player.md#the-visualizer) from the player bar. Resizing across 1024 pixels swaps the
 layout without stopping the music.

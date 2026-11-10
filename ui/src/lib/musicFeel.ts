@@ -296,8 +296,13 @@ export function tempoFromOnsets(F: Feel): void {
   F.confRaw = Math.max(0, Math.min(1, (y1 - 0.08) / 0.3))
 }
 
-/** What the visualizer shows under its style list: how it hears the music right now. */
+/** The three moods the visualizer names (2.0.7, UX batch 4 - they were the detector's own "smooth", "in between"
+ *  and "aggressive"), calmest first, as the feel's aggression crosses a third and two thirds. */
+export const MOODS = ['calm', 'lively', 'intense'] as const
+
+/** What the visualizer shows under its style list, after "Mood:": how it hears the music right now - "intense ·
+ *  128 BPM", or "calm · listening for the tempo" before it is sure of one. */
 export function feelWords(F: Feel): string {
-  const feel = F.aggr < 0.34 ? 'smooth' : F.aggr < 0.67 ? 'in between' : 'aggressive'
-  return `${feel} · ${F.conf > 0.35 ? `${Math.round(F.bpm)} bpm` : 'finding the tempo'}`
+  const mood = F.aggr < 0.34 ? MOODS[0] : F.aggr < 0.67 ? MOODS[1] : MOODS[2]
+  return `${mood} · ${F.conf > 0.35 ? `${Math.round(F.bpm)} BPM` : 'listening for the tempo'}`
 }

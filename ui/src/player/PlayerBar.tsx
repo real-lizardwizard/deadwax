@@ -1,6 +1,6 @@
 import { Cover } from './Cover'
 import { SpeedChip } from './SpeedChip'
-import { nextRepeat } from '../lib/upNext'
+import { nextRepeat, shuffleLabel } from '../lib/upNext'
 import { AirPlayIcon, InfoIcon, NextIcon, PauseIcon, PlayIcon, PlaylistAddIcon, PreviousIcon, QueueIcon, RepeatIcon, RepeatOneIcon, ShuffleIcon, VisualizerIcon } from './icons'
 import { Scrubber } from './NowPlaying'
 import type { Player } from './usePlayer'
@@ -72,8 +72,8 @@ export function PlayerBar({
   }
 
   //? a whole library's shuffle (Part B): its order IS the shuffle - Shuffle reads on and can't be turned off, as
-  //? Up Next's chip has it: aria-disabled (focus stays), named for why in Up Next's own words (upNextView: your
-  //? library, or everything - Browse's Songs), the click doing nothing
+  //? Up Next's chip has it: aria-disabled (focus stays), named for why in Up Next's own words (lib/upNext shuffleLabel,
+  //? Now Playing's too since 2.0.14: your library, or all music - Browse's Songs), the click doing nothing
   const pagedScope = player.queue.upNext?.paged?.scope
   const paged = !!pagedScope
   //? "Artist — Album", as Now Playing has it; either alone when the other isn't known
@@ -84,15 +84,15 @@ export function PlayerBar({
       <div class="app-playbar-now">
         <Cover id={track.coverArt} size={120} class="app-playbar-cover" />
         <span class="app-playbar-text">
-          <span class="app-playbar-title">{track.title}</span>
+          <span class="app-playbar-title" dir="auto">{track.title}</span>
           {player.error ? (
-            <span class="app-playbar-byline is-error">{player.error}</span>
+            <span class="app-playbar-byline is-error" dir="auto">{player.error}</span>
           ) : onAlbum ? (
-            <button type="button" class="app-playbar-byline is-link" onClick={onAlbum} aria-label={`Go to the album: ${byline}`}>
+            <button type="button" class="app-playbar-byline is-link" dir="auto" onClick={onAlbum} aria-label={`Go to the album: ${byline}`}>
               {byline}
             </button>
           ) : (
-            <span class="app-playbar-byline">{byline}</span>
+            <span class="app-playbar-byline" dir="auto">{byline}</span>
           )}
         </span>
       </div>
@@ -105,7 +105,7 @@ export function PlayerBar({
             onClick={() => {
               if (!paged) player.setShuffle(!player.shuffle)
             }}
-            aria-label={paged ? `Shuffle - shuffling ${pagedScope === 'store' ? 'everything' : 'your whole library'}` : 'Shuffle'}
+            aria-label={shuffleLabel(pagedScope)}
             aria-pressed={player.shuffle}
             aria-disabled={paged}
           >

@@ -67,11 +67,11 @@
  * and the first pressing, and empty again once the list closes - by a pick or by the Pressing button.
  *
  * And with logins on and a library of your own (2.0.0-player.52, second review), drawn as ethan: an album the
- * store holds that isn't his is "in the store" in the meta line, "In the store, not in your library" under Get
- * and "In the store" in the pressing list - the page taking `personal` from the session, never drawn as logins
+ * store holds that isn't his is "in the collection" in the meta line, "In the collection, not in your library" under Get
+ * and "In the collection" in the pressing list - the page taking `personal` from the session, never drawn as logins
  * off; the library asked again every time the page shows; and a library answer kept from earlier in the
  * session (an unstar in Amperfy since, read back) giving way to the store line's fresh word once it lands - the
- * meta line never "in your library" over "In the store, not in your library", nor the other way round. Logins
+ * meta line never "in your library" over "In the collection, not in your library", nor the other way round. Logins
  * off after it: "in your library" and "Already in your library", as ever.
  *
  * Run it with:  node ui/test/group.sim.cjs   (TMPDIR somewhere writable inside a sandbox)
@@ -142,6 +142,14 @@ exports.joinJob = (jobId) => globalThis.__group.joinJob(jobId)
 fs.writeFileSync(path.join(OUT, 'app/useSheet.js'), `
 exports.takeOpener = (event) => event.currentTarget
 `)
+//? (2.0.13) the album's description: what it was asked with kept, what it answers the test's - by default settled
+//? with none, so the tracklist waits for nothing more than it did
+fs.writeFileSync(path.join(OUT, 'app/useDescription.js'), `
+exports.useDescription = (kind, ids, below, page) => {
+  globalThis.__group.describeAsks.push([kind, ids, below, page])
+  return globalThis.__group.describing
+}
+`)
 
 const asked = []
 const answers = []
@@ -152,6 +160,8 @@ const owning = (albums) => ({ index: OwnedIndex.buildOwnedIndex(albums), artists
 const stateAsks = []
 globalThis.__group = {
   owned: null,
+  describeAsks: [],
+  describing: { description: null, settled: true, at: null },
   //? how many times the page asked the library again (2.0.0-player.52, second review: every time it shows)
   ownedAsks: 0,
   storeState(body, signal) {
@@ -233,8 +243,8 @@ async function main() {
     const { draw } = page({ id: slowRush.group.id, preview: PREVIEW })
     draw()
     check('one ask, for the group', asked, [slowRush.group.id])
-    check('"Asking MusicBrainz…", as a status, with the sweep', [text(classed('app-asking')[0]), classed('app-asking')[0]?.props.role, classed('app-sweep').length],
-      ['Asking MusicBrainz…', 'status', 1])
+    check('(2.0.6) "Loading…", as a status, with the sweep', [text(classed('app-asking')[0]), classed('app-asking')[0]?.props.role, classed('app-sweep').length],
+      ['Loading…', 'status', 1])
     check('the header: title, artist, and what it is - and nothing about the library before it answers',
       [text(classed('pl-hero-title')[0]), text(classed('pl-hero-artist')[0]), text(classed('pl-hero-meta')[0])],
       ['The Slow Rush', 'Tame Impala', '2020 · Album'])
@@ -265,7 +275,7 @@ async function main() {
     draw()
     await settle()
     draw()
-    check('it says MusicBrainz isn\'t answering, and offers to ask again', [text(classed('app-rg-trouble')[0]).startsWith("MusicBrainz isn't answering just now"),
+    check('(2.0.6) it says the album\'s details can\'t be loaded, and offers to ask again', [text(classed('app-rg-trouble')[0]).startsWith("This album's details can't be loaded right now - try again in a few minutes."),
       find((node) => node.type === 'button' && text(node) === 'Try again').length], [true, 1])
     check('...and draws no tracklist', classed('app-rg-tracks').length, 0)
     answers.push(answering(slowRush, 'MusicBrainz failed part way'))
@@ -357,7 +367,7 @@ async function main() {
     empty.draw()
     await settle()
     empty.draw()
-    check('no pressings at all says so', text(classed('pl-notice')[0]), 'MusicBrainz lists no pressings of this album.')
+    check('no pressings at all says so', text(classed('pl-notice')[0]), 'There are no pressings of this album to get.')
   }
 
   console.log('\na cold link, with the group MusicBrainz sends beside each pressing')
@@ -459,7 +469,7 @@ async function main() {
     await settle()
     draw()
     check('the answer drawn under the pressing: already downloading, cancelled in Requests', find((node) => node.type === StoreState)[0]?.props.status,
-      { kind: 'downloading', title: 'Already downloading', lines: ['From bob · queued', 'Open Requests to cancel it if you want another peer.'] })
+      { kind: 'downloading', title: 'Already downloading', lines: ['From bob · queued', 'To get it from another source, cancel it in Requests first.'] })
     check('...in a polite live region that is always there', classed('app-rg-store')[0]?.props['aria-live'], 'polite')
     check('...UNDER Get, where an answer landing late moves nothing a finger is reaching for (the pressing\'s facts, 2.0.0-player.50, under its picker)',
       classed('app-rg-actions')[0]?.props.children.filter(Boolean).map((child) => child.type === 'button' ? child.props.class : child.props?.class ?? child.type?.name), ['PressingPicker', 'app-rg-facts', 'app-rg-get', 'app-rg-store'].map((name) => name))
@@ -550,7 +560,7 @@ async function main() {
     draw()
     check('...and it does: yours now, a cancel only taking it off your list', find((node) => node.type === StoreState)[0]?.props.status,
       { kind: 'downloading', title: 'Already downloading', lines: ['From glassbeads · queued',
-        "Someone else asked for it too, so cancelling it in Requests only takes it off your list - another peer isn't offered for a download you share."] })
+        "Someone else asked for it too, so cancelling it in Requests only takes it off your list - another source isn't offered for a download you share."] })
   }
 
   console.log('\na cold link: Get builds from the group the pressings carry, the pressing\'s credit where it has none')
@@ -586,7 +596,7 @@ async function main() {
     check('...Get not pressed: the panel isn\'t showing this page\'s sources', classed('app-rg-get')[0].props['aria-pressed'], false)
     check('the tracklist: "Tracklist", the line, and a table - its "Against the usual tracklist" column, since some pressings differ',
       [text(find(byClass('app-rg-desk-title'), table())[0]), text(find(byClass('app-rg-summary'), table())[0]), find((node) => node.type === 'th', table()).map(text), classed('app-rg-list').length],
-      ['Tracklist', 'The usual tracklist, shared by 9 of 10 pressings', ['#', 'Title', 'Against the usual tracklist', 'Length'], 0])
+      ['Tracklist', 'The usual tracklist, shared by 9 of 10 pressings', ['#', 'Title', 'Compared with the usual', 'Length'], 0])
     check('...the usual pressing\'s twelve rows, none marked, their against cells empty',
       [find(byClass('app-rg-row'), table()).length, find(byClass('is-marked'), table()).length, find(byClass('app-rg-against'), table()).map(text).join('')], [12, 0, ''])
     const japan = byPrefix(slowRush, '452ccdb4')
@@ -746,7 +756,19 @@ async function main() {
     const maybe = classed('app-rg-maybe')[0]
     check('a folder of its name with no ids: "maybe in your library", dashed - the year and kind still before it',
       [text(classed('pl-hero-meta')[0]), text(maybe), maybe?.type], ['2020 · Album · maybe in your library', 'maybe in your library', 'span'])
-    check('...its folders in its tooltip, as the main page\'s card says them', maybe?.props.title.includes('Old Rips/Tame Impala - The Slow Rush (MP3)') && maybe.props.title.startsWith('A folder with this name, not tagged with MusicBrainz ids'), true)
+    check('...its folders in its tooltip, as the main page\'s card says them (logins off: everyone can Edit albums)', maybe?.props.title.includes('Old Rips/Tame Impala - The Slow Rush (MP3)') && maybe.props.title.startsWith('A folder with this name, not matched to a pressing'), true)
+    //? (2.0.6, UX batch 3: RG5) ...and said in words anyone reads, under Get - the tooltip was its only explanation, which a phone never shows
+    check('(2.0.6) ...and why, in a line under Get, how to settle it for whoever can Edit albums', [text(classed('app-rg-maybe-note')[0]), classed('app-rg-maybe-note')[0]?.props.class],
+      ["You may already have this - an album with this name is in your library, but it isn't matched to a pressing. Match it to a pressing in Edit album.", 'app-footnote app-rg-maybe-note'])
+    {
+      const session = require(path.join(OUT, 'app/session.js'))
+      session.setSessionMe({ user: 'ethan', auth: 'on', admin: false })
+      draw()
+      check('(2.0.6) ...a listener who can\'t Edit albums: the line without the how, and no folders in a tooltip', [text(classed('app-rg-maybe-note')[0]), classed('app-rg-maybe')[0]?.props.title],
+        ["You may already have this - an album with this name is in your library, but it isn't matched to a pressing.", undefined])
+      session.setSessionMe(null)
+      draw()
+    }
     globalThis.__group.owned = owning([{ path: 'Old Rips/Tame Impala - The Slow Rush', artist: 'Tame Impala', album: 'The Slow Rush' },
       { path: 'Tame Impala/The Slow Rush (2020)', release_mbid: usual.id, release_group_mbid: slowRush.group.id }])
     draw()
@@ -787,7 +809,7 @@ async function main() {
       [many.length, !!field(), find(byClass('app-picker-filter'), listbox()).length, text(find(byClass('app-visually-hidden'), classed('app-picker-filter')[0])[0]), field()?.props['aria-controls'] === listbox()?.props.id],
       [40, true, 0, 'Filter the pressings', true])
     check('...its placeholder saying what works, as the rows say it - a country by its code (review: "country" asked for "Japan")',
-      field()?.props.placeholder, 'JP, CD, a label or cat. no.')
+      field()?.props.placeholder, 'JP, CD, a label or catalogue no.')
     //? (review: "No pressing matches" was a region made with its words, which VoiceOver doesn't read, and
     //? nothing said how many matched) one region, there before a word is typed, saying what's left
     check('...and a polite live region in the list before anything is typed, read out but never drawn, empty',
@@ -870,13 +892,13 @@ async function main() {
     first.draw()
     await settle()
     first.draw()
-    check('ethan, Dummy the store\'s and not his: the library asked as the page shows, the meta line "in the store"',
-      [globalThis.__group.ownedAsks, meta()], [1, '1994 · in the store'])
+    check('ethan, Dummy the store\'s and not his: the library asked as the page shows, the meta line "in the collection"',
+      [globalThis.__group.ownedAsks, meta()], [1, '1994 · in the collection'])
     stateAsks.at(-1).resolve(heldLine(false))
     await settle()
     first.draw()
-    check('...under "In the store, not in your library", the pressing on screen marked "In the store"',
-      [meta(), storeLine(), mark()], ['1994 · in the store', 'In the store, not in your library', [true, true, true]])
+    check('...under "In the collection, not in your library", the pressing on screen marked "In the collection"',
+      [meta(), storeLine(), mark()], ['1994 · in the collection', 'In the collection, not in your library', [true, true, true]])
     first.draw({ shown: false })
     const hidden = globalThis.__group.ownedAsks
     first.draw({ shown: true })
@@ -892,8 +914,8 @@ async function main() {
     stateAsks.at(-1).resolve(heldLine(false))
     await settle()
     stale.draw()
-    check('...and the store line\'s fresh word wins: "in the store" over "In the store, not in your library" - never "in your library" over it',
-      [meta(), storeLine(), mark(), / · in your library$/.test(meta())], ['1994 · in the store', 'In the store, not in your library', [true, true, true], false])
+    check('...and the store line\'s fresh word wins: "in the collection" over "In the collection, not in your library" - never "in your library" over it',
+      [meta(), storeLine(), mark(), / · in your library$/.test(meta())], ['1994 · in the collection', 'In the collection, not in your library', [true, true, true], false])
     //? ...and the other way: starred in Amperfy since, read back into his library
     globalThis.__group.owned = owns(false)
     const starred = page({ id: dummy.group.id })
@@ -991,6 +1013,81 @@ async function main() {
     check('on a desktop: the table\'s row of the song marked and said', [marked.length, marked[0] && text(find(byClass('app-rg-title'), marked[0])[0])],
       [1, 'Patience, the song you searched for'])
     delete globalThis.window
+  }
+
+  console.log('\nits description (2.0.13): asked by the group\'s id once the pressings are in, the tracklist waiting for it a moment')
+  {
+    const G = globalThis.__group
+    const timers = []
+    const realTimeout = globalThis.setTimeout, realClear = globalThis.clearTimeout
+    globalThis.setTimeout = (fn, ms) => { const timer = { fn, ms, live: true }; timers.push(timer); return timer }
+    globalThis.clearTimeout = (timer) => { if (timer) timer.live = false }
+    //? groups the session has kept no pressings of: pages opened for the first time
+    const FIRST = 'aaaaaaaa-1111-4000-8000-000000000001', SECOND = 'aaaaaaaa-1111-4000-8000-000000000002'
+    G.describeAsks.length = 0
+    G.describing = { description: null, settled: false, at: null }
+    answers.push(answering(dummy))
+    const { draw } = page({ id: FIRST })
+    draw()
+    check('not asked while the pressings are out - its MusicBrainz lookup never takes a turn ahead of theirs', G.describeAsks.at(-1), ['album', null, false, FIRST])
+    await settle()
+    draw()
+    check('...the pressings in: asked, by the group\'s id alone (an album you don\'t have has nothing of Navidrome\'s)', G.describeAsks.at(-1), ['album', { mbid: FIRST }, false, FIRST])
+    check('the pressings in, the description not: the tracklist waits, saying it is loading', [classed('app-rg-track').length, text(classed('app-asking')[0])], [0, 'Loading…'])
+    const WIKI = { paragraph: { text: 'Dummy is the debut studio album by Portishead.', source: 'wikipedia', url: 'https://en.wikipedia.org/wiki/Dummy_(album)' },
+      subtitle: '1994 studio album by Portishead' }
+    const before = G.describeAsks.length
+    G.describing = { description: WIKI, settled: true, at: 'top' }
+    draw()
+    const blocks = () => find((node) => node.type?.name === 'DescriptionBlock')
+    check('...it came: under the hero - subtitle and paragraph together - then the tracklist',
+      [blocks().map((node) => node.props.at), blocks()[0]?.props.description.subtitle, classed('app-rg-track').length > 0, G.describeAsks[before][2]],
+      [['top'], WIKI.subtitle, true, false])
+    const kids = tree.props.children.flat(Infinity).filter((node) => node && typeof node === 'object')
+    check('...between the hero and the tracklist', [kids.findIndex((node) => node.props?.class === 'pl-album-hero') < kids.findIndex((node) => node.type?.name === 'DescriptionBlock'),
+      kids.findIndex((node) => node.type?.name === 'DescriptionBlock') < kids.findIndex((node) => node.props?.class === 'app-rg-tracks')], [true, true])
+    draw()
+    check('...the page told the tracklist is drawn, from then on', G.describeAsks.at(-1)[2], true)
+    G.describing = { description: WIKI, settled: true, at: 'foot' }
+    draw()
+    const foot = tree.props.children.flat(Infinity).filter((node) => node && typeof node === 'object')
+    check('one placed at the foot: under the tracklist, above the links to MusicBrainz', [blocks().map((node) => node.props.at),
+      foot.findIndex((node) => node.type?.name === 'DescriptionBlock') > foot.findIndex((node) => node.props?.class === 'app-rg-tracks'),
+      foot.findIndex((node) => node.type?.name === 'DescriptionBlock') < foot.findIndex((node) => node.props?.class === 'app-rg-links')], [['foot'], true, true])
+
+    //? come back to (Back) with its description still out: its pressings from the session - the tracklist on the first
+    //? frame, which the scroll put back needs
+    G.describing = { description: null, settled: false, at: null }
+    const back = page({ id: FIRST })
+    back.draw()
+    check('come back to, the description still out: the tracklist on the first frame', classed('app-rg-track').length > 0, true)
+
+    //? never answering: the tracklist drawn after DESCRIPTION_WAIT_MS all the same
+    answers.push(answering(slowRush))
+    const late = page({ id: SECOND })
+    late.draw()
+    await settle()
+    late.draw()
+    check('the description never coming: the tracklist waits...', classed('app-rg-track').length, 0)
+    const due = timers.filter((timer) => timer.ms === 500 && timer.live)
+    due.forEach((timer) => timer.fn())
+    late.draw()
+    check('...DESCRIPTION_WAIT_MS at most, then drawn without it', [due.length > 0, classed('app-rg-track').length > 0], [true, true])
+
+    //? the pressings failing: asked all the same (Wikipedia may still know it), the trouble said
+    answers.push(() => Promise.reject(new Error('MusicBrainz away')))
+    const THIRD = 'aaaaaaaa-1111-4000-8000-000000000003'
+    const failing = page({ id: THIRD })
+    failing.draw()
+    await settle()
+    failing.draw()
+    check('the pressings failed: the description asked all the same', G.describeAsks.at(-1).slice(0, 2), ['album', { mbid: THIRD }])
+    //? (after review) its trouble - Try again where the tracklist would be - drawn before the description could land:
+    //? told it is under the top place, so a description goes to the foot, never above that button
+    check('...told that what is under the top place is drawn: the trouble, its Try again', [classed('app-rg-trouble').length, G.describeAsks.at(-1)[2]], [1, true])
+    globalThis.setTimeout = realTimeout
+    globalThis.clearTimeout = realClear
+    G.describing = { description: null, settled: true, at: null }
   }
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed')

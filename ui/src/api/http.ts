@@ -17,14 +17,22 @@ export class ApiError extends Error {
   readonly busy: boolean
   /** (2.0.0-player.61) what kind of refusal a People route said it was - `locked` brings its unlock form back */
   readonly kind: string | null
+  /** (2.0.4) what whoever runs deadwax needs beside `detail`, when deadwax split its answer in two (src/auth.py
+   *  Explained): `detail` is then written for anyone, and this is shown only to them (lib/errorWords.ts) */
+  readonly why: string | null
+  /** (2.0.4) the route it was the answer of, under /deadwax - whose answer it was (lib/errorWords.ts serviceOf) */
+  readonly path: string | null
 
-  constructor(status: number, detail: string | null, fallback: string, busy = false, kind: string | null = null) {
+  constructor(status: number, detail: string | null, fallback: string, busy = false, kind: string | null = null,
+              why: string | null = null, path: string | null = null) {
     super(detail || fallback)
     this.name = 'ApiError'
     this.status = status
     this.detail = detail
     this.busy = busy
     this.kind = kind
+    this.why = why
+    this.path = path
   }
 }
 
@@ -48,14 +56,14 @@ export class MusicBrainzUnavailable extends ApiError {
   }
 }
 
-async function readBody(response: Response): Promise<{ detail: string | null; busy: boolean; kind: string | null }> {
+async function readBody(response: Response): Promise<{ detail: string | null; busy: boolean; kind: string | null; why: string | null }> {
   try {
-    const body = (await response.json()) as { detail?: unknown; busy?: unknown; kind?: unknown }
+    const body = (await response.json()) as { detail?: unknown; busy?: unknown; kind?: unknown; why?: unknown }
     return { detail: typeof body.detail === 'string' ? body.detail : null, busy: body.busy === true,
-             kind: typeof body.kind === 'string' ? body.kind : null }
+             kind: typeof body.kind === 'string' ? body.kind : null, why: typeof body.why === 'string' ? body.why : null }
   } catch {
     // an error response that isn't JSON is still an error; don't mask it with a parse failure
-    return { detail: null, busy: false, kind: null }
+    return { detail: null, busy: false, kind: null, why: null }
   }
 }
 
@@ -98,12 +106,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${BASE}${path}`, init)
 
   if (!response.ok) {
-    const { detail, busy, kind } = await readBody(response)
+    const { detail, busy, kind, why } = await readBody(response)
     noteSignedOut(path, response.status, detail, sentUnder)
     // deliberately not special-cased here: 503 only means "MusicBrainz is down" on the
     // MusicBrainz routes, and slskd answers 502 for its own refusals. Mapping status codes
-    // to meanings is each module's job - see musicbrainz.ts.
-    throw new ApiError(response.status, detail, `${init?.method ?? 'GET'} ${path} failed`, busy, kind)
+    // to meanings is each module's job - see musicbrainz.ts - and to words lib/errorWords.ts's.
+    throw new ApiError(response.status, detail, `${init?.method ?? 'GET'} ${path} failed`, busy, kind, why, path)
   }
 
   return (await response.json()) as T
@@ -123,9 +131,9 @@ export async function fetchOk(path: string, init?: RequestInit): Promise<Respons
   const sentUnder = session
   const response = await fetch(`${BASE}${path}`, init)
   if (!response.ok) {
-    const { detail, busy } = await readBody(response)
+    const { detail, busy, why } = await readBody(response)
     noteSignedOut(path, response.status, detail, sentUnder)
-    throw new ApiError(response.status, detail, `${init?.method ?? 'GET'} ${path} failed`, busy)
+    throw new ApiError(response.status, detail, `${init?.method ?? 'GET'} ${path} failed`, busy, null, why, path)
   }
   return response
 }

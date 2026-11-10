@@ -1159,7 +1159,9 @@ def test_logins_are_refused_while_nothing_would_be_filed(on, monkeypatch, mode):
     for answer in (client.get("/deadwax/me"), client.get(JOBS),
                    client.post(LOGIN, json={"username": "james", "password": PASSWORDS["james"]})):
         assert answer.status_code == 503
-        assert f"ORGANIZE_MODE is '{mode}'" in answer.json()["detail"] and "copy or move" in answer.json()["detail"]
+        #? (2.0.4) the setting for whoever runs deadwax (`why`); the sentence for anyone (src/auth.py Explained)
+        assert answer.json()["detail"] == auth.CANT_SIGN_IN
+        assert f"ORGANIZE_MODE is '{mode}'" in answer.json()["why"] and "copy or move" in answer.json()["why"]
     #? the health check judges deadwax alone, and the pages still draw (the sign-in shows why)
     assert client.get("/deadwax/health").status_code == 200
     assert client.get("/player/").status_code == 200
@@ -1178,7 +1180,7 @@ def test_logins_are_refused_without_organizings_folders(on, monkeypatch, folder)
     client = TestClient(on.app)
     for answer in (client.get("/deadwax/me"),
                    client.post(LOGIN, json={"username": "james", "password": PASSWORDS["james"]})):
-        assert answer.status_code == 503 and f"{folder} is not set" in answer.json()["detail"]
+        assert answer.status_code == 503 and f"{folder} is not set" in answer.json()["why"]
 
 
 def test_start_up_says_why_and_where_to_change_it(on, monkeypatch, caplog):

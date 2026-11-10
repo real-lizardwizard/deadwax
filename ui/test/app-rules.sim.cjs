@@ -309,7 +309,8 @@ const APP_SIDE = (file) => file.startsWith('app/') || file.startsWith('player/')
 const ALLOWED = {
   'player/AlbumPage.tsx': ['playTracks'],
   'player/MiniPlayer.tsx': ['toggle', 'next'],
-  'player/NowPlaying.tsx': ['toggle', 'next', 'previous', 'showAirPlay'],
+  //? (2.0.14: and Shuffle and Repeat, on its transport as the player bar has them)
+  'player/NowPlaying.tsx': ['toggle', 'next', 'previous', 'showAirPlay', 'setRepeat', 'setShuffle'],
   //? the Gapless checkbox in You > Playback, since 2.0.0-player.10: its click calls setGapless
   'app/GaplessChoice.tsx': ['setGapless'],
   //? the turntable's record, since 2.0.0-player.11: its click plays or pauses (a tap)
@@ -424,7 +425,7 @@ console.log('\nthe playback actions only from the files allowed')
     'app/useShuffleFeed.ts': ['extendQueue'],
     'player/AlbumPage.tsx': ['playTracks'],
     'player/MiniPlayer.tsx': ['next', 'toggle'],
-    'player/NowPlaying.tsx': ['next', 'previous', 'showAirPlay', 'toggle'],
+    'player/NowPlaying.tsx': ['next', 'previous', 'setRepeat', 'setShuffle', 'showAirPlay', 'toggle'],
     'player/PlayerBar.tsx': ['next', 'previous', 'setRepeat', 'setShuffle', 'showAirPlay', 'toggle'],
     'player/SpeedChip.tsx': ['setSpeed'],
     'player/SpeedFader.tsx': ['setSpeed'],
@@ -563,13 +564,14 @@ console.log('\na link out of the app opens beside it')
   //? (2.0.0-player.47: the four phone notes went - Needs a look, Library care, the settings and the log are
   //? drawn on a phone - and so did the gate's link to the main page's settings tab: "Set up Navidrome" opens
   //? the app's own Settings at Connections)
-  check('...and there are links to look at (Info > Debug\'s test bench, an artist\'s About, People\'s Sharing link, an album\'s Properties, the album you don\'t have)',
+  check('...and there are links to look at (Info > Debug\'s test bench, an artist\'s About, a description\'s source, People\'s Sharing link, an album\'s Properties, the album you don\'t have)',
     //? (2.0.0-player.42: the Edit panel's went - "Choose the folder" took its place - and Library care's
     //? phone note came; 2.0.0-player.44: an album page's Properties, its release on musicbrainz.org;
     //? 2.0.0-player.50: the album you don't have, its group and its pressing on musicbrainz.org;
     //? 2.0.0-player.61: People's link to Sharing deadwax, where it says why it needs logins on;
-    //? 2.0.0-player.66: You's, the sidebar's and the server settings' line's links to the main page went with it)
-    [...new Set(out.map(([file]) => file))].sort(), ['app/AlbumProperties.tsx', 'app/ArtistPage.tsx', 'app/InfoSheet.tsx', 'app/People.tsx', 'app/ReleaseGroupPage.tsx'])
+    //? 2.0.0-player.66: You's, the sidebar's and the server settings' line's links to the main page went with it;
+    //? 2.0.13: a description's source, "From Wikipedia" / "More on Last.fm")
+    [...new Set(out.map(([file]) => file))].sort(), ['app/AlbumProperties.tsx', 'app/ArtistPage.tsx', 'app/Description.tsx', 'app/InfoSheet.tsx', 'app/People.tsx', 'app/ReleaseGroupPage.tsx'])
 }
 
 console.log('\nNow Playing covers everything behind it')
@@ -709,13 +711,24 @@ console.log('\nnothing below the title in Now Playing can change height')
     ['class="pl-sheet-title"', 'pl-sheet-artist', '<Scrubber ', 'class="pl-transport"', 'class="pl-sheet-footer"'].map(at).every((place, index, all) => place !== -1 && (index === 0 || place > all[index - 1])), true)
   check('...the turntable\'s time line in the bar\'s place, one or the other',
     /\{turntable \? <TurntableTime player=\{player\} previewing=\{previewing\} \/> : <Scrubber player=\{player\} \/>\}/.test(body), true)
-  check('the album line is one box, link or not', (body.match(/<span class="pl-sheet-byline">\{byline\}<\/span>/g) ?? []).length, 2)
+  check('the album line is one box, link or not', (body.match(/<span class="pl-sheet-byline" dir="auto">\{byline\}<\/span>/g) ?? []).length, 2)
   const footer = body.slice(at('class="pl-sheet-footer"'))
   //? (2.0.0-player.57: Up next drawn - it opens Up Next - after AirPlay's place and before •••)
   check('the icon row: AirPlay only with a speaker, ••• always, Up next always (opening Up Next), and no dead Lyrics',
     [/\{player\.airplay && \(\s*<button[^>]*onClick=\{player\.showAirPlay\}/.test(footer), /onClick=\{onMore\}/.test(footer), /onClick=\{onUpNext\}/.test(footer), /Lyrics/.test(footer),
       footer.indexOf('onClick={player.showAirPlay}') < footer.indexOf('onClick={onUpNext}') && footer.indexOf('onClick={onUpNext}') < footer.indexOf('onClick={onMore}')],
     [true, true, true, false, true])
+  //? (2.0.14) Shuffle and Repeat on the transport row - its first and last - so they add no row and no height
+  const transport = body.slice(at('class="pl-transport"'), at('class="pl-sheet-footer"'))
+  const buttons = [...transport.matchAll(/onClick=\{(\w+)\}/g)].map((match) => match[1])
+  check('the transport: Shuffle, Previous, play or pause, Next, Repeat - in that one row, nothing added under it',
+    [buttons, (body.match(/class="pl-transport"/g) ?? []).length], [['onShuffle', 'onPrevious', 'onToggle', 'onNext', 'onRepeat'], 1])
+  check('...Shuffle and Repeat straight from the tap, nothing awaited: Shuffle flips it (not during a whole library\'s), Repeat steps it',
+    [/const onShuffle = \(\) => \{\s*if \(!paged\) player\.setShuffle\(!player\.shuffle\)\s*\}/.test(sheet),
+      /const onRepeat = \(\) => player\.setRepeat\(nextRepeat\(player\.repeat\)\)\n/.test(sheet),
+      /const paged = !!pagedScope\n/.test(sheet) && /const pagedScope = player\.queue\.upNext\?\.paged\?\.scope\n/.test(sheet),
+      /\bawait\b|\.then\(/.test(sheet)],
+    [true, true, true, false])
   const css = fs.readFileSync(path.resolve(SRC, '../../interface/player/player.css'), 'utf8')
   check('...a fixed height, so AirPlay coming and going moves nothing', /\.pl-sheet-footer \{[^}]*(?<![-\w])height: var\(--pl-hit\);/.test(css), true)
   const appCss = fs.readFileSync(path.resolve(SRC, '../../interface/player/app.css'), 'utf8')
@@ -1283,7 +1296,7 @@ console.log('\nGet: the Sources sheet, a download from the tap, and Requests')
     [true, true, true, true, true])
   check('a pick only on a fresh Get, never for a pressing held or on its way, and said when it isn\'t made',
     [/if \(!fresh \|\| !rule\.pick\) return/.test(run), /const blocked = autoPickBlocked\(result, release\)/.test(run), /autoGrabPick\(result\.candidates, rule\.filters, rule\.sort\)/.test(run),
-      /setNotPicked\(notPickedLine\(blocked\)\)/.test(run), /requery\(\) \{\s*if \(search\) void run\(search\.release, queryOverride\(query, shownQuery\), false\)/.test(hook)],
+      /setNotPicked\(notPickedLine\(blocked, result\.candidates\.length\)\)/.test(run), /requery\(\) \{\s*if \(search\) void run\(search\.release, queryOverride\(query, shownQuery\), false\)/.test(hook)],
     [true, true, true, true, true])
   check('...the settings read as the answer lands, the safe default until they\'re in',
     /pick: getSettingsNow\(\)\.get_mode === 'pick'/.test(sheet), true)
@@ -1357,7 +1370,7 @@ console.log('\nArtists and the id bridge: Play from the tap with every album in 
 
   const album = code(read('player/AlbumPage.tsx'))
   check('the album page\'s store answer, Search\'s held row and Info\'s details: each through a latestOnly() of its own',
-    [/const storeRequests = useMemo\(latestOnly, \[\]\)/.test(album), /storeAlbum\(\{ navidrome_id: id \}, request\.signal\)\.then\(\s*\(answer\) => \{\s*if \(request\.current\(\)\) setStore/.test(album),
+    [/const storeRequests = useMemo\(latestOnly, \[\]\)/.test(album), /storeAlbum\(\{ navidrome_id: id \}, request\.signal\)\.then\(\s*\(answer\) => \{\s*if \(!request\.current\(\)\) return\s*setStore\(answer\)/.test(album),
       /const request = heldRequests\.begin\(\)/.test(code(read('app/Search.tsx'))), /const request = requests\.begin\(\)/.test(code(read('app/useInfoDetails.ts')))],
     [true, true, true, true])
   check('...a held row\'s look called off with the chip\'s, when the box changes or the root stops showing',
@@ -1371,7 +1384,7 @@ console.log('\nArtists and the id bridge: Play from the tap with every album in 
   check('Search\'s held row opens the album you have with its credited artist, so the page\'s artist line holds its place',
     /const artist = creditName\(group\['artist-credit'\]\)\s*if \(album\) onOpenAlbum\(\{ id: album, name: group\.title \?\? '', \.\.\.\(artist \? \{ artist \} : \{\}\) \}\)/.test(code(read('app/Search.tsx'))), true)
   check('an artist\'s name that isn\'t a link is drawn plain: on an album page only once the album has said so, never in a flash',
-    [/<p class=\{`pl-hero-artist\$\{album \? ' app-hero-plain' : ''\}`\}>\{artistName\}<\/p>/.test(album), /<p class="pl-hero-artist app-hero-plain">\{header\.artist\}<\/p>/.test(code(read('app/ReleaseGroupPage.tsx')))],
+    [/<p class=\{`pl-hero-artist\$\{album \? ' app-hero-plain' : ''\}`\} dir="auto">\{artistName\}<\/p>/.test(album), /<p class="pl-hero-artist app-hero-plain" dir="auto">\{header\.artist\}<\/p>/.test(code(read('app/ReleaseGroupPage.tsx')))],
     [true, true])
   check('a row looking for its album fades: an artist\'s, Search\'s, a Done row',
     [/class=\{`app-artist-album\$\{opening === row\.key \? ' is-busy' : ''\}`\}/.test(page), /class=\{`app-result\$\{looking \? ' is-busy' : ''\}`\}/.test(code(read('app/SearchRows.tsx'))),
@@ -1416,11 +1429,24 @@ console.log('\npins: deadwax\'s own, asked when asked, and nothing about them pl
   check('Home asks afresh as it comes into view, and App says when that is - never as the app starts',
     [/const \{ pins, problem \} = usePins\(shown \? 'fresh' : false\)/.test(home), /const homeShown = watching === 'home'/.test(app), /<Home\b[^>]*?shown=\{homeShown\}/.test(app.replace(/\n\s*/g, ' ')),
       //? (2.0.0-player.51) and what is new in your library, which it draws too
-      /\[status, arriving, arrivingTrouble, homeShown, newAlbums\]/.test(app)],
+      /\[status, arriving, arrivingTrouble, homeShown, newAlbums, personal\]/.test(app)],
+    [true, true, true, true])
+  //? (2.0.6, review) Requests' retry refusals say "the collection" with logins on: App hands requestsView
+  //? hasLibrary(), and asks it again when that changes - requests.sim only ever sets it by hand
+  check('(2.0.6) Requests\' words follow whose library: App passes requestsView personal from hasLibrary(), in the memo\'s deps',
+    [/const personalRequests = hasLibrary\(\)/.test(app),
+      /requestsView\(\{[^}]*\bpersonal: personalRequests \}, Date\.now\(\)\)/.test(app),
+      /requestsView\([\s\S]*?\),\s*\[[^\]]*\bpersonalRequests\]/.test(app)],
+    [true, true, true])
+  check('(2.0.5) Home\'s Recently added is YOURS with a library of your own - App hands Home hasLibrary(), and asks your list again as Home shows, as the Library does',
+    [/const personal = hasLibrary\(\)/.test(app), /<Home\b[^>]*?personal=\{personal\}/.test(app.replace(/\n\s*/g, ' ')),
+      /if \(homeShown && hasLibrary\(\)\) refreshIfOld\('yours'\)/.test(app),
+      /if \(personal\) return albumIndex\('yours'\)\.then\(\(index\) => sortAlbums\(index\.albums, 'newest', 'you'\)\.slice\(0, RECENT_COUNT\)\)/.test(home)],
     [true, true, true, true])
   check('...the shelves drawn once the pins have answered, or failed, or the wait - counted only while Home shows - is over',
     //? (2.0.0-player.51) and, as the pins are, what is new in your library - so its shelf never moves those under it
-    [/const ready = \(pins !== null \|\| problem !== null \|\| waited\) && \(newAlbums !== null \|\| waited\)/.test(home), /<div class="app-home-shelves" hidden=\{!ready\}>/.test(home), /if \(!shown \|\| waited\) return/.test(home)], [true, true, true])
+    //? (2.0.15) and Recently played's answer - it sits over Recently added
+    [/const ready =\s*\(pins !== null \|\| problem !== null \|\| waited\) && \(newAlbums !== null \|\| waited\) && \(playedShelf\.kind !== 'asking' \|\| waited\)/.test(home), /<div class="app-home-shelves" hidden=\{!ready\}>/.test(home), /if \(!shown \|\| waited\) return/.test(home)], [true, true, true])
   check('...New in your library (2.0.0-player.51) under Pinned and over Recently added, drawn only with something new; App asks for it as Home - or the Library tab, whose tiles carry the marks - comes into view, and an album opened is new no longer',
     [home.indexOf('<Pinned ') < home.indexOf('<NewInYourLibrary ') && home.indexOf('<NewInYourLibrary ') < home.indexOf('{recent}'),
       /\{!!newAlbums\?\.length && <NewInYourLibrary albums=\{newAlbums\} onOpen=\{onOpen\} \/>\}/.test(home),
@@ -1436,8 +1462,35 @@ console.log('\npins: deadwax\'s own, asked when asked, and nothing about them pl
     /const newAlbums = useMemo\(\(\) => \(!hasLibrary\(\) \? NOTHING_NEW : myLibrary \? newShelf\(myLibrary\) : null\), \[myLibrary\]\)/.test(app), true)
   check('...and Library care draws Held by nobody only with logins on (2.0.0-player.61: and Look after the library)',
     /\{sessionMe\(\)\?\.auth === 'on' && parts\.held && <HeldByNobody live=\{live\} \/>\}/.test(code(read('app/LibraryCare.tsx'))), true)
-  check('...Pinned first, then Recently added, then Not played in a while, all inside the gate',
-    /<NeedsNavidrome\b[^>]*>\s*<Shelves\b/.test(home) && home.indexOf('<Pinned ') < home.indexOf('{recent}') && home.indexOf('{recent}') < home.indexOf('{notPlayed}'), true)
+  check('...Pinned first, then New in your library, (2.0.15) Recently played, Recently added, then Not played in a while, all inside the gate',
+    /<NeedsNavidrome\b[^>]*>\s*<Shelves\b/.test(home) && home.indexOf('<Pinned ') < home.indexOf('<NewInYourLibrary ') && home.indexOf('<NewInYourLibrary ') < home.indexOf('{played}')
+      && home.indexOf('{played}') < home.indexOf('{recent}') && home.indexOf('{recent}') < home.indexOf('{notPlayed}'), true)
+  //? (2.0.15) Recently played: recent at RECENT_COUNT through latestOnly, asked as Home is drawn and again each time it
+  //? comes into view, what lands put through lib/home.ts's rules with whether the shelves are on screen; its element
+  //? memoised on what it draws, so a download moving (App re-rendering Home) or the pins changing redraws no tile
+  const playedHook = home.slice(home.indexOf('function useRecentlyPlayed('), home.indexOf('function RecentlyPlayed('))
+  check('(2.0.15) Recently played: recent at RECENT_COUNT, only the newest answer drawn, asked again as Home comes into view, never by a timer',
+    [/const requests = useMemo\(latestOnly, \[\]\)/.test(playedHook), /albumPage\('recent', 0, request\.signal, RECENT_COUNT\)/.test(playedHook),
+      /if \(request\.current\(\)\) setState\(\(now\) => playedLanded\(now, \{ albums: page \}, onScreen\.current, RECENT_COUNT, tilesPerRow\(drawn\.current\)\)\)/.test(playedHook),
+      /if \(request\.current\(\) && !isAbort\(reason\)\) setState\(\(now\) => playedLanded\(now, \{ error: reason \}, onScreen\.current, RECENT_COUNT, tilesPerRow\(drawn\.current\)\)\)/.test(playedHook),
+      /if \(asked\.current && !shown\) \{[\s\S]{0,160}setState\(playedOutOfView\)\s*return\s*\}/.test(playedHook), /\}, \[shown\]\)/.test(playedHook),
+      /setInterval|setTimeout/.test(playedHook)],
+    [true, true, true, true, true, true, false])
+  check('...its element memoised on what it draws; whether the shelves show set as `ready` is known',
+    [/const played = useMemo\(\(\) => <RecentlyPlayed shelf=\{playedShelf\} onOpen=\{onOpen\} drawn=\{playedDrawn\} \/>, \[playedShelf, onOpen\]\)/.test(home),
+      /onScreen\.current = ready && shown/.test(home),
+      //? Home's own memo, which App re-renders as downloads move, never keyed on what is arriving
+      /\[status, onRetry, onOpen, onOpenArtist, shown, newAlbums, personal\],/.test(home)],
+    [true, true, true])
+  //? (review) the desktop's shelf is a grid that wraps, so what lands is told how many tiles a row holds - read from
+  //? the drawn shelf's own grid, the phone's sideways row (no grid) Infinity - and lib/home.ts keeps the rows drawn
+  const perRow = home.slice(home.indexOf('function tilesPerRow('), home.indexOf('function RecentlyPlayed('))
+  check('...told how many tiles a row of the drawn shelf holds: the grid\'s columns, read from the section the shelf draws; no grid, Infinity',
+    [/const list = section\?\.querySelector\('\.app-shelf'\)/.test(perRow), /if \(style\.display !== 'grid'\) return Infinity/.test(perRow),
+      /const columns = style\.gridTemplateColumns\.split\(' '\)\.filter\(Boolean\)\.length\s*return columns >= 1 \? columns : Infinity/.test(perRow),
+      /<section ref=\{drawn\} class="app-section app-shelf-section" aria-labelledby="app-played-title"/.test(home),
+      /const playedShelf = useRecentlyPlayed\(shown, onScreen, playedDrawn\)/.test(home)],
+    [true, true, true, true, true])
   const notPlayed = home.slice(home.indexOf('function NotPlayedInAWhile('), home.indexOf('function Shelves('))
   check('Not played in a while: recent at 500, only the newest answer drawn',
     [/const requests = useMemo\(latestOnly, \[\]\)/.test(notPlayed), /albumPage\('recent', 0, request\.signal, RECENT_LISTED\)/.test(notPlayed), /if \(request\.current\(\)\) setAlbums\(notPlayedInAWhile\(/.test(notPlayed)],
@@ -1454,14 +1507,14 @@ console.log('\npins: deadwax\'s own, asked when asked, and nothing about them pl
   check('the album page\'s pin: by the release the bridge says, drawn until it says there is none, live only once it has - and the pins have',
     [/release_mbid: release, navidrome_id: id/.test(album), /\{!\(storeDone && !release\) && \(/.test(album), /ready=\{storeDone && !!release && pinsKnown\}/.test(album),
       /onToggle=\{\(\) => void setPinned\(pinTarget, !pinned\)\}/.test(album), /const \{ pins, known: pinsKnown, canSave \} = usePins\(true\)/.test(album),
-      /onRefused=\{\(\) => sayPins\(PINS_UNSAVED\)\}/.test(album)],
+      /onRefused=\{\(\) => sayPins\(pinsUnsaved\(seesDetail\(accessNow\(\)\)\)\)\}/.test(album)],
     [true, true, true, true, true, true])
   const artist = code(read('app/ArtistPage.tsx')).replace(/\n\s*/g, ' ')
   check('the artist\'s pin: by MusicBrainz id, else name and Navidrome\'s id - live once that is settled, and the pins have answered',
     [/const pinTarget: ArtistPinTarget = \{ kind: 'artist', mbid, navidrome_id: libraryId, name, cover: picture \}/.test(artist),
       /const pinReady = pinsKnown && !!name && \(mbid !== null \|\| \(library\.state !== 'asking' && ownedKnown && libraryId !== null\)\)/.test(artist),
       /<PinToggle look="chip" pinned=\{pinned\} ready=\{pinReady\}/.test(artist), /const \{ pins, known: pinsKnown, canSave \} = usePins\(true\)/.test(artist),
-      /onRefused=\{\(\) => sayPins\(PINS_UNSAVED\)\}/.test(artist)],
+      /onRefused=\{\(\) => sayPins\(pinsUnsaved\(seesDetail\(accessNow\(\)\)\)\)\}/.test(artist)],
     [true, true, true, true, true])
   const appLine = app.replace(/\n\s*/g, ' ')
   check('the ••• menu\'s pin: asked as Now Playing opens, its tap closing the menu, saving and saying so - App\'s, handed to the menu',
@@ -2234,8 +2287,9 @@ console.log('\nLooking after the library in the app, on a desktop (2.0.0-player.
   //? doing so" - ServerSettings' line is pinned in settingslog.sim; the Edit panel's Lyrics note is words, not a
   //? link, so the links-out count can't see it (review). Read raw: an apostrophe in JSX text isn't a string
   const lyricsNote = (read('app/EditPanel.tsx').match(/<h3 id="app-edit-lyrics"[\s\S]*?<\/section>/) ?? [''])[0]
-  check('the Edit panel\'s Lyrics tab: re-timing named where it is - Managing\'s Settings, under Library - never the main page',
-    [/re-timing the lyrics already saved, are in Managing's Settings, under Library\./.test(lyricsNote), /main page/i.test(lyricsNote)], [true, false])
+  //? (2.0.8, UX batch 5) by the page's own name and group - there was never a "Managing's Settings"
+  check('the Edit panel\'s Lyrics tab: re-timing named where it is - Lyrics in Server settings (Library) - never the main page',
+    [/re-time the ones already saved, see Lyrics in Server settings \(Library\)\./.test(lyricsNote), /main page|Managing/i.test(lyricsNote)], [true, false])
   //? (2.0.0-player.66) the main page retired: Managing lists only its pages - its "Open the main page" went, and
   //? so did You's row and footnote (read raw, comments and all: no link to `/` in any form)
   check('Managing has no link to `/` - the sidebar\'s nor You\'s',
@@ -2336,7 +2390,10 @@ console.log('\ninside a track (2.0.0-player.44): the track inspector, the cover 
       /window\.removeEventListener\('popstate', moved\)\s*window\.removeEventListener\('hashchange', moved\)/.test(viewer)],
     [true, true])
   check('an album page\'s Properties: from the bridge answer it asks already - no new request - drawn under the songs',
-    [(page.match(/storeAlbum\(/g) ?? []).length, /<AlbumProperties rows=\{albumProperties\(store, storeFailed, releaseSaid\)\} \/>/.test(page),
+    [(page.match(/storeAlbum\(/g) ?? []).length,
+      //? (2.0.5) the no-release line for whoever can Edit albums, as /me last said it (useAccess - drawn again as it changes)
+      /<AlbumProperties rows=\{albumProperties\(store, storeFailed, releaseSaid, undefined, albumEdit\(access\.permissions\)\.editors\)\} \/>/.test(page)
+        && /const access = useAccess\(\)/.test(page),
       page.indexOf('<AlbumProperties') > page.indexOf('class="pl-album-footer"')],
     [1, true, true])
   //? (review) "not tagged" only on Navidrome's own word for the album - the bridge's null is also its answer for
@@ -2484,23 +2541,24 @@ console.log('\nGet, as the main page had it (2.0.0-player.41)')
   const sheet = code(read('app/Sources.tsx'))
   const hook = code(read('hooks/useCandidateSearch.ts'))
   //? another pressing of an album you hold: the album page's last chip, to the group's page with no preview
-  check('the album you have: "Other pressings" last in the chip row drawn from the first frame, opening its group',
+  check('the album you have: "Pressings" (2.0.5: one name on every frame) last in the chip row drawn from the first frame, opening its group',
     [album.indexOf('<div class={`app-album-chips') >= 0 && album.indexOf('<div class={`app-album-chips') < album.indexOf('{chips.map(') && album.indexOf('{chips.map(') < album.indexOf('app-other-pressings')
       && album.indexOf('app-other-pressings') < album.indexOf('<div class="pl-hero-actions">'),
-      /\{group && onOpenGroup && \(\s*<button\s+type="button"\s+class="app-chip app-other-pressings"\s+aria-label="Other pressings"\s+onClick=\{\(\) => onOpenGroup\(\{ id: group, title: shown\?\.name \?\? '' \}\)\}/.test(album),
+      /\{group && onOpenGroup && \(\s*<button\s+type="button"\s+class="app-chip app-other-pressings"\s+onClick=\{\(\) => onOpenGroup\(\{ id: group, title: shown\?\.name \?\? '' \}\)\}\s*>[\s\S]{0,400}?\{PRESSINGS\}\s*<ChevronRightIcon/.test(album)
+        && /export const PRESSINGS = 'Pressings'/.test(album) && !/app-other-(long|short)|Other pressings<\/span>/.test(album),
       /const group = otherPressingsGroup\(store\)/.test(album), /onOpenGroup=\{openHeldGroup\}/.test(app)],
     [true, true, true, true])
   const held = /const openHeldGroup = useCallback\(\(group: \{ id: string; title: string \}\) => \{([\s\S]*?)\n  \}, \[\]\)/.exec(app)?.[1] ?? ''
   check('...App opens it as a page on the tab showing, its name the label - and no preview, so the header and Get are MusicBrainz\'s own',
     [/const page: Page = \{ kind: 'group', id: group\.id, \.\.\.\(group\.title \? \{ label: group\.title \} : \{\}\) \}/.test(held), /router\.open\(page\)/.test(held), /groupPreviews/.test(held),
-      /title=\{page\.label \?\? ''\}/.test(app), /<h1 class="pl-hero-title">\{header\.title \|\| title\}<\/h1>/.test(page), /getGroup\(mbid, preview, releases, chosen\)/.test(page)],
+      /title=\{page\.label \?\? ''\}/.test(app), /<h1 class=\{heroTitleClass\(header\.title \|\| title\)\} dir="auto">\{header\.title \|\| title\}<\/h1>/.test(page), /getGroup\(mbid, preview, releases, chosen\)/.test(page)],
     [true, true, false, true, true, true])
   check('the pressing list marks what the library holds, from the page\'s one /library/owned answer (whose each is, as the store line last said - second review)',
     [/const ownership = owned \? ownedForGroup\(owned\.index, \{\s*groupId: mbid,\s*releaseIds: releases\.map\(\(release\) => release\.id\),[\s\S]*?\}\) : null\s*(?:const [^\n]*\n\s*){3}const holding = ownership \? withStoreLine\(ownership\.held, said\) : null/.test(page),
       //? (2.0.0-player.52) and which of those are yours: "In the store" for one that isn't, with a library of your own
       //? (2.0.0-player.53) the pressing asked for: the address's, else - opened from a song - one with the song
       /pressingsView\(releases, asked, heldIds, yoursIds\)/.test(page),
-      /\{row\.held && <span class=\{`app-picker-held\$\{row\.inStore \? ' is-store' : ''\}`\}>\{row\.inStore \? 'In the store' : 'In your library'\}<\/span>\}/.test(code(read('app/PressingPicker.tsx')))],
+      /\{row\.held && <span class=\{`app-picker-held\$\{row\.inStore \? ' is-store' : ''\}`\}>\{row\.inStore \? 'In the collection' : 'In your library'\}<\/span>\}/.test(code(read('app/PressingPicker.tsx')))],
     [true, true, true])
   //? James's decision kept (pin both): Search's MusicBrainz half leaves held groups out, and the artist
   //? page's held rows still open the album you have - the way to another pressing is the album page's
@@ -2585,7 +2643,7 @@ console.log('\nlooking after deadwax from a phone (2.0.0-player.47)')
   const panel = code(read('app/EditPanel.tsx'))
   check('the Edit sheet\'s Tags note says nothing of Shift - a phone has none to tick a run with',
     [/<TagsList\s+album=\{subject\}\s+sheet=\{modal\}/.test(panel),
-      /\{count \? `\$\{count\} of \$\{tracks\.length\} ticked` : sheet \? 'Tick tracks to edit only those\.' : 'Tick tracks to edit only those; Shift ticks a run\.'\}/.test(panel)],
+      /\{count \? `\$\{count\} of \$\{tracks\.length\} selected` : sheet \? "Select tracks to edit only those\. Tap a track's name to see everything in its file\." : "Select tracks to edit only those; Shift selects a run\. Click a track's name to see everything in its file\."\}/.test(panel)],
     [true, true])
   check('the gate: no link out - "Set up Navidrome", the app\'s secondary button, calls the module\'s setUpNavidrome',
     [linksOut(gate).length, /import \{ setUpNavidrome \} from '\.\/navidromeSetUp'/.test(gate),
@@ -2678,7 +2736,17 @@ console.log('\na better Library (2.0.0-player.59): one list per scope, asked in 
       (section.match(/<ShuffleSongs\b/g) ?? []).length, (home.match(/<ShuffleSongs\b/g) ?? []).length],
     [true, true, true, 2, 1])
   check('...the root\'s Recently added is your newest 12; the notice at 10,000',
-    [/albums: sortAlbums\(index\.albums, 'newest'\)\.slice\(0, RECENT_ON_ROOT\)/.test(home), /\{index\?\.truncated && <p class="pl-notice">\{TRUNCATED_NOTICE\}<\/p>\}/.test(section)], [true, true])
+    [/albums: sortAlbums\(index\.albums, 'newest', 'you'\)\.slice\(0, RECENT_ON_ROOT\)/.test(home), /\{index\?\.truncated && <p class="pl-notice">\{TRUNCATED_NOTICE\}<\/p>\}/.test(section)], [true, true])
+  //? (2.0.11 - James: "Recently added should be for the user's library, not deadwax's") every Recently added over YOUR
+  //? albums goes by when each entered your library (lib/shelves.ts 'you', its star) - Home's shelf, the root's 12, the
+  //? section and Your albums' sort with its month headers (cut from the whole list, never from what Find left - review) - and the collection's lists never by a star
+  const homeShelf = code(read('app/Home.tsx'))
+  check('(2.0.11) Recently added over your albums is by when you added each - Home, the root, the section\'s sort and its headers; the collection\'s by created',
+    [(homeShelf.match(/sortAlbums\([^)]*\)/g) ?? []), (home.match(/sortAlbums\([^)]*\)/g) ?? []),
+      /const by: AddedBy = scope === 'yours' \? 'you' : 'collection'/.test(section),
+      /sortAlbums\(albums, sort, by\) : \[\]\), \[albums, sort, by\]\)/.test(section), /groupAlbums\(found, sort, by, sorted\), \[found, sort, by, sorted\]\)/.test(section),
+      /albumPage\('newest', 0, signal, RECENT_COUNT\)/.test(homeShelf), /albumPage\('newest', 0, request\.signal, RECENT_ON_ROOT\)/.test(home)],
+    [["sortAlbums(index.albums, 'newest', 'you')"], ["sortAlbums(index.albums, 'newest', 'you')"], true, true, true, true, true])
   check('(review) the logins-off root\'s 12 asked again as the root shows, once over a minute old - their grid kept meanwhile',
     [/useEffect\(\(\) => \{\s*if \(shown && !personal && landedAt\.current && Date\.now\(\) - landedAt\.current > INDEX_FRESH_MS\) load\(\)\s*\}, \[shown\]\)/.test(home),
       /if \(!request\.current\(\)\) return\s*landedAt\.current = Date\.now\(\)\s*setRecent\(found\)/.test(home), /setRecent\(null\)/.test(home)], [true, true, false])
@@ -2738,6 +2806,21 @@ console.log('\nPeople and permissions (2.0.0-player.61)')
     [files.filter((file) => APP_SIDE(file) && /noteAccess\(/.test(code(read(file)))).sort(),
       files.filter((file) => APP_SIDE(file) && /useAccess\(\)/.test(code(read(file)))).length >= 8],
     [['app/App.tsx', 'app/You.tsx', 'app/access.ts', 'app/signInGate.tsx'], true])
+}
+
+console.log('\nChange password (2.0.2)')
+{
+  const OWN_FILES = ['app/ChangePassword.tsx', 'lib/ownPassword.ts']
+  check('its files reach no playback action, nor a context',
+    OWN_FILES.map((file) => [actionsIn(code(read(file))), /useContext|PlayerContext|ActionsContext|usePlayer/.test(code(read(file)))]),
+    OWN_FILES.map(() => [[], false]))
+  const own = code(read('app/ChangePassword.tsx'))
+  check('...every password field dropped once a change is done, and no confirm()',
+    [/\(answer\) => \{[\s\S]{0,120}?setForm\(EMPTY_FORM\)/.test(own), /confirm\(/.test(own)], [true, false])
+  const you = code(read('app/You.tsx'))
+  //? (2.0.8, UX batch 5) in You's Account section, drawn with logins on alone
+  check('You draws it only for a Navidrome sign-in (lib/ownPassword.ts changeOffered), before Sign out, in Account',
+    /\{who\?\.auth === 'on' && \(\s*<section class="app-section" aria-labelledby="app-account-title">[\s\S]{0,200}?\{changeOffered\(who\) && <ChangePassword user=\{who\.user\} \/>\}[\s\S]{0,120}?<SignOutRow user=\{who\.user\} \/>/.test(you), true)
 }
 
 console.log('\nNormalization (2.0.0-player.62): every queued song through queued(), in the tap; the rule pure')
@@ -2837,7 +2920,16 @@ console.log('\nInfo\'s Debug is an admin\'s (2.0.0-player.63): the role from /me
   //? (review of 2.0.0-player.63) the strip going with focus in it gives that focus to the list, not to <body>
   check('...the strip going with focus inside it hands the focus to the list',
     /if \(tabs\.length < 2 && strip\.current\?\.contains\(document\.activeElement\)\) refocus\.current = true\s*useLayoutEffect\(\(\) => \{\s*if \(!refocus\.current\) return\s*refocus\.current = false\s*scroller\.current\?\.focus\(\{ preventScroll: true \}\)\s*\}, \[tabs\.length\]\)/.test(info), true)
-  check('...About\'s Playing group from Debug\'s own rows', /playing: playingRows\(\{ track, wrapped: player\.wrapped, gapless: player\.gapless, format: sentFormat\(track\), level \}\)/.test(info), true)
+  //? (2.0.7) About's Sound group from its own formatters (lib/aboutSound.ts), on Debug's own inputs; Debug keeps its rows
+  check('...About\'s Sound group from its own formatters, on Debug\'s inputs - never Debug\'s rows',
+    [/sound: soundRows\(\{ track, gapless: player\.gapless, format: sentFormat\(track\), level \}\)/.test(info), /playingRows|formatRow\(|normalizationRow\(|gaplessRow\(/.test(info)], [true, false])
+  //? (2.0.7) notes in the text face - the review's 1.10: every note was monospace - but a row's noteMono (field names)
+  check('...a row\'s note in the data face only when the row says it is data (noteMono)',
+    [/<dd class=\{`app-kv-note\$\{row\.noteMono \? ' app-mono' : ''\}`\}>\{row\.note\}<\/dd>/.test(info), /class="app-kv-note app-mono"/.test(info)], [true, false])
+  //? (2.0.7) the folder for whoever looks after the albums: App says who, by the one rule; Info hands it to About
+  check('...the folder only for an admin: App passes seesFolders on the admin flag alone, Info hands it to aboutRows',
+    [/<InfoSheet\b[^>]*\bfolders=\{seesFolders\(access\.admin\)\}/.test(app.replace(/\n\s*/g, ' ')),
+      /about: aboutRows\(track, album, details, hasLibrary\(\), folders\)/.test(info), /folders = false,/.test(info)], [true, true, true])
   check('nothing but Info draws Debug\'s sections or its test bench link',
     [files.filter((file) => /\bdebugSections\(/.test(code(read(file)))).sort(), files.filter((file) => /\bbenchRow\(|BENCH_ADDRESS/.test(code(read(file)))).sort()],
     [['app/InfoSheet.tsx', 'lib/debugRows.ts'], ['lib/debugRows.ts']])

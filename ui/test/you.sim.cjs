@@ -48,6 +48,9 @@
  *    answer until then - and for a read already out (the sheet's, asked as it opened), never sending
  *    the answer that read replaces. Under the three, "Confirm before cancelling" - this device's -
  *    with its note, after what went wrong keeping the three.
+ *  - (2.0.2) Change password in About, before Sign out, handed who is signed in - only with logins on and a
+ *    Navidrome sign-in: never the break-glass admin, never with logins off (app/ChangePassword.tsx's own states are
+ *    ownpassword.sim.cjs's).
  *
  * A script for the same reason as the other sims: there is no JS test runner here.
  *
@@ -137,7 +140,9 @@ globalThis.__you = {
   },
   ping(service) {
     asked[service] += 1
-    return Promise.resolve(ANSWERS[service])
+    //? (review) an ask that itself fails, as api/http.ts throws it
+    const failing = globalThis.__you.pingFailure?.[service]
+    return failing ? Promise.reject(failing) : Promise.resolve(ANSWERS[service])
   },
 }
 const ME = { user: 'local', admin: true, auth: 'off', version: '2.0.0-player.9' }
@@ -146,7 +151,10 @@ const chosenLooks = []
 const chosenWindDowns = []
 const LOOK = { opensAs: 'turntable', onOpensAs: (look) => chosenLooks.push(look), windDown: true, onWindDown: (on) => chosenWindDowns.push(on) }
 const answersWith = (value) => () => Promise.resolve(value)
-const failsWith = (words) => () => Promise.reject(new Error(words))
+//? (2.0.4) failures as the page meets them: fetch's own TypeError, and an answer as api/http.ts throws it (a 502 from
+//? something in front of deadwax: no words of its own)
+const failsOffline = () => () => Promise.reject(new TypeError('Failed to fetch'))
+const failsWithAnswer = (status) => () => Promise.reject(new (require(path.join(OUT, 'api/http.js')).ApiError)(status, null, 'GET /me failed', false, null, null, '/me'))
 
 let failures = 0
 function check(label, actual, expected) {
@@ -195,6 +203,10 @@ const byClass = (name) => (node) => typeof node.props?.class === 'string' && nod
 const about = () => Object.fromEntries(find((node) => node.type === 'div' && node.props?.class === 'app-row')
   .map((row) => [text(row.props.children[0]), text(row.props.children[1])]))
 const identity = () => find(byClass('app-identity-sub')).map(text)
+const aboutRows = () => Object.fromEntries(find((node) => node.type === 'div' && node.props?.class === 'app-row')
+  .map((row) => [text(row.props.children[0]), text(row.props.children[1])]))
+//? (2.0.8, UX batch 5) the headline: the person signed in - "deadwax" only with logins off
+const headline = () => find(byClass('app-identity-name')).map(text)
 const failure = () => find(byClass('app-error')).map(text)
 const checkAgain = () => find((node) => node.type === 'button' && text(node) === 'Check again')[0]
 
@@ -205,13 +217,14 @@ async function main() {
   check('hidden, never opened: no ping, no /me', asked, { me: 0, musicbrainz: 0, slskd: 0, navidrome: 0 })
 
   console.log('\n/deadwax/me asked with the pings, and asked again')
-  meAnswers.push(failsWith('deadwax is restarting'))
+  meAnswers.push(failsOffline())
   draw({ shown: true, current: true, ...LOOK })
   check('shown: /me and the three pings, once each', asked, { me: 1, musicbrainz: 1, slskd: 1, navidrome: 1 })
   await settle()
   draw({ shown: true, current: true, ...LOOK })
-  check('/me failed: the version and logins say they are not known', about(), { Version: 'unknown', Logins: 'unknown' })
-  check('...the failure is said', failure(), ["deadwax didn't answer: deadwax is restarting"])
+  check('/me failed: the version and logins say they are not known', about(), { Version: 'Not known', Logins: 'Not known' })
+  //? (2.0.4) in a listener's words, and (logins off: everyone runs deadwax) fetch's own under them
+  check('...the failure is said', failure(), ["Can't connect to deadwax. Check your connection, then try again.Failed to fetch"])
   check('...and the identity line claims nothing', identity(), [])
   check('drawn again, nothing is asked again by itself', asked.me, 1)
 
@@ -223,13 +236,14 @@ async function main() {
   await settle()
   draw({ shown: true, current: true, ...LOOK })
   check('deadwax back: the version and logins, and nothing failed', [about(), failure()], [{ Version: '2.0.0-player.9', Logins: 'Off' }, []])
-  check('...and the identity line says what deadwax said', identity(), ['Logins are off'])
+  check('...and the identity line says what deadwax said', identity(), ['No sign-in needed'])
+  check('...under "deadwax" - nobody signs in, so there is nobody to name (2.0.8) - and its "d" as ever', [headline(), find(byClass('app-avatar')).map(text)], [['deadwax'], ['d']])
 
-  meAnswers.push(failsWith('no answer'))
+  meAnswers.push(failsWithAnswer(502))
   checkAgain().props.onClick()
   await settle()
   draw({ shown: true, current: true, ...LOOK })
-  check('a failed ask after a good one keeps the version, and says it failed', [about().Version, failure()], ['2.0.0-player.9', ["deadwax didn't answer: no answer"]])
+  check('a failed ask after a good one keeps the version, and says it failed', [about().Version, failure()], ['2.0.0-player.9', ["deadwax can't do that right now. Try again in a minute.GET /me failed"]])
 
   console.log('\neach connection row is read whole')
   const list = find((node) => node.type === 'ul' && byClass('app-group')(node))[0]
@@ -238,9 +252,26 @@ async function main() {
   check('every row is one, polite and atomic', rows.map((row) => [row.props['aria-live'], row.props['aria-atomic']]), [['polite', 'true'], ['polite', 'true'], ['polite', 'true']])
   check('...holding its service with its answer', rows.map(text), [
     'MusicBrainzConnected',
-    'slskdNOT_LOGGED_INslskd is not logged in to Soulseek',
+    //? (2.0.4) a word for the code, never the code; slskd's sentence under it
+    'slskdNot on Soulseekslskd is not logged in to Soulseek',
     'NavidromeNavidrome 0.64.2',
   ])
+  {
+    //? (review) the ask itself failing: "Couldn't check", its sentence - and the route's own words, for the admin and
+    //? Settings holder these rows are drawn for (it was "Something went wrong. Try again." alone)
+    const { ApiError } = require(path.join(OUT, 'api/http.js'))
+    globalThis.__you.pingFailure = { slskd: new ApiError(500, 'Error pinging slskd: boom', 'GET /monitor_slskd/ping failed', false, null, null, '/monitor_slskd/ping') }
+    checkAgain().props.onClick()
+    await settle()
+    draw({ shown: true, current: true, ...LOOK })
+    globalThis.__you.pingFailure = null
+    check('a ping that fails itself: the row\'s word, its sentence, and the route\'s own words after it',
+      find((node) => node.type === 'li' && byClass('app-status-row')(node)).map(text)[1],
+      "slskdCouldn't checkSomething went wrong. Try again. (Error pinging slskd: boom)")
+    checkAgain().props.onClick()
+    await settle()
+    draw({ shown: true, current: true, ...LOOK })
+  }
 
   console.log('\nPlayback: Gapless, then Now Playing opens as, then Pause winds the record down, then Maximum quality')
   const named = (name) => find((node) => typeof node.type === 'function' && node.type.name === name)
@@ -265,18 +296,25 @@ async function main() {
   const winds = named('WindDownChoice')[0]
   winds?.props.onChange(false)
   check('Pause winds the record down is handed App\'s setting, and App\'s way to change it', [winds?.props.on, chosenWindDowns], [true, [false]])
-  check('the notes: what Gapless does, where the button is, what winding down does, what Normalization does, and where all five are kept', notes, [
-    'An experiment: it shortens the pause between songs, and FLAC songs played one after another can join in one stream, with none at all.',
-    'The button at the top right of Now Playing switches between them until it closes.',
-    "The turntable only: pausing from it slows the record's sound to a stop over about a second, as a real deck does. Off, it stops at once. The cover's pause is always instant.",
-    'Used from the next thing you play. FLAC songs only - others play as they are. deadwax measures an album the first time it levels it, which can make its first song wait a few seconds.',
-    'All five are kept on this device. Maximum quality is used from the next song, Normalization from the next thing you play.',
+  check('the notes: what Gapless does, where the button is, what winding down does, what Normalization does, and that they are kept on this device', notes, [
+    'Plays one song straight into the next. In Safari and Chrome, FLAC albums play through with no pause at all, as they were recorded; other songs change with a much shorter pause. It downloads the next song ahead, which uses more data, and on a slow connection that can stop helping: turn it off if song changes are no quicker.',
+    "What you see first when you open Now Playing. The button at its top right switches between the two while it's open. For phones: a big screen has no Now Playing view.",
+    'On the turntable, pausing slows the music to a stop over about a second, as a real record deck does. Turn it off to stop at once. Pausing from the cover always stops at once. For phones: a big screen has no turntable.',
+    'Evens out FLAC songs only - other files play as they are. The first time an album is levelled, deadwax measures it, so its first song can take a few seconds to start.',
+    'These are kept on this device. Maximum quality changes from the next song, and Normalization from the next thing you play.',
   ])
+  //? (2.0.1) James: "I need the descriptions to be more user oriented and not testing oriented" - every word You
+  //? draws, its notes and headings included, says what a setting does, never how it was tried
+  check('nothing You draws reads as a test note: no "experiment", "trial", "test", "verified" or build number (2.0.1)',
+    //? About's Version row is the one place a build number belongs: what deadwax answered, taken out
+    text(tree).replace(ME.version, '').match(/experiment|\btrial|\bverified\b|\btest(s|ed|ing)?\b|2\.0\.0-player|\bplayer\.\d/gi), null)
+  check('...and the scan reads what it is for: the drawn words, the Playback notes among them',
+    [text(tree).includes(notes[0]), notes.length], [true, 5])
   check('...the wind-down\'s note is what its checkbox is described by: the one note by that id',
     find((node) => node.props?.id === 'app-wind-down-note').map(text).length, 1)
   check('...the first is what the checkbox is described by', find((node) => node.props?.id === 'app-gapless-note').map(text).length, 1)
   check('...the second what the looks are: the one note by that id, the button\'s',
-    find((node) => node.props?.id === 'app-look-note').map(text), ['The button at the top right of Now Playing switches between them until it closes.'])
+    find((node) => node.props?.id === 'app-look-note').map(text), ["What you see first when you open Now Playing. The button at its top right switches between the two while it's open. For phones: a big screen has no Now Playing view."])
 
   console.log('\nGetting albums: first, kept on deadwax, chosen only once deadwax has answered')
   {
@@ -295,20 +333,20 @@ async function main() {
     check('...and a choice goes to the store, which saves it on deadwax', globalThis.__you.chosen, [{ get_mode: 'pick' }])
     check('the note says what picking does, what the floor does, what Format does, and where all three are kept',
       find((node) => node.props?.id === 'app-get-note').map(text),
-      ['With “Pick the best source for me”, Get takes the best match that passes your quality floor, and shows you the sources when nothing matches well. The floor is also what the sources start filtered by. Format changes how sources are scored: Prefer lossless ranks lossless folders higher, and Lossless only leaves out folders with no lossless file. All three are kept for you on deadwax, not on this device.'])
+      ['“Show me the sources” lets you choose each download yourself. “Pick the best source for me” downloads the best match that meets your quality floor, and shows you the sources instead when nothing matches well, or when you already have the album or are getting it. The quality floor is also what the sources start filtered to. Format: Prefer lossless ranks lossless downloads higher, and Lossless only leaves out anything without a lossless file. All three are kept for you on deadwax, so they follow you to every device.'])
     const confirm = named('ConfirmCancelChoice')[0]
     check('under them, "Confirm before cancelling" - this device\'s, on as it ships - and its note says so',
       [!!confirm, confirm?.props.on, find((node) => node.props?.id === 'app-confirm-cancel-note').map(text)],
       [true, true, ['The ✕ on a download in Requests asks first. Kept on this device.']])
-    check('nothing failed, nothing said', failure().filter((line) => !line.startsWith("deadwax didn't answer")), [])
+    check('nothing failed, nothing said', failure().filter((line) => !line.startsWith("deadwax can't do that right now")), [])
     //? the connection rows are live regions too, but list items; this one is the section's own div
     const problemRegion = () => find((node) => node.type === 'div' && node.props?.['aria-live'] === 'polite' && node.props?.['aria-atomic'] === 'true')
     check('a save\'s failure has a live region always in the page, empty while nothing failed', [problemRegion().length, text(problemRegion()[0])], [1, ''])
-    globalThis.__you.getting = { settings: null, canSave: false, problem: 'Not saved: the database is locked' }
+    globalThis.__you.getting = { settings: null, canSave: false, problem: 'Not saved. the database is locked' }
     draw({ shown: true, current: true, ...LOOK })
-    check('a database that can\'t keep them, and a save that failed, are said', failure().filter((line) => !line.startsWith("deadwax didn't answer")),
-      ["deadwax can't keep these: its database isn't writable.", 'Not saved: the database is locked'])
-    check('...the failure inside that region, so VoiceOver hears why the choice went back', text(problemRegion()[0]), 'Not saved: the database is locked')
+    check('a database that can\'t keep them, and a save that failed, are said', failure().filter((line) => !line.startsWith("deadwax can't do that right now")),
+      ["deadwax can't keep these: its database isn't writable.", 'Not saved. the database is locked'])
+    check('...the failure inside that region, so VoiceOver hears why the choice went back', text(problemRegion()[0]), 'Not saved. the database is locked')
     //? (review) in the section, in order: what went wrong keeping the three sits right under them and their
     //? note, never under this device's own setting - "can't keep these" read as being about it
     const section = find((node) => node.type === 'section' && node.props?.['aria-labelledby'] === 'app-getting-title')[0]
@@ -403,7 +441,7 @@ exports.readDownloadDefaults = () => globalThis.__getting.downloadDefaults
       format_preference: server.stored.format_preference ?? 'prefer_lossless', stored: Object.keys(server.stored).sort(),
       seeded: server.seeded, unseeded: server.seeded ? server.unseeded : KEYS, can_save: server.canSave })
     const take = (values) => {
-      if (!server.canSave || server.refuse) throw new Error("deadwax can't keep preferences: its database isn't writable")
+      if (!server.canSave || server.refuse) throw new (require(path.join(OUT2, 'api/http.js')).ApiError)(503, "deadwax can't keep preferences: its database isn't writable", 'PUT /me/preferences failed', false, null, null, '/me/preferences')
       Object.assign(server.stored, values)
       server.seeded = true
       server.unseeded = []
@@ -417,7 +455,7 @@ exports.readDownloadDefaults = () => globalThis.__getting.downloadDefaults
         server.puts.push(values)
         if (server.hold) {
           return new Promise((resolve, reject) => server.held.push({ values, let: (refuse) => {
-            try { if (refuse) throw new Error('the database is locked'); resolve(take(values)) } catch (error) { reject(error) }
+            try { if (refuse) throw new (require(path.join(OUT2, 'api/http.js')).ApiError)(503, 'the database is locked', 'PUT /me/preferences failed', false, null, null, '/me/preferences'); resolve(take(values)) } catch (error) { reject(error) }
           } }))
         }
         try { return Promise.resolve(take(values)) } catch (error) { return Promise.reject(error) }
@@ -544,7 +582,7 @@ exports.readDownloadDefaults = () => globalThis.__getting.downloadDefaults
     server.refuse = true
     await G.chooseGetSettings({ quality_floor: '320' })
     check('one deadwax won\'t keep goes back to what the server holds, and says so',
-      [G.getSettingsNow().quality_floor, G.useGetSettings(false).problem], ['lossless', "Not saved: deadwax can't keep preferences: its database isn't writable"])
+      [G.getSettingsNow().quality_floor, G.useGetSettings(false).problem], ['lossless', "Not saved. deadwax can't keep preferences: its database isn't writable"])
     server.refuse = false
     await G.chooseGetSettings({ quality_floor: '24bit' })
     check('...said until the next choice, which clears it', G.useGetSettings(false).problem, null)
@@ -576,11 +614,11 @@ exports.readDownloadDefaults = () => globalThis.__getting.downloadDefaults
     server.held.shift().let(true)
     await mode
     check('an older choice refused goes back - to the server\'s, saying so - and the newer one still shows',
-      [G.getSettingsNow(), G.useGetSettings(false).problem], [{ get_mode: 'sources', quality_floor: 'lossless', format_preference: 'prefer_lossless' }, 'Not saved: the database is locked'])
+      [G.getSettingsNow(), G.useGetSettings(false).problem], [{ get_mode: 'sources', quality_floor: 'lossless', format_preference: 'prefer_lossless' }, 'Not saved. the database is locked'])
     server.held.shift().let()
     await floor
     check('...the newer one saved, and what was refused said still', [G.getSettingsNow(), server.stored, G.useGetSettings(false).problem],
-      [{ get_mode: 'sources', quality_floor: 'lossless', format_preference: 'prefer_lossless' }, { get_mode: 'sources', quality_floor: 'lossless' }, 'Not saved: the database is locked'])
+      [{ get_mode: 'sources', quality_floor: 'lossless', format_preference: 'prefer_lossless' }, { get_mode: 'sources', quality_floor: 'lossless' }, 'Not saved. the database is locked'])
 
     fresh({ get_mode: 'sources', quality_floor: 'any' })
     await G.askGetSettings()
@@ -627,9 +665,11 @@ exports.readDownloadDefaults = () => globalThis.__getting.downloadDefaults
     const order = find(byClass('app-link-row')).map(text)
     //? (2.0.0-player.33) Server settings and Log after it - and (.42) Library care first of them; the link to the
     //? main page that came last went in 2.0.0-player.66
-    check('"Albums that need a look" with its count, first in Managing - and nothing after Log',
-      [text(within(row(), byClass('app-row-label'))[0]), text(within(row(), byClass('app-queue-badge'))[0]), row().props['aria-label'], order[0].startsWith('Albums that need a look'), order.length],
-      ['Albums that need a look', '3', 'Albums that need a look, 3 albums', true, 4])
+    //? (2.0.8, UX batch 5) "Needs a look" - the page's own name - under "Manage"
+    check('"Needs a look" with its count, first in Manage - and nothing after Event log',
+      [text(within(row(), byClass('app-row-label'))[0]), text(within(row(), byClass('app-queue-badge'))[0]), row().props['aria-label'], order[0].startsWith('Needs a look'), order.length,
+        find((node) => node.props?.id === 'app-managing-title').map(text)],
+      ['Needs a look', '3', 'Needs a look, 3 albums', true, 4, ['Manage']])
     row().props.onClick()
     check('...a tap goes to its page', opened, [true])
     check('...and the main page\'s footnote no longer says the queue is there', footnotes().some((words) => words.includes('albums that need a look')), false)
@@ -643,12 +683,12 @@ exports.readDownloadDefaults = () => globalThis.__getting.downloadDefaults
     const footnotes = () => find(byClass('app-footnote')).map(text)
     const opened = []
     draw({ shown: true, current: true, ...LOOK, needsLook: 2, onNeedsLook: () => {}, onManaging: (kind) => opened.push(kind) })
-    check('under "Albums that need a look", Library care, Server settings then Log - and no main page after them (2.0.0-player.66)', rows().map((words) => words.replace(/\d+$/, '')),
-      ['Albums that need a look', 'Library care', 'Server settings', 'Log'])
+    check('under "Needs a look", Library care, Server settings then Event log - and no main page after them (2.0.0-player.66)', rows().map((words) => words.replace(/\d+$/, '')),
+      ['Needs a look', 'Library care', 'Server settings', 'Event log'])
     const button = (words) => find((node) => node.type === 'button' && text(node) === words)[0]
     button('Library care').props.onClick()
     button('Server settings').props.onClick()
-    button('Log').props.onClick()
+    button('Event log').props.onClick()
     check('...each opening its page', opened, ['care', 'settings', 'log'])
     check('...and the footnote no longer says settings and the log are on the main page', footnotes().some((words) => /settings|the log/i.test(words)), false)
     //? (2.0.0-player.42) nor the bulk runs, and (2.0.0-player.45) nor an artist's pictures and re-filing: nothing
@@ -667,11 +707,70 @@ exports.readDownloadDefaults = () => globalThis.__getting.downloadDefaults
     await settle()
     draw(props)
     check('not an admin: no Managing section, no row', [find((node) => node.props?.id === 'app-managing-title').length, find(byClass('app-queue-link-row')).length], [0, 0])
+    //? (2.0.4) nor Connections: what slskd's key or Navidrome's address is doing is whoever runs deadwax's - nothing asked
+    const pinged = asked.slskd
+    check('...nor Connections, nor its Check again', [find((node) => node.props?.id === 'app-connections-title').length, checkAgain()], [0, undefined])
+    //? (review) Getting albums' database line: a listener told who can fix it - an admin's (above) isn't
+    const keeps = globalThis.__you.getting
+    globalThis.__you.getting = { settings: null, canSave: false, problem: null }
+    draw(props)
+    check('...a database that can\'t keep Getting albums: said, and to tell whoever runs deadwax',
+      failure().filter((line) => line.startsWith("deadwax can't keep")), ["deadwax can't keep these: its database isn't writable. Tell whoever runs deadwax."])
+    globalThis.__you.getting = keeps
+    draw(props)
+    //? You shown again (the only way, with no Check again): /me and the pings asked as it comes back
     meAnswers.push(answersWith(ME))
-    checkAgain().props.onClick()
+    draw({ ...props, shown: false })
+    draw(props)
+    check('...and no ping asked for them', asked.slskd, pinged)
     await settle()
     draw(props)
-    check('...and back once deadwax says so: the four rows', find(byClass('app-queue-link-row')).length, 4)
+    check('...and back once deadwax says so: the four rows, and Connections', [find(byClass('app-queue-link-row')).length, find((node) => node.props?.id === 'app-connections-title').length], [4, 1])
+    //? (review) and asked now - not left on "Checking…" with Check again disabled until You is opened again
+    check('...its pings asked the moment it is drawn', asked.slskd, pinged + 1)
+    await settle()
+    draw(props)
+    check('...answered: no row still checking, and Check again offered',
+      [find((node) => node.type === 'li' && byClass('app-status-row')(node)).map(text).filter((row) => row.includes('Checking')), checkAgain()?.props.disabled],
+      [[], false])
+  }
+
+  console.log('\nChange password (2.0.2): before Sign out - a Navidrome sign-in\'s alone - both in Account (2.0.8)')
+  {
+    const props = { shown: true, current: true, ...LOOK }
+    const named = (name) => find((node) => typeof node.type === 'function' && node.type.name === name)
+    const about = () => {
+      const section = find((node) => node.type === 'section' && node.props?.['aria-labelledby'] === 'app-account-title')[0]
+      const parts = []
+      const visit = (node) => {
+        if (!node || typeof node !== 'object') return
+        if (Array.isArray(node)) { node.forEach(visit); return }
+        if (typeof node.type === 'function') parts.push(node.type.name)
+        visit(node.props?.children)
+      }
+      visit(section)
+      return parts
+    }
+    //? (2.0.4) asked as You is shown again - "Check again" is Connections', which isn't drawn for everyone now
+    const asWho = async (who) => {
+      meAnswers.push(answersWith(who))
+      draw({ ...props, shown: false })
+      draw(props)
+      await settle()
+      draw(props)
+    }
+    await asWho({ ...ME, user: 'ethan', admin: false, auth: 'on', permissions: ['request'] })
+    check('logins on, signed in through Navidrome: Change password, then Sign out', about(), ['ChangePassword', 'SignOutRow'])
+    check('...handed who they are', named('ChangePassword')[0]?.props, { user: 'ethan' })
+    //? (2.0.8, UX batch 5) the person as the headline, an Account section, About's Logins an admin's alone
+    check('...their name the headline, nothing under it - and About only the version: Logins is an admin\'s',
+      [headline(), identity(), find((node) => node.props?.id === 'app-account-title').map(text), Object.keys(aboutRows())], [['ethan'], [], ['Account'], ['Version']])
+    check('...the avatar their initial, a capital', find(byClass('app-avatar')).map(text), ['E'])
+    await asWho({ ...ME, user: 'deadwax', admin: true, auth: 'on' })
+    check('the break-glass sign-in: no Navidrome account, so Sign out alone', about(), ['SignOutRow'])
+    check('...an admin: About says whether logins are on', aboutRows(), { Version: '2.0.0-player.9', Logins: 'On' })
+    await asWho(ME)
+    check('logins off: neither - and no Account section at all', [about(), find((node) => node.props?.id === 'app-account-title').length], [[], 0])
   }
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed')

@@ -149,7 +149,7 @@
     min-height: var(--lab-control);
     max-width: 100%;
     color: var(--dw-text);
-    font-size: var(--dw-text-body);
+    font-size: var(--dw-text-field);
 }
 
 .lab-field select,

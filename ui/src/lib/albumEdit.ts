@@ -213,7 +213,7 @@ export interface EditStatusFacts {
   deleted: string | null
   /** why the library can't be read at all (LIBRARY_PATH unset) - not an error */
   problem: string | null
-  /** the library's last read failed */
+  /** the library's last read failed - (2.0.8) said in words already (lib/errorWords.ts) */
   error: string | null
   /** how many albums the library lists */
   albums: number
@@ -244,14 +244,15 @@ export function editStatus(facts: EditStatusFacts): EditStatus | null {
   if (facts.deleted) return { text: `Deleted ${facts.deleted}.` }
   if (facts.problem) return { text: facts.problem }
   if (facts.holding) return null
-  if (facts.error && (facts.stale || !facts.albums)) return { text: `deadwax couldn't read the library: ${facts.error}`, retry: true }
+  //? (2.0.8) `error` is said already, in words (EditPanel: lib/errorWords.ts) - never the read's raw words
+  if (facts.error && (facts.stale || !facts.albums)) return { text: facts.error, retry: true }
   if (!facts.asked || !facts.loaded || facts.stale) return { text: "Finding the album's folder…", busy: true }
   const folders = facts.folders
   if (!folders || !folders.paths.length) {
     return {
       text: facts.release
-        ? 'deadwax has no folder of this album: Navidrome knows it by a MusicBrainz release no folder in the library is tagged with.'
-        : "deadwax can't tell which folder this album is: Navidrome knows it by no MusicBrainz release, and no untagged folder in the library has its name.",
+        ? "deadwax can't find this album's folder: no folder in the library is matched to the release Navidrome has for it. Choose the folder yourself, or look again."
+        : "deadwax can't find this album's folder: it isn't matched to a release, and no unmatched folder in the library has its name. Choose the folder yourself, or look again.",
       retry: true,
       choose: true,
     }

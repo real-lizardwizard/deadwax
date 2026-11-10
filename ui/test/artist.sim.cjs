@@ -9,7 +9,7 @@
  *  - THE ORDER of the albums (`artistRows`): MusicBrainz's albums with what the library holds of each
  *    - by the store's word (/library/owned's folders, by group id), opened as the Navidrome album
  *    holding one of those releases, "2 editions" past one - and every album Navidrome has that no
- *    row claimed as a row of its own; oldest first, the undated last whichever kind, then by title,
+ *    row claimed as a row of its own; newest first (2.0.12), the undated last whichever kind, then by title,
  *    then steady. An untagged rip claimed only by the ONE album of its exact title. Studio only never
  *    hides an album you have. MusicBrainz down: the albums you have are the whole list. A renamed
  *    artist's albums under either name, together.
@@ -132,30 +132,30 @@ console.log('\nthe page\'s id')
 console.log('\nthe albums, in order')
 {
   const rows = A.artistRows(HELD, [THIRD_G, DUMMY_G, PORTISHEAD_G], LIBRARY)
-  check('oldest first; what you have marked, opened as the album you have; what you don\'t, not',
-    summary(rows), [['Dummy', '1994', 'nd-cd', true, 2], ['Portishead', '1997', 'nd-self', true, 1], ['Third', '2008', null, false, 0]])
+  check('newest first (2.0.12); what you have marked, opened as the album you have; what you don\'t, not',
+    summary(rows), [['Third', '2008', null, false, 0], ['Portishead', '1997', 'nd-self', true, 1], ['Dummy', '1994', 'nd-cd', true, 2]])
   check('...each Navidrome album claimed once - neither copy of Dummy listed again',
-    rows.map((row) => row.key), ['group:rg-dummy', 'group:rg-portishead', 'group:rg-third'])
-  check('...the releases you hold of each, for the bridge', rows.map((row) => row.releases), [[CD, VINYL], [SELFTITLED], []])
-  check('the lines, as the board has them', rows.map(A.rowLine), ['1994 · in your library · 2 editions', '1997 · in your library', '2008 · not in your library'])
-  check('Play plays one copy of each album you have, in the page\'s order - the plain edition', A.playOrder(rows), ['nd-cd', 'nd-self'])
+    rows.map((row) => row.key), ['group:rg-third', 'group:rg-portishead', 'group:rg-dummy'])
+  check('...the releases you hold of each, for the bridge', rows.map((row) => row.releases), [[], [SELFTITLED], [CD, VINYL]])
+  check('the lines, as the board has them', rows.map((row) => A.rowLine(row)), ['2008 · not in your library', '1997 · in your library', '1994 · in your library · 2 pressings'])
+  check('Play plays one copy of each album you have, in the page\'s order - the plain edition', A.playOrder(rows), ['nd-self', 'nd-cd'])
   const plainLater = O.buildOwnedIndex([owned('Portishead/Dummy (1994) [Deluxe]', CD, 'rg-dummy', { edition: 'Deluxe', year: '1994' }), owned('Portishead/Dummy plain', VINYL, 'rg-dummy', { edition: '', year: '2016' })])
-  check('...the plain edition, whatever its year or its folder\'s name', A.artistRows(HELD, [DUMMY_G], plainLater)[0].albumId, 'nd-vinyl')
+  check('...the plain edition, whatever its year or its folder\'s name', A.artistRows(HELD, [DUMMY_G], plainLater).find((row) => row.key === 'group:rg-dummy').albumId, 'nd-vinyl')
   const labelled = O.buildOwnedIndex([owned('Portishead/Dummy (1994) [Anniversary]', VINYL, 'rg-dummy', { edition: 'Anniversary', year: '2014' }), owned('Portishead/Dummy (1994) [Original]', CD, 'rg-dummy', { edition: 'Original', year: '1994' })])
-  check('...two editions with labels: the older, whatever its folder\'s name', A.artistRows(HELD, [DUMMY_G], labelled)[0].albumId, 'nd-cd')
+  check('...two editions with labels: the older, whatever its folder\'s name', A.artistRows(HELD, [DUMMY_G], labelled).find((row) => row.key === 'group:rg-dummy').albumId, 'nd-cd')
 
   const undated = A.artistRows([nd('nd-x', 'Demo Tape', 0)], [group('rg-u', 'Unknown Date', ''), THIRD_G, DUMMY_G], LIBRARY)
-  check('the undated sink to the end, whichever kind - MusicBrainz\'s or one you have', undated.map((row) => row.title), ['Dummy', 'Third', 'Demo Tape', 'Unknown Date'])
+  check('the undated sink to the end, whichever kind - MusicBrainz\'s or one you have', undated.map((row) => row.title), ['Third', 'Dummy', 'Demo Tape', 'Unknown Date'])
   const ties = A.artistRows([], [group('rg-b', 'B side', '2001'), group('rg-a', 'a side', '2001'), group('rg-a2', 'A Side', '2001')], null)
   check('a year\'s albums by title, folded, then steadily', ties.map((row) => row.key), ['group:rg-a', 'group:rg-a2', 'group:rg-b'])
 
   const rip = nd('nd-rip', 'Dummy', 1994)
   const NONE = O.buildOwnedIndex([])
   check('an untagged rip claimed by the one album of its exact title',
-    summary(A.artistRows([rip], [DUMMY_G, THIRD_G], NONE)), [['Dummy', '1994', 'nd-rip', true, 1], ['Third', '2008', null, false, 0]])
+    summary(A.artistRows([rip], [DUMMY_G, THIRD_G], NONE)), [['Third', '2008', null, false, 0], ['Dummy', '1994', 'nd-rip', true, 1]])
   check('...the library not having answered: Navidrome\'s claim stands, every other row says neither',
-    [summary(A.artistRows([rip], [DUMMY_G, THIRD_G], null)), A.artistRows([rip], [DUMMY_G, THIRD_G], null).map(A.rowLine)],
-    [[['Dummy', '1994', 'nd-rip', true, 1], ['Third', '2008', null, null, 0]], ['1994 · in your library', '2008']])
+    [summary(A.artistRows([rip], [DUMMY_G, THIRD_G], null)), A.artistRows([rip], [DUMMY_G, THIRD_G], null).map((row) => A.rowLine(row))],
+    [[['Third', '2008', null, null, 0], ['Dummy', '1994', 'nd-rip', true, 1]], ['2008', '1994 · in your library']])
   check('...never by an album sharing its title with another - its own row then',
     A.artistRows([rip], [DUMMY_G, group('rg-dummy-2', 'Dummy', '2010')], null).map((row) => row.key).sort(),
     ['album:nd-rip', 'group:rg-dummy', 'group:rg-dummy-2'])
@@ -169,21 +169,21 @@ console.log('\nthe albums, in order')
   check('Studio only never hides an album you have: a live album held is its own row',
     summary(A.artistRows([...HELD, nd('nd-rose', 'Roseland NYC Live', 1998, ROSELAND)], [DUMMY_G, PORTISHEAD_G, THIRD_G],
       O.buildOwnedIndex([...LIBRARY.byRelease.values()].flat().concat(owned('Portishead/Roseland NYC Live (1998)', ROSELAND, 'rg-roseland'))))),
-    [['Dummy', '1994', 'nd-cd', true, 2], ['Portishead', '1997', 'nd-self', true, 1], ['Roseland NYC Live', '1998', 'nd-rose', true, 1], ['Third', '2008', null, false, 0]])
+    [['Third', '2008', null, false, 0], ['Roseland NYC Live', '1998', 'nd-rose', true, 1], ['Portishead', '1997', 'nd-self', true, 1], ['Dummy', '1994', 'nd-cd', true, 2]])
   check('...and with it off, a live album says so', A.rowLine(A.artistRows([], [ROSELAND_G], NONE)[0]), '1998 · Live album · not in your library')
 
   const down = A.artistRows(HELD, null, LIBRARY)
   check('MusicBrainz down (or not knowing who this is): the albums you have are the whole list - one row per album the folders say',
-    summary(down), [['Dummy', '1994', 'nd-cd', true, 2], ['Portishead', '1997', 'nd-self', true, 1]])
+    summary(down), [['Portishead', '1997', 'nd-self', true, 1], ['Dummy', '1994', 'nd-cd', true, 2]])
   check('...keyed as MusicBrainz\'s rows will be, opening the same copy: its answer moves no key',
     [down.map((row) => [row.key, row.albumId]), A.artistRows(HELD, [THIRD_G, DUMMY_G, PORTISHEAD_G], LIBRARY).filter((row) => row.held).map((row) => [row.key, row.albumId])],
-    [[['group:rg-dummy', 'nd-cd'], ['group:rg-portishead', 'nd-self']], [['group:rg-dummy', 'nd-cd'], ['group:rg-portishead', 'nd-self']]])
-  check('...and Play plays Dummy once', A.playOrder(down), ['nd-cd', 'nd-self'])
+    [[['group:rg-portishead', 'nd-self'], ['group:rg-dummy', 'nd-cd']], [['group:rg-portishead', 'nd-self'], ['group:rg-dummy', 'nd-cd']]])
+  check('...and Play plays Dummy once', A.playOrder(down), ['nd-self', 'nd-cd'])
   check('...an album the folders say nothing of is a row of its own',
     A.artistRows([nd('nd-rip', 'Old Rip', 1990)], null, LIBRARY).map((row) => row.key), ['album:nd-rip'])
-  check('...before the library answers, Navidrome\'s copies of one album claimed by title stay apart, oldest first',
-    summary(A.artistRows(HELD, null, null)).map((row) => row[2]), ['nd-cd', 'nd-self', 'nd-vinyl'])
-  check('...and MusicBrainz\'s row claims both by title, the older opened', A.artistRows(HELD, [DUMMY_G], null)[0].albumId, 'nd-cd')
+  check('...before the library answers, Navidrome\'s copies of one album claimed by title stay apart, newest first',
+    summary(A.artistRows(HELD, null, null)).map((row) => row[2]), ['nd-vinyl', 'nd-self', 'nd-cd'])
+  check('...and MusicBrainz\'s row claims both by title, the older opened', A.artistRows(HELD, [DUMMY_G], null).find((row) => row.key === 'group:rg-dummy').albumId, 'nd-cd')
   check('held by the store\'s word, not found by Navidrome: in your library, opened by the bridge',
     A.artistRows([], [DUMMY_G], LIBRARY).map((row) => [row.held, row.albumId, row.releases.length, row.editions]), [[true, null, 2, 2]])
   check('...and Play has nothing of it to play', A.playOrder(A.artistRows([], [DUMMY_G], LIBRARY)), [])
@@ -196,22 +196,22 @@ console.log('\nthe albums, in order')
   check('a renamed artist: the albums credited to their old name and their new, together, in order',
     summary(A.artistRows([nd('nd-bully', 'BULLY', 2025, BULLY), nd('nd-donda', 'Donda', 2021, DONDA)],
       [group('rg-bully', 'BULLY', '2025-03-28', { 'artist-credit': credited('Ye') }), group('rg-donda', 'Donda', '2021-08-29', { 'artist-credit': credited('Kanye West') })], ye)),
-    [['Donda', '2021', 'nd-donda', true, 1], ['BULLY', '2025', 'nd-bully', true, 1]])
+    [['BULLY', '2025', 'nd-bully', true, 1], ['Donda', '2021', 'nd-donda', true, 1]])
   check('a group twice in MusicBrainz\'s answer is one row', A.artistRows([], [THIRD_G, THIRD_G], null).length, 1)
 
   const split = O.buildOwnedIndex([owned('Portishead/Dummy (1994) (Disc 1)', CD, 'rg-dummy'), owned('Portishead/Dummy (1994) (Disc 2)', CD, 'rg-dummy')])
   const twice = O.buildOwnedIndex([owned('Portishead/Dummy (1994) [FLAC]', CD, 'rg-dummy'), owned('Portishead/Dummy (1994) [MP3]', CD, 'rg-dummy')])
   check('"2 editions" counts releases: a set kept one folder per disc, or one release twice, is one',
-    [A.artistRows([nd('nd-cd', 'Dummy', 1994, CD)], [DUMMY_G], split)[0].editions, A.artistRows([], [DUMMY_G], twice)[0].editions, A.artistRows(HELD, [DUMMY_G], LIBRARY)[0].editions],
+    [A.artistRows([nd('nd-cd', 'Dummy', 1994, CD)], [DUMMY_G], split).find((row) => row.key === 'group:rg-dummy').editions, A.artistRows([], [DUMMY_G], twice).find((row) => row.key === 'group:rg-dummy').editions, A.artistRows(HELD, [DUMMY_G], LIBRARY).find((row) => row.key === 'group:rg-dummy').editions],
     [1, 1, 2])
   const untaggedToo = O.buildOwnedIndex([owned('Portishead/Dummy (1994)', CD, 'rg-dummy'), owned('Portishead/Dummy rip', '', 'rg-dummy')])
-  check('...a folder naming no release counts once of its own', A.artistRows([], [DUMMY_G], untaggedToo)[0].editions, 2)
+  check('...a folder naming no release counts once of its own', A.artistRows([], [DUMMY_G], untaggedToo).find((row) => row.key === 'group:rg-dummy').editions, 2)
   const asScanned = O.buildOwnedIndex([
     owned('Portishead/Dummy (1994) [20th Anniversary Reissue 180gram]', VINYL, 'rg-dummy', { edition: '20th Anniversary Reissue 180gram', year: '2014' }),
     owned('Portishead/Dummy (1994)', CD, 'rg-dummy', { edition: 'Standard', year: '1994' }),
   ])
   check('the scan names the plain copy "Standard" beside another, and lists it after: still the plain edition, for the page and for Search',
-    [A.artistRows(HELD, [DUMMY_G], asScanned)[0].albumId, B.heldReleases(asScanned, 'rg-dummy')], ['nd-cd', [CD, VINYL]])
+    [A.artistRows(HELD, [DUMMY_G], asScanned).find((row) => row.key === 'group:rg-dummy').albumId, B.heldReleases(asScanned, 'rg-dummy')], ['nd-cd', [CD, VINYL]])
   check('the copies in order: plain, then oldest, a year nobody wrote last, then by folder',
     B.heldInOrder([{ path: 'c', edition: 'Deluxe', year: '1990' }, { path: 'b', edition: '', year: '' }, { path: 'a', edition: 'standard', year: '2001' }, { path: 'd', edition: '', year: '2001' }]).map((x) => x.path),
     ['a', 'd', 'b', 'c'])
@@ -265,11 +265,11 @@ console.log('\nthe lines')
   check('Plays the 2 albums you have', A.playsLine(2, 2, true), 'Plays the 2 albums you have')
   check('...the one album', A.playsLine(1, 1, true), 'Plays the album you have')
   check('...while their songs are asked for', A.playsLine(2, 1, false), 'Getting the songs of the 2 albums you have…')
-  check('...some not sent', A.playsLine(3, 2, true), "Plays 2 of the 3 albums you have - Navidrome didn't send the rest")
-  check('...none sent', A.playsLine(2, 0, true), "Navidrome didn't send the songs")
+  check('...some not sent', A.playsLine(3, 2, true), "Plays 2 of the 3 albums you have - the rest didn't load")
+  check('...none sent', A.playsLine(2, 0, true), "Couldn't load their songs.")
   check('...nothing to play: what Navidrome said - still looking, none of theirs, or nothing when it failed',
     [A.playsLine(0, 0, true, 'asking'), A.playsLine(0, 0, true), A.playsLine(0, 0, true, 'failed')],
-    ['Looking for their albums in your library…', 'Navidrome has none of their albums to play', ''])
+    ['Looking for their albums in your library…', 'None of their albums are here to play.', ''])
   const facts = { type: 'Group', area: 'United Kingdom', begin_area: 'Bristol', country: 'GB', began: '1991', ended_on: '', ended: false, disambiguation: '' }
   check('who they are: type, where from, since when', A.factsLine(facts), 'Group · Bristol · since 1991')
   check('...ended, with its dates', A.factsLine({ ...facts, begin_area: 'London', began: '1965-01-01', ended: true, ended_on: '2014-11-10' }), 'Group · London · 1965 to 2014')
@@ -589,7 +589,18 @@ exports.applyArtistImages = (name, choices, options) => globalThis.__page.ask('i
 exports.searchArtists = (query, signal) => globalThis.__page.ask('artistSearch', query, !!signal)
 `)
 //? (2.0.0-player.61) what this person may do - the page reads it from the access store: a mount's `admin` says which
-write('app/access.js', `exports.useAccess = () => ({ permissions: globalThis.__page.permissions, on: true, unverified: false })\n`)
+write('app/access.js', `exports.useAccess = () => ({ permissions: globalThis.__page.permissions, on: true, unverified: false })
+exports.accessNow = exports.useAccess
+//? (2.0.4) whether this reader runs deadwax (an error's own words, under its sentence): a listener's page unless a case says
+exports.seesDetail = () => globalThis.__page.runs === true
+`)
+//? (2.0.13) the page's description: what it was asked with kept, and what it answers given by the test - by default
+//? settled with none, so the albums wait for nothing more than they did
+write('app/useDescription.js', `exports.useDescription = (kind, ids, below, page) => {
+  globalThis.__page.describeAsks.push([kind, ids, below, page])
+  return globalThis.__page.describing
+}
+`)
 write('app/useOwned.js', `
 exports.ownedNow = () => globalThis.__page.owned
 exports.useOwned = () => globalThis.__page.owned
@@ -599,6 +610,7 @@ exports.whenOwned = () => globalThis.__page.owned ? Promise.resolve() : new Prom
 const W = globalThis.__page = {
   asks: [], open: [], owned: null, ownedWaiting: [], indexAge: 0, plays: [], remembered: [], sheets: [],
   pins: { pins: [], known: true, canSave: true, problem: null }, pinned: [], said: [],
+  describeAsks: [], describing: { description: null, settled: true, at: null },
   ask(name, ...args) {
     W.asks.push([name, ...args])
     let resolve, reject
@@ -623,6 +635,7 @@ function ownedAnswers(index) {
 function reset() {
   W.asks.length = 0; W.open.length = 0; W.owned = null; W.ownedWaiting.length = 0; W.indexAge = 0; W.plays.length = 0; W.remembered.length = 0; W.sheets.length = 0
   W.pins = { pins: [], known: true, canSave: true, problem: null }; W.pinned.length = 0; W.said.length = 0
+  W.describeAsks.length = 0; W.describing = { description: null, settled: true, at: null }
 }
 
 //? the albums' wait (ROWS_WAIT_MS) and the sections' (ABOUT_WAIT_MS): timers the test fires by hand -
@@ -639,7 +652,7 @@ const fire = (ms) => {
 }
 
 const hooks = require(path.join(PAGE, 'node_modules/preact/hooks.js'))
-const { ArtistPage, PREFETCH_AT_ONCE, forgetKeptArtist } = require(path.join(PAGE, 'app/ArtistPage.js'))
+const { ArtistPage, ARTIST_GONE, PREFETCH_AT_ONCE, forgetKeptArtist } = require(path.join(PAGE, 'app/ArtistPage.js'))
 const { PINS_UNSAVED: P_UNSAVED } = require(path.join(PAGE, 'app/PinToggle.js'))
 
 let tree = null
@@ -723,34 +736,41 @@ async function page() {
     check('MusicBrainz answered, the library not: still waiting', rowKeys(), [])
     waitOver()
     await one.settled()
-    check('the wait over: drawn - every row MusicBrainz has, Navidrome\'s albums claimed by title', rowKeys(), ['group:rg-dummy', 'group:rg-portishead', 'group:rg-third'])
-    check('...and no verdict, and no Get, where only the library could say', [rowLines(), getChips()], [['1994 · in your library · 2 editions', '1997 · in your library', '2008'], []])
+    check('the wait over: drawn - every row MusicBrainz has, Navidrome\'s albums claimed by title', rowKeys(), ['group:rg-third', 'group:rg-portishead', 'group:rg-dummy'])
+    check('...and no verdict, and no Get, where only the library could say', [rowLines(), getChips()], [['2008', '1997 · in your library', '1994 · in your library · 2 pressings'], []])
     check('...Play still disabled: which copies are one album is the library\'s to say', pills().map((pill) => pill[1]), [true, true])
     ownedAnswers(LIBRARY)
     await one.settled()
     check('the library answered: the same rows, the same keys, Third "not in your library" with its Get',
-      [rowKeys(), rowLines()[2], getChips()], [['group:rg-dummy', 'group:rg-portishead', 'group:rg-third'], '2008 · not in your library', ['Get Third']])
+      [rowKeys(), rowLines()[0], getChips()], [['group:rg-third', 'group:rg-portishead', 'group:rg-dummy'], '2008 · not in your library', ['Get Third']])
     check('the albums Play plays asked for, one copy of Dummy', asked('prefetch').map((one) => one[0]).sort(), ['nd-cd', 'nd-self'])
     while (outstanding('prefetch').length) answer('prefetch', songsOf)
     await one.settled()
     check('every album in hand: Play and Shuffle live', [pills(), playsWords()], [[['Play', false], ['Shuffle', false]], 'Plays the 2 albums you have'])
     classed('pl-pill')[0].props.onClick()
     check('Play: every album remembered for Info and the turntable, then the queue - Dummy once', [W.remembered, W.plays.map((p) => [p[0].map((t) => t.id), p[1], p[2]])],
-      [[['nd-cd', 'nd-self']], [[['nd-cd-1', 'nd-cd-2', 'nd-self-1', 'nd-self-2'], 0, false]]])
+      [[['nd-self', 'nd-cd']], [[['nd-self-1', 'nd-self-2', 'nd-cd-1', 'nd-cd-2'], 0, false]]])
 
     find((node) => node.type === 'button' && words(node) === 'Studio only')[0].props.onClick()
     one.draw()
     one.draw()
     check('Studio only off: asked again - the rows on screen meanwhile, busy', [asked('discography').slice(-1), rowKeys(), classed('app-artist-albums')[0].props['aria-busy']],
-      [[[PORTISHEAD, false]], ['group:rg-dummy', 'group:rg-portishead', 'group:rg-third'], true])
+      [[[PORTISHEAD, false]], ['group:rg-third', 'group:rg-portishead', 'group:rg-dummy'], true])
     answer('discography', { 'release-groups': [...DISCOGRAPHY['release-groups'], ROSELAND_G] })
     await one.settled()
-    check('...its answer drawn', rowKeys(), ['group:rg-dummy', 'group:rg-portishead', 'group:rg-roseland', 'group:rg-third'])
+    check('...its answer drawn', rowKeys(), ['group:rg-third', 'group:rg-roseland', 'group:rg-portishead', 'group:rg-dummy'])
 
     const again = mount()
     again.draw()
-    check('the page come back to (Back): its rows on the first frame, from the session', rowKeys(), ['group:rg-dummy', 'group:rg-portishead', 'group:rg-roseland', 'group:rg-third'])
+    check('the page come back to (Back): its rows on the first frame, from the session', rowKeys(), ['group:rg-third', 'group:rg-roseland', 'group:rg-portishead', 'group:rg-dummy'])
     check('...asking MusicBrainz nothing again', asked('discography').length, 2)
+    //? (2.0.13) its description still out (left before it came): the rows on the first frame all the same - the
+    //? scroll put back needs them - the description, when it comes, at the foot
+    W.describing = { description: null, settled: false, at: null }
+    const thirdTime = mount()
+    thirdTime.draw()
+    check('...come back to with its description still out: the rows on the first frame still', rowKeys().length, 4)
+    W.describing = { description: null, settled: true, at: null }
   }
 
   console.log('\nthe page: MusicBrainz slow - what you have drawn, keyed as its rows will be')
@@ -764,11 +784,11 @@ async function page() {
     waitOver()
     await one.settled()
     check('the wait over, MusicBrainz still out: one row per album you have, Dummy once', [rowKeys(), rowLines()],
-      [['group:rg-dummy', 'group:rg-portishead'], ['1994 · in your library · 2 editions', '1997 · in your library']])
+      [['group:rg-portishead', 'group:rg-dummy'], ['1997 · in your library', '1994 · in your library · 2 pressings']])
     check('...and Play asks for one copy of Dummy', asked('prefetch').map((one) => one[0]).sort(), ['nd-cd', 'nd-self'])
     answer('discography', DISCOGRAPHY)
     await one.settled()
-    check('MusicBrainz answering adds what you don\'t have and moves no key', rowKeys(), ['group:rg-dummy', 'group:rg-portishead', 'group:rg-third'])
+    check('MusicBrainz answering adds what you don\'t have and moves no key', rowKeys(), ['group:rg-third', 'group:rg-portishead', 'group:rg-dummy'])
   }
 
   console.log('\nthe page: a few albums asked for at a time')
@@ -780,10 +800,10 @@ async function page() {
     one.draw()
     answer('artistAlbums', { id: 'ar-many', name: 'Many', album: many })
     await one.settled()
-    check(`at most ${PREFETCH_AT_ONCE} out at once, in the page's order`, outstanding('prefetch').map((one) => one.args[0]), ['nd-0', 'nd-1', 'nd-2', 'nd-3'])
+    check(`at most ${PREFETCH_AT_ONCE} out at once, in the page's order`, outstanding('prefetch').map((one) => one.args[0]), ['nd-8', 'nd-7', 'nd-6', 'nd-5'])
     answer('prefetch', songsOf)
     await one.settled()
-    check('...the next as one answers', outstanding('prefetch').map((one) => one.args[0]), ['nd-1', 'nd-2', 'nd-3', 'nd-4'])
+    check('...the next as one answers', outstanding('prefetch').map((one) => one.args[0]), ['nd-7', 'nd-6', 'nd-5', 'nd-4'])
     while (outstanding('prefetch').length) { answer('prefetch', songsOf); await one.settled() }
     classed('pl-pill')[1].props.onClick()
     check('Shuffle: all nine remembered, every song queued, shuffled', [W.remembered[0]?.length, W.plays[0]?.[0].length, W.plays[0]?.[1], W.plays[0]?.[2]], [9, 18, null, true])
@@ -811,19 +831,32 @@ async function page() {
     answer('libraryArtists', [])
     await none.settled()
     check('nobody of theirs in Navidrome (a list just asked for): said under the buttons, which stay', [asked('libraryArtists'), pills().length, playsWords()],
-      [[[false]], 2, 'Navidrome has none of their albums to play'])
+      [[[false]], 2, 'None of their albums are here to play.'])
 
     reset()
     ownedAnswers(O.buildOwnedIndex([]))
     const failing = mount({ id: 'mb:aaaaaaaa-0000-4000-8000-000000000002' })
     failing.draw()
-    answer('libraryArtists', new Error('Navidrome is restarting'))
+    //? (2.0.4) as api/http.ts throws Navidrome's 502: said in a listener's words, never its address or its error
+    answer('libraryArtists', new (require(path.join(PAGE, 'api/http.js')).ApiError)(502, "Navidrome couldn't be reached at http://navidrome:4533: All connection attempts failed", 'GET /navidrome/artists failed', false, null, null, '/navidrome/artists'))
     await failing.settled()
     const retry = find((node) => node.type === 'button' && words(node) === 'Try again' && byClass('pl-text-button')(node))
-    check('the look failing: why, and Try again', [words(classed('pl-notice')[0]).startsWith('Navidrome is restarting'), retry.length], [true, 1])
+    check('the look failing: why, in a listener\'s words, and Try again', [words(classed('pl-notice')[0]), retry.length],
+      ["Can't reach the music server right now. If it keeps happening, tell whoever runs deadwax.Try again", 1])
     retry[0].props.onClick()
     await failing.settled()
     check('...which looks again', asked('libraryArtists').length, 2)
+
+    //? (review) an artist the music server no longer has - an old pin or link: a sentence for anyone, never
+    //? "Navidrome has nothing by that id", and no Try again, which can't find them
+    reset()
+    const gone = mount({ id: 'nosuchartist' })
+    gone.draw()
+    answer('artistAlbums', new (require(path.join(PAGE, 'api/http.js')).ApiError)(404, 'Navidrome has nothing by that id', 'GET /navidrome/artists/nosuchartist failed', false, null, null, '/navidrome/artists/nosuchartist'))
+    await gone.settled()
+    check('an artist that\'s gone: said so, with no Try again',
+      [words(classed('pl-notice')[0]), find((node) => node.type === 'button' && words(node) === 'Try again' && byClass('pl-text-button')(node)).length],
+      [ARTIST_GONE, 0])
 
     reset()
     const away = mount({ id: 'mb:aaaaaaaa-0000-4000-8000-000000000003', navidromeOk: false })
@@ -841,7 +874,7 @@ async function page() {
     await one.settled()
     answer('discography', { 'release-groups': [DUMMY_G] })
     await one.settled()
-    check('held by the store\'s word, Navidrome having no artist for them: in your library', rowLines(), ['1994 · in your library · 2 editions'])
+    check('held by the store\'s word, Navidrome having no artist for them: in your library', rowLines(), ['1994 · in your library · 2 pressings'])
     find((node) => byClass('app-artist-album')(node))[0].props.onClick()
     one.draw()
     check('the tap asks the bridge, the row faded while it looks', [asked('bridge'), classed('app-artist-album')[0].props.class], [[[[CD, VINYL]]], 'app-artist-album is-busy'])
@@ -877,7 +910,7 @@ async function page() {
     check('Navidrome has no id for them, the library hasn\'t answered: nothing claimed', words(classed('app-search-empty')[0]), '')
     ownedAnswers(O.buildOwnedIndex([]))
     await one.settled()
-    check('...it has, and can\'t say either: said', words(classed('app-search-empty')[0]), "MusicBrainz doesn't know who this is from your files, so only the albums you have are here.")
+    check('...it has, and can\'t say either: said', words(classed('app-search-empty')[0]), "Only the albums you have are shown - their other albums can't be found.")
   }
 
   console.log('\nthe page: the pin (2.0.0-player.18)')
@@ -913,7 +946,8 @@ async function page() {
     one.draw()
     check('deadwax can\'t keep pins: not live', pin().props['aria-disabled'], true)
     pin().props.onClick()
-    check('...a tap says why in the app\'s notice, and pins nothing', [W.said, W.pinned.length], [[P_UNSAVED], 2])
+    //? (2.0.4) and, to someone who doesn't run deadwax, to tell whoever does
+    check('...a tap says why in the app\'s notice, and pins nothing', [W.said, W.pinned.length], [[`${P_UNSAVED}. Tell whoever runs deadwax.`], 2])
     W.pins = { pins: null, known: true, canSave: true, problem: "Couldn't get your pins: Failed to fetch" }
     one.draw()
     check('the pins couldn\'t be had: live all the same (not held for ever), reading "Pin"', [pin().props['aria-disabled'], words(pin())], [false, 'Pin'])
@@ -929,6 +963,98 @@ async function page() {
     pin().props.onClick()
     check('...nobody can say one: live, pinning them by name and Navidrome\'s id', [pin().props['aria-disabled'], W.pinned],
       [false, [[{ kind: 'artist', mbid: null, navidrome_id: 'ar-anon-pin', name: 'Anon', cover: null }, true]]])
+  }
+
+  console.log('\nthe page: their description (2.0.13) - asked once who they are is settled, the albums waiting for it')
+  {
+    reset()
+    W.describing = { description: null, settled: false, at: null }
+    const one = mount({ id: 'ar-desc' })
+    one.draw()
+    check('first frame: not asked - Navidrome\'s artist and their facts still to come', W.describeAsks.at(-1), ['artist', null, false, 'ar-desc'])
+    answer('artistAlbums', { ...PORTISHEAD_ARTIST, id: 'ar-desc' })
+    await one.settled()
+    check('Navidrome answered, the facts not: still not asked (deadwax\'s lookup of them is the facts\' own)', W.describeAsks.at(-1)[1], null)
+    answer('facts', { mbid: PORTISHEAD, name: 'Portishead', genres: [], aliases: [], links: [], members: [] })
+    await one.settled()
+    check('...the facts in: asked by their MusicBrainz id and Navidrome\'s', W.describeAsks.at(-1).slice(0, 2), ['artist', { mbid: PORTISHEAD, navidromeId: 'ar-desc' }])
+    answer('discography', DISCOGRAPHY)
+    ownedAnswers(LIBRARY)
+    await one.settled()
+    check('every other answer in, the description not: the albums still wait', rowKeys(), [])
+    const WIKI = { paragraph: { text: 'Portishead are an English electronic band.', source: 'wikipedia', url: 'https://en.wikipedia.org/wiki/Portishead_(band)' },
+      subtitle: 'English band' }
+    const before = W.describeAsks.length
+    W.describing = { description: WIKI, settled: true, at: 'top' }
+    await one.settled()
+    const blocks = find((node) => node.type?.name === 'DescriptionBlock')
+    check('...it answered: the albums drawn, and the paragraph at its top place - under Play, above the albums - its subtitle not in it',
+      [rowKeys().length, blocks.map((node) => node.props.at), blocks[0]?.props.description.paragraph.text, blocks[0]?.props.description.subtitle], [3, ['top'], WIKI.paragraph.text, null])
+    const names = classed('app-artist-names')[0]
+    const subtitle = classed('app-artist-subtitle')[0]
+    check('...the subtitle under their name, in the hero (fixed in height: it moves nothing below), as text, its direction its own',
+      [!!subtitle && find((node) => node === subtitle, names).length, subtitle?.props.children, subtitle?.props.dir,
+        names.props.children.flat(Infinity).findIndex((node) => node?.type === 'h1') < names.props.children.flat(Infinity).indexOf(subtitle)], [1, 'English band', 'auto', true])
+    const body = classed('app-artist-body')[0].props.children.flat ? classed('app-artist-body')[0].props.children.flat(Infinity) : []
+    const at = (test) => body.findIndex((node) => node && typeof node === 'object' && test(node))
+    check('...in the body after Play and before the albums', [at((node) => node.props?.class === 'app-artist-play') < at((node) => node.type?.name === 'DescriptionBlock'),
+      at((node) => node.type?.name === 'DescriptionBlock') < at((node) => node.props?.class === 'app-artist-albums')], [true, true])
+    check('...told, as it came, that the albums weren\'t drawn yet - and after, that they are', [W.describeAsks[before][2], W.describeAsks.at(-1)[2]], [false, true])
+    W.describing = { description: WIKI, settled: true, at: 'foot' }
+    await one.settled()
+    const after = classed('app-artist-body')[0].props.children.flat(Infinity)
+    const where = (test) => after.findIndex((node) => node && typeof node === 'object' && test(node))
+    check('one placed at the foot: drawn last in the body, under the albums and the sections', [find((node) => node.type?.name === 'DescriptionBlock').map((node) => node.props.at),
+      where((node) => node.type?.name === 'DescriptionBlock') > where((node) => node.props?.class === 'app-artist-albums'),
+      after.filter((node) => node && typeof node === 'object').at(-1)?.type?.name], [['foot'], true, 'DescriptionBlock'])
+  }
+
+  console.log('\nthe page: a subtitle alone - drawn in the hero, nothing in the body')
+  {
+    reset()
+    W.describing = { description: { paragraph: null, subtitle: 'Icelandic band' }, settled: true, at: null }
+    const one = mount({ id: 'ar-desc-sub' })
+    one.draw()
+    answer('artistAlbums', { ...PORTISHEAD_ARTIST, id: 'ar-desc-sub' })
+    await one.settled()
+    check('the subtitle in the hero; no block', [words(classed('app-artist-subtitle')[0]), find((node) => node.type?.name === 'DescriptionBlock').length], ['Icelandic band', 0])
+    W.describing = { description: null, settled: true, at: null }
+    one.draw()
+    check('none: no subtitle line at all', classed('app-artist-subtitle').length, 0)
+  }
+
+  console.log('\nthe page: the library failed - its notice and Try again drawn - the description told it is under the top place')
+  {
+    reset()
+    W.describing = { description: null, settled: false, at: null }
+    const one = mount({ id: 'ar-desc-fail' })
+    one.draw()
+    check('first frame: not told anything is drawn under the top place', W.describeAsks.at(-1)[2], false)
+    answer('artistAlbums', new Error('Navidrome away'))
+    await one.settled()
+    //? (after review) the notice, with Try again, sits under the top place before the description is asked: one that
+    //? lands then goes to the foot, never above that button
+    check('Navidrome failed: the notice drawn, the description asked and told what is under it is drawn',
+      [find((node) => node.props?.class === 'pl-notice' && words(node).includes('Try again')).length > 0, W.describeAsks.at(-1)[1] !== null, W.describeAsks.at(-1)[2]],
+      [true, true, true])
+  }
+
+  console.log('\nthe page: the albums wait for the description no longer than they wait for the rest')
+  {
+    reset()
+    W.describing = { description: null, settled: false, at: null }
+    const one = mount({ id: 'ar-desc-2' })
+    one.draw()
+    answer('artistAlbums', { ...PORTISHEAD_ARTIST, id: 'ar-desc-2' })
+    await one.settled()
+    answer('facts', { mbid: PORTISHEAD, name: 'Portishead', genres: [], aliases: [], links: [], members: [] })
+    answer('discography', DISCOGRAPHY)
+    ownedAnswers(LIBRARY)
+    await one.settled()
+    check('the description still out', rowKeys(), [])
+    fire(1500)
+    await one.settled()
+    check('ROWS_WAIT_MS over: the albums drawn without it', rowKeys().length, 3)
   }
 }
 
@@ -970,7 +1096,7 @@ async function manage() {
     await one.settled()
     check('everything answered: drawn, under the albums - In your library, About, Line-up', titles(), ['Albums', 'In your library', 'About', 'Line-up'])
     check('In your library: albums, tracks, size, years, the folder', factRows().slice(0, 5),
-      [['Albums', '3'], ['Tracks', '33'], ['Size', '400 MB'], ['Years', '1994–2008'], ['Folder', 'Portishead']])
+      [['Albums', '3'], ['Songs', '33'], ['Size', '400 MB'], ['Years', '1994–2008'], ['Folder', 'Portishead']])
     check('About: what tells them apart, then type, where from, founded, other names - no "Now" (the library files them as MusicBrainz names them)',
       [words(classed('app-artist-disambiguation')[0]), factRows().slice(5)],
       ['Bristol trip hop band', [['Type', 'Group'], ['From', 'Bristol'], ['Founded', '1991'], ['Other names', 'Portis Head']]])
@@ -1047,7 +1173,7 @@ async function manage() {
       [factRows().slice(0, 1), words(classed('is-folder')[0])],
       [[['Albums', '2']], 'FoldersKanye West\nYeTheir albums are filed under 2 names - Kanye West and Ye'])
     check('About: "Now: Ye" first - Move albums to Ye on its row - then type and where from', [factRows().slice(5, 8).map((row) => row.join(': ')), words(classed('is-now')[0])],
-      [['Now: Ye', 'Type: Person', 'From: Atlanta'], 'NowYeMove albums to Ye'])
+      [['Now known as: Ye', 'Type: Person', 'From: Atlanta'], 'Now known asYeMove albums to Ye'])
     check('...and Born', factRows().find((row) => row[0] === 'Born'), ['Born', '8 June 1977'])
     check('an admin\'s: Artist images… (their pictures into Ye\'s folder) and Move albums to Ye', manageButtons().map((one) => one[0]), ['Artist images…', 'Move albums to Ye'])
     find((node) => byClass('app-artist-manage-button')(node) && words(node) === 'Move albums to Ye')[0].props.onClick({ currentTarget: null })
@@ -1079,7 +1205,7 @@ async function manage() {
     answer('summary', summaryOf('Ye', 'Ye', { first_year: '2025', last_year: '2025' }), (name) => name === 'Ye')
     await one.settled()
     check('Navidrome\'s "Ye", Donda still filed as Kanye West: never "Now: Ye" on Ye\'s own page - the name still in use, with Move albums to Ye',
-      [words(classed('is-now')[0]), manageButtons().map((one) => one[0])], ['Also filed asKanye WestMove albums to Ye', ['Artist images…', 'Move albums to Ye']])
+      [words(classed('is-now')[0]), manageButtons().map((one) => one[0])], ['Also known here asKanye WestMove albums to Ye', ['Artist images…', 'Move albums to Ye']])
     find((node) => byClass('app-artist-manage-button')(node) && words(node) === 'Move albums to Ye')[0].props.onClick({ currentTarget: null })
     check('...Move moves the other name\'s albums, from this page', [managed[0].page, managed[0].name, managed[0].moveNames, managed[0].currentName], ['ar-ye', 'Ye', ['Kanye West'], 'Ye'])
     managed[0].onMoved({ mbid: YE, name: 'Ye', moved: 1, emptied: ['Kanye West'] })
@@ -1116,7 +1242,7 @@ async function manage() {
     await one.settled()
     waitOver()
     await one.settled()
-    check('said, and for an admin, Which artist is this?', [words(classed('app-search-empty')[0]).startsWith("MusicBrainz doesn't know who this is"), manageButtons().map((one) => one[0]).includes('Which artist is this?')],
+    check('said, and for an admin, Which artist is this?', [words(classed('app-search-empty')[0]).startsWith('Only the albums you have are shown'), manageButtons().map((one) => one[0]).includes('Which artist is this?')],
       [true, true])
     find((node) => words(node) === 'Which artist is this?' && node.type === 'button')[0].props.onClick({ currentTarget: null })
     check('...its tap opens the panel to choose, with the page\'s name to search for', [managed[0].mode, managed[0].name, managed[0].mbid], ['who', 'Nirvana', null])
@@ -1147,12 +1273,12 @@ async function manage() {
     check('another chosen (Change): asked for by its id - and meanwhile nothing of the last one\'s said as theirs, Change still there',
       [asked('facts').slice(-1), classed('app-artist-disambiguation').length, classed('app-artist-facts').length, words(find(byClass('app-asking-text'), aboutOf())[0]),
         find((node) => byClass('app-artist-change')(node)).length],
-      [[[NIRVANA_UK]], 0, 0, 'Asking MusicBrainz…', 1])
+      [[[NIRVANA_UK]], 0, 0, 'Loading…', 1])
     answer('facts', new Error('MusicBrainz is unreachable right now'), (mbid) => mbid === NIRVANA_UK)
     await one.settled()
     check('...MusicBrainz failing for them: said, with Try again - and Change, the way to another', [words(find(byClass('app-search-empty'), aboutOf())[0]),
       find((node) => node.type === 'button' && words(node) === 'Try again', aboutOf()).length, find((node) => byClass('app-artist-change')(node)).length, classed('app-artist-disambiguation').length],
-      ["MusicBrainz isn't answering just now, so who they are isn't here.", 1, 1, 0])
+      ["Artist details can't be loaded right now.", 1, 1, 0])
 
     reset()
     ownedAnswers(O.buildOwnedIndex([]))
@@ -1160,7 +1286,7 @@ async function manage() {
     plain.draw()
     answer('artistAlbums', { id: 'ar-nirvana-2', name: 'Nirvana', album: [nd('nd-bleach', 'Bleach', 1989)] })
     await plain.settled()
-    check('not an admin: said, and no way to choose', [words(classed('app-search-empty')[0]).startsWith("MusicBrainz doesn't know"), manageButtons()], [true, []])
+    check('not an admin: said, and no way to choose', [words(classed('app-search-empty')[0]).startsWith('Only the albums you have are shown'), manageButtons()], [true, []])
   }
 
   console.log('\n...MusicBrainz not answering for who they are')
@@ -1177,13 +1303,13 @@ async function manage() {
     await one.settled()
     const about = find((node) => node.type === 'section' && node.props['aria-labelledby'] === 'app-artist-about-title')[0]
     check('About says so, with Try again - the albums and the library half drawn all the same',
-      [words(find((node) => byClass('app-search-empty')(node), about)[0]), titles()], ["MusicBrainz isn't answering just now, so who they are isn't here.", ['Albums', 'In your library', 'About']])
+      [words(find((node) => byClass('app-search-empty')(node), about)[0]), titles()], ["Artist details can't be loaded right now.", ['Albums', 'In your library', 'About']])
     find((node) => node.type === 'button' && words(node) === 'Try again', about)[0].props.onClick()
     await one.settled()
     //? review: only the second ask was pinned - the failure could have stayed on screen while it asked
     const aboutNow = find((node) => node.type === 'section' && node.props['aria-labelledby'] === 'app-artist-about-title')[0]
     check('...which asks again - the failure giving way to "Asking MusicBrainz…" while it does',
-      [asked('facts').length, words(find(byClass('app-asking-text'), aboutNow)[0]), find(byClass('app-search-empty'), aboutNow).length], [2, 'Asking MusicBrainz…', 0])
+      [asked('facts').length, words(find(byClass('app-asking-text'), aboutNow)[0]), find(byClass('app-search-empty'), aboutNow).length], [2, 'Loading…', 0])
   }
 
   console.log('\n...the sections\' wait: under the albums once they are drawn, for MusicBrainz and the library, or ABOUT_WAIT_MS (review: none of it was pinned)')
@@ -1221,7 +1347,7 @@ async function manage() {
     await slowmb.settled()
     check('...ABOUT_WAIT_MS over: drawn with what has answered - In your library first, About saying it is asking',
       [titles(), words(find(byClass('app-asking-text'), find((node) => node.type === 'section' && node.props['aria-labelledby'] === 'app-artist-about-title')[0])[0])],
-      [['Albums', 'In your library', 'About'], 'Asking MusicBrainz…'])
+      [['Albums', 'In your library', 'About'], 'Loading…'])
     //? the names change once drawn (a folder of theirs filed under another name): what it said stays while it is asked
     W.owned = { index: O.buildOwnedIndex([...A.everyOwned(LIBRARY), { path: 'Portishead Live/Roseland (1998)', artist: 'Portishead Live', album: 'Roseland', release_mbid: ROSELAND, albumartist_mbids: [PORTISHEAD] }]), artists: [] }
     await slowmb.settled()
@@ -1568,7 +1694,7 @@ async function manage() {
     answer('refileApply', new Error('deadwax is unreachable'))
     await broke.drawn()
     check('an apply that fails: none after it (what the preview said is no longer what is on disk), and the failure said',
-      [asked('refileApply').map((one) => one[0]), broke.told, failures()], [['Kanye West'], [], ['deadwax is unreachable']])
+      [asked('refileApply').map((one) => one[0]), broke.told, failures()], [['Kanye West'], [], ["The move didn't work. Try again - if it keeps happening, tell whoever runs deadwax."]])
 
     reset()
     const same = body(['Kanye', 'Kanye West'])
@@ -1684,7 +1810,7 @@ async function manage() {
     answer('imagesPreview', new Error('fanart.tv is unreachable'))
     await drawn()
     check('...the look failing: said, with Try again - and Save still can\'t be pressed, nothing it would write on screen',
-      [classed('is-warning').map(words), classed('app-artist-panel-primary')[0].props.disabled], [['fanart.tv is unreachable'], true])
+      [classed('is-warning').map(words), classed('app-artist-panel-primary')[0].props.disabled], [["Couldn't look for pictures just now. Try again - if it keeps happening, tell whoever runs deadwax."], true])
     find((node) => node.type === 'button' && words(node) === 'Try again')[0].props.onClick()
     check('...Try again asks again for the artist last picked, not the page\'s', asked('imagesPreview').slice(-1), [['Ye', NIRVANA_UK, true]])
 

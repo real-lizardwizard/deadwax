@@ -267,11 +267,18 @@ async function runs() {
   check('nothing to do: a run of none, ended at once', empty, { total: 0, done: 0, written: 0, missing: 0, failed: 0, running: false })
   check('addOutcome: one more done, each count added, a count left out none', B.addOutcome(B.startRun(2), { missing: 3 }), { total: 2, done: 1, written: 0, missing: 3, failed: 0, running: true })
 
-  //? the main page's status bar's template for each run, as it is in LibraryView.tsx
-  const mainPage = {
-    covers: (r) => `fetched ${r.written} cover${r.written === 1 ? '' : 's'}${r.missing ? `, ${r.missing} had none on the Archive` : ''}${r.failed ? `, ${r.failed} failed - try those again` : ''}${r.done < r.total ? ` (stopped at ${r.done} of ${r.total})` : ''}`,
-    disc: (r) => `fetched CD art for ${r.written} album${r.written === 1 ? '' : 's'}${r.missing ? `, ${r.missing} had none to find` : ''}${r.failed ? `, ${r.failed} failed - try those again` : ''}${r.done < r.total ? ` (stopped at ${r.done} of ${r.total})` : ''}`,
-    lyrics: (r) => `saved lyrics for ${r.written} track${r.written === 1 ? '' : 's'}${r.missing ? `, ${r.missing} not on LRCLIB or instrumental` : ''}${r.failed ? `, ${r.failed} failed - try those again` : ''}${r.done < r.total ? ` (stopped at ${r.done} of ${r.total} albums)` : ''}`,
+  //? (2.0.8, UX batch 5) each run's result in sentences - it was the main page's status bar's lower-case run-on line. A
+  //? template of its own here, so a change to bulkSummary is a change to this too: a failed cover or CD art is taken by
+  //? the next run, a failed track's lyrics are sent to the album's own Get lyrics (lyricsTargets never takes an album
+  //? with some)
+  const each = (count, one, many) => `${count} ${count === 1 ? one : many}`
+  const sentences = {
+    covers: (r) => [`Got ${each(r.written, 'cover', 'covers')}.`, r.missing ? `${r.missing} ${r.missing === 1 ? 'has' : 'have'} none in the Cover Art Archive.` : '',
+      r.failed ? `${r.failed} failed - run it again to try ${r.failed === 1 ? 'it' : 'them'} again.` : '', r.done < r.total ? `Stopped at ${r.done} of ${r.total}.` : ''].filter(Boolean).join(' '),
+    disc: (r) => [`Got CD art for ${each(r.written, 'album', 'albums')}.`, r.missing ? `${r.missing} ${r.missing === 1 ? 'has' : 'have'} none to find.` : '',
+      r.failed ? `${r.failed} failed - run it again to try ${r.failed === 1 ? 'it' : 'them'} again.` : '', r.done < r.total ? `Stopped at ${r.done} of ${r.total}.` : ''].filter(Boolean).join(' '),
+    lyrics: (r) => [`Saved lyrics for ${each(r.written, 'track', 'tracks')}.`, r.missing ? `${r.missing} ${r.missing === 1 ? "isn't on LRCLIB or is" : "aren't on LRCLIB or are"} instrumental.` : '',
+      r.failed ? `${r.failed} failed - try ${r.failed === 1 ? 'it' : 'them'} again from the album's own Get lyrics, in Edit album.` : '', r.done < r.total ? `Stopped at ${r.done} of ${r.total} albums.` : ''].filter(Boolean).join(' '),
   }
   const cases = [
     { total: 10, done: 10, written: 1, missing: 0, failed: 0, running: false },
@@ -279,11 +286,14 @@ async function runs() {
     { total: 12, done: 4, written: 0, missing: 1, failed: 3, running: false },
     { total: 3, done: 3, written: 0, missing: 0, failed: 0, running: false },
   ]
-  check('the words for a finished run are the main page\'s, for every run and outcome',
-    B.BULK_KINDS.flatMap((kind) => cases.map((one) => B.bulkSummary(kind, one) === mainPage[kind](one))), Array(12).fill(true))
+  check('the words for a finished run are sentences, for every run and outcome (2.0.8)',
+    B.BULK_KINDS.flatMap((kind) => cases.map((one) => B.bulkSummary(kind, one) === sentences[kind](one))), Array(12).fill(true))
   check('...for instance', [B.bulkSummary('covers', cases[1]), B.bulkSummary('disc', cases[2]), B.bulkSummary('lyrics', cases[2])],
-    ['fetched 7 covers, 2 had none on the Archive, 1 failed - try those again', 'fetched CD art for 0 albums, 1 had none to find, 3 failed - try those again (stopped at 4 of 12)',
-      'saved lyrics for 0 tracks, 1 not on LRCLIB or instrumental, 3 failed - try those again (stopped at 4 of 12 albums)'])
+    ['Got 7 covers. 2 have none in the Cover Art Archive. 1 failed - run it again to try it again.',
+      'Got CD art for 0 albums. 1 has none to find. 3 failed - run it again to try them again. Stopped at 4 of 12.',
+      "Saved lyrics for 0 tracks. 1 isn't on LRCLIB or is instrumental. 3 failed - try them again from the album's own Get lyrics, in Edit album. Stopped at 4 of 12 albums."])
+  check('...none of it lower-case, run on, or the Archive by a nickname', B.BULK_KINDS.flatMap((kind) => cases.map((one) => B.bulkSummary(kind, one)))
+    .filter((said) => /^[a-z]|\(stopped|try those|on the Archive/.test(said)), [])
 }
 
 function pageWords() {
@@ -303,17 +313,24 @@ function pageWords() {
     ['The runs act on the whole library: 4 album folders.', 'The runs act on 2 of 4 album folders: those matching “third”.', 'No album folder matches “zz”.', 'The runs act on the whole library: 1 album folder.'])
   check('what a run will do, said before it starts: how many, which, where, and what it writes',
     [L.planWords('covers', 12, ''), L.planWords('disc', 1, 'portishead'), L.planWords('lyrics', 3, '')],
-    ["12 album folders with a release and no cover in the whole library. Each cover comes from the Cover Art Archive, by the release the album's tags name, and is saved beside its tracks - nothing else about the album changes.",
-      "1 album folder with a release and no CD art of deadwax's own among the folders matching “portishead”. A picture of each disc, from the Cover Art Archive (or fanart.tv, with a key), is saved beside the tracks as disc.jpg (disc1.jpg, disc2.jpg… for a set with a picture per disc; .png when that's what the source has) - nothing else changes.",
-      '3 album folders with no lyrics at all in the whole library. Each track is looked up on LRCLIB and saved as a .lrc beside it - nothing else changes. An album with some lyrics is finished from its own Get lyrics, in its Edit panel.'])
+    ["12 album folders matched to a release with no cover in the whole library. Each cover comes from the Cover Art Archive, for the release the album is matched to, and is saved beside its tracks - nothing else about the album changes.",
+      "1 album folder matched to a release with no disc picture from deadwax yet among the folders matching “portishead”. A picture of each disc comes from the Cover Art Archive (or fanart.tv, with a key in Server settings) and is saved beside the tracks - nothing else changes.",
+      "3 album folders with no lyrics at all in the whole library. Each track's lyrics come from LRCLIB and are saved beside it - nothing else changes. An album with some lyrics is finished from its own Get lyrics, in Edit album."])
   check('...and with nothing to do, that', [L.planWords('covers', 0, ''), L.planWords('disc', 0, 'x'), L.planWords('lyrics', 0, '')],
-    ['No album with a release is missing its cover in the whole library.', "Every album with a release has CD art of deadwax's own among the folders matching “x”.", 'Every album has some lyrics in the whole library.'])
+    ['No album matched to a release is missing its cover in the whole library.', 'Every album matched to a release has a disc picture from deadwax among the folders matching “x”.', 'Every album has some lyrics in the whole library.'])
   check('the buttons are the main page\'s words', B.BULK_KINDS.map((kind) => L.BULK_LABELS[kind]), ['Get covers', 'Get CD art', 'Get lyrics'])
   //? (2.0.0-player.65, the 2.0.0 release review) the page's line names only the parts drawn for this person
   check('what the page is for names only what it draws: both, the runs alone (Edit albums), Rescan alone (Look after the library)',
     [L.careLine({ rescan: true, bulk: true }) === L.CARE_LINE, /Rescan/.test(L.careLine({ rescan: false, bulk: true })),
       /runs|covers|lyrics/.test(L.careLine({ rescan: true, bulk: false })), /^Rescan/.test(L.careLine({ rescan: true, bulk: false }))],
     [true, false, false, true])
+  //? (2.0.8, UX batch 5) what the page is FOR - it said how it works ("through the same steps as an album's own Get
+  //? buttons, each with Stop") - and when to Rescan, first
+  check('...said as what it is for, and when to use Rescan (2.0.8)', [L.CARE_LINE, L.careLine({ rescan: false, bulk: true }), L.careLine({ rescan: true, bulk: false }), L.RESCAN_WORDS],
+    ["Rescan the library after changing tags in another program, and fill in missing covers, CD art and lyrics across many albums at once - one album at a time, and Stop ends a run after the album it's on.",
+      "Fill in missing covers, CD art and lyrics across many albums at once - one album at a time, and Stop ends a run after the album it's on.",
+      'Rescan reads every file of the library again - use it after changing tags in another program.',
+      "Use Rescan after editing tags in another program: deadwax spots a changed album by its folder's date, and editing tags in place doesn't change it. Albums added from a download show up without it."])
   const editions = [album('Portishead/Third (2008)'), album('Portishead/Third (2008) [Deluxe]', { album: 'Third' }), album('Air/Moon Safari (1998)', { total_size: 0, track_count: 1 })]
   check('the scan as the main page\'s status bar counts it: an album held in two pressings once, tracks, size',
     [L.scanTotals(editions), L.scanTotals([album('A/B (2000)', { total_size: 0, track_count: 1 })]), L.scanTotals([])], ['2 albums · 21 tracks · 200 MB', '1 album · 1 track', '0 albums · 0 tracks'])
@@ -386,7 +403,7 @@ async function store() {
   await stopped
   check('Stop during the first of three: that album finished, nothing more asked, "stopped at 1 of 3"',
     [asked, S.libraryCareNow().runs.disc, B.bulkSummary('disc', S.libraryCareNow().runs.disc)],
-    [['A/One (2000)'], { total: 3, done: 1, written: 1, missing: 0, failed: 0, running: false }, 'fetched CD art for 1 album (stopped at 1 of 3)'])
+    [['A/One (2000)'], { total: 3, done: 1, written: 1, missing: 0, failed: 0, running: false }, 'Got CD art for 1 album. Stopped at 1 of 3.'])
   check('...a stopped run that wrote is behind the disk too', S.libraryCareNow().behind.disc, true)
   S.caughtUp(['disc'])
 
@@ -531,7 +548,7 @@ async function page() {
     libraryOf(LIB, { error: 'HTTP 504' })
     one.draw()
     check('a refresh that failed with albums on screen: said with Try again beside the scan, the page kept',
-      [words(classed('app-care-problem')[0]).startsWith("Couldn't read the library just now: HTTP 504"), !!button('Try again', classed('app-care-problem')[0]), !!button('Rescan')], [true, true, true])
+      [words(classed('app-care-problem')[0]).startsWith("Couldn't read the library just now. (HTTP 504)"), !!button('Try again', classed('app-care-problem')[0]), !!button('Rescan')], [true, true, true])
     libraryOf(LIB, { error: 'HTTP 504', loading: true })
     one.draw()
     C.reloads.length = 0
@@ -558,7 +575,7 @@ async function page() {
     check('the real scan in: each run with how many it takes, the main page\'s words',
       ['covers', 'disc', 'lyrics'].map((kind) => [words(classed('app-care-heading', runRow(kind))[0]), words(buttons(runRow(kind))[0])]),
       [['Covers', 'Get covers · 2'], ['CD art', 'Get CD art · 2'], ['Lyrics', 'Get lyrics · 2']])
-    check('...each saying what it will act on before it starts, in album folders', words(classed('app-care-note', runRow('disc'))[0]).startsWith("2 album folders with a release and no CD art of deadwax's own in the whole library."), true)
+    check('...each saying what it will act on before it starts, in album folders', words(classed('app-care-note', runRow('disc'))[0]).startsWith('2 album folders matched to a release with no disc picture from deadwax yet in the whole library.'), true)
     check('...and the whole library said under the field', words(classed('app-care-note')[1]), 'The runs act on the whole library: 3 album folders.')
     //? (2.0.0-player.47, review: at 17px on a phone "- empty for the whole library" was cut off mid-sentence -
     //? the line under the field says what an empty one means)
@@ -571,7 +588,7 @@ async function page() {
     check('words typed: kept, and every run narrowed to the albums they match',
       [S.libraryCareNow().narrow, words(classed('app-care-note')[1]), ['covers', 'disc', 'lyrics'].map((kind) => words(buttons(runRow(kind))[0]))],
       ['portishead', 'The runs act on 2 of 3 album folders: those matching “portishead”.', ['Get covers · 1', 'Get CD art · 2', 'Get lyrics · 1']])
-    check('...said in each run too', words(classed('app-care-note', runRow('covers'))[0]).startsWith('1 album folder with a release and no cover among the folders matching “portishead”.'), true)
+    check('...said in each run too', words(classed('app-care-note', runRow('covers'))[0]).startsWith('1 album folder matched to a release with no cover among the folders matching “portishead”.'), true)
 
     told = one.redraws()
     buttons(runRow('disc'))[0].props.onClick()
@@ -581,13 +598,13 @@ async function page() {
     check('Get CD art pressed: the targets in view asked, one at a time, through Get CD art\'s call', C.calls.map((c) => [c.route, c.path]), [['disc', 'Portishead/Dummy (1994)']])
     check('...its button now Stop, with how far it has got; the run\'s words empty while it runs',
       [words(buttons(runRow('disc'))[0]), buttons(runRow('disc'))[0].props.class.includes('is-running'), classed('app-care-spin', runRow('disc')).length, words(classed('app-care-result', runRow('disc'))[0])],
-      ['Stop · 0 of 2', true, 1, ''])
+      ['Stop after this album · 1 of 2', true, 1, ''])
     check('...the other runs still offered - each kind runs on its own, as on the main page', words(buttons(runRow('covers'))[0]), 'Get covers · 1')
     told = one.redraws()
     await answer('disc', { written: ['disc.jpg'], source: 'caa' })
     check('...told again as each album answers', one.redraws() > told, true)
     one.draw()
-    check('one done: Stop says so', words(buttons(runRow('disc'))[0]), 'Stop · 1 of 2')
+    check('one done: Stop says so - the album being fetched, the second', words(buttons(runRow('disc'))[0]), 'Stop after this album · 2 of 2')
     told = one.redraws()
     buttons(runRow('disc'))[0].props.onClick()
     check('...told again as Stop is pressed', one.redraws() > told, true)
@@ -598,7 +615,7 @@ async function page() {
     check('...and as it ends', one.redraws() > told, true)
     one.draw()
     check('ended: its words, the main page\'s, kept on screen - a status the screen reader hears',
-      [words(classed('app-care-result', runRow('disc'))[0]), classed('app-care-result', runRow('disc'))[0].props.role], ['fetched CD art for 1 album, 1 had none to find', 'status'])
+      [words(classed('app-care-result', runRow('disc'))[0]), classed('app-care-result', runRow('disc'))[0].props.role], ['Got CD art for 1 album. 1 has none to find.', 'status'])
     check('...and the library told once', C.announced, 1)
 
     //? (review: the scan in hand still listed Dummy as without CD art, so "Get CD art · 2" came back at
@@ -625,7 +642,7 @@ async function page() {
     const again = mount(LibraryCare, { admin: true, live: true, backLabel: 'You', onBack() {} })
     again.draw()
     check('the page left and come back to: the run\'s words still there, the words typed too',
-      [words(classed('app-care-result', runRow('disc'))[0]), find((node) => node.type === 'input' && byClass('app-care-input')(node))[0].props.value], ['fetched CD art for 1 album, 1 had none to find', 'portishead'])
+      [words(classed('app-care-result', runRow('disc'))[0]), find((node) => node.type === 'input' && byClass('app-care-input')(node))[0].props.value], ['Got CD art for 1 album. 1 has none to find.', 'portishead'])
     buttons(runRow('lyrics'))[0].props.onClick()
     await settle()
     check('a page gone is told nothing more (its listener let go)', one.redraws(), gone)
@@ -633,10 +650,10 @@ async function page() {
     const third = mount(LibraryCare, { admin: true, live: true, backLabel: 'You', onBack() {} })
     third.draw()
     check('a run going on while the page was away: drawn running again, its Stop live', [words(buttons(runRow('lyrics'))[0]), (buttons(runRow('lyrics'))[0].props.onClick(), S.libraryCareNow().stopping.lyrics)],
-      ['Stop · 0 of 1', true])
+      ['Stop after this album · 1 of 1', true])
     await answer('lyrics', lyricsSummary({ written: 9, instrumental: 1 }))
     third.draw()
-    check('...its result said there once it ends', words(classed('app-care-result', runRow('lyrics'))[0]), 'saved lyrics for 9 tracks, 1 not on LRCLIB or instrumental')
+    check('...its result said there once it ends', words(classed('app-care-result', runRow('lyrics'))[0]), "Saved lyrics for 9 tracks. 1 isn't on LRCLIB or is instrumental.")
 
     //? a run that wrote while no page drew it: a page drawn after begins every read of its own after it
     buttons(runRow('covers'))[0].props.onClick()
@@ -649,7 +666,7 @@ async function page() {
     const fourth = mount(LibraryCare, { admin: true, live: true, backLabel: 'You', onBack() {} })
     fourth.draw()
     check('...a page drawn after it: nothing held (its reads all come after the run), no read asked for it - drawn from the scan it reads',
-      [S.libraryCareNow().behind, C.reloads.length, words(classed('app-care-note', runRow('covers'))[0]).startsWith('No album with a release is missing its cover')],
+      [S.libraryCareNow().behind, C.reloads.length, words(classed('app-care-note', runRow('covers'))[0]).startsWith('No album matched to a release is missing its cover')],
       [{ covers: false, disc: false, lyrics: false }, 0, true])
     fourth.unmount()
 
@@ -734,28 +751,28 @@ async function retime() {
   await settle()
   check('pressed: told to draw again (the run is the module\'s - nothing else would draw it, on either settings page)', one.redraws() > told, true)
   one.draw()
-  check('pressed: a REAL scan read - never the saved one - and the button its Stop', [C.lists.length, C.snapshots, words(retimeButton())], [1, [], 'reading the library'])
+  check('pressed: a REAL scan read - never the saved one - and the button its Stop', [C.lists.length, C.snapshots, words(retimeButton())], [1, [], 'Reading the library…'])
   C.lists[0].resolve({ albums: [album('A/One (2000)', { lyrics_count: 4 }), album('A/None (2000)', { lyrics_count: 0 }), album('A/Two (2000)', { lyrics_count: 2 })] })
   await settle()
   one.draw()
   //? (its count shows from the first album done - "reading the library" until then, as on the main page before the move)
   check('...the albums with lyrics, one at a time, through the re-time route', [C.calls.map((c) => [c.route, c.path, c.options]), words(retimeButton())],
-    [[['retime', 'A/One (2000)', { retime: true }]], 'reading the library'])
+    [[['retime', 'A/One (2000)', { retime: true }]], 'Reading the library…'])
   told = one.redraws()
   await answer('retime', lyricsSummary({ retimed: 3, unchanged: 1 }))
   check('...told again as an album answers', one.redraws() > told, true)
   one.draw()
-  check('...one done: the next asked, the count moved', [C.calls.map((c) => c.path), words(retimeButton())], [['A/One (2000)', 'A/Two (2000)'], 're-timing 1/2 albums · stop'])
+  check('...one done: the next asked, the count moved', [C.calls.map((c) => c.path), words(retimeButton())], [['A/One (2000)', 'A/Two (2000)'], 'Re-timing 2 of 2 albums · Stop after this album'])
   one.unmount()
   const gone = one.redraws()
   const back = mount(RT.RetimeLyrics, { unsaved: false })
   back.draw()
-  check('the page gone and drawn again (its tab left, the app\'s page left): the run still drawn, Stop and all', words(buttons()[0]), 're-timing 1/2 albums · stop')
+  check('the page gone and drawn again (its tab left, the app\'s page left): the run still drawn, Stop and all', words(buttons()[0]), 'Re-timing 2 of 2 albums · Stop after this album')
   buttons()[0].props.onClick()
   await answer('retime', lyricsSummary({ custom: 1, failed: 1 }))
   check('...the page gone told nothing more (its listener let go)', one.redraws(), gone)
   back.draw()
-  const ended = "re-timed 3 tracks, 1 already at this lead, 1 left alone - not LRCLIB's timings any more, so edited by hand or from somewhere else, 1 failed - try again."
+  const ended = "Re-timed 3 tracks, 1 already at this lead, 1 left alone - not LRCLIB's timings any more, so edited by hand or from somewhere else, 1 failed - try again."
   check('...its words once it ends: re-timed, already at this lead, left alone, failed', words(classed('settings-retime-note')[0]), ended)
   const PROMPT = 'Lyrics saved before the lead changed keep their old timings until re-timed.'
 
@@ -780,7 +797,7 @@ async function retime() {
   await answer('retime', lyricsSummary({ retimed: 4 }))
   const comeBack = mount(RT.RetimeLyrics, { unsaved: false })
   comeBack.draw()
-  check('a run that ended while nothing drew it: said on coming back', words(classed('settings-retime-note')[0]), 're-timed 4 tracks.')
+  check('a run that ended while nothing drew it: said on coming back', words(classed('settings-retime-note')[0]), 'Re-timed 4 tracks.')
   comeBack.unmount()
   const after = mount(RT.RetimeLyrics, { unsaved: false })
   after.draw()
@@ -796,7 +813,7 @@ async function retime() {
   await settle()
   await answer('retime', lyricsSummary({ retimed: 2 }))
   after.draw()
-  check('ended, on screen', words(classed('settings-retime-note')[0]), 're-timed 2 tracks.')
+  check('ended, on screen', words(classed('settings-retime-note')[0]), 'Re-timed 2 tracks.')
   after.draw({ unsaved: true })
   check('...a new lead typed: "Save the new lead first."', words(classed('settings-retime-note')[0]), 'Save the new lead first.')
   after.draw({ unsaved: false })
@@ -829,7 +846,7 @@ async function retime() {
   await answer('retime', lyricsSummary({ retimed: 2 }))
   after.draw({ unsaved: true })
   after.draw({ unsaved: false })
-  check('a new lead typed and saved while it ran: the run goes on, Stop and all', words(buttons()[0]), 're-timing 1/2 albums · stop')
+  check('a new lead typed and saved while it ran: the run goes on, Stop and all', words(buttons()[0]), 'Re-timing 2 of 2 albums · Stop after this album')
   await answer('retime', lyricsSummary({ retimed: 3 }))
   after.draw()
   check('...and as it ends, the prompt - never "re-timed 5 tracks.", part of which was at the lead no longer saved', words(classed('settings-retime-note')[0]), PROMPT)
@@ -840,7 +857,7 @@ async function retime() {
   await settle()
   await answer('retime', lyricsSummary({ unchanged: 2 }))
   after.draw()
-  check('...a run after it, nothing typed: its words, as ever', words(classed('settings-retime-note')[0]), 're-timed 0 tracks, 2 already at this lead.')
+  check('...a run after it, nothing typed: its words, as ever', words(classed('settings-retime-note')[0]), 'Re-timed 0 tracks, 2 already at this lead.')
   //? the same however it ends: a lead typed and saved while the library was read, the read failing
   buttons()[0].props.onClick()
   await settle()
@@ -865,7 +882,7 @@ async function retime() {
   await answer('retime', new Error('LRCLIB went away'))
   back2.draw()
   check('Stop during the first album: it ends after it, said "stopped at" - a failed album counting its lyrics failed',
-    [C.calls.length, words(classed('settings-retime-note')[0])], [1, 're-timed 0 tracks, 4 failed - try again (stopped at 1 of 2 albums)'])
+    [C.calls.length, words(classed('settings-retime-note')[0])], [1, 'Re-timed 0 tracks, 4 failed - try again. Stopped at 1 of 2 albums.'])
   RT.forgetRetime()
   reset()
   back2.draw()
@@ -874,7 +891,7 @@ async function retime() {
   C.lists[0].reject(new Error('HTTP 504'))
   await settle()
   back2.draw()
-  check('the library couldn\'t be read: said, nothing re-timed', [words(classed('settings-retime-note')[0]), C.calls.length], ["couldn't read the library - Error: HTTP 504", 0])
+  check('the library couldn\'t be read: said, nothing re-timed', [words(classed('settings-retime-note')[0]), C.calls.length], ["Couldn't read the library. (HTTP 504)", 0])
   back2.unmount()
   const back3 = mount(RT.RetimeLyrics, { unsaved: false })
   back3.draw()

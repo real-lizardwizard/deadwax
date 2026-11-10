@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'preact/hooks'
 
 import { PLAYLIST_NAME_MAX } from '../lib/playlists'
+import { sayError } from './sayError'
 
 /**
  * New playlist's form (2.0.0-player.58) - the Playlists page's and the picker's: a Name field, Create and Cancel.
@@ -37,7 +38,7 @@ export function NewPlaylistForm({ onCreate, onCancel }: { onCreate: (name: strin
       (caught: unknown) => {
         sending.current = false
         setBusy(false)
-        setProblem(caught instanceof Error ? caught.message : String(caught))
+        setProblem(sayError(caught))
       },
     )
   }

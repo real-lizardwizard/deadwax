@@ -104,3 +104,8 @@ export function artistArtUrl(path: string, kind: string, version?: number | stri
   const bust = version === undefined ? '' : `&v=${encodeURIComponent(String(version))}`
   return `/deadwax/library/artist/art?artist=${encodeURIComponent(path)}&kind=${encodeURIComponent(kind)}${bust}`
 }
+
+/** (2.0.8, UX batch 5) "1 file", "12 files" - never "12 file(s)". */
+export function filesWord(count: number): string {
+  return `${count} ${count === 1 ? 'file' : 'files'}`
+}

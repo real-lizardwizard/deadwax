@@ -45,22 +45,27 @@ BLOCKING, WRONG, COSMETIC = 3, 2, 1
 #? the edition vocabulary and that has been a recurring source of silent drift, so this one
 #? stays server-side and travels with the data.
 ISSUE_TYPES: dict[str, dict] = {
+    #? (2.0.8, UX batch 5) each hint a sentence or two in plain words - what is wrong, then what fixes it, named as
+    #? the app names it - never a tag's name; the labels say the problem as a person would ("Not matched to
+    #? MusicBrainz", not "No release id"). The one place they are read as text is Edit album's Release tab, so none
+    #? sends you there (it reads "Find their release and apply it", not "in Edit album's Release tab"); the Artwork
+    #? tab says for itself that an unmatched album has to be matched first. tests/test_metadata_health.py holds them.
     "no_release": {
-        "label": "No release id",
-        "hint": "these files were never matched to a MusicBrainz release, so nothing else "
-                "about them can be checked against anything. Pick a release in the editor.",
+        "label": "Not matched to MusicBrainz",
+        "hint": "These files were never matched to a release on MusicBrainz, so nothing else about them can be "
+                "checked. Find their release and apply it.",
         "severity": BLOCKING,
     },
     "no_artist_tag": {
         "label": "No artist tag",
-        "hint": "not one file names an artist, so the name shown here came from the folder. "
-                "Renaming the folder would rename the album.",
+        "hint": "Not one file names an artist, so the name shown here comes from the folder. Renaming the folder "
+                "would rename the album.",
         "severity": BLOCKING,
     },
     "mixed_tags": {
         "label": "Mixed tags",
-        "hint": "the files in this folder disagree about which album they belong to, which "
-                "usually means two albums are sharing a folder.",
+        "hint": "The files in this folder disagree about which album they belong to - usually two albums are "
+                "sharing one folder.",
         "severity": BLOCKING,
     },
     #? 2.0.0-player.46: the app's library is Navidrome's, so a folder Navidrome doesn't list is out of
@@ -76,49 +81,49 @@ ISSUE_TYPES: dict[str, dict] = {
     },
     "split_discs": {
         "label": "Split across folders",
-        "hint": "this folder holds only some discs of a release whose other discs are in "
-                "another folder. Applying the release in the editor merges them into one.",
+        "hint": "This folder holds only some discs of a release whose other discs are in another folder. "
+                "Applying the release merges them into one.",
         "severity": WRONG,
     },
     "artist_split": {
         "label": "Artist under two names",
-        "hint": "this artist's albums are filed under more than one folder name - usually a "
-                "rename, like Kanye West and Ye. Move albums to … on the artist's page moves "
-                "them all under the name MusicBrainz uses now.",
+        "hint": "This artist's albums are in folders under more than one name - usually a rename, like "
+                "Kanye West and Ye. Move albums to … on the artist's page moves them all under the name "
+                "MusicBrainz uses now.",
         "severity": WRONG,
     },
     "misfiled": {
-        "label": "Folder off-convention",
-        "hint": "the folder is not named the way these tags say it should be, so its name "
-                "and its contents tell different stories. Applying a release re-files it.",
+        "label": "Folder name doesn't match the tags",
+        "hint": "The folder isn't named the way its tags say it should be, so its name and its files tell "
+                "different stories. Applying a release renames it to match.",
         "severity": WRONG,
     },
     "no_original_year": {
         "label": "No original year",
-        "hint": "no originaldate tag, so there is nothing recording the album's own year as "
-                "distinct from this pressing's - which is what the folder is named after.",
+        "hint": "The tags don't record the album's first year - the year its folder is named after. Applying a "
+                "release writes it.",
         "severity": WRONG,
     },
     "no_year": {
         "label": "No year",
-        "hint": "no date tag on any file, so this album has no year at all.",
+        "hint": "No file says when it was released, so this album has no year at all.",
         "severity": WRONG,
     },
     "untitled_tracks": {
         "label": "Untitled tracks",
-        "hint": "some files carry no title tag, so the titles shown are their filenames. "
-                "Applying a release writes the real ones.",
+        "hint": "Some files have no title, so the titles shown are their file names. Applying a release "
+                "writes the real ones.",
         "severity": WRONG,
     },
     "unnumbered_tracks": {
         "label": "Unnumbered tracks",
-        "hint": "some files carry no track number, so the running order here is alphabetical "
-                "rather than the album's.",
+        "hint": "Some files have no track number, so the running order here is alphabetical rather than "
+                "the album's.",
         "severity": COSMETIC,
     },
     "no_art": {
         "label": "No cover art",
-        "hint": "no cover beside the tracks and none embedded in them. The editor can fetch "
+        "hint": "There's no cover beside the tracks and none inside them. Get cover, on the Artwork tab, fetches "
                 "one from the Cover Art Archive.",
         "severity": COSMETIC,
     },

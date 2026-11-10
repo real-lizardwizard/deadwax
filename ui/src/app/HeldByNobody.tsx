@@ -4,6 +4,7 @@ import { addFlagged, dismissFlag, heldByNobody } from '../api/library'
 import type { HeldByNobody as HeldAnswer } from '../api/types'
 import { isAbort, latestOnly } from '../lib/latest'
 import { flagWords, heldByNobodyLine, nextFocus } from '../lib/myLibrary'
+import { sayError } from './sayError'
 
 /** How many of the albums nobody holds are listed before "Show all". */
 export const HELD_SHOWN = 20
@@ -56,7 +57,7 @@ export function HeldByNobody({ live }: { live: boolean }) {
         setProblem(null)
       },
       (caught: unknown) => {
-        if (request.current() && !isAbort(caught)) setProblem(caught instanceof Error ? caught.message : String(caught))
+        if (request.current() && !isAbort(caught)) setProblem(sayError(caught, '', { failed: "Couldn't read who has which albums." }))
       },
     )
   }
@@ -97,12 +98,12 @@ export function HeldByNobody({ live }: { live: boolean }) {
     ;(how === 'add' ? addFlagged(flagId) : dismissFlag(flagId)).then(
       (result) => {
         const users = 'users' in result ? result.users : []
-        setSaid(how === 'add' ? (users.length ? `${name}: given to ${users.join(', ')}` : `${name}: nobody to give it to`) : `${name}: put away`)
+        setSaid(how === 'add' ? (users.length ? `${name}: given to ${users.join(', ')}` : `${name}: nobody to give it to`) : `${name}: dismissed`)
         done()
       },
       (caught: unknown) => {
         setSaid('')
-        setRefused(caught instanceof Error ? caught.message : String(caught))
+        setRefused(sayError(caught, '', { failed: how === 'add' ? "Couldn't add it for them." : "Couldn't dismiss it." }))
         done()
       },
     )
@@ -112,9 +113,10 @@ export function HeldByNobody({ live }: { live: boolean }) {
   const shown = all ? albums : albums.slice(0, HELD_SHOWN)
   return (
     <section class="app-care-section" aria-labelledby="app-care-held">
-      <h2 ref={heading} id="app-care-held" class="app-care-title" tabIndex={-1}>Held by nobody</h2>
+      {/* (2.0.8, UX batch 5) "In nobody's library" - it was "Held by nobody" */}
+      <h2 ref={heading} id="app-care-held" class="app-care-title" tabIndex={-1}>In nobody's library</h2>
       {!answer ? (
-        problem ? <p class="app-care-problem">{problem}</p> : <p class="app-care-note">Asking deadwax…</p>
+        problem ? <p class="app-care-problem">{problem}</p> : <p class="app-care-note">Loading…</p>
       ) : (
         <>
           <p class="app-care-note">{heldByNobodyLine(answer.count)}</p>
@@ -122,7 +124,7 @@ export function HeldByNobody({ live }: { live: boolean }) {
             <ul class="app-care-held">
               {shown.map((album) => (
                 <li key={album.id} class="app-care-held-row">
-                  <span class="app-care-held-name">{[album.album || 'Unknown album', album.artist].filter(Boolean).join(' · ')}</span>
+                  <span class="app-care-held-name" dir="auto">{[album.album || 'Unknown album', album.artist].filter(Boolean).join(' · ')}</span>
                   <span class="app-care-held-path">{album.path}</span>
                 </li>
               ))}
@@ -140,14 +142,14 @@ export function HeldByNobody({ live }: { live: boolean }) {
               <ul ref={flagList} class="app-care-held">
                 {answer.flags.map((flag) => (
                   <li key={flag.id} class="app-care-held-row" data-flag={String(flag.id)}>
-                    <span class="app-care-held-name">{flagName(flag)}</span>
+                    <span class="app-care-held-name" dir="auto">{flagName(flag)}</span>
                     <span class="app-care-held-path">{flagWords(flag)}</span>
                     <span class="app-care-held-actions">
                       <button type="button" class="app-button app-care-button" aria-disabled={busy === flag.id} onClick={() => act(flag.id, 'add')}>
                         Add for them
                       </button>
                       <button type="button" class="app-text-button" aria-disabled={busy === flag.id} onClick={() => act(flag.id, 'dismiss')}>
-                        Put away
+                        Dismiss
                       </button>
                     </span>
                   </li>

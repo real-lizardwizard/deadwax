@@ -91,10 +91,13 @@ for (const [name, expected] of Object.entries(artist)) {
   const a = P.artistManaging(name === 'none' ? P.NONE : set(name))
   check(`the artist page's managing with ${name} (images, which artist, move, any)`, [a.images, a.whichArtist, a.move, a.any], expected)
 }
-check('Get, Sources, Next peer and Ask again: Get albums\'', [P.gets(set('request')), P.gets(set('edit', 'library', 'downloads', 'server')), P.gets(P.ALL)], [true, false, true])
+check('Get, Sources, Another source and Same source again: Get albums\'', [P.gets(set('request')), P.gets(set('edit', 'library', 'downloads', 'server')), P.gets(P.ALL)], [true, false, true])
+check('...and People\'s line under it names the retry buttons as Requests shows them (2.0.6)', P.LINES.request, 'Search Soulseek and download - Get, Sources, Another source, Same source again.')
+check('...and Look after the library\'s names Library care\'s list as it is headed (2.0.8)', P.LINES.library, "Delete albums, move an artist's albums, Needs a look, Rescan, In nobody's library.")
 check('...without it, said in Get\'s place', P.GET_OFF, 'Getting albums is off for you - ask an admin.')
 check('the queue count asked only with Look after the library', [P.asksQueueSummary(set('library')), P.asksQueueSummary(set('edit')), P.asksQueueSummary(P.NONE)], [true, false, false])
-check('a Managing page refused, in words', P.NO_PERMISSION, "You don't have permission for this page.")
+check('a Managing page refused, in words (2.0.8: what to do too)', P.NO_PERMISSION, "This page needs a permission an admin hasn\'t given you - ask one if you need it.")
+check('...and People\'s, which can\'t be given', P.PEOPLE_ONLY, 'Only an admin can open People - it comes with being a Navidrome admin.')
 
 console.log('\nPeople\'s checkboxes')
 const ticked = { request: true, edit: false, library: false, downloads: false, server: false }
@@ -109,7 +112,7 @@ check('ticking Settings and the log, and Look after the library, says what they 
   [P.WARN_SERVER, P.WARN_LIBRARY, P.WARN_NO_REQUEST, null, null])
 check('...the words', [P.WARN_SERVER, P.WARN_LIBRARY, P.WARN_NO_REQUEST],
   ["Settings can point deadwax at other folders and change how it downloads and files - give it only to someone you'd trust as an admin.",
-    "This includes deleting albums from disk, which can't be undone.", 'They can still play, browse and add what the store has.'])
+    "This includes deleting albums from disk, which can't be undone.", 'They can still play, look through and add what the collection has.'])
 const admin = P.checkboxes(true, 'Admins have every permission - that changes with Make admin.', null)
 check('a Navidrome admin\'s: all ticked, all locked, no warnings - "Admins can do everything."',
   [admin.every((box) => box.checked && box.locked && !box.warning), P.lockedReason(true, 'whatever')], [true, 'Admins can do everything.'])
@@ -123,7 +126,7 @@ check('Save offered only when the draft differs from what was saved',
   [P.changed(ticked, { ...ticked }), P.changed(ticked, { ...ticked, edit: true }), P.changed(null, ticked)], [false, true, false])
 check('...and what it says once saved', P.savedWords('ethan'), 'Saved - ethan has them from their next tap.')
 check('You, when an admin gave something this session doesn\'t honour', P.UNVERIFIED,
-  "deadwax couldn't check your account with Navidrome as you signed in, so the extra permissions an admin gave you are off until you sign in again.")
+  "Some things an admin let you do are off for now - sign out and in again to get them back.")
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')
 process.exit(failures ? 1 : 0)

@@ -60,6 +60,16 @@ export function noteAccess(me: Me): void {
   for (const listener of listeners) listener(next)
 }
 
+/**
+ * (2.0.4) Whether this person runs deadwax, as far as what went wrong goes: an admin, or someone given Settings and
+ * the log - they read the event log anyway. They are shown an error's own words under its sentence
+ * (lib/errorWords.ts, app/ErrorNote.tsx) and You's Connections rows; everyone else the sentence, with "Tell whoever
+ * runs deadwax." where only they can put it right.
+ */
+export function seesDetail(access: Pick<Access, 'admin' | 'permissions'>): boolean {
+  return access.admin || access.permissions.has('server')
+}
+
 /** Forget what /me said (the sims, between cases). */
 export function forgetAccess(): void {
   noted = null

@@ -478,8 +478,9 @@ def test_the_songs_saved_and_the_metadata_refused_is_a_502_saying_so(player):
 
     fake.playlist_call = refusing
     answer = ethan.post(f"{PLAYER}/playlists/pl-mine/edit", json={"base": ["s1", "s2"], "song_ids": ["s2", "s1"], "name": "Renamed"})
-    assert answer.status_code == 502 and answer.json()["detail"].startswith("The songs were saved, but Navidrome didn't take")
-    assert "database is locked" in answer.json()["detail"]
+    #? (2.0.4) the sentence for anyone, Navidrome's own words as the why (src/auth.py Explained)
+    assert answer.status_code == 502 and answer.json()["detail"] == rules.PART_SAVED
+    assert "database is locked" in answer.json()["why"]
     assert fake.playlists["pl-mine"]["rows"] == ["s2", "s1"] and fake.playlists["pl-mine"]["name"] == "Mine"
 
 
@@ -597,8 +598,8 @@ def test_written_and_only_the_read_after_failing_says_it_was_saved_and_done_agai
     let_go = refuse(fake, after_the_write)
     body = {"base": ["s1", "s2"], "song_ids": ["s2", "s1"]}
     answer = ethan.post(f"{PLAYER}/playlists/pl-mine/edit", json=body)
-    assert answer.status_code == 502 and answer.json()["detail"].startswith("Saved - but Navidrome didn't answer")
-    assert "database is locked" in answer.json()["detail"]
+    assert answer.status_code == 502 and answer.json()["detail"] == rules.SAVED_UNREAD
+    assert "database is locked" in answer.json()["why"]
     assert fake.playlists["pl-mine"]["rows"] == ["s2", "s1"]
     let_go()
     forget(fake)

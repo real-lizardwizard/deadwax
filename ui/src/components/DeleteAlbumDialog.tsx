@@ -5,6 +5,7 @@ import type { DeletionSummary, LibraryAlbum } from '../api/types'
 import { formatSize } from '../lib/format'
 import { holdersText } from '../lib/myLibrary'
 import { Loading, LoadingPanel } from './Loading'
+import { sayError } from '../app/sayError'
 
 interface Props {
   album: LibraryAlbum
@@ -52,7 +53,7 @@ export function DeleteAlbumDialog({ album, onCancel, onDeleted }: Props) {
         const result = await libraryApi.deletionSummary(album.path)
         if (!cancelled) setSummary(result)
       } catch (caught) {
-        if (!cancelled) setError(caught instanceof Error ? caught.message : 'could not read that folder')
+        if (!cancelled) setError(sayError(caught, '', { failed: "Couldn't read that folder." }))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -69,7 +70,7 @@ export function DeleteAlbumDialog({ album, onCancel, onDeleted }: Props) {
       await libraryApi.deleteAlbum(album.path)
       onDeleted()
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'could not delete it')
+      setError(sayError(caught, '', { failed: "Couldn't delete it." }))
       setDeleting(false)
     }
   }
@@ -133,7 +134,7 @@ export function DeleteAlbumDialog({ album, onCancel, onDeleted }: Props) {
             disabled={loading || deleting || !summary}
             onClick={() => void confirm()}
           >
-            {deleting ? <Loading label="Deleting" /> : 'delete permanently'}
+            {deleting ? <Loading label="Deleting…" /> : 'Delete permanently'}
           </button>
         </div>
       </div>

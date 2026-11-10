@@ -110,6 +110,10 @@ src/
                    who asked for each download (job_requests - see "Downloads per person"); each
                    person's library (library_membership, user_credentials, library_flags,
                    library_seed, store_index_scanned - see "Personal libraries").
+  descriptions.py  PURE. An artist's or an album's short description (2.0.13): Navidrome's own read as
+                   text first, else Wikipedia's summary by MusicBrainz -> Wikidata -> enwiki; Wikidata's
+                   one-line subtitle; kept 30 days (none 3) - see "Descriptions on the artist and album
+                   pages".
   pins.py          PURE. What a pin to the app's Home keys on (store:<store_album.id>, mb:<mbid>)
                    and the PUT's list - see "Pins, and a finished Home". Never Navidrome stars.
   playlists.py     PURE. Playlists (2.0.0-player.58), Navidrome's own: whose (mine by owner, case-
@@ -195,7 +199,8 @@ src/
                    see "Resume what was playing".
   api/             musicbrainz_endpoint.py, slskd_endpoint.py, coverart_endpoint.py,
                    artist_images_endpoint.py (Wikidata/Commons + TheAudioDB),
-                   lrclib_endpoint.py (LRCLIB), navidrome_endpoint.py (Subsonic, for
+                   lrclib_endpoint.py (LRCLIB), wikipedia_endpoint.py (Wikidata's sitelinks and
+                   descriptions, Wikipedia's summaries, for descriptions), navidrome_endpoint.py (Subsonic, for
                    the player - holds the login; client_for(request) asks as the signed-in
                    user with logins on, SHARED_ACCOUNT_USES lists what asks as the shared one),
                    navidrome_admin.py (2.0.0-player.61: Navidrome's NATIVE account API for People,
@@ -221,6 +226,9 @@ src/
                    my_library (/deadwax/me/library) and held (/deadwax/library/held, Look after
                    the library's) - see "Personal libraries"; people (/deadwax/people, People: a
                    Navidrome admin's, unlocked with their own password - see "Managing accounts");
+                   own_password (/deadwax/me/password, You's Change password: yours, changed in
+                   Navidrome as you - see "Changing your own password"); describe
+                   (/deadwax/describe/artist|album - see "Descriptions on the artist and album pages");
                    library's /queue/summary is the app's Needs-a-look count, from the saved
                    scan alone - see "Needs a look"
 interface/         the app's pages: player/ (the app, its stylesheets, manifest and icons),
@@ -249,8 +257,13 @@ ui/                Preact + Vite + TypeScript: the app (src/player/main.tsx -> s
                    since 2.0.0-player.24 lib/deckClock.ts, its one time base; the voice ends
                    in a peak limiter since 2.0.0-player.35) - see "The turntable, part two",
                    "The record's sound follows the hand" and "The record's sound never clips".
+                   lib/errorWords.ts says every error in a listener's words (the pure classes and
+                   sentences), app/ErrorNote.tsx and app/sayError.ts draw them - see "Errors and
+                   connections in a listener's words".
                    app/NeedsALook.tsx is the review queue (both frames), its rules the pure
                    lib/needsLook.ts and its count app/useQueueSummary.ts - see "Needs a look".
+                   app/Description.tsx (with app/useDescription.ts and lib/describe.ts) is the artist's
+                   and the album's description - see "Descriptions on the artist and album pages".
                    app/ArtistPanel.tsx is the artist page's managing on both frames (Artist
                    images…, Move albums to …, Which artist is this?), its rules and the page's
                    In your library and full facts lib/artistManage.ts - see "The artist page, as
@@ -300,7 +313,7 @@ ui/                Preact + Vite + TypeScript: the app (src/player/main.tsx -> s
                    ui/src/lab/ is the turntable's test bench at /player/lab/, a third page built
                    in a pass of its own: the real Turntable and deck over signals it makes, set
                    beside an ideal turntable - see notes/turntable-bench.md.
-tests/             3657 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             3879 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ios/               the native iPhone app (SwiftUI), built on James's Mac, never in the image:
                    DeadwaxKit/ (its Core tested on Linux with swift.org's toolchain in
                    ~/.local/swift, its Audio engine on ios.yml's macOS runner), App/, the
@@ -343,11 +356,11 @@ section of that title in notes/: `grep -rn "### X" notes/` finds it.
 | one stream for FLAC, hi-res resampled to 48 kHz | `notes/player-stream-hires.md` |
 | normalization: the level rule, the measurement, the levelled copy | `notes/player-normalization.md` |
 | the store index and the "already have it" checks | `notes/store-index.md` |
-| the one app: routes, the gesture rule, the restyle, Now Playing, Info, resume what was playing | `notes/app.md` |
+| the one app: routes, the gesture rule, the restyle, Now Playing, Info, resume what was playing, errors in a listener's words | `notes/app.md` |
 | Requests, Search, the album you don't have, Sources and Get, song search, search like Apple Music | `notes/app-requests-search-get.md` |
-| artists, the id bridge, pins, Home | `notes/app-artists-pins.md` |
+| artists, the id bridge, pins, Home, the artist and album descriptions | `notes/app-artists-pins.md` |
 | the desktop frame, the Edit panel, Needs a look (and Not in Navidrome), server settings and the log, Library care - and all of them on a phone | `notes/app-desktop.md` |
-| logins and roles: signing in through Navidrome, sessions, admins, break-glass, the sign-in screen; downloads per person; personal libraries; the player as you (Library and Browse, Add and Remove); People, Navidrome's admins as deadwax's, permissions | `notes/logins.md` |
+| logins and roles: signing in through Navidrome, sessions, admins, break-glass, the sign-in screen; downloads per person; personal libraries; the player as you (Library and Browse, Add and Remove); People, Navidrome's admins as deadwax's, permissions; changing your own password | `notes/logins.md` |
 | playlists: Navidrome's own, as you - whose, the routes and the replace, the picker, a playlist's page and its Edit | `notes/playlists.md` |
 | the app's Library: its root, sections, sorts, groups, the index, Find, the album index route, the shelf | `notes/app-library.md` |
 | the turntable: its look, momentum, the deck, the first fix (.11, .14, .16) | `notes/turntable.md` |
@@ -383,6 +396,11 @@ table above), never here. Add to this file only a rule that holds everywhere.
   randomUUID, clipboard, service workers). localhost IS a secure context, so test from a non-local
   name too: Chromium with `--host-resolver-rules="MAP deadwax.test 127.0.0.1"`.
 - **Only the newest answer draws**: every fetch-then-draw goes through `latestOnly()` (`lib/latest.ts`).
+- **Errors in a listener's words**: a page a listener reads (the files `ui/test/errors.sim.cjs` scans) says an
+  error through `lib/errorWords.ts` (`errorNote`, `sayError`), never its own text; its own words only for whoever
+  runs deadwax (`access.ts seesDetail`). The managing pages (People, Server settings, the log, Needs a look,
+  Library care, the editors) still show raw words - UX batch 5's. A server refusal that needs a setting named
+  answers `auth.Explained` (`detail` for anyone, `why` for them).
 - **Tokens only in CSS** (`interface/styles/theme.css`; section 10's `--dw-*` for the app); a raw value
   in a rule is a bug. `app-desktop.css` rules live only inside its desktop media queries.
 - **Links out of the app open beside it** (`target="_blank" rel="noopener"`): following one in the page
@@ -509,7 +527,7 @@ phone's sheet.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 3657 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 3879 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see `notes/tooling.md`:
@@ -547,7 +565,7 @@ code sees before James's Mac (notes/ios.md).
 
 ## What the tests cannot tell you
 
-All 3657 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 3879 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

@@ -191,9 +191,9 @@ function describeMediaError(error: MediaError | null): string {
     case 2: // MEDIA_ERR_NETWORK
       return 'The connection dropped while this song was loading'
     case 3: // MEDIA_ERR_DECODE
-      return "This song's file couldn't be decoded"
+      return "This device couldn't play this song's audio"
     case 4: // MEDIA_ERR_SRC_NOT_SUPPORTED - also what a failed request looks like from here
-      return "Couldn't play this song - Navidrome didn't send audio this device can play"
+      return "Couldn't play this song - it didn't come as audio this device can play"
     default:
       return "Couldn't play this song"
   }
@@ -219,7 +219,7 @@ const HAVE_METADATA = 1
 /** Why the song before this one was passed over, named - the line is shown under the NEXT song. */
 function skipNotice(title: string, error: MediaError | null): string {
   return error?.code === MEDIA_ERR_DECODE
-    ? `Skipped "${title}" - its file couldn't be decoded`
+    ? `Skipped "${title}" - this device couldn't play its audio`
     : `Skipped "${title}" - it wouldn't play`
 }
 

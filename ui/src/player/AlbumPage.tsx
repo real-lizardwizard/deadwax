@@ -7,7 +7,7 @@ import type { StoreAlbumResponse } from '../api/types'
 import type { ViewerImage } from '../components/ArtViewer'
 import { AlbumProperties } from '../app/AlbumProperties'
 import { CoverViewer } from '../app/CoverViewer'
-import { PINS_UNSAVED, PinToggle } from '../app/PinToggle'
+import { pinsUnsaved, PinToggle } from '../app/PinToggle'
 import { keepJoinFocus } from '../app/StoreState'
 import { hasLibrary } from '../app/useMyLibrary'
 import { takeOpener } from '../app/useSheet'
@@ -15,6 +15,7 @@ import { sayPins, setPinned, usePins } from '../app/usePins'
 import { discHeadings } from '../lib/discTitles'
 import { formatDuration, sharedFormat, trackTime } from '../lib/format'
 import { editAlbum, type EditAlbum } from '../lib/albumEdit'
+import { albumEdit } from '../lib/permissions'
 import { albumProperties } from '../lib/albumProperties'
 import { alsoChips, otherPressingsGroup } from '../lib/idBridge'
 import { isAbort, latestOnly } from '../lib/latest'
@@ -27,6 +28,12 @@ import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, MoreIcon, PlayIcon, Playi
 import { Cover } from './Cover'
 import { queued, warmAlbum } from './levelling'
 import type { Player } from './usePlayer'
+import { accessNow, seesDetail, useAccess } from '../app/access'
+import { errorNote } from '../app/ErrorNote'
+import { heroTitleClass } from '../lib/titles'
+import { DESCRIPTION_WAIT_MS, inBlock } from '../lib/describe'
+import { DescriptionBlock } from '../app/Description'
+import { useDescription } from '../app/useDescription'
 
 /**
  * One album: its cover, Play and Shuffle, and its songs.
@@ -52,7 +59,7 @@ import type { Player } from './usePlayer'
  * own latestOnly) says which. The row is drawn from the first frame, so a chip arriving moves
  * nothing a finger is reaching for; a chip opens that pressing's page over this one.
  *
- * Since 2.0.0-player.41 the row ends with "Other pressings ›" once the bridge says which MusicBrainz
+ * Since 2.0.0-player.41 the row ends with "Pressings ›" (2.0.5's one name) once the bridge says which MusicBrainz
  * album this is (the release group its folders carry): the album you don't have's page for it, over
  * this one - every pressing in its list, the ones you hold marked, Get on any - so the deluxe beside
  * the standard you have can be got (v0.9.1's ask). It lands with the Also chips, in the row drawn from
@@ -60,9 +67,9 @@ import type { Player } from './usePlayer'
  * bridge has answered (or failed) - its place held, so nothing below moves - and so what is in it,
  * the badge too, first shows where it stays: a phone's row is centred, and the badge slid sideways as
  * the chip landed. Beside an Also chip, in a row too narrow for all three whole (its own width, by a
- * container query - a phone, or a desktop's column narrowed by the Edit panel), it says "Pressings"
- * (its name still "Other pressings") and "In your library" keeps its green tick and gives its words
- * up (still read, never shown), leaving the Also chip room to say which pressing it is.
+ * container query - a phone, or a desktop's column narrowed by the Edit panel), the Also chip gives way.
+ * (2.0.5, UX batch 2) The chip is "Pressings ›" on every frame (it was "Other pressings" with room), and the
+ * badge is a badge (app.css), keeping its words - in a narrow row it had left a bare tick in a box.
  *
  * Since 2.0.0-player.18 the bar's top right has the pin (Album.dc.html's): it pins the album to Home
  * by its release - the bridge's answer says which - and deadwax keys the pin on the store's row for
@@ -101,11 +108,22 @@ import type { Player } from './usePlayer'
  * its place (review). With logins off, and for the break-glass admin, the badge reads "In your library" as
  * it always did and nothing is offered.
  *
+ * Since 2.0.13 the album's DESCRIPTION (app/useDescription.ts, app/Description.tsx) - Wikidata's one-line subtitle
+ * and Navidrome's or Wikipedia's paragraph - asked once the bridge has answered for this album (on a page come back
+ * to, the answer it had is drawn from its first frame): under the hero when it is in hand as the songs are drawn -
+ * they wait for it DESCRIPTION_WAIT_MS at most - else at the foot, above Properties (lib/describe.ts placeOf).
+ *
  * Since 2.0.0-player.57 (Up Next, shuffle and repeat) every song's row ends with a ••• and the bar has one for
  * the whole album, between the phone's Edit and the pin - each opening the song menu (App's QueueMenu: Play
  * Next, Play Last) through `onQueueMenu`, with the songs in hand: the album's ••• is aria-disabled until they
  * are. This page names no Up Next action - the menu plays them, in its tap.
  */
+/** (2.0.4) An album page whose album Navidrome no longer has (a 404). */
+export const ALBUM_GONE = "This album isn't here any more - it may have been moved or deleted."
+
+/** (2.0.5) The chip to every pressing of the album - one name, on a phone and a desktop alike. */
+export const PRESSINGS = 'Pressings'
+
 export function AlbumPage({
   id,
   preview,
@@ -144,12 +162,17 @@ export function AlbumPage({
   onQueueMenu?: ((event: MouseEvent, pick: QueuePick<AlbumWithSongs>) => void) | undefined
 }) {
   const [album, setAlbum] = useState<AlbumWithSongs | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  //? (2.0.4) the errors themselves, said by errorNote (app/ErrorNote.tsx) in a listener's words
+  const [error, setError] = useState<unknown>(null)
   const requests = useMemo(latestOnly, [])
   //? what the store holds of this album, and its other pressings - the id bridge
   const [store, setStore] = useState<StoreAlbumResponse | null>(null)
+  //? (2.0.5) Properties' no-release line is for whoever can Edit albums (lib/albumProperties.ts)
+  const access = useAccess()
   //? the bridge failed to answer - so, answered or not, whether the album can be pinned is known
   const [storeFailed, setStoreFailed] = useState(false)
+  //? (2.0.13) which album the bridge last answered (or failed) for - the description is asked by THIS album's ids
+  const [storeFor, setStoreFor] = useState<string | null>(null)
   const storeRequests = useMemo(latestOnly, [])
   const { pins, known: pinsKnown, canSave } = usePins(true)
   //? the cover, full size (2.0.0-player.44), and the control that opened it - focus goes back there
@@ -158,7 +181,7 @@ export function AlbumPage({
   //? (2.0.0-player.52) Add to my library / Remove from my library: what this page just did, the ask out, a refusal
   const [changed, setChanged] = useState<'added' | 'removed' | null>(null)
   const [mineBusy, setMineBusy] = useState(false)
-  const [mineRefused, setMineRefused] = useState<string | null>(null)
+  const [mineRefused, setMineRefused] = useState<unknown>(null)
   const mineButton = useRef<HTMLButtonElement | null>(null)
 
   //? the refresh last asked for: a new one is an edit's (2.0.0-player.21), asked afresh and drawn over
@@ -180,7 +203,7 @@ export function AlbumPage({
       },
       (reason: unknown) => {
         if (!request.current() || isAbort(reason) || again) return
-        setError(reason instanceof Error ? reason.message : String(reason))
+        setError(reason)
       },
     )
     return () => requests.supersede()
@@ -199,11 +222,15 @@ export function AlbumPage({
     setMineRefused(null)
     storeAlbum({ navidrome_id: id }, request.signal).then(
       (answer) => {
-        if (request.current()) setStore(answer)
+        if (!request.current()) return
+        setStore(answer)
+        setStoreFor(id)
       },
       (reason: unknown) => {
+        if (!request.current() || isAbort(reason)) return
+        setStoreFor(id)
         //? a check that can't be made draws no chip - and no pin, with no release to pin it by
-        if (request.current() && !isAbort(reason) && !again) setStoreFailed(true)
+        if (!again) setStoreFailed(true)
       },
     )
     return () => storeRequests.supersede()
@@ -215,6 +242,25 @@ export function AlbumPage({
   useEffect(() => {
     if (album) warmAlbum(album)
   }, [album?.id])
+
+  //? (2.0.13) the album's description - asked once the bridge has said which MusicBrainz album this is (its release
+  //? group: Wikipedia's words), with Navidrome's id beside it (Navidrome's own). Under the hero when it is in hand as
+  //? the songs are drawn - they wait for it DESCRIPTION_WAIT_MS at most - else at the page's foot, so a late one
+  //? moves no song under a finger. Once drawn, the songs stay drawn (an edit's refresh keeps them)
+  const songsDrawn = useRef<string | null>(null)
+  const describing = useDescription('album', storeFor === id
+    ? { mbid: store?.release_group_mbid ?? null, navidromeId: id } : null, songsDrawn.current === id, id)
+  const [songsWaited, setSongsWaited] = useState<string | null>(null)
+  useEffect(() => {
+    if (!album) return
+    const timer = setTimeout(() => setSongsWaited(id), DESCRIPTION_WAIT_MS)
+    return () => clearTimeout(timer)
+  }, [id, !!album])
+  if (album && (describing.settled || songsWaited === id)) songsDrawn.current = id
+  const drawSongs = !!album && songsDrawn.current === id
+  //? its subtitle and paragraph, together - an album's hero holds Play and the chips from its first frame, so the
+  //? subtitle heads the block rather than landing in the hero above them
+  const describedBlock = inBlock('album', describing.description)
 
   const shown: Album | null = album ?? (preview?.id === id ? preview : null)
   //? what Navidrome has said of the album's release, for Properties' "not tagged" (review - never the
@@ -278,7 +324,7 @@ export function AlbumPage({
       },
       (caught: unknown) => {
         setMineBusy(false)
-        setMineRefused(caught instanceof Error ? caught.message : String(caught))
+        setMineRefused(caught)
       },
     )
   }
@@ -332,7 +378,7 @@ export function AlbumPage({
             ready={storeDone && !!release && pinsKnown}
             unsaved={!canSave}
             onToggle={() => void setPinned(pinTarget, !pinned)}
-            onRefused={() => sayPins(PINS_UNSAVED)}
+            onRefused={() => sayPins(pinsUnsaved(seesDetail(accessNow())))}
           />
         )}
       </header>
@@ -350,7 +396,7 @@ export function AlbumPage({
               setViewing([{
                 label: shown.name ?? '',
                 sources: [coverFullUrl(shown.coverArt), coverUrl(shown.coverArt, 800)].filter((source): source is string => !!source),
-                missing: 'Navidrome has no cover for this album',
+                missing: 'No cover for this album',
               }])
             }}
           >
@@ -359,15 +405,15 @@ export function AlbumPage({
         ) : (
           <Cover id={shown?.coverArt} size={800} class="pl-hero-cover" />
         )}
-        <h1 class="pl-hero-title">{shown?.name ?? ''}</h1>
+        <h1 class={heroTitleClass(shown?.name)} dir="auto">{shown?.name ?? ''}</h1>
         {artistId && artistName && onArtist ? (
-          <button type="button" class="pl-hero-artist app-hero-link" onClick={() => onArtist({ id: artistId, name: artistName })}>
+          <button type="button" class="pl-hero-artist app-hero-link" dir="auto" onClick={() => onArtist({ id: artistId, name: artistName })}>
             {artistName}
           </button>
         ) : (
           //? not a link: drawn plain once the album has said it names no artist to go to - never while
           //? it might still be one, which would flash from grey to the link's colour
-          <p class={`pl-hero-artist${album ? ' app-hero-plain' : ''}`}>{artistName}</p>
+          <p class={`pl-hero-artist${album ? ' app-hero-plain' : ''}`} dir="auto">{artistName}</p>
         )}
         <p class="pl-hero-meta">
           {[shown?.genre, shown?.year, format].filter(Boolean).join(' · ')}
@@ -397,13 +443,11 @@ export function AlbumPage({
             <button
               type="button"
               class="app-chip app-other-pressings"
-              aria-label="Other pressings"
               onClick={() => onOpenGroup({ id: group, title: shown?.name ?? '' })}
             >
-              {/* "Pressings" where an Also chip shares a row too narrow for all three whole (app.css's
-                  container query), so the Also chip keeps what room there is */}
-              <span class="app-other-long">Other pressings</span>
-              <span class="app-other-short">Pressings</span>
+              {/* (2.0.5) one name on every frame - it was "Other pressings" where there was room, "Pressings" where
+                  not; the page it opens lists every pressing, this one too, as the picker's own "Pressings" does */}
+              {PRESSINGS}
               <ChevronRightIcon class="app-chip-icon" />
             </button>
           )}
@@ -446,7 +490,7 @@ export function AlbumPage({
           </button>
         </div>
       )}
-      {(mine.action || mine.note || mineRefused) && (
+      {(mine.action || mine.note || !!mineRefused) && (
         <div class="app-album-mine" tabIndex={-1}>
           {mine.note && (
             <p class="app-store-line" role="status">
@@ -464,19 +508,21 @@ export function AlbumPage({
               {mine.action === 'add' ? (mineBusy ? 'Adding…' : 'Add to my library') : mineBusy ? 'Removing…' : 'Remove from my library'}
             </button>
           )}
-          {mineRefused && (
+          {!!mineRefused && (
             <p class="app-store-line is-refused" role="alert">
-              {mineRefused}
+              {errorNote(mineRefused, { as: 'span' })}
             </p>
           )}
         </div>
       )}
 
-      {error && <p class="pl-notice">{error}</p>}
-      {!album && !error && <div class="pl-spinner" aria-label="Loading" />}
+      {describedBlock && describing.at === 'top' && <DescriptionBlock description={describedBlock} at="top" />}
+
+      {error ? errorNote(error, { class: 'pl-notice', gone: ALBUM_GONE }) : null}
+      {!drawSongs && !error && <div class="pl-spinner" aria-label="Loading" />}
 
       <ol class="pl-tracks">
-        {songs.map((song, index) => {
+        {(drawSongs ? songs : []).map((song, index) => {
           const isCurrent = player.track?.id === song.id
           const heading = headings[index]
           const showArtist = song.artist && song.artist !== shown?.artist
@@ -493,8 +539,8 @@ export function AlbumPage({
                     {isCurrent ? <PlayingBars paused={!player.playing} /> : song.track ?? ''}
                   </span>
                   <span class="pl-track-text">
-                    <span class="pl-track-title">{song.title}</span>
-                    {showArtist && <span class="pl-track-artist">{song.artist}</span>}
+                    <span class="pl-track-title" dir="auto">{song.title}</span>
+                    {showArtist && <span class="pl-track-artist" dir="auto">{song.artist}</span>}
                   </span>
                   <span class="pl-track-time">{trackTime(song.duration)}</span>
                 </button>
@@ -516,15 +562,18 @@ export function AlbumPage({
         })}
       </ol>
 
-      {album && (
+      {drawSongs && album && (
         <p class="pl-album-footer">
           {songs.length} {songs.length === 1 ? 'song' : 'songs'}
           {total ? `, ${formatDuration(total)}` : ''}
         </p>
       )}
 
+      {/* (2.0.13) a description that came after the songs were drawn: here, where it moves nothing under a finger */}
+      {describedBlock && describing.at === 'foot' && <DescriptionBlock description={describedBlock} at="foot" />}
+
       {/* what the main page's details pane said of the album (2.0.0-player.44), once the bridge has answered */}
-      <AlbumProperties rows={albumProperties(store, storeFailed, releaseSaid)} />
+      <AlbumProperties rows={albumProperties(store, storeFailed, releaseSaid, undefined, albumEdit(access.permissions).editors)} />
 
       <CoverViewer images={viewing} onClose={() => setViewing(null)} opener={viewOpener} />
     </section>

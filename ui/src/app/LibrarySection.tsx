@@ -7,9 +7,9 @@ import { isAbort, latestOnly } from '../lib/latest'
 import { newMarks } from '../lib/myLibrary'
 import {
   ALBUM_SORTS, albumSortFrom, artistOrderFrom, filterAlbums, filterArtists, filteredCountText, finding, groupAlbums, groupArtists,
-  indexEntries, indexKind, noMatchText, showsIndex, sortAlbums, sortArtistsBy, type AlbumSort,
+  indexEntries, indexKind, noMatchText, showsIndex, sortAlbums, sortArtistsBy, type AddedBy, type AlbumSort,
 } from '../lib/shelves'
-import { EMPTY_LIBRARY, NOTHING_OF_YOURS_PLAYED, NO_ARTISTS_OF_YOURS, yourArtists, yourEmptyNotice } from '../lib/yourLibrary'
+import { EMPTY_LIBRARY, NOTHING_OF_YOURS_PLAYED, NO_ALBUMS, NO_ARTISTS, NO_ARTISTS_OF_YOURS, yourArtists, yourEmptyNotice } from '../lib/yourLibrary'
 import { libraryArtists, type Album, type Artist, type Song } from '../player/api'
 import { ChevronDownIcon, ChevronLeftIcon, SearchIcon } from '../player/icons'
 import { readPlayerArtistOrder, readPlayerOrder, writePlayerArtistOrder, writePlayerOrder } from '../state/persisted'
@@ -21,11 +21,12 @@ import { Shelf } from './Shelf'
 import { ShuffleSongs } from './ShuffleSongs'
 import { useMyLibrary } from './useMyLibrary'
 import { useYourAlbumsGeneration, yourAlbums } from './useYourAlbums'
+import { errorNote } from './ErrorNote'
 
-const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 /** What the Library says above a list it couldn't refresh - the list it has stays drawn. */
-export const COULDNT_REFRESH = "Couldn't refresh"
+/** (2.0.4) over what went wrong asking again - the list below stays as it was */
+export const COULDNT_REFRESH = "Couldn't update this list - showing it as it was."
 /** ...and above a list cut at the route's cap (src/routes/navidrome.py INDEX_MAX). */
 export const TRUNCATED_NOTICE = 'Showing the first 10000 albums - deadwax reads at most that many.'
 
@@ -140,7 +141,7 @@ function SectionHead({ page, title, titleRef, find, sort, count }: {
         ) : (
           <span />
         )}
-        <span class="app-library-count app-mono">{count}</span>
+        <span class="app-library-count">{count}</span>
       </div>
     </>
   )
@@ -211,11 +212,14 @@ function AlbumSection({ id, personal, shown, onOpen, onBrowse, page, titleRef }:
   const storeGeneration = useIndexGeneration('store')
   const generation = scope === 'yours' ? yoursGeneration : storeGeneration
   const [index, setIndex] = useState<AlbumIndex | null>(() => keptIndex(scope))
-  const [problem, setProblem] = useState<string | null>(null)
+  const [problem, setProblem] = useState<unknown>(null)
   const asks = useMemo(latestOnly, [])
   const sorts = useSorts()
   //? Recently added has its own order, and no choice of another
   const sort: AlbumSort = id === 'recent' ? 'newest' : sorts.album
+  //? (2.0.11) Recently added over your albums is when each entered YOUR library (its star); the collection's lists
+  //? keep when the collection got it - never your stars, which only some of its albums carry
+  const by: AddedBy = scope === 'yours' ? 'you' : 'collection'
   const [typed, setTyped] = useState('')
   const mine = useMyLibrary()
   const marks = useMemo(() => newMarks(mine), [mine])
@@ -228,7 +232,7 @@ function AlbumSection({ id, personal, shown, onOpen, onBrowse, page, titleRef }:
         if (request.current()) setIndex(list)
       },
       (reason: unknown) => {
-        if (request.current() && !isAbort(reason)) setProblem(message(reason))
+        if (request.current() && !isAbort(reason)) setProblem(reason)
       },
     )
   }
@@ -240,9 +244,9 @@ function AlbumSection({ id, personal, shown, onOpen, onBrowse, page, titleRef }:
   useEffect(() => () => asks.supersede(), [])
 
   const albums = index?.albums ?? null
-  const sorted = useMemo(() => (albums ? sortAlbums(albums, sort) : []), [albums, sort])
+  const sorted = useMemo(() => (albums ? sortAlbums(albums, sort, by) : []), [albums, sort, by])
   const found = useMemo(() => (finding(typed) ? filterAlbums(sorted, typed) : sorted), [sorted, typed])
-  const groups = useMemo(() => groupAlbums(found, sort), [found, sort])
+  const groups = useMemo(() => groupAlbums(found, sort, by, sorted), [found, sort, by, sorted])
   const entries = useMemo(() => (showsIndex(sort, sorted.length, typed) ? indexEntries(groups, sort) : null), [groups, sort, sorted.length, typed])
   const item = useCallback((album: Album) => <AlbumTile key={album.id} album={album} marks={marks} onOpen={onOpen} />, [marks, onOpen])
   const itemKey = useCallback((album: Album) => album.id, [])
@@ -254,7 +258,7 @@ function AlbumSection({ id, personal, shown, onOpen, onBrowse, page, titleRef }:
   if (!albums) {
     body = problem ? (
       <div class="pl-notice">
-        <p>{problem}</p>
+        {errorNote(problem, { retry: true })}
         <button type="button" class="pl-text-button" onClick={load}>
           Try again
         </button>
@@ -268,7 +272,7 @@ function AlbumSection({ id, personal, shown, onOpen, onBrowse, page, titleRef }:
         : notice === 'unplayed' ? <p class="pl-notice">{NOTHING_OF_YOURS_PLAYED}</p>
           : <span />
     ) : (
-      <p class="pl-notice">{albums.length && (sort === 'recent' || sort === 'frequent') ? 'Nothing played yet.' : 'No albums in Navidrome yet.'}</p>
+      <p class="pl-notice">{albums.length && (sort === 'recent' || sort === 'frequent') ? 'Nothing played yet.' : NO_ALBUMS}</p>
     )
   } else if (!found.length) {
     body = <p class="pl-notice">{noMatchText('albums', typed)}</p>
@@ -306,7 +310,8 @@ function AlbumSection({ id, personal, shown, onOpen, onBrowse, page, titleRef }:
       {personal && id === 'albums' && <ShuffleSongs scope="yours" shown={shown} actions={actions} count />}
       {albums && problem && (
         <div class="pl-notice app-library-problem">
-          <p>{`${COULDNT_REFRESH}: ${problem}`}</p>
+          <p>{COULDNT_REFRESH}</p>
+          {errorNote(problem, { retry: true })}
           <button type="button" class="pl-text-button" onClick={load}>
             Try again
           </button>
@@ -326,7 +331,7 @@ function ArtistSection({ id, personal, shown, onOpenArtist, onBrowse, page, titl
   const yours = personal && id === 'artists'
   const inStore = personal && id === 'storeArtists'
   const [artists, setArtists] = useState<Artist[] | null>(null)
-  const [problem, setProblem] = useState<string | null>(null)
+  const [problem, setProblem] = useState<unknown>(null)
   const asks = useMemo(latestOnly, [])
   const generation = useYourAlbumsGeneration()
   const sorts = useSorts()
@@ -344,7 +349,7 @@ function ArtistSection({ id, personal, shown, onOpenArtist, onBrowse, page, titl
         if (request.current()) setArtists(list)
       },
       (reason: unknown) => {
-        if (request.current() && !isAbort(reason)) setProblem(message(reason))
+        if (request.current() && !isAbort(reason)) setProblem(reason)
       },
     )
   }
@@ -370,14 +375,14 @@ function ArtistSection({ id, personal, shown, onOpenArtist, onBrowse, page, titl
   if (!artists) {
     body = problem ? (
       <div class="pl-notice">
-        <p>{problem}</p>
+        {errorNote(problem, { retry: true })}
         <button type="button" class="pl-text-button" onClick={load}>
           Try again
         </button>
       </div>
     ) : <div class="pl-spinner" aria-label="Loading" />
   } else if (!sorted.length) {
-    body = yours ? <EmptyLibrary lead={NO_ARTISTS_OF_YOURS} onBrowse={onBrowse} /> : <p class="pl-notice">No artists in Navidrome yet.</p>
+    body = yours ? <EmptyLibrary lead={NO_ARTISTS_OF_YOURS} onBrowse={onBrowse} /> : <p class="pl-notice">{NO_ARTISTS}</p>
   } else if (!found.length) {
     body = <p class="pl-notice">{noMatchText('artists', typed)}</p>
   } else {
@@ -411,7 +416,8 @@ function ArtistSection({ id, personal, shown, onOpenArtist, onBrowse, page, titl
       />
       {artists && problem && (
         <div class="pl-notice app-library-problem">
-          <p>{`${COULDNT_REFRESH}: ${problem}`}</p>
+          <p>{COULDNT_REFRESH}</p>
+          {errorNote(problem, { retry: true })}
           <button type="button" class="pl-text-button" onClick={load}>
             Try again
           </button>

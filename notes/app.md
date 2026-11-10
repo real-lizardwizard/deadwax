@@ -502,7 +502,9 @@ engine files changed, as that spec said they would: `ui/src/player/usePlayer.ts`
   means.
 - **The controls.** Now Playing gains ONE button, Up next (`app-upnext-button`, QueueIcon), between AirPlay's place and •••,
   tinted while Shuffle or Repeat is on and named for it ("Up next - Shuffle and Repeat all"); Shuffle and Repeat are in Up
-  Next, where the iPhone's Music app has them, so nothing else on the screen moves. Up Next (`app/UpNext.tsx`) is Info's
+  Next, where the iPhone's Music app has them, so nothing else on the screen moves. *(Changed in 2.0.14 at James's request:
+  Shuffle and Repeat are on Now Playing's transport too, and the tint is gone - "Shuffle and Repeat on Now Playing's main
+  screen (2.0.14)" below.)* Up Next (`app/UpNext.tsx`) is Info's
   shell: a sheet over Now Playing (App's `over` gains 'upnext') and on a desktop the side panel (`lib/appFrame.ts`'s `Side`
   gains 'upnext', `closesOnCrossing` returns `upNextPanel`, the one-panel rule both ways). It draws `upNextView`: the song
   playing, the chips, Playing Next with Clear, the shown round's rows (`UP_NEXT_DRAWN` 100, then "And N more songs."), what
@@ -966,3 +968,1023 @@ surviving checks). **Checked in a real page** (my own instance, stand-ins): `/`,
 sign-in at `/player/`, then Home), with no request for `/scripts/`, main.css or deadwax-ui.js and nothing in the
 console. **NOT verified - James's**: the home-screen icon on his iPhone, an old bookmark or icon for `/`, and an
 old `/` tab reloaded.
+
+### Settings described for the person using them (2.0.1)
+
+James, 2026-10-23, right after 2.0.0: "let's clean up the settings. I need the descriptions to be more user
+oriented and not testing oriented. Like where gapless says 'an experiment' is unacceptable." The words had been
+written while each feature was on trial on his phone, so some said how a thing was built or how it compared
+with before rather than what it does for you. Words only: no behaviour, default, setting name, value or route
+changed, and the engine files have no diff.
+
+**You.** Every note says what the setting does and when you'd change it. Gapless: "Plays one song straight into
+the next. In Safari and Chrome, FLAC albums play through with no pause at all, as they were recorded; other songs
+change with a much shorter pause. It downloads the next song ahead, which uses more data, and on a slow
+connection that can stop helping: turn it off if song changes are no quicker" - the guide's own advice (Gapless
+never stops the music; on a slow connection it costs data and stops helping), and the one stream's browsers
+(it is still off by default - the words don't tell anyone to leave it on). Getting albums' note now says what
+both "When I tap Get" choices mean (Pick the best shows the sources instead when nothing matches well, or when you
+already have the album or are getting it - autoPickBlocked's other cases, so no "only"); Now Playing opens as, Pause winds the record down and Normalization's notes
+were tightened, the first two ending "For phones: a big screen has no Now Playing view" / "... has no turntable"
+(You shows them on a desktop too, where they change nothing; "big screen", not "desktop", because app-rules.sim
+holds You.tsx free of the word - You is told no frame); the closing line no longer counts the settings ("All five"). Maximum quality's two notes keep
+every fact the sim holds them to (88.2 to 384 kHz, 48 or 44.1 kHz, lossless 24-bit, "with Gapless on", 3 dB
+quieter with Normalization off - HEADROOM_DB) in plainer words. Original says hi-res songs are sent "at their own rate, in case a USB DAC can play them at
+it" - not "exactly as they are" (Normalization, on by default, levels them under Original too) and not "the
+choice for a USB DAC" (whether an iPhone ever runs one at a song's own rate isn't known: player.md's Maximum
+quality and Known gaps); settings.sim holds both out.
+Normalization's Off no longer measures itself against "before this setting": "No levelling: every song plays
+exactly as the file is, bit for bit, unless Maximum quality converts it."
+
+**Server settings.** For an admin running a home server: the intro line says a saved change takes effect at once
+and is used instead of the compose file's value until reverted; SLSKD_URL, SLSKD_APIKEY, the picture keys,
+MUSICBRAINZ_EMAIL, the three Navidrome rows, DEADWAX_SECRET_KEY, DEADWAX_ADMIN_PASSWORD, LIBRARY_PATH,
+SLSKD_INCOMPLETE_PATH, DB_PATH (and its locked reason), the player cache's two rows (no longer "for Safari"
+alone: the cache holds what iPhones and Safari seek in, Gapless's stream and the resampled and levelled copies
+too), the shared-account lock ("deadwax's own Navidrome account, which deadwax uses for its own work and for
+anything that isn't one person's" - with logins on each person plays as their own, as the row beside it says),
+PLAYER_CACHE_MB's "a few GB suits it better" (said only at the default or under it, never to an admin who gave
+the cache more), the organizing verdict's blockers and the group's note (ORGANIZE_MODE "is set to Off" / "Dry
+run", the dropdown's words, not `'dry_run'`; organizing is "the only setting here that files or moves your
+music", since the caches write files too), and the notes of When a download fails ("the sources", the app's word, not "the
+candidates list"), Cover art (Get cover and the Edit panel, not "the metadata editor") and Lyrics (an album's Get
+lyrics). AUTO_RETRY_PEER's off line named a button the app doesn't have ("Try next peer"); it is **Next peer**,
+in Requests - configuration.md and .env.example's AUTO_RETRY_PEER comment ("in the downloads panel" too) said
+the same and are fixed with it. ORGANIZE_MODE's dropdown names its modes Off,
+Dry run, Copy and Move (ORGANIZE_MODE_CHOICES; the values stay `off`/`dry_run`/`copy`/`move`, and the Organize
+modes list under the group still shows them as compose takes them). The rows are still titled by their
+environment names: an admin types those into compose, so they are words a person acts on.
+
+**Docs.** player.md's "Gapless playback (experimental)" is "Gapless playback" (its anchor `#gapless-playback`,
+every link to it changed), the README's "Gapless, as an experiment" and troubleshooting's "is an experiment" went,
+and player.md's and configuration.md's Normalization Off and By song match the app (Off keeps "unless Maximum
+quality converts it" in both, and player.md's "Off is bit-perfect" no longer measures itself against "before
+this setting existed" - nor says the file is sent "exactly as it is", which a 24/192 FLAC resampled under the
+default Up to 48 kHz is not: it is the file itself "unless Maximum quality converts it"). player.md's "What still needs
+trying on a real iPhone" is a section of the guide, not a setting's words, and is left.
+
+**Pinned**: tests/test_settings_words.py - no word "experiment", "trial", "test", "verified" or a build number
+in the settings route's answer (a plain install, a filled-in one, a broken one reaching every "unrecognised"
+branch, as an admin sees it and as someone given Settings and the log does), in the tables the rows are drawn
+from, in any string literal of src/routes/settings.py but its docstrings, or in the comment-stripped source of
+You's and Server settings' files; ORGANIZE_MODE's labels are words over the same values, and the blockers and
+the group note use them; PLAYER_CACHE_MB's advice only at or under the default; the shared-account lock never
+says everything goes through deadwax's account; configuration.md's Normalization Off and player.md's "Off is
+bit-perfect" keep Maximum quality's exception; .env.example names Next peer in Requests, never "Try next peer". you.sim scans
+everything You draws (About's version taken out) and pins the new notes word for word; settings.sim scans the
+choices' labels and notes and pins Maximum quality's and Normalization's word for word.
+
+### Errors and connections in a listener's words (2.0.4)
+
+James, 2026-10-23: "apply that same review to the info panel and everything else. I want to make sure it all
+provides a good user experience." The words-and-UX review of every screen (~225 findings) found the worst
+problem to be listeners shown raw server errors, settings and plumbing where they needed a sentence; he chose
+to build its five words batches in order, and this is **batch 1, errors and connections**, with the review's
+"error classification" and "server reason codes" (its "Bigger than wording" B1, B7). Words and small UX only:
+no route's status changed, nothing heard changed, and the engine files have no diff (the player's own
+playback-error words live in usePlayer.ts and are batch 4's).
+
+**One helper, `lib/errorWords.ts`** (pure). `errorKind` classes an error by what it is - never by its words, but
+for one test: **offline** (fetch's TypeError: "Failed to fetch", Safari's "Load failed", Firefox's
+"NetworkError…"), **timeout** (408, 504, a TimeoutError), **unreachable** (a 502/503 with no words fit for
+anyone), **not-found** (404), **not-allowed** (401, 403), **refused** (a 4xx - or a 502/503 - whose words are
+fit for anyone, or an answer deadwax split in two), **other** (a 500, an error of the page's own). The one test
+of words is `plumbing`: a setting's name (`[A-Z]+_[A-Z_]+`), an address, an exception's name, an errno, a path,
+http.ts's "GET /x failed", a status ("answered 502"), slskd, "Navidrome said" - such words never become a
+listener's line. `errorWords(error, {admin, service, gone, failed})` gives the sentence (`text`), what to do
+(`advice`) and, for whoever runs deadwax only, the error's own words (`detail`; the server's `why` first). The
+sentences: "Can't connect to deadwax." + "Check your connection, then try again."; "That took too long." +
+"Try again."; unreachable by whose answer it was - `serviceOf`, from the route ApiError now carries (`path`):
+the Navidrome routes "Can't reach the music server right now.", the downloads' and slskd's "Downloads aren't
+working right now.", anything else "deadwax can't do that right now." - + "Try again in a minute"; a 404 the
+caller's sentence (`gone`), else deadwax's words, never FastAPI's bare "Not Found"; a 401 "Your sign-in has
+ended - sign in again."; a 403 deadwax's words ("That needs Edit albums…"); refused the server's words AS
+WRITTEN (a user's name in them is never re-cased; "deadwax" and "slskd" never capitalised); other "Something
+went wrong." + "Try again". To someone who doesn't run deadwax the advice adds "- if it keeps happening, tell
+whoever runs deadwax." (unreachable, other), "If it keeps happening, tell whoever runs deadwax." (deadwax's own
+5xx in words) or **"Tell whoever runs deadwax."** (deadwax's split 503); whoever runs it is never told to tell
+themselves, and gets the detail instead.
+
+**Who runs deadwax** (`access.ts seesDetail`): an admin, or someone given **Settings and the log** - they read
+the event log anyway. They see the error's own words in a smaller line under the sentence (`.app-error-detail`)
+or, in a one-line notice, in brackets after it.
+
+**How a page says it.** `app/ErrorNote.tsx`'s `errorNote(error, opts)` and `errorLine(text, detail, opts)` are
+FUNCTIONS returning the page's own `<p>`/`<span>`, not components: a page's words stay its own (every sim reads
+them as it reads the rest), and they call no hook, so `{error ? errorNote(error) : null}` changes no hook order;
+who reads is what /me last said (`accessNow`). `app/sayError.ts`'s `sayError(error, lead)` is the one-line form
+for stores that keep words (the pins, the playlists, Getting albums, Search's halves, a notice) - no JSX, so a
+store needs nothing of Preact's. Pages that kept `x instanceof Error ? x.message : String(x)` in state now keep
+the error itself (`unknown`) and say it at render: Home's Recently added, the Library root and sections and
+Songs (usePaged), the album page (its 404 "This album isn't here any more - it may have been moved or
+deleted.", and Add/Remove's refusal), the artist page (the library half; the albums-you-don't-have half's
+non-MusicBrainz failures), Search's library halves and the album you don't have (via sayError), Sources (the
+search's error - "Downloads aren't working right now." with slskd's words for whoever runs deadwax, never
+"Error searching slskd: HTTPConnectionPool…"), the store box's Join and Add, the pins (read, pin, Edit - "Couldn't
+pin Dummy. …", "Not saved. …"), the playlists (list, open, refresh "Couldn't update this playlist - showing it as
+it was.", edit, delete, add, create), You's /me failure, Getting albums' saves, Change password, Your library's
+Put away, and the Library sections' "Couldn't update this list - showing it as it was." (was "Couldn't refresh:
+<raw>").
+
+**Requests' reasons** (`jobErrorWords`): every string the server writes into a job's `error` - store.py's
+TRANSFER_FAILURE_REASONS, poller.py's `_fail` and filing messages, routes/download.py's cancel - has a sentence
+("The person sharing it refused to send it.", "deadwax lost track of this download - the person sharing
+it may have gone offline, or downloads stopped working for a while." - slskd down or restarted looks the same as a
+peer gone, since get_downloads answers [] on any failure, "It downloaded, but deadwax couldn't find its files to add them to your library." for
+`NOTHING_ORGANIZED`, "…couldn't be added to your library." for `organize failed: <exception>`, a dry run's, the
+already-there and failed-to-organize counts; "3 of 10 files arrived." after a failure's reason). A RequestRow
+carries `reason` (everyone's), `reasonTell` (JobCard adds "Tell whoever runs deadwax." for anyone else) and
+`reasonDetail` (the job's own words, for whoever runs it); a retry's problem `problemDetail` likewise
+(RETRY_WORDS says slskd's "still stopping the last attempt" in a listener's words; plumbing becomes "The
+download couldn't be started."). A Done row that wasn't added says the sentence instead of "Not filed: <raw>" -
+and (after review) keeps the tell and the job's own words too: outcomeWords returns them, the row carries them as
+reasonTell / reasonDetail, and DoneRow draws the words under the line for whoever runs deadwax (with logins off,
+everyone - the SLSKD_DOWNLOAD_PATH hint is theirs) and "Tell whoever runs deadwax." for anyone else.
+Words that are fit as written ("reel2reel went offline after 4 of 10 files") pass as written. The ending words
+themselves - Partly filed, Interrupted while filing, organizing, peer - are batch 3's. The failure banner is
+"Can't update your requests right now" over the error in a listener's words (no "try again": it asks again
+itself), the database line "Requests can't be shown right now: deadwax can't keep track of downloads. Tell
+whoever runs deadwax." to anyone but whoever runs deadwax (they keep DB_PATH); a Done row that can't open says
+"Can't open this album yet - the music server isn't set up." / "Can't open this album right now - the music
+server can't be reached. Try again in a minute." (App's navidromeProblem).
+
+**The Navidrome gate** (NeedsNavidrome): a listener reads "Your music isn't available right now" / "…yet" and
+what to do (Try again; or to tell whoever runs deadwax) - never Navidrome's address, its error or a setting;
+whoever runs deadwax keeps "Connect Navidrome" / "Can't reach Navidrome" and the reason (troubleshooting's
+titles); **Set up Navidrome** is an admin's alone (Navidrome's rows are), a Settings holder reading "An admin
+can set it up in Server settings (Connections)." It reads `accessNow()`, not a hook: a leaf the sims call as a
+function, drawn again with every status.
+
+**You -> Connections** is for whoever runs deadwax only: nobody else's You draws it, and nothing is asked for
+them (no MusicBrainz ping either). Each row says a word for its code (`PING_STATUS`: "Can't reach it", "Not on
+Soulseek", "Key refused", "Not running", "Not set up", "Unclear", "No answer", "Busy"…) - never the code - over a
+sentence: slskd's from the server (slskd_endpoint.py `PING_WORDS`, in place of the log's own lines - "slskd ping
+failed with connection error, functionality enabled, but couldnt connect…"; slskd's state keeps
+describe_server_state's words; get_client's own refusals, SLSKD_URL unusable or no SLSKD_APIKEY, are a new code
+`NOT_SET_UP` with their words, where they were UNKNOWN_ERROR), MusicBrainz's from `MUSICBRAINZ_LINES` (its ping
+answers with request_with_retries's error dict, shared with every MusicBrainz question, so its words are the
+app's). A ping deadwax didn't answer is "Couldn't check". You's "Check again" goes with Connections (/me is asked
+again as You shows).
+
+**The sign-in and a session's words** (src/auth.py): **`Explained`**, an HTTPException with a `why`, answered
+by app.py's handler as `{"detail", "why"}` with its own status: `detail` for anyone, `why` for whoever runs
+deadwax. Logins that can't work (`unusable()`: the key, organizing off) answer `CANT_SIGN_IN` "deadwax isn't
+ready for signing in, so nobody can use it just now." with unusable()'s words as the why; a database that can't
+be read `NO_DATABASE` "deadwax can't read its database just now, so it can't check who you are." with
+`NO_DATABASE_WHY` (DB_PATH); Navidrome not set up or its address unusable at a sign-in `NAVIDROME_UNSET`
+(was "deadwax can't ask Navidrome: {e}"); Navidrome answering oddly `NAVIDROME_REFUSED` (was "Navidrome couldn't
+check your password: {e}"); an LDAP account `LDAP_ACCOUNT`. `KEY_CHANGED` is "deadwax's sign-ins have been reset
+since you signed in - sign in again." (the log names the key, as it did). Navidrome down at a sign-in keeps its
+words, with no why. The app (`lib/signIn.ts`): `signInProblem` shows deadwax's words only when they hold no
+plumbing - a split 503 with " Tell whoever runs deadwax." after it - else "Something went wrong on the server -
+try again in a moment." (was "deadwax answered 500"); no answer at all "Can't reach deadwax. Check you're on the
+right network (or your VPN is on) and try again." (was "…over WireGuard…"); `signInWhy` is the why (or a
+detail too technical for the line), drawn folded under **For whoever runs deadwax** (a `<details>`, signin.css)
+- the screen can't tell who is reading, at the gate's failed /me as on a failed sign-in. The playlist route's
+part-saved answers (PART_SAVED, SAVED_UNREAD) are Explained too: the sentence, with Navidrome's words as the why
+(they were ": {why}" on the end).
+
+**The database-down lines** add "Tell whoever runs deadwax." for anyone who doesn't run it: Getting albums'
+(`GETTING_UNSAVED`), Your library's (`LIBRARY_UNREAD`), a pin's (`pinsUnsaved`), Requests' (above). Needs a
+look's IGNORES_UNSAVED is a managing page's, read by those who run it, and is left (batch 5).
+
+**Left for later batches, on purpose**: the managing pages (People, Server settings, the event log, Needs a
+look, Library care, Held by nobody, the Edit panel's editors and inspector, the artist panel) still show their
+errors' own words - their readers are those who run deadwax (batch 5); the player's playback errors
+(usePlayer.ts, an engine file - batch 4); the vocabulary inside fit server words ("in the store", "MusicBrainz
+release id", Navidrome by name - batches 2 and 3); Home's Arriving line ("Can't reach deadwax just now"); a
+"Server: everything's working" row for listeners in You (the review's #2 offered it; batch 1 as the review
+defines it doesn't build it).
+
+**Pinned**: ui/test/errors.sim.cjs (new) - every class and sentence, for a listener and for whoever runs deadwax;
+THE SCAN: every raw error the app is known to meet (slskd's traceback line, Navidrome's address, NOT_CONFIGURED,
+an errno, http.ts's fallback, fetch's words…) put through every way the app says an error, for a listener -
+no plumbing, no raw words, no detail; every job error read out of the Python with a sentence of its own; a word
+for every ping code read out of the Python; the gate for each reader; and the listener pages and stores holding
+no catch that keeps an error's raw words (`x instanceof Error ? x.message`, `String(caught)`) off a console line.
+signin.sim, you.sim, requests.sim, sources.sim, search.sim, pins.sim, playlists.sim, artist.sim, mylibrary.sim
+and app-rules.sim were updated on purpose - their fakes throw what api/http.ts throws (an ApiError with its
+status and route, fetch's TypeError) where they threw a bare Error - and pin the listener's words beside the
+admin's. tests/test_error_words.py (new): no sign-in or session sentence anyone but an admin reads holds a
+setting, an exception or WireGuard; the key, organizing, the database, Navidrome unset, odd and LDAP answered
+in two halves with their statuses; every slskd ping branch a sentence with its code kept, NOT_SET_UP naming the
+setting; the part-saved playlist sentences. test_logins.py, test_downloads_per_person.py and test_playlists.py
+now read the setting from `why`.
+
+**Verified** (as built, before review): 3757 Python tests (3755 passed, 2 skipped; tests/test_error_words.py new - 36), pyflakes, tsc, the
+build, and all 64 sims (errors.sim new). Mutation-checked (each broken, its test seen failing, restored byte for
+byte): fetch's TypeError as offline; a 502/503's words passing only when fit; no detail for a listener; a job
+error's sentence; the gate's listener branch; Connections and its pings for whoever runs deadwax; a catch keeping
+raw words (the page scan); seesDetail taking Settings and the log; the sign-in hiding plumbing; JobCard's tell;
+RETRY_WORDS; "deadwax" never capitalised; KEY_CHANGED holding no setting; no key answered as an Explained; slskd's
+ping sentence; the Explained handler's `why`. Seen in a real page (headless Chromium as deadwax.test, 390x844,
+logins on, a stand-in Navidrome, slskd absent): ethan's You has no Connections and his Home and Library, Navidrome
+down, say "Your music isn't available right now" and the music server sentence; james's You shows Connections'
+"Can't reach it" over slskd's sentence, and his Home keeps "Can't reach Navidrome" with the address; Sources with
+slskd down says "Downloads aren't working right now." - with the traceback's line under it for james only; a
+server with no DEADWAX_SECRET_KEY shows the sign-in's sentence and tell, the key folded under For whoever runs
+deadwax; a sign-in that can't reach deadwax says so without WireGuard.
+
+**After review.**
+- "no transfers reported by slskd" said "It never started - the person sharing it has probably gone offline." -
+  but get_downloads answers [] on ANY failure, so slskd down or restarted (mid-download too) ends every open job
+  the same way. Now "deadwax lost track of this download - the person sharing it may have gone offline, or
+  downloads stopped working for a while.", true of both (troubleshooting and downloading.md say when it's slskd).
+- A refusal deadwax named a `kind` of (people.py's Refused - People's and Change password's `{detail, kind}`) is
+  `refused` whatever its status, its words passing plumbing: Change password's TIMED_OUT (504) and NOT_KEPT (500)
+  had become "That took too long. Try again." / "Something went wrong.", losing "sign in again with the new
+  password" - and a try again then fails. Server side NOT_KEPT holds no exception's name now, and UNKNOWN /
+  UNKNOWN_SAVED put what wasn't read in brackets only when it isn't one (`_unknown_words`; the log has it).
+- Done rows that weren't added (above) keep the tell and the job's words.
+- Connections: a "Couldn't check" row says the ask's own words in brackets after the sentence (`unansweredLine`,
+  noticeWords as an admin), not "Something went wrong. Try again." alone; access growing while You is shown (a
+  Settings-and-log grant landing with /me) asks the pings at once (an effect on seesDetail, a `pinged` ref so the
+  first show isn't asked twice) - they sat on "Checking…" with Check again disabled; slskd's 401, CONNECTION_ERROR
+  and NOT_SET_UP sentences are said for the reader - the ping route passes `is_admin(user)`, and anyone else reads
+  PING_WORDS_NOT_ADMIN (Key refused "...only an admin can change it", Can't reach it "...its address (SLSKD_URL)
+  only an admin can change", Not set up "...only an admin can set it", each "in Server settings (Connections)."):
+  SLSKD_URL and SLSKD_APIKEY are ADMINS_ONLY.
+- The artist page for an artist the music server no longer has (an old pin or link) says ARTIST_GONE, never
+  "Navidrome has nothing by that id", and offers no Try again on a not-found.
+- Download sentences say "your library" (an album added) and "the collection" (already there), the decided words.
+- The sign-in answered with the very words the screen came up with says them once, as the answer (the live region
+  reads it), with one fold.
+- `retry` (ErrorOptions): where the page draws its own Try again (Home, the Library root, sections and songs, the
+  artist page, Sources, Search's halves, the gate's MUSIC_UNREACHED) the advice leaves trying again to the button -
+  "Check your connection.", the tell alone for a listener, nothing for whoever runs deadwax.
+- errors.sim pins the whole JOB_ERRORS table (words and tell) and that it holds exactly the fixed strings the server
+  writes, and the formatted ones whole; its page scan also catches `(x as Error).message`, `.message` of a caught
+  error and `${error}` interpolation (checked by putting each back).
+- The CLAUDE.md rule is scoped to the pages errors.sim scans; the managing pages are batch 5's.
+
+**Verified after review**: 3764 Python tests (3762 passed, 2 skipped; test_error_words.py 40, test_own_password.py
++3), pyflakes, tsc, the build, all 64 sims; the engine files no diff. Mutation-checked (each broken, its check seen
+failing, restored and compared): the no-transfers sentence (errors.sim's table), the `kind` rule (errors.sim, and
+NOT_KEPT's name back in test_own_password), the Done row's detail and tell (requests.sim), the "Couldn't check"
+detail and the pings on access growing (you.sim), the reader's slskd sentence (test_error_words), ARTIST_GONE and
+its hidden Try again (artist.sim), the sign-in's single sentence (signin.sim), `retry` (errors.sim, sources.sim),
+the tell of a dry run and of an interrupted filing (errors.sim's table), and the two scan forms
+(`(error as Error).message`, `${error}`) put back into Home.tsx. Not seen in a real page after review.
+
+**After the second review.**
+- deadwax ITSELF not answering the gate's Navidrome check (fetch's TypeError: off the network, the VPN off, deadwax
+  restarting) told a listener "Can't reach the music server right now. If it keeps happening, tell whoever runs
+  deadwax." - the music server may be fine. lib/navidromeCheck.ts marks that status `offline` (a field the route
+  never sends, on NavidromeStatus), and the gate's listener line is then DEADWAX_UNREACHED, "Can't connect to
+  deadwax. Check your connection." beside its Try again; a Done row's can't-open line likewise CANT_OPEN_OFFLINE
+  ("Can't open this album right now - can't connect to deadwax. Check your connection, then try again."). Whoever runs
+  deadwax keeps "Can't reach Navidrome" over the error's own words, as before (batch 5's).
+- test_error_words pins each slskd ping code's sentence whole (it let anything starting "slskd" through).
+- requests.sim pins a retry's problemDetail by reader; you.sim the Getting albums database line's tell for a listener.
+- Docs quote the three not-an-admin ping sentences as written, and the README counts Settings-and-log holders in.
+
+**Verified after the second review**: 3764 Python tests (3762 passed, 2 skipped - no new test, the ping one now
+exact), pyflakes, tsc, the build, all 64 sims; the engine files no diff. Mutation-checked: the gate's offline line and its
+`offline` mark (errors.sim), the can't-open line (errors.sim), the ping sentence back to a log line (test_error_words),
+the retry's detail shown to anyone (requests.sim), the Getting albums tell dropped (you.sim).
+
+### Your library, Home and the Library in one vocabulary (2.0.5)
+
+James, 2026-10-23: "I want to make sure it all provides a good user experience." This is **batch 2** of the words-and-UX
+review's five (`work/ux-audit/words-ux.md` in the scratch folder: its "Batches" section, the findings X2, #7, #8, #9,
+shot 15, and the A1-A3, A7, A9, A11 and B8 sections), with James's binding decisions (`work/ux-audit/decisions.md`):
+the shared music on the server is **"All music"** as a heading and **"the collection"** in a sentence - never "the
+store", "Browse", "Navidrome" or "everything" in listener text - and **Home's Recently added shows the listener's OWN
+library**. The rest is the review's recommended vocabulary: "your library", "added to your library" (not filed or
+starred), "Dismiss" (not "Put away"), "Get it again", "an admin", "songs" on listener pages, one label for pressings.
+Words and three small UX changes - Home's source, the Properties role check, the badge; no route or status changed,
+nothing heard changed, and the engine files have no diff.
+
+**"The collection", everywhere a person reads it.** `lib/whose.ts` `IN_THE_STORE` is "in the collection" (the
+identifier stays), so every line built on it changed at once: the album page's badge, the album you don't have's line
+and its **Pressing** list, Search's rows and region and late place ("Searching the collection…", "More from the
+collection", "The collection can't be searched just now."), songs' "a pressing in the collection", the artist page
+(its facts headed **In the collection**, "Plays the 2 albums in the collection", "Looking in the collection…"), Info's
+folder heading and artist count, the store box (`lib/myLibrary.ts` "In the collection, not in your library", "The
+collection has 9 of 11 tracks…", "The collection also has another pressing…", the Done rows' "Already in the
+collection…"), Held by nobody's "Every album in the collection is in somebody's library.", People's "the albums stay in
+the collection", the listen-only warning ("They can still play, look through and add what the collection has."). The
+server's own: routes/my_library.py (LOGINS_OFF, the two Add refusals - "That pressing isn't matched to a release on
+MusicBrainz, so it can't be added from here.", "That pressing isn't in the collection now - Get it instead." - REMOVED,
+REMOVE_UNWRITTEN "It's out of your library, but deadwax couldn't save that, so it may come back - try Remove again in
+a moment.", Navidrome keeping the star "It's still in your library - try Remove again in a moment.") and
+routes/held.py's flag refusal ("…isn't in the collection any more - dismiss it."). "Everything" for the collection:
+Up Next's "All music, shuffled", the player bar's "Shuffle - shuffling all music"; the sidebar's "Search everything"
+placeholder is **Search** (Search's own "Artists, albums and songs" didn't fit the field; its aria-label says what it
+searches). Left on purpose: poller.py's job error "already in the store" (a key old rows carry, which the app says in a
+sentence since 2.0.4, and admins' detail), the log's lines, and "the store index" in the docs - a mechanism's name.
+
+**The Library root** (#8): with a library of your own the first group is yours, named so - `SIDEBAR_YOURS`: Recently
+added, **Your albums**, **Your artists** - and the second, headed **All music** (`ALL_MUSIC`, was "Browse"), is the
+collection's: **All albums**, **All artists**, **All songs** (`SIDEBAR_BROWSE`'s labels). No label appears twice across
+the two (whose.sim pins it), the desktop's sidebar has the same two groups and headings, and each page's title is its
+row's own word (`PERSONAL_TITLES`: "All albums" where it was "Albums in the store"). With logins off nothing changed:
+one group, Albums, Artists, Songs. The empty states say "Nothing in your library yet." and "Look through All music and
+add the albums you like, or find new ones in Search and Get them." with **See All music** (was Browse the store);
+"You haven't played anything from your library yet."; with logins off "No albums yet." / "No artists yet." / "No
+songs yet." (`lib/yourLibrary.ts` NO_ALBUMS, NO_ARTISTS, NO_SONGS) - never "in Navidrome".
+
+**Home's Recently added is yours** (#9, James's choice of the review's behaviour option): `app/Home.tsx`
+`recentlyAddedAlbums(personal)` - with a library of your own the Library's own list (app/albumIndex.ts `yours`, sorted
+`newest` by lib/shelves.ts and cut at RECENT_COUNT, as LibraryHome does - since 2.0.11 by when each entered your
+library, "Recently added means added to your library (2.0.11)" in notes/app-library.md), so the two shelves never differ; with logins
+off (one library, the collection) getAlbumList2 `newest` at 20 as ever. It is keyed on the `yours` generation
+(useYourAlbumsGeneration - an Add, a Remove, your count moving), and App now calls `refreshIfOld('yours')` as Home
+comes into view too, as it does for the Library tab. App hands Home `personal={hasLibrary()}`. Your library empty, the
+shelf says the Library's two lines. The review saw ethan's Home lead with Dummy and Mezzanine, which weren't in his
+library, while his Library led with his own (shot 16); in a real page now his Home and his Library show the same two.
+
+**Your library in what the person sees** (#7). The album page: "It's already here - add it to your library to keep
+it with your music." over **Add to my library**, "Added to your library." after it; "This album can't be added from
+here - make it a favourite in another music app, and it joins your library." (no release id) and "…from here yet - …"
+(a folder deadwax hasn't found); after a Remove Add can't undo, "To add it back, make it a favourite in another music
+app." You > Your library: "12 albums · 2 waiting to be added"; "N of them is/are missing some songs."; the dead login
+"New albums can't be added to your library until you sign in again. Sign out, then sign in - with your new password if
+you changed it. Nothing is lost meanwhile." (never the server's `login_problem`, which names Navidrome; it also covers
+KEY_CHANGED); waiting with no words "Waiting its turn to be added."; the footnote, Amperfy's one mention: "Your library
+is also in your other music apps, such as Amperfy, as your favourite albums. Making an album a favourite there, or
+taking it out, adds it here or takes it out within a few minutes."; an album an admin deleted "Removed by an admin."
+with **Get it again** and **Dismiss** ("Dismissing…", "<album> dismissed" said), and Held by nobody's **Dismiss** too.
+The delete dialog's holders "…removed by an admin." The server's waiting reasons (src/library_ledger.py PROBLEM_WORDS):
+"The music server hasn't picked it up yet - it's added as soon as it has.", "An admin needs to match it to a release
+on MusicBrainz before it can be added.", "Its files aren't there just now - it's added once they are.", "The music
+server isn't answering - it's added once it does.", "Being added again - nothing for you to do." (not confirmed), "It
+was moved or re-tagged, so it's being added again - nothing for you to do." (a star lost). Saying "Apply a release to
+it in Edit album" to the admin reading it is batch 5's (M8).
+
+**Pins** (H8-H10): "Removed from the collection" - with logins off "Removed from your library" (`pinLine(pin,
+personal)`, Pinned reading hasLibrary()) - "Can't be found right now", "Not ready to play yet".
+
+**The artist page**: "None of their albums are here to play.", "Couldn't load their songs.", "…- the rest didn't load"
+(AR1); its facts' **Songs** (was Tracks); **Now known as** / **Also known here as** (was Now / Also filed as). Artist
+rows count only inside your own library (shot 15): Your artists - and every artist with logins off - "3 albums";
+All artists keeps "3 albums in the collection" (`albumCountLine(count, '')`). Its MusicBrainz words are batch 3's.
+
+**The album page.** The cover viewer's missing words "No cover for this album" (AP10). **Properties** (AP11-AP13): the
+release is **MusicBrainz: View this pressing ↗** - the same link, words not the raw id (so not in the data face: the
+`is-mono` rule went); **Added** (was First seen), ", downloaded here" (was ", filed by deadwax"); the no-release line
+"Not matched to a release - match it in Edit album" only for whoever can Edit albums - `albumProperties(…, edits)`,
+AlbumPage reading `albumEdit(useAccess().permissions).editors` (an admin, an Edit-albums holder, everyone with logins
+off). **Pressings ›** is the chip's one name on every frame (was "Other pressings", "Pressings" in a narrow row; the
+page it opens lists every pressing, as the picker's own "Pressings" does) - `PRESSINGS`, and no long/short spans.
+
+**"In your library" is a badge** (AP8, M3): label-sized (`--dw-text-label`), as tall as the tracklist's Bonus badge
+(`--app-held-badge: var(--app-rg-chip)`, 22px against a chip's 30, its padding `--app-rg-chip-pad`), centred on the
+chips' row - it had a chip's own height, padding and box and read as a button that did nothing. It keeps its words
+wherever "In your library", the Also chip and "Pressings" fit whole: the narrow rule is now a row of 420px or less
+(was 600), measured in a real page - badge 119px + "Also: the 2014 pressing" 182 + "Pressings" 99 + two gaps is 416,
+a 390px phone's row 350, a 1024px desktop's 524, a 1440px desktop's with Info or the Edit panel open 470. There - a
+phone held upright, with an Also chip - it gives way whole, as "In the collection" always has (still read; after
+review - as built it kept a bare tick with no box, which read as the Also pressing ticked); M3 was a desktop with Info
+open, which keeps its words now. With the words kept on a phone the Also chip read "Also: the 2014…" at 390 and "A…"
+at 320.
+
+**Pinned**: ui/test/vocabulary.sim.cjs (new) - a small tokenizer reads what a listener reads in each file (string
+literals that are words, JSX text; comments, imports, class lists, scopes and regex literals left out, nested
+templates followed) and checks the batch's own files say none of "store", "Browse", "Navidrome", starring, "Subsonic",
+"Put away", "Request it again", "the admin", "First seen", "Other pressings", and that no file of the app says "the
+store" - each rule first shown catching a sample. home.sim: Home's shelf source both ways, its order and count, the
+generation, the empty words, never `newest` with a library of your own. app-rules.sim: App's `personal` and
+refreshIfOld for Home, Pressings' one name, Properties' role from useAccess. inspector.sim: the Properties rows and the
+role. whose.sim: the badge's tokens and its narrow rule, the groups' labels (none twice) and titles, the album page's
+lines holding no starring, Subsonic or Navidrome. tests/test_personal_libraries.py: every waiting reason and every
+Add/Remove answer free of store/Navidrome/star/Subsonic, and REMOVED the page's own REMOVED_FROM_PAGE. Updated on
+purpose for the new words: app-rules, artist, group, inspector, mylibrary, people, permissions, pins, requests,
+searchList, searchQuery, search, songs, sources, upnext and whose sims; test_app_css (the badge, the narrow rule),
+test_personal_libraries, test_player_as_you.
+
+**Verified** (as built, before review): 3785 Python tests (3783 passed, 2 skipped; two new in test_personal_libraries),
+pyflakes, tsc, the build, all 65 sims (vocabulary.sim new); the engine files no diff. Mutation-checked (each broken, its
+check seen failing, restored byte for byte): Home's source ignoring `personal` (home.sim, app-rules), App's
+refreshIfOld for Home and its `personal` prop (app-rules), "Not in Navidrome yet", "More from the store", "(starred)"
+in the footnote, a "Browse" heading, "No albums in Navidrome yet.", "Put away", "Other pressings" and a Subsonic line
+each put back (vocabulary.sim, and pins / mylibrary / whose / app-rules where they pin it), the scanner skipping no
+regex literal (vocabulary.sim), the no-release line shown to everyone and AlbumPage passing no role (inspector,
+app-rules), the badge's chip height and the narrow row keeping its box (test_app_css, whose.sim), "All albums" or "Your
+albums" named "Albums" (whose.sim), "Navidrome" in a waiting reason and "the store" in an Add refusal and REMOVED
+differing from the page (test_personal_libraries), Your artists' "in your library" back (whose.sim), pinLine ignoring
+`personal` (pins.sim), the old dead-login sentence (mylibrary, vocabulary). Seen in a real page (headless Chromium as
+deadwax.test, a stand-in Navidrome, logins on and off, 390x844 and 1440x900): ethan (a listener) - Home and the
+Library's Recently added the same two albums of his, the root's Your albums / Your artists / All music (All albums,
+All artists, All songs), the empty states, You's "Your library" and its one footnote, album pages' badge ("In the
+collection" grey; "In your library" a small badge, its tick alone beside an Also chip at 390, 430 and 320 and its words
+at 800, 1024 and 1440 - and at 1440 with Info or the Edit panel open beside the page, the row 470px: M3's case), "Pressings ›", Properties' "MusicBrainz View this pressing ↗" with no no-release line; james
+(an admin) - the no-release line "Not matched to a release - match it in Edit album", All artists' "3 albums in the
+collection", Your artists' "3 albums", the desktop sidebar's Library and All music groups; logins off - one group,
+"3 albums", the collection's newest on Home. No console errors.
+
+**After review** (eleven findings, nine once duplicates are merged; each reproduced by tracing the code or refuted):
+- **"N still being added" said progress for albums that only an admin can move** (a NO_RELEASE entry waits for ever):
+  You > Your library says **"12 albums · 2 waiting to be added"**, true of every waiting state (`libraryLine`;
+  mylibrary.sim pins it), and the docs quoting it changed - troubleshooting.md's heading too (no link pointed at it).
+- **Home's Recently added was described as "what was added to your library recently"** (README, player.md, sharing.md),
+  but it is ordered by Navidrome's `created` - when the COLLECTION got each album - as the Library's own Recently added
+  is (the spec's "same source"; kept). The docs now say so, and that an album you Add that the collection has had a
+  while keeps its old place, so it may be on neither Home shelf (New in your library leaves an Add out on purpose) -
+  it is in Your albums. Ordering by when it joined your library would be a new order for the Library too: James's call.
+- **The bare tick**: on a phone's row with an Also chip the badge kept its tick with no box and no words, which read as
+  the Also pressing ticked. It now gives way whole there, as "In the collection" always has (still read); the line under
+  Play says whose the album is (Add or Remove, logins on - with logins off every album is in your library). The
+  review's alternative, letting the row wrap, was not taken: the second line lands with the bridge's answer and pushes
+  the songs down under a finger, which 2.0.0-player.41 and .52 fixed. And a regression of the badge's own found
+  meanwhile: shorter than a chip (22px against 30), the row drawn with it alone - unseen, until the bridge answers -
+  grew by 8px as "Pressings ›" landed, moving the songs; `.app-album-chips` now holds `min-height: var(--app-chip)`
+  from the first frame (test_app_css, whose.sim).
+- **Get it again offered to someone who may not Get** (its page then says "Getting albums is off for you"): shown only
+  with Get albums (`gets(useAccess().permissions)`, as Search, ReleaseGroupPage and JobCard gate Get); Dismiss stays
+  for everyone (mylibrary.sim, both ways).
+- **Stale words in the docs**: README's "Other pressings" is **Pressings**; downloading.md's "Put away" is **Dismiss**;
+  player.md's and troubleshooting.md's "**Now** row" is **Now known as**.
+- **held.py's reworded refusal unpinned**: test_add_and_remove_answer_in_the_collections_words reads routes/held.py's
+  answers too, each free of store/Navidrome/star/Subsonic and of "put … away".
+- **Not changed - New in your library and Recently added can show one album twice** (a Get filed for you is both new
+  and newest): true, but not 2.0.5's - the collection's newest, the shelf until now, led with that same album too.
+
+Verified after review: 3785 Python tests (3783 passed, 2 skipped), pyflakes, tsc, the build, all 65 sims; the engine
+files no diff. Mutation-checked (each broken, its check seen failing, restored byte for byte): "still being added" back
+(mylibrary.sim), Get it again ungated (mylibrary.sim), the row's min-height gone and the bare tick put back
+(test_app_css, whose.sim), held.py's "put the flag away." back (test_personal_libraries).
+
+**Second review** (four findings, all real; each fix with a check that fails without it):
+- **Up Next still said "everything"**: with Repeat All on a shuffle of all music, its last line read "Then everything
+  again, in a new order." - it is **"Then all music again, in a new order."** now (lib/upNext.ts; upnext.sim). The
+  vocabulary scan missed it because it reads a one-word literal as an identifier (`'everything'`, like `'store'` or a
+  scope), so it now has an "everything" rule for what it does read (a placeholder "Search everything" fails it) and
+  upnext.sim pins the sentence itself.
+- **Held by nobody was outside the scan**: its "Put away" became Dismiss in this batch, but app/HeldByNobody.tsx was
+  not in vocabulary.sim's BATCH; it is now ("Put away" or "put away" back fails it).
+- **Pinned's own wiring was unpinned**: pins.sim checked pinLine both ways but nothing that Pinned hands it
+  `hasLibrary()`. pins.sim now signs in (setSessionMe) and reads a deleted album's card and its Edit row: both
+  "Removed from the collection".
+- **"Amperfy once" was unpinned**: mylibrary.sim counts Amperfy in everything You > Your library draws - once, and
+  that in the footnote.
+
+Verified after the second review: 3785 Python tests (3783 passed, 2 skipped), pyflakes, tsc, the build, all 65 sims;
+the engine files no diff. Mutation-checked: Held by nobody's spoken "put away" and its "Put away" label back
+(vocabulary.sim), `const personal = false` and Edit's row calling pinLine without it (pins.sim), a second Amperfy in
+the footnote (mylibrary.sim), Up Next's 'everything' back (upnext.sim), the sidebar's "Search everything" (vocabulary.sim).
+
+### Search, the album you don't have, Sources and Requests in one vocabulary (2.0.6)
+
+James, 2026-10-23: "I want to make sure it all provides a good user experience." This is **batch 3** of the words-and-UX
+review's five (`work/ux-audit/words-ux.md` in the scratch folder: its "Batches" section, findings #3, #10, #11, RG5 and the
+A4-A6 and A8 sections - and the artist page's MusicBrainz words and "2 editions", which batch 2 left to this one), with
+James's decisions (`work/ux-audit/decisions.md`): **"source"** for where a download comes from, never peer, folder,
+Soulseek or slskd; **Get** the verb and **Requests** the list; **"added to your library"**, never filed or organizing;
+**"pressing"** for one release of an album. Words and the small UX the batch names (the maybe box's tooltip made visible
+text, the score as a percentage with each chip's meaning beside it) - no route, status or behaviour changed, nothing heard
+changed, the engine files have no diff. Batch 1's errorWords and batch 2's words are kept; batch 2's vocabulary sim is
+extended.
+
+**Search** (#3, S1-S23). The **"saved" mark is gone**: a row from MusicBrainz's answers kept on disk is drawn exactly as
+MusicBrainz's own row would be - "· saved" read as "you saved this album", and nothing a listener does needs to know
+where an answer was kept. Only a failure under such rows says what they are: *Showing earlier results - searching for
+more isn't working right now.* (*Showing earlier results.* in a kind's one-row slot, which must fit 320). A desktop tile's
+third line for something nobody here has is **Not in your library** (**Not in the collection** with logins on, where
+your library is only part of what's here; was "On MusicBrainz" / "Saved from MusicBrainz"), **Maybe in your library** for
+a group a folder of its name may be (ownedForGroup's `guessed`, the album page's own "maybe" - `groupMaybe`, shared with
+the group's section row, which says *maybe in your library* too, so tile and row never disagree), and nothing for an album
+or song while the owned index hasn't come (lib/searchList.ts `placeLabel`, `notHere`). A MusicBrainz ARTIST tile says
+*Not in your library* only once the library's artist list (getArtists, `Marks.artists`) has come and no artist in it has
+that name or the name it was matched as: an mb-artist row only means newArtists or creditedRow didn't tie it to a library
+artist - two Nirvanas answering stay MusicBrainz's beside the library's untagged Nirvana - and is blank otherwise (review).
+A tile with a **Get** (SearchRows `topRow`) leaves its third line empty, its height kept: at 1440 with no side panel a tile
+is 224px and its text 62px beside the Get, so the line read "Not in y…" (measured, review) - the Get says it isn't here,
+and the group's section row and its page carry the "maybe". MusicBrainz's name is out of
+every line: the hint *Search your library and albums you don't have yet.* (*Search your library, the collection, and
+albums nobody has yet.*), the field's label *Search for artists, albums and songs*, the busy lines *Searching…* (was
+"Asking MusicBrainz…", "Searching your library and MusicBrainz…") and *Loading…* for a More button (was "Asking your
+library…"), the region's *Also found: 3 albums.* / *Found earlier: 1 song.* / *More found: …* / *Nothing more found.*,
+*Show 3 more albums* (a fold), *No other albums for "…".*, *No more albums for "…".*, *Show 12 from your library*,
+*Can't search for more right now.*, *Searching for more isn't working right now - try again in a few minutes.*,
+*Too many searches just now - try again in a moment.*, *Studio albums and EPs - See all for everything they
+made.*, *Type a little more, or press Search, to find albums you don't have yet.*, *…to find songs you don't have yet.*,
+*Found songs called "…", but none is on an album yet - there's nothing to get.*, *No more results.* (was "MusicBrainz
+sent nothing new."), *You already have everything found.*, **More artists** / **More albums** (was "More from
+MusicBrainz"), *That's all for this search - add a word to narrow it.*, *No results for "…".* with its full stop. The
+server's 422 for words MusicBrainz can't read is *That search couldn't be read - try other words* (routes/
+search_musicbrainz.py REJECTED_WORDS). A row's Get reads **Getting…** while it asks (Search and the artist page).
+
+**The album you don't have** (A5): *Loading…*, *This album's details can't be loaded right now - try again in a few
+minutes.*, *There are no pressings of this album to get.*, *That link isn't an album.*, the desktop table's **Compared
+with the usual** column, the pressing notes *No tracklist listed* / *The only tracklist listed* / *No tracks are listed
+for this pressing* / *The only pressing (with a tracklist)*, the filter's placeholder *JP, CD, a label or catalogue no.*
+(the review's "Country, format…" was not taken: the code's own comment says a country is typed as its code, as the rows
+show it). **RG5**: the dashed maybe's explanation was its tooltip alone (folders' paths and "the metadata editor"), which a
+phone never shows - now a line under Get, where a late line moves nothing a finger is reaching for (lib/whose.ts
+`maybeLine`): *You may already have this - an album with this name is in your library, but it isn't matched to a
+pressing.* (*It may already be here - … in the collection …* when the folders aren't yours), plus *Match it to a pressing
+in Edit album.* for whoever can Edit albums - who alone keeps the tooltip, its words now "not matched to a pressing …
+Edit album". The "· 2 editions" of the artist page and owned.ts' label are **2 pressings**. **The artist page**:
+*Loading their albums…*, *Their other albums can't be shown right now - try again in a few minutes.*, *Only the albums you
+have are shown - their other albums can't be found.*, *Showing their first 500 albums.*, *No other albums found.* / *No
+studio albums found - turn off Studio only to see them all.*, *Artist details can't be loaded right now.*, *Loading…*.
+Its "Which artist is this?" panel stays MusicBrainz's (an admin's, batch 5); **On MusicBrainz** stays over the ↗ links.
+
+**Sources** (#11, A6). *Looking for "Third" by Portishead…* over *This takes a few seconds.* (was "Asking Soulseek…" and
+"slskd listens for answers…"); **Search for** / **Search** under Search again (was "Search Soulseek for" / "Re-search");
+*Nothing found for "…".*, *Nothing lossless found for "…".* over *Some were found, but none with lossless files - your
+Format is Lossless only, which leaves the rest out. …* (never how many lossy ones: `response_count` counts answers);
+*41 sources found - none match your filters.*; under the cards *Searched for "…" · 41 sources, 4 match your filters*;
+the region's lines now each end in a full stop (it said "…Getting albums.. Didn't pick…" before). The **Starts now** chip
+(was Free slot); a card's Speed note *their usual speed* (was "their own average"); Starts *now* / *after 3 others* / *soon*
+(was "3 ahead" / "next" - queue_length counts those ahead, so "3rd in their queue" would have been wrong); a set shared
+one folder per disc *in 2 parts, one per disc*. **The score is a percentage**, "70%" (VoiceOver "70% match"; the
+desktop panel's box grows to hold "100%": `width: auto`, min-width and `--app-desk-source-score-pad`), and its reasons
+are headed **Why it's a 70% match** (a visible heading, the group labelled by it). **The six signals** have names a
+listener reads and what each measures written beside its chip (lib/candidates.ts SIGNAL_LABELS, SIGNAL_MEANINGS - each
+read against src/matching.py): **Track names** (title_match: "the pressing's tracks it has, found by their names"),
+**Track count** ("how near its number of files is to the pressing's tracks"), **Track lengths** ("the tracks found whose
+length is right, to within 8 seconds" - DURATION_TOLERANCE_SEC), **Edition** ("whether its name says the same edition
+(deluxe, remaster…) - its year there helps": score_edition only adds for the year), **Format** ("lossless or not, as your Format asks"), **Availability** (score_peer: "how
+soon it can start: a free slot, a short queue, their speed" - the review's "Their speed" would have been untrue, speed is
+a fifth of it). Each chip says its value with "%". Drawn as rows (app.css: `.app-source-signals` a two-column grid, chips
+in one column so the words line up, `.app-source-signal-row` `display: contents`). The desktop's **Match details** chip
+(was Signals) has the same six names; its popover is 300px with a 100px name column so they stay on one line. A pick not
+made says what to do: *No close match that passes your filters - choose a source yourself.*, *You already have part of
+it - choose a source yourself.*, *This pressing has no tracklist to check the sources against - …*, *It can't be told
+whether you already have this pressing - …*; with no source found at all there is no such line (nothing to choose:
+`notPickedLine(blocked, found)` is null at 0, and the empty state speaks - review). The store box: *To get it from another source, cancel it in Requests first.*,
+*being added to your library now*, *didn't work - trying another source*, *Getting it adds only the tracks that folder
+doesn't have yet.* / *Getting it would add a separate copy, in …*, *Its quality isn't known, so it may be below your
+quality floor (…)*, *…another source isn't offered for a download you share.* Its folder paths stay (B6, beyond the batches).
+
+**Requests and Arriving** (#10, A8). *starting…* (was "asking slskd…"), *didn't start* (was "refused"), *adding to your
+library…* / Arriving's *adding…* (was "organizing"), *4th in their queue* / *4th in line* (was "#4 in their queue" / "#4 in
+queue"), *2nd try* (was "try 2") - `ordinal()`. The buttons **Another source · 2 left** / **Same source again**, busy
+*Trying another source…* / *Trying again…* (was Next peer / Ask again / Trying next peer… / Asking again…): 174px of words at
+their size, so `--app-job-action-min` is 192px and the pair stacks on a 390px phone (measured in a real page - "Next peer"
+fitted two across; a shorter "Next source · 10 left" still didn't). The other places naming the buttons say them too (review): People's line under Get albums
+(permissions.ts LINES.request, pinned by permissions.sim), Server settings' AUTO_RETRY_PEER line while it is off (pinned by
+test_settings_words), configuration.md's row and README. The retry problems *They refused - try another source.*,
+*No other source would send it.*, and RETRY_WORDS turns the server's "no other peers to try - search again for more" into
+*No other source to try - Get it again to search for more.*, MOVED_ON into *It's already been tried again meanwhile.* and
+CLEARED into *It's been cleared from the list - Get it again to download it.*; and by how they start (`retryWordsStarting`,
+review) store_index's in_flight_words and already_have, which name a source, say "being filed" and carry a library folder's
+path (safeWords catches only a path from the root): *It's already downloading.*, *It's already downloaded, and being added
+now.*, *It's already in your library.* (*…in the collection.* with logins on - RequestsInput's `personal`, App's
+hasLibrary()). The same goes for /enqueue's 409 on a pending row's *didn't start*. The route's own words stay the detail,
+for whoever runs deadwax (errors.sim reads them out of the Python; requests.sim the pending row). Done rows: *You already had it* (was "Already in your library,
+nothing filed"), *In your library - 2 files couldn't be added* (was "Partly filed: 2 file(s) failed to organize";
+`partlyWords`, the job's own words for whoever runs deadwax), *Stopped while being added to your library* with the tell
+(was "Interrupted while filing: check the library and slskd's folder" to everyone - that is now the detail), *Downloaded,
+but not added to your library* with the tell (organizing off), with logins on *In their library* (was "Filed - in their
+library"), *Not added - the collection's copy may be another pressing, so an admin has been asked to check it* / *…; an
+admin has checked it* (grant_for's FLAGGED is another pressing OR an untagged rip, so "may be"), *In your library - 2
+files couldn't be added* for an incomplete grant. The dry run's sentence says "rehearse adding albums" (errorWords). A row
+that can't open: *Not ready to play yet - it may still be scanning.*, *Can't find this album to open it - it may have moved, or isn't
+matched to a pressing.*, *Couldn't open it - tap to try again.* (R19). The ✕ asks *…You'll lose your place in their queue.* Empty
+Requests says "tap Get" only to someone who can Get; anyone else reads GET_OFF (the review's "Albums you join show here"
+was not true: Join is Get albums' too). Arriving's stale line *Can't update downloads right now - showing the last
+progress. Trying again…* (H4). The database line for whoever runs deadwax keeps slskd's folder and DB_PATH.
+
+**Pinned**: vocabulary.sim reads batch 3's files (BATCH3: Search, SearchRows, searchList, searchResults, songs,
+ReleaseGroupPage, pressings, PressingPicker, owned, Sources, SourceCard, candidates, getSettings, StoreState,
+useCandidateSearch, Requests, JobCard, requestsView, perPerson, useDownloadJobs, Arriving, myLibrary, artistPage,
+ArtistPage) for "MusicBrainz", "Soulseek", "slskd", peer, folder, filed/filing, organizing, "release id", "editions", the
+saved mark, "Asking", Signals/Titles/Lengths, Free slot, their own average, Re-search, "#N in", Next peer/Ask again, "Get…",
+"ahead" and Navidrome - each rule shown catching a sample; six lines left on purpose in ALLOW3 with why (the ↗ links'
+label, the maybe tooltip, the store box's library folders, the database line for whoever runs deadwax, the artist facts'
+Folder row, Held by nobody's flag line), and a check that none of ALLOW3 is stale. Its tokenizer also skips JSX "text" that
+is code (a type annotation, a loop's head, a spread, a call). A one-word template part ("${n} editions", "try ${n}") reads
+as an identifier to it, so those two are pinned by artist.sim and requests.sim instead. candidates.sim: the six names and
+meanings read against matching.py (WEIGHTS, DURATION_TOLERANCE_SEC), Starts' words, the not-picked lines; sources.sim: the
+"%" score, the heading, each chip beside its meaning, Match details; requests.sim: every row's new words, `ordinal`, the
+empty line by reader, the tell on a stopped filing; group.sim: the maybe line for an editor and a listener (no tooltip);
+searchList.sim: Not in your library / the collection / Maybe, no saved mark; test_app_css: the signal rows' grid, the
+desktop score box, the 192px stacking point. Updated on purpose: artist, candidates, errors, group, owned (its fixture's
+"2 pressings"), pressings, requests, search, searchList, searchQuery, songs, sources, vocabulary, whose sims;
+test_app_css, test_musicbrainz_routes.
+
+**Verified** (as built, before review): 3786 Python tests (3784 passed, 2 skipped; one new in test_app_css), pyflakes,
+tsc, the build, all 65 sims; the engine files no diff. 35 mutations, each caught and restored byte for byte (sha256
+checked; `work/uxb3-builder/mut/mutate.py`) - among them the tile's "On MusicBrainz", the saved mark, the maybe tile, a
+MusicBrainz word in Search / the album page / the artist page, "Get…", the old hint, "peer" as a signal's name, the 8 s
+meaning, the meaning or "%" not drawn, Free slot, slskd in the asking note, "#4", Partly filed, the interrupted tell,
+Next peer, the ordinals' teens, "as another copy", the empty line ungated, "the peer refused", Navidrome in a Done note,
+Arriving's old line, the maybe tooltip for everyone, the maybe line not drawn or ungated, "2 editions", the retry words,
+a stale ALLOW3, the code filter, the 150px stacking point, the signal grid, the desktop score box, the server's 422
+words. Seen in a real page (headless Chromium as deadwax.test, logins off, my own deadwax on 8110 over a stand-in
+Navidrome and slskd, real MusicBrainz; 390x844, 320x640, 1440x900): Search's hint and rows, Requests' four sections and
+Arriving in the new words, the retry pair stacked at 390 and 320 and side by side at 1440 with no label clipped, the
+album you don't have's "not in your library", Sources' asking lines, chips, "65%" scores (55px with the chevron on a
+phone, 35px on the desktop panel), "Why it's a 65% match" with each chip beside its meaning (two lines each at 390), the
+footer, and Match details' six sliders on one line each inside the panel; no horizontal scroll, no console errors.
+
+### Info, Now Playing, the turntable and the visualizer in a listener's words (2.0.7)
+
+James, 2026-10-23: "apply that same review to the info panel and everything else. I want to make sure it all provides a
+good user experience." This is **batch 4** of the words-and-UX review's five (`work/ux-audit/words-ux.md` in the scratch
+folder: its "Batches" section, findings #5 and #6, 2.1-2.3, 3.2, 3.3, 4.1, 5.1-5.3, M6, and the B1-B6 sections), with
+James's decisions (`work/ux-audit/decisions.md`). Words and the small UX the batch names - the folder for whoever looks
+after the albums, the conditional pressing line, the face of notes, the turntable's silent-record line. No route, status
+or behaviour changed, nothing heard changed. The one engine change is usePlayer.ts's playback-error STRINGS (this
+change's exception); streamSource.ts, lib/{playQueue,gapless,scrub,streamWrap,streamPlan,fmp4}.ts and player.sim have
+no diff. Batch 1's errorWords and batches 2-3's words are kept; batch 2's vocabulary sim is extended.
+
+**About's Sound** (#5, B1 1.1-1.10). The group was "Playing", three of Debug's own rows in Debug's words - "Album,
+-3.56 dB · the album at -14.4 LUFS" in monospace, "Asked for; deadwax hasn't said yet", "Not levelled - deadwax is
+running without numpy and soundfile", "On, in one stream", "Navidrome didn't say". It is **Sound** now, with its own
+formatters (`lib/aboutSound.ts`, from Debug's own inputs, so the two say one thing two ways), every row in the text face:
+**Format** the file plainly (`formatWords`, shared with Debug's Format; `Not known` when Navidrome gave none of it);
+**Gapless** `On` / `Off`; **Normalization** (the vocabulary's name, "volume" and "adjusted" in its sentences) -
+`Album volume matching, 3.6 dB quieter` (the gain to a tenth; `no change needed` under 0.05), `… - as loud as it can go
+without distorting` when held by its peak, `… - kept as it is, it can't go louder without distorting` when held by its
+peak at a gain that rounds to nothing (after review: a quiet master already peaking at full scale - +4 dB wanted, -0.01
+given - had read "no change needed"), `… - nothing to adjust, the album is silent`, `Checking…`, `Measuring the
+album… (3 of 10 songs)`, `Not this time - the album was still being measured` ('plain'), `Not this time - the song
+hasn't been measured yet` ('unmeasured'), `Off`, and `Off for this song - …`. The server's `why` is never shown: read by
+what it is (`ABOUT_REASONS`, as batch 1's jobErrorWords reads job errors) - levels.py's NO_LIBRARIES and NO_CACHE "this
+server can't adjust volume", NOT_FLAC (and player_cache's own) "only FLAC songs are adjusted", the cache's too-big words
+"its file is too large", anything else (UNREADABLE, the channels, the STREAMINFO, a measurement's error) "its file can't
+be measured" (after review: a "didn't answer in time" line for album_context's timeout was dropped - describe() answers
+its CannotPlan, and the album's asking, as 'unmeasured', so it could never show; info.sim pins that); a FLAC sent as an MP3 transcode "this
+device can't play FLAC, so it's sent as MP3". No reason code was added server side (no route change): info.sim reads each
+reason out of the Python, so a new or reworded one fails it rather than leaking. The review's "Next time it will be" was
+not taken - nothing guarantees the measurement will have finished. **Debug keeps the numbers** (describeLevel unchanged).
+
+**The folder** (#6): headed **On the server** (was "In your library" / "In the collection", which over a path read like a
+shop), drawn only for an admin - `seesFolders(admin)` in lib/aboutRows.ts (everyone, with logins off), as the spec and the
+review's batch list say ("the folder for admins only (#6)"; #6's own fix line also named Edit-albums holders - see
+After review). App passes `folders` to
+InfoSheet, which passes it to aboutRows. **This pressing:** only when it adds to the album's line (M6, idBridge
+`pressingAdds`): an edition, a 4-digit year that isn't the album line's, or formats that aren't its one format - it said
+"1994 · FLAC" under "1994 · FLAC · 11 songs". **Notes** are in the text face; only a row's `noteMono` (Debug's field
+names' *Empty* line) is data (1.10).
+
+**Debug's labels** (2.1, 2.3): **Sent to this device** (was What this device is sent), **Why sent this way** (Why), **Last
+song change** (Gap), **Fields from Navidrome** (Navidrome sent) with **Song fields**, **Only on other songs**, **Album
+fields**. The turntable's facts are a row each (`turntableRows`), where they were dot-joined notes under two rows:
+Turntable sound (its own note only: the window ready), **Voice**, **Clock step** (`21.3 ms at a time`), **Data used**,
+Turntable timing, **Main-thread sound**, **Limiter** (`36 peaks held under full scale since it showed (65 samples), the
+deepest 1.4 dB`), **Frames under a hand**, **Not restarted** and **Interruptions** (only when there were any - `The sound
+was interrupted once`), **Delay behind the hand** (latencyNote less its "The record's sound: "). Each shows when its note
+part did. The test bench uses the same rows, less Voice (its own voice line says it). **Left out**: 2.2 (gapless.ts's "one
+element (off)" words - an engine file with no diff allowed) and 2.4 (the Record 20 s refusal and its row's wording - not
+in batch 4's list).
+
+**The playback errors** (3.1, usePlayer.ts strings only): `This device couldn't play this song's audio` (decode),
+`Couldn't play this song - it didn't come as audio this device can play` (MEDIA_ERR_SRC_NOT_SUPPORTED - which is also how
+a refused request looks from the page, so the review's "this device can't play its file" would have been untrue),
+`Skipped "…" - this device couldn't play its audio`. The review's "seems to be damaged" for a decode error was not taken
+(after review): what the element decodes is often deadwax's own copy - the FLAC in an MP4, the 48 kHz resample, the
+levelled copy - or a format the device's decoder can't manage, not a damaged file (the engine's own comments read a
+decode failure against the copy: loudness.ts unlevelled(), streamFailed's "its RATE is the likelier cause"). Not routed
+through errorWords: a MediaError isn't an ApiError, and fitting it would be new logic. vocabulary.sim pins all three in
+usePlayer.ts and in troubleshooting.md, which quotes them.
+
+**The mini player's name** (3.2): `Now playing: Roads, Portishead - open` (`miniPlayerLabel`, the line under the title -
+the artist, or a "Skipped …" notice in its place - so VoiceOver hears what is shown); was "Open now playing". **Up Next**
+(3.3): Now Playing's button is `Up Next`, `Up Next - Shuffle on`… (upNextLabel), as the sheet and the player bar say it.
+
+**The turntable's silent record** (4.1, B9): the first time the record is turned on a song it can never sound for -
+`SILENT_WORDS.notFlac` "The record makes sound for FLAC songs only - this one moves silently." or, the deck's report
+saying no Web Audio / no voice (`soundless`), `noAudio` "This browser can't make the record's sound - turning it still
+moves through the song." (the browser first: it holds for every song). Marked only by .11's silent turn (a press past the
+tap slop that the deck didn't take), never by a tap, never before a touch (no coach mark), never for a silence that passes
+(starting, a window loading); kept until the song changes. Turntable tells Now Playing (`onSilent`), which draws it as
+`.app-tt-silent` in the failure's slot - laid over the plinth's foot like `.app-is-turntable .pl-sheet-error` (one rule),
+in --dw-text-2, a failure first. The turntable subscribes to the deck's report as a boolean, so nothing else redraws it.
+
+**The visualizer** (5.1-5.3): `VIZ_WORDS` in lib/vizSync.ts - "The visualizer follows FLAC songs only - it rests for
+this one.", "The visualizer can't follow this song - it rests for this one." (a 415 or an undecodable window), "The
+visualizer has lost the music for now - it keeps trying." (it asks again after VIZ_RETRY_MS), "This browser can't follow
+the music, so the visualizer can't move with it." The reason's own words are SyncPlan's new `detail`, passed through
+vizAudio's onSeeing, and drawn in brackets after the line for whoever runs deadwax (`vizNote`, `seesDetail(accessNow())`
+- batch 1's one-line form). Ambient without WebGL: `GL_FALLBACK` "This browser can't draw the full Ambient effect, so a
+simpler version is showing." The readout: **Now showing: Mandala** and **Mood: intense · 128 BPM** / `lively · listening
+for the tempo` (musicFeel `MOODS` calm, lively, intense for the detector's smooth, in between, aggressive) - the mood only
+while the visualizer follows the song (`showsMood`: not 'unseen', not 'nothing'). 5.4 ("Media Player style") isn't in
+batch 4's list and is left.
+
+**Pinned**: info.sim (About's Sound - every Normalization state, every server reason read from levels.py and player_cache.py
+(and describe()'s two plain returns, so a timeout reads as unmeasured), none of Debug's words; the folder by `folders` and seesFolders' rule; the pressing line both ways;
+the mini player's name drawn); debug.sim (the labels, the turntable a fact a row and none dot-joined, noteMono, playingRows
+gone, player.md naming Fields from Navidrome); vizsync.sim (the words, `detail`, vizNote, showsMood); visualizer.sim (GL_FALLBACK, the note's reader, the
+readout and its mood's condition);
+musicfeel.sim (the moods, BPM); turntable.sim (silentNote, soundless, the component: no line before a turn or on a tap,
+once on a turn, the browser's line once the deck says so, gone on a song change and with the turntable; Now Playing's
+slot); upnext.sim, app-rules.sim (App's `folders`, the Sound rows' source, the note face), whose.sim (On the server);
+vocabulary.sim BATCH4 (About, Now Playing, the mini player, Up Next, the turntable, the visualizer and usePlayer.ts's
+strings: no LUFS, "levelled", numpy/soundfile, STREAMINFO/MiB, "in one stream", "hasn't said", Navidrome, "can't be seen",
+WebGL, "Up next", "Open now playing", "couldn't be decoded"; the readout's "now:"/"feel:"/"bpm" in any of their text,
+BATCH4_LABELS; the playback error words in usePlayer.ts and troubleshooting.md); test_app_css (the silent line's rule).
+
+**Verified** (as built, before review): 3787 Python tests (3785 passed, 2 skipped; one new in test_app_css), pyflakes,
+tsc, the build, all 65 sims; the engine guard empty, usePlayer.ts's diff three string literals. 40 mutations
+(`work/uxb4-builder/mut/mutate.py`), each caught and restored byte for byte (sha256). Seen in a real page (headless
+Chromium as deadwax.test, logins off, my own deadwax on 8110 over a stand-in Navidrome on 4540; 390x844 and 1440x900):
+the mini player "Now playing: Mysterons, Portishead - open", Now Playing's "Up Next", About's Sound (FLAC, Off, "Album
+volume matching, 0.9 dB quieter", none monospace), no pressing line for plain Dummy, On the server → Folder; Debug's new
+labels and, after a turn of the record, Voice, Data used, Main-thread sound, Limiter, Frames under a hand and Delay behind
+the hand a row each; the visualizer's "Mood: lively · listening for the tempo" under Style; no console errors. Not seen: the
+silent-record line (the stand-in library is all FLAC and headless Chromium has Web Audio - turntable.sim drives it), a
+listener's About with logins on (no folder - info.sim), "Now showing:" with Rotate all.
+
+**After review** (eight findings, each reproduced or refuted first):
+- A peak-held gain that rounds to 0.0 read "no change needed - as loud as it can go without distorting" (a quiet master
+  peaking at full scale: +4 dB wanted, -0.01 given). Now `… - kept as it is, it can't go louder without distorting`
+  when held with a rise wanted (aboutLevel; info.sim).
+- The "the music server didn't answer in time" reason could never show: describe() answers CannotPlan and the album's
+  asking as 'unmeasured' (traced in levels.py). Dropped from OFF_WORDS, ABOUT_REASONS and player.md; info.sim pins
+  describe()'s two plain returns instead of reading the timeout's words.
+- A decode error said the file "seems to be damaged" - untrue when it is deadwax's own copy or the device's decoder.
+  Now neutral (above); troubleshooting.md matches.
+- The folder was first built for Edit-albums holders too (the review's #6 fix line names them, and batch 3's maybe
+  tooltip shows folders by that rule); a second review held it to the spec, which says "an admin's only" twice, as the
+  batch list does - so `seesFolders(admin)` takes the admin flag alone, and info.sim and app-rules pin it. Widening it
+  again is one line there (plus player.md, sharing.md, README and those two checks).
+- The readout said "Mood: lively" beside "it rests for this one" for an MP3 (the feel is fed only by a song heard, so
+  it held newFeel()'s default or the last FLAC's mood): the mood now shows only while the visualizer follows the song.
+- vocabulary.sim's "now:"/"feel:"/"bpm" rule could never fire on real code (wordy() drops "now:" and " bpm" as code -
+  three mutations passed it): now BATCH4_LABELS over every piece of text, its samples shaped like the code.
+- "Up next" left in two app.css comments, and "now:"/"feel:" in app-desktop.css's comments: fixed.
+- The new playback words were pinned nowhere: vocabulary.sim pins them in usePlayer.ts and as troubleshooting.md
+  quotes them (player.sim, an engine file, keeps no diff).
+
+### Managing in plain words: Edit album, Needs a look, Library care, People, the Event log, You (2.0.8)
+
+James, 2026-10-23: "apply that same review to the info panel and everything else. I want to make sure it all provides a
+good user experience." This is **batch 5**, the last of the words-and-UX review's five (`work/ux-audit/words-ux.md` in the
+scratch folder: its "Batches" section, findings #13, #14, #15, M8, M9, and the B7-B12 sections), with James's decisions
+(`work/ux-audit/decisions.md`): **Manage** for the admin area, its pages **Server settings**, **Library care** and
+**Event log**; **It's fine as it is** / **Marked fine** / **Ask about it again**; **Select**, not Tick; **Dismiss**.
+Words and the small UX the batch names - results under the Get buttons, You's headline and Account section, Logins for
+admins only. No route, status or behaviour changed, nothing heard changed, and the engine files have no diff. Batch 1's
+errorWords carries the managing pages' errors now (they were left to this batch), and the vocabulary sim is extended.
+
+**The issues, in sentences** (#14, src/metadata_health.py `ISSUE_TYPES`): every hint a sentence or two - a capital, a
+full stop - saying what's wrong and then what fixes it, by the app's names, never a tag's name: "No original year" is
+"The tags don't record the album's first year - the year its folder is named after. Applying a release writes it." (was
+"no originaldate tag, so there is nothing recording…"; true whether or not a pressing year is there - a rip with no
+year at all shows both chips). The one place the hints are read as text is the Release tab itself, so none sends you
+there: "Find their release and apply it.", "Applying a release renames it to match.", and No cover art's "Get cover,
+on the Artwork tab, fetches one from the Cover Art Archive." with no "once the album is matched" (a matched album read
+that as untrue; the Artwork tab says it for an unmatched one). Two chips renamed (#15): **Not matched to MusicBrainz** (was "No release id") and
+**Folder name doesn't match the tags** (was "Folder off-convention"). "Not in Navidrome" stays - an admin's page, and
+troubleshooting's anchor. tests/test_metadata_health.py holds every hint to it.
+
+**Edit album** (#13, #14, B12). The Release tab's "currently: no edition · 1994 · 2 tracks · 11111111…" is **Now: No
+edition · 1994 (this pressing 2014) · 2 tracks · Matched to MusicBrainz** (the release id in that span's title); its
+search box shows the plain words a blank box searches for (`plainAlbumQuery`, lib/release.ts - the fielded query is
+still what's sent, the decision kept); the ignored line "2 issue(s) ignored on this album" + "un-ignore" is **Marked
+fine: No cover art, …** + **Ask about it again** (title "Put this album back in Needs a look"); the accept button's
+title "Mark it fine and stop asking about …", busy "Marking it fine…"; ◁ has "Previous album" as title and
+aria-label, "skip ▷" is **Skip ▷**, ✕ is named "Close" (the editor's, the tag editor's and the cover viewer's). Every
+message a sentence: "Couldn't load that release.", "The search didn't work.", "Couldn't work out the changes.",
+"Couldn't apply the changes.", "Couldn't write 3 files.", "Updated the tags in 12 files, saved cover.jpg, moved the
+folder to match its tags." (was "Retagged 12 file(s)", "re-filed the folder"), "0 of 2 files would change, the cover
+would be downloaded", **Save cover only** / **Replace cover only**, **Download cover art**, "Fetching the
+tracklist…", "Working out the changes…", "Nothing to change." - "1 file", "2 files" everywhere (`filesWord`,
+lib/format.ts), never "(s)". The writers' problems, in the preview and after Apply, are drawn as sentences
+(`asSentence` - a capital, a full stop - however the server wrote them), and src/retag.py's three "(s)" are counted
+properly ("1 file didn't match the tracklist and will keep its existing title and track number", "this release has 2
+tracks but the folder has 1…", "1 file name here is already taken there"). The tag editor: "Saved 3 files.", "Fix the marked fields first." (was "marked in
+yellow"), "the Release tab moves an album's folder to where its tags say it belongs" (was "the metadata editor
+re-files…"). The delete dialog: **Delete permanently**, "Couldn't read that folder." / "Couldn't delete it.". The Tags
+tab: **Select**, never Tick ("2 of 11 selected", "Select tracks to edit only those; Shift selects a run.", "Select
+every track" / "Deselect every track") - and the line says a track's name opens it ("Tap a track's name to see
+everything in its file." on a phone, "Click…" on a desktop). Artwork: "To get a cover, first match the album to a
+release in the Release tab." (and CD art's alike). Lyrics: "To shift when synced lyrics appear, or re-time the ones
+already saved, see Lyrics in Server settings (Library)." - there was never a "Managing's Settings". The folder
+finder: "deadwax can't find this album's folder: no folder in the library is matched to the release Navidrome has for
+it. Choose the folder yourself, or look again." (and the no-release one), "2 folders have this album's name, and none
+is matched to a release. Which one is it?".
+
+**The Get buttons say what came of them** (#13, components/LibraryParts.tsx with the pure lib/getResults.ts). Get cover,
+Get CD art and Get lyrics drew their result only in a tooltip - a phone has none - and a failed cover went only to the
+console. Each now draws a line UNDER the button (`ResultLine`, `.app-edit-note`, a live region): the route's own
+words made a sentence where they're fit (a 404's "The Cover Art Archive has no front cover for that release.", CD
+art's "No CD art on the Cover Art Archive for this release - a fanart.tv key in Server settings adds another source.",
+a 502's "The Cover Art Archive couldn't be reached - try again."), anything else errorWords' sentence with `failed`
+for its lead ("Couldn't get the cover.") - its own words in brackets for whoever runs deadwax, the tell for anyone
+else; said as it fails, for whoever reads then. Busy is words ("Getting the cover…", "Getting CD art…", "Getting
+lyrics…"), never a bare spinner; after a failure the button is **Try again**, and with none to find - the cover's 404
+as CD art's - **Look again** (was "Retry cover" / "No CD art found"; the review found the cover's 404 still read Try
+again). Get lyrics keeps **Lyrics · 9 of 10** on the button and the outcome under it, a sentence ("Saved lyrics for 9
+tracks (all synced), 1 not on LRCLIB." - lib/lyrics.ts `describeLyrics` and `describeRetime` start with a capital now),
+with nothing added: it said "Press it again to look for the rest." whenever tracks were still without, the ones LRCLIB
+had just said it hasn't got included - one press asks for every track without lyrics, and the failures say "try again"
+for themselves. A success says nothing over what it got:
+the cover or the disc picture shows, and the button goes.
+
+**Needs a look** (#15, B11). Its line says what it's for and what to do: "Albums whose tags, folder or cover need
+fixing, albums Navidrome doesn't list, and new downloads nobody has looked at yet. Open one to fix it, or to mark it
+fine as it is." (was what they "want"). The last chip and a row's word are **Marked fine** (`MARKED_FINE`, was
+"Ignored"; its title "Albums you marked fine as they are, with "It's fine as it is"", a row's "Marked fine: no cover"),
+and a row's mark after it too. The database line: "deadwax can't save to its database (check DB_PATH), so an album you
+mark "It's fine as it is" will come back." (11.2); Navidrome unset "…It's set up in Server settings (Connections)."
+(11.3); Navidrome failing says Navidrome's own words only for whoever runs deadwax (`navidromeFailed(problem,
+detail)`, the page passing `seesDetail(accessNow())`) - anyone else "Couldn't ask Navidrome which albums it has - try
+again in a minute.". The library's read failing is "Couldn't read the library." / "Couldn't check the library just
+now." through errorNote / sayError (was "deadwax couldn't read the library: HTTP 502") - **hooks/useLibrary.ts now keeps
+the failure itself** (`error: unknown`), so the pages can say it; the Edit panel hands editStatus the sentence already
+worded.
+
+**Library care** (#15, B11). "Rescan the library after changing tags in another program, and fill in missing covers,
+CD art and lyrics across many albums at once - one album at a time, and Stop ends a run after the album it's on." (the
+runs alone, Rescan alone, as careLine had them); Rescan's note says when first ("Use Rescan after editing tags in another
+program: deadwax spots a changed album by its folder's date, and editing tags in place doesn't change it."), and its
+title - a phone never showed it - went. The plans: "matched to a release" (was "with a release"), "with no disc picture
+from deadwax yet" (was "no CD art of deadwax's own", and the disc.jpg / disc1.jpg file list went). **Stop after this
+album · 3 of 12** says on the button what was only in its title (runBulk asks `stopped()` before each album, so it is
+true). The results are sentences (`bulkSummary`): "Got 7 covers. 2 have none in the Cover Art Archive. 1 failed - run
+it again to try it again. Stopped at 12 of 40." - CD art "Got CD art for 3 albums. 1 has none to find." - lyrics "Saved
+lyrics for 9 tracks. 1 isn't on LRCLIB or is instrumental. 3 failed - try them again from the album's own Get lyrics,
+in Edit album." (a failed cover or CD art is still missing, so the next run takes it; a track that failed may be on an
+album that has some lyrics now, which lyricsTargets never takes - so it isn't told "run it again"). Re-time saved
+lyrics: **Re-timing 3 of 10 albums · Stop after this album**, "Reading the library…", "Re-timed 3 tracks, … Stopped at
+3 of 10 albums.". Both Stop labels count the album being worked on (done + 1, at most the total), so the number
+doesn't move when Stop is pressed ("Stopping after 3 of 12") or when the run stops there ("Stopped at 3 of 12.") - it
+showed the albums finished, one behind, and read "0 of 12" as the first began. **In nobody's library** (was "Held by nobody"), "Loading…" (was "Asking deadwax…"), its refusals in
+words (a 409's own words pass as written).
+
+**People** (B10). The version note: "Your Navidrome (0.65.0) isn't the one People was checked with (0.64). If something
+here doesn't work, use Navidrome's own Users page." (was "People was made for Navidrome 0.64 - this is 0.65.0."); the
+http note "…on your own network or over a VPN…" (was WireGuard); Amperfy is "their other music apps" in Make admin's,
+Made's and Reset's words; "Unlocked on this device until it's left alone for 15 minutes. Lock ends it now."; Add a
+person "Makes a Navidrome account for an ordinary listener. You can make them an admin afterwards."; Known only to
+deadwax "People deadwax still keeps things for who no longer have a Navidrome account…"; "Choose one for them in
+Navidrome's Users page." and "They keep what they were given before: …" (never tick); a non-admin's page "Only an admin
+can open People - it comes with being a Navidrome admin." (`PEOPLE_ONLY`). People's own refusals (a `kind`) keep their
+words as written - setting names and all, its readers are admins - anything else goes through sayError.
+
+**You** (B7, B10). The headline is the person: with logins on the name signed in (the session's until /me answers), with
+them off **deadwax** over "No sign-in needed" (was "deadwax" over "james" or "Logins are off"); the avatar the name's
+first letter, a capital ("d" with logins off, as it was). **Account** (logins on only) holds Change password and Sign out, which were under About; About has the Version
+("Not known" when deadwax didn't answer, was "unknown") and **Logins only for an admin** (`access.admin`). **Manage**
+(was "Managing deadwax") lists **Needs a look** (was "Albums that need a look"), Library care, People, Server settings,
+**Event log** (was "Log"). Sign out's line: "…with your music server (Navidrome) account." / "…with the emergency admin
+password - this sign-in lasts 12 hours." (9.5); its failure "Couldn't reach deadwax, so you're still signed in - try
+again."; the sign-in's lede "Sign in with your music server (Navidrome) account." (9.4). UNVERIFIED (7.8): "Some things
+an admin let you do are off for now - sign out and in again to get them back."; a Manage page without its permission
+(11.1): "This page needs a permission an admin hasn't given you - ask one if you need it.". signin.css puts Account's
+first row straight under its heading, as every section's first group sits (the 12px between the two rows was About's).
+
+**The sidebar and pages**: **Manage** (was "Managing"), **Server settings** and **Event log** (were "Settings" and
+"Log"); the Event log's page title, its back label, its list's name; its stream line "Lost the live feed -
+reconnecting…" (11.14, was "The stream was lost - trying again"); the history's failure "Couldn't load the lines deadwax
+kept - what happens from now still shows." The permission labels stay (Look after the library, Settings and the log -
+People's checkboxes and the server's 403s); their line names "In nobody's library".
+
+**The ledger said to the reader** (M8, src/library_ledger.py): `problem_text(problem, can_apply)` - NO_RELEASE, to
+someone who may apply a release (routes/my_library.py passes `can(request, user, "edit")`: an admin, or anyone given Edit
+albums - the spec said "an admin"; Edit albums is who can actually do it, so they too are told what to do rather than to
+ask an admin), is `NO_RELEASE_YOURS` "It isn't matched to a release on MusicBrainz yet. Apply a release to it in Edit
+album, and it's added after that." - stars.py's worker reads the entry's release afresh at each try, so applying one is
+what adds it. Anyone else keeps "An admin needs to match it…".
+
+**The log** (M9, src/config.py): "DEADWAX_ADMINS is set, but deadwax no longer reads it (since 2.0.0): …" (was "since
+2.0.0-player.61").
+
+**Errors on the managing pages** go through batch 1's errorWords: Needs a look, Library care, In nobody's library,
+People (usePeople), Server settings (a 400 save refusal - "LIBRARY_PATH: …" - kept as written: those are the rows' own
+words, read by Settings holders; anything else in a sentence), MusicBrainz's saved answers, the Event log's history,
+the Edit panel's editors, the track inspector (its lyrics, useTrackDetails), the artist panel, the delete dialog,
+re-time - a sentence for anyone, the error's own words in brackets or under it for whoever runs deadwax (an admin
+still sees the detail).
+
+**Pinned**: getresults.sim (new: the words, and the three buttons drawn - busy, the line under the button, Try again /
+Look again, the line per album, a success saying nothing, no title holding a reason, no console.error); vocabulary.sim
+BATCH5 (39 files: no "(s)", Tick, Ignored/un-ignore/Accepted as it is, Managing, "the metadata editor", "could not",
+Held by nobody, WireGuard/Amperfy, "No release id"/off-convention, "the queue", "deadwax's settings", "Asking", "Stop
+·", "the Archive", "Logins are off", "Albums that need a look", "People was made for", "Retry cover", "break-glass";
+BATCH5_LOWER the lower-case starts put right; BATCH5_LABELS "currently:", a bare "Log" and "un-ignore" in any text - a
+lower-case hyphenated word reads as a class name to the words-only scan; a declaration the JSX-text scan takes for words
+is skipped); errors.sim MANAGING_FILES (no catch keeping raw words on any managing
+page, editor or hook - a list key `key={`…${problem}`}` aside); needslook.sim (Marked fine, the line, the database and
+Navidrome lines, Navidrome's words by reader on the page too, the read failure in words by reader, useLibrary keeping the
+failure itself); care.sim (careLine, RESCAN_WORDS, the plans, the run sentences against an oracle of their own, Stop
+after this album, the re-time words, the read failure in words); you.sim (the headline both ways, Account, Logins an
+admin's, Manage and its rows); routes.sim (the sidebar and page labels, the refusal, editStatus taking worded errors and
+the panel wording them, the folder sentences); permissions.sim, people.sim, signin.sim (the lede, Sign out's words),
+settingslog.sim (the stream line, the history line, a 400 kept, a save that never reached deadwax in words),
+mbanswers.sim, inspector.sim, mylibrary.sim (In nobody's library, its refusal through an ApiError as http throws it),
+artist.sim, app-rules.sim (the Lyrics pointer, Select, Account) - each updated on purpose. Python:
+test_metadata_health (sentences, no tag names, the two labels), test_personal_libraries (NO_RELEASE by reader, through
+the route), test_logins (the log line), test_logins_css (Account under its heading).
+
+**Verified** (as built, before review): 3790 Python tests (3788 passed, 2 skipped; three new - test_metadata_health 1,
+test_personal_libraries 1, test_logins_css 1 - and test_logins' and test_retag's pins tightened), pyflakes, tsc, the
+build, all 66 sims (getresults.sim new); the engine guard empty. 69 mutations (`work/uxb5-builder/mut/mutate.py`), each
+seen failing its check and restored byte for byte (sha256): two slipped through at first - "un-ignore" back in the
+editor (the words-only scan reads a lower-case hyphenated word as a class name: now BATCH5_LABELS) and the avatar's
+initial (now you.sim) - and were caught once pinned. Seen in a real page (headless Chromium as deadwax.test, my own
+deadwax on 8110 with logins on and 8111 with them off, over a stand-in Navidrome on 4549, slskd absent; 390x844 and
+1440x900): james's You - "james" as the headline, Manage's five rows, Account's Change password and Sign out, About's
+Version and Logins - and his Your library saying "It isn't matched to a release on MusicBrainz yet. Apply a release to it
+in Edit album, and it's added after that."; Needs a look's line and chips (Not matched to MusicBrainz, No original year,
+No cover art) and the Release tab's hints in sentences and its **Now:** line; the Lyrics tab's pointer; the Tags tab's
+Select line; Library care's lines, plans and a covers run ending "Got 0 covers. 4 have none in the Cover Art Archive.";
+In nobody's library; People's http note with a VPN; the Event log's title; logins off at 1440 the sidebar's Manage
+(Needs a look, Library care, Server settings, Event log), Get cover and Get CD art on Mezzanine each saying under the
+button why there was none ("The Cover Art Archive has no front cover for that release.", "No CD art on the Cover Art
+Archive for this release - a fanart.tv key in Server settings adds another source.") with Try again / Look again, and You
+headed "deadwax" over "No sign-in needed"; ethan's You - "ethan", Account, About with the Version alone, no Manage - and
+both Needs a look's and People's refusals in their new words; no console errors. Not seen: a Stop pressed mid-run (the
+stand-in's run ends in a moment - care.sim drives it), the editors' failure sentences (care.sim, errors.sim and
+settingslog.sim drive them), a phone's Edit sheet with a Get failing (the same component; getresults.sim draws it).
+
+**After review** (sixteen findings, each reproduced or refuted first; two were one). The **No original year** hint
+claimed a pressing year a rip with no year at all hasn't got - "The tags don't record the album's first year - the year
+its folder is named after." now, in docs/library.md's table too. The hints are read as text only on the Release tab, so
+none sends you there any more, and No cover art's dropped "once the album is matched" (both above). Library care's and
+Re-time's **Stop** count the album being worked on (above). Edit album's **Marked fine:** names only what the album
+still has - `markedFineIssues()` (lib/metadataQueue.ts), which Needs a look's chip title uses too: the stored list
+named a problem since fixed. "Matched to MusicBrainz" is in the line's own face: its span kept the raw id's mono class
+(`metadata-mbid`, whose two rules in app.css and app-desktop.css went with it), which set the words in mono and onto a
+line of their own on a phone. The Release tab's last lower-case lines are sentences - "Search to match this album to a
+release, or just edit the fields.", "No releases found for that search.", "The release this album is matched to isn't
+in these results.", "None on file" / "Pick a release", a row's "11 tracks" (was "11 trk"), the Current badge's "matched
+to", the tag editor's **Undo** - and vocabulary.sim holds each (BATCH5_RULES, BATCH5_LOWER, BATCH5_LABELS). The **Now:**
+year is `nowYear()` (lib/release.ts, tags.sim): the pressing's in brackets only when there is one - an originaldate
+with no date read "1994 (this pressing )". People's **unknown_shape** (src/api/navidrome_admin.py) says what the
+version note says: "People was checked with Navidrome 0.64, and the interface it uses can change between versions - use
+Navidrome's own Users page meanwhile." (test_people). A cover the Archive hasn't got reads **Look again**, as CD art's
+does - its 404 is a fact, not a failure; and a Get lyrics result no longer adds "Press it again to look for the rest."
+(above). A tag editor problem that starts with a file's name keeps its case (`asSentenceKeeping()`, lib/errorWords.ts,
+errors.sim): "intro.flac couldn't be read as audio." was "Intro.flac…", a file that isn't there. retag's counts are
+pinned word for word - "1 file didn't match the tracklist and will keep its existing title…", "2 files … their", "1
+file name here is already taken there (01.flac)", "2 file names here are…" (test_retag, test_split_discs). The docs:
+configuration.md's two "metadata editor"s are the Release tab; README's **Event log**; README's and sharing.md's
+"tick"/"ticked" are choose, select and given; every "You → Change password" is **You → Account → Change password** -
+the People refusal `YOUR_PASSWORD` (src/people.py) too. vocabulary.sim's scanner read a self-closing tag's "/>" after
+an attribute's expression (`<Loading label={x} />`) as a regex and lost the rest of the line - Get cover's label among
+it; it doesn't now, and "Retry cover" there is caught. Verified: 3793 Python tests (3791 passed, 2 skipped; three new),
+pyflakes, tsc, the build, all 66 sims; the engine guard empty; 28 mutations
+(`work/uxb5-fixer/mutate.py`), each failing its check and restored byte for byte (sha256).
+
+**After the second review** (three findings, each reproduced first; all real, all nits). Edit album's issues box was
+right but unguarded: putting its condition back to the stored list (`album.ignored_issues.length > 0`) drew an empty
+`#metadata-issues` box - one gap above **Now:** - for an album marked fine for a problem since fixed, and no check
+noticed; needslook.sim now holds the condition on `markedFine`. People's `refusalOf` (app/usePeople.ts) keeps a
+refusal's words only when it has a `kind`, and nothing held that either: errors.sim now runs the real refusalOf - a
+`locked` refusal as written, a 500 whose detail is an exception's text through sayError, the route guard's 403 the same
+way. And the guide still sent a phone's reader to rows straight under You: every way to a managing page is now **You →
+Manage → …** (configuration.md, getting-started.md, downloading.md, troubleshooting.md, README), the sidebar's
+**Server settings** (it said "Settings"), getting-started.md's step 2 **Fill in Server settings → Connections**, and
+player.md's wrapped "You → Change password" **You → Account → Change password**; vocabulary.sim reads every guide, a
+wrapped path as one line, for each old way. Seven mutations (`work/uxb5-fixer2/mutate.py`), each caught and restored
+byte for byte (sha256).
+
+### Shuffle and Repeat on Now Playing's main screen (2.0.14)
+
+James, 2026-10-24: **"in the mobile I need the shuffle and loop buttons on the main player page"**. Choice 2 of .57 (Up
+Next, shuffle and repeat, above: Shuffle and Repeat only inside Up Next on a phone, "Now Playing's main screen gets nothing
+but the Up next icon") is changed at his request; the desktop's player bar already had them beside previous and next
+(choice 3), and keeps them as they were.
+
+- **Where.** On Now Playing's transport row (player/NowPlaying.tsx): Shuffle first, before Previous, and Repeat last, after
+  Next - the desktop bar's order and Music's on a Mac - on both looks (cover and turntable) and on a phone on its side,
+  since the row is the same element in all of them. Up Next keeps its own chips; it is one setting, so a change in either
+  place shows in the other (the real page: Repeat All set on Now Playing, Up Next's chip reads "Repeat all", pressed).
+- **The same controls**: `player.shuffle`/`player.setShuffle`, `player.repeat`/`player.setRepeat(nextRepeat(...))`, called
+  straight from the tap (app-rules.sim's `ALLOWED` gives NowPlaying.tsx setShuffle and setRepeat, as PlayerBar's). Shuffle
+  is aria-pressed, and during a whole library's shuffle (Part B) reads on, is aria-disabled and its tap does nothing,
+  named for why - "Shuffle - shuffling all music" / "...your whole library", now `shuffleLabel()` in lib/upNext.ts, which
+  the player bar calls too (its words unchanged; upnext.sim holds them). Repeat cycles off, all, one, aria-pressed while
+  on, Repeat One's glyph on One, named in Up Next's words (`repeatLabel`: "Repeat", "Repeat all", "Repeat one") - an
+  icon's name, read by VoiceOver with its pressed state. Both in the icon row's grey, the accent while on, dimmed
+  (`--app-pin-off`) while disabled, as Up Next's chips and the bar's buttons are. Neither wakes the turntable's sound
+  (they move no song), so the wakeDeckAudio list in app-rules.sim is unchanged.
+- **The Up Next button's tint goes**: with both modes lit a few pixels above it, a third purple mark for the same state
+  read as noise, and "so a song repeating isn't a mystery" no longer needs it. Its name still says what is on
+  (`upNextLabel`). The rule `.pl-sheet-footer .app-upnext-button.is-on` is removed; test_app_css holds it gone.
+- **The layout** (app.css's "Shuffle and Repeat on Now Playing's transport (2.0.14)", above the phone frame's section).
+  Shuffle and Repeat are `pl-icon-button`s (44px every way, `flex: none`), never `pl-transport-button`s (the turntable
+  sim counts those). The row is `space-between` and reaches past the body's 28px padding by `--app-np-mode-reach`
+  (`(--pl-hit - --app-np-mode-icon) / 2`, 10px), so the 24px glyphs sit exactly under the scrubber's two ends (measured:
+  0px off at every size). Nothing sets a height: the row stays the transport buttons' 72px, so the title, the scrubber,
+  the icon row, the cover, the turntable and the fader are where they were, to the tenth of a pixel, at all four sizes
+  below. **At 320 wide** the row is 284px and two 44px targets plus three 72px buttons are 304 - so there, and only
+  that narrow, the middle three give up width (flex's own shrink, floored at `min-width: var(--pl-hit)`): 65.3px wide,
+  still 72 tall, the five touching edge to edge with no overlap. From 375 they keep their 72px.
+- **The press stays round at any width** (after review). player.css draws the transport's press on the button itself,
+  round by 50% - so at 320, a 65x72 button pressed a 65x72 oval. app.css now clears that fill
+  (`.pl-transport .pl-transport-button:active { background: none }`) and draws it on a `::before` laid in the button's
+  one grid cell (`grid-area: 1 / 1`, the glyph laid in the same cell over it): `width: 100%; aspect-ratio: 1`, so a
+  circle of the button's width, centred by the button's `place-items: center` - 65.3px at 320, and the 72px circle
+  player.css always drew from 375 up. Measured (CSS.forcePseudoState :active, both looks, 320x568, 375x812, 844x390):
+  the fill 65.3x65.3 / 72x72, the button's own background transparent, the scale(0.92) as before, glyphs where they
+  were, and the row, scrubber, title and icon row at the same place to 0.1px as before the fix.
+- **The dimmed Shuffle doesn't flash a press** (after review): player.css's `.pl-icon-button:active` fill is unguarded,
+  so during a whole library's shuffle the tap that does nothing still looked taken. `.pl-transport
+  .app-np-mode[aria-disabled='true']:active { background: none }`, as the pin and a job's Cancel skip theirs (measured:
+  aria-disabled and :active, background transparent, opacity 0.45; enabled and :active, the 0.06 fill).
+- **Measured in the real page** (headless Chromium, mobile emulation, `http://deadwax.test`, this branch against 2.0.13
+  side by side): 320x568 - Shuffle 18-62, Previous/Pause/Next 65.3 wide, Repeat 258-302, gaps 0; 375x812 - all at
+  full size, gaps 8.8; 390x844 - gaps 12.5; 844x390 - gaps 45, the row 484 wide inside the 520px body. Every target
+  44px or more, no page scroll sideways, no console error; the states lit and named as above (Shuffle on, Repeat all,
+  one, off), the Up Next button grey throughout.
+- **Verified**: info.sim (the transport drawn on both looks - Shuffle, Previous, Pause, Next, Repeat - each state's name,
+  pressed, lit and glyph, each tap's call, a whole library's shuffle from either scope, on the turntable too; the Up Next
+  button no longer tinted), app-rules.sim (the allowlist; the five in one row in that order, nothing added under it; the
+  handlers straight from the tap), upnext.sim (`shuffleLabel`), turntable.sim (its stand-in player gains the fields),
+  test_app_css (the tokens, the reach, the floor, the arithmetic at 320, 375 and 390, the tint gone, the round press and
+  the dimmed Shuffle's no-press); 18 mutations, each caught and restored byte for byte, and 6 more after review. Python 3852 collected (3850 passed, 2 skipped; one new). The engine files have no
+  diff.
+- **NOT verified - the iPhone's**: the five under a thumb at 375/390 in the home-screen app, VoiceOver's reading of the
+  Repeat button's name changing as it is double-tapped (iOS reads a pressed state's change; whether it reads the new name
+  too is not known - Up Next's chips say it in a live region, these don't), and the round press at 320 on a real SE
+  (WebKit's `aspect-ratio` on a grid item; measured in Chromium only).
+

@@ -669,7 +669,7 @@ and the sources are for; "Get the album" is the screen's ONE solid purple button
   downloading, a part held - another pressing held doesn't stop it); then `autoGrabPick(candidates,
   candidateFilters(chips), 'score')` at AUTO_GRAB_MIN_SCORE or more, asked for as a tapped Get is,
   and the sheet hands over. Otherwise the cards show with `notPickedLine` ("Didn't pick a source
-  for you: …"). `autoPickBlocked(result, release)` also refuses a release with no tracklist ("with
+  for you: …"; since 2.0.6 "… - choose a source yourself.", and no line at all when no source was found). `autoPickBlocked(result, release)` also refuses a release with no tracklist ("with
   no tracklist to match the folders against, no score can be trusted") or no release id ("with no
   release id, deadwax can't tell whether you already have it"): the album as a whole, a chip's
   fallback, is scored on edition, format and peer alone - a two-track FLAC folder from a fast peer

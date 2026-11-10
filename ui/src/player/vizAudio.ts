@@ -133,8 +133,10 @@ export class VizListener {
   private readonly agc = { peak: 0.3 }
   private seeing: Seeing = 'nothing'
   private why: string | null = null
+  private detail: string | null = null
 
-  constructor(private readonly onSeeing: (seeing: Seeing, why: string | null) => void) {}
+  //? (2.0.7) the line, and the reason's own words for whoever runs deadwax (lib/vizSync.ts SyncPlan's `detail`)
+  constructor(private readonly onSeeing: (seeing: Seeing, why: string | null, detail: string | null) => void) {}
 
   /** One look: what the element is doing and the song after it, and the copy made to follow it
    *  (lib/vizSync.ts) - at `rate`, the player's speed (2.0.0-player.39). */
@@ -165,10 +167,11 @@ export class VizListener {
     if (plan.start !== null) this.startNode(plan.start)
     if (plan.fetch !== null && song) void this.fetchWindow(song, plan.fetch)
     else if (plan.prefetch !== null && following) void this.fetchWindow(following, plan.prefetch)
-    if (plan.seeing !== this.seeing || plan.why !== this.why) {
+    if (plan.seeing !== this.seeing || plan.why !== this.why || plan.detail !== this.detail) {
       this.seeing = plan.seeing
       this.why = plan.why
-      this.onSeeing(plan.seeing, plan.why)
+      this.detail = plan.detail
+      this.onSeeing(plan.seeing, plan.why, plan.detail)
     }
   }
 

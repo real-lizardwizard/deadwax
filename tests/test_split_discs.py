@@ -97,7 +97,20 @@ def test_a_file_name_already_taken_there_refuses_the_merge(tmp_path):
     plan = plan_retag("Radiohead/OK Computer (Disc 2)", RELEASE, str(tmp_path))
 
     assert not plan["merge"] and not plan["moves"]
-    assert any("already taken there" in p for p in plan["problems"])
+    #? (2.0.8) counted in words - never "file name(s)"
+    assert any("2 file names here are already taken there (01.flac, 02.flac)" in p for p in plan["problems"])
+
+
+def test_one_file_name_already_taken_there_is_said_as_one(tmp_path):
+    disc_folder(tmp_path, "OK Computer (1997)", 1, ["Airbag", "Paranoid Android"],
+                names={"Airbag": "01.flac", "Paranoid Android": "02.flac"})
+    disc_folder(tmp_path, "OK Computer (Disc 2)", 2, ["Lucky", "The Tourist"],
+                names={"Lucky": "01.flac", "The Tourist": "2-02 The Tourist.flac"})
+
+    plan = plan_retag("Radiohead/OK Computer (Disc 2)", RELEASE, str(tmp_path))
+
+    assert not plan["merge"]
+    assert any("1 file name here is already taken there (01.flac)" in p for p in plan["problems"])
 
 
 def test_another_release_in_that_folder_refuses_the_merge(tmp_path):
