@@ -383,3 +383,93 @@ check 4 hears a ramp, and AirPlay's route picker.
 - NOT run anywhere yet (at the push): the engine's 12 offline-render tests and the app's device build.
   They have since, on ios.yml's macOS job - see "First run on macOS". Everything on the phone is still
   to run.
+
+## Phase 0 on James's iPhone (2026-11-10)
+
+docs/ios.md's eight checks, run on the phone. **The Mac**: MacBook Air M2 (8 GB), macOS 27.2, **Xcode 27.1
+(27A9275)**, no Simulator runtime at any point (`xcrun simctl runtime list`: 0 disk images, before and after).
+**The phone**: "Green Anole", an iPhone 17 Pro on **iOS 27.2 (24B119)** - updated since the 27.0 the plan
+names. Built from `1d9b295`, ios.yml green on it. The repo was cloned to `~/Desktop/Code/deadwax`, not
+`~/Developer/deadwax`, with iCloud's Desktop & Documents sync **on**: install.sh printed its note, and nothing
+failed on a file that wasn't on the Mac. The Once steps were begun on 2026-10-27 (Xcode's first launch, the
+Apple ID, the team) and finished on 2026-11-10 (the first Run from Xcode, then the checks).
+
+1. **Install without a Simulator - pass.** `install.sh` on its own (Xcode not needed) pulled, found ios.yml had
+   passed, built Release into an empty `~/Library/Caches/deadwax-build`, installed over the app Xcode's Run
+   had put there, and opened it: **24 s** in all. Its words: `Installed deadwax 0.1 (1), runs until Tue 17
+   Nov, 15:30`, and `Space: 34Gi free of 228Gi before, 36Gi free of 228Gi now` (the rise is the Mac's, not the
+   build's). `** BUILD SUCCEEDED **` with no Swift warning (one line from appintentsmetadataprocessor:
+   metadata skipped, no AppIntents.framework); the app is 1.2 MB, `AppIcon60x60@2x.png` and `@3x.png` at its
+   root, no `Assets.car`, signed Apple Development for `net.lizardlounge.deadwax`. The first install before
+   it was Xcode's Run with the cable (Once step 5), not timed. Disk over the whole setup: 57 GB free on
+   2026-10-27 before Xcode's first launch, 34 GB on 2026-11-10; Xcode holds 7.3 GB of that
+   (`~/Library/Developer/Xcode/iOS DeviceSupport` 6.8 GB - the phone's debug symbols from its first
+   connection - and DerivedData 0.3 GB), the rest isn't Xcode's.
+2. **The icon - pass.** The record shows on the home screen: the loose PNGs through `CFBundleIconFiles`, no
+   asset catalog, work on iOS 27.2.
+3. **The connection - pass on home Wi-Fi; WireGuard not done yet.** Check said OK by IP and by name, logins
+   on, and James signed in. The Local Network question came once, and he allowed it. So
+   `NSAllowsArbitraryLoads` alone lets plain http through on iOS 27.2, by IP and by name. Test sounds listed
+   all ten songs once Navidrome had scanned the album, and Hi-res found a 24/192 FLAC. **Away from home over
+   WireGuard: not done yet.**
+4. **AirPods, from silence - pass.** All three beeps, the first as loud as the other two, every time: song 1
+   from cold, song 3 tapped while 1 played, song 2 after 2 minutes paused - on AirPods and on the speaker,
+   Streamed and Downloaded (Download all 10). No start lost even on song 1 (its first beep at 0.0 s), so
+   AVAudioPlayerNode's start ramp (R3) isn't heard, and "Left for later phases"' start-on-zeros workaround
+   isn't needed.
+5. **The join - pass.** Song 9 into song 10 is one unbroken tone, no gap, click or blip: AirPods and the
+   speaker, Streamed and Downloaded.
+6. **Locked - FAIL on one point: play after a pause, from the AirPods.** The rest passed: songs 7, 8, 9 and
+   10 played one after another locked; the hi-res song played locked to its end; paused from the lock
+   screen, 2 minutes, played from the lock screen, it carried on from where it was (the engine asleep and
+   rebuilt from the frame left); the lock screen showed each song. Background audio works on a free account
+   (R4). **But a press of an AirPod's stem paused, and a second press never played again** - every time,
+   locked and unlocked, after a few seconds paused and after more than a minute. Nothing else (another app,
+   Siri) answered the press. **After any pause - the AirPods', or the app's own button - the lock screen
+   still shows Pause**: iOS still counts deadwax as playing. So the second press is sent as a pause, which
+   does nothing to a paused engine (`pauseNow`'s `guard wantsPlay`); on the lock screen, tapping its Pause
+   first (which only flips its button) and then Play resumes it. Check 6's lock-screen pause and play passed
+   only because there the pause was the lock screen's own tap. docs/ios.md's "their controls work, as do the
+   AirPods'" isn't true yet for play after a pause.
+   **Not diagnosed and not fixed** (this session fixed only build problems; the app logs nothing). What is
+   known: the app does say it paused - `pause` publishes `.paused`, and `changed` -> `showNowPlaying` sets
+   `MPNowPlayingInfoPropertyPlaybackRate` to 0. Leads, unverified: after a pause the engine keeps its output
+   running (silence) for `idleStopSeconds` (60 s), and iOS may judge "playing" by the session's live output
+   rather than the rate; the idle stop then publishes the same phase (`publish(self.state.phase)`), which
+   `guard next != state` drops, so nothing tells iOS again once the output has stopped - and a press after
+   more than a minute failed too. Before changing anything: log each remote command and the engine's phase as
+   they arrive (os `Logger`, read in Console with the phone connected), then try what makes a pause plain to
+   iOS (`MPNowPlayingInfoCenter.playbackState`, pausing or stopping the output) without losing check 4's
+   clean starts from a running output.
+7. **Interruptions - pass for Siri and an AirPod out; a phone call not done yet.** Siri paused it and it came
+   back afterwards; taking an AirPod out paused it. **A phone call: not done yet.**
+8. **Hi-res - pass.** The 24/192 song played, and the line under Playing read, word for word: `24-bit 192 kHz
+   FLAC file → 48 kHz output (AirPods Pro)`.
+
+Still open from Phase 0: **check 6's AirPods play after a pause** (above), **check 3 over WireGuard** and
+**check 7 with a phone call**.
+
+### What went wrong on the way
+
+- **install.sh found no team at first**: "Xcode knows no Apple ID yet", with the Apple ID already added in
+  Xcode > Settings > Accounts and a Personal Team showing. Xcode 27.1's defaults held only
+  `DVTDeveloperAccountManagerAppleIDLists`, and there was no signing certificate. Once James made one
+  (Accounts > the Personal Team > Manage Certificates… > + > Apple Development),
+  `IDEProvisioningTeamByIdentifier` was there in the shape install_helper.py reads (`teamID`, `teamName`,
+  `isFreeProvisioningTeam`, `teamType` "Personal Team"), and install.sh wrote Local.xcconfig and stopped as
+  designed. Whether opening the team or making the certificate wrote the key wasn't told apart. Not changed
+  here: docs/ios.md's step 3, or install.sh's message, could say to make the certificate.
+- `security find-identity -v -p codesigning` listed the new identity as matching but **0 valid**, while
+  `security verify-cert -p codeSign` passed on its certificate (issued by WWDR G3). Signing worked anyway,
+  in Xcode's Run and in install.sh's build: noted only.
+- **Xcode's first Run re-sorted `ios/Config/Info.plist`**: `CFBundleIcons` moved up into alphabetical order,
+  nothing else (the two files' content compared equal through plutil). Restored with `git checkout
+  ios/Config/Info.plist`. install.sh checks only `ios/Deadwax.xcodeproj` before its pull, so this would stop
+  only a pull that brings an Info.plist change, with git's own "would be overwritten". The project file was
+  never changed: the team only in Local.xcconfig, Signing & Capabilities never touched.
+- **make-test-album.py refuses a folder that doesn't exist** ("There's no folder ..."), where docs/ios.md says
+  to make the album "in an empty folder": `mkdir` it first. It then made the ten songs (5.8 MB) in 2.7 s with
+  Xcode's python3 3.9.6, into `~/Desktop/Code/deadwax-test-album`, which James copied into his library.
+- xcode-select points at the Command Line Tools on this Mac and was left so: install.sh's own
+  `DEVELOPER_DIR` found Xcode, as designed. Xcode's first launch installed its own components (James's
+  password, in Xcode); nothing else was installed, and nothing ran with sudo.
