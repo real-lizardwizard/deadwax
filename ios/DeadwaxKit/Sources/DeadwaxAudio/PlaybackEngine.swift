@@ -56,10 +56,13 @@ public struct EngineState: Equatable {
 ///   join stays continuous. Every node runs at the output's rate, so the mixer itself converts
 ///   nothing. (The mixer's own conversion was measured first and failed: a 30 kHz tone in a 192 kHz
 ///   file came out at -21.8 dB, aliased - EngineRenderTests' `theRateConversionMeasured`.)
-/// - The output is started once and kept running across songs and pauses, so a song is scheduled
-///   onto an output that is already live - never a new output on a tap. A song started from silence
-///   is scheduled `startLead` ahead (the output's latency and one IO buffer), so the output is
-///   live when its first sample plays. A pause longer than `idleStopSeconds` stops the engine.
+/// - The output is started once and kept running across songs, so a song is scheduled onto an
+///   output that is already live. A song started from silence is scheduled `startLead` ahead (the
+///   output's latency and one IO buffer), so the output is live when its first sample plays. A pause
+///   (or the queue's end, a stop, a failure) stops the output at once (`idleStopSeconds`, 0): iOS
+///   counts an app whose output runs as playing, whatever its now-playing rate says, so with the
+///   output left running the lock screen kept Pause and the AirPods' next press came as another
+///   pause. Play then starts the output again and goes on from the frame left.
 /// - When iOS stops the engine itself (a call, a new route, media services reset), the node's clock
 ///   is gone before the engine hears of it, so where the song was is the last position read while it
 ///   played (`Lane.lastSample`, read at least every buffer), and play goes on from there.
@@ -73,8 +76,9 @@ public final class PlaybackEngine {
         public var aheadSeconds: Double = 2.0
         /// How much is scheduled before a node starts from silence.
         public var startSeconds: Double = 1.0
-        /// A pause this long stops the engine, to save battery.
-        public var idleStopSeconds: Double = 60
+        /// How long a pause keeps the output running: none. iOS reads a running output as playing
+        /// (notes/ios.md, "The pause the lock screen didn't see"); it was 60 s, for a quicker play.
+        public var idleStopSeconds: Double = 0
         /// After a configuration change (a new route), how long the engine waits before playing on,
         /// so a pause for the same change - the old output gone: AirPods out, headphones unplugged,
         /// which the app hears as a route change on another queue - comes first and wins.
@@ -336,6 +340,14 @@ public final class PlaybackEngine {
             }
             while done < frames {
                 let wanted = min(chunk, frames - done)
+                guard engine.isRunning else {
+                    // a stopped output (paused, the queue ended) plays nothing, as on the phone
+                    for channel in 0..<Int(buffer.format.channelCount) {
+                        (into[channel] + Int(done)).update(repeating: 0, count: Int(wanted))
+                    }
+                    done += wanted
+                    continue
+                }
                 let status = try engine.renderOffline(wanted, to: piece)
                 guard status == .success else { throw AudioFailure("Offline render: \(status.rawValue)") }
                 for channel in 0..<Int(buffer.format.channelCount) {
@@ -353,6 +365,9 @@ public final class PlaybackEngine {
 
     /// Tests: the phase now, without waiting for `onChange` on the main queue.
     var phase: EngineState.Phase { queue.sync { state.phase } }
+
+    /// Tests: whether the output is running - what iOS goes by to call the app playing.
+    var outputRunning: Bool { queue.sync { engine.isRunning } }
 
     /// Tests: iOS stopping the engine (a call, a new route) - and, with `change`, the configuration
     /// change it posts, handled as the notification's would be.

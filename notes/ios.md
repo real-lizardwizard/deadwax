@@ -125,9 +125,11 @@ The plan's section 3, as Phase 0 needs it:
   own lane, started with `play(at:)` the host time the first lane's last sample plays (offline: the
   render's sample count). A song that would begin on a lane still holding songs that play before the
   one scheduled last (44.1 kHz, a short 96 kHz song, 44.1 kHz again) waits, its first buffer parked,
-  until that lane has run out - see "After review, again". **The output starts once and keeps running**; a song started from silence is
-  scheduled `startLead` ahead (AVAudioSession's outputLatency + ioBufferDuration); a pause longer than
-  60 s stops the engine, and the next play rebuilds from the frame left. A lane that runs dry mid-song
+  until that lane has run out - see "After review, again". **The output starts once and keeps running while something plays**; a song
+  started from silence is scheduled `startLead` ahead (AVAudioSession's outputLatency + ioBufferDuration);
+  a pause (or the queue's end, a stop, a failure) stops the engine at once - iOS counts a running output
+  as playing, see "The pause the lock screen didn't see" (it was 60 s until then) - and the next play
+  rebuilds from the frame left. A lane that runs dry mid-song
   (a stream behind) is stopped and restarted from the frame it reached. Configuration changes (a new
   route or hardware format) reconnect the lanes and go on from the frame reached; a media-services
   reset makes a new engine. **No gain** (Phase 0 is "Off": nothing multiplies).
@@ -419,7 +421,7 @@ Apple ID, the team) and finished on 2026-11-10 (the first Run from Xcode, then t
    isn't needed.
 5. **The join - pass.** Song 9 into song 10 is one unbroken tone, no gap, click or blip: AirPods and the
    speaker, Streamed and Downloaded.
-6. **Locked - FAIL on one point: play after a pause, from the AirPods.** The rest passed: songs 7, 8, 9 and
+6. **Locked - FAIL on one point: play after a pause, from the AirPods; fixed the same day.** The rest passed: songs 7, 8, 9 and
    10 played one after another locked; the hi-res song played locked to its end; paused from the lock
    screen, 2 minutes, played from the lock screen, it carried on from where it was (the engine asleep and
    rebuilt from the frame left); the lock screen showed each song. Background audio works on a free account
@@ -429,25 +431,15 @@ Apple ID, the team) and finished on 2026-11-10 (the first Run from Xcode, then t
    still shows Pause**: iOS still counts deadwax as playing. So the second press is sent as a pause, which
    does nothing to a paused engine (`pauseNow`'s `guard wantsPlay`); on the lock screen, tapping its Pause
    first (which only flips its button) and then Play resumes it. Check 6's lock-screen pause and play passed
-   only because there the pause was the lock screen's own tap. docs/ios.md's "their controls work, as do the
-   AirPods'" isn't true yet for play after a pause.
-   **Not diagnosed and not fixed** (this session fixed only build problems; the app logs nothing). What is
-   known: the app does say it paused - `pause` publishes `.paused`, and `changed` -> `showNowPlaying` sets
-   `MPNowPlayingInfoPropertyPlaybackRate` to 0. Leads, unverified: after a pause the engine keeps its output
-   running (silence) for `idleStopSeconds` (60 s), and iOS may judge "playing" by the session's live output
-   rather than the rate; the idle stop then publishes the same phase (`publish(self.state.phase)`), which
-   `guard next != state` drops, so nothing tells iOS again once the output has stopped - and a press after
-   more than a minute failed too. Before changing anything: log each remote command and the engine's phase as
-   they arrive (os `Logger`, read in Console with the phone connected), then try what makes a pause plain to
-   iOS (`MPNowPlayingInfoCenter.playbackState`, pausing or stopping the output) without losing check 4's
-   clean starts from a running output.
+   only because there the pause was the lock screen's own tap. **Diagnosed with a logging build and fixed the
+   same day** - a pause stops the output at once - and James re-checked it on the phone: see "The pause the
+   lock screen didn't see" below.
 7. **Interruptions - pass for Siri and an AirPod out; a phone call not done yet.** Siri paused it and it came
    back afterwards; taking an AirPod out paused it. **A phone call: not done yet.**
 8. **Hi-res - pass.** The 24/192 song played, and the line under Playing read, word for word: `24-bit 192 kHz
    FLAC file → 48 kHz output (AirPods Pro)`.
 
-Still open from Phase 0: **check 6's AirPods play after a pause** (above), **check 3 over WireGuard** and
-**check 7 with a phone call**.
+Still open from Phase 0: **check 3 over WireGuard** and **check 7 with a phone call**.
 
 ### What went wrong on the way
 
@@ -465,11 +457,55 @@ Still open from Phase 0: **check 6's AirPods play after a pause** (above), **che
 - **Xcode's first Run re-sorted `ios/Config/Info.plist`**: `CFBundleIcons` moved up into alphabetical order,
   nothing else (the two files' content compared equal through plutil). Restored with `git checkout
   ios/Config/Info.plist`. install.sh checks only `ios/Deadwax.xcodeproj` before its pull, so this would stop
-  only a pull that brings an Info.plist change, with git's own "would be overwritten". The project file was
-  never changed: the team only in Local.xcconfig, Signing & Capabilities never touched.
+  only a pull that brings an Info.plist change, with git's own "would be overwritten". Left open with the
+  project, Xcode did it again later, when files in App/ changed under it: close the project in Xcode once the
+  first Run is done (install.sh doesn't need Xcode open). The project file was never changed: the team only
+  in Local.xcconfig, Signing & Capabilities never touched.
 - **make-test-album.py refuses a folder that doesn't exist** ("There's no folder ..."), where docs/ios.md says
   to make the album "in an empty folder": `mkdir` it first. It then made the ten songs (5.8 MB) in 2.7 s with
   Xcode's python3 3.9.6, into `~/Desktop/Code/deadwax-test-album`, which James copied into his library.
 - xcode-select points at the Command Line Tools on this Mac and was left so: install.sh's own
   `DEVELOPER_DIR` found Xcode, as designed. Xcode's first launch installed its own components (James's
   password, in Xcode); nothing else was installed, and nothing ran with sudo.
+
+### The pause the lock screen didn't see (fixed 2026-11-10)
+
+Check 6's failure above: after any pause the lock screen kept Pause, and the AirPods' next press did nothing.
+
+**Found with a logging build** (never committed; its patch was kept out of the repo): every remote command,
+pause, play and engine phase printed to stdout, read on the Mac with `xcrun devicectl device process launch
+--console --device <phone> net.lizardlounge.deadwax` - no Xcode, no sudo; `--console` bridges the app's
+stdout, and `fflush` after each line keeps it prompt. A temporary "Pause test" picker chose how a pause
+stopped the audio. James pressed the AirPods in each; the log and the lock screen said:
+
+| pause mode | the lock screen after an AirPods pause | the next press arrived as | result |
+| --- | --- | --- | --- |
+| Today: the nodes paused, the output on for 60 s | ⏸ | `pause` (the app at rate 0 already) | nothing |
+| Stop: the output stopped at once, the session left active | ▶ | `play`, 1.3 s later | on from the very frame (80.8 s), sounding 0.27 s after the press |
+| Stop + session deactivated | ▶ | `play`, 3 min later | on from 9.0 s, cleanly; the deactivation itself raised no error |
+
+So **iOS 27.2 goes by the app's running output, not by `MPNowPlayingInfoPropertyPlaybackRate`** - the app
+did set rate 0 at every pause - and a stopped output is enough; the session can stay active. The same was
+reported on Apple's forums for AVAudioEngine apps (developer.apple.com/forums/thread/773870: pausing only
+the player node left the pause icon, and `playbackState` "does nothing on iOS"). The earlier "after more than
+a minute failed too" isn't explained by this; not seen again once the output stopped at once.
+
+**The fix**: `PlaybackEngine.Settings.idleStopSeconds` 60 -> **0**, so a pause - and the queue's end, a stop,
+a failure, a skip or seek while paused, which arm the same stop - stops the output at once, through the
+path a pause longer than a minute always took (`held` = the exact frame, `reset`, `engine.stop()`, asleep;
+play rebuilds from `held`). Already proved on the phone before the fix: check 4's song 2 after 2 minutes
+paused and check 6's play after 2 minutes are that path. The cost: play after a pause sounds 0.2-0.4 s after
+the tap (the output starting again), against about 15 ms with the output left running. A skip or seek while
+paused records the new song's start before stopping (`begin` sets `held`, and `reset` clears the lane
+`heard()` would read), so play goes to the new song.
+
+- **Tests** (on James's Mac, `swift test --package-path ios/DeadwaxKit` with Xcode 27.1's toolchain, the
+  build in `~/Library/Caches`): 64 Core and 13 engine tests pass. New: `aPauseStopsTheOutputAndPlayGoesOnFromWhereItWas`
+  (the output off after a pause, on again with play, the song sample-exact from the frame left) - with 60 s
+  put back it fails on `!engine.outputRunning`. `renderOffline` (tests only) now renders silence for a
+  stopped output, as the phone plays nothing then: `aShortSongInAnotherFormatPlaysBetweenNotOver` renders on
+  past the queue's end, and the stopped engine's render threw `-80802` (AVAudioEngine's "not running").
+- **On the phone** (James, the fixed build): AirPods pause, locked and unlocked - the lock screen shows ▶ and
+  the next press plays on from where it was; the app's own pause - ▶; song 10 run to its end - ▶, and a
+  press plays it again; song 1 tapped after a pause - all three beeps, the first as loud.
+- docs/ios.md says how a pause works now (it said the output stopped after a minute, to save battery).

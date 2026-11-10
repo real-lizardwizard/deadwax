@@ -119,8 +119,9 @@ happens in `~/Library/Caches/deadwax-build`, and the last build's whole log is `
 
 The lock screen and Control Center show what's playing, and their controls work, as do the AirPods'.
 A phone call or Siri pauses the music, and it carries on when they're done. Taking an AirPod out
-pauses it. After a minute paused, the app stops its audio output to save battery. The next play
-starts it again.
+pauses it. A pause stops the app's audio output at once: that is how iOS knows it has paused, so
+the lock screen shows play and the AirPods' next press plays. The next play starts the output
+again, a moment later.
 
 ## The checks
 

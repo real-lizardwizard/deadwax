@@ -275,6 +275,33 @@ func energyMap(_ samples: [Float], block: Int = 2_048) -> String {
                 "the song goes on from frame \(from)")
     }
 
+    // A pause stops the output at once: iOS counts an app whose output runs as playing, and with it
+    // left running the lock screen kept Pause and the AirPods' next press came as another pause
+    // (notes/ios.md, "The pause the lock screen didn't see"). Play goes on from the frame left.
+    @Test func aPauseStopsTheOutputAndPlayGoesOnFromWhereItWas() throws {
+        let rate = 48_000.0
+        let song = signal(frames: 96_000, channels: 2, seed: 0.7)
+        let engine = try offlineEngine(rate: rate, channels: 2)
+        engine.play(tracksFromWhereAsked([song], rate: rate), from: 0)
+        engine.settle()
+        _ = try engine.renderOffline(24_000)
+        engine.settle()
+        let before = try #require(engine.position())
+        engine.pause()
+        engine.settle()
+        #expect(engine.phase == .paused)
+        #expect(!engine.outputRunning, "the pause stops the output")
+        let held = try #require(engine.position())
+        #expect(abs(held.seconds - before.seconds) < 0.001, "paused where the song was (\(held.seconds) s)")
+        engine.resume()
+        engine.settle()
+        #expect(engine.outputRunning)
+        let out = try engine.renderOffline(24_000)
+        let from = Int((held.seconds * rate).rounded())
+        #expect(firstDifference(samples(out, channel: 0)[8_192..<9_192], song[0][(from + 8_192)..<(from + 9_192)]) == nil,
+                "the song goes on from frame \(from)")
+    }
+
     @Test func aNewRoutePlaysOnFromWhereItWas() throws {
         let rate = 48_000.0
         let song = signal(frames: 96_000, channels: 2, seed: 0.8)
