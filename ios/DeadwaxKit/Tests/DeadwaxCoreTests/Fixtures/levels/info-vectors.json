@@ -1,0 +1,6069 @@
+{
+ "aboutRows": [
+  {
+   "name": "a song on the titled disc of a set",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 3 of 6 · 5:08",
+      "Disc 2 · Unreleased Tracks"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975 · FLAC · 11 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "the untitled disc of a titled set",
+   "track": {
+    "id": "d1t2",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 2 of 5 · 5:00",
+      "Disc 1"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975 · FLAC · 11 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "an ordinary one-disc album",
+   "track": {
+    "id": "t4",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Dummy",
+    "albumId": "dummy",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "dummy",
+    "name": "Dummy",
+    "artist": "Portishead",
+    "year": 1994,
+    "song": [
+     {
+      "id": "t1",
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "t2",
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "t3",
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "t4",
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "t5",
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "t6",
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "t7",
+      "track": 7,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "t8",
+      "track": 8,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "t9",
+      "track": 9,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "t10",
+      "track": 10,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "t11",
+      "track": 11,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 4 of 11 · 5:00"
+     ]
+    },
+    "album": {
+     "id": "dummy",
+     "title": "Dummy",
+     "coverArt": "cover-wywh",
+     "line": "1994 · FLAC · 11 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": "The album is by Portishead"
+    }
+   }
+  },
+  {
+   "name": "a one-disc album with a title",
+   "track": {
+    "id": "t4",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "dummy",
+    "name": "Dummy",
+    "artist": "Portishead",
+    "year": 1994,
+    "song": [
+     {
+      "id": "t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "t6",
+      "discNumber": 1,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "t7",
+      "discNumber": 1,
+      "track": 7,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "t8",
+      "discNumber": 1,
+      "track": 8,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "t9",
+      "discNumber": 1,
+      "track": 9,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "t10",
+      "discNumber": 1,
+      "track": 10,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "t11",
+      "discNumber": 1,
+      "track": 11,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 1,
+      "title": "Live"
+     }
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 4 of 11 · 5:00",
+      "Disc 1 · Live"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Dummy",
+     "coverArt": "cover-wywh",
+     "line": "1994 · FLAC · 11 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": "The album is by Portishead"
+    }
+   }
+  },
+  {
+   "name": "numbered straight through the set",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 7,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 8,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 9,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 10,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 11,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 8 of 11 · 5:08",
+      "Disc 2 · Unreleased Tracks"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975 · FLAC · 11 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "a number past the album's count",
+   "track": {
+    "id": "p14",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "dummy",
+    "name": "Dummy",
+    "artist": "Portishead",
+    "year": 1994,
+    "song": [
+     {
+      "id": "p1",
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "p5",
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "p14",
+      "track": 14,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 14 · 5:00"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Dummy",
+     "coverArt": "cover-wywh",
+     "line": "1994 · FLAC · 3 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": "The album is by Portishead"
+    }
+   }
+  },
+  {
+   "name": "no track number",
+   "track": {
+    "id": "x",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "dummy",
+    "name": "Dummy",
+    "artist": "Portishead",
+    "year": 1994,
+    "song": [
+     {
+      "id": "x",
+      "duration": 61
+     }
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "1:01"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Dummy",
+     "coverArt": "cover-wywh",
+     "line": "1994 · 1 song"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": "The album is by Portishead"
+    }
+   }
+  },
+  {
+   "name": "no length either",
+   "track": {
+    "id": "x",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 0,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "dummy",
+    "name": "Dummy",
+    "artist": "Portishead",
+    "year": 1994,
+    "song": [
+     {
+      "id": "x"
+     }
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": []
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Dummy",
+     "coverArt": "cover-wywh",
+     "line": "1994 · 1 song"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": "The album is by Portishead"
+    }
+   }
+  },
+  {
+   "name": "a length that rounds up",
+   "track": {
+    "id": "x",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "dummy",
+    "name": "Dummy",
+    "artist": "Portishead",
+    "year": 1994,
+    "song": [
+     {
+      "id": "x",
+      "duration": 59.5,
+      "track": 2
+     }
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 2 · 1:00"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Dummy",
+     "coverArt": "cover-wywh",
+     "line": "1994 · 1 song"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": "The album is by Portishead"
+    }
+   }
+  },
+  {
+   "name": "the album not in hand",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": null,
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "5:08"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": ""
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "played from a playlist's stub",
+   "track": {
+    "id": "t4",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Dummy",
+    "albumId": "dummy",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "dummy",
+    "name": "Dummy",
+    "artist": "Portishead",
+    "year": 1994,
+    "song": [
+     {
+      "id": "t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "partial": true
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 4 · 5:00"
+     ]
+    },
+    "album": {
+     "id": "dummy",
+     "title": "Dummy",
+     "coverArt": "cover-wywh",
+     "line": "1994"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": "The album is by Portishead"
+    }
+   }
+  },
+  {
+   "name": "no year sent",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 3 of 6 · 5:08",
+      "Disc 2 · Unreleased Tracks"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "FLAC · 11 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "a year of 0",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 0,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 3 of 6 · 5:08",
+      "Disc 2 · Unreleased Tracks"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "FLAC · 11 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "mixed formats",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "a",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "mp3",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 2 of 2 · 5:00"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975 · 2 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "a song with no suffix",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "a",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 2 of 2 · 5:00"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975 · 2 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "one song",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d2t3",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 1 of 1 · 5:00"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975 · FLAC · 1 song"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "the album's own cover over the song's",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "mf-d2t3",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "al-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 3 of 6 · 5:08",
+      "Disc 2 · Unreleased Tracks"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "al-wywh",
+     "line": "1975 · FLAC · 11 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "the song's cover when the album sent none",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "mf-d2t3",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 3 of 6 · 5:08",
+      "Disc 2 · Unreleased Tracks"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "mf-d2t3",
+     "line": "1975 · FLAC · 11 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "a song count sent without the songs",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "year": 1975,
+    "songCount": 10
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "5:08"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975 · 10 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "a song count of one",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "songCount": 1
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "5:08"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1 song"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "no album id",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": null,
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": null,
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "5:08"
+     ]
+    },
+    "album": {
+     "id": null,
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": ""
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "the queue's album id over the album's",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "q-id",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "a-id",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 3 of 6 · 5:08",
+      "Disc 2 · Unreleased Tracks"
+     ]
+    },
+    "album": {
+     "id": "q-id",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975 · FLAC · 11 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "no album named at all",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "",
+    "albumId": null,
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": null,
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "5:08"
+     ]
+    },
+    "album": null,
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "the album's name over the queue's",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Queue name",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Album name",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 3 of 6 · 5:08",
+      "Disc 2 · Unreleased Tracks"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Album name",
+     "coverArt": "cover-wywh",
+     "line": "1975 · FLAC · 11 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "an empty album name falls to the queue's",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Queue name",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 3 of 6 · 5:08",
+      "Disc 2 · Unreleased Tracks"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Queue name",
+     "coverArt": "cover-wywh",
+     "line": "1975 · FLAC · 11 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "a compilation",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Various Artists",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 3 of 6 · 5:08",
+      "Disc 2 · Unreleased Tracks"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975 · FLAC · 11 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": "The album is by Various Artists"
+    }
+   }
+  },
+  {
+   "name": "case and spaces are not a difference",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": " pink floyd ",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 3 of 6 · 5:08",
+      "Disc 2 · Unreleased Tracks"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975 · FLAC · 11 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "nobody named an artist",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": null,
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "",
+     "lines": [
+      "5:08"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": ""
+    },
+    "artist": null
+   }
+  },
+  {
+   "name": "the album's artist when the song names none",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "",
+     "lines": [
+      "5:08"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "the song's artist over the queue's",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Queue artist",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Song artist"
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Queue artist",
+     "lines": [
+      "Track 3 of 6 · 5:08",
+      "Disc 2 · Unreleased Tracks"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975 · FLAC · 11 songs"
+    },
+    "artist": {
+     "name": "Song artist",
+     "note": "The album is by Pink Floyd"
+    }
+   }
+  },
+  {
+   "name": "filled in, with the folder",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ],
+    "artistId": "ar-floyd",
+    "recordLabels": [
+     {
+      "name": "Harvest"
+     },
+     {
+      "name": " Harvest "
+     },
+     {
+      "name": "EMI"
+     },
+     {
+      "name": ""
+     },
+     {}
+    ]
+   },
+   "details": {
+    "song": {
+     "id": "d2t3",
+     "playCount": 12,
+     "displayComposer": "Roger Waters, David Gilmour"
+    },
+    "store": {
+     "present": [
+      {
+       "edition": "Experience edition",
+       "year": "2011",
+       "formats": [
+        "flac"
+       ],
+       "path": "Pink Floyd/Wish You Were Here (1975) [Experience edition]"
+      }
+     ]
+    }
+   },
+   "folders": true,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 3 of 6 · 5:08 · played 12 times",
+      "Disc 2 · Unreleased Tracks"
+     ],
+     "writtenBy": "Roger Waters, David Gilmour"
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975 · Harvest / EMI · FLAC · 11 songs",
+     "pressing": "This pressing: Experience edition · 2011 · FLAC",
+     "folder": "Pink Floyd/Wish You Were Here (1975) [Experience edition]"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "filled in, without the folder",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ],
+    "artistId": "ar-floyd",
+    "recordLabels": [
+     {
+      "name": "Harvest"
+     },
+     {
+      "name": " Harvest "
+     },
+     {
+      "name": "EMI"
+     },
+     {
+      "name": ""
+     },
+     {}
+    ]
+   },
+   "details": {
+    "song": {
+     "id": "d2t3",
+     "playCount": 12,
+     "displayComposer": "Roger Waters, David Gilmour"
+    },
+    "store": {
+     "present": [
+      {
+       "edition": "Experience edition",
+       "year": "2011",
+       "formats": [
+        "flac"
+       ],
+       "path": "Pink Floyd/Wish You Were Here (1975) [Experience edition]"
+      }
+     ]
+    }
+   },
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 3 of 6 · 5:08 · played 12 times",
+      "Disc 2 · Unreleased Tracks"
+     ],
+     "writtenBy": "Roger Waters, David Gilmour"
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975 · Harvest / EMI · FLAC · 11 songs",
+     "pressing": "This pressing: Experience edition · 2011 · FLAC"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "pressing: {\"edition\":\"\",\"year\":\"1975\",\"formats\":[\"flac\"]}",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ],
+    "artistId": "ar-floyd",
+    "recordLabels": [
+     {
+      "name": "Harvest"
+     },
+     {
+      "name": " Harvest "
+     },
+     {
+      "name": "EMI"
+     },
+     {
+      "name": ""
+     },
+     {}
+    ]
+   },
+   "details": {
+    "song": {
+     "id": "d2t3",
+     "playCount": 12,
+     "displayComposer": "Roger Waters, David Gilmour"
+    },
+    "store": {
+     "present": [
+      {
+       "path": "x",
+       "edition": "",
+       "year": "1975",
+       "formats": [
+        "flac"
+       ]
+      }
+     ]
+    }
+   },
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 3 of 6 · 5:08 · played 12 times",
+      "Disc 2 · Unreleased Tracks"
+     ],
+     "writtenBy": "Roger Waters, David Gilmour"
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975 · Harvest / EMI · FLAC · 11 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "pressing: {\"edition\":null,\"year\":\"1975-09-12\",\"formats\":[\"FLAC\"]}",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ],
+    "artistId": "ar-floyd",
+    "recordLabels": [
+     {
+      "name": "Harvest"
+     },
+     {
+      "name": " Harvest "
+     },
+     {
+      "name": "EMI"
+     },
+     {
+      "name": ""
+     },
+     {}
+    ]
+   },
+   "details": {
+    "song": {
+     "id": "d2t3",
+     "playCount": 12,
+     "displayComposer": "Roger Waters, David Gilmour"
+    },
+    "store": {
+     "present": [
+      {
+       "path": "x",
+       "edition": null,
+       "year": "1975-09-12",
+       "formats": [
+        "FLAC"
+       ]
+      }
+     ]
+    }
+   },
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 3 of 6 · 5:08 · played 12 times",
+      "Disc 2 · Unreleased Tracks"
+     ],
+     "writtenBy": "Roger Waters, David Gilmour"
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975 · Harvest / EMI · FLAC · 11 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "pressing: {\"edition\":\"Experience edition\",\"year\":\"1975\",\"formats\":[\"flac\"]}",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ],
+    "artistId": "ar-floyd",
+    "recordLabels": [
+     {
+      "name": "Harvest"
+     },
+     {
+      "name": " Harvest "
+     },
+     {
+      "name": "EMI"
+     },
+     {
+      "name": ""
+     },
+     {}
+    ]
+   },
+   "details": {
+    "song": {
+     "id": "d2t3",
+     "playCount": 12,
+     "displayComposer": "Roger Waters, David Gilmour"
+    },
+    "store": {
+     "present": [
+      {
+       "path": "x",
+       "edition": "Experience edition",
+       "year": "1975",
+       "formats": [
+        "flac"
+       ]
+      }
+     ]
+    }
+   },
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 3 of 6 · 5:08 · played 12 times",
+      "Disc 2 · Unreleased Tracks"
+     ],
+     "writtenBy": "Roger Waters, David Gilmour"
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975 · Harvest / EMI · FLAC · 11 songs",
+     "pressing": "This pressing: Experience edition · 1975 · FLAC"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "pressing: {\"edition\":\"\",\"year\":\"2011\",\"formats\":[\"flac\"]}",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ],
+    "artistId": "ar-floyd",
+    "recordLabels": [
+     {
+      "name": "Harvest"
+     },
+     {
+      "name": " Harvest "
+     },
+     {
+      "name": "EMI"
+     },
+     {
+      "name": ""
+     },
+     {}
+    ]
+   },
+   "details": {
+    "song": {
+     "id": "d2t3",
+     "playCount": 12,
+     "displayComposer": "Roger Waters, David Gilmour"
+    },
+    "store": {
+     "present": [
+      {
+       "path": "x",
+       "edition": "",
+       "year": "2011",
+       "formats": [
+        "flac"
+       ]
+      }
+     ]
+    }
+   },
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 3 of 6 · 5:08 · played 12 times",
+      "Disc 2 · Unreleased Tracks"
+     ],
+     "writtenBy": "Roger Waters, David Gilmour"
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975 · Harvest / EMI · FLAC · 11 songs",
+     "pressing": "This pressing: 2011 · FLAC"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "pressing: {\"edition\":\"\",\"year\":\"1975\",\"formats\":[\"flac\",\"mp3\"]}",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ],
+    "artistId": "ar-floyd",
+    "recordLabels": [
+     {
+      "name": "Harvest"
+     },
+     {
+      "name": " Harvest "
+     },
+     {
+      "name": "EMI"
+     },
+     {
+      "name": ""
+     },
+     {}
+    ]
+   },
+   "details": {
+    "song": {
+     "id": "d2t3",
+     "playCount": 12,
+     "displayComposer": "Roger Waters, David Gilmour"
+    },
+    "store": {
+     "present": [
+      {
+       "path": "x",
+       "edition": "",
+       "year": "1975",
+       "formats": [
+        "flac",
+        "mp3"
+       ]
+      }
+     ]
+    }
+   },
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 3 of 6 · 5:08 · played 12 times",
+      "Disc 2 · Unreleased Tracks"
+     ],
+     "writtenBy": "Roger Waters, David Gilmour"
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975 · Harvest / EMI · FLAC · 11 songs",
+     "pressing": "This pressing: 1975 · FLAC/MP3"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "pressing: {\"edition\":\"\",\"year\":\"1975\",\"formats\":[\"flac\"]}",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ],
+    "artistId": "ar-floyd",
+    "recordLabels": [
+     {
+      "name": "Harvest"
+     },
+     {
+      "name": " Harvest "
+     },
+     {
+      "name": "EMI"
+     },
+     {
+      "name": ""
+     },
+     {}
+    ]
+   },
+   "details": {
+    "song": {
+     "id": "d2t3",
+     "playCount": 12,
+     "displayComposer": "Roger Waters, David Gilmour"
+    },
+    "store": {
+     "present": [
+      {
+       "path": "x",
+       "edition": "",
+       "year": "1975",
+       "formats": [
+        "flac"
+       ]
+      }
+     ]
+    }
+   },
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 3 of 6 · 5:08 · played 12 times",
+      "Disc 2 · Unreleased Tracks"
+     ],
+     "writtenBy": "Roger Waters, David Gilmour"
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "Harvest / EMI · FLAC · 11 songs",
+     "pressing": "This pressing: 1975 · FLAC"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "pressing: {\"edition\":\"  \",\"year\":\"19x5\",\"formats\":[]}",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ],
+    "artistId": "ar-floyd",
+    "recordLabels": [
+     {
+      "name": "Harvest"
+     },
+     {
+      "name": " Harvest "
+     },
+     {
+      "name": "EMI"
+     },
+     {
+      "name": ""
+     },
+     {}
+    ]
+   },
+   "details": {
+    "song": {
+     "id": "d2t3",
+     "playCount": 12,
+     "displayComposer": "Roger Waters, David Gilmour"
+    },
+    "store": {
+     "present": [
+      {
+       "path": "x",
+       "edition": "  ",
+       "year": "19x5",
+       "formats": []
+      }
+     ]
+    }
+   },
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 3 of 6 · 5:08 · played 12 times",
+      "Disc 2 · Unreleased Tracks"
+     ],
+     "writtenBy": "Roger Waters, David Gilmour"
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975 · Harvest / EMI · FLAC · 11 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "two folders of a set",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ]
+   },
+   "details": {
+    "store": {
+     "present": [
+      {
+       "path": "A/Disc 1",
+       "edition": "",
+       "year": "1975",
+       "formats": [
+        "flac"
+       ]
+      },
+      {
+       "path": "A/Disc 2",
+       "edition": "",
+       "year": "1975",
+       "formats": [
+        "flac",
+        "mp3"
+       ]
+      },
+      {
+       "path": ""
+      }
+     ]
+    }
+   },
+   "folders": true,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 3 of 6 · 5:08",
+      "Disc 2 · Unreleased Tracks"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975 · FLAC · 11 songs",
+     "pressing": "This pressing: 1975 · FLAC/MP3",
+     "folder": "A/Disc 1\nA/Disc 2"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "the song's details are this song's only",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ],
+    "artistId": "ar-floyd",
+    "recordLabels": [
+     {
+      "name": "Harvest"
+     },
+     {
+      "name": " Harvest "
+     },
+     {
+      "name": "EMI"
+     },
+     {
+      "name": ""
+     },
+     {}
+    ]
+   },
+   "details": {
+    "song": {
+     "id": "other",
+     "playCount": 99,
+     "displayComposer": "X"
+    },
+    "store": {
+     "present": [
+      {
+       "edition": "Experience edition",
+       "year": "2011",
+       "formats": [
+        "flac"
+       ],
+       "path": "Pink Floyd/Wish You Were Here (1975) [Experience edition]"
+      }
+     ]
+    }
+   },
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 3 of 6 · 5:08",
+      "Disc 2 · Unreleased Tracks"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975 · Harvest / EMI · FLAC · 11 songs",
+     "pressing": "This pressing: Experience edition · 2011 · FLAC"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "the album's count until Navidrome answers",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd",
+      "playCount": 1
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ],
+    "artistId": "ar-floyd",
+    "recordLabels": [
+     {
+      "name": "Harvest"
+     },
+     {
+      "name": " Harvest "
+     },
+     {
+      "name": "EMI"
+     },
+     {
+      "name": ""
+     },
+     {}
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 3 of 6 · 5:08 · played once",
+      "Disc 2 · Unreleased Tracks"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975 · Harvest / EMI · FLAC · 11 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "Navidrome's answer over it, even one saying fewer",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd",
+      "playCount": 5
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ],
+    "artistId": "ar-floyd",
+    "recordLabels": [
+     {
+      "name": "Harvest"
+     },
+     {
+      "name": " Harvest "
+     },
+     {
+      "name": "EMI"
+     },
+     {
+      "name": ""
+     },
+     {}
+    ]
+   },
+   "details": {
+    "song": {
+     "id": "d2t3"
+    }
+   },
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 3 of 6 · 5:08",
+      "Disc 2 · Unreleased Tracks"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975 · Harvest / EMI · FLAC · 11 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "nothing sent",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ]
+   },
+   "details": {
+    "song": {
+     "id": "d2t3",
+     "playCount": 0,
+     "displayComposer": " "
+    },
+    "store": {
+     "present": []
+    },
+    "artist": null,
+    "facts": null
+   },
+   "folders": true,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 3 of 6 · 5:08",
+      "Disc 2 · Unreleased Tracks"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975 · FLAC · 11 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "writers from the contributors",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ]
+   },
+   "details": {
+    "song": {
+     "id": "d2t3",
+     "contributors": [
+      {
+       "role": "Composer",
+       "artist": {
+        "name": " Geoff Barrow "
+       }
+      },
+      {
+       "role": "composer",
+       "artist": {
+        "name": "Geoff Barrow"
+       }
+      },
+      {
+       "role": "lyricist",
+       "artist": {
+        "name": "Beth Gibbons"
+       }
+      },
+      {
+       "role": "composer",
+       "artist": {
+        "name": "Adrian Utley"
+       }
+      },
+      {
+       "role": "composer"
+      }
+     ]
+    }
+   },
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 3 of 6 · 5:08",
+      "Disc 2 · Unreleased Tracks"
+     ],
+     "writtenBy": "Geoff Barrow, Adrian Utley"
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975 · FLAC · 11 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "the album's song's writers before Navidrome answers",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t3",
+      "discNumber": 1,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t4",
+      "discNumber": 1,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d1t5",
+      "discNumber": 1,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t1",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t2",
+      "discNumber": 2,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 308,
+      "suffix": "flac",
+      "artist": "Pink Floyd",
+      "displayComposer": "Roger Waters"
+     },
+     {
+      "id": "d2t4",
+      "discNumber": 2,
+      "track": 4,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t5",
+      "discNumber": 2,
+      "track": 5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t6",
+      "discNumber": 2,
+      "track": 6,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 3 of 6 · 5:08",
+      "Disc 2 · Unreleased Tracks"
+     ],
+     "writtenBy": "Roger Waters"
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975 · FLAC · 11 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": null
+    }
+   }
+  },
+  {
+   "name": "a disc number of 0 is disc 1",
+   "track": {
+    "id": "z2",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "dummy",
+    "name": "Dummy",
+    "artist": "Portishead",
+    "year": 1994,
+    "song": [
+     {
+      "id": "z1",
+      "discNumber": 0,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "z2",
+      "discNumber": 2,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": "2",
+      "title": " Bonus "
+     },
+     {
+      "disc": 2,
+      "title": "Second"
+     },
+     {
+      "disc": 0,
+      "title": "None"
+     },
+     {
+      "disc": "x",
+      "title": "Bad"
+     },
+     {
+      "disc": 1,
+      "title": ""
+     }
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 1 of 1 · 5:00",
+      "Disc 2 · Bonus"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Dummy",
+     "coverArt": "cover-wywh",
+     "line": "1994 · FLAC · 2 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": "The album is by Portishead"
+    }
+   }
+  },
+  {
+   "name": "a disc title given as a string disc",
+   "track": {
+    "id": "z1",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "dummy",
+    "name": "Dummy",
+    "artist": "Portishead",
+    "year": 1994,
+    "song": [
+     {
+      "id": "z1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "z2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": "1",
+      "title": "Live"
+     }
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 1 of 2 · 5:00",
+      "Disc 1 · Live"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Dummy",
+     "coverArt": "cover-wywh",
+     "line": "1994 · FLAC · 2 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": "The album is by Portishead"
+    }
+   }
+  },
+  {
+   "name": "a fractional track number",
+   "track": {
+    "id": "z1",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "dummy",
+    "name": "Dummy",
+    "artist": "Portishead",
+    "year": 1994,
+    "song": [
+     {
+      "id": "z1",
+      "discNumber": 1,
+      "track": 2.5,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "z2",
+      "discNumber": 1,
+      "track": 2,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ]
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "5:00"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Dummy",
+     "coverArt": "cover-wywh",
+     "line": "1994 · FLAC · 2 songs"
+    },
+    "artist": {
+     "name": "Pink Floyd",
+     "note": "The album is by Portishead"
+    }
+   }
+  }
+ ],
+ "writtenBy": [
+  {
+   "song": {
+    "displayComposer": " Geoff Barrow "
+   },
+   "words": "Geoff Barrow"
+  },
+  {
+   "song": {
+    "contributors": [
+     {
+      "role": "composer",
+      "artist": {
+       "name": "A"
+      }
+     },
+     {
+      "role": "lyricist",
+      "artist": {
+       "name": "B"
+      }
+     },
+     {
+      "role": "Composer",
+      "artist": {
+       "name": "A"
+      }
+     }
+    ]
+   },
+   "words": "A"
+  },
+  {
+   "song": null,
+   "words": ""
+  },
+  {
+   "song": {
+    "displayComposer": "",
+    "contributors": [
+     {
+      "role": "COMPOSER",
+      "artist": {
+       "name": "C"
+      }
+     },
+     {
+      "role": "composer",
+      "artist": {
+       "name": "D"
+      }
+     }
+    ]
+   },
+   "words": "C, D"
+  },
+  {
+   "song": {
+    "contributors": []
+   },
+   "words": ""
+  },
+  {
+   "song": {},
+   "words": ""
+  }
+ ],
+ "playedLine": [
+  {
+   "count": 1,
+   "words": "played once"
+  },
+  {
+   "count": 2,
+   "words": "played 2 times"
+  },
+  {
+   "count": 0,
+   "words": ""
+  },
+  {
+   "count": null,
+   "words": ""
+  },
+  {
+   "count": 2.5,
+   "words": ""
+  },
+  {
+   "count": -1,
+   "words": ""
+  },
+  {
+   "count": 12,
+   "words": "played 12 times"
+  },
+  {
+   "count": 1000,
+   "words": "played 1000 times"
+  }
+ ],
+ "labelLine": [
+  {
+   "labels": [
+    {
+     "name": "Harvest"
+    }
+   ],
+   "words": "Harvest"
+  },
+  {
+   "labels": [
+    {
+     "name": "Go! Beat"
+    },
+    {
+     "name": "London"
+    },
+    {
+     "name": "Go! Beat "
+    }
+   ],
+   "words": "Go! Beat / London"
+  },
+  {
+   "labels": [
+    {
+     "name": ""
+    }
+   ],
+   "words": ""
+  },
+  {
+   "labels": null,
+   "words": ""
+  },
+  {
+   "labels": [],
+   "words": ""
+  },
+  {
+   "labels": [
+    {},
+    {
+     "name": " EMI "
+    }
+   ],
+   "words": "EMI"
+  }
+ ],
+ "trackTime": [
+  {
+   "seconds": 0,
+   "words": ""
+  },
+  {
+   "seconds": 61,
+   "words": "1:01"
+  },
+  {
+   "seconds": 308,
+   "words": "5:08"
+  },
+  {
+   "seconds": 59.5,
+   "words": "1:00"
+  },
+  {
+   "seconds": 0.4,
+   "words": "0:00"
+  },
+  {
+   "seconds": 0.5,
+   "words": "0:01"
+  },
+  {
+   "seconds": 3600.5,
+   "words": "60:01"
+  },
+  {
+   "seconds": 125.49,
+   "words": "2:05"
+  },
+  {
+   "seconds": null,
+   "words": ""
+  },
+  {
+   "seconds": 1.5,
+   "words": "0:02"
+  },
+  {
+   "seconds": 7199.6,
+   "words": "120:00"
+  }
+ ],
+ "sharedFormat": [
+  {
+   "songs": [
+    {
+     "suffix": "flac"
+    },
+    {
+     "suffix": "FLAC"
+    }
+   ],
+   "format": "FLAC"
+  },
+  {
+   "songs": [
+    {
+     "suffix": "flac"
+    },
+    {}
+   ],
+   "format": null
+  },
+  {
+   "songs": [],
+   "format": null
+  },
+  {
+   "songs": [
+    {
+     "suffix": "mp3"
+    }
+   ],
+   "format": "MP3"
+  },
+  {
+   "songs": [
+    {}
+   ],
+   "format": null
+  },
+  {
+   "songs": [
+    {
+     "suffix": ""
+    },
+    {
+     "suffix": ""
+    }
+   ],
+   "format": null
+  }
+ ]
+}

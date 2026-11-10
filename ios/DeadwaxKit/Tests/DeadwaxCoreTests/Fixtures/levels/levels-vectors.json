@@ -1,0 +1,5096 @@
+{
+ "python_gain_for": {
+  "REFERENCE_LUFS": -18,
+  "FULL_DB": -0.0000010354387945871882,
+  "FULL_DB_repr": "-1.0354387945871882e-06",
+  "HEADROOM_DB": 3,
+  "cases": [
+   {
+    "name": "typical loud song",
+    "loudness_lufs": -10.6,
+    "peak": 0.8912509381337456,
+    "reserve_db": 0,
+    "gain_db": -7.4,
+    "wanted_db": -7.4,
+    "peak_db": -0.9999999999999997,
+    "held": false,
+    "multiplier": 0.42657951880159267,
+    "multiplier_f32": 0.4265795052051544
+   },
+   {
+    "name": "quiet song held by its peak",
+    "loudness_lufs": -24,
+    "peak": 0.6683439175686147,
+    "reserve_db": 0,
+    "gain_db": 3.49,
+    "wanted_db": 6,
+    "peak_db": -3.499999999999999,
+    "held": true,
+    "multiplier": 1.4945140423664582,
+    "multiplier_f32": 1.494513988494873
+   },
+   {
+    "name": "room enough for the reserve",
+    "loudness_lufs": -20,
+    "peak": 0.5011872336272722,
+    "reserve_db": 3,
+    "gain_db": 2,
+    "wanted_db": 2,
+    "peak_db": -6.000000000000001,
+    "held": false,
+    "multiplier": 1.2589254117941673,
+    "multiplier_f32": 1.258925437927246
+   },
+   {
+    "name": "held inside the reserve",
+    "loudness_lufs": -20,
+    "peak": 0.6309573444801932,
+    "reserve_db": 3,
+    "gain_db": 0.99,
+    "wanted_db": 2,
+    "peak_db": -4,
+    "held": true,
+    "multiplier": 1.1207274261366476,
+    "multiplier_f32": 1.1207274198532104
+   },
+   {
+    "name": "same, no reserve (the phone)",
+    "loudness_lufs": -20,
+    "peak": 0.6309573444801932,
+    "reserve_db": 0,
+    "gain_db": 2,
+    "wanted_db": 2,
+    "peak_db": -4,
+    "held": false,
+    "multiplier": 1.2589254117941673,
+    "multiplier_f32": 1.258925437927246
+   },
+   {
+    "name": "silence: loudness null, peak 0",
+    "loudness_lufs": null,
+    "peak": 0,
+    "reserve_db": 0,
+    "gain_db": 0,
+    "wanted_db": 0,
+    "peak_db": null,
+    "held": false,
+    "multiplier": 1,
+    "multiplier_f32": 1
+   },
+   {
+    "name": "under the gate: loudness null, peak 0.5",
+    "loudness_lufs": null,
+    "peak": 0.5,
+    "reserve_db": 0,
+    "gain_db": 0,
+    "wanted_db": 0,
+    "peak_db": -6.020599913279624,
+    "held": false,
+    "multiplier": 1,
+    "multiplier_f32": 1
+   },
+   {
+    "name": "under the gate: loudness null, full-scale peak",
+    "loudness_lufs": null,
+    "peak": 1,
+    "reserve_db": 0,
+    "gain_db": -0.01,
+    "wanted_db": 0,
+    "peak_db": 0,
+    "held": true,
+    "multiplier": 0.9988493699365052,
+    "multiplier_f32": 0.9988493919372559
+   },
+   {
+    "name": "peak 0 (digital zero) but loudness given",
+    "loudness_lufs": -30,
+    "peak": 0,
+    "reserve_db": 0,
+    "gain_db": 12,
+    "wanted_db": 12,
+    "peak_db": null,
+    "held": false,
+    "multiplier": 3.9810717055349722,
+    "multiplier_f32": 3.981071710586548
+   },
+   {
+    "name": "very quiet, small peak, not held",
+    "loudness_lufs": -60,
+    "peak": 0.001,
+    "reserve_db": 0,
+    "gain_db": 42,
+    "wanted_db": 42,
+    "peak_db": -60,
+    "held": false,
+    "multiplier": 125.89254117941675,
+    "multiplier_f32": 125.89253997802734
+   },
+   {
+    "name": "very quiet, held",
+    "loudness_lufs": -60,
+    "peak": 0.01,
+    "reserve_db": 0,
+    "gain_db": 39.99,
+    "wanted_db": 42,
+    "peak_db": -40,
+    "held": true,
+    "multiplier": 99.88493699365053,
+    "multiplier_f32": 99.88493347167969
+   },
+   {
+    "name": "very loud master",
+    "loudness_lufs": -3,
+    "peak": 1,
+    "reserve_db": 0,
+    "gain_db": -15,
+    "wanted_db": -15,
+    "peak_db": 0,
+    "held": false,
+    "multiplier": 0.1778279410038923,
+    "multiplier_f32": 0.17782793939113617
+   },
+   {
+    "name": "0 LUFS",
+    "loudness_lufs": 0,
+    "peak": 1,
+    "reserve_db": 0,
+    "gain_db": -18,
+    "wanted_db": -18,
+    "peak_db": 0,
+    "held": false,
+    "multiplier": 0.12589254117941673,
+    "multiplier_f32": 0.1258925348520279
+   },
+   {
+    "name": "exactly the reference",
+    "loudness_lufs": -18,
+    "peak": 0.5,
+    "reserve_db": 0,
+    "gain_db": 0,
+    "wanted_db": 0,
+    "peak_db": -6.020599913279624,
+    "held": false,
+    "multiplier": 1,
+    "multiplier_f32": 1
+   },
+   {
+    "name": "full-scale peak, wants up",
+    "loudness_lufs": -20,
+    "peak": 1,
+    "reserve_db": 0,
+    "gain_db": -0.01,
+    "wanted_db": 2,
+    "peak_db": 0,
+    "held": true,
+    "multiplier": 0.9988493699365052,
+    "multiplier_f32": 0.9988493919372559
+   },
+   {
+    "name": "16-bit full scale peak 32767/32768",
+    "loudness_lufs": -20,
+    "peak": 0.999969482421875,
+    "reserve_db": 0,
+    "gain_db": 0,
+    "wanted_db": 2,
+    "peak_db": -0.00026507636037961915,
+    "held": true,
+    "multiplier": 1,
+    "multiplier_f32": 1
+   },
+   {
+    "name": "24-bit largest sample",
+    "loudness_lufs": -20,
+    "peak": 0.9999998807907104,
+    "reserve_db": 0,
+    "gain_db": 0,
+    "wanted_db": 2,
+    "peak_db": -0.0000010354387945871882,
+    "held": true,
+    "multiplier": 1,
+    "multiplier_f32": 1
+   },
+   {
+    "name": "wanted -7.42",
+    "loudness_lufs": -10.58,
+    "peak": 0.01,
+    "reserve_db": 0,
+    "gain_db": -7.42,
+    "wanted_db": -7.42,
+    "peak_db": -40,
+    "held": false,
+    "multiplier": 0.4255984131337431,
+    "multiplier_f32": 0.4255984127521515
+   },
+   {
+    "name": "wanted -7.425 (floors to -7.43)",
+    "loudness_lufs": -10.575,
+    "peak": 0.01,
+    "reserve_db": 0,
+    "gain_db": -7.43,
+    "wanted_db": -7.425000000000001,
+    "peak_db": -40,
+    "held": false,
+    "multiplier": 0.4251087068046157,
+    "multiplier_f32": 0.4251087009906769
+   },
+   {
+    "name": "wanted -7.4299999",
+    "loudness_lufs": -10.5700001,
+    "peak": 0.01,
+    "reserve_db": 0,
+    "gain_db": -7.43,
+    "wanted_db": -7.4299999,
+    "peak_db": -40,
+    "held": false,
+    "multiplier": 0.4251087068046157,
+    "multiplier_f32": 0.4251087009906769
+   },
+   {
+    "name": "wanted -7.4200000001 (snaps to -7.42)",
+    "loudness_lufs": -10.5799999999,
+    "peak": 0.01,
+    "reserve_db": 0,
+    "gain_db": -7.42,
+    "wanted_db": -7.4200000001,
+    "peak_db": -40,
+    "held": false,
+    "multiplier": 0.4255984131337431,
+    "multiplier_f32": 0.4255984127521515
+   },
+   {
+    "name": "wanted 2.9999999999 (snaps up to 3.00)",
+    "loudness_lufs": -20.999999999899998,
+    "peak": 0.01,
+    "reserve_db": 0,
+    "gain_db": 3,
+    "wanted_db": 2.999999999899998,
+    "peak_db": -40,
+    "held": false,
+    "multiplier": 1.4125375446227544,
+    "multiplier_f32": 1.4125375747680664
+   },
+   {
+    "name": "wanted 1.2",
+    "loudness_lufs": -19.2,
+    "peak": 0.01,
+    "reserve_db": 0,
+    "gain_db": 1.2,
+    "wanted_db": 1.1999999999999993,
+    "peak_db": -40,
+    "held": false,
+    "multiplier": 1.1481536214968828,
+    "multiplier_f32": 1.1481536626815796
+   },
+   {
+    "name": "wanted 7.42 from -25.42",
+    "loudness_lufs": -25.42,
+    "peak": 0.01,
+    "reserve_db": 0,
+    "gain_db": 7.42,
+    "wanted_db": 7.420000000000002,
+    "peak_db": -40,
+    "held": false,
+    "multiplier": 2.3496328208483073,
+    "multiplier_f32": 2.349632740020752
+   },
+   {
+    "name": "wanted -0.001 (floors to -0.01)",
+    "loudness_lufs": -17.999,
+    "peak": 0.01,
+    "reserve_db": 0,
+    "gain_db": -0.01,
+    "wanted_db": -0.0010000000000012221,
+    "peak_db": -40,
+    "held": false,
+    "multiplier": 0.9988493699365052,
+    "multiplier_f32": 0.9988493919372559
+   },
+   {
+    "name": "wanted 3.999",
+    "loudness_lufs": -21.999,
+    "peak": 0.01,
+    "reserve_db": 0,
+    "gain_db": 3.99,
+    "wanted_db": 3.9989999999999988,
+    "peak_db": -40,
+    "held": false,
+    "multiplier": 1.5830695667064394,
+    "multiplier_f32": 1.5830695629119873
+   },
+   {
+    "name": "wanted 0.004",
+    "loudness_lufs": -18.004,
+    "peak": 0.01,
+    "reserve_db": 0,
+    "gain_db": 0,
+    "wanted_db": 0.004000000000001336,
+    "peak_db": -40,
+    "held": false,
+    "multiplier": 1,
+    "multiplier_f32": 1
+   },
+   {
+    "name": "gain -0.25 exactly (JS toFixed(1) tie)",
+    "loudness_lufs": -17.75,
+    "peak": 0.01,
+    "reserve_db": 0,
+    "gain_db": -0.25,
+    "wanted_db": -0.25,
+    "peak_db": -40,
+    "held": false,
+    "multiplier": 0.9716279515771061,
+    "multiplier_f32": 0.971627950668335
+   },
+   {
+    "name": "gain 0.75 exactly",
+    "loudness_lufs": -18.75,
+    "peak": 0.01,
+    "reserve_db": 0,
+    "gain_db": 0.75,
+    "wanted_db": 0.75,
+    "peak_db": -40,
+    "held": false,
+    "multiplier": 1.0901844923851276,
+    "multiplier_f32": 1.0901844501495361
+   },
+   {
+    "name": "gain -1.75 exactly",
+    "loudness_lufs": -16.25,
+    "peak": 0.01,
+    "reserve_db": 0,
+    "gain_db": -1.75,
+    "wanted_db": -1.75,
+    "peak_db": -40,
+    "held": false,
+    "multiplier": 0.81752303794365,
+    "multiplier_f32": 0.8175230622291565
+   },
+   {
+    "name": "gain 2.25 exactly",
+    "loudness_lufs": -20.25,
+    "peak": 0.01,
+    "reserve_db": 0,
+    "gain_db": 2.25,
+    "wanted_db": 2.25,
+    "peak_db": -40,
+    "held": false,
+    "multiplier": 1.2956866975170194,
+    "multiplier_f32": 1.2956867218017578
+   },
+   {
+    "name": "held, limit 1e-10 under 3.00 (guard: 2.99)",
+    "loudness_lufs": -40,
+    "peak": 0.7079456999985745,
+    "reserve_db": 0,
+    "gain_db": 2.99,
+    "wanted_db": 22,
+    "peak_db": -3.0000010353387943,
+    "held": true,
+    "multiplier": 1.4109122364580962,
+    "multiplier_f32": 1.410912275314331
+   },
+   {
+    "name": "held, limit 1e-10 over 3.00 (3.00)",
+    "loudness_lufs": -40,
+    "peak": 0.7079456999822734,
+    "reserve_db": 0,
+    "gain_db": 3,
+    "wanted_db": 22,
+    "peak_db": -3.0000010355387943,
+    "held": true,
+    "multiplier": 1.4125375446227544,
+    "multiplier_f32": 1.4125375747680664
+   },
+   {
+    "name": "held, limit 1e-10 under 0.50 (guard: 0.49)",
+    "loudness_lufs": -30,
+    "peak": 0.9440607637559659,
+    "reserve_db": 0,
+    "gain_db": 0.49,
+    "wanted_db": 12,
+    "peak_db": -0.5000010353387946,
+    "held": true,
+    "multiplier": 1.058034915996231,
+    "multiplier_f32": 1.058034896850586
+   },
+   {
+    "name": "wanted 3 - 4e-9: within 5e-7 of 300 hundredths, snaps to 3.00",
+    "loudness_lufs": -20.999999996,
+    "peak": 0.01,
+    "reserve_db": 0,
+    "gain_db": 3,
+    "wanted_db": 2.9999999959999997,
+    "peak_db": -40,
+    "held": false,
+    "multiplier": 1.4125375446227544,
+    "multiplier_f32": 1.4125375747680664
+   },
+   {
+    "name": "wanted 3 - 6e-9: just outside, floors to 2.99",
+    "loudness_lufs": -20.999999994,
+    "peak": 0.01,
+    "reserve_db": 0,
+    "gain_db": 2.99,
+    "wanted_db": 2.9999999939999995,
+    "peak_db": -40,
+    "held": false,
+    "multiplier": 1.4109122364580962,
+    "multiplier_f32": 1.410912275314331
+   },
+   {
+    "name": "wanted -2 - 4e-9: within 5e-7 above -200, snaps to -2.00",
+    "loudness_lufs": -15.999999996,
+    "peak": 0.01,
+    "reserve_db": 0,
+    "gain_db": -2,
+    "wanted_db": -2.0000000040000003,
+    "peak_db": -40,
+    "held": false,
+    "multiplier": 0.7943282347242815,
+    "multiplier_f32": 0.7943282127380371
+   },
+   {
+    "name": "wanted -2 - 6e-9: floors to -2.01",
+    "loudness_lufs": -15.999999994,
+    "peak": 0.01,
+    "reserve_db": 0,
+    "gain_db": -2.01,
+    "wanted_db": -2.0000000060000005,
+    "peak_db": -40,
+    "held": false,
+    "multiplier": 0.793414256777125,
+    "multiplier_f32": 0.7934142351150513
+   },
+   {
+    "name": "h=799.9999995: round(h,6) is 799.999999 (7.99); (h*1e6).rounded()/1e6 says 8.00",
+    "loudness_lufs": -25.999999995,
+    "peak": 0.01,
+    "reserve_db": 0,
+    "gain_db": 7.99,
+    "wanted_db": 7.999999995,
+    "peak_db": -40,
+    "held": false,
+    "multiplier": 2.5089961794654005,
+    "multiplier_f32": 2.5089962482452393
+   },
+   {
+    "name": "h=656.9999995: 6.56, the multiply shortcut says 6.57",
+    "loudness_lufs": -24.569999995,
+    "peak": 0.01,
+    "reserve_db": 0,
+    "gain_db": 6.56,
+    "wanted_db": 6.569999995,
+    "peak_db": -40,
+    "held": false,
+    "multiplier": 2.128139045982712,
+    "multiplier_f32": 2.128139019012451
+   },
+   {
+    "name": "h=-818.0000005: -8.19, the multiply shortcut says -8.18",
+    "loudness_lufs": -9.819999995,
+    "peak": 0.01,
+    "reserve_db": 0,
+    "gain_db": -8.19,
+    "wanted_db": -8.180000005,
+    "peak_db": -40,
+    "held": false,
+    "multiplier": 0.3894933077036545,
+    "multiplier_f32": 0.38949331641197205
+   },
+   {
+    "name": "the loudness route's example album (3.1)",
+    "loudness_lufs": -11.437218417201565,
+    "peak": 0.98876953125,
+    "reserve_db": 0,
+    "gain_db": -6.57,
+    "wanted_db": -6.562781582798435,
+    "peak_db": -0.09809849506211576,
+    "held": false,
+    "multiplier": 0.4693534343171951,
+    "multiplier_f32": 0.46935343742370605
+   },
+   {
+    "name": "a hi-res album held by its peak: the phone, no reserve",
+    "loudness_lufs": -23.81630525,
+    "peak": 0.50115966796875,
+    "reserve_db": 0,
+    "gain_db": 5.81,
+    "wanted_db": 5.816305249999999,
+    "peak_db": -6.000477743319013,
+    "held": false,
+    "multiplier": 1.9520907340433051,
+    "multiplier_f32": 1.9520907402038574
+   },
+   {
+    "name": "...and the web's copy of it, with the resample's room",
+    "loudness_lufs": -23.81630525,
+    "peak": 0.50115966796875,
+    "reserve_db": 3,
+    "gain_db": 3,
+    "wanted_db": 5.816305249999999,
+    "peak_db": -6.000477743319013,
+    "held": true,
+    "multiplier": 1.4125375446227544,
+    "multiplier_f32": 1.4125375747680664
+   }
+  ]
+ },
+ "typescript": {
+  "levelFor": [
+   {
+    "setting": "auto",
+    "as": "album",
+    "level": "album"
+   },
+   {
+    "setting": "auto",
+    "as": "songs",
+    "level": "track"
+   },
+   {
+    "setting": "song",
+    "as": "album",
+    "level": "track"
+   },
+   {
+    "setting": "song",
+    "as": "songs",
+    "level": "track"
+   },
+   {
+    "setting": "album",
+    "as": "album",
+    "level": "album"
+   },
+   {
+    "setting": "album",
+    "as": "songs",
+    "level": "album"
+   },
+   {
+    "setting": "off",
+    "as": "album",
+    "level": null
+   },
+   {
+    "setting": "off",
+    "as": "songs",
+    "level": null
+   }
+  ],
+  "relevel": [
+   {
+    "setting": "auto",
+    "saved": "album",
+    "level": "album"
+   },
+   {
+    "setting": "auto",
+    "saved": "track",
+    "level": "track"
+   },
+   {
+    "setting": "auto",
+    "saved": null,
+    "level": "track"
+   },
+   {
+    "setting": "song",
+    "saved": "album",
+    "level": "track"
+   },
+   {
+    "setting": "song",
+    "saved": "track",
+    "level": "track"
+   },
+   {
+    "setting": "song",
+    "saved": null,
+    "level": "track"
+   },
+   {
+    "setting": "album",
+    "saved": "album",
+    "level": "album"
+   },
+   {
+    "setting": "album",
+    "saved": "track",
+    "level": "album"
+   },
+   {
+    "setting": "album",
+    "saved": null,
+    "level": "album"
+   },
+   {
+    "setting": "off",
+    "saved": "album",
+    "level": null
+   },
+   {
+    "setting": "off",
+    "saved": "track",
+    "level": null
+   },
+   {
+    "setting": "off",
+    "saved": null,
+    "level": null
+   }
+  ],
+  "isFlac": [
+   {
+    "suffix": "flac",
+    "contentType": "audio/flac",
+    "isFlac": true
+   },
+   {
+    "suffix": "FLAC",
+    "contentType": null,
+    "isFlac": true
+   },
+   {
+    "suffix": null,
+    "contentType": "audio/x-flac",
+    "isFlac": true
+   },
+   {
+    "suffix": null,
+    "contentType": "Audio/FLAC; charset=x",
+    "isFlac": true
+   },
+   {
+    "suffix": "mp3",
+    "contentType": "audio/mpeg",
+    "isFlac": false
+   },
+   {
+    "suffix": "m4a",
+    "contentType": "audio/mp4",
+    "isFlac": false
+   },
+   {
+    "suffix": "opus",
+    "contentType": "audio/ogg",
+    "isFlac": false
+   },
+   {
+    "suffix": null,
+    "contentType": null,
+    "isFlac": false
+   },
+   {
+    "suffix": "",
+    "contentType": "audio/flac ",
+    "isFlac": true
+   },
+   {
+    "suffix": "Flac",
+    "contentType": "audio/mpeg",
+    "isFlac": true
+   },
+   {
+    "suffix": null,
+    "contentType": " audio/x-flac ;x",
+    "isFlac": true
+   },
+   {
+    "suffix": null,
+    "contentType": ";audio/flac",
+    "isFlac": false
+   },
+   {
+    "suffix": "flac ",
+    "contentType": null,
+    "isFlac": false
+   },
+   {
+    "suffix": null,
+    "contentType": "audio/flacx",
+    "isFlac": false
+   }
+  ],
+  "levels": [
+   {
+    "suffix": "flac",
+    "contentType": "audio/flac",
+    "level": "album",
+    "format": "raw",
+    "levels": true
+   },
+   {
+    "suffix": "flac",
+    "contentType": "audio/flac",
+    "level": "album",
+    "format": "mp3",
+    "levels": false
+   },
+   {
+    "suffix": "flac",
+    "contentType": "audio/flac",
+    "level": "track",
+    "format": "raw",
+    "levels": true
+   },
+   {
+    "suffix": "flac",
+    "contentType": "audio/flac",
+    "level": "track",
+    "format": "mp3",
+    "levels": false
+   },
+   {
+    "suffix": "flac",
+    "contentType": "audio/flac",
+    "level": null,
+    "format": "raw",
+    "levels": false
+   },
+   {
+    "suffix": "flac",
+    "contentType": "audio/flac",
+    "level": null,
+    "format": "mp3",
+    "levels": false
+   },
+   {
+    "suffix": "FLAC",
+    "contentType": null,
+    "level": "album",
+    "format": "raw",
+    "levels": true
+   },
+   {
+    "suffix": "FLAC",
+    "contentType": null,
+    "level": "album",
+    "format": "mp3",
+    "levels": false
+   },
+   {
+    "suffix": "FLAC",
+    "contentType": null,
+    "level": "track",
+    "format": "raw",
+    "levels": true
+   },
+   {
+    "suffix": "FLAC",
+    "contentType": null,
+    "level": "track",
+    "format": "mp3",
+    "levels": false
+   },
+   {
+    "suffix": "FLAC",
+    "contentType": null,
+    "level": null,
+    "format": "raw",
+    "levels": false
+   },
+   {
+    "suffix": "FLAC",
+    "contentType": null,
+    "level": null,
+    "format": "mp3",
+    "levels": false
+   },
+   {
+    "suffix": null,
+    "contentType": "audio/x-flac",
+    "level": "album",
+    "format": "raw",
+    "levels": true
+   },
+   {
+    "suffix": null,
+    "contentType": "audio/x-flac",
+    "level": "album",
+    "format": "mp3",
+    "levels": false
+   },
+   {
+    "suffix": null,
+    "contentType": "audio/x-flac",
+    "level": "track",
+    "format": "raw",
+    "levels": true
+   },
+   {
+    "suffix": null,
+    "contentType": "audio/x-flac",
+    "level": "track",
+    "format": "mp3",
+    "levels": false
+   },
+   {
+    "suffix": null,
+    "contentType": "audio/x-flac",
+    "level": null,
+    "format": "raw",
+    "levels": false
+   },
+   {
+    "suffix": null,
+    "contentType": "audio/x-flac",
+    "level": null,
+    "format": "mp3",
+    "levels": false
+   },
+   {
+    "suffix": null,
+    "contentType": "Audio/FLAC; charset=x",
+    "level": "album",
+    "format": "raw",
+    "levels": true
+   },
+   {
+    "suffix": null,
+    "contentType": "Audio/FLAC; charset=x",
+    "level": "album",
+    "format": "mp3",
+    "levels": false
+   },
+   {
+    "suffix": null,
+    "contentType": "Audio/FLAC; charset=x",
+    "level": "track",
+    "format": "raw",
+    "levels": true
+   },
+   {
+    "suffix": null,
+    "contentType": "Audio/FLAC; charset=x",
+    "level": "track",
+    "format": "mp3",
+    "levels": false
+   },
+   {
+    "suffix": null,
+    "contentType": "Audio/FLAC; charset=x",
+    "level": null,
+    "format": "raw",
+    "levels": false
+   },
+   {
+    "suffix": null,
+    "contentType": "Audio/FLAC; charset=x",
+    "level": null,
+    "format": "mp3",
+    "levels": false
+   },
+   {
+    "suffix": "mp3",
+    "contentType": "audio/mpeg",
+    "level": "album",
+    "format": "raw",
+    "levels": false
+   },
+   {
+    "suffix": "mp3",
+    "contentType": "audio/mpeg",
+    "level": "album",
+    "format": "mp3",
+    "levels": false
+   },
+   {
+    "suffix": "mp3",
+    "contentType": "audio/mpeg",
+    "level": "track",
+    "format": "raw",
+    "levels": false
+   },
+   {
+    "suffix": "mp3",
+    "contentType": "audio/mpeg",
+    "level": "track",
+    "format": "mp3",
+    "levels": false
+   },
+   {
+    "suffix": "mp3",
+    "contentType": "audio/mpeg",
+    "level": null,
+    "format": "raw",
+    "levels": false
+   },
+   {
+    "suffix": "mp3",
+    "contentType": "audio/mpeg",
+    "level": null,
+    "format": "mp3",
+    "levels": false
+   },
+   {
+    "suffix": "m4a",
+    "contentType": "audio/mp4",
+    "level": "album",
+    "format": "raw",
+    "levels": false
+   },
+   {
+    "suffix": "m4a",
+    "contentType": "audio/mp4",
+    "level": "album",
+    "format": "mp3",
+    "levels": false
+   },
+   {
+    "suffix": "m4a",
+    "contentType": "audio/mp4",
+    "level": "track",
+    "format": "raw",
+    "levels": false
+   },
+   {
+    "suffix": "m4a",
+    "contentType": "audio/mp4",
+    "level": "track",
+    "format": "mp3",
+    "levels": false
+   },
+   {
+    "suffix": "m4a",
+    "contentType": "audio/mp4",
+    "level": null,
+    "format": "raw",
+    "levels": false
+   },
+   {
+    "suffix": "m4a",
+    "contentType": "audio/mp4",
+    "level": null,
+    "format": "mp3",
+    "levels": false
+   }
+  ],
+  "signedDb": [
+   {
+    "value": -7.42,
+    "words": "-7.42 dB"
+   },
+   {
+    "value": 0.004,
+    "words": "+0.00 dB"
+   },
+   {
+    "value": -0.004,
+    "words": "+0.00 dB"
+   },
+   {
+    "value": 12,
+    "words": "+12.00 dB"
+   },
+   {
+    "value": -0.25,
+    "words": "-0.25 dB"
+   },
+   {
+    "value": 0.125,
+    "words": "+0.13 dB"
+   },
+   {
+    "value": -0.125,
+    "words": "-0.13 dB"
+   },
+   {
+    "value": 0.005,
+    "words": "+0.01 dB"
+   },
+   {
+    "value": -0.005,
+    "words": "-0.01 dB"
+   },
+   {
+    "value": 1.005,
+    "words": "+1.00 dB"
+   },
+   {
+    "value": -1.005,
+    "words": "-1.00 dB"
+   },
+   {
+    "value": 2.675,
+    "words": "+2.67 dB"
+   },
+   {
+    "value": 0,
+    "words": "+0.00 dB"
+   },
+   {
+    "value": 3.49,
+    "words": "+3.49 dB"
+   },
+   {
+    "value": -0.01,
+    "words": "-0.01 dB"
+   },
+   {
+    "value": 5.81,
+    "words": "+5.81 dB"
+   },
+   {
+    "value": -6.57,
+    "words": "-6.57 dB"
+   },
+   {
+    "value": 22,
+    "words": "+22.00 dB"
+   }
+  ],
+  "volumeChange": [
+   {
+    "gain": -7.42,
+    "words": "7.4 dB quieter"
+   },
+   {
+    "gain": 2.35,
+    "words": "2.4 dB louder"
+   },
+   {
+    "gain": -0.04,
+    "words": "no change needed"
+   },
+   {
+    "gain": 0,
+    "words": "no change needed"
+   },
+   {
+    "gain": -0.25,
+    "words": "0.3 dB quieter"
+   },
+   {
+    "gain": 0.25,
+    "words": "0.3 dB louder"
+   },
+   {
+    "gain": 0.75,
+    "words": "0.8 dB louder"
+   },
+   {
+    "gain": -1.75,
+    "words": "1.8 dB quieter"
+   },
+   {
+    "gain": 2.25,
+    "words": "2.3 dB louder"
+   },
+   {
+    "gain": 0.05,
+    "words": "0.1 dB louder"
+   },
+   {
+    "gain": -0.05,
+    "words": "0.1 dB quieter"
+   },
+   {
+    "gain": 0.15,
+    "words": "0.1 dB louder"
+   },
+   {
+    "gain": -3.56,
+    "words": "3.6 dB quieter"
+   },
+   {
+    "gain": 0.95,
+    "words": "0.9 dB louder"
+   },
+   {
+    "gain": -0.94,
+    "words": "0.9 dB quieter"
+   },
+   {
+    "gain": -3.25,
+    "words": "3.3 dB quieter"
+   },
+   {
+    "gain": 3.75,
+    "words": "3.8 dB louder"
+   },
+   {
+    "gain": 1.45,
+    "words": "1.4 dB louder"
+   },
+   {
+    "gain": 12.65,
+    "words": "12.7 dB louder"
+   },
+   {
+    "gain": -0.01,
+    "words": "no change needed"
+   },
+   {
+    "gain": 0.04,
+    "words": "no change needed"
+   },
+   {
+    "gain": 3.49,
+    "words": "3.5 dB louder"
+   },
+   {
+    "gain": -6.57,
+    "words": "6.6 dB quieter"
+   },
+   {
+    "gain": 5.81,
+    "words": "5.8 dB louder"
+   }
+  ],
+  "toFixed": [
+   {
+    "value": 0.25,
+    "digits": 1,
+    "fixed": "0.3"
+   },
+   {
+    "value": 3.25,
+    "digits": 1,
+    "fixed": "3.3"
+   },
+   {
+    "value": 0.75,
+    "digits": 1,
+    "fixed": "0.8"
+   },
+   {
+    "value": 3.75,
+    "digits": 1,
+    "fixed": "3.8"
+   },
+   {
+    "value": 2.35,
+    "digits": 1,
+    "fixed": "2.4"
+   },
+   {
+    "value": 0.15,
+    "digits": 1,
+    "fixed": "0.1"
+   },
+   {
+    "value": 1.45,
+    "digits": 1,
+    "fixed": "1.4"
+   },
+   {
+    "value": 0.05,
+    "digits": 1,
+    "fixed": "0.1"
+   },
+   {
+    "value": 0.04,
+    "digits": 1,
+    "fixed": "0.0"
+   },
+   {
+    "value": 12.65,
+    "digits": 1,
+    "fixed": "12.7"
+   },
+   {
+    "value": 0.45,
+    "digits": 1,
+    "fixed": "0.5"
+   },
+   {
+    "value": 10.25,
+    "digits": 1,
+    "fixed": "10.3"
+   },
+   {
+    "value": 17.75,
+    "digits": 1,
+    "fixed": "17.8"
+   },
+   {
+    "value": 0,
+    "digits": 1,
+    "fixed": "0.0"
+   },
+   {
+    "value": 0.5,
+    "digits": 1,
+    "fixed": "0.5"
+   },
+   {
+    "value": 1.5,
+    "digits": 1,
+    "fixed": "1.5"
+   },
+   {
+    "value": 2.5,
+    "digits": 1,
+    "fixed": "2.5"
+   },
+   {
+    "value": 99.95,
+    "digits": 1,
+    "fixed": "100.0"
+   },
+   {
+    "value": 7.425,
+    "digits": 1,
+    "fixed": "7.4"
+   },
+   {
+    "value": 0.125,
+    "digits": 2,
+    "fixed": "0.13"
+   },
+   {
+    "value": 1.005,
+    "digits": 2,
+    "fixed": "1.00"
+   },
+   {
+    "value": 2.675,
+    "digits": 2,
+    "fixed": "2.67"
+   },
+   {
+    "value": 0.005,
+    "digits": 2,
+    "fixed": "0.01"
+   },
+   {
+    "value": 0.004,
+    "digits": 2,
+    "fixed": "0.00"
+   },
+   {
+    "value": 7.425,
+    "digits": 2,
+    "fixed": "7.42"
+   },
+   {
+    "value": 0.015,
+    "digits": 2,
+    "fixed": "0.01"
+   },
+   {
+    "value": 1.125,
+    "digits": 2,
+    "fixed": "1.13"
+   },
+   {
+    "value": 0.375,
+    "digits": 2,
+    "fixed": "0.38"
+   },
+   {
+    "value": 1e-7,
+    "digits": 2,
+    "fixed": "0.00"
+   },
+   {
+    "value": 123456.785,
+    "digits": 2,
+    "fixed": "123456.79"
+   },
+   {
+    "value": 22,
+    "digits": 2,
+    "fixed": "22.00"
+   },
+   {
+    "value": 0.0078125,
+    "digits": 2,
+    "fixed": "0.01"
+   },
+   {
+    "value": 0.5,
+    "digits": 0,
+    "fixed": "1"
+   },
+   {
+    "value": 1.5,
+    "digits": 0,
+    "fixed": "2"
+   },
+   {
+    "value": 2.5,
+    "digits": 0,
+    "fixed": "3"
+   },
+   {
+    "value": 0.49999999999999994,
+    "digits": 0,
+    "fixed": "0"
+   },
+   {
+    "value": 3.5,
+    "digits": 0,
+    "fixed": "4"
+   },
+   {
+    "value": 0.0078125,
+    "digits": 6,
+    "fixed": "0.007813"
+   },
+   {
+    "value": -0.25,
+    "digits": 1,
+    "fixed": "-0.3"
+   },
+   {
+    "value": -0.004,
+    "digits": 2,
+    "fixed": "-0.00"
+   },
+   {
+    "value": 14.4,
+    "digits": 1,
+    "fixed": "14.4"
+   },
+   {
+    "value": 32.4,
+    "digits": 1,
+    "fixed": "32.4"
+   },
+   {
+    "value": 24.13202092051506,
+    "digits": 2,
+    "fixed": "24.13"
+   },
+   {
+    "value": 13.72,
+    "digits": 1,
+    "fixed": "13.7"
+   },
+   {
+    "value": 31.72,
+    "digits": 1,
+    "fixed": "31.7"
+   },
+   {
+    "value": 27.772895051166415,
+    "digits": 2,
+    "fixed": "27.77"
+   },
+   {
+    "value": 12.3,
+    "digits": 1,
+    "fixed": "12.3"
+   },
+   {
+    "value": 5.699999999999999,
+    "digits": 1,
+    "fixed": "5.7"
+   },
+   {
+    "value": 28.792874794453382,
+    "digits": 2,
+    "fixed": "28.79"
+   },
+   {
+    "value": 25.92,
+    "digits": 1,
+    "fixed": "25.9"
+   },
+   {
+    "value": 43.92,
+    "digits": 1,
+    "fixed": "43.9"
+   },
+   {
+    "value": 3.5088456328958273,
+    "digits": 2,
+    "fixed": "3.51"
+   },
+   {
+    "value": 27.12,
+    "digits": 1,
+    "fixed": "27.1"
+   },
+   {
+    "value": 45.120000000000005,
+    "digits": 1,
+    "fixed": "45.1"
+   },
+   {
+    "value": 21.38375122100115,
+    "digits": 2,
+    "fixed": "21.38"
+   },
+   {
+    "value": 25.67,
+    "digits": 1,
+    "fixed": "25.7"
+   },
+   {
+    "value": 7.670000000000002,
+    "digits": 1,
+    "fixed": "7.7"
+   },
+   {
+    "value": 18.24479260481894,
+    "digits": 2,
+    "fixed": "18.24"
+   },
+   {
+    "value": 19.25,
+    "digits": 1,
+    "fixed": "19.3"
+   },
+   {
+    "value": 37.25,
+    "digits": 1,
+    "fixed": "37.3"
+   },
+   {
+    "value": 23.86851841583848,
+    "digits": 2,
+    "fixed": "23.87"
+   },
+   {
+    "value": 20.22,
+    "digits": 1,
+    "fixed": "20.2"
+   },
+   {
+    "value": 38.22,
+    "digits": 1,
+    "fixed": "38.2"
+   },
+   {
+    "value": 5.240721506997943,
+    "digits": 2,
+    "fixed": "5.24"
+   },
+   {
+    "value": 17.81,
+    "digits": 1,
+    "fixed": "17.8"
+   },
+   {
+    "value": 35.81,
+    "digits": 1,
+    "fixed": "35.8"
+   },
+   {
+    "value": 14.754329547286034,
+    "digits": 2,
+    "fixed": "14.75"
+   },
+   {
+    "value": 23.78,
+    "digits": 1,
+    "fixed": "23.8"
+   },
+   {
+    "value": 5.780000000000001,
+    "digits": 1,
+    "fixed": "5.8"
+   },
+   {
+    "value": 7.505010841414332,
+    "digits": 2,
+    "fixed": "7.51"
+   },
+   {
+    "value": 7.67,
+    "digits": 1,
+    "fixed": "7.7"
+   },
+   {
+    "value": 25.67,
+    "digits": 1,
+    "fixed": "25.7"
+   },
+   {
+    "value": 3.7744022347033024,
+    "digits": 2,
+    "fixed": "3.77"
+   },
+   {
+    "value": 27.29,
+    "digits": 1,
+    "fixed": "27.3"
+   },
+   {
+    "value": 9.29,
+    "digits": 1,
+    "fixed": "9.3"
+   },
+   {
+    "value": 11.589308241382241,
+    "digits": 2,
+    "fixed": "11.59"
+   },
+   {
+    "value": 12.54,
+    "digits": 1,
+    "fixed": "12.5"
+   },
+   {
+    "value": 30.54,
+    "digits": 1,
+    "fixed": "30.5"
+   },
+   {
+    "value": 9.463363029062748,
+    "digits": 2,
+    "fixed": "9.46"
+   },
+   {
+    "value": 21.49,
+    "digits": 1,
+    "fixed": "21.5"
+   },
+   {
+    "value": 39.489999999999995,
+    "digits": 1,
+    "fixed": "39.5"
+   },
+   {
+    "value": 19.746104339137673,
+    "digits": 2,
+    "fixed": "19.75"
+   },
+   {
+    "value": 9.84,
+    "digits": 1,
+    "fixed": "9.8"
+   },
+   {
+    "value": 8.16,
+    "digits": 1,
+    "fixed": "8.2"
+   },
+   {
+    "value": 5.583068858832121,
+    "digits": 2,
+    "fixed": "5.58"
+   },
+   {
+    "value": 16.47,
+    "digits": 1,
+    "fixed": "16.5"
+   },
+   {
+    "value": 1.5300000000000011,
+    "digits": 1,
+    "fixed": "1.5"
+   },
+   {
+    "value": 8.384098531678319,
+    "digits": 2,
+    "fixed": "8.38"
+   },
+   {
+    "value": 24.23,
+    "digits": 1,
+    "fixed": "24.2"
+   },
+   {
+    "value": 42.230000000000004,
+    "digits": 1,
+    "fixed": "42.2"
+   },
+   {
+    "value": 28.39087039232254,
+    "digits": 2,
+    "fixed": "28.39"
+   },
+   {
+    "value": 7.71,
+    "digits": 1,
+    "fixed": "7.7"
+   },
+   {
+    "value": 10.29,
+    "digits": 1,
+    "fixed": "10.3"
+   },
+   {
+    "value": 20.144340796396136,
+    "digits": 2,
+    "fixed": "20.14"
+   },
+   {
+    "value": 13.03,
+    "digits": 1,
+    "fixed": "13.0"
+   },
+   {
+    "value": 4.970000000000001,
+    "digits": 1,
+    "fixed": "5.0"
+   },
+   {
+    "value": 21.814477611333132,
+    "digits": 2,
+    "fixed": "21.81"
+   },
+   {
+    "value": 10.82,
+    "digits": 1,
+    "fixed": "10.8"
+   },
+   {
+    "value": 7.18,
+    "digits": 1,
+    "fixed": "7.2"
+   },
+   {
+    "value": 8.937861705198884,
+    "digits": 2,
+    "fixed": "8.94"
+   },
+   {
+    "value": 8.42,
+    "digits": 1,
+    "fixed": "8.4"
+   },
+   {
+    "value": 9.58,
+    "digits": 1,
+    "fixed": "9.6"
+   },
+   {
+    "value": 15.460859276354313,
+    "digits": 2,
+    "fixed": "15.46"
+   },
+   {
+    "value": 12.62,
+    "digits": 1,
+    "fixed": "12.6"
+   },
+   {
+    "value": 30.619999999999997,
+    "digits": 1,
+    "fixed": "30.6"
+   },
+   {
+    "value": 10.621848637238145,
+    "digits": 2,
+    "fixed": "10.62"
+   },
+   {
+    "value": 1.56,
+    "digits": 1,
+    "fixed": "1.6"
+   },
+   {
+    "value": 16.44,
+    "digits": 1,
+    "fixed": "16.4"
+   },
+   {
+    "value": 23.44950160011649,
+    "digits": 2,
+    "fixed": "23.45"
+   },
+   {
+    "value": 12.52,
+    "digits": 1,
+    "fixed": "12.5"
+   },
+   {
+    "value": 5.48,
+    "digits": 1,
+    "fixed": "5.5"
+   },
+   {
+    "value": 4.04039497487247,
+    "digits": 2,
+    "fixed": "4.04"
+   },
+   {
+    "value": 15.72,
+    "digits": 1,
+    "fixed": "15.7"
+   },
+   {
+    "value": 2.2799999999999994,
+    "digits": 1,
+    "fixed": "2.3"
+   },
+   {
+    "value": 1.7305359989404678,
+    "digits": 2,
+    "fixed": "1.73"
+   },
+   {
+    "value": 26.27,
+    "digits": 1,
+    "fixed": "26.3"
+   },
+   {
+    "value": 44.269999999999996,
+    "digits": 1,
+    "fixed": "44.3"
+   },
+   {
+    "value": 1.885103853419423,
+    "digits": 2,
+    "fixed": "1.89"
+   },
+   {
+    "value": 28.33,
+    "digits": 1,
+    "fixed": "28.3"
+   },
+   {
+    "value": 46.33,
+    "digits": 1,
+    "fixed": "46.3"
+   },
+   {
+    "value": 24.643046613782644,
+    "digits": 2,
+    "fixed": "24.64"
+   },
+   {
+    "value": 18.67,
+    "digits": 1,
+    "fixed": "18.7"
+   },
+   {
+    "value": 36.67,
+    "digits": 1,
+    "fixed": "36.7"
+   },
+   {
+    "value": 23.65343182347715,
+    "digits": 2,
+    "fixed": "23.65"
+   },
+   {
+    "value": 14.44,
+    "digits": 1,
+    "fixed": "14.4"
+   },
+   {
+    "value": 32.44,
+    "digits": 1,
+    "fixed": "32.4"
+   },
+   {
+    "value": 0.9955905005335808,
+    "digits": 2,
+    "fixed": "1.00"
+   },
+   {
+    "value": 28.89,
+    "digits": 1,
+    "fixed": "28.9"
+   },
+   {
+    "value": 10.89,
+    "digits": 1,
+    "fixed": "10.9"
+   },
+   {
+    "value": 0.8796548936516047,
+    "digits": 2,
+    "fixed": "0.88"
+   },
+   {
+    "value": 13.4,
+    "digits": 1,
+    "fixed": "13.4"
+   },
+   {
+    "value": 31.4,
+    "digits": 1,
+    "fixed": "31.4"
+   },
+   {
+    "value": 0.7076474837958813,
+    "digits": 2,
+    "fixed": "0.71"
+   },
+   {
+    "value": 22.77,
+    "digits": 1,
+    "fixed": "22.8"
+   },
+   {
+    "value": 40.769999999999996,
+    "digits": 1,
+    "fixed": "40.8"
+   },
+   {
+    "value": 24.79233923368156,
+    "digits": 2,
+    "fixed": "24.79"
+   },
+   {
+    "value": 5.7,
+    "digits": 1,
+    "fixed": "5.7"
+   },
+   {
+    "value": 12.3,
+    "digits": 1,
+    "fixed": "12.3"
+   },
+   {
+    "value": 24.811236709356308,
+    "digits": 2,
+    "fixed": "24.81"
+   },
+   {
+    "value": 9.62,
+    "digits": 1,
+    "fixed": "9.6"
+   },
+   {
+    "value": 27.619999999999997,
+    "digits": 1,
+    "fixed": "27.6"
+   },
+   {
+    "value": 28.835093127563596,
+    "digits": 2,
+    "fixed": "28.84"
+   },
+   {
+    "value": 19.23,
+    "digits": 1,
+    "fixed": "19.2"
+   },
+   {
+    "value": 37.230000000000004,
+    "digits": 1,
+    "fixed": "37.2"
+   },
+   {
+    "value": 13.361537139862776,
+    "digits": 2,
+    "fixed": "13.36"
+   },
+   {
+    "value": 6.77,
+    "digits": 1,
+    "fixed": "6.8"
+   },
+   {
+    "value": 11.23,
+    "digits": 1,
+    "fixed": "11.2"
+   },
+   {
+    "value": 18.636899823322892,
+    "digits": 2,
+    "fixed": "18.64"
+   },
+   {
+    "value": 20.16,
+    "digits": 1,
+    "fixed": "20.2"
+   },
+   {
+    "value": 38.16,
+    "digits": 1,
+    "fixed": "38.2"
+   },
+   {
+    "value": 3.0004657432436943,
+    "digits": 2,
+    "fixed": "3.00"
+   },
+   {
+    "value": 24.41,
+    "digits": 1,
+    "fixed": "24.4"
+   },
+   {
+    "value": 6.41,
+    "digits": 1,
+    "fixed": "6.4"
+   },
+   {
+    "value": 28.827933752909303,
+    "digits": 2,
+    "fixed": "28.83"
+   },
+   {
+    "value": 17.74,
+    "digits": 1,
+    "fixed": "17.7"
+   },
+   {
+    "value": 0.26000000000000156,
+    "digits": 1,
+    "fixed": "0.3"
+   },
+   {
+    "value": 11.16640543565154,
+    "digits": 2,
+    "fixed": "11.17"
+   },
+   {
+    "value": 6.84,
+    "digits": 1,
+    "fixed": "6.8"
+   },
+   {
+    "value": 24.84,
+    "digits": 1,
+    "fixed": "24.8"
+   },
+   {
+    "value": 14.7631527017802,
+    "digits": 2,
+    "fixed": "14.76"
+   },
+   {
+    "value": 22.59,
+    "digits": 1,
+    "fixed": "22.6"
+   },
+   {
+    "value": 40.59,
+    "digits": 1,
+    "fixed": "40.6"
+   },
+   {
+    "value": 6.18845097720623,
+    "digits": 2,
+    "fixed": "6.19"
+   },
+   {
+    "value": 17.2,
+    "digits": 1,
+    "fixed": "17.2"
+   },
+   {
+    "value": 35.2,
+    "digits": 1,
+    "fixed": "35.2"
+   },
+   {
+    "value": 4.883178295567632,
+    "digits": 2,
+    "fixed": "4.88"
+   },
+   {
+    "value": 18.19,
+    "digits": 1,
+    "fixed": "18.2"
+   },
+   {
+    "value": 36.19,
+    "digits": 1,
+    "fixed": "36.2"
+   },
+   {
+    "value": 28.647329416126013,
+    "digits": 2,
+    "fixed": "28.65"
+   },
+   {
+    "value": 9.84,
+    "digits": 1,
+    "fixed": "9.8"
+   },
+   {
+    "value": 27.84,
+    "digits": 1,
+    "fixed": "27.8"
+   },
+   {
+    "value": 13.607952436432242,
+    "digits": 2,
+    "fixed": "13.61"
+   },
+   {
+    "value": 17.14,
+    "digits": 1,
+    "fixed": "17.1"
+   },
+   {
+    "value": 0.8599999999999994,
+    "digits": 1,
+    "fixed": "0.9"
+   },
+   {
+    "value": 0.39907459169626236,
+    "digits": 2,
+    "fixed": "0.40"
+   },
+   {
+    "value": 23.8,
+    "digits": 1,
+    "fixed": "23.8"
+   },
+   {
+    "value": 5.800000000000001,
+    "digits": 1,
+    "fixed": "5.8"
+   },
+   {
+    "value": 7.674122890457511,
+    "digits": 2,
+    "fixed": "7.67"
+   },
+   {
+    "value": 23.57,
+    "digits": 1,
+    "fixed": "23.6"
+   },
+   {
+    "value": 5.57,
+    "digits": 1,
+    "fixed": "5.6"
+   },
+   {
+    "value": 27.28329436853528,
+    "digits": 2,
+    "fixed": "27.28"
+   },
+   {
+    "value": 20.28,
+    "digits": 1,
+    "fixed": "20.3"
+   },
+   {
+    "value": 38.28,
+    "digits": 1,
+    "fixed": "38.3"
+   },
+   {
+    "value": 15.292464913800359,
+    "digits": 2,
+    "fixed": "15.29"
+   },
+   {
+    "value": 4.33,
+    "digits": 1,
+    "fixed": "4.3"
+   },
+   {
+    "value": 13.67,
+    "digits": 1,
+    "fixed": "13.7"
+   },
+   {
+    "value": 1.9060707092285156,
+    "digits": 2,
+    "fixed": "1.91"
+   },
+   {
+    "value": 23.49,
+    "digits": 1,
+    "fixed": "23.5"
+   },
+   {
+    "value": 41.489999999999995,
+    "digits": 1,
+    "fixed": "41.5"
+   },
+   {
+    "value": 20.61730812303722,
+    "digits": 2,
+    "fixed": "20.62"
+   },
+   {
+    "value": 18.97,
+    "digits": 1,
+    "fixed": "19.0"
+   },
+   {
+    "value": 0.9699999999999989,
+    "digits": 1,
+    "fixed": "1.0"
+   },
+   {
+    "value": 20.099727641791105,
+    "digits": 2,
+    "fixed": "20.10"
+   },
+   {
+    "value": 26.69,
+    "digits": 1,
+    "fixed": "26.7"
+   },
+   {
+    "value": 44.69,
+    "digits": 1,
+    "fixed": "44.7"
+   },
+   {
+    "value": 4.706921065226197,
+    "digits": 2,
+    "fixed": "4.71"
+   },
+   {
+    "value": 1.95,
+    "digits": 1,
+    "fixed": "1.9"
+   },
+   {
+    "value": 16.05,
+    "digits": 1,
+    "fixed": "16.1"
+   },
+   {
+    "value": 7.552469931542873,
+    "digits": 2,
+    "fixed": "7.55"
+   },
+   {
+    "value": 29.18,
+    "digits": 1,
+    "fixed": "29.2"
+   },
+   {
+    "value": 11.18,
+    "digits": 1,
+    "fixed": "11.2"
+   },
+   {
+    "value": 20.033458108082414,
+    "digits": 2,
+    "fixed": "20.03"
+   },
+   {
+    "value": 22.31,
+    "digits": 1,
+    "fixed": "22.3"
+   },
+   {
+    "value": 4.309999999999999,
+    "digits": 1,
+    "fixed": "4.3"
+   },
+   {
+    "value": 11.418490502983332,
+    "digits": 2,
+    "fixed": "11.42"
+   },
+   {
+    "value": 2.93,
+    "digits": 1,
+    "fixed": "2.9"
+   },
+   {
+    "value": 20.93,
+    "digits": 1,
+    "fixed": "20.9"
+   },
+   {
+    "value": 6.493467343971133,
+    "digits": 2,
+    "fixed": "6.49"
+   },
+   {
+    "value": 4.57,
+    "digits": 1,
+    "fixed": "4.6"
+   },
+   {
+    "value": 22.57,
+    "digits": 1,
+    "fixed": "22.6"
+   },
+   {
+    "value": 0.9039533883333206,
+    "digits": 2,
+    "fixed": "0.90"
+   },
+   {
+    "value": 18.85,
+    "digits": 1,
+    "fixed": "18.9"
+   },
+   {
+    "value": 36.85,
+    "digits": 1,
+    "fixed": "36.9"
+   },
+   {
+    "value": 1.8872523587197065,
+    "digits": 2,
+    "fixed": "1.89"
+   },
+   {
+    "value": 27.11,
+    "digits": 1,
+    "fixed": "27.1"
+   },
+   {
+    "value": 45.11,
+    "digits": 1,
+    "fixed": "45.1"
+   },
+   {
+    "value": 1.3610047660768032,
+    "digits": 2,
+    "fixed": "1.36"
+   },
+   {
+    "value": 20.63,
+    "digits": 1,
+    "fixed": "20.6"
+   },
+   {
+    "value": 2.629999999999999,
+    "digits": 1,
+    "fixed": "2.6"
+   },
+   {
+    "value": 18.06185125373304,
+    "digits": 2,
+    "fixed": "18.06"
+   },
+   {
+    "value": 8.8,
+    "digits": 1,
+    "fixed": "8.8"
+   },
+   {
+    "value": 26.8,
+    "digits": 1,
+    "fixed": "26.8"
+   },
+   {
+    "value": 12.043354399502277,
+    "digits": 2,
+    "fixed": "12.04"
+   },
+   {
+    "value": 1.35,
+    "digits": 1,
+    "fixed": "1.4"
+   },
+   {
+    "value": 19.35,
+    "digits": 1,
+    "fixed": "19.4"
+   },
+   {
+    "value": 2.6614311430603266,
+    "digits": 2,
+    "fixed": "2.66"
+   },
+   {
+    "value": 24.51,
+    "digits": 1,
+    "fixed": "24.5"
+   },
+   {
+    "value": 42.510000000000005,
+    "digits": 1,
+    "fixed": "42.5"
+   },
+   {
+    "value": 28.565809708088636,
+    "digits": 2,
+    "fixed": "28.57"
+   },
+   {
+    "value": 9.76,
+    "digits": 1,
+    "fixed": "9.8"
+   },
+   {
+    "value": 8.24,
+    "digits": 1,
+    "fixed": "8.2"
+   },
+   {
+    "value": 15.647788317874074,
+    "digits": 2,
+    "fixed": "15.65"
+   },
+   {
+    "value": 29.02,
+    "digits": 1,
+    "fixed": "29.0"
+   },
+   {
+    "value": 11.02,
+    "digits": 1,
+    "fixed": "11.0"
+   },
+   {
+    "value": 4.389336258172989,
+    "digits": 2,
+    "fixed": "4.39"
+   },
+   {
+    "value": 5.77,
+    "digits": 1,
+    "fixed": "5.8"
+   },
+   {
+    "value": 23.77,
+    "digits": 1,
+    "fixed": "23.8"
+   },
+   {
+    "value": 5.471759391948581,
+    "digits": 2,
+    "fixed": "5.47"
+   },
+   {
+    "value": 14.47,
+    "digits": 1,
+    "fixed": "14.5"
+   },
+   {
+    "value": 3.5299999999999994,
+    "digits": 1,
+    "fixed": "3.5"
+   },
+   {
+    "value": 8.866402488201857,
+    "digits": 2,
+    "fixed": "8.87"
+   },
+   {
+    "value": 17.24,
+    "digits": 1,
+    "fixed": "17.2"
+   },
+   {
+    "value": 35.239999999999995,
+    "digits": 1,
+    "fixed": "35.2"
+   },
+   {
+    "value": 18.4540777746588,
+    "digits": 2,
+    "fixed": "18.45"
+   },
+   {
+    "value": 12.03,
+    "digits": 1,
+    "fixed": "12.0"
+   },
+   {
+    "value": 30.03,
+    "digits": 1,
+    "fixed": "30.0"
+   },
+   {
+    "value": 8.565100617706776,
+    "digits": 2,
+    "fixed": "8.57"
+   },
+   {
+    "value": 29.95,
+    "digits": 1,
+    "fixed": "29.9"
+   },
+   {
+    "value": 47.95,
+    "digits": 1,
+    "fixed": "48.0"
+   },
+   {
+    "value": 24.221331859007478,
+    "digits": 2,
+    "fixed": "24.22"
+   },
+   {
+    "value": 1.75,
+    "digits": 1,
+    "fixed": "1.8"
+   },
+   {
+    "value": 16.25,
+    "digits": 1,
+    "fixed": "16.3"
+   },
+   {
+    "value": 29.693369809538126,
+    "digits": 2,
+    "fixed": "29.69"
+   },
+   {
+    "value": 10.55,
+    "digits": 1,
+    "fixed": "10.6"
+   },
+   {
+    "value": 7.449999999999999,
+    "digits": 1,
+    "fixed": "7.4"
+   },
+   {
+    "value": 26.12831155769527,
+    "digits": 2,
+    "fixed": "26.13"
+   },
+   {
+    "value": 26.37,
+    "digits": 1,
+    "fixed": "26.4"
+   },
+   {
+    "value": 8.370000000000001,
+    "digits": 1,
+    "fixed": "8.4"
+   },
+   {
+    "value": 28.96542213857174,
+    "digits": 2,
+    "fixed": "28.97"
+   },
+   {
+    "value": 4.88,
+    "digits": 1,
+    "fixed": "4.9"
+   },
+   {
+    "value": 13.120000000000001,
+    "digits": 1,
+    "fixed": "13.1"
+   },
+   {
+    "value": 18.99015295319259,
+    "digits": 2,
+    "fixed": "18.99"
+   },
+   {
+    "value": 21.5,
+    "digits": 1,
+    "fixed": "21.5"
+   },
+   {
+    "value": 39.5,
+    "digits": 1,
+    "fixed": "39.5"
+   },
+   {
+    "value": 0.5941312573850155,
+    "digits": 2,
+    "fixed": "0.59"
+   },
+   {
+    "value": 19.51,
+    "digits": 1,
+    "fixed": "19.5"
+   },
+   {
+    "value": 37.510000000000005,
+    "digits": 1,
+    "fixed": "37.5"
+   },
+   {
+    "value": 24.61522593162954,
+    "digits": 2,
+    "fixed": "24.62"
+   },
+   {
+    "value": 24.78,
+    "digits": 1,
+    "fixed": "24.8"
+   },
+   {
+    "value": 42.78,
+    "digits": 1,
+    "fixed": "42.8"
+   },
+   {
+    "value": 7.979254983365536,
+    "digits": 2,
+    "fixed": "7.98"
+   },
+   {
+    "value": 4.76,
+    "digits": 1,
+    "fixed": "4.8"
+   },
+   {
+    "value": 13.24,
+    "digits": 1,
+    "fixed": "13.2"
+   },
+   {
+    "value": 13.275477150455117,
+    "digits": 2,
+    "fixed": "13.28"
+   },
+   {
+    "value": 9.44,
+    "digits": 1,
+    "fixed": "9.4"
+   },
+   {
+    "value": 27.439999999999998,
+    "digits": 1,
+    "fixed": "27.4"
+   },
+   {
+    "value": 0.5230261199176311,
+    "digits": 2,
+    "fixed": "0.52"
+   },
+   {
+    "value": 24.12,
+    "digits": 1,
+    "fixed": "24.1"
+   },
+   {
+    "value": 6.120000000000001,
+    "digits": 1,
+    "fixed": "6.1"
+   },
+   {
+    "value": 25.470408322289586,
+    "digits": 2,
+    "fixed": "25.47"
+   },
+   {
+    "value": 25.58,
+    "digits": 1,
+    "fixed": "25.6"
+   },
+   {
+    "value": 7.579999999999998,
+    "digits": 1,
+    "fixed": "7.6"
+   },
+   {
+    "value": 13.057913482189178,
+    "digits": 2,
+    "fixed": "13.06"
+   },
+   {
+    "value": 2.4,
+    "digits": 1,
+    "fixed": "2.4"
+   },
+   {
+    "value": 20.4,
+    "digits": 1,
+    "fixed": "20.4"
+   },
+   {
+    "value": 0.11402447707951069,
+    "digits": 2,
+    "fixed": "0.11"
+   },
+   {
+    "value": 2.43,
+    "digits": 1,
+    "fixed": "2.4"
+   },
+   {
+    "value": 20.43,
+    "digits": 1,
+    "fixed": "20.4"
+   },
+   {
+    "value": 5.18462972715497,
+    "digits": 2,
+    "fixed": "5.18"
+   },
+   {
+    "value": 11.63,
+    "digits": 1,
+    "fixed": "11.6"
+   },
+   {
+    "value": 29.630000000000003,
+    "digits": 1,
+    "fixed": "29.6"
+   },
+   {
+    "value": 3.372022295370698,
+    "digits": 2,
+    "fixed": "3.37"
+   },
+   {
+    "value": 9.58,
+    "digits": 1,
+    "fixed": "9.6"
+   },
+   {
+    "value": 8.42,
+    "digits": 1,
+    "fixed": "8.4"
+   },
+   {
+    "value": 27.575000189244747,
+    "digits": 2,
+    "fixed": "27.58"
+   },
+   {
+    "value": 11.36,
+    "digits": 1,
+    "fixed": "11.4"
+   },
+   {
+    "value": 6.640000000000001,
+    "digits": 1,
+    "fixed": "6.6"
+   },
+   {
+    "value": 5.813034838065505,
+    "digits": 2,
+    "fixed": "5.81"
+   },
+   {
+    "value": 4.02,
+    "digits": 1,
+    "fixed": "4.0"
+   },
+   {
+    "value": 22.02,
+    "digits": 1,
+    "fixed": "22.0"
+   },
+   {
+    "value": 3.733916077762842,
+    "digits": 2,
+    "fixed": "3.73"
+   },
+   {
+    "value": 9.18,
+    "digits": 1,
+    "fixed": "9.2"
+   },
+   {
+    "value": 27.18,
+    "digits": 1,
+    "fixed": "27.2"
+   },
+   {
+    "value": 18.37715799920261,
+    "digits": 2,
+    "fixed": "18.38"
+   },
+   {
+    "value": 24.76,
+    "digits": 1,
+    "fixed": "24.8"
+   },
+   {
+    "value": 42.760000000000005,
+    "digits": 1,
+    "fixed": "42.8"
+   },
+   {
+    "value": 23.773736134171486,
+    "digits": 2,
+    "fixed": "23.77"
+   },
+   {
+    "value": 16.03,
+    "digits": 1,
+    "fixed": "16.0"
+   },
+   {
+    "value": 1.9699999999999989,
+    "digits": 1,
+    "fixed": "2.0"
+   },
+   {
+    "value": 15.823011668398976,
+    "digits": 2,
+    "fixed": "15.82"
+   },
+   {
+    "value": 4.33,
+    "digits": 1,
+    "fixed": "4.3"
+   },
+   {
+    "value": 22.33,
+    "digits": 1,
+    "fixed": "22.3"
+   },
+   {
+    "value": 28.84426748380065,
+    "digits": 2,
+    "fixed": "28.84"
+   },
+   {
+    "value": 18.5,
+    "digits": 1,
+    "fixed": "18.5"
+   },
+   {
+    "value": 0.5,
+    "digits": 1,
+    "fixed": "0.5"
+   },
+   {
+    "value": 8.680674126371741,
+    "digits": 2,
+    "fixed": "8.68"
+   },
+   {
+    "value": 15.07,
+    "digits": 1,
+    "fixed": "15.1"
+   },
+   {
+    "value": 2.9299999999999997,
+    "digits": 1,
+    "fixed": "2.9"
+   },
+   {
+    "value": 21.897757463157177,
+    "digits": 2,
+    "fixed": "21.90"
+   },
+   {
+    "value": 10.58,
+    "digits": 1,
+    "fixed": "10.6"
+   },
+   {
+    "value": 28.58,
+    "digits": 1,
+    "fixed": "28.6"
+   },
+   {
+    "value": 21.63032471202314,
+    "digits": 2,
+    "fixed": "21.63"
+   },
+   {
+    "value": 29.6,
+    "digits": 1,
+    "fixed": "29.6"
+   },
+   {
+    "value": 47.6,
+    "digits": 1,
+    "fixed": "47.6"
+   },
+   {
+    "value": 13.831078726798296,
+    "digits": 2,
+    "fixed": "13.83"
+   },
+   {
+    "value": 10.48,
+    "digits": 1,
+    "fixed": "10.5"
+   },
+   {
+    "value": 7.52,
+    "digits": 1,
+    "fixed": "7.5"
+   },
+   {
+    "value": 16.144602270796895,
+    "digits": 2,
+    "fixed": "16.14"
+   },
+   {
+    "value": 8.26,
+    "digits": 1,
+    "fixed": "8.3"
+   },
+   {
+    "value": 9.74,
+    "digits": 1,
+    "fixed": "9.7"
+   },
+   {
+    "value": 19.309308975934982,
+    "digits": 2,
+    "fixed": "19.31"
+   },
+   {
+    "value": 13.36,
+    "digits": 1,
+    "fixed": "13.4"
+   },
+   {
+    "value": 31.36,
+    "digits": 1,
+    "fixed": "31.4"
+   },
+   {
+    "value": 15.205171359702945,
+    "digits": 2,
+    "fixed": "15.21"
+   },
+   {
+    "value": 22.03,
+    "digits": 1,
+    "fixed": "22.0"
+   },
+   {
+    "value": 4.030000000000001,
+    "digits": 1,
+    "fixed": "4.0"
+   },
+   {
+    "value": 2.212060410529375,
+    "digits": 2,
+    "fixed": "2.21"
+   },
+   {
+    "value": 4.31,
+    "digits": 1,
+    "fixed": "4.3"
+   },
+   {
+    "value": 13.690000000000001,
+    "digits": 1,
+    "fixed": "13.7"
+   },
+   {
+    "value": 24.858093028888106,
+    "digits": 2,
+    "fixed": "24.86"
+   },
+   {
+    "value": 3.14,
+    "digits": 1,
+    "fixed": "3.1"
+   },
+   {
+    "value": 21.14,
+    "digits": 1,
+    "fixed": "21.1"
+   },
+   {
+    "value": 28.587518446147442,
+    "digits": 2,
+    "fixed": "28.59"
+   },
+   {
+    "value": 26.7,
+    "digits": 1,
+    "fixed": "26.7"
+   },
+   {
+    "value": 44.7,
+    "digits": 1,
+    "fixed": "44.7"
+   },
+   {
+    "value": 24.461731826886535,
+    "digits": 2,
+    "fixed": "24.46"
+   },
+   {
+    "value": 21.67,
+    "digits": 1,
+    "fixed": "21.7"
+   },
+   {
+    "value": 39.67,
+    "digits": 1,
+    "fixed": "39.7"
+   },
+   {
+    "value": 11.69668709859252,
+    "digits": 2,
+    "fixed": "11.70"
+   },
+   {
+    "value": 13.93,
+    "digits": 1,
+    "fixed": "13.9"
+   },
+   {
+    "value": 31.93,
+    "digits": 1,
+    "fixed": "31.9"
+   },
+   {
+    "value": 5.761979324743152,
+    "digits": 2,
+    "fixed": "5.76"
+   },
+   {
+    "value": 4.47,
+    "digits": 1,
+    "fixed": "4.5"
+   },
+   {
+    "value": 22.47,
+    "digits": 1,
+    "fixed": "22.5"
+   },
+   {
+    "value": 10.95772571861744,
+    "digits": 2,
+    "fixed": "10.96"
+   },
+   {
+    "value": 22.57,
+    "digits": 1,
+    "fixed": "22.6"
+   },
+   {
+    "value": 4.57,
+    "digits": 1,
+    "fixed": "4.6"
+   },
+   {
+    "value": 12.386723337695003,
+    "digits": 2,
+    "fixed": "12.39"
+   },
+   {
+    "value": 15.17,
+    "digits": 1,
+    "fixed": "15.2"
+   },
+   {
+    "value": 33.17,
+    "digits": 1,
+    "fixed": "33.2"
+   },
+   {
+    "value": 26.703527960926294,
+    "digits": 2,
+    "fixed": "26.70"
+   },
+   {
+    "value": 15.72,
+    "digits": 1,
+    "fixed": "15.7"
+   },
+   {
+    "value": 33.72,
+    "digits": 1,
+    "fixed": "33.7"
+   },
+   {
+    "value": 6.516706505790353,
+    "digits": 2,
+    "fixed": "6.52"
+   },
+   {
+    "value": 15.06,
+    "digits": 1,
+    "fixed": "15.1"
+   },
+   {
+    "value": 2.9399999999999995,
+    "digits": 1,
+    "fixed": "2.9"
+   },
+   {
+    "value": 27.746343053877354,
+    "digits": 2,
+    "fixed": "27.75"
+   },
+   {
+    "value": 24.17,
+    "digits": 1,
+    "fixed": "24.2"
+   },
+   {
+    "value": 42.17,
+    "digits": 1,
+    "fixed": "42.2"
+   },
+   {
+    "value": 4.958185711875558,
+    "digits": 2,
+    "fixed": "4.96"
+   },
+   {
+    "value": 9.91,
+    "digits": 1,
+    "fixed": "9.9"
+   },
+   {
+    "value": 27.91,
+    "digits": 1,
+    "fixed": "27.9"
+   },
+   {
+    "value": 11.603438425809145,
+    "digits": 2,
+    "fixed": "11.60"
+   },
+   {
+    "value": 12.49,
+    "digits": 1,
+    "fixed": "12.5"
+   },
+   {
+    "value": 30.490000000000002,
+    "digits": 1,
+    "fixed": "30.5"
+   },
+   {
+    "value": 1.2421475071460009,
+    "digits": 2,
+    "fixed": "1.24"
+   },
+   {
+    "value": 0.26,
+    "digits": 1,
+    "fixed": "0.3"
+   },
+   {
+    "value": 18.26,
+    "digits": 1,
+    "fixed": "18.3"
+   },
+   {
+    "value": 5.360632538795471,
+    "digits": 2,
+    "fixed": "5.36"
+   },
+   {
+    "value": 7.29,
+    "digits": 1,
+    "fixed": "7.3"
+   },
+   {
+    "value": 10.71,
+    "digits": 1,
+    "fixed": "10.7"
+   },
+   {
+    "value": 0.037938253954052925,
+    "digits": 2,
+    "fixed": "0.04"
+   },
+   {
+    "value": 15.01,
+    "digits": 1,
+    "fixed": "15.0"
+   },
+   {
+    "value": 33.01,
+    "digits": 1,
+    "fixed": "33.0"
+   },
+   {
+    "value": 17.687080968171358,
+    "digits": 2,
+    "fixed": "17.69"
+   },
+   {
+    "value": 14.29,
+    "digits": 1,
+    "fixed": "14.3"
+   },
+   {
+    "value": 32.29,
+    "digits": 1,
+    "fixed": "32.3"
+   },
+   {
+    "value": 21.632384145632386,
+    "digits": 2,
+    "fixed": "21.63"
+   },
+   {
+    "value": 21.62,
+    "digits": 1,
+    "fixed": "21.6"
+   },
+   {
+    "value": 39.620000000000005,
+    "digits": 1,
+    "fixed": "39.6"
+   },
+   {
+    "value": 13.225299753248692,
+    "digits": 2,
+    "fixed": "13.23"
+   },
+   {
+    "value": 7.91,
+    "digits": 1,
+    "fixed": "7.9"
+   },
+   {
+    "value": 25.91,
+    "digits": 1,
+    "fixed": "25.9"
+   },
+   {
+    "value": 13.304348951205611,
+    "digits": 2,
+    "fixed": "13.30"
+   },
+   {
+    "value": 24.4,
+    "digits": 1,
+    "fixed": "24.4"
+   },
+   {
+    "value": 42.4,
+    "digits": 1,
+    "fixed": "42.4"
+   },
+   {
+    "value": 12.85224387422204,
+    "digits": 2,
+    "fixed": "12.85"
+   },
+   {
+    "value": 15.4,
+    "digits": 1,
+    "fixed": "15.4"
+   },
+   {
+    "value": 2.5999999999999996,
+    "digits": 1,
+    "fixed": "2.6"
+   },
+   {
+    "value": 28.617248190566897,
+    "digits": 2,
+    "fixed": "28.62"
+   },
+   {
+    "value": 9.12,
+    "digits": 1,
+    "fixed": "9.1"
+   },
+   {
+    "value": 8.88,
+    "digits": 1,
+    "fixed": "8.9"
+   },
+   {
+    "value": 1.2030845135450363,
+    "digits": 2,
+    "fixed": "1.20"
+   },
+   {
+    "value": 18.42,
+    "digits": 1,
+    "fixed": "18.4"
+   },
+   {
+    "value": 0.4200000000000017,
+    "digits": 1,
+    "fixed": "0.4"
+   },
+   {
+    "value": 24.25417718477547,
+    "digits": 2,
+    "fixed": "24.25"
+   },
+   {
+    "value": 10.12,
+    "digits": 1,
+    "fixed": "10.1"
+   },
+   {
+    "value": 28.119999999999997,
+    "digits": 1,
+    "fixed": "28.1"
+   },
+   {
+    "value": 25.823303516954184,
+    "digits": 2,
+    "fixed": "25.82"
+   },
+   {
+    "value": 28.46,
+    "digits": 1,
+    "fixed": "28.5"
+   },
+   {
+    "value": 10.46,
+    "digits": 1,
+    "fixed": "10.5"
+   },
+   {
+    "value": 9.939318308606744,
+    "digits": 2,
+    "fixed": "9.94"
+   },
+   {
+    "value": 22.03,
+    "digits": 1,
+    "fixed": "22.0"
+   },
+   {
+    "value": 40.03,
+    "digits": 1,
+    "fixed": "40.0"
+   },
+   {
+    "value": 21.900957338511944,
+    "digits": 2,
+    "fixed": "21.90"
+   },
+   {
+    "value": 3.15,
+    "digits": 1,
+    "fixed": "3.1"
+   },
+   {
+    "value": 14.85,
+    "digits": 1,
+    "fixed": "14.8"
+   },
+   {
+    "value": 7.132331421598792,
+    "digits": 2,
+    "fixed": "7.13"
+   },
+   {
+    "value": 1.88,
+    "digits": 1,
+    "fixed": "1.9"
+   },
+   {
+    "value": 19.88,
+    "digits": 1,
+    "fixed": "19.9"
+   },
+   {
+    "value": 24.588486570864916,
+    "digits": 2,
+    "fixed": "24.59"
+   },
+   {
+    "value": 4.77,
+    "digits": 1,
+    "fixed": "4.8"
+   },
+   {
+    "value": 13.23,
+    "digits": 1,
+    "fixed": "13.2"
+   },
+   {
+    "value": 23.477678624913096,
+    "digits": 2,
+    "fixed": "23.48"
+   },
+   {
+    "value": 28.85,
+    "digits": 1,
+    "fixed": "28.9"
+   },
+   {
+    "value": 46.85,
+    "digits": 1,
+    "fixed": "46.9"
+   },
+   {
+    "value": 20.721813887357712,
+    "digits": 2,
+    "fixed": "20.72"
+   },
+   {
+    "value": 28.58,
+    "digits": 1,
+    "fixed": "28.6"
+   },
+   {
+    "value": 46.58,
+    "digits": 1,
+    "fixed": "46.6"
+   },
+   {
+    "value": 19.876861525699496,
+    "digits": 2,
+    "fixed": "19.88"
+   },
+   {
+    "value": 12.91,
+    "digits": 1,
+    "fixed": "12.9"
+   },
+   {
+    "value": 30.91,
+    "digits": 1,
+    "fixed": "30.9"
+   },
+   {
+    "value": 22.39338280633092,
+    "digits": 2,
+    "fixed": "22.39"
+   },
+   {
+    "value": 8.65,
+    "digits": 1,
+    "fixed": "8.7"
+   },
+   {
+    "value": 9.35,
+    "digits": 1,
+    "fixed": "9.3"
+   },
+   {
+    "value": 2.8996061626821756,
+    "digits": 2,
+    "fixed": "2.90"
+   },
+   {
+    "value": 21.12,
+    "digits": 1,
+    "fixed": "21.1"
+   },
+   {
+    "value": 3.120000000000001,
+    "digits": 1,
+    "fixed": "3.1"
+   },
+   {
+    "value": 25.873708315193653,
+    "digits": 2,
+    "fixed": "25.87"
+   },
+   {
+    "value": 20.17,
+    "digits": 1,
+    "fixed": "20.2"
+   },
+   {
+    "value": 38.17,
+    "digits": 1,
+    "fixed": "38.2"
+   },
+   {
+    "value": 18.892023945227265,
+    "digits": 2,
+    "fixed": "18.89"
+   },
+   {
+    "value": 8.01,
+    "digits": 1,
+    "fixed": "8.0"
+   },
+   {
+    "value": 9.99,
+    "digits": 1,
+    "fixed": "10.0"
+   },
+   {
+    "value": 21.518892589956522,
+    "digits": 2,
+    "fixed": "21.52"
+   },
+   {
+    "value": 8.85,
+    "digits": 1,
+    "fixed": "8.8"
+   },
+   {
+    "value": 9.15,
+    "digits": 1,
+    "fixed": "9.2"
+   },
+   {
+    "value": 25.089937252923846,
+    "digits": 2,
+    "fixed": "25.09"
+   },
+   {
+    "value": 6.36,
+    "digits": 1,
+    "fixed": "6.4"
+   },
+   {
+    "value": 11.64,
+    "digits": 1,
+    "fixed": "11.6"
+   },
+   {
+    "value": 17.376038655638695,
+    "digits": 2,
+    "fixed": "17.38"
+   },
+   {
+    "value": 16.58,
+    "digits": 1,
+    "fixed": "16.6"
+   },
+   {
+    "value": 34.58,
+    "digits": 1,
+    "fixed": "34.6"
+   },
+   {
+    "value": 16.4317483920604,
+    "digits": 2,
+    "fixed": "16.43"
+   },
+   {
+    "value": 18.17,
+    "digits": 1,
+    "fixed": "18.2"
+   },
+   {
+    "value": 0.1700000000000017,
+    "digits": 1,
+    "fixed": "0.2"
+   },
+   {
+    "value": 22.984820511192083,
+    "digits": 2,
+    "fixed": "22.98"
+   },
+   {
+    "value": 2.53,
+    "digits": 1,
+    "fixed": "2.5"
+   },
+   {
+    "value": 15.47,
+    "digits": 1,
+    "fixed": "15.5"
+   },
+   {
+    "value": 2.7370636258274317,
+    "digits": 2,
+    "fixed": "2.74"
+   },
+   {
+    "value": 5,
+    "digits": 1,
+    "fixed": "5.0"
+   },
+   {
+    "value": 13,
+    "digits": 1,
+    "fixed": "13.0"
+   },
+   {
+    "value": 14.00616254657507,
+    "digits": 2,
+    "fixed": "14.01"
+   },
+   {
+    "value": 6.45,
+    "digits": 1,
+    "fixed": "6.5"
+   },
+   {
+    "value": 11.55,
+    "digits": 1,
+    "fixed": "11.6"
+   },
+   {
+    "value": 5.262715956196189,
+    "digits": 2,
+    "fixed": "5.26"
+   },
+   {
+    "value": 3.56,
+    "digits": 1,
+    "fixed": "3.6"
+   },
+   {
+    "value": 21.56,
+    "digits": 1,
+    "fixed": "21.6"
+   },
+   {
+    "value": 0.7318432442843914,
+    "digits": 2,
+    "fixed": "0.73"
+   },
+   {
+    "value": 22.79,
+    "digits": 1,
+    "fixed": "22.8"
+   },
+   {
+    "value": 4.789999999999999,
+    "digits": 1,
+    "fixed": "4.8"
+   },
+   {
+    "value": 20.068098781630397,
+    "digits": 2,
+    "fixed": "20.07"
+   },
+   {
+    "value": 22.04,
+    "digits": 1,
+    "fixed": "22.0"
+   },
+   {
+    "value": 4.039999999999999,
+    "digits": 1,
+    "fixed": "4.0"
+   },
+   {
+    "value": 14.443401396274567,
+    "digits": 2,
+    "fixed": "14.44"
+   },
+   {
+    "value": 16.88,
+    "digits": 1,
+    "fixed": "16.9"
+   },
+   {
+    "value": 1.120000000000001,
+    "digits": 1,
+    "fixed": "1.1"
+   },
+   {
+    "value": 17.857285542413592,
+    "digits": 2,
+    "fixed": "17.86"
+   },
+   {
+    "value": 27.62,
+    "digits": 1,
+    "fixed": "27.6"
+   },
+   {
+    "value": 45.620000000000005,
+    "digits": 1,
+    "fixed": "45.6"
+   },
+   {
+    "value": 17.57284266874194,
+    "digits": 2,
+    "fixed": "17.57"
+   },
+   {
+    "value": 29.9,
+    "digits": 1,
+    "fixed": "29.9"
+   },
+   {
+    "value": 47.9,
+    "digits": 1,
+    "fixed": "47.9"
+   },
+   {
+    "value": 28.812774633988738,
+    "digits": 2,
+    "fixed": "28.81"
+   },
+   {
+    "value": 9.54,
+    "digits": 1,
+    "fixed": "9.5"
+   },
+   {
+    "value": 27.54,
+    "digits": 1,
+    "fixed": "27.5"
+   },
+   {
+    "value": 22.319538854062557,
+    "digits": 2,
+    "fixed": "22.32"
+   },
+   {
+    "value": 15.43,
+    "digits": 1,
+    "fixed": "15.4"
+   },
+   {
+    "value": 33.43,
+    "digits": 1,
+    "fixed": "33.4"
+   },
+   {
+    "value": 23.827202981337905,
+    "digits": 2,
+    "fixed": "23.83"
+   }
+  ],
+  "words": [
+   {
+    "name": "off: no level",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac"
+    },
+    "format": "raw",
+    "answer": null,
+    "debug": "Off",
+    "about": "Off"
+   },
+   {
+    "name": "mp3 asked album",
+    "track": {
+     "suffix": "mp3",
+     "contentType": "audio/mpeg",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": null,
+    "debug": "Not levelled - MP3 songs play as they are",
+    "about": "Off for this song - only FLAC songs are adjusted"
+   },
+   {
+    "name": "m4a asked album",
+    "track": {
+     "suffix": "m4a",
+     "contentType": "audio/mp4",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": null,
+    "debug": "Not levelled - M4A songs play as they are",
+    "about": "Off for this song - only FLAC songs are adjusted"
+   },
+   {
+    "name": "opus asked track, sent as mp3",
+    "track": {
+     "suffix": "opus",
+     "contentType": "audio/ogg",
+     "level": "track"
+    },
+    "format": "mp3",
+    "answer": null,
+    "debug": "Not levelled - OPUS songs play as they are",
+    "about": "Off for this song - only FLAC songs are adjusted"
+   },
+   {
+    "name": "no suffix, not flac",
+    "track": {
+     "suffix": null,
+     "contentType": "audio/mpeg",
+     "level": "track"
+    },
+    "format": "raw",
+    "answer": null,
+    "debug": "Not levelled - only FLAC songs are levelled",
+    "about": "Off for this song - only FLAC songs are adjusted"
+   },
+   {
+    "name": "flac sent as mp3",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "mp3",
+    "answer": null,
+    "debug": "Not levelled - FLAC songs play as they are",
+    "about": "Off for this song - this device can't play FLAC, so it's sent as MP3"
+   },
+   {
+    "name": "flac, no format said",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": null,
+    "answer": null,
+    "debug": "Asked for; deadwax hasn't said yet",
+    "about": "Checking…"
+   },
+   {
+    "name": "flac, no answer yet",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": null,
+    "debug": "Asked for; deadwax hasn't said yet",
+    "about": "Checking…"
+   },
+   {
+    "name": "flac by its type alone",
+    "track": {
+     "suffix": null,
+     "contentType": "audio/x-flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "measured",
+     "gain_db": -7.42,
+     "wanted_db": -7.42,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "debug": "Album, -7.42 dB · the album at -10.6 LUFS",
+    "about": "Album volume matching, 7.4 dB quieter"
+   },
+   {
+    "name": "album measured",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "measured",
+     "gain_db": -7.42,
+     "wanted_db": -7.42,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "debug": "Album, -7.42 dB · the album at -10.6 LUFS",
+    "about": "Album volume matching, 7.4 dB quieter"
+   },
+   {
+    "name": "song measured",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "track"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "track",
+     "state": "measured",
+     "gain_db": 1.2,
+     "wanted_db": 1.2,
+     "loudness_lufs": -19.2,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "debug": "Song, +1.20 dB · the song at -19.2 LUFS",
+    "about": "Song volume matching, 1.2 dB louder"
+   },
+   {
+    "name": "song measured -3.10",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "track"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "track",
+     "state": "measured",
+     "gain_db": -3.1,
+     "wanted_db": -3.1,
+     "loudness_lufs": -14.9,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "debug": "Song, -3.10 dB · the song at -14.9 LUFS",
+    "about": "Song volume matching, 3.1 dB quieter"
+   },
+   {
+    "name": "album -3.56 from -14.4",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "measured",
+     "gain_db": -3.56,
+     "wanted_db": -3.56,
+     "loudness_lufs": -14.4,
+     "peak_db": -1,
+     "held": false,
+     "songs": 10,
+     "measured_songs": 10,
+     "why": null
+    },
+    "debug": "Album, -3.56 dB · the album at -14.4 LUFS",
+    "about": "Album volume matching, 3.6 dB quieter"
+   },
+   {
+    "name": "song held",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "track"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "track",
+     "state": "measured",
+     "gain_db": 1.2,
+     "wanted_db": 2.35,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": true,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "debug": "Song, +1.20 dB · held there by its peak (it wanted +2.35)",
+    "about": "Song volume matching, 1.2 dB louder - as loud as it can go without distorting"
+   },
+   {
+    "name": "album held at -0.01, wanted +4",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "measured",
+     "gain_db": -0.01,
+     "wanted_db": 4,
+     "loudness_lufs": -22,
+     "peak_db": -1,
+     "held": true,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "debug": "Album, -0.01 dB · held there by its peak (it wanted +4.00)",
+    "about": "Album volume matching - kept as it is, it can't go louder without distorting"
+   },
+   {
+    "name": "song held at +0.04, wanted 1.5",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "track"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "track",
+     "state": "measured",
+     "gain_db": 0.04,
+     "wanted_db": 1.5,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": true,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "debug": "Song, +0.04 dB · held there by its peak (it wanted +1.50)",
+    "about": "Song volume matching - kept as it is, it can't go louder without distorting"
+   },
+   {
+    "name": "album held, wanted null",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "measured",
+     "gain_db": 2,
+     "wanted_db": null,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": true,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "debug": "Album, +2.00 dB · the album at -10.6 LUFS",
+    "about": "Album volume matching, 2.0 dB louder - as loud as it can go without distorting"
+   },
+   {
+    "name": "album held at 0, wanted -2",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "measured",
+     "gain_db": 0,
+     "wanted_db": -2,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": true,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "debug": "Album, +0.00 dB · held there by its peak (it wanted -2.00)",
+    "about": "Album volume matching, no change needed - as loud as it can go without distorting"
+   },
+   {
+    "name": "album unheld -0.01",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "measured",
+     "gain_db": -0.01,
+     "wanted_db": -0.01,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "debug": "Album, -0.01 dB · the album at -10.6 LUFS",
+    "about": "Album volume matching, no change needed"
+   },
+   {
+    "name": "album silent",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "measured",
+     "gain_db": 0,
+     "wanted_db": 0,
+     "loudness_lufs": null,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "debug": "Album, +0.00 dB · the album is silent",
+    "about": "Album volume matching - nothing to adjust, the album is silent"
+   },
+   {
+    "name": "song silent",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "track"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "track",
+     "state": "measured",
+     "gain_db": 0,
+     "wanted_db": 0,
+     "loudness_lufs": null,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "debug": "Song, +0.00 dB · the song is silent",
+    "about": "Song volume matching - nothing to adjust, the song is silent"
+   },
+   {
+    "name": "gain -0.25 (tie)",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "measured",
+     "gain_db": -0.25,
+     "wanted_db": -0.25,
+     "loudness_lufs": -17.75,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "debug": "Album, -0.25 dB · the album at -17.8 LUFS",
+    "about": "Album volume matching, 0.3 dB quieter"
+   },
+   {
+    "name": "gain -3.25 (tie)",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "measured",
+     "gain_db": -3.25,
+     "wanted_db": -3.25,
+     "loudness_lufs": -14.75,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "debug": "Album, -3.25 dB · the album at -14.8 LUFS",
+    "about": "Album volume matching, 3.3 dB quieter"
+   },
+   {
+    "name": "lufs -10.25 (tie)",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "measured",
+     "gain_db": -7.75,
+     "wanted_db": -7.75,
+     "loudness_lufs": -10.25,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "debug": "Album, -7.75 dB · the album at -10.3 LUFS",
+    "about": "Album volume matching, 7.8 dB quieter"
+   },
+   {
+    "name": "lufs -0.04",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "measured",
+     "gain_db": -17.96,
+     "wanted_db": -17.96,
+     "loudness_lufs": -0.04,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "debug": "Album, -17.96 dB · the album at 0.0 LUFS",
+    "about": "Album volume matching, 18.0 dB quieter"
+   },
+   {
+    "name": "lufs +1.5",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "measured",
+     "gain_db": -19.5,
+     "wanted_db": -19.5,
+     "loudness_lufs": 1.5,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "debug": "Album, -19.50 dB · the album at 1.5 LUFS",
+    "about": "Album volume matching, 19.5 dB quieter"
+   },
+   {
+    "name": "album measuring 1 of 3",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "measuring",
+     "gain_db": null,
+     "wanted_db": -7.42,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 1,
+     "why": null
+    },
+    "debug": "Measuring its album… (1 of 3 songs)",
+    "about": "Measuring the album… (1 of 3 songs)"
+   },
+   {
+    "name": "album measuring 7 of 12",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "measuring",
+     "gain_db": null,
+     "wanted_db": -7.42,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": false,
+     "songs": 12,
+     "measured_songs": 7,
+     "why": null
+    },
+    "debug": "Measuring its album… (7 of 12 songs)",
+    "about": "Measuring the album… (7 of 12 songs)"
+   },
+   {
+    "name": "album measuring 0 of 1",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "measuring",
+     "gain_db": null,
+     "wanted_db": -7.42,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": false,
+     "songs": 1,
+     "measured_songs": 0,
+     "why": null
+    },
+    "debug": "Measuring its album… (0 of 1 song)",
+    "about": "Measuring the album… (0 of 1 song)"
+   },
+   {
+    "name": "song measuring",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "track"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "track",
+     "state": "measuring",
+     "gain_db": null,
+     "wanted_db": -7.42,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "debug": "Measuring the song…",
+    "about": "Measuring the song…"
+   },
+   {
+    "name": "album unmeasured",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "unmeasured",
+     "gain_db": null,
+     "wanted_db": -7.42,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "debug": "Not measured yet - it played as it is this time",
+    "about": "Not this time - the album hasn't been measured yet"
+   },
+   {
+    "name": "song unmeasured",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "track"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "track",
+     "state": "unmeasured",
+     "gain_db": null,
+     "wanted_db": -7.42,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "debug": "Not measured yet - it played as it is this time",
+    "about": "Not this time - the song hasn't been measured yet"
+   },
+   {
+    "name": "measured but no gain",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "measured",
+     "gain_db": null,
+     "wanted_db": -7.42,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "debug": "Not measured yet - it played as it is this time",
+    "about": "Not this time - the album hasn't been measured yet"
+   },
+   {
+    "name": "album plain",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "plain",
+     "gain_db": null,
+     "wanted_db": -7.42,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "debug": "Played as it is this time - its album was still being measured",
+    "about": "Not this time - the album was still being measured"
+   },
+   {
+    "name": "song plain",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "track"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "track",
+     "state": "plain",
+     "gain_db": null,
+     "wanted_db": -7.42,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "debug": "Played as it is this time - its loudness was still being measured",
+    "about": "Not this time - the song was still being measured"
+   },
+   {
+    "name": "not levelled: no libraries",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "not_levelled",
+     "gain_db": null,
+     "wanted_db": -7.42,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": "deadwax is running without numpy and soundfile"
+    },
+    "debug": "Not levelled - deadwax is running without numpy and soundfile",
+    "about": "Off for this song - this server can't adjust volume"
+   },
+   {
+    "name": "not levelled: no cache",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "not_levelled",
+     "gain_db": null,
+     "wanted_db": -7.42,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": "the player's cache can't be used on this server"
+    },
+    "debug": "Not levelled - the player's cache can't be used on this server",
+    "about": "Off for this song - this server can't adjust volume"
+   },
+   {
+    "name": "not levelled: not flac",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "not_levelled",
+     "gain_db": null,
+     "wanted_db": -7.42,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": "it isn't a FLAC file"
+    },
+    "debug": "Not levelled - it isn't a FLAC file",
+    "about": "Off for this song - only FLAC songs are adjusted"
+   },
+   {
+    "name": "not levelled: unreadable",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "not_levelled",
+     "gain_db": null,
+     "wanted_db": -7.42,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": "its file can't be read as FLAC by deadwax (20- or 32-bit)"
+    },
+    "debug": "Not levelled - its file can't be read as FLAC by deadwax (20- or 32-bit)",
+    "about": "Off for this song - its file can't be measured"
+   },
+   {
+    "name": "not levelled: 6 channels",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "not_levelled",
+     "gain_db": null,
+     "wanted_db": -7.42,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": "it has 6 channels - only mono and stereo are levelled"
+    },
+    "debug": "Not levelled - it has 6 channels - only mono and stereo are levelled",
+    "about": "Off for this song - its file can't be measured"
+   },
+   {
+    "name": "not levelled: no length",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "track"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "track",
+     "state": "not_levelled",
+     "gain_db": null,
+     "wanted_db": -7.42,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": "its STREAMINFO doesn't say how long it is"
+    },
+    "debug": "Not levelled - its STREAMINFO doesn't say how long it is",
+    "about": "Off for this song - its file can't be measured"
+   },
+   {
+    "name": "not levelled: too large",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "not_levelled",
+     "gain_db": null,
+     "wanted_db": -7.42,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": "it is 412 MiB, more than the 256 MiB a song is held in memory to repackage"
+    },
+    "debug": "Not levelled - it is 412 MiB, more than the 256 MiB a song is held in memory to repackage",
+    "about": "Off for this song - its file is too large"
+   },
+   {
+    "name": "not levelled: empty file",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "not_levelled",
+     "gain_db": null,
+     "wanted_db": -7.42,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": "the file is empty"
+    },
+    "debug": "Not levelled - the file is empty",
+    "about": "Off for this song - its file can't be measured"
+   },
+   {
+    "name": "not levelled: first bytes",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "not_levelled",
+     "gain_db": null,
+     "wanted_db": -7.42,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": "its first bytes aren't a FLAC file's"
+    },
+    "debug": "Not levelled - its first bytes aren't a FLAC file's",
+    "about": "Off for this song - its file can't be measured"
+   },
+   {
+    "name": "not levelled: libsndfile",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "not_levelled",
+     "gain_db": null,
+     "wanted_db": -7.42,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": "Error opening: unknown format"
+    },
+    "debug": "Not levelled - Error opening: unknown format",
+    "about": "Off for this song - its file can't be measured"
+   },
+   {
+    "name": "not levelled: why null",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "not_levelled",
+     "gain_db": null,
+     "wanted_db": -7.42,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "debug": "Not levelled - deadwax won't level it",
+    "about": "Off for this song - its file can't be measured"
+   }
+  ],
+  "formatWords": [
+   {
+    "track": {
+     "id": "so-1",
+     "title": "Glory Box",
+     "artist": "Portishead",
+     "album": "Dummy",
+     "albumId": "al-1",
+     "coverArt": null,
+     "duration": 308,
+     "contentType": "audio/flac",
+     "suffix": "flac",
+     "sampleRate": 44100,
+     "bitDepth": 16,
+     "channels": 2
+    },
+    "words": "FLAC, 16-bit, 44.1 kHz, stereo"
+   },
+   {
+    "track": {
+     "id": "so-1",
+     "title": "Glory Box",
+     "artist": "Portishead",
+     "album": "Dummy",
+     "albumId": "al-1",
+     "coverArt": null,
+     "duration": 308,
+     "contentType": "audio/flac",
+     "suffix": "flac",
+     "sampleRate": 192000,
+     "bitDepth": 24,
+     "channels": 2
+    },
+    "words": "FLAC, 24-bit, 192 kHz, stereo"
+   },
+   {
+    "track": {
+     "id": "so-1",
+     "title": "Glory Box",
+     "artist": "Portishead",
+     "album": "Dummy",
+     "albumId": "al-1",
+     "coverArt": null,
+     "duration": 308,
+     "contentType": "audio/flac",
+     "suffix": "flac",
+     "sampleRate": 88200,
+     "bitDepth": 24,
+     "channels": 2
+    },
+    "words": "FLAC, 24-bit, 88.2 kHz, stereo"
+   },
+   {
+    "track": {
+     "id": "so-1",
+     "title": "Glory Box",
+     "artist": "Portishead",
+     "album": "Dummy",
+     "albumId": "al-1",
+     "coverArt": null,
+     "duration": 308,
+     "contentType": "audio/flac",
+     "suffix": "flac",
+     "sampleRate": 22050,
+     "bitDepth": 16,
+     "channels": 6
+    },
+    "words": "FLAC, 16-bit, 22.05 kHz, 6 channels"
+   },
+   {
+    "track": {
+     "id": "so-1",
+     "title": "Glory Box",
+     "artist": "Portishead",
+     "album": "Dummy",
+     "albumId": "al-1",
+     "coverArt": null,
+     "duration": 308,
+     "contentType": "audio/mp4",
+     "suffix": "m4a",
+     "sampleRate": 44100,
+     "bitDepth": 16,
+     "channels": 2
+    },
+    "words": "M4A, 16-bit, 44.1 kHz, stereo"
+   },
+   {
+    "track": {
+     "id": "so-1",
+     "title": "Glory Box",
+     "artist": "Portishead",
+     "album": "Dummy",
+     "albumId": "al-1",
+     "coverArt": null,
+     "duration": 308,
+     "contentType": "audio/x-flac",
+     "suffix": null,
+     "sampleRate": 44100,
+     "bitDepth": 16,
+     "channels": 2
+    },
+    "words": "FLAC, 16-bit, 44.1 kHz, stereo"
+   },
+   {
+    "track": {
+     "id": "so-1",
+     "title": "Glory Box",
+     "artist": "Portishead",
+     "album": "Dummy",
+     "albumId": "al-1",
+     "coverArt": null,
+     "duration": 308,
+     "contentType": "Audio/MPEG; charset=x",
+     "suffix": null,
+     "sampleRate": 44100,
+     "bitDepth": 16,
+     "channels": 2
+    },
+    "words": "MPEG, 16-bit, 44.1 kHz, stereo"
+   },
+   {
+    "track": {
+     "id": "so-1",
+     "title": "Glory Box",
+     "artist": "Portishead",
+     "album": "Dummy",
+     "albumId": "al-1",
+     "coverArt": null,
+     "duration": 308,
+     "contentType": "video/mp4",
+     "suffix": null,
+     "sampleRate": 44100,
+     "bitDepth": 16,
+     "channels": 2
+    },
+    "words": "16-bit, 44.1 kHz, stereo"
+   },
+   {
+    "track": {
+     "id": "so-1",
+     "title": "Glory Box",
+     "artist": "Portishead",
+     "album": "Dummy",
+     "albumId": "al-1",
+     "coverArt": null,
+     "duration": 308,
+     "contentType": "audio/flac",
+     "suffix": "",
+     "sampleRate": 44100,
+     "bitDepth": 16,
+     "channels": 2
+    },
+    "words": "FLAC, 16-bit, 44.1 kHz, stereo"
+   },
+   {
+    "track": {
+     "id": "so-1",
+     "title": "Glory Box",
+     "artist": "Portishead",
+     "album": "Dummy",
+     "albumId": "al-1",
+     "coverArt": null,
+     "duration": 308,
+     "contentType": null,
+     "suffix": null,
+     "sampleRate": 0,
+     "bitDepth": 0,
+     "channels": 0
+    },
+    "words": ""
+   },
+   {
+    "track": {
+     "id": "so-1",
+     "title": "Glory Box",
+     "artist": "Portishead",
+     "album": "Dummy",
+     "albumId": "al-1",
+     "coverArt": null,
+     "duration": 308,
+     "contentType": "audio/flac",
+     "suffix": "flac",
+     "sampleRate": 44100,
+     "bitDepth": 0,
+     "channels": 1
+    },
+    "words": "FLAC, 44.1 kHz, mono"
+   },
+   {
+    "track": {
+     "id": "so-1",
+     "title": "Glory Box",
+     "artist": "Portishead",
+     "album": "Dummy",
+     "albumId": "al-1",
+     "coverArt": null,
+     "duration": 308,
+     "contentType": "audio/flac",
+     "suffix": "flac",
+     "sampleRate": 11025,
+     "bitDepth": 16,
+     "channels": 3
+    },
+    "words": "FLAC, 16-bit, 11.025 kHz, 3 channels"
+   },
+   {
+    "track": {
+     "id": "so-1",
+     "title": "Glory Box",
+     "artist": "Portishead",
+     "album": "Dummy",
+     "albumId": "al-1",
+     "coverArt": null,
+     "duration": 308,
+     "contentType": "audio/x-wav",
+     "suffix": "wav",
+     "sampleRate": 48000,
+     "bitDepth": 32,
+     "channels": 2
+    },
+    "words": "WAV, 32-bit, 48 kHz, stereo"
+   },
+   {
+    "track": {
+     "id": "so-1",
+     "title": "Glory Box",
+     "artist": "Portishead",
+     "album": "Dummy",
+     "albumId": "al-1",
+     "coverArt": null,
+     "duration": 308,
+     "contentType": "audio/mpeg",
+     "suffix": "mp3",
+     "sampleRate": 44100,
+     "bitDepth": 0,
+     "channels": 2
+    },
+    "words": "MP3, 44.1 kHz, stereo"
+   },
+   {
+    "track": {
+     "id": "so-1",
+     "title": "Glory Box",
+     "artist": "Portishead",
+     "album": "Dummy",
+     "albumId": "al-1",
+     "coverArt": null,
+     "duration": 308,
+     "contentType": "audio/flac",
+     "suffix": "flac",
+     "sampleRate": 0,
+     "bitDepth": 16,
+     "channels": 2
+    },
+    "words": "FLAC, 16-bit, stereo"
+   }
+  ],
+  "soundRows": [
+   {
+    "track": {
+     "id": "so-1",
+     "title": "Glory Box",
+     "artist": "Portishead",
+     "album": "Dummy",
+     "albumId": "al-1",
+     "coverArt": null,
+     "duration": 308,
+     "contentType": "audio/flac",
+     "suffix": "flac",
+     "sampleRate": 192000,
+     "bitDepth": 24,
+     "channels": 2,
+     "level": "album"
+    },
+    "gapless": true,
+    "format": "raw",
+    "level": {
+     "level": "album",
+     "state": "measured",
+     "gain_db": -3.56,
+     "wanted_db": -7.42,
+     "loudness_lufs": -14.4,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "rows": [
+     {
+      "label": "Format",
+      "value": "FLAC, 24-bit, 192 kHz, stereo"
+     },
+     {
+      "label": "Gapless",
+      "value": "On"
+     },
+     {
+      "label": "Normalization",
+      "value": "Album volume matching, 3.6 dB quieter"
+     }
+    ]
+   },
+   {
+    "track": {
+     "id": "so-1",
+     "title": "Glory Box",
+     "artist": "Portishead",
+     "album": "Dummy",
+     "albumId": "al-1",
+     "coverArt": null,
+     "duration": 308,
+     "contentType": null,
+     "suffix": null,
+     "sampleRate": 0,
+     "bitDepth": 0,
+     "channels": 0
+    },
+    "gapless": false,
+    "format": "raw",
+    "level": null,
+    "rows": [
+     {
+      "label": "Format",
+      "value": "Not known"
+     },
+     {
+      "label": "Gapless",
+      "value": "Off"
+     },
+     {
+      "label": "Normalization",
+      "value": "Off"
+     }
+    ]
+   },
+   {
+    "track": {
+     "id": "so-1",
+     "title": "Glory Box",
+     "artist": "Portishead",
+     "album": "Dummy",
+     "albumId": "al-1",
+     "coverArt": null,
+     "duration": 308,
+     "contentType": "audio/flac",
+     "suffix": "flac",
+     "sampleRate": 44100,
+     "bitDepth": 16,
+     "channels": 2,
+     "level": "track"
+    },
+    "gapless": true,
+    "format": "raw",
+    "level": {
+     "level": "album",
+     "state": "measured",
+     "gain_db": -7.42,
+     "wanted_db": -7.42,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "rows": [
+     {
+      "label": "Format",
+      "value": "FLAC, 16-bit, 44.1 kHz, stereo"
+     },
+     {
+      "label": "Gapless",
+      "value": "On"
+     },
+     {
+      "label": "Normalization",
+      "value": "Checking…"
+     }
+    ]
+   },
+   {
+    "track": {
+     "id": "so-1",
+     "title": "Glory Box",
+     "artist": "Portishead",
+     "album": "Dummy",
+     "albumId": "al-1",
+     "coverArt": null,
+     "duration": 308,
+     "contentType": "audio/flac",
+     "suffix": "flac",
+     "sampleRate": 44100,
+     "bitDepth": 16,
+     "channels": 2,
+     "level": "album"
+    },
+    "gapless": true,
+    "format": "raw",
+    "level": null,
+    "rows": [
+     {
+      "label": "Format",
+      "value": "FLAC, 16-bit, 44.1 kHz, stereo"
+     },
+     {
+      "label": "Gapless",
+      "value": "On"
+     },
+     {
+      "label": "Normalization",
+      "value": "Checking…"
+     }
+    ]
+   },
+   {
+    "track": {
+     "id": "so-1",
+     "title": "Glory Box",
+     "artist": "Portishead",
+     "album": "Dummy",
+     "albumId": "al-1",
+     "coverArt": null,
+     "duration": 308,
+     "contentType": "audio/mpeg",
+     "suffix": "mp3",
+     "sampleRate": 44100,
+     "bitDepth": 16,
+     "channels": 2,
+     "level": "album"
+    },
+    "gapless": true,
+    "format": "raw",
+    "level": null,
+    "rows": [
+     {
+      "label": "Format",
+      "value": "MP3, 16-bit, 44.1 kHz, stereo"
+     },
+     {
+      "label": "Gapless",
+      "value": "On"
+     },
+     {
+      "label": "Normalization",
+      "value": "Off for this song - only FLAC songs are adjusted"
+     }
+    ]
+   },
+   {
+    "track": {
+     "id": "so-1",
+     "title": "Glory Box",
+     "artist": "Portishead",
+     "album": "Dummy",
+     "albumId": "al-1",
+     "coverArt": null,
+     "duration": 308,
+     "contentType": "audio/flac",
+     "suffix": "flac",
+     "sampleRate": 44100,
+     "bitDepth": 16,
+     "channels": 2,
+     "level": "track"
+    },
+    "gapless": true,
+    "format": "raw",
+    "level": {
+     "level": "track",
+     "state": "measuring",
+     "gain_db": null,
+     "wanted_db": -7.42,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "rows": [
+     {
+      "label": "Format",
+      "value": "FLAC, 16-bit, 44.1 kHz, stereo"
+     },
+     {
+      "label": "Gapless",
+      "value": "On"
+     },
+     {
+      "label": "Normalization",
+      "value": "Measuring the song…"
+     }
+    ]
+   }
+  ],
+  "constants": {
+   "SOUND_TITLE": "Sound",
+   "LEVEL_CHECKING": "Checking…",
+   "LEVEL_NOT_KNOWN_YET": "Asked for; deadwax hasn't said yet",
+   "OFF_WORDS": {
+    "server": "Off for this song - this server can't adjust volume",
+    "kind": "Off for this song - only FLAC songs are adjusted",
+    "transcoded": "Off for this song - this device can't play FLAC, so it's sent as MP3",
+    "large": "Off for this song - its file is too large",
+    "file": "Off for this song - its file can't be measured"
+   },
+   "NOT_KNOWN": "Not known",
+   "DEFAULT_NORMALIZATION": "auto"
+  },
+  "settings": [
+   {
+    "value": "auto",
+    "label": "Automatic",
+    "note": "An album you play keeps one level for the whole album, so its quiet songs stay quiet beside its loud ones. Anything else - a playlist, a shuffle, a song you add with Play Next - is levelled song by song."
+   },
+   {
+    "value": "song",
+    "label": "By song",
+    "note": "Every song brought to the same loudness, even the quiet and loud songs of one album."
+   },
+   {
+    "value": "album",
+    "label": "By album",
+    "note": "Every song at its album's level, even when it plays on its own or in a playlist."
+   },
+   {
+    "value": "off",
+    "label": "Off",
+    "note": "No levelling: every song plays exactly as the file is, bit for bit, unless Maximum quality converts it."
+   }
+  ]
+ }
+}
