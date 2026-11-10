@@ -3,16 +3,32 @@ import AVFAudio
 import DeadwaxCore
 import Foundation
 
-/// One song for the engine: the song, and how to open its audio at a point in it (its beginning, a
-/// seek's seconds, or the exact frame it was left at) - the source turns that into a frame at the
-/// file's own rate (`StartPoint.frame(at:)`).
+/// One entry of the queue for the engine: Up Next's key for it, what it decodes to, the song, and
+/// how to open its audio at a point in it (its beginning, a seek's seconds, or the exact frame it
+/// was left at) - the source turns that into a frame at the file's own rate (`StartPoint.frame(at:)`).
 public struct EngineTrack {
+    /// Up Next's key for the entry (its Mark's): unique in the queue, and what the engine reports
+    /// the song heard by, so an index from an older list is never acted on.
+    public let key: Int
+    /// What the entry decodes to: `"<song id>|<level, or off>"` (`audio(songID:level:)`). Two
+    /// entries with the same `audio` give the same samples at the same gain, so an edit that keeps
+    /// it - Repeat One's copies, Shuffle turned off re-keying the same songs - keeps what is scheduled.
+    public let audio: String
     public let song: Song
+    /// Opens the entry's audio: the app's source, wrapped at the entry's gain (`GainedSource.wrap`),
+    /// decided once for the entry and the same at every open.
     public let open: (StartPoint) throws -> PCMSource
 
-    public init(song: Song, open: @escaping (StartPoint) throws -> PCMSource) {
+    public init(key: Int, audio: String, song: Song, open: @escaping (StartPoint) throws -> PCMSource) {
+        self.key = key
+        self.audio = audio
         self.song = song
         self.open = open
+    }
+
+    /// `"<song id>|<level>"`, or `"<song id>|off"` with no level.
+    public static func audio(songID: String, level: String?) -> String {
+        "\(songID)|\(level ?? "off")"
     }
 }
 
@@ -24,11 +40,13 @@ public struct EngineState: Equatable {
         case playing
         case paused
         case ended
+        /// Debug's words; `EngineState.failure` says what kind of failure it was.
         case failed(String)
     }
 
     public var phase: Phase = .idle
-    /// The song heard (an index into the tracks played).
+    /// The entry heard (its key), and where it is in the CURRENT tracks.
+    public var key: Int?
     public var index: Int?
     /// The heard song's own rate and channels - what it was decoded at.
     public var fileRate: Double?
@@ -38,6 +56,61 @@ public struct EngineState: Equatable {
     public var outputRate: Double?
     /// The start time asked of the last song started from silence: output latency plus one IO buffer.
     public var lastStartLead: Double?
+    /// The output's latency the positions are taken back by (seconds).
+    public var latency: Double?
+    /// With `.failed`: the failure, its kind and deadwax's status - the app's words come from them.
+    public var failure: AudioFailure?
+
+    public init() {}
+}
+
+/// Where the listener is: the entry heard, its index in the current tracks, how far in (seconds of
+/// the song's own, the output's latency behind the render), and its exact length once its decode has
+/// ended (Navidrome's `duration` is whole seconds).
+public struct EnginePosition: Equatable {
+    public let key: Int
+    public let index: Int
+    public let seconds: Double
+    public let length: Double?
+
+    public init(key: Int, index: Int, seconds: Double, length: Double?) {
+        self.key = key
+        self.index = index
+        self.seconds = seconds
+        self.length = length
+    }
+}
+
+/// What Debug shows of the engine (plan R8): its lanes, the output, and the last start.
+public struct EngineDebug: Equatable {
+    public struct Lane: Equatable {
+        /// The songs' own rate and channels.
+        public let rate: Double
+        public let channels: Int
+        /// The rate the lane's node runs at - the output's.
+        public let nodeRate: Double
+        /// The lane converts the songs' rate to the output's.
+        public let converting: Bool
+        /// Scheduled past what the render has reached, in seconds.
+        public let aheadSeconds: Double
+        public let pendingBuffers: Int
+        public let started: Bool
+        /// The lane the song heard is on.
+        public let heard: Bool
+    }
+
+    public var lanes: [Lane] = []
+    public var outputRate: Double?
+    public var latency: Double = 0
+    public var lastStartLead: Double?
+    /// From the last play (or resume) asked for to its first sample heard, in seconds.
+    public var lastStartSeconds: Double?
+    public var outputRunning = false
+    public var asleep = true
+    public var phase: EngineState.Phase = .idle
+    public var key: Int?
+    /// The entry being decoded (the one heard, or the next once the heard one's decode has ended).
+    public var feedKey: Int?
 
     public init() {}
 }
@@ -49,23 +122,32 @@ public struct EngineState: Equatable {
 ///   on the same node, so within a format the samples run on unbroken - nothing trimmed, nothing
 ///   crossfaded. A song in another format goes on its own lane, started at the moment the first
 ///   lane's last sample plays.
-/// - Nothing is processed but what an output needs: no gain, the decoder's int-to-float (exact),
-///   the main mixer at unity, and - only when a file's rate isn't the output's (48 kHz on the
-///   speaker and AirPods: a 44.1 kHz CD, a 96 or 192 kHz file) - the lane's own AVAudioConverter at
-///   its best quality (the mastering algorithm, `.max`), one per lane and kept across its songs so a
-///   join stays continuous. Every node runs at the output's rate, so the mixer itself converts
-///   nothing. (The mixer's own conversion was measured first and failed: a 30 kHz tone in a 192 kHz
-///   file came out at -21.8 dB, aliased - EngineRenderTests' `theRateConversionMeasured`.)
+/// - Nothing is processed but what an output needs: the gain of the entry when the app asks for one
+///   (its source's own multiply, GainedSource - the engine itself multiplies nothing), the decoder's
+///   int-to-float (exact), the main mixer at unity, and - only when a file's rate isn't the output's
+///   (48 kHz on the speaker and AirPods: a 44.1 kHz CD, a 96 or 192 kHz file) - the lane's own
+///   AVAudioConverter at its best quality (the mastering algorithm, `.max`), one per lane and kept
+///   across its songs so a join stays continuous. Every node runs at the output's rate, so the mixer
+///   itself converts nothing. (The mixer's own conversion was measured first and failed: a 30 kHz
+///   tone in a 192 kHz file came out at -21.8 dB, aliased - EngineRenderTests'
+///   `theRateConversionMeasured`.)
 /// - The output is started once and kept running across songs, so a song is scheduled onto an
 ///   output that is already live. A song started from silence is scheduled `startLead` ahead (the
 ///   output's latency and one IO buffer), so the output is live when its first sample plays. A pause
-///   (or the queue's end, a stop, a failure) stops the output at once (`idleStopSeconds`, 0): iOS
-///   counts an app whose output runs as playing, whatever its now-playing rate says, so with the
-///   output left running the lock screen kept Pause and the AirPods' next press came as another
-///   pause. Play then starts the output again and goes on from the frame left.
+///   (or a stop, a failure) stops the output at once (`idleStopSeconds`, 0): iOS counts an app whose
+///   output runs as playing, whatever its now-playing rate says. The queue's end stops it once its
+///   last samples have been heard. Play then starts the output again and goes on from the frame left.
+/// - One position for every reader - the lock screen, the scrubber, the plays rule, a pause's
+///   resume point: the frame HEARD, the output's `latency` behind the render (Core's HeardEstimate).
+///   A song change is said when it is heard.
 /// - When iOS stops the engine itself (a call, a new route, media services reset), the node's clock
-///   is gone before the engine hears of it, so where the song was is the last position read while it
-///   played (`Lane.lastSample`, read at least every buffer), and play goes on from there.
+///   is gone before the engine hears of it, so where the song was is estimated from the last reading
+///   taken while it played (read at least every buffer), carried on to the moment it is noticed, less
+///   the old route's latency - and play goes on from there.
+/// - The queue is followed by Up Next's keys (`EngineTrack.key`), not indices: an edit of what comes
+///   after the song heard (`replaceUpcoming`) is taken when nothing it changes is on a node yet, and
+///   refused - held by the app until the next song - when it would change a song already scheduled.
+///   The song heard is never touched.
 ///
 /// Every call hops onto the engine's own serial queue; `onChange` is called on the main queue.
 public final class PlaybackEngine {
@@ -79,10 +161,14 @@ public final class PlaybackEngine {
         /// How long a pause keeps the output running: none. iOS reads a running output as playing
         /// (notes/ios.md, "The pause the lock screen didn't see"); it was 60 s, for a quicker play.
         public var idleStopSeconds: Double = 0
+        /// The queue's end: the output stops this long after its last sample has been heard.
+        public var endLingerSeconds: Double = 0.1
         /// After a configuration change (a new route), how long the engine waits before playing on,
         /// so a pause for the same change - the old output gone: AirPods out, headphones unplugged,
         /// which the app hears as a route change on another queue - comes first and wins.
         public var changeSettleSeconds: Double = 0.3
+        /// How long to wait before reading a stream again that had nothing yet.
+        public var retrySeconds: Double = 0.05
         /// Offline manual rendering in this format (the tests' render), instead of the device.
         public var offline: AVAudioFormat?
 
@@ -92,10 +178,13 @@ public final class PlaybackEngine {
     /// The lead before a song started from silence plays: the app sets it from AVAudioSession
     /// (outputLatency + ioBufferDuration). Zero plays at once.
     public var startLead: () -> TimeInterval = { 0 }
+    /// How far the ear is behind the render: the app sets it from AVAudioSession (outputLatency +
+    /// ioBufferDuration). Read on the engine's queue at each position read.
+    public var latency: () -> TimeInterval = { 0 }
     public var onChange: ((EngineState) -> Void)?
-    /// Tests: what the engine does, line by line, on its queue - offline, each line starts with the
-    /// render's sample count.
-    var trace: ((String) -> Void)?
+    /// What the engine does, line by line, on its queue - each line starts with the render's sample
+    /// count offline, the host time in seconds on the phone. Debug keeps the last lines for a log.
+    public var trace: ((String) -> Void)?
 
     private let settings: Settings
     private let queue = DispatchQueue(label: "deadwax.engine", qos: .userInitiated)
@@ -119,9 +208,13 @@ public final class PlaybackEngine {
         /// The converter holds frames it hasn't given out yet (its filter's look-ahead): given out by
         /// `flush` when the lane's songs end.
         var holding = false
-        /// The node's sample count when it was last read playing, in the songs' frames - where the
-        /// song was when iOS stops the engine (its clock reads nil then).
-        var lastSample: Int64?
+        /// The render's position when the node was last read playing (the songs' frames), when, and
+        /// the output's latency then - where the song was when iOS stops the engine (its clock reads
+        /// nil then).
+        var lastRead: HeardReading?
+        /// The frame heard, estimated once iOS had stopped the engine: kept, so later reads don't
+        /// carry the estimate on.
+        var stopped: Int64?
         /// Offline only: the render's sample count when the node started.
         var renderStart: AVAudioFramePosition?
 
@@ -152,7 +245,8 @@ public final class PlaybackEngine {
             pending = 0
             started = false
             nodeFrames = 0
-            lastSample = nil
+            lastRead = nil
+            stopped = nil
         }
 
         func resetConverter() {
@@ -174,7 +268,7 @@ public final class PlaybackEngine {
     /// The song being decoded and scheduled - the one heard, or the next one once the heard one's
     /// decode has ended.
     private struct Feed {
-        let index: Int
+        var key: Int
         let source: PCMSource
         /// Where the source was opened at; its frame once the decoded format is known.
         let start: StartPoint
@@ -187,8 +281,8 @@ public final class PlaybackEngine {
         /// scheduled last (see `schedule`). Scheduled first when the feed goes on.
         var parked: AVAudioPCMBuffer?
 
-        init(index: Int, source: PCMSource, start: StartPoint) {
-            self.index = index
+        init(key: Int, source: PCMSource, start: StartPoint) {
+            self.key = key
             self.source = source
             self.start = start
         }
@@ -200,25 +294,47 @@ public final class PlaybackEngine {
         }
     }
 
-    /// A song and a point in it: where the engine is, or was left.
-    typealias Spot = (index: Int, at: StartPoint)
+    /// The next song failed while the one heard was still playing: the heard one plays to its end,
+    /// and the failure is said then, at that song.
+    private struct FailedNext {
+        var key: Int
+        let failure: AudioFailure
+        let at: StartPoint
+    }
+
+    /// An entry (by its key) and a point in its song: where the engine is, or was left.
+    typealias Spot = (key: Int, at: StartPoint)
 
     private var lanes: [LaneKey: Lane] = [:]
     private var heardLane: LaneKey?
     /// The lane the song scheduled last went on: the one that plays last.
     private var tail: LaneKey?
     private var tracks: [EngineTrack] = []
+    /// Each entry's index in `tracks`, by its key.
+    private var indexOf: [Int: Int] = [:]
+    /// The entry heard (its key).
     private var current: Int?
     private var feed: Feed?
-    private var entryTrack: [Int: Int] = [:]
+    private var failedNext: FailedNext?
+    /// Each timeline entry's queue entry: entry id -> key.
+    private var entryKey: [Int: Int] = [:]
+    /// Each entry's exact length in seconds, once its decode has ended.
+    private var lengths: [Int: Double] = [:]
     private var nextEntry = 1
     private var generation = 0
     private var wantsPlay = false
     private var asleep = true
     private var held: Spot?
+    private var lastFailure: AudioFailure?
+    /// The output's latency as last read, kept with every reading of a node.
+    private var lastLatency: Double = 0
+    /// When the last play or resume was asked (host seconds), until its first sample is heard.
+    private var playAsked: Double?
+    private var lastStartSeconds: Double?
     private var idle: DispatchWorkItem?
     private var retry: DispatchWorkItem?
     private var restart: DispatchWorkItem?
+    private var songChange: DispatchWorkItem?
     private var state = EngineState()
 
     public init(settings: Settings = Settings()) throws {
@@ -248,17 +364,33 @@ public final class PlaybackEngine {
 
     /// Plays `tracks` from `index`, `seconds` in.
     public func play(_ tracks: [EngineTrack], from index: Int, at seconds: Double = 0) {
+        let asked = Self.hostSeconds()
         queue.async {
-            self.tracks = tracks
+            self.setTracks(tracks, fresh: true)
             self.wantsPlay = true
+            self.playAsked = asked
             self.begin(at: index, from: seconds > 0 ? .seconds(seconds) : .beginning)
         }
     }
 
-    /// Replaces what comes after the song heard, keeping it playing (the tracks are the same up to
-    /// and including it).
-    public func replaceTracks(_ tracks: [EngineTrack]) {
-        queue.async { self.tracks = tracks }
+    /// A queue put back paused (resume what was playing): `index`, `seconds` in, shown and held -
+    /// nothing opened, fetched or played, the output left off. Play opens it from there.
+    public func restoreQueue(_ tracks: [EngineTrack], at index: Int, seconds: Double) {
+        queue.async {
+            self.setTracks(tracks, fresh: true)
+            self.wantsPlay = false
+            self.begin(at: index, from: seconds.isFinite && seconds > 0 ? .seconds(seconds) : .beginning)
+        }
+    }
+
+    /// Up Next changed what comes after the song heard (the tracks up to and including it are the
+    /// same, by key). True: the engine follows `tracks` from here. False: nothing changed - the edit
+    /// would change a song already scheduled on a node (the next one, in the last seconds of the song
+    /// heard), or the song heard isn't where it was in them - and the app holds it, to make it again
+    /// after the next song change against the queue as it is then. The song heard is never touched.
+    /// Waits on the engine's queue, like `position()`.
+    public func replaceUpcoming(_ tracks: [EngineTrack]) -> Bool {
+        queue.sync { replaceUpcomingNow(tracks) }
     }
 
     public func pause() {
@@ -266,20 +398,22 @@ public final class PlaybackEngine {
     }
 
     public func resume() {
-        queue.async { self.resumeNow() }
+        let asked = Self.hostSeconds()
+        queue.async { self.resumeNow(asked: asked) }
     }
 
-    /// Another song of the tracks, from its start.
+    /// Another entry of the tracks, from its start. Paused, it stays paused there.
     public func skip(to index: Int) {
         queue.async { self.begin(at: index, from: .beginning) }
     }
 
     /// `seconds` into the song heard - turned into a frame by the song's source, at the file's own
     /// rate, so a seek before the song has been heard (paused, or still loading) lands where it says.
+    /// Paused, nothing loads: play opens it there.
     public func seek(to seconds: Double) {
         queue.async {
-            guard let at = self.heard() else { return }
-            self.begin(at: at.index, from: .seconds(seconds))
+            guard let at = self.heard(), let index = self.indexOf[at.key] else { return }
+            self.begin(at: index, from: .seconds(seconds))
         }
     }
 
@@ -289,37 +423,65 @@ public final class PlaybackEngine {
             self.reset()
             self.current = nil
             self.held = nil
+            self.lastFailure = nil
             self.publish(.idle)
             self.armIdle()
         }
     }
 
-    /// The song heard and how far in, in seconds.
-    public func position() -> (index: Int, seconds: Double)? {
+    /// The entry heard, its index in the current tracks, and how far in - what the listener hears.
+    /// While a seek waits for its bytes, the seek's target.
+    public func position() -> EnginePosition? {
         queue.sync {
-            guard let at = heard() else { return nil }
-            return (at.index, at.at.seconds)
+            guard let at = heard(), let index = indexOf[at.key] else { return nil }
+            return EnginePosition(key: at.key, index: index, seconds: at.at.seconds, length: lengths[at.key])
         }
     }
 
-    /// After AVAudioSession's media services were reset: a new engine, and on from where it was.
+    /// What Debug shows.
+    public func debug() -> EngineDebug {
+        queue.sync {
+            var debug = EngineDebug()
+            debug.lanes = lanes.sorted { ($0.key.rate, $0.key.channels) < ($1.key.rate, $1.key.channels) }.map { key, lane in
+                let rendered = lane.started ? max(sample(of: lane) ?? lane.lastRead?.frame ?? 0, 0) : 0
+                return EngineDebug.Lane(rate: lane.format.sampleRate, channels: Int(lane.format.channelCount),
+                                        nodeRate: lane.nodeFormat.sampleRate, converting: lane.converter != nil,
+                                        aheadSeconds: Double(max(lane.timeline.end - rendered, 0)) / lane.format.sampleRate,
+                                        pendingBuffers: lane.pending, started: lane.started, heard: heardLane == key)
+            }
+            debug.outputRate = state.outputRate
+            debug.latency = lastLatency
+            debug.lastStartLead = state.lastStartLead
+            debug.lastStartSeconds = lastStartSeconds
+            debug.outputRunning = engine.isRunning
+            debug.asleep = asleep
+            debug.phase = state.phase
+            debug.key = current
+            debug.feedKey = feed?.key
+            return debug
+        }
+    }
+
+    /// After AVAudioSession's media services were reset: the old engine and its nodes are dead, and
+    /// nothing is asked of them - a new engine, and on from where the song was heard.
     public func rebuild() {
         queue.async {
-            let at = self.heard()
+            let at = self.heard(readingNodes: false)
             let playing = self.wantsPlay
-            self.reset()
-            for lane in self.lanes.values { self.engine.detach(lane.node) }
+            self.reset(touchingNodes: false)
             self.lanes.removeAll()
             self.heardLane = nil
-            self.engine.stop()
             self.engine = AVAudioEngine()
+            self.note("media services reset: a new engine")
             do {
                 try self.configure(self.engine)
             } catch {
-                self.fail("iOS couldn't make a new audio engine: \(error.localizedDescription)")
+                self.held = at
+                self.fail(AudioFailure("iOS couldn't make a new audio engine: \(error.localizedDescription)"))
                 return
             }
             self.asleep = true
+            self.held = at
             self.resumeFrom(at, playing: playing)
         }
     }
@@ -366,6 +528,9 @@ public final class PlaybackEngine {
     /// Tests: the phase now, without waiting for `onChange` on the main queue.
     var phase: EngineState.Phase { queue.sync { state.phase } }
 
+    /// Tests: the state now, without waiting for `onChange`.
+    var stateNow: EngineState { queue.sync { state } }
+
     /// Tests: whether the output is running - what iOS goes by to call the app playing.
     var outputRunning: Bool { queue.sync { engine.isRunning } }
 
@@ -380,24 +545,45 @@ public final class PlaybackEngine {
 
     // MARK: on the queue
 
+    static func hostSeconds() -> Double { AVAudioTime.seconds(forHostTime: mach_absolute_time()) }
+
+    private func setTracks(_ new: [EngineTrack], fresh: Bool) {
+        tracks = new
+        var index: [Int: Int] = [:]
+        for (at, track) in new.enumerated() where index[track.key] == nil { index[track.key] = at }
+        indexOf = index
+        if fresh {
+            lengths.removeAll()
+        } else {
+            lengths = lengths.filter { index[$0.key] != nil }
+        }
+    }
+
     private func begin(at index: Int, from start: StartPoint) {
         reset()
+        lastFailure = nil
         guard tracks.indices.contains(index) else {
             finish()
             return
         }
-        current = index
-        held = (index, start)
+        let key = tracks[index].key
+        current = key
+        held = (key, start)
+        guard wantsPlay else {
+            // a skip, a seek or a queue put back while paused: nothing opens and the output stays off
+            // (iOS would count it as playing) - play opens it from `held`
+            sleep()
+            publish(.paused)
+            return
+        }
         do {
-            feed = Feed(index: index, source: try tracks[index].open(start), start: start)
+            feed = Feed(key: key, source: try tracks[index].open(start), start: start)
         } catch {
-            fail(String(describing: error))
+            fail(error)
             return
         }
         guard ensureRunning() else { return }
-        // loaded while paused (a skip or a seek): it waits, paused, for play
-        publish(wantsPlay ? .loading : .paused)
-        if !wantsPlay { armIdle() }
+        publish(.loading)
         pump()
     }
 
@@ -406,25 +592,61 @@ public final class PlaybackEngine {
         idle?.cancel()
         idle = nil
         if engine.isRunning { return true }
+        matchOutput()
         engine.prepare()
         do {
             try engine.start()
             asleep = false
             return true
         } catch {
-            fail("iOS wouldn't start the audio: \(error.localizedDescription)")
+            fail(AudioFailure("iOS wouldn't start the audio: \(error.localizedDescription)"))
             return false
         }
     }
 
-    private func reset() {
+    /// The output stopped and marked asleep: play makes everything again from `held`.
+    private func sleep() {
+        idle?.cancel()
+        idle = nil
+        if engine.isRunning { engine.stop() }
+        asleep = true
+    }
+
+    /// The main mixer connected to the output at the hardware's rate - which a new route can change
+    /// (AirPlay, a USB DAC) - before lanes are made for it, so iOS's output never converts a second
+    /// time after a lane's own converter. Lanes made for another rate are made again. Only on a
+    /// stopped engine, never offline.
+    private func matchOutput() {
+        guard settings.offline == nil, !engine.isRunning else { return }
+        let hardware = engine.outputNode.outputFormat(forBus: 0)
+        guard hardware.sampleRate > 0 else { return }
+        let mixer = engine.mainMixerNode.outputFormat(forBus: 0)
+        if mixer.sampleRate != hardware.sampleRate {
+            let channels = mixer.channelCount > 0 ? mixer.channelCount : min(max(hardware.channelCount, 1), 2)
+            if let format = AVAudioFormat(standardFormatWithSampleRate: hardware.sampleRate, channels: channels) {
+                engine.connect(engine.mainMixerNode, to: engine.outputNode, format: format)
+                note("the mixer reconnected to the output at \(Int(hardware.sampleRate)) Hz")
+            }
+        }
+        let rate = engine.mainMixerNode.outputFormat(forBus: 0).sampleRate
+        for (key, lane) in lanes where lane.nodeFormat.sampleRate != rate && lane.timeline.isEmpty {
+            engine.detach(lane.node)
+            lanes[key] = nil
+        }
+    }
+
+    /// Everything scheduled let go: the nodes stopped (unless they belong to a dead engine, after a
+    /// media services reset), the feed closed, every wait cancelled.
+    private func reset(touchingNodes: Bool = true) {
         generation += 1
         retry?.cancel()
         retry = nil
         restart?.cancel()
         restart = nil
+        songChange?.cancel()
+        songChange = nil
         for lane in lanes.values {
-            lane.node.stop()
+            if touchingNodes { lane.node.stop() }
             lane.clear()
             lane.resetConverter()
         }
@@ -432,18 +654,23 @@ public final class PlaybackEngine {
         tail = nil
         feed?.source.close()
         feed = nil
-        entryTrack.removeAll()
+        failedNext = nil
+        entryKey.removeAll()
     }
 
     private func frames(_ seconds: Double, _ rate: Double) -> Int64 { Int64(seconds * rate) }
+
+    /// The rate the main mixer runs at - the output's, or the offline render's.
+    private var outputRate: Double {
+        settings.offline?.sampleRate ?? engine.mainMixerNode.outputFormat(forBus: 0).sampleRate
+    }
 
     private func laneFor(_ format: AVAudioFormat) -> Lane {
         let key = LaneKey(format)
         if let lane = lanes[key] { return lane }
         let node = AVAudioPlayerNode()
         engine.attach(node)
-        // the rate the main mixer runs at - the output's, or the offline render's
-        let output = settings.offline?.sampleRate ?? engine.mainMixerNode.outputFormat(forBus: 0).sampleRate
+        let output = outputRate
         var nodeFormat = format
         var converter: AVAudioConverter?
         if output > 0, output != format.sampleRate,
@@ -466,25 +693,58 @@ public final class PlaybackEngine {
     /// One line for `trace`.
     private func note(_ words: @autoclosure () -> String) {
         guard let trace else { return }
-        let at = settings.offline != nil ? "\(engine.manualRenderingSampleTime) " : ""
+        let at = settings.offline != nil ? "\(engine.manualRenderingSampleTime) " : String(format: "%.3f ", Self.hostSeconds())
         trace(at + words())
     }
 
-    /// The node's own sample count now, once it is playing - kept as the lane's `lastSample`. Nil
-    /// when the engine isn't running (iOS stopped it, or it is asleep) or the node isn't playing.
+    /// The output's latency now, kept for the readings that follow.
+    private func currentLatency() -> Double {
+        let read = latency()
+        lastLatency = read.isFinite ? max(read, 0) : 0
+        return lastLatency
+    }
+
+    /// The render's position on the lane's node now, in the songs' frames, once it is playing - kept
+    /// as the lane's `lastRead`. Nil when the engine isn't running (iOS stopped it, or it is asleep)
+    /// or the node isn't playing.
     private func sample(of lane: Lane) -> Int64? {
         guard lane.started, let nodeTime = lane.node.lastRenderTime, nodeTime.isSampleTimeValid,
               let playerTime = lane.node.playerTime(forNodeTime: nodeTime) else { return nil }
         let frame = lane.songFrames(playerTime.sampleTime)
-        lane.lastSample = frame
+        var at: Double?
+        if settings.offline == nil {
+            at = nodeTime.isHostTimeValid ? AVAudioTime.seconds(forHostTime: nodeTime.hostTime) : Self.hostSeconds()
+        }
+        lane.lastRead = HeardReading(frame: frame, at: at, latency: lastLatency)
+        lane.stopped = nil
         return frame
+    }
+
+    /// The frame heard on the lane: the output's latency behind the render - or, when the node's clock
+    /// can't be read because iOS stopped the engine before telling it (or it is dead), estimated from
+    /// the last reading, once, and kept.
+    private func heardFrame(of lane: Lane, readingNodes: Bool = true) -> Int64? {
+        let rate = lane.format.sampleRate
+        if readingNodes, let rendered = sample(of: lane) {
+            return HeardEstimate.heard(rendered: rendered, latency: currentLatency(), rate: rate)
+        }
+        if let stopped = lane.stopped { return stopped }
+        guard let reading = lane.lastRead else { return nil }
+        let stoppedByIOS = !readingNodes || !engine.isRunning
+        let now = stoppedByIOS && settings.offline == nil ? Self.hostSeconds() : nil
+        let estimate = HeardEstimate.atStop(reading, now: now, rate: rate, end: lane.timeline.end)
+        if stoppedByIOS {
+            lane.stopped = estimate
+            note("the clock gone: heard at frame \(estimate), from a reading at \(reading.frame)")
+        }
+        return estimate
     }
 
     private func ahead(_ lane: Lane) -> Int64 {
         lane.timeline.end - max(sample(of: lane) ?? 0, 0)
     }
 
-    /// Decodes and schedules until the feed's lane holds `aheadSeconds` past what is heard.
+    /// Decodes and schedules until the feed's lane holds `aheadSeconds` past what is rendered.
     private func pump() {
         while var feeding = feed {
             if let key = feeding.lane, let lane = lanes[key],
@@ -501,13 +761,14 @@ public final class PlaybackEngine {
                 do {
                     result = try feeding.source.read(maxFrames: size)
                 } catch {
-                    fail(String(describing: error))
+                    feedFailed(error)
                     return
                 }
             }
             switch result {
             case .waiting:
-                scheduleRetry()
+                // a seek working through what has arrived goes on at once; a stream waits for bytes
+                scheduleRetry(soon: feeding.source.busy)
                 startLanesIfReady()
                 return
             case .end:
@@ -516,6 +777,7 @@ public final class PlaybackEngine {
                 guard schedule(buffer, feed: &feeding) else {
                     // held until the lane's earlier songs have played (its last buffer's completion
                     // pumps again)
+                    if feeding.parked == nil { note("entry \(feeding.key) parked: its lane still holds songs before the one scheduled last") }
                     feeding.parked = buffer
                     feed = feeding
                     startLanesIfReady()
@@ -524,6 +786,44 @@ public final class PlaybackEngine {
                 feed = feeding
             }
         }
+        if feed == nil, wantsPlay, !lanes.values.contains(where: { !$0.timeline.isEmpty }) {
+            // nothing scheduled and nothing left to decode (a song with no audio in it at the queue's
+            // end, or a next one that wouldn't open after it): no completion will come to say so
+            if let failed = failedNext {
+                failedNext = nil
+                current = failed.key
+                held = (failed.key, failed.at)
+                fail(failed.failure)
+            } else {
+                finish()
+            }
+            return
+        }
+        startLanesIfReady()
+    }
+
+    /// The feed's source failed. When it is the next song and the one heard is still playing, the
+    /// heard one plays to its end and the failure is said there, at the song that failed (so a 401
+    /// on the next song's stream stops the queue at that song, not seconds before it); otherwise now.
+    private func feedFailed(_ error: Error) {
+        let failure = AudioFailure.from(error)
+        guard let feeding = feed else {
+            fail(failure)
+            return
+        }
+        let rate = feeding.source.format?.sampleRate ?? 0
+        let othersPlaying = heardLane != nil && wantsPlay && lanes.values.contains { lane in
+            lane.timeline.entries.contains { entry in entry.frames > 0 && entryKey[entry.id] != feeding.key }
+        }
+        guard feeding.key != current, othersPlaying else {
+            fail(failure)
+            return
+        }
+        note("the next song failed (\(failure.description)): said when the song heard ends")
+        failedNext = FailedNext(key: feeding.key, failure: failure, at: feeding.reached(at: rate))
+        feeding.source.close()
+        feed = nil
+        if let last = tail, let lane = lanes[last] { flush(lane, key: last) }
         startLanesIfReady()
     }
 
@@ -556,7 +856,7 @@ public final class PlaybackEngine {
             feeding.lane = key
             feeding.entry = id
             tail = key
-            entryTrack[id] = feeding.index
+            entryKey[id] = feeding.key
             lane.timeline.begin(id: id, songOffset: (feeding.startFrame ?? 0) + feeding.decoded)
         }
         guard let id = feeding.entry else { return true }
@@ -657,30 +957,38 @@ public final class PlaybackEngine {
     }
 
     /// The feed's song has all been decoded: close its entry and open the next song, which will
-    /// be scheduled straight after on the same lane when its format is the same.
+    /// be scheduled straight after on the same lane when its format is the same. (A next song in
+    /// another format flushes this lane's converter when its first buffer is scheduled - not before,
+    /// so a next song let go by an edit before then leaves the converter unbroken for its successor.)
     private func endFeed() {
         guard let ended = feed else { return }
         if let key = ended.lane, let id = ended.entry { lanes[key]?.timeline.close(id: id) }
+        if let startFrame = ended.startFrame, let rate = ended.source.format?.sampleRate, rate > 0 {
+            lengths[ended.key] = Double(startFrame + ended.decoded) / rate
+        }
         ended.source.close()
         feed = nil
-        let endedLane = ended.lane.flatMap { key in lanes[key].map { (key, $0) } }
-        let next = ended.index + 1
-        guard tracks.indices.contains(next) else {
-            if case let (key, lane)? = endedLane { flush(lane, key: key) }
+        openAfter(ended.key, lane: ended.lane)
+    }
+
+    /// Opens the entry after `key` from its beginning, as the feed - or, with none (the queue's
+    /// end), or one that won't open, lets `laneKey`'s converter give out what it holds.
+    private func openAfter(_ key: Int, lane laneKey: LaneKey?) {
+        let flushEnded = {
+            if let laneKey, let lane = self.lanes[laneKey] { self.flush(lane, key: laneKey) }
+        }
+        guard let at = indexOf[key], tracks.indices.contains(at + 1) else {
+            flushEnded()
             return
         }
+        let next = tracks[at + 1]
         do {
-            let source = try tracks[next].open(.beginning)
-            feed = Feed(index: next, source: source, start: .beginning)
-            // a song in another format next: the lane has had its last song for now (a stream's format
-            // is known only once its header arrives - then its first buffer flushes, in `schedule`)
-            if case let (key, lane)? = endedLane, let format = source.format, LaneKey(format) != key {
-                flush(lane, key: key)
-            }
+            feed = Feed(key: next.key, source: try next.open(.beginning), start: .beginning)
         } catch {
-            // the song heard plays to its end; the queue stops there
+            // the song heard plays to its end; the failure is said there
             feed = nil
-            if case let (key, lane)? = endedLane { flush(lane, key: key) }
+            failedNext = FailedNext(key: next.key, failure: AudioFailure.from(error), at: .beginning)
+            flushEnded()
         }
     }
 
@@ -722,6 +1030,11 @@ public final class PlaybackEngine {
             lane.node.play()
         }
         state.lastStartLead = lead
+        if let asked = playAsked, settings.offline == nil {
+            // its first sample heard: the lead, and the output's latency after it
+            lastStartSeconds = Self.hostSeconds() + lead + currentLatency() - asked
+        }
+        playAsked = nil
     }
 
     /// Enough is scheduled on the lane to start it: `startSeconds`, or all there is.
@@ -729,11 +1042,11 @@ public final class PlaybackEngine {
         feed?.lane != key || lane.timeline.end >= frames(settings.startSeconds, lane.format.sampleRate)
     }
 
-    /// The lane that has the song `index` scheduled on it.
-    private func laneHolding(_ index: Int?) -> LaneKey? {
-        guard let index else { return nil }
+    /// The lane that has the entry `key` scheduled on it.
+    private func laneHolding(_ key: Int?) -> LaneKey? {
+        guard let key else { return nil }
         return lanes.first(where: { _, lane in
-            lane.timeline.entries.contains { entry in entryTrack[entry.id] == index }
+            lane.timeline.entries.contains { entry in entryKey[entry.id] == key }
         })?.key
     }
 
@@ -755,7 +1068,7 @@ public final class PlaybackEngine {
                            atRate: nodeTime.sampleRate)
     }
 
-    private func scheduleRetry() {
+    private func scheduleRetry(soon: Bool = false) {
         guard retry == nil else { return }
         let generation = self.generation
         let work = DispatchWorkItem { [weak self] in
@@ -764,7 +1077,11 @@ public final class PlaybackEngine {
             self.pump()
         }
         retry = work
-        queue.asyncAfter(deadline: .now() + 0.05, execute: work)
+        if soon {
+            queue.async(execute: work)
+        } else {
+            queue.asyncAfter(deadline: .now() + settings.retrySeconds, execute: work)
+        }
     }
 
     /// A buffer has been played: keep the lane fed, follow the song heard, and notice a lane that
@@ -788,15 +1105,16 @@ public final class PlaybackEngine {
                 let next = nextEntry
                 nextEntry += 1
                 feeding.entry = next
-                entryTrack[next] = feeding.index
+                entryKey[next] = feeding.key
                 lane.timeline.begin(id: next, songOffset: songFrame)
                 tail = key
                 feed = feeding
-                current = feeding.index
-                held = (feeding.index, .frame(songFrame, rate: lane.format.sampleRate))
+                current = feeding.key
+                held = (feeding.key, .frame(songFrame, rate: lane.format.sampleRate))
                 publish(.loading)
             } else {
                 // this lane's songs are all heard
+                let ended = lastSpot(of: lane)
                 lane.node.stop()
                 lane.clear()
                 lane.resetConverter()
@@ -805,70 +1123,230 @@ public final class PlaybackEngine {
                 }
                 if heardLane == nil {
                     if let waiting = lanes.values.first(where: { !$0.started && !$0.timeline.isEmpty }),
-                       let first = waiting.timeline.entries.first, let index = entryTrack[first.id] {
+                       let first = waiting.timeline.entries.first, let next = entryKey[first.id] {
                         // a lane scheduled but never started (its start time couldn't be read): now
-                        current = index
-                        held = (index, .frame(first.songOffset, rate: waiting.format.sampleRate))
+                        current = next
+                        held = (next, .frame(first.songOffset, rate: waiting.format.sampleRate))
                     } else if let feeding = feed {
-                        current = feeding.index
-                        held = (feeding.index, feeding.reached(at: feeding.source.format?.sampleRate ?? lane.format.sampleRate))
+                        current = feeding.key
+                        held = (feeding.key, feeding.reached(at: feeding.source.format?.sampleRate ?? lane.format.sampleRate))
                         publish(.loading)
+                    } else if let failed = failedNext {
+                        // the next song failed while this one played: said now, at it
+                        failedNext = nil
+                        current = failed.key
+                        held = (failed.key, failed.at)
+                        fail(failed.failure)
+                        return
                     } else {
+                        if let ended {
+                            current = ended.key
+                            held = ended
+                        }
                         finish()
                         return
                     }
                 }
             }
         }
-        if let at = heard(), at.index != current {
-            current = at.index
-        }
+        followHeard()
+        forgetPlayed()
         let phase: EngineState.Phase = wantsPlay ? (heardLane == nil ? .loading : .playing) : .paused
         publish(phase)
         pump()
     }
 
-    /// The song heard and the frame of it, from the heard lane's node - or, when its clock can't be
-    /// read (iOS stopped the engine before telling it), the last sample read while it played - or
-    /// where it was left.
-    private func heard() -> Spot? {
-        if let key = heardLane, let lane = lanes[key], let now = sample(of: lane) ?? lane.lastSample,
-           let found = lane.timeline.locate(now), let index = entryTrack[found.entry.id] {
-            return (index, .frame(found.songFrame, rate: lane.format.sampleRate))
+    /// The last entry on `lane` and the frame at its end - where the queue was when it ran out.
+    private func lastSpot(of lane: Lane) -> Spot? {
+        guard let last = lane.timeline.entries.last, let key = entryKey[last.id] else { return nil }
+        return (key, .frame(last.songOffset + last.frames, rate: lane.format.sampleRate))
+    }
+
+    /// `current` follows the song heard. When the render is already in a later song than the ear
+    /// (the output's latency), the change is said when the ear gets there.
+    private func followHeard() {
+        songChange?.cancel()
+        songChange = nil
+        guard let laneKey = heardLane, let lane = lanes[laneKey], let rendered = sample(of: lane) else { return }
+        let rate = lane.format.sampleRate
+        let heardAt = HeardEstimate.heard(rendered: rendered, latency: currentLatency(), rate: rate)
+        guard let heardEntry = lane.timeline.locate(heardAt) else { return }
+        if let key = entryKey[heardEntry.entry.id], key != current { current = key }
+        guard let renderedEntry = lane.timeline.locate(rendered), renderedEntry.entry.id != heardEntry.entry.id,
+              heardEntry.entry.end > heardAt else { return }
+        let wait = Double(heardEntry.entry.end - heardAt) / rate
+        let generation = self.generation
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.generation == generation else { return }
+            self.songChange = nil
+            self.followHeard()
+            self.publish(self.state.phase)
+        }
+        songChange = work
+        queue.asyncAfter(deadline: .now() + wait, execute: work)
+    }
+
+    /// The entries played and heard are forgotten (a long shuffle, an endless Repeat One, on one lane),
+    /// a second and the latency behind the render.
+    private func forgetPlayed() {
+        for lane in lanes.values where lane.timeline.entries.count > 2 {
+            guard let rendered = lane.lastRead?.frame else { continue }
+            let behind = HeardEstimate.frames(lastLatency + 1, rate: lane.format.sampleRate)
+            let before = lane.timeline.entries.map(\.id)
+            lane.timeline.forget(before: rendered - behind)
+            let kept = Set(lane.timeline.entries.map(\.id))
+            for id in before where !kept.contains(id) { entryKey[id] = nil }
+        }
+    }
+
+    /// The song heard and the frame of it, from the heard lane - the output's latency behind its
+    /// render, or estimated when its clock can't be read (`heardFrame`) - or where it was left.
+    private func heard(readingNodes: Bool = true) -> Spot? {
+        if let laneKey = heardLane, let lane = lanes[laneKey],
+           let frame = heardFrame(of: lane, readingNodes: readingNodes),
+           let found = lane.timeline.locate(frame), let key = entryKey[found.entry.id] {
+            return (key, .frame(found.songFrame, rate: lane.format.sampleRate))
         }
         if let held { return held }
         if let current { return (current, .beginning) }
         return nil
     }
 
+    // MARK: Up Next's edits
+
+    /// What comes after the entry `heardKey` in the order it plays, each with whether any of it is on a
+    /// node: the lanes' entries by id (ids ascend in scheduling order, across lanes), then the feed, or
+    /// a next song that failed. Nil when there is something scheduled and the entry heard isn't in it.
+    private func upcoming(after heardKey: Int) -> [(key: Int, committed: Bool)]? {
+        let entries = lanes.values.flatMap { $0.timeline.entries }.sorted { $0.id < $1.id }
+        var items: [(key: Int, committed: Bool)] = []
+        for entry in entries {
+            guard let key = entryKey[entry.id] else { continue }
+            if let last = items.last, last.key == key {
+                if entry.frames > 0 { items[items.count - 1].committed = true }
+                continue
+            }
+            items.append((key, entry.frames > 0))
+        }
+        if let feeding = feed {
+            if items.last?.key != feeding.key { items.append((feeding.key, false)) }
+        } else if let failed = failedNext, items.last?.key != failed.key {
+            items.append((failed.key, false))
+        }
+        if items.isEmpty { return [] }
+        guard let at = items.lastIndex(where: { $0.key == heardKey }) else { return nil }
+        return Array(items[(at + 1)...])
+    }
+
+    private func replaceUpcomingNow(_ new: [EngineTrack]) -> Bool {
+        guard let heardKey = heard()?.key else {
+            // nothing heard or held: a queue nothing plays from yet
+            setTracks(new, fresh: false)
+            return true
+        }
+        // the song heard, where it was, with everything before it the same
+        guard let at = indexOf[heardKey], at < new.count, new[at].key == heardKey, new[at].audio == tracks[at].audio,
+              zip(tracks[..<at], new[..<at]).allSatisfy({ $0.key == $1.key }) else {
+            note("an edit without the song heard where it was: refused")
+            return false
+        }
+        guard let later = upcoming(after: heardKey) else {
+            note("an edit while the song heard isn't among what is scheduled: refused")
+            return false
+        }
+        // what is scheduled or decoding after it is kept while the new list has the same audio there
+        var kept = 0
+        while kept < later.count {
+            let place = at + 1 + kept
+            guard place < new.count, let old = indexOf[later[kept].key], new[place].audio == tracks[old].audio else { break }
+            kept += 1
+        }
+        if kept < later.count, later[kept].committed {
+            note("an edit held: entry \(later[kept].key) is on a node already")
+            return false
+        }
+        if current != heardKey {
+            current = heardKey
+        }
+        // the kept take the new list's keys (Shuffle turned off makes new entries of the same songs)
+        var renamed: [Int: Int] = [:]
+        for (offset, item) in later.prefix(kept).enumerated() where item.key != new[at + 1 + offset].key {
+            renamed[item.key] = new[at + 1 + offset].key
+        }
+        rekey(renamed)
+        setTracks(new, fresh: false)
+        let lastKept = kept > 0 ? new[at + kept].key : heardKey
+        if kept < later.count {
+            // the next song, on no node yet, let go of: the new list's in its place, straight after
+            note("an edit: entry \(later[kept].key) let go of; on after entry \(lastKept)")
+            retry?.cancel()
+            retry = nil
+            feed?.source.close()
+            feed = nil
+            failedNext = nil
+            openAfter(lastKept, lane: tail)
+            pump()
+        } else if feed == nil, failedNext == nil, wantsPlay, engine.isRunning,
+                  lanes.values.contains(where: { !$0.timeline.isEmpty }) {
+            // the queue's last song decoded with nothing after it: what was added goes on after it
+            if let index = indexOf[lastKept], tracks.indices.contains(index + 1) {
+                note("an edit: added after the queue's end")
+                openAfter(lastKept, lane: nil)
+                pump()
+            }
+        }
+        publish(state.phase)
+        return true
+    }
+
+    /// Entries' keys changed by an edit (`renamed[old] = new`), wherever the engine holds them.
+    private func rekey(_ renamed: [Int: Int]) {
+        guard !renamed.isEmpty else { return }
+        for (id, key) in entryKey {
+            if let to = renamed[key] { entryKey[id] = to }
+        }
+        if let key = feed?.key, let to = renamed[key] { feed?.key = to }
+        if let key = failedNext?.key, let to = renamed[key] { failedNext?.key = to }
+        if let key = current, let to = renamed[key] { current = to }
+        if let spot = held, let to = renamed[spot.key] { held = (to, spot.at) }
+        var moved: [Int: Double] = [:]
+        for (key, length) in lengths { moved[renamed[key] ?? key] = length }
+        lengths = moved
+    }
+
+    // MARK: pause, play, and iOS's own stops
+
     private func pauseNow() {
         guard wantsPlay else { return }
         held = heard()
         wantsPlay = false
-        if engine.isRunning {
+        if settings.idleStopSeconds > 0, engine.isRunning {
             for lane in lanes.values where lane.started { lane.node.pause() }
-        } else {
-            // iOS stopped the engine (a call): nothing to pause; play starts again from `held`
-            reset()
-            asleep = true
+            publish(.paused)
+            armIdle()
+            return
         }
+        // the output off at once (iOS counts a running one as playing); play goes on from `held`,
+        // the last sample heard
+        reset()
+        sleep()
         publish(.paused)
-        armIdle()
     }
 
-    private func resumeNow() {
+    private func resumeNow(asked: Double) {
         if wantsPlay { return }
-        if state.phase == .ended, let current {
+        playAsked = asked
+        if state.phase == .ended, let current, let index = indexOf[current] {
             wantsPlay = true
-            begin(at: current, from: .beginning)
+            begin(at: index, from: .beginning)
             return
         }
         let started = lanes.values.filter { $0.started }
         let loaded = feed != nil || lanes.values.contains { !$0.timeline.isEmpty }
         if asleep || !engine.isRunning || started.count > 1 || !loaded {
             // the engine slept or iOS stopped it, a pause caught a change of lanes, or nothing is
-            // loaded (after a failure, or a stop): start again from the frame left - or, with
-            // nothing to go on from, stay idle
+            // loaded (after a failure, a stop, a queue put back): start again from the frame left -
+            // or, with nothing to go on from, stay idle
             let at = heard()
             reset()
             resumeFrom(at, playing: true)
@@ -887,33 +1365,32 @@ public final class PlaybackEngine {
     }
 
     private func resumeFrom(_ at: Spot?, playing: Bool) {
-        guard let at else {
+        guard let at, let index = indexOf[at.key] else {
             wantsPlay = false
             publish(.idle)
             armIdle()
             return
         }
         wantsPlay = playing
-        begin(at: at.index, from: at.at)
-        if !playing {
-            held = at
-            publish(.paused)
-        }
+        begin(at: index, from: at.at)
     }
 
     private func configurationChanged() {
         // the engine was stopped by a new route or hardware format (AirPods connecting, AirPlay):
-        // make the lanes again and go on from the frame reached
+        // make the lanes again and go on from the frame heard - estimated from the last reading,
+        // less the old route's latency (its samples went with it)
         let at = heard()
         let playing = wantsPlay
         reset()
         // the output's rate may be another now: the lanes are made again, converting to it
         for lane in lanes.values { engine.detach(lane.node) }
         lanes.removeAll()
-        asleep = true
+        matchOutput()
+        sleep()
         held = at
         guard playing, at != nil else {
-            publish(state.phase == .idle ? .idle : .paused)
+            // ended stays ended and a failure keeps its words; only what was playing is paused
+            publish(state.phase == .playing || state.phase == .loading ? .paused : state.phase)
             return
         }
         // The same change can be the old output going away (AirPods out), which the app hears as a
@@ -935,18 +1412,18 @@ public final class PlaybackEngine {
         }
     }
 
-    private func armIdle() {
+    /// Stops the output `after` seconds unless play comes first (`idleStopSeconds` by default).
+    private func armIdle(after seconds: Double? = nil) {
         idle?.cancel()
         let work = DispatchWorkItem { [weak self] in
             guard let self, !self.wantsPlay else { return }
-            self.held = self.heard()
+            self.held = self.heard() ?? self.held
             self.reset()
-            self.engine.stop()
-            self.asleep = true
+            self.sleep()
             self.publish(self.state.phase)
         }
         idle = work
-        queue.asyncAfter(deadline: .now() + settings.idleStopSeconds, execute: work)
+        queue.asyncAfter(deadline: .now() + (seconds ?? settings.idleStopSeconds), execute: work)
     }
 
     private func finish() {
@@ -957,22 +1434,33 @@ public final class PlaybackEngine {
         }
         heardLane = nil
         publish(.ended)
-        armIdle()
+        // the samples rendered are still on their way to the ear: the output stops once they are heard
+        armIdle(after: lastLatency + settings.endLingerSeconds)
     }
 
-    private func fail(_ words: String) {
+    private func fail(_ error: Error) {
+        let failure = AudioFailure.from(error)
         // kept, so play after a failure (a stream cut off) goes on from where it stopped
         held = heard() ?? held
         wantsPlay = false
         reset()
-        publish(.failed(words))
+        lastFailure = failure
+        note("failed: \(failure.description)")
+        publish(.failed(failure.description))
         armIdle()
     }
 
     private func publish(_ phase: EngineState.Phase) {
         var next = state
         next.phase = phase
-        next.index = current
+        next.key = current
+        next.index = current.flatMap { indexOf[$0] }
+        if case .failed = phase {
+            next.failure = lastFailure
+        } else {
+            next.failure = nil
+        }
+        next.latency = lastLatency
         if let key = heardLane ?? feed?.lane, let lane = lanes[key] {
             next.fileRate = lane.format.sampleRate
             next.fileChannels = Int(lane.format.channelCount)

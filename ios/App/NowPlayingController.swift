@@ -40,15 +40,15 @@ final class NowPlayingController {
     }
 
     /// What the lock screen shows. iOS runs the clock on from `elapsed` at `rate`, so this is set
-    /// when something changes, not every second.
-    func show(song: Song, index: Int, count: Int, elapsed: Double, playing: Bool, artwork: UIImage?) {
+    /// when something changes, not every second. `elapsed` is what is heard (the engine takes the
+    /// output's latency off). No queue index or count since 0.2: Repeat's copies and Up Next's edits
+    /// make them mean nothing a listener could use.
+    func show(song: Song, elapsed: Double, playing: Bool, artwork: UIImage?) {
         var info: [String: Any] = [
             MPMediaItemPropertyTitle: song.name,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: elapsed,
             MPNowPlayingInfoPropertyPlaybackRate: playing ? 1.0 : 0.0,
             MPNowPlayingInfoPropertyDefaultPlaybackRate: 1.0,
-            MPNowPlayingInfoPropertyPlaybackQueueIndex: index,
-            MPNowPlayingInfoPropertyPlaybackQueueCount: count,
             MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.audio.rawValue,
         ]
         if let artist = song.artist { info[MPMediaItemPropertyArtist] = artist }

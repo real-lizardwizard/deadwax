@@ -29,6 +29,9 @@ public final class StreamSource: PCMSource {
     private var skip: AVAudioFramePosition = 0
     private var ended = false
     public private(set) var format: AVAudioFormat?
+    /// The last `.waiting` came with more in hand: a seek dropping frames gave up only because one
+    /// read does at most 64 decodes (so the engine's queue is never held long), not for want of bytes.
+    public private(set) var busy = false
 
     /// The packet handed to the converter, kept alive until its next input call.
     private var held: UnsafeMutableRawPointer?
@@ -77,12 +80,13 @@ public final class StreamSource: PCMSource {
     // MARK: reading
 
     public func read(maxFrames: AVAudioFrameCount) throws -> PCMRead {
+        busy = false
         if ended { return .end }
         if !haveFormat {
             while !haveFormat, parseMore() {}
             if !haveFormat {
-                if let failure = bytes.failure { throw AudioFailure(failure) }
-                if exhausted { throw AudioFailure("iOS couldn't find audio it can play in this file.") }
+                if let failure = bytes.failure { throw failure }
+                if exhausted { throw AudioFailure("iOS couldn't find audio it can play in this file.", kind: .unsupported) }
                 return .waiting
             }
         }
@@ -91,7 +95,8 @@ public final class StreamSource: PCMSource {
               let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: maxFrames) else {
             throw AudioFailure("No memory for a buffer of \(maxFrames) frames.")
         }
-        // a few tries, so a seek's dropped frames don't come back as an empty read
+        // a few tries, so a seek's dropped frames don't come back as an empty read - and no more, so
+        // one read never holds the engine's queue long (a deep seek says `busy` and is read again)
         for _ in 0..<64 {
             buffer.frameLength = maxFrames
             var frames = maxFrames
@@ -99,10 +104,10 @@ public final class StreamSource: PCMSource {
             let status = AudioConverterFillComplexBuffer(converter, converterInput, context, &frames,
                                                          buffer.mutableAudioBufferList, nil)
             if status == Self.broken {
-                throw AudioFailure(bytes.failure ?? "The song stopped arriving.")
+                throw bytes.failure ?? AudioFailure("The song stopped arriving.", kind: .network)
             }
             if status != noErr && status != Self.needMore {
-                throw AudioFailure("iOS couldn't decode this song (AudioConverter \(status)).")
+                throw AudioFailure("iOS couldn't decode this song (AudioConverter \(status)).", kind: .decode)
             }
             buffer.frameLength = frames
             compact()
@@ -121,6 +126,8 @@ public final class StreamSource: PCMSource {
             }
             return .frames(buffer)
         }
+        // every try decoded frames, all dropped: there is more in hand, read again at once
+        busy = true
         return .waiting
     }
 
@@ -170,17 +177,18 @@ public final class StreamSource: PCMSource {
     private func makeConverter() throws {
         let channels = AVAudioChannelCount(sourceFormat.mChannelsPerFrame)
         guard channels == 1 || channels == 2 else {
-            throw AudioFailure("This song has \(channels) channels; Phase 0 plays mono and stereo only.")
+            throw AudioFailure("This song has \(channels) channels; deadwax for iPhone plays mono and stereo only.",
+                               kind: .unsupported)
         }
         guard let out = floatFormat(sampleRate: sourceFormat.mSampleRate, channels: channels) else {
-            throw AudioFailure("iOS has no float format for \(sourceFormat.mSampleRate) Hz.")
+            throw AudioFailure("iOS has no float format for \(sourceFormat.mSampleRate) Hz.", kind: .unsupported)
         }
         var input = sourceFormat
         var output = out.streamDescription.pointee
         var made: AudioConverterRef?
         let status = AudioConverterNew(&input, &output, &made)
         guard status == noErr, let made else {
-            throw AudioFailure("iOS can't decode this kind of file (AudioConverterNew \(status)).")
+            throw AudioFailure("iOS can't decode this kind of file (AudioConverterNew \(status)).", kind: .unsupported)
         }
         if var cookie, !cookie.isEmpty {
             _ = AudioConverterSetProperty(made, kAudioConverterDecompressionMagicCookie, UInt32(cookie.count), &cookie)

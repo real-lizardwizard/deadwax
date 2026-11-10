@@ -60,12 +60,19 @@ final class AppModel {
     @ObservationIgnored private var headerBits: [String: Int] = [:]
     /// The cover last asked for the lock screen, so a failed fetch isn't asked again at every change.
     @ObservationIgnored private var coverAsked: String?
+    /// The engine's key for each song of `queue` (Up Next's marks, until its own slice lands): unique
+    /// across plays, so a state of the queue before the last play - still on its way to the main
+    /// queue - names no song of this one.
+    @ObservationIgnored private var keys: [Int] = []
+    @ObservationIgnored private var nextKey = 0
+    /// A 401 on a stream asks who is signed in once, not at each of the failure's re-publishes.
+    @ObservationIgnored private var askedAfterSignOut = false
 
     init() {
         installLine = InstallExpiry.line(expiration: Self.profile()?.expiration, now: Date())
         session.onInterruption = { [weak self] began, shouldResume in self?.interruption(began: began, shouldResume: shouldResume) }
         session.onOldDeviceGone = { [weak self] in self?.pause() }
-        session.onReset = { [weak self] in self?.engine?.rebuild() }
+        session.onReset = { [weak self] in self?.mediaReset() }
         nowPlaying.connect(.init(
             play: { [weak self] in self?.resume() },
             pause: { [weak self] in self?.pause() },
@@ -215,9 +222,12 @@ final class AppModel {
         }
         guard let engine = ensureEngine() else { return }
         playWords = nil
+        askedAfterSignOut = false
         queue = PlayQueue(songs: songs, index: index)
+        keys = songs.indices.map { nextKey + $0 }
+        nextKey += songs.count
         elapsed = 0
-        engine.play(Self.tracks(songs, copies: source == .downloaded, files: files, client: client), from: index)
+        engine.play(Self.tracks(songs, keys: keys, copies: source == .downloaded, files: files, client: client), from: index)
         startTicking()
         showNowPlaying()
     }
@@ -243,47 +253,80 @@ final class AppModel {
 
     func stop() {
         engine?.stop()
+        files.keep([], ahead: [])
         nowPlaying.clear()
     }
 
+    /// Next and Previous keep a pause (the engine moves there without loading, and play opens it);
+    /// after the queue ended or failed they play.
     func next() {
+        catchUp()
         guard let index = queue.nextIndex else { return }
         engine?.skip(to: index)
-        resumeIfPaused()
+        playIfStopped()
     }
 
     func previous() {
+        catchUp()
         switch queue.previous(at: elapsed) {
         case .restart: engine?.seek(to: 0)
         case .go(let index): engine?.skip(to: index)
         }
-        resumeIfPaused()
+        playIfStopped()
     }
 
     func seek(to seconds: Double) {
         engine?.seek(to: seconds)
     }
 
-    private func resumeIfPaused() {
-        if engineState.phase == .paused || engineState.phase == .ended { resume() }
+    private func playIfStopped() {
+        switch engineState.phase {
+        case .ended, .failed: resume()
+        default: break
+        }
+    }
+
+    /// The queue's place from the engine's own position (what is heard), before a Next or Previous
+    /// is worked out from it: a state change can still be on its way.
+    private func catchUp() {
+        guard let at = engine?.position(), keys.indices.contains(at.index), keys[at.index] == at.key else { return }
+        queue.move(to: at.index)
+        elapsed = at.seconds
+    }
+
+    /// iOS reset its media services: the old engine is dead. The session is made active again when
+    /// something was playing, then the engine makes itself again and goes on from the frame heard.
+    private func mediaReset() {
+        if engineState.phase == .playing || engineState.phase == .loading { try? session.activate() }
+        engine?.rebuild()
     }
 
     /// The engine's tracks. Nonisolated, so the closures it makes - which the engine calls on its
     /// own queue - belong to no actor.
-    nonisolated static func tracks(_ songs: [Song], copies: Bool, files: SongFiles, client: DeadwaxClient) -> [EngineTrack] {
-        songs.map { song in
-            EngineTrack(song: song) { start in
-                // a downloaded copy when asked for and there is one; the stream otherwise
+    nonisolated static func tracks(_ songs: [Song], keys: [Int], copies: Bool, files: SongFiles,
+                                   client: DeadwaxClient) -> [EngineTrack] {
+        zip(songs, keys).map { song, key in
+            // no Normalization yet (its own slice decides each entry's level, once): Off, so every
+            // entry is the decode as it is - GainedSource.wrap hands the source itself back
+            let factor: Float? = nil
+            return EngineTrack(key: key, audio: EngineTrack.audio(songID: song.id, level: nil), song: song) { start in
+                // a downloaded copy when asked for and there is one; the stream (or its cached copy) otherwise
+                let source: PCMSource
                 if copies, let url = files.downloadedURL(for: song) {
-                    return try FileSource(url: url, start: start)
+                    source = try FileSource(url: url, start: start)
+                } else {
+                    source = try files.streamSource(for: song, client: client, start: start)
                 }
-                return try files.streamSource(for: song, client: client, start: start)
+                return GainedSource.wrap(source, factor: factor)
             }
         }
     }
 
+    /// The engine's two readings of the output, from AVAudioSession: the lead before a song started
+    /// from silence, and the latency taken off every position.
     nonisolated static func lead(_ engine: PlaybackEngine) {
         engine.startLead = { AudioSessionController.startLead() }
+        engine.latency = { AudioSessionController.latency() }
     }
 
     private func ensureEngine() -> PlaybackEngine? {
@@ -303,17 +346,36 @@ final class AppModel {
     }
 
     private func changed(_ state: EngineState) {
-        let moved = state.index != nil && state.index != queue.index
+        // the song heard, by its key: a state from before the last play names none of this queue's
+        let index = state.key.flatMap { keys.firstIndex(of: $0) }
+        let moved = index != nil && index != queue.index
         engineState = state
-        if let index = state.index { queue.move(to: index) }
-        if case .failed(let words) = state.phase { playWords = words }
+        if let index { queue.move(to: index) }
+        if case .failed(let words) = state.phase {
+            playWords = words
+            if state.failure?.kind == .signedOut, !askedAfterSignOut {
+                // a 401 on a stream stopped the queue at that song: ask who is signed in, so the
+                // sign-in shows
+                askedAfterSignOut = true
+                Task { await self.check() }
+            }
+        }
         outputName = session.outputName
         if moved || state.phase != .loading { tick() }
-        // the song after this one starts arriving now, so the join is seamless
+        if index != nil { keepAndPrefetch() }
+        showNowPlaying()
+    }
+
+    /// The song heard and the next kept in the cache, every fetch of a song skipped past let go, and
+    /// the next song's bytes begun now, so the join is seamless.
+    private func keepAndPrefetch() {
+        let from = queue.index
+        guard queue.songs.indices.contains(from) else { return }
+        let inUse = Array(queue.songs[from..<min(from + 2, queue.songs.count)])
+        files.keep(inUse, ahead: Set(queue.songs[from...].map(\.id)))
         if source == .stream, let client, let next = queue.nextIndex {
             files.prefetch(queue.songs[next], client: client)
         }
-        showNowPlaying()
     }
 
     private func startTicking() {
@@ -325,7 +387,10 @@ final class AppModel {
 
     private func tick() {
         guard let engine else { return }
-        if let at = engine.position(), at.index == queue.index { elapsed = at.seconds }
+        // what is heard, of the song the queue shows (the engine's change of song follows the ear)
+        if let at = engine.position(), keys.indices.contains(queue.index), at.key == keys[queue.index] {
+            elapsed = at.seconds
+        }
         if engineState.phase != .playing && engineState.phase != .loading {
             ticker?.invalidate()
             ticker = nil
@@ -334,8 +399,7 @@ final class AppModel {
 
     private func showNowPlaying() {
         guard let song = queue.current else { return }
-        nowPlaying.show(song: song, index: queue.index, count: queue.songs.count, elapsed: elapsed,
-                        playing: engineState.phase == .playing,
+        nowPlaying.show(song: song, elapsed: elapsed, playing: engineState.phase == .playing,
                         artwork: artwork?.id == song.coverArt ? artwork?.image : nil)
         if let cover = song.coverArt, artwork?.id != cover, coverAsked != cover, let client {
             coverAsked = cover
