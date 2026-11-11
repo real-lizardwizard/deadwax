@@ -382,4 +382,14 @@ never looked at); the two new reasons' words, pinned as literals. And the fix ab
 failing on a server without the libraries or a folder is unmeasured LOOK_LATER, and not_levelled once a counted song
 is unmeasured (the fix reverted is caught).
 
+A second review's mutations found five more no test caught, each with a test now (run once each, caught, then
+reverted): the asker's refused login answered as a 404 (the route is in test_player_as_you's refused-login list: 401,
+LOGIN_GONE - the 401 is what brings the app's sign-in up); a song Navidrome lists twice pooled once, or the listing
+de-duplicated (a test of song-3 listed twice, the songs within 10 LU of each other: four entries, `album.songs` 4,
+the album's loudness `loudness_of` of all four and its gain at reserve 0 the stream's own - pooled once it would be
+another - with each id looked at once and its file's head asked of Navidrome once); the album id unbounded (one
+longer than ID_MAX a 422 with nothing asked, ID_MAX itself answered); the looks unbounded (a 20-song album looked at
+no more than LOOKS_AT_ONCE, 8, at a time: the app asks every 5 s while an album measures); and NO_CACHE said before
+NO_LIBRARIES when both are missing (NO_LIBRARIES first, as describe() says them).
+
 **Not verified**: against a real Navidrome, as everything here (the suite's Navidromes are fakes).
