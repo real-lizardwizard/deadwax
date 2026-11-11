@@ -1254,7 +1254,9 @@ reproduced" aJoinIsTheTwoSongsLaidEndToEnd above.
   fence: reading isPlaying, playerTime or volume, prepare, a zero-frame render, a zero-length buffer.
 - **The window is however long GCD takes to run that block**: microseconds on this idle Mac, which is why it
   never failed here; on ios.yml's loaded 3-vCPU runner, completions have been seen more than 10 ms late. Apple
-  documents only that a buffer with no time, on a playing node, "plays in the very near future".
+  documents only that a buffer with no time, on a playing node, "plays in the very near future". Measured since
+  (fix/ci-settle, below): a fresh engine's node takes its first buffer 0.26 ms after the call at the median and
+  0.34 ms at worst in 150 trials here, 1.23 ms at worst under `taskpolicy -b`.
 - **Emulated, it is CI's failures to the digit.** Each scheduleBuffer performed 0.5 ms late (`scheduleLag`,
   below): theQueuesEnd's shape stuck 40 of 40 with CI's numbers (one due, ends [4800, 9600], the clock at
   4800, nothing called back); 37 of EngineRenderTests' 53 failed, aJoinIsTheTwoSongsLaidEndToEnd with 70cbef6's
@@ -1264,22 +1266,25 @@ reproduced" aJoinIsTheTwoSongsLaidEndToEnd above.
 **What changed.**
 - **Offline only, the engine waits for the node's queue before it renders**: renderOffline sleeps until
   `offlineScheduleSettle` after the last buffer put on a node or node started (`lastScheduledAt`, stamped in
-  enqueue, in playFromSilence and at the next lane's start). The live path is untouched: the phone's output
-  paces its renders. It was 10 ms, not the 2 ms first proposed (the runner has shown GCD stalls past 10 ms,
-  and the 2 ms settle failed 40 of 40 at a 3 ms lag); **it is 30 ms since the third commit**: the verifiers
-  measured 10 ms covering only about 5 ms of a node's queue held off - each emulated lag is due at enqueue plus
-  the lag, so the render waits the settle less the lag, and AVAudioPlayerNode's own queue and the thread
-  wake-ups eat 2-5 ms of what is left. At an 8 ms lag the 10 ms settle failed every run (8-12 tests, 7 of 40
-  for theQueuesEnd alone), at 15 ms 53 of 83; 5 ms passed 4 of 4, 2 ms 8 of 8. 30 ms costs about 7 s on the
-  Audio suite here (29.2 s at 10 ms, 36.7 s at 30 ms). It is a bound, not a fence (there is none: see "What
+  enqueue, in playFromSilence and at the next lane's start). The live path is untouched: the phone's output paces
+  its renders. It was 10 ms, not the 2 ms first proposed (the runner has shown GCD stalls past 10 ms, and the 2 ms
+  settle failed 40 of 40 at a 3 ms lag); it was 30 ms from the third commit: the verifiers measured 10 ms covering
+  only about 5 ms of a node's queue held off - each emulated lag is due at enqueue plus the lag, so the render
+  waits the settle less the lag, and what ate 2-5 ms of what was left was put down to AVAudioPlayerNode's own
+  queue and the thread wake-ups. **That was wrong**: it was the hook's own Thread.sleep running late (by up to
+  half its interval, here); the node's queue takes well under a millisecond (fix/ci-settle, below). At an 8 ms lag
+  the 10 ms settle failed every run (8-12 tests, 7 of 40 for theQueuesEnd alone), at 15 ms 53 of 83; 5 ms passed 4
+  of 4, 2 ms 8 of 8. 30 ms cost about 7 s on the Audio suite here (29.2 s at 10 ms, 36.7 s at 30 ms). **It is 100
+  ms since fix/ci-settle**, waited on a strict timer (below). It is a bound, not a fence (there is none: see "What
   was found").
-- **`scheduleLag`, a tests-only hook beside `completionLag`**: each scheduleBuffer performed that long later,
-  in order, on a queue of the engine's, drained before any node or engine stops (as StopImpl does), and
-  skipped for a node detached meanwhile. `DEADWAX_TEST_SCHEDULE_LAG` sets it on every engine the tests make
-  (`offlineEngine`, `liveEngine`), and ios.yml runs the Audio tests a second time with it - at 0.0005 s in
-  the first commit, which a settle cut back to 2 ms would most likely still have passed (it held the paths
-  stamped, not the bound); at **0.010 s** since the third commit, which the old 10 ms settle fails across the
-  suite and the 30 ms one passes with 20 ms to spare.
+- **`scheduleLag`, a tests-only hook beside `completionLag`**: each scheduleBuffer performed that long later, in
+  order, on a queue of the engine's, drained before any node or engine stops (as StopImpl does), and skipped for a
+  node detached meanwhile (timed on a strict timer since fix/ci-settle; a Thread.sleep before).
+  `DEADWAX_TEST_SCHEDULE_LAG` sets it on every engine the tests make (`offlineEngine`, `liveEngine`), and ios.yml
+  runs the Audio tests a second time with it - at 0.0005 s in the first commit, which a settle cut back to 2 ms
+  would most likely still have passed (it held the paths stamped, not the bound); at **0.010 s** since the third
+  commit, which the old 10 ms settle fails across the suite and the 30 ms one passed here "with 20 ms to spare" -
+  which the runner showed it didn't have (below).
 - **completionsHandled says which it is**: with every callback AVAudioEngine made handled, "the node's clock
   has passed a buffer it hasn't called back: AVAudioPlayerNode took the buffer late"; otherwise both counts; and
   each lane's buffers scheduled and called back, its ends, frames and clock (`lanesSaid`).
@@ -1289,12 +1294,89 @@ reproduced" aJoinIsTheTwoSongsLaidEndToEnd above.
 theQueuesEndWithItsBuffersTakenLateIsHeard (CI's theQueuesEnd: the song whole and on time, the queue's end).
 With the settle taken out both fail, and the helper's message names AVAudioPlayerNode; the whole Audio suite at
 `DEADWAX_TEST_SCHEDULE_LAG=0.0005` without the settle fails 49 of its 79, and passes with it. (Since the third
-commit: at 0.010 with the settle back at 10 ms - see "The verifiers' findings".)
+commit: at 0.010 with the settle back at 10 ms - see "The verifiers' findings". At fix/ci-settle, the settle set
+to 0: both fail, the second naming AVAudioPlayerNode, and the Audio suite at 0.010 fails 65 of its 87, 37 of them
+naming it.)
 
 **What only the phone can tell.** Not "never", as first written: a start from silence on an output just
 started is the start lead ahead (milliseconds), and a node's CommandQueue later than that would start the song
 that late after a moment of silence, the count ahead by it. Top-ups go on 2 s ahead and the next lane is
-scheduled seconds ahead, so they aren't exposed. Nothing here has run on an iPhone or on macOS 26.
+scheduled seconds ahead, so they aren't exposed. Nothing here has run on an iPhone or on macOS 26. And one
+found offline since (fix/ci-settle, below): scheduleBuffer CALLED on one thread while a render runs on
+another blocks the caller - 5-6 ms in 1 of 50 trials here, 5-164 ms in 38 of 50 under `taskpolicy -b`, the
+shape of a timed wait the system coalesces. The offline tests never take that path; the phone's engine queue
+calls scheduleBuffer while the IO thread renders all the time. Whether a live render has the same wait, and
+what a backgrounded app's coalesced timers would make of it (the queue held, a start late), only the phone
+can say.
+
+**ios.yml's runner at 09781a5: 12 of 87, and the settle at 100 ms (fix/ci-settle).** The plain run passed
+(87 of 87 Audio, 511 Core); the second run, every buffer 10 ms late, failed 12 of 87, every one in
+completionsHandled with "AVAudioPlayerNode took the buffer late" - 30 ms of settle less a 10 ms lag left 20 ms,
+and something on the runner took more. On this Mac the same run passed 3 of 3, 7 CPU hogs included.
+- **What was found: timer coalescing, not the node's queue.** Every ordinary wait in the test process - a
+  Thread.sleep, usleep, mach_wait_until, a semaphore's timeout - is let run late here by half its interval, up to
+  10 ms (a 10 ms sleep woke 10.2-15 ms after it began, 30 and 100 ms ones up to 10 ms late); under `taskpolicy -b`
+  (the process run as background) a 10 ms sleep woke 17-210 ms after. A strict dispatch timer with no leeway woke
+  within about 0.1 ms in both, a few ms late now and then (7 ms once in a few hundred). The hook (scheduleLag) and
+  the settle (renderOffline) both waited on Thread.sleep: so at a 10 ms lag the hook's buffer reached the node
+  10-15 ms after it was asked for, here - the "2-5 ms" the third commit put down to the node's queue - and on a
+  machine that coalesces harder, past 30 ms. The node's own queue was never the slow part: 0.26 ms at the median,
+  1.23 ms at worst under -b (BufferTakeMeasuredTests, below).
+- **Reproduced, under `taskpolicy -b`** (the CI's 12 run alone, each run once unless said): at 09781a5 the plain
+  run passed 12 of 12 and the lagged run failed 8 of 12 with the CI's message - the runner's pattern. With both
+  waits on a strict timer the lagged run passed 12 of 12 at a 30 ms settle and 12 of 12 twice at 100 ms; with
+  the settle at 100 ms but the hook back on Thread.sleep it failed 9 of 12. The strict timer is the fix; the
+  100 ms is margin. That the runner coalesces as -b does is inferred, not seen: its Thread.sleep line in the
+  measurement (below) will say.
+- **What changed.** `PlaybackEngine.sleep(until:)`: the calling thread held until a host time on a strict
+  DispatchSource timer (leeway 0), never before it - used only by renderOffline's settle and the scheduleLag
+  hook (the phone's path is untouched). `offlineScheduleSettle` is **100 ms**: before, the plain run's wait was
+  30 ms plus whatever the machine's coalescing added, so the margin a runner had was never known; now it is
+  the settle itself, 100 ms over the node's queue and 90 ms over ios.yml's 10 ms hook. The cost: the Audio
+  suite took 38.3 s at 30 ms (as at 09781a5), 60.4 s at 100 ms on the strict timer, 61.8 s at 100 ms on
+  Thread.sleep - so the strict timer saves 1.3 s here, and on a machine that coalesces harder, up to as much
+  again as the wait. Not done, though considered: skipping the wait when no render could reach the new buffer
+  (one put on behind a second already taken) - knowing what a node has taken means reading its clock, which is
+  what a buffer taken late makes wrong (the hold's finding 1), so it could let a render reach a buffer the node
+  hasn't taken; and skipping it for a render while the output is stopped - sound, but such renders are rare.
+- **The measurement, `howLateANodeTakesABufferIsMeasured`** (BufferTakeMeasuredTests.swift, one of
+  EngineRenderTests so it runs alone): about a second, printing one line and asserting nothing - a measurement
+  that can fail would be one more flaky test on the very machine it is for. ios.yml's two macOS runs each print
+  it; find it in the log by "AVAudioPlayerNode taking a buffer, measured". Its parts, each as trials, min /
+  median / p90 / p99 / max in ms, and the share over some limits:
+  - **asked at once**: 150 trials, a fresh offline engine each, a node attached while it runs (as every lane
+    is), a buffer scheduled and played at once, then rendered 64 frames at a time (0.2 ms apart, on the strict
+    timer) until the output carries it - the time from the call to that render. What the plain run's settle
+    must cover; its share over the settle (100 ms) should be 0.0%. A fresh engine is the worse case (median
+    0.26 ms here; 0.00 for a node on an engine long running).
+  - **behind a 10 ms scheduleLag hook**: 50 trials as the hook does it, the time from its due time to the first
+    render carrying the buffer, rendering only once the hook's call has returned (as in the engine, whose
+    render comes the settle after) - what the lagged run's settle less the lag (90 ms) must cover. Then **the
+    hook's own block past its due time**: whether the strict timer holds on that machine.
+  - **never taken within 500 ms**: a count; anything but 0 is a node that never took its buffer.
+  - **a 10 ms Thread.sleep past its time**: how hard that machine coalesces timers - what made 30 ms fail.
+  If "asked at once" and "behind the hook" stay within a few ms over several runs, the settle could come down
+  (each 10 ms off is about 3 s off the suite here); any share over the settle is a machine the settle doesn't
+  cover. Here: asked at once median 0.26 / p99 0.29 / max 0.34 ms; behind the hook median 0.12 / max 7.34 ms
+  (the hook's block itself 7.22 ms late once); a 10 ms Thread.sleep 0.2-5 ms late. Under `taskpolicy -b`: at
+  once max 1.23 ms, behind the hook max 0.22 ms, a 10 ms Thread.sleep 7-97 ms late.
+- **One the longer settle brought out: the hold tests' bytes before AVAudioEngine's callbacks.** The settle is
+  waited inside the engine's queue, so whatever falls due meanwhile runs the moment the render ends - and at 100
+  ms the stream's retry (every 50 ms) always has. With 5 CPU hogs,
+  aSongInAnotherFormatStartsWhereALaneRunDryReallyEnds failed once: the retry read A's last bytes the instant the
+  render ended, before AVAudioEngine (on its own thread, at no set time) had called back A's buffers, so `ranOut`
+  couldn't say A had run out and the bytes went straight on - no "entry 0 held", B over A's end. The engine did as
+  built (it goes by the callbacks, never the clock); the test had taken the callbacks for granted, and at 30 ms
+  the next retry had come about 20 ms after the render. Seven tests in six places let bytes come to a lane run
+  dry, its completions handled late, and look for them held:
+  aLaneRunDryWhoseLastCompletionIsLateGoesOnFromTheFrameHeard,
+  aSongInAnotherFormatStartsWhereALaneRunDryReallyEnds, aRaceOnThePhonesBufferingIsHeldThenGoesOnExactly,
+  aResampledLaneBegunAgainCountsFromTheFrameItGaveOut (its 0.25 s half),
+  aConverterTailAfterTheNodeRanOutIsCountedWhereItPlays and anotherFormatLate's two with completionLag. They now
+  wait for those callbacks first (`runOutCalledBack`, bounded and required), as their comments assumed ("every
+  callback arrives"); anotherFormatLate's callbackLag variant doesn't, its callbacks held off on purpose. Not
+  changed: that a phone's callbacks can come after a stream's bytes the same way (the hold review accepted that
+  race, with the clock's 0.25 s backstop).
 
 ### The hold on the callbacks (fix/engine-hold)
 
@@ -1572,8 +1654,9 @@ it while the node played.
   renders still left it: the window's two IO buffers are what cover a render larger than a retry.
 
 **4 (low): the 10 ms settle failed from an 8 ms lag.** Held (measured above, "A node's buffers, taken late").
-- **Fixed: 30 ms** (`offlineScheduleSettle`), the verifiers' second choice (25-50 ms). Still a bound. Their first,
-  a fence, isn't there to be had: nothing tried tells when the node's queue has taken a buffer (above, "A node's
+- **Fixed: 30 ms** (`offlineScheduleSettle`), the verifiers' second choice (25-50 ms) - 100 ms since
+  fix/ci-settle, on a strict timer ("A node's buffers, taken late"). Still a bound. Their first, a fence, isn't
+  there to be had: nothing tried tells when the node's queue has taken a buffer (above, "A node's
   buffers, taken late": isPlaying, playerTime, prepare, a zero-frame render, a zero-length buffer), and a dummy
   buffer's `.dataConsumed` would come only once a render has read it - the render this waits to make (reasoned,
   not tried). Not taken either: nodes attached before the engine starts offline (their scheduleBuffer is not

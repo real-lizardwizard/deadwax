@@ -82,6 +82,7 @@ extension EngineRenderTests {
         engine.settle()
         try #require(engine.phase == .playing, "started on its first second (\(engine.phase))\n\(trace)")
         _ = try engine.renderOffline(48_000 + 512) // its node runs out at 48000; every callback arrives
+        try runOutCalledBack(engine)
         let handled = engine.callbacksDone
         gate.release() // the retry reads it long before the last completion is handled
         waitFor(engine) { engine.callbacksDone >= handled + 10 && engine.phase == .playing }
@@ -185,6 +186,7 @@ extension EngineRenderTests {
                 }
                 try #require(engine.phase == .loading || lag > 0, "\(what): ran dry (\(engine.phase))\n\(trace)")
                 let reached = (before.lastIndex { $0 != 0 } ?? -1) + 1 // the output frames the node played
+                if lag > 0 { try runOutCalledBack(engine) }
                 gate.release()
                 waitFor(engine) { engine.phase == .playing && trace.description.contains("ran dry mid-song") }
                 try #require(engine.phase == .playing, "\(what): on again (\(engine.phase))\n\(trace)")
@@ -269,6 +271,7 @@ extension EngineRenderTests {
         engine.settle()
         _ = try render(engine, frames: 43_200, piece: 4_800)
         _ = try engine.renderOffline(4_800 + 1_024)
+        try runOutCalledBack(engine)
         let handled = engine.callbacksDone
         gate.release()
         waitFor(engine) { engine.callbacksDone > handled && trace.description.contains("converter holding") && engine.phase == .playing }
@@ -453,6 +456,7 @@ extension EngineRenderTests {
                      entry(c, rate: 48_000, key: 2, id: "c")], from: 0)
         engine.settle()
         _ = try engine.renderOffline(24_512)
+        if engine.callbackLag == 0 { try runOutCalledBack(engine, sourceLocation: sourceLocation) } // held off on purpose there
         gate.release()
         waitFor(engine) { trace.description.contains("lane 96000 Hz") && engine.callbacksDone >= 5 && engine.phase == .playing }
         try #require(engine.phase == .playing, "B on (\(engine.phase))\n\(trace)", sourceLocation: sourceLocation)

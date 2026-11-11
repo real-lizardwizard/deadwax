@@ -434,7 +434,9 @@ public final class PlaybackEngine {
     /// Tests: how long after the engine asks AVAudioPlayerNode to schedule a buffer the node takes it - its
     /// CommandQueue slow, as on ios.yml's runner, made certain: each scheduleBuffer is performed this much
     /// later, in order, and drained before any node or engine stops (as AVAudioPlayerNode's StopImpl does).
-    /// Set before `play`.
+    /// Timed on a strict timer (`sleep(until:)`): on a Thread.sleep, as it was, a 10 ms lag ran 10-15 ms here
+    /// and 17-210 ms under `taskpolicy -b` - most likely ios.yml's 12 of 87 at 09781a5 (notes/ios.md "A node's
+    /// buffers, taken late"). Set before `play`.
     var scheduleLag: TimeInterval = 0
     private let scheduleQueue = DispatchQueue(label: "deadwax.engine.schedule-lag", qos: .userInitiated)
     private func drainScheduling() { if scheduleLag > 0 { scheduleQueue.sync {} } }
@@ -447,10 +449,14 @@ public final class PlaybackEngine {
     /// engine runs (every lane): a render begun before that has run plays the buffer a render late while
     /// the node's clock counts it on time. The phone's output never renders that soon after a buffer it
     /// needs; offline a render can come microseconds after one (notes/ios.md "A node's buffers, taken late").
-    /// A bound, not a fence (there is none): 10 ms covered only about 5 ms of a node's queue held off (8 ms
-    /// failed every run here), so 30 ms - about 7 s more on the Audio suite - and ios.yml's second run holds
-    /// it with every buffer taken 10 ms late.
-    static let offlineScheduleSettle: Double = 0.030
+    /// A bound, not a fence (there is none). 100 ms since ios.yml's runner failed 12 of 87 at 30 ms with every
+    /// buffer taken 10 ms late: that hook and this wait were Thread.sleeps, which the system lets run late (timer
+    /// coalescing - half the interval, up to 10 ms, here; up to 200 ms under `taskpolicy -b`, where the old code
+    /// fails 8 of those 12 the same way), so the 30 ms was never the margin it looked. Both wait on a strict
+    /// timer now (`sleep(until:)`) and this is the wait: 100 ms over the node's own queue (at most 1.3 ms here,
+    /// -b included), 90 ms over ios.yml's 10 ms hook; about 22 s more on the Audio suite here (38 s to 60 s).
+    /// BufferTakeMeasuredTests prints how late the node takes a buffer on the machine running the tests.
+    static let offlineScheduleSettle: Double = 0.100
     /// The output was started and no song has been started on it since: the next start from silence takes
     /// the start lead. A start on an output already running plays at the next render.
     private var outputFresh = false
@@ -666,8 +672,7 @@ public final class PlaybackEngine {
             }
             if let scheduled = lastScheduledAt {
                 // a buffer just put on, or a node just started: the node takes it on its own queue first
-                let wait = scheduled + offlineSettle - Self.hostSeconds()
-                if wait > 0 { Thread.sleep(forTimeInterval: wait) }
+                Self.sleep(until: scheduled + offlineSettle)
                 lastScheduledAt = nil
             }
             var done: AVAudioFrameCount = 0
@@ -735,6 +740,20 @@ public final class PlaybackEngine {
     /// Tests: completions AVAudioEngine has called back so far, handled or not.
     var callbacksArrived: Int { arrivals.value }
 
+    /// Tests: AVAudioEngine has called back every buffer on each lane whose node's clock has passed all on it -
+    /// what `ranOut` goes by, handled or not. Offline its callbacks come on its own thread after the render, at
+    /// no set time; a test that lets bytes come to a lane run dry, to see them held, waits for this first.
+    var runOutCalledBack: Bool {
+        queue.sync {
+            lanes.values.allSatisfy { lane in
+                guard lane.started, let nodeTime = lane.node.lastRenderTime, nodeTime.isSampleTimeValid,
+                      let playerTime = lane.node.playerTime(forNodeTime: nodeTime),
+                      playerTime.sampleTime >= lane.nodeFrames else { return true }
+                return lane.calls.value >= lane.scheduled
+            }
+        }
+    }
+
     /// Tests: completions the engine has handled so far (any generation, ignored or not).
     var callbacksDone: Int { queue.sync { callbacksHandled } }
 
@@ -759,6 +778,28 @@ public final class PlaybackEngine {
     // MARK: on the queue
 
     static func hostSeconds() -> Double { AVAudioTime.seconds(forHostTime: mach_absolute_time()) }
+
+    /// Offline renders and the tests' hooks only: the calling thread held until `due` (host seconds), never
+    /// before it, and on a strict timer, so not much after. Thread.sleep, usleep, mach_wait_until and a
+    /// semaphore's timeout are all let run late by the system's timer coalescing - half the interval, up to
+    /// 10 ms, on this Mac (a 10 ms sleep woke 10-15 ms after), up to 200 ms under `taskpolicy -b` - where a strict
+    /// timer with no leeway woke within about 0.1 ms in both, a few ms late now and then (7 ms once in a few
+    /// hundred) (notes/ios.md "A node's buffers, taken late").
+    static func sleep(until due: Double) {
+        while true {
+            let left = due - hostSeconds()
+            guard left > 0 else { return }
+            let woken = DispatchSemaphore(value: 0)
+            let timer = DispatchSource.makeTimerSource(flags: .strict, queue: strictTimerQueue)
+            timer.schedule(deadline: .now() + left, leeway: .nanoseconds(0))
+            timer.setEventHandler { woken.signal() }
+            timer.resume()
+            woken.wait()
+            timer.cancel()
+        }
+    }
+
+    private static let strictTimerQueue = DispatchQueue(label: "deadwax.engine.strict-timer", qos: .userInitiated)
 
     private func setTracks(_ new: [EngineTrack], fresh: Bool) {
         tracks = new
@@ -1211,8 +1252,7 @@ public final class PlaybackEngine {
             let node = lane.node
             let due = Self.hostSeconds() + scheduleLag
             scheduleQueue.async {
-                let wait = due - Self.hostSeconds()
-                if wait > 0 { Thread.sleep(forTimeInterval: wait) }
+                Self.sleep(until: due)
                 // a node detached meanwhile takes nothing (scheduling on one is an exception)
                 guard node.engine != nil else { return }
                 node.scheduleBuffer(buffer, completionCallbackType: .dataRendered, completionHandler: completion)
