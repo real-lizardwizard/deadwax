@@ -176,6 +176,8 @@ ROUTES = {
     #? (2.0.0-player.62) Normalization: Info's level of a song, and an album page's "measure this album"
     ("GET", "/deadwax/navidrome/level/{song_id}"): "user",
     ("POST", "/deadwax/navidrome/level/album/{album_id}"): "user",
+    #? (2.1.1) the iPhone app's Normalization: what is measured of an album, read only - the album the asker's first
+    ("GET", "/deadwax/navidrome/loudness/album/{album_id}"): "user",
     ("POST", "/deadwax/navidrome/scrobble/{song_id}"): "user",
     #? (2.0.0-player.57) the Library's Shuffle: an order of the asker's library (or the store), and its pages - theirs
     ("GET", "/deadwax/navidrome/shuffle"): "user",

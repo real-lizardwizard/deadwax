@@ -272,6 +272,12 @@ def test_there_is_no_general_proxy():
     second (a POST) starts measuring an album's songs in the background, after one getAlbum AS THE ASKER for the
     id it was given, bounded. Neither passes anything the page sent on - see test_normalization.py.
 
+    `/loudness/album/{album_id}` joined it in 2.1.1, deliberately: the iPhone app's Normalization - deadwax's OWN
+    answer, not a relay, and read only: what deadwax has measured of an album (each song's loudness and peak, and
+    the album's pooled), never measuring or making anything. One getAlbum AS THE ASKER for the id it was given,
+    bounded, then the reads Info's route makes as the shared account (the listing, each song's version and
+    STREAMINFO - internal calls through the client); nothing the app sent passed on - see test_normalization.py.
+
     `/queue` (GET and POST) and `/queue/at` joined it in 2.0.0-player.64, deliberately: resume what was playing -
     Navidrome's own play queue, as the asker. Two Subsonic calls between them, getPlayQueueByIndex and
     savePlayQueueByIndex, with parameters deadwax builds from declared, bounded fields (the request models forbid any
@@ -286,7 +292,8 @@ def test_there_is_no_general_proxy():
 
     assert paths == [
         "/album_index", "/albums", "/albums/{album_id}", "/artists", "/artists/{artist_id}", "/cover/{cover_id}",
-        "/level/album/{album_id}", "/level/{song_id}", "/playlists", "/playlists", "/playlists/{playlist_id}", "/playlists/{playlist_id}/add",
+        "/level/album/{album_id}", "/level/{song_id}", "/loudness/album/{album_id}", "/playlists", "/playlists",
+        "/playlists/{playlist_id}", "/playlists/{playlist_id}/add",
         "/playlists/{playlist_id}/delete", "/playlists/{playlist_id}/edit", "/queue", "/queue", "/queue/at",
         "/scrobble/{song_id}", "/scrub/{song_id}", "/search", "/shuffle", "/shuffle/{token}", "/songs/{song_id}",
         "/status", "/stream/{song_id}",

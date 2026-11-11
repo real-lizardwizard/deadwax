@@ -9,6 +9,12 @@ It isn't yet a player to use day to day. That's Phase 1.
 The app talks only to deadwax, never to Navidrome, through deadwax's own routes. Nothing changes on
 the server for Phase 0: it works with deadwax 2.0.0 as it is.
 
+deadwax 2.1.1 adds the one route the next phase needs for normalization. It tells the app what
+deadwax has already measured of an album's loudness: each song's, and the album's as a whole. The app
+can then level songs on the phone from the same measurements the web app's Normalization uses. The
+route only reads what's there and never measures anything itself. It only answers about an album
+the signed-in person can see in Navidrome. Nothing changes for the web app.
+
 ## What you need
 
 - **A Mac with Xcode.** Xcode 16 or later opens the project. An iPhone on iOS 27 needs **Xcode 27**,

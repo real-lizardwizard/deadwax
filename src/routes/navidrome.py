@@ -9,7 +9,8 @@ playlists, 2.0.0-player.58, a fixed call or two each with declared, bounded inpu
 whole album list, 2.0.0-player.59's /album_index, getAlbumList2 a page at a time as the asker, its one parameter the
 scope, which picks the list type - see after /albums. Resume what was playing, 2.0.0-player.64's /queue and
 /queue/at: getPlayQueueByIndex and savePlayQueueByIndex as the asker, with deadwax's own record beside them - see the
-very end.)
+very end. The iPhone app's Normalization, 2.1.1's /loudness/album/{album_id}: deadwax's own answer of what it has
+measured, after one getAlbum as the asker - see after /level/album.)
 """
 
 import asyncio
@@ -679,6 +680,22 @@ async def level_album(request: Request, album_id: str = PathParam(..., min_lengt
     except NavidromeError as e:
         raise _fail(e)
     return {"state": cache.levels.warm(album_id)}
+
+
+@router.get("/loudness/album/{album_id}")
+async def loudness_of_album(request: Request, album_id: str = PathParam(..., min_length=1, max_length=ID_MAX)):
+    """
+    (2.1.1) What deadwax has measured of an album, for the iPhone app's Normalization: each song's loudness and
+    peak and the album's pooled, unrounded - the phone works the gain out itself, with no resample's room, as it
+    plays the file as it is - never measuring or making anything (src/levels.py album_loudness()). The album is
+    looked up AS THE ASKER first (Navidrome answers only for an album that user may see), then read as the
+    shared account, as every other read the player cache makes. deadwax's own answer, not a relay.
+    """
+    try:
+        await client_for(request).call("getAlbum", {"id": album_id})
+    except NavidromeError as e:
+        raise _fail(e)
+    return await player_cache.cache.levels.album_loudness(album_id)
 
 
 @router.post("/scrobble/{song_id}")

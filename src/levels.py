@@ -28,6 +28,9 @@ already makes of a FLAC song (src/player_cache.py). This is the part between: on
     another gain a moment later, and the album would step at a join.
   - An album page opening (Part A) starts its album's measurement early (warm(), POST /level/album/{id}),
     dropped when another album is being measured - a play measures on demand anyway.
+  - (2.1.1) The iPhone app reads what is measured of an album (album_loudness(), GET /loudness/album/{id}):
+    each song's loudness and peak and the album's pooled, unrounded - it levels on the phone, the file as it
+    is, with no resample's room. Read only, like describe(): it never measures.
   - A download filed by the organizer (Part B) has its FLAC songs measured from their local files, on a
     low-priority thread of their own (measure_filed()), keyed by the STREAMINFO read from each file - the
     same key Navidrome's copy of it will have, since tagging never touches STREAMINFO.
@@ -42,6 +45,7 @@ rate. Anything else is answered exactly as without `level`, and describe() - Inf
 
 import asyncio
 import concurrent.futures
+import math
 import os
 import secrets
 import shutil
@@ -108,6 +112,10 @@ NOT_FLAC = "it isn't a FLAC file"
 UNREADABLE = "its file can't be read as FLAC by deadwax (20- or 32-bit)"
 NO_CACHE = "the player's cache can't be used on this server"
 NO_LIBRARIES = "deadwax is running without numpy and soundfile"
+#? (2.1.1) ...and the iPhone app's loudness route (album_loudness()): a song, or the album, that couldn't be
+#? looked at just now - asked again in a moment - and an album none of whose songs can be levelled
+LOOK_LATER = "it couldn't be looked at just now"
+NOTHING_TO_LEVEL = "none of its songs can be levelled"
 
 
 @cache
@@ -277,18 +285,27 @@ class Levels:
 
         async def look(song_id: str):
             async with at_once:
-                try:
-                    return await self._song(song_id)
-                except NavidromeError as e:
-                    if e.unreachable:
-                        raise
-                    #? (after review) only a refusal that says "a moment" is brief; any other is the file's
-                    return None if e.status in BRIEF_REFUSALS else str(e)
-                except (CannotPlan, httpx.TransportError):
-                    return None
+                return await self._look_at(song_id)
 
         looked = await asyncio.gather(*(look(song_id) for song_id in ids))
         return [song for song in looked if isinstance(song, Song)], all(song is not None for song in looked)
+
+    async def _look_at(self, song_id: str) -> Song | str | None:
+        """
+        One FLAC song of an album looked at, as _album_songs() looks at each: the Song, why it can't be levelled
+        (an answer that stays: a refusal of Navidrome's about the file, or deadwax's own reason), or None when it
+        couldn't be looked at just now (its STREAMINFO not read in time, Navidrome broken off, or answering it
+        with a 429 or 503). Navidrome not answering at all raises, as asking does.
+        """
+        try:
+            return await self._song(song_id)
+        except NavidromeError as e:
+            if e.unreachable:
+                raise
+            #? (after review) only a refusal that says "a moment" is brief; any other is the file's
+            return None if e.status in BRIEF_REFUSALS else str(e)
+        except (CannotPlan, httpx.TransportError):
+            return None
 
     # ------------------------------------------------------------ measurements
 
@@ -736,6 +753,84 @@ class Levels:
             measured = max(measured, progress[0])
         return {**answer, "state": state, "songs": len(counted), "measured_songs": measured}
 
+    # ------------------------------------------------------------ the iPhone app's answer (2.1.1)
+
+    async def album_loudness(self, album_id: str) -> dict:
+        """
+        What deadwax has measured of an album, for the iPhone app's Normalization (GET
+        /deadwax/navidrome/loudness/album/{album_id}): every song of Navidrome's album, in its order, with its
+        loudness and peak as measured, and the album's - its counted songs' histograms pooled, as the stream's
+        album gain pools them - all UNROUNDED. The phone works the gain out itself (loudness.gain_for) with no
+        resample's room, since it plays the file as it is: so no gain, no reserve and no kept gain here, and
+        nothing about a copy (no `plain`, no "too big").
+
+        Read only: it never measures, never makes anything and never takes the one-album gate - the reads as
+        the shared account any level answer makes (the listing, each FLAC song's version and STREAMINFO, looked
+        at as _album_songs() looks), then one look in the measurements kept. What IS measured is said even
+        without the libraries or a cache folder: the phone needs neither of the server. The album is never
+        given from part of itself (`whole`). Never raises: an album that couldn't be listed or looked at just
+        now is `unmeasured`, LOOK_LATER, not whole, with no songs.
+        """
+        at_once = asyncio.Semaphore(LOOKS_AT_ONCE)
+
+        async def look(song_id: str):
+            async with at_once:
+                return await self._look_at(song_id)
+
+        try:
+            listing = await self.cache.albums._listing(album_id)
+            listed = [(str(entry.get("id")), _is_flac(entry)) for entry in listing if entry.get("id")]
+            ids = [song_id for song_id, flac in listed if flac]
+            #? each song looked at once, however often it is listed
+            unique = list(dict.fromkeys(ids))
+            looked = dict(zip(unique, await asyncio.gather(*(look(song_id) for song_id in unique))))
+        except (*_ASKING, _NoAlbum):
+            return _loudness_answer("unmeasured", LOOK_LATER, False, _album_level(None, None, 0), [])
+        #? the album as _album_songs() gives it: its levellable songs in its order, and whether that is all of them
+        songs = [looked[song_id] for song_id in ids if isinstance(looked[song_id], Song)]
+        whole = all(looked[song_id] is not None for song_id in ids)
+        known = await self.known([song.key for song in songs])
+        album_live = self._live(self._albums.get(album_id))
+
+        def entry(song_id: str, flac: bool) -> dict:
+            if not flac:
+                return _song_entry(song_id, "not_levelled", why=NOT_FLAC)
+            song = looked[song_id]
+            if song is None:
+                return _song_entry(song_id, "unmeasured", why=LOOK_LATER)
+            if not isinstance(song, Song):
+                return _song_entry(song_id, "not_levelled", why=song)
+            if song.key in self._unmeasurable:
+                return _song_entry(song_id, "not_levelled", why=self._unmeasurable[song.key])
+            measurement = known.get(song.key)
+            if measurement is not None:
+                return _song_entry(song_id, "measured", measurement.loudness, measurement.peak)
+            measuring = album_live or self._live(self._songs.get(song.key))
+            return _song_entry(song_id, "measuring" if measuring else "unmeasured")
+
+        entries = [entry(song_id, flac) for song_id, flac in listed]
+        counted = [song for song in songs if song.key not in self._unmeasurable]
+        if whole and counted and all(song.key in known for song in counted):
+            pooled = [known[song.key] for song in counted]
+            level = _album_level(loudness.loudness_of(pooled), max(m.peak for m in pooled), len(pooled))
+            return _loudness_answer("measured", None, True, level, entries)
+        level = _album_level(None, None, len(counted))
+        if whole and not counted:
+            return _loudness_answer("not_levelled", NOTHING_TO_LEVEL, True, level, entries)
+        later = None if whole else LOOK_LATER
+        if album_live or any(self._live(self._songs.get(song.key)) for song in counted):
+            return _loudness_answer("measuring", later, whole, level, entries)
+        #? nothing more can be measured here - said only while a counted song is still unmeasured. (After review)
+        #? with every counted song measured, what is missing is a look that failed just now (not whole), and the
+        #? next look may well make the album `measured`: a not_levelled answer, which the phone keeps 10 minutes,
+        #? would leave it unlevelled that long for a moment's 503
+        if any(song.key not in known for song in counted):
+            if missing_libraries() is not None:
+                return _loudness_answer("not_levelled", NO_LIBRARIES, whole, level, entries)
+            if await self.cache._folder() is None:
+                return _loudness_answer("not_levelled", NO_CACHE, whole, level, entries)
+        return _loudness_answer("unmeasured", later, whole, level, entries)
+
     def _say(self, what: tuple, line: str, warn: bool = False) -> None:
         """A line said once a VERSION_SECONDS, however many requests run into it."""
         now = self.cache.clock()
@@ -775,12 +870,38 @@ def _measured(answer: dict, resolved: Resolved) -> dict:
             "songs": resolved.songs, "measured_songs": resolved.songs}
 
 
+# ---------------------------------------------------------------- the iPhone app's answer's parts (2.1.1)
+
+def _number(value: float | None) -> float | None:
+    """A number as the loudness route sends it: unrounded, or None for one that isn't finite - silence's -inf is
+    null (Starlette's JSON refuses infinities: an -inf would be a 500)."""
+    return value if value is not None and math.isfinite(value) else None
+
+
+def _song_entry(song_id: str, state: str, loudness_lufs: float | None = None, peak: float | None = None,
+                why: str | None = None) -> dict:
+    """One song of the loudness route's answer - every one is made here, so each has every key. Measured: its
+    loudness (null when it is silent) and its peak (1.0 = full scale, 0.0 for digital silence)."""
+    return {"id": song_id, "state": state, "loudness_lufs": _number(loudness_lufs), "peak": _number(peak), "why": why}
+
+
+def _album_level(loudness_lufs: float | None, peak: float | None, songs: int) -> dict:
+    """The album's part of the answer: its pooled loudness (null when it is silent, or not measured) and its loudest
+    sample (null when not measured), and how many songs count toward its level."""
+    return {"loudness_lufs": _number(loudness_lufs), "peak": _number(peak), "songs": songs}
+
+
+def _loudness_answer(state: str, why: str | None, whole: bool, album: dict, songs: list[dict]) -> dict:
+    """The loudness route's answer - every one made here, so each has every key."""
+    return {"reference_lufs": loudness.REFERENCE_LUFS, "algorithm": loudness.ALGORITHM_VERSION, "state": state,
+            "why": why, "whole": whole, "album": album, "songs": songs}
+
+
 def _lufs(value: float) -> str:
     return f"{value:.1f} LUFS" if value != float("-inf") else "silent"
 
 
 def _dbfs(peak: float) -> str:
-    import math
     return f"{20 * math.log10(peak):+.2f} dBFS" if peak > 0 else "silent"
 
 
