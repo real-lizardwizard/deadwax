@@ -367,13 +367,19 @@ final class AppModel {
     }
 
     /// The song heard and the next kept in the cache, every fetch of a song skipped past let go, and
-    /// the next song's bytes begun now, so the join is seamless.
+    /// the next song's bytes begun now, so the join is seamless. What is let go is decided from the
+    /// earlier of this state's song and the engine's own now (StreamCache.kept): a state reaches the
+    /// main queue after the engine has moved on, and after a quick Previous it names a later song than
+    /// the one the engine has just opened a fetch for.
     private func keepAndPrefetch() {
-        let from = queue.index
-        guard queue.songs.indices.contains(from) else { return }
-        let inUse = Array(queue.songs[from..<min(from + 2, queue.songs.count)])
-        files.keep(inUse, ahead: Set(queue.songs[from...].map(\.id)))
-        if source == .stream, let client, let next = queue.nextIndex {
+        guard queue.songs.indices.contains(queue.index) else { return }
+        // read on the engine's queue, after every skip and play sent from here: where it is now
+        let now = engine?.position()
+        let engineAt = now.flatMap { at in keys.indices.contains(at.index) && keys[at.index] == at.key ? at.index : nil }
+        let (inUse, ahead) = StreamCache.kept(queue.songs, shown: queue.index, engineAt: engineAt)
+        files.keep(inUse, ahead: ahead)
+        // nothing begun for a queue the engine no longer holds (a state from before a stop)
+        if now != nil, source == .stream, let client, let next = queue.nextIndex {
             files.prefetch(queue.songs[next], client: client)
         }
     }

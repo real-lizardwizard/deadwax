@@ -34,8 +34,9 @@ final class SongFiles: @unchecked Sendable {
         let support = manager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         cache = StreamCacheFolder(url: caches.appendingPathComponent("deadwax/stream", isDirectory: true))
         downloadFolder = support.appendingPathComponent("deadwax/phase0", isDirectory: true)
-        // the parts of fetches the app was stopped in, and anything the cache doesn't name, deleted;
-        // the songs kept, down to the limit
+        // the parts of fetches the app was stopped in, and anything the cache doesn't name, deleted
+        // (everything, once, in the folder 0.1 left: its fetches wrote under the song's own name, so a
+        // song cut short there would pass for whole); the songs kept, down to the limit
         cache.sweep()
         try? manager.createDirectory(at: downloadFolder, withIntermediateDirectories: true)
         Self.keepOffBackups(downloadFolder)
@@ -67,10 +68,11 @@ final class SongFiles: @unchecked Sendable {
     }
 
     /// `inUse`: the song heard and the next one - their files are never evicted (nor is any song
-    /// still arriving). `ahead`: the ids of every song from the one heard to the queue's end - a fetch
-    /// of any other song (one skipped past, or of a queue played no more) is let go and its part
-    /// deleted; a complete one is the cache's, and stays. Songs further ahead keep arriving: the
-    /// engine may be reading one already (a short next song), and they will play.
+    /// still arriving). `ahead`: the ids of every song from the one heard to the queue's end (the
+    /// earliest the engine may be reading: StreamCache.kept) - a fetch of any other song (one skipped
+    /// past, or of a queue played no more) is let go and its part deleted; a complete one is the
+    /// cache's, and stays. Songs further ahead keep arriving: the engine may be reading one already (a
+    /// short next song), and they will play.
     func keep(_ inUse: [Song], ahead: Set<String>) {
         let gone: [StreamFetch] = lock.withLock {
             kept = Set(inUse.compactMap(StreamCache.name(for:)))

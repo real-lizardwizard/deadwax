@@ -148,6 +148,32 @@ extension EngineRenderTests {
         #expect(engine.stateNow.key == 5 && engine.stateNow.index == 1)
     }
 
+    // A cut after a kept song that is already on a node: what comes after it opens after IT, not after
+    // the song heard - so the kept song plays once, and the new one straight after.
+    @Test func aCutAfterAKeptSongOpensAfterIt() throws {
+        let rate = 44_100.0
+        let a = signal(frames: 44_100, channels: 2, seed: 0.12)
+        let b = signal(frames: 4_410, channels: 2, seed: 0.22) // 0.1 s: all of it on the node behind A
+        let d = signal(frames: 22_050, channels: 2, seed: 0.42)
+        // C: a stream whose header hasn't arrived - opened after B, on no node
+        let gate = GatedBytes(Data(repeating: 0, count: 100_000))
+        let C = EngineTrack(key: 2, audio: "c|off", song: Song(id: "c")) { start in
+            try StreamSource(bytes: gate, typeHint: kAudioFileFLACType, start: start)
+        }
+        let (A, B) = (entry(a, rate: rate, key: 0, id: "a"), entry(b, rate: rate, key: 1, id: "b"))
+        let engine = try liveEngine(rate: rate)
+        engine.play([A, B, C], from: 0)
+        engine.settle()
+        var took: Bool?
+        let out = try render(engine, frames: 44_100 + 4_410 + 22_050 + 4_096) { done in
+            if done >= 40_960, took == nil { took = engine.replaceUpcoming([A, B, entry(d, rate: rate, key: 3, id: "d")]) }
+        }
+        #expect(took == true, "B kept, C (on no node) let go")
+        #expect(firstDifference(out[4_096..<44_100], a[0][4_096...]) == nil, "A")
+        #expect(firstDifference(out[44_100..<48_510], b[0]) == nil, "B, once")
+        #expect(firstDifference(out[48_510..<70_560], d[0]) == nil, "D straight after B")
+    }
+
     // Resume what was playing: the queue comes back paused, nothing opened or played, the output off;
     // play opens the song at the second it was left.
     @Test func aQueuePutBackPausedLoadsNothing() throws {

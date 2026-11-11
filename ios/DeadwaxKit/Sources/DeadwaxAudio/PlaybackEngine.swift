@@ -325,6 +325,9 @@ public final class PlaybackEngine {
     private var wantsPlay = false
     private var asleep = true
     private var held: Spot?
+    /// The entry `state.fileRate` was read for. A skip, a seek or a queue put back while paused opens
+    /// nothing, so the rate of the song before must not be said for the one shown.
+    private var rateOf: Int?
     private var lastFailure: AudioFailure?
     /// The output's latency as last read, kept with every reading of a node.
     private var lastLatency: Double = 0
@@ -463,7 +466,8 @@ public final class PlaybackEngine {
     }
 
     /// After AVAudioSession's media services were reset: the old engine and its nodes are dead, and
-    /// nothing is asked of them - a new engine, and on from where the song was heard.
+    /// nothing is asked of them - a new engine, and on from where the song was heard when it was
+    /// playing. Paused, ended or failed, it stays so (a failure with its words), as after a new route.
     public func rebuild() {
         queue.async {
             let at = self.heard(readingNodes: false)
@@ -482,7 +486,13 @@ public final class PlaybackEngine {
             }
             self.asleep = true
             self.held = at
-            self.resumeFrom(at, playing: playing)
+            guard playing else {
+                // as after a new route: ended stays ended (play still starts the queue's own rule, not
+                // the end frame again) and a failure keeps its words; a pause stays a pause
+                self.publish(self.state.phase == .playing || self.state.phase == .loading ? .paused : self.state.phase)
+                return
+            }
+            self.resumeFrom(at, playing: true)
         }
     }
 
@@ -554,6 +564,7 @@ public final class PlaybackEngine {
         indexOf = index
         if fresh {
             lengths.removeAll()
+            rateOf = nil
         } else {
             lengths = lengths.filter { index[$0.key] != nil }
         }
@@ -1308,6 +1319,7 @@ public final class PlaybackEngine {
         if let key = feed?.key, let to = renamed[key] { feed?.key = to }
         if let key = failedNext?.key, let to = renamed[key] { failedNext?.key = to }
         if let key = current, let to = renamed[key] { current = to }
+        if let key = rateOf, let to = renamed[key] { rateOf = to }
         if let spot = held, let to = renamed[spot.key] { held = (to, spot.at) }
         var moved: [Int: Double] = [:]
         for (key, length) in lengths { moved[renamed[key] ?? key] = length }
@@ -1464,9 +1476,16 @@ public final class PlaybackEngine {
         if let key = heardLane ?? feed?.lane, let lane = lanes[key] {
             next.fileRate = lane.format.sampleRate
             next.fileChannels = Int(lane.format.channelCount)
+            rateOf = current
         } else if let format = feed?.source.format {
             next.fileRate = format.sampleRate
             next.fileChannels = Int(format.channelCount)
+            rateOf = current
+        } else if current == nil || rateOf != current {
+            // nothing open, and the rate kept was another entry's (a skip or a queue put back while
+            // paused, a stop): not known until play opens it. A pause keeps its song's.
+            next.fileRate = nil
+            next.fileChannels = nil
         }
         let output = engine.outputNode.outputFormat(forBus: 0).sampleRate
         next.outputRate = settings.offline?.sampleRate ?? (output > 0 ? output : nil)

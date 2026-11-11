@@ -8,7 +8,8 @@ import Foundation
 /// - A fetch writes into `<name>.part`, renamed to `<name>` only once every byte has arrived and its
 ///   length is checked (the app's StreamFetch). So a file under its own name is always complete.
 /// - At launch every part is deleted (a fetch the app was stopped in), and anything the cache
-///   doesn't name: the rest are kept.
+///   doesn't name: the rest are kept. A folder without `layoutMarker` (Phase 0's, whose fetches wrote
+///   under the song's own name) is emptied once.
 /// - A file is played again when its length is still the song's - for a file sent as it is,
 ///   Navidrome's `size` when it says one; a transcode (mp3) on any length but none. Another length
 ///   (the file replaced or retagged on the server) is deleted and the song streamed afresh.
@@ -46,9 +47,53 @@ public enum StreamCache {
             && suffix.unicodeScalars.allSatisfy { ("a"..."z").contains($0) || ("0"..."9").contains($0) }
     }
 
-    /// What a launch deletes from the folder: every part, and anything the cache doesn't name.
+    /// The file that says the folder is this layout's: every song under its own name complete, every
+    /// fetch in a part. Phase 0 (app 0.1) wrote each fetch straight under the song's name, unchecked,
+    /// and emptied the folder at every launch - so a folder without the marker can hold a song cut
+    /// short under its own name, and is emptied once. (No dot in it: never a song's name.)
+    public static let layoutMarker = "layout-1"
+
+    /// What a launch deletes from the folder: every part, and anything the cache doesn't name - or,
+    /// without the layout's marker (a folder Phase 0 left), everything in it.
     public static func sweep(_ fileNames: [String]) -> [String] {
-        fileNames.filter { !isSongName($0) }.sorted()
+        guard fileNames.contains(layoutMarker) else { return fileNames.sorted() }
+        return fileNames.filter { !isSongName($0) && $0 != layoutMarker }.sorted()
+    }
+
+    /// The songs whose files and fetches the app keeps after the song heard changes. `shown` is the
+    /// queue's index from the engine's last state to reach the main thread, `engineAt` the engine's own
+    /// index read just now (nil: it holds no queue). A state can be older than the engine - a Previous
+    /// the engine has already opened a fetch for - so the songs kept begin at the earlier of the two,
+    /// and a fetch the engine has just opened is never let go on the word of a late state.
+    /// `inUse` (never evicted): from there to the song after the later of the two. `ahead` (their
+    /// fetches go on; any other is let go): every song from there to the queue's end, by id.
+    public static func kept(_ songs: [Song], shown: Int, engineAt: Int?) -> (inUse: [Song], ahead: Set<String>) {
+        guard !songs.isEmpty else { return ([], []) }
+        let last = songs.count - 1
+        let shownAt = min(max(shown, 0), last)
+        let now = engineAt.map { min(max($0, 0), last) } ?? shownAt
+        let from = min(shownAt, now)
+        let through = min(max(shownAt, now) + 1, last)
+        return (Array(songs[from...through]), Set(songs[from...].map(\.id)))
+    }
+
+    /// A file's length from its attributes, as either Foundation gives it: Apple's an NSNumber, the
+    /// open-source one's (Linux) a Swift UInt. Zero when there is none.
+    public static func byteCount(_ value: Any?) -> Int64 {
+        switch value {
+        case let count as UInt: return Int64(clamping: count)
+        case let count as UInt64: return Int64(clamping: count)
+        case let count as Int: return Int64(count)
+        case let count as Int64: return count
+        case let count as NSNumber: return count.int64Value
+        default: return 0
+        }
+    }
+
+    /// Whether a file's attributes are a regular file's (Apple's give the type bridged from a string).
+    static func isRegular(_ attributes: [FileAttributeKey: Any]) -> Bool {
+        let type = attributes[.type]
+        return (type as? FileAttributeType) == .typeRegular || (type as? String) == FileAttributeType.typeRegular.rawValue
     }
 
     /// What to do with the cache's file for a song about to be played.
@@ -114,8 +159,9 @@ public struct StreamCacheFolder: Sendable {
     public func url(for name: String) -> URL { url.appendingPathComponent(name, isDirectory: false) }
     public func partURL(for name: String) -> URL { url(for: StreamCache.partName(name)) }
 
-    /// At launch: the folder made if it isn't there, its parts and strangers deleted, and the songs
-    /// kept down to `limit`. Says what it deleted.
+    /// At launch: the folder made if it isn't there, its parts and strangers deleted (all of it, once,
+    /// when Phase 0 left it - then marked as this layout's), and the songs kept down to `limit`. Says
+    /// what it deleted.
     @discardableResult
     public func sweep(limit: Int64 = StreamCache.limit) -> [String] {
         let manager = FileManager.default
@@ -123,6 +169,9 @@ public struct StreamCacheFolder: Sendable {
         let names = (try? manager.contentsOfDirectory(atPath: url.path)) ?? []
         var gone = StreamCache.sweep(names)
         for name in gone { try? manager.removeItem(at: url(for: name)) }
+        if !names.contains(StreamCache.layoutMarker) {
+            _ = manager.createFile(atPath: url(for: StreamCache.layoutMarker).path, contents: Data())
+        }
         gone += evict(limit: limit, keep: [])
         return gone
     }
@@ -133,18 +182,17 @@ public struct StreamCacheFolder: Sendable {
         let names = (try? manager.contentsOfDirectory(atPath: url.path)) ?? []
         return names.filter(StreamCache.isSongName).compactMap { name in
             guard let attributes = try? manager.attributesOfItem(atPath: url(for: name).path),
-                  (attributes[.type] as? FileAttributeType) == .typeRegular else { return nil }
-            let bytes = (attributes[.size] as? NSNumber)?.int64Value ?? 0
+                  StreamCache.isRegular(attributes) else { return nil }
             let date = attributes[.modificationDate] as? Date ?? .distantPast
-            return StreamCache.File(name: name, bytes: bytes, lastPlayed: date)
+            return StreamCache.File(name: name, bytes: StreamCache.byteCount(attributes[.size]), lastPlayed: date)
         }
     }
 
     /// The length of the complete file of `name`, or nil when there is none.
     public func bytes(of name: String) -> Int64? {
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: url(for: name).path),
-              (attributes[.type] as? FileAttributeType) == .typeRegular else { return nil }
-        return (attributes[.size] as? NSNumber)?.int64Value ?? 0
+              StreamCache.isRegular(attributes) else { return nil }
+        return StreamCache.byteCount(attributes[.size])
     }
 
     /// The cache's complete copy of `song`, marked as played `now` - or nil: there is none, or there

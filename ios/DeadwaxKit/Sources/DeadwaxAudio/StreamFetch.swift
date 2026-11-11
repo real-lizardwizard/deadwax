@@ -54,32 +54,51 @@ public final class StreamFetch: NSObject, ByteSource, URLSessionDataDelegate {
         super.init()
     }
 
+    /// Makes the part and starts the request. Nothing, when the fetch was let go before it started:
+    /// the app hands a fetch out under its own lock and starts it after, so a skip on the main thread
+    /// can cancel it in between - and then no part is made and nothing is asked of the server.
     public func start() {
-        let manager = FileManager.default
-        try? manager.createDirectory(at: partURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        var attributes: [FileAttributeKey: Any]?
-        #if !os(macOS)
-        // readable and writable while the phone is locked after its first unlock, so a locked phone
-        // goes on fetching the next song (iOS's default class today; said, so a new default can't
-        // take it away)
-        attributes = [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]
-        #endif
-        _ = manager.createFile(atPath: partURL.path, contents: nil, attributes: attributes)
-        writer = try? FileHandle(forWritingTo: partURL)
-        reader = try? FileHandle(forReadingFrom: partURL)
-        guard writer != nil, reader != nil else {
-            fail(AudioFailure("The phone couldn't make a file to stream into (\(partURL.lastPathComponent))."))
-            return
+        enum Begun {
+            case letGo
+            case unwritable
+            case running(URLSessionDataTask)
         }
-        configuration.httpShouldSetCookies = false
-        configuration.httpCookieAcceptPolicy = .never
-        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        configuration.timeoutIntervalForRequest = 20
-        let queue = OperationQueue()
-        queue.maxConcurrentOperationCount = 1
-        let session = URLSession(configuration: configuration, delegate: self, delegateQueue: queue)
-        lock.withLock { self.session = session }
-        session.dataTask(with: request).resume()
+        // all under the lock, so a cancel() lands either before (nothing starts) or after (it sees the
+        // session, and stops it and deletes the part)
+        let begun: Begun = lock.withLock {
+            guard !cancelled, failed == nil, !complete, session == nil else { return .letGo }
+            let manager = FileManager.default
+            try? manager.createDirectory(at: partURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            var attributes: [FileAttributeKey: Any]?
+            #if !os(macOS)
+            // readable and writable while the phone is locked after its first unlock, so a locked phone
+            // goes on fetching the next song (iOS's default class today; said, so a new default can't
+            // take it away)
+            attributes = [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]
+            #endif
+            _ = manager.createFile(atPath: partURL.path, contents: nil, attributes: attributes)
+            writer = try? FileHandle(forWritingTo: partURL)
+            reader = try? FileHandle(forReadingFrom: partURL)
+            guard writer != nil, reader != nil else { return .unwritable }
+            configuration.httpShouldSetCookies = false
+            configuration.httpCookieAcceptPolicy = .never
+            configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+            configuration.timeoutIntervalForRequest = 20
+            let queue = OperationQueue()
+            queue.maxConcurrentOperationCount = 1
+            let session = URLSession(configuration: configuration, delegate: self, delegateQueue: queue)
+            self.session = session
+            return .running(session.dataTask(with: request))
+        }
+        switch begun {
+        case .letGo:
+            return
+        case .unwritable:
+            fail(AudioFailure("The phone couldn't make a file to stream into (\(partURL.lastPathComponent))."))
+        case .running(let task):
+            // a cancel() since has cancelled the task with its session: it ends at once, unheard
+            task.resume()
+        }
     }
 
     /// Stops the fetch and deletes its part - a song skipped past. A reader still holding it sees it
