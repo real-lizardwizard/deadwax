@@ -39,21 +39,23 @@ final class NowPlayingController {
         for command in unused { command.isEnabled = false }
     }
 
-    /// What the lock screen shows. iOS runs the clock on from `elapsed` at `rate`, so this is set
-    /// when something changes, not every second. `elapsed` is what is heard (the engine takes the
-    /// output's latency off). No queue index or count since 0.2: Repeat's copies and Up Next's edits
-    /// make them mean nothing a listener could use.
-    func show(song: Song, elapsed: Double, playing: Bool, artwork: UIImage?) {
+    /// What the lock screen shows: the entry heard - its title, artist and album as the queue has them, and its
+    /// length (the engine's decoded length once known, else Navidrome's). iOS runs the clock on from `elapsed` at
+    /// `rate`, so this is set when something changes, not every second. `elapsed` is what is heard (the engine takes
+    /// the output's latency off). No queue index or count since 0.2: Repeat's copies and Up Next's edits make them
+    /// mean nothing a listener could use.
+    func show(title: String, artist: String?, album: String?, duration: Double?, elapsed: Double, playing: Bool,
+              artwork: UIImage?) {
         var info: [String: Any] = [
-            MPMediaItemPropertyTitle: song.name,
+            MPMediaItemPropertyTitle: title,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: elapsed,
             MPNowPlayingInfoPropertyPlaybackRate: playing ? 1.0 : 0.0,
             MPNowPlayingInfoPropertyDefaultPlaybackRate: 1.0,
             MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.audio.rawValue,
         ]
-        if let artist = song.artist { info[MPMediaItemPropertyArtist] = artist }
-        if let album = song.album { info[MPMediaItemPropertyAlbumTitle] = album }
-        if let duration = song.duration { info[MPMediaItemPropertyPlaybackDuration] = duration }
+        if let artist { info[MPMediaItemPropertyArtist] = artist }
+        if let album { info[MPMediaItemPropertyAlbumTitle] = album }
+        if let duration { info[MPMediaItemPropertyPlaybackDuration] = duration }
         if let artwork {
             info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: artwork.size) { _ in artwork }
         }
