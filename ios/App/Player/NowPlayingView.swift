@@ -1,71 +1,239 @@
 import DeadwaxCore
 import SwiftUI
 
-/// Now Playing, over the tabs: the cover, the title, the byline (Go to the album), the scrubber, the transport, and
-/// Up Next and Info as sheets. STUB (the Player part's): working, plain - no scrubbing yet, the clocks only.
+/// Now Playing, over the tabs (ui/src/player/NowPlaying.tsx, a phone's): the cover over its own blur, smaller while
+/// paused; a failure's words ABOVE the title (a line that comes and goes moves the cover, never what a finger is
+/// reaching for); the title and "Artist — Album", which goes to the album; the scrubber; the transport - Shuffle,
+/// Previous, Play/Pause, Next, Repeat (2.0.14) - and a footer of AirPlay, Up Next and •••. It closes from the chevron
+/// or a drag down its top half past PlayerWords.dismissDistance, begun past dragStartDistance - the cover and the
+/// row above it are the grip, the bar and the buttons below keep their own gestures.
+///
+/// Every action is PlayerModel's, called straight from the tap. Shuffle and Repeat are named in Up Next's words
+/// (shuffleLabel, repeatLabel), pressed while on, tinted while on; a library's shuffle can't be turned off, so its
+/// Shuffle stays on and does nothing. The Up Next button names what is on (upNextLabel) and is never tinted.
 struct NowPlayingView: View {
     @Environment(PlayerModel.self) private var player
     @Environment(AppNavigation.self) private var navigation
-    @Environment(\.dismiss) private var dismiss
     @State private var showsUpNext = false
     @State private var showsInfo = false
+    /// How far the sheet has been dragged down (points).
+    @State private var dragY: CGFloat = 0
+
+    /// The cover's scale while paused (--pl-paused-scale).
+    private static let pausedScale: CGFloat = 0.82
 
     init() {}
 
     var body: some View {
-        VStack(spacing: 20) {
-            HStack {
-                Button { dismiss() } label: { Image(systemName: "chevron.down").font(.title2) }
-                    .accessibilityLabel("Close")
-                Spacer()
+        ZStack {
+            Color.black.ignoresSafeArea()
+            if let entry = player.current {
+                Backdrop(cover: entry.track.coverArt)
+                content(entry.track)
             }
-            if let track = player.current?.track {
-                CoverImage(id: track.coverArt, size: 320)
-                    .frame(maxWidth: 320)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                VStack(spacing: 4) {
-                    Text(track.title).font(.title3.bold()).multilineTextAlignment(.center)
-                    let byline = PlayerWords.byline(artist: track.artist, album: track.album)
-                    if let album = AlbumRoute(track: track) {
-                        Button(byline) { navigation.openAlbum(album) }
-                            .accessibilityLabel(PlayerWords.goToAlbum(byline))
-                    } else {
-                        Text(byline).foregroundStyle(Palette.quiet)
-                    }
-                    if let error = player.errorLine { Text(error).font(.footnote).foregroundStyle(Palette.quiet) }
-                }
-                HStack {
-                    Text(PlayerWords.elapsed(shown: player.shownPosition))
-                    Spacer()
-                    Text(PlayerWords.remaining(shown: player.shownPosition, length: player.duration))
-                }
-                .font(.footnote.monospacedDigit())
-                .foregroundStyle(Palette.quiet)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(PlayerWords.scrubberName)
-                .accessibilityValue(PlayerWords.scrubberValue(shown: player.shownPosition, length: player.duration))
-                HStack(spacing: 40) {
-                    Button { player.previous() } label: { Image(systemName: "backward.fill").font(.title) }
-                        .accessibilityLabel("Previous")
-                    Button { player.toggle() } label: {
-                        Image(systemName: player.isPlaying ? "pause.fill" : "play.fill").font(.largeTitle)
-                    }
-                    .accessibilityLabel(PlayerWords.playPause(playing: player.isPlaying))
-                    Button { player.next() } label: { Image(systemName: "forward.fill").font(.title) }
-                        .accessibilityLabel(PlayerWords.next)
-                }
-                HStack(spacing: 40) {
-                    Button { showsInfo = true } label: { Image(systemName: "info.circle") }
-                        .accessibilityLabel("Info")
-                    Button { showsUpNext = true } label: { Image(systemName: "list.bullet") }
-                        .accessibilityLabel("Up Next")
-                }
-                .font(.title3)
-            }
-            Spacer(minLength: 0)
         }
-        .padding(24)
+        .offset(y: dragY)
         .sheet(isPresented: $showsUpNext) { UpNextScreen() }
         .sheet(isPresented: $showsInfo) { InfoView() }
+    }
+
+    private func content(_ track: QueueTrack) -> some View {
+        VStack(spacing: 0) {
+            VStack(spacing: 0) {
+                HStack {
+                    Button(action: close) {
+                        Image(systemName: "chevron.down")
+                            .font(.title3.weight(.semibold))
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(NowPlayingWords.close)
+                    Spacer()
+                }
+                Spacer(minLength: 12)
+                CoverImage(id: track.coverArt, size: 360)
+                    .frame(maxWidth: 360)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .shadow(color: .black.opacity(0.4), radius: 24, y: 12)
+                    .scaleEffect(player.isPlaying ? 1 : Self.pausedScale)
+                    .animation(.spring(response: 0.45, dampingFraction: 0.7), value: player.isPlaying)
+                    .padding(.horizontal, 8)
+                Spacer(minLength: 12)
+            }
+            .contentShape(Rectangle())
+            .gesture(grip)
+
+            VStack(alignment: .leading, spacing: 4) {
+                if let error = player.errorLine, !error.isEmpty {
+                    Text(error)
+                        .font(.footnote)
+                        .foregroundStyle(Palette.quiet)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Text(track.title)
+                    .font(.title2.bold())
+                    .lineLimit(1)
+                byline(track)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.bottom, 12)
+
+            ScrubberView()
+
+            transport
+                .padding(.vertical, 12)
+
+            footer(track)
+        }
+        .padding(.horizontal, 24)
+        .padding(.bottom, 8)
+    }
+
+    @ViewBuilder private func byline(_ track: QueueTrack) -> some View {
+        let byline = PlayerWords.byline(artist: track.artist, album: track.album)
+        if let route = PlayedAlbum.route(track, player: player) {
+            Button {
+                navigation.goToPlayedAlbum(route)
+            } label: {
+                Text(byline)
+                    .font(.body)
+                    .foregroundStyle(Palette.quiet)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(PlayerWords.goToAlbum(byline))
+        } else {
+            Text(byline)
+                .font(.body)
+                .foregroundStyle(Palette.quiet)
+                .lineLimit(1)
+                .frame(minHeight: 28)
+        }
+    }
+
+    private var transport: some View {
+        let paged = player.paged != nil
+        let mode = player.repeatMode
+        return HStack {
+            ModeButton(glyph: "shuffle", on: player.shuffle, label: shuffleLabel(player.paged?.scope), enabled: !paged) {
+                if !paged { player.toggleShuffle() }
+            }
+            Spacer(minLength: 0)
+            Button { player.previous() } label: {
+                Image(systemName: "backward.fill").font(.title)
+                    .frame(minWidth: 56, minHeight: 56)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel(NowPlayingWords.previous)
+            Spacer(minLength: 0)
+            Button { player.toggle() } label: {
+                ZStack {
+                    Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: 44))
+                        .opacity(player.isLoading ? 0.35 : 1)
+                    if player.isLoading { ProgressView().controlSize(.large) }
+                }
+                .frame(minWidth: 72, minHeight: 72)
+                .contentShape(Rectangle())
+            }
+            .accessibilityLabel(PlayerWords.playPause(playing: player.isPlaying))
+            Spacer(minLength: 0)
+            Button { player.next() } label: {
+                Image(systemName: "forward.fill").font(.title)
+                    .frame(minWidth: 56, minHeight: 56)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel(PlayerWords.next)
+            Spacer(minLength: 0)
+            ModeButton(glyph: mode == .one ? "repeat.1" : "repeat", on: mode != .off, label: repeatLabel(mode)) {
+                player.setRepeat(nextRepeat(mode))
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func footer(_ track: QueueTrack) -> some View {
+        let route = PlayedAlbum.route(track, player: player)
+        return HStack {
+            AirPlayButton()
+                .frame(width: 44, height: 44)
+            Spacer()
+            Button { showsUpNext = true } label: {
+                Image(systemName: "list.bullet")
+                    .font(.title3)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(upNextLabel(shuffle: player.shuffle, repeat: player.repeatMode))
+            Spacer()
+            NowPlayingMenu(hasAlbum: route != nil, onInfo: { showsInfo = true }) {
+                if let route { navigation.goToPlayedAlbum(route) }
+            }
+        }
+        .foregroundStyle(.primary)
+    }
+
+    /// The sheet's drag to close, from the top half alone: it follows a finger down once it has gone
+    /// dragStartDistance, and closes the sheet let go past dismissDistance - else springs back.
+    private var grip: some Gesture {
+        DragGesture(minimumDistance: PlayerWords.dragStartDistance, coordinateSpace: .global)
+            .onChanged { value in dragY = max(0, value.translation.height) }
+            .onEnded { value in
+                if max(0, value.translation.height) > PlayerWords.dismissDistance {
+                    close()
+                } else {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { dragY = 0 }
+                }
+            }
+    }
+
+    private func close() {
+        navigation.nowPlayingShown = false
+    }
+}
+
+/// Shuffle and Repeat on the transport: pressed while on (VoiceOver's "selected"), tinted the accent while on - and
+/// Shuffle, during a library's shuffle, on and dimmed, its tap doing nothing (that order is the shuffle).
+private struct ModeButton: View {
+    let glyph: String
+    let on: Bool
+    let label: String
+    var enabled = true
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: glyph)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(on ? Palette.accent : Color.primary.opacity(0.7))
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .disabled(!enabled)
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+}
+
+/// Behind it all, the cover again - blurred to a wash and dimmed, asked at the size the big cover is, so it is the
+/// same picture from the cache.
+private struct Backdrop: View {
+    let cover: String?
+
+    var body: some View {
+        GeometryReader { space in
+            CoverImage(id: cover, size: 360)
+                .scaledToFill()
+                .frame(width: space.size.width, height: space.size.height)
+                .clipped()
+                .blur(radius: 60)
+                .overlay(Color.black.opacity(0.55))
+        }
+        .ignoresSafeArea()
+        .accessibilityHidden(true)
     }
 }
