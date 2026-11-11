@@ -513,3 +513,389 @@ paused records the new song's start before stopping (`begin` sets `held`, and `r
   the next press plays on from where it was; the app's own pause - ▶; song 10 run to its end - ▶, and a
   press plays it again; song 1 tapped after a pause - all three beeps, the first as loud.
 - docs/ios.md says how a pause works now (it said the output stopped after a minute, to save battery).
+
+## Phase 1: the Core (app 0.2)
+
+Phase 1 is the player. Its Core - everything in DeadwaxKit that isn't a screen - was built first, as six slices
+in parallel, each in a worktree of its own: the server's loudness route, Up Next and resume (one slice, p1/queue),
+the Library's rules (p1/library), Normalization, plays and Info's words (p1/levels), the engine (p1/engine), and
+the API layer (p1/api). Each was built from a spec read off the web app and the server at 2.1.0, reviewed
+adversarially (every finding checked against the code and the source it ports, mutations included) and fixed.
+The server's slice is on main as **deadwax 2.1.1** (the route) and **2.1.2** (the review's tests), merged into
+`ios` (40bd97e) before the rest; notes/player-normalization.md "The iPhone app's loudness route (2.1.1)" has it.
+The five Swift slices were merged into one branch, `p1/merge` from 40bd97e: p1/api, p1/engine, p1/library and
+p1/levels with no conflict, then p1/queue (`--no-ff`, none either) - see "The merge" below.
+
+**Not built yet: the screens** (the specs' screens.md: the tab bar, sign-in, the Library, the album page, the
+queue menu, Now Playing and the mini player, Info, You). The Phase 0 app runs on the new engine (its own keys,
+unique across plays; the streaming cache kept across launches; Normalization Off, no factor; the lock screen
+without the queue's index and count), but nothing in it calls Up Next, resume, the Library's rules or
+Normalization's yet, and `MARKETING_VERSION` is still 0.1 (ios.yml and check_project.py pin it) - 0.2 comes
+with the screens.
+
+**The decisions** that settled the specs' open questions, binding on all of it (D1-D13):
+
+- **D1** Two tabs, Library and You, Library first. Debug sits under You for `isAdmin` (a Navidrome admin,
+  break-glass, or anyone with logins off), and Phase 0's test screen moves there, its downloads folder kept.
+- **D2** The Library opens on Albums ("Your albums", or "Albums" with logins off); a personal user also gets an
+  "All music" heading with one "All albums" row (the store's scope). Five sorts with the web's ids
+  (`alphabeticalByArtist` the default, `alphabeticalByName`, `newest`, `byYearDesc`, `byYearAsc`); grid or list
+  per device, grid by default; the index (letters for Artist and Title, decades for Year) only at 50 albums or
+  more and never while finding; New marks. The last album_index answer and its ETag are kept on disk per
+  (server, user, scope); album_index gets 30 s to answer.
+- **D3** Normalization is the web's rule. An entry's gain is fixed at its first open, waiting at most 20 s for
+  the first song of a play (a join never waits); every album-level entry of one album shares ONE decision for
+  the queue's life; FLAC only; Navidrome's replayGain is not used; the "no answer in time" words as levels.md
+  proposed; Off's note without the "Maximum quality" clause; the loudness answer carries `algorithm`
+  (loudness.ALGORITHM_VERSION); raw values over the wire, and the phone applies gain_for with reserve 0.
+- **D4** Up Next: an edit that would change a next song already scheduled on a player node is HELD (the engine's
+  replaceUpcoming answers false) and made at the next song change - the song being heard is never touched.
+  Paged state and withMore are ported, with no shuffle feed in Phase 1; Next and Previous while paused keep the
+  pause, as the web's do; the lock screen no longer gets the queue's index and count, and its shuffle and repeat
+  commands stay disabled; "Shuffling your whole library" is ported as it is.
+- **D5** Resume: the label "iPhone"; the device id as the web makes it (16 characters), kept in UserDefaults
+  under `deadwax-player-device`; no album fetch after a pick-up; an unsent save retried at the next trigger, at
+  most every 30 s; `paged` and `pagedRounds` carried through.
+- **D6** Plays: a ListenTracker as plays-words.md has it; failures dropped as the web drops them, through one
+  PlayReporter, with `time` always set on a submission.
+- **D7** Errors: an APIFailure (status, method, path, detail, why, kind, busy - or offline, timeout, other) and a
+  port of ErrorWords; a 401 on a stream stops the queue at that song and asks /me; a player failure's raw words
+  only in Debug's "Last failure".
+- **D8** Info: the decision applied to the song playing; the artist card the name only; the Gapless row always
+  "On"; "Set it up in Server settings" opens /player/ in Safari.
+- **D9** The engine: the output latency subtracted from every position; the stream cache's limit 2,000,000,000
+  bytes, the least recently played out first; fetches of songs skipped past cancelled and their parts deleted; a
+  seek past what has arrived waits (busy).
+- **D10** At launch, /me failing without a 401 shows a can't-reach screen (the UNREACHED words, Try again, Change
+  address, the detail for seesDetail).
+- **D11** The Play Next / Play Last notice: a capsule above the mini player for 5 s.
+- **D12** The id bridge is asked only when `hasLibrary`.
+- **D13** ui/test/iostraces.sim.cjs runs ios/scripts/export-traces.cjs --check, so a change to the TypeScript
+  rules the Swift ports mirror fails in tests.yml too.
+
+D1, D2's screen, D8's, D10 and D11 are the screens'; the Core holds only the rules they draw by.
+
+### Up Next and the queue
+
+**Ported**: lib/upNext.ts and the queue parts of playQueue.ts are UpNextTypes.swift, UpNext.swift and
+UpNextView.swift - every type, function and word (startUpNext, toppedUp, withRepeat, withShuffle, withNext,
+withLast, withoutKey, movedKey, withoutAdded, jumpedTo, onward, backward, pastCopies, withMore, upNextView).
+Randomness is passed in (`random`, a number in [0, 1)) and drawn in the TypeScript's order, so the same numbers
+make the same queue. `QueueTrack(song:albumId:albumName:...)` is the web's toQueueTrack, its album filling in
+what the song leaves out; `Repeat` is the device's own setting (`deadwax-player-repeat`), never saved with the
+queue. Phase 0's PlayQueue.swift is untouched (the Phase 0 app still uses it).
+
+**QueueController** is usePlayer.ts's queue rules over an `EngineLink` protocol (play, restore,
+replaceUpcoming, skip, seek, resume, stop, heard): catching up with the engine, held edits, the top-up after 2 s
+(half a short song's length - its decoded length, else its tags'), Next and Previous, the queue's end, a failed
+song's skip, putting a saved queue back. Tested against a fake engine (pure Core, so Linux can run it too); it
+replays no traces.
+
+**D4 under the engine** has two consequences, both pinned by tests:
+- A row's tap is the exception. A jump the engine refuses as an edit (in a song's last ~2.5 s, when the next
+  song is already on a node - and during a seek on its way, where the web's jumpTo does nothing) plays the queue
+  afresh from the row, catching up first in case the engine joined meanwhile, and makes a change already held
+  after it: the jump leaves the song heard anyway.
+- Repeat One turned on in a song's last ~2.5 s, with the next song scheduled, applies after the join and repeats
+  the NEXT song; Repeat turned off there lets the scheduled copy play once more. The web repeats, or stops
+  repeating, the song being heard.
+
+**Failures**: `skipFailed()` acts only while `intendsToPlay` (afterFailure's stop): a paused phone stays paused,
+and the retry of a load failure stays the app's.
+
+**Held to the TypeScript**: ios/scripts/export-traces.cjs compiles upNext.ts and playQueue.ts and records 150
+seeded traces (the state after every op), each scenario upnext.sim.cjs checks plus more, and digests of
+upnext.sim's 2,000 property runs; UpNextTraceTests replay all of it, and the Swift port runs 2,000 wider property
+runs of its own (lists of 1-12). **Found and left on main**: every one of upnext.sim.cjs's 2,000 property runs
+starts from a ONE-song list - `seeded(run + 1)`'s first number is under 0.016 for every seed up to 2,000, so
+`1 + pick(6)` is always 1. The fix is the web's (seed from spread values, or drop the first draw), then the
+exporter run again so property.json follows.
+
+### Resume
+
+**Ported**: lib/resume.ts is Resume.swift - windowOf, toSave, relevel, savedLevels, fromSnapshot (every check in
+the web's order), resumed (every branch), shuffledTrack, pickedUpWords, changedSince, saveDue. The snapshot is
+written and read by hand (SnapshotJSON.swift's `WebJSON`) as JSON.stringify and JSON.parse do it - escapes,
+Number-to-String, array-index keys first, Object.prototype's names, the cap counted in UTF-16 units - because the
+phone's text must be the web's unit for unit (a queue saved on one is put back by the other) and JSONEncoder drops
+nils, writes `\/` and writes 200.0. The reader keeps a stack of its own: recursing overflowed a 512 KB test thread
+below 900 levels of nesting in a debug build. ResumeModels.swift is the wire (QueueAnswer, KeptQueue,
+QueueSaveBody, QueueAtBody, SavedQueue), each property named as its JSON key, as SignInBody is. DeviceID.swift
+makes and reads the device id (D5).
+
+**ResumeController** is useResume.ts's createResume as a state machine over ResumePlayer, ResumeServer and
+ResumeClock protocols, so Linux can test it too: observe, position, start, background, foreground, stop. Its
+tests replay resume.sim.cjs's hook checks scenario by scenario, at the sim's timings. It replays no traces.
+
+**Held to the TypeScript**: the exporter records 1,741 resume cases (each recorded snapshot also checked against
+a reference writer) and resume.sim's 500-run round trip (40 kept whole, all 500 digested); the Swift tests write
+every snapshot exactly as the web does and read every text the web wrote as the web reads it, and the Swift port
+of the run generator makes the web's texts at every one of the 12,500 steps.
+
+**Lessons**: Swift Testing dies with "Index out of range" (signal 5) and names no test, so the resume tests read
+requests through `ResumePage.ask(kind, n)`, which records an issue instead; bound every loop that calls a
+function under test (an unbounded one hung the run under a mutation); `x[key] = try #require(...)` picks the
+wrong overload and warns - bind to a let first; write `#require(v as Bool?)` for an optional Bool.
+
+**Mutations** (the review's, 42): 36 caught at first; the two real gaps (M40, tick's fallback to the tags'
+duration; M36, the 0.5 s a queue put back is let go at) have tests now, as do four on the refused jump. Left
+alive as near-equivalent, with no test: M34 (newer()'s `>` against `>=`), M35 (`idsRev` set on a position save -
+/queue/at answers the unchanged ids_rev) and M39 (`countFrom` not reset in take).
+
+### The Library's rules
+
+DeadwaxCore holds the web Library's rules as Sendable value types on Foundation alone: `Fold` (foldName and
+findText), `AlbumTime` (Date.parse and the month headers), `Shelf` and `ShelfIndex` (five sorts, the two readings
+of Recently added, the headers, Find, the index), `AlbumIndexState` (albumIndex.ts's one list per scope, plus the
+phone's own pieces - the 304 against the ETag sent, a list restored from disk, and `clear()` with an epoch so
+nothing asked before a sign-out lands after it), `NewMarks` and `MyLibraryState` (the New marks and
+"cleared when you open it"), `StarredCountWatch`, `LibraryWords` and LibraryModels.swift (`IndexAlbum` read
+leniently - only `id` required, since the dev stand-in's `created` is a float and synthesized decoding would
+lose the whole Library over it).
+
+- **Comparing like JS**: fold keys compare as UTF-16 code units (`FoldKey`). Swift's String `<` and `contains`
+  work on canonical Characters: they order Hangul jamo and astral ideographs the other way, and can't find "바"
+  in "방탄". Final_Sigma is done by hand (`JSText.lowercase`).
+- **Dates follow V8's ISO parser**: offset hours 0-23 and minutes 0-59; 24:00 only with every fraction digit 0;
+  the fraction read as V8's ReadMilliseconds reads it (nine significant digits, scaled by at most nine:
+  ".0123456789" is 123 ms); a time with no zone is local, with V8's "former" rule at the clock changes; days
+  proleptic Gregorian, month headers from the UTC month. A space in the T's place goes to V8's LEGACY parser,
+  which reads a year 0-99 otherwise ("0012-05-06 00:00Z" is 5 December 2006), so the port reads a space only after
+  a whole date with a year outside 0-99 and says nil ("Date unknown") wherever the legacy parser alone would read
+  it. Navidrome sends RFC 3339 with a T. A differential of 20,068 strings in four zones (80,272 comparisons)
+  against Node 20.12.2's Date.parse found no string read to a different value; 7,176 that V8's legacy parser reads
+  are nil here, each of a kind AlbumTime's comment names (dates.json's `legacy` lists them, with what V8 makes of
+  each).
+- **Recently added, yours**: stars chain into moments - a star at most 30,000 ms before the previous one joins its
+  moment, 30,001 ms starts a new one.
+- **Held to the TypeScript**: ios/scripts/export-library-vectors.cjs compiles lib/shelves.ts, owned.ts's
+  foldName, myLibrary.ts, appFrame.ts and yourLibrary.ts with tsc, runs albumIndex.ts and useMyLibrary.ts as real
+  modules against stand-ins for the network, and writes Fixtures/library/ (dates, fold, index, marks, seen,
+  shelves, store, words: seeded, ASCII, never edited by hand) - 2,634 fold names (with Mc, Nl and No as they stand
+  after NFKD; no Lt survives NFKD), 1,410 date strings in UTC, New York, London and Lord Howe plus 16 legacy
+  kinds, 21 lists with 5 sorts and both readings plus Finds, 84 index fits, the 30,000/30,001 ms moments, and
+  traces of the real store and seen modules.
+- **Contract**: tests/test_ios_library_contract.py holds the models to INDEX_FIELDS (only id required),
+  album_index's `{albums, truncated}`, AlbumScope and SCOPE_LIST, `_entry`'s keys (artist and album never null),
+  my_library's answers, `Seen`, and the break-glass name.
+- **Mutations**: the review's 16 and 8 more on the date code, all 24 caught.
+
+### Normalization, plays and Info's words
+
+The web asks deadwax for a levelled copy (`&level=`); the phone plays the original and multiplies every decoded
+sample by one Float. So DeadwaxCore takes the web's setting and rule and the server's gain rule, as pure Swift.
+
+- **The setting** (`Normalization`, Levels.swift): auto, song, album, off; Automatic by default, UserDefaults key
+  `deadwax-player-normalization`, read as the web reads it (`read`: "song", "album", "off", anything else
+  Automatic); the web's labels and notes, Off's without "unless Maximum quality converts it" (D3). `QueuedAs`,
+  `Level` (album, track), `levelFor`, `relevel` and `Song.isFlac` are the web's.
+- **The gain** (`gainFor`): src/loudness.py gain_for line for line, reserve 0, Python's `round(x, 6)` before the
+  floor, FULL_DB written as Python's repr of it. `gainMultiplier` is worked in Double and rounded to a Float
+  once; `AppliedLevel.multiplier` is nil for Off, a song that isn't FLAC, anything played as it is and exactly
+  0 dB, so those play bit for bit. A measured loudness with a NULL peak plays as it is (the phone's own rule: a
+  peak of 0 would mean no limit, and the engine has no limiter).
+- **When** (D3): `LevelDecisions`, one per queue, keyed by Up Next's key. An entry is decided at its first open
+  and keeps it; an album's album-level entries are all decided from the answer in hand when the first was (none
+  included), so an album never steps. `settled(key:level:song:)` says what an entry will play at before it is
+  opened, and Info reads that - never a fresh decision on the live answer. Only the first song waits
+  (`LevelWait`, at most 20 s, never for a song the answer doesn't list or one not levelled); `LoudnessAsking`
+  reads, warms when unmeasured, reads every 5 s while measuring, and reads once more after a warm says
+  not_levelled (the read says why). LoudnessModels.swift is the route's answer (`AlbumLoudness` with its
+  `AlbumLevel` and `SongLoudness`; a state this app doesn't know decodes as unmeasured), the warm's (`WarmAnswer`)
+  and `LevelAnswer`, the shape Info's words are written against, which the phone makes from what it applied
+  (`levelAnswer`).
+- **Words**: Debug's `describeLevel`, About's `aboutLevel`, `soundRows` and `formatWords`, verbatim; every toFixed
+  through `jsFixed` (JS rounds an exact tie away from zero, printf to even); Info's numbers rounded as levels.py
+  rounds its own (half-even: +0.125 reads "+0.12"); D3's two lines for no answer in time; Gapless always On (D8).
+  `AboutCard.about` is aboutRows' cards, the artist card the name only (D8); `AboutDiscTitle` reads `disc` as
+  JS's Number() does (" 2 ", "2.0", "0x2" and true are discs), apart from the routes' Int-reading `DiscTitle`.
+- **Plays** (D6): the web's rule, `Listen`, `PlayReport` (now playing, or a play with its time in whole
+  milliseconds) and `ListenTracker`, usePlayer's bookkeeping: nothing counted before `began()`, and at a join the
+  old song's rest counts to it, the clock restarting there.
+- **Held to their sources**: ios/scripts/export-level-vectors.cjs compiles the web's TypeScript and runs
+  ios/scripts/level_vectors.py (44 gain_for cases: the spec's 41, the route's example album, a hi-res album played
+  by the phone and by the web), writing Fixtures/levels/ (levels-vectors, info-vectors, plays-vectors), which the
+  Swift tests, tests/test_ios_levels.py and ui/test/ioslevels.sim.cjs read.
+- **libm**: the vectors are made on macOS; CI's pytest runs on Linux, whose glibc log10 isn't correctly rounded
+  (five peaks' dB an ulp apart, by an emulation of e_log10.c). So pytest compares what log10 and pow make within
+  a few ulps, and each case carries `log10_stable` (its gain and held unchanged with log10 1 to 4 ulps off). Only
+  the 24-bit largest sample isn't (its limit is exactly 0): Swift holds it to the rule's property, and both
+  suites pin that set. Under the emulation, 6 of test_ios_levels.py's tests failed before that and all pass now.
+- **Mutations**: 15 (the review's 11 and four on the fixes), all caught.
+- **Left from the first review, not changed**: just after a warm the book holds `unmeasured` for up to 5 s and
+  `LevelWait.shouldWait` doesn't wait on that, so the first play of a never-measured album would be fixed as
+  unmeasured - the app's LoudnessBook should record the warm's 202 `measuring` as measuring, or shouldWait take
+  a warming flag; `gainFor` and `jsFixed` can give -0.0, which nothing shows today.
+
+### The engine
+
+From specs/engine.md with D4 and D9, then the review's fixes (DeadwaxAudio; its pure arithmetic in Core).
+
+- **Gain** is a source wrapper: `GainedSource.wrap(source, factor:)` returns the source itself for nil or exactly
+  1.0 (Off is the decode, bit for bit), else a `vDSP_vsmul` of each channel of each buffer as it is read, so every
+  reopen carries the entry's one factor. No limiter. Measured: the 44.1 -> 48 kHz lane carries a full-scale tone's
+  inter-sample peak to +3.01 dBFS (R10).
+- **Keys**: `EngineTrack {key, audio, song, open}`, `audio` = `"<id>|<level or off>"`. `replaceUpcoming(tracks)
+  -> Bool` (synchronous) replaces Phase 0's replaceTracks: refused unless the song heard keeps its index, its
+  audio and the keys before it; items kept while their audio matches, re-keyed; a next song not yet on a node let
+  go and the new one opened after the last kept; one already on a node holds the edit (false, D4); a song added
+  after the queue's end opened.
+- **One heard position**: the render less `latency()` (D9). Pauses, route changes, media resets and failures go on
+  from the heard frame. A song change is published when it is heard, on its own timer between completions;
+  entries are forgotten a second and the latency behind the render; the queue's end stops the output after
+  latency + 0.1 s. `EnginePosition {key, index, seconds, length?}` - length the whole song's, after a seek too.
+- **Routes and resets** go on from Core's `HeardEstimate.atStop`: the last reading carried on for at most 1 s,
+  capped, less the OLD route's latency; the mixer reconnected at the hardware rate. Ended stays ended and failed
+  keeps its words through a new route and through `rebuild()`, which never calls into the dead engine.
+- **Paused loads nothing**: restoreQueue, or a skip or seek while paused, opens nothing and reports no
+  fileRate/fileChannels until play opens the song; a pause keeps its own song's rate.
+- **Seeks** past what has arrived wait (Loading); a deep seek says `busy` and is read again at once.
+- **Failures**: `AudioFailure {description, kind, status}` (network, decode, unsupported, signedOut, other). A
+  next song's 401 waits for the song heard to end, then stops the queue there (D7).
+- **The streaming cache** (Core's `StreamCache` and `StreamCacheFolder`, the app's SongFiles):
+  `Caches/deadwax/stream/<id>.<suffix>`, kept across launches now. A `layout-1` marker records the layout, and the
+  folder 0.1 left (its fetches wrote under the song's own name) is emptied once. A fetch writes `.part`, renamed
+  only when Content-Length is met; a cancel before `start()` makes nothing. Past 2,000,000,000 bytes the least
+  recently played go first - never the song heard, the next, or a live fetch. Fetches of songs skipped past are
+  cancelled from the EARLIER of the state's index and the engine's own (`StreamCache.kept`): a state reaching the
+  main thread late, after a quick Previous, used to cancel the fetch the engine had just opened (reasoned from
+  the code, never reproduced). Sizes are read as NSNumber or as UInt, which Linux's swift-foundation gives.
+- **Tests**: StreamFetchTests wait by suspending, not blocking - nine blocking in parallel stalled every fetch on
+  this 8-core Mac, and a 3- or 4-core runner would have stalled on the original six. 13 mutations (the review's 8
+  and reverts of the five fixes), all caught.
+- **Not built**: the spec's CachedStreamSource (6.2), 3.4's staging, 4.3 #5's rate-change test, and 5.2 #10 (a
+  prefetch after every replaceUpcoming that changes the next song - for when Up Next is wired). Minor and left:
+  `stop()` calls `files.keep([])` on main while the engine's stop is still queued, so a next-song fetch opened in
+  that gap runs to the end and is cached.
+
+### The API, models and errors in the listener's words
+
+- **Routes.swift** names all 23 routes the app calls, one `Endpoint(method:path:query:)` a line in the form
+  tests/test_ios_contract.py reads, all listed in `Routes.all`. `Routes.timeouts` gives album_index 30 s (D2),
+  everything else the transport's 8 s; `CoverSize` is row 128, tile 400, hero 1024 (and the lock screen's 1024).
+- **Models.swift** reads Navidrome's pass-through answers leniently: a field of another type is absent, and a song
+  that can't be read is left out rather than losing the album. Me's version, permissions and
+  permissions_unverified are optional, so an older server still reads. `NavidromeStatus` was added at the merge
+  (below).
+- **APIFailure** replaces Phase 0's DeadwaxError (kept as a typealias, so Phase 0's screen reads as it did). It
+  keeps everything api/http.ts's ApiError keeps - status, method, the route with its query, detail, why, kind,
+  busy, FastAPI's 422 list - and when nothing answered it is `.offline`, `.timeout` or `.other`. A cancelled task
+  is a CancellationError, never a failure. The client tells `onSignedOut` of a 401 from any route but the
+  sign-in's, with the session the request went out under. `fetch(..., ifNoneMatch:)` returns `.unchanged` on a
+  304; URLSessionTransport keeps no cache of its own, so the 304 reaches it.
+- **Offline is narrower than the web's, deliberately**: only the codes meaning no network or no host (-1009,
+  -1005, -1004, -1003, -1006, -1020, -1018). TLS failures, an answer that isn't HTTP and ATS's refusal are
+  `.other`, told to tell whoever runs deadwax - checking the connection can't fix a certificate. The web says
+  "Can't connect" for all of them only because fetch's TypeError can't tell them apart. D10's can't-reach screen
+  gets every /me failure but a 401 either way. ClientTests.whichTransportFailuresAreOffline pins every code.
+- **ErrorWords.swift** ports lib/errorWords.ts, signIn.ts's sentences and the media errors' words, its patterns
+  written so ICU matches what JavaScript matches: `\b` as ASCII lookarounds, `/i` as both cases of each letter,
+  JavaScript's own `\s` set, `$` as the end of input; trim and `===` on JavaScript's terms; `upperFirst`
+  upper-cases only a BMP first character, as charAt(0) does (U+10428 stays U+10428).
+- **Access.swift** ports access.ts (can, isAdmin, seesDetail, isBreakGlass, hasLibrary - D12) and signIn.ts's
+  afterSignIn.
+- **Held to the TypeScript**: ios/scripts/export-error-words.cjs compiles errorWords.ts and signIn.ts and writes
+  Fixtures/errors/error-words.json (77 errors in 10 ways, 105 plumbing strings, 40 job reasons, the sentence
+  cases), which ErrorWordsTests replays.
+- **Mutations**: four gaps in the first commit (the server's required query names unchecked, two offline codes
+  untested, the BMP guard) found by mutation and closed; six mutations, all caught.
+
+### How the ports are kept in step with the web
+
+Every pure rule the phone shares with the web is held to the web's own TypeScript, compiled and run - never to a
+reading of it - by a committed exporter that writes the fixtures the Swift tests replay, and a sim that runs the
+exporter with `--check` so tests.yml (which runs every sim, each on its own) fails when the web moves:
+
+| exporter (ios/scripts/) | what it runs | fixtures (Tests/DeadwaxCoreTests/Fixtures/) | sim (ui/test/) |
+| --- | --- | --- | --- |
+| export-traces.cjs | upNext.ts, playQueue.ts, resume.ts; hashes 23 pieces of usePlayer.ts (upnext/'s `made_from`) and useResume.ts's createResume (resume/'s) | upnext/, resume/ | iostraces.sim.cjs (D13) |
+| export-library-vectors.cjs | shelves.ts, owned.ts's foldName, myLibrary.ts, appFrame.ts, yourLibrary.ts; albumIndex.ts and useMyLibrary.ts as modules; Node's Date.parse | library/ | ioslibrary.sim.cjs |
+| export-level-vectors.cjs | loudness.ts, resume.ts's relevel, streamWrap.ts's isFlac, the words, aboutRows, the play rule, toFixed; src/loudness.py through level_vectors.py | levels/ | ioslevels.sim.cjs |
+| export-error-words.cjs | errorWords.ts, signIn.ts | errors/ | ioserrorwords.sim.cjs |
+
+`--check` makes everything again in memory and compares it byte for byte with what is committed, so a hand edit
+fails too. **A web rule changed**: its sim fails; run the exporter and commit what it writes; that touches ios/,
+so ios.yml's Swift run says whether the port still agrees - and fails until the Swift is changed to match. **The
+two controllers replay nothing** (QueueController and ResumeController are ported by hand), so their pieces of
+usePlayer.ts and useResume.ts are hashed into the fixtures' `made_from`, function by function, each found exactly
+once: a change fails naming the piece and the Swift file - port it first, then run the exporter. The server's
+side is the Python suite's: tests/test_ios_contract.py, test_ios_library_contract.py and test_ios_levels.py read
+the Swift source and hold it to the routes, models and constants it relies on, so a server change that would
+break the app fails where the server is changed.
+
+### The merge (p1/merge)
+
+- **Folded**: `Level` (p1/queue's Level.swift and p1/levels' Levels.swift) and `Normalization` with `relevel`
+  (p1/queue's Normalization.swift and Levels.swift) were each declared twice. The queue slice's copies were the
+  levels slice's to the character (CaseIterable included, after its review), so Level.swift and
+  Normalization.swift were deleted and Levels.swift's kept: the same cases and raw values, the same default, the
+  same storage key and the same reading of a stored value; resume's callers (fromSnapshot, resumed, savedLevels,
+  the tests) compile against it unchanged. A scan of every type and function name declared in Sources/ (by
+  nesting, comments and strings blanked) found no other name declared twice.
+- **Added**: `NavidromeStatus` (Models.swift), the status route's `{configured, ok, server, problem}`, so the route
+  Routes.swift names has a model the contract checks (ClientTests decodes its three shapes).
+- **The contract, extended** (tests/test_ios_contract.py: 36 tests after the api slice, 46 now): resume's models
+  against play_queue.answer and kept_view (and the store's schema: every nullable column optional in KeptQueue),
+  QueueSave and QueueAt (both `extra="forbid"`: exactly their fields, the server's required ones non-optional),
+  the saves' answers, the device id's alphabet and length and the label against DEVICE_PATTERN and LABEL_PATTERN,
+  and Resume's window, caps and client name against play_queue's; AlbumLoudness, AlbumLevel and SongLoudness
+  against levels._loudness_answer, _album_level and _song_entry (with `algorithm` required and the states the
+  server says); LevelAnswer against describe()'s answer and Level against the route's Literal; NavidromeStatus
+  against each of the status route's three answers; a PlayReport's query read from Plays.swift and sent through
+  the real scrobble route; SeenBody's two shapes posted to /me/library/seen. Required fields are a model's
+  non-optional lets wherever in DeadwaxCore it is declared (test_ios_library_contract.py reads every Core file now
+  too). The route count is checked by name: every `static let X = Endpoint(` is in `Routes.all`, once. 29
+  mutations, one or more per model (a field renamed, an optional made required, a raw value renamed, a route left
+  out of `all`), each restored byte for byte: all 29 fail.
+- **Near-duplicates left**, each read the same way where both apply:
+  - `AboutTrack(song:)` and `QueueTrack(song:albumId:albumName:...)` (the web's toQueueTrack): the same for a song
+    that carries its own artist, album, album id, cover and a title; for one that doesn't, QueueTrack falls back to
+    the album's and to the id for a title, AboutTrack to "" and nil. The web's About is drawn from the queue's
+    entry, so the screens should make About's track from the QueueTrack (an `AboutTrack(track:)`), not from the
+    Song.
+  - `AboutAlbum` / `PressingRow` (About's, all optional, numbers as Double, read by JS's rules) and `Album` /
+    `StoreRow` (the routes', `id` required - and `path` for a row - numbers as Int): the same bytes read the same
+    for every answer the server sends; they differ only on malformed ones (a year of 1975.5, a disc written
+    " 2 ", a row without an id). `AboutDiscTitle` (JS's Number()) and `DiscTitle` (Int) likewise.
+  - `AboutCard.trackTime` and `discHeadings`/`discTitleMap` (format.ts and discTitles.ts, About's) have no second
+    copy in Core; the album page will need the same headings and should call these.
+  - `PersonalLibrary.has(me)` and `Access(me:).hasLibrary`: the same rule (logins on, not break-glass), each with
+    its own `breakGlassUser = "deadwax"`, both pinned to auth.BREAK_GLASS_USER.
+  - Three JS trims (`WebText.trim`, `JSText.trim`, `ErrorWords.trim`) over the same set of scalars, and two
+    `same` (UTF-16 equality): identical answers. `WebText.number` and `WebJSON.number` (both JS's String(n)) agree
+    from 1e-4 to 1e16; outside it only WebJSON lays the digits out as JS does (WebText's callers are rates and
+    disc numbers).
+  - DeadwaxClient's private `LevelWarmed {state?}` and LoudnessModels' `WarmAnswer {state}`: the client hands the
+    state on as a String ("" for none), which the app wraps in a WarmAnswer for `LoudnessAsking.afterWarm`.
+  - `DeadwaxClient.scrobble(songID:submission:time:)` builds its own query; `PlayReport.query` builds the same
+    one (a play always with its time, which the client's signature leaves optional).
+  - Phase 0's `PlayQueue` (still the Phase 0 app's) and Up Next's `previousAction`: the same 3 s rule.
+
+### Verified (Phase 1's Core, p1/merge, 2026-11-10)
+
+All on James's Mac (8 GB; heavy builds one at a time), Xcode 27.1's toolchain:
+- `swift test --package-path ios/DeadwaxKit`: **DeadwaxCore 389 tests in 53 suites, DeadwaxAudio 54 tests in 2
+  suites**, all passing, no compiler warning (Phase 0 ended at 64 and 13).
+- xcodebuild, the Deadwax scheme, Debug, `generic/platform=iOS`, CODE_SIGNING_ALLOWED=NO: BUILD SUCCEEDED (one
+  line from appintentsmetadataprocessor, none from the code).
+- The full Python suite: **4004 passed** (2.1.2's 3909, and 95 from Phase 1: test_ios_contract.py 8 -> 46,
+  test_ios_library_contract.py 8, test_ios_levels.py 49); pyflakes clean on the contract tests.
+- Every ui/test/*.sim.cjs on its own (72), the four ios*.sim.cjs among them: all pass.
+- `python3 ios/scripts/check_project.py` ok; `bash -n` on ios/scripts/*.sh.
+- Each slice's own mutations, above; the contract's 29 at the merge.
+
+### Not verified
+
+- **DeadwaxCore on Linux**: no Linux toolchain here, and none of Phase 1's Core has been compiled on Linux.
+  Everything new was written for swift-corelibs / swift-foundation (no Apple-only import; file sizes read as
+  NSNumber or UInt, TimeZone, Unicode.Scalar properties, decomposedStringWithCompatibilityMapping, classic
+  URLError codes), but ios.yml's ubuntu job (swift:6.4.1-noble) is the first real compile.
+- **Nothing ran on the phone**: the engine's risks E1-E9, the late-state race and its fix, a 304 through
+  URLSession for a request carrying its own If-None-Match (with `urlCache` nil), the per-session and per-request
+  timeouts holding together. Phone checks to add with the screens: turn Repeat One on in a song's last 2 s
+  (the next song repeats - D4's consequence); tap an Up Next row in a song's last 2 s (it plays).
+- **The fixtures were written on Node 20.12.2; CI runs Node 22.** If Node 22's ICU or tz data differ (the
+  Library's fold names and dates are the likeliest), a sim fails on the first CI run and its fixtures need
+  writing once on Node 22.
+- **libm**: the glibc check is an emulation of e_log10.c, not glibc; tests.yml's pytest on ubuntu is the test.
+- **A real Navidrome**: every Navidrome in the suites is a fake, as before - the loudness route included.
