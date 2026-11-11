@@ -21,7 +21,7 @@ struct AccountSection: View {
             } label: {
                 HStack {
                     Text(row.label)
-                        .foregroundStyle(SignInLook.danger)
+                        .foregroundStyle(Palette.danger)
                     Spacer(minLength: 12)
                     Text(user)
                         .foregroundStyle(Palette.quiet)
@@ -34,7 +34,7 @@ struct AccountSection: View {
             if let problem = row.problem {
                 Text(problem)
                     .font(.footnote)
-                    .foregroundStyle(SignInLook.danger)
+                    .foregroundStyle(Palette.danger)
                     .fixedSize(horizontal: false, vertical: true)
             }
         } header: {

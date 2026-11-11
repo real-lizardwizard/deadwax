@@ -2,11 +2,13 @@ import DeadwaxCore
 import SwiftUI
 
 /// You's Debug (admins only, D1): Phase 0's one screen, moved - Check's report, the test sounds, the hi-res row,
-/// what is playing (with the engine's own words for its last failure, D7), and how long this install runs. The
+/// what is playing (with the engine's own words for its last failure, D7, and an Up Next edit held for the join, D4),
+/// the Library's last album list asks (how many albums, how long - check 1), and how long this install runs. The
 /// address and the sign-in are the app's own screens now.
 struct DebugView: View {
     @Environment(DebugModel.self) private var model
     @Environment(PlayerModel.self) private var player
+    @Environment(LibraryModel.self) private var library
 
     init() {}
 
@@ -18,23 +20,39 @@ struct DebugView: View {
                 hiRes
             }
             playing
+            libraryLists
             Section {
                 Text(model.installLine)
                     .font(.footnote)
                     .foregroundStyle(Palette.quiet)
             } footer: {
-                Text(version)
+                Text(YouView.appVersion)
             }
         }
         .navigationTitle("Debug")
         .task { if model.report == nil { await model.check() } }
     }
 
-    private var version: String {
-        let info = Bundle.main.infoDictionary
-        let short = info?["CFBundleShortVersionString"] as? String ?? "?"
-        let build = info?["CFBundleVersion"] as? String ?? "?"
-        return "deadwax for iPhone \(short) (\(build))"
+    // MARK: the Library's lists
+
+    /// Each scope's last album_index answer: a new list (200) or the one kept still standing (304), how many albums
+    /// and how long it took - to count against the web's Library, and to time a big library.
+    private var libraryLists: some View {
+        Section {
+            ForEach([AlbumScope.yours, .store], id: \.self) { scope in
+                if let fetch = library.lastFetch[scope] {
+                    LabeledContent(scope == .yours ? "Your albums" : "All albums") {
+                        Text("\(fetch.albums) albums \u{00B7} \(fetch.status) \u{00B7} \(String(format: "%.2f", fetch.seconds)) s")
+                            .font(.footnote.monospacedDigit())
+                    }
+                }
+            }
+            if library.lastFetch.isEmpty {
+                Text("Not asked yet").foregroundStyle(Palette.quiet)
+            }
+        } header: {
+            Text("Library")
+        }
     }
 
     // MARK: the server
@@ -182,6 +200,9 @@ struct DebugView: View {
             } else {
                 Text("Nothing playing").foregroundStyle(Palette.quiet)
             }
+            if player.holdsAnEdit {
+                LabeledContent("Up Next", value: "An edit held for the next song")
+            }
             if let words = player.lastFailure {
                 LabeledContent("Last failure") {
                     Text(words).font(.footnote).foregroundStyle(.red)
@@ -192,8 +213,5 @@ struct DebugView: View {
         }
     }
 
-    private func clock(_ seconds: Double) -> String {
-        let whole = max(Int(seconds.rounded(.down)), 0)
-        return String(format: "%d:%02d", whole / 60, whole % 60)
-    }
+    private func clock(_ seconds: Double) -> String { Format.clock(seconds) }
 }

@@ -10,7 +10,8 @@ import SwiftUI
 /// shows and again whenever its generation moves (an Add or a Remove, the starred count, older than a minute), pull
 /// to refresh asks now. A list asked again swaps in where the old one was - never emptied, the scroll kept.
 /// Choosing a sort or typing into Find goes back to the top. Tapping the Library tab again scrolls the root to its
-/// top, and takes the store's screen away. Nothing here plays (the gesture rule): a tile opens its album.
+/// top; the store's screen is a page of the tab's own (AppRoute.albums), so the tab's tap pops it with whatever
+/// album is over it. Nothing here plays (the gesture rule): a tile opens its album.
 struct AlbumsScreen: View {
     let scope: AlbumScope
     /// The tab's root - All music's row above your albums, and the tab's tap scrolls it to the top.
@@ -19,7 +20,6 @@ struct AlbumsScreen: View {
     @Environment(LibraryModel.self) private var library
     @Environment(ServerModel.self) private var server
     @Environment(AppNavigation.self) private var navigation
-    @Environment(\.dismiss) private var dismiss
     /// What is typed into Find - the screen's own: leaving it clears it.
     @State private var typed = ""
     /// On screen (not covered by a page pushed over it).
@@ -84,10 +84,9 @@ struct AlbumsScreen: View {
             .onChange(of: typed) { _, _ in jump(proxy, to: .top) }
             .onChange(of: library.sort) { _, _ in jump(proxy, to: .top) }
             .onChange(of: navigation.libraryScrollToTop) { _, _ in
-                // the Library tab tapped with no page of the stack's own on top: the root goes to its top, and the
-                // store's screen (pushed by a link, not a path value) is taken away
-                guard shown else { return }
-                if root { jump(proxy, to: .top, animated: true) } else { dismiss() }
+                // the Library tab tapped at its root: the root list goes to its top
+                guard shown, root else { return }
+                jump(proxy, to: .top, animated: true)
             }
         }
         .navigationTitle(LibraryWords.title(scope, personal: personal))
@@ -272,16 +271,13 @@ private struct AllMusicRow: View {
     }
 }
 
-/// The way to the store's albums - All music's row, and an empty library's See All music. A link that pushes its
-/// screen itself: the tab's path holds only AppRoute values, and the shell's AppRoute has no case for an Albums
-/// screen (the merge can add `.albums(AlbumScope)` and make this `NavigationLink(value:)`).
+/// The way to the store's albums - All music's row, and an empty library's See All music: the store's Albums screen
+/// pushed on the tab's path (AppRoute.albums), so the tab's tap pops it like any page.
 private struct StoreAlbumsLink<Content: View>: View {
     @ViewBuilder let label: () -> Content
 
     var body: some View {
-        NavigationLink {
-            AlbumsScreen(scope: .store, root: false)
-        } label: {
+        NavigationLink(value: AppRoute.albums(.store)) {
             label()
         }
     }

@@ -94,7 +94,7 @@ struct NowPlayingView: View {
         let byline = PlayerWords.byline(artist: track.artist, album: track.album)
         if let route = PlayedAlbum.route(track, player: player) {
             Button {
-                navigation.goToPlayedAlbum(route)
+                navigation.openAlbum(route)
             } label: {
                 Text(byline)
                     .font(.body)
@@ -171,7 +171,7 @@ struct NowPlayingView: View {
             .accessibilityLabel(upNextLabel(shuffle: player.shuffle, repeat: player.repeatMode))
             Spacer()
             NowPlayingMenu(hasAlbum: route != nil, onInfo: { showsInfo = true }) {
-                if let route { navigation.goToPlayedAlbum(route) }
+                if let route { navigation.openAlbum(route) }
             }
         }
         .foregroundStyle(.primary)

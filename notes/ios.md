@@ -41,18 +41,23 @@ ios/
   Deadwax.xcodeproj/        committed: objectVersion 77, ONE app target, ONE synchronized folder (App/),
                             one local package reference (DeadwaxKit), configs based on Config/*.xcconfig;
                             a shared scheme (xcodebuild -scheme Deadwax needs it) and the workspace file
-  Config/                   Base.xcconfig (bundle id, MARKETING_VERSION 0.1, CURRENT_PROJECT_VERSION 1,
+  Config/                   Base.xcconfig (bundle id, MARKETING_VERSION 0.2, CURRENT_PROJECT_VERSION 2 - 0.1 (1) until Phase 1,
                             iOS 17.0, Swift 5 mode, signing Automatic, `#include? "Local.xcconfig"`),
                             Debug/Release.xcconfig (each includes Base), Local.xcconfig.example (the team
                             id; Local.xcconfig and `device` are gitignored), Info.plist (a plain file)
-  App/                      the SwiftUI app: DeadwaxApp, AppModel (@Observable, @MainActor), ContentView,
-                            URLSessionTransport, SessionKeychain, AudioSessionController,
-                            NowPlayingController, SongFiles (stream cache, downloads); Icon/ loose PNGs
+  App/                      the SwiftUI app (Phase 0's AppModel and ContentView became these in 0.2 - see
+                            "Phase 1: the app (0.2)"): DeadwaxApp (and Palette), Models/ (ServerModel,
+                            PlayerModel and its +Engine/+Resume, LoudnessBook, PlayReporter, LibraryModel,
+                            AlbumIndexStore, AlbumModel, DebugModel), Root/ (the gates, MainTabs), Shared/
+                            (Routes, CoverImage, ErrorNote, Notice), Library/, Album/, Player/, UpNext/,
+                            Info/, You/ (DebugView is Phase 0's test screen); URLSessionTransport,
+                            SessionKeychain, AudioSessionController, NowPlayingController, SongFiles (stream
+                            cache, downloads); Icon/ loose PNGs
   DeadwaxKit/               Package.swift (tools 6.0; iOS 17, macOS 14)
     Sources/DeadwaxCore/    pure Swift + Foundation, Swift 6 mode, tested on Linux
     Sources/DeadwaxAudio/   the engine; every file inside #if canImport(AVFAudio); Swift 5 mode
-    Tests/DeadwaxCoreTests/ Swift Testing, 64 tests
-    Tests/DeadwaxAudioTests/  12 offline-render tests, macOS only
+    Tests/DeadwaxCoreTests/ Swift Testing, 64 tests in Phase 0, 508 in 69 suites at app 0.2
+    Tests/DeadwaxAudioTests/  offline-render tests, macOS only (12 in Phase 0, 54 at app 0.2)
   scripts/                  install.sh (James's), install_helper.py (its JSON/plist reading, in Xcode's
                             python3), check-linux.sh, check_project.py, make-icon.py, make-test-album.py
   README.md                 a pointer to docs/ios.md and this file
@@ -526,7 +531,8 @@ The server's slice is on main as **deadwax 2.1.1** (the route) and **2.1.2** (th
 The five Swift slices were merged into one branch, `p1/merge` from 40bd97e: p1/api, p1/engine, p1/library and
 p1/levels with no conflict, then p1/queue (`--no-ff`, none either) - see "The merge" below.
 
-**Not built yet: the screens** (the specs' screens.md: the tab bar, sign-in, the Library, the album page, the
+**Not built yet: the screens** (built since, as app 0.2 - see "Phase 1: the app (0.2)" at the end; what follows
+was true of the Core alone) (the specs' screens.md: the tab bar, sign-in, the Library, the album page, the
 queue menu, Now Playing and the mini player, Info, You). The Phase 0 app runs on the new engine (its own keys,
 unique across plays; the streaming cache kept across launches; Normalization Off, no factor; the lock screen
 without the queue's index and count), but nothing in it calls Up Next, resume, the Library's rules or
@@ -813,6 +819,9 @@ exporter with `--check` so tests.yml (which runs every sim, each on its own) fai
 | export-library-vectors.cjs | shelves.ts, owned.ts's foldName, myLibrary.ts, appFrame.ts, yourLibrary.ts; albumIndex.ts and useMyLibrary.ts as modules; Node's Date.parse | library/ | ioslibrary.sim.cjs |
 | export-level-vectors.cjs | loudness.ts, resume.ts's relevel, streamWrap.ts's isFlac, the words, aboutRows, the play rule, toFixed; src/loudness.py through level_vectors.py | levels/ | ioslevels.sim.cjs |
 | export-error-words.cjs | errorWords.ts, signIn.ts | errors/ | ioserrorwords.sim.cjs |
+| export-screen-vectors.cjs | SignIn.tsx, SignOutRow.tsx, QueueMenu.tsx, MiniPlayer.tsx, signIn.ts, whose.ts, scrub.ts, discTitles.ts, format.ts; lines of AlbumPage.tsx, NowPlaying.tsx and signInGate.tsx read out by pattern | screens/ | iosscreens.sim.cjs |
+| export-you-vectors.cjs | You.tsx's expressions and words, read out of the source and evaluated as written (136 cases) | you/ | iosyou.sim.cjs |
+| export-gate-vectors.cjs | NeedsNavidrome.tsx, access.ts, errorWords.ts, navidromeCheck.ts, the gate rendered against a Preact stand-in (35 cases) | gate/ | iosgate.sim.cjs |
 
 `--check` makes everything again in memory and compares it byte for byte with what is committed, so a hand edit
 fails too. **A web rule changed**: its sim fails; run the exporter and commit what it writes; that touches ios/,
@@ -1046,3 +1055,207 @@ All on James's Mac (8 GB; heavy builds one at a time), Xcode 27.1's toolchain:
   writing once on Node 22.
 - **libm**: the glibc check is an emulation of e_log10.c, not glibc; tests.yml's pytest on ubuntu is the test.
 - **A real Navidrome**: every Navidrome in the suites is a fake, as before - the loudness route included.
+
+## Phase 1: the app (0.2)
+
+The screens, on the Core above, built as six branches. **p1/app** first, the shell (f736efe): the models, the
+gates, two tabs and a compiling stub for every screen, with the names the parts keep. Then five parts in parallel
+worktrees on it: **p1/app-player**, **-you**, **-library**, **-album** and **-nowplaying**. Each part owned its
+own files, so the five `--no-ff` merges into p1/app had no conflict (a6170b6, 5684244, 14982ed, eb82b6d,
+c75a378). A last commit settled what the parts left to each other. The rule throughout is that the **screens
+draw and Core decides**. A rule a part needed and Core lacked went into DeadwaxCore, tested against the web where
+the web has it. The views draw and call the models from the tap. The app is **0.2 (2)**: Base.xcconfig,
+check_project.py, ios.yml and test_ios_install.py all pin it.
+
+### The shell (p1/app)
+
+Phase 0's one model and one screen are split into models the screens read from the environment.
+
+- **ServerModel** holds:
+  - the address (UserDefaults `address`);
+  - the client;
+  - the session, in the Keychain per server;
+  - /me and Access;
+  - the launch: needsAddress, checking, unreachable (D10), signedOut, ready.
+- **A 401 mid-use.** One under the session in hand (SignInRules.endsSession) brings the sign-in over the app, and
+  the music plays on. One sent under an older session is ignored. Signing in again carries on for the same person.
+  Anyone else starts again through `whenPersonChanges`, which the other models reset on.
+- **/me** is asked again as the app comes to the front and after a song fails. With logins off, a 401 asks again
+  at most once a minute.
+- **PlayerModel** is the player's whole public surface, each member doc-commented with the Core call it makes.
+- **Phase 0's test screen** is now DebugModel and You > Debug, for `isAdmin` (D1).
+- **RootView** runs the gates in order. **MainTabs** has Library and You:
+  - a second tap on the tab shown pops it to its root;
+  - the mini player sits above the tab bar;
+  - the notice capsule shows for 5 s and is announced to VoiceOver (D11).
+- **Shared/** holds Routes (AppRoute, AlbumRoute, AppNavigation), CoverImage, ErrorNote (ErrorWords; the raw
+  words only for seesDetail) and Notice.
+
+### The player's wiring (p1/app-player)
+
+- **The queue** is QueueController over `PlayerEngineLink` (PlayerModel+Engine.swift), Core's EngineLink on
+  PlaybackEngine.
+  - Engine keys are `generation << 32 | Up Next key`. Up Next's keys restart at 0 with each queue, so a state of
+    another generation is dropped.
+  - The generation moves only with a new queue (`beginStart`/`endStart`) and a stop, never with the controller's
+    own replays.
+  - `replaceUpcoming` is the engine's own synchronous answer (false: held, D4). `heard()` is `engine.position()`.
+- **Listens.** An action runs inside `act {}`, and its song change is a new listen. A change found by catching up
+  is the engine running on (`PlayReporter.join`).
+- **Levels.** There is one LevelStore per queue. Each entry is decided at its first open, from LoudnessShelf, and
+  wrapped by `GainedSource.wrap(source, factor:)`; Off and as-it-is are the source itself.
+  - The entry a play, skip or jump named may wait at a LevelGate, for up to 20 s. A join, or a queue put back,
+    never waits.
+  - When the engine takes an edit, the kept entries' decisions follow them (`LevelDecisions.carry`).
+- **LoudnessBook** (main):
+  - It wants the queue's albums and the last 2 album pages shown.
+  - It reads, warms, and reads again every 5 s.
+  - A read's "unmeasured" is held off the shelf until the warm answers.
+  - While a gate waits, it reads that album every second.
+- **Failures.**
+  - The raw words go to `lastFailure`, and /me is asked once per song.
+  - Then `PlayerWords.afterEngineFailure` decides: retry after 1.5 s, skip with its notice, or stop (a 401, or the
+    phone's own failure).
+- **Resume.** There is a ResumeController per `server.person` once /me answered, labelled "iPhone". The put-back is
+  `restoreQueue`, paused, and fetches nothing. Saves run inside background tasks.
+- **The lock screen** shows the entry's fields, with no index or count; its shuffle and repeat stay off.
+  Interruptions, routes and resets are Phase 0's.
+- **Streams** are asked through `ClientBox`, so a sign-in mid-queue streams the next song under the new session.
+
+### The gates and You (p1/app-you)
+
+- **Server address.** Phase 0's field and words, verbatim. What is typed reaches ServerModel only at Check.
+- **Can't reach (D10).** The web's launch sentence (ErrorWords.signInProblem):
+  - UNREACHED when nothing answered, deadwax's own words when it did;
+  - Try again and Change address;
+  - the detail folded under "For whoever runs deadwax". It shows while nobody is known, then only for
+    seesDetail.
+- **Sign in.** The web's elements and order, all from SignInForm, with the password manager's content types. Return
+  moves to the password, then submits. The reason and the problem are announced.
+- **You.**
+  - The headline.
+  - Playback: Gapless On; Normalization's four choices, Off without "Maximum quality".
+  - Account: Sign out and its footnote.
+  - About.
+  - This phone: the address, and Debug for isAdmin.
+  - The version at the foot.
+- **In Core.** YouLines decides You from /me, held to You.tsx by Fixtures/you/ (export-you-vectors.cjs, 136
+  cases, iosyou.sim.cjs). UnreachedLines is the phone's own, hand-tested.
+
+### The Library (p1/app-library)
+
+- **Albums.** The tab opens on "Your albums", or "Albums" with logins off and for break-glass. "All music" and
+  its "All albums" row lead to the store's scope.
+- **Sorts and layout.** Five sorts, saved under `deadwax-player-order`. Grid or list, per device.
+- **Find** filters in place.
+- **Headers and the index.** Headers sit in the flow. The trailing index shows letters or decades, at 50+ albums
+  and never while finding.
+- **New marks** come from GET /me/library. A starred count that moves forgets your albums.
+- **The album index.**
+  - One ask per generation, shared by every screen.
+  - If-None-Match with the kept ETag; a 304 keeps the list.
+  - 30 s to answer.
+  - refreshIfOld as a screen shows, and pull to refresh.
+- **Kept on disk** per (server, user, scope), excluded from backup, and drawn before the first ask. Core's
+  KeptAlbumIndex decides which bytes may be drawn for whom.
+- **At 3,000 albums.** Each Shelf is built once, off the main actor, on lazy stacks. Covers are asked at exactly
+  400 and 128.
+
+### The album page and the queue menu (p1/app-album)
+
+- **The hero** is drawn at once from what opened the page, with the cover asked at 1024.
+- **The badge** has its place held until whose it is is known.
+- **Play and Shuffle.**
+- **The mine block**: Add / Remove, with the placeholder that keeps the songs from moving.
+- **The songs**, with their disc headings and playing bars, then the footer, and the bar's ••• for the album.
+- **AlbumModel** asks for the album, and for the id bridge only with a library (D12). Only the newest answer
+  draws, and a pull to refresh keeps what is shown when it fails.
+- **The queue menu** is a confirmationDialog (Play Next, Play Last, Cancel), carried out in the tap.
+- **New in Core:** AlbumPageRules.swift.
+  - PlayingBars.
+  - AlbumGone: a `{}` answer or a 404 draws the gone line alone.
+
+### The player's screens (p1/app-nowplaying)
+
+- **The mini player.** Cover, title, a second line (the failure, else the artist), Play/Pause, Next and the
+  hairline.
+- **Now Playing.**
+  - The cover over its own blur.
+  - "Artist - Album", which goes to the album.
+  - The scrubber (Core's Scrub; a VoiceOver slider moving 5 s).
+  - Shuffle, Previous, Play/Pause, Next, Repeat, AirPlay, Up Next.
+  - ••• with Info, Go to album and Cancel.
+  - A drag down past 110 pt closes it.
+- **Up Next** draws upNextView:
+  - the song playing and Repeat One's line;
+  - the chips;
+  - Playing Next with Clear;
+  - "And N more songs.";
+  - Edit (moves, with Move up/down as VoiceOver actions, and removes; VoiceOver's focus goes where the web's goes).
+- **Info.** About (AboutCard, LevelWords.soundRows) and an admin's Debug: The file, Sent to this device, and
+  Fields from Navidrome. The song's details and the bridge are held 0.5 s for each other.
+- **In Core:** Info.swift.
+
+### The merge (p1/app)
+
+- **Go to album.** The shell's `openAlbum` pushed on the current tab. Now Playing's `goToPlayedAlbum` pushed on
+  Library. One `openAlbum` is kept: it closes Now Playing, selects Library, and doesn't push the album on top
+  again. screens.md had the current tab.
+- **All albums** is `AppRoute.albums(AlbumScope)`, a value link. It stacks with album pages and pops with the
+  tab's tap. A second tap on the tab scrolls the root only.
+- **Add/Remove** calls `LibraryModel.libraryChanged()` directly. The album part's notification is gone.
+- **The album page's lifecycle.**
+  - It marks itself opened (`library.opened`: its New mark cleared, `seen` posted) on appear and when marks
+    arrive.
+  - It calls `albumShown` and `albumLeft` for LoudnessBook's pages, and wants them again on reappear.
+- **Info's Conversion** is `PlayerModel.conversion`. The output's name had shown twice.
+- **Debug** gained:
+  - the Library's lists (albums, status, the last fetch's time);
+  - Up Next's held edit (`holdsAnEdit`);
+  - the version.
+- **Palette** holds every colour, each named for its theme.css token.
+- **CoverCache** is bounded at 96 MB of decoded bytes, and cancels a fetch nobody waits for.
+- **The Navidrome gate** (NeedsNavidrome.tsx; the nowplaying part left it, with D8).
+  - Core's NavidromeGate holds the rule, held to the web by Fixtures/gate/ (export-gate-vectors.cjs, 35 cases,
+    iosgate.sim.cjs).
+  - `LibraryModel.checkNavidrome` asks GET /deadwax/navidrome/status quietly, and only the newest answer counts.
+  - The Library root draws the gate in place of its albums.
+  - The phone's own call: the Library draws until a check finds Navidrome missing, where the web shows a spinner.
+  - Set up Navidrome opens /player/ in Safari.
+  - Only the root has the gate. A page above it shows its own ErrorNote.
+- **Read as one piece.** Every screen is reachable, no stub is left, and no view decides a rule Core decides.
+
+### Verified (p1/app, 2026-11-11)
+
+- **xcodebuild** (Debug, `generic/platform=iOS`, unsigned): BUILD SUCCEEDED. Its one warning is
+  appintentsmetadataprocessor's own; none comes from the code.
+- **swift test**: DeadwaxCore 508 tests in 69 suites, DeadwaxAudio 54 in 2, all passing.
+- **pytest**: 4004 passed.
+- **The sims**: all 75 `ui/test/*.sim.cjs`, each run on its own, pass.
+- **check_project.py** ok, and the project file is unchanged.
+- **Each part's own mutations:**
+  - KeptAlbumIndex: 6, each failing;
+  - YouLines' identity rule: fails.
+
+### What only the phone can tell
+
+- **Nothing has been drawn.** There is no Simulator, so no view has been seen by anyone or read by VoiceOver. The
+  checks are in the order of the plan's and screens.md 14's.
+- **Unseen live:**
+  - the level wait against a measuring server;
+  - plays reaching Navidrome;
+  - resume across devices;
+  - the lock screen;
+  - a 304 through URLSession;
+  - scrollTo under the bar;
+  - disk reads and Shelf builds at James's size;
+  - the drag to close;
+  - the scrubber under a finger;
+  - AirPlay's picker;
+  - Edit's drag.
+- **Left:**
+  - the Library's Shuffle (Paged; no feed, D4);
+  - Debug's Source row;
+  - About.swift's older trackTime;
+  - docs/ios.md and ios/README.md, which still describe Phase 0;
+  - the engine test `aNewRouteGoesOnFromTheFrameHeard`, which failed once on timing under load.

@@ -98,6 +98,11 @@ final class LibraryModel {
     /// Each scope's last answer: when, how long it took, and how many albums - for Debug (check 1 counts them
     /// against the web's Library, and times James's library, recorded nowhere yet).
     private(set) var lastFetch: [AlbumScope: IndexFetch] = [:]
+    /// What the last check of Navidrome found (GET /navidrome/status) - nil before one has, when the Library draws
+    /// meanwhile (NavidromeGate.shownOnPhone). What the gate closes on.
+    private(set) var navidrome: NavidromeGate.Checked?
+    /// A check of Navidrome is out (the gate's Try again shows it busy).
+    private(set) var checkingNavidrome = false
 
     /// One album index answer, as Debug may show it.
     struct IndexFetch: Equatable {
@@ -124,6 +129,8 @@ final class LibraryModel {
     @ObservationIgnored private var drawnCache: [AlbumScope: DrawnShelf] = [:]
     /// Only the newest /me/library answer counts (latestOnly).
     @ObservationIgnored private var mineAsks = 0
+    /// Only the newest Navidrome check counts (navidromeCheck.ts's latestOnly).
+    @ObservationIgnored private var navidromeAsks = 0
     @ObservationIgnored private var starredCount = StarredCountWatch()
     /// The last write of each kept list, so writes of one list land in the order its answers did.
     @ObservationIgnored private var writes: [AlbumIndexFiles.Key: Task<Void, Never>] = [:]
@@ -170,10 +177,11 @@ final class LibraryModel {
         if index.refreshIfOld(scope, now: Self.nowMs()) { syncGeneration(scope) }
     }
 
-    /// The Library tab came into view (the tab picked, the app back in front on it, a new person): its lists asked
-    /// again if over a minute old - the store's always, yours with a library of your own - and your library asked
-    /// for its New marks (App.tsx's libraryShown).
+    /// The Library tab came into view (the tab picked, the app back in front on it, a new person): Navidrome checked
+    /// until it is found answering, its lists asked again if over a minute old - the store's always, yours with a
+    /// library of your own - and your library asked for its New marks (App.tsx's libraryShown).
     func libraryShown() {
+        if navidrome?.status.ok != true, !checkingNavidrome { Task { await checkNavidrome() } }
         refreshIfOld(.store)
         guard server.access.hasLibrary else { return }
         refreshIfOld(.yours)
@@ -322,6 +330,34 @@ final class LibraryModel {
         return drawn
     }
 
+    // MARK: Navidrome
+
+    /// Asks whether deadwax has a Navidrome that answers (navidromeChecks' check): at the Library's first showing for
+    /// a person, as it shows again while it wasn't found answering, from the gate's Try again, after a sign-in again.
+    /// Quiet: what was found stands until the answer lands, and only the newest answer counts.
+    func checkNavidrome() async {
+        guard let client = server.client else { return }
+        navidromeAsks += 1
+        let asked = navidromeAsks
+        let epoch = self.epoch
+        checkingNavidrome = true
+        let found: NavidromeGate.Checked
+        do {
+            found = .answered(try await client.call(Routes.navidromeStatus, as: NavidromeStatus.self))
+        } catch {
+            guard asked == navidromeAsks, epoch == self.epoch else { return }
+            if APIFailure.isCancellation(error) {
+                checkingNavidrome = false
+                return
+            }
+            let failure = error as? APIFailure ?? .other(String(describing: error))
+            found = .failed(failure, problem: failure.words)
+        }
+        guard asked == navidromeAsks, epoch == self.epoch else { return }
+        checkingNavidrome = false
+        navidrome = found
+    }
+
     // MARK: your library (logins on, a library of your own)
 
     /// GET /me/library - the New marks, and your albums asked again when its starred count moved. Only the newest
@@ -359,6 +395,7 @@ final class LibraryModel {
             syncGeneration(scope)
         }
         failures = [:]
+        if navidrome?.status.ok != true { Task { await checkNavidrome() } }
         if server.access.hasLibrary { Task { await askMine() } }
     }
 
@@ -396,6 +433,9 @@ final class LibraryModel {
         mine.clear()
         starredCount = StarredCountWatch()
         mineAsks += 1
+        navidrome = nil
+        checkingNavidrome = false
+        navidromeAsks += 1
     }
 
     private static func nowMs() -> Int64 { Int64(Date().timeIntervalSince1970 * 1000) }

@@ -39,7 +39,7 @@ struct MineBlock: View {
             }
             if let refused {
                 ErrorNote(refused)
-                    .foregroundStyle(AlbumPalette.refused)
+                    .foregroundStyle(Palette.danger)
                     .multilineTextAlignment(.center)
             }
         }

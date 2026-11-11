@@ -48,15 +48,3 @@ enum PlayedAlbum {
         route(id: track.albumId, track: track, player: player)
     }
 }
-
-extension AppNavigation {
-    /// Go to album, from the player: Now Playing closes (and Info and Up Next with it), and the album's page is pushed
-    /// on the Library's stack - the album pages' tab - shown if it wasn't, its pages kept. An album already on top
-    /// of it isn't pushed twice.
-    func goToPlayedAlbum(_ route: AlbumRoute) {
-        nowPlayingShown = false
-        if tab != .library { select(.library) }
-        if case .album(let top)? = library.last, top.id == route.id { return }
-        library.append(.album(route))
-    }
-}

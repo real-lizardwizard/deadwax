@@ -44,18 +44,28 @@ struct CoverImage: View {
 }
 
 /// Covers kept in memory by server, cover id and size: one fetch per cover at a time, a failure not asked again for
-/// a minute.
+/// a minute. Held to `costLimit` bytes of decoded pixels (a 400 px tile is 640 KB, so about 150 of them), the least
+/// recently used let go first; a fetch every view waiting on it has left - a tile scrolled past - is called off, so
+/// a fast scroll through a big library doesn't queue covers nobody will see in front of the ones on screen.
 @MainActor
 final class CoverCache {
     static let shared = CoverCache()
 
+    /// The decoded covers kept, in bytes.
+    static let costLimit = 96 * 1024 * 1024
+
     private let images = NSCache<NSString, UIImage>()
-    private var loading: [String: Task<UIImage?, Never>] = [:]
+    private var loading: [String: (task: Task<UIImage?, Never>, waiting: Int)] = [:]
     private var failedAt: [String: Date] = [:]
     private static let againAfter: TimeInterval = 60
 
     init() {
-        images.countLimit = 400
+        images.totalCostLimit = Self.costLimit
+    }
+
+    private static func cost(_ image: UIImage) -> Int {
+        guard let cg = image.cgImage else { return 1 }
+        return max(cg.bytesPerRow * cg.height, 1)
     }
 
     private static func key(_ client: DeadwaxClient, _ id: String, _ size: Int) -> String {
@@ -66,24 +76,52 @@ final class CoverCache {
         images.object(forKey: Self.key(client, id, size) as NSString)
     }
 
+    /// The cover, fetched once however many views wait for it - nil when there is none, it failed, or the view left
+    /// (its task cancelled) before it came.
     func load(client: DeadwaxClient, id: String, size: Int) async -> UIImage? {
         let key = Self.key(client, id, size)
         if let image = images.object(forKey: key as NSString) { return image }
         if let at = failedAt[key], Date().timeIntervalSince(at) < Self.againAfter { return nil }
-        if let task = loading[key] { return await task.value }
-        let task = Task<UIImage?, Never> {
-            guard let data = try? await client.cover(coverID: id, size: size) else { return nil }
-            return UIImage(data: data)
-        }
-        loading[key] = task
-        let image = await task.value
-        loading[key] = nil
-        if let image {
-            images.setObject(image, forKey: key as NSString)
-            failedAt[key] = nil
+        let task: Task<UIImage?, Never>
+        if let asking = loading[key] {
+            task = asking.task
+            loading[key] = (task, asking.waiting + 1)
         } else {
+            task = Task<UIImage?, Never> { [weak self] in
+                let data = try? await client.cover(coverID: id, size: size)
+                let image = data.flatMap(UIImage.init(data:))
+                self?.landed(key, image, called: Task.isCancelled)
+                return image
+            }
+            loading[key] = (task, 1)
+        }
+        return await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            Task { @MainActor in self.left(key, task) }
+        }
+    }
+
+    /// A fetch done: kept, or - unless it was called off - a failure not asked again for a minute. One called off is
+    /// out of `loading` already (`left`), and a new fetch of the same cover may be there now.
+    private func landed(_ key: String, _ image: UIImage?, called off: Bool) {
+        if !off { loading[key] = nil }
+        if let image {
+            images.setObject(image, forKey: key as NSString, cost: Self.cost(image))
+            failedAt[key] = nil
+        } else if !off {
             failedAt[key] = Date()
         }
-        return image
+    }
+
+    /// A view waiting on `task` left: the fetch called off once nobody waits for it.
+    private func left(_ key: String, _ task: Task<UIImage?, Never>) {
+        guard let asking = loading[key], asking.task == task else { return }
+        if asking.waiting > 1 {
+            loading[key] = (task, asking.waiting - 1)
+        } else {
+            loading[key] = nil
+            task.cancel()
+        }
     }
 }

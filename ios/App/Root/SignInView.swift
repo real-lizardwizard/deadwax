@@ -42,20 +42,20 @@ struct SignInView: View {
                 if let said = lines.reason {
                     Text(said)
                         .font(.footnote)
-                        .foregroundStyle(SignInLook.amber)
+                        .foregroundStyle(Palette.amber)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 10)
-                        .background(SignInLook.amberBack, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(SignInLook.amberEdge))
+                        .background(Palette.amberFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Palette.amberEdge))
                     if let why = lines.reasonWhy { whoever(why) }
                 }
                 fields
                 if let problem = lines.problem {
                     Text(problem)
                         .font(.callout)
-                        .foregroundStyle(SignInLook.danger)
+                        .foregroundStyle(Palette.danger)
                         .fixedSize(horizontal: false, vertical: true)
                     if let why = lines.problemWhy { whoever(why) }
                 }
@@ -169,18 +169,6 @@ struct SignInView: View {
             }
         }
     }
-}
-
-/// The web's sign-in colours (theme.css): a warning's amber for why the screen is up, the boards' failure red.
-enum SignInLook {
-    /// --dw-amber-text #fcd34d
-    static let amber = Color(red: 0xFC / 255, green: 0xD3 / 255, blue: 0x4D / 255)
-    /// --dw-badge-amber-bg rgba(251, 191, 36, 0.14)
-    static let amberBack = Color(red: 251 / 255, green: 191 / 255, blue: 36 / 255).opacity(0.14)
-    /// --dw-badge-amber-border rgba(252, 211, 77, 0.3)
-    static let amberEdge = Color(red: 252 / 255, green: 211 / 255, blue: 77 / 255).opacity(0.3)
-    /// --dw-danger-text #fca5a5: what went wrong, and Sign out
-    static let danger = Color(red: 0xFC / 255, green: 0xA5 / 255, blue: 0xA5 / 255)
 }
 
 /// A sign-in field: a filled, rounded box, its text never smaller than the body's.

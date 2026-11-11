@@ -7,7 +7,9 @@ import SwiftUI
 /// own), the songs with their disc headings, the footer; the bar's ••• is the whole album's Play Next and Play Last.
 ///
 /// What it asks as it opens, at once (AlbumModel): the album; the id bridge only with a library of your own (D12);
-/// and, as the songs come, the album's levels warmed (PlayerModel.albumShown). Every rule is Core's; this draws.
+/// and, as the songs come, the album's levels warmed (PlayerModel.albumShown) - wanted again each time the page is
+/// shown, let go when it goes (PlayerModel.albumLeft). While it is on top your library is told it was opened
+/// (LibraryModel.opened - its New mark goes), again as /me/library answers. Every rule is Core's; this draws.
 ///
 /// Play queues the songs from the first, Shuffle every song once in a random order, a row's tap from that song - all
 /// as the album (Normalization's album level), through PlayerModel.play in the tap, nothing awaited first.
@@ -16,7 +18,10 @@ struct AlbumView: View {
 
     @Environment(ServerModel.self) private var server
     @Environment(PlayerModel.self) private var player
+    @Environment(LibraryModel.self) private var library
     @State private var model: AlbumModel
+    /// On screen - the page on top of its tab.
+    @State private var shown = false
     @State private var menu: QueueMenuRequest?
     /// The hero's title has scrolled away: the bar shows it.
     @State private var titleInBar = false
@@ -46,7 +51,7 @@ struct AlbumView: View {
                     .listRowSeparator(.hidden)
             } else if model.mineBlockShown {
                 MineBlock(mine: model.mine, busy: model.busy, refused: model.refused,
-                          act: { action in Task { await model.change(action, client: server.client) } },
+                          act: { action in Task { await model.change(action, client: server.client, library: library) } },
                           noteFocused: $noteFocused)
                     .listRowSeparator(.hidden)
             }
@@ -103,6 +108,26 @@ struct AlbumView: View {
             await model.refresh(client: server.client, player: player)
         }
         .onChange(of: model.answered) { _, _ in told() }
+        .onAppear {
+            shown = true
+            seen()
+            // shown again (a page over it gone, its tab back): its levels wanted again - its first showing waits for
+            // the album to answer (AlbumModel.load)
+            if let album = model.album { player.albumShown(album) }
+        }
+        .onDisappear {
+            shown = false
+            player.albumLeft(id: route.id)
+        }
+        .onChange(of: library.marks) { _, _ in
+            // your library answered while the page is on top: one opened before deadwax said what is new is cleared too
+            if shown { seen() }
+        }
+    }
+
+    /// The page on top is seen (App.tsx's seenAlbum for the page on top): its New mark goes, and deadwax is told.
+    private func seen() {
+        library.opened(id: route.id, musicBrainzId: route.musicBrainzId ?? model.album?.musicBrainzId)
     }
 
     /// The songs, a disc heading above the first of each disc when the album shows them.

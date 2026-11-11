@@ -73,8 +73,16 @@ final class PlayerModel {
     /// The output's name (AVAudioSession's route), for Debug's readout.
     private(set) var outputName: String?
 
-    /// The Hi-res readout for the song playing: its file's rate and bits, and the output's rate (Phase 0's).
+    /// The Hi-res readout for the song playing: its file's rate and bits, and the output's rate (Phase 0's), with the
+    /// output's name.
     var readout: String? {
+        guard var line = conversion else { return nil }
+        if let outputName { line += " (\(outputName))" }
+        return line
+    }
+
+    /// The readout without the output's name - Info's Debug, whose Output row names it already.
+    var conversion: String? {
         guard let entry = current, let rate = engineState.fileRate else { return nil }
         let song = song(for: entry) ?? Song(track: entry.track)
         var bits = song.bitDepth ?? headerBits[song.id]
@@ -84,9 +92,7 @@ final class PlayerModel {
             headerBits[song.id] = info.bitsPerSample
         }
         let output = engineState.outputRate ?? session.outputRate
-        var line = RateWords.readout(fileRate: rate, bits: bits, codec: song.suffix, outputRate: output)
-        if let outputName { line += " (\(outputName))" }
-        return line
+        return RateWords.readout(fileRate: rate, bits: bits, codec: song.suffix, outputRate: output)
     }
 
     /// The engine's phase in words, for Debug.
@@ -103,6 +109,9 @@ final class PlayerModel {
 
     /// The engine's lanes and clocks, for Debug; nil before anything played.
     func engineDebug() -> EngineDebug? { link?.engine.debug() }
+
+    /// An Up Next edit made in a song's last moments is held for the join (D4), for Debug.
+    var holdsAnEdit: Bool { controller?.holdsAnEdit ?? false }
 
     // MARK: Info's readings (D8)
 

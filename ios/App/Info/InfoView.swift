@@ -113,7 +113,7 @@ struct InfoView: View {
             Section(InfoWords.albumTitle) {
                 if let route = PlayedAlbum.route(id: card.id, track: track, player: player) {
                     Button {
-                        navigation.goToPlayedAlbum(route)
+                        navigation.openAlbum(route)
                     } label: {
                         HStack(spacing: 12) {
                             albumCard(card)
@@ -194,7 +194,7 @@ struct InfoView: View {
         let album = raw.flatMap { $0.albumID == track.albumId ? $0.answer : nil }
         //? the engine's rows move as it plays: read again at each tick (`tick` read so the rows are drawn again)
         let _ = tick
-        let engine = InfoDebug.Engine(player.engineDebug(), outputName: player.outputName, readout: player.readout)
+        let engine = InfoDebug.Engine(player.engineDebug(), outputName: player.outputName, readout: player.conversion)
         let sections = InfoDebug.sections(song: song, level: track.level, key: entry.key, decisions: player.levelDecisions,
                                           live: track.albumId.flatMap { player.loudness(albumID: $0) },
                                           engine: engine, album: album)

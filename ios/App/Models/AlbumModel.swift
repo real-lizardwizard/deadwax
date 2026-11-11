@@ -2,14 +2,6 @@ import DeadwaxCore
 import Foundation
 import Observation
 
-extension Notification.Name {
-    /// An album page's Add to my library or Remove from my library was taken by deadwax: the person's library changed
-    /// (the web's announceAddedToLibrary / announceRemovedFromLibrary, lib/libraryEvents.ts, which useMyLibrary.ts and
-    /// useYourAlbums.ts hear). `object` is the AlbumMine.Change; `userInfo["album"]` Navidrome's album id. Whoever keeps
-    /// a list of the person's own albums asks it again (AlbumIndexState.forget(.yours), MyLibraryState's refresh).
-    static let deadwaxLibraryChanged = Notification.Name("deadwax.libraryChanged")
-}
-
 /// One album page's state (screens.md 4): the album's answer, the id bridge's (only with a library of your own, D12),
 /// what this page just did with Add or Remove, and the ask out. Every rule is Core's - Whose (whose it is, the badge,
 /// the mine block and when each is drawn), DiscHeadings, AlbumPageLines, QueuePick, AlbumGone, AddRelease - this keeps
@@ -189,10 +181,11 @@ final class AlbumModel {
     // MARK: Add and Remove
 
     /// Add to my library (`POST /me/library/add`, the pressing the bridge found - AddRelease.from) or Remove from my
-    /// library (`POST /me/library/remove`, by Navidrome's id). Taken: `changed` says so at once, and the person's
-    /// library is told it changed (`.deadwaxLibraryChanged`). Refused: `refused`, and `changed` stays as it was. Not a
-    /// page's request - it runs to its answer even if the page goes.
-    func change(_ action: AlbumMine.Action, client: DeadwaxClient?) async {
+    /// library (`POST /me/library/remove`, by Navidrome's id). Taken: `changed` says so at once, and the Library is
+    /// told your library changed (LibraryModel.libraryChanged: Your albums and the New marks asked again - the web's
+    /// announceAddedToLibrary / announceRemovedFromLibrary, which useMyLibrary.ts and useYourAlbums.ts hear). Refused:
+    /// `refused`, and `changed` stays as it was. Not a page's request - it runs to its answer even if the page goes.
+    func change(_ action: AlbumMine.Action, client: DeadwaxClient?, library: LibraryModel) async {
         guard !busy, let client else { return }
         busy = true
         refused = nil
@@ -207,7 +200,7 @@ final class AlbumModel {
             let done: AlbumMine.Change = action == .add ? .added : .removed
             changed = done
             answered += 1
-            NotificationCenter.default.post(name: .deadwaxLibraryChanged, object: done, userInfo: ["album": route.id])
+            library.libraryChanged()
         } catch {
             busy = false
             if APIFailure.isCancellation(error) { return }

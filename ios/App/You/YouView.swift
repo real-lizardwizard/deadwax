@@ -28,7 +28,7 @@ struct YouView: View {
                 } footer: {
                     if let unverified = lines.unverified {
                         Text(unverified)
-                            .foregroundStyle(SignInLook.amber)
+                            .foregroundStyle(Palette.amber)
                     }
                 }
                 PlaybackSection()
@@ -101,8 +101,6 @@ struct Avatar: View {
 
     @ScaledMetric(relativeTo: .title) private var size: CGFloat = 52
 
-    static let fill = Color(red: 0x3B / 255, green: 0x35 / 255, blue: 0x47 / 255)
-
     var body: some View {
         Text(letter)
             .font(.title.weight(.semibold))
@@ -110,7 +108,7 @@ struct Avatar: View {
             .minimumScaleFactor(0.5)
             .padding(4)
             .frame(width: size, height: size)
-            .background(Self.fill, in: Circle())
+            .background(Palette.avatar, in: Circle())
             .accessibilityHidden(true)
     }
 }

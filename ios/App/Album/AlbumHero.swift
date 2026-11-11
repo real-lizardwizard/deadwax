@@ -1,18 +1,6 @@
 import DeadwaxCore
 import SwiftUI
 
-/// The album page's colours beyond the app's Palette, from the web's theme (interface/styles/theme.css).
-enum AlbumPalette {
-    /// --dw-badge-green-text: "In your library".
-    static let held = Color(red: 0x6E / 255, green: 0xE7 / 255, blue: 0xB7 / 255)
-    /// --dw-badge-green-bg, rgba(52, 211, 153, 0.14).
-    static let heldFill = Color(red: 52 / 255, green: 211 / 255, blue: 153 / 255).opacity(0.14)
-    /// --dw-badge-green-border, rgba(110, 231, 183, 0.28).
-    static let heldEdge = Color(red: 110 / 255, green: 231 / 255, blue: 183 / 255).opacity(0.28)
-    /// --dw-danger-text: a refusal's line.
-    static let refused = Color(red: 0xFC / 255, green: 0xA5 / 255, blue: 0xA5 / 255)
-}
-
 /// The top of an album page (screens.md 4, AlbumPage.tsx's hero): the cover (asked at 1024), the title (two lines,
 /// a step smaller over 60 letters), the artist (plain text in Phase 1 - the artist page is Phase 3), the meta line,
 /// the badge - its place held, unseen, until whose it is is known - and Play and Shuffle, live once the songs are in.
@@ -84,14 +72,14 @@ struct HeldBadge: View {
             Text(mine.badge)
         }
         .font(.caption.weight(.semibold))
-        .foregroundStyle(yours ? AlbumPalette.held : Palette.quiet)
+        .foregroundStyle(yours ? Palette.held : Palette.quiet)
         .padding(.horizontal, yours ? 8 : 0)
         .padding(.vertical, 3)
         .background {
             if yours {
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(AlbumPalette.heldFill)
-                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(AlbumPalette.heldEdge, lineWidth: 0.5))
+                    .fill(Palette.heldFill)
+                    .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Palette.heldEdge, lineWidth: 0.5))
             }
         }
         .accessibilityElement(children: .combine)

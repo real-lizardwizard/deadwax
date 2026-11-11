@@ -12,6 +12,8 @@ enum AppTab: Hashable {
 enum AppRoute: Hashable {
     /// An album's page, by Navidrome's album id (with what the list knew, to draw before it loads).
     case album(AlbumRoute)
+    /// An Albums screen of a scope, pushed: All music's All albums (the store's), over Your albums.
+    case albums(AlbumScope)
     /// You's This phone > Server: the Server address screen, pushed.
     case serverAddress
     /// You's Debug (admins only).
@@ -26,23 +28,30 @@ struct AlbumRoute: Hashable {
     var artist: String?
     var coverArt: String?
     var year: Int?
+    /// The album's MusicBrainz release id, as the opener knew it: what the page tells your library it opened with
+    /// (MyLibraryState.opened - the web's preview's musicBrainzId).
+    var musicBrainzId: String?
 
-    init(id: String, name: String? = nil, artist: String? = nil, coverArt: String? = nil, year: Int? = nil) {
+    init(id: String, name: String? = nil, artist: String? = nil, coverArt: String? = nil, year: Int? = nil,
+         musicBrainzId: String? = nil) {
         self.id = id
         self.name = name
         self.artist = artist
         self.coverArt = coverArt
         self.year = year
+        self.musicBrainzId = musicBrainzId
     }
 
     /// A Library row's album.
     init(_ album: IndexAlbum) {
-        self.init(id: album.id, name: album.name, artist: album.artist, coverArt: album.coverArt, year: album.year)
+        self.init(id: album.id, name: album.name, artist: album.artist, coverArt: album.coverArt, year: album.year,
+                  musicBrainzId: album.musicBrainzId)
     }
 
     /// An album already loaded.
     init(_ album: Album) {
-        self.init(id: album.id, name: album.name, artist: album.artist, coverArt: album.coverArt, year: album.year)
+        self.init(id: album.id, name: album.name, artist: album.artist, coverArt: album.coverArt, year: album.year,
+                  musicBrainzId: album.musicBrainzId)
     }
 
     /// A queue entry's album (Now Playing's Go to the album, Info's album line); nil when the track names none.
@@ -53,7 +62,7 @@ struct AlbumRoute: Hashable {
 }
 
 /// Where the app is: the tab shown, each tab's pages, and Now Playing open or not. RootView and MainTabs draw it;
-/// any screen opens a page with `open(_:)` or `openAlbum(_:)`.
+/// a screen opens a page on its own tab with `open(_:)`, and the player goes to an album with `openAlbum(_:)`.
 @MainActor
 @Observable
 final class AppNavigation {
@@ -91,18 +100,14 @@ final class AppNavigation {
         }
     }
 
-    /// An album's page pushed on the tab shown, closing Now Playing first (Go to the album).
+    /// Go to album, from the player (Now Playing's byline and •••, Info's album card): Now Playing closes - Info and
+    /// Up Next with it - and the album's page is pushed on the Library's stack, the album pages' tab, shown if it
+    /// wasn't, its pages kept. An album already on top of it isn't pushed twice.
     func openAlbum(_ album: AlbumRoute) {
         nowPlayingShown = false
-        open(.album(album))
-    }
-
-    /// The tab shown back at its root.
-    func popToRoot() {
-        switch tab {
-        case .library: library.removeAll()
-        case .you: you.removeAll()
-        }
+        if tab != .library { select(.library) }
+        if case .album(let top)? = library.last, top.id == album.id { return }
+        library.append(.album(album))
     }
 
     /// The person changed: every page popped, Now Playing closed, Library shown.
@@ -120,6 +125,7 @@ extension View {
         navigationDestination(for: AppRoute.self) { route in
             switch route {
             case .album(let album): AlbumView(route: album)
+            case .albums(let scope): AlbumsScreen(scope: scope, root: false)
             case .serverAddress: ServerAddressView()
             case .debug: DebugView()
             }
