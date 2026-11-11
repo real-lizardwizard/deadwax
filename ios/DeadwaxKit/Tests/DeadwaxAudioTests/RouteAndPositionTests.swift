@@ -333,11 +333,12 @@ extension EngineRenderTests {
             pieces += 1
         }
         #expect(engine.phase == .ended)
-        Thread.sleep(forTimeInterval: 0.1)
-        engine.settle()
-        #expect(engine.outputRunning, "0.6 s to go: its last samples are on their way to the ear")
-        waitFor(engine, seconds: 3) { !engine.outputRunning }
-        #expect(!engine.outputRunning, "stopped once heard")
+        waitFor(engine) { !engine.outputRunning }
+        try #require(!engine.outputRunning, "stopped once heard")
+        // measured on the engine's queue, not by when this thread looked: a sleep, then "still running",
+        // would fail whenever the test was held off longer than the linger
+        let ended = try #require(engine.endedAt), stopped = try #require(engine.outputStoppedAt)
+        #expect(stopped - ended >= 0.599, "\(stopped - ended) s after the end: its last 0.5 s were on their way to the ear, and 0.1 s more")
     }
 
     // A song played from part-way in still has its whole length once its decode has ended - the plays

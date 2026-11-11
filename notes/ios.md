@@ -1011,7 +1011,8 @@ ios.yml's macOS job (macos-26-arm64, 3 vCPU, Swift 6.3.3) failed at 70cbef6 on t
 this Mac:
 - aJoinIsTheTwoSongsLaidEndToEnd: on both channels the first difference was at frame 4096, the first frame it
   checks, and the largest difference in the first 4096 frames was 0.45767212 and 0.45776367. Those are the
-  song's own peaks there, so the render was silent from frame 0.
+  song's own peaks there, so the render was silent from frame 0. Its next check, silence after the last song,
+  passed: nothing of the song came late, so the render was silent throughout, not a node started late.
 - aNextSongNotYetOnANodeIsLetGo: `sample 0 of 22050 is 0.0, expected -0.44799805`. A was whole, but C wasn't
   straight after it.
 
@@ -1083,13 +1084,19 @@ Every failure was aNewRouteGoesOnFromTheFrameHeard, neither of CI's two. What wa
 - **aJoinIsTheTwoSongsLaidEndToEnd: not reproduced.**
   - It passed in every run here: 31 one-process runs before the fixes and every package run after, a
     200-iteration loop of it under spinners and delays, and 300 runs of its first engine in a fresh process.
-  - It renders in one call, with no completion involved, so the helper isn't its cause. A render silent from
-    frame 0 means the node wasn't playing, or the output wasn't running, when it rendered.
+  - It renders in one call, with no completion involved, so the helper isn't its cause. A render silent
+    throughout means the node wasn't playing, or the output wasn't running, when it rendered.
   - It now `#require`s phase `.playing` and the output running before the render. On a difference it prints
     where the song begins in the render (`whereItBegins`: silent throughout, or the frame its first 64 frames
-    are at), the phase, the output's state and the engine's trace, which now has "the output started". The next
-    CI failure will say which.
-- **A fetch's own timeout raced a starved test (test timing, seen only with the pool cut to one thread).**
+    are at), the phase, the output's state and the engine's trace. Since the reviews the trace says "the output
+    started", "the output stopped", every configuration change (the output's state, and whether it was
+    playing), and "rendered N of M frames as silence: the output is stopped" when renderOffline fills with
+    silence because the output is stopped. The next CI failure will say which.
+  - A lead, not followed up: in both of CI's runs the first tests took 5 s and 10.5 s even when trivial
+    (aFetchLetGoBeforeItStartsMakesNothing), and the log's lines there came about 10 ms apart, as if the
+    output were paced. Whether the whole process was held, or only its output, is not known.
+- **A fetch's own timeout raced a starved test (test timing; first seen here with the pool cut to one thread,
+  and by the second review without it - see "After the two reviews").**
   - After the fixes, a harsher run than ios.yml's: one process with `LIBDISPATCH_COOPERATIVE_POOL_STRICT=1`
     under 7 hogs. aSkippedFetchIsCancelledAndItsPartDeleted failed in 1 of 6 runs, then 4 of 6: its part was gone
     before the skip, and the test took about 30-37 s.
@@ -1125,6 +1132,90 @@ With the fetch's idle timeout too (the final code), all 509 passed again:
 - the Audio suites alone, 7 hogs: 15 of 15;
 - one process with the strict pool, 7 hogs: 6 of 6, where it had failed in 4 of 6;
 - the real package and the one process, each once with no load.
+
+**After the two reviews.** Two adversarial reviews of abf5587 (one on the race, one on the phone) ran their own
+load here: 20 of 20 runs passed in one process, in the real package and in the Audio suites alone, under 5 hogs
+each. Their findings, all four accepted:
+
+- **A lane run dry, its last completion still to come, was counted straight on (an engine race; it can happen
+  on the phone).**
+  - AVAudioPlayerNode's clock runs on through the silence once it has played all on it, and a buffer put on it
+    then plays after the silence. The engine counted it straight after the last (`nodeFrames`, the lane's
+    timeline): the position, the frame a pause, a call or a new route goes on from, and the moment the next
+    lane starts were all ahead of the ear by the silence, for the rest of the lane.
+  - Two ways in. A stream behind whose retry (every 50 ms) finds the bytes before the lane's last completion is
+    handled. Or every completion held longer than what is scheduled ahead (2 s on the phone, 0.3 s in the
+    tests), when the first one's pump tops up a node that has run out. Only the designed order was right: the
+    last completion first, which starts the lane again from the frame it reached (played()'s ran-dry path).
+  - Made certain with `completionLag` and `GatedFrames` (a decoded song whose frames past N haven't come, in
+    RenderHelpers.swift). Without the fix: the late last completion put the position at 34112 where 33600 was
+    heard, and a pause and play skipped the 512 frames; the stall, 48000 where 24000 was heard; and a 96 kHz
+    song after a 48 kHz one run dry started 4800 frames early, over the first song's end.
+  - A listener would hear it only after a stall: a pause, a call or a new route skipping the silence's length
+    of the song, and the next song in another format starting over the end of this one.
+  - The fix: schedule() holds the buffer (`Wait.ranOut`; "entry N held: its lane's node has played all on it"
+    in the trace) while the lane's node has played all on it by its own clock and a completion is still to
+    come. That completion starts the lane again from the frame it reached, the path that was there. The check
+    comes after the earlier-songs one, so that wait is still said as it was ("parked").
+  - The tests, in RanDryTests.swift: aLaneThatRunsDryMidSongGoesOnFromTheFrameItReached (the designed order),
+    aLaneRunDryWhoseLastCompletionIsLateGoesOnFromTheFrameHeard (lag 0.25 s), aStallLongerThanWhatIsAheadGoes…
+    (lag 1 s) and aSongInAnotherFormatStartsWhereALaneRunDryReallyEnds. Each wants the song bit-exact from the
+    frame heard, the position that frame, and a pause and play bit-exact from it; the last wants the first
+    song's second half alone to its very end. The last three fail without the fix.
+  - Left as it was: a lane's converter (a song whose rate isn't the output's) keeps its last frames, under
+    1 ms, until the lane's last completion, and they go on then (`flush`), after a node that has run out by
+    then. Not tested.
+- **A lane started with nothing on it (an engine fault, found by the first new test).** `ready()` let a lane
+  start once `startSeconds` were scheduled - the tests' 0 - so the lane begun again after running dry started
+  empty: its clock ran ahead of what then went on it, the phase said playing over silence, and the position
+  ran on. It now also wants something on the lane. On the phone (`startSeconds` 1 s) only a lane begun again
+  whose song then had no more frames could have started empty.
+- **The aJoin diagnostics (review 1).** The trace lines above (the output stopped, configuration changes,
+  silence rendered because the output is stopped). Review 1 also read CI's log: the "silence after the last
+  song" check passed, so the render was silent throughout (corrected above).
+- **A fetch held off by a busy process (review 2; on the phone in principle).**
+  - StreamFetch's URLSession delegate queue was an `OperationQueue()` at the default QoS. With every core busy
+    at the default QoS its work waits until that stops: a scratch program fetching 1000 bytes from the tests'
+    stub while 16 `.medium` tasks spun for 6 s saw the old StreamFetch finish after 5.684, 5.685 and 5.685 s,
+    and the new one after 0.006, 0.005 and 0.006 s. A second probe, from a default-QoS thread under the same
+    load: an `OperationQueue()` operation and a `DispatchQueue.global()` block waited 3.687 s of a 4 s spell,
+    `.userInitiated` queues and AVAudioPlayerNode's completion queue (which runs at userInitiated) 0 ms.
+  - The fix: the queue runs at `.userInitiated`, the engine's own QoS. On the phone this needed the app to
+    keep every core busy at the default QoS for longer than what is buffered: heard as the song stopping to
+    load.
+  - The tests: in 2 of the review's 17 runs of its own one-process package under hogs, every fetch test that waits
+    for its fetch failed at once, unfinished when the helper's 10 s timeout fired. In the second, the review's
+    probe saw a cooperative-pool task held 12.5 s (the stub's answers seem to need a free thread of it, as the
+    helper's comment says). In ios.yml's second failing run they passed after 12 s. The helper's bound is now a
+    minute and its timeout runs at `.userInitiated`; the skipped fetch waits up to 60 s for its 4000 bytes.
+- **aRouteChangeThatPausesWinsOverPlayingOn passed without the race decided (review 2).** It slept 0.4 s past
+  a 0.2 s settle and checked the phase; a test held off past the settle passed whichever way it went. The
+  change now waits 5 s, the test `#require`s the restart waiting (`restartWaiting`) before the pause, then
+  expects it let go, the phase paused, the output stopped and the position held.
+- **theQueuesEndIsHeardBeforeTheOutputStops slept 0.1 s and expected the output still running**: a test held
+  off longer than the 0.6 s linger would have failed. It now waits for the stop and compares the engine's own
+  times of the end and the stop (`endedAt`, `outputStoppedAt`): at least 0.599 s apart.
+- **Not changed.** `completionsHandled`'s and `waitFor`'s 5 s bounds: the completions come on
+  AVAudioPlayerNode's queue at userInitiated and the engine's queue is userInitiated, which the default-QoS
+  load that held the fetch didn't hold (0 ms above). ios.yml still runs the whole package together.
+
+**Mutations** on the final code, each restored byte for byte, all failing:
+- the `ranOut` hold taken out (the late last completion, the stall, the next song in another format);
+- `ready()` without "something on the lane" (aLaneThatRunsDryMidSong…: the phase playing over silence);
+- the pause no longer letting a waiting restart go (aRouteChange…: `restartWaiting` still true);
+- the end's linger taken out (theQueuesEnd…: 0 s between the end and the stop);
+- the first round's four again: the reading's latency, the completion holding the engine, the helper's sleep,
+  the stop guard.
+
+**After the reviews' fixes.** All 513 tests (Core 452, Audio 61) passed:
+- one process, 5 hogs: 15 of 15;
+- the real package (two bundles), 5 hogs: 15 of 15;
+- the Audio suites alone, 5 hogs: 15 of 15;
+- one process, 7 hogs: 10 of 10;
+- one process with the strict pool, 7 hogs: 6 of 6;
+- the real package and the one process, each with no load.
+The iOS sims and tests/test_source_bytes.py and tests/test_ios_contract.py pass. Swift 6.3, CI's, wasn't run
+here: ios.yml is its first run of this code.
 
 ### Verified (Phase 1's Core, p1/merge, 2026-11-10)
 

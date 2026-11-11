@@ -121,6 +121,44 @@ final class GatedBytes: ByteSource {
     }
 }
 
+/// A song held in memory whose frames past `arrived` haven't come yet - a stream behind, decoded: `.waiting`
+/// there until `release`.
+final class GatedFrames: PCMSource {
+    let samples: [[Float]]
+    let format: AVAudioFormat?
+    private let lock = NSLock()
+    private var at = 0
+    private var arrived: Int
+
+    init(_ samples: [[Float]], rate: Double, arrived: Int) {
+        self.samples = samples
+        format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: rate,
+                               channels: AVAudioChannelCount(samples.count), interleaved: false)
+        self.arrived = arrived
+    }
+
+    /// The rest of the song has arrived.
+    func release() { lock.withLock { arrived = samples[0].count } }
+
+    func read(maxFrames: AVAudioFrameCount) throws -> PCMRead {
+        let total = samples[0].count
+        if at >= total { return .end }
+        let count = min(Int(maxFrames), lock.withLock { arrived } - at)
+        if count <= 0 { return .waiting }
+        let buffer = AVAudioPCMBuffer(pcmFormat: format!, frameCapacity: AVAudioFrameCount(count))!
+        for channel in 0..<samples.count {
+            samples[channel].withUnsafeBufferPointer { from in
+                buffer.floatChannelData![channel].update(from: from.baseAddress! + at, count: count)
+            }
+        }
+        buffer.frameLength = AVAudioFrameCount(count)
+        at += count
+        return .frames(buffer)
+    }
+
+    func close() {}
+}
+
 /// A source that says nothing has arrived, until `fail` - then throws it at the next read.
 final class FailingSource: PCMSource {
     let failure: AudioFailure

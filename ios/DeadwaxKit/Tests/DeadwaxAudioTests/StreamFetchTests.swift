@@ -68,7 +68,12 @@ final class ResumeOnce: @unchecked Sendable {
     /// wide as the Mac has cores, and nine of them each holding a thread in a semaphore's wait stalled
     /// every fetch on an 8-core Mac until the waits ran out (5.5 s for the nine, 0.5 s one at a time or
     /// suspended - so the stub's answers seem to need a free thread of it). A CI runner has 3 or 4.
-    private func fetch(_ query: String, into folder: URL, seconds: Double = 10,
+    ///
+    /// `seconds` is only how long a fetch that never finishes is given: a minute, longer than any stall
+    /// seen. On ios.yml's runner these took 12 s (milliseconds here), and with the old 10 s a timeout that
+    /// came before the fetch's queue was let run failed every one of them at once - 2 of the second
+    /// review's 17 load runs here. The timeout runs at the engine's QoS, as the fetch's queue now does.
+    private func fetch(_ query: String, into folder: URL, seconds: Double = 60,
                        idle: TimeInterval? = nil) async -> (StreamFetch, Bool) {
         let file = folder.appendingPathComponent("s1.flac")
         let fetch = StreamFetch(request: URLRequest(url: URL(string: "http://stub.test/stream?\(query)")!), fileURL: file,
@@ -77,7 +82,7 @@ final class ResumeOnce: @unchecked Sendable {
         let finished = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
             let once = ResumeOnce(continuation)
             fetch.onFinish = { _ in once.resume(true) }
-            DispatchQueue.global().asyncAfter(deadline: .now() + seconds) { once.resume(false) }
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + seconds) { once.resume(false) }
             fetch.start()
         }
         return (fetch, finished)
@@ -184,9 +189,9 @@ final class ResumeOnce: @unchecked Sendable {
         // its part before the skip (notes/ios.md "The engine's tests under load")
         let (fetch, finished) = await fetch("declared=100000&send=4000&hold=1", into: dir, seconds: 0.5, idle: 600)
         #expect(!finished, "still arriving")
-        let until = Date().addingTimeInterval(5)
+        let until = Date().addingTimeInterval(60)
         while fetch.bytesWritten < 4000, Date() < until { await pause(0.01) }
-        #expect(fetch.bytesWritten == 4000, "the bytes sent, arrived within 5 s")
+        #expect(fetch.bytesWritten == 4000, "the bytes sent, arrived within 60 s")
         #expect(fetch.failure == nil, "nothing ended the fetch before the skip: \(String(describing: fetch.failure))")
         #expect(FileManager.default.fileExists(atPath: fetch.partURL.path))
         fetch.cancel()

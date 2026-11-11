@@ -280,9 +280,10 @@ public final class PlaybackEngine {
         var decoded: Int64 = 0
         var lane: LaneKey?
         var entry: Int?
-        /// A buffer decoded but held back: its lane still holds songs that play before the one
-        /// scheduled last (see `schedule`). Scheduled first when the feed goes on.
+        /// A buffer decoded but held back, and why (`Wait`, see `schedule`). Scheduled first when the
+        /// feed goes on.
         var parked: AVAudioPCMBuffer?
+        var parkedFor: Wait?
 
         init(key: Int, source: PCMSource, start: StartPoint) {
             self.key = key
@@ -295,6 +296,17 @@ public final class PlaybackEngine {
             guard let startFrame else { return start }
             return .frame(startFrame + decoded, rate: rate)
         }
+    }
+
+    /// Why a decoded buffer waits (`Feed.parked`) rather than going on its lane's node now. A completion
+    /// on the lane pumps again, and the buffer goes on once the wait is over.
+    private enum Wait {
+        /// The lane still holds songs that play before the one scheduled last (44.1 kHz, a short 96 kHz
+        /// song, 44.1 kHz again): laid on now, it would play ahead of the song between.
+        case earlierSongs
+        /// The lane's node has played everything put on it and its last completion hasn't been handled
+        /// (`ranOut`): laid on now, it would play after the silence while the count has it straight on.
+        case ranOut
     }
 
     /// The next song failed while the one heard was still playing: the heard one plays to its end,
@@ -346,6 +358,9 @@ public final class PlaybackEngine {
     /// the difference (`callbacksOutstanding`).
     private var buffersScheduled = 0
     private var callbacksHandled = 0
+    /// When the queue's end was said and when the output last stopped (tests: `endedAt`, `outputStoppedAt`).
+    private var ended: Double?
+    private var stoppedOutput: Double?
     /// Completions AVAudioEngine has called back, counted on its own thread (tests: `callbacksArrived`).
     private final class Arrivals {
         private let lock = NSLock()
@@ -525,6 +540,7 @@ public final class PlaybackEngine {
                 throw AudioFailure("No memory for \(frames) frames.")
             }
             var done: AVAudioFrameCount = 0
+            var silent: AVAudioFrameCount = 0
             let chunk = engine.manualRenderingMaximumFrameCount
             guard let piece = AVAudioPCMBuffer(pcmFormat: engine.manualRenderingFormat, frameCapacity: chunk),
                   let into = buffer.floatChannelData, let from = piece.floatChannelData else {
@@ -538,6 +554,7 @@ public final class PlaybackEngine {
                         (into[channel] + Int(done)).update(repeating: 0, count: Int(wanted))
                     }
                     done += wanted
+                    silent += wanted
                     continue
                 }
                 let status = try engine.renderOffline(wanted, to: piece)
@@ -548,6 +565,9 @@ public final class PlaybackEngine {
                 done += piece.frameLength
             }
             buffer.frameLength = done
+            // said, so a render that comes out silent says whether the output was stopped (ios.yml's
+            // aJoinIsTheTwoSongsLaidEndToEnd: silent throughout, once)
+            if silent > 0 { note("rendered \(silent) of \(frames) frames as silence: the output is stopped") }
             return buffer
         }
     }
@@ -583,6 +603,17 @@ public final class PlaybackEngine {
 
     /// Tests: completions AVAudioEngine has called back so far, handled or not.
     var callbacksArrived: Int { arrivals.value }
+
+    /// Tests: completions the engine has handled so far (any generation, ignored or not).
+    var callbacksDone: Int { queue.sync { callbacksHandled } }
+
+    /// Tests: a configuration change's restart waits (`changeSettleSeconds`) and hasn't been let go.
+    var restartWaiting: Bool { queue.sync { restart != nil } }
+
+    /// Tests: when the queue's end was said, and when the output last stopped (host seconds) - the
+    /// linger between them is the engine's own clock's, whatever the test's thread was doing.
+    var endedAt: Double? { queue.sync { ended } }
+    var outputStoppedAt: Double? { queue.sync { stoppedOutput } }
 
     /// Tests: iOS stopping the engine (a call, a new route) - and, with `change`, the configuration
     /// change it posts, handled as the notification's would be.
@@ -660,7 +691,11 @@ public final class PlaybackEngine {
     private func sleep() {
         idle?.cancel()
         idle = nil
-        if engine.isRunning { engine.stop() }
+        if engine.isRunning {
+            engine.stop()
+            stoppedOutput = Self.hostSeconds()
+            note("the output stopped")
+        }
         asleep = true
     }
 
@@ -830,15 +865,23 @@ public final class PlaybackEngine {
             case .end:
                 endFeed()
             case .frames(let buffer):
-                guard schedule(buffer, feed: &feeding) else {
-                    // held until the lane's earlier songs have played (its last buffer's completion
-                    // pumps again)
-                    if feeding.parked == nil { note("entry \(feeding.key) parked: its lane still holds songs before the one scheduled last") }
+                if let wait = schedule(buffer, feed: &feeding) {
+                    // held until the wait is over (a completion on the lane pumps again)
+                    if wait != feeding.parkedFor {
+                        switch wait {
+                        case .earlierSongs:
+                            note("entry \(feeding.key) parked: its lane still holds songs before the one scheduled last")
+                        case .ranOut:
+                            note("entry \(feeding.key) held: its lane's node has played all on it, its last completion to come")
+                        }
+                    }
                     feeding.parked = buffer
+                    feeding.parkedFor = wait
                     feed = feeding
                     startLanesIfReady()
                     return
                 }
+                feeding.parkedFor = nil
                 feed = feeding
             }
         }
@@ -883,12 +926,18 @@ public final class PlaybackEngine {
         startLanesIfReady()
     }
 
-    /// Schedules a decoded buffer on its format's lane - or, returning false, doesn't: a song that
-    /// begins on a lane still holding songs that play BEFORE the one scheduled last (44.1 kHz, then a
-    /// short 96 kHz song on its own lane, then 44.1 kHz again while the first is still playing) would
-    /// be laid straight after the first song, ahead of the one between. It waits for that lane to run
-    /// out instead (`played` clears it), and then goes on it to start when the last lane ends.
-    private func schedule(_ decoded: AVAudioPCMBuffer, feed feeding: inout Feed) -> Bool {
+    /// Schedules a decoded buffer on its format's lane (nil) - or doesn't, and says why it waits:
+    /// - a song that begins on a lane still holding songs that play BEFORE the one scheduled last
+    ///   (44.1 kHz, then a short 96 kHz song on its own lane, then 44.1 kHz again while the first is
+    ///   still playing) would be laid straight after the first song, ahead of the one between. It waits
+    ///   for that lane to run out instead (`played` clears it), and then goes on it to start when the
+    ///   last lane ends.
+    /// - a lane whose node has played all on it, its last completion not handled yet (`ranOut`): the
+    ///   node's clock runs on through the silence, so what went on now would play after it while the
+    ///   count - the position, every resume point, the next lane's start - had it straight on, ahead
+    ///   by the silence for the rest of the lane. It waits for that completion, which starts the lane
+    ///   again from the frame it reached (`played`, the stream-behind path).
+    private func schedule(_ decoded: AVAudioPCMBuffer, feed feeding: inout Feed) -> Wait? {
         let key = LaneKey(decoded.format)
         let beginning = feeding.lane != key || feeding.entry == nil
         if beginning, let last = tail, last != key, let lastLane = lanes[last] {
@@ -897,7 +946,10 @@ public final class PlaybackEngine {
         }
         if beginning, let busy = lanes[key], !busy.timeline.isEmpty,
            let last = tail, last != key, let lastLane = lanes[last], !lastLane.timeline.isEmpty {
-            return false
+            return .earlierSongs
+        }
+        if let target = lanes[key], ranOut(target) {
+            return .ranOut
         }
         let lane = laneFor(decoded.format)
         let buffer = conform(decoded, to: lane.format)
@@ -915,7 +967,7 @@ public final class PlaybackEngine {
             entryKey[id] = feeding.key
             lane.timeline.begin(id: id, songOffset: (feeding.startFrame ?? 0) + feeding.decoded)
         }
-        guard let id = feeding.entry else { return true }
+        guard let id = feeding.entry else { return nil }
         lane.timeline.extend(id: id, frames: Int64(buffer.frameLength))
         feeding.decoded += Int64(buffer.frameLength)
         if let converter = lane.converter {
@@ -923,7 +975,17 @@ public final class PlaybackEngine {
         } else {
             enqueue(buffer, on: lane, key: key)
         }
-        return true
+        return nil
+    }
+
+    /// The lane's node has played everything put on it, by its own clock, and its last completion is
+    /// still to be handled: late (a busy phone, a starved thread - made certain with `completionLag`), or
+    /// beaten by a stream's retry that has just found bytes. The node's clock is past the count until
+    /// that completion starts the lane again or clears it (notes/ios.md "The engine's tests under load").
+    private func ranOut(_ lane: Lane) -> Bool {
+        guard lane.started, !lane.ends.isEmpty, engine.isRunning, let nodeTime = lane.node.lastRenderTime,
+              nodeTime.isSampleTimeValid, let playerTime = lane.node.playerTime(forNodeTime: nodeTime) else { return false }
+        return playerTime.sampleTime >= lane.nodeFrames
     }
 
     /// One buffer onto the lane's node. Its completion is `.dataRendered`: the moment the render
@@ -1106,9 +1168,12 @@ public final class PlaybackEngine {
         playAsked = nil
     }
 
-    /// Enough is scheduled on the lane to start it: `startSeconds`, or all there is.
+    /// Enough is scheduled on the lane to start it: `startSeconds`, or all there is - and something. A
+    /// node started with nothing on it plays silence with its clock running, and what goes on it after
+    /// plays later than the count says (a lane run dry and begun again, with a `startSeconds` of 0).
     private func ready(_ lane: Lane, _ key: LaneKey) -> Bool {
-        feed?.lane != key || lane.timeline.end >= frames(settings.startSeconds, lane.format.sampleRate)
+        lane.timeline.end > 0
+            && (feed?.lane != key || lane.timeline.end >= frames(settings.startSeconds, lane.format.sampleRate))
     }
 
     /// The lane that has the entry `key` scheduled on it.
@@ -1177,6 +1242,7 @@ public final class PlaybackEngine {
                 // ran dry mid-song: start the lane again from the frame it reached, once buffered (the
                 // converter keeps what it holds, so the song goes on unbroken from it)
                 let songFrame = entry.songOffset + entry.frames
+                note("lane \(Int(lane.format.sampleRate)) Hz ran dry mid-song: on again from frame \(songFrame) once buffered")
                 lane.node.stop()
                 lane.clear()
                 heardLane = nil
@@ -1458,6 +1524,7 @@ public final class PlaybackEngine {
         // the engine was stopped by a new route or hardware format (AirPods connecting, AirPlay):
         // make the lanes again and go on from the frame heard - estimated from the last reading,
         // less the old route's latency (its samples went with it)
+        note("a configuration change: the output \(engine.isRunning ? "running" : "stopped"), \(wantsPlay ? "playing" : "not playing")")
         let at = heard()
         let playing = wantsPlay
         reset()
@@ -1512,6 +1579,7 @@ public final class PlaybackEngine {
             lane.clear()
         }
         heardLane = nil
+        ended = Self.hostSeconds()
         publish(.ended)
         // the samples rendered are still on their way to the ear: the output stops once they are heard
         armIdle(after: lastLatency + settings.endLingerSeconds)

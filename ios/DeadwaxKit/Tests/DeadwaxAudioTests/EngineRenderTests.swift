@@ -372,20 +372,24 @@ func energyMap(_ samples: [Float], block: Int = 2_048) -> String {
 
     // AirPods out: the engine's configuration change and the app's pause for the old device gone
     // arrive on different queues, in either order - the pause wins, nothing plays on the speaker.
+    // The change's wait is 5 s here (0.3 s on the phone), so the pause surely lands inside it; that it
+    // let the restart go is asserted, not slept on (a sleep passed whether or not the restart had run).
     @Test func aRouteChangeThatPausesWinsOverPlayingOn() throws {
         let rate = 48_000.0
         let song = signal(frames: 96_000, channels: 2, seed: 0.9)
-        let engine = try offlineEngine(rate: rate, channels: 2, changeSettle: 0.2)
+        let engine = try offlineEngine(rate: rate, channels: 2, changeSettle: 5)
         engine.play(tracksFromWhereAsked([song], rate: rate), from: 0)
         engine.settle()
         _ = try engine.renderOffline(24_000)
         engine.settle()
         let before = try #require(engine.position())
         engine.systemStopped(change: true) // the change first...
-        engine.pause() // ...and the pause after it
-        Thread.sleep(forTimeInterval: 0.4)
+        try #require(engine.restartWaiting, "the change waits before playing on")
+        engine.pause() // ...and the pause after it, while it waits
         engine.settle()
+        #expect(!engine.restartWaiting, "the pause let the restart go: it never plays on")
         #expect(engine.phase == .paused)
+        #expect(!engine.outputRunning)
         let held = try #require(engine.position())
         #expect(abs(held.seconds - before.seconds) < 0.001)
     }

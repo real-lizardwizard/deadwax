@@ -91,6 +91,11 @@ public final class StreamFetch: NSObject, ByteSource, URLSessionDataDelegate {
             configuration.timeoutIntervalForRequest = idleTimeout
             let queue = OperationQueue()
             queue.maxConcurrentOperationCount = 1
+            // the bytes it writes are what the song heard is decoded from next: the engine's own QoS. At
+            // the default, a process keeping every core busy at the default QoS held the fetch off until
+            // it stopped (finished after 5.7 s of a 6 s spell, against 6 ms at this QoS: notes/ios.md "The
+            // engine's tests under load")
+            queue.qualityOfService = .userInitiated
             let session = URLSession(configuration: configuration, delegate: self, delegateQueue: queue)
             self.session = session
             return .running(session.dataTask(with: request))
