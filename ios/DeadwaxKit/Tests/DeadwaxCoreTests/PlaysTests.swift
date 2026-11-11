@@ -207,6 +207,21 @@ import Testing
         #expect(Self.play(&tracker, from: 0.5, to: 90, every: 0.5, clockFrom: 100.5, duration: 180) == [.played(songID: "b", atMs: 5000)])
     }
 
+    @Test func theClockIsReadFromTheJoinOn() {
+        //? usePlayer's crossInto sets lastAt to the join's moment: the first step after it may count no more than
+        //? the time since the join (and the slack), even when the position jumps and no seek was flagged
+        var tracker = ListenTracker()
+        tracker.newListen(songID: "a", at: 0, from: 190)
+        _ = tracker.began(wallMs: 1)
+        _ = Self.play(&tracker, from: 190, to: 199, clockFrom: 0, duration: 200)
+        #expect(tracker.lastAt == 9)
+        _ = tracker.join(into: "b", oldLength: 200, newPosition: 0.5, monotonic: 100.5, newDuration: 180, wallMs: 2)
+        #expect(tracker.lastAt == 100.5 && tracker.lastPosition == 0.5)
+        let before = tracker.listen.heard
+        #expect(tracker.tick(position: 30, monotonic: 101, duration: 180) == nil)
+        #expect(tracker.listen.heard - before == 0.5 + PlayRule.slack, "half a second since the join, and the slack")
+    }
+
     @Test func aJoinAfterASeekCountsNothingAcrossIt() {
         var tracker = ListenTracker()
         tracker.newListen(songID: "a", at: 0)

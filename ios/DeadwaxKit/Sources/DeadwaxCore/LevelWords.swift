@@ -188,9 +188,10 @@ public enum LevelWords {
 
     // ------------------------------------------------------------ the phone's
 
-    /// The answer Info's words are written from on the phone: what was applied to the song, once it has been
-    /// decided (it plays, or has played) - or, for a song not begun yet, what deadwax says of its album now
-    /// (so "Measuring the album… (3 of 10 songs)" can show). Nil until either exists.
+    /// The answer Info's words are written from on the phone: what was applied to the song, once it is settled
+    /// (it plays or has played, or its album's answer is fixed for the queue) - or, for a song whose open will
+    /// decide from whatever deadwax says then, what deadwax says of its album now (so "Measuring the album… (3
+    /// of 10 songs)" can show). Nil until either exists.
     static func answer(song: Song, level: Level?, decided: AppliedLevel?, live: AlbumLoudness?) -> LevelAnswer? {
         if let decided { return levelAnswer(decided) }
         guard let live else { return nil }
@@ -202,8 +203,9 @@ public enum LevelWords {
         return nil
     }
 
-    /// About's Normalization for a song on the phone: `level` as it was queued, `decided` what was applied (nil
-    /// before it has begun), `live` the book's answer for its album now.
+    /// About's Normalization for a song on the phone: `level` as it was queued, `decided` what is settled for it
+    /// (`LevelDecisions.settled` - nil while nothing is), `live` the book's answer for its album now. The app
+    /// calls the form that takes the queue's decisions, so a settled decision is never missed.
     public static func about(song: Song, level: Level?, decided: AppliedLevel?, live: AlbumLoudness?) -> String {
         if let late = unanswered(decided) { return unansweredAbout(late) }
         return aboutLevel(suffix: song.suffix, contentType: song.contentType, level: level, format: StreamFormat.format(for: song),
@@ -215,6 +217,17 @@ public enum LevelWords {
         if unanswered(decided) != nil { return unansweredDebug }
         return describeLevel(suffix: song.suffix, contentType: song.contentType, level: level, format: StreamFormat.format(for: song),
                              answer: answer(song: song, level: level, decided: decided, live: live))
+    }
+
+    /// About's Normalization for the queue's entry `key`: what its queue has settled for it, else what deadwax
+    /// says now.
+    public static func about(song: Song, level: Level?, key: Int, decisions: LevelDecisions, live: AlbumLoudness?) -> String {
+        about(song: song, level: level, decided: decisions.settled(key: key, level: level, song: song), live: live)
+    }
+
+    /// Debug's Normalization for the queue's entry `key`, from the same as `about`.
+    public static func debug(song: Song, level: Level?, key: Int, decisions: LevelDecisions, live: AlbumLoudness?) -> String {
+        debug(song: song, level: level, decided: decisions.settled(key: key, level: level, song: song), live: live)
     }
 
     // ------------------------------------------------------------ the file
@@ -268,7 +281,7 @@ public enum LevelWords {
     }
 
     /// About's Sound group on the phone: the same three rows, Gapless always On (the engine joins every song
-    /// end to end; D8), Normalization from what was applied or what deadwax says now.
+    /// end to end; D8), Normalization from what is settled or what deadwax says now.
     public static func soundRows(song: Song, level: Level?, decided: AppliedLevel?, live: AlbumLoudness?) -> [SoundRow] {
         let words = formatWords(FileFacts(song: song))
         return [
@@ -276,5 +289,10 @@ public enum LevelWords {
             SoundRow(label: "Gapless", value: "On"),
             SoundRow(label: "Normalization", value: about(song: song, level: level, decided: decided, live: live)),
         ]
+    }
+
+    /// About's Sound group for the queue's entry `key` (the form the app calls).
+    public static func soundRows(song: Song, level: Level?, key: Int, decisions: LevelDecisions, live: AlbumLoudness?) -> [SoundRow] {
+        soundRows(song: song, level: level, decided: decisions.settled(key: key, level: level, song: song), live: live)
     }
 }

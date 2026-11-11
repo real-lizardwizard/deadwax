@@ -10,6 +10,12 @@ written again (`node ios/scripts/export-level-vectors.cjs`) and the phone's test
 half is ui/test/ioslevels.sim.cjs's.
 
 No numpy needed: gain_for() is plain Python.
+
+The vectors are made on James's Mac; CI runs this on Linux, whose glibc log10 is not correctly rounded (five of the
+committed peaks' dB come out an ulp apart there, emulating glibc 2.39's e_log10.c) and whose pow may round a last
+bit differently. So what log10 and pow make - `peak_db`, `multiplier`, and the peaks the helper writes with ** - is
+compared within a few ulps; gain, wanted and held exactly (every case but one keeps them with log10 4 ulps off, and
+that one, `log10_stable` false, takes FULL_DB and its peak from the same log10, so it is the same everywhere here).
 """
 
 import importlib.util
@@ -48,6 +54,21 @@ def _f32(value: float) -> float:
     return struct.unpack("<f", struct.pack("<f", value))[0]
 
 
+def _near(a: float, b: float, ulps: int) -> bool:
+    """Within `ulps` ulps of each other: the last bits libm leaves to the platform."""
+    return a == b or abs(a - b) <= ulps * math.ulp(max(abs(a), abs(b)))
+
+
+def _f32_ulp(value: float) -> float:
+    """The gap above a 32-bit float (positive)."""
+    bits = struct.unpack("<I", struct.pack("<f", value))[0]
+    return struct.unpack("<f", struct.pack("<I", bits + 1))[0] - value
+
+
+#? which fields of a case a platform's libm makes, and how far apart two platforms' may be
+_LIBM_FIELDS = {"peak": 2, "peak_db": 4, "multiplier": 2}
+
+
 @pytest.mark.parametrize("case", CASES, ids=[case["name"] for case in CASES])
 def test_every_vector_is_gain_for_itself(case):
     lufs = -math.inf if case["loudness_lufs"] is None else case["loudness_lufs"]
@@ -58,8 +79,8 @@ def test_every_vector_is_gain_for_itself(case):
     if case["peak_db"] is None:
         assert gain.peak_db == -math.inf
     else:
-        assert gain.peak_db == case["peak_db"]
-    assert case["multiplier"] == 10 ** (gain.gain_db / 20)
+        assert _near(gain.peak_db, case["peak_db"], _LIBM_FIELDS["peak_db"])
+    assert _near(case["multiplier"], 10 ** (gain.gain_db / 20), _LIBM_FIELDS["multiplier"])
     assert case["multiplier_f32"] == _f32(case["multiplier"])
     #? the peak at the gain, in the very Float the phone multiplies by, never past full scale
     assert _f32(case["peak"]) * case["multiplier_f32"] <= 1.0
@@ -67,8 +88,28 @@ def test_every_vector_is_gain_for_itself(case):
 
 def test_the_vectors_are_the_ones_the_helper_makes():
     """The committed half is the helper's list run now: a case added, or the rule changed, means writing the
-    vectors again (and the Swift tests running on them)."""
-    assert _helper().python_half() == _vectors()["python_gain_for"]
+    vectors again (and the Swift tests running on them). Exactly, but for the last bits libm makes."""
+    made, committed = _helper().python_half(), _vectors()["python_gain_for"]
+    assert {key: value for key, value in made.items() if key != "cases"} == \
+        {key: value for key, value in committed.items() if key != "cases"}
+    assert [case["name"] for case in made["cases"]] == [case["name"] for case in committed["cases"]]
+    for mine, theirs in zip(made["cases"], committed["cases"]):
+        assert set(mine) == set(theirs), mine["name"]
+        for key, value in theirs.items():
+            if key in _LIBM_FIELDS and value is not None and mine[key] is not None:
+                assert _near(mine[key], value, _LIBM_FIELDS[key]), (mine["name"], key, mine[key], value)
+            elif key == "multiplier_f32":
+                #? the multiplier a last bit apart can round to the next Float
+                assert abs(mine[key] - value) <= _f32_ulp(min(mine[key], value)), (mine["name"], key)
+            else:
+                assert mine[key] == value, (mine["name"], key, mine[key], value)
+
+
+def test_only_the_24_bit_limit_hangs_on_log10s_last_bit():
+    """Every case keeps its gain and held with log10 a few ulps off, but the one whose limit is exactly 0: the
+    Swift tests hold that one to the rule's property, not its bits (a phone on Linux's glibc could fall either
+    side). A new case on such a boundary shows here first, to be moved off it or added to the property's list."""
+    assert [case["name"] for case in CASES if not case["log10_stable"]] == ["24-bit largest sample"]
 
 
 def test_the_constants_are_the_servers():

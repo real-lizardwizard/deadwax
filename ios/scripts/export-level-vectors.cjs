@@ -147,6 +147,9 @@ function levelsHalf() {
     ['song held at +0.04, wanted 1.5', { ...flac, level: 'track' }, 'raw', ans({ level: 'track', gain_db: 0.04, wanted_db: 1.5, held: true })],
     ['album held, wanted null', { ...flac, level: 'album' }, 'raw', ans({ gain_db: 2, wanted_db: null, held: true })],
     ['album held at 0, wanted -2', { ...flac, level: 'album' }, 'raw', ans({ gain_db: 0, wanted_db: -2, held: true })],
+    //? an album at the reference that peaks at full scale: gain_for(-18.0, 1.0) is -0.01, wanted 0, held - no
+    //? change needed, never "kept as it is" (only a change wanted and not made is that)
+    ['album held at -0.01, wanted 0', { ...flac, level: 'album' }, 'raw', ans({ gain_db: -0.01, wanted_db: 0, loudness_lufs: -18, held: true })],
     ['album unheld -0.01', { ...flac, level: 'album' }, 'raw', ans({ gain_db: -0.01, wanted_db: -0.01, held: false })],
     ['album silent', { ...flac, level: 'album' }, 'raw', ans({ gain_db: 0, wanted_db: 0, loudness_lufs: null })],
     ['song silent', { ...flac, level: 'track' }, 'raw', ans({ level: 'track', gain_db: 0, wanted_db: 0, loudness_lufs: null })],
@@ -167,6 +170,8 @@ function levelsHalf() {
     ['not levelled: no libraries', { ...flac, level: 'album' }, 'raw', ans({ state: 'not_levelled', gain_db: null, why: 'deadwax is running without numpy and soundfile' })],
     ['not levelled: no cache', { ...flac, level: 'album' }, 'raw', ans({ state: 'not_levelled', gain_db: null, why: "the player's cache can't be used on this server" })],
     ['not levelled: not flac', { ...flac, level: 'album' }, 'raw', ans({ state: 'not_levelled', gain_db: null, why: "it isn't a FLAC file" })],
+    //? ABOUT_REASONS's NOT_FLAC is anchored at the start: the words anywhere else are a file that can't be measured
+    ['not levelled: not flac, said mid-sentence', { ...flac, level: 'album' }, 'raw', ans({ state: 'not_levelled', gain_db: null, why: "Navidrome said: it isn't a FLAC file" })],
     ['not levelled: unreadable', { ...flac, level: 'album' }, 'raw', ans({ state: 'not_levelled', gain_db: null, why: "its file can't be read as FLAC by deadwax (20- or 32-bit)" })],
     ['not levelled: 6 channels', { ...flac, level: 'album' }, 'raw', ans({ state: 'not_levelled', gain_db: null, why: 'it has 6 channels - only mono and stereo are levelled' })],
     ['not levelled: no length', { ...flac, level: 'track' }, 'raw', ans({ level: 'track', state: 'not_levelled', gain_db: null, why: "its STREAMINFO doesn't say how long it is" })],
@@ -247,6 +252,9 @@ function infoVectors() {
     ['a length that rounds up', queueTrack({ id: 'x' }), { ...plain, song: [{ id: 'x', duration: 59.5, track: 2 }] }, null, false],
     ['the album not in hand', queueTrack(), null, null, false],
     ['played from a playlist\'s stub', queueTrack({ id: 't4', album: 'Dummy', albumId: 'dummy' }), stub, null, false],
+    //? a stub of a set holding songs of two discs, the album titling one: still no disc line (the album page would
+    //? draw "Disc 2 · Unreleased Tracks" over the whole album's songs, never over a stub's)
+    ['a playlist\'s stub of two discs', queueTrack(), { ...EXPERIENCE, song: [song('d1t1', 1, 1), song('d2t3', 2, 3)], partial: true }, null, false],
     ['no year sent', queueTrack(), { ...EXPERIENCE, year: undefined }, null, false],
     ['a year of 0', queueTrack(), { ...EXPERIENCE, year: 0 }, null, false],
     ['mixed formats', queueTrack(), { ...EXPERIENCE, song: [song('a', 1, 1), song('d2t3', 1, 2, { suffix: 'mp3' })] }, null, false],
@@ -288,8 +296,9 @@ function infoVectors() {
   ]
   const aboutRows = cases.map(([name, track, album, details, folders]) => {
     const about = A.aboutRows(track, album, details, false, folders)
-    //? Phase 1's artist card is the name (and the album artist's note): its link, facts and count are Phase 4's
-    const artist = about.artist ? { name: about.artist.name, note: about.artist.note } : null
+    //? Phase 1's artist card is the name and nothing else (D8): the album artist's note, the link, facts and
+    //? count are left to a later phase
+    const artist = about.artist ? { name: about.artist.name } : null
     return { name, track, album, details, folders, about: { song: about.song, album: about.album, artist } }
   })
   return {

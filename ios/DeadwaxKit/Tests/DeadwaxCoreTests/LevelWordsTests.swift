@@ -128,6 +128,60 @@ import Testing
         #expect(LevelWords.about(song: Self.flac, level: .album, decided: held, live: nil) == "Album volume matching, 3.5 dB louder - as loud as it can go without distorting")
     }
 
+    @Test func anAlbumAtTheReferenceThatPeaksAtFullScaleNeedsNoChange() {
+        //? gain_for(-18.0, 1.0): -0.01, wanted 0, held - nothing was wanted, so it is "no change needed", never
+        //? "kept as it is" (a change wanted and not made); the web says the same of the server's answer
+        //? (levels-vectors.json's "album held at -0.01, wanted 0")
+        let applied = decide(level: .album, song: Self.flac, answer: Self.measured(loudness: -18.0, peak: 1.0))
+        guard case .gain(let gain, .album, songs: 3) = applied else {
+            Issue.record("expected the album's gain, got \(applied)")
+            return
+        }
+        #expect(gain.gainDb == -0.01 && gain.wantedDb == 0 && gain.held)
+        #expect(LevelWords.about(song: Self.flac, level: .album, decided: applied, live: nil)
+                == "Album volume matching, no change needed - as loud as it can go without distorting")
+        #expect(LevelWords.debug(song: Self.flac, level: .album, decided: applied, live: nil)
+                == "Album, -0.01 dB \u{00B7} held there by its peak (it wanted +0.00)")
+    }
+
+    @Test func whatWasWantedIsRoundedAsTheServerRoundsItEvenAtATie() {
+        //? -18.125 LUFS wants exactly +0.125: the server's round(0.125, 2) is 0.12 (half to even, on the exact
+        //? binary value), which the web then says as "+0.12" - JS's toFixed would have made it "+0.13"
+        let held = decide(level: .album, song: Self.flac, answer: Self.measured(loudness: -18.125, peak: pow(10, (Loudness.fullDB - 0.1) / 20)))
+        #expect(levelAnswer(held)?.wantedDb == 0.12)
+        #expect(LevelWords.debug(song: Self.flac, level: .album, decided: held, live: nil).hasSuffix("held there by its peak (it wanted +0.12)"))
+    }
+
+    @Test func infoSaysWhatAnEntryNotYetOpenedWillPlayAt() {
+        //? the album's first song began while it was being measured, so the whole album plays as it is for this
+        //? queue (D3); its next song, skipped to while paused and not opened yet, says so - not the gain deadwax
+        //? has measured since, which it won't be played at
+        var decisions = LevelDecisions()
+        let first = Song(id: "s1", albumId: "al", suffix: "flac", contentType: "audio/flac")
+        _ = decisions.decide(key: 1, level: .album, song: first, answer: QueueDecisionTests.measuring)
+        #expect(LevelWords.about(song: Self.flac, level: .album, key: 2, decisions: decisions, live: Self.measured())
+                == "Not this time - the album was still being measured")
+        #expect(LevelWords.debug(song: Self.flac, level: .album, key: 2, decisions: decisions, live: Self.measured())
+                == "Played as it is this time - its album was still being measured")
+        #expect(LevelWords.soundRows(song: Self.flac, level: .album, key: 2, decisions: decisions, live: Self.measured()).last
+                == SoundRow(label: "Normalization", value: "Not this time - the album was still being measured"))
+        //? the other way round: fixed at its gain, it says the gain even while deadwax says it is measuring again
+        var atGain = LevelDecisions()
+        _ = atGain.decide(key: 1, level: .album, song: first, answer: Self.measured())
+        #expect(LevelWords.about(song: Self.flac, level: .album, key: 2, decisions: atGain, live: QueueDecisionTests.measuring)
+                == "Album volume matching, 7.4 dB quieter")
+        //? fixed with no answer at all: the D3 line
+        var none = LevelDecisions()
+        _ = none.decide(key: 1, level: .album, song: first, answer: nil)
+        #expect(LevelWords.about(song: Self.flac, level: .album, key: 2, decisions: none, live: Self.measured())
+                == "Not this time - the album's volume couldn't be checked")
+        //? nothing settled (its own song level, or nothing fixed yet): what deadwax says now
+        #expect(LevelWords.about(song: Self.flac, level: .track, key: 2, decisions: decisions, live: QueueDecisionTests.measuring)
+                == "Measuring the song\u{2026}")
+        #expect(LevelWords.about(song: Self.flac, level: .album, key: 2, decisions: LevelDecisions(), live: QueueDecisionTests.measuring)
+                == "Measuring the album\u{2026} (1 of 3 songs)")
+    }
+
     @Test func aSilentAlbumHasNothingToAdjust() {
         let silent = DecisionTests.answer(.measured, album: AlbumLevel(loudnessLufs: nil, peak: 0, songs: 3))
         let applied = decide(level: .album, song: Self.flac, answer: silent)

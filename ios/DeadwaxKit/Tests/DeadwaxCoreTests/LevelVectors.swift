@@ -45,6 +45,9 @@ enum LevelVectors {
         let held: Bool
         let multiplier: Double
         let multiplier_f32: Double
+        /// gain and held stay put with log10 a few ulps off (level_vectors.py): false only on a boundary log10's
+        /// last bit decides, which another platform's libm may decide the other way
+        let log10_stable: Bool
     }
 
     struct TypeScript: Decodable {

@@ -49,23 +49,35 @@ import Testing
         #expect(album.song?.count == 2)
         #expect(album.song?.first?.track == nil && album.song?.first?.discNumber == 1 && album.song?.first?.duration == 308.4)
         #expect(album.song?.first?.contributors == [SongDetails.Credit(role: "composer", name: "Geoff Barrow"), SongDetails.Credit(role: "composer", name: nil)])
-        #expect(album.discTitles == [DiscTitle(disc: 2, title: "Bonus"), DiscTitle(disc: 1, title: "One"), DiscTitle(disc: nil, title: "No"),
-                                     DiscTitle(disc: nil, title: "None")])
+        #expect(album.discTitles == [AboutDiscTitle(disc: 2, title: "Bonus"), AboutDiscTitle(disc: 1, title: "One"), AboutDiscTitle(disc: nil, title: "No"),
+                                     AboutDiscTitle(disc: nil, title: "None")])
         #expect(album.recordLabels == [AboutAlbum.Label(name: "Go! Beat"), AboutAlbum.Label(name: nil)])
         #expect(AboutCard.labelLine(album.recordLabels) == "Go! Beat")
         #expect(AboutCard.writtenBy(album.song?.first) == "Geoff Barrow")
     }
 
+    @Test func aStubOfTwoDiscsHasNoDiscLine() {
+        //? the info vector "a playlist's stub of two discs", by hand: the album page would head the song "Disc 2 ·
+        //? Unreleased Tracks", but a stub's songs aren't the album's - no disc line, as the web
+        let track = AboutTrack(id: "d2t3", title: "x", artist: "Pink Floyd", album: "Wish You Were Here", albumId: "wywh", coverArt: nil, duration: 300)
+        let songs = [SongDetails(id: "d1t1", track: 1, discNumber: 1), SongDetails(id: "d2t3", track: 3, discNumber: 2)]
+        let whole = AboutAlbum(id: "wywh", name: "Wish You Were Here", song: songs, discTitles: [AboutDiscTitle(disc: 2, title: "Unreleased Tracks")])
+        #expect(AboutCard.about(track: track, album: whole).song.lines == ["Track 3 \u{00B7} 5:00", "Disc 2 \u{00B7} Unreleased Tracks"])
+        let stub = AboutAlbum(id: "wywh", name: "Wish You Were Here", song: songs, partial: true,
+                              discTitles: [AboutDiscTitle(disc: 2, title: "Unreleased Tracks")])
+        #expect(AboutCard.about(track: track, album: stub).song.lines == ["Track 3 \u{00B7} 5:00"])
+    }
+
     @Test func aDiscWrittenAsTextIsReadAsJavaScriptReadsIt() {
-        #expect(DiscTitle.number("2") == 2)
-        #expect(DiscTitle.number(" 3 ") == 3)
-        #expect(DiscTitle.number("") == 0)
-        #expect(DiscTitle.number("1.5") == 1.5)
-        #expect(DiscTitle.number("Infinity") == nil)
-        #expect(DiscTitle.number("nan") == nil)
-        #expect(DiscTitle.number("0x10") == 16, "Number(\"0x10\") is 16 in JavaScript too")
-        #expect(DiscTitle.number("0x1p3") == nil)
-        #expect(DiscTitle.number("two") == nil)
+        #expect(AboutDiscTitle.number("2") == 2)
+        #expect(AboutDiscTitle.number(" 3 ") == 3)
+        #expect(AboutDiscTitle.number("") == 0)
+        #expect(AboutDiscTitle.number("1.5") == 1.5)
+        #expect(AboutDiscTitle.number("Infinity") == nil)
+        #expect(AboutDiscTitle.number("nan") == nil)
+        #expect(AboutDiscTitle.number("0x10") == 16, "Number(\"0x10\") is 16 in JavaScript too")
+        #expect(AboutDiscTitle.number("0x1p3") == nil)
+        #expect(AboutDiscTitle.number("two") == nil)
     }
 
     @Test func aPressingsYearIsReadWhetherTextOrNumber() throws {
@@ -83,12 +95,14 @@ import Testing
         #expect(AboutTrack(song: Song(id: "x")).duration == 0)
     }
 
-    @Test func theArtistCardIsTheSongsArtistAndANote() {
-        //? D8: the screen draws the name only; the note is here for when it is wanted
+    @Test func theArtistCardIsTheSongsArtistsNameAlone() {
+        //? D8: the name and nothing else - not even the web's "The album is by Various Artists" on a compilation
         let track = AboutTrack(id: "s1", title: "Roads", artist: "Portishead", album: "Dummy", albumId: "al", coverArt: nil, duration: 305)
         let album = AboutAlbum(id: "al", name: "Dummy", artist: "Various Artists", song: [SongDetails(id: "s1", artist: "Portishead", track: 4)])
         let about = AboutCard.about(track: track, album: album)
-        #expect(about.artist == About.ArtistCard(name: "Portishead", note: "The album is by Various Artists"))
+        #expect(about.artist == About.ArtistCard(name: "Portishead"))
+        let encoded = try? JSONEncoder().encode(about.artist)
+        #expect(encoded.map { String(decoding: $0, as: UTF8.self) } == #"{"name":"Portishead"}"#)
         //? a number past the album's count: no count; the length the queue's, the album sending none
         #expect(about.song.lines == ["Track 4 \u{00B7} 5:05"])
         #expect(about.album == About.AlbumCard(id: "al", title: "Dummy", coverArt: nil, line: "1 song", pressing: nil, folder: nil))

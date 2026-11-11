@@ -44,6 +44,11 @@ public enum AppliedLevel: Equatable, Sendable {
 /// missing from the answer (the album changed since) plays as it is; the song's own `not_levelled` before
 /// anything of its album's (as src/levels.py describe() decides); then by the song's own state (track) or the
 /// album's (album). `whole` is never read: the server answers `measured` only for a whole album.
+///
+/// A measured loudness with no peak beside it (the server sends null only for a peak that isn't finite, which
+/// today's never measures) plays as it is, as not measured: a peak of 0 would mean no limit at all, the whole
+/// gain wanted - +22 dB for a song at -40 LUFS - and the engine has no limiter behind it. With no loudness
+/// either it is silence, a gain of nothing, as the server's own gain_for() says.
 public func decide(level: Level?, song: Song, answer: AlbumLoudness?) -> AppliedLevel {
     guard let level else { return .off }
     guard song.isFlac else { return .notFlac }
@@ -55,7 +60,8 @@ public func decide(level: Level?, song: Song, answer: AlbumLoudness?) -> Applied
     case .track:
         switch mine.state {
         case .measured:
-            return .gain(gainFor(loudness: mine.loudnessLufs ?? -.infinity, peak: mine.peak ?? 0), .track, songs: 1)
+            guard let gain = safeGain(loudness: mine.loudnessLufs, peak: mine.peak) else { return .unmeasured(.track, songs: 1) }
+            return .gain(gain, .track, songs: 1)
         case .measuring:
             return .plain(.track, songs: 1, measured: 0)
         case .unmeasured, .notLevelled:
@@ -64,7 +70,10 @@ public func decide(level: Level?, song: Song, answer: AlbumLoudness?) -> Applied
     case .album:
         switch answer.state {
         case .measured:
-            return .gain(gainFor(loudness: answer.album.loudnessLufs ?? -.infinity, peak: answer.album.peak ?? 0), .album, songs: songs)
+            guard let gain = safeGain(loudness: answer.album.loudnessLufs, peak: answer.album.peak) else {
+                return .unmeasured(.album, songs: songs)
+            }
+            return .gain(gain, .album, songs: songs)
         case .notLevelled:
             return .notLevelled(why: answer.why, .album)
         case .measuring:
@@ -73,6 +82,14 @@ public func decide(level: Level?, song: Song, answer: AlbumLoudness?) -> Applied
             return .unmeasured(.album, songs: songs)
         }
     }
+}
+
+/// gain_for() on the route's numbers: a null loudness is silence (-infinity), a null peak beside a loudness is no
+/// gain at all (nil: play as it is) - and beside silence a peak of 0, whose gain is nothing either way.
+func safeGain(loudness: Double?, peak: Double?) -> Gain? {
+    guard let loudness else { return gainFor(loudness: -.infinity, peak: peak ?? 0) }
+    guard let peak else { return nil }
+    return gainFor(loudness: loudness, peak: peak)
 }
 
 /// Info's answer for a decision, in the web's LevelAnswer shape, so the web's own words (`LevelWords`) say it.
@@ -110,6 +127,10 @@ public func levelAnswer(_ applied: AppliedLevel, live: Bool = false) -> LevelAns
 ///    throughout, and a gapless join never steps (the web steps once its measurement lands; D3). Its next play
 ///    picks the gain up. A song of the album deadwax won't level is still that song's own decision.
 ///  - Track-level entries are each their own: decided from the answer in hand when each is opened.
+///
+/// Info reads `settled(key:level:song:)`, never a fresh `decide` on the book's answer: an album-level entry not
+/// opened yet (skipped to while paused, D4) whose album is fixed already will play from the fixed answer, so
+/// its words must come from that too.
 public struct LevelDecisions: Sendable, Equatable {
     public private(set) var entries: [Int: AppliedLevel] = [:]
     /// the answer each album's album-level entries are decided from (an entry with nil: there was none)
@@ -122,20 +143,34 @@ public struct LevelDecisions: Sendable, Equatable {
         entries[key]
     }
 
+    /// The album whose one answer an entry is decided from: an album-level FLAC's, nil for anything else.
+    static func sharing(level: Level?, song: Song) -> String? {
+        guard level == .album, song.isFlac else { return nil }
+        return song.albumId
+    }
+
+    /// What an entry is played at, as far as it is settled now, without deciding anything: the decision made at
+    /// its first open; else, for an album-level entry whose album's answer is fixed already, the decision its
+    /// open will make from that answer (it can be no other); else nil - its open will decide from whatever
+    /// deadwax says then. What Info's words are written from (`LevelWords.about`'s `decided`).
+    public func settled(key: Int, level: Level?, song: Song) -> AppliedLevel? {
+        if let made = entries[key] { return made }
+        guard let album = Self.sharing(level: level, song: song), let fixed = albums[album] else { return nil }
+        return DeadwaxCore.decide(level: level, song: song, answer: fixed)
+    }
+
     /// The entry's decision: the one made at its first open, or made now from `answer` (the book's for the
     /// song's album, at this moment) - for an album-level entry, from the answer its album's first was decided
     /// from.
     public mutating func decide(key: Int, level: Level?, song: Song, answer: AlbumLoudness?) -> AppliedLevel {
-        if let made = entries[key] { return made }
-        var from = answer
-        if level == .album, song.isFlac, let album = song.albumId {
-            if let fixed = albums[album] {
-                from = fixed
-            } else {
-                albums[album] = .some(answer)
-            }
+        if let made = settled(key: key, level: level, song: song) {
+            entries[key] = made
+            return made
         }
-        let made = DeadwaxCore.decide(level: level, song: song, answer: from)
+        if let album = Self.sharing(level: level, song: song) {
+            albums[album] = .some(answer)
+        }
+        let made = DeadwaxCore.decide(level: level, song: song, answer: answer)
         entries[key] = made
         return made
     }

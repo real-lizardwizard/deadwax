@@ -137,8 +137,7 @@
      "line": "1975 · FLAC · 11 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -279,8 +278,7 @@
      "line": "1975 · FLAC · 11 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -402,8 +400,7 @@
      "line": "1994 · FLAC · 11 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": "The album is by Portishead"
+     "name": "Pink Floyd"
     }
    }
   },
@@ -543,8 +540,7 @@
      "line": "1994 · FLAC · 11 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": "The album is by Portishead"
+     "name": "Pink Floyd"
     }
    }
   },
@@ -685,8 +681,7 @@
      "line": "1975 · FLAC · 11 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -752,8 +747,7 @@
      "line": "1994 · FLAC · 3 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": "The album is by Portishead"
+     "name": "Pink Floyd"
     }
    }
   },
@@ -802,8 +796,7 @@
      "line": "1994 · 1 song"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": "The album is by Portishead"
+     "name": "Pink Floyd"
     }
    }
   },
@@ -849,8 +842,7 @@
      "line": "1994 · 1 song"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": "The album is by Portishead"
+     "name": "Pink Floyd"
     }
    }
   },
@@ -900,8 +892,7 @@
      "line": "1994 · 1 song"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": "The album is by Portishead"
+     "name": "Pink Floyd"
     }
    }
   },
@@ -939,8 +930,7 @@
      "line": ""
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -994,8 +984,76 @@
      "line": "1994"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": "The album is by Portishead"
+     "name": "Pink Floyd"
+    }
+   }
+  },
+  {
+   "name": "a playlist's stub of two discs",
+   "track": {
+    "id": "d2t3",
+    "title": "Wish You Were Here (Live at Wembley)",
+    "artist": "Pink Floyd",
+    "album": "Wish You Were Here",
+    "albumId": "wywh",
+    "coverArt": "cover-wywh",
+    "duration": 308,
+    "contentType": "audio/flac",
+    "suffix": "flac",
+    "sampleRate": 44100,
+    "bitDepth": 16,
+    "channels": 2
+   },
+   "album": {
+    "id": "wywh",
+    "name": "Wish You Were Here",
+    "artist": "Pink Floyd",
+    "year": 1975,
+    "coverArt": "cover-wywh",
+    "song": [
+     {
+      "id": "d1t1",
+      "discNumber": 1,
+      "track": 1,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     },
+     {
+      "id": "d2t3",
+      "discNumber": 2,
+      "track": 3,
+      "duration": 300,
+      "suffix": "flac",
+      "artist": "Pink Floyd"
+     }
+    ],
+    "discTitles": [
+     {
+      "disc": 2,
+      "title": "Unreleased Tracks"
+     }
+    ],
+    "partial": true
+   },
+   "details": null,
+   "folders": false,
+   "about": {
+    "song": {
+     "title": "Wish You Were Here (Live at Wembley)",
+     "artist": "Pink Floyd",
+     "lines": [
+      "Track 3 · 5:00"
+     ]
+    },
+    "album": {
+     "id": "wywh",
+     "title": "Wish You Were Here",
+     "coverArt": "cover-wywh",
+     "line": "1975"
+    },
+    "artist": {
+     "name": "Pink Floyd"
     }
    }
   },
@@ -1135,8 +1193,7 @@
      "line": "FLAC · 11 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -1277,8 +1334,7 @@
      "line": "FLAC · 11 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -1346,8 +1402,7 @@
      "line": "1975 · 2 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -1414,8 +1469,7 @@
      "line": "1975 · 2 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -1475,8 +1529,7 @@
      "line": "1975 · FLAC · 1 song"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -1617,8 +1670,7 @@
      "line": "1975 · FLAC · 11 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -1758,8 +1810,7 @@
      "line": "1975 · FLAC · 11 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -1802,8 +1853,7 @@
      "line": "1975 · 10 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -1845,8 +1895,7 @@
      "line": "1 song"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -1884,8 +1933,7 @@
      "line": ""
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -2026,8 +2074,7 @@
      "line": "1975 · FLAC · 11 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -2060,8 +2107,7 @@
     },
     "album": null,
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -2202,8 +2248,7 @@
      "line": "1975 · FLAC · 11 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -2344,8 +2389,7 @@
      "line": "1975 · FLAC · 11 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -2486,8 +2530,7 @@
      "line": "1975 · FLAC · 11 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": "The album is by Various Artists"
+     "name": "Pink Floyd"
     }
    }
   },
@@ -2628,8 +2671,7 @@
      "line": "1975 · FLAC · 11 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -2716,8 +2758,7 @@
      "line": "1975"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -2858,8 +2899,7 @@
      "line": "1975 · FLAC · 11 songs"
     },
     "artist": {
-     "name": "Song artist",
-     "note": "The album is by Pink Floyd"
+     "name": "Song artist"
     }
    }
   },
@@ -3037,8 +3077,7 @@
      "folder": "Pink Floyd/Wish You Were Here (1975) [Experience edition]"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -3215,8 +3254,7 @@
      "pressing": "This pressing: Experience edition · 2011 · FLAC"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -3392,8 +3430,7 @@
      "line": "1975 · Harvest / EMI · FLAC · 11 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -3569,8 +3606,7 @@
      "line": "1975 · Harvest / EMI · FLAC · 11 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -3747,8 +3783,7 @@
      "pressing": "This pressing: Experience edition · 1975 · FLAC"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -3925,8 +3960,7 @@
      "pressing": "This pressing: 2011 · FLAC"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -4104,8 +4138,7 @@
      "pressing": "This pressing: 1975 · FLAC/MP3"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -4281,8 +4314,7 @@
      "pressing": "This pressing: 1975 · FLAC"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -4456,8 +4488,7 @@
      "line": "1975 · Harvest / EMI · FLAC · 11 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -4625,8 +4656,7 @@
      "folder": "A/Disc 1\nA/Disc 2"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -4802,8 +4832,7 @@
      "pressing": "This pressing: Experience edition · 2011 · FLAC"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -4961,8 +4990,7 @@
      "line": "1975 · Harvest / EMI · FLAC · 11 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -5124,8 +5152,7 @@
      "line": "1975 · Harvest / EMI · FLAC · 11 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -5277,8 +5304,7 @@
      "line": "1975 · FLAC · 11 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -5453,8 +5479,7 @@
      "line": "1975 · FLAC · 11 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -5597,8 +5622,7 @@
      "line": "1975 · FLAC · 11 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": null
+     "name": "Pink Floyd"
     }
    }
   },
@@ -5682,8 +5706,7 @@
      "line": "1994 · FLAC · 2 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": "The album is by Portishead"
+     "name": "Pink Floyd"
     }
    }
   },
@@ -5751,8 +5774,7 @@
      "line": "1994 · FLAC · 2 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": "The album is by Portishead"
+     "name": "Pink Floyd"
     }
    }
   },
@@ -5813,8 +5835,7 @@
      "line": "1994 · FLAC · 2 songs"
     },
     "artist": {
-     "name": "Pink Floyd",
-     "note": "The album is by Portishead"
+     "name": "Pink Floyd"
     }
    }
   }

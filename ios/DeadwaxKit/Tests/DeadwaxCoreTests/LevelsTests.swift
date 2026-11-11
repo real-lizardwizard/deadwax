@@ -9,9 +9,20 @@ import Testing
     @Test func everyServerCaseGivesTheServersGain() throws {
         let python = try LevelVectors.levels().python_gain_for
         #expect(python.cases.count >= 41)
+        //? the one case whose gain hangs on log10's last bit (its limit is exactly 0): the vectors were made with
+        //? macOS's log10, and `Loudness.fullDB` is a literal, so glibc's could put it a hundredth lower
+        #expect(python.cases.filter { !$0.log10_stable }.map(\.name) == ["24-bit largest sample"])
         for each in python.cases {
             let gain = gainFor(loudness: each.loudness_lufs ?? -.infinity, peak: each.peak, reserveDb: each.reserve_db)
-            #expect(gain.gainDb == each.gain_db, "\(each.name): gain")
+            if each.log10_stable {
+                #expect(gain.gainDb == each.gain_db, "\(each.name): gain")
+            } else {
+                //? the rule's property instead: the server's gain or the hundredth under it, never past the limit
+                //? this platform's log10 gives, and the peak inside full scale (below)
+                let below = ((each.gain_db * 100).rounded() - 1) / 100
+                #expect(gain.gainDb == each.gain_db || gain.gainDb == below, "\(each.name): gain \(gain.gainDb)")
+                #expect(gain.gainDb <= Loudness.fullDB - 20 * log10(each.peak) - each.reserve_db, "\(each.name): inside the limit")
+            }
             #expect(gain.wantedDb == each.wanted_db, "\(each.name): wanted")
             #expect(gain.held == each.held, "\(each.name): held")
             if let peakDb = each.peak_db {
@@ -22,7 +33,9 @@ import Testing
             let multiplier = gainMultiplier(gain.gainDb)
             let expected = Float(each.multiplier_f32)
             #expect(Double(expected) == each.multiplier_f32, "\(each.name): the vector's Float32 is one")
-            #expect(abs(multiplier - expected) <= expected.ulp, "\(each.name): multiplier \(multiplier) against \(expected)")
+            if each.log10_stable {
+                #expect(abs(multiplier - expected) <= expected.ulp, "\(each.name): multiplier \(multiplier) against \(expected)")
+            }
             //? the rule keeps every sample at or under full scale, in the very Float the phone multiplies by
             #expect(Float(each.peak) * multiplier <= 1, "\(each.name): the peak stays inside full scale")
         }
@@ -70,6 +83,33 @@ import Testing
         //? the phone keeps no reserve: the same song is not held there
         let phone = gainFor(loudness: -20, peak: pow(10, -4.0 / 20))
         #expect(phone.gainDb == 2.0 && !phone.held)
+    }
+
+    @Test func aLimitOfExactlyWhatWasWantedIsNotHeld() throws {
+        //? gain_for's `held` is `limit < wanted`: a peak that allows exactly the gain wanted didn't hold it, and
+        //? Debug says "the album at …", never "held there by its peak". Such a peak is found with this platform's
+        //? own log10, as gainFor works it, so the case stays exact whatever libm says: a peak whose limit L makes
+        //? -18 - (-18 - L) give L back, so the loudness asks for exactly L
+        var found: [(loudness: Double, peak: Double)] = []
+        var peak = 0.5011871738810982
+        for _ in 0..<256 where found.count < 4 {
+            peak = peak.nextUp
+            let limit = Loudness.fullDB - 20 * log10(peak) - 0
+            let loudness = Loudness.referenceLUFS - limit
+            if Loudness.referenceLUFS - loudness == limit { found.append((loudness, peak)) }
+        }
+        //? and the one this Mac's Python finds for gain_for(-24.0, 0.5011871738810982): limit and wanted both 6.0
+        if Loudness.fullDB - 20 * log10(0.5011871738810982) == 6.0 { found.append((-24.0, 0.5011871738810982)) }
+        try #require(!found.isEmpty, "no peak found whose limit is exactly what was wanted")
+        for (loudness, peak) in found {
+            let gain = gainFor(loudness: loudness, peak: peak)
+            #expect(gain.wantedDb == Loudness.fullDB - 20 * log10(peak), "\(peak): the limit is what was wanted")
+            #expect(!gain.held, "\(peak): not held")
+            #expect(gain.gainDb <= gain.wantedDb)
+            let words = LevelWords.describeLevel(suffix: "flac", contentType: nil, level: .album, format: "raw",
+                                                 answer: levelAnswer(.gain(gain, .album, songs: 1)))
+            #expect(!words.contains("held"), "\(words)")
+        }
     }
 
     @Test func theGainIsRoundedDownToTheHundredth() {
@@ -353,6 +393,23 @@ struct SplitMix {
         #expect(decide(level: .album, song: Self.flac, answer: answer) == decide(level: .album, song: Self.flac, answer: Self.answer(.measured)))
     }
 
+    @Test func aLoudnessWithNoPeakPlaysAsItIs() {
+        //? a peak of 0 would be no limit at all - the whole gain wanted, +22 dB here, with no limiter behind it:
+        //? a measured loudness with a null peak is played as it is, as not measured
+        let loud = AlbumLevel(loudnessLufs: -40, peak: nil, songs: 3)
+        #expect(decide(level: .album, song: Self.flac, answer: Self.answer(.measured, album: loud)) == .unmeasured(.album, songs: 3))
+        let songs = [SongLoudness(id: "s2", state: .measured, loudnessLufs: -40, peak: nil)]
+        #expect(decide(level: .track, song: Self.flac, answer: Self.answer(.measured, songs: songs)) == .unmeasured(.track, songs: 1))
+        #expect(decide(level: .track, song: Self.flac, answer: Self.answer(.measured, songs: songs)).multiplier == nil)
+        //? silence with no peak is still silence: nothing to adjust, as the server's gain_for says
+        let silent = AlbumLevel(loudnessLufs: nil, peak: nil, songs: 3)
+        #expect(decide(level: .album, song: Self.flac, answer: Self.answer(.measured, album: silent))
+                == .gain(Gain(gainDb: 0, wantedDb: 0, loudness: -.infinity, peakDb: -.infinity, held: false), .album, songs: 3))
+        //? and a peak of 0 that IS sent is digital silence's: the server's own rule, no limit
+        let zero = [SongLoudness(id: "s2", state: .measured, loudnessLufs: -30, peak: 0)]
+        #expect(decide(level: .track, song: Self.flac, answer: Self.answer(.measured, songs: zero)) == .gain(gainFor(loudness: -30, peak: 0), .track, songs: 1))
+    }
+
     @Test func aGainOfExactlyNothingMultipliesNothing() {
         let atReference = AppliedLevel.gain(gainFor(loudness: -18, peak: 0.5), .album, songs: 1)
         #expect(atReference.multiplier == nil)
@@ -413,6 +470,24 @@ struct SplitMix {
         let later = decisions.decide(key: 2, level: .album, song: Self.song("s3"), answer: Self.measuring)
         #expect(first == later)
         #expect(first.multiplier == later.multiplier)
+    }
+
+    @Test func whatIsSettledBeforeAnEntryIsOpened() {
+        var decisions = LevelDecisions()
+        //? nothing is settled before anything is decided: every open decides from what deadwax says then
+        #expect(decisions.settled(key: 2, level: .album, song: Self.song("s2")) == nil)
+        let first = decisions.decide(key: 1, level: .album, song: Self.song("s1"), answer: Self.measuring)
+        //? the album's answer is fixed: its next album-level entry, not opened yet, will be the same - and is it
+        //? when it is opened, whatever deadwax says by then
+        let settled = decisions.settled(key: 2, level: .album, song: Self.song("s2"))
+        #expect(settled == .plain(.album, songs: 3, measured: 1) && settled == first)
+        #expect(decisions.decided(2) == nil, "settled decides nothing")
+        #expect(decisions.decide(key: 2, level: .album, song: Self.song("s2"), answer: Self.measured) == settled)
+        //? a track-level entry, or another album's, isn't settled until it is opened
+        #expect(decisions.settled(key: 3, level: .track, song: Self.song("s3")) == nil)
+        #expect(decisions.settled(key: 4, level: .album, song: Self.song("s1", album: "al-2")) == nil)
+        //? and an entry decided is its decision
+        #expect(decisions.settled(key: 1, level: .album, song: Self.song("s1")) == first)
     }
 
     @Test func aSongThatIsntAFlacFixesNothing() {

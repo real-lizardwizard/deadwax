@@ -11,16 +11,25 @@ have reserve 0; the web's 3 dB room for a resampled copy is in a few, to show th
 `loudness_lufs` None stands for -inf (silence: no block above the gate), as the loudness route sends null for it;
 `peak_db` None for -inf (a peak of 0). `multiplier` is 10 ** (gain_db / 20) and `multiplier_f32` that rounded
 once to a 32-bit float - the one number the phone multiplies every sample by.
+
+`log10_stable` says whether the case's gain and held stay put when log10's answer is 1, 2 or 4 ulps off either
+way - as another platform's libm can be (glibc's log10 is not correctly rounded, and the phone's FULL_DB is a
+literal, not its own log10's). A stable case is held to its gain exactly everywhere; an unstable one sits on a
+boundary only log10's last bit decides (the 24-bit largest sample: its limit is exactly 0), and the Swift tests
+hold it to the rule's property instead. The numbers log10 and pow make (`peak_db`, `multiplier`, and the peaks
+written with **) can differ in their last bits between macOS and Linux, so the tests compare those within ulps.
 """
 
 import json
 import math
 import struct
 import sys
+import types
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from src import loudness  # noqa: E402
 from src.loudness import FULL_DB, REFERENCE_LUFS, gain_for  # noqa: E402
 from src.resample import HEADROOM_DB  # noqa: E402
 
@@ -87,13 +96,41 @@ def finite(value: float) -> float | None:
     return value if math.isfinite(value) else None
 
 
+def gain_with_log10_off(loudness_lufs: float, peak: float, reserve: float, ulps: int):
+    """gain_for() itself, with log10's answer `ulps` ulps off (up for more than 0) - FULL_DB left as it is."""
+    def log10(x: float) -> float:
+        y = math.log10(x)
+        for _ in range(abs(ulps)):
+            y = math.nextafter(y, math.inf if ulps > 0 else -math.inf)
+        return y
+    off = types.SimpleNamespace(**{name: getattr(math, name) for name in dir(math) if not name.startswith("_")})
+    off.log10 = log10
+    real = loudness.math
+    loudness.math = off
+    try:
+        return gain_for(loudness_lufs, peak, reserve)
+    finally:
+        loudness.math = real
+
+
+def log10_stable(loudness_lufs: float, peak: float, reserve: float) -> bool:
+    """Whether gain and held are the same with log10 1, 2 or 4 ulps off either way."""
+    gain = gain_for(loudness_lufs, peak, reserve)
+    for ulps in (-4, -2, -1, 1, 2, 4):
+        off = gain_with_log10_off(loudness_lufs, peak, reserve, ulps)
+        if (off.gain_db, off.held) != (gain.gain_db, gain.held):
+            return False
+    return True
+
+
 def case(name: str, lufs: float | None, peak: float, reserve: float) -> dict:
-    gain = gain_for(-math.inf if lufs is None else lufs, peak, reserve)
+    loudness_lufs = -math.inf if lufs is None else lufs
+    gain = gain_for(loudness_lufs, peak, reserve)
     multiplier = 10 ** (gain.gain_db / 20)
     return {
         "name": name, "loudness_lufs": lufs, "peak": peak, "reserve_db": reserve,
         "gain_db": gain.gain_db, "wanted_db": gain.wanted_db, "peak_db": finite(gain.peak_db), "held": gain.held,
-        "multiplier": multiplier, "multiplier_f32": f32(multiplier),
+        "multiplier": multiplier, "multiplier_f32": f32(multiplier), "log10_stable": log10_stable(loudness_lufs, peak, reserve),
     }
 
 

@@ -5,9 +5,9 @@ import Foundation
 // from the queue's entry, the album answer it was played from, and what Info asks for as it opens: the song as
 // Navidrome has it now (`GET /deadwax/navidrome/songs/{song_id}`, decoded as `SongDetails`) and the store's
 // rows of its album (the id bridge's `present`). The rule for every line, as on the web: a field Navidrome
-// didn't send is LEFT OUT, never guessed. Phase 1's artist card is the name (D8) - its link, facts and count
-// need routes the phone gets in Phase 4; the web's note "The album is by …" is worked out as the web works it.
-// Fixtures/levels/info-vectors.json holds every line to the TypeScript's own answers.
+// didn't send is LEFT OUT, never guessed. Phase 1's artist card is the name and nothing else (D8): the web's
+// note "The album is by …", its link, facts and count are not made here at all (the last three need routes the
+// phone gets in Phase 4). Fixtures/levels/info-vectors.json holds every line to the TypeScript's own answers.
 
 /// A song as Navidrome's answers carry it, for About: `GET /deadwax/navidrome/songs/{song_id}` (getSong passed
 /// on as it is - `{}` when Navidrome sent none), and each song of the album answer. Every field optional, and
@@ -84,7 +84,11 @@ public struct SongDetails: Decodable, Sendable, Equatable {
 
 /// A disc's title, as Navidrome's album answer carries it (OpenSubsonic `discTitles`): `disc` a number (or a
 /// number written as a string), `title` the title. Ones the rule can't use are dropped when it reads them.
-public struct DiscTitle: Decodable, Sendable, Equatable {
+///
+/// About's own reading of the field, apart from the album page's `DiscTitle` (the routes' models), which reads
+/// `disc` as an Int: here it is read as the web's discTitleMap reads it, JS's `Number(disc)` - " 2 ", "2.0",
+/// "0x2" and `true` are discs to the web and so to About, which info-vectors.json holds to the web's answers.
+public struct AboutDiscTitle: Decodable, Sendable, Equatable {
     /// JS's `Number(disc)`, or nil when it is none
     public let disc: Double?
     public let title: String?
@@ -102,7 +106,7 @@ public struct DiscTitle: Decodable, Sendable, Equatable {
         if let number = keyed.aboutNumber(.disc) {
             disc = number
         } else if let text = keyed.aboutString(.disc) {
-            disc = DiscTitle.number(text)
+            disc = AboutDiscTitle.number(text)
         } else if let flag = try? keyed.decodeIfPresent(Bool.self, forKey: .disc) {
             disc = flag ? 1 : 0
         } else {
@@ -149,13 +153,13 @@ public struct AboutAlbum: Decodable, Sendable, Equatable {
     public let song: [SongDetails]?
     /// a playlist's stub of the album (the web's, 2.0.0-player.58): `song` holds only the playlist's songs of it
     public let partial: Bool?
-    public let discTitles: [DiscTitle]?
+    public let discTitles: [AboutDiscTitle]?
     public let artistId: String?
     /// OpenSubsonic: the labels the files name
     public let recordLabels: [Label]?
 
     public init(id: String? = nil, name: String? = nil, artist: String? = nil, year: Double? = nil, coverArt: String? = nil,
-                songCount: Double? = nil, song: [SongDetails]? = nil, partial: Bool? = nil, discTitles: [DiscTitle]? = nil,
+                songCount: Double? = nil, song: [SongDetails]? = nil, partial: Bool? = nil, discTitles: [AboutDiscTitle]? = nil,
                 artistId: String? = nil, recordLabels: [Label]? = nil) {
         self.id = id
         self.name = name
@@ -281,10 +285,9 @@ public struct About: Codable, Sendable, Equatable {
         public let folder: String?
     }
 
+    /// The artist's card: the name, and nothing else in Phase 1 (D8).
     public struct ArtistCard: Codable, Sendable, Equatable {
         public let name: String
-        /// "The album is by Various Artists" - the album's own artist, when it isn't the song's
-        public let note: String?
     }
 
     public let song: SongCard
@@ -331,24 +334,17 @@ public enum AboutCard {
         let folder = folders ? folderLine(present) : nil
 
         let name = nonEmpty(song?.artist) ?? nonEmpty(track.artist) ?? nonEmpty(album?.artist) ?? ""
-        let albumArtist = album?.artist ?? ""
-        let note = !albumArtist.isEmpty && !sameName(albumArtist, name) ? "The album is by \(albumArtist)" : nil
 
         return About(
             song: About.SongCard(title: track.title, artist: track.artist, lines: lines, writtenBy: writers.isEmpty ? nil : writers),
             album: title.isEmpty ? nil : About.AlbumCard(id: track.albumId ?? album?.id, title: title, coverArt: album?.coverArt ?? track.coverArt,
                                                          line: albumLine, pressing: pressing, folder: folder),
-            artist: name.isEmpty ? nil : About.ArtistCard(name: name, note: note))
+            artist: name.isEmpty ? nil : About.ArtistCard(name: name))
     }
 
     static func nonEmpty(_ text: String?) -> String? {
         guard let text, !text.isEmpty else { return nil }
         return text
-    }
-
-    /// Two artist names that are one: case and spaces aside (aboutRows.ts sameName).
-    public static func sameName(_ a: String, _ b: String) -> Bool {
-        WebText.same(WebText.trim(a).lowercased(), WebText.trim(b).lowercased())
     }
 
     /// Who wrote a song, as Navidrome sends it: OpenSubsonic's one line, else its composers, each once.
@@ -406,7 +402,7 @@ public enum AboutCard {
 
     /// Each disc's title, by its number - blank titles and discs that aren't whole numbers above 0 left out, the
     /// first title of a disc kept (discTitles.ts discTitleMap).
-    static func discTitleMap(_ titles: [DiscTitle]?) -> [Double: String] {
+    static func discTitleMap(_ titles: [AboutDiscTitle]?) -> [Double: String] {
         var map: [Double: String] = [:]
         for entry in titles ?? [] {
             let title = WebText.trim(entry.title ?? "")
@@ -418,7 +414,7 @@ public enum AboutCard {
 
     /// For each song, the album page's heading above it, or nil: the first song of each disc, whenever the album
     /// shows headings at all - more than one disc, or a disc with a title (discTitles.ts discHeadings).
-    static func discHeadings(_ songs: [SongDetails], _ titles: [DiscTitle]?) -> [String?] {
+    static func discHeadings(_ songs: [SongDetails], _ titles: [AboutDiscTitle]?) -> [String?] {
         let byDisc = discTitleMap(titles)
         let discs = Set(songs.map(discOf))
         let show = discs.count > 1 || discs.contains { byDisc[$0] != nil }

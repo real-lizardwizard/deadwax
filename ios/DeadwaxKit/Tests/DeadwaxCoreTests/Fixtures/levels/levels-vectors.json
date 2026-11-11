@@ -15,7 +15,8 @@
     "peak_db": -0.9999999999999997,
     "held": false,
     "multiplier": 0.42657951880159267,
-    "multiplier_f32": 0.4265795052051544
+    "multiplier_f32": 0.4265795052051544,
+    "log10_stable": true
    },
    {
     "name": "quiet song held by its peak",
@@ -27,7 +28,8 @@
     "peak_db": -3.499999999999999,
     "held": true,
     "multiplier": 1.4945140423664582,
-    "multiplier_f32": 1.494513988494873
+    "multiplier_f32": 1.494513988494873,
+    "log10_stable": true
    },
    {
     "name": "room enough for the reserve",
@@ -39,7 +41,8 @@
     "peak_db": -6.000000000000001,
     "held": false,
     "multiplier": 1.2589254117941673,
-    "multiplier_f32": 1.258925437927246
+    "multiplier_f32": 1.258925437927246,
+    "log10_stable": true
    },
    {
     "name": "held inside the reserve",
@@ -51,7 +54,8 @@
     "peak_db": -4,
     "held": true,
     "multiplier": 1.1207274261366476,
-    "multiplier_f32": 1.1207274198532104
+    "multiplier_f32": 1.1207274198532104,
+    "log10_stable": true
    },
    {
     "name": "same, no reserve (the phone)",
@@ -63,7 +67,8 @@
     "peak_db": -4,
     "held": false,
     "multiplier": 1.2589254117941673,
-    "multiplier_f32": 1.258925437927246
+    "multiplier_f32": 1.258925437927246,
+    "log10_stable": true
    },
    {
     "name": "silence: loudness null, peak 0",
@@ -75,7 +80,8 @@
     "peak_db": null,
     "held": false,
     "multiplier": 1,
-    "multiplier_f32": 1
+    "multiplier_f32": 1,
+    "log10_stable": true
    },
    {
     "name": "under the gate: loudness null, peak 0.5",
@@ -87,7 +93,8 @@
     "peak_db": -6.020599913279624,
     "held": false,
     "multiplier": 1,
-    "multiplier_f32": 1
+    "multiplier_f32": 1,
+    "log10_stable": true
    },
    {
     "name": "under the gate: loudness null, full-scale peak",
@@ -99,7 +106,8 @@
     "peak_db": 0,
     "held": true,
     "multiplier": 0.9988493699365052,
-    "multiplier_f32": 0.9988493919372559
+    "multiplier_f32": 0.9988493919372559,
+    "log10_stable": true
    },
    {
     "name": "peak 0 (digital zero) but loudness given",
@@ -111,7 +119,8 @@
     "peak_db": null,
     "held": false,
     "multiplier": 3.9810717055349722,
-    "multiplier_f32": 3.981071710586548
+    "multiplier_f32": 3.981071710586548,
+    "log10_stable": true
    },
    {
     "name": "very quiet, small peak, not held",
@@ -123,7 +132,8 @@
     "peak_db": -60,
     "held": false,
     "multiplier": 125.89254117941675,
-    "multiplier_f32": 125.89253997802734
+    "multiplier_f32": 125.89253997802734,
+    "log10_stable": true
    },
    {
     "name": "very quiet, held",
@@ -135,7 +145,8 @@
     "peak_db": -40,
     "held": true,
     "multiplier": 99.88493699365053,
-    "multiplier_f32": 99.88493347167969
+    "multiplier_f32": 99.88493347167969,
+    "log10_stable": true
    },
    {
     "name": "very loud master",
@@ -147,7 +158,8 @@
     "peak_db": 0,
     "held": false,
     "multiplier": 0.1778279410038923,
-    "multiplier_f32": 0.17782793939113617
+    "multiplier_f32": 0.17782793939113617,
+    "log10_stable": true
    },
    {
     "name": "0 LUFS",
@@ -159,7 +171,8 @@
     "peak_db": 0,
     "held": false,
     "multiplier": 0.12589254117941673,
-    "multiplier_f32": 0.1258925348520279
+    "multiplier_f32": 0.1258925348520279,
+    "log10_stable": true
    },
    {
     "name": "exactly the reference",
@@ -171,7 +184,8 @@
     "peak_db": -6.020599913279624,
     "held": false,
     "multiplier": 1,
-    "multiplier_f32": 1
+    "multiplier_f32": 1,
+    "log10_stable": true
    },
    {
     "name": "full-scale peak, wants up",
@@ -183,7 +197,8 @@
     "peak_db": 0,
     "held": true,
     "multiplier": 0.9988493699365052,
-    "multiplier_f32": 0.9988493919372559
+    "multiplier_f32": 0.9988493919372559,
+    "log10_stable": true
    },
    {
     "name": "16-bit full scale peak 32767/32768",
@@ -195,7 +210,8 @@
     "peak_db": -0.00026507636037961915,
     "held": true,
     "multiplier": 1,
-    "multiplier_f32": 1
+    "multiplier_f32": 1,
+    "log10_stable": true
    },
    {
     "name": "24-bit largest sample",
@@ -207,7 +223,8 @@
     "peak_db": -0.0000010354387945871882,
     "held": true,
     "multiplier": 1,
-    "multiplier_f32": 1
+    "multiplier_f32": 1,
+    "log10_stable": false
    },
    {
     "name": "wanted -7.42",
@@ -219,7 +236,8 @@
     "peak_db": -40,
     "held": false,
     "multiplier": 0.4255984131337431,
-    "multiplier_f32": 0.4255984127521515
+    "multiplier_f32": 0.4255984127521515,
+    "log10_stable": true
    },
    {
     "name": "wanted -7.425 (floors to -7.43)",
@@ -231,7 +249,8 @@
     "peak_db": -40,
     "held": false,
     "multiplier": 0.4251087068046157,
-    "multiplier_f32": 0.4251087009906769
+    "multiplier_f32": 0.4251087009906769,
+    "log10_stable": true
    },
    {
     "name": "wanted -7.4299999",
@@ -243,7 +262,8 @@
     "peak_db": -40,
     "held": false,
     "multiplier": 0.4251087068046157,
-    "multiplier_f32": 0.4251087009906769
+    "multiplier_f32": 0.4251087009906769,
+    "log10_stable": true
    },
    {
     "name": "wanted -7.4200000001 (snaps to -7.42)",
@@ -255,7 +275,8 @@
     "peak_db": -40,
     "held": false,
     "multiplier": 0.4255984131337431,
-    "multiplier_f32": 0.4255984127521515
+    "multiplier_f32": 0.4255984127521515,
+    "log10_stable": true
    },
    {
     "name": "wanted 2.9999999999 (snaps up to 3.00)",
@@ -267,7 +288,8 @@
     "peak_db": -40,
     "held": false,
     "multiplier": 1.4125375446227544,
-    "multiplier_f32": 1.4125375747680664
+    "multiplier_f32": 1.4125375747680664,
+    "log10_stable": true
    },
    {
     "name": "wanted 1.2",
@@ -279,7 +301,8 @@
     "peak_db": -40,
     "held": false,
     "multiplier": 1.1481536214968828,
-    "multiplier_f32": 1.1481536626815796
+    "multiplier_f32": 1.1481536626815796,
+    "log10_stable": true
    },
    {
     "name": "wanted 7.42 from -25.42",
@@ -291,7 +314,8 @@
     "peak_db": -40,
     "held": false,
     "multiplier": 2.3496328208483073,
-    "multiplier_f32": 2.349632740020752
+    "multiplier_f32": 2.349632740020752,
+    "log10_stable": true
    },
    {
     "name": "wanted -0.001 (floors to -0.01)",
@@ -303,7 +327,8 @@
     "peak_db": -40,
     "held": false,
     "multiplier": 0.9988493699365052,
-    "multiplier_f32": 0.9988493919372559
+    "multiplier_f32": 0.9988493919372559,
+    "log10_stable": true
    },
    {
     "name": "wanted 3.999",
@@ -315,7 +340,8 @@
     "peak_db": -40,
     "held": false,
     "multiplier": 1.5830695667064394,
-    "multiplier_f32": 1.5830695629119873
+    "multiplier_f32": 1.5830695629119873,
+    "log10_stable": true
    },
    {
     "name": "wanted 0.004",
@@ -327,7 +353,8 @@
     "peak_db": -40,
     "held": false,
     "multiplier": 1,
-    "multiplier_f32": 1
+    "multiplier_f32": 1,
+    "log10_stable": true
    },
    {
     "name": "gain -0.25 exactly (JS toFixed(1) tie)",
@@ -339,7 +366,8 @@
     "peak_db": -40,
     "held": false,
     "multiplier": 0.9716279515771061,
-    "multiplier_f32": 0.971627950668335
+    "multiplier_f32": 0.971627950668335,
+    "log10_stable": true
    },
    {
     "name": "gain 0.75 exactly",
@@ -351,7 +379,8 @@
     "peak_db": -40,
     "held": false,
     "multiplier": 1.0901844923851276,
-    "multiplier_f32": 1.0901844501495361
+    "multiplier_f32": 1.0901844501495361,
+    "log10_stable": true
    },
    {
     "name": "gain -1.75 exactly",
@@ -363,7 +392,8 @@
     "peak_db": -40,
     "held": false,
     "multiplier": 0.81752303794365,
-    "multiplier_f32": 0.8175230622291565
+    "multiplier_f32": 0.8175230622291565,
+    "log10_stable": true
    },
    {
     "name": "gain 2.25 exactly",
@@ -375,7 +405,8 @@
     "peak_db": -40,
     "held": false,
     "multiplier": 1.2956866975170194,
-    "multiplier_f32": 1.2956867218017578
+    "multiplier_f32": 1.2956867218017578,
+    "log10_stable": true
    },
    {
     "name": "held, limit 1e-10 under 3.00 (guard: 2.99)",
@@ -387,7 +418,8 @@
     "peak_db": -3.0000010353387943,
     "held": true,
     "multiplier": 1.4109122364580962,
-    "multiplier_f32": 1.410912275314331
+    "multiplier_f32": 1.410912275314331,
+    "log10_stable": true
    },
    {
     "name": "held, limit 1e-10 over 3.00 (3.00)",
@@ -399,7 +431,8 @@
     "peak_db": -3.0000010355387943,
     "held": true,
     "multiplier": 1.4125375446227544,
-    "multiplier_f32": 1.4125375747680664
+    "multiplier_f32": 1.4125375747680664,
+    "log10_stable": true
    },
    {
     "name": "held, limit 1e-10 under 0.50 (guard: 0.49)",
@@ -411,7 +444,8 @@
     "peak_db": -0.5000010353387946,
     "held": true,
     "multiplier": 1.058034915996231,
-    "multiplier_f32": 1.058034896850586
+    "multiplier_f32": 1.058034896850586,
+    "log10_stable": true
    },
    {
     "name": "wanted 3 - 4e-9: within 5e-7 of 300 hundredths, snaps to 3.00",
@@ -423,7 +457,8 @@
     "peak_db": -40,
     "held": false,
     "multiplier": 1.4125375446227544,
-    "multiplier_f32": 1.4125375747680664
+    "multiplier_f32": 1.4125375747680664,
+    "log10_stable": true
    },
    {
     "name": "wanted 3 - 6e-9: just outside, floors to 2.99",
@@ -435,7 +470,8 @@
     "peak_db": -40,
     "held": false,
     "multiplier": 1.4109122364580962,
-    "multiplier_f32": 1.410912275314331
+    "multiplier_f32": 1.410912275314331,
+    "log10_stable": true
    },
    {
     "name": "wanted -2 - 4e-9: within 5e-7 above -200, snaps to -2.00",
@@ -447,7 +483,8 @@
     "peak_db": -40,
     "held": false,
     "multiplier": 0.7943282347242815,
-    "multiplier_f32": 0.7943282127380371
+    "multiplier_f32": 0.7943282127380371,
+    "log10_stable": true
    },
    {
     "name": "wanted -2 - 6e-9: floors to -2.01",
@@ -459,7 +496,8 @@
     "peak_db": -40,
     "held": false,
     "multiplier": 0.793414256777125,
-    "multiplier_f32": 0.7934142351150513
+    "multiplier_f32": 0.7934142351150513,
+    "log10_stable": true
    },
    {
     "name": "h=799.9999995: round(h,6) is 799.999999 (7.99); (h*1e6).rounded()/1e6 says 8.00",
@@ -471,7 +509,8 @@
     "peak_db": -40,
     "held": false,
     "multiplier": 2.5089961794654005,
-    "multiplier_f32": 2.5089962482452393
+    "multiplier_f32": 2.5089962482452393,
+    "log10_stable": true
    },
    {
     "name": "h=656.9999995: 6.56, the multiply shortcut says 6.57",
@@ -483,7 +522,8 @@
     "peak_db": -40,
     "held": false,
     "multiplier": 2.128139045982712,
-    "multiplier_f32": 2.128139019012451
+    "multiplier_f32": 2.128139019012451,
+    "log10_stable": true
    },
    {
     "name": "h=-818.0000005: -8.19, the multiply shortcut says -8.18",
@@ -495,7 +535,8 @@
     "peak_db": -40,
     "held": false,
     "multiplier": 0.3894933077036545,
-    "multiplier_f32": 0.38949331641197205
+    "multiplier_f32": 0.38949331641197205,
+    "log10_stable": true
    },
    {
     "name": "the loudness route's example album (3.1)",
@@ -507,7 +548,8 @@
     "peak_db": -0.09809849506211576,
     "held": false,
     "multiplier": 0.4693534343171951,
-    "multiplier_f32": 0.46935343742370605
+    "multiplier_f32": 0.46935343742370605,
+    "log10_stable": true
    },
    {
     "name": "a hi-res album held by its peak: the phone, no reserve",
@@ -519,7 +561,8 @@
     "peak_db": -6.000477743319013,
     "held": false,
     "multiplier": 1.9520907340433051,
-    "multiplier_f32": 1.9520907402038574
+    "multiplier_f32": 1.9520907402038574,
+    "log10_stable": true
    },
    {
     "name": "...and the web's copy of it, with the resample's room",
@@ -531,7 +574,8 @@
     "peak_db": -6.000477743319013,
     "held": true,
     "multiplier": 1.4125375446227544,
-    "multiplier_f32": 1.4125375747680664
+    "multiplier_f32": 1.4125375747680664,
+    "log10_stable": true
    }
   ]
  },
@@ -3917,6 +3961,29 @@
     "about": "Album volume matching, no change needed - as loud as it can go without distorting"
    },
    {
+    "name": "album held at -0.01, wanted 0",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "measured",
+     "gain_db": -0.01,
+     "wanted_db": 0,
+     "loudness_lufs": -18,
+     "peak_db": -1,
+     "held": true,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": null
+    },
+    "debug": "Album, -0.01 dB · held there by its peak (it wanted +0.00)",
+    "about": "Album volume matching, no change needed - as loud as it can go without distorting"
+   },
+   {
     "name": "album unheld -0.01",
     "track": {
      "suffix": "flac",
@@ -4375,6 +4442,29 @@
     },
     "debug": "Not levelled - it isn't a FLAC file",
     "about": "Off for this song - only FLAC songs are adjusted"
+   },
+   {
+    "name": "not levelled: not flac, said mid-sentence",
+    "track": {
+     "suffix": "flac",
+     "contentType": "audio/flac",
+     "level": "album"
+    },
+    "format": "raw",
+    "answer": {
+     "level": "album",
+     "state": "not_levelled",
+     "gain_db": null,
+     "wanted_db": -7.42,
+     "loudness_lufs": -10.6,
+     "peak_db": -1,
+     "held": false,
+     "songs": 3,
+     "measured_songs": 3,
+     "why": "Navidrome said: it isn't a FLAC file"
+    },
+    "debug": "Not levelled - Navidrome said: it isn't a FLAC file",
+    "about": "Off for this song - its file can't be measured"
    },
    {
     "name": "not levelled: unreadable",
