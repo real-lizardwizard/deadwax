@@ -80,7 +80,9 @@ func offlineEngine(rate: Double, channels: AVAudioChannelCount, changeSettle: Do
     settings.startSeconds = 0
     settings.bufferSeconds = 0.1
     settings.changeSettleSeconds = changeSettle
-    return try PlaybackEngine(settings: settings)
+    let engine = try PlaybackEngine(settings: settings)
+    engine.scheduleLag = testScheduleLag
+    return engine
 }
 
 /// What the engine asked the songs' sources for: each open's frame at the song's own rate - and

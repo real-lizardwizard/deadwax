@@ -25,6 +25,26 @@ func liveEngine(rate: Double, channels: AVAudioChannelCount = 2, ahead: Double =
     settings.changeSettleSeconds = changeSettle
     let engine = try PlaybackEngine(settings: settings)
     engine.latency = { latency }
+    engine.scheduleLag = testScheduleLag
+    return engine
+}
+
+/// Every test engine's buffers taken late by AVAudioPlayerNode, as on ios.yml's runner: DEADWAX_TEST_SCHEDULE_LAG
+/// seconds (unset: none). ios.yml runs the audio tests a second time at 0.0005 s, which failed 37 of
+/// EngineRenderTests' 53 before the engine's offline settle (notes/ios.md "A node's buffers, taken late").
+let testScheduleLag: TimeInterval = Double(ProcessInfo.processInfo.environment["DEADWAX_TEST_SCHEDULE_LAG"] ?? "") ?? 0
+
+/// An offline engine with the phone's own buffering - a second scheduled before a start from silence, 2 s
+/// kept ahead - in 0.1 s buffers.
+func phoneLikeEngine(rate: Double, channels: AVAudioChannelCount = 2) throws -> PlaybackEngine {
+    var settings = PlaybackEngine.Settings()
+    settings.offline = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: rate, channels: channels, interleaved: false)
+    settings.aheadSeconds = 2
+    settings.startSeconds = 1
+    settings.bufferSeconds = 0.1
+    settings.changeSettleSeconds = 0
+    let engine = try PlaybackEngine(settings: settings)
+    engine.scheduleLag = testScheduleLag
     return engine
 }
 
@@ -53,7 +73,16 @@ func completionsHandled(_ engine: PlaybackEngine, seconds: Double = 5,
                         sourceLocation: SourceLocation = #_sourceLocation) throws {
     let until = Date().addingTimeInterval(seconds)
     while engine.completionsDue > 0, Date() < until { Thread.sleep(forTimeInterval: 0.001) }
-    try #require(engine.completionsDue == 0, "the completions of what was rendered, handled within \(seconds) s",
+    guard engine.completionsDue > 0 else { return }
+    // which it was: AVAudioEngine's callbacks all handled - the node's clock has passed a buffer the render
+    // hasn't taken, which is AVAudioPlayerNode taking it late (ios.yml's runner) - or callbacks arrived and
+    // not handled, the engine's own queue held off
+    let arrived = engine.callbacksArrived, handled = engine.callbacksDone
+    let which = arrived == handled
+        ? "every callback AVAudioEngine made was handled, so the node's clock has passed a buffer it hasn't called back: AVAudioPlayerNode took the buffer late, its clock counting it on time (notes/ios.md \"A node's buffers, taken late\")"
+        : "AVAudioEngine called back \(arrived), the engine handled \(handled): its queue is held off"
+    try #require(engine.completionsDue == 0,
+                 "the completions of what was rendered, handled within \(seconds) s - \(which); \(engine.lanesSaid)",
                  sourceLocation: sourceLocation)
 }
 
@@ -122,27 +151,33 @@ final class GatedBytes: ByteSource {
 }
 
 /// A song held in memory whose frames past `arrived` haven't come yet - a stream behind, decoded: `.waiting`
-/// there until `release`.
+/// there until `release`. With `endHeld`, its end isn't said until `releaseEnd` either (a stream whose last
+/// bytes hold no audio - a tag, padding, the fetch's end - come after its last frame).
 final class GatedFrames: PCMSource {
     let samples: [[Float]]
     let format: AVAudioFormat?
     private let lock = NSLock()
     private var at = 0
     private var arrived: Int
+    private var endHeld: Bool
 
-    init(_ samples: [[Float]], rate: Double, arrived: Int) {
+    init(_ samples: [[Float]], rate: Double, arrived: Int, endHeld: Bool = false) {
         self.samples = samples
         format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: rate,
                                channels: AVAudioChannelCount(samples.count), interleaved: false)
         self.arrived = arrived
+        self.endHeld = endHeld
     }
 
-    /// The rest of the song has arrived.
-    func release() { lock.withLock { arrived = samples[0].count } }
+    /// The rest of the song has arrived - or its frames up to `frames`.
+    func release(to frames: Int? = nil) { lock.withLock { arrived = min(frames ?? samples[0].count, samples[0].count) } }
+
+    /// The stream's last bytes have come: its end is said.
+    func releaseEnd() { lock.withLock { endHeld = false } }
 
     func read(maxFrames: AVAudioFrameCount) throws -> PCMRead {
         let total = samples[0].count
-        if at >= total { return .end }
+        if at >= total { return lock.withLock { endHeld } ? .waiting : .end }
         let count = min(Int(maxFrames), lock.withLock { arrived } - at)
         if count <= 0 { return .waiting }
         let buffer = AVAudioPCMBuffer(pcmFormat: format!, frameCapacity: AVAudioFrameCount(count))!

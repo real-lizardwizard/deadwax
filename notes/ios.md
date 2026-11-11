@@ -134,7 +134,9 @@ The plan's section 3, as Phase 0 needs it:
   render's sample count). A song that would begin on a lane still holding songs that play before the
   one scheduled last (44.1 kHz, a short 96 kHz song, 44.1 kHz again) waits, its first buffer parked,
   until that lane has run out - see "After review, again". **The output starts once and keeps running while something plays**; a song
-  started from silence is scheduled `startLead` ahead (AVAudioSession's outputLatency + ioBufferDuration);
+  started from silence on an output just started is scheduled `startLead` ahead (AVAudioSession's
+  outputLatency + ioBufferDuration) - on one already running, not (since fix/engine-hold: "The hold on the
+  callbacks");
   a pause (or the queue's end, a stop, a failure) stops the engine at once - iOS counts a running output
   as playing, see "The pause the lock screen didn't see" (it was 60 s until then) - and the next play
   rebuilds from the frame left. A lane that runs dry mid-song
@@ -173,8 +175,9 @@ The plan's section 3, as Phase 0 needs it:
   another format, when another lane's first buffer is decoded, or when the lane's buffers run out with
   it still holding. A lane's end, for the next lane's start, is the node's exact frame count once
   flushed. Positions stay in the songs' own frames (the node's count at the rates' ratio). A lane that
-  runs dry mid-song keeps its converter, so the song goes on unbroken (the position reads up to the
-  filter's hold, under a millisecond, ahead). A configuration change makes the lanes again, since the
+  runs dry mid-song keeps its converter, so the song goes on unbroken. (What it holds is not "under a
+  millisecond", as this said: 576 song frames at 44.1 kHz and 1152 at 96 kHz, 12-13 ms, which the position
+  read ahead until fix/engine-hold counted them - see "The hold on the callbacks".) A configuration change makes the lanes again, since the
   output's rate may be another. `theRateConversionMeasured` renders 1 kHz (192/96/44.1 kHz -> 48 kHz)
   and a 30 kHz tone (aliasing) and prints the numbers (bounds 60 dB and -40 dB catch only a broken
   conversion): see "First run on macOS" for them. (The words used to say iOS converted "after the
@@ -1164,16 +1167,19 @@ each. Their findings, all four accepted:
     of the song, and the next song in another format starting over the end of this one.
   - The fix: schedule() holds the buffer (`Wait.ranOut`; "entry N held: its lane's node has played all on it"
     in the trace) while the lane's node has played all on it by its own clock and a completion is still to
-    come. That completion starts the lane again from the frame it reached, the path that was there. The check
+    come. (The clock was the wrong thing to ask: it is not exact, and on a real output it reads "played all"
+    with frames still to play. Since fix/engine-hold the hold is told by AVAudioEngine's callbacks - see "The
+    hold on the callbacks".) That completion starts the lane again from the frame it reached, the path that was there. The check
     comes after the earlier-songs one, so that wait is still said as it was ("parked").
   - The tests, in RanDryTests.swift: aLaneThatRunsDryMidSongGoesOnFromTheFrameItReached (the designed order),
     aLaneRunDryWhoseLastCompletionIsLateGoesOnFromTheFrameHeard (lag 0.25 s), aStallLongerThanWhatIsAheadGoes…
     (lag 1 s) and aSongInAnotherFormatStartsWhereALaneRunDryReallyEnds. Each wants the song bit-exact from the
     frame heard, the position that frame, and a pause and play bit-exact from it; the last wants the first
     song's second half alone to its very end. The last three fail without the fix.
-  - Left as it was: a lane's converter (a song whose rate isn't the output's) keeps its last frames, under
-    1 ms, until the lane's last completion, and they go on then (`flush`), after a node that has run out by
-    then. Not tested.
+  - Left as it was: a lane's converter (a song whose rate isn't the output's) keeps its last frames until the
+    lane's last completion, and they go on then (`flush`), after a node that has run out by then. Not tested.
+    (They are 12-13 ms, not "under 1 ms" as this said; fix/engine-hold counts them where they play - "The hold
+    on the callbacks".)
 - **A lane started with nothing on it (an engine fault, found by the first new test).** `ready()` let a lane
   start once `startSeconds` were scheduled - the tests' 0 - so the lane begun again after running dry started
   empty: its clock ran ahead of what then went on it, the phase said playing over silence, and the position
@@ -1225,6 +1231,169 @@ each. Their findings, all four accepted:
 - the real package and the one process, each with no load.
 The iOS sims and tests/test_source_bytes.py and tests/test_ios_contract.py pass. Swift 6.3, CI's, wasn't run
 here: ios.yml is its first run of this code.
+
+### A node's buffers, taken late (the CI cause, fix/engine-hold)
+
+ios.yml's macOS job failed again at 307384f: theQueuesEndIsHeardBeforeTheOutputStops waited out
+completionsHandled's 5 s with one completion due and none called back. An investigation and a challenge of it
+(both on this Mac, raw AVAudioPlayerNode and the engine) agree on the cause, and it is also 70cbef6's "not
+reproduced" aJoinIsTheTwoSongsLaidEndToEnd above.
+
+**What was found.**
+- **AVAudioPlayerNode performs scheduleBuffer asynchronously**, on a serial dispatch queue of its own: a sample
+  of a soak run shows `AVAudioPlayerNodeImpl::BufferCommand::Perform` on a GCD worker in a per-node queue named
+  CommandQueue, handing the slice to the audio unit, and `StopImpl` doing `dispatch_sync` onto the same queue.
+  It is so for a node attached while the engine runs (attached before the first start: 0 of 300 late), and
+  every lane is one: laneFor runs in pump, after the output has started - on the phone too. play() takes
+  effect at once.
+- **A render begun before that block has run plays the buffer a render (or more) late**, while the node's
+  clock (`playerTime`) counts it as on time; the `.dataRendered` completion follows the audio, not the clock.
+  A raw node scheduled, played and rendered at once: 165 of 200 late here, the first sound at frame 2400 or
+  4800 while the clock read 7200 after 7200 rendered; with 2 ms before the render, 0 of 200. Nothing tried is a
+  fence: reading isPlaying, playerTime or volume, prepare, a zero-frame render, a zero-length buffer.
+- **The window is however long GCD takes to run that block**: microseconds on this idle Mac, which is why it
+  never failed here; on ios.yml's loaded 3-vCPU runner, completions have been seen more than 10 ms late. Apple
+  documents only that a buffer with no time, on a playing node, "plays in the very near future".
+- **Emulated, it is CI's failures to the digit.** Each scheduleBuffer performed 0.5 ms late (`scheduleLag`,
+  below): theQueuesEnd's shape stuck 40 of 40 with CI's numbers (one due, ends [4800, 9600], the clock at
+  4800, nothing called back); 37 of EngineRenderTests' 53 failed, aJoinIsTheTwoSongsLaidEndToEnd with 70cbef6's
+  signature (first difference at frame 4096, 0.45767212 and 0.45776367, silent throughout with the
+  silence-after check passing), and aNextSongNotYetOnANodeIsLetGo's "C not straight after A" fits it too.
+
+**What changed.**
+- **Offline only, the engine waits for the node's queue before it renders**: renderOffline sleeps until
+  `offlineScheduleSettle` (10 ms) after the last buffer put on a node or node started (`lastScheduledAt`,
+  stamped in enqueue, in playFromSilence and at the next lane's start). The live path is untouched: the phone's
+  output paces its renders. 10 ms, not the 2 ms first proposed: the runner has shown GCD stalls past 10 ms, and
+  the 2 ms settle failed 40 of 40 at a 3 ms lag. It is a bound, not a fence (there is none); ios.yml's
+  second run is what says it holds there.
+- **`scheduleLag`, a tests-only hook beside `completionLag`**: each scheduleBuffer performed that long later,
+  in order, on a queue of the engine's, drained before any node or engine stops (as StopImpl does), and
+  skipped for a node detached meanwhile. `DEADWAX_TEST_SCHEDULE_LAG` sets it on every engine the tests make
+  (`offlineEngine`, `liveEngine`), and ios.yml runs the Audio tests a second time with it at 0.0005.
+- **completionsHandled says which it is**: with every callback AVAudioEngine made handled, "the node's clock
+  has passed a buffer it hasn't called back: AVAudioPlayerNode took the buffer late"; otherwise both counts; and
+  each lane's buffers scheduled and called back, its ends, frames and clock (`lanesSaid`).
+
+**What the tests hold** (BuffersTakenLateTests.swift): aJoinWithItsBuffersTakenLateIsStillTheTwoSongsEndToEnd
+(CI's aJoin with every buffer 0.5 ms late: the two songs end to end, bit-exact, silence after) and
+theQueuesEndWithItsBuffersTakenLateIsHeard (CI's theQueuesEnd: the song whole and on time, the queue's end).
+With the settle taken out both fail, and the helper's message names AVAudioPlayerNode; the whole Audio suite at
+`DEADWAX_TEST_SCHEDULE_LAG=0.0005` without the settle fails 49 of its 79, and passes with it.
+
+**What only the phone can tell.** Not "never", as first written: a start from silence on an output just
+started is the start lead ahead (milliseconds), and a node's CommandQueue later than that would start the song
+that late after a moment of silence, the count ahead by it. Top-ups go on 2 s ahead and the next lane is
+scheduled seconds ahead, so they aren't exposed. Nothing here has run on an iPhone or on macOS 26.
+
+### The hold on the callbacks (fix/engine-hold)
+
+98a9d9e's hold ("A lane run dry, its last completion still to come", above) was reviewed through three lenses,
+each finding judged by a skeptic; three designs followed, and two judges. All eleven findings were real. The
+root of the worst: **the node's clock is not exact**, and the hold read it as if it were.
+
+**What was found.**
+- **1, the clock.** 98a9d9e held a buffer while the node's clock said it had played all on it
+  (`playerTime >= nodeFrames`). On a real output a node started with play(at:) a host time counts from the
+  time asked while its first sample lands on a render's edge: its clock ran 245-651 frames ahead of its
+  samples on this Mac's output, and read "played all" with frames still to come. Bytes found then (a stream
+  catching up) were held, and a join that was seamless became a rebuffer: 21.7 ms of silence on this Mac's
+  output, 0.5 s and more on the phone's settings. A buffer taken late (above) puts the clock ahead the same way.
+- **3 and 6, a converter lane's count.** A lane converting (a 44.1 or 96 kHz song on the 48 kHz output) begun
+  again after running dry counted from what went INTO its converter, but the converter holds the last 576 song
+  frames at 44.1 kHz and 1152 at 96 kHz (about 627 and 576 of the output's, 12-13 ms), and those play first.
+  The position, and every pause, call or new route after, was that far ahead: a pause skipped 576 frames
+  (1516 with the completion late). The notes said "under a millisecond" (corrected above).
+- **4 and 10, a converter's tail.** A converter lane whose stream ran dry at the song's very last frame, its
+  end said only after, had only its converter's tail left: 98a9d9e never started it again (nothing counted on
+  it), silent for good, the queue never ending. `ready()` counted frames on the timeline, not on the node.
+- **2 and 11, nothing left.** The same at the output's rate (no converter): nothing of the song anywhere.
+  70cbef6 played silence saying playing; 98a9d9e said loading; both for good with the output running. A seek or
+  a resume at a song's very end did the same.
+- **5, another format started in the past.** A song in another format whose bytes came after the heard lane
+  had played all on it was started at that lane's end, a time the render had passed: a node played at a time
+  past counts from it, so its count ran ahead by the silence and the song after it started early, over its
+  end (B's position 25024 for 24000, C at 23488).
+- **7 and 9, the lead.** The start lead (output latency and an IO buffer: about 0.2 s on AirPods, 2 s on
+  AirPlay) was taken on every start from silence - a lane begun again after running dry, a skip, a seek while
+  playing - on an output that was already live: that long of silence before the song.
+- **8, the race.** Bytes read after AVAudioEngine has called the lane's last buffer back and before the engine
+  has handled it. With 98a9d9e's clock they were held; laid on the node that had run out (70cbef6) they played
+  after the silence, counted straight on.
+
+**What changed** (PlaybackEngine.swift).
+- **`ranOut` is told by the callbacks.** Each lane counts the buffers put on its node since it began
+  (`scheduled`) and the callbacks AVAudioEngine makes of them, on its own thread (`Calls`), for that beginning
+  only: an epoch bumped at each `clear`, since a stop lets every buffer go and their callbacks come later and
+  mustn't count for what goes on next. Played all = every one called back, its completion not yet handled.
+  One backstop reads the clock, past any error it has: 0.25 s past all on the node (`ranOutBackstopSeconds`),
+  for AVAudioEngine's completion thread held off longer than what is ahead, whose callbacks then come in a
+  burst and the first one handled pumps before the rest are counted.
+- **A lane begun again counts its converter's frames** (`converterHolds`): it begins at the frame they start
+  at, and they are counted on its timeline.
+- **A converter lane run dry with only its tail left** (played()'s tail path) begins again with those frames,
+  counted from where they begin, flushed onto its node; `ready()` wants something on the NODE (`nodeFrames`).
+- **`moveOnFromNothingLeft`**: with nothing of the song `current` names on a node, in a converter or counted,
+  its decode over, and no lane playing, the queue goes on to the first song scheduled, the one decoding, or
+  ends (`endIfNothingLeft`, pump's end factored out).
+- **The next lane never starts at an end already rendered**: not while the heard lane has run out
+  (`!ranOut(heard)`), and not at an end the render has passed (offline the render's count, live the node's
+  clock short of its end). It starts from silence once the heard lane's completions are handled.
+- **The lead only on an output just started** (`outputFresh`, set by ensureRunning's start, cleared by the
+  first start from silence and by sleep): play after a pause and a new route take it.
+- **The race goes the designed way**: its bytes are held ("entry N held"), and that completion begins the
+  lane again from the frame it reached once `startSeconds` are buffered, as after any run dry.
+
+**Where the judges differed, and what was taken.**
+- **Not taken: beginning the lane again at once with the bytes held** (one judge's `parkedWhole`). On the
+  phone the completion is queued right behind the retry, so the race's window is microseconds; and a stream
+  that has just run dry may still be slow, so starting with what little was held risks a scrap of sound and a
+  second gap where the wait gives one. Every restart waits for `startSeconds`.
+- **Kept: `!ranOut(heard)` at the next lane's start**, which the other judge found redundant. Offline it is
+  (its mutation survives: the end guard sees it), but live every callback can be in while the node's
+  `lastRenderTime` is not yet past the end, and the next lane would start in the past.
+- **Not taken**: a pool of spare nodes, settling run-outs before a start, a position-aware settle, a race
+  bound in seconds - each more machinery than the finding needs.
+
+**What the tests hold** (HoldOnTheCallbacksTests.swift, each a review's or a judge's probe with its prints made
+expectations, each failing without its change - see the mutations):
+- bytesFoundWhileTheNodeStillPlaysGoStraightOnWhateverItsClockSays (1): `clockAhead` starts the node 600
+  frames in the past, its clock that far ahead; the bytes go straight on, nothing held, bit-exact.
+- aRaceOnThePhonesBufferingIsHeldThenGoesOnExactly (8): `phoneLikeEngine` (2 s ahead, 1 s to start), the
+  completion 0.25 s late; held, then bit-exact from 48000, a pause and play exact from 57600.
+- aBurstOfLateCallbacksAfterAStallGoesOnFromTheFrameHeard: AVAudioEngine's callbacks 1 s late (`callbackLag`),
+  then a burst; the backstop holds, on from 14400.
+- lateCallbacksOfBuffersLetGoDontCountForTheNext: three seeks with the let-go callbacks 0.15 s late; nothing
+  held, nothing run dry (the epoch).
+- aResampledLaneBegunAgainCountsFromTheFrameItGaveOut (3, 6): 44.1 and 96 kHz, both orders, the position within
+  1.5 song frames of the ear and a pause exact.
+- aResampledSongsLastFramesAfterARunDryArePlayedAndTheQueueEnds, …ThenTheNextSongStraightAfter,
+  aConverterTailAfterTheNodeRanOutIsCountedWhereItPlays (4, 10).
+- aLaneBegunAgainWithNothingLeftEndsTheQueue, …ThenASongInAnotherFormat,
+  aLaneBegunAgainEmptyThenTheSameFormatBehindCountsFromItsOwnStart, aSeekOrAResumeAtASongsVeryEndPlaysTheNext
+  (2, 11).
+- anotherFormatLateAfterTheLaneRanOutStartsWhereItIsHeard and anotherFormatAfterAnEndAlreadyRenderedWithCallbacksLate
+  (5): B from the frame heard, C straight after B's last frame, alone.
+- theLeadIsTakenOnlyOnAnOutputJustStarted (7, 9): the lead at the first start, after a pause and on a new route;
+  none on a run-dry restart, a skip, a seek.
+- RanDryTests' four, unchanged, still pass: the designed order and 98a9d9e's three races.
+
+**Mutations**, each restored byte for byte (sha-256 checked), the Audio tests run through the build lock:
+the clock put back as `ranOut` (fails bytesFound…); the hold taken out (7 tests); the backstop out (aBurst…); the
+epoch out (lateCallbacks…); `ready()` as 70cbef6 had it (7) and as 98a9d9e had it (2); the converter's frames
+uncounted (aResampledLaneBegunAgain…); `moveOnFromNothingLeft` out (3); the old tail flush (aConverterTail…); the
+end guards out (anotherFormatAfterAnEndAlreadyRendered…); both join guards out (both anotherFormat… tests); the
+lead always taken (theLeadIs…); the settle at 0 (both BuffersTakenLate tests; 49 of 79 at a 0.5 ms lag). The
+one that survives is `!ranOut(heard)` alone, offline, as said above.
+
+**What only the phone can tell.**
+- That a real output's `.dataRendered` callbacks come after the render that took a buffer's last sample, never
+  before it - the hold now rests on that, where it rested on the clock.
+- A real stall (the network gone mid-song): one rebuffer of about a second, and the position, a pause and a call
+  right after it.
+- That the backstop never fires in normal playback (it needs the clock a quarter of a second past all on the
+  node with a callback still to come).
+- A 44.1 kHz album over a bad connection: a pause after a rebuffer going on from the frame heard.
 
 ### Verified (Phase 1's Core, p1/merge, 2026-11-10)
 
