@@ -738,7 +738,8 @@ def test_calls_already_on_their_way_when_the_login_dies_end_it_once(player):
     assert auth.player_refused(stand_in) is False
 
 
-def test_a_refused_login_is_a_401_from_the_status_the_bridge_the_turntable_the_pins_and_the_descriptions(player):
+def test_a_refused_login_is_a_401_from_the_status_the_bridge_the_turntable_the_pins_the_descriptions_and_the_loudness(
+        player):
     """Each place that turns a Navidrome failure into "Navidrome didn't say" lets a refused login through."""
     asks = [("get", f"{PLAYER}/status", None), ("get", f"{BRIDGE}?navidrome_id=nd-dummy", None),
             ("get", f"{BRIDGE}?release_mbid={CD}", None),
@@ -746,7 +747,10 @@ def test_a_refused_login_is_a_401_from_the_status_the_bridge_the_turntable_the_p
             ("post", "/deadwax/me/pins/toggle", {"kind": "album", "pinned": True, "navidrome_id": "nd-dummy"}),
             #? (2.0.13) the descriptions' Navidrome side
             ("get", "/deadwax/describe/artist?navidrome_id=ar-1", None),
-            ("get", "/deadwax/describe/album?navidrome_id=nd-dummy", None)]
+            ("get", "/deadwax/describe/album?navidrome_id=nd-dummy", None),
+            #? (2.1.1, after review) the iPhone app's loudness of an album: its getAlbum as the asker refused is the 401
+            #? that brings the app's sign-in up - never the 404 of an album that isn't theirs
+            ("get", f"{PLAYER}/loudness/album/nd-dummy", None)]
     for method, path, body in asks:
         ethan = signed_in(player, "ethan")
         player.fake.passwords["ethan"] = "changed"

@@ -1641,6 +1641,11 @@ def test_the_apps_loudness_route_reports_what_is_measured_without_the_libraries_
     blocked.write_text("not a folder")
     no_folder = Mp4Cache(blocked)
     monkeypatch.setattr(player_cache, "cache", no_folder)
+    #? (after review) both missing: the libraries are said first, as describe() and the stream say them
+    monkeypatch.setattr(levels, "missing_libraries", lambda: "numpy")
+    both = album_loudness(client)
+    assert (both["state"], both["why"], both["album"]["songs"]) == ("not_levelled", levels.NO_LIBRARIES, 3)
+    monkeypatch.setattr(levels, "missing_libraries", real)
     answer = album_loudness(client)
     assert (answer["state"], answer["why"], answer["album"]["songs"]) == ("not_levelled", levels.NO_CACHE, 3)
     no_folder.levels.store = store
@@ -1844,6 +1849,85 @@ def test_the_apps_loudness_route_gives_no_lasting_answer_for_a_look_that_failed_
     why = levels.NO_LIBRARIES if missing == "libraries" else levels.NO_CACHE
     assert (lasting["state"], lasting["why"], lasting["whole"]) == ("not_levelled", why, False)
     assert states(lasting)[2] == ("song-3", "unmeasured", None)
+
+
+def test_the_apps_loudness_route_pools_a_song_listed_twice_twice_as_the_stream_does(upstream, client, mp4_cache, store,
+                                                                                    tmp_path, monkeypatch):
+    """
+    (After review) Navidrome's listing naming a song twice (an album that holds the same file twice over): the answer
+    has an entry for each - four, in the listing's order - and the album pools that song twice, as the stream's album
+    gain does (_album_songs() keeps every listed FLAC id). Tidied to one, the phone's album gain would be another than
+    the web's. Its version and STREAMINFO are read once all the same: each id is looked at once.
+    """
+    np, sf, _ = libs()
+    #? within 10 LU of each other, so the relative gate keeps every block and the second song-3 moves the level
+    files = {f"song-{i}": write_flac(sf, tmp_path / f"twice-{i}.flac", music(np, 44100, 44100 * 2 + i, level=level,
+                                                                             seed=i), 44100, 16).read_bytes()
+             for i, level in ((1, 0.25), (2, 0.25), (3, 0.7))}
+    state, _ = upstream
+    album = serving(state, files)
+    album.listed.append("song-3")
+    real, looks = levels.Levels._song, []
+
+    async def looked_at(self, song_id):
+        looks.append(song_id)
+        return await real(self, song_id)
+
+    monkeypatch.setattr(levels.Levels, "_song", looked_at)
+    fresh = album_loudness(client)
+    assert [song["id"] for song in fresh["songs"]] == ["song-1", "song-2", "song-3", "song-3"]
+    assert (fresh["state"], fresh["whole"], fresh["album"]["songs"]) == ("unmeasured", True, 4)
+    assert sorted(looks) == ["song-1", "song-2", "song-3"], "each id looked at once, however often it is listed"
+    assert album.ranges["song-3"] == ["bytes=0-3", "bytes=0-65535"], "and Navidrome asked for its file's head once"
+    monkeypatch.setattr(levels.Levels, "_song", real)
+
+    played = client.get(url("song-1"))
+    answer = album_loudness(client)
+    one, two, three = (mp4_cache.levels._read[key_of(files[song])] for song in ("song-1", "song-2", "song-3"))
+    assert (answer["state"], answer["whole"], len(answer["songs"])) == ("measured", True, 4)
+    assert answer["album"] == {"loudness_lufs": loudness.loudness_of([one, two, three, three]), "peak": three.peak,
+                               "songs": 4}
+    assert answer["songs"][3] == answer["songs"][2] == {"id": "song-3", "state": "measured",
+                                                        "loudness_lufs": three.loudness, "peak": three.peak, "why": None}
+    album_level = answer["album"]
+    assert loudness.gain_for(album_level["loudness_lufs"], album_level["peak"], 0.0).gain_db == gain_of(played)
+    #? and the test means something: pooled once, the gain would be another
+    assert loudness.gain_for(loudness.loudness_of([one, two, three]), three.peak, 0.0).gain_db != gain_of(played)
+
+
+def test_the_apps_loudness_route_looks_at_an_albums_songs_eight_at_a_time(upstream, client, mp4_cache, monkeypatch):
+    """(After review) The app asks every 5 s while an album is measured: a 20-song album's songs are looked at
+    LOOKS_AT_ONCE at a time, as the stream's album is - never 20 sets of ranges asked of Navidrome at once."""
+    state, _ = upstream
+    serving(state, {f"song-{i}": constant_flac(rate=44100, bps=16, blocks=(4096,) * (2 + i)) for i in range(20)})
+    real = levels.Levels._song
+    looking, most = set(), []
+
+    async def counted(self, song_id):
+        looking.add(song_id)
+        most.append(len(looking))
+        try:
+            await asyncio.sleep(0.02)
+            return await real(self, song_id)
+        finally:
+            looking.discard(song_id)
+
+    monkeypatch.setattr(levels.Levels, "_song", counted)
+    answer = album_loudness(client)
+    assert (answer["whole"], answer["album"]["songs"], len(most)) == (True, 20, 20)
+    assert max(most) == levels.LOOKS_AT_ONCE == 8
+
+
+def test_the_apps_loudness_route_takes_an_id_as_long_as_navidromes_and_no_longer(upstream, client, mp4_cache):
+    """(After review) The album id is bounded, as every id the player's routes take (ID_MAX): one longer is a 422 with
+    nothing asked of Navidrome; the longest is asked for, as the asker and then as the shared account."""
+    state, seen = upstream
+    album = serving(state, {"song-1": constant_flac(rate=44100, bps=16, blocks=(4096,) * 4)})
+    assert client.get(f"/deadwax/navidrome/loudness/album/{'x' * (navidrome_routes.ID_MAX + 1)}").status_code == 422
+    assert seen == [] and album.calls == []
+    album.album_id = "x" * navidrome_routes.ID_MAX
+    answer = album_loudness(client, f"/deadwax/navidrome/loudness/album/{album.album_id}")
+    assert album.calls == [("getAlbum", album.album_id)] * 2 and (answer["whole"], answer["album"]["songs"]) == (True, 1)
 
 
 def test_every_loudness_answer_is_made_with_every_key():
