@@ -1953,4 +1953,12 @@ another.
   - Debug's Source row;
   - About.swift's older trackTime;
   - docs/ios.md and ios/README.md, which still describe Phase 0;
-  - the engine test `aNewRouteGoesOnFromTheFrameHeard`, which failed once on timing under load.
+  - the engine test `aNewRouteGoesOnFromTheFrameHeard`, which failed once on timing under load;
+  - later, **the play queue picked up live** between the phone and the web app, which James wants eventually
+    (decided 2026-11-11: the on-open and on-front rule of "Resume" stays for now). The two ways put to him: the
+    phone alone, asking deadwax every ~15 s while the app is on screen and paused (GET /queue reads Navidrome's
+    queue, so another Navidrome app's save shows too); or deadwax sending each change over an SSE stream the
+    app holds open while it runs (not Apple push, which a free account doesn't get; shaped like the event log's
+    stream, but each person's own, not the `server` permission's), server work on main as a 2.1.x patch. A
+    stream sees only the saves made through deadwax: another app's, saved straight to Navidrome, would need
+    deadwax to ask Navidrome as well.
