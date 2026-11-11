@@ -1,0 +1,37 @@
+{
+  "about": "lib/myLibrary.ts isNew(newMarks(answer), album) for each answer (rows) and album (columns). Written by ios/scripts/export-library-vectors.cjs.",
+  "answers": [
+    null,
+    {"on":false},
+    {"on":true,"library":false,"kept":false},
+    {"on":true,"library":true,"kept":true,"count":12,"starred":10,"new":[{"album_id":1,"artist":"Portishead","album":"Dummy","release_mbid":"rel-1","release_group_mbid":"grp-1","navidrome_id":"nd-dummy","added_at":"2026-10-15T09:00:00+00:00","how":"grabbed"},{"album_id":3,"artist":"Portishead","album":"Third","release_mbid":"rel-3","release_group_mbid":"grp-3","navidrome_id":null,"added_at":"2026-10-15T09:00:00+00:00","how":"grabbed"}]},
+    {"on":true,"library":true,"kept":true,"count":3,"starred":3,"new":[{"album_id":4,"artist":"Portishead","album":"Mixed","release_mbid":"REL-Mixed-ABC","release_group_mbid":"grp-4","navidrome_id":"","added_at":"2026-10-15T09:00:00+00:00","how":"grabbed"},{"album_id":5,"artist":"Portishead","album":"No release","release_mbid":null,"release_group_mbid":"grp-5","navidrome_id":"nd-5","added_at":"2026-10-15T09:00:00+00:00","how":"grabbed"},{"album_id":6,"artist":"Portishead","album":"Empty","release_mbid":"","release_group_mbid":"grp-6","navidrome_id":null,"added_at":"2026-10-15T09:00:00+00:00","how":"grabbed"},{"album_id":7,"artist":"Portishead","album":"Spaced","release_mbid":" rel-7 ","release_group_mbid":"grp-7","navidrome_id":"ND-7","added_at":"2026-10-15T09:00:00+00:00","how":"grabbed"}]},
+    {"on":true,"library":true,"kept":true,"count":0,"starred":0,"new":[]}
+  ],
+  "albums": [
+    {"id":"nd-dummy"},
+    {"id":"nd-x","musicBrainzId":"REL-3"},
+    {"id":"nd-x","musicBrainzId":"rel-4"},
+    {"id":"nd-x","musicBrainzId":"rel-1"},
+    {"id":"nd-x","musicBrainzId":"  REL-1  "},
+    {"id":"nd-x","musicBrainzId":""},
+    {"id":""},
+    {"id":"nd-5"},
+    {"id":"ND-5"},
+    {"id":"nd-7"},
+    {"id":"ND-7"},
+    {"id":"nd-y","musicBrainzId":"rel-mixed-abc"},
+    {"id":"nd-y","musicBrainzId":" rel-7 "},
+    {"id":"nd-y","musicBrainzId":"rel-7"},
+    {"id":"nd-y","musicBrainzId":"REL-MIXED-ABC"},
+    {"id":"nd-dummy","musicBrainzId":"other"}
+  ],
+  "isNew": [
+    [false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false],
+    [false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false],
+    [false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false],
+    [true,true,false,true,true,false,false,false,false,false,false,false,false,false,false,true],
+    [false,false,false,false,false,false,false,true,false,false,true,true,false,false,true,false],
+    [false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false]
+  ]
+}
