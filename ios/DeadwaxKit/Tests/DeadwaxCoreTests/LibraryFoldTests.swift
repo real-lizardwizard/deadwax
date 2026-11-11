@@ -64,6 +64,30 @@ import Testing
         #expect(Array("ΟΔΟΣ".lowercased().unicodeScalars.map(\.value)) == [0x3BF, 0x3B4, 0x3BF, 0x3C3])
     }
 
+    /// (review) Every category the fold keeps or drops, as it is after NFKD: a spacing mark (Mc) is a mark, gone as
+    /// \p{M} takes it - the vowel signs of Hindi, Tamil and Bengali names, two-part ones split by NFKD first - and a
+    /// letter number (Nl) or other number (No) that no decomposition touches is a number, kept. Each answer read off
+    /// the compiled TypeScript (fold.json has them, and ~500 random names drawn mostly from these scripts).
+    @Test func spacingMarksGoLetterAndOtherNumbersStay() {
+        let scalars = { (text: String) in Fold.key(text).unicodeScalars.map(\.value) }
+        #expect(scalars("हिंदी") == [0x939, 0x926])
+        #expect(scalars("தமிழ்") == [0xBA4, 0xBAE, 0xBB4])
+        #expect(scalars("বাংলা") == [0x9AC, 0x9B2])
+        #expect(scalars("কোলকাতা") == [0x995, 0x9B2, 0x995, 0x9A4])
+        #expect(scalars("〇〇") == [0x3007, 0x3007])
+        #expect(scalars("ↅ") == [0x2185])
+        #expect(scalars("𐍁") == [0x10341])
+        #expect(scalars("x༪y") == [0x78, 0xF2A, 0x79])
+        #expect(scalars("৴a") == [0x9F4, 0x61])
+        #expect(scalars("𐄇") == [0x10107])
+        //? the categories themselves, scalar by scalar: Mc out; Nl, No in
+        let scalar = { (value: UInt32) in Unicode.Scalar(value)! }
+        #expect([0x93F, 0x940, 0xBBF, 0x9BE, 0x903].allSatisfy { Fold.isMark(scalar($0)) })
+        #expect([0x3007, 0x2185, 0x16EE, 0x10341, 0xF2A, 0x9F4, 0x1369, 0x10107].allSatisfy { Fold.isLetterOrNumber(scalar($0)) })
+        //? a sigma before a spacing mark: the mark goes first, so the sigma ends the word
+        #expect(scalars("aΣः") == [0x61, 0x3C2])
+    }
+
     @Test func hangulIsKeptAsJamo() {
         #expect(Array(Fold.key("방탄").unicodeScalars.map(\.value)) == [0x1107, 0x1161, 0x11BC, 0x1110, 0x1161, 0x11AB])
         #expect(Fold.key("ŉ").unicodeScalars.map(\.value) == [0x2BC, 0x6E])

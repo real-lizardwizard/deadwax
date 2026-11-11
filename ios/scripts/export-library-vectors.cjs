@@ -10,10 +10,11 @@
  * for the network (as ui/test/whose.sim.cjs and mylibrary.sim.cjs do). Writes, under
  * ios/DeadwaxKit/Tests/DeadwaxCoreTests/Fixtures/library/:
  *
- *   fold.json     foldName, findText and the header initial of ~4,000 names (fixed awkward ones, and seeded random
- *                 strings from many scripts, marks, ligatures, spaces and brackets)
- *   dates.json    Date.parse and monthLabel of ~1,150 date strings in four time zones (UTC, New York, London, Lord
- *                 Howe), the clocks' changes included
+ *   fold.json     foldName, findText and the header initial of ~2,600 names (fixed awkward ones, and seeded random
+ *                 strings from many scripts, marks - spacing ones too, as Indic scripts have them - ligatures,
+ *                 letter and other numbers, spaces and brackets)
+ *   dates.json    Date.parse and monthLabel of ~1,400 date strings in four time zones (UTC, New York, London, Lord
+ *                 Howe), the clocks' changes included, and a space in the T's place
  *   shelves.json  album lists (the sims' fixtures, and seeded random ones with stars seconds apart across month
  *                 ends) under the five sorts x both `by`: the order, the headers, the index, and Find's
  *   index.json    fitIndex over the 27 letters at 0-40 slots, and entryAt swept every half point down each strip
@@ -117,6 +118,12 @@ const emit = (name, value, depth) => {
 let seed = 12345
 const rand = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648
 const pick = (list) => list[Math.floor(rand() * list.length)]
+//? a second, separate sequence for what was added after the first fixtures were written (the review's names): drawing
+//? on it leaves every other fixture's random choices as they were
+const seeded = (start) => {
+  let state = start
+  return () => (state = (state * 1103515245 + 12345) % 2147483648) / 2147483648
+}
 const cp = (...points) => String.fromCodePoint(...points)
 const chars = (text) => [...text]
 
@@ -135,6 +142,12 @@ const FIXED_NAMES = [
   cp(0x1c4), cp(0x1e9e), 'K', 'Ω', cp(0x2126), cp(0x212a), cp(0x663), cp(0x967, 0x968), cp(0x217b), cp(0x1d43), cp(0xff76, 0xff9e),
   'Ｔｈｅ Ｂｅａｔｌｅｓ', cp(0x20000) + 'x', cp(0xfa0e) + 'y', 'Zz Top', 'a', 'A', 'ä', 'Ä', 'a' + cp(0x308), '10cc', '2Pac',
   'Beatles Tribute', 'bjork', 'BJÖRK', cp(0x130), 'ı', 'ǅ', cp(0x345) + 'Σ', 'Σ' + cp(0x345), cp(0xd4e) + ' x',
+  //? (review) every general category the fold keeps or drops, as it is AFTER NFKD: spacing marks (Mc) dropped - the
+  //? vowel signs of Hindi, Tamil and Bengali names, two-part ones NFKD splits - letter numbers (Nl) and other numbers
+  //? (No) that no decomposition touches, kept; titlecase letters (Lt), which NFKD always decomposes
+  'हिंदी', 'தமிழ்', 'বাংলা', 'A.R. Rahman - ரோஜா', 'কোলকাতা', 'கொ', 'शंकर महादेवन', 'ΑΣ' + cp(0x93f) + ' x', cp(0x3007, 0x3007),
+  cp(0x2185), cp(0x16ee) + 'x', cp(0x3021) + cp(0x3029), cp(0x10341), 'Ↄ ' + cp(0x2184), 'x' + cp(0xf2a) + 'y', cp(0x9f4) + 'a',
+  cp(0x1369, 0x1372), cp(0x10107), cp(0x2189), cp(0x1f88) + 'x', cp(0x1fbc), cp(0x1c8) + 'ubljana', 'Σ' + cp(0x93f), 'aΣ' + cp(0x903),
 ]
 
 const POOLS = [
@@ -153,6 +166,23 @@ function randomName(maxLength) {
 
 const foldNames = [...FIXED_NAMES]
 for (let n = 0; n < 2000; n++) foldNames.push(randomName(14))
+//? (review) names drawn mostly from the scripts and categories above, on their own sequence
+const SCRIPT_POOLS = [
+  'कखगमनरहदि' + cp(0x93e, 0x93f, 0x940, 0x94b, 0x94c, 0x902, 0x903, 0x94d), 'கதமழரன' + cp(0xbbe, 0xbbf, 0xbc6, 0xbca, 0xbcd, 0xbd7),
+  'কবলমর' + cp(0x9be, 0x9bf, 0x9cb, 0x9d7, 0x982, 0x9bc), cp(0x3007, 0x2185, 0x16ee, 0x10341, 0x2160, 0x3021, 0x2183, 0x2184),
+  cp(0xf2a, 0x9f4, 0x1369, 0x10107, 0x2189, 0xbd, 0xb2), cp(0x1c5, 0x1c8, 0x1f88, 0x1fbc, 0x1ffc), 'ΑΣσ ',
+].map(chars)
+const rand2 = seeded(424242)
+for (let n = 0; n < 500; n++) {
+  let text = rand2() < 0.2 ? 'The ' : ''
+  const length = 1 + Math.floor(rand2() * 12)
+  for (let k = 0; k < length; k++) {
+    const pools = rand2() < 0.75 ? SCRIPT_POOLS : POOLS
+    const pool = pools[Math.floor(rand2() * pools.length)]
+    text += pool[Math.floor(rand2() * pool.length)]
+  }
+  foldNames.push(text)
+}
 emit('fold.json', {
   about: 'lib/owned.ts foldName, lib/shelves.ts findText and initialOf(foldName) of each name: [name, foldName, findText, initial]. Written by ios/scripts/export-library-vectors.cjs.',
   names: foldNames.map((name) => {
@@ -183,11 +213,34 @@ const dateTexts = [
   '2026-10-05T1:22:31Z', '26-10-05', '2026-10-05T', '2026-10-05T14', '2026-10-05T14:22:31+01',
   '2026-10-05T14:22:31ZZ', 'not a date', '', '20261005', '2026-10-05T14:22:31.123x',
   '-000000-01-01T00:00:00Z', '+275760-09-13T00:00:00.001Z', '-271821-04-19T23:59:59.999Z', '2026-10-05T14:22:31+01:00Z',
+  //? (review) an offset's hours 0-23 and minutes 0-59; 24:00 with no fraction digit but 0; a fraction past nine digits,
+  //? which V8 reads as nine significant digits scaled by nine (".0123456789" is 123 ms there); a time after a part date
+  '2026-10-05T14:22:31+24:00', '2026-10-05T14:22:31+25:00', '2026-10-05T14:22:31+12:60', '2026-10-05T14:22:31-99:99',
+  '2026-10-05T14:22:31-23:59', '2026-10-05T14:22:31+00:59', '2026-10-05T14:22:31-00:00', '2026-10-05T14:22:31-00:60',
+  '2026-10-05T24:00:00.0001Z', '2026-10-05T24:00:00.000Z', '2026-10-05T24:00:00.0000000000000Z', '2026-10-05T24:00:00.0000000000001Z',
+  '2026-10-05T24:00:00.1Z', '2026-10-05T24:00:00.000', '2026-10-05T24:00:00.0001', '2026-10-05T24:00:00.5+01:00',
+  '2026-10-05T14:22:31.0001234567891Z', '2026-10-05T14:22:31.00012345678Z', '2026-10-05T14:22:31.000123456Z',
+  '2026-10-05T14:22:31.0001234567Z', '2026-10-05T14:22:31.1234567891Z', '2026-10-05T14:22:31.123456789123456Z',
+  '2026-10-05T14:22:31.0000000001Z', '2026-10-05T14:22:31.0123456789Z', '2026-10-05T14:22:31.00123456789Z',
+  '2026-10-05T14:22:31.000000000Z', '2026-10-05T14:22:31.0000000000Z', '2026-10-05T14:22:31.999999999999Z',
+  '2026-10-05T14:22:31.0999999999Z', '2026-10-05T14:22:31.0001234567891', '2026-10-05T14:22:31.0001234567891+02:00',
+  '2026T14:22Z', '2026-10T14:22Z', '2026T14:22', '0001-01-01T00:00:00.0123456789Z',
+  //? a space in the T's place: V8's legacy parser reads the rest, as the ISO one would wherever the port reads it
+  '2026-10-05 14:22:31.0001234567891Z', '2026-10-05 14:22:31-99:99', '2026-10-05 14:22:31-00:60', '0100-06-01 00:00Z',
+  '-000001-01-01 00:00Z', '+002026-10-05 12:00Z', '2026-10-05 24:00Z', '2026-10-05 24:00:00Z', '2026-10-05 24:00',
+  '2026-10-05 24:00:00.000Z', '2026-02-30 12:00Z', '2026-02-31 12:00Z', '2026-10-05 14:22:31.Z', '2026-10-05 14:22:31,5Z',
+  '2026-10-05 14:22:31ZZ', '2026-10-05 14', '2026-10-05 14:22:31z', '2026-10-05 14:22:31.123x', '2026-10-05 14:60Z',
+  '2026-10-05 25:00Z', '2026-10-05 14:22:60Z', '2026-10-05 14:22:31+23:59', '2026-10-05 14:22:31.5-05:30',
 ]
 //? forms outside the ISO format that V8 reads anyway, with its legacy parser - which the port deliberately doesn't (Navidrome
 //? sends RFC 3339, nothing else): written down so the Swift tests can say each is read as no date there, and so a change in
 //? what V8 does with them shows here
-const legacyTexts = ['2026-1-05', '2026-10-05T14:22:31+0100', '2026-10-05Z', ' 2026-10-05', '2026-10-05 ', '+02026-10-05']
+const legacyTexts = ['2026-1-05', '2026-10-05T14:22:31+0100', '2026-10-05Z', ' 2026-10-05', '2026-10-05 ', '+02026-10-05',
+  //? (review) after a space, where V8's legacy parser reads more than the ISO one: a year 0-99 (1-31 as a month and
+  //? day, the rest 19xx and 20xx), a time after a part date, an offset of 24 hours or more, a fraction after 24:00
+  //? that rounds to 0 ms, a space before the zone - and an ISO date gone wrong that it reads as month, day and year
+  '0001-01-01 00:00:00Z', '0012-05-06 00:00Z', '0050-06-01 00:00Z', '+000005-01-02 00:00Z', '2026-10 14:22Z', '2026 14:22Z',
+  '2026-10-05 14:22:31+24:00', '2026-10-05 24:00:00.0001Z', '2026-10-05 14:22:31 Z', '0001-13-29']
 //? the clocks' changes, 2024-2028: New York (second Sunday of March, first of November, 2am), London (last Sundays of
 //? March and October, 1am), Lord Howe (first Sundays of October and April, 2am, half an hour)
 const sunday = (year, month, nth) => {
@@ -213,6 +266,8 @@ for (let n = 0; n < 600; n++) {
   const zone = pick(['Z', '+00:00', '-05:00', '+05:30', '+14:00', '-12:00', '', 'z'])
   dateTexts.push(`${pad(year, 4)}-${pad(month, 2)}-${pad(day, 2)}T${pad(hour, 2)}:${pad(minute, 2)}:${pad(second, 2)}${fraction}${zone}`)
 }
+//? (review) every third of them again with a space for the T (no random draw, so nothing else moves)
+dateTexts.push(...dateTexts.slice(-600).filter((_, n) => n % 3 === 0).map((text) => text.replace('T', ' ')))
 const dateRows = dateTexts.map((text) => ({ text, ms: [], month: [] }))
 const legacyRows = legacyTexts.map((text) => ({ text, ms: [], month: [] }))
 for (const zone of ZONES) {
@@ -307,6 +362,17 @@ const NAMED = {
     { id: 'dlx', name: 'Dummy (Deluxe Edition)', artist: 'Portishead' },
     { id: 'dummy', name: 'Dummy', artist: 'Portishead', year: 1994 },
   ],
+  //? (review) SAME_MOMENT_MS's edge: a star exactly 30,000 ms before the last joins its moment, 30,001 ms is a new
+  //? one - each over a month's end, so the headers show which
+  moment: [
+    { id: 'n1', name: 'n1', artist: 'a', starred: '2026-09-01T00:00:20Z', created: '2026-02-01T00:00:00Z' },
+    { id: 'n2', name: 'n2', artist: 'a', starred: '2026-08-31T23:59:50Z', created: '2026-03-01T00:00:00Z' },
+    { id: 'n3', name: 'n3', artist: 'a', starred: '2026-08-31T23:59:19.999Z', created: '2026-04-01T00:00:00Z' },
+    { id: 'n4', name: 'n4', artist: 'a', starred: '2026-08-31T23:58:49.999Z' },
+    { id: 'n5', name: 'n5', artist: 'a', starred: '2026-08-01T00:00:00Z', created: '2026-05-01T00:00:00Z' },
+    { id: 'n6', name: 'n6', artist: 'a', starred: '2026-07-31T23:59:30Z', created: '2026-06-01T00:00:00Z' },
+    { id: 'n7', name: 'n7', artist: 'a', starred: '2026-07-31T23:58:59.999Z', created: '2026-07-01T00:00:00Z' },
+  ],
   empty: [],
 }
 const NAMED_TYPED = {
@@ -319,6 +385,7 @@ const NAMED_TYPED = {
   whose: ['', 'portishead', 'the'],
   collation: ['', '바', '방탄', '一', 'one'],
   dlx: ['', 'deluxe', 'dummy', 'edition dummy'],
+  moment: ['', 'n2', 'n6', 'n7'],
   empty: ['', 'x'],
 }
 

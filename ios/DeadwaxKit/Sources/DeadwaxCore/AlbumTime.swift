@@ -15,12 +15,18 @@ public enum AlbumTime {
     static let maxMs: Int64 = 8_640_000_000_000_000
 
     /// `Date.parse(text)` for the ISO forms: `YYYY` (or an expanded year, `+YYYYYY`/`-YYYYYY`, never `-000000`),
-    /// `YYYY-MM`, `YYYY-MM-DD` (UTC midnight), the last followed by `T`, `t` or a space and `HH:MM`, optional `:SS`,
-    /// optional `.` and one or more digits (cut to milliseconds), then `Z`/`z`, `+HH:MM`, `-HH:MM` - or nothing,
-    /// which is LOCAL time in `zone`, as a browser reads it in its own. Month 1-12, day 1-31 rolling on past a
-    /// month's end ("2026-02-30" is 2 March, as V8), hour 0-24 (24 only as 24:00:00), minute and second 0-59, within
-    /// a Date's reach; anything else nil. What V8 reads only with its legacy parser ("2026-1-05", "+0100", a space
-    /// around the date, "Mon, 05 Oct 2026 ...") is nil here: Navidrome sends RFC 3339 and nothing else.
+    /// `YYYY-MM`, `YYYY-MM-DD` (UTC midnight), then `T` or `t` and `HH:MM`, optional `:SS`, optional `.` and one or
+    /// more digits (read as V8 reads them - `fraction`), then `Z`/`z`, `+HH:MM`, `-HH:MM` (hours 0-23, minutes
+    /// 0-59) - or nothing, which is LOCAL time in `zone`, as a browser reads it in its own. Month 1-12, day 1-31
+    /// rolling on past a month's end ("2026-02-30" is 2 March, as V8), hour 0-24 (24 only as 24:00:00, with no
+    /// fraction digit but 0), minute and second 0-59, within a Date's reach; anything else nil.
+    ///
+    /// A SPACE in the T's place is read too, after a whole date: V8 hands that to its legacy parser, which reads
+    /// these forms as above except for a year 0-99 (a year 1-31 as a month and day, the rest as 19xx and 20xx) - so
+    /// that is nil with a space - and where it is looser (an offset of 24 hours or more, a fraction after 24:00 that
+    /// rounds to 0 ms), which is nil here too. What V8 reads only with its legacy parser ("2026-1-05", "+0100", a
+    /// space around the date or before the zone, "2026-10 14:22", "Mon, 05 Oct 2026 ...") is nil: Navidrome sends
+    /// RFC 3339 with a T and nothing else. dates.json's `legacy` lists each kind, with what V8 makes of it.
     public static func ms(_ text: String?, zone: TimeZone = .current) -> Int64? {
         guard let text else { return nil }
         let bytes = Array(text.utf8)
@@ -50,16 +56,21 @@ public enum AlbumTime {
             year = plain
         }
         var month = 1, day = 1, hour = 0, minute = 0, second = 0, millis = 0
+        var fractionIsZero = true
         var offset: Int? = 0                                           //? the date-only forms are UTC
+        var wholeDate = false
         if take(0x2D) {                                                // -
             guard let m = digits(2) else { return nil }
             month = m
             if take(0x2D) {
                 guard let d = digits(2) else { return nil }
                 day = d
+                wholeDate = true
             }
         }
         if at < bytes.count && (bytes[at] == 0x54 || bytes[at] == 0x74 || bytes[at] == 0x20) {   // T t space
+            //? a space is V8's legacy parser: read only where it reads as the ISO one does (see above)
+            if bytes[at] == 0x20 && (!wholeDate || (0...99).contains(year)) { return nil }
             at += 1
             offset = nil                                               //? a time with no zone is local
             guard let h = digits(2), take(0x3A), let mi = digits(2) else { return nil }
@@ -69,15 +80,12 @@ public enum AlbumTime {
                 guard let s = digits(2) else { return nil }
                 second = s
                 if take(0x2E) {                                        // .
-                    var count = 0
-                    while at < bytes.count, bytes[at] >= 0x30, bytes[at] <= 0x39 {
-                        if count < 3 { millis = millis * 10 + Int(bytes[at] - 0x30) }
-                        count += 1
-                        at += 1
-                    }
-                    guard count > 0 else { return nil }
-                    var scale = count
-                    while scale < 3 { millis *= 10; scale += 1 }
+                    let start = at
+                    while at < bytes.count, bytes[at] >= 0x30, bytes[at] <= 0x39 { at += 1 }
+                    guard at > start else { return nil }
+                    let read = fraction(bytes[start..<at])
+                    millis = read.ms
+                    fractionIsZero = read.zero
                 }
             }
             if at < bytes.count {
@@ -87,17 +95,43 @@ public enum AlbumTime {
                 } else if bytes[at] == 0x2B || bytes[at] == 0x2D {     // + -
                     let sign = bytes[at] == 0x2D ? -1 : 1
                     at += 1
-                    guard let oh = digits(2), take(0x3A), let om = digits(2) else { return nil }
+                    guard let oh = digits(2), take(0x3A), let om = digits(2), oh <= 23, om <= 59 else { return nil }
                     offset = sign * (oh * 3600 + om * 60)
                 }
             }
         }
         guard at == bytes.count, (1...12).contains(month), (1...31).contains(day), hour <= 24, minute <= 59,
-              second <= 59, hour < 24 || (minute == 0 && second == 0 && millis == 0) else { return nil }
+              second <= 59, hour < 24 || (minute == 0 && second == 0 && fractionIsZero) else { return nil }
         let days = Int64(daysFromCivil(year, month, 1)) + Int64(day - 1)
         let wall = days * 86_400_000 + Int64(hour * 3_600_000 + minute * 60_000 + second * 1000 + millis)
         let instant = offset.map { wall - Int64($0) * 1000 } ?? utc(fromLocal: wall, zone: zone)
         return abs(instant) <= maxMs ? instant : nil
+    }
+
+    /// The digits after a second's `.` as V8's date parser reads them (dateparser ReadUnsignedNumeral and
+    /// ReadMilliseconds): leading zeros skipped, the next nine digits at most taken as a number, which is then scaled
+    /// to milliseconds by how many digits there were - counting no more than nine. Up to nine digits that is the
+    /// fraction cut to milliseconds (".9999" is 999); past nine, with leading zeros, V8 makes more of it than is
+    /// there (".0123456789" is 123 ms, ".00012345678" 12), and so does this. `zero`: no digit but 0 - the only
+    /// fraction 24:00:00 may have.
+    static func fraction(_ digits: ArraySlice<UInt8>) -> (ms: Int, zero: Bool) {
+        var number = 0, taken = 0
+        var zero = true
+        for byte in digits {
+            if zero && byte == 0x30 { continue }
+            zero = false
+            if taken < 9 { number = number * 10 + Int(byte - 0x30) }
+            taken += 1
+        }
+        switch digits.count {
+        case 1: return (number * 100, zero)
+        case 2: return (number * 10, zero)
+        case 3: return (number, zero)
+        default:
+            var scale = min(digits.count, 9)
+            while scale > 3 { number /= 10; scale -= 1 }
+            return (number, zero)
+        }
     }
 
     /// A local wall time (as milliseconds, read as if it were UTC) as the instant it names in `zone`, as V8 decides

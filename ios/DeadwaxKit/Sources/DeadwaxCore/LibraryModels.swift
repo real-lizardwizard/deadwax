@@ -1,8 +1,9 @@
 import Foundation
 
 // The Library's answers from deadwax: /navidrome/album_index (src/routes/navidrome.py) and /me/library
-// (src/routes/my_library.py). One stored property a line, in the form tests/test_ios_contract.py's
-// `required_fields` reads.
+// (src/routes/my_library.py). One stored property a line, in the form tests/test_ios_library_contract.py reads: it
+// holds every field here to the routes' own names (INDEX_FIELDS, AlbumScope, _entry, the answers, Seen), so a
+// server change that would leave one nil here fails in the Python suite.
 
 /// Which album list: `yours` - your starred albums, asked as you - or `store`, every album deadwax holds
 /// (src/routes/navidrome.py `AlbumScope`, SCOPE_LIST).

@@ -25,12 +25,14 @@ import Testing
     }
 
     /// The one deliberate difference: what V8 reads only with its legacy parser - a month or day of one digit, an
-    /// offset without its colon, a Z after a date alone, a space around the date, a signed year of five digits - is no
-    /// date here ("Date unknown", as an unreadable `created` already is). Navidrome sends RFC 3339; porting V8's
+    /// offset without its colon, a Z after a date alone, a space around the date or before the zone, a signed year of
+    /// five digits; and after a space in the T's place, where that parser reads more than the ISO one (a year 0-99, a
+    /// time after a part date, an offset of 24 hours or more, a fraction after 24:00 that rounds to 0 ms) - is no date
+    /// here ("Date unknown", as an unreadable `created` already is). Navidrome sends RFC 3339 with a T; porting V8's
     /// fallback for strings it never sends would be the riskiest code in the Library for nothing.
     @Test func whatOnlyV8sLegacyParserReadsIsNoDate() throws {
         let fixture = try LibraryFixtures.load("dates", as: DatesFixture.self)
-        #expect(fixture.legacy.count == 6)
+        #expect(fixture.legacy.count == 16)
         for row in fixture.legacy {
             #expect(row.ms.allSatisfy { $0 != nil }, "V8 no longer reads \(LibraryFixtures.spelled(row.text)) - move it to the dates")
             for name in fixture.zones {
@@ -39,6 +41,33 @@ import Testing
                 #expect(AlbumTime.monthLabel(row.text, zone: zone) == AlbumTime.dateUnknown)
             }
         }
+    }
+
+    /// (review) Where the port read what V8 refuses, or read it otherwise - each answer V8's (Node, in UTC; dates.json
+    /// has them in four zones): an offset's hours 0-23 and minutes 0-59; 24:00 only with no fraction digit but 0; a
+    /// fraction past nine digits read as V8 reads it, nine significant digits scaled by nine.
+    @Test func whatV8RefusesAndHowItReadsALongFraction() {
+        let cases: [(String, Int64?)] = [
+            ("2026-10-05T14:22:31+24:00", nil), ("2026-10-05T14:22:31+25:00", nil), ("2026-10-05T14:22:31+12:60", nil),
+            ("2026-10-05T14:22:31-99:99", nil), ("2026-10-05T14:22:31-00:60", nil),
+            ("2026-10-05T14:22:31+23:59", 1_791_123_811_000), ("2026-10-05T14:22:31-23:59", 1_791_296_491_000),
+            ("2026-10-05T24:00:00.0001Z", nil), ("2026-10-05T24:00:00.0000000000001Z", nil), ("2026-10-05T24:00:00.1Z", nil),
+            ("2026-10-05T24:00:00.000Z", 1_791_244_800_000), ("2026-10-05T24:00:00.0000000000000Z", 1_791_244_800_000),
+            ("2026-10-05T14:22:31.0001234567891Z", 1_791_210_151_123), ("2026-10-05T14:22:31.00012345678Z", 1_791_210_151_012),
+            ("2026-10-05T14:22:31.0123456789Z", 1_791_210_151_123), ("2026-10-05T14:22:31.0001234567Z", 1_791_210_151_001),
+            ("2026-10-05T14:22:31.000123456Z", 1_791_210_151_000), ("2026-10-05T14:22:31.123456789123456Z", 1_791_210_151_123),
+            ("2026-10-05T14:22:31.0999999999Z", 1_791_210_151_999), ("2026-10-05T14:22:31.0000000001Z", 1_791_210_151_000),
+            //? a space for the T: read only where V8's legacy parser reads as the ISO one does
+            ("2026-10-05 14:22:31.0001234567891Z", 1_791_210_151_123), ("0100-06-01 00:00Z", -58_998_412_800_000),
+            ("2026-10-05 24:00Z", 1_791_244_800_000), ("0001-01-01 00:00:00Z", nil), ("0050-06-01 00:00Z", nil),
+            ("2026-10 14:22Z", nil), ("2026-10-05 14:22:31+24:00", nil), ("2026-10-05 24:00:00.0001Z", nil),
+        ]
+        for (text, expected) in cases {
+            #expect(AlbumTime.ms(text, zone: Self.utc) == expected, "\(text)")
+        }
+        #expect(AlbumTime.fraction(Array("5".utf8)[...]) == (500, false))
+        #expect(AlbumTime.fraction(Array("0000".utf8)[...]) == (0, true))
+        #expect(AlbumTime.fraction(Array("0000000000001".utf8)[...]) == (0, false))
     }
 
     @Test func theExpandedYearsAndTheEdgesOfADate() {

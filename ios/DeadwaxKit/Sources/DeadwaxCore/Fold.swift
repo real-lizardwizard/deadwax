@@ -71,6 +71,7 @@ public enum Fold {
         }
     }
 
+    /// `[\p{L}\p{N}]`. (No titlecase letter survives NFKD, so `.titlecaseLetter` is \p{L}'s completeness, never met.)
     static func isLetterOrNumber(_ scalar: Unicode.Scalar) -> Bool {
         switch scalar.properties.generalCategory {
         case .uppercaseLetter, .lowercaseLetter, .titlecaseLetter, .modifierLetter, .otherLetter,

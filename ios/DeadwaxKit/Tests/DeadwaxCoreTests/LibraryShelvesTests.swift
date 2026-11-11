@@ -214,6 +214,26 @@ import Testing
         #expect(Shelf(apart, zone: Self.utc).moments([0, 1, 2]).count == 3)
     }
 
+    /// (review) SAME_MOMENT_MS's edge, as `last - at <= SAME_MOMENT_MS`: a star exactly 30,000 ms before the last
+    /// joins its moment, one 30,001 ms before starts the next - each over a month's end, so the headers say which.
+    @Test func exactlyThirtySecondsIsStillOneMoment() throws {
+        let shelf = try Self.shelf("""
+        [{"id":"n1","name":"n1","artist":"a","starred":"2026-09-01T00:00:20Z","created":"2026-02-01T00:00:00Z"},
+         {"id":"n2","name":"n2","artist":"a","starred":"2026-08-31T23:59:50Z","created":"2026-03-01T00:00:00Z"},
+         {"id":"n3","name":"n3","artist":"a","starred":"2026-08-31T23:59:19.999Z","created":"2026-04-01T00:00:00Z"},
+         {"id":"n4","name":"n4","artist":"a","starred":"2026-08-31T23:58:49.999Z"},
+         {"id":"n5","name":"n5","artist":"a","starred":"2026-08-01T00:00:00Z","created":"2026-05-01T00:00:00Z"},
+         {"id":"n6","name":"n6","artist":"a","starred":"2026-07-31T23:59:30Z","created":"2026-06-01T00:00:00Z"},
+         {"id":"n7","name":"n7","artist":"a","starred":"2026-07-31T23:58:59.999Z","created":"2026-07-01T00:00:00Z"}]
+        """)
+        #expect(Shelf.sameMomentMs == 30_000)
+        let moments = shelf.moments(Array(shelf.albums.indices)).map { Self.ids(shelf, $0.members) }
+        #expect(moments == [["n2", "n1"], ["n3", "n4"], ["n6", "n5"], ["n7"]])
+        let groups = shelf.groups(shelf.sorted(.newest, by: .you), .newest, by: .you)
+        #expect(groups.map { "\($0.label ?? "") \(Self.ids(shelf, $0.items))" }
+                == ["September 2026 [\"n2\", \"n1\"]", "August 2026 [\"n3\", \"n4\", \"n6\", \"n5\"]", "July 2026 [\"n7\"]"])
+    }
+
     // MARK: - whose.sim "your library: your starred albums, in the order chosen"
 
     @Test func yourStarredAlbumsInTheOrderChosen() throws {
