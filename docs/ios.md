@@ -14,7 +14,8 @@ and what only a phone can tell is what [the checks](#the-checks) are for. Until 
 read everything below as what the app is built to do.
 
 The app talks only to deadwax, never to Navidrome, through deadwax's own routes, so the phone never
-needs Navidrome's password.
+needs the Navidrome account deadwax itself uses. With logins on, you sign in with your own Navidrome
+user name and password: the password goes to deadwax, and isn't kept on the phone.
 
 **Which deadwax it needs.** Everything but normalization works with deadwax 2.0.0 or later.
 Normalization needs **deadwax 2.1.1 or later**, which adds the route that tells the app what deadwax
@@ -22,7 +23,10 @@ has already measured of an album's loudness: each song's, and the album's as a w
 songs on the phone from the same measurements the web app's Normalization uses. The route only reads
 what's there and never measures anything itself, and it only answers about an album the signed-in
 person can see in Navidrome. With an older deadwax, songs play as they are, and Info says "Not this
-time - the album's volume couldn't be checked".
+time - the album's volume couldn't be checked" ("the song's" for a song levelled on its own). 2.1.1
+isn't a release yet: until it is, it's in the `:experimental` image, not `:latest` (see "Which image
+tag" under [The compose file](getting-started.md#the-compose-file)). You > About shows which deadwax
+you have.
 
 **Where Phase 1 is.** It's on the `ios` branch while it's being built. `main` has Phase 0, released
 with deadwax 2.1.0. install.sh builds whichever branch is checked out, so to try Phase 1, switch to
@@ -38,7 +42,8 @@ with deadwax 2.1.0. install.sh builds whichever branch is checked out, so to try
 - **An iPhone on iOS 17 or later** and its cable, for the first install.
 - **A free Apple account.** Its catch: **each install runs for 7 days**, and then the app won't open
   until you install it again. Installing it again is one command, below, and keeps everything on
-  the phone. **You > Debug** says when the install runs out.
+  the phone. For an admin (with logins off, everyone), **You > Debug** says when the install runs
+  out; anyone else just finds the app won't open after the 7 days.
 - **The test album.** "Start test (2026)" by "deadwax test" is ten short FLAC songs: eight of three
   beeps each, with the first beep at a known time, and two that are one steady tone cut in two. It's
   still the clearest test of a seamless join, and Debug's Test sounds play it.
@@ -133,10 +138,10 @@ From then on the app opens straight into your music. If deadwax doesn't answer a
 **Try again** and **Change address**, and it tries again by itself whenever you come back to the app.
 
 If your sign-in ends while you're using the app (it ran out after 30 days unused, an admin reset
-your password, it was ended from another device), the sign-in comes up over the app with deadwax's
-reason, Now Playing closes, and the music plays on underneath. Signing in again as the same person
-carries on where you were. Signing in as someone else starts afresh: nothing of the first person's
-queue stays.
+your password, or your password was changed from another device), the sign-in comes up over the
+app with deadwax's reason, Now Playing closes, and the music plays on underneath. Signing in again as
+the same person carries on where you were. Signing in as someone else starts afresh: nothing of the
+first person's queue stays.
 
 The app has two tabs, **Library** and **You**. Tapping the tab you're on goes back to its first
 screen, or to the top of it. Once something is playing, the mini player sits just above the tabs.
@@ -182,8 +187,9 @@ the Library tab or the app, and when you pull down.
 ## An album's page
 
 - **At the top**: the cover, the title, the artist, and a line like "Electronic · 1998 · FLAC" (the
-  genre, the year, and the format when all its songs share one). With logins on, it says whether the
-  album is **In your library** or only **In the collection**.
+  genre, the year, and the format when all its songs share one). It says whether the album is **In
+  your library** or only **In the collection**. With logins off, and for the break-glass `deadwax`
+  sign-in, every album reads In your library.
 - **Play** plays the album from its first song. **Shuffle** plays it in a random order, with Shuffle
   on.
 - **The songs**, under a heading for each disc when there's more than one, or a disc has a title
@@ -283,8 +289,9 @@ field Navidrome sent about the song and its album.
     peak, so nothing is made louder than it can go without distorting. The first time an album is
     levelled, deadwax measures it, so its first song can take a few seconds to start. It waits 20
     seconds at most, then plays the song as it is that time, and Info says "Not this time - the
-    album was still being measured". One song running into the next never waits. The choice is kept
-    on this phone, and takes effect from the next thing you play.
+    album was still being measured" ("the song was" for a song levelled on its own). One song
+    running into the next never waits. The choice is kept on this phone, and takes effect from the
+    next thing you play.
 - **Account**, with logins on: **Sign out**. It ends this phone's session and stops what's playing.
   If deadwax can't be reached, it says "Couldn't reach deadwax, so you're still signed in - try
   again." Changing your password is the web app's, for now.
@@ -339,9 +346,10 @@ at each pause and change of song, and as the app goes to the background.
 
 When the app opens with nothing playing, it puts back what you were last playing, paused at the
 second it stopped, from whichever device saved it last: the web app, or another app on Navidrome. A
-notice says where it came from ("Picked up from your Mac", "Picked up from Symfonium"). Nothing is
-fetched until you press play. It's put back with this phone's Repeat and Normalization. The web app
-picks up the phone's queue the same way ("Picked up from your iPhone").
+notice says where it came from ("Picked up from your Mac", "Picked up from Symfonium"; with logins
+off, "Picked up from a Mac"). Nothing is fetched until you press play. It's put back with this phone's
+Repeat and Normalization. The web app picks up the phone's queue the same way ("Picked up from your
+iPhone", or "Picked up from an iPhone" with logins off).
 
 Coming back to the app while paused, it looks again (at most every 15 seconds). With logins on, it
 takes what another device saved since this phone last did. With logins off everyone shares one queue,
@@ -365,7 +373,8 @@ Phase 1 exists to answer these on the phone. Note what you see for each.
 
 1. **Sign in and count.** Sign in with your Navidrome account. The Library shows your albums: does
    the count above them match the web app's Library? And All albums against the web app's All music?
-   You > Debug > Library says how many each list had and how long it took to come: note the times.
+   If you're an admin, You > Debug > Library says how many each list had and how long it took to
+   come: note the times.
 2. **The joins.** Find the test album under All music > All albums ("start test" in Find), tap song 9
    and let it run into song 10: one unbroken tone, with no gap, click or blip. Then a live or
    continuous album you know well: is every join seamless? Then previous: in a song's first 3 seconds
@@ -385,7 +394,7 @@ Phase 1 exists to answer these on the phone. Note what you see for each.
 6. **Picking up, both ways.** Play an album on the phone, pause it, and close the app (swipe it away).
    Open the web app on the Mac: the same queue, song and second, paused. Then play something else on
    the Mac, pause it, and open the app on the phone: it has it, paused, and says "Picked up from your
-   Mac".
+   Mac" ("Picked up from a Mac" with logins off, where everyone shares one queue).
 7. **Plays.** Songs played on the phone turn up in Navidrome's recently played (and on Last.fm or
    ListenBrainz, if Navidrome is linked to them).
 8. **AirPlay and AirPods.** AirPlay to a speaker from Now Playing, and back to the phone. AirPods
@@ -400,14 +409,18 @@ The tests can't reach these either. Note what happens.
 
 - **A phone call in the middle of a song.** It pauses, and after the call it carries on from the
   same place.
-- **Repeat One, or a tap in Up Next, in a song's last two or three seconds.** By then the next song
-  is lined up for a seamless join, so a change to the queue is held and made after it: Repeat One
-  turned on there repeats the next song, not this one (Debug's Playing says "An edit held for the next
-  song" meanwhile). A tap on a row still plays that row at once. Does either sound wrong at the join?
+- **Repeat One, or a change in Up Next (move or take out a song, Play Next), in a song's last two or
+  three seconds.** By then the next song is lined up for a seamless join, so a change to the queue is
+  held and made after it: Repeat One turned on there repeats the next song, not this one. A tap on a
+  row isn't held: it still plays that row at once. Try a tap there too. Does any of them sound wrong
+  at the join?
 - **WireGuard off in the middle of a song**, away from home. What does the mini player say, and does
   the music come back once WireGuard is on again?
-- **The Library's grid flung from A to Z**, on a big library. Does it keep up? With the cable in,
-  Xcode's Debug navigator shows the app's memory: note it.
+- **The Library's grid flung from A to Z**, on a big library. Does it keep up? To see its memory,
+  run the app from Xcode: open `ios/Deadwax.xcodeproj`, choose the iPhone and press Run, as in step 5
+  of [Once](#once). Xcode's Debug navigator then shows the app's memory while you fling: note it.
+  Running it this way installs a Debug build over the app (everything on the phone stays), so run
+  install.sh afterwards to put the Release build back.
 - **Sign out, then sign in as someone else.** Their Library, and nothing of the first person's queue.
 
 ## What it can't do yet
@@ -431,7 +444,8 @@ These are the web app's for now. Most of them come to the phone in the next phas
 | **"Something went wrong on the server - try again in a moment."** as the app opens | deadwax answered, with an error. **Try again**; if it lasts, deadwax's log says why. |
 | Sign in: **"That user name and password didn't work."** | Your Navidrome user name and password, as on the web app. |
 | Sign in: **"Too many tries for ... - wait ... seconds and try again."** | deadwax holds off so Navidrome doesn't lock the account. Wait, then try again. |
-| Sign in: **"deadwax can't reach the music server, so nobody can sign in just now."** | deadwax signs people in through Navidrome. Check that Navidrome is running and that deadwax's [Navidrome settings](configuration.md#navidrome-settings--connections) are right. |
+| Sign in: **"Navidrome isn't answering, so deadwax can't check your password right now - try again in a moment."** | deadwax signs people in through Navidrome, and Navidrome is down, or deadwax can't reach it. Check that Navidrome is running, then sign in again. |
+| Sign in: **"deadwax can't reach the music server, so nobody can sign in just now. Tell whoever runs deadwax."** | deadwax hasn't been told where Navidrome is, or the address it has can't be used. Whoever runs deadwax sets it in [Navidrome settings](configuration.md#navidrome-settings--connections); what's wrong is folded under "For whoever runs deadwax". (A deadwax older than 2.0.4 says "Something went wrong on the server - try again in a moment." here instead.) |
 | The sign-in comes up over the app, with a reason ("Your sign-in ran out after 30 days without use - sign in again.") | Sign in again. The music plays on underneath. |
 | Library: **"Your music isn't available right now"** (an admin sees **"Can't reach Navidrome"**) | deadwax can't reach Navidrome. Check Navidrome is running, then **Try again**. |
 | Library: **"Your music isn't available yet"** (an admin sees **"Connect Navidrome"**) | deadwax hasn't been told where Navidrome is. An admin's **Set up Navidrome** opens the web app in Safari: set it up in Server settings (Connections), then come back. |
@@ -439,8 +453,8 @@ These are the web app's for now. Most of them come to the phone in the next phas
 | An album's page: **"This album isn't here any more - it may have been moved or deleted."** | Go back, and pull down on the Library to bring it up to date. |
 | A song's line says **"The connection dropped while this song was loading"**, or the next song's says **"Skipped "..." - it wouldn't play"** | The app asks for a song once more after a moment, then goes on past it. Check the phone's network. |
 | **"This device couldn't play this song's audio"**, or **"Skipped "..." - this device couldn't play its audio"** | The file is damaged, or in a form iPhones can't play. Try it on the web app; an admin finds the details in You > Debug > Playing. |
-| Info's Normalization: **"Not this time - the album's volume couldn't be checked"** | deadwax is older than 2.1.1, or didn't answer in time. The song plays as it is; with 2.1.1 or later, the album's next play is levelled. |
-| The beep album isn't found | Make it with `make-test-album.py` into your music library (see "What you need"), let Navidrome scan it, then Check again in Debug. |
+| Info's Normalization: **"Not this time - the album's volume couldn't be checked"** ("the song's" for a song levelled on its own) | deadwax is older than 2.1.1, or didn't answer in time. The song plays as it is; with 2.1.1 or later, the album's next play is levelled. |
+| The beep album isn't found | Make it with `make-test-album.py` into your music library (see "What you need"), let Navidrome scan it, then Check again in You > Debug (an admin's). |
 | **"Untrusted Developer"** when opening the app | Settings > General > VPN & Device Management > your Apple ID > Trust. |
 | The app won't open at all after a week | The free install ran out. Run `install.sh` again: nothing on the phone is lost. |
 | install.sh: **"No paired iPhone the Mac can reach now"** | Connect the cable and unlock the phone (or turn on Connect via network in Xcode, with the Mac and the phone on the same Wi-Fi), then run it again. |
