@@ -7,13 +7,13 @@ import UIKit
 /// The player every screen draws and taps: the queue as Up Next has it, the entry heard, where it is, Repeat,
 /// Shuffle, Normalization, the song's failure words and the notice - and the actions, each the Core call named on it.
 ///
-/// THE SHELL'S PLAYER (app 0.2): this is the surface the parts build on, and its names don't change. Under it runs
-/// Phase 0's engine path, made a little wider - a queue started by Core's `startUpNext` (Shuffle included), the
-/// engine's keys unique across plays, Next/Previous/seek/jump as the engine does them, a failure in a listener's
-/// words, the lock screen and interruptions exactly as Phase 0. What it does NOT do yet is marked "the Player part":
-/// QueueController over an EngineLink (Repeat's copies, held edits, Play Next/Last with a queue, moves, Shuffle
-/// mid-queue, skipFailed and the retry), Normalization's levels (every song plays as the file is, Off), resume and
-/// prefetch through SongFiles' own rules. A screen calls the names here and gets that behaviour when it lands.
+/// THE PLAYER (app 0.2, notes/ios.md "Phase 1: the player's wiring"): Core's QueueController drives the queue over
+/// PlaybackEngine (PlayerEngineLink: Repeat's copies, held edits (D4), Play Next/Last, moves, Shuffle, skipFailed);
+/// each entry plays at the level decided at its first open (LevelStore, the LoudnessBook's answers - Off plays bit
+/// for bit); plays go to Navidrome (PlayReporter, D6); the queue is saved and put back paused at launch (Core's
+/// ResumeController, D5); a song that won't play is retried once, passed over or stops the queue, in a listener's
+/// words (D7); the lock screen shows the entry heard. AirPods, Siri, interruptions and routes are Phase 0's: a pause
+/// stops the output at once, and a call ended goes on from the same place in the same song.
 @MainActor
 @Observable
 final class PlayerModel {
@@ -28,10 +28,11 @@ final class PlayerModel {
     var current: QueueEntry? { entries.indices.contains(queue.index) ? entries[queue.index] : nil }
     /// Something is queued: the mini player shows.
     var hasQueue: Bool { current != nil }
-    /// The player means to play (playing, or loading to play): Play/Pause shows Pause.
-    var isPlaying: Bool { engineState.phase == .playing || engineState.phase == .loading }
-    /// The song is loading (the spinner over Play/Pause).
-    var isLoading: Bool { engineState.phase == .loading }
+    /// The player means to play (playing, or loading to play - a song asked for again after it failed included):
+    /// Play/Pause shows Pause.
+    var isPlaying: Bool { retrying || engineState.phase == .playing || engineState.phase == .loading }
+    /// The song is loading (the spinner over Play/Pause): its bytes, its level's wait, or the retry's 1.5 s.
+    var isLoading: Bool { retrying || engineState.phase == .loading }
     /// Seconds into the entry heard, as the engine last said (twice a second while it plays).
     private(set) var position: Double = 0
     /// What the scrubber and both clocks show: a seek's target while it is on its way (Scrub.reportedPosition, let
@@ -50,9 +51,11 @@ final class PlayerModel {
     /// The song's failure words, in a listener's words (PlayerWords.words / skipped) - the second line of the mini
     /// player and Now Playing (PlayerWords.secondLine(error:artist:)). Nil while all is well.
     private(set) var errorLine: String?
-    /// The notice capsule's words (D11): "Playing next: …", "Added to Up Next: …" - shown for `Notice.seconds`.
+    /// The notice capsule's words (D11): "Playing next: …", "Added to Up Next: …", "Picked up from …" - shown for
+    /// `Notice.seconds`.
     private(set) var notice: String?
     /// The device's Normalization (levels.md 4.2; UserDefaults `Normalization.storageKey`), read at each play's tap.
+    /// A change applies from the next thing played: queued entries keep their level and decision.
     var normalization: Normalization {
         get { normalizationSetting }
         set {
@@ -63,7 +66,7 @@ final class PlayerModel {
 
     // MARK: Debug's readings
 
-    /// The engine's own state, as it last said.
+    /// The engine's own state, as it last said (of the queue playing).
     private(set) var engineState = EngineState()
     /// The last failure in the engine's own words (D7: raw words only in Debug's "Last failure").
     private(set) var lastFailure: String?
@@ -72,7 +75,8 @@ final class PlayerModel {
 
     /// The Hi-res readout for the song playing: its file's rate and bits, and the output's rate (Phase 0's).
     var readout: String? {
-        guard let entry = current, let song = songs[entry.key], let rate = engineState.fileRate else { return nil }
+        guard let entry = current, let rate = engineState.fileRate else { return nil }
+        let song = song(for: entry) ?? Song(track: entry.track)
         var bits = song.bitDepth ?? headerBits[song.id]
         if bits == nil, (song.suffix ?? "").lowercased() == "flac", let header = files.header(of: song),
            let info = FLACStreamInfo.parse(header) {
@@ -98,21 +102,23 @@ final class PlayerModel {
     }
 
     /// The engine's lanes and clocks, for Debug; nil before anything played.
-    func engineDebug() -> EngineDebug? { engine?.debug() }
+    func engineDebug() -> EngineDebug? { link?.engine.debug() }
 
     // MARK: Info's readings (D8)
 
-    /// The song an entry was queued from - every field Navidrome gave (Info's Format, Sample rate, Bit depth).
-    func song(for entry: QueueEntry) -> Song? { songs[entry.key] }
+    /// The song an entry was queued from - every field Navidrome gave (Info's Format, Sample rate, Bit depth): the
+    /// album page's, or the one deadwax's saved queue sent back (resume).
+    func song(for entry: QueueEntry) -> Song? { shelf[entry.track.id] }
 
     /// An album a queue came from, as its page last loaded it (the last 8 kept), for Info's album lines.
     func playedAlbum(id: String) -> Album? { albums.first { $0.id == id } }
 
-    /// Each entry's level as decided (levels.md 4.3, LevelDecisions) - empty until the Player part decides levels.
+    /// Each entry of the queue's level as decided (levels.md 4.3, LevelDecisions) - by Up Next's key; Info reads
+    /// `settled(key:level:song:)`.
     private(set) var levelDecisions = LevelDecisions()
 
-    /// An album's loudness as deadwax last answered it (GET .../loudness/album/{id}); nil until the Player part asks.
-    func loudness(albumID: String) -> AlbumLoudness? { nil }
+    /// An album's loudness as deadwax last answered it (GET .../loudness/album/{id}); nil until the book has asked.
+    func loudness(albumID: String) -> AlbumLoudness? { loudnessAnswers[albumID] }
 
     // MARK: kept
 
@@ -120,34 +126,58 @@ final class PlayerModel {
     private let files: SongFiles
     private let session = AudioSessionController()
     private let nowPlaying = NowPlayingController()
-    @ObservationIgnored private var engine: PlaybackEngine?
+    private let book: LoudnessBook
+    private let reporter: PlayReporter
+    @ObservationIgnored private var link: PlayerEngineLink?
+    @ObservationIgnored private var controller: QueueController?
     /// The queue's entries, as QueueController.entries(queue) gives them: Up Next's keys.
     private var entries: [QueueEntry] = []
-    /// The engine's key for each entry: unique across plays, so a state from before the last play - still on its
-    /// way to the main queue - names no entry of this one (Phase 0's rule).
-    @ObservationIgnored private var engineKeys: [Int] = []
-    @ObservationIgnored private var nextEngineKey = 0
-    /// Each entry's song, by Up Next's key.
-    @ObservationIgnored private var songs: [Int: Song] = [:]
+    /// The songs the app has of the queue's tracks, by id (an album page's, Debug's, resume's).
+    @ObservationIgnored private var shelf: [String: Song] = [:]
     @ObservationIgnored private var albums: [Album] = []
+    private var loudnessAnswers: [String: AlbumLoudness] = [:]
     /// The decoded length the engine reported for the entry heard.
     private var length: Double?
     private var pendingSeek: Scrub.PendingSeek?
     private var normalizationSetting = Normalization.read(UserDefaults.standard.string(forKey: Normalization.storageKey))
-    /// Debug's test songs play their downloaded copies.
-    @ObservationIgnored private var playsCopies = false
+    /// A song that failed to load is being asked for again (PlayerWords.retryDelaySeconds).
+    private var retrying = false
     @ObservationIgnored private var ticker: Timer?
     @ObservationIgnored private var interrupted = false
     @ObservationIgnored private var artwork: (id: String, image: UIImage)?
     @ObservationIgnored private var coverAsked: String?
     @ObservationIgnored private var headerBits: [String: Int] = [:]
-    /// A failure asks who is signed in once, not at each of its re-publishes.
-    @ObservationIgnored private var askedAfterFailure = false
     @ObservationIgnored private var noticeShown = 0
+    @ObservationIgnored private var skipShown = 0
+    /// The entry heard as the model last followed it: the engine's key (unique across queues), nil for none.
+    @ObservationIgnored private var heardEntry: Int?
+    @ObservationIgnored private var heardLength: Double = 0
+    /// Inside an action of the listener's: a song change in it starts a new listen; outside, the engine ran on by
+    /// itself (a join).
+    @ObservationIgnored private var acting = false
+    /// Where a queue put back starts its listen.
+    @ObservationIgnored private var listenFrom: Double = 0
+    /// The song heard was asked for again already (afterFailure's `retried`) - false at every song change.
+    @ObservationIgnored private var retried = false
+    @ObservationIgnored private var retryWork: DispatchWorkItem?
+    /// A failure asks who is signed in once per song, not at each of its re-publishes.
+    @ObservationIgnored private var askedAfterFailure = false
+    /// iOS refused the session in the action just made: said once the action's song change is drawn.
+    @ObservationIgnored private var refusedNow = false
+    @ObservationIgnored private var levelsShown: LevelStore?
+    // resume
+    @ObservationIgnored private var resuming: ResumeController?
+    @ObservationIgnored private var resumeFor: Int?
+    @ObservationIgnored private var sessionSeen: String?
+    @ObservationIgnored private var sessionCount = 0
+    @ObservationIgnored private let resumeClock = MainQueueClock()
 
     init(server: ServerModel, files: SongFiles) {
         self.server = server
         self.files = files
+        book = LoudnessBook(server: server)
+        reporter = PlayReporter(server: server)
+        book.onAnswer = { [weak self] album, answer in self?.loudnessAnswers[album] = answer }
         session.onInterruption = { [weak self] began, shouldResume in self?.interruption(began: began, shouldResume: shouldResume) }
         session.onOldDeviceGone = { [weak self] in self?.pause() }
         session.onReset = { [weak self] in self?.mediaReset() }
@@ -159,44 +189,50 @@ final class PlayerModel {
             previous: { [weak self] in self?.previous() },
             seek: { [weak self] seconds in self?.seek(to: seconds) }
         ))
+        watchServer()
     }
 
     // MARK: playing
 
     /// The album page's Play, Shuffle and a song's tap: `songs` played from `index` (nil with Shuffle: anywhere),
     /// every one at QueuePickWords.playLevel(normalization) - as an album. Call it in the tap, nothing awaited first.
-    /// Will be: QueueController.playTracks(tracks, start:, shuffle:) (upnext.md 6).
+    /// QueueController.playTracks(tracks, start:, shuffle:) (upnext.md 6).
     func play(songs: [Song], album: Album, at index: Int?, shuffle: Bool = false) {
         let level = QueuePickWords.playLevel(normalization)
         let tracks = songs.map { QueueTrack(song: $0, albumId: album.id, albumName: album.name ?? "",
                                             albumArtist: album.artist, albumCoverArt: album.coverArt, level: level) }
         remember(album)
-        start(startUpNext(tracks, start: index, shuffle: shuffle), songs: songs, copies: false)
+        shelve(songs)
+        startQueue(copies: false) { $0.playTracks(tracks, start: index, shuffle: shuffle) }
     }
 
     /// Play Next from a ••• menu: the pick queued straight after the song playing's copies (pick.choose(.next,
     /// setting: normalization)), and the notice said when the music didn't start from it (pick.notice). True when
-    /// something was queued (the menu closes). Will be: QueueController.playNext(tracks).
-    /// THE SHELL: only with nothing queued (it plays); with a queue it does nothing yet and answers false.
+    /// something was queued (the menu closes). QueueController.playNext(tracks).
     @discardableResult
     func playNext(_ pick: QueuePick<Song>, album: Album) -> Bool { choose(.next, pick, album: album) }
 
-    /// Play Last from a ••• menu: the pick queued at the end of Playing Next. Will be: QueueController.playLast.
-    /// THE SHELL: as playNext.
+    /// Play Last from a ••• menu: the pick queued at the end of Playing Next. QueueController.playLast.
     @discardableResult
     func playLast(_ pick: QueuePick<Song>, album: Album) -> Bool { choose(.last, pick, album: album) }
 
-    /// Play Next or Play Last, by the choice (QueuedHow).
+    /// Play Next or Play Last, by the choice (QueuedHow). With nothing playing - or a queue played out with nothing
+    /// after it - the songs play from the first, and the mini player is the notice.
     @discardableResult
     func choose(_ choice: QueueChoice, _ pick: QueuePick<Song>, album: Album) -> Bool {
         guard let queued = pick.choose(choice, setting: normalization) else { return false }
-        guard !hasQueue else { return false }
+        // no engine (iOS wouldn't make one): nothing queued, and the song's line says so
+        guard ensureController() != nil else { return true }
         let tracks = queued.tracks.map { QueueTrack(song: $0, albumId: album.id, albumName: album.name ?? "",
                                                     albumArtist: album.artist, albumCoverArt: album.coverArt,
                                                     level: queued.level) }
         remember(album)
-        // it started the music: the mini player is the notice (pick.notice(choice, started: true) is nil)
-        start(startUpNext(tracks, start: 0), songs: queued.tracks, copies: false)
+        shelve(queued.tracks)
+        var started = false
+        startQueue(copies: false) { controller in
+            started = choice == .next ? controller.playNext(tracks) : controller.playLast(tracks)
+        }
+        if let words = pick.notice(choice, started: started) { say(words) }
         return true
     }
 
@@ -216,202 +252,253 @@ final class PlayerModel {
         if isPlaying { pause() } else { resume() }
     }
 
-    /// Play: the song from where it paused; after the queue ended or failed, the entry shown again.
+    /// Play: the song from where it paused (a queue put back: from where it was left); after the queue ended, the
+    /// entry shown again from its start; after a failure, from where it stopped.
     func resume() {
-        guard let engine else { return }
-        try? session.activate()
-        engine.resume()
+        guard let controller, let link, hasQueue else { return }
+        follow()
+        cancelRetry()
+        switch engineState.phase {
+        case .ended:
+            if let heardEntry, let track = current?.track { reporter.newListen(entry: heardEntry, songID: track.id) }
+        case .failed:
+            // from where it stopped: the same listen, and who is signed in asked again should it fail again
+            reporter.seeked()
+            askedAfterFailure = false
+        default:
+            break
+        }
+        controller.intendsToPlay = true
+        link.resume()
+        sayRefusal()
+        startTicking()
+        observeResume()
+    }
+
+    /// Pause: the output off at once (iOS counts a running one as playing); play goes on from the sample heard.
+    func pause() {
+        guard let link else { return }
+        cancelRetry()
+        tick()
+        controller?.intendsToPlay = false
+        link.engine.pause()
+        observeResume()
+    }
+
+    /// Next: past Repeat One's copies to the next song (a held edit made first). Playing or paused as it was.
+    func next() {
+        guard let controller else { return }
+        cancelRetry()
+        act { controller.next() }
         startTicking()
     }
 
-    func pause() {
-        engine?.pause()
-    }
-
-    /// Next: the entry after the one heard (Core's `onward`), kept paused when paused. Will be: QueueController.next()
-    /// (Repeat One's copies passed by, a held edit made first).
-    func next() {
-        catchUp()
-        guard let index = onward(queue) else { return }
-        engine?.skip(to: index)
-        playIfStopped()
-    }
-
-    /// Previous: the song again from its start after `UpNext.restartAfterSeconds`, else the entry before (Core's
-    /// `backward`). Will be: QueueController.previous().
+    /// Previous: the song again from its start after `UpNext.restartAfterSeconds`, else the entry before the run of
+    /// Repeat One's copies it is part of. Playing or paused as it was.
     func previous() {
-        catchUp()
-        switch backward(queue, position: position) {
-        case .restart: seek(to: 0)
-        case .go(let index): engine?.skip(to: index)
+        guard let controller, let link else { return }
+        cancelRetry()
+        follow()
+        if case .restart = backward(queue, position: link.heard()?.seconds ?? 0) {
+            // the same entry from its start: a new listen, and the thumb held at 0 until the engine lands there
+            pendingSeek = Scrub.PendingSeek(target: 0, since: Self.nowMs())
+            if let heardEntry, let track = current?.track { reporter.newListen(entry: heardEntry, songID: track.id) }
+            resuming?.position(0)
         }
-        playIfStopped()
+        act { controller.previous() }
+        startTicking()
+        showNowPlaying()
     }
 
     /// The scrubber let go, or the lock screen's: `seconds` into the entry heard. The thumb holds there until the
     /// engine reports it landed (Scrub.PendingSeek, Scrub.settled).
     func seek(to seconds: Double) {
-        guard let engine else { return }
+        guard let link, hasQueue else { return }
+        follow()
         pendingSeek = Scrub.PendingSeek(target: seconds, since: Self.nowMs())
-        engine.seek(to: seconds)
+        reporter.seeked()
+        link.seek(to: seconds)
+        resuming?.position(seconds)
         showNowPlaying()
     }
 
-    /// Repeat's button: off -> all -> one (Repeat.allCases), kept on the device. Will be: QueueController.setRepeat
-    /// (one's copies queued ahead). THE SHELL: the setting is kept and drawn; the engine doesn't repeat yet.
+    /// Repeat's button: off -> all -> one (Repeat.allCases), kept on the device, the queue fitted to it
+    /// (QueueController.setRepeat: one's copies queued ahead). In a song's last ~2.5 s the change is made after the
+    /// join (D4): Repeat One turned on there repeats the NEXT song.
     func setRepeat(_ mode: Repeat) {
-        repeatMode = mode
-        UserDefaults.standard.set(mode.rawValue, forKey: Repeat.storageKey)
+        guard let controller else {
+            repeatChanged(mode)
+            return
+        }
+        act { controller.setRepeat(mode) }
     }
 
-    /// Shuffle's button mid-queue. Will be: QueueController.setShuffle(!shuffle). THE SHELL: nothing yet.
-    func toggleShuffle() {}
+    /// Shuffle's button mid-queue: QueueController.setShuffle(!shuffle).
+    func toggleShuffle() {
+        guard let controller else { return }
+        act { controller.setShuffle(!controller.shuffle) }
+    }
 
-    /// An Up Next row tapped: that entry played from its start. Will be: QueueController.jumpTo(key:) (a row ahead
-    /// in Playing Next or the list, the rows before it let go). THE SHELL: the engine skips to it.
+    /// An Up Next row tapped: that entry played from its start, paused or not (QueueController.jumpTo(key:)) - in a
+    /// song's last moments too, the queue played afresh from the row.
     func jump(to key: Int) {
-        catchUp()
-        guard let index = entries.firstIndex(where: { $0.key == key }) else { return }
-        engine?.skip(to: index)
-        playIfStopped()
+        guard let controller else { return }
+        cancelRetry()
+        act { controller.jumpTo(key: key) }
+        startTicking()
     }
 
-    /// An Up Next row dragged to `index` of its own group. Will be: QueueController.moveInQueue(key:to:). THE SHELL:
-    /// nothing yet.
-    func move(key: Int, to index: Int) {}
+    /// An Up Next row dragged to `index` of its own group (QueueController.moveInQueue(key:to:)).
+    func move(key: Int, to index: Int) {
+        guard let controller else { return }
+        act { controller.moveInQueue(key: key, to: index) }
+    }
 
-    /// An Up Next row removed. Will be: QueueController.removeFromQueue(key:). THE SHELL: nothing yet.
-    func remove(key: Int) {}
+    /// An Up Next row removed (QueueController.removeFromQueue(key:)).
+    func remove(key: Int) {
+        guard let controller else { return }
+        act { controller.removeFromQueue(key: key) }
+    }
 
-    /// Up Next's Clear on Playing Next. Will be: QueueController.clearPlayingNext(). THE SHELL: nothing yet.
-    func clearPlayingNext() {}
+    /// Up Next's Clear on Playing Next (QueueController.clearPlayingNext()).
+    func clearPlayingNext() {
+        guard let controller else { return }
+        act { controller.clearPlayingNext() }
+    }
 
     /// Stops and forgets the queue: the mini player goes.
     func stop() {
-        engine?.stop()
+        cancelRetry()
+        reporter.stop()
+        link?.stop()
+        controller = nil
         files.keep([], ahead: [])
         nowPlaying.clear()
-        ticker?.invalidate()
-        ticker = nil
+        stopTicking()
         queue = .empty
         entries = []
-        engineKeys = []
-        songs = [:]
+        heardEntry = nil
         position = 0
         length = nil
         pendingSeek = nil
         errorLine = nil
+        levelDecisions = LevelDecisions()
+        levelsShown = link?.levels
+        book.wantQueue([])
+        observeResume()
     }
 
-    /// The person changed (ServerModel.whenPersonChanges): everything of theirs let go.
+    /// The person changed (ServerModel.whenPersonChanges): everything of theirs let go - resume first, so the stop
+    /// saves nothing over their queue.
     func reset() {
+        resuming?.stop()
+        resuming = nil
+        resumeFor = nil
         stop()
         albums = []
-        levelDecisions = LevelDecisions()
+        shelf = [:]
+        book.reset()
+        loudnessAnswers = [:]
+        noticeShown += 1
         notice = nil
         lastFailure = nil
         engineState = EngineState()
     }
 
-    /// The album page showed `album` with its songs: kept for Info, and its levels warmed when the setting will want
-    /// them (AlbumPageLines.warms). Will be: the LoudnessBook's warm (its 202 "measuring" recorded, LevelWait).
+    /// The album page showed `album` with its songs: kept for Info, and - when Normalization will level them
+    /// (AlbumPageLines.warms) - its loudness asked for and its levels warmed (the LoudnessBook).
     func albumShown(_ album: Album) {
         remember(album)
-        guard AlbumPageLines.warms(normalization, songs: album.song), let client = server.client else { return }
-        Task { _ = try? await client.warmLevels(albumID: album.id) }
+        guard AlbumPageLines.warms(normalization, songs: album.song) else { return }
+        book.wantPage(album.id)
     }
 
     /// The album page found its album gone (404): nothing kept of it.
     func albumGone(id: String) {
         albums.removeAll { $0.id == id }
+        book.leavePage(id)
     }
 
-    /// The app came to the front: the position read again. Will be: resume's save and the engine's re-read (resume.md 6).
+    /// The album page went: its loudness no longer wanted for it (the queue may still want it).
+    func albumLeft(id: String) {
+        book.leavePage(id)
+    }
+
+    /// The app came to the front: the position read again, and resume's look for what another device played.
     func becameActive() {
         tick()
+        resuming?.foreground()
     }
 
-    /// The app went to the back. Will be: the queue saved for resume (resume.md 6).
-    func movedToBackground() {}
+    /// The app went to the back: what resume has due is saved at once.
+    func movedToBackground() {
+        tick()
+        resuming?.background()
+    }
 
     /// Debug's test songs and hi-res row: `songs` played from `index` as they are (no album; Off), their downloaded
     /// copies when `copies` (a song with none is streamed).
     func playTest(_ songs: [Song], at index: Int, copies: Bool) {
         let tracks = songs.map { QueueTrack(song: $0, albumId: $0.albumId ?? "", albumName: $0.album ?? "") }
-        start(startUpNext(tracks, start: index), songs: songs, copies: copies)
+        shelve(songs)
+        startQueue(copies: copies) { $0.playTracks(tracks, start: index) }
     }
 
-    // MARK: the engine (Phase 0's path)
+    // MARK: the controller
 
-    private func start(_ started: UpNextQueue, songs played: [Song], copies: Bool) {
-        guard let client = server.client, started.current != nil else { return }
-        do {
-            try session.activate()
-        } catch {
-            errorLine = ErrorWords.other
-            lastFailure = "iOS wouldn't let the app play: \(error.localizedDescription)"
-            return
-        }
-        guard let engine = ensureEngine() else { return }
-        let made = QueueController.entries(started)
-        // the song each entry was queued from, by its track's id (startUpNext keeps the order it was given or shuffles it)
-        var byID: [String: Song] = [:]
-        for song in played { byID[song.id] = song }
-        var kept: [Int: Song] = [:]
-        for entry in made { kept[entry.key] = byID[entry.track.id] }
-        errorLine = nil
-        askedAfterFailure = false
-        playsCopies = copies
-        queue = started
-        entries = made
-        songs = kept
-        engineKeys = made.indices.map { nextEngineKey + $0 }
-        nextEngineKey += made.count
-        position = 0
-        length = nil
-        pendingSeek = nil
-        engine.play(Self.tracks(made, songs: kept, keys: engineKeys, copies: copies, files: files, client: client),
-                    from: started.index)
+    /// A play that may start a new queue: a new generation of engine keys and of level decisions, from its first play
+    /// or restore. Made in the tap: nothing awaited.
+    private func startQueue(copies: Bool, _ body: (QueueController) -> Void) {
+        guard let controller = ensureController(), let link else { return }
+        cancelRetry()
+        link.beginStart(copies: copies)
+        act { body(controller) }
+        link.endStart()
+        pruneShelf()
         startTicking()
-        showNowPlaying()
     }
 
-    /// The engine's tracks. Nonisolated, so the closures it makes - which the engine calls on its own queue - belong
-    /// to no actor. Every entry plays as the file is (Off: GainedSource.wrap hands the source itself back) until the
-    /// Player part applies its level.
-    nonisolated static func tracks(_ entries: [QueueEntry], songs: [Int: Song], keys: [Int], copies: Bool,
-                                   files: SongFiles, client: DeadwaxClient) -> [EngineTrack] {
-        zip(entries, keys).map { entry, key in
-            let song = songs[entry.key] ?? Song(id: entry.track.id, title: entry.track.title)
-            let factor: Float? = nil
-            return EngineTrack(key: key, audio: EngineTrack.audio(songID: song.id, level: nil), song: song) { start in
-                let source: PCMSource
-                if copies, let url = files.downloadedURL(for: song) {
-                    source = try FileSource(url: url, start: start)
-                } else {
-                    source = try files.streamSource(for: song, client: client, start: start)
-                }
-                return GainedSource.wrap(source, factor: factor)
-            }
-        }
+    /// An action of the listener's on the controller: the queue caught up with the engine first (a join it hasn't
+    /// seen is a join), then the action - whose song change is a new listen.
+    private func act(_ body: () -> Void) {
+        follow()
+        acting = true
+        body()
+        acting = false
+        sayRefusal()
     }
 
-    /// The engine's two readings of the output, from AVAudioSession.
-    nonisolated static func lead(_ engine: PlaybackEngine) {
-        engine.startLead = { AudioSessionController.startLead() }
-        engine.latency = { AudioSessionController.latency() }
+    /// The queue caught up with what the engine is playing.
+    private func follow() {
+        guard let controller, !acting else { return }
+        controller.catchUp()
     }
 
-    private func ensureEngine() -> PlaybackEngine? {
-        if let engine { return engine }
+    private func ensureController() -> QueueController? {
+        if let controller { return controller }
+        guard let link = ensureLink() else { return nil }
+        let made = QueueController(engine: link, repeat: repeatMode)
+        made.onChange = { [weak self] next in MainActor.assumeIsolated { self?.queueChanged(next) } }
+        made.onRepeatChange = { [weak self] mode in MainActor.assumeIsolated { self?.repeatChanged(mode) } }
+        controller = made
+        return made
+    }
+
+    private func ensureLink() -> PlayerEngineLink? {
+        if let link { return link }
         do {
             let engine = try PlaybackEngine()
             Self.lead(engine)
             engine.onChange = { [weak self] state in
-                MainActor.assumeIsolated { self?.changed(state) }
+                MainActor.assumeIsolated { self?.engineChanged(state) }
             }
-            self.engine = engine
-            return engine
+            let made = PlayerEngineLink(engine: engine, files: files, shelf: book.shelf, decided: Self.decidedHook(self))
+            made.size = { [weak self] id in MainActor.assumeIsolated { self?.shelf[id]?.size } }
+            made.activate = { [weak self] in MainActor.assumeIsolated { self?.activateSession() ?? false } }
+            made.refused = { [weak self] in MainActor.assumeIsolated { self?.refusedNow = true } }
+            made.clientBox.client = server.client
+            link = made
+            return made
         } catch {
             errorLine = ErrorWords.other
             lastFailure = "iOS couldn't make the audio engine: \(error.localizedDescription)"
@@ -419,66 +506,245 @@ final class PlayerModel {
         }
     }
 
-    private func changed(_ state: EngineState) {
-        // the entry heard, by its engine key: a state from before the last play names none of this queue's
-        let index = state.key.flatMap { engineKeys.firstIndex(of: $0) }
-        let moved = index != nil && index != queue.index
-        engineState = state
-        if let index, moved {
-            queue.index = index
-            position = 0
-            length = nil
-            pendingSeek = nil
-            errorLine = nil
-        }
-        if case .failed(let words) = state.phase {
-            lastFailure = words
-            let failure = PlayerWords.Failure(rawValue: state.failure?.kind.rawValue ?? "") ?? .other
-            errorLine = PlayerWords.words(failure)
-            if !askedAfterFailure {
-                // a song that failed to load asks who is signed in (D7): a stream's 401 shows the sign-in
-                askedAfterFailure = true
-                Task { await server.refreshMe() }
+    /// The engine's two readings of the output, from AVAudioSession - made outside the main actor, as the engine
+    /// reads them on its own queue.
+    nonisolated static func lead(_ engine: PlaybackEngine) {
+        engine.startLead = { AudioSessionController.startLead() }
+        engine.latency = { AudioSessionController.latency() }
+    }
+
+    /// A level decided on the engine's queue, drawn on the main one - made outside the main actor for the same reason.
+    nonisolated static func decidedHook(_ model: PlayerModel) -> @Sendable (LevelStore, LevelDecisions) -> Void {
+        { [weak model] store, made in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { model?.levelsDecided(store, made) }
             }
         }
-        outputName = session.outputName
-        if moved || state.phase != .loading { tick() }
-        if index != nil { keepAndPrefetch() }
+    }
+
+    private func levelsDecided(_ store: LevelStore, _ made: LevelDecisions) {
+        guard link?.levels === store else { return }
+        levelDecisions = made
+    }
+
+    private func repeatChanged(_ mode: Repeat) {
+        repeatMode = mode
+        UserDefaults.standard.set(mode.rawValue, forKey: Repeat.storageKey)
+    }
+
+    // MARK: following the queue and the engine
+
+    /// The queue changed (QueueController.onChange): drawn, the song change handled, the albums it needs asked about,
+    /// the cache kept and the next song fetched, resume told, the lock screen set.
+    private func queueChanged(_ next: UpNextQueue) {
+        guard let link else { return }
+        queue = next
+        entries = QueueController.entries(next)
+        if levelsShown !== link.levels {
+            levelsShown = link.levels
+            levelDecisions = link.levels.snapshot
+        }
+        let entry = current.map { link.engineKey($0.key) }
+        if entry != heardEntry { songChanged(to: entry) }
+        book.wantQueue(LoudnessAsking.wanted(next.tracks, playing: next.index))
+        keepAndPrefetch()
+        observeResume()
         showNowPlaying()
     }
 
-    /// The queue's place from the engine's own position (what is heard), before a Next or Previous is worked out.
-    private func catchUp() {
-        guard let at = engine?.position(), engineKeys.indices.contains(at.index), engineKeys[at.index] == at.key else { return }
-        queue.index = at.index
-        position = at.seconds
+    /// Another entry is heard: its words and its retry start afresh (usePlayer.ts at every load and join), and its
+    /// listen begins - a new one when the listener moved, the old song's rest counted to it when the engine ran on.
+    private func songChanged(to entry: Int?) {
+        let old = heardEntry
+        let oldLength = length ?? heardLength
+        heardEntry = entry
+        heardLength = current?.track.duration ?? 0
+        length = nil
+        pendingSeek = nil
+        position = listenFrom
+        errorLine = nil
+        retried = false
+        askedAfterFailure = false
+        cancelRetry()
+        guard let entry, let track = current?.track else {
+            reporter.stop()
+            return
+        }
+        if acting || old == nil {
+            reporter.newListen(entry: entry, songID: track.id, from: listenFrom)
+        } else if case .failed = engineState.phase, engineState.key == entry {
+            // the next song failed while the one before played (the engine says so at its end): the one before
+            // counted to its end, and the failed one's listen never begins - it was never heard
+            reporter.tick(position: oldLength, duration: oldLength)
+            reporter.newListen(entry: entry, songID: track.id)
+        } else {
+            let at = link?.position()
+            let heard = at.map { $0.key == entry ? $0.seconds : 0 } ?? 0
+            position = heard
+            reporter.join(entry: entry, songID: track.id, oldLength: oldLength, newPosition: heard,
+                          newDuration: track.duration)
+        }
     }
 
-    private func playIfStopped() {
-        switch engineState.phase {
-        case .ended, .failed: resume()
-        default: break
+    /// The engine said something changed. A state of another queue's generation (still on its way from before a new
+    /// play or a stop) is dropped.
+    private func engineChanged(_ state: EngineState) {
+        guard let link else { return }
+        if let key = state.key {
+            guard link.isCurrent(key) else { return }
+        } else if hasQueue {
+            return
         }
+        let was = engineState
+        engineState = state
+        outputName = session.outputName
+        follow()
+        switch state.phase {
+        case .playing:
+            retrying = false
+            if let key = state.key { reporter.began(entry: key) }
+        case .ended where was.phase != .ended:
+            // the queue played out: the listen counted to its end, then Repeat's next time round, or the music stops
+            tick()
+            act { _ = controller?.queueEnded() }
+        case .failed(let words) where was.phase != state.phase || was.key != state.key:
+            failed(state, words: words)
+        default:
+            break
+        }
+        if isPlaying { startTicking() }
+        tick()
+        keepAndPrefetch()
+        observeResume()
+        showNowPlaying()
+    }
+
+    /// A song that won't play (D7): its raw words to Debug, who is signed in asked again (a stream's 401 brings the
+    /// sign-in), and then PlayerWords.afterEngineFailure - asked for again once after 1.5 s, passed over to the next
+    /// song (its notice where the artist goes, for 5 s), or the queue stopped at it with the words.
+    private func failed(_ state: EngineState, words: String) {
+        lastFailure = words
+        guard let controller, let key = state.key, key == heardEntry else { return }
+        if !askedAfterFailure {
+            askedAfterFailure = true
+            Task { await server.refreshMe() }
+        }
+        let failure = PlayerWords.Failure(rawValue: state.failure?.kind.rawValue ?? "") ?? .other
+        switch PlayerWords.afterEngineFailure(failure, intendsToPlay: controller.intendsToPlay, retried: retried) {
+        case .retry:
+            retried = true
+            errorLine = PlayerWords.words(failure)
+            retrying = true
+            scheduleRetry(of: key)
+        case .skip:
+            let title = current?.track.title
+            var skippedTo: Int?
+            act { skippedTo = controller.skipFailed() }
+            if skippedTo != nil {
+                showSkipped(PlayerWords.skipped(title: title?.isEmpty == false ? title : nil, failure: failure))
+            } else {
+                errorLine = PlayerWords.words(failure)
+            }
+        case .stop:
+            controller.intendsToPlay = false
+            errorLine = PlayerWords.words(failure)
+        }
+    }
+
+    /// The song asked for again from where it stopped, after the retry's delay - the same listen - unless the
+    /// listener moved or paused meanwhile.
+    private func scheduleRetry(of key: Int) {
+        retryWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.retryWork = nil
+                guard self.retrying else { return }
+                self.retrying = false
+                guard self.heardEntry == key, self.controller?.intendsToPlay == true, let link = self.link else { return }
+                self.reporter.seeked()
+                link.resume()
+                self.sayRefusal()
+                self.startTicking()
+            }
+        }
+        retryWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + PlayerWords.retryDelaySeconds, execute: work)
+    }
+
+    private func cancelRetry() {
+        retryWork?.cancel()
+        retryWork = nil
+        retrying = false
+    }
+
+    /// A skipped song's words in the next song's second line, for PlayerWords.skipNoticeSeconds - cleared only if
+    /// they are still what it says.
+    private func showSkipped(_ words: String) {
+        skipShown += 1
+        let shown = skipShown
+        errorLine = words
+        Task {
+            try? await Task.sleep(for: .seconds(PlayerWords.skipNoticeSeconds))
+            if shown == skipShown, errorLine == words { errorLine = nil }
+        }
+    }
+
+    // MARK: the session
+
+    private func activateSession() -> Bool {
+        do {
+            try session.activate()
+            return true
+        } catch {
+            lastFailure = "iOS wouldn't let the app play: \(error.localizedDescription)"
+            return false
+        }
+    }
+
+    /// iOS refused the session in the action just made: nothing plays, and the song says so.
+    private func sayRefusal() {
+        guard refusedNow else { return }
+        refusedNow = false
+        controller?.intendsToPlay = false
+        errorLine = ErrorWords.other
     }
 
     /// iOS reset its media services: the session made active again when something was playing, then the engine
     /// makes itself again and goes on from the frame heard.
     private func mediaReset() {
-        if isPlaying { try? session.activate() }
-        engine?.rebuild()
+        if isPlaying { _ = activateSession() }
+        link?.engine.rebuild()
     }
 
-    /// The song heard and the next kept in the cache, and the next song's bytes begun (Phase 0's StreamCache.kept).
-    private func keepAndPrefetch() {
-        let queued = entries.compactMap { songs[$0.key] }
-        guard queued.count == entries.count, queued.indices.contains(queue.index) else { return }
-        let now = engine?.position()
-        let engineAt = now.flatMap { at in engineKeys.indices.contains(at.index) && engineKeys[at.index] == at.key ? at.index : nil }
-        let (inUse, ahead) = StreamCache.kept(queued, shown: queue.index, engineAt: engineAt)
-        files.keep(inUse, ahead: ahead)
-        if now != nil, !playsCopies, let client = server.client, let next = nextIndex(queue), queued.indices.contains(next) {
-            files.prefetch(queued[next], client: client)
+    private func interruption(began: Bool, shouldResume: Bool) {
+        if began {
+            interrupted = isPlaying
+            pause()
+        } else if shouldResume, interrupted {
+            interrupted = false
+            resume()
         }
+    }
+
+    // MARK: the cache, the ticker, the lock screen
+
+    /// The song heard and the next kept in the cache (StreamCache.kept), and - while the music is meant to play -
+    /// the next song's bytes begun, so the join stays seamless. A queue put back loads nothing.
+    private func keepAndPrefetch() {
+        guard let link else { return }
+        let queued = entries.map { engineSong($0.track) }
+        guard queued.indices.contains(queue.index) else { return }
+        let (inUse, ahead) = StreamCache.kept(queued, shown: queue.index, engineAt: link.position()?.index)
+        files.keep(inUse, ahead: ahead)
+        guard controller?.intendsToPlay == true, !link.copies, let client = server.client, let next = nextIndex(queue),
+              queued.indices.contains(next) else { return }
+        files.prefetch(queued[next], client: client)
+    }
+
+    /// The song the engine plays for a track: the entry's own, with Navidrome's size when the app has it.
+    private func engineSong(_ track: QueueTrack) -> Song {
+        Song(track: track, size: shelf[track.id]?.size)
     }
 
     private func startTicking() {
@@ -488,23 +754,43 @@ final class PlayerModel {
         }
     }
 
+    private func stopTicking() {
+        ticker?.invalidate()
+        ticker = nil
+    }
+
+    /// Twice a second while playing: the queue caught up, the position read, the listen counted, Repeat's top-up
+    /// and a held edit given their chance, and resume told where it is.
     private func tick() {
-        guard let engine else { return }
-        if let at = engine.position(), engineKeys.indices.contains(queue.index), at.key == engineKeys[queue.index] {
+        guard let link else { return }
+        follow()
+        if let at = link.position(), let entry = current, at.key == link.engineKey(entry.key) {
             position = at.seconds
             length = at.length
             pendingSeek = Scrub.settled(pendingSeek, position: at.seconds, now: Self.nowMs())
         }
-        if !isPlaying {
-            ticker?.invalidate()
-            ticker = nil
+        if engineState.phase == .playing {
+            reporter.tick(position: position, duration: duration)
+            controller?.tick(heard: reporter.heard, length: length)
+            resuming?.position(position)
         }
+        if !isPlaying { stopTicking() }
+    }
+
+    /// Seconds into the entry heard as the engine says it now (a queue put back: its parked second).
+    private func heardSeconds() -> Double {
+        link?.position()?.seconds ?? position
     }
 
     private func showNowPlaying() {
-        guard let entry = current, let song = songs[entry.key] else { return }
-        let cover = entry.track.coverArt
-        nowPlaying.show(song: song, elapsed: shownPosition, playing: engineState.phase == .playing,
+        guard let entry = current else { return }
+        let track = entry.track
+        let cover = track.coverArt
+        nowPlaying.show(title: track.title.isEmpty ? track.id : track.title,
+                        artist: track.artist.isEmpty ? nil : track.artist,
+                        album: track.album.isEmpty ? nil : track.album,
+                        duration: duration > 0 ? duration : nil,
+                        elapsed: shownPosition, playing: engineState.phase == .playing,
                         artwork: cover != nil && artwork?.id == cover ? artwork?.image : nil)
         if let cover, artwork?.id != cover, coverAsked != cover, let client = server.client {
             coverAsked = cover
@@ -517,20 +803,101 @@ final class PlayerModel {
         }
     }
 
-    private func interruption(began: Bool, shouldResume: Bool) {
-        if began {
-            interrupted = isPlaying
-            engine?.pause()
-        } else if shouldResume, interrupted {
-            interrupted = false
-            resume()
+    // MARK: resume
+
+    /// Who is signed in, watched: the engine's opens ask through the client in hand, and resume is made for each
+    /// person once /me has answered.
+    private func watchServer() {
+        withObservationTracking {
+            _ = server.launch
+            _ = server.me
+            _ = server.person
+            _ = server.client
+        } onChange: { [weak self] in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    self?.serverChanged()
+                    self?.watchServer()
+                }
+            }
         }
     }
+
+    private func serverChanged() {
+        link?.clientBox.client = server.client
+        guard server.launch == .ready, server.me != nil, resumeFor != server.person else { return }
+        resuming?.stop()
+        let player = ResumePlayerLink(
+            position: { [weak self] in MainActor.assumeIsolated { self?.heardSeconds() ?? 0 } },
+            restore: { [weak self] queue, position in MainActor.assumeIsolated { self?.putBack(queue, position: position) } }
+        )
+        let routes = ResumeRoutes(
+            client: { [weak self] in self?.server.client },
+            shelve: { [weak self] songs in self?.shelve(songs) }
+        )
+        let made = ResumeController(
+            device: Self.deviceID(), label: Resume.label, player: player, server: routes, clock: resumeClock,
+            session: { [weak self] in MainActor.assumeIsolated { self?.sessionGeneration() ?? 0 } },
+            normalization: { [weak self] in MainActor.assumeIsolated { self?.normalization ?? .default } },
+            say: { [weak self] words in MainActor.assumeIsolated { self?.say(words) } }
+        )
+        resuming = made
+        resumeFor = server.person
+        made.observe(queue: queue, playing: isPlaying)
+        made.start()
+    }
+
+    /// The queue resume put back (its one action): paused at `position` seconds into its song, nothing loaded or
+    /// fetched, fitted to this device's Repeat - a new queue, its listen from where it was left.
+    private func putBack(_ saved: UpNextQueue, position at: Double) -> UpNextQueue? {
+        guard let controller = ensureController(), let link else { return nil }
+        link.beginStart(copies: false)
+        listenFrom = at
+        var made: UpNextQueue?
+        act { made = controller.restoreQueue(saved, position: at) }
+        listenFrom = 0
+        link.endStart()
+        if made != nil { pruneShelf() }
+        return made
+    }
+
+    private func observeResume() {
+        resuming?.observe(queue: queue, playing: isPlaying)
+    }
+
+    /// The sign-in's generation, as resume reads it: +1 each time the session in hand changes.
+    private func sessionGeneration() -> Int {
+        let now = server.client?.session
+        if now != sessionSeen {
+            sessionSeen = now
+            sessionCount += 1
+        }
+        return sessionCount
+    }
+
+    /// This phone's id in deadwax's record of the queue (DeviceID), made once and kept.
+    private static func deviceID() -> String {
+        let read = DeviceID.read(UserDefaults.standard.string(forKey: DeviceID.storageKey))
+        if read.isNew { UserDefaults.standard.set(read.id, forKey: DeviceID.storageKey) }
+        return read.id
+    }
+
+    // MARK: kept for Info
 
     private func remember(_ album: Album) {
         albums.removeAll { $0.id == album.id }
         albums.insert(album, at: 0)
         if albums.count > 8 { albums.removeLast(albums.count - 8) }
+    }
+
+    private func shelve(_ songs: [Song]) {
+        for song in songs { shelf[song.id] = song }
+    }
+
+    /// Only the songs of the queue kept, once a new one is made.
+    private func pruneShelf() {
+        let ids = Set(queue.tracks.map(\.id))
+        shelf = shelf.filter { ids.contains($0.key) }
     }
 
     private static func nowMs() -> Double { Date().timeIntervalSince1970 * 1000 }
