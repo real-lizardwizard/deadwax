@@ -13,7 +13,8 @@ final class AudioSessionController {
     var onInterruption: ((_ began: Bool, _ shouldResume: Bool) -> Void)?
     /// The output in use went away: AirPods out of the ears or taken off, headphones unplugged.
     var onOldDeviceGone: (() -> Void)?
-    /// iOS reset its media services: everything audio is made again.
+    /// iOS reset its media services: everything audio is made again (the category is set again
+    /// before this is called; the model activates the session when it was playing).
     var onReset: (() -> Void)?
 
     private var observers: [NSObjectProtocol] = []
@@ -62,6 +63,15 @@ final class AudioSessionController {
     /// buffer, so its first sample lands on an output that is already live. Read on the engine's
     /// queue; AVAudioSession's properties may be read from any thread.
     nonisolated static func startLead() -> TimeInterval {
+        let session = AVAudioSession.sharedInstance()
+        return session.outputLatency + session.ioBufferDuration
+    }
+
+    /// How far the ear is behind the engine's render: the same sum, read at every position the
+    /// engine gives (the lock screen, the scrubber, a pause, a new route), so each is what is heard -
+    /// tens of milliseconds on the speaker, more on AirPods, about 2 s on AirPlay (iOS's own figure,
+    /// unmeasured here). Read on the engine's queue.
+    nonisolated static func latency() -> TimeInterval {
         let session = AVAudioSession.sharedInstance()
         return session.outputLatency + session.ioBufferDuration
     }

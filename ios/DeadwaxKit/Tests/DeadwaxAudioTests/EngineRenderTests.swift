@@ -46,7 +46,7 @@ final class GrowingBytes: ByteSource {
     let all: Data
     var released = 0
     var step: Int
-    var failure: String?
+    var failure: AudioFailure?
 
     init(_ data: Data, step: Int) {
         all = data
@@ -91,18 +91,29 @@ final class Opens {
 }
 
 /// Songs whose sources start where they are asked, at their own rate, as FileSource and
-/// StreamSource do.
-func tracksFromWhereAsked(_ songs: [[[Float]]], rate: Double, opens: Opens = Opens()) -> [EngineTrack] {
+/// StreamSource do - keyed 0, 1, 2... as Up Next would, each at `factors[index]`'s gain when given
+/// (the app's decision, fixed for the entry: every open wraps with the same one).
+func tracksFromWhereAsked(_ songs: [[[Float]]], rate: Double, opens: Opens = Opens(),
+                          factors: [Float?]? = nil) -> [EngineTrack] {
     songs.enumerated().map { index, song in
-        EngineTrack(song: Song(id: "\(index)")) { start in
+        let factor = factors?[index] ?? nil
+        return EngineTrack(key: index, audio: EngineTrack.audio(songID: "\(index)", level: factor.map { "\($0)" }),
+                           song: Song(id: "\(index)")) { start in
             let frame = start.frame(at: rate)
             opens.frames.append(frame)
             if opens.failing > 0 {
                 opens.failing -= 1
-                throw AudioFailure("The song stopped arriving.")
+                throw AudioFailure("The song stopped arriving.", kind: .network)
             }
-            return MemorySource(song, rate: rate, start: Int(frame))
+            return GainedSource.wrap(MemorySource(song, rate: rate, start: Int(frame)), factor: factor)
         }
+    }
+}
+
+/// One entry, from its start (or where it is asked, at `rate`): song `id`, under Up Next's `key`.
+func entry(_ samples: [[Float]], rate: Double, key: Int, id: String, factor: Float? = nil) -> EngineTrack {
+    EngineTrack(key: key, audio: EngineTrack.audio(songID: id, level: factor.map { "\($0)" }), song: Song(id: id)) { start in
+        GainedSource.wrap(MemorySource(samples, rate: rate, start: Int(start.frame(at: rate))), factor: factor)
     }
 }
 
@@ -153,10 +164,7 @@ func energyMap(_ samples: [Float], block: Int = 2_048) -> String {
         let a = signal(frames: 13_230, channels: 2, seed: 0.1) // 0.3 s
         let b = signal(frames: 11_025, channels: 2, seed: 0.7) // 0.25 s
         let engine = try offlineEngine(rate: rate, channels: 2)
-        let tracks = [a, b].enumerated().map { index, song in
-            EngineTrack(song: Song(id: "\(index)")) { _ in MemorySource(song, rate: rate) }
-        }
-        engine.play(tracks, from: 0)
+        engine.play(tracksFromWhereAsked([a, b], rate: rate), from: 0)
         engine.settle()
         let total = a[0].count + b[0].count
         let out = try engine.renderOffline(AVAudioFrameCount(total + 4096))
@@ -182,25 +190,23 @@ func energyMap(_ samples: [Float], block: Int = 2_048) -> String {
         let a = signal(frames: 24_000, channels: 2, seed: 0.2)
         let b = signal(frames: 24_000, channels: 2, seed: 0.3)
         let engine = try offlineEngine(rate: rate, channels: 2)
-        engine.play([a, b].enumerated().map { index, song in
-            EngineTrack(song: Song(id: "\(index)")) { _ in MemorySource(song, rate: rate) }
-        }, from: 0)
+        engine.play(tracksFromWhereAsked([a, b], rate: rate), from: 0)
         engine.settle()
         _ = try engine.renderOffline(36_000)
         engine.settle()
         let at = try #require(engine.position())
         #expect(at.index == 1)
+        #expect(at.key == 1)
         #expect(abs(at.seconds - 0.25) < 0.1)
+        #expect(at.length == 0.5, "the song's decode has ended: its exact length")
+        #expect(engine.stateNow.key == 1 && engine.stateNow.index == 1)
     }
 
     @Test func anotherFormatPlaysOnItsOwnLaneAfterTheFirst() throws {
         let a = signal(frames: 4_410 * 3, channels: 2, seed: 0.4) // 0.3 s at 44.1
         let b = signal(frames: 9_600 * 3, channels: 2, seed: 0.5) // 0.3 s at 96
         let engine = try offlineEngine(rate: 48_000, channels: 2)
-        engine.play([
-            EngineTrack(song: Song(id: "cd")) { _ in MemorySource(a, rate: 44_100) },
-            EngineTrack(song: Song(id: "hires")) { _ in MemorySource(b, rate: 96_000) },
-        ], from: 0)
+        engine.play([entry(a, rate: 44_100, key: 0, id: "cd"), entry(b, rate: 96_000, key: 1, id: "hires")], from: 0)
         engine.settle()
         let out = try engine.renderOffline(48_000)
         let left = samples(out, channel: 0)
@@ -223,11 +229,8 @@ func energyMap(_ samples: [Float], block: Int = 2_048) -> String {
         let third = signal(frames: 22_050, channels: 2, seed: 0.35) // 0.5 s
         let engine = try offlineEngine(rate: rate, channels: 2)
         engine.trace = { print("engine: \($0)") }
-        engine.play([
-            EngineTrack(song: Song(id: "a")) { _ in MemorySource(first, rate: rate) },
-            EngineTrack(song: Song(id: "b")) { _ in MemorySource(between, rate: 96_000) },
-            EngineTrack(song: Song(id: "c")) { _ in MemorySource(third, rate: rate) },
-        ], from: 0)
+        engine.play([entry(first, rate: rate, key: 0, id: "a"), entry(between, rate: 96_000, key: 1, id: "b"),
+                     entry(third, rate: rate, key: 2, id: "c")], from: 0)
         engine.settle()
         var left: [Float] = []
         while left.count < 66_150 + 8_192 {
@@ -354,9 +357,11 @@ func energyMap(_ samples: [Float], block: Int = 2_048) -> String {
             Issue.record("expected the failure, got \(engine.phase)")
             return
         }
+        #expect(engine.stateNow.failure?.kind == .network, "the kind goes with the words, for the app's sentence")
         engine.resume()
         engine.settle()
         #expect(engine.phase == .playing)
+        #expect(engine.stateNow.failure == nil)
         #expect(opens.frames == [0, 0])
         engine.stop()
         engine.resume()
@@ -365,20 +370,28 @@ func energyMap(_ samples: [Float], block: Int = 2_048) -> String {
     }
 
     // A seek before the song has been heard (paused after a skip, or still loading) is seconds at
-    // the file's own rate, not 44.1 kHz's.
+    // the file's own rate, not 44.1 kHz's. Paused, nothing opens: play opens it there.
     @Test func aSeekBeforeTheSongIsHeardIsAtItsOwnRate() throws {
         let rate = 192_000.0
         let opens = Opens()
         let engine = try offlineEngine(rate: 48_000, channels: 2)
         let songs = [signal(frames: 192_000, channels: 2, seed: 0.1), signal(frames: 192_000, channels: 2, seed: 0.2)]
         engine.play(tracksFromWhereAsked(songs, rate: rate, opens: opens), from: 0)
+        engine.settle()
+        let opened = opens.frames.count // the song, and the next once its decode ended
         engine.pause()
-        engine.skip(to: 1) // loaded while paused: not heard yet
+        engine.skip(to: 1) // while paused: not heard yet, nothing opened
         engine.seek(to: 0.5)
+        engine.settle()
+        #expect(opens.frames.count == opened, "nothing opens while paused")
+        #expect(!engine.outputRunning)
+        #expect(engine.phase == .paused)
+        #expect(engine.position()?.seconds == 0.5)
+        #expect(engine.position()?.key == 1)
+        engine.resume()
         engine.settle()
         let expected: Int64 = 96_000
         #expect(opens.frames.last == expected)
-        #expect(engine.position()?.seconds == 0.5)
     }
 
     // The one lossy step in the chain: a lane's converter taking a file's rate to the output's (48 kHz
