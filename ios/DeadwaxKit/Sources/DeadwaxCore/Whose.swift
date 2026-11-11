@@ -100,6 +100,31 @@ public enum Whose {
 
     /// The invisible placeholder held while whose it is is still to come: `addFromPage` over this button's words.
     public static let placeholderButton = "Add to my library"
+
+    // MARK: what the album page draws of it, and when (AlbumPage.tsx)
+
+    /// Whether the badge is drawn yet (AlbumPage.tsx: `storeDone && !mine.pending`): until then its place is held,
+    /// unseen, so "In your library" first shows where it stays and never flips. `storeDone`: the id bridge has
+    /// answered or failed. `bridgeAsked`: whether the page asks the bridge at all - the web always does; the phone in
+    /// Phase 1 only with a library of its own (screens.md, open question 10: without one nothing on the page reads
+    /// it), so pass `personal` - and without a library there is no answer to wait for, and the badge is drawn at once.
+    /// With one, the bridge must be asked: `albumMine` pends until it is done.
+    public static func badgeShown(_ mine: AlbumMine, storeDone: Bool, bridgeAsked: Bool) -> Bool {
+        (storeDone || !bridgeAsked) && !mine.pending
+    }
+
+    /// Whether the unseen placeholder holds the mine block's place (AlbumPage.tsx: `mine.pending && album &&
+    /// !mineRefused`): while whose it is is still to come and the album's answer is in (`albumIn`) - not after a
+    /// refusal of this page's last Add or Remove (`refused`), which the block says instead.
+    public static func placeholderShown(_ mine: AlbumMine, albumIn: Bool, refused: Bool) -> Bool {
+        mine.pending && albumIn && !refused
+    }
+
+    /// Whether the mine block is drawn (AlbumPage.tsx: `mine.action || mine.note || !!mineRefused`): with an action
+    /// to offer, a line to say, or this page's last Add or Remove refused (`refused`, said in it).
+    public static func mineBlockShown(_ mine: AlbumMine, refused: Bool) -> Bool {
+        mine.action != nil || !(mine.note ?? "").isEmpty || refused
+    }
 }
 
 /// What the album page says of whose an album is, and offers (whose.ts AlbumMine).

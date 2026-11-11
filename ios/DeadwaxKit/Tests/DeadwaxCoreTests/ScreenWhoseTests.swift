@@ -37,7 +37,9 @@ import Testing
         #expect(fixture["sim"].list.count == 14)
         #expect(fixture["wired"].list.count > 400)
         expectMadeFrom(fixture, ["ui/src/lib/whose.ts", "ui/src/player/AlbumPage.tsx the mine wiring",
-                                 "ui/src/player/AlbumPage.tsx release and storeDone", "ui/src/player/AlbumPage.tsx the mine button"])
+                                 "ui/src/player/AlbumPage.tsx release and storeDone", "ui/src/player/AlbumPage.tsx the mine button",
+                                 "ui/src/player/AlbumPage.tsx the badge shown", "ui/src/player/AlbumPage.tsx the placeholder shown",
+                                 "ui/src/player/AlbumPage.tsx the mine block shown"])
     }
 
     @Test func theWordsAreTheWebs() {
@@ -92,9 +94,11 @@ import Testing
     }
 
     /// The album page's state - its album answer (or none, or its failure), the id bridge's answer (or its failure),
-    /// the last change - into albumMine as AlbumPage.tsx wires it.
+    /// the last change - into albumMine as AlbumPage.tsx wires it; and what the page draws of it, and when: the badge,
+    /// the unseen placeholder and the mine block, with this page's last Add or Remove refused and not.
     @Test func thePagesWiringIsTheWebs() {
         let diffs = ScreenDiffs()
+        var drawn = 0
         for row in fixture["wired"].list {
             let album: Album? = row["album"].isNull ? nil
                 : Album(id: row["album"]["id"].string!, musicBrainzId: row["album"]["musicBrainzId"].string, starred: row["album"]["starred"].string)
@@ -106,8 +110,36 @@ import Testing
                                         storeFailed: row["storeFailed"].bool!,
                                         changed: row["changed"].string.flatMap(AlbumMine.Change.init(rawValue:)))
             compare("wired \(row)", swift, row["mine"], diffs)
+            //? the web asks the bridge always: its badge waits for it, as ours does whenever we ask it
+            let storeDone = store != nil || row["storeFailed"].bool!
+            let shown = row["shown"]
+            diffs.flag("wired \(row): badge shown", Whose.badgeShown(swift, storeDone: storeDone, bridgeAsked: true), shown["badge"])
+            for (index, refused) in [false, true].enumerated() {
+                diffs.flag("wired \(row): placeholder (refused \(refused))", Whose.placeholderShown(swift, albumIn: album != nil, refused: refused),
+                           shown["placeholder"][index])
+                diffs.flag("wired \(row): mine block (refused \(refused))", Whose.mineBlockShown(swift, refused: refused), shown["block"][index])
+            }
+            if shown["placeholder"][0].bool == true { drawn += 1 }
         }
         diffs.done()
+        #expect(drawn > 0, "some state draws the placeholder")
+    }
+
+    /// The phone's Phase 1 asks the id bridge only with a library of its own (screens.md, open question 10): without
+    /// one there is nothing to wait for, so the badge - "In your library" - is drawn at once, which the web's
+    /// `storeDone && !mine.pending` would never do with no bridge asked.
+    @Test func withNoLibraryTheBadgeIsDrawnAtOnce() {
+        let noLibrary = Whose.albumMine(personal: false, album: nil, albumFailed: false, store: nil, storeFailed: false, changed: nil)
+        #expect(noLibrary.badge == "In your library" && !noLibrary.pending)
+        #expect(Whose.badgeShown(noLibrary, storeDone: false, bridgeAsked: false))
+        #expect(!Whose.badgeShown(noLibrary, storeDone: false, bridgeAsked: true), "the web's rule: waits for the bridge it asked")
+        #expect(!Whose.placeholderShown(noLibrary, albumIn: true, refused: false) && !Whose.mineBlockShown(noLibrary, refused: false))
+        //? with a library the bridge is asked, and the badge waits for it and for whose it is
+        let pending = Whose.albumMine(personal: true, album: Album(id: "al", starred: nil), albumFailed: false, store: nil, storeFailed: false,
+                                      changed: nil)
+        #expect(pending.pending && !Whose.badgeShown(pending, storeDone: false, bridgeAsked: true))
+        #expect(Whose.placeholderShown(pending, albumIn: true, refused: false) && !Whose.placeholderShown(pending, albumIn: true, refused: true))
+        #expect(!Whose.mineBlockShown(pending, refused: false) && Whose.mineBlockShown(pending, refused: true))
     }
 
     @Test("logins off: \"In your library\", nothing offered - as it always was")

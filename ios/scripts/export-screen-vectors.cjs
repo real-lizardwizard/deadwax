@@ -110,9 +110,9 @@ write('app/useSheet.js', 'exports.useSheet = () => {}\n')
 write('state/persisted.js', 'exports.readPlayerNormalization = () => globalThis.__screens.setting\n')
 write('player/Cover.js', 'exports.Cover = function Cover() { return null }\n')
 write('player/icons.js', 'exports.NextIcon = exports.PauseIcon = exports.PlayIcon = function Icon() { return null }\n')
-write('player/usePlayer.js', 'exports.usePosition = () => 0\n')
+write('player/usePlayer.js', 'exports.usePosition = () => globalThis.__screens.position\n')
 
-const G = (globalThis.__screens = { remembered: [], warmed: [], said: [], setting: 'auto' })
+const G = (globalThis.__screens = { remembered: [], warmed: [], said: [], setting: 'auto', position: 0 })
 const load = (file) => require(path.join(OUT, file))
 const hooks = load('node_modules/preact/hooks.js')
 const S = load('lib/signIn.js'), W = load('lib/whose.js'), D = load('lib/discTitles.js'), F = load('lib/format.js')
@@ -537,6 +537,15 @@ function whoseFixture() {
     /<div class="app-album-mine is-waiting" aria-hidden="true">\s*<p class="app-store-line">\{ADD_FROM_PAGE\}<\/p>\s*<button[^>]*>\s*([^<]+?)\s*<\/button>/, 'the mine placeholder')
   const wiring = lines('player/AlbumPage.tsx', /const mine = albumMine\((\{[\s\S]*?\n {2}\})\)/, 'the mine wiring')
   const derived = lines('player/AlbumPage.tsx', /const release = (store\?\.release_mbid \?\? null)\s*const storeDone = (store !== null \|\| storeFailed)/, 'release and storeDone')
+  //? what the page draws of it, and when (AlbumPage.tsx, as written): the badge once the bridge is done and nothing
+  //? pends; the unseen placeholder while it pends with the album in; the mine block with an action, a note or a refusal
+  const badgeWhen = lines('player/AlbumPage.tsx', /<div class=\{`app-album-chips\$\{(storeDone && !mine\.pending) \? '' : ' is-waiting'\}`\}>/, 'the badge shown')
+  const placeholderWhen = lines('player/AlbumPage.tsx', /\{(mine\.pending && album && !mineRefused) && \(\s*<div class="app-album-mine is-waiting"/, 'the placeholder shown')
+  const blockWhen = lines('player/AlbumPage.tsx', /\{\((mine\.action \|\| mine\.note \|\| !!mineRefused)\) && \(\s*<div class="app-album-mine" tabIndex=\{-1\}>/, 'the mine block shown')
+  const badgeShown = expression(badgeWhen.found[1], 'storeDone', 'mine')
+  const placeholderShown = expression(placeholderWhen.found[1], 'mine', 'album', 'mineRefused')
+  const blockShown = expression(blockWhen.found[1], 'mine', 'mineRefused')
+  const REFUSED = new ApiError(503, "Navidrome isn't answering", 'POST /me/library/add failed', false, null, null, '/me/library/add')
   //? the page's state, as AlbumPage.tsx turns it into albumMine's inputs - evaluated as written
   const inputsOf = expression(wiring.found[1], 'hasLibrary', 'album', 'error', 'storeDone', 'storeFailed', 'store', 'release', 'changed')
   const releaseOf = expression(derived.found[1], 'store'), storeDoneOf = expression(derived.found[2], 'store', 'storeFailed')
@@ -554,16 +563,22 @@ function whoseFixture() {
             for (const changed of [null, 'added', 'removed']) {
               if (store && storeFailed) continue
               const release = releaseOf(store)
-              const input = inputsOf(() => personal, album, error, storeDoneOf(store, storeFailed), storeFailed, store, release, changed)
+              const storeDone = storeDoneOf(store, storeFailed)
+              const input = inputsOf(() => personal, album, error, storeDone, storeFailed, store, release, changed)
+              const mine = W.albumMine(input)
               wired.push({
                 personal, album, error, store: store && { release_mbid: store.release_mbid ?? null, present: store.present.length, yours: store.yours ?? null },
-                storeFailed, changed, mine: mineOut(W.albumMine(input)),
+                storeFailed, changed, mine: mineOut(mine),
+                //? [not refused, refused] for the two the last refusal decides
+                shown: { badge: !!badgeShown(storeDone, mine), placeholder: [null, REFUSED].map((refused) => !!placeholderShown(mine, album, refused)),
+                  block: [null, REFUSED].map((refused) => !!blockShown(mine, refused)) },
               })
             }
   return {
-    about: 'lib/whose.ts: albumMine over every combination of its inputs - [personal, starred, storeDone, bridgeFailed, bridgeYours (null: not sent), present, release, releaseSaid, changed] -> [yours, badge, action, note (by its name in words), pending]; whose.sim.cjs\'s cases by name; heldPhrase and heldLabel; the words; the mine block\'s button and placeholder, and `wired`: the album page\'s state (the album\'s answer or none, its error, the id bridge\'s answer - present as a count - or its failure, the last change) turned into albumMine\'s inputs as AlbumPage.tsx does it, and what albumMine says (AlbumPage.tsx, evaluated as written).',
+    about: 'lib/whose.ts: albumMine over every combination of its inputs - [personal, starred, storeDone, bridgeFailed, bridgeYours (null: not sent), present, release, releaseSaid, changed] -> [yours, badge, action, note (by its name in words), pending]; whose.sim.cjs\'s cases by name; heldPhrase and heldLabel; the words; the mine block\'s button and placeholder, and `wired`: the album page\'s state (the album\'s answer or none, its error, the id bridge\'s answer - present as a count - or its failure, the last change) turned into albumMine\'s inputs as AlbumPage.tsx does it, and what albumMine says, with `shown`: whether the page draws the badge, the unseen placeholder and the mine block from it - the last two [with no refusal, with one] (AlbumPage.tsx, evaluated as written).',
     made_by: MADE_BY,
-    made_from: Object.fromEntries([whole('lib/whose.ts'), button.from, placeholder.from, wiring.from, derived.from]),
+    made_from: Object.fromEntries([whole('lib/whose.ts'), button.from, placeholder.from, wiring.from, derived.from, badgeWhen.from, placeholderWhen.from,
+      blockWhen.from]),
     words: { IN_YOUR_LIBRARY: W.IN_YOUR_LIBRARY, IN_THE_STORE: W.IN_THE_STORE, ...MINE_WORDS },
     held,
     buttons,
@@ -864,6 +879,12 @@ function scrubFixture() {
   reading('the measured case: asked 4:00, landed 1:35 (145 s early)', [asked(240), { kind: 'seeked', position: 240 }, { kind: 'clock', position: 299.9, at: 0 },
     { kind: 'ended', position: 300, at: 144900, rate: 1 }])
   reading('at double speed the song plays on twice as far', [{ kind: 'clock', position: 300, at: 0 }, { kind: 'ended', position: 300, at: 3500, rate: 2 }], landed)
+  //? `rate || 1`: a rate of 0 or NaN is no speed to measure by, so the wall clock counts as at 1 - the seeded runs
+  //? below never reach a judged end with its clock, so these are what hold it
+  reading('a rate of 0 at the end is measured as 1', [{ kind: 'clock', position: 299.9, at: 0 }, { kind: 'ended', position: 300, at: 2000, rate: 0 }], landed)
+  reading('...and so is NaN', [{ kind: 'clock', position: 299.9, at: 0 }, { kind: 'ended', position: 300, at: 2000, rate: NaN }], landed)
+  reading('...from asking, with the clock at its end', [asked(240), { kind: 'seeked', position: 240 }, { kind: 'clock', position: 299.9, at: 1000 },
+    { kind: 'ended', position: 299.95, at: 4000, rate: 0 }])
   reading(`off by under ${SC.LANDED_WITHIN_S} s is where asked (Navidrome's rounded length, update spacing)`, [{ kind: 'ended', position: 299.2, at: 1, rate: 1 }], landed)
   reading(`the clock within ${SC.END_SLACK_S} s of the length counts as at the end`, [{ kind: 'clock', position: 300 - SC.END_SLACK_S, at: 5 }], landed)
   reading('...and further back does not', [{ kind: 'clock', position: 299, at: 5 }], landed)
@@ -879,7 +900,7 @@ function scrubFixture() {
   reading('a pause doesn\'t stop a seek on its way: its \'seeked\' still counts', [asked(90), { kind: 'paused' }, { kind: 'seeked', position: 90 }])
   reading('a new seek starts a new reading', [{ kind: 'ended', position: 293, at: 50000, rate: 1 }, { kind: 'asked', asked: 60, length: 300, track: 's1' }], landed)
   reading('a seek with no length known can\'t be judged', [asked(130, 0)])
-  //? seeded runs of every event, rates of 0 and NaN included
+  //? seeded runs of every event, rates of 0 and NaN among them (their judged ends are the named runs' above)
   const rand = seeded(9001)
   const pick = (list) => list[Math.floor(rand() * list.length)]
   for (let run = 0; run < 80; run++) {
@@ -971,6 +992,17 @@ function playerFixture() {
     }
   const paused = MiniPlayer({ player: { track: { id: 's', title: 'Roads', artist: 'Portishead' }, error: null, playing: false, buffering: true, duration: 0, toggle() {}, next() {} }, onOpen() {} })
   const pausedButtons = find(paused, (node) => node.type === 'button').filter((node) => !byClass('pl-mini-open')(node))
+  //? the hairline along its bottom (MiniPlayer.tsx's Progress, driven): what it scales to, from the position and the length
+  const progress = []
+  for (const duration of [300, 245.3, 0.5, 0, NaN, -10, Infinity])
+    for (const position of [0, 1, 150, 299.9, 300, 450, -5, -0, NaN, Infinity]) {
+      G.position = position
+      const tree = MiniPlayer({ player: { track: { id: 's', title: 'Roads', artist: 'Portishead' }, error: null, playing: true, buffering: false, duration, toggle() {}, next() {} }, onOpen() {} })
+      const bar = find(tree, (node) => typeof node.type === 'function' && node.type.name === 'Progress')[0]
+      const line = bar.type(bar.props)
+      progress.push({ position: num(position), duration: num(duration), transform: line.props.style.transform })
+    }
+  G.position = 0
   //? afterFailure over its inputs, a queue of `count` with the song failed at `index`
   const failures = []
   for (const code of [0, 1, 2, 3, 4, 5])
@@ -1006,7 +1038,7 @@ function playerFixture() {
     scrub.push({ shown: num(shown), length: num(length), value: SC.clock(shown) + value.found[1] + SC.clock(length), elapsed: SC.clock(shown), remaining: clocks.found[1] + SC.clock(length - shown) })
   }
   return {
-    about: 'player/MiniPlayer.tsx miniPlayerLabel ("undefined": no line) and the mini player drawn (its line, its name, its buttons\' names); lib/playQueue.ts afterFailure as [code, intendsToPlay, retried, next (nextIndex of the queue), action]; Now Playing\'s byline, Go to album and clocks (NowPlaying.tsx, evaluated as written); the constants.',
+    about: 'player/MiniPlayer.tsx miniPlayerLabel ("undefined": no line) and the mini player drawn (its line, its name, its buttons\' names); its hairline (`progress`: the Progress component driven, its transform from the position and the length); lib/playQueue.ts afterFailure as [code, intendsToPlay, retried, next (nextIndex of the queue), action]; Now Playing\'s byline, Go to album and clocks (NowPlaying.tsx, evaluated as written); the constants.',
     made_by: MADE_BY,
     made_from: Object.fromEntries([['ui/src/player/MiniPlayer.tsx', sha256(source('player/MiniPlayer.tsx'))], afterFailureText.from, byline.from, goTo.from, value.from, clocks.from,
       scrubName.from, dismiss.from, dragStart.from, skipMs.from, failedTitle.from]),
@@ -1018,7 +1050,7 @@ function playerFixture() {
     },
     labels, drawn,
     pausedButtons: pausedButtons.map((node) => node.props['aria-label']),
-    failures, bylines, scrub,
+    failures, bylines, scrub, progress,
   }
 }
 

@@ -24,6 +24,13 @@ public enum PlayerWords {
         error ?? artist
     }
 
+    /// The hairline along the mini player's bottom edge, as the part of it drawn (MiniPlayer.tsx Progress): the
+    /// position over the song's length, never past 1 - and 0 with no length yet (0 or NaN). Computed as the web's is:
+    /// NaN for a NaN position, below 0 for one below 0 - neither of which the engine reports.
+    public static func progress(position: Double, duration: Double) -> Double {
+        JSNumber.truthy(duration) ? JSNumber.min(position / duration, 1) : 0
+    }
+
     /// Play and Pause's name: what pressing it does.
     public static func playPause(playing: Bool) -> String { playing ? "Pause" : "Play" }
     /// Next's name.
@@ -114,29 +121,29 @@ public enum PlayerWords {
     public enum AfterFailure: Sendable, Equatable {
         /// ask again, once, after `retryDelaySeconds`, from where it stopped - the same listen
         case retry
-        /// on to this song of the queue
-        case skip(Int)
+        /// on past it: `QueueController.skipFailed()` (the Up Next branch's), which chooses where - the next song
+        /// past any Repeat One copies of the failed one (usePlayer.ts runs the web's `pastCopies` on afterFailure's
+        /// index the same way) - and stops, as at the queue's end, when there is none (it answers nil). Played:
+        /// `skipped(title:failure:)` stands in the next song's second line for `skipNoticeSeconds`; stopped:
+        /// `words(_:)` stays, as for `stop`.
+        case skip
         /// nothing more: the words stay
         case stop
     }
 
     /// afterFailure: stopped when the listener didn't mean it to play (paused) or the failure was an abort; a load
-    /// failure (network, or not audio) asked for again once; otherwise on to `next` - the queue's next song, past any
-    /// Repeat One copies of the failed one (`nil`: none) - or stopped at the queue's end.
-    public static func afterFailure(code: Int, intendsToPlay: Bool, retried: Bool, next: Int?) -> AfterFailure {
+    /// failure (network, or not audio) asked for again once; otherwise on past it (`skip`). The web's also stops at the
+    /// queue's end (no `nextIndex`); here that is `skipFailed`'s to find, past Repeat One's copies, which the web's
+    /// next index isn't - so where to go, and whether anywhere is left, is never decided twice.
+    public static func afterFailure(code: Int, intendsToPlay: Bool, retried: Bool) -> AfterFailure {
         if !intendsToPlay || code == mediaErrAborted { return .stop }
         let loadFailure = code == mediaErrNetwork || code == mediaErrSrcNotSupported
         if loadFailure && !retried { return .retry }
-        return next.map(AfterFailure.skip) ?? .stop
+        return .skip
     }
 
     /// The same, by the failure's kind.
-    public static func afterFailure(_ failure: Failure, intendsToPlay: Bool, retried: Bool, next: Int?) -> AfterFailure {
-        afterFailure(code: code(failure), intendsToPlay: intendsToPlay, retried: retried, next: next)
-    }
-
-    /// playQueue.ts nextIndex: the song after `index`, or nil past the last.
-    public static func nextIndex(index: Int, count: Int) -> Int? {
-        index + 1 < count ? index + 1 : nil
+    public static func afterFailure(_ failure: Failure, intendsToPlay: Bool, retried: Bool) -> AfterFailure {
+        afterFailure(code: code(failure), intendsToPlay: intendsToPlay, retried: retried)
     }
 }

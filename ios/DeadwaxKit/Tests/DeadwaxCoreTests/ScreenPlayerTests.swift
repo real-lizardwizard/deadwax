@@ -2,13 +2,14 @@ import Foundation
 import Testing
 @testable import DeadwaxCore
 
-/// Fixtures/screens/player.json: player/MiniPlayer.tsx's label and its drawn line, lib/playQueue.ts's afterFailure,
-/// Now Playing's byline, Go to the album and clocks (NowPlaying.tsx, evaluated as written), and the constants.
+/// Fixtures/screens/player.json: player/MiniPlayer.tsx's label, its drawn line and its hairline, lib/playQueue.ts's
+/// afterFailure, Now Playing's byline, Go to the album and clocks (NowPlaying.tsx, evaluated as written), and the
+/// constants.
 @Suite struct ScreenPlayerTests {
     let fixture = try! Web.load("player")
 
     @Test func theFixtureIsThere() {
-        #expect(fixture["failures"].list.count == 120)
+        #expect(fixture["failures"].list.count == 120 && fixture["progress"].list.count == 70)
         expectMadeFrom(fixture, ["ui/src/player/MiniPlayer.tsx", "ui/src/lib/playQueue.ts afterFailure", "ui/src/player/NowPlaying.tsx the byline"])
     }
 
@@ -50,19 +51,34 @@ import Testing
         diffs.done()
     }
 
-    /// afterFailure, as [code, intendsToPlay, retried, next, action].
+    /// afterFailure, as [code, intendsToPlay, retried, next, action]. The web's answer carries where a skip goes, and
+    /// stops at the queue's end; the phone's `.skip` leaves both to `skipFailed`. So `.skip` is replayed as the web's
+    /// skip to the queue's next song (`next`, the fixture's nextIndex) - or, with none, its stop at the end.
     @Test func afterAFailureIsTheWebs() {
         let diffs = ScreenDiffs()
         for row in fixture["failures"].list {
-            let action = PlayerWords.afterFailure(code: row[0].int!, intendsToPlay: row[1].bool!, retried: row[2].bool!, next: row[3].int)
-            let web: PlayerWords.AfterFailure = switch row[4]["kind"].string ?? "" {
-            case "retry": .retry
-            case "skip": .skip(row[4]["index"].int!)
-            default: .stop
+            let action = PlayerWords.afterFailure(code: row[0].int!, intendsToPlay: row[1].bool!, retried: row[2].bool!)
+            let swift: String = switch action {
+            case .retry: "retry"
+            case .stop: "stop"
+            case .skip: row[3].int.map { "skip \($0)" } ?? "stop"
             }
-            diffs.check("afterFailure(\(row[0]), \(row[1]), \(row[2]), \(row[3]))", action, web)
+            let web = row[4]["kind"].string == "skip" ? "skip \(row[4]["index"].int!)" : row[4]["kind"].string ?? "?"
+            diffs.check("afterFailure(\(row[0]), \(row[1]), \(row[2]), \(row[3]))", swift, web)
         }
         diffs.done()
+    }
+
+    /// MiniPlayer.tsx's Progress driven: the hairline's transform, from the position and the song's length.
+    @Test func theMiniPlayersHairlineIsTheWebs() {
+        let diffs = ScreenDiffs()
+        for row in fixture["progress"].list {
+            let done = PlayerWords.progress(position: row["position"].num!, duration: row["duration"].num!)
+            diffs.text("progress(\(row["position"]), \(row["duration"]))", "scaleX(\(JSNumber.string(done)))", row["transform"])
+        }
+        diffs.done()
+        #expect(PlayerWords.progress(position: 150, duration: 300) == 0.5 && PlayerWords.progress(position: 450, duration: 300) == 1)
+        #expect(PlayerWords.progress(position: 12, duration: 0) == 0 && PlayerWords.progress(position: 12, duration: .nan) == 0)
     }
 
     /// A failure's words by its kind: the engine's network, decode and not-audio failures as the web's media codes
@@ -78,11 +94,11 @@ import Testing
         //? the engine's kinds, by their raw values (DeadwaxAudio's AudioFailure.Kind)
         #expect(PlayerWords.Failure.allCases.map(\.rawValue) == ["network", "decode", "unsupported", "signedOut", "other"])
         //? a load failure is asked for again once; a decode failure, or one asked again already, goes on
-        #expect(PlayerWords.afterFailure(.network, intendsToPlay: true, retried: false, next: 1) == .retry)
-        #expect(PlayerWords.afterFailure(.unsupported, intendsToPlay: true, retried: true, next: 1) == .skip(1))
-        #expect(PlayerWords.afterFailure(.decode, intendsToPlay: true, retried: false, next: nil) == .stop)
-        #expect(PlayerWords.afterFailure(.other, intendsToPlay: false, retried: false, next: 2) == .stop)
-        #expect(PlayerWords.nextIndex(index: 1, count: 3) == 2 && PlayerWords.nextIndex(index: 2, count: 3) == nil)
+        #expect(PlayerWords.afterFailure(.network, intendsToPlay: true, retried: false) == .retry)
+        #expect(PlayerWords.afterFailure(.unsupported, intendsToPlay: true, retried: true) == .skip)
+        #expect(PlayerWords.afterFailure(.decode, intendsToPlay: true, retried: false) == .skip)
+        #expect(PlayerWords.afterFailure(.signedOut, intendsToPlay: true, retried: false) == .retry)
+        #expect(PlayerWords.afterFailure(.other, intendsToPlay: false, retried: false) == .stop)
     }
 
     @Test func nowPlayingsBylineIsTheWebs() {

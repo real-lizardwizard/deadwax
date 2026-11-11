@@ -173,6 +173,42 @@ import Testing
         diffs.done()
     }
 
+    /// The phone's own rule (no 'seeked' event): a seek on its way is let go of once the engine reports within
+    /// `landedWithin` of its target - closer than 1.5 s, as the readout counts a landing - or after `pendingMaxMs`.
+    @Test func aSeekOnItsWayIsLetGoOfOnceItHasLanded() {
+        let pending = Scrub.PendingSeek(target: 120, since: 1000)
+        #expect(Scrub.landedWithin == 1.5)
+        for (position, landed) in [(120.0, true), (121.49, true), (118.51, true), (121.5, false), (118.5, false), (121.51, false),
+                                   (118.49, false), (25.0, false), (Double.nan, false), (Double.infinity, false)] {
+            #expect(Scrub.landed(pending, position: position) == landed, "landed at \(position)")
+            #expect((Scrub.settled(pending, position: position, now: 1500) == nil) == landed, "settled at \(position)")
+        }
+        //? landed or not, it lets go after PENDING_MAX_MS - and not before
+        #expect(Scrub.settled(pending, position: 25, now: 1000 + Scrub.pendingMaxMs - 1) == pending)
+        #expect(Scrub.settled(pending, position: 25, now: 1000 + Scrub.pendingMaxMs) == nil)
+        #expect(Scrub.settled(nil, position: 25, now: 1500) == nil)
+        //? a target of NaN never lands: it waits out its 20 s
+        #expect(!Scrub.landed(Scrub.PendingSeek(target: .nan, since: 0), position: 0))
+    }
+
+    /// The scenario the rule is for: a seek to 2:00 that lands at once. With `reportedPosition` alone the thumb and both
+    /// clocks stayed at 2:00 for 20 s while the song played on; let go of by `settled`, they follow the song.
+    @Test func aSeekThatLandsAtOnceIsFollowed() {
+        var pending: Scrub.PendingSeek? = Scrub.PendingSeek(target: 120, since: 0)
+        var shown: [Double] = []
+        //? the engine: its position is the target until the new place plays, then where it plays
+        for (now, position) in [(0.0, 25.0), (100.0, 120.0), (1000.0, 120.3), (2000.0, 121.0), (3000.0, 122.0)] {
+            pending = Scrub.settled(pending, position: position, now: now)
+            shown.append(Scrub.reportedPosition(pending, position: position, now: now))
+        }
+        #expect(shown == [120, 120, 120.3, 121, 122])
+        #expect(pending == nil)
+        //? an engine still reporting where the song was keeps the target shown - the thumb never snaps back
+        let waiting = Scrub.PendingSeek(target: 180, since: 0)
+        #expect(Scrub.settled(waiting, position: 25, now: 3000) == waiting)
+        #expect(Scrub.reportedPosition(Scrub.settled(waiting, position: 25, now: 3000), position: 25, now: 3000) == 180)
+    }
+
     @Test func voiceOversAdjustIsTheArrows() {
         #expect(Scrub.adjusted(increment: true, from: 60, length: 300) == 65)
         #expect(Scrub.adjusted(increment: false, from: 2, length: 300) == 0)

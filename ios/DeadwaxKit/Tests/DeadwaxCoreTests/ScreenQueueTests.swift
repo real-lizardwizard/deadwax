@@ -55,8 +55,13 @@ import Testing
         let whole = QueuePick.album(album)
         #expect(whole?.label == "Dummy" && whole?.tracks.map(\.id) == ["a", "b"] && whole?.queuedAs == .album && whole?.albumIds == ["al-1"])
         #expect(QueuePick.album(Album(id: "al-2", name: "Empty")) == nil, "no ••• for an album whose songs aren't in")
+        //? AlbumPage.tsx: aria-disabled={!album || !tracks.length} - an answer with no songs in it offers nothing either
+        #expect(QueuePick.album(Album(id: "al-3", name: "Empty", song: [])) == nil, "no ••• for an album with no songs")
         let one = QueuePick.song(songs[1], of: album)
         #expect(one.label == "Sour Times" && one.tracks.map(\.id) == ["b"] && one.queuedAs == nil)
+        //? `albums: [album]`: the album is remembered as just added, so it opens at once from Up Next
+        #expect(one.albumIds == ["al-1"])
+        #expect(one.choose(.last, setting: .off)?.remember == ["al-1"] && whole?.choose(.next, setting: .off)?.remember == ["al-1"])
         #expect(one.choose(.next, setting: .auto)?.level == .track)
         #expect(whole?.choose(.last, setting: .auto)?.level == .album)
         #expect(QueuePickWords.playLevel(.auto) == .album && QueuePickWords.playLevel(.song) == .track && QueuePickWords.playLevel(.off) == nil)

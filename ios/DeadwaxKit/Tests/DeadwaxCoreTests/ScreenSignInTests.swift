@@ -5,7 +5,7 @@ import Testing
 /// Fixtures/screens/signin.json: the web's sign-in screen (app/SignIn.tsx) driven a step at a time - typing, Sign in,
 /// deadwax's answer - and what it drew after each; the gate's launch reason (signInGate.tsx, as written); which 401
 /// ends the session (api/http.ts); Sign out (SignOutRow.tsx) driven; and the words. Replayed here through SignInForm,
-/// SignInRules, SessionCount and SignOutRow, step for step.
+/// SignInRules and SignOutRow, step for step.
 @Suite struct ScreenSignInTests {
     let fixture = try! Web.load("signin")
 
@@ -103,23 +103,81 @@ import Testing
     }
 
     /// A 401 from any route but /auth/'s, to a request sent under the session held now, ends it - with its detail as
-    /// the sign-in's reason.
+    /// the sign-in's reason. The web's "signed in since" (its session count moved on) is the phone's cookie replaced.
     @Test func whichRefusalEndsTheSessionIsTheWebs() {
         let diffs = ScreenDiffs()
         for row in fixture["sessions"].list {
             let path = row["path"].string!, status = row["status"].int!
-            var sessions = SessionCount()
-            let sentUnder = sessions.current
-            if row["signedInSince"].bool! { sessions.newSession() }
-            let label = "\(status) \(path) signed in since \(row["signedInSince"])"
-            diffs.flag(label, sessions.ends(status: status, path: path, sentUnder: sentUnder), row["ends"])
+            let since = row["signedInSince"].bool!
             let failure = APIFailure.answered(.init(status: status, method: "GET", path: path, detail: row["detail"].string))
-            diffs.flag("\(label) (thrown)", SignInRules.endsSession(failure, sentUnder: sentUnder, session: sessions.current), row["ends"])
+            let label = "\(status) \(path) signed in since \(row["signedInSince"])"
+            diffs.flag(label, SignInRules.endsSession(failure, sentUnder: "s.first", current: since ? "s.second" : "s.first"), row["ends"])
+            //? logins just turned on: the request that failed went out with no cookie, and none is held yet - or one is now
+            diffs.flag("\(label) (no cookie sent)", SignInRules.endsSession(failure, sentUnder: nil, current: since ? "s.first" : nil), row["ends"])
             if row["ends"].bool == true { diffs.text("\(label): the reason", failure.detail, row["said"]) }
         }
         diffs.done()
-        #expect(!SignInRules.endsSession(.offline(.init(server: try! ServerAddress.parse("192.168.3.20:8090").get(), method: "GET", path: "/me",
-                                                        reason: "offline")), sentUnder: 0, session: 0))
+        let server = try! ServerAddress.parse("192.168.3.20:8090").get()
+        #expect(!SignInRules.endsSession(.offline(.init(server: server, method: "GET", path: "/me", reason: "offline")),
+                                         sentUnder: "s.1", current: "s.1"))
+        #expect(!SignInRules.endsSession(.timeout(.init(server: server, method: "GET", path: "/me", reason: "timed out")),
+                                         sentUnder: nil, current: nil))
+        #expect(!SignInRules.endsSession(.other("unreadable"), sentUnder: "s.1", current: "s.1"))
+    }
+
+    /// The rule over what the client really tells: `onSignedOut` passes the cookie the request carried, and the app
+    /// compares it with the one in hand when the 401 lands - a sign-in in between makes it an old session's 401.
+    @Test func theClientsSignedOutHookFeedsTheRule() async throws {
+        let heard = SignedOutHeard()
+        let (made, transport) = client(session: "s.old")
+        var old = made
+        old.onSignedOut = { failure, session in heard.hear(failure, session) }
+        transport.answer("/deadwax/me", 401, #"{"detail":"Your session has ended. Sign in again."}"#)
+        _ = try? await old.me()
+        //? someone signed in meanwhile: the app's client now carries the new cookie
+        var new = old
+        new.session = "s.new"
+        _ = try? await new.me()
+        let told = heard.all
+        try #require(told.count == 2)
+        #expect(told[0].1 == "s.old" && told[1].1 == "s.new")
+        #expect(!SignInRules.endsSession(told[0].0, sentUnder: told[0].1, current: "s.new"), "the old session's 401 says nothing of the new one")
+        #expect(SignInRules.endsSession(told[1].0, sentUnder: told[1].1, current: "s.new"))
+        #expect(SignInRules.endsSession(told[0].0, sentUnder: told[0].1, current: "s.old"), "with no sign-in since, it ends the session")
+        #expect(told[1].0.detail == "Your session has ended. Sign in again.")
+    }
+
+    /// The client's signOut throws only when nothing answered, or when its task was cancelled - which learned nothing,
+    /// so the row is as it was and says nothing.
+    @Test func aCancelledSignOutLeavesTheRowAsItWas() async {
+        var row = SignOutRow()
+        let rowAsks = row.press()
+        #expect(rowAsks)
+        let cancelled = row.answered(CancellationError())
+        #expect(cancelled == .stay)
+        #expect(!row.busy && row.problem == nil && row.label == "Sign out")
+        let (deadwax, transport) = client(session: "s.1")
+        transport.goAway()
+        var unreached = SignOutRow()
+        let unreachedAsks = unreached.press()
+        #expect(unreachedAsks)
+        do { try await deadwax.signOut(); Issue.record("nothing answered, and signOut didn't throw") } catch {
+            let outcome = unreached.answered(error)
+            #expect(outcome == .stay)
+        }
+        #expect(unreached.problem == SignOutRow.unreached && !unreached.busy)
+        let (answering, answers) = client(session: "s.1")
+        answers.answer("/deadwax/auth/logout", 503, #"{"detail":"couldn't forget it"}"#)
+        var signedOut = SignOutRow()
+        let signedOutAsks = signedOut.press()
+        #expect(signedOutAsks)
+        do {
+            try await answering.signOut()
+            let outcome = signedOut.answered(nil)
+            #expect(outcome == .startAgain)
+        } catch {
+            Issue.record("deadwax answered, and signOut threw \(error)")
+        }
     }
 
     @Test func signOutIsTheWebs() {

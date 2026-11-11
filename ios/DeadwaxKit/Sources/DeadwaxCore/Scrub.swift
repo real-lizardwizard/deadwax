@@ -6,7 +6,8 @@ import Foundation
 /// lands - and the readout of where a seek really landed. Held to what the TypeScript answers: Tests/DeadwaxCoreTests/
 /// Fixtures/screens/scrub.json (ui/test/scrub.sim.cjs's checks by name, seeded drags and seek readings, sweeps),
 /// written by ios/scripts/export-screen-vectors.cjs. scrub.ts is one of the web's engine files: it is read here,
-/// never changed.
+/// never changed. One rule is the phone's own, with no TypeScript to hold it to: when a seek on its way has landed
+/// (`landed`, `settled`), since the phone's engine has no 'seeked' event to say so.
 ///
 /// Times are seconds, `now` and `since` milliseconds. The numbers go through JavaScript's Math.max and Math.min
 /// (`JSNumber`), so NaN and -0 come out as the web's do.
@@ -119,6 +120,27 @@ public enum Scrub {
     public static func reportedPosition(_ pending: PendingSeek?, position: Double, now: Double) -> Double {
         guard let pending, now - pending.since < pendingMaxMs else { return position }
         return pending.target
+    }
+
+    // MARK: letting go of a seek on its way (the phone's own)
+
+    /// Whether the seek on its way has landed: the engine reports a position within `landedWithin` of its target
+    /// (closer than, as the readout judges a landing). A NaN position is no report of a landing.
+    ///
+    /// The web lets go of its pending seek at the media element's 'seeked' event, and `reportedPosition` lets go on
+    /// its own only after `pendingMaxMs`. The phone's engine has no 'seeked': `seek(to:)` returns at once, and its
+    /// position is the target until the new place plays. So the app lets go by this rule instead (`settled`) - else a
+    /// seek that landed at once would hold the thumb and both clocks at its target for 20 s while the song played on.
+    public static func landed(_ pending: PendingSeek, position: Double) -> Bool {
+        abs(position - pending.target) < landedWithin
+    }
+
+    /// The seek still on its way after the engine reports `position` at `now` (ms): nil once it has `landed`, or once
+    /// `pendingMaxMs` have gone by, landed or not - else the same. The app keeps what this answers and shows
+    /// `reportedPosition` of it, at every position the engine reports.
+    public static func settled(_ pending: PendingSeek?, position: Double, now: Double) -> PendingSeek? {
+        guard let pending, now - pending.since < pendingMaxMs, !landed(pending, position: position) else { return nil }
+        return pending
     }
 
     // MARK: where a seek really landed (Debug's readout)

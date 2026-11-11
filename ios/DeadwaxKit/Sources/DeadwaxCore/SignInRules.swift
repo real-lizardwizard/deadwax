@@ -125,34 +125,16 @@ public enum SignInRules {
         return (ErrorWords.signInProblem(error), ErrorWords.signInWhy(error))
     }
 
-    /// Whether a refusal ends the session the app holds (http.ts noteSignedOut): a 401 from any route but /auth/'s,
-    /// to a request sent under the session the app holds now - a 401 to one sent before the latest sign-in is that
-    /// old session's, and says nothing about this one. `path` is the route under /deadwax. The sign-in comes up over
-    /// the app with the 401's detail as its reason; the app, and the music, stay as they were under it.
-    public static func endsSession(status: Int, path: String, sentUnder: Int, session: Int) -> Bool {
-        status == 401 && !path.utf16.starts(with: "/auth/".utf16) && sentUnder == session
-    }
-
-    /// The same for a failure the client threw.
-    public static func endsSession(_ failure: APIFailure, sentUnder: Int, session: Int) -> Bool {
-        guard let answer = failure.answer else { return false }
-        return endsSession(status: answer.status, path: answer.path, sentUnder: sentUnder, session: session)
-    }
-}
-
-/// Which session the app's requests go out under (http.ts newSession / currentSession): one more at every sign-in,
-/// so a 401 to a request sent before it can be told from one to this session's.
-public struct SessionCount: Sendable, Equatable {
-    public private(set) var current: Int
-
-    public init(current: Int = 0) { self.current = current }
-
-    /// Someone signed in.
-    public mutating func newSession() { current += 1 }
-
-    /// Whether a refusal to a request sent under `sentUnder` ends this session.
-    public func ends(status: Int, path: String, sentUnder: Int) -> Bool {
-        SignInRules.endsSession(status: status, path: path, sentUnder: sentUnder, session: current)
+    /// Whether a refusal ends the session the app holds now (http.ts noteSignedOut): a 401 from any route but /auth/'s
+    /// (`APIFailure.isSignedOut`), to a request sent under the session cookie the app holds now. The web counts its
+    /// sessions (`newSession` at each sign-in) and compares the count a request went out under; the phone compares the
+    /// cookies themselves, since every sign-in brings a new one: `sentUnder` is the cookie the client's `onSignedOut`
+    /// passes (the one that request carried), `current` the one in hand when it answered. A 401 to a request sent
+    /// before the latest sign-in is that old session's, and says nothing about this one - else a poll that left just
+    /// before a sign-in, answered just after, brought the sign-in straight back. When this is true the sign-in comes
+    /// up over the app with the 401's `detail` as its reason; the app, and the music, stay as they were under it.
+    public static func endsSession(_ failure: APIFailure, sentUnder: String?, current: String?) -> Bool {
+        failure.isSignedOut && sentUnder == current
     }
 }
 
@@ -188,11 +170,16 @@ public struct SignOutRow: Sendable, Equatable {
         case stay
     }
 
-    /// deadwax's answer - nil for a 200 - or no answer at all. Any answer of deadwax's starts again.
+    /// deadwax's answer - nil for a 200 - or no answer at all. Any answer of deadwax's starts again. With the app's
+    /// client that is nil or a throw: `DeadwaxClient.signOut()` already takes any answer as signed out, and throws only
+    /// when nothing answered (`.offline`, `.timeout`) or the task asking was cancelled. A cancelled ask learned nothing
+    /// (the web's can't be cancelled): the row is as it was before it was pressed, and says nothing - never "Couldn't
+    /// reach deadwax", which it may well have.
     public mutating func answered(_ error: (any Error)?) -> Outcome {
         guard let error else { return .startAgain }
         if (error as? APIFailure)?.answer != nil { return .startAgain }
         busy = false
+        if error is CancellationError { return .stay }
         problem = Self.unreached
         return .stay
     }
