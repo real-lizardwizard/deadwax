@@ -8,12 +8,16 @@ public struct HTTPRequest: Sendable, Equatable {
     public var url: URL
     public var headers: [String: String]
     public var body: Data?
+    /// Seconds to wait for an answer, when the route needs other than the transport's own (album_index's 30 -
+    /// `Routes.timeouts`); nil for the transport's.
+    public var timeout: Double?
 
-    public init(method: String, url: URL, headers: [String: String] = [:], body: Data? = nil) {
+    public init(method: String, url: URL, headers: [String: String] = [:], body: Data? = nil, timeout: Double? = nil) {
         self.method = method
         self.url = url
         self.headers = headers
         self.body = body
+        self.timeout = timeout
     }
 }
 
@@ -37,36 +41,15 @@ public struct HTTPResponse: Sendable, Equatable {
 /// How requests reach deadwax. The app's is URLSession with cookies handled by hand (no
 /// HTTPCookieStorage: the session is kept in the Keychain and sent as `Cookie:`, so a background
 /// download, which runs outside the app, can send it too). A transport throws only when nothing
-/// answered; any HTTP status is an answer.
+/// answered; any HTTP status is an answer - a 304 included, passed on as it came (never answered from a
+/// cache of the transport's own), so `DeadwaxClient.fetch` can say "unchanged".
 public protocol HTTPTransport: Sendable {
     func send(_ request: HTTPRequest) async throws -> HTTPResponse
 }
 
-/// Why something didn't work, with the words the app shows.
-public enum DeadwaxError: Error, Sendable, Equatable {
-    /// What was typed isn't an address.
-    case badAddress(String)
-    /// Nothing answered at the address.
-    case unreachable(String)
-    /// deadwax said 401: logins are on and this phone isn't signed in (or its session ended).
-    case signedOut(String)
-    /// deadwax answered, and refused: its status and its own words (`detail`).
-    case refused(status: Int, detail: String)
-    /// deadwax answered with something the app couldn't read.
-    case unreadable(String)
-
-    public var words: String {
-        switch self {
-        case .badAddress(let words), .unreachable(let words), .signedOut(let words), .unreadable(let words):
-            return words
-        case .refused(_, let detail):
-            return detail
-        }
-    }
-}
-
 /// FastAPI's error body is `{"detail": "..."}`, or for a refused form a list of `{msg}`. deadwax's own
-/// words are shown as they are; anything else falls back to the status.
+/// words are shown as they are; anything else falls back to the status. Phase 0's words (APIFailure.words reads
+/// the same); a listener's are ErrorWords'.
 public func detailWords(_ body: Data, status: Int) -> String {
     if let object = try? JSONSerialization.jsonObject(with: body) as? [String: Any] {
         if let detail = object["detail"] as? String, !detail.isEmpty {

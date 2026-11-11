@@ -20,13 +20,13 @@ import Testing
     }
 
     @Test func a401IsASignInToDo() {
-        let report = CheckReport.from(health: .success(ok), me: .failure(.signedOut("Sign in.")))
+        let report = CheckReport.from(health: .success(ok), me: .failure(.answered(.init(status: 401, method: "GET", path: "/me", detail: "Sign in."))))
         #expect(report.needsSignIn && !report.ok)
         #expect(report.lines.last?.hasPrefix("Logins are on, and this phone isn't signed in.") == true)
     }
 
     @Test func nothingAnsweringIsOneLine() {
-        let report = CheckReport.from(health: .failure(.unreachable("Couldn't reach deadwax.")), me: nil)
+        let report = CheckReport.from(health: .failure(.other("Couldn't reach deadwax.")), me: nil)
         #expect(report.lines == ["Couldn't reach deadwax."])
         #expect(!report.ok)
     }

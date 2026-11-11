@@ -28,7 +28,8 @@ import Testing
 
     @Test func whatIsntAnAddressIsSaid() {
         for typed in ["", "   ", "ftp://x", "http://", "two words", "host:99999"] {
-            guard case .failure(.badAddress(let words)) = ServerAddress.parse(typed) else {
+            // what was typed isn't an address: words (APIFailure.badAddress), never something answering
+            guard case .failure(.other(let words)) = ServerAddress.parse(typed) else {
                 Issue.record("\(typed) was read as an address")
                 continue
             }
