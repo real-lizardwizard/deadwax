@@ -199,6 +199,8 @@ func energyMap(_ samples: [Float], block: Int = 2_048) -> String {
         #expect(at.key == 1)
         #expect(abs(at.seconds - 0.25) < 0.1)
         #expect(at.length == 0.5, "the song's decode has ended: its exact length")
+        // the state follows from the first song's completions, which come on AVAudioEngine's thread
+        waitFor(engine) { engine.stateNow.key == 1 }
         #expect(engine.stateNow.key == 1 && engine.stateNow.index == 1)
     }
 
@@ -266,6 +268,14 @@ func energyMap(_ samples: [Float], block: Int = 2_048) -> String {
         let before = try #require(engine.position()) // the app's ticker reads it every 0.5 s
         #expect(before.seconds > 0.9)
         engine.systemStopped(change: false) // the call: iOS stops the engine first...
+        // ...and calls back every buffer it let go at once, well before the app hears of the call:
+        // those are not the song played to its end
+        Thread.sleep(forTimeInterval: 0.1)
+        engine.settle()
+        #expect(engine.phase == .playing, "the stop is not the song ending (\(engine.phase))")
+        let stopped = try #require(engine.position())
+        #expect(stopped.key == 0 && abs(stopped.seconds - before.seconds) < 0.001,
+                "where the song was when iOS stopped it (\(stopped.seconds) s), not the last frame scheduled")
         engine.pause() // ...then the app hears the interruption
         engine.settle()
         let held = try #require(engine.position())
@@ -274,6 +284,7 @@ func energyMap(_ samples: [Float], block: Int = 2_048) -> String {
         engine.settle()
         let out = try engine.renderOffline(24_000)
         let from = Int((held.seconds * rate).rounded())
+        try #require(from + 9_192 <= song[0].count, "goes on from inside the song (frame \(from)), not past it")
         #expect(firstDifference(samples(out, channel: 0)[8_192..<9_192], song[0][(from + 8_192)..<(from + 9_192)]) == nil,
                 "the song goes on from frame \(from)")
     }
@@ -301,6 +312,7 @@ func energyMap(_ samples: [Float], block: Int = 2_048) -> String {
         #expect(engine.outputRunning)
         let out = try engine.renderOffline(24_000)
         let from = Int((held.seconds * rate).rounded())
+        try #require(from + 9_192 <= song[0].count, "goes on from inside the song (frame \(from)), not past it")
         #expect(firstDifference(samples(out, channel: 0)[8_192..<9_192], song[0][(from + 8_192)..<(from + 9_192)]) == nil,
                 "the song goes on from frame \(from)")
     }

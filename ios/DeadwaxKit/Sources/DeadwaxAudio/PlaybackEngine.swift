@@ -1099,6 +1099,14 @@ public final class PlaybackEngine {
     /// ran dry - at its end, or mid-song (a stream that didn't keep up).
     private func played(generation: Int, lane key: LaneKey) {
         guard generation == self.generation, let lane = lanes[key] else { return }
+        // A stopped output renders nothing. When iOS stops the engine itself - a call, before the app
+        // hears of the interruption - AVAudioEngine calls back every buffer still scheduled at once,
+        // and taken as rendered they ran the lane dry: the song "ended" at the last frame scheduled,
+        // and the call came back to the queue's end (ios.yml's macOS runner, where those callbacks
+        // won the race with the pause; notes/ios.md "A stop is not the song ending"). Those samples
+        // were let go, not heard. Every way on from such a stop - play, a new route, a media services
+        // reset - lets the lanes go and starts again from the frame heard, so nothing waits on them.
+        guard engine.isRunning else { return }
         lane.pending = max(lane.pending - 1, 0)
         note("lane \(Int(lane.format.sampleRate)) Hz: a buffer rendered, \(lane.pending) to go")
         if lane.pending == 0, lane.holding, feed?.lane != key {

@@ -92,9 +92,18 @@ public func listTitle(_ source: [QueueTrack], again: Bool) -> String {
     return again ? "\(title), again" : title
 }
 
-/// Which of the song menu's two the notice is for.
-public enum QueuedHow: String, Sendable {
+/// Which of the song menu's two the notice is for - also the queue menu's choice (QueuePick.swift's `QueueChoice`
+/// is this type, under the screens' name).
+public enum QueuedHow: String, Sendable, CaseIterable {
     case next, last
+
+    /// The queue menu's row (QueueMenu.tsx).
+    public var label: String {
+        switch self {
+        case .next: return "Play Next"
+        case .last: return "Play Last"
+        }
+    }
 }
 
 /// The app's notice for what Play Next or Play Last did.

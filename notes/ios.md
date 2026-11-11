@@ -922,12 +922,96 @@ contract mutations) and a Linux reading of everything new in Core (no Linux tool
     pattern's `try!` failing would crash at its first use with the error in the log - a test that built each
     pattern first would crash the same way.
 
+### The screens' own rules (p1/screens-core, merged on ios)
+
+Every decision the web's sign-in screen, album page, queue menu, mini player and Now Playing make is a pure
+DeadwaxCore port, so the SwiftUI views only draw. Built on 790037d (before the Up Next slice), then merged into
+ios after it.
+
+- **SignInRules.swift**:
+  - SignInForm: the name trimmed with JS's trim, the password as typed and cleared after any answer, busy, the
+    problem and its fold, the reason never said twice.
+  - launchReason, from signInGate.tsx.
+  - endsSession(failure, sentUnder:current:), http.ts's noteSignedOut over the phone's cookies:
+    `failure.isSignedOut && sentUnder == current`. DeadwaxClient's onSignedOut passes the cookie the request
+    carried; the web's session counter is not ported.
+  - SignOutRow: any answer from deadwax starts the app again; no answer keeps you signed in; a cancelled task
+    leaves the row as it was and says nothing (the phone's own call - the web's sign-out can't be cancelled).
+- **Whose.swift**: albumMine, heldLabel, the six words, the mine button, and
+  albumMine(personal:album:albumFailed:store:storeFailed:changed:), wired the way AlbumPage.tsx wires it.
+  badgeShown, placeholderShown and mineBlockShown are the page's three display conditions; `bridgeAsked: false`
+  (Phase 1 without a library) draws the badge at once, which the web never does because it always asks.
+- **DiscTitles.swift** (DiscHeadings) and **Format.swift** (trackTime, formatDuration, clock, sharedFormat,
+  isLongTitle; AlbumPageLines: the meta line, footer, row number and artist, the warm).
+- **Scrub.swift**: all of scrub.ts (an engine file, read only), with JS's Math.max/min for NaN and -0; and the
+  phone's own landed and settled - a pending seek is let go of once the engine reports a position less than
+  1.5 s from the target, or after 20 s, since the engine has no 'seeked' event. Those two are hand-tested, with
+  no TypeScript behind them.
+- **PlayerWords.swift**: the mini player's and Now Playing's words, the hairline (progress), a failure's words
+  by its kind (AudioFailure.Kind mapped to the web's media codes; signedOut is 4), the engine's own description
+  for Debug only. afterFailure gives retry, skip or stop; where a skip goes is QueueController.skipFailed's
+  (past Repeat One copies, nil at the end), so the web's nextIndex is not ported.
+- **QueuePick.swift**: Play Next and Play Last as a choice, and the level each song is queued at. At the merge
+  `QueueChoice` became a typealias of the Up Next port's `QueuedHow` (which took the menu's `label` and
+  CaseIterable), and the notice is `queuedWords` - one copy of each.
+
+**Vectors**: ios/scripts/export-screen-vectors.cjs compiles the TS with ui's tsc and drives SignIn.tsx,
+SignOutRow.tsx, QueueMenu.tsx and MiniPlayer.tsx (with its Progress) against stand-ins. The lines that live
+inside AlbumPage.tsx, NowPlaying.tsx and signInGate.tsx are read out by pattern and evaluated as written, each
+hashed in made_from; a pattern that stops matching stops the script. It writes Fixtures/screens/{signin, whose,
+discs, format, scrub, player, queue}.json (plain ASCII, seeded, special numbers as strings); `--check` compares
+byte for byte, and ui/test/iosscreens.sim.cjs runs it. The Screen*Tests replay every vector and fail when a
+replay compared nothing.
+
+**Reviewed**: seven findings, all real, all fixed in 679c69a - the session rule moved onto cookies (it had been
+ported over a counter the client can't supply), the frozen scrubber (landed/settled), the queue picks' albums,
+the readout's `rate || 1`, the album page's display rules, afterFailure's skip left to skipFailed, and the
+hand-off note. Mutations: 33 at review (29 caught, 3 real gaps since fixed, 1 equivalent), 22 after the fixes
+(21 caught, 1 equivalent).
+
+**Known differences**: About.swift's own trackTime writes 'inf:nan' for Infinity where the web and Format write
+'Infinity:NaN' - they agree on every finite length, and About's trackTime, sharedFormat and disc headings fold
+into Format and DiscHeadings when About.swift is next touched. The DiscTitle model reads disc as an Int or a
+digit string, narrower than JS's Number(), and agrees on everything Navidrome sends. isSignedOut uses hasPrefix
+where http.ts uses startsWith; they agree on every ASCII path, and every route is ASCII.
+
+### A stop is not the song ending (found by ios.yml, fixed on ios)
+
+The first push of Phase 1's Core (87024cd) failed ios.yml's macOS job (macos-26-arm64, Xcode 26.6) twice.
+Both times positionFollowsTheSongHeard failed. The first time aCallGoesOnFromWhereTheSongWas also failed, with
+the pause held at 2.0 s (the song's end, not the 1.0 s it had reached), and then crashed indexing past the
+song. Both tests passed on this Mac and at 9f5a78a, so the failures were races, and one of them is a real phone
+bug.
+
+- **The bug.** When the engine is stopped, AVAudioEngine calls back the completion of EVERY buffer still
+  scheduled, at once, with the output not running. A trace with the stop marked showed it: two came in before
+  the pause and eight after. played() took each as rendered, so a lane whose callbacks all arrived before the
+  pause ran dry. The song "ended" at the last frame scheduled, and finish() was called. On the phone, iOS stops
+  the engine for a call before the app hears of the interruption, so the callbacks would win that race nearly
+  every time: the call would come back to the queue's end, or to a song a minute on. Before this, nothing
+  stopped the engine from outside but tests.
+- **The fix.** played() returns while `!engine.isRunning`: the samples were let go, not heard. Every way on from
+  such a stop - play (resumeNow sees the output stopped), a new route (configurationChanged), a media services
+  reset (rebuild) - calls reset(), which lets the lanes go and starts again from the frame heard, so no count
+  waits on the dropped callbacks. The engine's own stops either reset first (pauseNow, armIdle, stop) or come
+  with nothing left scheduled (finish).
+- **The tests.** aCallGoesOnFromWhereTheSongWas now waits 0.1 s after iOS's stop before the interruption, the
+  order the phone has. It checks the engine still says playing at the frame it was at, and that it goes on from
+  inside the song (a `#require`, so a regression fails rather than crashing the run). With the fix taken out it
+  fails on this Mac every time, with CI's crash. positionFollowsTheSongHeard waits (RenderHelpers' waitFor) for
+  the first song's completions, which come on AVAudioEngine's thread after the render - settle() alone can run
+  first, as it did on the runner with the Core suites running beside it. aPauseStopsTheOutputAndPlayGoesOnFromWhereItWas
+  has the same `#require`.
+- **On the phone:** Phase 0's "a phone call" check (not done yet) is where this shows; also check that a call
+  that comes in mid-song goes back to the same place in the same song.
+
 ### Verified (Phase 1's Core, p1/merge, 2026-11-10)
 
 All on James's Mac (8 GB; heavy builds one at a time), Xcode 27.1's toolchain:
 - `swift test --package-path ios/DeadwaxKit`, from a clean build: **DeadwaxCore 392 tests in 54 suites,
   DeadwaxAudio 54 tests in 2 suites**, all passing, no compiler warning (Phase 0 ended at 64 and 13; the merge
-  at 389 in 53, before the review fixes' title test and FixtureFilesTests' two).
+  at 389 in 53, before the review fixes' title test and FixtureFilesTests' two). With the screens' own rules
+  merged and the stop fixed (ios): **DeadwaxCore 452 tests in 61 suites, DeadwaxAudio 54 in 2**, all passing.
 - xcodebuild, the Deadwax scheme, Debug, `generic/platform=iOS`, CODE_SIGNING_ALLOWED=NO: BUILD SUCCEEDED (one
   line from appintentsmetadataprocessor, none from the code).
 - The full Python suite: **4004 passed** (2.1.2's 3909, and 95 from Phase 1: test_ios_contract.py 8 -> 46,
@@ -942,7 +1026,10 @@ All on James's Mac (8 GB; heavy builds one at a time), Xcode 27.1's toolchain:
 
 ### Not verified
 
-- **DeadwaxCore on Linux**: no Linux toolchain here, and none of Phase 1's Core has been compiled on Linux.
+- **DeadwaxCore on Linux** - since checked: ios.yml's ubuntu job built and passed all of Phase 1's Core at
+  87024cd on its first run, and tests.yml ran every ios*.sim.cjs on Node 22 with the fixtures written on Node
+  20.12.2, all passing. What follows was written before that run.
+  No Linux toolchain here, and none of Phase 1's Core has been compiled on Linux.
   Everything new was written for swift-corelibs / swift-foundation (no Apple-only import; file sizes read as
   NSNumber or UInt, TimeZone, Unicode.Scalar properties, decomposedStringWithCompatibilityMapping, classic
   URLError codes, each found in corelibs' URLError.Code), but ios.yml's ubuntu job (swift:6.4.1-noble) is the

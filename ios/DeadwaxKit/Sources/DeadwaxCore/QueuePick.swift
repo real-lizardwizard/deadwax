@@ -9,19 +9,8 @@ import Foundation
 /// level - `.next` is the queue's playNext, `.last` its playLast (QueueController on the Up Next branch), each song
 /// queued as an entry carrying `level` - and the call answers whether the music STARTED from it (nothing was
 /// playing); `notice(started:)` is then the line said for 5 s over the mini player, or nil when the music starting is
-/// the notice. `QueueChoice`'s raw values are the Up Next port's `QueuedHow`'s, so `QueuedHow(rawValue:
-/// choice.rawValue)` maps one onto the other where both are built.
-public enum QueueChoice: String, Sendable, CaseIterable {
-    case next, last
-
-    /// The menu's row.
-    public var label: String {
-        switch self {
-        case .next: return "Play Next"
-        case .last: return "Play Last"
-        }
-    }
-}
+/// the notice. `QueueChoice` is the Up Next port's `QueuedHow` (UpNextView.swift), and the notice its `queuedWords`.
+public typealias QueueChoice = QueuedHow
 
 /// What the queue menu was opened with: one song (a row's •••) or an album's songs (the album's •••), always in
 /// hand, and how they are queued for the player's Normalization - as an album for the album's own •••, else as songs.
@@ -64,7 +53,7 @@ public struct QueuePick<Track: Sendable>: Sendable {
     /// The line said when the music didn't start from the choice (upNext.ts queuedWords): "Playing next: Dummy", "Added
     /// to Up Next: Dummy" - nil when it did start, the mini player being the notice then.
     public func notice(_ choice: QueueChoice, started: Bool) -> String? {
-        started ? nil : QueuePickWords.queued(choice, label: label)
+        started ? nil : queuedWords(choice, label: label)
     }
 }
 
@@ -85,12 +74,6 @@ extension QueuePick where Track == Song {
 public enum QueuePickWords {
     /// The menu's Cancel.
     public static let cancel = "Cancel"
-
-    /// upNext.ts queuedWords - the Up Next port's `queuedWords` says the same (UpNextView.swift), and the two fold into
-    /// that one where both are built.
-    public static func queued(_ choice: QueueChoice, label: String) -> String {
-        choice == .next ? "Playing next: \(label)" : "Added to Up Next: \(label)"
-    }
 
     /// The level the album page's Play and Shuffle queue its songs at: always as an album (AlbumPage.tsx
     /// `queued(tracks, 'album')`).
