@@ -95,9 +95,10 @@ import Testing
         #expect(failed.failed && failed.version == YouWords.notKnown && failed.identity == nil && failed.logins == nil)
     }
 
-    @Test func theAppsVersionLine() {
-        #expect(YouWords.app(version: "0.2", build: "2") == "deadwax for iPhone 0.2 (2)")
-        #expect(YouWords.app(version: nil, build: nil) == "deadwax for iPhone ? (?)")
+    @Test func theAppsVersionRow() {
+        #expect(YouWords.app == "App")
+        #expect(YouWords.app(version: "0.2", build: "2") == "0.2 (2)")
+        #expect(YouWords.app(version: nil, build: nil) == "? (?)")
     }
 }
 

@@ -381,6 +381,35 @@ func energyMap(_ samples: [Float], block: Int = 2_048) -> String {
         #expect(engine.phase == .idle)
     }
 
+    // A song asked for again that fails in the very same way is a new failure, said again: the app's retry waits
+    // for it to skip the song (PlayerWords.afterFailure's `retried`), and the same phase, key and words would have
+    // been dropped as no change - the queue sat on the failure for ever (the player review).
+    @Test func aFailureMetAgainIsSaidAgain() throws {
+        let rate = 48_000.0
+        let opens = Opens()
+        opens.failing = 2
+        let engine = try offlineEngine(rate: rate, channels: 2)
+        engine.play(tracksFromWhereAsked([signal(frames: 48_000, channels: 2, seed: 0.4)], rate: rate, opens: opens), from: 0)
+        engine.settle()
+        let first = engine.stateNow
+        guard case .failed = first.phase else {
+            Issue.record("expected the failure, got \(first.phase)")
+            return
+        }
+        engine.resume()
+        engine.settle()
+        let again = engine.stateNow
+        #expect(again.phase == first.phase && again.key == first.key && again.failure == first.failure,
+                "the same failure, in the same words")
+        #expect(again.failures == first.failures + 1, "and a new state for it")
+        #expect(again != first)
+        engine.resume()
+        engine.settle()
+        #expect(engine.phase == .playing)
+        #expect(engine.stateNow.failures == again.failures, "playing says no new failure")
+        #expect(opens.frames == [0, 0, 0])
+    }
+
     // A seek before the song has been heard (paused after a skip, or still loading) is seconds at
     // the file's own rate, not 44.1 kHz's. Paused, nothing opens: play opens it there.
     @Test func aSeekBeforeTheSongIsHeardIsAtItsOwnRate() throws {

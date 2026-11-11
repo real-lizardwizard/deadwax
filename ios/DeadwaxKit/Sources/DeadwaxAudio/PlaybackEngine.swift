@@ -60,6 +60,10 @@ public struct EngineState: Equatable {
     public var latency: Double?
     /// With `.failed`: the failure, its kind and deadwax's status - the app's words come from them.
     public var failure: AudioFailure?
+    /// How many failures the engine has said, all told: one more at each. A song asked for again that fails in the
+    /// very same way (a retry, play after a failure) is a new failure, and this is what makes its state a new one -
+    /// published, where the same phase, key and words would have been dropped as no change.
+    public var failures = 0
 
     public init() {}
 }
@@ -329,6 +333,8 @@ public final class PlaybackEngine {
     /// nothing, so the rate of the song before must not be said for the one shown.
     private var rateOf: Int?
     private var lastFailure: AudioFailure?
+    /// Every failure said (EngineState.failures).
+    private var failureCount = 0
     /// The output's latency as last read, kept with every reading of a node.
     private var lastLatency: Double = 0
     /// When the last play or resume was asked (host seconds), until its first sample is heard.
@@ -1465,6 +1471,7 @@ public final class PlaybackEngine {
         wantsPlay = false
         reset()
         lastFailure = failure
+        failureCount += 1
         note("failed: \(failure.description)")
         publish(.failed(failure.description))
         armIdle()
@@ -1480,6 +1487,7 @@ public final class PlaybackEngine {
         } else {
             next.failure = nil
         }
+        next.failures = failureCount
         next.latency = lastLatency
         if let key = heardLane ?? feed?.lane, let lane = lanes[key] {
             next.fileRate = lane.format.sampleRate

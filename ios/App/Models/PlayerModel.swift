@@ -28,9 +28,10 @@ final class PlayerModel {
     var current: QueueEntry? { entries.indices.contains(queue.index) ? entries[queue.index] : nil }
     /// Something is queued: the mini player shows.
     var hasQueue: Bool { current != nil }
-    /// The player means to play (playing, or loading to play - a song asked for again after it failed included):
-    /// Play/Pause shows Pause.
-    var isPlaying: Bool { retrying || engineState.phase == .playing || engineState.phase == .loading }
+    /// The player means to play (playing, or loading to play): Play/Pause shows Pause. Not while a song that failed
+    /// waits the retry's 1.5 s - Play shows, busy (`isLoading`), as the web's retry does (setPlaying(false),
+    /// setBuffering(true)); a tap on it asks for the song now.
+    var isPlaying: Bool { engineState.phase == .playing || engineState.phase == .loading }
     /// The song is loading (the spinner over Play/Pause): its bytes, its level's wait, or the retry's 1.5 s.
     var isLoading: Bool { retrying || engineState.phase == .loading }
     /// Seconds into the entry heard, as the engine last said (twice a second while it plays).
@@ -151,10 +152,15 @@ final class PlayerModel {
     private var normalizationSetting = Normalization.read(UserDefaults.standard.string(forKey: Normalization.storageKey))
     /// A song that failed to load is being asked for again (PlayerWords.retryDelaySeconds).
     private var retrying = false
+    /// The song's line says iOS refused to play (sayRefusal): words for a play that didn't happen, gone at the next.
+    @ObservationIgnored private var refusalSaid = false
     @ObservationIgnored private var ticker: Timer?
     @ObservationIgnored private var interrupted = false
     @ObservationIgnored private var artwork: (id: String, image: UIImage)?
     @ObservationIgnored private var coverAsked: String?
+    /// The lock screen's cover that last failed, and when: not asked again for `coverAgainSeconds`.
+    @ObservationIgnored private var coverFailed: (id: String, at: Double)?
+    private static let coverAgainSeconds: Double = 15
     @ObservationIgnored private var headerBits: [String: Int] = [:]
     @ObservationIgnored private var noticeShown = 0
     @ObservationIgnored private var skipShown = 0
@@ -238,9 +244,11 @@ final class PlayerModel {
         remember(album)
         shelve(queued.tracks)
         var started = false
-        startQueue(copies: false) { controller in
+        // only songs added: a song that failed keeps its retry (the web's addSongs leaves the retry's timer alone)
+        startQueue(copies: false, cancelsRetry: false) { controller in
             started = choice == .next ? controller.playNext(tracks) : controller.playLast(tracks)
         }
+        if started { cancelRetry() }
         if let words = pick.notice(choice, started: started) { say(words) }
         return true
     }
@@ -271,11 +279,17 @@ final class PlayerModel {
         case .ended:
             if let heardEntry, let track = current?.track { reporter.newListen(entry: heardEntry, songID: track.id) }
         case .failed:
-            // from where it stopped: the same listen, and who is signed in asked again should it fail again
+            // from where it stopped: the same listen, and who is signed in asked again should it fail again - and
+            // its words gone, as the web's reload() clears them: the song is being asked for again
             reporter.seeked()
             askedAfterFailure = false
+            errorLine = nil
         default:
             break
+        }
+        if refusalSaid {
+            refusalSaid = false
+            errorLine = nil
         }
         controller.intendsToPlay = true
         link.resume()
@@ -316,6 +330,8 @@ final class PlayerModel {
         }
         act { controller.previous() }
         startTicking()
+        // paused, no tick follows: the clock read back now, so it shows the restart once the hold lets go
+        tick()
         showNowPlaying()
     }
 
@@ -328,6 +344,9 @@ final class PlayerModel {
         reporter.seeked()
         link.seek(to: seconds)
         resuming?.position(seconds)
+        // paused, the ticker is stopped and the engine says nothing of a seek: the position read back now (the
+        // engine answers the seek's target), so the clock keeps it once Scrub's hold has let go
+        tick()
         showNowPlaying()
     }
 
@@ -391,6 +410,7 @@ final class PlayerModel {
         length = nil
         pendingSeek = nil
         errorLine = nil
+        refusalSaid = false
         levelDecisions = LevelDecisions()
         levelsShown = link?.levels
         book.wantQueue([])
@@ -456,14 +476,18 @@ final class PlayerModel {
     // MARK: the controller
 
     /// A play that may start a new queue: a new generation of engine keys and of level decisions, from its first play
-    /// or restore. Made in the tap: nothing awaited.
-    private func startQueue(copies: Bool, _ body: (QueueController) -> Void) {
+    /// or restore. Made in the tap: nothing awaited. A failed song's retry is called off first, unless `cancelsRetry`
+    /// is false (Play Next and Play Last, which may only add songs). The songs kept for the queue are pruned only when
+    /// a new queue did start: songs added by an edit held for the join (D4) are not in the queue yet, and keep their
+    /// Navidrome song (its size, for the stream cache's length check; Info's fields) for when they are.
+    private func startQueue(copies: Bool, cancelsRetry: Bool = true, _ body: (QueueController) -> Void) {
         guard let controller = ensureController(), let link else { return }
-        cancelRetry()
+        if cancelsRetry { cancelRetry() }
+        let generation = link.generation
         link.beginStart(copies: copies)
         act { body(controller) }
         link.endStart()
-        pruneShelf()
+        if link.generation != generation { pruneShelf() }
         startTicking()
     }
 
@@ -572,6 +596,7 @@ final class PlayerModel {
         pendingSeek = nil
         position = listenFrom
         errorLine = nil
+        refusalSaid = false
         retried = false
         askedAfterFailure = false
         cancelRetry()
@@ -616,7 +641,9 @@ final class PlayerModel {
             // the queue played out: the listen counted to its end, then Repeat's next time round, or the music stops
             tick()
             act { _ = controller?.queueEnded() }
-        case .failed(let words) where was.phase != state.phase || was.key != state.key:
+        case .failed(let words) where state.failures != was.failures:
+            // a new failure (EngineState.failures counts each) - the same words again included: a retry that met the
+            // same failure is what lets afterFailure skip the song. A failure said again (a new route) is not new.
             failed(state, words: words)
         default:
             break
@@ -672,6 +699,8 @@ final class PlayerModel {
                 self.retrying = false
                 guard self.heardEntry == key, self.controller?.intendsToPlay == true, let link = self.link else { return }
                 self.reporter.seeked()
+                // asked for again: its words go (the web's reload()); failing again says so again
+                self.errorLine = nil
                 link.resume()
                 self.sayRefusal()
                 self.startTicking()
@@ -717,6 +746,7 @@ final class PlayerModel {
         refusedNow = false
         controller?.intendsToPlay = false
         errorLine = ErrorWords.other
+        refusalSaid = true
     }
 
     /// iOS reset its media services: the session made active again when something was playing, then the engine
@@ -728,7 +758,8 @@ final class PlayerModel {
 
     private func interruption(began: Bool, shouldResume: Bool) {
         if began {
-            interrupted = isPlaying
+            // a song waiting its retry was meant to play too: the call ended, it is asked for again
+            interrupted = isPlaying || retrying
             pause()
         } else if shouldResume, interrupted {
             interrupted = false
@@ -756,11 +787,15 @@ final class PlayerModel {
         Song(track: track, size: shelf[track.id]?.size)
     }
 
+    /// The ticker runs in the run loop's common modes: a scheduledTimer's default mode doesn't fire while a list is
+    /// being scrolled, which would freeze the hairline, Repeat's top-up, a held edit and resume's reports meanwhile.
     private func startTicking() {
         guard ticker == nil else { return }
-        ticker = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        ticker = timer
     }
 
     private func stopTicking() {
@@ -801,11 +836,22 @@ final class PlayerModel {
                         duration: duration > 0 ? duration : nil,
                         elapsed: shownPosition, playing: engineState.phase == .playing,
                         artwork: cover != nil && artwork?.id == cover ? artwork?.image : nil)
-        if let cover, artwork?.id != cover, coverAsked != cover, let client = server.client {
+        let now = Monotonic.seconds()
+        let failedLately = coverFailed.map { $0.id == cover && now - $0.at < Self.coverAgainSeconds } ?? false
+        if let cover, artwork?.id != cover, coverAsked != cover, !failedLately, let client = server.client {
             coverAsked = cover
             Task {
-                guard let data = try? await client.cover(coverID: cover, size: CoverSize.lockScreen),
-                      let image = UIImage(data: data) else { return }
+                let image = (try? await client.cover(coverID: cover, size: CoverSize.lockScreen)).flatMap(UIImage.init(data:))
+                // only the newest answer draws: a cover asked for a song left since is dropped
+                guard self.coverAsked == cover else { return }
+                guard let image else {
+                    // failed: asked again at the lock screen's next change (a song, a pause, a seek) once
+                    // coverAgainSeconds have gone by
+                    self.coverAsked = nil
+                    self.coverFailed = (cover, Monotonic.seconds())
+                    return
+                }
+                self.coverFailed = nil
                 self.artwork = (cover, image)
                 self.showNowPlaying()
             }

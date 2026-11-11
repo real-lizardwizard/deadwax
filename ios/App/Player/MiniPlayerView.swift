@@ -3,7 +3,8 @@ import SwiftUI
 
 /// The mini player above the tab bar, whenever something is queued (ui/src/player/MiniPlayer.tsx): the cover, the
 /// title and its second line - the player's failure words, a skipped song's notice included, else the artist
-/// (PlayerWords.secondLine) - Play/Pause (busy while the song loads) and Next, and a hairline along its bottom edge
+/// (PlayerWords.secondLine) - Play/Pause (busy while the song loads) and Next, each at least 44 points and growing with
+/// the text size, and a hairline along its bottom edge
 /// for how far into the song it is (PlayerWords.progress). The bar, not its buttons, opens Now Playing; VoiceOver
 /// reads it as "Now playing: Roads, Portishead - open" (PlayerWords.miniPlayerLabel).
 struct MiniPlayerView: View {
@@ -47,14 +48,15 @@ struct MiniPlayerView: View {
 
                 Button { player.toggle() } label: {
                     ZStack {
+                        // the glyph keeps its room under the spinner, so the button doesn't change size as it loads
+                        Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+                            .font(.title2)
+                            .opacity(player.isLoading ? 0 : 1)
                         if player.isLoading {
                             ProgressView()
-                        } else {
-                            Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                                .font(.title2)
                         }
                     }
-                    .frame(width: 44, height: 44)
+                    .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
                 }
                 .accessibilityLabel(PlayerWords.playPause(playing: player.isPlaying))
@@ -62,7 +64,7 @@ struct MiniPlayerView: View {
                 Button { player.next() } label: {
                     Image(systemName: "forward.fill")
                         .font(.title2)
-                        .frame(width: 44, height: 44)
+                        .frame(minWidth: 44, minHeight: 44)
                         .contentShape(Rectangle())
                 }
                 .accessibilityLabel(PlayerWords.next)

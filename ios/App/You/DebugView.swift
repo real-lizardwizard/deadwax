@@ -26,7 +26,7 @@ struct DebugView: View {
                     .font(.footnote)
                     .foregroundStyle(Palette.quiet)
             } footer: {
-                Text(YouView.appVersion)
+                Text("deadwax for iPhone \(YouView.appVersion)")
             }
         }
         .navigationTitle("Debug")

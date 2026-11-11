@@ -268,13 +268,30 @@ final class ServerModel {
         }
     }
 
-    /// The app came to the front (scenePhase .active): /me asked again; on the can't-reach screen, tried again.
+    /// The app came to the front (scenePhase .active): /me asked again; on the can't-reach screen, tried again; on
+    /// the sign-in shown alone, asked quietly (signInGate.tsx asks while the sign-in shows too).
     func becameActive() {
         switch launch {
         case .ready: Task { await refreshMe() }
         case .unreachable: Task { await check() }
+        case .signedOut: Task { await askWhileSignedOut() }
         default: break
         }
+    }
+
+    /// The sign-in shown alone (the launch's 401, or a sign-out), and the app back at the front: /me asked again,
+    /// quietly. A 200 - logins turned off since, or this phone's session good again - takes the sign-in away as a
+    /// sign-in would; anything else leaves it as it is, its form and its reason untouched (signInGate.tsx's ask():
+    /// with the sign-in shown, only a 200 changes anything - showSignIn returns while it is up).
+    private func askWhileSignedOut() async {
+        guard case .signedOut = launch, let client else { return }
+        asks += 1
+        let asked = asks
+        guard let answer = try? await client.me(), asked == asks, case .signedOut = launch else { return }
+        meFailure = nil
+        signOutRow = SignOutRow()
+        accept(answer, before: nil)
+        launch = .ready
     }
 
     /// `action` is run, on the main actor, each time the person changes - the player stops and forgets its queue, the

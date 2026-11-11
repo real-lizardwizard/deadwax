@@ -28,30 +28,34 @@ struct AlbumRoute: Hashable {
     var artist: String?
     var coverArt: String?
     var year: Int?
+    /// The album's genre, as the opener knew it: the meta line's first part before the album answers (AlbumPage.tsx's
+    /// `[shown?.genre, shown?.year, format]`, shown = album ?? preview), so the line only gains the format when it does.
+    var genre: String?
     /// The album's MusicBrainz release id, as the opener knew it: what the page tells your library it opened with
     /// (MyLibraryState.opened - the web's preview's musicBrainzId).
     var musicBrainzId: String?
 
     init(id: String, name: String? = nil, artist: String? = nil, coverArt: String? = nil, year: Int? = nil,
-         musicBrainzId: String? = nil) {
+         genre: String? = nil, musicBrainzId: String? = nil) {
         self.id = id
         self.name = name
         self.artist = artist
         self.coverArt = coverArt
         self.year = year
+        self.genre = genre
         self.musicBrainzId = musicBrainzId
     }
 
     /// A Library row's album.
     init(_ album: IndexAlbum) {
         self.init(id: album.id, name: album.name, artist: album.artist, coverArt: album.coverArt, year: album.year,
-                  musicBrainzId: album.musicBrainzId)
+                  genre: album.genre, musicBrainzId: album.musicBrainzId)
     }
 
     /// An album already loaded.
     init(_ album: Album) {
         self.init(id: album.id, name: album.name, artist: album.artist, coverArt: album.coverArt, year: album.year,
-                  musicBrainzId: album.musicBrainzId)
+                  genre: album.genre, musicBrainzId: album.musicBrainzId)
     }
 
     /// A queue entry's album (Now Playing's Go to the album, Info's album line); nil when the track names none.
@@ -62,7 +66,8 @@ struct AlbumRoute: Hashable {
 }
 
 /// Where the app is: the tab shown, each tab's pages, and Now Playing open or not. RootView and MainTabs draw it;
-/// a screen opens a page on its own tab with `open(_:)`, and the player goes to an album with `openAlbum(_:)`.
+/// a screen opens a page on its own tab with `open(_:)`, and the player goes to an album with `openAlbum(_:)` - on the
+/// tab shown, as a screen's page would be.
 @MainActor
 @Observable
 final class AppNavigation {
@@ -101,13 +106,13 @@ final class AppNavigation {
     }
 
     /// Go to album, from the player (Now Playing's byline and •••, Info's album card): Now Playing closes - Info and
-    /// Up Next with it - and the album's page is pushed on the Library's stack, the album pages' tab, shown if it
-    /// wasn't, its pages kept. An album already on top of it isn't pushed twice.
+    /// Up Next with it - and the album's page is pushed on the tab shown, its pages kept (screens.md 7, the web's
+    /// goToAlbum: "opens the album page on the current tab"). An album already on top of it isn't pushed twice.
     func openAlbum(_ album: AlbumRoute) {
         nowPlayingShown = false
-        if tab != .library { select(.library) }
-        if case .album(let top)? = library.last, top.id == album.id { return }
-        library.append(.album(album))
+        let top = tab == .library ? library.last : you.last
+        if case .album(let shown)? = top, shown.id == album.id { return }
+        open(.album(album))
     }
 
     /// The person changed: every page popped, Now Playing closed, Library shown.

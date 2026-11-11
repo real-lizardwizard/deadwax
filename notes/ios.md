@@ -1110,7 +1110,7 @@ Phase 0's one model and one screen are split into models the screens read from t
 - **LoudnessBook** (main):
   - It wants the queue's albums and the last 2 album pages shown.
   - It reads, warms, and reads again every 5 s.
-  - A read's "unmeasured" is held off the shelf until the warm answers.
+  - A read's "unmeasured" is held off the shelf until the warm answers - and past a "busy" warm (review fixes).
   - While a gate waits, it reads that album every second.
 - **Failures.**
   - The raw words go to `lastFailure`, and /me is asked once per song.
@@ -1138,7 +1138,7 @@ Phase 0's one model and one screen are split into models the screens read from t
   - Account: Sign out and its footnote.
   - About.
   - This phone: the address, and Debug for isAdmin.
-  - The version at the foot.
+  - The app's own version (About's App row since the review fixes; it was a footer).
 - **In Core.** YouLines decides You from /me, held to You.tsx by Fixtures/you/ (export-you-vectors.cjs, 136
   cases, iosyou.sim.cjs). UnreachedLines is the phone's own, hand-tested.
 
@@ -1199,8 +1199,8 @@ Phase 0's one model and one screen are split into models the screens read from t
 ### The merge (p1/app)
 
 - **Go to album.** The shell's `openAlbum` pushed on the current tab. Now Playing's `goToPlayedAlbum` pushed on
-  Library. One `openAlbum` is kept: it closes Now Playing, selects Library, and doesn't push the album on top
-  again. screens.md had the current tab.
+  Library. One `openAlbum` is kept: it closes Now Playing and doesn't push the album on top again. The merge had it
+  select Library; the review fixes put it on the tab shown, as screens.md 7 and the web's goToAlbum have it.
 - **All albums** is `AppRoute.albums(AlbumScope)`, a value link. It stacks with album pages and pops with the
   tab's tap. A second tap on the tab scrolls the root only.
 - **Add/Remove** calls `LibraryModel.libraryChanged()` directly. The album part's notification is gone.
@@ -1225,11 +1225,58 @@ Phase 0's one model and one screen are split into models the screens read from t
   - Only the root has the gate. A page above it shows its own ErrorNote.
 - **Read as one piece.** Every screen is reachable, no stub is left, and no view decides a rule Core decides.
 
+### Review fixes (p1/app, after the app's three reviews)
+
+Three reviews read the merge (d2d52da): the screens against the web, the player's wiring, and the app as iOS runs
+it. Every finding was checked against the code and the specs. All are fixed but one, rejected below with part of
+another.
+
+- **The album page's meta line** no longer jumps. AlbumRoute carries the genre (IndexAlbum's, Album's), so the
+  line drawn before the album answers is genre and year, and only gains the format.
+- **The sign-in shown alone asks /me again** as the app comes to the front (signInGate.tsx asks while the sign-in
+  shows). Only a 200 changes anything: logins turned off elsewhere take the sign-in away.
+- **Go to album opens on the tab shown** (screens.md 7), no longer always on Library.
+- **The retry's 1.5 s shows Play, busy**, as the web's does. `isPlaying` leaves `retrying` out; a call during
+  the retry still asks for the song again after it.
+- **The mini player's buttons** are at least 44 pt and grow with the text size; Play/Pause keeps its room under the
+  spinner.
+- **The app's version is About's App row** ("0.2 (2)", screens.md 8.5), not This phone's footer.
+- **A failure's words go when the song is asked for again**: the retry, and Play after a failure or after iOS
+  refused the session (the web's reload()). A skip's notice is left alone.
+- **A "busy" warm keeps the read's "unmeasured" off the shelf** (Core's `LoudnessAsking.keepsHeldRead`): the first
+  song goes on waiting, at most 20 s, while the book warms again 5 s on, rather than the album being fixed as it is
+  for the queue's life. A read's "unmeasured" is now always held until its warm answers, not only when the warm
+  goes at once.
+- **Answers gone stale.** The shelf keeps when each answer was kept. An album wanted again with no fresh answer is
+  read first (`readsFirst`, levels.md 4.2), not warmed on a step left from before. A first song's wait counts an
+  answer only when it is fresh or was read since the wait began (`believed`); once the wait is over it is decided
+  from what is in hand, as before.
+- **A paused seek, and Previous's restart, are read back** (`tick()`), so the clock keeps them after Scrub's 20 s.
+- **Play Next and Play Last in a retry's 1.5 s** keep the retry unless the music started from them.
+- **Songs a held Play Next added keep their Navidrome song**: the shelf is pruned only when a new queue started.
+- **A failure met again is said again.** EngineState gains `failures`, one more at each `fail()`, so the same phase,
+  key and words are a new state. The model takes a new count as a new failure (and a failure said again, on a new
+  route, as none). EngineRenderTests' `aFailureMetAgainIsSaidAgain` fails with the count taken out.
+- **Covers.** CoverImage keeps the image a load gave only while on screen and draws what the cache holds; a load for
+  a cover the view has left draws nothing. Covers are decoded off the main thread (`byPreparingForDisplay`). A
+  fetch and its failure are the session's (by its hash), a view's task id carries the session too, and coming to
+  the front forgets every failure, so covers come back after signing in again or a tunnel coming back.
+- **The lock screen's artwork**: only the answer for the song showing is drawn; a failure is asked again at the
+  next change, no sooner than 15 s on.
+- **The ticker and the book's 1 s timer run in the common run-loop modes**, so they don't stop while a list
+  scrolls.
+- **Rejected: the empty Your albums' words** ("…or find new ones in Search and Get them."). The phone has no Search
+  or Get in Phase 1, but the words are the web's, verbatim, as library.md gives them, and held to yourLibrary.ts by
+  the Library's vectors (Fixtures/library/words.json). Changing them is James's call.
+- **Rejected in part: a hurried album warmed every second.** levels.md 4.2 says no warm sooner than 5 s after the
+  last; the wait is bounded by LevelWait's 20 s either way.
+
 ### Verified (p1/app, 2026-11-11)
 
 - **xcodebuild** (Debug, `generic/platform=iOS`, unsigned): BUILD SUCCEEDED. Its one warning is
   appintentsmetadataprocessor's own; none comes from the code.
-- **swift test**: DeadwaxCore 508 tests in 69 suites, DeadwaxAudio 54 in 2, all passing.
+- **swift test**: DeadwaxCore 508 tests in 69 suites, DeadwaxAudio 54 in 2, all passing (after the review fixes:
+  511 and 55).
 - **pytest**: 4004 passed.
 - **The sims**: all 75 `ui/test/*.sim.cjs`, each run on its own, pass.
 - **check_project.py** ok, and the project file is unchanged.

@@ -66,10 +66,11 @@ final class AlbumModel {
     var name: String { album.map { $0.name ?? "" } ?? route.name ?? "" }
     var artist: String { album.map { $0.artist ?? "" } ?? route.artist ?? "" }
     var coverArt: String? { album.map(\.coverArt) ?? route.coverArt }
-    /// The line under the artist: genre, year and the songs' one format (the opener's year until the album answers).
+    /// The line under the artist: genre, year and the songs' one format (the opener's genre and year until the album
+    /// answers, so the line only gains the format when it does).
     var meta: String {
         if let album { return AlbumPageLines.meta(album) }
-        return AlbumPageLines.meta(genre: nil, year: route.year, format: nil)
+        return AlbumPageLines.meta(genre: route.genre, year: route.year, format: nil)
     }
     /// The title a step smaller over 60 letters (titles.ts isLongTitle).
     var longTitle: Bool { Format.isLongTitle(name) }

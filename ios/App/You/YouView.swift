@@ -4,8 +4,8 @@ import SwiftUI
 /// The You tab (screens.md 8, the web's app/You.tsx as Phase 1 has it), top to bottom: who is signed in - the
 /// avatar's letter, the name, "No sign-in needed" with logins off - and the UNVERIFIED line under them when /me says
 /// so; Playback (Gapless, Normalization); Account (Sign out, with logins on); About (deadwax's version, and for an
-/// admin whether logins are on, with /me's failure said under them); This phone (the address, Change address, and
-/// Debug for an admin, D1), with the app's own version at the foot.
+/// admin whether logins are on, and the app's own version and build - with /me's failure said under them); This phone
+/// (the address, Change address, and Debug for an admin, D1).
 ///
 /// Core's YouLines decides every line of it from what /me last said (ServerModel.me, its failure, whether it is being
 /// asked again, Access); this only draws. /me is asked the first time You shows, as the web asks it, and on a pull.
@@ -78,6 +78,9 @@ struct YouView: View {
             if let logins = lines.logins {
                 LabeledContent(YouWords.logins, value: logins)
             }
+            LabeledContent(YouWords.app) {
+                Text(Self.appVersion).monospaced()
+            }
             if lines.failed, let failure = server.meFailure {
                 ErrorNote(failure)
             }
@@ -86,7 +89,7 @@ struct YouView: View {
         }
     }
 
-    /// "deadwax for iPhone 0.2 (2)", from the bundle.
+    /// About's App row: "0.2 (2)", from the bundle.
     static var appVersion: String {
         let info = Bundle.main.infoDictionary
         return YouWords.app(version: info?["CFBundleShortVersionString"] as? String, build: info?["CFBundleVersion"] as? String)

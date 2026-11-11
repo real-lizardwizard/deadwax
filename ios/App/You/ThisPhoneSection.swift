@@ -3,7 +3,7 @@ import SwiftUI
 
 /// You > This phone (screens.md 8, the phone's own): the deadwax this phone finds at its address, Change address
 /// (the Server address screen, pushed - another server signs out of this one, whose Keychain session stays keyed to
-/// it), and, for an admin, Debug (D1: Phase 0's test screen). The app's own version at its foot.
+/// it), and, for an admin, Debug (D1: Phase 0's test screen). The app's own version is About's App row.
 struct ThisPhoneSection: View {
     /// Debug is offered (YouLines.debug: an admin).
     let debug: Bool
@@ -29,8 +29,6 @@ struct ThisPhoneSection: View {
             }
         } header: {
             Text(YouWords.thisPhone)
-        } footer: {
-            Text(YouView.appVersion)
         }
     }
 }

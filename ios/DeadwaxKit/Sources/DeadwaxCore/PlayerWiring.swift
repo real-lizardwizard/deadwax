@@ -60,6 +60,40 @@ extension LoudnessAsking {
     }
 }
 
+extension LoudnessAsking {
+    /// Whether a read's not-measured answer, held off the shelf while the warm it led to was out, goes on the shelf
+    /// once that warm has answered `said` (nil: the warm failed). Not after "busy": deadwax measures one album at a
+    /// time and dropped this one (levels.py warm(): "busy" is dropped, not queued - on the web a play measures on
+    /// demand anyway, and the phone's never does). "Unmeasured" on the shelf would end a first song's wait at once
+    /// and fix the whole album as it is for the queue's life (D3); kept off it, the song goes on waiting - LevelWait's
+    /// 20 s at most - while the book warms again 5 s on, and the read stays held for that warm's answer. After any
+    /// other answer, and after a failed warm, it goes on the shelf: nothing more will come of waiting on it (not
+    /// levelled: the next read says why). A "measuring" answer is `warmed`'s, before this is asked.
+    public static func keepsHeldRead(after said: WarmAnswer?) -> Bool {
+        guard let said else { return true }
+        return said.state != "busy"
+    }
+
+    /// Whether an album that becomes wanted again (an album page, a play) is read before anything else (levels.md
+    /// 4.2: "On becoming wanted with no fresh answer: GET loudness first") - with no answer in hand, or one no longer
+    /// `fresh`: a measured or not-levelled one over 10 minutes old, and any measuring or unmeasured one (believed
+    /// "only until the next read"). Not a warm left due from before: the album may be measured since.
+    public static func readsFirst(_ answer: AlbumLoudness?, fetchedAt: Double, now: Double) -> Bool {
+        guard let answer else { return true }
+        return !fresh(answer, fetchedAt: fetchedAt, now: now)
+    }
+
+    /// Whether the answer on the shelf counts for a first song's level wait that began at `waitBegan` (levels.md 4.2:
+    /// a measured or not-levelled answer believed 10 minutes, a measuring or unmeasured one "only until the next
+    /// read"): one still `fresh`, or one read since the wait began. An older one counts as none, so the song waits
+    /// for the read its play set off - an album last read "not measured", and measured since, isn't fixed as it is
+    /// from that read. Once the wait is over (the read came, failed with nothing believed, or 20 s went by) the entry
+    /// is decided from the answer in hand, whichever it is (levels.md 4.3: "then it decides from what it has").
+    public static func believed(_ answer: AlbumLoudness, fetchedAt: Double, waitBegan: Double, now: Double) -> Bool {
+        fresh(answer, fetchedAt: fetchedAt, now: now) || fetchedAt >= waitBegan
+    }
+}
+
 extension LevelWait {
     /// `shouldWait`, with the phone's own end to it: a read of the album's loudness that FAILED, with no answer in
     /// hand, ends the wait at once - the song plays as it is this time (`.unanswered`: "deadwax didn't say in time")

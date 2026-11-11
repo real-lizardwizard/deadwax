@@ -46,9 +46,11 @@ public enum YouWords {
     /// Phase 0's test screen, for an admin (D1).
     public static let debug = "Debug"
 
-    /// At the foot of You: the app's own version and build, from its bundle ("deadwax for iPhone 0.2 (2)").
+    /// About's row for the app's own version and build (screens.md 8.5: "Native adds App = `0.2 (build)`"), beside
+    /// deadwax's Version - its label, and its value from the bundle ("0.2 (2)").
+    public static let app = "App"
     public static func app(version: String?, build: String?) -> String {
-        "deadwax for iPhone \(version ?? "?") (\(build ?? "?"))"
+        "\(version ?? "?") (\(build ?? "?"))"
     }
 }
 

@@ -25,6 +25,7 @@ struct RootView: View {
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .active:
+                CoverCache.shared.forgetFailures()
                 server.becameActive()
                 player.becameActive()
             case .background:

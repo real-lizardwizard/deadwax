@@ -102,6 +102,51 @@ import Testing
         #expect(LoudnessAsking.warmed(nil, said: WarmAnswer(state: "measuring")) == nil)
     }
 
+    // MARK: a busy warm, and answers gone stale (the player review)
+
+    @Test func aBusyWarmKeepsTheReadOffTheShelf() {
+        //? busy: another album is being measured and this one was dropped - "unmeasured" kept off the shelf, so
+        //? the first song goes on waiting (nil in hand) rather than being fixed as it is from the read at once
+        #expect(!LoudnessAsking.keepsHeldRead(after: WarmAnswer(state: "busy")))
+        let song = Song(id: "s2", albumId: "al", suffix: "flac")
+        #expect(LevelWait.shouldWait(level: .album, song: song, answer: nil, waited: 0, readFailed: false))
+        #expect(!LevelWait.shouldWait(level: .album, song: song, answer: Self.unmeasured, waited: 0, readFailed: false))
+        //? anything else, and a warm that failed, put it there: nothing more comes of waiting
+        for said in ["not_levelled", "measured", "", "later"] {
+            #expect(LoudnessAsking.keepsHeldRead(after: WarmAnswer(state: said)), "\(said)")
+        }
+        #expect(LoudnessAsking.keepsHeldRead(after: nil))
+    }
+
+    @Test func anAlbumWantedAgainIsReadFirstUnlessItsAnswerIsFresh() {
+        let measured = AlbumLoudness(state: .measured, album: AlbumLevel(loudnessLufs: -10, peak: 0.5, songs: 1),
+                                     songs: [SongLoudness(id: "s1", state: .measured, loudnessLufs: -10, peak: 0.5)])
+        #expect(LoudnessAsking.readsFirst(nil, fetchedAt: 0, now: 0))
+        #expect(!LoudnessAsking.readsFirst(measured, fetchedAt: 100, now: 699))
+        #expect(LoudnessAsking.readsFirst(measured, fetchedAt: 100, now: 700))
+        //? measuring and unmeasured are believed only until the next read: a read first, never a warm left due
+        #expect(LoudnessAsking.readsFirst(Self.unmeasured, fetchedAt: 100, now: 100))
+        let measuring = LoudnessAsking.warmed(Self.unmeasured, said: WarmAnswer(state: "measuring"))
+        #expect(LoudnessAsking.readsFirst(measuring, fetchedAt: 100, now: 101))
+    }
+
+    @Test func aStaleAnswerCountsAsNoneForAFirstSongsWait() {
+        let measured = AlbumLoudness(state: .measured, album: AlbumLevel(loudnessLufs: -10, peak: 0.5, songs: 1),
+                                     songs: [SongLoudness(id: "s1", state: .measured, loudnessLufs: -10, peak: 0.5)])
+        //? read before the wait began: believed only while fresh (a measured one, 10 minutes)
+        #expect(LoudnessAsking.believed(measured, fetchedAt: 100, waitBegan: 500, now: 500))
+        #expect(!LoudnessAsking.believed(measured, fetchedAt: 100, waitBegan: 800, now: 800))
+        #expect(!LoudnessAsking.believed(Self.unmeasured, fetchedAt: 100, waitBegan: 101, now: 101))
+        //? read since the wait began: believed, whatever it says - it is the read the play set off
+        #expect(LoudnessAsking.believed(Self.unmeasured, fetchedAt: 101, waitBegan: 101, now: 102))
+        #expect(LoudnessAsking.believed(measured, fetchedAt: 900, waitBegan: 800, now: 2_000))
+        //? so a stale "not measured" makes the song wait (none in hand) where it would have been fixed as it is
+        let song = Song(id: "s2", albumId: "al", suffix: "flac")
+        let stale: AlbumLoudness? = LoudnessAsking.believed(Self.unmeasured, fetchedAt: 100, waitBegan: 400, now: 400)
+            ? Self.unmeasured : nil
+        #expect(LevelWait.shouldWait(level: .album, song: song, answer: stale, waited: 0, readFailed: false))
+    }
+
     // MARK: the wait, ended by a failed read
 
     @Test func aFailedReadWithNoAnswerEndsTheWait() {

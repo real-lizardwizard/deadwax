@@ -214,7 +214,8 @@ final class PlayerEngineLink: EngineLink {
 ///
 /// The first entry of a play or skip (`mayWait`) is opened behind a `LevelGate` while `LevelWait` says to wait - no
 /// answer yet, or one saying its album is being measured - for at most 20 s on the engine's own retry, with the book
-/// asked to read every second meanwhile (`LoudnessShelf.hurry`); a failed read with no answer ends the wait.
+/// asked to read every second meanwhile (`LoudnessShelf.hurry`); a failed read with no answer ends the wait. An
+/// answer read before the wait began and no longer fresh (LoudnessAsking.believed) counts as none.
 final class LevelStore: @unchecked Sendable {
     private let lock = NSLock()
     private let shelf: LoudnessShelf
@@ -263,12 +264,17 @@ final class LevelStore: @unchecked Sendable {
         let made: AppliedLevel? = lock.withLock {
             if let made = decisions.decided(key) { return made }
             let album = song.albumId.flatMap { $0.isEmpty ? nil : $0 }
-            let (answer, failed) = album.map { shelf.answer($0) } ?? (nil, false)
+            let (answer, failed, fetchedAt) = album.map { shelf.answer($0) } ?? (nil, false, 0)
             if wait, let album, decisions.settled(key: key, level: level, song: song) == nil {
                 let now = Monotonic.seconds()
                 let since = waitSince[key] ?? now
                 waitSince[key] = since
-                if LevelWait.shouldWait(level: level, song: song, answer: answer, waited: now - since, readFailed: failed) {
+                // an answer from before the wait that is no longer fresh counts as none: the play's own read is
+                // waited for (LoudnessAsking.believed); once the wait is over, decided from what is in hand
+                let believed = answer.flatMap {
+                    LoudnessAsking.believed($0, fetchedAt: fetchedAt, waitBegan: since, now: now) ? $0 : nil
+                }
+                if LevelWait.shouldWait(level: level, song: song, answer: believed, waited: now - since, readFailed: failed) {
                     shelf.hurry(album, at: now)
                     return nil
                 }
