@@ -1,53 +1,116 @@
 import DeadwaxCore
 import SwiftUI
 
-/// The You tab (D1): who is signed in and Sign out (logins on), This phone's server, the version, and Debug for an
-/// admin. STUB (the You part's): working, plain - Normalization and the rest are the parts'.
+/// The You tab (screens.md 8, the web's app/You.tsx as Phase 1 has it), top to bottom: who is signed in - the
+/// avatar's letter, the name, "No sign-in needed" with logins off - and the UNVERIFIED line under them when /me says
+/// so; Playback (Gapless, Normalization); Account (Sign out, with logins on); About (deadwax's version, and for an
+/// admin whether logins are on, with /me's failure said under them); This phone (the address, Change address, and
+/// Debug for an admin, D1), with the app's own version at the foot.
+///
+/// Core's YouLines decides every line of it from what /me last said (ServerModel.me, its failure, whether it is being
+/// asked again, Access); this only draws. /me is asked the first time You shows, as the web asks it, and on a pull.
 struct YouView: View {
     @Environment(ServerModel.self) private var server
+    @Environment(AppNavigation.self) private var navigation
+    @State private var asked = false
 
     init() {}
 
+    private static let top = "you-top"
+
     var body: some View {
-        List {
-            if server.access.loginsOn {
+        let lines = YouLines(me: server.me, failure: server.meFailure, asking: server.askingMe, access: server.access)
+        ScrollViewReader { proxy in
+            List {
                 Section {
-                    Button(server.signOutRow.label, role: .destructive) { Task { await server.signOut() } }
-                        .disabled(server.signOutRow.busy)
-                    if let problem = server.signOutRow.problem {
-                        Text(problem).font(.footnote).foregroundStyle(.red)
-                    }
+                    headline(lines)
+                        .id(Self.top)
                 } footer: {
-                    Text(SignOutRow.footnote(user: server.access.user))
+                    if let unverified = lines.unverified {
+                        Text(unverified)
+                            .foregroundStyle(SignInLook.amber)
+                    }
                 }
+                PlaybackSection()
+                if lines.account, let me = server.me {
+                    AccountSection(user: me.user)
+                }
+                about(lines)
+                ThisPhoneSection(debug: lines.debug)
             }
-            Section("This phone") {
-                NavigationLink(value: AppRoute.serverAddress) {
-                    LabeledContent("Server", value: server.address?.description ?? "")
-                }
-                if server.access.isAdmin {
-                    NavigationLink("Debug", value: AppRoute.debug)
-                }
+            .onChange(of: navigation.youScrollToTop) { _, _ in
+                withAnimation { proxy.scrollTo(Self.top, anchor: .top) }
             }
-            Section {
-                LabeledContent("Version", value: server.me?.version ?? (server.askingMe ? "…" : ""))
-                LabeledContent("App", value: Self.appVersion)
-                if let failure = server.meFailure {
-                    ErrorNote(failure)
+        }
+        .navigationTitle(YouWords.title)
+        .refreshable { await server.refreshMe() }
+        .task {
+            guard !asked else { return }
+            asked = true
+            await server.refreshMe()
+        }
+    }
+
+    private func headline(_ lines: YouLines) -> some View {
+        HStack(spacing: 14) {
+            Avatar(letter: lines.avatar)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(lines.name)
+                    .font(.title2.bold())
+                    .lineLimit(2)
+                if let identity = lines.identity {
+                    Text(identity)
+                        .font(.subheadline)
+                        .foregroundStyle(Palette.quiet)
                 }
             }
         }
-        .navigationTitle("You")
-        .onChange(of: server.signOutRow.problem) { _, problem in
-            if let problem { Notice.announce(problem) }
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    private func about(_ lines: YouLines) -> some View {
+        Section {
+            LabeledContent(YouWords.version) {
+                Text(lines.version).monospaced()
+            }
+            if let logins = lines.logins {
+                LabeledContent(YouWords.logins, value: logins)
+            }
+            if lines.failed, let failure = server.meFailure {
+                ErrorNote(failure)
+            }
+        } header: {
+            Text(YouWords.about)
         }
     }
 
     /// "deadwax for iPhone 0.2 (2)", from the bundle.
     static var appVersion: String {
         let info = Bundle.main.infoDictionary
-        let short = info?["CFBundleShortVersionString"] as? String ?? "?"
-        let build = info?["CFBundleVersion"] as? String ?? "?"
-        return "deadwax for iPhone \(short) (\(build))"
+        return YouWords.app(version: info?["CFBundleShortVersionString"] as? String, build: info?["CFBundleVersion"] as? String)
+    }
+}
+
+/// The avatar: a letter in a round tile (the web's .app-avatar - 52 points, --dw-avatar #3b3547, title-size and
+/// semibold), growing with the text size. The sign-in's "d" and You's initial. Hidden from VoiceOver: the name
+/// beside it says who.
+struct Avatar: View {
+    let letter: String
+
+    @ScaledMetric(relativeTo: .title) private var size: CGFloat = 52
+
+    static let fill = Color(red: 0x3B / 255, green: 0x35 / 255, blue: 0x47 / 255)
+
+    var body: some View {
+        Text(letter)
+            .font(.title.weight(.semibold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
+            .padding(4)
+            .frame(width: size, height: size)
+            .background(Self.fill, in: Circle())
+            .accessibilityHidden(true)
     }
 }
