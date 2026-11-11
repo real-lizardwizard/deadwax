@@ -3,12 +3,10 @@ import Testing
 @testable import DeadwaxCore
 
 /// The Library's fixtures (Fixtures/library), written by ios/scripts/export-library-vectors.cjs from the web app's
-/// own compiled TypeScript - never by hand - and read here through Bundle.module.
+/// own compiled TypeScript - never by hand - and read here through Fixtures (FixtureFiles.swift).
 enum LibraryFixtures {
     static func load<T: Decodable>(_ name: String, as type: T.Type = T.self) throws -> T {
-        let url = try #require(Bundle.module.url(forResource: name, withExtension: "json", subdirectory: "Fixtures/library"),
-                               "Fixtures/library/\(name).json isn't in the test bundle")
-        return try JSONDecoder().decode(T.self, from: Data(contentsOf: url))
+        try JSONDecoder().decode(T.self, from: Fixtures.data("library/\(name).json"))
     }
 
     /// Strings equal as JavaScript compares them - every UTF-16 unit - not as Swift's `==` (canonical equivalence),

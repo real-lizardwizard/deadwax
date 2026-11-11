@@ -5,10 +5,7 @@ import Foundation
 /// ios/scripts/export-level-vectors.cjs (never by hand), and the shapes they are read into.
 enum LevelVectors {
     static func data(_ name: String) throws -> Data {
-        guard let url = Bundle.module.url(forResource: name, withExtension: "json", subdirectory: "Fixtures/levels") else {
-            throw CocoaError(.fileNoSuchFile, userInfo: [NSFilePathErrorKey: "Fixtures/levels/\(name).json"])
-        }
-        return try Data(contentsOf: url)
+        try Fixtures.data("levels/\(name).json")
     }
 
     static func load<T: Decodable>(_ type: T.Type, _ name: String) throws -> T {

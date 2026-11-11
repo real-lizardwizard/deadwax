@@ -582,8 +582,9 @@ UpNextView.swift - every type, function and word (startUpNext, toppedUp, withRep
 withLast, withoutKey, movedKey, withoutAdded, jumpedTo, onward, backward, pastCopies, withMore, upNextView).
 Randomness is passed in (`random`, a number in [0, 1)) and drawn in the TypeScript's order, so the same numbers
 make the same queue. `QueueTrack(song:albumId:albumName:...)` is the web's toQueueTrack, its album filling in
-what the song leaves out; `Repeat` is the device's own setting (`deadwax-player-repeat`), never saved with the
-queue. Phase 0's PlayQueue.swift is untouched (the Phase 0 app still uses it).
+what the song leaves out - never the title, which is the song's own ("" where Navidrome left it out, the web's
+undefined; not Song.name's id - see "Review fixes"); `Repeat` is the device's own setting
+(`deadwax-player-repeat`), never saved with the queue. Phase 0's PlayQueue.swift is untouched (the Phase 0 app still uses it).
 
 **QueueController** is usePlayer.ts's queue rules over an `EngineLink` protocol (play, restore,
 replaceUpcoming, skip, seek, resume, stop, heard): catching up with the engine, held edits, the top-up after 2 s
@@ -849,10 +850,10 @@ break the app fails where the server is changed.
   out of `all`), each restored byte for byte: all 29 fail.
 - **Near-duplicates left**, each read the same way where both apply:
   - `AboutTrack(song:)` and `QueueTrack(song:albumId:albumName:...)` (the web's toQueueTrack): the same for a song
-    that carries its own artist, album, album id, cover and a title; for one that doesn't, QueueTrack falls back to
-    the album's and to the id for a title, AboutTrack to "" and nil. The web's About is drawn from the queue's
-    entry, so the screens should make About's track from the QueueTrack (an `AboutTrack(track:)`), not from the
-    Song.
+    that carries its own artist, album, album id and cover; for one that doesn't, QueueTrack falls back to the
+    album's, AboutTrack to "" and nil. A title is the song's own in both ("" for none). The web's About is drawn
+    from the queue's entry, so the screens should make About's track from the QueueTrack (an
+    `AboutTrack(track:)`), not from the Song.
   - `AboutAlbum` / `PressingRow` (About's, all optional, numbers as Double, read by JS's rules) and `Album` /
     `StoreRow` (the routes', `id` required - and `path` for a row - numbers as Int): the same bytes read the same
     for every answer the server sends; they differ only on malformed ones (a year of 1975.5, a disc written
@@ -871,25 +872,84 @@ break the app fails where the server is changed.
     one (a play always with its time, which the client's signature leaves optional).
   - Phase 0's `PlayQueue` (still the Phase 0 app's) and Up Next's `previousAction`: the same 3 s rule.
 
+### Review fixes (p1/merge, after the merge's two reviews)
+
+Two reviews of p1/merge at 43c11d5: the merge's (every slice's files and both folds checked by script, 82
+contract mutations) and a Linux reading of everything new in Core (no Linux toolchain on the Mac).
+
+- **GET /queue's songs hold every field the phone resumes from.** The route trims each song to
+  navidrome.SHUFFLE_FIELDS, and shuffledTrack makes every resumed entry from what is left - but the contract
+  only held Song's one required field (`id`) to that list. Without `suffix` and `contentType` every song put back
+  would read as no FLAC, so the queue would play unlevelled; without `duration` every length would be 0. (The
+  review dropped suffix: the contract and the 1,182 tests of the 19 files that touch the route or its fields all
+  passed.) test_ios_contract.py now reads shuffledTrack's `song.<name>` reads out of Resume.swift, by Song's JSON
+  names, and holds them to SHUFFLE_FIELDS (guarded: the reads found include id, title, duration, contentType,
+  suffix and samplingRate). Dropping suffix, duration, contentType, samplingRate or title from SHUFFLE_FIELDS
+  each fails it, naming the field. The web's toQueueTrack reads the same fields and has the same gap on main's
+  side (a test for main, not this branch).
+- **`QueueTrack(song:)`'s title is the song's own**, `song.title ?? ""`, as the web's toQueueTrack (`title:
+  song.title`) and the phone's own shuffledTrack have it. It was `song.name`, which falls back to the id, and
+  the notes called it the web's toQueueTrack: a phone-saved snapshot carries an entry outside the saved window
+  whole (resume.ts toSave's `extra`), so a song with no title would have reached the web with its id for one.
+  UpNextTests' aQueueEntrysTitleIsTheSongsOwn holds a missing and an empty title to "" (both fail under
+  `song.name`), and shuffledTrack's too.
+- **One way to find a fixture, the same on both platforms.** LevelVectors and LibraryFixtures found their files
+  with `Bundle.module.url(forResource:withExtension:subdirectory:)` and nothing to fall back on; ErrorFixture
+  fell back to the bundle's `resourceURL`, the Up Next and resume traces used only that. Whether CFBundle's
+  subdirectory search reads Linux's flat `.resources` folder as the Mac's bundle is read had never been tried
+  (at 40bd97e no Core test read a resource). All four now go through `Fixtures.url` (FixtureFiles.swift): the
+  checkout's Fixtures/ beside the file, found from `#filePath` - `swift test` runs from the checkout on the Mac
+  and in ios.yml's ubuntu job, and no Bundle is involved - else the bundle's copy by `resourceURL`, else a
+  `Fixtures.Missing` naming the path (the plain error replaces LevelVectors' CocoaError). FixtureFilesTests holds
+  each area's file to the checkout's path (fails with the bundle looked in first) and a missing one to its
+  error (fails when the checkout's path is given without looking).
+- **Rejected, with why**:
+  - *The resource accessor might not compile on Linux in Swift 6 mode*: it has. ebb2ad8 declared
+    `resources: [.copy("Fixtures")]` on both test targets, and ios.yml's run at 9f5a78a (the merge of 2.1.1,
+    after it) built DeadwaxCoreTests on swift:6.4.1-noble in Swift 6 mode and passed (64 tests) - so SwiftPM's
+    generated `Bundle.module` compiled there. Nothing changed in Package.swift but its comment.
+  - *URLError.Code members missing on Linux*: every one Core and its tests name - isOffline's seven
+    (`.dataNotAllowed` and `.internationalRoamingOff` among them), the four ClientTests expects to be `.other`
+    (`.secureConnectionFailed`, `.serverCertificateUntrusted`, `.badServerResponse`, `.cannotParseResponse`) and
+    `.timedOut` - is a case of swift-corelibs-foundation's `URLError.Code` (Sources/Foundation/NSError.swift, read
+    on its main branch), none inside an `#if`.
+  - *glibc's log10 an ulp off*: already allowed for - the one case that hangs on log10's last bit is marked
+    `log10_stable: false` and held to the rule's property; `fullDB`'s formula check is within 1e-18, far wider
+    than its ulp.
+  - *tzdata, NFKD, NSRegularExpression, JSONEncoder on Linux*: nothing to change before the ubuntu job says
+    otherwise (the zones are four whose rules tzdata has long agreed on; the fold fixtures' code points are old;
+    the patterns spell their classes out over ICU on both; the encoder is swift-foundation's on both). A
+    pattern's `try!` failing would crash at its first use with the error in the log - a test that built each
+    pattern first would crash the same way.
+
 ### Verified (Phase 1's Core, p1/merge, 2026-11-10)
 
 All on James's Mac (8 GB; heavy builds one at a time), Xcode 27.1's toolchain:
-- `swift test --package-path ios/DeadwaxKit`: **DeadwaxCore 389 tests in 53 suites, DeadwaxAudio 54 tests in 2
-  suites**, all passing, no compiler warning (Phase 0 ended at 64 and 13).
+- `swift test --package-path ios/DeadwaxKit`, from a clean build: **DeadwaxCore 392 tests in 54 suites,
+  DeadwaxAudio 54 tests in 2 suites**, all passing, no compiler warning (Phase 0 ended at 64 and 13; the merge
+  at 389 in 53, before the review fixes' title test and FixtureFilesTests' two).
 - xcodebuild, the Deadwax scheme, Debug, `generic/platform=iOS`, CODE_SIGNING_ALLOWED=NO: BUILD SUCCEEDED (one
   line from appintentsmetadataprocessor, none from the code).
 - The full Python suite: **4004 passed** (2.1.2's 3909, and 95 from Phase 1: test_ios_contract.py 8 -> 46,
   test_ios_library_contract.py 8, test_ios_levels.py 49); pyflakes clean on the contract tests.
 - Every ui/test/*.sim.cjs on its own (72), the four ios*.sim.cjs among them: all pass.
 - `python3 ios/scripts/check_project.py` ok; `bash -n` on ios/scripts/*.sh.
-- Each slice's own mutations, above; the contract's 29 at the merge.
+- Each slice's own mutations, above; the contract's 29 at the merge; the review fixes' nine, each restored byte for
+  byte: suffix, duration, contentType, samplingRate and title each dropped from SHUFFLE_FIELDS (each fails the
+  queue-answer contract, naming the field), QueueTrack(song:)'s and shuffledTrack's titles made `song.name`
+  (aQueueEntrysTitleIsTheSongsOwn; shuffledTrack's also ResumeCaseTests' trace), the bundle looked in before the
+  checkout and the checkout's path given without looking (FixtureFilesTests) - all nine fail.
 
 ### Not verified
 
 - **DeadwaxCore on Linux**: no Linux toolchain here, and none of Phase 1's Core has been compiled on Linux.
   Everything new was written for swift-corelibs / swift-foundation (no Apple-only import; file sizes read as
   NSNumber or UInt, TimeZone, Unicode.Scalar properties, decomposedStringWithCompatibilityMapping, classic
-  URLError codes), but ios.yml's ubuntu job (swift:6.4.1-noble) is the first real compile.
+  URLError codes, each found in corelibs' URLError.Code), but ios.yml's ubuntu job (swift:6.4.1-noble) is the
+  first real compile. What is known from it: the test targets' declared resources, and so SwiftPM's generated
+  `Bundle.module`, built there in Swift 6 mode at 9f5a78a; the fixtures are read from the checkout, so none
+  leans on CFBundle's resource search, and only the missing-fixture test makes Bundle.module at all, reading its
+  `resourceURL` (Review fixes).
 - **Nothing ran on the phone**: the engine's risks E1-E9, the late-state race and its fix, a 304 through
   URLSession for a request carrying its own If-None-Match (with `urlCache` nil), the per-session and per-request
   timeouts holding together. Phone checks to add with the screens: turn Repeat One on in a song's last 2 s

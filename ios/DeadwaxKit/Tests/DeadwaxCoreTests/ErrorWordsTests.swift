@@ -51,9 +51,7 @@ struct ErrorFixture: Decodable {
     let after_sign_in: [After]
 
     static func load() throws -> ErrorFixture {
-        let url = try #require(Bundle.module.url(forResource: "error-words", withExtension: "json", subdirectory: "Fixtures/errors")
-                               ?? Bundle.module.resourceURL?.appendingPathComponent("Fixtures/errors/error-words.json"))
-        return try JSONDecoder().decode(ErrorFixture.self, from: Data(contentsOf: url))
+        try JSONDecoder().decode(ErrorFixture.self, from: Fixtures.data("errors/error-words.json"))
     }
 }
 

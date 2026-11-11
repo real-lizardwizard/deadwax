@@ -27,7 +27,8 @@ let package = Package(
                 swiftSettings: [.swiftLanguageMode(.v5)]),
         // Fixtures/: what the Swift tests replay - traces recorded from the web app's own TypeScript and
         // vectors shared with the Python suite (ios/scripts/export-traces.cjs writes them). One folder
-        // per area; read through Bundle.module.
+        // per area; read by Fixtures.url (Tests/DeadwaxCoreTests/FixtureFiles.swift): from the checkout,
+        // else this copy in the test bundle.
         .testTarget(name: "DeadwaxCoreTests", dependencies: ["DeadwaxCore"],
                     resources: [.copy("Fixtures")]),
         .testTarget(name: "DeadwaxAudioTests", dependencies: ["DeadwaxAudio", "DeadwaxCore"],

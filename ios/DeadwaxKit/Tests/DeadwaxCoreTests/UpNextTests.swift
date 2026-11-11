@@ -70,9 +70,22 @@ import Testing
         #expect(bare.album == "The Album" && bare.artist == "Them" && bare.albumId == "al" && bare.coverArt == "cv")
         let own = QueueTrack(song: Song(id: "t", album: "Its Own", albumId: "x", artist: "Her", coverArt: "c2"),
                              albumId: "al", albumName: "The Album", albumArtist: "Them", albumCoverArt: "cv", level: .album)
-        #expect(own.title == "t" && own.album == "Its Own" && own.albumId == "x" && own.artist == "Her" && own.coverArt == "c2")
+        #expect(own.album == "Its Own" && own.albumId == "x" && own.artist == "Her" && own.coverArt == "c2")
         #expect(own.level == .album)
         #expect(QueueTrack(song: Song(id: "u"), albumId: "al", albumName: "A").artist == "")
+    }
+
+    @Test func aQueueEntrysTitleIsTheSongsOwn() { // (review) api.ts toQueueTrack's `title: song.title`
+        //? never the id Song.name falls back to: a title Navidrome left out, or sent empty, is "" - the web's
+        //? undefined and "" - as shuffledTrack makes it from GET /queue's songs
+        #expect(entry(title: "One").title == "One")
+        #expect(entry(title: nil).title == "")
+        #expect(entry(title: "").title == "")
+        #expect(shuffledTrack(Song(id: "t")).title == "" && shuffledTrack(Song(id: "t", title: "")).title == "")
+    }
+
+    private func entry(title: String?) -> QueueTrack {
+        QueueTrack(song: Song(id: "t", title: title, album: "Its Own", albumId: "x"), albumId: "al", albumName: "The Album")
     }
 }
 

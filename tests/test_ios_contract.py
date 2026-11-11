@@ -451,6 +451,14 @@ def swift_raw_values(file: str, enum: str) -> set[str]:
     return values
 
 
+def swift_function(file: str, name: str) -> str:
+    """The body of `func <name>` in a DeadwaxCore file (one only), comments blanked."""
+    code = _code((CORE / file).read_text(encoding="utf-8"))
+    found = list(re.finditer(r"\bfunc\s+" + name + r"\b[^{]*\{", code))
+    assert len(found) == 1, f"func {name} is declared {len(found)} times in {file}"
+    return _block(code, found[0].end() - 1)
+
+
 def optional_fields(struct: str) -> set[str]:
     return {name for name, optional in fields(struct).items() if optional}
 
@@ -489,6 +497,13 @@ def test_the_queue_answer_is_what_get_queue_sends(tmp_path):
     assert not required_fields("QueueAnswer") & literal_nulls(glass)
     # its songs are trimmed to the shuffle's fields: a Song needs only its id, which is always among them
     assert required_fields("Song") <= set(navidrome.SHUFFLE_FIELDS)
+    # (review) and every field the phone makes a resumed entry from is among them too: shuffledTrack's `song.<name>`
+    # reads, by Song's JSON names. A trimmed-out field decodes as absent without a word - no suffix or content type
+    # and every song put back reads as no FLAC, so plays unlevelled; no duration and every length is 0
+    keys = coding_keys(swift_struct("Song"))
+    read = {keys[name] for name in re.findall(r"\bsong\.(\w+)", swift_function("Resume.swift", "shuffledTrack"))}
+    assert {"id", "title", "duration", "contentType", "suffix", "samplingRate"} <= read, read  # the reader's guard
+    assert read <= set(navidrome.SHUFFLE_FIELDS), f"GET /queue trims away {sorted(read - set(navidrome.SHUFFLE_FIELDS))}"
 
 
 def test_deadwaxs_record_is_what_the_app_reads_back(tmp_path):

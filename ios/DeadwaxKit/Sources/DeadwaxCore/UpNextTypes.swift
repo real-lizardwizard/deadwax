@@ -45,10 +45,12 @@ public struct QueueTrack: Sendable, Equatable, Hashable {
 
     /// A song of Navidrome's as a queue entry, its album's answer filling in what the song leaves out - the web's
     /// `toQueueTrack(song, album)` (ui/src/player/api.ts): the album's artist, name, id and cover, 0 for a length or
-    /// a format Navidrome didn't say.
+    /// a format Navidrome didn't say. The title is the song's own, never the album's or the id (Song.name's
+    /// fallback): one Navidrome left out is "" here, the web's undefined, as shuffledTrack has it - so a snapshot
+    /// this phone saves never hands the web an id for a title.
     public init(song: Song, albumId: String, albumName: String, albumArtist: String? = nil,
                 albumCoverArt: String? = nil, level: Level? = nil) {
-        self.init(id: song.id, title: song.name, artist: song.artist ?? albumArtist ?? "",
+        self.init(id: song.id, title: song.title ?? "", artist: song.artist ?? albumArtist ?? "",
                   album: song.album ?? albumName, albumId: song.albumId ?? albumId,
                   coverArt: song.coverArt ?? albumCoverArt, duration: song.duration ?? 0,
                   contentType: song.contentType, suffix: song.suffix, sampleRate: song.samplingRate ?? 0,

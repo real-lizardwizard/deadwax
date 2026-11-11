@@ -100,19 +100,6 @@ enum JSONValue: Decodable, Equatable {
     var isNull: Bool { self == .null }
 }
 
-enum Fixtures {
-    /// A fixture of this target's, by its path under Fixtures/ (copied into the test bundle whole).
-    static func data(_ path: String) throws -> Data {
-        let url = try #require(Bundle.module.resourceURL?.appendingPathComponent("Fixtures").appendingPathComponent(path),
-                               "the test bundle has no resources")
-        return try Data(contentsOf: url)
-    }
-
-    static func json(_ path: String) throws -> JSONValue {
-        try JSONDecoder().decode(JSONValue.self, from: data(path))
-    }
-}
-
 /// A fixture's song, as export-traces.cjs wrote it.
 func queueTrack(_ json: JSONValue) -> QueueTrack? {
     guard let id = json["id"]?.string, let title = json["title"]?.string, let artist = json["artist"]?.string,
