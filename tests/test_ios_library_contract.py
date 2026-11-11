@@ -6,9 +6,9 @@ the server's own names - so a route that renames or strips a field, or a Seen mo
 Python suite, where the server is changed, instead of decoding to nil on the phone (an IndexAlbum field the route
 strips is silently nil; a field pydantic doesn't declare is dropped without a word).
 
-tests/test_ios_contract.py's `required_fields` reads Models.swift alone; these models live in LibraryModels.swift,
-so this file reads that one, with a reader of its own: each struct's stored properties (its own, not a nested
-type's, never a static or computed one), named as its CodingKeys say, and whether each is optional.
+The models live in LibraryModels.swift, but a model is found wherever in DeadwaxCore it is declared (once), as
+tests/test_ios_contract.py finds the rest - read with a reader of this file's own: each struct's stored properties
+(its own, not a nested type's, never a static one), named as its CodingKeys say, and whether each is optional.
 """
 
 import inspect
@@ -22,7 +22,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src import auth  # noqa: E402
 from src.routes import my_library, navidrome  # noqa: E402
 
-SOURCE = Path(__file__).resolve().parent.parent / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore" / "LibraryModels.swift"
+CORE = Path(__file__).resolve().parent.parent / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore"
+SOURCE = CORE / "LibraryModels.swift"
 
 
 def _block(code: str, opening: int) -> str:
@@ -52,10 +53,13 @@ def _top_level(body: str) -> str:
 
 
 def _body(kind: str, name: str) -> str:
-    """The body of `<kind> <name>` in LibraryModels.swift (declared once), comments out (none of its strings hold a brace)."""
-    code = re.sub(r"//[^\n]*", "", SOURCE.read_text(encoding="utf-8"))
-    found = [_block(code, match.end() - 1) for match in re.finditer(r"\b" + kind + r"\s+" + name + r"\b[^{]*\{", code)]
-    assert len(found) == 1, f"{kind} {name} is declared {len(found)} times in LibraryModels.swift"
+    """The body of `<kind> <name>` in whichever DeadwaxCore file declares it (one only), comments out (none of these
+    models' strings hold a brace)."""
+    found = []
+    for file in sorted(CORE.glob("*.swift")):
+        code = re.sub(r"//[^\n]*", "", file.read_text(encoding="utf-8"))
+        found += [_block(code, match.end() - 1) for match in re.finditer(r"\b" + kind + r"\s+" + name + r"\b[^{]*\{", code)]
+    assert len(found) == 1, f"{kind} {name} is declared {len(found)} times in DeadwaxCore"
     return found[0]
 
 

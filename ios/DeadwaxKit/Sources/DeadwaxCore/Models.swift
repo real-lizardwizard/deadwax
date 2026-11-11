@@ -46,6 +46,25 @@ public struct Me: Codable, Sendable, Equatable {
     public var permissions_unverified: Bool? { permissionsUnverified }
 }
 
+/// `GET /deadwax/navidrome/status`: whether there is a Navidrome to play from, and if not, why not (src/routes/
+/// navidrome.py status, ui/src/player/api.ts NavidromeStatus). Not set up: configured false, `problem` the server's
+/// NOT_CONFIGURED; set up but its ping failed: configured, not ok, `problem` what failed (plumbing - for whoever runs
+/// deadwax); ok: `server` the name and version ("Navidrome 0.64.2"). A refused personal login is a 401, never an
+/// answer. The web's `offline` is never the route's - the phone's is `APIFailure.offline`.
+public struct NavidromeStatus: Codable, Sendable, Equatable {
+    public let configured: Bool
+    public let ok: Bool
+    public let server: String?
+    public let problem: String?
+
+    public init(configured: Bool, ok: Bool, server: String? = nil, problem: String? = nil) {
+        self.configured = configured
+        self.ok = ok
+        self.server = server
+        self.problem = problem
+    }
+}
+
 /// A song as Navidrome's Subsonic answers describe it, passed on by deadwax as it is. Only what the
 /// app reads is declared; everything is optional but the id, since Navidrome leaves out what a file
 /// doesn't have (`samplingRate` and `bitDepth` come from OpenSubsonic, and older servers omit them;

@@ -560,8 +560,24 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
         #expect(cleared.cleared == 3)
         #expect(try sentJSON(transport.last) == ["album_ids": .list([.number(1), .number(2)])])
         transport.answer("/deadwax/navidrome/status", 200, #"{"configured":true,"ok":false,"server":null,"problem":"x"}"#)
-        struct Status: Decodable { let configured: Bool; let ok: Bool }
-        let status = try await deadwax.call(Routes.navidromeStatus, as: Status.self)
-        #expect(status.configured && !status.ok)
+        let status = try await deadwax.call(Routes.navidromeStatus, as: NavidromeStatus.self)
+        #expect(status == NavidromeStatus(configured: true, ok: false, problem: "x"))
+    }
+
+    @Test func theNavidromeStatusIsReadInEachOfItsShapes() async throws {
+        // src/routes/navidrome.py status's three answers: not set up, its ping failed, and ok
+        let (deadwax, transport) = client()
+        let shapes: [(String, NavidromeStatus)] = [
+            (#"{"configured":false,"ok":false,"server":null,"problem":"Navidrome isn't set up (NAVIDROME_URL)"}"#,
+             NavidromeStatus(configured: false, ok: false, problem: "Navidrome isn't set up (NAVIDROME_URL)")),
+            (#"{"configured":true,"ok":false,"server":null,"problem":"Navidrome unreached at http://navidrome:4533"}"#,
+             NavidromeStatus(configured: true, ok: false, problem: "Navidrome unreached at http://navidrome:4533")),
+            (#"{"configured":true,"ok":true,"server":"Navidrome 0.64.2","problem":null}"#,
+             NavidromeStatus(configured: true, ok: true, server: "Navidrome 0.64.2")),
+        ]
+        for (json, status) in shapes {
+            transport.answer("/deadwax/navidrome/status", 200, json)
+            #expect(try await deadwax.call(Routes.navidromeStatus, as: NavidromeStatus.self) == status)
+        }
     }
 }

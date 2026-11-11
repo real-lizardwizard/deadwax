@@ -14,13 +14,17 @@ admin's - and every number the app sends (page sizes, offsets, the covers' sizes
 the bounds the server declares. A server change that would break the app fails here, in the Python suite,
 where the server is changed - the app is built only on a Mac.
 
-Phase 1's loudness route (GET /deadwax/navidrome/loudness/album/{album_id}) lands on the server as 2.1.1:
-its case below fails until then, by design - the app was written against it first.
+Phase 1's models are held the same way, each to the code that builds its answer or reads its body: resume's
+(GET /queue's answer and deadwax's record, the two saves' bodies, what a save answers, the device and label the
+phone saves under), the loudness route's (2.1.1) with its album and song parts, Info's level answer, Navidrome's
+status, a play's query (sent through the real route) and the New mark's `seen` body. The Library's own models are in
+tests/test_ios_library_contract.py, which reads every DeadwaxCore file the same way.
 """
 
 import inspect
 import re
 import sys
+import typing
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -30,8 +34,10 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src import auth, users  # noqa: E402
+from src import auth, levels, loudness, users  # noqa: E402
+from src import play_queue as queue_rules  # noqa: E402
 from src.api.app import start  # noqa: E402
+from src.api.navidrome_endpoint import CLIENT_NAME  # noqa: E402
 from src.config import Config  # noqa: E402
 from src.routes import my_library, navidrome, store_album  # noqa: E402
 from src.routes.auth import SignIn  # noqa: E402
@@ -195,12 +201,18 @@ def returned_keys(function) -> set[str]:
 
 def test_the_app_names_its_routes_in_the_form_this_test_reads():
     found = endpoints()
-    # Routes.all in the Swift lists every one; a line in another form would be missed here, silently
-    assert len(found) == ROUTE_COUNT
+    # every Endpoint the Swift makes is a line in the one form read here - one in another form would be missed,
+    # silently - and each route is named once
+    code = _code((CORE / "Routes.swift").read_text(encoding="utf-8"))
+    assert code.count("Endpoint(") == len(found) == ROUTE_COUNT
     assert len({(m, p) for m, p, _ in found}) == ROUTE_COUNT
+    # Routes.all lists every one of them, each once - by name, so a route left out of it (and so out of the
+    # Swift's own checks) fails here, not only a count that happens to agree
     text = (CORE / "Routes.swift").read_text(encoding="utf-8")
-    listed = re.search(r"public static let all: \[Endpoint\] = \[(.*?)\]", text, re.S).group(1)
-    assert len(re.findall(r"\w+", listed)) == ROUTE_COUNT
+    declared = re.findall(r"public static let (\w+) = Endpoint\(", text)
+    listed = re.findall(r"\w+", re.search(r"public static let all: \[Endpoint\] = \[(.*?)\]", text, re.S).group(1))
+    assert len(declared) == ROUTE_COUNT
+    assert sorted(listed) == sorted(declared), set(listed) ^ set(declared)
 
 
 @pytest.mark.parametrize("method,path,query", endpoints(), ids=[f"{m} {p}" for m, p, _ in endpoints()])
@@ -405,3 +417,231 @@ def test_the_swift_reader_reads_what_it_should():
     assert "release_group_mbid" in fields("StoreAlbum") and "releaseGroupMbid" not in fields("StoreAlbum")
     assert "tracks" in sent_fields("AddRelease") and "tracks" not in fields("AddRelease")
     assert fields("Health") == {"status": False, "version": True, "poller": True}
+
+
+# ---------------------------------------------------------------------------- Phase 1's models
+
+def returned_literals(function) -> list[str]:
+    """The text of each dict literal a route function returns (`return {...}`, or `return _no_store({...})`), braces
+    matched - so a multi-line literal is read whole."""
+    source = inspect.getsource(function)
+    return [_block(source, match.end() - 1) for match in re.finditer(r"\breturn (?:_no_store\()?\{", source)]
+
+
+def literal_keys(literal: str) -> set[str]:
+    return set(re.findall(r'"(\w+)":', _top_level(literal)))
+
+
+def literal_nulls(literal: str) -> set[str]:
+    """The keys a literal sends as null."""
+    return set(re.findall(r'"(\w+)":\s*None\b', _top_level(literal)))
+
+
+def swift_raw_values(file: str, enum: str) -> set[str]:
+    """The raw values of a String enum's cases in a DeadwaxCore file: `case a, b` and `case c = "c_d"`."""
+    code = _code((CORE / file).read_text(encoding="utf-8"))
+    found = list(re.finditer(r"\benum\s+" + enum + r"\b[^{]*\{", code))
+    assert len(found) == 1, f"enum {enum} is declared {len(found)} times in {file}"
+    values = set()
+    for line in re.findall(r"\bcase\s+([^\n]+)", _top_level(_block(code, found[0].end() - 1))):
+        for item in line.split(","):
+            named = re.match(r'\s*(\w+)\s*(?:=\s*"([^"]+)")?\s*$', item)
+            assert named, f"{enum}: can't read {item!r}"
+            values.add(named.group(2) or named.group(1))
+    return values
+
+
+def optional_fields(struct: str) -> set[str]:
+    return {name for name, optional in fields(struct).items() if optional}
+
+
+def assert_decodes(struct: str, answer: dict):
+    """What decoding `answer` as `struct` needs: every field the Swift reads is a key the answer has (one renamed would
+    read as absent, or fail), and every one it can't do without is there and not null (a null where the Swift has a
+    plain type fails the whole answer)."""
+    assert set(fields(struct)) <= set(answer), f"{struct} reads {sorted(set(fields(struct)) - set(answer))}, never sent"
+    sent = {name for name, value in answer.items() if value is not None}
+    assert required_fields(struct) <= sent, f"{struct} needs {sorted(required_fields(struct) - sent)}: {answer}"
+
+
+def _play_queue_record(tmp_path, snapshot):
+    store = JobStore(str(tmp_path / "deadwax.db"))
+    store.init()
+    store.put_play_queue("ethan", ["so-1", "so-2", "so-1"], 1, 12.5, snapshot, "AbCdEfGhIjKlMnOp", "iPhone")
+    return store.play_queue("ethan")
+
+
+def test_the_queue_answer_is_what_get_queue_sends(tmp_path):
+    # resume's GET /queue: play_queue.answer() builds every answer the route gives but the break-glass admin's
+    body = {"entry": [{"id": "so-1", "title": "One"}, {"id": "so-2"}], "currentIndex": 1, "position": 12500,
+            "changedBy": CLIENT_NAME}
+    for record in (_play_queue_record(tmp_path, None), None):
+        answer = queue_rules.answer(body, record, False, navidrome.SHUFFLE_FIELDS, CLIENT_NAME)
+        assert set(fields("QueueAnswer")) == set(answer), answer
+        assert_decodes("QueueAnswer", answer)
+    # Navidrome's queue empty - no index, no record - and logins off
+    empty = queue_rules.answer({}, None, True, navidrome.SHUFFLE_FIELDS, CLIENT_NAME)
+    assert_decodes("QueueAnswer", empty)
+    assert {"index", "kept"} <= optional_fields("QueueAnswer")
+    # the break-glass admin's, written out in the route
+    (glass,) = returned_literals(navidrome.queue)
+    assert literal_keys(glass) == set(fields("QueueAnswer"))
+    assert not required_fields("QueueAnswer") & literal_nulls(glass)
+    # its songs are trimmed to the shuffle's fields: a Song needs only its id, which is always among them
+    assert required_fields("Song") <= set(navidrome.SHUFFLE_FIELDS)
+
+
+def test_deadwaxs_record_is_what_the_app_reads_back(tmp_path):
+    record = queue_rules.kept_view(_play_queue_record(tmp_path, None))
+    assert set(fields("KeptQueue")) == set(record), record
+    assert_decodes("KeptQueue", record)
+    # and every column the record can hold NULL is optional in the Swift (the snapshot today) - read from the schema,
+    # so a column made nullable on the server without the phone's model following fails here
+    schema = re.search(r"CREATE TABLE IF NOT EXISTS play_queue \((.*?)\n\);", Path(inspect.getfile(JobStore)).read_text(
+        encoding="utf-8"), re.S).group(1)
+    columns = {}
+    for line in re.sub(r"--[^\n]*", "", schema).splitlines():
+        column = re.match(r"\s*(\w+)\s+(\w+)(.*?),?\s*$", line)
+        if column:
+            columns[{"idx": "index"}.get(column.group(1), column.group(1))] = "NOT NULL" in column.group(3)
+    nullable = {name for name in record if not columns[name]}
+    assert nullable == {"snapshot"}
+    assert nullable <= optional_fields("KeptQueue")
+
+
+def test_the_queue_saves_send_what_the_server_declares():
+    # both bodies are extra="forbid": a key the server doesn't declare is a 422 for every save, and so is one it
+    # requires left out
+    for struct, model in (("QueueSaveBody", navidrome.QueueSave), ("QueueAtBody", navidrome.QueueAt)):
+        assert model.model_config.get("extra") == "forbid"
+        sent = fields(struct)
+        assert set(sent) == set(model.model_fields), f"{struct}: {sorted(set(sent) ^ set(model.model_fields))}"
+        needed = {name for name, field in model.model_fields.items() if field.is_required()}
+        assert needed <= required_fields(struct), f"{struct} may leave out {sorted(needed - required_fields(struct))}"
+        # a Swift nil is left out of the JSON (the synthesized encoder's encodeIfPresent): only a field with a
+        # default may be
+        assert optional_fields(struct) <= set(model.model_fields) - needed
+    assert optional_fields("QueueSaveBody") == {"snapshot"}
+
+
+def test_the_phone_saves_under_a_device_and_label_the_server_takes():
+    # a device or label outside the patterns is a 422 on every save
+    alphabet = re.search(r'public static let alphabet = Array\("([^"]+)"\)', (CORE / "DeviceID.swift").read_text(
+        encoding="utf-8")).group(1)
+    length = swift_constant("DeviceID.swift", "DeviceID", "length")
+    assert queue_rules.DEVICE.match(alphabet[:length]) and queue_rules.DEVICE.match(alphabet[-length:])
+    assert all(queue_rules.DEVICE.match(char * length) for char in alphabet)
+    assert re.search(r"public static let lengths = 8\.\.\.64\n", (CORE / "DeviceID.swift").read_text(encoding="utf-8"))
+    assert queue_rules.DEVICE_PATTERN.endswith("{8,64}$")
+    label = re.search(r'public static let label = "([^"]+)"', (CORE / "Resume.swift").read_text(encoding="utf-8"))
+    assert label and queue_rules.LABEL.match(label.group(1))
+    # the window, the snapshot's cap and the furthest position are the server's - and what Navidrome records a
+    # deadwax save as, which says whose the record is
+    assert swift_constant("Resume.swift", "Resume", "maxEntries") == queue_rules.RESUME_MAX
+    assert swift_constant("Resume.swift", "Resume", "before") == queue_rules.RESUME_BEFORE
+    assert swift_constant("Resume.swift", "Resume", "snapshotMax") == queue_rules.SNAPSHOT_MAX
+    assert swift_constant("Resume.swift", "Resume", "positionMax") == queue_rules.POSITION_MAX
+    assert f'public static let deadwaxClient = "{CLIENT_NAME}"' in (CORE / "Resume.swift").read_text(encoding="utf-8")
+
+
+def test_a_save_answers_what_the_app_reads():
+    for route in (navidrome.save_queue, navidrome.save_queue_at):
+        literals = returned_literals(route)
+        assert len(literals) == 2, literals          # the break-glass admin's nulls, and the record's revs
+        for literal in literals:
+            assert literal_keys(literal) == set(fields("SavedQueue")), literal
+        # the break-glass admin's are null: neither may be required
+        assert {"rev", "ids_rev"} <= set().union(*map(literal_nulls, literals))
+    assert required_fields("SavedQueue") == set()
+
+
+def test_the_loudness_answer_is_what_the_app_decodes():
+    # src/levels.py builds every answer of the loudness route (2.1.1) with these three, so each has every key
+    measured = levels._loudness_answer(
+        "measured", None, True, levels._album_level(-20.5, 0.75, 2),
+        [levels._song_entry("so-1", "measured", -20.0, 0.5), levels._song_entry("so-2", "measured", None, 0.0)])
+    later = levels._loudness_answer("unmeasured", levels.LOOK_LATER, False, levels._album_level(None, None, 0), [])
+    for answer in (measured, later):
+        assert set(fields("AlbumLoudness")) == set(answer), answer
+        assert_decodes("AlbumLoudness", answer)
+        assert set(fields("AlbumLevel")) == set(answer["album"])
+        assert_decodes("AlbumLevel", answer["album"])
+    for song in (levels._song_entry("so-3", "unmeasured"), levels._song_entry("so-4", "not_levelled", why=levels.NOT_FLAC),
+                 *measured["songs"]):
+        assert set(fields("SongLoudness")) == set(song), song
+        assert_decodes("SongLoudness", song)
+    # the measurement's version is always sent, a whole number - the phone requires it
+    assert "algorithm" in required_fields("AlbumLoudness")
+    assert measured["algorithm"] == loudness.ALGORITHM_VERSION and isinstance(loudness.ALGORITHM_VERSION, int)
+    # and the states it says are the ones the app names (one it doesn't know reads as unmeasured, by design - so a
+    # state renamed on either side would read as unmeasured, without a word)
+    said = set(re.findall(r'_(?:loudness_answer|song_entry)\((?:[^,()]+, )?"(\w+)"', inspect.getsource(levels)))
+    assert said == {"measured", "measuring", "unmeasured", "not_levelled"}, said
+    assert swift_raw_values("LoudnessModels.swift", "LoudnessState") == said
+
+
+def test_infos_level_answer_is_the_servers_shape():
+    # the phone makes its own (levelAnswer) so the web's words say what is heard - in the shape GET /level/{song_id}
+    # answers (levels.describe), so the words are written against one shape
+    source = inspect.getsource(levels.Levels.describe)
+    literal = _block(source, re.search(r"answer = \{", source).end() - 1)
+    assert set(fields("LevelAnswer")) == literal_keys(literal)
+    assert required_fields("LevelAnswer") == literal_keys(literal) - literal_nulls(literal)
+    level = next(field for field in app_routes()[("GET", "/deadwax/navidrome/level/{song_id}")].dependant.query_params
+                 if field.alias == "level")
+    assert swift_raw_values("Levels.swift", "Level") == set(typing.get_args(level.field_info.annotation))
+    # and every state a level answer is given (describe() and the measured answer it hands on) is one the phone's
+    # LevelAnswer.State names
+    states = set(re.findall(r'"state": "(\w+)"', inspect.getsource(levels)))
+    assert states == {"measured", "measuring", "unmeasured", "plain", "not_levelled"}, states
+    assert swift_raw_values("LoudnessModels.swift", "State") == states
+
+
+def test_navidrome_status_is_what_the_app_decodes():
+    literals = returned_literals(navidrome.status)
+    assert len(literals) == 3, literals                 # not set up, its ping failed, ok
+    for literal in literals:
+        assert literal_keys(literal) == set(fields("NavidromeStatus")), literal
+        assert not required_fields("NavidromeStatus") & literal_nulls(literal), literal
+    assert required_fields("NavidromeStatus") == {"configured", "ok"}
+
+
+def test_a_play_is_sent_as_the_server_reads_it(monkeypatch):
+    # the query a PlayReport is sent with, read from the Swift, through the real route: the names it declares and
+    # the values as FastAPI parses them ("true"/"false", a time in whole milliseconds)
+    plays = (CORE / "Plays.swift").read_text(encoding="utf-8")
+    sent = re.findall(r'case \.(nowPlaying|played)[^:]*: return \[(.*?)\]\n', plays)
+    assert [name for name, _ in sent] == ["nowPlaying", "played"]
+    pairs = {name: re.findall(r'\("(\w+)", ("?)([^")]+)"?\)', items) for name, items in sent}
+    assert pairs["nowPlaying"] == [("submission", '"', "false")]
+    assert pairs["played"] == [("submission", '"', "true"), ("time", "", "String(atMs")]
+    query = next(q for m, p, q in endpoints() if p == "/deadwax/navidrome/scrobble/{song_id}")
+    assert {name for items in pairs.values() for name, _, _ in items} == set(query)
+
+    monkeypatch.setattr(Config, "AUTH_MODE", None)
+    asked = []
+
+    class Navidrome:
+        async def call(self, name, params=None, **_):
+            asked.append((name, params))
+            return {}
+
+    monkeypatch.setattr(navidrome, "client_for", lambda request: Navidrome())
+    client = TestClient(start())
+    assert client.post("/deadwax/navidrome/scrobble/so-1?submission=false").status_code == 200
+    assert client.post("/deadwax/navidrome/scrobble/so-1?submission=true&time=1767312000123").status_code == 200
+    assert asked == [("scrobble", {"id": "so-1", "submission": "false", "time": None}),
+                     ("scrobble", {"id": "so-1", "submission": "true", "time": 1767312000123})]
+
+
+def test_seen_is_taken_as_the_app_sends_it(monkeypatch):
+    # SeenBody's two shapes, as the synthesized encoder writes them (a nil left out): the server takes each
+    keys = coding_keys(swift_struct("SeenBody"))
+    assert set(keys.values()) == set(my_library.Seen.model_fields)
+    assert optional_fields("SeenBody") == set(my_library.Seen.model_fields)
+    assert all(not field.is_required() for field in my_library.Seen.model_fields.values())
+    monkeypatch.setattr(Config, "AUTH_MODE", None)
+    client = TestClient(start())
+    for body in ({keys["releaseMBID"]: "b84ee12a-09ef-421b-82de-0441a926375b"}, {keys["albumIDs"]: [1, 2]}):
+        answer = client.post("/deadwax/me/library/seen", json=body)
+        assert answer.status_code == 200 and answer.json() == {"cleared": 0}, answer.text
