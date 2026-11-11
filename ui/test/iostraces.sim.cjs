@@ -9,7 +9,10 @@
  * can't land with the iPhone's port tested against what the TypeScript used to do. A queue saved on one is put back
  * by the other, so a snapshot the web writes differently from the phone is a queue lost. The fix is to run the
  * exporter and commit what it writes; that touches ios/, which runs ios.yml's Swift replay, which says whether the
- * ports still agree.
+ * ports still agree. The two controllers replay nothing - QueueController.swift ports usePlayer.ts's queue rules and
+ * ResumeController.swift useResume.ts's createResume, by hand - so the pieces of those they port are hashed too,
+ * function by function: a change to one fails here naming the piece and the Swift file, to be ported before the
+ * exporter is run.
  *
  * Run it with:  node ui/test/iostraces.sim.cjs   (ui/node_modules installed: the exporter compiles with tsc)
  */

@@ -13,11 +13,11 @@ import Testing
         p.server.asks.removeAll()
         p.set(startUpNext(queueOf(["1", "2"]), start: 0), playing: true)
         p.play(2_250)
-        p.asked(.full)[0].ok(7, 7)
+        p.ask(.full, 0).ok(7, 7)
         p.play(5_000)
         p.set(p.player.queue, playing: false)
         p.run(10)
-        p.asked(.at)[0].ok(8, 7)
+        p.ask(.at, 0).ok(8, 7)
         p.run(20_000)
         return p
     }
@@ -49,7 +49,7 @@ import Testing
         let p = ResumePage()
         let tapped = startUpNext(queueOf(["9"]), start: 0)
         p.set(tapped, playing: true)
-        p.asked(.get)[0].answer(answerOf(["1", "2"], 0, 50, kept: keptOf(["1", "2"], 0, 50)))
+        p.ask(.get, 0).answer(answerOf(["1", "2"], 0, 50, kept: keptOf(["1", "2"], 0, 50)))
         p.run(100)
         #expect(p.player.restored.isEmpty && p.said.isEmpty && p.player.queue == tapped)
     }
@@ -60,7 +60,7 @@ import Testing
         let empty = ResumePage(answer: answerOf([], nil, 0, changedBy: ""))
         #expect(empty.player.restored.isEmpty && empty.said.isEmpty)
         let failed = ResumePage()
-        failed.asked(.get)[0].refuse(.status(502))
+        failed.ask(.get, 0).refuse(.status(502))
         failed.run(10)
         #expect(failed.player.restored.isEmpty)
     }
@@ -80,26 +80,26 @@ import Testing
         #expect(p.asked(.full).count == 1)
         #expect(full.ids == ["1", "2", "3", "4"] && full.index == 0 && full.device == "phone-device-1" && full.label == "iPhone")
         #expect(full.snapshot != nil)
-        p.asked(.full)[0].ok(1, 1)
+        p.ask(.full, 0).ok(1, 1)
         p.play(20_000)
         #expect(p.server.asks.count == 1, "nothing more for 20 s of playing")
         p.play(10_000)
-        #expect(p.asked(.at).count == 1 && p.asked(.at)[0].at?.ids_rev == 1 && p.asked(.at)[0].at?.index == 0, "at 30 s")
-        p.asked(.at)[0].ok(2, 1)
+        #expect(p.asked(.at).count == 1 && p.ask(.at, 0).at?.ids_rev == 1 && p.ask(.at, 0).at?.index == 0, "at 30 s")
+        p.ask(.at, 0).ok(2, 1)
 
         p.player.at = 0
         p.set(p.player.queue.at(1))
         p.play(750, from: 0)
         #expect(p.asked(.at).count == 1, "a song change: nothing at once")
         p.play(500, from: 0.75)
-        #expect(p.asked(.at).count == 2 && p.asked(.at)[1].at?.index == 1, "a second after it, naming the next song")
-        p.asked(.at)[1].ok(3, 1)
+        #expect(p.asked(.at).count == 2 && p.ask(.at, 1).at?.index == 1, "a second after it, naming the next song")
+        p.ask(.at, 1).ok(3, 1)
 
         p.play(5_000, from: 1.25)
         p.set(p.player.queue, playing: false)
         p.run(10)
-        #expect(p.asked(.at).count == 3 && p.asked(.at)[2].at?.position == 6.25, "a pause: at once, at its second")
-        p.asked(.at)[2].ok(4, 1)
+        #expect(p.asked(.at).count == 3 && p.ask(.at, 2).at?.position == 6.25, "a pause: at once, at its second")
+        p.ask(.at, 2).ok(4, 1)
         p.run(60_000)
         #expect(p.server.asks.count == 4, "then nothing while paused")
 
@@ -107,8 +107,8 @@ import Testing
         p.run(500)
         #expect(p.server.asks.count == 4, "a scrub while paused: nothing at once")
         p.run(700)
-        #expect(p.asked(.at).count == 4 && p.asked(.at)[3].at?.position == 120, "a second after it")
-        p.asked(.at)[3].ok(5, 1)
+        #expect(p.asked(.at).count == 4 && p.ask(.at, 3).at?.position == 120, "a second after it")
+        p.ask(.at, 3).ok(5, 1)
 
         p.set(withNext(p.player.queue, [list[3]]))
         p.run(1_000)
@@ -116,7 +116,7 @@ import Testing
         p.run(1_900)
         #expect(p.asked(.full).count == 1, "two edits a second apart: nothing until 2 s after the second")
         p.run(200)
-        #expect(p.asked(.full).count == 2 && p.asked(.full)[1].full?.ids == ["1", "2", "4", "3", "3", "4"])
+        #expect(p.asked(.full).count == 2 && p.ask(.full, 1).full?.ids == ["1", "2", "4", "3", "3", "4"])
     }
 
     @Test func thirtySecondsAreCountedByReportsNotATimer() {
@@ -124,7 +124,7 @@ import Testing
         p.server.asks.removeAll()
         p.set(startUpNext(queueOf(["1", "2"]), start: 0), playing: true)
         p.run(2_100)
-        p.asked(.full)[0].ok(1, 1)
+        p.ask(.full, 0).ok(1, 1)
         p.player.at = 70
         p.run(90_000)
         #expect(p.asked(.at).isEmpty)
@@ -138,16 +138,16 @@ import Testing
         p.server.asks.removeAll()
         p.set(startUpNext(queueOf(["1", "2", "3"]), start: 0), playing: true)
         p.play(2_250)
-        p.asked(.full)[0].ok(1, 1)
+        p.ask(.full, 0).ok(1, 1)
         p.set(p.player.queue.at(1))
         p.play(1_250, from: 0)
         #expect(p.asked(.at).count == 1)
         p.set(p.player.queue.at(2))
         p.play(1_250, from: 0)
         #expect(p.asked(.at).count == 1 && p.asked(.full).count == 1, "another due while the first is out: it waits")
-        p.asked(.at)[0].refuse(.status(409))
+        p.ask(.at, 0).refuse(.status(409))
         p.run(10)
-        #expect(p.asked(.full).count == 2 && p.asked(.full)[1].full?.index == 2 && p.asked(.at).count == 1)
+        #expect(p.asked(.full).count == 2 && p.ask(.full, 1).full?.index == 2 && p.asked(.at).count == 1)
     }
 
     @Test func a422SavesInFullToo() {
@@ -155,12 +155,12 @@ import Testing
         p.server.asks.removeAll()
         p.set(startUpNext(queueOf(["1", "2", "3"]), start: 0), playing: true)
         p.play(2_250)
-        p.asked(.full)[0].ok(1, 1)
+        p.ask(.full, 0).ok(1, 1)
         p.set(p.player.queue.at(1))
         p.play(1_250, from: 0)
-        p.asked(.at)[0].refuse(.status(422))
+        p.ask(.at, 0).refuse(.status(422))
         p.run(10)
-        #expect(p.asked(.full).count == 2 && p.asked(.full)[1].full?.index == 1)
+        #expect(p.asked(.full).count == 2 && p.ask(.full, 1).full?.index == 1)
     }
 
     @Test func goingToTheBackgroundSendsWhatIsDueAtOnce() {
@@ -169,11 +169,11 @@ import Testing
         let list = queueOf(["1", "2"])
         p.set(startUpNext(list, start: 0), playing: true)
         p.play(2_250)
-        p.asked(.full)[0].ok(1, 1)
+        p.ask(.full, 0).ok(1, 1)
         p.play(5_000)
         p.controller.background()
         p.controller.background()
-        #expect(p.asked(.at).count == 1 && p.asked(.at)[0].at?.ids_rev == 1 && (p.asked(.at)[0].at?.position ?? 0) > 7,
+        #expect(p.asked(.at).count == 1 && p.ask(.at, 0).at?.ids_rev == 1 && (p.ask(.at, 0).at?.position ?? 0) > 7,
                 "once, though the app heard of the background twice")
         p.set(withNext(p.player.queue, [list[1]]))
         p.controller.background()
@@ -185,13 +185,13 @@ import Testing
         p.server.asks.removeAll()
         p.set(startUpNext(queueOf(["1", "2"]), start: 0), playing: true)
         p.play(2_250)
-        p.asked(.full)[0].refuse(.status(401))
+        p.ask(.full, 0).refuse(.status(401))
         p.play(60_000)
         #expect(p.asked(.full).count == 1)
         p.session = 2
         p.play(500)
         #expect(p.asked(.full).count == 2)
-        p.asked(.full)[1].ok(nil, nil)
+        p.ask(.full, 1).ok(nil, nil)
         p.run(10)
         #expect(p.controller.off)
         p.set(p.player.queue.at(1))
@@ -208,7 +208,7 @@ import Testing
         p.server.asks.removeAll()
         p.set(startUpNext(queueOf(["1", "2"]), start: 0), playing: true)
         p.play(2_250)
-        p.asked(.full)[0].refuse(.unanswered)
+        p.ask(.full, 0).refuse(.unanswered)
         p.play(29_000)
         #expect(p.asked(.full).count == 1, "nothing inside 30 s of the failure")
         p.play(1_500)
@@ -219,27 +219,27 @@ import Testing
 
     @Test func theFrontAsksAgainAtMostEvery15Seconds() {
         let p = ResumePage()
-        p.asked(.get)[0].refuse(.status(502))
+        p.ask(.get, 0).refuse(.status(502))
         p.run(100)
         p.focus()
         #expect(p.asked(.get).count == 1)
         p.run(15_000)
         p.focus()
         #expect(p.asked(.get).count == 2)
-        p.asked(.get)[1].answer(answerOf(["1", "2"], 1, 30, kept: keptOf(["1", "2"], 1, 30)))
+        p.ask(.get, 1).answer(answerOf(["1", "2"], 1, 30, kept: keptOf(["1", "2"], 1, 30)))
         p.run(10)
-        #expect(p.player.restored.count == 1 && p.player.restored[0].ids == ["1", "2"] && p.player.restored[0].index == 1
-                    && p.player.restored[0].position == 30)
+        #expect(p.player.restored.count == 1 && p.restored(0)?.ids == ["1", "2"] && p.restored(0)?.index == 1
+                    && p.restored(0)?.position == 30)
         p.draw()
         p.run(16_000)
         p.focus()
-        p.asked(.get)[2].answer(answerOf(["1", "2", "3"], 2, 12, kept: keptOf(["1", "2", "3"], 2, 12, rev: 9)))
+        p.ask(.get, 2).answer(answerOf(["1", "2", "3"], 2, 12, kept: keptOf(["1", "2", "3"], 2, 12, rev: 9)))
         p.run(10)
-        #expect(p.player.restored.count == 2 && p.player.restored[1].ids == ["1", "2", "3"] && p.said.last == "Picked up from your Mac")
+        #expect(p.player.restored.count == 2 && p.restored(1)?.ids == ["1", "2", "3"] && p.said.last == "Picked up from your Mac")
         p.draw()
         p.run(16_000)
         p.focus()
-        p.asked(.get)[3].answer(answerOf(["1", "2", "3"], 2, 12, kept: keptOf(["1", "2", "3"], 2, 12, rev: 9)))
+        p.ask(.get, 3).answer(answerOf(["1", "2", "3"], 2, 12, kept: keptOf(["1", "2", "3"], 2, 12, rev: 9)))
         p.run(10)
         #expect(p.player.restored.count == 2 && p.said.count == 2, "the same answer: not put back or said twice")
     }
@@ -248,7 +248,7 @@ import Testing
         let p = Self.playedThenPaused()
         p.focus()
         #expect(p.asked(.get).count == 1)
-        p.asked(.get)[0].answer(answerOf(["1", "2"], 0, 7.25, kept: keptOf(["1", "2"], 0, 7.25, rev: 9, device: "phone-device-1")))
+        p.ask(.get, 0).answer(answerOf(["1", "2"], 0, 7.25, kept: keptOf(["1", "2"], 0, 7.25, rev: 9, device: "phone-device-1")))
         p.run(10)
         #expect(p.player.restored.isEmpty, "its own save the newest: kept as it is")
         p.set(p.player.queue, playing: true)
@@ -261,12 +261,12 @@ import Testing
         p.focus()
         #expect(p.asked(.get).count == 2, "asked again, paused")
         p.set(p.player.queue.at(1))
-        p.asked(.get)[1].answer(answerOf(["7"], 0, 5, changedBy: "Symfonium"))
+        p.ask(.get, 1).answer(answerOf(["7"], 0, 5, changedBy: "Symfonium"))
         p.run(10)
         #expect(p.player.restored.isEmpty, "a tap while the ask was out: its answer dropped")
         p.run(2_000)
         #expect(p.asked(.at).count == 2, "the tap's song change saved")
-        p.asked(.at)[1].ok(10, 7)
+        p.ask(.at, 1).ok(10, 7)
         p.run(16_000)
         p.focus()
         p.asked(.get).last?.answer(answerOf(["2"], 0, 77, changedBy: "Symfonium"))
@@ -301,25 +301,25 @@ import Testing
         p.draw()
         p.run(16_000)
         p.focus()
-        p.asked(.get)[1].answer(answerOf(["1", "2", "3"], 1, 125, kept: keptOf(["1", "2", "3"], 1, 125, rev: 6, label: "iPhone")))
+        p.ask(.get, 1).answer(answerOf(["1", "2", "3"], 1, 125, kept: keptOf(["1", "2", "3"], 1, 125, rev: 6, label: "iPhone")))
         p.run(10)
         p.draw()
         #expect(p.player.restored.map(\.position) == [95, 125] && p.said == ["Picked up from your iPhone"])
         p.run(16_000)
         p.focus()
-        p.asked(.get)[2].answer(answerOf(["1", "2", "3"], 2, 5, kept: keptOf(["1", "2", "3"], 2, 5, rev: 7, label: "iPhone")))
+        p.ask(.get, 2).answer(answerOf(["1", "2", "3"], 2, 5, kept: keptOf(["1", "2", "3"], 2, 5, rev: 7, label: "iPhone")))
         p.run(10)
         p.draw()
         #expect(p.player.restored.count == 3 && p.said.count == 1, "the next song there: the same pick-up")
         p.run(16_000)
         p.focus()
-        p.asked(.get)[3].answer(answerOf(["4", "5"], 0, 5, kept: keptOf(["4", "5"], 0, 5, rev: 8, label: "iPhone")))
+        p.ask(.get, 3).answer(answerOf(["4", "5"], 0, 5, kept: keptOf(["4", "5"], 0, 5, rev: 8, label: "iPhone")))
         p.run(10)
         p.draw()
         #expect(p.player.restored.count == 4 && p.said == ["Picked up from your iPhone", "Picked up from your iPhone"])
         p.run(16_000)
         p.focus()
-        p.asked(.get)[4].answer(answerOf(["4", "5"], 0, 50, kept: keptOf(["4", "5"], 0, 50, rev: 9, device: "desk-device-3", label: "Mac")))
+        p.ask(.get, 4).answer(answerOf(["4", "5"], 0, 50, kept: keptOf(["4", "5"], 0, 50, rev: 9, device: "desk-device-3", label: "Mac")))
         p.run(10)
         #expect(p.player.restored.count == 5 && p.said.last == "Picked up from your Mac")
     }
@@ -331,7 +331,7 @@ import Testing
         p.play(3_000, from: 95)
         p.set(p.player.queue, playing: false)
         p.run(10)
-        p.asked(.at)[0].ok(6, 4)
+        p.ask(.at, 0).ok(6, 4)
         p.run(16_000)
         p.focus()
         p.asked(.get).last?.answer(answerOf(["1", "2", "3"], 2, 5, kept: keptOf(["1", "2", "3"], 2, 5, rev: 9, label: "iPhone")))
@@ -352,7 +352,7 @@ import Testing
         p.server.asks.removeAll()
         p.set(p.player.queue.at(1))
         p.run(1_200)
-        #expect(p.asked(.full).count == 1 && p.asked(.at).isEmpty && p.asked(.full)[0].full?.ids == ["1", "2", "3"])
+        #expect(p.asked(.full).count == 1 && p.asked(.at).isEmpty && p.ask(.full, 0).full?.ids == ["1", "2", "3"])
     }
 
     @Test func thirtySecondsCountFromPlayingStarting() {
@@ -387,13 +387,39 @@ import Testing
         p.server.asks.removeAll()
         p.report(120)
         p.run(1_200)
-        #expect(p.asked(.at).count == 1 && p.asked(.at)[0].at?.position == 120)
-        p.asked(.at)[0].ok(6, 4)
+        #expect(p.asked(.at).count == 1 && p.ask(.at, 0).at?.position == 120)
+        p.ask(.at, 0).ok(6, 4)
         p.run(16_000)
         p.focus()
-        p.asked(.get)[0].answer(answerOf(["1", "2"], 0, 30, kept: keptOf(["1", "2"], 0, 30, rev: 7, device: "phone-device-1")))
+        p.ask(.get, 0).answer(answerOf(["1", "2"], 0, 30, kept: keptOf(["1", "2"], 0, 30, rev: 7, device: "phone-device-1")))
         p.run(10)
         #expect(p.player.restored.count == 1 && p.player.at == 120)
+    }
+
+    @Test func aPutBackQueueMovedMoreThanHalfASecondIsNoLongerUntouched() { // onPosition: > 0.5 s lets it go
+        func pickedUp(movedBy: Double) -> ResumePage {
+            let p = ResumePage(answer: answerOf(["1", "2", "3"], 1, 95, kept: keptOf(["1", "2", "3"], 1, 95)))
+            p.draw()
+            p.report(95 + movedBy)
+            p.run(16_000)
+            p.focus()
+            p.ask(.get, 1).answer(answerOf(["1", "2", "3"], 2, 5, kept: keptOf(["1", "2", "3"], 2, 5, rev: 4)))
+            p.run(10)
+            return p
+        }
+        // half a second: still the queue put back and untouched - deadwax's answer taken, though it is no newer
+        let still = pickedUp(movedBy: 0.5)
+        #expect(still.player.restored.count == 2 && still.restored(1)?.index == 2)
+        // a second (too little to save): moved here - paused after a change, it takes only what is newer elsewhere,
+        // which rev 4 isn't (the Mac's rev 5 was taken)...
+        let moved = pickedUp(movedBy: 1)
+        #expect(moved.player.restored.count == 1 && moved.asked(.full).isEmpty && moved.asked(.at).isEmpty)
+        // ...and rev 9 is
+        moved.run(16_000)
+        moved.focus()
+        moved.ask(.get, 2).answer(answerOf(["1", "2", "3"], 2, 5, kept: keptOf(["1", "2", "3"], 2, 5, rev: 9)))
+        moved.run(10)
+        #expect(moved.player.restored.count == 2 && moved.restored(1)?.index == 2)
     }
 
     // MARK: the phone's own
@@ -401,7 +427,7 @@ import Testing
     @Test func stopLetsGoOfEverything() {
         let p = ResumePage()
         p.controller.stop()
-        p.asked(.get)[0].answer(answerOf(["1"], 0, 5, changedBy: "Symfonium"))
+        p.ask(.get, 0).answer(answerOf(["1"], 0, 5, changedBy: "Symfonium"))
         p.set(startUpNext(queueOf(["1", "2"]), start: 0), playing: true)
         p.play(5_000)
         p.focus()
@@ -410,15 +436,15 @@ import Testing
 
     @Test func onlyTheNewestAskIsRead() {
         let p = ResumePage()
-        p.asked(.get)[0].refuse(.unanswered)
+        p.ask(.get, 0).refuse(.unanswered)
         p.run(15_000)
         p.focus()
         p.run(15_000)
         p.focus()
         #expect(p.asked(.get).count == 3)
         //? the older answer comes last: never read
-        p.asked(.get)[2].answer(answerOf(["2"], 0, 0, changedBy: "Symfonium"))
-        p.asked(.get)[1].answer(answerOf(["1"], 0, 0, changedBy: "Symfonium"))
+        p.ask(.get, 2).answer(answerOf(["2"], 0, 0, changedBy: "Symfonium"))
+        p.ask(.get, 1).answer(answerOf(["1"], 0, 0, changedBy: "Symfonium"))
         p.run(10)
         #expect(p.player.restored.map(\.ids) == [["2"]])
     }

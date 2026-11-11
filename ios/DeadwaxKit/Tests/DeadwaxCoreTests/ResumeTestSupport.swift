@@ -83,7 +83,10 @@ struct ResumeSongs {
     init(_ json: JSONValue?) throws {
         let fields = try #require(json?.object, "the fixture has no songs table")
         var table: [String: QueueTrack] = [:]
-        for (key, song) in fields { table[key] = try #require(queueTrack(song), "song \(key) doesn't read") }
+        for (key, song) in fields {
+            let track = try #require(queueTrack(song), "song \(key) doesn't read")
+            table[key] = track
+        }
         self.table = table
     }
 
@@ -212,6 +215,10 @@ final class FakeResumeServer: ResumeServer {
         init(at body: QueueAtBody, _ done: @escaping (Result<SavedQueue, ResumeFailure>) -> Void) {
             kind = .at; full = nil; at = body; answerQueue = nil; answerSave = done
         }
+        /// A request that was never made: no body, and answering it does nothing.
+        init(missing kind: Kind) {
+            self.kind = kind; full = nil; at = nil; answerQueue = nil; answerSave = nil; done = true
+        }
 
         func answer(_ queue: QueueAnswer) {
             guard !done else { return }
@@ -325,6 +332,21 @@ final class ResumePage {
     }
 
     func asked(_ kind: FakeResumeServer.Kind) -> [FakeResumeServer.Ask] { server.asked(kind) }
+
+    /// The `n`th request of a kind (0 the first) - or, when it wasn't made, an issue recorded at the caller's line and
+    /// a stand-in that carries no body and answers nothing: a regression fails by name, never by an index out of
+    /// range that takes the whole test process down with no test named.
+    func ask(_ kind: FakeResumeServer.Kind, _ n: Int, sourceLocation: SourceLocation = #_sourceLocation) -> FakeResumeServer.Ask {
+        let made = server.asked(kind)
+        if made.indices.contains(n) { return made[n] }
+        Issue.record("request \(n + 1) of \(kind) was never made (\(made.count) were)", sourceLocation: sourceLocation)
+        return FakeResumeServer.Ask(missing: kind)
+    }
+
+    /// The `n`th queue the player was given back (0 the first), or nil - never a crash.
+    func restored(_ n: Int) -> (ids: [String], index: Int, position: Double)? {
+        player.restored.indices.contains(n) ? player.restored[n] : nil
+    }
 }
 
 /// resume.sim.cjs's songOf: Portishead's, as GET /queue sends them.

@@ -47,7 +47,8 @@ public protocol EngineLink: AnyObject {
     /// Up Next changed what comes after the entry heard (`current`, the same in both lists, and everything before
     /// it). True: the engine follows `entries` from here. False: it can't now - the entry heard isn't `current`
     /// (it moved on), or the change would replace a next song already scheduled on a player node - and nothing
-    /// changed; the controller holds the change and makes it again at the next song change.
+    /// changed; the controller holds the change and makes it again at the next song change (a row's tap, which
+    /// leaves the song heard anyway, is played afresh with `play` instead).
     func replaceUpcoming(_ entries: [QueueEntry], current: Int) -> Bool
     /// Another entry of the queue, from its start; playing or paused as the engine was.
     func skip(to index: Int)
@@ -184,7 +185,10 @@ public final class QueueController {
     }
 
     /// Repeat set: kept on the device, and the queue fitted to it - the copies or later rounds let go, the new ones
-    /// queued.
+    /// queued. Set in a song's last ~2.5 s, with the next song already on a player node (D4), the change is held and
+    /// made after the join, against the song then playing: Repeat One turned on there repeats the NEXT song, and
+    /// Repeat off lets the song's copy already scheduled play once more - where the web, which can cut its buffer up
+    /// to the playhead, repeats (or stops repeating) the song being heard.
     public func setRepeat(_ mode: Repeat) {
         guard mode != repeatMode else { return }
         repeatMode = mode
@@ -217,13 +221,30 @@ public final class QueueController {
         return false
     }
 
-    /// A row's tap: that song now, playing even from a pause. A key gone from Up Next, or a change the engine can't
-    /// take this moment, does nothing - a tap is made now or not at all.
+    /// A row's tap: that song now, playing even from a pause - made now or not at all, never held. A key gone from
+    /// Up Next does nothing. An edit the engine can't take this moment (D4: the next song already on a player node,
+    /// which is every song's last ~2.5 s; or a seek on its way) is no bar, unlike the web's "a seek on its way:
+    /// nothing": the jump leaves the song heard anyway, so the queue is played afresh from the row, as a skip would
+    /// start it - nothing the listener stays on is cut.
     public func jumpTo(key: Int) {
         catchUp()
-        guard let edited = jumpedTo(queue, key), replaceUpcoming(edited) else { return }
+        guard let edited = jumpedTo(queue, key) else { return }
+        if replaceUpcoming(edited) {
+            //? a row's tap plays it, paused or not - next() starts what the listener means to be playing
+            intendsToPlay = true
+            next()
+            return
+        }
+        //? the engine may have run on into the next song since the catch-up: the row found again in the queue as it
+        //? is now (gone, or now the song playing: nothing more to do)
+        catchUp()
+        guard let fresh = jumpedTo(queue, key), let index = onward(fresh) else { return }
+        queue = fresh
+        queue.index = index
         intendsToPlay = true
-        next()
+        engine.play(Self.entries(queue), from: index, at: 0)
+        changed()
+        runHeld()
     }
 
     public func moveInQueue(key: Int, to: Int) { edit { movedKey($0, key, to: to) } }
@@ -280,11 +301,14 @@ public final class QueueController {
         return true
     }
 
-    /// The song heard won't play, and won't be asked for again (the retry is the app's): the next song past its
-    /// Repeat One copies, played - or, with none, the music stops as at the queue's end. The index skipped to, or nil.
+    /// The song heard won't play, and won't be asked for again (the retry is the app's): while the listener means the
+    /// music to be playing, the next song past its Repeat One copies, played - or, with none, the music stops as at
+    /// the queue's end. Paused (a pocketed phone a call paused), nothing moves and nothing plays: the failure waits
+    /// for a tap, as the web's afterFailure() stops when !intendsToPlay. The index skipped to, or nil.
     @discardableResult
     public func skipFailed() -> Int? {
         catchUp()
+        guard intendsToPlay else { return nil }
         guard let index = pastCopies(queue, from: queue.index + 1) else {
             intendsToPlay = false
             changed()

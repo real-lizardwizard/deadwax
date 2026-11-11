@@ -49,6 +49,12 @@
  * what they do or only in their text (the files name the sources' hashes; for api.ts's toQueueTrack and
  * useShuffleFeed.ts's shuffledTrack, the hash of the function alone) - without the files made again; making them
  * again touches ios/**, which runs ios.yml's Swift replay. Never edit the files by hand.
+ *
+ * The two controllers are ported by hand and replay no traces: QueueController.swift (usePlayer.ts's queue rules -
+ * catchUp, the edits and the held change, Repeat's top-up, Play Next/Last, Next, Previous, a row's tap, Shuffle,
+ * Repeat, restoreQueue, onEnded's Repeat line, onFailure's skip) and ResumeController.swift (useResume.ts's
+ * createResume). The pieces of the web they port are hashed into the files' made_from as well, each function alone,
+ * so a change to one fails the check too, naming it and the Swift file to read it against - port it, THEN run this.
  */
 
 'use strict'
@@ -966,6 +972,42 @@ const resumeMadeFrom = {
   'ui/src/app/useShuffleFeed.ts shuffledTrack': sha256(shuffledTrackText),
 }
 
+/* ===== the controllers, ported by hand (see the header): their sources' pieces hashed ===== */
+
+/** Pieces of a source file a hand port follows, each found exactly once - or the export stops, naming it. */
+function handPieces(file, swift, patterns) {
+  const text = fs.readFileSync(path.join(REPO, file), 'utf8')
+  const hashes = {}
+  for (const [what, pattern] of Object.entries(patterns)) {
+    const found = [...text.matchAll(pattern)]
+    if (found.length !== 1) {
+      throw new Error(`${file} has ${found.length} of ${what} as the exporter finds it (1 wanted): update the exporter, and read ${swift} against the change`)
+    }
+    hashes[`${file} ${what}`] = sha256(found[0][0])
+    BY_HAND[`${file} ${what}`] = swift
+  }
+  return hashes
+}
+/** made_from's names of a hand-ported piece -> the Swift file that ports it. */
+const BY_HAND = {}
+//? usePlayer.ts: an inner function of the hook (4 spaces in), or an action (6), whole - its own //? lines included
+const playerFunction = (name) => new RegExp(`\\n {4}function ${name}\\([^\\n]*\\{\\n[\\s\\S]*?\\n {4}}\\n`, 'g')
+const playerAction = (name) => new RegExp(`\\n {6}${name}\\([^\\n]*\\{\\n[\\s\\S]*?\\n {6}},\\n`, 'g')
+const QUEUE_CONTROLLER = 'ios/DeadwaxKit/Sources/DeadwaxCore/QueueController.swift'
+Object.assign(madeFrom, handPieces('ui/src/player/usePlayer.ts', QUEUE_CONTROLLER, {
+  ...Object.fromEntries(['catchUp', 'replaceUpcoming', 'apply', 'edit', 'runHeld', 'topUp', 'addSongs', 'songLength']
+    .map((name) => [name, playerFunction(name)])),
+  ...Object.fromEntries(['playTracks', 'next', 'previous', 'setShuffle', 'setRepeat', 'playNext', 'playLast', 'jumpTo',
+    'moveInQueue', 'removeFromQueue', 'clearPlayingNext', 'extendQueue', 'restoreQueue']
+    .map((name) => [`actions.${name}`, playerAction(name)])),
+  "onEnded's Repeat": /\n {6}if \(state\.repeat !== 'off' && nextIndex\(state\.queue\) === null\) state\.queue = toppedUp\(state\.queue, state\.repeat\)\n/g,
+  "onFailure's skip": /\n {6}const skipTo = action\.kind === 'skip' \? pastCopies\(state\.queue, action\.index\) : null\n/g,
+}))
+//? useResume.ts: createResume whole, with the two helpers above it (sameIds, signature)
+Object.assign(resumeMadeFrom, handPieces('ui/src/app/useResume.ts', 'ios/DeadwaxKit/Sources/DeadwaxCore/ResumeController.swift', {
+  createResume: /\nconst sameIds = [\s\S]*?\nexport function createResume\(\): Resume \{\n[\s\S]*?\n}\n/g,
+}))
+
 const UA_IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1'
 const resumeConstants = {
   RESUME_MAX: R.RESUME_MAX, RESUME_BEFORE: R.RESUME_BEFORE, RESUME_SNAPSHOT_MAX: R.RESUME_SNAPSHOT_MAX,
@@ -1647,6 +1689,8 @@ const where = (dir, name) => path.relative(REPO, path.join(dir, name))
 
 if (CHECK) {
   const stale = []
+  //? the hand-ported pieces whose hash isn't the one committed: they need a person, not only the exporter
+  const handChanged = new Set()
   for (const [dir, name, text] of written) {
     const file = path.join(dir, name)
     const committedText = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null
@@ -1654,6 +1698,7 @@ if (CHECK) {
     let only = ''
     try {
       const [a, b] = [JSON.parse(committedText), JSON.parse(text)]
+      for (const piece of Object.keys(BY_HAND)) if (a.made_from?.[piece] !== b.made_from?.[piece]) handChanged.add(piece)
       delete a.made_from
       delete b.made_from
       if (JSON.stringify(a) === JSON.stringify(b)) only = ' (only the sources\' hashes: every trace is the same)'
@@ -1661,8 +1706,13 @@ if (CHECK) {
     stale.push(`${where(dir, name)}${committedText === null ? ' (missing)' : only}`)
   }
   if (stale.length) {
+    const byHand = [...handChanged].sort()
     console.error(`The iPhone's traces are stale: ${stale.join(', ')}.\n` +
-      `${[...new Set([...RESUME_SOURCES, ...Object.keys(resumeMadeFrom)])].join(', ')} changed without them - run\n` +
+      (byHand.length
+        ? `These pieces changed, and the Swift ports of them are written by hand - nothing replays them, so read each\n` +
+          `change and port it first:\n${byHand.map((piece) => `  ${piece}  ->  ${BY_HAND[piece]}`).join('\n')}\nthen run\n`
+        : `${[...new Set([...SOURCES, ...RESUME_SOURCES, ...Object.keys(madeFrom), ...Object.keys(resumeMadeFrom)])]
+          .filter((name) => !(name in BY_HAND)).join(', ')} changed without them - run\n`) +
       '  node ios/scripts/export-traces.cjs  and commit what it writes\n' +
       '(then the Swift replay, swift test --package-path ios/DeadwaxKit, says whether the ports still agree).')
     process.exit(1)

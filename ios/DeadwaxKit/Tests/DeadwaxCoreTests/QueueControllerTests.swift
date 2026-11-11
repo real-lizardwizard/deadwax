@@ -18,6 +18,8 @@ final class FakeEngine: EngineLink {
     var nextScheduled = false
     /// a seek on its way: every edit refused, as the web's stream refuses one
     var seeking = false
+    /// run as an edit arrives, before it is judged - the audio thread moving on between two calls of the main one
+    var asAnEditArrives: (() -> Void)?
     private(set) var log: [String] = []
 
     var ids: [String] { entries.map(\.track.id) }
@@ -36,6 +38,7 @@ final class FakeEngine: EngineLink {
     }
 
     func replaceUpcoming(_ entries: [QueueEntry], current: Int) -> Bool {
+        asAnEditArrives?()
         guard !seeking, current == index, entries.indices.contains(current),
               entries[current] == self.entries[current] else {
             log.append("refused")
@@ -115,6 +118,10 @@ private func rig(_ mode: Repeat = .off, seed: Int64 = 1) -> (QueueController, Fa
 private extension QueueController {
     var after: [String] { queue.after }
     func key(_ id: String, nth: Int = 0) -> Int { queue.key(id, nth: nth) ?? -1 }
+    /// The key of the queue's `place`th entry (-1 for none: a key no row has).
+    func key(at place: Int) -> Int { queue.upNext?.marks.dropFirst(place).first?.key ?? -1 }
+    /// Where the `place`th entry came from (nil for none).
+    func from(at place: Int) -> MarkFrom? { queue.upNext?.marks.dropFirst(place).first?.from }
 }
 
 @Suite struct QueueControllerStartTests {
@@ -230,13 +237,53 @@ private extension QueueController {
         #expect(player.queue.current?.id == "3" && engine.log == before)
     }
 
-    @Test func aRowsTapTheEngineCantTakeIsNotMade() {
+    @Test func aRowsTapInASongsLastSecondsIsPlayedAfresh() { // D4: the next song already on a node
+        let (player, engine) = rig()
+        player.playTracks(simAlbum(4), start: 0)
+        engine.seconds = 198
+        engine.nextScheduled = true
+        player.jumpTo(key: player.key("4"))
+        #expect(player.queue.current?.id == "4" && player.queue.ids == ["1", "4"] && player.intendsToPlay && !player.holdsAnEdit)
+        #expect(engine.log == ["play 0", "refused", "play 1"] && engine.current == "4" && engine.playing)
+        #expect(engine.ids == player.queue.ids && engine.entries.map(\.key) == player.queue.upNext?.marks.map(\.key))
+        player.previous()
+        #expect(player.queue.current?.id == "1")
+    }
+
+    @Test func aRowsTapTheEngineCantTakeAsAnEditIsPlayedAfreshFromAPause() { // a seek on its way: the web does nothing
         let (player, engine) = rig()
         player.playTracks(simAlbum(3), start: 0)
         player.intendsToPlay = false
         engine.seeking = true
         player.jumpTo(key: player.key("3"))
-        #expect(player.queue.current?.id == "1" && !player.intendsToPlay && !player.holdsAnEdit && engine.log.last == "refused")
+        #expect(player.queue.current?.id == "3" && player.intendsToPlay && !player.holdsAnEdit)
+        #expect(engine.log.suffix(2) == ["refused", "play 1"] && engine.current == "3" && engine.playing)
+    }
+
+    @Test func aChangeHeldThroughARowsTapPlayedAfreshIsMadeAfterIt() {
+        let (player, engine) = rig()
+        player.playTracks(simAlbum(4), start: 0)
+        engine.seconds = 198
+        engine.nextScheduled = true
+        player.playNext([simTrack("9")])
+        #expect(player.holdsAnEdit && player.after == ["2", "3", "4"])
+        player.jumpTo(key: player.key("4"))
+        #expect(player.queue.current?.id == "4" && player.after == ["9"] && !player.holdsAnEdit)
+        #expect(engine.ids == ["1", "4", "9"] && engine.log.suffix(2) == ["play 1", "replaced"])
+    }
+
+    @Test func aRowsTapRefusedAsTheEngineJoinsIsFoundAgain() {
+        let (player, engine) = rig()
+        player.playTracks(simAlbum(4), start: 0)
+        engine.nextScheduled = true
+        engine.asAnEditArrives = { [unowned engine] in
+            engine.asAnEditArrives = nil
+            engine.join(after: 0.1)
+        }
+        player.jumpTo(key: player.key("4"))
+        // song 2, run into meanwhile, is left as song 1 would have been
+        #expect(player.queue.current?.id == "4" && player.queue.ids == ["1", "2", "4"] && engine.log == ["play 0", "refused", "play 2"])
+        #expect(engine.current == "4" && engine.ids == player.queue.ids && !player.holdsAnEdit)
     }
 
     @Test func shuffleMidSongLeavesTheSongPlayingAlone() { // :4998-5006
@@ -250,7 +297,7 @@ private extension QueueController {
         #expect(player.after.sorted() == ["1", "2", "4", "5", "6", "7", "8"])
         engine.join()
         player.engineChanged()
-        let now = player.queue.current!.id
+        let now = player.queue.current?.id
         player.setShuffle(false)
         #expect(!player.shuffle && player.after == simAlbum(8).map(\.id).drop { $0 != now }.dropFirst().map { $0 })
         #expect(!engine.log.contains { $0.hasPrefix("seek") || $0.hasPrefix("skip") })
@@ -279,7 +326,7 @@ private extension QueueController {
         engine.join()
         player.engineChanged()
         let index = player.queue.index
-        #expect(player.queue.current?.id == "2" && player.queue.upNext?.marks[index].from == .one)
+        #expect(player.queue.current?.id == "2" && player.from(at: index) == .one)
         engine.seconds = 0.4
         player.previous()
         #expect(player.queue.current?.id == "1")
@@ -318,7 +365,20 @@ private extension QueueController {
         #expect(one.after == [])
         oneEngine.playOut()
         #expect(one.queueEnded())
-        #expect(one.queue.current?.id == "3" && one.queue.upNext?.marks[one.queue.index].from == .one)
+        #expect(one.queue.current?.id == "3" && one.from(at: one.queue.index) == .one)
+    }
+
+    @Test func repeatOneTurnedOnInASongsLastSecondsRepeatsTheNextSong() { // D4's hold: a divergence, recorded
+        let (player, engine) = rig()
+        player.playTracks(simAlbum(3), start: 0)
+        engine.seconds = 198
+        engine.nextScheduled = true
+        player.setRepeat(.one)
+        #expect(player.repeatMode == .one && player.after == ["2", "3"] && player.holdsAnEdit && engine.ids == ["1", "2", "3"])
+        engine.join()
+        player.engineChanged()
+        #expect(player.queue.current?.id == "2" && player.queue.ids == ["1", "2", "2", "2", "3"] && !player.holdsAnEdit)
+        #expect(engine.ids == player.queue.ids)
     }
 
     @Test func theQueuePlayedOutStops() { // :3311
@@ -359,6 +419,19 @@ private extension QueueController {
         player.tick(heard: 0.5, length: 1.5)
         #expect(player.queue.ids == ["1", "1", "1"])
         player.tick(heard: 0.75, length: 1.5)
+        #expect(player.queue.ids == ["1", "1", "1", "1"])
+    }
+
+    @Test func aShortSongsTagsGiveItsLengthUntilItIsDecoded() { // songLength(): the tags' until the element knows
+        var short = simTrack("1")
+        short.duration = 1.5
+        let (player, engine) = rig(.one)
+        player.playTracks([short], start: 0)
+        engine.join()
+        player.engineChanged()
+        player.tick(heard: 0.5)
+        #expect(player.queue.ids == ["1", "1", "1"])
+        player.tick(heard: 0.75)
         #expect(player.queue.ids == ["1", "1", "1", "1"])
     }
 
@@ -427,13 +500,13 @@ private extension QueueController {
         player.previous()
         #expect(player.queue.current?.id == "1" && player.queue.index == 0)
         (player, engine) = joined()
-        player.jumpTo(key: player.queue.upNext!.marks[3].key)
+        player.jumpTo(key: player.key(at: 3))
         #expect(player.queue.current?.id == "4")
         (player, engine) = joined()
-        player.removeFromQueue(key: player.queue.upNext!.marks[2].key)
+        player.removeFromQueue(key: player.key(at: 2))
         #expect(player.queue.current?.id == "2" && player.after == ["4"] && engine.log.last == "replaced")
         (player, engine) = joined()
-        player.moveInQueue(key: player.queue.upNext!.marks[3].key, to: 0)
+        player.moveInQueue(key: player.key(at: 3), to: 0)
         #expect(player.queue.current?.id == "2" && player.after == ["4", "3"])
     }
 
@@ -504,7 +577,8 @@ private extension QueueController {
         let (player, _) = rig(.all)
         player.playTracks([simTrack("a"), simTrack("b")], start: 0)
         var skips = 0
-        while player.skipFailed() != nil { skips += 1 }
+        //? bounded: a skip that never stops fails here by name rather than hanging the run
+        while skips < 20, player.skipFailed() != nil { skips += 1 }
         #expect(skips == 3 && player.queue.tracks.count == 4 && !player.intendsToPlay)
     }
 
@@ -512,8 +586,18 @@ private extension QueueController {
         let (player, _) = rig(.all)
         player.playTracks([simTrack("x")], start: 0)
         var skips = 0
-        while player.skipFailed() != nil { skips += 1 }
+        while skips < 20, player.skipFailed() != nil { skips += 1 }
         #expect(skips == 2 && player.queue.tracks.count == 3 && !player.intendsToPlay)
+    }
+
+    @Test func aFailureWhilePausedWaitsForATap() { // playQueue.ts afterFailure: !intendsToPlay -> stop
+        let (player, engine) = rig()
+        player.playTracks(simAlbum(3), start: 0)
+        player.intendsToPlay = false
+        #expect(player.skipFailed() == nil)
+        #expect(player.queue.index == 0 && !player.intendsToPlay && engine.log == ["play 0"])
+        player.intendsToPlay = true
+        #expect(player.skipFailed() == 1 && engine.log.last == "play 1")
     }
 }
 

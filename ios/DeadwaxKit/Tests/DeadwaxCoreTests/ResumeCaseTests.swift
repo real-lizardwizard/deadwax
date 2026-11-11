@@ -60,7 +60,7 @@ import Testing
         for item in loaded.cases["pickedUp", default: []] {
             let from: PickedFrom? = item["from"]?["device"]?.string.map(PickedFrom.device)
                 ?? item["from"]?["app"]?.string.map(PickedFrom.app)
-            #expect(pickedUpWords(from, shared: try #require(item["shared"]?.bool)) == item["result"]?.string, "\(describe(item))")
+            #expect(pickedUpWords(from, shared: try #require(item["shared"]?.bool as Bool?)) == item["result"]?.string, "\(describe(item))")
         }
         #expect(loaded.cases["window"]?.count == 15 && loaded.cases["relevel"]?.count == 12 && loaded.cases["pickedUp"]?.count == 22)
     }
@@ -123,7 +123,8 @@ import Testing
                 wanted = nil
                 nils += 1
             } else {
-                wanted = try #require(loaded.songs.queue(item["result"]), "\(label): the result doesn't rebuild")
+                let rebuilt = try #require(loaded.songs.queue(item["result"]), "\(label): the result doesn't rebuild")
+                wanted = rebuilt
             }
             let difference = queueDifference(back, wanted)
             #expect(difference == nil, "\(label): \(difference ?? "")")
@@ -180,7 +181,10 @@ import Testing
         let loaded = try Self.load()
         let queuesCase = try #require(loaded.cases["saveQueues"]?.first?["queues"]?.object)
         var queues: [String: UpNextQueue] = [:]
-        for (name, record) in queuesCase { queues[name] = try #require(loaded.songs.queue(record), "\(name) doesn't rebuild") }
+        for (name, record) in queuesCase {
+            let queue = try #require(loaded.songs.queue(record), "\(name) doesn't rebuild")
+            queues[name] = queue
+        }
         let cases = loaded.cases["saveDue", default: []]
         #expect(cases.count == 735)
         let int64 = { (json: JSONValue?) -> Int64? in json?.int.map(Int64.init) }
