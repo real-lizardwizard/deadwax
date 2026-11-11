@@ -1089,6 +1089,18 @@ Every failure was aNewRouteGoesOnFromTheFrameHeard, neither of CI's two. What wa
     where the song begins in the render (`whereItBegins`: silent throughout, or the frame its first 64 frames
     are at), the phase, the output's state and the engine's trace, which now has "the output started". The next
     CI failure will say which.
+- **A fetch's own timeout raced a starved test (test timing, seen only with the pool cut to one thread).**
+  - After the fixes, a harsher run than ios.yml's: one process with `LIBDISPATCH_COOPERATIVE_POOL_STRICT=1`
+    under 7 hogs. aSkippedFetchIsCancelledAndItsPartDeleted failed in 1 of 6 runs, then 4 of 6: its part was gone
+    before the skip, and the test took about 30-37 s.
+  - StreamFetch's request fails after 20 s without a byte (timeoutIntervalForRequest). The test holds a fetch
+    open, and its task waited longer than that for the one thread. Once the test named it, the failure read "The
+    song stopped arriving: The request timed out."
+  - A scratch test holding its task 21 s after the bytes saw the same: at 21.0 s, the part deleted. With a 600 s
+    idle, nothing ended the fetch.
+  - The fix: StreamFetch's `idleTimeout` (internal, 20 s, set before start), and the test holds its fetch open
+    for 600. Its wait now asserts the 4000 bytes, and that nothing ended the fetch before the skip.
+  - On the phone, nothing changes: 20 s without a byte still ends a stream as a network failure.
 - **70cbef6's `guard engine.isRunning` in played(), re-checked: sound.**
   - Every stop the engine makes resets first (or comes with nothing scheduled), and every way on from iOS's stop
     resets the lanes, so nothing waits on the completions it ignores.
@@ -1107,6 +1119,12 @@ Every failure was aNewRouteGoesOnFromTheFrameHeard, neither of CI's two. What wa
 - the real package (two bundles), 7 hogs: 15 of 15;
 - the Audio suites alone, 7 hogs: 15 of 15;
 - the package with no load.
+
+With the fetch's idle timeout too (the final code), all 509 passed again:
+- one process, 7 hogs: 15 of 15;
+- the Audio suites alone, 7 hogs: 15 of 15;
+- one process with the strict pool, 7 hogs: 6 of 6, where it had failed in 4 of 6;
+- the real package and the one process, each once with no load.
 
 ### Verified (Phase 1's Core, p1/merge, 2026-11-10)
 

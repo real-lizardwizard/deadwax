@@ -44,6 +44,11 @@ public final class StreamFetch: NSObject, ByteSource, URLSessionDataDelegate {
     /// it is cancelled).
     public var onFinish: ((StreamFetch) -> Void)?
 
+    /// How long the request may go without a byte before it fails (URLSession's timeoutIntervalForRequest):
+    /// 20 s. Tests: a test holding a fetch open gives it longer, so a test held off its thread that long
+    /// doesn't see the fetch end under it (notes/ios.md "The engine's tests under load"). Set before `start`.
+    var idleTimeout: TimeInterval = 20
+
     /// `configuration`: the session's, for tests (a URLProtocol stub); by default an ephemeral one.
     /// Cookies are turned off on it either way.
     public init(request: URLRequest, fileURL: URL, configuration: URLSessionConfiguration? = nil) {
@@ -83,7 +88,7 @@ public final class StreamFetch: NSObject, ByteSource, URLSessionDataDelegate {
             configuration.httpShouldSetCookies = false
             configuration.httpCookieAcceptPolicy = .never
             configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-            configuration.timeoutIntervalForRequest = 20
+            configuration.timeoutIntervalForRequest = idleTimeout
             let queue = OperationQueue()
             queue.maxConcurrentOperationCount = 1
             let session = URLSession(configuration: configuration, delegate: self, delegateQueue: queue)

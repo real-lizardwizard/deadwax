@@ -61,16 +61,19 @@ final class ResumeOnce: @unchecked Sendable {
         return configuration
     }
 
-    /// Starts a fetch of `query` into `<folder>/s1.flac` and waits for it to finish (or `seconds`).
+    /// Starts a fetch of `query` into `<folder>/s1.flac` and waits for it to finish (or `seconds`). `idle`:
+    /// how long it may go without a byte, when not the fetch's own 20 s.
     ///
     /// Waits by suspending, never by blocking a thread: Swift Testing runs these in parallel on a pool as
     /// wide as the Mac has cores, and nine of them each holding a thread in a semaphore's wait stalled
     /// every fetch on an 8-core Mac until the waits ran out (5.5 s for the nine, 0.5 s one at a time or
     /// suspended - so the stub's answers seem to need a free thread of it). A CI runner has 3 or 4.
-    private func fetch(_ query: String, into folder: URL, seconds: Double = 10) async -> (StreamFetch, Bool) {
+    private func fetch(_ query: String, into folder: URL, seconds: Double = 10,
+                       idle: TimeInterval? = nil) async -> (StreamFetch, Bool) {
         let file = folder.appendingPathComponent("s1.flac")
         let fetch = StreamFetch(request: URLRequest(url: URL(string: "http://stub.test/stream?\(query)")!), fileURL: file,
                                 configuration: configuration())
+        if let idle { fetch.idleTimeout = idle }
         let finished = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
             let once = ResumeOnce(continuation)
             fetch.onFinish = { _ in once.resume(true) }
@@ -176,10 +179,15 @@ final class ResumeOnce: @unchecked Sendable {
     @Test func aSkippedFetchIsCancelledAndItsPartDeleted() async {
         let dir = folder()
         defer { try? FileManager.default.removeItem(at: dir) }
-        let (fetch, finished) = await fetch("declared=100000&send=4000&hold=1", into: dir, seconds: 0.5)
+        // held open 10 minutes without a byte: with the fetch's own 20 s, this test held off its thread
+        // that long (the cooperative pool cut to one thread, under load) saw the fetch time out and delete
+        // its part before the skip (notes/ios.md "The engine's tests under load")
+        let (fetch, finished) = await fetch("declared=100000&send=4000&hold=1", into: dir, seconds: 0.5, idle: 600)
         #expect(!finished, "still arriving")
         let until = Date().addingTimeInterval(5)
         while fetch.bytesWritten < 4000, Date() < until { await pause(0.01) }
+        #expect(fetch.bytesWritten == 4000, "the bytes sent, arrived within 5 s")
+        #expect(fetch.failure == nil, "nothing ended the fetch before the skip: \(String(describing: fetch.failure))")
         #expect(FileManager.default.fileExists(atPath: fetch.partURL.path))
         fetch.cancel()
         #expect(fetch.isCancelled && !fetch.isComplete)
