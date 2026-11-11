@@ -130,8 +130,8 @@ The plan's section 3, as Phase 0 needs it:
   About 2 s scheduled ahead in 0.5 s buffers, refilled from each buffer's `.dataRendered` completion
   (see "First run on macOS"). **The next song in the same format is scheduled straight after the last
   buffer on the same node** (sample-exact; nothing trimmed or crossfaded). Another format goes on its
-  own lane, started with `play(at:)` the host time the first lane's last sample plays (offline: the
-  render's sample count). A song that would begin on a lane still holding songs that play before the
+  own lane, started with `play(at:)` the SAMPLE time the first lane's last sample plays (a host time until
+  fix/engine-hold, which overlapped the two by 5-15 ms - see "Starts at a sample time"). A song that would begin on a lane still holding songs that play before the
   one scheduled last (44.1 kHz, a short 96 kHz song, 44.1 kHz again) waits, its first buffer parked,
   until that lane has run out - see "After review, again". **The output starts once and keeps running while something plays**; a song
   started from silence on an output just started is scheduled `startLead` ahead (AVAudioSession's
@@ -304,7 +304,8 @@ found, each fixed:
 - **`NSLock.lock()` is unavailable from async contexts** in Swift 6 mode: use `withLock { }`.
 - **Offline rendering has no clock**: a lane switch can't be timed from `lastRenderTime`'s host time
   before the render runs, so the engine remembers each lane's start on the render's sample count
-  (`manualRenderingSampleTime`).
+  (`manualRenderingSampleTime`). (Since "Starts at a sample time" every lane's start is remembered so, live
+  too, as `Lane.origin`: the sample time it was started at.)
 - **AVAudioPlayerNode takes only buffers in its connection's exact format**: decoders that agree on
   rate and channels can still differ in layout - `conform` copies.
 
@@ -1395,6 +1396,95 @@ one that survives is `!ranOut(heard)` alone, offline, as said above.
   node with a callback still to come).
 - A 44.1 kHz album over a bad connection: a pause after a rebuffer going on from the frame heard.
 
+### Starts at a sample time (fix/engine-hold, its second commit)
+
+The third design's two timing changes, which the judges took apart from the hold, in a commit of their own so it
+can be reverted alone if the phone disagrees.
+
+**What was found** (real output, this Mac, mixer volume 0, print-only probes in scratch copies).
+- **A start from silence at a host time counts ahead of its samples.** play(at:) a host time puts the node's
+  count at that time while its first sample lands on a render's edge: the count was 245-651 frames (5-14 ms)
+  ahead, so the position, and the frame a pause, a call or a new route goes on from, were that far past the ear.
+- **A song in another format started at a host time overlapped the one before.** The next lane was started at
+  the host time the heard lane's clock said it ends: B's first sample 238-723 frames over A's end, in 8 of 8
+  trials. Started at the SAMPLE time of A's end, read as A's start plus what is on it: straight after A's last
+  sample in 24 of 24, a node attached before the start or while running, A started at once or at a sample time.
+- **A sample-time start lands exactly, its count with it**: the first sample at the time asked, and the node's
+  clock origin the time asked (attached before the start or while running, k from 0 to 1536 frames past the
+  last render).
+- **Just after engine.stop() and start() of the same engine, the render times are left from the last run.**
+  A node's `lastRenderTime` read 18944, its host time 505 ms old, until this run's first render 5-12 ms later;
+  a node started at that time + 512 played at once, its count 23040 frames (0.48 s) ahead of its samples. And
+  the nodes' time runs on across the stop (43520 twenty ms later) while the main mixer's starts from 0 again
+  (1024): a start from the mixer's time, which the third design fell back to, would be half a second in the
+  past. Once a render of this run is there, a start from the node's own time (+512) and a join at its end
+  landed exactly, after a 0.3 s stop and a 0.03 s one, 6 of 6. Offline the render's count runs on across a
+  stop (12288 before and after) and is the nodes' time: a node started at count + 1000 sounds at 1000.
+- **Found by this commit's own test, there before it: a song in a third format played over the second.** With
+  three formats queued and the second shorter than what is scheduled ahead (2 s on the phone), the third was
+  decoded while the first was still heard, and every lane waiting started at the first's end: the 96 kHz song
+  and the 48 kHz one after it both at 24000, together.
+
+**What changed.**
+- **A start from silence is a sample time**: the lane's node's render time plus the start lead on an output just
+  started, or plus one IO buffer (`ioBuffer`, AVAudioSession's ioBufferDuration, set by the app beside
+  `startLead`; none offline) on one already running, so the start is never in a render under way. The lane's
+  count begins there (`Lane.origin`, in place of `renderStart`, which was offline only). Offline the lead is now
+  taken too, as the phone takes it.
+- **The next lane starts at a sample time**: the heard lane's `origin` plus what is on its node (its clock, when
+  it has no origin), and only when that is at least one IO buffer past the render (offline, not behind it);
+  otherwise it is said ("not started at N: the render is at M already") and the lane starts from silence once
+  the heard lane's completions are handled. `time(whenEnds:)` is gone.
+- **A render time is one of this run of the output** (`ofThisRun`): not the reading the node had as the output
+  started (`renderAtStart`, read just after engine.start()), not stamped before the start (`outputStartedAt`),
+  and the lane's own node's, never the mixer's.
+- **With no such render time** (an output just started that hasn't rendered yet) a start from silence is as it
+  was: the lead ahead at a host time, or at once, with no origin ("started from silence at a host time: no
+  render time yet"). Nothing retries or waits. A node a pause left paused (`idleStopSeconds`) goes on at once,
+  with no origin, as before.
+- **Only the lane whose song comes next starts at the heard lane's end**, one at a time; a lane after it waits
+  for that one to be heard.
+- **The app** (PlayerModel.lead, AudioSessionController.ioBuffer): `engine.ioBuffer` reads
+  `ioBufferDuration` on the engine's queue, as `startLead` and `latency` do. This and the starts are the only
+  changes to what the phone runs.
+
+**Where this differs from the judges' synthesis**: the main mixer is not a fallback for a node's render time
+(the probe above: after a restart it counts from 0 while the nodes run on), and a render time left from before a
+stop is refused (it read 505 ms old, and a start there was half a second in the past). The third-format overlap
+was not in any finding.
+
+**What the tests hold** (StartsAtASampleTimeTests.swift):
+- aStartFromSilenceLandsWhereItsCountSays: a 0.05 s lead offline, silence for 2400 frames then the song bit-exact,
+  "started from silence at 2400", the position the frame heard; a pause and play take the lead again and go on
+  from 9600, the frame heard.
+- aSongInAnotherFormatJoinsAtTheSampleTheHeardLaneEnds: 48 kHz started 2400 in, 96 kHz at 26400 (A whole to its
+  last frame, no gap), 48 kHz straight after; then 44.1 kHz (its converter's 24000 frames), 96 kHz at its end,
+  and the third format straight after the 96 kHz song, alone.
+- startWithNoRenderTimeFallsBack (`noRenderTime`): the song at once, said, and a 96 kHz song after a 22222-frame
+  one joined at 22222 by the clock, the queue ending.
+- aRenderTimeLeftFromBeforeAStopIsNoTimeToStartAt: `ofThisRun` with the probe's own readings.
+- Every earlier test passes unchanged; RanDryTests and HoldOnTheCallbacksTests included.
+
+**Mutations**, each restored byte for byte (sha-256 checked), all nine failing:
+- the lead not taken offline (aStartFromSilence…, aSongInAnotherFormatJoins…);
+- the lane's count from the render's time, not the time it starts at (the same two: B 2400 frames over A);
+- the join read off the heard lane's clock, not its `origin` (anotherFormatPlaysOnItsOwnLaneAfterTheFirst and
+  both anotherFormat… tests: a clock needs a render first, so a join planned before the heard node has rendered -
+  a short song, a lane begun again - came late or not at all);
+- the fallback not playing, and the fallback's join with no clock to read (startWithNoRenderTime…);
+- `ofThisRun` without the reading-at-start check, and without the host-time check (aRenderTimeLeft…);
+- every waiting lane started at the heard lane's end (aSongInAnotherFormatJoins…: the third format over the
+  second);
+- the render guard taken out (anotherFormatAfterAnEndAlreadyRenderedWithCallbacksLate).
+Not mutated: the margin, which is 0 offline - its one IO buffer is the phone's to show.
+
+**What only the phone can tell.**
+- That a sample-time start and join land exactly on the phone's output as on this Mac's: a 44.1 kHz album into a
+  96 kHz one, gapless, with no click or overlap at the change; and the position after a start no longer ahead.
+- That the phone's render times after a pause and play behave as this Mac's (left from the last run until its
+  first render); if they are fresher or staler, the start falls back to the host time, as before.
+- That one IO buffer past the last render is enough on the phone, the screen locked (larger buffers) included.
+
 ### Verified (Phase 1's Core, p1/merge, 2026-11-10)
 
 All on James's Mac (8 GB; heavy builds one at a time), Xcode 27.1's toolchain:
@@ -1670,6 +1760,8 @@ another.
 - **Nothing has been drawn.** There is no Simulator, so no view has been seen by anyone or read by VoiceOver. The
   checks are in the order of the plan's and screens.md 14's.
 - **Unseen live:**
+  - the engine's hold on the callbacks and its sample-time starts and joins (fix/engine-hold): the checks at the
+    end of "The hold on the callbacks" and "Starts at a sample time";
   - the level wait against a measuring server;
   - plays reaching Navidrome;
   - resume across devices;

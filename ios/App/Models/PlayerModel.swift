@@ -539,11 +539,12 @@ final class PlayerModel {
         }
     }
 
-    /// The engine's two readings of the output, from AVAudioSession - made outside the main actor, as the engine
+    /// The engine's three readings of the output, from AVAudioSession - made outside the main actor, as the engine
     /// reads them on its own queue.
     nonisolated static func lead(_ engine: PlaybackEngine) {
         engine.startLead = { AudioSessionController.startLead() }
         engine.latency = { AudioSessionController.latency() }
+        engine.ioBuffer = { AudioSessionController.ioBuffer() }
     }
 
     /// A level decided on the engine's queue, drawn on the main one - made outside the main actor for the same reason.

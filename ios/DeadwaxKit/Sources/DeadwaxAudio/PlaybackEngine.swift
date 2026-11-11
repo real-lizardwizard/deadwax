@@ -185,6 +185,9 @@ public final class PlaybackEngine {
     /// How far the ear is behind the render: the app sets it from AVAudioSession (outputLatency +
     /// ioBufferDuration). Read on the engine's queue at each position read.
     public var latency: () -> TimeInterval = { 0 }
+    /// The output's IO buffer (AVAudioSession's ioBufferDuration): a node started on an output already
+    /// running starts this far past its last render, so the start is never in a render already under way.
+    public var ioBuffer: () -> TimeInterval = { 0 }
     public var onChange: ((EngineState) -> Void)?
     /// What the engine does, line by line, on its queue - each line starts with the render's sample
     /// count offline, the host time in seconds on the phone. Debug keeps the last lines for a log.
@@ -222,8 +225,13 @@ public final class PlaybackEngine {
         /// The frame heard, estimated once iOS had stopped the engine: kept, so later reads don't
         /// carry the estimate on.
         var stopped: Int64?
-        /// Offline only: the render's sample count when the node started.
-        var renderStart: AVAudioFramePosition?
+        /// The node time (the render's sample count) its count of frames played starts from: the sample time
+        /// it was started at (`playFromSilence`, `startLanesIfReady`). Nil when it was started at once or at a
+        /// host time (no render time to start from), where its clock says it.
+        var origin: AVAudioFramePosition?
+        /// What its node's render time read as the output last started: left from before the stop, never a
+        /// time to start at (`renderTime`). Kept across `clear`, which can come before this run's first render.
+        var renderAtStart: AVAudioFramePosition?
         /// Buffers scheduled on the node since the lane last began (`clear`), and the completions
         /// AVAudioEngine has called back of them (`calls`, counted on its own thread, of this beginning
         /// only - `epoch`): all called back, and the node has rendered everything on it, whatever its
@@ -261,6 +269,7 @@ public final class PlaybackEngine {
             nodeFrames = 0
             lastRead = nil
             stopped = nil
+            origin = nil
             scheduled = 0
             epoch = calls.begin()
         }
@@ -431,10 +440,16 @@ public final class PlaybackEngine {
     /// The output was started and no song has been started on it since: the next start from silence takes
     /// the start lead. A start on an output already running plays at the next render.
     private var outputFresh = false
+    /// When this run of the output was started (host seconds): a render time from before it - left from the
+    /// run before a stop - is no time to start a node at.
+    private var outputStartedAt: Double?
     /// Tests: a node started from silence offline counts its clock this many frames ahead of its samples,
     /// as one started with play(at:) on a real output does (245-651 frames on this Mac's output, the hold
     /// review's finding 1): played at a time that many frames past, it plays from its first frame at once.
     var clockAhead: AVAudioFramePosition = 0
+    /// Tests: no render time for a start from silence, as on an output that hasn't rendered yet - it falls
+    /// back to a host time (or at once), as before sample-time starts.
+    var noRenderTime = false
     /// Tests: the lead each start from silence took (what the phone's play(at:) would have waited).
     private var startLeads: [Double] = []
     var leadsTaken: [Double] { queue.sync { startLeads } }
@@ -759,7 +774,9 @@ public final class PlaybackEngine {
         matchOutput()
         engine.prepare()
         do {
+            outputStartedAt = Self.hostSeconds()
             try engine.start()
+            for lane in lanes.values { lane.renderAtStart = lane.node.lastRenderTime.map { $0.sampleTime } }
             asleep = false
             outputFresh = true
             note("the output started")
@@ -1273,51 +1290,112 @@ public final class PlaybackEngine {
         // the song heard first: its lane starts from silence (or is already playing)
         if heardLane == nil, let key = laneHolding(current), let lane = lanes[key], !lane.started, ready(lane, key) {
             playFromSilence(lane)
-            lane.renderStart = settings.offline != nil ? engine.manualRenderingSampleTime : nil
             lane.started = true
             heardLane = key
-            note("lane \(Int(lane.format.sampleRate)) Hz started from silence")
+            note("lane \(Int(lane.format.sampleRate)) Hz started from silence \(lane.origin.map { "at \($0)" } ?? "at a host time: no render time yet")")
             publish(.playing)
         }
-        // then a song in another format after it: its lane starts when the heard lane runs out
-        // (its end is exact once its converter has given out all it holds)
+        // then a song in another format after it: its lane starts at the very sample the heard lane's last one
+        // plays at, a node SAMPLE time (exact once its converter has given out all it holds) - a host time
+        // overlapped the two by 238-723 frames on this Mac's output (notes/ios.md "Starts at a sample time")
         // - never at an end already rendered: a node played at a time past counts from it, so its count
         // runs ahead and the song after it overlaps its end (the hold review's finding 5). It waits for
         // the heard lane's last completion, and starts from silence (`played`).
+        // - and only the lane whose song comes next: a song in a third format, decoded while the heard lane
+        // still plays (the one between shorter than what is scheduled ahead), waits for that one to be heard,
+        // or it started at the same end and played over it
         guard let heardKey = heardLane, let heard = lanes[heardKey], heard.started, heard.pending > 0,
-              !heard.holding, !ranOut(heard) else { return }
-        for (key, lane) in lanes where key != heardKey && !lane.started && !lane.timeline.isEmpty && ready(lane, key) {
-            guard let when = time(whenEnds: heard) else { continue }
-            lane.node.play(at: when)
-            if settings.offline != nil { lastScheduledAt = Self.hostSeconds() }
-            lane.renderStart = settings.offline != nil && when.isSampleTimeValid ? when.sampleTime : nil
-            lane.started = true
-            note("lane \(Int(lane.format.sampleRate)) Hz to start at \(when.isSampleTimeValid ? "\(when.sampleTime)" : "a host time"), when lane \(Int(heard.format.sampleRate)) Hz ends")
+              !heard.holding, !ranOut(heard), let end = endTime(of: heard), let now = renderTime(heard) else { return }
+        guard !lanes.contains(where: { $0.key != heardKey && $0.value.started }) else { return }
+        let waiting = lanes.filter { $0.key != heardKey && !$0.value.started && !$0.value.timeline.isEmpty }
+        guard let (key, lane) = waiting.min(by: { ($0.value.timeline.entries.first?.id ?? .max) < ($1.value.timeline.entries.first?.id ?? .max) }),
+              ready(lane, key) else { return }
+        guard end >= now + margin() else {
+            note("lane \(Int(lane.format.sampleRate)) Hz not started at \(end): the render is at \(now) already")
+            return
         }
+        lane.node.play(at: AVAudioTime(sampleTime: end, atRate: outputRate))
+        if settings.offline != nil { lastScheduledAt = Self.hostSeconds() }
+        lane.origin = end
+        lane.started = true
+        note("lane \(Int(lane.format.sampleRate)) Hz to start at \(end), when lane \(Int(heard.format.sampleRate)) Hz ends")
     }
 
-    /// Starts a node from silence, `startLead` ahead so its first sample lands on a live output.
-    /// Only on an output just started: on one already running (a lane begun again after running dry, a
-    /// skip, a seek while playing) the output is live, and the lead would be silence the listener waits
-    /// through - about 2 s on AirPlay (the hold review's findings 7 and 9). A node played at once also
-    /// counts its clock from its first sample; one played at a host time counts from that time while its
-    /// first sample lands on a render's edge.
+    /// Where the render is, in the lane's node time: offline, the render's own count (a node's time there,
+    /// across a stop too); live, the node's own last render - one of this run of the output only, never the
+    /// one it still reads just after a start, left from before the stop (`renderAtStart`, and a host time
+    /// before `outputStartedAt`): a start at that time would be in the past. Never the main mixer's: after a
+    /// stop and start it counts from 0 again while the nodes' time runs on (notes/ios.md "Starts at a sample
+    /// time"). Nil with none yet.
+    private func renderTime(_ lane: Lane) -> AVAudioFramePosition? {
+        if settings.offline != nil { return engine.manualRenderingSampleTime }
+        guard let time = lane.node.lastRenderTime, time.isSampleTimeValid else { return nil }
+        return Self.ofThisRun(time.sampleTime, host: time.isHostTimeValid ? AVAudioTime.seconds(forHostTime: time.hostTime) : nil,
+                              atStart: lane.renderAtStart, startedAt: outputStartedAt)
+    }
+
+    /// A node's render time (`sample`, and its host time in seconds) if it is one of this run of the output:
+    /// not the reading the node had as the output started (`atStart`) and not stamped before the start
+    /// (`startedAt`). Just after a stop and start this Mac's output still read the last run's, 505 ms old.
+    static func ofThisRun(_ sample: AVAudioFramePosition, host: Double?, atStart: AVAudioFramePosition?,
+                          startedAt: Double?) -> AVAudioFramePosition? {
+        if sample == atStart { return nil }
+        if let host, let startedAt, host < startedAt { return nil }
+        return sample
+    }
+
+    /// How far past the last render a node is started on an output already running: one IO buffer, so the
+    /// start is never inside a render under way. None offline, where nothing renders until asked.
+    private func margin() -> AVAudioFramePosition {
+        settings.offline != nil ? 0 : frames(max(ioBuffer(), 0), outputRate)
+    }
+
+    /// The node time the last sample scheduled on `lane` plays at: where its count starts (the sample time it
+    /// was started at, else read off its clock) plus what is on its node.
+    private func endTime(of lane: Lane) -> AVAudioFramePosition? {
+        let scale = outputRate / lane.nodeFormat.sampleRate
+        let end = AVAudioFramePosition((Double(lane.nodeEnd) * scale).rounded())
+        if let origin = lane.origin { return origin + end }
+        guard let nodeTime = lane.node.lastRenderTime, nodeTime.isSampleTimeValid,
+              let playerTime = lane.node.playerTime(forNodeTime: nodeTime) else { return nil }
+        return nodeTime.sampleTime - AVAudioFramePosition((Double(playerTime.sampleTime) * scale).rounded()) + end
+    }
+
+    /// Starts a node from silence at a SAMPLE time: the render's now, plus the start lead on an output just
+    /// started, so its first sample lands on a live output - or one IO buffer on an output already running (a
+    /// lane begun again after running dry, a skip, a seek while playing), where the lead would be silence the
+    /// listener waits through, about 2 s on AirPlay (the hold review's findings 7 and 9). A sample time puts
+    /// the first sample exactly there and the node's count with it (`origin`); a host time (as before) had the
+    /// count a few hundred frames ahead of the samples on this Mac's output (notes/ios.md "Starts at a sample
+    /// time"). With no render time yet it starts as before: at a host time, or at once. A node a pause left
+    /// paused (`idleStopSeconds`) goes on at once, its clock saying where it is.
     private func playFromSilence(_ lane: Lane) {
         let lead = outputFresh ? max(startLead(), 0) : 0
         outputFresh = false
         if settings.offline != nil { startLeads.append(lead) }
-        if lead > 0, settings.offline == nil {
-            lane.node.play(at: AVAudioTime(hostTime: mach_absolute_time() + AVAudioTime.hostTime(forSeconds: lead)))
-        } else if clockAhead > 0, let offline = settings.offline {
-            lane.node.play(at: AVAudioTime(sampleTime: engine.manualRenderingSampleTime - clockAhead, atRate: offline.sampleRate))
-        } else {
+        let rate = outputRate
+        var ahead = lead
+        if lane.started {
             lane.node.play()
+            lane.origin = nil
+        } else if !noRenderTime, let now = renderTime(lane) {
+            let at = clockAhead > 0 ? now - clockAhead : now + (lead > 0 ? frames(lead, rate) : margin())
+            lane.node.play(at: AVAudioTime(sampleTime: at, atRate: rate))
+            lane.origin = at
+            ahead = Double(max(at - now, 0)) / rate
+        } else {
+            if lead > 0, settings.offline == nil {
+                lane.node.play(at: AVAudioTime(hostTime: mach_absolute_time() + AVAudioTime.hostTime(forSeconds: lead)))
+            } else {
+                lane.node.play()
+            }
+            lane.origin = nil
         }
         if settings.offline != nil { lastScheduledAt = Self.hostSeconds() }
         state.lastStartLead = lead
         if let asked = playAsked, settings.offline == nil {
             // its first sample heard: the lead, and the output's latency after it
-            lastStartSeconds = Self.hostSeconds() + lead + currentLatency() - asked
+            lastStartSeconds = Self.hostSeconds() + ahead + currentLatency() - asked
         }
         playAsked = nil
     }
@@ -1375,29 +1453,6 @@ public final class PlaybackEngine {
         return lanes.first(where: { _, lane in
             lane.timeline.entries.contains { entry in entryKey[entry.id] == key }
         })?.key
-    }
-
-    /// When the last sample scheduled on `lane` will play, as a time another node can start at.
-    private func time(whenEnds lane: Lane) -> AVAudioTime? {
-        if let offline = settings.offline, let start = lane.renderStart {
-            // rendering offline there is no clock: the render's own sample count, from where it started
-            // (every node runs at the render's rate, so a node's sample time is the render's)
-            let frames = Double(lane.nodeEnd) * offline.sampleRate / lane.nodeFormat.sampleRate
-            let at = start + AVAudioFramePosition(frames.rounded())
-            // an end the render has passed is no time to start at (see startLanesIfReady)
-            guard at >= engine.manualRenderingSampleTime else { return nil }
-            return AVAudioTime(sampleTime: at, atRate: offline.sampleRate)
-        }
-        guard let nodeTime = lane.node.lastRenderTime, nodeTime.isSampleTimeValid,
-              let playerTime = lane.node.playerTime(forNodeTime: nodeTime) else { return nil }
-        // an end the render has passed is no time to start at (see startLanesIfReady)
-        guard lane.nodeEnd > playerTime.sampleTime else { return nil }
-        let remaining = Double(lane.nodeEnd - playerTime.sampleTime) / playerTime.sampleRate
-        if nodeTime.isHostTimeValid {
-            return AVAudioTime(hostTime: nodeTime.hostTime + AVAudioTime.hostTime(forSeconds: remaining))
-        }
-        return AVAudioTime(sampleTime: nodeTime.sampleTime + AVAudioFramePosition(remaining * nodeTime.sampleRate),
-                           atRate: nodeTime.sampleRate)
     }
 
     private func scheduleRetry(soon: Bool = false) {

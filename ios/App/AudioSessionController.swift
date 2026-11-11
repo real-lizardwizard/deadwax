@@ -67,6 +67,13 @@ final class AudioSessionController {
         return session.outputLatency + session.ioBufferDuration
     }
 
+    /// The output's IO buffer: a song started on an output already running is started this far past the
+    /// engine's last render (as a sample time), so the start never lands inside a render under way. Read on
+    /// the engine's queue.
+    nonisolated static func ioBuffer() -> TimeInterval {
+        AVAudioSession.sharedInstance().ioBufferDuration
+    }
+
     /// How far the ear is behind the engine's render: the same sum, read at every position the
     /// engine gives (the lock screen, the scrubber, a pause, a new route), so each is what is heard -
     /// tens of milliseconds on the speaker, more on AirPods, about 2 s on AirPlay (iOS's own figure,
