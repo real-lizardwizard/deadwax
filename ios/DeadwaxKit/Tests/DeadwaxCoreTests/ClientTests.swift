@@ -250,6 +250,45 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
         }
     }
 
+    /// Every code APIFailure.isOffline names is "Can't connect to deadwax." - WireGuard dropping mid-request (-1005),
+    /// a DNS miss - from the client and from a bare URLError alike; dropping one would make it read "Something went
+    /// wrong ... tell whoever runs deadwax". And the codes the web would also call offline (its fetch can't tell a TLS
+    /// failure or a garbled answer from no network) but the phone says as `other` - a deliberate difference: checking
+    /// the connection can't fix a certificate or a proxy, only whoever runs deadwax can.
+    @Test func whichTransportFailuresAreOffline() async {
+        let offline: [URLError.Code] = [
+            .notConnectedToInternet, .networkConnectionLost, .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed,
+            .dataNotAllowed, .internationalRoamingOff,
+        ]
+        let other: [URLError.Code] = [.secureConnectionFailed, .serverCertificateUntrusted, .badServerResponse,
+                                      .cannotParseResponse]
+        for code in offline + other {
+            let expected: ErrorWords.Kind = offline.contains(code) ? .offline : .other
+            #expect(APIFailure.isOffline(code) == (expected == .offline), "URLError \(code.rawValue)")
+            #expect(ErrorWords.kind(of: URLError(code)) == expected, "URLError \(code.rawValue)")
+            let (deadwax, transport) = client()
+            transport.fail(code)
+            do {
+                _ = try await deadwax.me()
+                Issue.record("URLError \(code.rawValue): expected a failure")
+            } catch let error as APIFailure {
+                switch (error, expected) {
+                case (.offline(let none), .offline):
+                    #expect(none.path == "/me", "URLError \(code.rawValue)")
+                    #expect(ErrorWords.of(error).said == "Can't connect to deadwax. Check your connection, then try again.")
+                case (.other(let words), .other):
+                    #expect(words.hasPrefix("Couldn't reach deadwax at http://192.168.3.20:8090."), "URLError \(code.rawValue)")
+                    #expect(ErrorWords.of(error).said
+                            == "Something went wrong. Try again - if it keeps happening, tell whoever runs deadwax.")
+                default:
+                    Issue.record("URLError \(code.rawValue): \(error), expected \(expected)")
+                }
+            } catch {
+                Issue.record("URLError \(code.rawValue): not an APIFailure: \(error)")
+            }
+        }
+    }
+
     @Test func detailIsDeadwaxsOwnWordsOrTheStatus() {
         #expect(detailWords(Data(#"{"detail":"Logins are off."}"#.utf8), status: 409) == "Logins are off.")
         #expect(detailWords(Data(#"{"detail":[{"msg":"field required"},{"msg":"too long"}]}"#.utf8), status: 422)

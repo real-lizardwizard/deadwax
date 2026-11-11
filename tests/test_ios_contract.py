@@ -210,6 +210,11 @@ def test_every_route_the_app_calls_is_the_servers_with_its_parameters(monkeypatc
     assert route is not None, f"the app calls {method} {path}, which the server doesn't have"
     declared = {field.alias for field in route.dependant.query_params}
     assert set(query) <= declared, f"{path}: the app sends {sorted(set(query) - declared)}, which the server ignores"
+    # and the other way: DeadwaxClient.url() sends only the names an Endpoint declares, so one that loses a parameter
+    # the server requires would make every call to it a 422 with nothing else noticing (search's q, album_index's
+    # scope, a song's level's level)
+    required = {field.alias for field in route.dependant.query_params if field.required}
+    assert required <= set(query), f"{path}: the server needs {sorted(required - set(query))}, which the app never sends"
     named = set(re.findall(r"\{(\w+)\}", path))
     assert named == {field.alias for field in route.dependant.path_params}
 

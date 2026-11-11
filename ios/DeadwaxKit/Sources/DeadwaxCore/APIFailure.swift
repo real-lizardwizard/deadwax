@@ -19,7 +19,8 @@ public enum APIFailure: Error, Sendable, Equatable {
     /// Nothing answered in the time allowed (the web's TimeoutError).
     case timeout(NoAnswer)
     /// Anything else, in words: an answer the app couldn't read, an address that isn't one, a connection that
-    /// failed in a way that isn't the network's (a TLS error, say).
+    /// failed in a way that isn't the network's (a TLS error, say - which the web, unable to tell, calls offline:
+    /// see `isOffline`).
     case other(String)
 
     /// An answer's status and route, and what deadwax said in its body.
@@ -164,6 +165,13 @@ extension APIFailure {
     }
 
     /// What URLSession says when the phone can't get to the network or the server at all.
+    ///
+    /// Narrower than the web on purpose. The web calls every fetch TypeError offline ("Load failed" is all Safari
+    /// says, a TLS failure or a garbled answer included) because fetch can't tell them apart; URLSession can. A
+    /// certificate, an ATS refusal, an answer that isn't HTTP (`.secureConnectionFailed`, `.badServerResponse`, ...)
+    /// isn't fixed by checking the connection, so each is `.other`: "Something went wrong ... tell whoever runs
+    /// deadwax", with Phase 0's words and the system's reason for whoever does. Every failure of `/me` but a 401
+    /// reaches the can't-reach screen either way.
     static func isOffline(_ code: URLError.Code) -> Bool {
         let codes: [URLError.Code] = [
             .notConnectedToInternet, .networkConnectionLost, .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed,

@@ -47,6 +47,9 @@ const VT = ch(0x0b), FF = ch(0x0c), NBSP = ch(0xa0), OGHAM = ch(0x1680), THIN = 
 const NARROW = ch(0x202f), MATH = ch(0x205f), IDEO = ch(0x3000), BOM = ch(0xfeff), NEL = ch(0x85), MONGOLIAN = ch(0x180e)
 const ZWSP = ch(0x200b), ELLIPSIS = ch(0x2026)
 const E_ACUTE = ch(0xe9), E_COMBINING = 'e' + ch(0x301), SHARP_S = ch(0xdf), LONG_S = ch(0x17f), KELVIN = ch(0x212a)
+/* a cased letter outside the BMP: JavaScript's charAt(0) is its lone high surrogate, which toUpperCase leaves be, where
+ * Swift's uppercased() would make U+10428 U+10400 */
+const DESERET = String.fromCodePoint(0x10428)
 const SMILE = String.fromCodePoint(0x1f600), DZ = ch(0x1c6), NAPOSTROPHE = ch(0x149), DOTLESS_I = ch(0x131), LIGATURE_FF = ch(0xfb00)
 
 /* ===== the errors ================================================================================ */
@@ -216,7 +219,7 @@ const SENTENCES = [
   'deadwax broke', 'slskd broke', 'it broke', '  it broke  ', 'deadwaxy broke', 'deadwax_x', 'deadwax-y', 'deadwax', 'Deadwax',
   'slskd!', 'ends.', 'ends!', 'ends?', 'ends' + ELLIPSIS, 'ends.\n', 'ends. ', '', '   ', SHARP_S + ' is sharp', E_COMBINING + 'lan',
   E_ACUTE + 'lan', DZ + ' digraph', NAPOSTROPHE + ' apostrophe', DOTLESS_I + ' dotless', LIGATURE_FF + ' ligature',
-  SMILE + ' smile', '1 thing', '\tx', NBSP + 'x' + NBSP, NEL + 'x', BOM + 'x' + BOM, 'x' + LS, MONGOLIAN + 'x', ZWSP + 'x',
+  SMILE + ' smile', DESERET + ' deseret', '1 thing', '\tx', NBSP + 'x' + NBSP, NEL + 'x', BOM + 'x' + BOM, 'x' + LS, MONGOLIAN + 'x', ZWSP + 'x',
   'ends.' + NEL, 'x\r\n',
 ].map((text) => ({ text, sentence: E.asSentence(text) }))
 

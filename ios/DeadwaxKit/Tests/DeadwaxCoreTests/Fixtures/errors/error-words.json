@@ -259,6 +259,7 @@
   {"text":"\u0131 dotless","sentence":"I dotless."},
   {"text":"\ufb00 ligature","sentence":"FF ligature."},
   {"text":"\ud83d\ude00 smile","sentence":"\ud83d\ude00 smile."},
+  {"text":"\ud801\udc28 deseret","sentence":"\ud801\udc28 deseret."},
   {"text":"1 thing","sentence":"1 thing."},
   {"text":"\tx","sentence":"X."},
   {"text":"\u00a0x\u00a0","sentence":"X."},
