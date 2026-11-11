@@ -3,6 +3,7 @@ import AVFAudio
 import AudioToolbox
 import DeadwaxCore
 import Foundation
+import Testing
 @testable import DeadwaxAudio
 
 // What Phase 1's render tests share (the Phase 0 helpers are at the top of EngineRenderTests.swift).
@@ -30,15 +31,58 @@ func liveEngine(rate: Double, channels: AVAudioChannelCount = 2, ahead: Double =
 /// Renders `frames` frames a `piece` at a time, the engine's buffer completions handled between (as
 /// they are on the phone while it plays). `before` is called with the frames rendered so far ahead of
 /// each piece. Channel 0.
-func render(_ engine: PlaybackEngine, frames: Int, piece: Int = 4_096, before: ((Int) -> Void)? = nil) throws -> [Float] {
+func render(_ engine: PlaybackEngine, frames: Int, piece: Int = 4_096, before: ((Int) -> Void)? = nil,
+            sourceLocation: SourceLocation = #_sourceLocation) throws -> [Float] {
     var out: [Float] = []
     while out.count < frames {
         before?(out.count)
         out += samples(try engine.renderOffline(AVAudioFrameCount(min(piece, frames - out.count))), channel: 0)
-        Thread.sleep(forTimeInterval: 0.01)
-        engine.settle()
+        try completionsHandled(engine, sourceLocation: sourceLocation)
     }
     return out
+}
+
+/// Waits (bounded) until the engine has handled the completion of every buffer the render has passed,
+/// then requires it. They come on AVAudioEngine's own thread after the render, at no set time: a sleep
+/// of 10 ms was enough on this Mac, and on ios.yml's 3-core runner, with Core's 450 tests in the same
+/// process, it wasn't - the next piece rendered before they came, nothing new was on the node in time,
+/// and the render was silent where the next song should have joined (notes/ios.md "The engine's tests
+/// under load"). On the phone they come long before the render needs them, 2 s ahead; this is that,
+/// made certain.
+func completionsHandled(_ engine: PlaybackEngine, seconds: Double = 5,
+                        sourceLocation: SourceLocation = #_sourceLocation) throws {
+    let until = Date().addingTimeInterval(seconds)
+    while engine.completionsDue > 0, Date() < until { Thread.sleep(forTimeInterval: 0.001) }
+    try #require(engine.completionsDue == 0, "the completions of what was rendered, handled within \(seconds) s",
+                 sourceLocation: sourceLocation)
+}
+
+/// The engine's trace, each line with the seconds since the test began - printed when a test fails, to
+/// say what the engine did and when.
+final class TraceLines: CustomStringConvertible {
+    private let lock = NSLock()
+    private let began = Date()
+    private var lines: [String] = []
+
+    func add(_ line: String) {
+        let at = String(format: "%.4f", Date().timeIntervalSince(began))
+        lock.withLock { lines.append("\(at) s: \(line)") }
+    }
+
+    var description: String { lock.withLock { lines.joined(separator: "\n") } }
+}
+
+/// Where a render that should have been `expected` from its first frame begins instead: silent
+/// throughout, or silent (or other) until frame N where `expected` begins - what tells a stopped output
+/// from a node that started late.
+func whereItBegins(_ got: [Float], _ expected: [Float]) -> String {
+    guard let sound = got.firstIndex(where: { $0 != 0 }) else { return "the render is silent throughout" }
+    let probe = 64
+    guard expected.count >= probe,
+          let at = (0...(got.count - probe)).first(where: { start in (0..<probe).allSatisfy { got[start + $0] == expected[$0] } }) else {
+        return "the first sound at frame \(sound), and the song's first frames nowhere"
+    }
+    return "the first sound at frame \(sound); the song's first frames at frame \(at)"
 }
 
 /// Every channel of a render, at once.

@@ -71,6 +71,31 @@ extension EngineRenderTests {
                 "on from the frame heard, 19200 - the old route's 4800 frames went with it")
     }
 
+    // The reading a new route (or a call) goes on from carries the latency read WITH it. It carried the
+    // one read before - none here until a buffer's completion had read one, the old route's on the phone
+    // for the first reading on a new one - so a new route before any completion went on from the frame
+    // rendered, not the frame heard: the test above on ios.yml's load, when the position was read before
+    // the completions came (notes/ios.md "The engine's tests under load").
+    @Test func aNewRouteBeforeAnyCompletionGoesOnFromTheFrameHeard() throws {
+        let rate = 48_000.0
+        let song = signal(frames: 96_000, channels: 2, seed: 0.64)
+        let engine = try liveEngine(rate: rate, ahead: 60, latency: 0.05)
+        engine.play(tracksFromWhereAsked([song], rate: rate), from: 0)
+        engine.settle()
+        _ = try engine.renderOffline(4_000) // short of the first buffer's 4800 frames: no completion can come
+        engine.settle()
+        #expect(engine.callbacksArrived == 0, "no buffer called back yet")
+        _ = engine.position() // the app's ticker
+        engine.systemStopped(change: true)
+        engine.settle()
+        #expect(engine.phase == .playing)
+        let heard = 4_000 - 2_400 // the render less the old route's 50 ms
+        #expect(engine.position()?.seconds == Double(heard) / rate, "on from the frame heard, \(heard), not the frame rendered")
+        let out = try engine.renderOffline(24_000)
+        #expect(firstDifference(samples(out, channel: 0)[8_192..<9_192], song[0][(heard + 8_192)..<(heard + 9_192)]) == nil,
+                "the song goes on from frame \(heard)")
+    }
+
     @Test func aNewRouteKeepsAnEndedQueueEnded() throws {
         let rate = 48_000.0
         let engine = try offlineEngine(rate: rate, channels: 2)
@@ -304,8 +329,7 @@ extension EngineRenderTests {
         var pieces = 0
         while engine.phase != .ended, pieces < 20 {
             _ = try engine.renderOffline(2_400)
-            Thread.sleep(forTimeInterval: 0.01)
-            engine.settle()
+            try completionsHandled(engine)
             pieces += 1
         }
         #expect(engine.phase == .ended)
@@ -354,8 +378,9 @@ extension EngineRenderTests {
         engine.settle()
         #expect(engine.stateNow.key == 0, "not said yet")
         #expect(engine.position()?.key == 1, "though B is what is heard")
-        Thread.sleep(forTimeInterval: 1.2)
-        engine.settle()
+        // the engine's own timer, 0.95 s from A's completion; no completion comes before it
+        waitFor(engine) { engine.stateNow.key == 1 }
+        #expect(engine.callbacksArrived == 1, "only A's buffer called back")
         #expect(engine.stateNow.key == 1 && engine.stateNow.index == 1, "said when heard, with no completion")
     }
 }

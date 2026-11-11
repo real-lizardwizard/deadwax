@@ -1005,6 +1005,109 @@ bug.
 - **On the phone:** Phase 0's "a phone call" check (not done yet) is where this shows; also check that a call
   that comes in mid-song goes back to the same place in the same song.
 
+### The engine's tests under load (fix/engine-ci)
+
+ios.yml's macOS job (macos-26-arm64, 3 vCPU, Swift 6.3.3) failed at 70cbef6 on two engine tests that pass on
+this Mac:
+- aJoinIsTheTwoSongsLaidEndToEnd: on both channels the first difference was at frame 4096, the first frame it
+  checks, and the largest difference in the first 4096 frames was 0.45767212 and 0.45776367. Those are the
+  song's own peaks there, so the render was silent from frame 0.
+- aNextSongNotYetOnANodeIsLetGo: `sample 0 of 22050 is 0.0, expected -0.44799805`. A was whole, but C wasn't
+  straight after it.
+
+Swift 6.3 builds ONE test bundle, so on the runner Core's 452 tests run in the engine's process. Swift 6.4 here
+builds one bundle per target. To run it as CI does, a scratch package (not committed) symlinked both targets'
+test files into one test target, and that ran under `perl -e 'alarm shift; 1 while 1' 600` CPU hogs, 5 or 7 of
+them on this 8-core Mac.
+
+**Before any change.**
+- One process, 5 hogs: 2 of 10 runs failed.
+- One process, 7 hogs: 7 of 10 failed, 1 crashed (SIGTRAP) and 2 passed.
+- One process with `LIBDISPATCH_COOPERATIVE_POOL_STRICT=1`, 5 hogs: 2 of 6 failed.
+- The Audio suites alone, 5 hogs: 0 of 10 failed.
+- No load: 2 of 2 passed.
+
+Every failure was aNewRouteGoesOnFromTheFrameHeard, neither of CI's two. What was found:
+
+- **A new route went on from the frame rendered (an engine race; it can happen on the phone).**
+  - The test expected position 0.4 after iOS stopped the engine for a new route, and got 0.5 (all 9 times),
+    the frame rendered.
+  - sample(of:) kept each reading with `lastLatency`, the latency read the time before. Offline that is 0 until a
+    buffer's completion has read one, so with the position read ahead of the completions (load) the reading
+    carried 0. The stop then went on from the reading's frame less no latency.
+  - With no load, 10 of 100 runs of it alone failed in a loop.
+  - On the phone a play reads the latency as it starts (playFromSilence), so a session's first reading is
+    right. But after a new route the engine goes on by itself, and its first reading there carried the old
+    route's latency. A call or another route change before the next reading then went on off by the two routes'
+    difference. A listener would hear a fraction of a second skipped or played again, between Bluetooth's
+    latency (about 0.2 s) and the speaker's (a few ms).
+  - The fix: the reading carries the latency read with it (`currentLatency()` in sample(of:)). heardFrame and
+    followHeard use that same read (`lastLatency`) rather than reading it twice.
+  - The test, aNewRouteBeforeAnyCompletionGoesOnFromTheFrameHeard, renders 4000 frames (short of the first
+    buffer, so no completion can come), reads the position, then has iOS stop the engine. It wants 1600
+    (0.0333 s) and the song bit-exact from there. Without the fix it gets 0.0833 s, the frame rendered.
+- **The render helper's 10 ms sleep stood in for "the completions came" (test timing: CI's
+  aNextSongNotYetOnANodeIsLetGo).**
+  - The engine tops its node up from each buffer's completion (played()). Offline nothing paces the render, and
+    the completions come on AVAudioPlayerNode's own queue after it, at no set time. So a starved completion
+    thread lets the next piece render past what was scheduled: silence.
+  - Made certain with `completionLag`, a tests-only hook that handles each completion N s after AVAudioEngine
+    calls it back. With the old sleep, a lag of 25 ms or more broke the song (A at frame 9134) and 20 ms or less
+    passed. Holding the completions 40 ms only from A's fourth buffer on made CI's failure exactly: A whole, and
+    `sample 0 of 22050 is 0.0, expected -0.44799805`.
+  - The fix: `render()` and the tests' other piecewise loops now call `completionsHandled`. It waits (1 ms
+    polls, bounded at 5 s) until `completionsDue` is 0 - the buffers the render has passed whose completions
+    the engine hasn't handled - then `#require`s it.
+  - The test, aNextSongNotYetOnANodeIsLetGoWithItsCompletionsLate, is the same test with every completion 50 ms
+    late. It passes now and fails with the sleep back.
+  - On the phone the output paces the render and keeps 2 s ahead, so a completion would have to be about 2 s
+    late. That is any starved player, heard as a gap where the next song should join, not a logic race. The
+    engine is unchanged for it.
+- **A crash (SIGTRAP), test-only, fixed in the engine.**
+  - The crash report puts it on AVAudioPlayerNodeImpl.CompletionHandlerQueue: -[AVAudioEngine dealloc],
+    DetachNode, AVAudioPlayerNodeImpl::StopImpl, then dispatch_assert_queue_not.
+  - The completion closure promoted the engine there. A test that let go of its engine with completions still on
+    their way made that the last reference, so AVAudioEngine was deallocated on its own completion queue,
+    stopping its nodes there, which traps.
+  - The fix: nothing on that queue holds the engine. The completion, and likewise the configuration-change
+    observer, captures the engine's queue and promotes `self` only on it.
+  - The test, anEngineLetGoWithCompletionsOnTheirWayGoesAtOnce, holds completions 30 s away and wants the engine
+    gone once the test lets go of it. It fails with the strong capture back.
+  - On the phone the app holds one engine for its whole life, so this can't happen there.
+- **The other sleeps (test timing).** These were not seen failing, but they had the same shape:
+  - positionFollowsTheSongHeard, aShortSong… and theQueuesEndIsHeard… now call `completionsHandled`.
+  - aCallGoesOnFromWhereTheSongWas waits for `callbacksOutstanding` to be 0, then `#require`s it. That counts
+    every buffer scheduled less every completion handled, ignored or not, which is what a stop lets go.
+  - theSongChange… waits on its own condition (stateNow.key == 1, the engine's own 0.95 s timer) and checks only
+    A's buffer called back, in place of sleep(1.2).
+- **aJoinIsTheTwoSongsLaidEndToEnd: not reproduced.**
+  - It passed in every run here: 31 one-process runs before the fixes and every package run after, a
+    200-iteration loop of it under spinners and delays, and 300 runs of its first engine in a fresh process.
+  - It renders in one call, with no completion involved, so the helper isn't its cause. A render silent from
+    frame 0 means the node wasn't playing, or the output wasn't running, when it rendered.
+  - It now `#require`s phase `.playing` and the output running before the render. On a difference it prints
+    where the song begins in the render (`whereItBegins`: silent throughout, or the frame its first 64 frames
+    are at), the phase, the output's state and the engine's trace, which now has "the output started". The next
+    CI failure will say which.
+- **70cbef6's `guard engine.isRunning` in played(), re-checked: sound.**
+  - Every stop the engine makes resets first (or comes with nothing scheduled), and every way on from iOS's stop
+    resets the lanes, so nothing waits on the completions it ignores.
+  - `callbacksHandled` counts them before the generation guard.
+  - Taking the guard out still fails aCallGoesOnFromWhereTheSongWas.
+
+**Mutations**, each restored byte for byte, and all four fail:
+- the reading's latency put back to the one read before (aNewRouteBeforeAnyCompletion…);
+- the completion holding the engine (anEngineLetGo…);
+- the render helper's sleep put back (aNextSongNotYetOnANodeIsLetGoWithItsCompletionsLate: A broken at 9134, C
+  not straight after it);
+- the stop guard taken out (aCallGoes…).
+
+**After.** All 509 tests (Core 452, Audio 57) passed:
+- one process, 7 hogs: 15 of 15;
+- the real package (two bundles), 7 hogs: 15 of 15;
+- the Audio suites alone, 7 hogs: 15 of 15;
+- the package with no load.
+
 ### Verified (Phase 1's Core, p1/merge, 2026-11-10)
 
 All on James's Mac (8 GB; heavy builds one at a time), Xcode 27.1's toolchain:

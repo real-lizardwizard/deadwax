@@ -201,7 +201,10 @@ public final class PlaybackEngine {
         /// From `format` to `nodeFormat`, when the rates differ; nil when they don't (nothing done).
         let converter: AVAudioConverter?
         var timeline = LaneTimeline()
-        var pending = 0
+        /// Where each buffer scheduled and not yet called back ends on the node (its frames since it
+        /// started), in order: one per completion to come.
+        var ends: [Int64] = []
+        var pending: Int { ends.count }
         var started = false
         /// Frames scheduled on the node since it started, at the node's rate.
         var nodeFrames: Int64 = 0
@@ -242,7 +245,7 @@ public final class PlaybackEngine {
         /// keeps what it holds: `resetConverter` lets it go.
         func clear() {
             timeline.reset()
-            pending = 0
+            ends.removeAll()
             started = false
             nodeFrames = 0
             lastRead = nil
@@ -339,6 +342,22 @@ public final class PlaybackEngine {
     private var restart: DispatchWorkItem?
     private var songChange: DispatchWorkItem?
     private var state = EngineState()
+    /// Buffers scheduled, and completions handled (any generation, ignored or not) - the tests wait on
+    /// the difference (`callbacksOutstanding`).
+    private var buffersScheduled = 0
+    private var callbacksHandled = 0
+    /// Completions AVAudioEngine has called back, counted on its own thread (tests: `callbacksArrived`).
+    private final class Arrivals {
+        private let lock = NSLock()
+        private var count = 0
+        func add() { lock.lock(); count += 1; lock.unlock() }
+        var value: Int { lock.lock(); defer { lock.unlock() }; return count }
+    }
+    private let arrivals = Arrivals()
+    /// Tests: how long after AVAudioEngine calls a buffer back the engine handles it - its completion
+    /// thread starved, as on ios.yml's macOS runner, made certain (notes/ios.md "The engine's tests under
+    /// load"). Set before `play`.
+    var completionLag: TimeInterval = 0
 
     public init(settings: Settings = Settings()) throws {
         self.settings = settings
@@ -356,10 +375,11 @@ public final class PlaybackEngine {
         }
         _ = engine.mainMixerNode
         if let observer { NotificationCenter.default.removeObserver(observer) }
+        // posted on AVAudioEngine's own thread: nothing there holds the engine (see `enqueue`)
+        let queue = self.queue
         observer = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange,
                                                           object: engine, queue: nil) { [weak self] _ in
-            guard let self else { return }
-            self.queue.async { self.configurationChanged() }
+            queue.async { self?.configurationChanged() }
         }
     }
 
@@ -544,6 +564,26 @@ public final class PlaybackEngine {
     /// Tests: whether the output is running - what iOS goes by to call the app playing.
     var outputRunning: Bool { queue.sync { engine.isRunning } }
 
+    /// Tests: buffers the render has passed whose completions the engine hasn't handled yet. AVAudioEngine
+    /// calls them back on its own thread after the render, so a test rendering in pieces waits for this
+    /// to be 0 before the next piece - the phone has them long before its render needs them, 2 s ahead.
+    var completionsDue: Int {
+        queue.sync {
+            lanes.values.reduce(0) { due, lane in
+                guard lane.started, let nodeTime = lane.node.lastRenderTime, nodeTime.isSampleTimeValid,
+                      let playerTime = lane.node.playerTime(forNodeTime: nodeTime) else { return due }
+                return due + lane.ends.prefix { $0 <= playerTime.sampleTime }.count
+            }
+        }
+    }
+
+    /// Tests: buffers scheduled whose completions haven't been handled yet, whatever called them back - a
+    /// render, or a stop letting them go (AVAudioEngine calls back every buffer still scheduled then).
+    var callbacksOutstanding: Int { queue.sync { buffersScheduled - callbacksHandled } }
+
+    /// Tests: completions AVAudioEngine has called back so far, handled or not.
+    var callbacksArrived: Int { arrivals.value }
+
     /// Tests: iOS stopping the engine (a call, a new route) - and, with `change`, the configuration
     /// change it posts, handled as the notification's would be.
     func systemStopped(change: Bool) {
@@ -608,6 +648,7 @@ public final class PlaybackEngine {
         do {
             try engine.start()
             asleep = false
+            note("the output started")
             return true
         } catch {
             fail(AudioFailure("iOS wouldn't start the audio: \(error.localizedDescription)"))
@@ -716,8 +757,8 @@ public final class PlaybackEngine {
     }
 
     /// The render's position on the lane's node now, in the songs' frames, once it is playing - kept
-    /// as the lane's `lastRead`. Nil when the engine isn't running (iOS stopped it, or it is asleep)
-    /// or the node isn't playing.
+    /// as the lane's `lastRead`, with the output's latency read now (`lastLatency` after it). Nil when
+    /// the engine isn't running (iOS stopped it, or it is asleep) or the node isn't playing.
     private func sample(of lane: Lane) -> Int64? {
         guard lane.started, let nodeTime = lane.node.lastRenderTime, nodeTime.isSampleTimeValid,
               let playerTime = lane.node.playerTime(forNodeTime: nodeTime) else { return nil }
@@ -726,7 +767,11 @@ public final class PlaybackEngine {
         if settings.offline == nil {
             at = nodeTime.isHostTimeValid ? AVAudioTime.seconds(forHostTime: nodeTime.hostTime) : Self.hostSeconds()
         }
-        lane.lastRead = HeardReading(frame: frame, at: at, latency: lastLatency)
+        // the latency of the route this reading was taken on, read with it: the estimate after iOS stops
+        // the engine takes it back from the frame. It was the latency read before - offline 0 until a
+        // buffer's completion had read one, and on the phone the old route's for the first reading on a
+        // new one (notes/ios.md "The engine's tests under load")
+        lane.lastRead = HeardReading(frame: frame, at: at, latency: currentLatency())
         lane.stopped = nil
         return frame
     }
@@ -737,7 +782,7 @@ public final class PlaybackEngine {
     private func heardFrame(of lane: Lane, readingNodes: Bool = true) -> Int64? {
         let rate = lane.format.sampleRate
         if readingNodes, let rendered = sample(of: lane) {
-            return HeardEstimate.heard(rendered: rendered, latency: currentLatency(), rate: rate)
+            return HeardEstimate.heard(rendered: rendered, latency: lastLatency, rate: rate)
         }
         if let stopped = lane.stopped { return stopped }
         guard let reading = lane.lastRead else { return nil }
@@ -886,14 +931,27 @@ public final class PlaybackEngine {
     /// the next lane started in time, a lane known to be done). `.dataPlayedBack` comes the output's
     /// latency later - offline, later than a half-second song in another format lasted (ios.yml's
     /// first macOS run), so the song after it started late.
+    ///
+    /// The completion comes on AVAudioPlayerNode's own completion queue, and nothing there holds the
+    /// engine: were its last reference released there, AVAudioEngine's dealloc would stop these nodes
+    /// on that queue, which traps (a test's engine let go with completions on their way, under load).
     private func enqueue(_ buffer: AVAudioPCMBuffer, on lane: Lane, key: LaneKey) {
         guard buffer.frameLength > 0 else { return }
-        lane.pending += 1
         lane.nodeFrames += Int64(buffer.frameLength)
+        lane.ends.append(lane.nodeFrames)
+        buffersScheduled += 1
         let generation = self.generation
+        let queue = self.queue
+        let lag = completionLag
+        let arrivals = self.arrivals
         lane.node.scheduleBuffer(buffer, completionCallbackType: .dataRendered) { [weak self] _ in
-            guard let self else { return }
-            self.queue.async { self.played(generation: generation, lane: key) }
+            arrivals.add()
+            let handle: () -> Void = { self?.played(generation: generation, lane: key) }
+            if lag > 0 {
+                queue.asyncAfter(deadline: .now() + lag, execute: handle)
+            } else {
+                queue.async(execute: handle)
+            }
         }
     }
 
@@ -1098,6 +1156,7 @@ public final class PlaybackEngine {
     /// A buffer has been played: keep the lane fed, follow the song heard, and notice a lane that
     /// ran dry - at its end, or mid-song (a stream that didn't keep up).
     private func played(generation: Int, lane key: LaneKey) {
+        callbacksHandled += 1
         guard generation == self.generation, let lane = lanes[key] else { return }
         // A stopped output renders nothing. When iOS stops the engine itself - a call, before the app
         // hears of the interruption - AVAudioEngine calls back every buffer still scheduled at once,
@@ -1107,7 +1166,7 @@ public final class PlaybackEngine {
         // were let go, not heard. Every way on from such a stop - play, a new route, a media services
         // reset - lets the lanes go and starts again from the frame heard, so nothing waits on them.
         guard engine.isRunning else { return }
-        lane.pending = max(lane.pending - 1, 0)
+        if !lane.ends.isEmpty { lane.ends.removeFirst() }
         note("lane \(Int(lane.format.sampleRate)) Hz: a buffer rendered, \(lane.pending) to go")
         if lane.pending == 0, lane.holding, feed?.lane != key {
             // its songs are done but the converter still holds their last frames: those go on first
@@ -1188,7 +1247,7 @@ public final class PlaybackEngine {
         songChange = nil
         guard let laneKey = heardLane, let lane = lanes[laneKey], let rendered = sample(of: lane) else { return }
         let rate = lane.format.sampleRate
-        let heardAt = HeardEstimate.heard(rendered: rendered, latency: currentLatency(), rate: rate)
+        let heardAt = HeardEstimate.heard(rendered: rendered, latency: lastLatency, rate: rate)
         guard let heardEntry = lane.timeline.locate(heardAt) else { return }
         if let key = entryKey[heardEntry.entry.id], key != current { current = key }
         guard let renderedEntry = lane.timeline.locate(rendered), renderedEntry.entry.id != heardEntry.entry.id,

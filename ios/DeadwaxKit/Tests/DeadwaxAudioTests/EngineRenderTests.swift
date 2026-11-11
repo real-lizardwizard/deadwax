@@ -164,8 +164,15 @@ func energyMap(_ samples: [Float], block: Int = 2_048) -> String {
         let a = signal(frames: 13_230, channels: 2, seed: 0.1) // 0.3 s
         let b = signal(frames: 11_025, channels: 2, seed: 0.7) // 0.25 s
         let engine = try offlineEngine(rate: rate, channels: 2)
+        let trace = TraceLines()
+        engine.trace = trace.add
         engine.play(tracksFromWhereAsked([a, b], rate: rate), from: 0)
         engine.settle()
+        // What the render takes as given. ios.yml's runner once rendered this test's first 4096 frames
+        // (at least) silent, not reproduced here in any load (notes/ios.md "The engine's tests under
+        // load"): these, and what is printed below, say which it was if it comes again.
+        try #require(engine.phase == .playing && engine.outputRunning,
+                     "playing with the output running before the render: \(engine.phase)\n\(trace)")
         let total = a[0].count + b[0].count
         let out = try engine.renderOffline(AVAudioFrameCount(total + 4096))
         // the node's start may be ramped (Apple DTS: "a short volume ramp"); the join is well past it
@@ -182,6 +189,10 @@ func energyMap(_ samples: [Float], block: Int = 2_048) -> String {
             #expect(got[total...].allSatisfy { $0 == 0 }, "silence after the last song")
             let ramp = (0..<from).map { abs(got[$0] - expected[$0]) }.max() ?? 0
             print("channel \(channel): largest difference in the first \(from) frames (the start ramp, if any): \(ramp)")
+            if first != nil || ramp > 0 {
+                print("channel \(channel): \(whereItBegins(got, expected)); after the render \(engine.phase), "
+                      + "the output \(engine.outputRunning ? "running" : "stopped"); the engine's trace:\n\(trace)")
+            }
         }
     }
 
@@ -193,14 +204,13 @@ func energyMap(_ samples: [Float], block: Int = 2_048) -> String {
         engine.play(tracksFromWhereAsked([a, b], rate: rate), from: 0)
         engine.settle()
         _ = try engine.renderOffline(36_000)
-        engine.settle()
+        // the state follows from the first song's completions, which come on AVAudioEngine's thread
+        try completionsHandled(engine)
         let at = try #require(engine.position())
         #expect(at.index == 1)
         #expect(at.key == 1)
         #expect(abs(at.seconds - 0.25) < 0.1)
         #expect(at.length == 0.5, "the song's decode has ended: its exact length")
-        // the state follows from the first song's completions, which come on AVAudioEngine's thread
-        waitFor(engine) { engine.stateNow.key == 1 }
         #expect(engine.stateNow.key == 1 && engine.stateNow.index == 1)
     }
 
@@ -237,8 +247,7 @@ func energyMap(_ samples: [Float], block: Int = 2_048) -> String {
         var left: [Float] = []
         while left.count < 66_150 + 8_192 {
             left += samples(try engine.renderOffline(4_096), channel: 0)
-            Thread.sleep(forTimeInterval: 0.01)
-            engine.settle()
+            try completionsHandled(engine)
         }
         print("a short song between, energy by 2048 frames (the joins at 22050 and 44100): \(energyMap(left))")
         // past each node's start (it may be ramped) and the rate converter's tail
@@ -270,8 +279,8 @@ func energyMap(_ samples: [Float], block: Int = 2_048) -> String {
         engine.systemStopped(change: false) // the call: iOS stops the engine first...
         // ...and calls back every buffer it let go at once, well before the app hears of the call:
         // those are not the song played to its end
-        Thread.sleep(forTimeInterval: 0.1)
-        engine.settle()
+        waitFor(engine) { engine.callbacksOutstanding == 0 }
+        try #require(engine.callbacksOutstanding == 0, "every buffer called back and handled")
         #expect(engine.phase == .playing, "the stop is not the song ending (\(engine.phase))")
         let stopped = try #require(engine.position())
         #expect(stopped.key == 0 && abs(stopped.seconds - before.seconds) < 0.001,
@@ -315,6 +324,31 @@ func energyMap(_ samples: [Float], block: Int = 2_048) -> String {
         try #require(from + 9_192 <= song[0].count, "goes on from inside the song (frame \(from)), not past it")
         #expect(firstDifference(samples(out, channel: 0)[8_192..<9_192], song[0][(from + 8_192)..<(from + 9_192)]) == nil,
                 "the song goes on from frame \(from)")
+    }
+
+    // An engine let go while its buffers' completions are on their way is let go at once: nothing on
+    // AVAudioEngine's completion queue holds it. The completion's closure used to (`guard let self`), and
+    // under load a test's engine had its last release there: AVAudioEngine's dealloc stopped the nodes on
+    // that very queue, which traps, and took the test process down (notes/ios.md "The engine's tests under
+    // load"). The app keeps its one engine for good, so on the phone this never came up.
+    @Test func anEngineLetGoWithCompletionsOnTheirWayGoesAtOnce() throws {
+        let rate = 48_000.0
+        // everything that holds the engine is in here, gone once it returns - but `engine` itself
+        func playAndRender(_ made: PlaybackEngine) throws {
+            made.completionLag = 30 // each completion's handling held back long past the end of this test
+            made.play(tracksFromWhereAsked([signal(frames: 48_000, channels: 2, seed: 0.66)], rate: rate), from: 0)
+            made.settle()
+            _ = try made.renderOffline(24_000)
+            waitFor(made) { made.callbacksArrived >= 5 }
+            try #require(made.callbacksArrived >= 5, "the render's five completions called back, their handling to come")
+        }
+        final class Watch { weak var engine: PlaybackEngine? }
+        var engine: PlaybackEngine? = try liveEngine(rate: rate, ahead: 60)
+        let watch = Watch()
+        watch.engine = engine
+        try playAndRender(try #require(engine))
+        engine = nil
+        #expect(watch.engine == nil, "let go at once, not kept by a completion on its way")
     }
 
     @Test func aNewRoutePlaysOnFromWhereItWas() throws {

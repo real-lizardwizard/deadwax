@@ -91,6 +91,21 @@ extension EngineRenderTests {
     }
 
     @Test func aNextSongNotYetOnANodeIsLetGo() throws {
+        try nextSongLetGo(lag: 0)
+    }
+
+    // The same, with every buffer's completion handled 50 ms after AVAudioEngine calls it back - its thread
+    // starved, as on ios.yml's runner, made certain. There, with a 10 ms sleep standing in for the
+    // completions, the ones near A's end came after the next piece was rendered, nothing followed A on the
+    // node in time, and the output was silent where C should have joined (A whole, C's first sample 0.0 -
+    // made again here with that sleep and the completions held 40 ms from A's fourth buffer on). The render
+    // waits for them now, as the phone has them 2 s ahead, so what is heard is the same (notes/ios.md "The
+    // engine's tests under load").
+    @Test func aNextSongNotYetOnANodeIsLetGoWithItsCompletionsLate() throws {
+        try nextSongLetGo(lag: 0.05)
+    }
+
+    private func nextSongLetGo(lag: Double) throws {
         let rate = 44_100.0
         let (a, _, c) = abc()
         let A = entry(a, rate: rate, key: 0, id: "a")
@@ -100,6 +115,7 @@ extension EngineRenderTests {
             try StreamSource(bytes: gate, typeHint: kAudioFileFLACType, start: start)
         }
         let engine = try liveEngine(rate: rate)
+        engine.completionLag = lag
         engine.play([A, B], from: 0)
         engine.settle()
         var took: Bool?
