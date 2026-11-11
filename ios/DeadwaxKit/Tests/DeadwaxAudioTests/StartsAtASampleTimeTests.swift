@@ -109,10 +109,11 @@ extension EngineRenderTests {
         }
     }
 
-    // No render time to start at (an output that hasn't rendered yet, or only the last run's reading): the start
-    // falls back to what it was - at once, or the lead ahead at a host time - with nothing retried or waited for,
-    // and a song in another format after it still joins at the heard lane's last sample, its end read off its
-    // clock (no `origin`). A's length is no piece's, so only that join puts B straight after it.
+    // No render time to start at, ever (an output that never renders, or only the last run's reading): the start
+    // waits for one for a tenth of a second (`renderWaitSeconds`), then falls back to what it was - at once, or
+    // the lead ahead at a host time - and a song in another format after it still joins at the heard lane's last
+    // sample, its end read off its clock (no `origin`). A's length is no piece's, so only that join puts B
+    // straight after it.
     @Test func startWithNoRenderTimeFallsBack() throws {
         let a = signal(frames: 22_222, channels: 2, seed: 0.66)
         let b = signal(frames: 48_000, channels: 2, seed: 0.67)
@@ -124,8 +125,11 @@ extension EngineRenderTests {
         engine.play([entry(a, rate: 48_000, key: 0, id: "a"), entry(b, rate: 96_000, key: 1, id: "b"),
                      entry(c, rate: 48_000, key: 2, id: "c")], from: 0)
         engine.settle()
+        #expect(engine.phase == .loading, "waiting for a render (\(engine.phase))\n\(trace)")
+        waitFor(engine) { engine.phase == .playing }
         try #require(engine.phase == .playing, "playing (\(engine.phase))\n\(trace)")
-        #expect(trace.description.contains("started from silence at a host time: no render time yet"), "\(trace)")
+        #expect(trace.description.contains("no render of this run of the output yet, waiting for one"), "\(trace)")
+        #expect(trace.description.contains("started from silence at a host time: no render of this run in 100 ms"), "\(trace)")
         var out: [Float] = []
         while engine.phase != .ended, out.count < 96_000 {
             out += samples(try engine.renderOffline(4_800), channel: 0)
@@ -154,6 +158,80 @@ extension EngineRenderTests {
         // a render of this run
         #expect(PlaybackEngine.ofThisRun(43_520, host: started + 0.0157, atStart: 18_944, startedAt: started) == 43_520)
         #expect(PlaybackEngine.ofThisRun(43_008, host: nil, atStart: nil, startedAt: started) == 43_008)
+    }
+
+    // Play after a pause, wired through: the output starts again and the song's second is decoded before its first
+    // render of this run, so its lane's node still reads the render time left from before the stop - for 5-12 ms on
+    // this Mac's output; `staleRenderReads` gives that reading (12000 frames behind, stamped just after the start,
+    // so only its being the reading taken at the start tells it apart). The start waits for a render of this run,
+    // then starts at a sample time: the lead's silence, the song from the frame left, its count exact, and a song in
+    // another format straight after its last sample. Started at a host time instead, as efb8b6a fell back to every
+    // time here, the count ran 12-22 ms ahead of the ear on this Mac's output and the next song over its end (the
+    // verifiers' first finding); started at the reading left, a quarter of a second ahead here (0.3-1.45 s on the
+    // output: their second).
+    @Test func playAfterAPauseWaitsForThisRunsFirstRender() throws {
+        let rate = 48_000.0
+        let a = signal(frames: 48_000, channels: 2, seed: 0.69)
+        let b = signal(frames: 48_000, channels: 2, seed: 0.70) // 0.5 s at 96 kHz
+        let engine = try liveEngine(rate: rate)
+        engine.startLead = { 0.05 }
+        engine.staleRenderReads = 3 // the lanes made before a start: only A's, at play after the pause
+        engine.staleRenderBehind = 12_000
+        let trace = TraceLines()
+        engine.trace = trace.add
+        engine.play([entry(a, rate: rate, key: 0, id: "a"), entry(b, rate: 96_000, key: 1, id: "b")], from: 0)
+        engine.settle()
+        try #require(engine.phase == .playing, "the first start: no lane read stale (\(engine.phase))\n\(trace)")
+        _ = try render(engine, frames: 12_000, piece: 4_800) // A from 2400: 9600 heard
+        engine.pause()
+        engine.settle()
+        engine.resume()
+        waitFor(engine) { engine.phase == .playing }
+        try #require(engine.phase == .playing, "on again (\(engine.phase))\n\(trace)")
+        #expect(trace.description.contains("no render of this run of the output yet, waiting for one"), "it waited\n\(trace)")
+        #expect(trace.description.contains("this run's first render after"), "\(trace)")
+        let starts = trace.description.split(separator: "\n").filter { $0.contains("started from silence") }
+        #expect(starts.count == 2 && starts.last?.hasSuffix("started from silence at 14400") == true,
+                "at the render's count, 12000, and the lead - never at the reading left (2400), nor a host time\n\(trace)")
+        var out = try render(engine, frames: 12_000, piece: 4_800)
+        #expect(out[0..<2_400].allSatisfy { $0 == 0 }, "the lead's silence: \(whereItBegins(out, Array(a[0][9_600...])))\n\(trace)")
+        #expect(firstDifference(out[2_400...], a[0][9_600..<19_200]) == nil,
+                "A from 9600, the frame left: \(whereItBegins(Array(out[2_400...]), Array(a[0][9_600...])))\n\(trace)")
+        let at = try #require(engine.position())
+        #expect(abs(at.seconds * rate - 19_200) < 1, "the position, the frame heard: \(at.seconds * rate)\n\(trace)")
+        out += try render(engine, frames: 28_800 + 9_600, piece: 4_800)
+        #expect(firstDifference(out[2_400..<40_800], a[0][9_600...]) == nil, "A whole to its last frame, nothing of B over it\n\(trace)")
+        #expect(trace.description.contains("lane 96000 Hz to start at 52800"), "B at A's last sample's next\n\(trace)")
+        #expect(out[40_800..<(40_800 + 64)].allSatisfy { $0 != 0 }, "B straight after A\n\(trace)")
+    }
+
+    // On an output just started, the lead counts from when the start was asked, on the render's own time line: a
+    // real output stamps a render's time ahead of now (24.8 ms on this Mac's), and a play(at:) host time -
+    // 307384f's, which Phase 0 heard lose no start on AirPods - is read on that line. Counted from the render's
+    // sample instead, every first start was that much later (224.8 ms after the call for a 0.2 s lead; the
+    // verifiers' finding). `renderHostAhead` stamps the offline render ahead of now: 20 ms leaves 30 of a 50 ms
+    // lead (1440 frames), and 80 ms leaves none - the next render, never before it.
+    @Test func theLeadCountsFromWhenTheStartWasAskedOnTheRendersTimeLine() throws {
+        let rate = 48_000.0
+        let song = signal(frames: 48_000, channels: 2, seed: 0.71)
+        for (ahead, expected) in [(0.02, 1_440), (0.08, 0)] {
+            let engine = try offlineEngine(rate: rate, channels: 2)
+            engine.startLead = { 0.05 }
+            engine.renderHostAhead = ahead
+            let trace = TraceLines()
+            engine.trace = trace.add
+            engine.play(tracksFromWhereAsked([song], rate: rate), from: 0)
+            engine.settle()
+            let line = trace.description.split(separator: "\n").first { $0.contains("started from silence at") }
+            let at = try #require(line.flatMap { Int(String($0.split(separator: " ").last ?? "")) }, "started at a sample time\n\(trace)")
+            #expect(abs(at - expected) <= 1, "render \(ahead) s ahead: started at \(at), not \(expected)\n\(trace)")
+            let out = try render(engine, frames: 9_600, piece: 4_800)
+            #expect(out[..<at].allSatisfy { $0 == 0 }, "silence to it\n\(trace)")
+            #expect(firstDifference(out[at...], song[0][..<(9_600 - at)]) == nil,
+                    "the song from it: \(whereItBegins(out, song[0]))\n\(trace)")
+            let position = try #require(engine.position())
+            #expect(abs(position.seconds * rate - Double(9_600 - at)) < 1, "its count from it: \(position.seconds * rate)")
+        }
     }
 }
 #endif

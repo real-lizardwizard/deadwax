@@ -30,8 +30,9 @@ func liveEngine(rate: Double, channels: AVAudioChannelCount = 2, ahead: Double =
 }
 
 /// Every test engine's buffers taken late by AVAudioPlayerNode, as on ios.yml's runner: DEADWAX_TEST_SCHEDULE_LAG
-/// seconds (unset: none). ios.yml runs the audio tests a second time at 0.0005 s, which failed 37 of
-/// EngineRenderTests' 53 before the engine's offline settle (notes/ios.md "A node's buffers, taken late").
+/// seconds (unset: none). 0.0005 s failed 37 of EngineRenderTests' 53 before the engine's offline settle; ios.yml
+/// runs the audio tests a second time at 0.010 s, which the 30 ms settle covers and the first 10 ms one didn't
+/// (notes/ios.md "A node's buffers, taken late").
 let testScheduleLag: TimeInterval = Double(ProcessInfo.processInfo.environment["DEADWAX_TEST_SCHEDULE_LAG"] ?? "") ?? 0
 
 /// An offline engine with the phone's own buffering - a second scheduled before a start from silence, 2 s

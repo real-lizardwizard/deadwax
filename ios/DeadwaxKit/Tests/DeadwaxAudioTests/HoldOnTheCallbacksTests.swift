@@ -280,6 +280,42 @@ extension EngineRenderTests {
         #expect(at.key == 1 && abs(at.seconds * 48_000 - 9_600) < 3, "B at the frame heard: \(at.seconds * 48_000)\n\(trace)")
     }
 
+    // The verifiers' tail scrap. A 44.1 kHz song on the 48 kHz output whose next song, in the same format, hasn't
+    // come by its end (a slow connection): its converter held the song's last 627 frames of the output's until the
+    // node had run out, and they played after a gap, alone, before the rebuffer's silence - a stutter. They go on
+    // while the node still plays, so the song is heard to its end exactly as when nothing follows it, bit for bit,
+    // then the wait; and the next song, once it comes, from its start.
+    @Test func aResampledSongsEndIsHeardOnTimeWhenTheNextIsLate() throws {
+        let songRate = 44_100.0
+        let a = signal(frames: 22_050, channels: 2, seed: 0.72) // 24000 of the output's
+        let b = signal(frames: 44_100, channels: 2, seed: 0.73)
+        // A alone, the queue's end: its converter's last frames go on as its decode ends
+        let alone = try liveEngine(rate: 48_000)
+        alone.play([entry(a, rate: songRate, key: 0, id: "a")], from: 0)
+        alone.settle()
+        let expected = try render(alone, frames: 36_000, piece: 512)
+        let gate = GatedFrames(b, rate: songRate, arrived: 0)
+        let engine = try liveEngine(rate: 48_000)
+        let trace = traced(engine)
+        engine.play([entry(a, rate: songRate, key: 0, id: "a"), gatedTrack(gate, b, rate: songRate, key: 1, id: "b")], from: 0)
+        engine.settle()
+        var out = try render(engine, frames: 22_016, piece: 512) // its node holds 23373: 1357 frames left
+        waitFor(engine, seconds: 1) { trace.description.contains("about to play out all on it") }
+        #expect(trace.description.contains("about to play out all on it, the next song not here"), "\(trace)")
+        out += try render(engine, frames: 36_000 - 22_016, piece: 512)
+        let lastSound = (out.lastIndex { $0 != 0 } ?? -1) + 1
+        #expect(firstDifference(out, expected) == nil,
+                "A to its end on time, then silence - A's last sound at \(lastSound) of 24000\n\(trace)")
+        #expect(!trace.description.contains("converter holding"), "nothing left for after the node ran out\n\(trace)")
+        gate.release()
+        waitFor(engine) { engine.phase == .playing && engine.stateNow.key == 1 }
+        try #require(engine.phase == .playing && engine.stateNow.key == 1, "B on (\(engine.phase))\n\(trace)")
+        let later = samples(try engine.renderOffline(9_600), channel: 0)
+        #expect(energy(later[4_096...]) > 0.01, "B heard\n\(trace)")
+        let at = try #require(engine.position())
+        #expect(at.key == 1 && abs(at.seconds * 48_000 - 9_600) < 3, "B from its start: \(at.seconds * 48_000)\n\(trace)")
+    }
+
     // Findings 2 and 11. A song at the output's rate (no converter) whose stream runs dry at its very last frame,
     // its end said after: nothing of it is left anywhere. 70cbef6 played silence for good saying playing, and
     // 98a9d9e said loading for good, the output running both times. The queue ends, the output stopped, the
@@ -393,6 +429,18 @@ extension EngineRenderTests {
         try anotherFormatLate(lag: { $0.callbackLag = 0.25 })
     }
 
+    // ...and with the render time a join reads behind the render (`joinRenderBehind`), as a live node's is: its last
+    // render time is the FIRST sample of that render, so with a render larger than the margin every callback can be
+    // in while the end is still ahead of it, and the end guard passes. Only "not while the heard lane has run out"
+    // (`!ranOut(heard)`) holds the next song then; without it B started at A's end, already rendered - its count
+    // ahead, C over its end. (Offline without this the end guard sees it too, so nothing held that guard before.)
+    @Test func anotherFormatLateWhileTheRenderTimeReadsBehindTheEnd() throws {
+        try anotherFormatLate(lag: {
+            $0.completionLag = 0.25
+            $0.joinRenderBehind = 4_800
+        })
+    }
+
     private func anotherFormatLate(lag: (PlaybackEngine) -> Void, sourceLocation: SourceLocation = #_sourceLocation) throws {
         let a = signal(frames: 24_000, channels: 2, seed: 0.95)
         let b = signal(frames: 48_000, channels: 2, seed: 0.96) // 0.5 s at 96 kHz
@@ -425,10 +473,11 @@ extension EngineRenderTests {
         }
     }
 
-    // Findings 7 and 9. The start lead (the output's latency and an IO buffer: about 0.2 s on AirPods, 2 s on
-    // AirPlay) is for an output just started, so its first sample lands on a live output. On one that has run all
-    // along - a lane begun again after running dry, a skip or a seek while playing - it was only silence the
-    // listener waited through. Play after a pause and a new route start the output again, and take it.
+    // Findings 7 and 9. The start lead (the output's latency and an IO buffer: about 0.2 s on AirPods; AirPlay's
+    // never measured) is for an output just started, so its first sample lands on a live output. On one that has
+    // run all along - a lane begun again after running dry, a skip or a seek while playing - it was silence the
+    // listener waited through, as much of it as the render's timestamp doesn't already run ahead (the verifiers'
+    // ninth). Play after a pause and a new route start the output again, and take it.
     @Test func theLeadIsTakenOnlyOnAnOutputJustStarted() throws {
         let rate = 48_000.0
         let song = signal(frames: 96_000, channels: 2, seed: 0.83)

@@ -68,13 +68,14 @@ jobs:
       - name: DeadwaxKit, with the engine's offline renders
         run: swift test --package-path ios/DeadwaxKit
 
-      # The engine's renders again with every buffer reaching its node half a millisecond late - what this
-      # runner's AVAudioPlayerNode did at 70cbef6 and 307384f (notes/ios.md "A node's buffers, taken late"):
-      # the engine's offline settle must cover it, whatever this run's own timing
+      # The engine's renders again with every buffer reaching its node 10 ms late - what this runner's
+      # AVAudioPlayerNode did at 70cbef6 and 307384f, held off longer (notes/ios.md "A node's buffers, taken
+      # late"): the engine's offline settle (30 ms) must cover it with room to spare, whatever this run's own
+      # timing. At 10 ms the old 10 ms settle failed most of the suite; at 0.5 ms a settle cut back to 2 ms passed.
       - name: The engine's offline renders, its buffers taken late
         if: ${{ !cancelled() }}
         env:
-          DEADWAX_TEST_SCHEDULE_LAG: "0.0005"
+          DEADWAX_TEST_SCHEDULE_LAG: "0.010"
         run: swift test --package-path ios/DeadwaxKit --filter DeadwaxAudioTests
 
       # A test process that crashes can end the step with its last lines unprinted: macOS's crash

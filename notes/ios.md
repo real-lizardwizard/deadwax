@@ -1263,15 +1263,23 @@ reproduced" aJoinIsTheTwoSongsLaidEndToEnd above.
 
 **What changed.**
 - **Offline only, the engine waits for the node's queue before it renders**: renderOffline sleeps until
-  `offlineScheduleSettle` (10 ms) after the last buffer put on a node or node started (`lastScheduledAt`,
-  stamped in enqueue, in playFromSilence and at the next lane's start). The live path is untouched: the phone's
-  output paces its renders. 10 ms, not the 2 ms first proposed: the runner has shown GCD stalls past 10 ms, and
-  the 2 ms settle failed 40 of 40 at a 3 ms lag. It is a bound, not a fence (there is none); ios.yml's
-  second run is what says it holds there.
+  `offlineScheduleSettle` after the last buffer put on a node or node started (`lastScheduledAt`, stamped in
+  enqueue, in playFromSilence and at the next lane's start). The live path is untouched: the phone's output
+  paces its renders. It was 10 ms, not the 2 ms first proposed (the runner has shown GCD stalls past 10 ms,
+  and the 2 ms settle failed 40 of 40 at a 3 ms lag); **it is 30 ms since the third commit**: the verifiers
+  measured 10 ms covering only about 5 ms of a node's queue held off - each emulated lag is due at enqueue plus
+  the lag, so the render waits the settle less the lag, and AVAudioPlayerNode's own queue and the thread
+  wake-ups eat 2-5 ms of what is left. At an 8 ms lag the 10 ms settle failed every run (8-12 tests, 7 of 40
+  for theQueuesEnd alone), at 15 ms 53 of 83; 5 ms passed 4 of 4, 2 ms 8 of 8. 30 ms costs about 7 s on the
+  Audio suite here (29.2 s at 10 ms, 36.7 s at 30 ms). It is a bound, not a fence (there is none: see "What
+  was found").
 - **`scheduleLag`, a tests-only hook beside `completionLag`**: each scheduleBuffer performed that long later,
   in order, on a queue of the engine's, drained before any node or engine stops (as StopImpl does), and
   skipped for a node detached meanwhile. `DEADWAX_TEST_SCHEDULE_LAG` sets it on every engine the tests make
-  (`offlineEngine`, `liveEngine`), and ios.yml runs the Audio tests a second time with it at 0.0005.
+  (`offlineEngine`, `liveEngine`), and ios.yml runs the Audio tests a second time with it - at 0.0005 s in
+  the first commit, which a settle cut back to 2 ms would most likely still have passed (it held the paths
+  stamped, not the bound); at **0.010 s** since the third commit, which the old 10 ms settle fails across the
+  suite and the 30 ms one passes with 20 ms to spare.
 - **completionsHandled says which it is**: with every callback AVAudioEngine made handled, "the node's clock
   has passed a buffer it hasn't called back: AVAudioPlayerNode took the buffer late"; otherwise both counts; and
   each lane's buffers scheduled and called back, its ends, frames and clock (`lanesSaid`).
@@ -1280,7 +1288,8 @@ reproduced" aJoinIsTheTwoSongsLaidEndToEnd above.
 (CI's aJoin with every buffer 0.5 ms late: the two songs end to end, bit-exact, silence after) and
 theQueuesEndWithItsBuffersTakenLateIsHeard (CI's theQueuesEnd: the song whole and on time, the queue's end).
 With the settle taken out both fail, and the helper's message names AVAudioPlayerNode; the whole Audio suite at
-`DEADWAX_TEST_SCHEDULE_LAG=0.0005` without the settle fails 49 of its 79, and passes with it.
+`DEADWAX_TEST_SCHEDULE_LAG=0.0005` without the settle fails 49 of its 79, and passes with it. (Since the third
+commit: at 0.010 with the settle back at 10 ms - see "The verifiers' findings".)
 
 **What only the phone can tell.** Not "never", as first written: a start from silence on an output just
 started is the start lead ahead (milliseconds), and a node's CommandQueue later than that would start the song
@@ -1315,9 +1324,11 @@ root of the worst: **the node's clock is not exact**, and the hold read it as if
   had played all on it was started at that lane's end, a time the render had passed: a node played at a time
   past counts from it, so its count ran ahead by the silence and the song after it started early, over its
   end (B's position 25024 for 24000, C at 23488).
-- **7 and 9, the lead.** The start lead (output latency and an IO buffer: about 0.2 s on AirPods, 2 s on
-  AirPlay) was taken on every start from silence - a lane begun again after running dry, a skip, a seek while
-  playing - on an output that was already live: that long of silence before the song.
+- **7 and 9, the lead.** The start lead (output latency and an IO buffer: about 0.2 s on AirPods; for AirPlay,
+  whatever its route reports - the 2 s once written here was never measured) was taken on every start from
+  silence - a lane begun again after running dry, a skip, a seek while playing - on an output that was already
+  live: silence before the song, as much of the lead as the render's timestamps don't already run ahead (this
+  Mac's own lead saved nothing; a 0.2 s one did - the verifiers' ninth finding, "The verifiers' findings").
 - **8, the race.** Bytes read after AVAudioEngine has called the lane's last buffer back and before the engine
   has handled it. With 98a9d9e's clock they were held; laid on the node that had run out (70cbef6) they played
   after the silence, counted straight on.
@@ -1352,7 +1363,8 @@ root of the worst: **the node's clock is not exact**, and the hold read it as if
   second gap where the wait gives one. Every restart waits for `startSeconds`.
 - **Kept: `!ranOut(heard)` at the next lane's start**, which the other judge found redundant. Offline it is
   (its mutation survives: the end guard sees it), but live every callback can be in while the node's
-  `lastRenderTime` is not yet past the end, and the next lane would start in the past.
+  `lastRenderTime` is not yet past the end, and the next lane would start in the past. (Held by a test since the
+  third commit: `joinRenderBehind` reads the render time behind the end - see "The verifiers' findings".)
 - **Not taken**: a pool of spare nodes, settling run-outs before a start, a position-aware settle, a race
   bound in seconds - each more machinery than the finding needs.
 
@@ -1385,7 +1397,8 @@ epoch out (lateCallbacks…); `ready()` as 70cbef6 had it (7) and as 98a9d9e had
 uncounted (aResampledLaneBegunAgain…); `moveOnFromNothingLeft` out (3); the old tail flush (aConverterTail…); the
 end guards out (anotherFormatAfterAnEndAlreadyRendered…); both join guards out (both anotherFormat… tests); the
 lead always taken (theLeadIs…); the settle at 0 (both BuffersTakenLate tests; 49 of 79 at a 0.5 ms lag). The
-one that survives is `!ranOut(heard)` alone, offline, as said above.
+one that survived is `!ranOut(heard)` alone, offline, as said above (it fails a test of its own since the third
+commit).
 
 **What only the phone can tell.**
 - That a real output's `.dataRendered` callbacks come after the render that took a buffer's last sample, never
@@ -1399,7 +1412,10 @@ one that survives is `!ranOut(heard)` alone, offline, as said above.
 ### Starts at a sample time (fix/engine-hold, its second commit)
 
 The third design's two timing changes, which the judges took apart from the hold, in a commit of their own so it
-can be reverted alone if the phone disagrees.
+can be reverted alone if the phone disagrees. (Reverted alone, the first commit's play() at once comes back for
+every start on a running output - a skip, a seek, a run-dry restart - two render cycles later than 307384f: a
+revert puts a start at the last render + one IO buffer, or 307384f's host-time lead, in its place. Finding 10 in
+"The verifiers' findings".)
 
 **What was found** (real output, this Mac, mixer volume 0, print-only probes in scratch copies).
 - **A start from silence at a host time counts ahead of its samples.** play(at:) a host time puts the node's
@@ -1430,7 +1446,8 @@ can be reverted alone if the phone disagrees.
   started, or plus one IO buffer (`ioBuffer`, AVAudioSession's ioBufferDuration, set by the app beside
   `startLead`; none offline) on one already running, so the start is never in a render under way. The lane's
   count begins there (`Lane.origin`, in place of `renderStart`, which was offline only). Offline the lead is now
-  taken too, as the phone takes it.
+  taken too, as the phone takes it. (Since the third commit the lead counts from when the start was asked, on the
+  render's own host timeline, not from the render's sample time, which is already ahead of now.)
 - **The next lane starts at a sample time**: the heard lane's `origin` plus what is on its node (its clock, when
   it has no origin), and only when that is at least one IO buffer past the render (offline, not behind it);
   otherwise it is said ("not started at N: the render is at M already") and the lane starts from silence once
@@ -1441,7 +1458,8 @@ can be reverted alone if the phone disagrees.
 - **With no such render time** (an output just started that hasn't rendered yet) a start from silence is as it
   was: the lead ahead at a host time, or at once, with no origin ("started from silence at a host time: no
   render time yet"). Nothing retries or waits. A node a pause left paused (`idleStopSeconds`) goes on at once,
-  with no origin, as before.
+  with no origin, as before. (Since the third commit it waits for this run's first render, up to 0.1 s, and only
+  then falls back - every play after a pause landed here.)
 - **Only the lane whose song comes next starts at the heard lane's end**, one at a time; a lane after it waits
   for that one to be heard.
 - **The app** (PlayerModel.lead, AudioSessionController.ioBuffer): `engine.ioBuffer` reads
@@ -1482,8 +1500,165 @@ Not mutated: the margin, which is 0 offline - its one IO buffer is the phone's t
 - That a sample-time start and join land exactly on the phone's output as on this Mac's: a 44.1 kHz album into a
   96 kHz one, gapless, with no click or overlap at the change; and the position after a start no longer ahead.
 - That the phone's render times after a pause and play behave as this Mac's (left from the last run until its
-  first render); if they are fresher or staler, the start falls back to the host time, as before.
+  first render); since the third commit the start waits up to 0.1 s for this run's first, then falls back to the
+  host time.
 - That one IO buffer past the last render is enough on the phone, the screen locked (larger buffers) included.
+
+### The verifiers' findings (fix/engine-hold, its third commit)
+
+The two commits above (efb8b6a on 307384f) were checked by verifiers: ten findings. Each was reproduced against
+the code (real output on this Mac, a 44.1 kHz device, mixer volume 0, probes in a scratch copy; or offline), then
+fixed with a test that fails without the fix, or rejected with why. Eight hold and are fixed (one in these notes
+alone); two are rejected as code changes.
+
+**1 (high): after a pause and play, every start fell back to the host time.** Held. ensureRunning calls
+engine.start() and the start from silence comes straight after it, while the node's `lastRenderTime` is still the
+last run's (see "Starts at a sample time"): `ofThisRun` refused it every time, so every play after a pause started
+"at a host time: no render time yet", with no origin, its count ahead of its samples, and a song in another format
+joined by the clock over the one before. On this Mac's output, A then B (the same rate, another lane): after a
+0.3 s pause B overlapped A by 803-851 frames (18-19 ms), after 1.5 s by 515-544 (12 ms), 6 of 6; with no pause
+the join was exact (but for a cold first start, below).
+- **Fixed: the start waits for a render of this run.** With no render time of this run, playFromSilence says so
+  once ("no render of this run of the output yet, waiting for one"), leaves the phase at loading, and asks again
+  every 2 ms on the engine's queue (`waitForRender`, generation-checked, cancelled by reset) for up to
+  `renderWaitBound()` - 0.1 s, or four IO buffers if that is longer. It then starts at a sample time and says
+  "this run's first render after N ms"; past the bound the fallback is as it was ("started from silence at a host
+  time: no render of this run in 100 ms"). The lead counts from when the start was first asked (`startAsked`), so
+  the wait is inside it, not added to it.
+- **Test**: playAfterAPauseWaitsForThisRunsFirstRender. `staleRenderReads` (tests only) makes the offline render
+  time read, for its first N reads after the output starts, a reading left from before the stop - 12000 frames
+  behind and equal to the reading at the start, as the real one is. Play, pause, play: it waits, then starts at
+  14400 (the 0.05 s lead from the ask), 2400 frames of silence then A from 9600 bit-exact, the position the frame
+  heard (19200), A whole to 40800 and the 96 kHz song joined at 52800, straight after A's last sample.
+  startWithNoRenderTimeFallsBack now expects the wait, then the fallback.
+- **On this Mac's output after the fix** (the verifiers' one-stream probe, every lane through one tapped mixer):
+  after a 0.3 s and a 1.5 s pause the join was exact (gap 0) 6 of 6, A going on from the very frame it paused at,
+  its first sample at its origin; the start waited 3.1-21.2 ms for the run's first render (in one of the six it
+  was there already). With a 0.2 s lead, the first frame was presented 202.0-202.5 ms after play (finding 8's
+  fix) and after a pause 213.6-216.3 ms after resume was called: the lead counts from the start asked, after
+  engine.start() has returned, as 307384f's play(at:) did. (The verifiers' other device probe, a tap on each
+  node, reads a gap of 17-19 thousand frames across a pause both before this commit and after: its taps are
+  not contiguous across the stop, so it doesn't measure the join; the one-stream probe does.)
+
+**2 (medium): the test of a render time left from before a stop held only the pure rule.**
+aRenderTimeLeftFromBeforeAStopIsNoTimeToStartAt called `ofThisRun` with the probe's readings; nothing held that
+the engine asks it, and offline the render time never went through it (offline it was always fresh). Held.
+- **Fixed**: the offline render time goes through `ofThisRun` as the live one does, and `staleRenderReads` gives
+  it a stale reading to refuse (finding 1's test). `renderTime` returns the sample and its host time
+  (`RenderTime`), for finding 8.
+
+**3 (low): a resampled song's last 13 ms were cut off after a dropout, when the next song in the same format was
+late.** Held, offline (live engine, 0.3 s ahead, and the phone's buffering): a 44.1 kHz song's stream on time to its
+end, the next song's late. Its converter keeps the song's last 576 frames (627 of the output's) until it is
+flushed, and a song in the same format coming next leaves them in it; the node played out what was on it, ran dry,
+and those frames came after the run-dry restart: A silent at 23373-23552, then its last 627 frames as a scrap, then
+silence until B. Not the hold's finding 4 (a tail found after the node had run out): here the converter still had
+it while the node played.
+- **Fixed: `flushBeforeRunningOut`**, called where pump finds the next song's bytes not there yet (`.waiting`):
+  with the tail lane's song decoded to its end (no entry open on the feed), its converter holding frames, the node
+  not run out, and what is left on it within the retry interval, two IO buffers and 20 ms, the converter's last
+  frames are flushed onto the node, said ("about to play out all on it, the next song not here: its converter's
+  last frames on now"). The song ends whole, on time. The cost: a next song that comes in that last stretch, the
+  node still playing, is still laid end to end on it, but through a fresh converter - as after a rebuffer or a
+  change of format - not one resample across the join. Without the flush that song joined through the one
+  converter, but a song later than that got the scrap. Assumed inaudible; a phone check.
+- **Test**: aResampledSongsEndIsHeardOnTimeWhenTheNextIsLate: A (22050 frames at 44.1 kHz) rendered in pieces of
+  512 with B held back, bit-equal to A rendered alone, nothing "converter holding"; B, let go, plays from its start.
+  It renders to 22016 and waits for the flush before rendering on: the check is made on each retry, in wall time,
+  and an offline render runs many times faster than that - the verifiers' probe, rendering straight through, still
+  shows the scrap (the render past the window between two retries). Its renders paced at real time, as the phone's
+  are, with the IO buffer told: A whole to its last frame (23999), no scrap, 9 of 9 (pieces of 512, live and the
+  phone's buffering, and pieces of 4800 with a 0.1 s IO buffer). Paced without the IO buffer told, the 4800-frame
+  renders still left it: the window's two IO buffers are what cover a render larger than a retry.
+
+**4 (low): the 10 ms settle failed from an 8 ms lag.** Held (measured above, "A node's buffers, taken late").
+- **Fixed: 30 ms** (`offlineScheduleSettle`), the verifiers' second choice (25-50 ms). Still a bound. Their first,
+  a fence, isn't there to be had: nothing tried tells when the node's queue has taken a buffer (above, "A node's
+  buffers, taken late": isPlaying, playerTime, prepare, a zero-frame render, a zero-length buffer), and a dummy
+  buffer's `.dataConsumed` would come only once a render has read it - the render this waits to make (reasoned,
+  not tried). Not taken either: nodes attached before the engine starts offline (their scheduleBuffer is not
+  deferred) - the tests would then run another path than the phone's.
+
+**5 (low): a rebuffer waits the whole `startSeconds`.** Holds as described: bytes only just behind (20-50 ms, or
+coming just as the node runs out) give 80 ms to 1.08 s of silence where 70cbef6 and 98a9d9e gave 50-430 ms - with
+the position exact, where theirs ran 2400-8640 frames ahead. It is the hold's design ("Where the
+judges differed": every restart waits for `startSeconds`; a stream just run dry may still be slow, and starting
+with less risks a scrap and a second gap). **Rejected** as a change here: what the phone's dropouts sound like
+decides it, and the position after one is now exact. If a shorter restart is wanted it is a setting of its own,
+not this commit.
+
+**6 (low): CI's 0.5 ms lag could not tell the settle's bound.** Held: a 2 ms settle passes at 0.5 ms.
+- **Fixed**: ios.yml's second Audio run is at `DEADWAX_TEST_SCHEDULE_LAG=0.010`, which the old 10 ms settle fails
+  across the suite and the 30 ms one passes (3 runs of 3 at 0.010, 87 of 87 each, 38.1-38.4 s; and 1 at 0.0005).
+  The verifiers proposed 0.005, which the old 10 ms settle passes (4 of 4): it would guard the 30 ms only against
+  falling under about 10.
+
+**7 (low): `!ranOut(heard)` at the next lane's start was held by no test** (its mutation survived, "The hold on
+the callbacks"). Held.
+- **Fixed**: `joinRenderBehind` (tests only) reads the join's render time that many frames behind the render, as a
+  live node's is (its last render time is the FIRST sample of that render): every callback can be in while the end
+  is still ahead of it, and the end guard passes. anotherFormatLateWhileTheRenderTimeReadsBehindTheEnd is
+  anotherFormatLate with the completions 0.25 s late and the render read 4800 behind; without the guard B starts at
+  A's end, already rendered.
+
+**8 (medium): the lead was added to the render's sample time, which is already ahead of now.** Held: a node's
+`lastRenderTime` is stamped with the time its samples are presented, ahead of now, so every start on an output just
+started (the first play, play after a pause, a call, a new route) was heard later than 307384f's by the lesser of
+that and the lead: 1.5 ms with this Mac's own lead, 24.8 ms with a 0.2 s one (a 200 ms lead at a host time
+presented 200.0 ms after the call; at render + lead, 224.8 ms). On the phone, at most the output's latency, if
+its render timestamps run ahead as this Mac's do.
+- **Fixed: the lead counts from when the start was asked, on the render's own host timeline**: the start is at the
+  render's sample plus (asked + lead - the render's host time) x rate, never before the render plus the margin. A
+  lead shorter than how far the render runs ahead starts at the render plus the margin; with no host time
+  (offline, unless a test stamps one) the lead is added to the sample, as before.
+- **Test**: theLeadCountsFromWhenTheStartWasAskedOnTheRendersTimeLine: `renderHostAhead` (tests only) stamps the
+  offline render's host time that far ahead of now; at 0.02 s a 0.05 s lead starts at 1440 (0.03 s), at 0.08 s at
+  0; silence to it, the song bit-exact from it, its count from it.
+
+**9 (low): the lead's silence (the hold's findings 7 and 9) is the lead less how far the render runs ahead, and
+"2 s on AirPlay" was never measured.** Held. **Fixed in these notes** ("The hold on the callbacks" corrected): no
+test can hold it, as nothing here has an AirPlay route. Each route's start against 307384f's is a phone check.
+
+**10 (low): play() at once starts two render cycles later than 307384f.** Holds as measured: play() put the
+first sample at the last render + 1536 (59.4-59.7 ms after the call, 12 of 12), where 307384f's host-time lead
+and efb8b6a's sample-time start put it at + 512 (36.4 ms); its count exact. Two places start so:
+- **The first commit alone** (if the second is reverted, as "Starts at a sample time" offers): every skip, seek
+  and run-dry restart on a running output - 23 ms here, by the same count about 43 ms at 1024 frames and 170 ms
+  at 4096 (locked) on the phone. **Fixed in the revert plan**: a revert of the second commit puts a sample-time
+  start at the last render + one IO buffer, or 307384f's host-time lead, in place of that play(), never play()
+  alone (said where the second commit offers its revert).
+- **efb8b6a's fallback on a running output**, with no render time of this run. **Rejected as a change**: rare here
+  (a node attached while running had a render time at once), rarer since finding 1's wait, which covers play
+  after a pause; and the start that needs no render and is 512 frames sooner, play(at:) a host time, puts the
+  count 245-651 frames ahead of the samples (the hold's finding 1), where play()'s is exact. 23 ms, once, in a
+  path the trace names ("no render of this run in 100 ms"); if the phone says it often, that is when to weigh 23
+  ms against a count ahead.
+
+**Mutations**, each restored byte for byte (sha-256 checked), the Audio tests run through the build lock:
+all seven failing.
+- no wait for this run's first render, straight to the fallback (playAfterAPause…, startWithNoRenderTime…);
+- the render time not through `ofThisRun` (playAfterAPause…: started at 1924, off the reading left from before
+  the stop, with the render at 12000 - a start in the past);
+- `ofThisRun` without the reading-at-start check (aRenderTimeLeft…, playAfterAPause…);
+- the lead from the render's sample, as efb8b6a counted it (theLeadCounts…);
+- the join without `!ranOut(heard)` (anotherFormatLateWhileTheRenderTimeReadsBehindTheEnd);
+- no flush before the node runs out (aResampledSongsEndIsHeard…);
+- the settle back at 10 ms with every buffer 10 ms late, ios.yml's new second run (18 of 87).
+
+**Seen and not fixed**: on this Mac's output, before this commit, the first start in the test process (a node
+never played) began 419 frames (9.5 ms) after the sample time it was given - most likely a cold node's queue - so
+its count was that far ahead and the join after it overlapped A by 419 frames; every later start was exact. After
+this commit the same: 224 frames late in the first trial of both device probes (their engines started together,
+the first in the process), exact in every later one. It is not from these starts (the sample time asked
+was right; the node's first sample came after it), and 307384f's host-time starts were further off on every start.
+
+**What only the phone can tell.**
+- How long after play the phone's first render of the run comes ("this run's first render after N ms"), and that
+  the fallback ("no render of this run in 100 ms", finding 10's play() at once) is never said.
+- A 44.1 kHz album over a bad connection: each song's end whole and on time, the next joined after it.
+- How long a rebuffer is (finding 5).
+- The very first start of a run on the phone: exact, or late as on this Mac once.
+- Each route's start lead against how far its render runs ahead (finding 9), AirPlay included.
 
 ### Verified (Phase 1's Core, p1/merge, 2026-11-10)
 
