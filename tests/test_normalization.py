@@ -1353,3 +1353,508 @@ def test_a_songs_gain_is_worked_out_once_for_requests_at_once(upstream, mp4_cach
     answers = run(at_once)
     assert len({answer.headers["x-deadwax-level"] for answer in answers}) == 1
     assert resolved == ["song-1"]
+
+
+# ---------------------------------------------------------------- the iPhone app's loudness route (2.1.1)
+
+LOUDNESS = "/deadwax/navidrome/loudness/album/album-1"
+
+#? every key of the answer, of its album and of each song - always there, null only where the route says
+ANSWER_KEYS = {"reference_lufs", "algorithm", "state", "why", "whole", "album", "songs"}
+ALBUM_KEYS = {"loudness_lufs", "peak", "songs"}
+SONG_KEYS = {"id", "state", "loudness_lufs", "peak", "why"}
+STATES = {"measured", "measuring", "unmeasured", "not_levelled"}
+
+
+def refuse_infinity(name: str):
+    raise AssertionError(f"{name} in the loudness route's answer: JSON has no infinity, and the phone's decoder none")
+
+
+def shaped(text: str) -> dict:
+    """The loudness route's answer, read as the phone reads it (no NaN or infinity), with every key it promises:
+    a number or null, and the album's and a song's loudness and peak null unless measured."""
+    answer = json.loads(text, parse_constant=refuse_infinity)
+    assert set(answer) == ANSWER_KEYS and set(answer["album"]) == ALBUM_KEYS
+    assert all(set(song) == SONG_KEYS for song in answer["songs"])
+    assert answer["reference_lufs"] == loudness.REFERENCE_LUFS == -18.0
+    assert answer["algorithm"] == loudness.ALGORITHM_VERSION and isinstance(answer["algorithm"], int)
+    assert answer["state"] in STATES and isinstance(answer["whole"], bool) and isinstance(answer["album"]["songs"], int)
+    if answer["state"] != "measured":
+        assert answer["album"]["loudness_lufs"] is None and answer["album"]["peak"] is None
+    for song in answer["songs"]:
+        assert song["state"] in STATES and isinstance(song["id"], str)
+        if song["state"] != "measured":
+            assert song["loudness_lufs"] is None and song["peak"] is None
+    return answer
+
+
+def album_loudness(client, path: str = LOUDNESS) -> dict:
+    response = client.get(path)
+    assert response.status_code == 200 and response.headers["content-type"] == "application/json", response.text
+    return shaped(response.text)
+
+
+def key_of(data: bytes) -> str:
+    """A FLAC's audio key, from the STREAMINFO libsndfile writes straight after the marker."""
+    return loudness.audio_key(data[8:42], None)
+
+
+def states(answer: dict) -> list[tuple[str, str, str | None]]:
+    return [(song["id"], song["state"], song["why"]) for song in answer["songs"]]
+
+
+def test_the_apps_loudness_route_says_what_is_measured_and_never_measures(upstream, client, mp4_cache, store, tmp_path,
+                                                                         monkeypatch):
+    """
+    Before any play the album is unmeasured, whole, three songs counting (its MP3 and its 20-bit FLAC left out, each
+    saying why) - and nothing is measured for the asking. Once a play has measured it: each FLAC song's own loudness
+    and peak, and the album's - its songs' histograms POOLED, as the stream's album gain is worked out - unrounded.
+    Through gain_for with no reserve they give the stream's own gain: a CD album keeps no resample's room on the web
+    either, so the phone and the web level it alike.
+    """
+    np, sf, _ = libs()
+    _, files = cd_album(np, sf, tmp_path)
+    files["mp3"] = b"\xff\xfb\x90\x00" + bytes(40000)
+    files["twenty"] = constant_flac(rate=44100, bps=20, blocks=(4096,) * 6)
+    state, _ = upstream
+    album = serving(state, files)
+    album.types["mp3"] = "audio/mpeg"
+    album.entries["mp3"].update(suffix="mp3", contentType="audio/mpeg")
+    seen = measured(monkeypatch)
+
+    fresh = album_loudness(client)
+    assert (fresh["state"], fresh["why"], fresh["whole"]) == ("unmeasured", None, True)
+    assert fresh["album"] == {"loudness_lufs": None, "peak": None, "songs": 3}
+    assert states(fresh) == [("song-1", "unmeasured", None), ("song-2", "unmeasured", None),
+                             ("song-3", "unmeasured", None), ("mp3", "not_levelled", levels.NOT_FLAC),
+                             ("twenty", "not_levelled", levels.UNREADABLE)]
+    assert seen == [] and kept_rows(store) == [], "the route never measures"
+    #? no album's measurement started, no song's, and the one-album gate never so much as made
+    assert mp4_cache.levels._albums == {} and mp4_cache.levels._songs == {} and mp4_cache.levels._album_gate is None
+
+    played = client.get(url("song-2"))
+    assert len(seen) == 3
+    answer = album_loudness(client)
+    songs = [mp4_cache.levels._read[key_of(files[song])] for song in ("song-1", "song-2", "song-3")]
+    assert (answer["state"], answer["why"], answer["whole"]) == ("measured", None, True)
+    assert answer["album"] == {"loudness_lufs": loudness.loudness_of(songs), "peak": max(m.peak for m in songs),
+                               "songs": 3}, "the pooled loudness and the loudest sample, unrounded"
+    assert answer["songs"][:3] == [{"id": song, "state": "measured", "loudness_lufs": m.loudness, "peak": m.peak,
+                                    "why": None} for song, m in zip(("song-1", "song-2", "song-3"), songs)]
+    assert answer["songs"][3:] == fresh["songs"][3:]
+    phone = loudness.gain_for(answer["album"]["loudness_lufs"], answer["album"]["peak"], 0.0)
+    assert phone.gain_db == gain_of(played)
+    assert album_loudness(client) == answer and len(seen) == 3, "asked again: the same answer, nothing measured"
+
+
+def test_the_apps_loudness_route_asks_navidrome_for_the_album_as_the_asker_first(upstream, client, mp4_cache,
+                                                                                 monkeypatch):
+    """An album Navidrome won't give the asker is its 404 - and nothing is listed, looked at or measured."""
+    state, seen = upstream
+    serving(state, {"song-1": constant_flac(rate=44100, bps=16, blocks=(4096,) * 4)})
+    measuring = measured(monkeypatch)
+    response = client.get("/deadwax/navidrome/loudness/album/al-9")
+    assert response.status_code == 404
+    assert [(request.url.path.rsplit("/", 1)[-1], request.url.params.get("id")) for request in seen] == [("getAlbum", "al-9")]
+    assert measuring == [] and mp4_cache.levels._albums == {} and mp4_cache.albums._listings == {}
+
+
+@pytest.mark.parametrize("by", ["album", "song"])
+def test_the_apps_loudness_route_says_an_album_is_being_measured(upstream, mp4_cache, store, tmp_path, monkeypatch, by):
+    """While its album is measured (an album page's warm), every song of it not measured yet is `measuring`, and so is
+    the album; while one song is measured on its own (a play by song) that song is, and the album with it - the
+    phone asks again in a moment. Once done, `measured` - or, by song, the rest still unmeasured."""
+    np, sf, _ = libs()
+    _, files = cd_album(np, sf, tmp_path)
+    state, _ = upstream
+    serving(state, files)
+    measured(monkeypatch, delay=0.5)
+
+    async def during(each):
+        if by == "album":
+            started = asyncio.ensure_future(each.post("/deadwax/navidrome/level/album/album-1"))
+        else:
+            started = asyncio.ensure_future(each.get(url("song-1", level="track")))
+        await asyncio.sleep(0.25)
+        middle = shaped((await each.get(LOUDNESS)).text)
+        await started
+        while mp4_cache.levels._albums or mp4_cache.levels._songs:
+            await asyncio.sleep(0.1)
+        after = shaped((await each.get(LOUDNESS)).text)
+        return middle, after
+
+    middle, after = run(during)
+    assert (middle["state"], middle["why"], middle["whole"]) == ("measuring", None, True)
+    assert middle["album"] == {"loudness_lufs": None, "peak": None, "songs": 3}
+    if by == "album":
+        assert {song["state"] for song in middle["songs"]} == {"measuring"}
+        assert after["state"] == "measured" and {song["state"] for song in after["songs"]} == {"measured"}
+    else:
+        assert [song["state"] for song in middle["songs"]] == ["measuring", "unmeasured", "unmeasured"]
+        assert after["state"] == "unmeasured" and [song["state"] for song in after["songs"]] == \
+            ["measured", "unmeasured", "unmeasured"], "one song measured is no album measured"
+
+
+def failing_looks_with(monkeypatch, song: str, error: Exception):
+    """`song`'s look raising `error`, every time."""
+    real = levels.Levels._song
+
+    async def failing(self, song_id):
+        if song_id == song:
+            raise error
+        return await real(self, song_id)
+
+    monkeypatch.setattr(levels.Levels, "_song", failing)
+
+
+@pytest.mark.parametrize("why", ["timed out", "busy", "too many"])
+def test_the_apps_loudness_route_never_pools_part_of_an_album(upstream, client, mp4_cache, store, tmp_path, monkeypatch,
+                                                              why):
+    """A song of a measured album that couldn't be looked at just now (its STREAMINFO not read in time, or Navidrome
+    answering a 503 or a 429): not whole, so not measured - the album's numbers null rather than pooled from the rest,
+    which would be another level a moment later - and that song unmeasured, to be looked at later."""
+    np, sf, _ = libs()
+    _, files = cd_album(np, sf, tmp_path)
+    state, _ = upstream
+    serving(state, files)
+    for song in files:
+        client.get(url(song))
+    assert album_loudness(client)["state"] == "measured"
+    if why == "timed out":
+        flaky_looks(monkeypatch, "song-3", 100)
+    else:
+        failing_looks_with(monkeypatch, "song-3", NavidromeError("Navidrome said wait", status=503 if why == "busy" else 429))
+    answer = album_loudness(client)
+    assert (answer["state"], answer["why"], answer["whole"]) == ("unmeasured", levels.LOOK_LATER, False)
+    assert answer["album"] == {"loudness_lufs": None, "peak": None, "songs": 2}
+    assert states(answer) == [("song-1", "measured", None), ("song-2", "measured", None),
+                              ("song-3", "unmeasured", levels.LOOK_LATER)]
+
+
+@pytest.mark.parametrize("status", [404, 500])
+def test_the_apps_loudness_route_levels_an_album_without_a_song_navidrome_cant_serve(upstream, client, mp4_cache, store,
+                                                                                    tmp_path, monkeypatch, status):
+    """A song whose file Navidrome can't serve (an error that stays) is left out, saying Navidrome's words, and the
+    album is measured from the rest - as the stream levels it."""
+    np, sf, _ = libs()
+    _, files = cd_album(np, sf, tmp_path)
+    state, _ = upstream
+    serving(state, files)
+    failing_looks_with(monkeypatch, "song-3", NavidromeError("Navidrome said no", status=status))
+    played = client.get(url("song-1"))
+    answer = album_loudness(client)
+    assert (answer["state"], answer["whole"], answer["album"]["songs"]) == ("measured", True, 2)
+    assert states(answer)[2] == ("song-3", "not_levelled", "Navidrome said no")
+    album = answer["album"]
+    assert loudness.gain_for(album["loudness_lufs"], album["peak"], 0.0).gain_db == gain_of(played)
+
+
+def test_the_apps_loudness_route_leaves_out_a_song_that_cant_be_measured(upstream, client, mp4_cache, store, tmp_path,
+                                                                        monkeypatch):
+    """A song libsndfile couldn't decode: `not_levelled` with the measurement's own words, and the album measured from
+    the rest - two songs counting, the stream's gain from them."""
+    np, sf, _ = libs()
+    _, files = cd_album(np, sf, tmp_path)
+    state, _ = upstream
+    serving(state, files)
+    real = loudness.measure_file
+
+    def cannot_for_song_3(path, *args, **kwargs):
+        if Path(path).read_bytes()[8:42] == files["song-3"][8:42]:
+            raise loudness.CannotMeasure("libsndfile couldn't decode all of it: a test")
+        return real(path, *args, **kwargs)
+
+    monkeypatch.setattr(levels.loudness, "measure_file", cannot_for_song_3)
+    played = client.get(url("song-1"))
+    answer = album_loudness(client)
+    assert (answer["state"], answer["whole"]) == ("measured", True)
+    assert answer["songs"][2] == {"id": "song-3", "state": "not_levelled", "loudness_lufs": None, "peak": None,
+                                  "why": "libsndfile couldn't decode all of it: a test"}
+    rest = [mp4_cache.levels._read[key_of(files[song])] for song in ("song-1", "song-2")]
+    assert answer["album"] == {"loudness_lufs": loudness.loudness_of(rest), "peak": max(m.peak for m in rest), "songs": 2}
+    assert loudness.gain_for(answer["album"]["loudness_lufs"], answer["album"]["peak"], 0.0).gain_db == gain_of(played)
+
+
+def test_the_apps_loudness_route_sends_silence_as_null_never_infinity(upstream, client, mp4_cache, store, tmp_path):
+    """Digital silence measures as -inf LUFS: sent as null - a measured song or album with no loudness - and its peak
+    0.0, never an infinity (which JSON can't carry: Starlette refuses it, a 500). gain_for of it asks for nothing."""
+    np, sf, _ = libs()
+    files = {f"song-{i}": write_flac(sf, tmp_path / f"silent-{i}.flac", np.zeros((frames, 2), dtype=np.int32), 44100,
+                                     16).read_bytes()
+             for i, frames in ((1, 44100 * 2), (2, 44100 * 2 + 5))}
+    state, _ = upstream
+    serving(state, files)
+    played = client.get(url("song-1"))
+    answer = album_loudness(client)
+    assert (answer["state"], answer["album"]) == ("measured", {"loudness_lufs": None, "peak": 0.0, "songs": 2})
+    assert [(song["state"], song["loudness_lufs"], song["peak"]) for song in answer["songs"]] == [("measured", None, 0.0)] * 2
+    assert loudness.gain_for(float("-inf"), 0.0, 0.0).gain_db == 0.0 == gain_of(played)
+
+
+def test_the_apps_loudness_route_carries_no_resample_room(upstream, client, mp4_cache, store, tmp_path):
+    """
+    A hi-res album held by its peak: the web's album gain keeps the resample's 3 dB of room under either Maximum
+    quality (_album_reserve), the phone's none - it plays the file as it is. The route's numbers are raw: through
+    gain_for with that room they are the stream's gain exactly, and with none they are up to 3 dB louder.
+    """
+    np, sf, _ = libs()
+    files = {}
+    for i in (1, 2):
+        quiet = music(np, 96000, 96000 * 2, level=0.1, seed=i)
+        if i == 1:
+            quiet[5000] = int(0.9 * FULL)
+        files[f"song-{i}"] = write_flac(sf, tmp_path / f"96-{i}.flac", quiet, 96000).read_bytes()
+    state, _ = upstream
+    serving(state, files)
+    web = gain_of(client.get(url("song-2", "fmp4", "album")))
+    album = album_loudness(client)["album"]
+    phone = loudness.gain_for(album["loudness_lufs"], album["peak"], 0.0)
+    assert web == loudness.gain_for(album["loudness_lufs"], album["peak"], resample.HEADROOM_DB).gain_db
+    assert phone.held, "held by its peak even with no room kept"
+    assert 0 < phone.gain_db - web <= resample.HEADROOM_DB + 0.01, (phone.gain_db, web)
+
+
+def test_the_apps_loudness_route_reports_what_is_measured_without_the_libraries_or_a_folder(upstream, client, mp4_cache,
+                                                                                           store, tmp_path, monkeypatch):
+    """What is measured is said whatever this server can do now - the phone needs neither numpy nor a cache folder of
+    it. An album not measured, where nothing more can be measured, is `not_levelled` saying why."""
+    np, sf, _ = libs()
+    _, files = cd_album(np, sf, tmp_path)
+    state, _ = upstream
+    serving(state, files)
+    real = levels.missing_libraries
+    monkeypatch.setattr(levels, "missing_libraries", lambda: "numpy")
+    unmeasured = album_loudness(client)
+    assert (unmeasured["state"], unmeasured["why"], unmeasured["whole"]) == ("not_levelled", levels.NO_LIBRARIES, True)
+    assert states(unmeasured) == [(song, "unmeasured", None) for song in files]
+    assert unmeasured["album"] == {"loudness_lufs": None, "peak": None, "songs": 3}
+
+    monkeypatch.setattr(levels, "missing_libraries", real)
+    client.get(url("song-1"))
+    measured_answer = album_loudness(client)
+    assert measured_answer["state"] == "measured"
+    monkeypatch.setattr(levels, "missing_libraries", lambda: "numpy")
+    assert album_loudness(client) == measured_answer
+    monkeypatch.setattr(levels, "missing_libraries", real)
+
+    blocked = tmp_path / "a-file"
+    blocked.write_text("not a folder")
+    no_folder = Mp4Cache(blocked)
+    monkeypatch.setattr(player_cache, "cache", no_folder)
+    answer = album_loudness(client)
+    assert (answer["state"], answer["why"], answer["album"]["songs"]) == ("not_levelled", levels.NO_CACHE, 3)
+    no_folder.levels.store = store
+    assert album_loudness(client) == measured_answer, "read from deadwax's database, no folder needed"
+
+
+def test_the_apps_loudness_route_says_an_album_with_no_flac_has_nothing_to_level(upstream, client, mp4_cache):
+    """An album of MP3s: nothing to level, each song saying so - and none of their files read."""
+    state, seen = upstream
+    album = serving(state, {"mp3-1": b"\xff\xfb\x90\x00" + bytes(4000), "mp3-2": b"\xff\xfb\x90\x00" + bytes(5000)})
+    for song in album.files:
+        album.types[song] = "audio/mpeg"
+        album.entries[song].update(suffix="mp3", contentType="audio/mpeg")
+    answer = album_loudness(client)
+    assert (answer["state"], answer["why"], answer["whole"]) == ("not_levelled", levels.NOTHING_TO_LEVEL, True)
+    assert answer["album"] == {"loudness_lufs": None, "peak": None, "songs": 0}
+    assert states(answer) == [("mp3-1", "not_levelled", levels.NOT_FLAC), ("mp3-2", "not_levelled", levels.NOT_FLAC)]
+    assert [request.url.path.rsplit("/", 1)[-1] for request in seen] == ["getAlbum", "getAlbum"], \
+        "the asker's look, then the album's listing - no song's file"
+
+
+@pytest.mark.parametrize("how", ["no songs listed", "the listing refused", "Navidrome gone mid-look"])
+def test_the_apps_loudness_route_says_an_album_it_couldnt_list_is_unmeasured_for_now(upstream, client, mp4_cache,
+                                                                                     monkeypatch, how):
+    """The album's listing not to be had as the shared account, or Navidrome not answering a look at all: a 200
+    all the same - unmeasured, LOOK_LATER, not whole, no songs - for the phone to ask again in a moment."""
+    state, _ = upstream
+    album = serving(state, {"song-1": constant_flac(rate=44100, bps=16, blocks=(4096,) * 4),
+                            "song-2": constant_flac(rate=44100, bps=16, blocks=(4096,) * 5)})
+    asked = []
+
+    def handle(request):
+        if request.url.path.endswith("getAlbum"):
+            asked.append(request.url.params.get("id"))
+            #? the asker's look is answered; the listing after it is what fails
+            if len(asked) > 1 and how == "no songs listed":
+                return httpx.Response(200, json=ok(album={"id": "album-1", "name": "Album"}))
+            if len(asked) > 1 and how == "the listing refused":
+                return httpx.Response(503, text="busy")
+        return album.handle(request)
+
+    state["handler"] = handle
+    if how == "Navidrome gone mid-look":
+        failing_looks_with(monkeypatch, "song-2", NavidromeError("Navidrome couldn't be reached", unreachable=True))
+    answer = album_loudness(client)
+    assert answer == {"reference_lufs": -18.0, "algorithm": loudness.ALGORITHM_VERSION, "state": "unmeasured",
+                      "why": levels.LOOK_LATER, "whole": False,
+                      "album": {"loudness_lufs": None, "peak": None, "songs": 0}, "songs": []}
+    assert asked == ["album-1", "album-1"]
+
+
+def test_the_apps_loudness_route_says_measuring_while_only_the_albums_own_task_runs(upstream, mp4_cache, store, tmp_path,
+                                                                                  monkeypatch):
+    """
+    (After review) A play's album measurement waiting at the one-album gate behind another album - or still listing
+    and looking at its songs - is the ONLY task running: no song of it is being measured yet. The album is
+    `measuring` all the same, and so is every song of it: the phone's first song waits only while it is, so
+    `unmeasured` there would send it on unlevelled at once (and the phone would post a warm, to be told `busy`). One
+    song's look failing just then: still measuring, but LOOK_LATER, not whole, that song unmeasured.
+    """
+    np, sf, _ = libs()
+    _, files = cd_album(np, sf, tmp_path)
+    state, _ = upstream
+    serving(state, files)
+    seen = measured(monkeypatch)
+
+    async def during(each):
+        gate, _ = mp4_cache.levels._gates()
+        await gate.acquire()
+        try:
+            play = asyncio.ensure_future(each.get(url("song-1")))
+            #? the play's album task has listed and looked at its songs, and waits at the gate
+            for _ in range(500):
+                if "album-1" in mp4_cache.levels._progress:
+                    break
+                await asyncio.sleep(0.01)
+            live = (list(mp4_cache.levels._albums), [key for key, task in mp4_cache.levels._songs.items() if not task.done()],
+                    list(seen))
+            waiting = shaped((await each.get(LOUDNESS)).text)
+            flaky_looks(monkeypatch, "song-2", 1)
+            part = shaped((await each.get(LOUDNESS)).text)
+        finally:
+            gate.release()
+        await play
+        while mp4_cache.levels._albums or mp4_cache.levels._songs:
+            await asyncio.sleep(0.05)
+        return live, waiting, part, shaped((await each.get(LOUDNESS)).text)
+
+    live, waiting, part, after = run(during)
+    assert live == (["album-1"], [], []), "the album's own task, no song's, nothing measured"
+    assert (waiting["state"], waiting["why"], waiting["whole"]) == ("measuring", None, True)
+    assert waiting["album"] == {"loudness_lufs": None, "peak": None, "songs": 3}
+    assert states(waiting) == [(song, "measuring", None) for song in files]
+    assert (part["state"], part["why"], part["whole"]) == ("measuring", levels.LOOK_LATER, False)
+    assert part["album"] == {"loudness_lufs": None, "peak": None, "songs": 2}
+    assert states(part) == [("song-1", "measuring", None), ("song-2", "unmeasured", levels.LOOK_LATER),
+                            ("song-3", "measuring", None)]
+    assert (after["state"], after["whole"]) == ("measured", True) and len(seen) == 3
+
+
+def test_the_apps_loudness_route_never_says_nothing_to_level_of_an_album_not_looked_at_whole(upstream, client,
+                                                                                            mp4_cache, monkeypatch):
+    """
+    (After review) An album whose one FLAC song couldn't be looked at just now, beside an MP3, has no song counted -
+    but that is no lasting answer: unmeasured, LOOK_LATER, not whole. NOTHING_TO_LEVEL, a not_levelled answer the
+    phone keeps 10 minutes, would leave the album unlevelled that long for a moment's 503 or a STREAMINFO read late.
+    Looked at again, its song counts.
+    """
+    state, _ = upstream
+    album = serving(state, {"song-1": constant_flac(rate=44100, bps=16, blocks=(4096,) * 4),
+                            "mp3": b"\xff\xfb\x90\x00" + bytes(4000)})
+    album.types["mp3"] = "audio/mpeg"
+    album.entries["mp3"].update(suffix="mp3", contentType="audio/mpeg")
+    failed = flaky_looks(monkeypatch, "song-1", 1)
+    answer = album_loudness(client)
+    assert (answer["state"], answer["why"], answer["whole"]) == ("unmeasured", levels.LOOK_LATER, False)
+    assert answer["album"] == {"loudness_lufs": None, "peak": None, "songs": 0}
+    assert states(answer) == [("song-1", "unmeasured", levels.LOOK_LATER), ("mp3", "not_levelled", levels.NOT_FLAC)]
+    again = album_loudness(client)
+    assert failed == ["song-1"]
+    assert (again["whole"], again["album"]["songs"], states(again)) == \
+        (True, 1, [("song-1", "unmeasured", None), ("mp3", "not_levelled", levels.NOT_FLAC)])
+
+
+def test_the_apps_loudness_route_counts_only_songs_that_can_be_measured_before_its_album_is(upstream, client,
+                                                                                           mp4_cache, monkeypatch):
+    """(After review) A song known to be unmeasurable, the album's others not measured yet: the album isn't measured,
+    and its count is the songs that WILL count toward its level - two, not three - as Info's describe() counts them."""
+    state, _ = upstream
+    files = {f"song-{i}": constant_flac(rate=44100, bps=16, blocks=(4096,) * (3 + i)) for i in (1, 2, 3)}
+    serving(state, files)
+    #? a server that could measure them (nothing is measured here, so no numpy is needed)
+    monkeypatch.setattr(levels, "missing_libraries", lambda: None)
+    first = album_loudness(client)
+    assert (first["state"], first["album"]["songs"]) == ("unmeasured", 3)
+    #? song-3 tried before and found unmeasurable: kept under its audio key, as _measure_now() keeps it
+    version = mp4_cache._versions["song-3"][1]
+    words = "libsndfile couldn't decode all of it: a test"
+    mp4_cache.levels._unmeasurable[loudness.audio_key(files["song-3"][8:42], version.key)] = words
+    answer = album_loudness(client)
+    assert (answer["state"], answer["why"], answer["whole"]) == ("unmeasured", None, True)
+    assert answer["album"] == {"loudness_lufs": None, "peak": None, "songs": 2}
+    assert states(answer) == [("song-1", "unmeasured", None), ("song-2", "unmeasured", None),
+                              ("song-3", "not_levelled", words)]
+    info = client.get("/deadwax/navidrome/level/song-1?level=album").json()
+    assert (info["state"], info["songs"], info["measured_songs"]) == ("unmeasured", 2, 0)
+
+
+@pytest.mark.parametrize("ghost", [{}, {"id": None}, {"id": ""}], ids=["no id", "a null id", "an empty id"])
+def test_the_apps_loudness_route_leaves_out_a_listed_song_without_an_id(upstream, client, mp4_cache, ghost):
+    """(After review) An entry of Navidrome's listing with no id is no song the app can play or ask about: left out
+    of the answer, never looked at (a look at song "None" would go to Navidrome), and no bar to the album being
+    whole - as _album_songs() leaves it out of the stream's album."""
+    state, seen = upstream
+    album = serving(state, {"song-1": constant_flac(rate=44100, bps=16, blocks=(4096,) * 4),
+                            "song-2": constant_flac(rate=44100, bps=16, blocks=(4096,) * 5)})
+    album.entries["ghost"] = {**{key: value for key, value in album.entries["song-2"].items() if key != "id"}, **ghost}
+    album.listed.insert(1, "ghost")
+    answer = album_loudness(client)
+    assert [song["id"] for song in answer["songs"]] == ["song-1", "song-2"]
+    assert (answer["whole"], answer["album"]["songs"]) == (True, 2)
+    assert {request.url.params.get("id") for request in seen if request.url.path.endswith("stream")} == \
+        {"song-1", "song-2"}
+
+
+@pytest.mark.parametrize("missing", ["libraries", "folder"])
+def test_the_apps_loudness_route_gives_no_lasting_answer_for_a_look_that_failed_just_now(upstream, client, mp4_cache,
+                                                                                         tmp_path, monkeypatch, missing):
+    """
+    (After review) A server that can measure nothing more now - no numpy and soundfile, or no cache folder (a filed
+    album is measured without one, by measure_filed()) - and an album whose every counted song is measured, but one
+    song couldn't be looked at just now: unmeasured, LOOK_LATER. Not not_levelled, which the phone keeps 10 minutes,
+    though nothing needs measuring and the next look makes it `measured`. Only a counted song still unmeasured makes
+    that answer lasting, whole or not.
+    """
+    np, sf, _ = libs()
+    _, files = cd_album(np, sf, tmp_path)
+    state, _ = upstream
+    serving(state, files)
+    client.get(url("song-1"))
+    whole = album_loudness(client)
+    assert whole["state"] == "measured"
+    if missing == "libraries":
+        monkeypatch.setattr(levels, "missing_libraries", lambda: "numpy")
+    else:
+        async def no_folder():
+            return None
+        monkeypatch.setattr(mp4_cache, "_folder", no_folder)
+    flaky_looks(monkeypatch, "song-2", 1)
+    answer = album_loudness(client)
+    assert (answer["state"], answer["why"], answer["whole"]) == ("unmeasured", levels.LOOK_LATER, False)
+    assert answer["album"] == {"loudness_lufs": None, "peak": None, "songs": 2}
+    assert states(answer) == [("song-1", "measured", None), ("song-2", "unmeasured", levels.LOOK_LATER),
+                              ("song-3", "measured", None)]
+    assert album_loudness(client) == whole, "looked at again: measured, from what is kept"
+
+    #? song-3's measurement gone (this test keeps them in memory only): now a counted song can't be measured here
+    del mp4_cache.levels._read[key_of(files["song-3"])]
+    flaky_looks(monkeypatch, "song-2", 1)
+    lasting = album_loudness(client)
+    why = levels.NO_LIBRARIES if missing == "libraries" else levels.NO_CACHE
+    assert (lasting["state"], lasting["why"], lasting["whole"]) == ("not_levelled", why, False)
+    assert states(lasting)[2] == ("song-3", "unmeasured", None)
+
+
+def test_every_loudness_answer_is_made_with_every_key():
+    """The parts every answer is built from (the iPhone app's contract test reads them): every key, whatever is given.
+    And the two reasons the route alone gives, word for word (after review): the app says them as they are."""
+    assert (levels.LOOK_LATER, levels.NOTHING_TO_LEVEL) == ("it couldn't be looked at just now",
+                                                           "none of its songs can be levelled")
+    assert set(levels._song_entry("x", "unmeasured")) == SONG_KEYS
+    assert levels._song_entry("x", "measured", float("-inf"), 0.0) == {"id": "x", "state": "measured", "loudness_lufs": None,
+                                                                       "peak": 0.0, "why": None}
+    assert set(levels._album_level(None, None, 0)) == ALBUM_KEYS
+    assert set(levels._loudness_answer("unmeasured", None, True, levels._album_level(None, None, 0), [])) == ANSWER_KEYS
+    assert [levels._number(value) for value in (-11.437218417201565, 0.0, float("-inf"), float("inf"), float("nan"), None)] \
+        == [-11.437218417201565, 0.0, None, None, None, None]

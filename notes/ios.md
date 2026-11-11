@@ -313,7 +313,8 @@ R4). Phase 0 has nothing that plays for ten minutes, as the plan's check had it.
 
 ### Left for later phases
 
-Normalization (gain in the engine, Phase 1, with the one new server route for album loudness),
+Normalization (gain in the engine, Phase 1, with the one new server route for album loudness - on main as
+deadwax 2.1.1: notes/player-normalization.md "The iPhone app's loudness route (2.1.1)"),
 Up Next and resume (ported from lib/upNext.ts and lib/resume.ts with cross-language traces), plays,
 the library screens, the background download session and its settings (Phase 2, with James's two),
 the streaming cache's own limit (Phase 0 empties it at each launch), the start-on-zeros workaround if

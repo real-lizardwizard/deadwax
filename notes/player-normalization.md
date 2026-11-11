@@ -287,3 +287,99 @@ FLAC under "Up to 48 kHz" - not only with a song it resamples - so the album's r
 setting and drop under "Original". That changes stream addresses `ui/test/player.sim.cjs` pins, so it is an engine
 change of its own (an address change in `streamWrap`/`api.ts`'s builders and the sim's recorded addresses), to be
 asked for as one.
+
+### The iPhone app's loudness route (2.1.1)
+
+The native app (notes/ios.md, Phase 1 = app 0.2) plays the ORIGINAL file and levels it on the phone: one Float32
+multiply per decoded sample, from the web's setting and rule (`levelFor`) and the server's measurements and
+`gain_for` - with **reserve 0**, since nothing on the phone resamples before the gain. So it needs the raw numbers,
+not a gain: `GET /deadwax/navidrome/loudness/album/{album_id}`, a user's route, on main as 2.1.1 (the first Phase 1
+server addition), then merged into `ios`. Settled with James for Phase 1: the phone follows the web's rule; the
+answer carries `algorithm`; raw values over the wire, the phone's `gain_for` at reserve 0.
+
+**The answer** (200, JSON; every key always there; `levels._loudness_answer`, `_album_level`, `_song_entry` build
+every one, so the contract test can read their keys):
+
+```json
+{"reference_lufs": -18.0, "algorithm": 1, "state": "measured", "why": null, "whole": true,
+ "album": {"loudness_lufs": -11.437218417201565, "peak": 0.98876953125, "songs": 3},
+ "songs": [{"id": "a1", "state": "measured", "loudness_lufs": -12.80316, "peak": 0.98876953125, "why": null},
+           {"id": "a4", "state": "not_levelled", "loudness_lufs": null, "peak": null, "why": "it isn't a FLAC file"}]}
+```
+
+- `reference_lufs` = `loudness.REFERENCE_LUFS`; `algorithm` = `loudness.ALGORITHM_VERSION` (1) - for Phase 2's
+  stored copies, re-fetched when the server's ruler changes. `state`: measured | measuring | unmeasured |
+  not_levelled (no `plain`: that is about a copy deadwax made). `whole`: every FLAC song of Navidrome's album looked
+  at (version and STREAMINFO read, or a lasting reason found) - false when one couldn't be just now, or when the
+  listing couldn't be had (then `songs` is `[]`).
+- `album.loudness_lufs` / `album.peak`: only when `measured` - `loudness_of()` of every counted song's histogram
+  POOLED (not an average: the phone can't work it out from the songs' numbers, which is why it is sent) and their
+  largest native sample peak, UNROUNDED; a null loudness there means the album is silent (-inf). `album.songs`: the
+  songs that count (FLAC, looked at, 16/24-bit, 1-2 channels, a length, not known unmeasurable) - describe()'s
+  `songs` for level=album.
+- `songs[]`: every song of Navidrome's listing in its order (MP3s too), entries without an id skipped. Measured: its
+  own loudness (null = silent) and peak; anything else null.
+- `_number()` sends every non-finite value as null: Starlette's JSONResponse uses `allow_nan=False`, so an -inf
+  would be a 500.
+
+**States, decided in order.** Per song: not FLAC -> not_levelled NOT_FLAC (nothing read); its look `None` (brief:
+STREAMINFO not in 10 s, Navidrome broke off, a 429/503) -> unmeasured, **`LOOK_LATER`** ("it couldn't be looked at
+just now"); its look words (a lasting NavidromeError, the cache's `_why_not`, UNREADABLE, `_reason`) -> not_levelled,
+those words; in `_unmeasurable` -> not_levelled, the CannotMeasure words; measured (memory or database, this
+algorithm) -> measured; else measuring when the album's task or its own is live, or unmeasured. The album: the
+listing failed (`_ASKING`, `_NoAlbum`, an unreachable error from a look) -> unmeasured, LOOK_LATER, not whole,
+`{null, null, 0}`, no songs; whole with every counted song measured -> measured; whole with none counted ->
+not_levelled **`NOTHING_TO_LEVEL`** ("none of its songs can be levelled"); the album's task or a counted song's live
+-> measuring (LOOK_LATER when not whole); a counted song still unmeasured and no numpy/soundfile -> not_levelled
+NO_LIBRARIES, or no cache folder -> not_levelled NO_CACHE; else unmeasured (LOOK_LATER when not whole).
+
+(After review) NO_LIBRARIES and NO_CACHE need a counted song still unmeasured. The order first written said them of
+an album not whole whatever was measured: every counted song measured (measure_filed() measures a filed album
+without a cache folder) and one song's look failed just now gave not_levelled NO_CACHE - a lasting answer, kept 10
+minutes by the phone's LoudnessBook, though nothing needed measuring and the next look would make it `measured`. It
+is unmeasured LOOK_LATER now. With a counted song unmeasured the answer stays not_levelled, whole or not: that song
+can't be measured here whatever the look finds. For the same reason NOTHING_TO_LEVEL needs `whole`: an album whose
+only FLAC songs couldn't be looked at just now has none counted, and is unmeasured LOOK_LATER.
+
+**Deliberately unlike describe()**: what IS measured is said even without the libraries or a cache folder (the
+phone needs no processing of the server); no "too big" (no copy is made for the phone); no `_plain`, no kept gains,
+no reserve, no rounding.
+
+**The code.** levels.py: `_album_songs`' inner look extracted UNCHANGED as `_look_at(song_id)` (Song | words | None;
+re-raises an unreachable NavidromeError) and used by both; `album_loudness(album_id)` lists, looks at each FLAC id
+once (8 at once), reads the kept measurements with ONE `known()`, and never raises (it catches what the listing and
+the looks can). It never measures, never makes, never takes or even makes the one-album gate. The route
+(routes/navidrome.py, after `level_album`): one `getAlbum` AS THE ASKER first (a 404 for an album that user can't
+see, a 401 for a dead login), then `album_loudness()` as the shared account - as POST /level/album does.
+
+**Cost**: the first call on an N-song FLAC album = 1 getAlbum as the asker + 1 listing + N x (4-byte range + one or
+two 64 KiB ranges) as the shared account, 8 at a time; then the listing and versions are believed 30 s
+(VERSION_SECONDS), STREAMINFO for good (by version). An app reading every 5 s while an album measures re-reads the N
+4-byte ranges every 30 s. One SQLite query per call.
+
+**Tests.** test_normalization.py, "the iPhone app's loudness route": before a play unmeasured and whole, the MP3 and
+the 20-bit FLAC saying why, nothing measured or gated; after one, each song's numbers and the album's pooled exactly,
+and `gain_for(album, reserve 0)` = the stream's gain for a CD album; the asker's 404 with nothing listed; measuring
+(by an album page's warm, and by one song played by song); a look failing just now (CannotPlan, 503, 429) never
+pooled from the rest; a song Navidrome can't serve (404, 500) and one that can't be measured left out, the album
+measured from the rest; silence as null, read with `parse_constant` refusing infinities; a peak-held hi-res album
+whose raw numbers give the stream's gain at HEADROOM_DB and up to 3 dB more at 0; measured rows said without the
+libraries or a folder, an unmeasured album then not_levelled NO_LIBRARIES / NO_CACHE; an MP3 album NOTHING_TO_LEVEL
+with no file read; the listing unlisted, refused, or Navidrome gone mid-look -> the LOOK_LATER answer; every part's
+keys. test_player_as_you.py walks it (ethan's getAlbum, then the shared listing - exactly those two on the walk's
+fake, which lists no songs) and refuses an album Navidrome won't give ethan with only his getAlbum asked. The route
+is in test_logins.py ROUTES, both no-general-proxy lists and the seam test (24 routes). Mutations run once each and
+caught: `whole` ignored, -inf passed through, the reserve applied to the peak, the asker's getAlbum dropped, the
+route left out of ROUTES.
+
+An adversarial review's mutations then found six that nothing caught, each with a test now (each mutation run once
+and caught, then reverted): NOTHING_TO_LEVEL without `whole` (an album of one FLAC song whose look failed once, and
+an MP3 - LOOK_LATER, then counted when looked at again); the album's own task ignored, and a measuring album not
+whole saying null (a play's album task waiting at the one-album gate behind another album, the only task live -
+every song measuring - then one look failing: measuring, LOOK_LATER); an unmeasured album's count with its
+unmeasurable song in it (two, as Info's describe() counts); a listed entry without an id kept (no id, null, "" -
+never looked at); the two new reasons' words, pinned as literals. And the fix above: a measured album with one look
+failing on a server without the libraries or a folder is unmeasured LOOK_LATER, and not_levelled once a counted song
+is unmeasured (the fix reverted is caught).
+
+**Not verified**: against a real Navidrome, as everything here (the suite's Navidromes are fakes).

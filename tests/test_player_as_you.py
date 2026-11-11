@@ -422,6 +422,8 @@ WALK = {
     #? (2.0.0-player.62) Normalization: Info's level of a song, and an album page's "measure this album" (a 202)
     "/level/{song_id}": [("get", f"/level/{SONG}?level=track")],
     "/level/album/{album_id}": [("post", "/level/album/nd-dummy")],
+    #? (2.1.1) the iPhone app's Normalization: what is measured of an album (a 200 even when its listing can't be had)
+    "/loudness/album/{album_id}": [("get", "/loudness/album/nd-dummy")],
     #? (2.0.0-player.64) resume what was playing: read, a full save, then a position save against its ids (the first
     #? full save of a fresh database is rev 1)
     "/queue": [("get", "/queue"), ("post", "/queue", {"ids": [SONG, SONG], "index": 1, "position": 12.5,
@@ -443,7 +445,7 @@ CACHE_CALL = ("demo", "stream")
 #? (2.0.0-player.62) what the player's Normalization asks as the shared account once the asker's access is confirmed:
 #? an album's listing and its songs (src/levels.py - measured once for every phone), beside the cache's own reads
 LEVEL_CALLS = {CACHE_CALL, ("demo", "getAlbum"), ("demo", "getSong")}
-LEVEL_WAYS = {f"/level/{SONG}?level=track", "POST /level/album/nd-dummy"}
+LEVEL_WAYS = {f"/level/{SONG}?level=track", "POST /level/album/nd-dummy", "/loudness/album/nd-dummy"}
 
 
 def way_key(method: str, path: str) -> str:
@@ -490,6 +492,8 @@ def test_every_player_route_asks_navidrome_as_the_signed_in_user(player):
     #? Normalization's reads as the shared account only after ethan's access is confirmed: his getSong, his getAlbum
     assert made[f"/level/{SONG}?level=track"][0] == ("ethan", "getSong"), made[f"/level/{SONG}?level=track"]
     assert made["POST /level/album/nd-dummy"][0] == ("ethan", "getAlbum"), made["POST /level/album/nd-dummy"]
+    #? (2.1.1) and the iPhone app's loudness of an album: ethan's getAlbum, then the album's listing as the shared account
+    assert made["/loudness/album/nd-dummy"] == [("ethan", "getAlbum"), ("demo", "getAlbum")], made["/loudness/album/nd-dummy"]
     #? the stream cache's make alone asks as the shared account - and only after ethan's access is confirmed
     for path in (f"/stream/{SONG}?format=raw&wrap=mp4", f"/stream/{SONG}?format=raw&wrap=fmp4", f"/scrub/{SONG}?at=0&seconds=1"):
         assert made[path][0] == ("ethan", "getSong"), (path, made[path])
@@ -644,6 +648,22 @@ def test_a_song_navidrome_wont_give_them_never_comes_out_of_the_cache(player):
     #? a refusal is never kept: shown to him again, he is asked afresh and plays
     player.fake.hidden.clear()
     assert ethan.get(f"{PLAYER}/stream/{SONG}?format=raw&wrap=mp4").content == whole.content
+
+
+def test_the_loudness_of_an_album_navidrome_wont_give_them_is_never_read_for_them(player):
+    """(2.1.1) The iPhone app's loudness route reads an album's songs as the shared account - so an album Navidrome
+    keeps from ethan is his 404, asked as him, and nothing is read as the shared account for him; james, who may see
+    it, is answered."""
+    james, ethan = signed_in(player, "james"), signed_in(player, "ethan")
+    #? a Navidrome giving users their own libraries: the album isn't found for him
+    player.fake.errors[("ethan", "getAlbum")] = httpx.Response(200, json=failed(70, "Album not found"))
+    player.fake.forget()
+    assert ethan.get(f"{PLAYER}/loudness/album/nd-dummy").status_code == 404
+    assert player.fake.by() == [("ethan", "getAlbum")]
+    player.fake.forget()
+    answer = james.get(f"{PLAYER}/loudness/album/nd-dummy")
+    assert answer.status_code == 200 and player.fake.by()[0] == ("james", "getAlbum")
+    assert answer.json()["state"] == "unmeasured" and answer.json()["songs"] == [], "this fake lists no songs for it"
 
 
 def test_the_same_song_is_the_same_bytes_whoever_asks(player, monkeypatch, tmp_path):
