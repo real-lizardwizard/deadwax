@@ -180,6 +180,15 @@ public struct LevelDecisions: Sendable, Equatable {
     public func fixed(album: String) -> Bool {
         albums[album] != nil
     }
+
+    /// An entry the engine re-keyed: Shuffle turned off makes new entries of the same songs, and the engine keeps
+    /// what it has scheduled of them under the new keys (its replaceUpcoming). The decision goes with the audio, so a
+    /// later open of it (a seek) plays at the level already heard, and Info says that level. Nothing when the old key
+    /// has no decision, or the new one has its own.
+    public mutating func carry(from old: Int, to new: Int) {
+        guard old != new, entries[new] == nil, let made = entries[old] else { return }
+        entries[new] = made
+    }
 }
 
 /// How long the first song of a play may wait for its loudness, and when it should: only a levelled FLAC, only

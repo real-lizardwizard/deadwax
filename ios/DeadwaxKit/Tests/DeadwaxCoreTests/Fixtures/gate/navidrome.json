@@ -1,0 +1,70 @@
+{
+  "made_by": "ios/scripts/export-gate-vectors.cjs",
+  "made_from": {
+    "ui/src/app/NeedsNavidrome.tsx": "bcf92c13222f42618cf850212ba79c8019f794aaba0883846f2cbabe8b05148c",
+    "ui/src/app/access.ts": "efb6d70cf02ecb7d60bb704222e15880efc105c63fbbe2dcf9a289aa39802aa4",
+    "ui/src/lib/errorWords.ts": "f878374b203a853f69ec4b576385ea148bcd190d0bbee4898c82a6f4f055c4a7",
+    "ui/src/lib/navidromeCheck.ts": "a965da176009a527062a2da14f1b1735723b95d02bb331148333b2833b4bfe24"
+  },
+  "statuses": {
+    "none": null,
+    "reached": {"configured":true,"ok":true,"server":"Navidrome 0.64.2","problem":null},
+    "unset": {"configured":false,"ok":false,"server":null,"problem":"Navidrome isn't set up - fill in NAVIDROME_URL, NAVIDROME_USER and NAVIDROME_PASSWORD in Server settings (Connections)"},
+    "down": {"configured":true,"ok":false,"server":null,"problem":"Navidrome couldn't be reached at http://navidrome:4533: All connection attempts failed"},
+    "quiet": {"configured":true,"ok":false,"server":null,"problem":null},
+    "unsetQuiet": {"configured":false,"ok":false,"server":null,"problem":null},
+    "offline": {"configured":true,"ok":false,"server":null,"problem":"TypeError: Failed to fetch","offline":true}
+  },
+  "words": {
+    "MUSIC_UNAVAILABLE": "Your music isn't available right now",
+    "MUSIC_NOT_YET": "Your music isn't available yet",
+    "MUSIC_UNREACHED": "Can't reach the music server right now. If it keeps happening, tell whoever runs deadwax.",
+    "DEADWAX_UNREACHED": "Can't connect to deadwax. Check your connection.",
+    "MUSIC_UNSET": "deadwax hasn't been connected to a music server yet. Tell whoever runs deadwax.",
+    "ADMIN_SETS_UP": "An admin can set it up in Server settings (Connections).",
+    "NAVIDROME_REQUIRED": "deadwax needs Navidrome for your library: the app shows and plays the albums Navidrome lists, through deadwax - so the phone never needs Navidrome's password.",
+    "NAVIDROME_UNREACHED": "Your library comes from Navidrome, so it shows here once deadwax can reach it."
+  },
+  "checks": {
+    "deadwaxUnreached": {"configured":true,"ok":false,"server":null,"offline":true},
+    "navidromeRefused": {"configured":true,"ok":false,"server":null,"offline":false},
+    "timedOut": {"configured":true,"ok":false,"server":null,"offline":false}
+  },
+  "cases": [
+    {"reader":"listener","me":{"user":"ethan","admin":false,"auth":"on","permissions":["request"]},"status":"none","drawn":{"spinner":"Connecting"}},
+    {"reader":"listener","me":{"user":"ethan","admin":false,"auth":"on","permissions":["request"]},"status":"reached","drawn":"open"},
+    {"reader":"listener","me":{"user":"ethan","admin":false,"auth":"on","permissions":["request"]},"status":"unset","drawn":{"title":"Your music isn't available yet","lines":["deadwax hasn't been connected to a music server yet. Tell whoever runs deadwax."],"buttons":[]}},
+    {"reader":"listener","me":{"user":"ethan","admin":false,"auth":"on","permissions":["request"]},"status":"down","drawn":{"title":"Your music isn't available right now","lines":["Can't reach the music server right now. If it keeps happening, tell whoever runs deadwax."],"buttons":["Try again"]}},
+    {"reader":"listener","me":{"user":"ethan","admin":false,"auth":"on","permissions":["request"]},"status":"quiet","drawn":{"title":"Your music isn't available right now","lines":["Can't reach the music server right now. If it keeps happening, tell whoever runs deadwax."],"buttons":["Try again"]}},
+    {"reader":"listener","me":{"user":"ethan","admin":false,"auth":"on","permissions":["request"]},"status":"unsetQuiet","drawn":{"title":"Your music isn't available yet","lines":["deadwax hasn't been connected to a music server yet. Tell whoever runs deadwax."],"buttons":[]}},
+    {"reader":"listener","me":{"user":"ethan","admin":false,"auth":"on","permissions":["request"]},"status":"offline","drawn":{"title":"Your music isn't available right now","lines":["Can't connect to deadwax. Check your connection."],"buttons":["Try again"]}},
+    {"reader":"settings","me":{"user":"sam","admin":false,"auth":"on","permissions":["request","server"]},"status":"none","drawn":{"spinner":"Connecting"}},
+    {"reader":"settings","me":{"user":"sam","admin":false,"auth":"on","permissions":["request","server"]},"status":"reached","drawn":"open"},
+    {"reader":"settings","me":{"user":"sam","admin":false,"auth":"on","permissions":["request","server"]},"status":"unset","drawn":{"title":"Connect Navidrome","lines":["Navidrome isn't set up - fill in NAVIDROME_URL, NAVIDROME_USER and NAVIDROME_PASSWORD in Server settings (Connections)","deadwax needs Navidrome for your library: the app shows and plays the albums Navidrome lists, through deadwax - so the phone never needs Navidrome's password. An admin can set it up in Server settings (Connections)."],"buttons":[]}},
+    {"reader":"settings","me":{"user":"sam","admin":false,"auth":"on","permissions":["request","server"]},"status":"down","drawn":{"title":"Can't reach Navidrome","lines":["Navidrome couldn't be reached at http://navidrome:4533: All connection attempts failed","Your library comes from Navidrome, so it shows here once deadwax can reach it."],"buttons":["Try again"]}},
+    {"reader":"settings","me":{"user":"sam","admin":false,"auth":"on","permissions":["request","server"]},"status":"quiet","drawn":{"title":"Can't reach Navidrome","lines":["","Your library comes from Navidrome, so it shows here once deadwax can reach it."],"buttons":["Try again"]}},
+    {"reader":"settings","me":{"user":"sam","admin":false,"auth":"on","permissions":["request","server"]},"status":"unsetQuiet","drawn":{"title":"Connect Navidrome","lines":["","deadwax needs Navidrome for your library: the app shows and plays the albums Navidrome lists, through deadwax - so the phone never needs Navidrome's password. An admin can set it up in Server settings (Connections)."],"buttons":[]}},
+    {"reader":"settings","me":{"user":"sam","admin":false,"auth":"on","permissions":["request","server"]},"status":"offline","drawn":{"title":"Can't reach Navidrome","lines":["TypeError: Failed to fetch","Your library comes from Navidrome, so it shows here once deadwax can reach it."],"buttons":["Try again"]}},
+    {"reader":"admin","me":{"user":"james","admin":true,"auth":"on"},"status":"none","drawn":{"spinner":"Connecting"}},
+    {"reader":"admin","me":{"user":"james","admin":true,"auth":"on"},"status":"reached","drawn":"open"},
+    {"reader":"admin","me":{"user":"james","admin":true,"auth":"on"},"status":"unset","drawn":{"title":"Connect Navidrome","lines":["Navidrome isn't set up - fill in NAVIDROME_URL, NAVIDROME_USER and NAVIDROME_PASSWORD in Server settings (Connections)","deadwax needs Navidrome for your library: the app shows and plays the albums Navidrome lists, through deadwax - so the phone never needs Navidrome's password. Set it up in Server settings (Connections), then come back."],"buttons":["Set up Navidrome"]}},
+    {"reader":"admin","me":{"user":"james","admin":true,"auth":"on"},"status":"down","drawn":{"title":"Can't reach Navidrome","lines":["Navidrome couldn't be reached at http://navidrome:4533: All connection attempts failed","Your library comes from Navidrome, so it shows here once deadwax can reach it."],"buttons":["Try again"]}},
+    {"reader":"admin","me":{"user":"james","admin":true,"auth":"on"},"status":"quiet","drawn":{"title":"Can't reach Navidrome","lines":["","Your library comes from Navidrome, so it shows here once deadwax can reach it."],"buttons":["Try again"]}},
+    {"reader":"admin","me":{"user":"james","admin":true,"auth":"on"},"status":"unsetQuiet","drawn":{"title":"Connect Navidrome","lines":["","deadwax needs Navidrome for your library: the app shows and plays the albums Navidrome lists, through deadwax - so the phone never needs Navidrome's password. Set it up in Server settings (Connections), then come back."],"buttons":["Set up Navidrome"]}},
+    {"reader":"admin","me":{"user":"james","admin":true,"auth":"on"},"status":"offline","drawn":{"title":"Can't reach Navidrome","lines":["TypeError: Failed to fetch","Your library comes from Navidrome, so it shows here once deadwax can reach it."],"buttons":["Try again"]}},
+    {"reader":"breakGlass","me":{"user":"deadwax","admin":true,"auth":"on"},"status":"none","drawn":{"spinner":"Connecting"}},
+    {"reader":"breakGlass","me":{"user":"deadwax","admin":true,"auth":"on"},"status":"reached","drawn":"open"},
+    {"reader":"breakGlass","me":{"user":"deadwax","admin":true,"auth":"on"},"status":"unset","drawn":{"title":"Connect Navidrome","lines":["Navidrome isn't set up - fill in NAVIDROME_URL, NAVIDROME_USER and NAVIDROME_PASSWORD in Server settings (Connections)","deadwax needs Navidrome for your library: the app shows and plays the albums Navidrome lists, through deadwax - so the phone never needs Navidrome's password. Set it up in Server settings (Connections), then come back."],"buttons":["Set up Navidrome"]}},
+    {"reader":"breakGlass","me":{"user":"deadwax","admin":true,"auth":"on"},"status":"down","drawn":{"title":"Can't reach Navidrome","lines":["Navidrome couldn't be reached at http://navidrome:4533: All connection attempts failed","Your library comes from Navidrome, so it shows here once deadwax can reach it."],"buttons":["Try again"]}},
+    {"reader":"breakGlass","me":{"user":"deadwax","admin":true,"auth":"on"},"status":"quiet","drawn":{"title":"Can't reach Navidrome","lines":["","Your library comes from Navidrome, so it shows here once deadwax can reach it."],"buttons":["Try again"]}},
+    {"reader":"breakGlass","me":{"user":"deadwax","admin":true,"auth":"on"},"status":"unsetQuiet","drawn":{"title":"Connect Navidrome","lines":["","deadwax needs Navidrome for your library: the app shows and plays the albums Navidrome lists, through deadwax - so the phone never needs Navidrome's password. Set it up in Server settings (Connections), then come back."],"buttons":["Set up Navidrome"]}},
+    {"reader":"breakGlass","me":{"user":"deadwax","admin":true,"auth":"on"},"status":"offline","drawn":{"title":"Can't reach Navidrome","lines":["TypeError: Failed to fetch","Your library comes from Navidrome, so it shows here once deadwax can reach it."],"buttons":["Try again"]}},
+    {"reader":"off","me":{"user":"local","admin":true,"auth":"off"},"status":"none","drawn":{"spinner":"Connecting"}},
+    {"reader":"off","me":{"user":"local","admin":true,"auth":"off"},"status":"reached","drawn":"open"},
+    {"reader":"off","me":{"user":"local","admin":true,"auth":"off"},"status":"unset","drawn":{"title":"Connect Navidrome","lines":["Navidrome isn't set up - fill in NAVIDROME_URL, NAVIDROME_USER and NAVIDROME_PASSWORD in Server settings (Connections)","deadwax needs Navidrome for your library: the app shows and plays the albums Navidrome lists, through deadwax - so the phone never needs Navidrome's password. Set it up in Server settings (Connections), then come back."],"buttons":["Set up Navidrome"]}},
+    {"reader":"off","me":{"user":"local","admin":true,"auth":"off"},"status":"down","drawn":{"title":"Can't reach Navidrome","lines":["Navidrome couldn't be reached at http://navidrome:4533: All connection attempts failed","Your library comes from Navidrome, so it shows here once deadwax can reach it."],"buttons":["Try again"]}},
+    {"reader":"off","me":{"user":"local","admin":true,"auth":"off"},"status":"quiet","drawn":{"title":"Can't reach Navidrome","lines":["","Your library comes from Navidrome, so it shows here once deadwax can reach it."],"buttons":["Try again"]}},
+    {"reader":"off","me":{"user":"local","admin":true,"auth":"off"},"status":"unsetQuiet","drawn":{"title":"Connect Navidrome","lines":["","deadwax needs Navidrome for your library: the app shows and plays the albums Navidrome lists, through deadwax - so the phone never needs Navidrome's password. Set it up in Server settings (Connections), then come back."],"buttons":["Set up Navidrome"]}},
+    {"reader":"off","me":{"user":"local","admin":true,"auth":"off"},"status":"offline","drawn":{"title":"Can't reach Navidrome","lines":["TypeError: Failed to fetch","Your library comes from Navidrome, so it shows here once deadwax can reach it."],"buttons":["Try again"]}}
+  ]
+}

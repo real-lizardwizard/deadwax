@@ -1,50 +1,64 @@
 import DeadwaxCore
 import SwiftUI
 
-/// Phase 0's one screen: the address and Check, signing in when logins are on, the test sounds,
-/// the hi-res row, what is playing, and how long this install runs.
-struct ContentView: View {
-    @Bindable var model: AppModel
+/// You's Debug (admins only, D1): Phase 0's one screen, moved - Check's report, the test sounds, the hi-res row,
+/// what is playing (with the engine's own words for its last failure, D7, and an Up Next edit held for the join, D4),
+/// the Library's last album list asks (how many albums, how long - check 1), and how long this install runs. The
+/// address and the sign-in are the app's own screens now.
+struct DebugView: View {
+    @Environment(DebugModel.self) private var model
+    @Environment(PlayerModel.self) private var player
+    @Environment(LibraryModel.self) private var library
+
+    init() {}
 
     var body: some View {
-        NavigationStack {
-            Form {
-                server
-                if model.report?.needsSignIn == true { signIn }
-                if model.report?.ok == true {
-                    testSounds
-                    hiRes
-                }
-                playing
-                Section {
-                    Text(model.installLine)
-                        .font(.footnote)
-                        .foregroundStyle(Palette.quiet)
-                } footer: {
-                    Text(version)
-                }
+        Form {
+            server
+            if model.report?.ok == true {
+                testSounds
+                hiRes
             }
-            .navigationTitle("deadwax")
+            playing
+            libraryLists
+            Section {
+                Text(model.installLine)
+                    .font(.footnote)
+                    .foregroundStyle(Palette.quiet)
+            } footer: {
+                Text("deadwax for iPhone \(YouView.appVersion)")
+            }
         }
+        .navigationTitle("Debug")
+        .task { if model.report == nil { await model.check() } }
     }
 
-    private var version: String {
-        let info = Bundle.main.infoDictionary
-        let short = info?["CFBundleShortVersionString"] as? String ?? "?"
-        let build = info?["CFBundleVersion"] as? String ?? "?"
-        return "deadwax for iPhone \(short) (\(build)) - Phase 0"
+    // MARK: the Library's lists
+
+    /// Each scope's last album_index answer: a new list (200) or the one kept still standing (304), how many albums
+    /// and how long it took - to count against the web's Library, and to time a big library.
+    private var libraryLists: some View {
+        Section {
+            ForEach([AlbumScope.yours, .store], id: \.self) { scope in
+                if let fetch = library.lastFetch[scope] {
+                    LabeledContent(scope == .yours ? "Your albums" : "All albums") {
+                        Text("\(fetch.albums) albums \u{00B7} \(fetch.status) \u{00B7} \(String(format: "%.2f", fetch.seconds)) s")
+                            .font(.footnote.monospacedDigit())
+                    }
+                }
+            }
+            if library.lastFetch.isEmpty {
+                Text("Not asked yet").foregroundStyle(Palette.quiet)
+            }
+        } header: {
+            Text("Library")
+        }
     }
 
     // MARK: the server
 
     private var server: some View {
         Section {
-            TextField("http://192.168.1.20:8090", text: $model.addressText)
-                .keyboardType(.URL)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .submitLabel(.go)
-                .onSubmit { Task { await model.check() } }
             Button(model.checking ? "Checking\u{2026}" : "Check") {
                 Task { await model.check() }
             }
@@ -52,34 +66,8 @@ struct ContentView: View {
             ForEach(model.report?.lines ?? [], id: \.self) { line in
                 Text(line).font(.footnote)
             }
-            if model.me?.loginsOn == true {
-                Button("Sign out", role: .destructive) { Task { await model.signOut() } }
-            }
         } header: {
-            Text("deadwax's address")
-        } footer: {
-            Text("The address you open deadwax at, by IP or by name. The first time, iOS asks to let deadwax find devices on your local network: say yes.")
-        }
-    }
-
-    private var signIn: some View {
-        Section {
-            TextField("Navidrome user name", text: $model.username)
-                .textContentType(.username)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-            SecureField("Password", text: $model.password)
-                .textContentType(.password)
-                .onSubmit { Task { await model.signIn() } }
-            Button(model.signingIn ? "Signing in\u{2026}" : "Sign in") { Task { await model.signIn() } }
-                .disabled(model.signingIn || model.username.isEmpty || model.password.isEmpty)
-            if let words = model.signInWords {
-                Text(words).font(.footnote).foregroundStyle(.red)
-            }
-        } header: {
-            Text("Sign in")
-        } footer: {
-            Text("Your Navidrome name and password, as on the web app. The password isn't kept on the phone: only the session deadwax gives back, in the Keychain.")
+            Text("deadwax")
         }
     }
 
@@ -87,12 +75,12 @@ struct ContentView: View {
 
     private var testSounds: some View {
         Section {
-            Picker("Play", selection: $model.source) {
-                ForEach(AppModel.Source.allCases) { Text($0.rawValue).tag($0) }
+            Picker("Play", selection: Binding(get: { model.source }, set: { model.source = $0 })) {
+                ForEach(DebugModel.Source.allCases) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented)
             ForEach(Array(model.testSongs.enumerated()), id: \.element.id) { index, song in
-                songRow(song, playing: model.queue.current?.id == song.id) {
+                songRow(song, playing: player.current?.track.id == song.id) {
                     model.play(model.testSongs, at: index)
                 }
             }
@@ -164,7 +152,7 @@ struct ContentView: View {
             }
             .disabled(model.findingHiRes)
             if let song = model.hiRes {
-                songRow(song, playing: model.queue.current?.id == song.id) {
+                songRow(song, playing: player.current?.track.id == song.id) {
                     model.play([song], at: 0)
                 }
             }
@@ -180,31 +168,31 @@ struct ContentView: View {
 
     private var playing: some View {
         Section {
-            if let song = model.queue.current {
+            if let track = player.current?.track {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(song.name).font(.headline)
-                    Text([song.artist, song.album].compactMap { $0 }.joined(separator: " \u{2014} "))
+                    Text(track.title.isEmpty ? track.id : track.title).font(.headline)
+                    Text([track.artist, track.album].filter { !$0.isEmpty }.joined(separator: " \u{2014} "))
                         .font(.subheadline).foregroundStyle(Palette.quiet)
-                    Text("\(model.phaseWords) \u{00B7} \(clock(model.elapsed))\(song.duration.map { " of \(clock($0))" } ?? "")")
+                    Text("\(player.phaseWords) \u{00B7} \(clock(player.shownPosition))\(player.duration > 0 ? " of \(clock(player.duration))" : "")")
                         .font(.footnote.monospacedDigit())
-                    if let readout = model.readout {
+                    if let readout = player.readout {
                         Text(readout).font(.footnote)
                     }
                 }
                 HStack {
                     Spacer()
-                    Button { model.previous() } label: { Image(systemName: "backward.fill") }
+                    Button { player.previous() } label: { Image(systemName: "backward.fill") }
                         .accessibilityLabel("Previous")
                     Spacer()
-                    Button { model.toggle() } label: {
-                        Image(systemName: model.engineState.phase == .playing ? "pause.fill" : "play.fill")
+                    Button { player.toggle() } label: {
+                        Image(systemName: player.engineState.phase == .playing ? "pause.fill" : "play.fill")
                             .font(.title)
                     }
-                    .accessibilityLabel(model.engineState.phase == .playing ? "Pause" : "Play")
+                    .accessibilityLabel(player.engineState.phase == .playing ? "Pause" : "Play")
                     Spacer()
-                    Button { model.next() } label: { Image(systemName: "forward.fill") }
+                    Button { player.next() } label: { Image(systemName: "forward.fill") }
                         .accessibilityLabel("Next")
-                        .disabled(model.queue.nextIndex == nil)
+                        .disabled(nextIndex(player.queue) == nil)
                     Spacer()
                 }
                 .buttonStyle(.borderless)
@@ -212,16 +200,18 @@ struct ContentView: View {
             } else {
                 Text("Nothing playing").foregroundStyle(Palette.quiet)
             }
-            if let words = model.playWords {
-                Text(words).font(.footnote).foregroundStyle(.red)
+            if player.holdsAnEdit {
+                LabeledContent("Up Next", value: "An edit held for the next song")
+            }
+            if let words = player.lastFailure {
+                LabeledContent("Last failure") {
+                    Text(words).font(.footnote).foregroundStyle(.red)
+                }
             }
         } header: {
             Text("Playing")
         }
     }
 
-    private func clock(_ seconds: Double) -> String {
-        let whole = max(Int(seconds.rounded(.down)), 0)
-        return String(format: "%d:%02d", whole / 60, whole % 60)
-    }
+    private func clock(_ seconds: Double) -> String { Format.clock(seconds) }
 }
