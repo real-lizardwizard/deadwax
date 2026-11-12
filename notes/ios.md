@@ -1960,8 +1960,8 @@ another.
     queue, so another Navidrome app's save shows too); or deadwax sending each change over an SSE stream the
     app holds open while it runs (not Apple push, which a free account doesn't get; shaped like the event log's
     stream, but each person's own, not the `server` permission's), server work on main as a 2.1.x patch. A
-    stream sees only the saves made through deadwax: another app's, saved straight to Navidrome, would need
-    deadwax to ask Navidrome as well.
+    stream sees only the saves made through deadwax: another app's, saved straight to Navidrome, would reach it
+    only if deadwax itself polled Navidrome's queue.
 
 ## Phase 1 on James's iPhone (app 0.2 (2), 2026-11-11)
 
