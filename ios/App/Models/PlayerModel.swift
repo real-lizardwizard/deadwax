@@ -161,6 +161,8 @@ final class PlayerModel {
     /// The lock screen's cover that last failed, and when: not asked again for `coverAgainSeconds`.
     @ObservationIgnored private var coverFailed: (id: String, at: Double)?
     private static let coverAgainSeconds: Double = 15
+    /// The next song's cover asked for ahead (`coverAhead`): asked once while it stays the next.
+    @ObservationIgnored private var coverAheadAsked: String?
     @ObservationIgnored private var headerBits: [String: Int] = [:]
     @ObservationIgnored private var noticeShown = 0
     @ObservationIgnored private var skipShown = 0
@@ -828,22 +830,34 @@ final class PlayerModel {
         link?.position()?.seconds ?? position
     }
 
+    /// The lock screen and Control Center: the entry heard, its cover drawn at once when the cover cache holds it - the
+    /// next song's is fetched there ahead, while this one plays (`coverAhead`) - else fetched now and drawn when it
+    /// comes. The lock screen's cover is CoverSize.lockScreen, the size Now Playing's own is asked at, so the two share
+    /// one fetch.
     private func showNowPlaying() {
         guard let entry = current else { return }
         let track = entry.track
         let cover = track.coverArt
+        if let cover, artwork?.id != cover, let client = server.client,
+           let kept = CoverCache.shared.cached(client: client, id: cover, size: CoverSize.lockScreen) {
+            artwork = (cover, kept)
+            coverAsked = nil
+            coverFailed = nil
+        }
         nowPlaying.show(title: track.title.isEmpty ? track.id : track.title,
                         artist: track.artist.isEmpty ? nil : track.artist,
                         album: track.album.isEmpty ? nil : track.album,
                         duration: duration > 0 ? duration : nil,
                         elapsed: shownPosition, playing: engineState.phase == .playing,
                         artwork: cover != nil && artwork?.id == cover ? artwork?.image : nil)
+        coverAhead()
         let now = Monotonic.seconds()
         let failedLately = coverFailed.map { $0.id == cover && now - $0.at < Self.coverAgainSeconds } ?? false
         if let cover, artwork?.id != cover, coverAsked != cover, !failedLately, let client = server.client {
             coverAsked = cover
             Task {
-                let image = (try? await client.cover(coverID: cover, size: CoverSize.lockScreen)).flatMap(UIImage.init(data:))
+                let image = await CoverCache.shared.load(client: client, id: cover, size: CoverSize.lockScreen,
+                                                         againAfter: Self.coverAgainSeconds)
                 // only the newest answer draws: a cover asked for a song left since is dropped
                 guard self.coverAsked == cover else { return }
                 guard let image else {
@@ -858,6 +872,21 @@ final class PlayerModel {
                 self.showNowPlaying()
             }
         }
+    }
+
+    /// The next song's cover, fetched into the cover cache while this one plays - one ahead, at the lock screen's size -
+    /// so the change sets the lock screen's artwork at once rather than a moment after (James's check of 0.2 (2)).
+    /// Nothing when it is this song's cover too (the album's songs mostly share one), when the cache has it, or while
+    /// the player isn't meaning to play (a queue put back, paused). Asked once while it stays the next; the fetch is
+    /// the cache's, shared with any view showing the cover, kept within its cost limit (a 1024 px cover is 4 MB of its
+    /// 96), and never called off - it is the next song's whichever screen is shown.
+    private func coverAhead() {
+        guard controller?.intendsToPlay == true, let client = server.client, let next = nextIndex(queue),
+              entries.indices.contains(next), let cover = entries[next].track.coverArt, !cover.isEmpty,
+              cover != current?.track.coverArt, cover != coverAheadAsked,
+              CoverCache.shared.cached(client: client, id: cover, size: CoverSize.lockScreen) == nil else { return }
+        coverAheadAsked = cover
+        Task { _ = await CoverCache.shared.load(client: client, id: cover, size: CoverSize.lockScreen) }
     }
 
     // MARK: resume

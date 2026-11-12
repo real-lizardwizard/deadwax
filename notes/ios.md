@@ -2103,3 +2103,39 @@ read, a snapshot of 500 lines once a second while shown, is 3 µs, and the text 
 a buffer rendered, 3 to go`, the newest at the bottom, about two a second while it plays, none while paused.
 Copy, and paste it into Notes: the whole log. Share opens the share sheet with it as text. In Console on the Mac,
 with the iPhone chosen and `subsystem:net.lizardlounge.deadwax` searched, the same lines arrive as they happen.
+
+### The lock screen's next cover, fetched ahead
+
+**What James saw.** The lock screen's art "takes a moment to render" at each song change. He said "Yes, fetch it
+ahead".
+
+**Why.** The lock screen's cover (`PlayerModel.showNowPlaying`, which sets MPNowPlayingInfoCenter's artwork) was
+fetched only once the new song was heard, straight from deadwax and outside the cover cache - the info centre was
+set without art first and again when it came. An album's songs often share a cover id, but Navidrome gives a song
+with its own embedded art its own (`mf-...`), so a change could mean a fetch every song.
+
+**What changed.**
+- **coverAhead()**: the next song is known as soon as the queue or the engine moves (`nextIndex(queue)`, with
+  Repeat's copies unrolled into the queue - the same next the stream prefetch uses, `keepAndPrefetch`). Its cover is
+  fetched into the app's CoverCache at the lock screen's size (CoverSize.lockScreen, 1024) while the song before
+  plays: one ahead, once while it stays the next, not when it is this song's cover too or already kept, and not
+  while the player isn't meaning to play. The fetch is never called off (an unstructured task, a waiter that never
+  leaves) - it is the next song's whatever screen is shown.
+- **showNowPlaying()** looks in CoverCache first: a cover kept there is set with the song's title, in the same
+  `nowPlayingInfo`, at once. Only a cover not kept is fetched then, and through the cache too
+  (`CoverCache.load`), so the lock screen and Now Playing's 360 pt cover (also asked at 1024 on a 3x phone) share
+  one fetch and one decoded image, where they had two.
+- **Its failure rule is kept**: a lock screen cover that failed is asked again at the next change no sooner than
+  15 s on. CoverCache's own is a minute, so `load` gained `againAfter` (default a minute; the lock screen passes its
+  15 s), the failure kept per session as before.
+- **Memory**: a 1024 px cover decoded is 4 MB of CoverCache's 96 MB limit (NSCache, by cost). The next one is one
+  more of those, and the cache may let it go under pressure (a big grid flung), when the change fetches it then, as
+  before. The lock screen still holds its own reference to the cover it shows.
+
+**Verified**: builds; the next song and the cover id come from the same queue the stream prefetch reads.
+**Assumed**: that MPNowPlayingInfoCenter shows artwork given with the song at once (it showed it at once when set
+later, so it should).
+
+**On the phone**: play an album whose songs have their own covers, or a few albums with Play Last, lock the phone,
+and let one song run into the next: the lock screen's cover changes with the title, not a moment after. Skip with
+Next on the lock screen too (the song after next has had less time - a skip two ahead may still take a moment).

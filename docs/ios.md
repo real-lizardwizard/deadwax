@@ -338,7 +338,8 @@ Debug is where Phase 0's test screen lives now:
 
 ## The lock screen and interruptions
 
-The lock screen and Control Center show the song, its artist, album, cover and how far in it is.
+The lock screen and Control Center show the song, its artist, album, cover and how far in it is. The
+next song's cover is fetched while a song plays, so the lock screen's cover changes with the song.
 Play, pause, next and previous work there, as does dragging the position, and the AirPods' presses
 work too. A phone call or Siri pauses the music, and it carries on when they're done. Taking an
 AirPod out pauses it.
