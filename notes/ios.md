@@ -2348,8 +2348,10 @@ have to kind of catch it as I'm scrolling." With something queued, no list scrol
 player in the right place, above the tab bar, but the inset never reaches the pages inside the stack: their lists
 end at the tab bar, under the player. Reported to Apple as FB23732628 (developer.apple.com/forums/thread/837946, July
 2026, no reply): a `safeAreaInset` or `safeAreaBar` on a NavigationStack doesn't update the content insets of the
-views in it, root or pushed, where the same modifier on the stack's content does. That it is the stack hosting each
-page apart from the SwiftUI around it is our reading, not Apple's word; that it is so on 27.2 is what James saw.
+views in it, root or pushed. The report measures that against the inset the same modifier gives on the stack's
+content, but doesn't show that working: that is the modifier's documented job, not something the report tested. That
+it is the stack hosting each page apart from the SwiftUI around it is our reading, not Apple's word; that it is so on
+27.2 is what James saw.
 
 **What changed** (MainTabs.swift, Routes.swift):
 - Each tab is a **TabStack**: its NavigationStack with the player as an `.overlay(alignment: .bottom)` - the same
@@ -2368,11 +2370,15 @@ page apart from the SwiftUI around it is our reading, not Apple's word; that it 
 
 **Verified**: the unsigned device build (no new Swift warnings), DeadwaxKit's tests, check_project.py, the source-bytes
 and contract tests. **Assumed**, since nothing is drawn here: that a `safeAreaInset` on a page inside the stack
-reaches its List, Form and ScrollView on iOS 17-27 (its documented behaviour, and what FB23732628 says works); that
-the overlay sits where the inset drew the player; that `onGeometryChange` reports the first height as it appears.
+reaches its List, Form and ScrollView on iOS 17-27 (its documented behaviour; FB23732628 takes it as the baseline
+but doesn't show it); that the overlay sits where the inset drew the player; that `onGeometryChange` reports the first
+height as it appears; that a change to `playerClearance`, an environment value set on the stack, reaches a page
+already pushed (the album page you start playing from, with nothing playing before).
 
-**On the phone**: with something playing, scroll You to the bottom and tap Debug without chasing it; the same at the
-end of an album, of Your albums and All albums (the letter index's last letter above the player), and in Server
+**On the phone**: with nothing playing, open an album, play its first song, and scroll the same page to its end
+without leaving it: the last song clears the mini player that has just come up (the room reaching a page already
+open). With something playing, scroll You to the bottom and tap Debug without chasing it; the same at the end of an
+album, of Your albums and All albums (the letter index's last letter above the player), and in Server
 address with the keyboard up and down. Play Next something, and while its line shows, scroll a list to the end: the
 last row clears the line too. Big text (Settings > Accessibility > Larger Text): the last row still clears. Nothing
 playing: no gap at a list's foot. Push and pop pages: the mini player stays still.
