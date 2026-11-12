@@ -215,14 +215,38 @@ private extension QueueController {
         #expect(!engine.log.contains { $0.hasPrefix("skip") || $0.hasPrefix("seek") || $0 == "play 1" })
     }
 
-    @Test func aRowsTapPlaysThatSongNow() { // :4966-4981
+    @Test func aRowsTapPlaysThatSongNowKeepingWhatItPasses() { // :4966-4981 (2.1.3)
         let (player, engine) = rig()
         player.playTracks(simAlbum(3), start: 0)
         engine.seconds = 2
-        player.jumpTo(key: player.key("3"))
-        #expect(player.queue.current?.id == "3" && player.queue.ids == ["1", "3"] && engine.current == "3" && engine.playing)
+        #expect(player.jumpTo(key: player.key("3")))
+        // nothing to edit: a skip to it, song 2 kept behind it
+        #expect(player.queue.current?.id == "3" && player.queue.ids == ["1", "2", "3"] && engine.current == "3" && engine.playing)
+        #expect(engine.log.suffix(2) == ["skip 2", "resume"])
+        player.previous()
+        #expect(player.queue.current?.id == "2")
         player.previous()
         #expect(player.queue.current?.id == "1")
+        player.next()
+        #expect(player.queue.current?.id == "2")
+    }
+
+    @Test func jamesWalkTapEightWhileFivePlays() { // James, 2026-11-11: "Keep them, in order"
+        let (player, engine) = rig()
+        player.playTracks(simAlbum(12), start: 0)
+        for _ in 0..<4 { player.next() }
+        #expect(player.queue.current?.id == "5")
+        player.jumpTo(key: player.key("8"))
+        #expect(player.queue.current?.id == "8" && player.queue.ids == simAlbum(12).map(\.id) && engine.current == "8")
+        #expect(player.view.history.map(\.track.id) == ["1", "2", "3", "4", "5", "6", "7"])
+        var walk: [String] = []
+        for _ in 0..<3 {
+            player.previous()
+            walk.append(player.queue.current?.id ?? "")
+        }
+        #expect(walk == ["7", "6", "5"] && engine.current == "5")
+        player.next()
+        #expect(player.queue.current?.id == "6")
     }
 
     @Test func aRowsTapFromAPausePlays() { // :4979-4981
@@ -231,36 +255,68 @@ private extension QueueController {
         player.intendsToPlay = false
         engine.seconds = 2
         player.jumpTo(key: player.key("3"))
-        #expect(player.queue.current?.id == "3" && player.intendsToPlay && engine.log.suffix(2) == ["skip 1", "resume"])
+        #expect(player.queue.current?.id == "3" && player.intendsToPlay && engine.log.suffix(2) == ["skip 2", "resume"])
         let before = engine.log
-        player.jumpTo(key: 999)
+        #expect(!player.jumpTo(key: 999))
         #expect(player.queue.current?.id == "3" && engine.log == before)
     }
 
-    @Test func aRowsTapInASongsLastSecondsIsPlayedAfresh() { // D4: the next song already on a node
+    @Test func aTapIntoTheListCarriesPlayingNextAfterIt() { // player.sim (2.1.3): song 9 still next after song 3
+        let (player, engine) = rig()
+        player.playTracks(simAlbum(4), start: 0)
+        player.playNext([simTrack("9")])
+        player.jumpTo(key: player.key("3"))
+        #expect(player.queue.current?.id == "3" && player.queue.ids == ["1", "2", "3", "9", "4"] && player.after == ["9", "4"])
+        #expect(engine.ids == player.queue.ids && engine.current == "3" && engine.log.suffix(3) == ["replaced", "skip 2", "resume"])
+        // History's song 1: that song again, after song 3 - then Up Next as it was
+        let one = player.view.history.first { $0.track.id == "1" }!
+        #expect(player.jumpTo(key: one.key))
+        #expect(player.queue.current?.id == "1" && player.queue.ids == ["1", "2", "3", "1", "9", "4"] && player.after == ["9", "4"])
+        #expect(player.from(at: 3) == .added && engine.current == "1" && engine.playing)
+        #expect(player.view.history.map(\.track.id) == ["1", "2", "3"])
+        player.previous()
+        #expect(player.queue.current?.id == "3")
+    }
+
+    @Test func aListTapInASongsLastSecondsIsASkip() { // D4: the next song already on a node - nothing to edit
         let (player, engine) = rig()
         player.playTracks(simAlbum(4), start: 0)
         engine.seconds = 198
         engine.nextScheduled = true
         player.jumpTo(key: player.key("4"))
-        #expect(player.queue.current?.id == "4" && player.queue.ids == ["1", "4"] && player.intendsToPlay && !player.holdsAnEdit)
-        #expect(engine.log == ["play 0", "refused", "play 1"] && engine.current == "4" && engine.playing)
+        #expect(player.queue.current?.id == "4" && player.queue.ids == ["1", "2", "3", "4"] && !player.holdsAnEdit)
+        #expect(engine.log == ["play 0", "skip 3", "resume"] && engine.current == "4" && engine.playing)
+        player.previous()
+        #expect(player.queue.current?.id == "3")
+    }
+
+    @Test func aTapWhoseEditIsRefusedIsPlayedAfresh() { // D4: Playing Next carried changes the song scheduled next
+        let (player, engine) = rig()
+        player.playTracks(simAlbum(4), start: 0)
+        player.playNext([simTrack("9")])
+        engine.seconds = 198
+        engine.nextScheduled = true
+        #expect(player.jumpTo(key: player.key("4")))
+        #expect(player.queue.current?.id == "4" && player.queue.ids == ["1", "2", "3", "4", "9"] && player.intendsToPlay)
+        #expect(engine.log.suffix(2) == ["refused", "play 3"] && engine.current == "4" && engine.playing && !player.holdsAnEdit)
         #expect(engine.ids == player.queue.ids && engine.entries.map(\.key) == player.queue.upNext?.marks.map(\.key))
         player.previous()
-        #expect(player.queue.current?.id == "1")
+        #expect(player.queue.current?.id == "3")
     }
 
-    @Test func aRowsTapTheEngineCantTakeAsAnEditIsPlayedAfreshFromAPause() { // a seek on its way: the web does nothing
+    @Test func aHistoryTapTheEngineCantTakeAsAnEditIsPlayedAfreshFromAPause() { // a seek on its way: the web does nothing
         let (player, engine) = rig()
         player.playTracks(simAlbum(3), start: 0)
+        player.next()
         player.intendsToPlay = false
         engine.seeking = true
-        player.jumpTo(key: player.key("3"))
-        #expect(player.queue.current?.id == "3" && player.intendsToPlay && !player.holdsAnEdit)
-        #expect(engine.log.suffix(2) == ["refused", "play 1"] && engine.current == "3" && engine.playing)
+        let one = player.view.history[0]
+        #expect(player.jumpTo(key: one.key))
+        #expect(player.queue.current?.id == "1" && player.queue.ids == ["1", "2", "1", "3"] && player.intendsToPlay)
+        #expect(engine.log.suffix(2) == ["refused", "play 2"] && engine.current == "1" && engine.playing && !player.holdsAnEdit)
     }
 
-    @Test func aChangeHeldThroughARowsTapPlayedAfreshIsMadeAfterIt() {
+    @Test func aChangeHeldThroughARowsTapIsMadeAfterIt() {
         let (player, engine) = rig()
         player.playTracks(simAlbum(4), start: 0)
         engine.seconds = 198
@@ -269,21 +325,33 @@ private extension QueueController {
         #expect(player.holdsAnEdit && player.after == ["2", "3", "4"])
         player.jumpTo(key: player.key("4"))
         #expect(player.queue.current?.id == "4" && player.after == ["9"] && !player.holdsAnEdit)
-        #expect(engine.ids == ["1", "4", "9"] && engine.log.suffix(2) == ["play 1", "replaced"])
+        #expect(engine.ids == ["1", "2", "3", "4", "9"] && engine.log.suffix(3) == ["skip 3", "resume", "replaced"])
     }
 
     @Test func aRowsTapRefusedAsTheEngineJoinsIsFoundAgain() {
         let (player, engine) = rig()
         player.playTracks(simAlbum(4), start: 0)
+        player.playNext([simTrack("9")])
         engine.nextScheduled = true
         engine.asAnEditArrives = { [unowned engine] in
             engine.asAnEditArrives = nil
             engine.join(after: 0.1)
         }
         player.jumpTo(key: player.key("4"))
-        // song 2, run into meanwhile, is left as song 1 would have been
-        #expect(player.queue.current?.id == "4" && player.queue.ids == ["1", "2", "4"] && engine.log == ["play 0", "refused", "play 2"])
+        // song 9, run into meanwhile, is behind song 4 as song 1 would have been
+        #expect(player.queue.current?.id == "4" && player.queue.ids == ["1", "9", "2", "3", "4"])
+        #expect(engine.log == ["play 0", "replaced", "refused", "play 4"])
         #expect(engine.current == "4" && engine.ids == player.queue.ids && !player.holdsAnEdit)
+    }
+
+    @Test func previousBeforeWhereTheListBeganMovesHistorysFloor() { // player.sim (2.1.3)
+        let (player, engine) = rig()
+        player.playTracks(simAlbum(4), start: 2)
+        player.previous()
+        #expect(player.queue.current?.id == "2" && player.queue.upNext?.startedAt == 1 && player.view.history.isEmpty)
+        #expect(engine.current == "2")
+        player.next()
+        #expect(player.queue.current?.id == "3" && player.view.history.map(\.track.id) == ["2"])
     }
 
     @Test func shuffleMidSongLeavesTheSongPlayingAlone() { // :4998-5006

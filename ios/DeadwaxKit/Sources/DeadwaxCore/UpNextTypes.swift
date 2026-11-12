@@ -217,4 +217,7 @@ public enum UpNext {
     public static let topUpHeardSeconds: Double = 2
     /// RESTART_AFTER_SECONDS: how far into a song Previous restarts it instead of going back one.
     public static let restartAfterSeconds: Double = 3
+    /// HISTORY_BACK: how far back History reaches - entries before the song playing; Resume.before, what a reload
+    /// keeps, so History after one is History before it (a test holds the two equal).
+    public static let historyBack = 50
 }

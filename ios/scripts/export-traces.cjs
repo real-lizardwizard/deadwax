@@ -16,6 +16,9 @@
  *   property.json   a digest of the final queue of each of upnext.sim's 2,000 property runs, so the Swift port of
  *                   that loop is known to run the very same 2,000 queues the sim checks.
  *
+ * (2.1.3) A row's tap is recorded as jumpedTo's edit with the index it moves to (`index`), then the move (setIndex);
+ * Previous as wentBack (startedAt following it down); History as historyRows, and in every view.
+ *
  * and two in Fixtures/resume/:
  *
  *   cases.json      resume.ts function by function: the window, relevel, the notice's words, savedLevels; toSave of
@@ -183,6 +186,7 @@ function stateOf(queue) {
 function viewOf(view) {
   const rows = (list) => list.map((row) => [row.key, row.track.id])
   return {
+    history: rows(view.history),
     playing: view.playing?.id ?? null,
     added: rows(view.added),
     list: view.list && { title: view.list.title, rows: rows(view.list.rows), more: view.list.more },
@@ -244,11 +248,20 @@ class Run {
   withoutKey(key) { return this.edit({ op: 'withoutKey', key }, U.withoutKey(this.queue, key)) }
   movedKey(key, to) { return this.edit({ op: 'movedKey', key, to }, U.movedKey(this.queue, key, to)) }
   withoutAdded() { return this.edit({ op: 'withoutAdded' }, U.withoutAdded(this.queue)) }
+  /** (2.1.3) A row's tap: its edit (or the same queue) recorded with the index to move to - the caller moves there
+   *  (setIndex), as the player does. The jump, or null. */
   jumpedTo(key) {
-    const next = U.jumpedTo(this.queue, key)
-    if (next === null) { this.query({ op: 'jumpedTo', key }, null); return null }
-    return this.edit({ op: 'jumpedTo', key }, next)
+    const jump = U.jumpedTo(this.queue, key)
+    if (jump === null) { this.query({ op: 'jumpedTo', key }, null); return null }
+    this.edit({ op: 'jumpedTo', key, index: jump.index }, jump.queue)
+    return jump
   }
+  /** (2.1.3) Previous's move: startedAt following it down before where listening began. */
+  wentBack(index) { return this.edit({ op: 'wentBack', index }, U.wentBack(this.queue, index)) }
+  /** (scenarios) the sim's previous(): backward early, then wentBack. */
+  previous() { const b = this.backward(1); if (b.kind === 'go') this.wentBack(b.index); return this.queue }
+  /** (scenarios) the sim's ended(): the next entry, copies included. */
+  ended() { return this.setIndex(Math.min(this.queue.index + 1, this.queue.tracks.length - 1)) }
   withMore(token, tracks, next) {
     const fields = { op: 'withMore', token, ids: tracks.map((t) => t.id) }
     if (next) fields.next = pagedOf(next)
@@ -291,6 +304,12 @@ class Run {
   shownPass() { return this.query({ op: 'shownPass' }, U.shownPass(this.queue)) }
   backward(position) { return this.query({ op: 'backward', position }, U.backward(this.queue, position)) }
   pastCopies(from) { return this.query({ op: 'pastCopies', from }, U.pastCopies(this.queue, from)) }
+  historyRows(back) {
+    const fields = { op: 'historyRows' }
+    if (back !== undefined) fields.back = back
+    const rows = back === undefined ? U.historyRows(this.queue) : U.historyRows(this.queue, back)
+    return this.query(fields, rows.map((row) => [row.key, row.track.id]))
+  }
   view(repeat, limit) {
     const fields = { op: 'upNextView', repeat }
     if (limit !== undefined) fields.limit = limit
@@ -365,12 +384,15 @@ function trace(seed, songs) {
     else if (op === 6) { repeat = repeatOf(); run.withRepeat(repeat); run.toppedUp(repeat) }
     else if (op === 7) run.toppedUp(repeat)
     else if (op === 8) {
-      if (run.jumpedTo(someKey()) !== null) { const next = run.onward(); if (next !== null) run.setIndex(next) }
+      //? (2.1.3) now and then a row of History's
+      const history = U.historyRows(run.queue)
+      const jump = run.jumpedTo(history.length && chance(0.3) ? history[pick(history.length)].key : someKey())
+      if (jump !== null) run.setIndex(jump.index)
     } else if (op === 9) { const next = run.onward(); if (next !== null) run.setIndex(next); run.toppedUp(repeat) }
     else if (op === 10) { const next = run.nextIndex(); if (next !== null) run.setIndex(next); run.toppedUp(repeat) }
     else if (op === 11) {
       const action = run.backward([0, 1, 3, 3.5, 40][pick(5)])
-      if (action.kind === 'go') run.setIndex(action.index)
+      if (action.kind === 'go') run.wentBack(action.index)
     } else if (op === 12) run.pastCopies(run.queue.index + pick(2))
     else if (op === 13) run.shownPass()
     else if (op === 14) run.view(['off', 'all', 'one'][pick(3)], [1, 3, 100][pick(3)])
@@ -477,11 +499,9 @@ scenario('a row\'s tap: jumped to', (r, { album, track }) => {
   r.start(album(5), 0)
   r.withLast([track('a'), track('b')])
   r.keep('start')
-  r.jumpedTo(r.keyOf('4'))
-  r.setIndex(r.onward())
+  r.setIndex(r.jumpedTo(r.keyOf('4')).index)
   r.use('start')
-  r.jumpedTo(r.keyOf('b'))
-  r.setIndex(r.onward())
+  r.setIndex(r.jumpedTo(r.keyOf('b')).index)
   r.use('start')
   r.jumpedTo(r.queue.upNext.marks[0].key)
   r.toppedUp('one')
@@ -490,8 +510,7 @@ scenario('a row\'s tap: jumped to', (r, { album, track }) => {
   r.jumpedTo(77)
   r.start(album(3), 0)
   r.toppedUp('one')
-  r.jumpedTo(r.keyOf('3'))
-  r.setIndex(r.onward())
+  r.setIndex(r.jumpedTo(r.keyOf('3')).index)
 })
 
 // Shuffle on (:286)
@@ -509,8 +528,7 @@ scenario('Shuffle on: the songs not yet heard this round', (r, { album, track })
   r.withoutKey(r.keyOf('9'))
   r.seeded(3).withShuffle(true)
   r.use('at6')
-  r.jumpedTo(r.keyOf('10'))
-  r.setIndex(r.onward())
+  r.setIndex(r.jumpedTo(r.keyOf('10')).index)
   r.seeded(3).withShuffle(true)
   r.use('start')
   r.withShuffle(false)
@@ -850,6 +868,162 @@ scenario('a song removed, then Shuffle off and on: it stays out of its round', (
   r.seeded(23).withShuffle(true)
 })
 
+// (2.1.3) History, and a tap that keeps what it passes (upnext.sim.cjs's 2.1.3 section)
+scenario('(2.1.3) James\'s walk: tap 8 while 5 plays - Previous plays 7, then 6, as on the album', (r, { album }) => {
+  r.start(album(12), 0)
+  r.setIndex(4)
+  r.setIndex(r.jumpedTo(r.keyOf('8')).index)
+  r.view('off')
+  for (let i = 0; i < 3; i++) r.previous()
+  r.setIndex(r.onward())
+  r.ended()
+})
+scenario('(2.1.3) a tap into the list with a song added: still next after it; after Previous drawn where it plays', (r, { album, track }) => {
+  r.start(album(12), 0)
+  r.setIndex(4)
+  r.withNext([track('a', { album: 'Dummy', albumId: 'dum' })])
+  r.setIndex(r.jumpedTo(r.keyOf('8')).index)
+  r.view('off')
+  r.previous()
+  r.view('off')
+  r.keep('back')
+  r.withoutAdded()
+  const aKey = r.keyOf('a')
+  r.movedKey(aKey, 0)
+  r.use('back')
+  r.withoutKey(aKey)
+  r.use('back')
+  r.setIndex(r.jumpedTo(aKey).index)
+})
+scenario('(2.1.3) History: what is behind the song playing', (r, { album }) => {
+  r.start(album(12), 4)
+  r.keep('fromFive')
+  r.view('off')
+  r.backward(1)
+  r.setIndex(6)
+  r.view('off')
+  r.wentBack(5)
+  r.use('fromFive')
+  r.previous()
+  r.historyRows()
+  r.ended()
+  r.historyRows()
+  r.plain(album(3), 2)
+  r.wentBack(1)
+  r.seeded(5).start(album(6), 3, true)
+  r.setIndex(3)
+  r.historyRows()
+  r.start(album(3), 0, false, { token: 't', total: 9, fetched: 3, scope: 'yours' })
+  r.setIndex(2)
+  r.historyRows()
+  r.start(album(5), 0)
+  r.setIndex(1)
+  r.toppedUp('one')
+  r.ended()
+  r.toppedUp('one')
+  r.ended()
+  r.withRepeat('off')
+  r.toppedUp('off')
+  r.setIndex(r.onward())
+  r.setIndex(r.onward())
+  r.view('off')
+  r.setIndex(2)
+  r.historyRows()
+  r.start(album(3), 0)
+  r.toppedUp('all')
+  for (let i = 0; i < 4; i++) { r.ended(); r.toppedUp('all') }
+  r.view('all')
+  r.start(album(80), 0)
+  r.setIndex(70)
+  r.view('off')
+  r.historyRows()
+  r.historyRows(3)
+  r.historyRows(0)
+  r.empty()
+  r.historyRows()
+})
+scenario('(2.1.3 review) a unit is one song: Shuffle and Repeat take a list song\'s copies with it', (r, { album }) => {
+  r.start(album(5), 0)
+  r.setIndex(1)
+  r.toppedUp('one')
+  r.previous()
+  r.toppedUp('one')
+  r.seeded(7).withShuffle(true)
+  r.setIndex(r.onward())
+  r.toppedUp('one')
+  r.backward(0)
+  r.historyRows()
+  r.start(album(2), 0)
+  r.setIndex(1)
+  r.toppedUp('all')
+  r.ended()
+  r.toppedUp('all')
+  r.withRepeat('one')
+  r.toppedUp('one')
+  r.previous()
+  r.toppedUp('one')
+  r.withRepeat('one')
+  r.view('one')
+})
+scenario('(2.1.3) History\'s tap: the song again, then Up Next as it was', (r, { album, track }) => {
+  r.start(album(9), 0)
+  r.setIndex(6)
+  r.withNext([track('a')])
+  const k3 = r.queue.upNext.marks[2].key
+  r.setIndex(r.jumpedTo(k3).index)
+  r.view('off')
+  r.keep('again')
+  r.previous()
+  r.use('again')
+  r.setIndex(r.onward())
+  r.historyRows()
+  r.start(album(4), 0)
+  r.setIndex(2)
+  r.toppedUp('one')
+  r.keep('one')
+  r.setIndex(r.jumpedTo(r.queue.upNext.marks[0].key).index)
+  r.toppedUp('one')
+  r.use('one')
+  r.jumpedTo(r.queue.upNext.marks[2].key)
+  r.jumpedTo(r.queue.upNext.marks[3].key)
+  r.jumpedTo(99)
+  r.start(album(12), 4)
+  r.setIndex(6)
+  r.jumpedTo(r.queue.upNext.marks[1].key)
+  r.start(album(80), 0)
+  r.setIndex(70)
+  r.jumpedTo(r.queue.upNext.marks[19].key)
+  r.setIndex(r.jumpedTo(r.queue.upNext.marks[20].key).index)
+  r.start(album(3), 0)
+  r.setIndex(2)
+  r.toppedUp('all')
+  r.ended()
+  r.toppedUp('all')
+  r.setIndex(r.jumpedTo(r.queue.upNext.marks[0].key).index)
+  r.withRepeat('off')
+})
+scenario('(2.1.3) Shuffle off after a jump in a shuffle: the album from that song\'s place', (r, { album }) => {
+  r.seeded(2).start(album(6), 0, true)
+  r.setIndex(r.jumpedTo(r.queue.upNext.marks[3].key).index)
+  r.withShuffle(false)
+})
+scenario('(2.1.3) Previous across songs added: the list drawn through them, rows, moves and removals by unit', (r, { album, track }) => {
+  //? 4 playing, a and b played next, then Previous to 3: the list is 4, a, b, 5, 6 (190ebaa drew only 4)
+  r.start(album(6), 0)
+  r.setIndex(3)
+  r.withNext([track('a'), track('b')])
+  r.previous()
+  r.view('off')
+  r.keep('across')
+  r.movedKey(r.keyOf('b'), 0)
+  r.use('across')
+  r.withoutKey(r.keyOf('a'))
+  r.use('across')
+  r.withoutAdded()
+  r.setIndex(r.jumpedTo(r.keyOf('5')).index)
+  r.view('off')
+})
+
 /* ===== the words and the constants ===== */
 
 const words = []
@@ -874,10 +1048,10 @@ const words = []
 
 const constants = {
   REPEAT_AHEAD: U.REPEAT_AHEAD, UP_NEXT_DRAWN: U.UP_NEXT_DRAWN, TOP_UP_HEARD_S: U.TOP_UP_HEARD_S,
-  REPEATS: U.REPEATS, RESTART_AFTER_SECONDS: Q.RESTART_AFTER_SECONDS,
+  REPEATS: U.REPEATS, RESTART_AFTER_SECONDS: Q.RESTART_AFTER_SECONDS, HISTORY_BACK: U.HISTORY_BACK,
 }
 
-/* ===== upnext.sim.cjs's property loop (:175-229), its every call as there, each run's last queue digested ===== */
+/* ===== upnext.sim.cjs's property loop (:207-262), its every call as there, each run's last queue digested ===== */
 
 /** 32-bit FNV-1a over the canonical line's character codes (ASCII), as eight hex digits. */
 function fnv1a(text) {
@@ -918,7 +1092,7 @@ function propertyDigests() {
     let queue = U.toppedUp(U.startUpNext(album(size), random() < 0.3 ? null : pick(size), random() < 0.5, random), repeat, random)
     let extra = 0
     for (let step = 0; step < PROPERTY_STEPS; step++) {
-      const op = pick(12)
+      const op = pick(14)
       const rowKeys = () => queue.upNext.marks.slice(queue.index + 1).map((m) => m.key)
       const someKey = () => { const keys = rowKeys(); return keys.length && random() < 0.85 ? keys[pick(keys.length)] : pick(queue.upNext.nextKey + 2) }
       if (op === 0) queue = U.withNext(queue, Array.from({ length: 1 + pick(2) }, () => simTrack(`n${extra++}`)))
@@ -930,14 +1104,18 @@ function propertyDigests() {
       else if (op === 6) { repeat = U.REPEATS[pick(3)]; queue = U.toppedUp(U.withRepeat(queue, repeat), repeat, random) }
       else if (op === 7) queue = U.toppedUp(queue, repeat, random)
       else {
-        if (op === 8) {
-          const jumped = U.jumpedTo(queue, someKey())
-          if (jumped) {
-            const next = U.onward(jumped)
-            if (next !== null) queue = at(jumped, next)
-          }
+        if (op === 8 || op === 12) {
+          //? (2.1.3) 12: a row of History's tap; 8: a row of Up Next's - its keys mostly, any key of the queue's, or none
+          const drawnHistory = U.historyRows(queue)
+          const key = op === 12 && drawnHistory.length ? drawnHistory[pick(drawnHistory.length)].key
+            : random() < 0.5 ? someKey() : queue.upNext.marks[pick(queue.upNext.marks.length)].key
+          const jumped = U.jumpedTo(queue, key)
+          if (jumped) queue = at(jumped.queue, jumped.index)
         } else if (op === 9) { const next = U.onward(queue); if (next !== null) queue = at(queue, next) }
-        else queue = ended(queue)
+        else if (op === 13) {
+          const b = U.backward(queue, 0)
+          if (b.kind === 'go') queue = U.wentBack(queue, b.index)
+        } else queue = ended(queue)
         queue = U.toppedUp(queue, repeat, random)
       }
     }
@@ -1191,7 +1369,7 @@ saveCase('Repeat One over two songs (Normalization Off): a copy\'s at its origin
   let shuffled = U.startUpNext(rAlbum(7, 'h'), 2, true, parkMiller(77))
   shuffled = U.withoutKey(shuffled, shuffled.upNext.marks[4].key)
   const jumped = U.jumpedTo(shuffled, shuffled.upNext.marks[5].key)
-  shuffled = atIndex(jumped, U.onward(jumped))
+  shuffled = atIndex(jumped.queue, jumped.index)
   shuffled = U.toppedUp(U.withRepeat(shuffled, 'all'), 'all', parkMiller(78))
   saveCase('Shuffle on, songs left out of a round, Repeat All\'s next round shuffled', shuffled, 100.25)
 }
@@ -1414,8 +1592,16 @@ for (const song of [
     live = atIndex(live, U.backward(live, 0).index)
     const save = saved(live, 12)
     const tracks = live.tracks.slice(save.start, save.start + save.ids.length).map(bareTrack).map(navidromeSong)
-    resumedCase('Previous before where the album was started (startedAt past the index): the account back',
+    resumedCase('Previous before where the album was started, as an app before 2.1.3 saved it (startedAt past the index): the account back - startedAt lowered to the song playing',
       answer(tracks, save.index, 12, 'deadwax', kept({ ids: save.ids, index: save.index, position: 12, snapshot: save.snapshot })), 'off')
+    //? (2.1.3 review) the iPhone's 0.2 or the web's 2.1.2: an album started at 5, Previous to 4 - picked up, startedAt 3
+    const old = atIndex(U.startUpNext(rAlbum(10), 4), 3)
+    const oldSave = saved(old, 12)
+    resumedCase('an album started at 5, Previous to 4, as 0.2 saved it: picked up with startedAt at 4\'s place',
+      answer(old.tracks.slice(oldSave.start, oldSave.start + oldSave.ids.length).map(bareTrack).map(navidromeSong), oldSave.index, 12, 'deadwax',
+        kept({ ids: oldSave.ids, index: oldSave.index, position: 12, snapshot: oldSave.snapshot })), 'off')
+    saveCase('(2.1.3) Previous before where the album was started, as wentBack moves it: startedAt with it',
+      U.wentBack(U.startUpNext(rAlbum(10), 4), 3), 12)
     let rounds = U.toppedUp(U.withRepeat(U.startUpNext(rAlbum(10), 4), 'all'), 'all')
     rounds = U.toppedUp(atIndex(rounds, 9), 'all')
     rounds = atIndex(rounds, 3)
@@ -1607,13 +1793,15 @@ for (let run = 0; run < ROUND_TRIP_RUNS; run++) {
         p.fetched >= p.total && repeat === 'all' ? { token: `${p.token}+`, total: 3, fetched: 0, scope: p.scope, level: 'track' } : undefined)
       else queue = U.toppedUp(queue, repeat, random)
     } else if (op === 8) {
-      const jumped = U.jumpedTo(queue, someKey())
-      const next = jumped ? U.onward(jumped) : null
-      if (jumped && next !== null) queue = atIndex(jumped, next)
+      //? (2.1.3) a row's tap - of History's now and then (an entry before the song playing)
+      const before = queue.upNext.marks.slice(0, queue.index).map((m) => m.key)
+      const jumped = U.jumpedTo(queue, before.length && random() < 0.3 ? before[pick(before.length)] : someKey())
+      if (jumped) queue = atIndex(jumped.queue, jumped.index)
     } else if (op === 9) { const next = U.onward(queue); if (next !== null) queue = atIndex(queue, next) }
     else if (op === 10) {
+      //? (2.1.3) as the engine moves now (wentBack), or - half the time - as an app before 2.1.3 saved it
       const back = U.backward(queue, 0)
-      if (back.kind === 'go') queue = atIndex(queue, back.index)
+      if (back.kind === 'go') queue = random() < 0.5 ? U.wentBack(queue, back.index) : atIndex(queue, back.index)
     } else queue = atIndex(queue, Math.min(queue.index + 1, queue.tracks.length - 1))
     queue = U.toppedUp(queue, repeat, random)
 
@@ -1623,9 +1811,12 @@ for (let run = 0; run < ROUND_TRIP_RUNS; run++) {
     //? the sim's own check, as the premise of what the phone is held to: the web reads its own snapshot back whole
     const back = R.fromSnapshot(saving.snapshot, queue.tracks.slice(start, end).map(bareTrack), saving.index, 'auto')
     const was = queue.upNext
+    //? (2.1.3) startedAt past the song playing's run comes back lowered to it
+    let unit = queue.index
+    while (unit > 0 && was.marks[unit].from === 'one') unit--
     const wanted = {
       tracks: queue.tracks.slice(start, end), index: queue.index - start, marks: was.marks.slice(start, end), source: was.source,
-      shuffle: was.shuffle, nextKey: was.nextKey, startedAt: Math.max(0, was.startedAt - start), left: was.left, paged: was.paged, pagedRounds: was.pagedRounds,
+      shuffle: was.shuffle, nextKey: was.nextKey, startedAt: Math.min(Math.max(0, was.startedAt - start), unit - start), left: was.left, paged: was.paged, pagedRounds: was.pagedRounds,
     }
     const got = back && {
       tracks: back.tracks, index: back.index, marks: back.upNext.marks, source: back.upNext.source, shuffle: back.upNext.shuffle,

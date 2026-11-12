@@ -221,30 +221,36 @@ public final class QueueController {
         return false
     }
 
-    /// A row's tap: that song now, playing even from a pause - made now or not at all, never held. A key gone from
-    /// Up Next does nothing. An edit the engine can't take this moment (D4: the next song already on a player node,
-    /// which is every song's last ~2.5 s; or a seek on its way) is no bar, unlike the web's "a seek on its way:
-    /// nothing": the jump leaves the song heard anyway, so the queue is played afresh from the row, as a skip would
-    /// start it - nothing the listener stays on is cut.
-    public func jumpTo(key: Int) {
+    /// A row's tap: that song now, playing even from a pause - made now or not at all, never held. Nothing is dropped
+    /// (2.1.3, jumpedTo): a row of Up Next moves the place onto it, the rows it passes left behind it where Previous
+    /// finds them; a row of History plays its song again, a new entry at the head of Playing Next. A key no row
+    /// draws does nothing. The engine skips to the jump's index - forward over several entries as Previous goes
+    /// back over one (`begin(at:)` starts any entry). An edit the engine can't take this moment (D4: the next song
+    /// already on a player node, which is every song's last ~2.5 s; or a seek on its way) is no bar, unlike the web's
+    /// "a seek on its way: nothing": the jump leaves the song heard anyway, so the queue is played afresh from the
+    /// row, as a skip would start it - nothing the listener stays on is cut. True when the jump was made - the
+    /// screen says what started only then.
+    @discardableResult
+    public func jumpTo(key: Int) -> Bool {
         catchUp()
-        guard let edited = jumpedTo(queue, key) else { return }
-        if replaceUpcoming(edited) {
-            //? a row's tap plays it, paused or not - next() starts what the listener means to be playing
+        guard let jump = jumpedTo(queue, key) else { return false }
+        if replaceUpcoming(jump.queue) {
+            //? a row's tap plays it, paused or not - move() starts what the listener means to be playing
             intendsToPlay = true
-            next()
-            return
+            move(to: jump.index)
+            return true
         }
         //? the engine may have run on into the next song since the catch-up: the row found again in the queue as it
         //? is now (gone, or now the song playing: nothing more to do)
         catchUp()
-        guard let fresh = jumpedTo(queue, key), let index = onward(fresh) else { return }
-        queue = fresh
-        queue.index = index
+        guard let fresh = jumpedTo(queue, key) else { return false }
+        queue = fresh.queue
+        queue.index = fresh.index
         intendsToPlay = true
-        engine.play(Self.entries(queue), from: index, at: 0)
+        engine.play(Self.entries(queue), from: fresh.index, at: 0)
         changed()
         runHeld()
+        return true
     }
 
     public func moveInQueue(key: Int, to: Int) { edit { movedKey($0, key, to: to) } }
@@ -270,12 +276,15 @@ public final class QueueController {
     }
 
     /// Previous: the song again past 3 s (or at the first song), else the entry before the run of Repeat One's copies
-    /// the song playing is part of. Playing or paused as it was.
+    /// the song playing is part of. Playing or paused as it was. (2.1.3) Back before where listening began, History
+    /// follows it down (wentBack) - the same tracks.
     public func previous() {
         catchUp()
         switch backward(queue, position: engine.heard()?.seconds ?? 0) {
         case .restart: engine.seek(to: 0)
-        case .go(let index): move(to: index)
+        case .go(let index):
+            queue = wentBack(queue, index)
+            move(to: index)
         }
     }
 

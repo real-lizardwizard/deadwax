@@ -10,13 +10,16 @@ import Testing
 @Suite struct ResumeRoundTripTests {
     static let position = 12.5
 
-    /// What toSave's snapshot must read back as: the window of the queue, its account whole.
+    /// What toSave's snapshot must read back as: the window of the queue, its account whole - (2.1.3) startedAt past
+    /// the song playing's run, as an app before 2.1.3 saved it, lowered to the run.
     static func wanted(_ queue: UpNextQueue, _ saving: Saving) -> UpNextQueue {
         let state = queue.upNext!
         let range = saving.start..<(saving.start + saving.ids.count)
+        var run = queue.index
+        while run > 0 && state.marks[run].from == .one { run -= 1 }
         return UpNextQueue(tracks: Array(queue.tracks[range]), index: queue.index - saving.start, upNext: UpNextState(
             marks: Array(state.marks[range]), source: state.source, shuffle: state.shuffle, nextKey: state.nextKey,
-            startedAt: max(0, state.startedAt - saving.start), left: state.left, paged: state.paged,
+            startedAt: min(max(0, state.startedAt - saving.start), run - saving.start), left: state.left, paged: state.paged,
             pagedRounds: state.pagedRounds))
     }
 
@@ -59,6 +62,7 @@ import Testing
         #expect(runs == 500 && steps == 25 && digests.count == runs)
         var counts = (states: 0, behind: 0, paged: 0, left: 0, ones: 0, added: 0, shuffled: 0)
         var failures = 0
+        var histories = 0
         for run in 0..<runs {
             let wantedDigests = try #require(digests[run].array)
             var step = 0
@@ -83,6 +87,13 @@ import Testing
                     failures += 1
                     Issue.record("run \(run) step \(step) doesn't read back: \(difference)")
                 }
+                //? (2.1.3) History after a reload is History before it - the same rows, keys and songs
+                if let history = Self.historyBack(queue, saving) {
+                    failures += 1
+                    Issue.record("run \(run) step \(step): History came back otherwise: \(history)")
+                } else if !historyRows(queue).isEmpty {
+                    histories += 1
+                }
                 if run < kept.count / steps, let recorded = songs.queue(kept[run * steps + step]["queue"]),
                    let difference = queueDifference(queue, recorded) {
                     failures += 1
@@ -95,6 +106,22 @@ import Testing
         #expect(counts.states == c["states"]?.int && counts.behind == c["behind"]?.int && counts.paged == c["paged"]?.int)
         #expect(counts.left == c["left"]?.int && counts.ones == c["ones"]?.int && counts.added == c["added"]?.int)
         #expect(counts.shuffled == c["shuffled"]?.int)
+        #expect(histories > 5_000, "\(histories) steps with a History")
+    }
+
+    /// The window read back has the History the queue had (nil), or the two as "key:id" lists.
+    static func historyBack(_ queue: UpNextQueue, _ saving: Saving) -> String? {
+        let range = saving.start..<(saving.start + saving.ids.count)
+        let bare = queue.tracks[range].map { track -> QueueTrack in
+            var plain = track
+            plain.level = nil
+            return plain
+        }
+        guard let back = fromSnapshot(saving.snapshot, tracks: bare, index: saving.index, setting: .auto) else {
+            return historyRows(queue).isEmpty ? nil : "nothing read back"
+        }
+        let rows = { (q: UpNextQueue) in historyRows(q).map { "\($0.key):\($0.track.id)" } }
+        return rows(back) == rows(queue) ? nil : "\(rows(back)) for \(rows(queue))"
     }
 
     /// export-traces.cjs's round trip, step for step and draw for draw (its arguments drawn in JavaScript's order).
@@ -145,16 +172,54 @@ import Testing
                     queue = toppedUp(queue, mode, random: random.next)
                 }
             case 8:
-                if let jumped = jumpedTo(queue, someKey()), let next = onward(jumped) { queue = jumped.at(next) }
+                //? (2.1.3) a row's tap - of History's now and then (an entry before the song playing)
+                let before = queue.upNext!.marks.prefix(queue.index).map(\.key)
+                let key = !before.isEmpty && random.next() < 0.3 ? before[pick(before.count)] : someKey()
+                if let jumped = jumpedTo(queue, key) { queue = jumped.queue.at(jumped.index) }
             case 9:
                 if let next = onward(queue) { queue = queue.at(next) }
             case 10:
-                if case .go(let index) = backward(queue, position: 0) { queue = queue.at(index) }
+                //? (2.1.3) as the player moves now (wentBack), or - half the time - as an app before 2.1.3 saved it
+                if case .go(let index) = backward(queue, position: 0) {
+                    queue = random.next() < 0.5 ? wentBack(queue, index) : queue.at(index)
+                }
             default:
                 queue = queue.at(min(queue.index + 1, queue.tracks.count - 1))
             }
             queue = toppedUp(queue, mode, random: random.next)
             each(queue)
         }
+    }
+}
+
+/// (2.1.3) History across a reload, as resume.sim.cjs holds it at the window's edge and after an old pick-up.
+@Suite struct ResumeHistoryTests {
+    private func readBack(_ queue: UpNextQueue, position: Double) -> UpNextQueue? {
+        let saving = toSave(queue, position: position)
+        let window = Array(queue.tracks[saving.start..<(saving.start + saving.ids.count)])
+        return fromSnapshot(saving.snapshot, tracks: window, index: saving.index, setting: .auto)
+    }
+    private func rows(_ queue: UpNextQueue) -> [String] { historyRows(queue).map { "\($0.key):\($0.track.id)" } }
+
+    @Test func historyAtTheWindowsEdgeIsTheSameAfterAReload() {
+        // song 100 played three times under Repeat One, its first play the 51st entry back: History stops short of it
+        var q = toppedUp(startUpNext(simAlbum(200), start: 0).at(99), .one)
+        q = toppedUp(q.at(100), .one).at(101)
+        q = withRepeat(q, .off).at(151)
+        let back = readBack(q, position: 0)
+        #expect(rows(q).count == 49 && rows(q).first == "\(q.upNext!.marks[102].key):101")
+        #expect(back.map(rows) == rows(q))
+        #expect(UpNext.historyBack == Resume.before)
+    }
+
+    @Test func aStartedAtSavedPastTheIndexIsLoweredSoHistoryShowsTheSongGoneBackTo() {
+        // the iPhone's 0.2 (or the web's 2.1.2): an album started at 5, Previous to 4 - startedAt left at 4
+        let old = startUpNext(simAlbum(10), start: 4).at(3)
+        #expect(old.upNext?.startedAt == 4)
+        var on = readBack(old, position: 12)!
+        #expect(on.upNext?.startedAt == 3)
+        on = on.at(onward(on)!)
+        on = on.at(onward(on)!)
+        #expect(on.current?.id == "6" && historyRows(on).map(\.track.id) == ["4", "5"])
     }
 }

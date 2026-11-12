@@ -57,6 +57,7 @@ import Testing
         #expect(constants["UP_NEXT_DRAWN"]?.int == UpNext.drawn)
         #expect(constants["TOP_UP_HEARD_S"]?.double == UpNext.topUpHeardSeconds)
         #expect(constants["RESTART_AFTER_SECONDS"]?.double == UpNext.restartAfterSeconds)
+        #expect(constants["HISTORY_BACK"]?.int == UpNext.historyBack && UpNext.historyBack == Resume.before)
         #expect(constants["REPEATS"]?.array?.compactMap(\.string) == Repeat.allCases.map(\.rawValue))
 
         let scenario = try #require(file["scenarios"]?.array?.first { $0["name"]?.string == "the words" })
@@ -150,7 +151,10 @@ struct Replay {
                 return jumped == nil ? tape.problem : "jumped, where the TypeScript gave null"
             }
             guard let jumped else { return "null, where the TypeScript jumped" }
-            result = jumped
+            //? (2.1.3) the edit, then the index to move to - the next op (setIndex) makes the move
+            if jumped.index != op["index"]?.int { return "a jump to \(jumped.index), the web's \(describe(op["index"]))" }
+            result = jumped.queue
+        case "wentBack": result = wentBack(queue, op["index"]?.int ?? -99)
         case "withMore":
             guard let list = tracks(op["ids"]) else { return "a song not in the table" }
             result = withMore(queue, token: op["token"]?.string ?? "", tracks: list, next: op["next"].flatMap(paged))
@@ -187,6 +191,9 @@ struct Replay {
             case .go(let index):
                 answer = expected?["kind"]?.string == "go" && expected?["index"]?.int == index ? nil : "go \(index), the web's \(describe(expected))"
             }
+        case "historyRows":
+            let rows = op["back"]?.int.map { historyRows(queue, back: $0) } ?? historyRows(queue)
+            answer = firstDifference("history", rows.map { "\($0.key) \($0.track.id)" }, rowsOf(op["result"]))
         case "upNextView":
             let view = op["limit"]?.int.map { upNextView(queue, mode, limit: $0) } ?? upNextView(queue, mode)
             answer = differsView(view, op["result"])
@@ -288,8 +295,9 @@ struct Replay {
     private func differsView(_ view: UpNextView, _ expected: JSONValue?) -> String? {
         guard let expected else { return "no view recorded" }
         if view.playing?.id != expected["playing"]?.string { return "playing \(view.playing?.id ?? "none"), the web's \(describe(expected["playing"]))" }
-        let rows = { (json: JSONValue?) -> [String] in
-            (json?.array ?? []).map { ($0.array ?? []).map { $0.string ?? $0.int.map(String.init) ?? "?" }.joined(separator: " ") }
+        let rows = rowsOf
+        if let problem = firstDifference("history", view.history.map { "\($0.key) \($0.track.id)" }, rows(expected["history"])) {
+            return problem
         }
         if let problem = firstDifference("added", view.added.map { "\($0.key) \($0.track.id)" }, rows(expected["added"])) { return problem }
         if let list = expected["list"], !list.isNull {
@@ -303,6 +311,11 @@ struct Replay {
         if view.then != expected["then"]?.string { return "then \(view.then ?? "nil"), the web's \(describe(expected["then"]))" }
         if view.repeatOne != expected["repeatOne"]?.bool { return "repeatOne \(view.repeatOne), the web's \(describe(expected["repeatOne"]))" }
         return nil
+    }
+
+    /// Recorded rows ([key, id] pairs) as "key id".
+    private func rowsOf(_ json: JSONValue?) -> [String] {
+        (json?.array ?? []).map { ($0.array ?? []).map { $0.string ?? $0.int.map(String.init) ?? "?" }.joined(separator: " ") }
     }
 
     private func firstDifference(_ field: String, _ ours: [String], _ theirs: [String]) -> String? {

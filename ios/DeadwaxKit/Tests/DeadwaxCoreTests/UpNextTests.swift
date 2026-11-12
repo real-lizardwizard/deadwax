@@ -136,27 +136,30 @@ import Testing
         #expect(movedKey(start, start.key("2")!, to: -3) == start)
     }
 
-    @Test func aRowsTap() { // :268-282
+    @Test func aRowsTap() { // :389-402 (2.1.3)
         let start = withLast(startUpNext(simAlbum(5), start: 0), [simTrack("a"), simTrack("b")])
         let toList = jumpedTo(start, start.key("4")!)!
-        let moved = toList.at(onward(toList)!)
-        #expect(moved.current?.id == "4" && moved.after == ["a", "b", "5"])
-        #expect(toList.upNext?.left == [LeftOut(pass: 0, at: 1), LeftOut(pass: 0, at: 2)])
+        let moved = toList.queue.at(toList.index)
+        // into the list: it plays, the songs passed kept behind it in order, Playing Next after it
+        #expect(moved.current?.id == "4" && moved.ids == ["1", "2", "3", "4", "a", "b", "5"] && moved.index == 3)
+        #expect(moved.after == ["a", "b", "5"] && toList.queue.upNext?.left == [])
+        // into Playing Next: the same queue, the place moved - the songs added above it behind it
         let toAdded = jumpedTo(start, start.key("b")!)!
-        let there = toAdded.at(onward(toAdded)!)
-        #expect(there.current?.id == "b" && there.after == ["2", "3", "4", "5"])
+        let there = toAdded.queue.at(toAdded.index)
+        #expect(toAdded.queue == start && there.current?.id == "b" && Array(there.ids.prefix(there.index)) == ["1", "a"])
+        #expect(there.after == ["2", "3", "4", "5"])
         #expect(jumpedTo(start, start.upNext!.marks[0].key) == nil)
         let copies = toppedUp(start, .one)
         #expect(jumpedTo(copies, copies.upNext!.marks[1].key) == nil)
         #expect(jumpedTo(start, 77) == nil)
         let one = toppedUp(startUpNext(simAlbum(3), start: 0), .one)
         let jumped = jumpedTo(one, one.key("3")!)!
-        #expect(jumped.at(onward(jumped)!).current?.id == "3")
+        #expect(jumped.queue.at(jumped.index).current?.id == "3" && jumped.queue.ids == ["1", "1", "1", "2", "3"])
     }
 
-    @Test func aJumpToAGroupsFirstRowIsANewButEqualQueue() {
+    @Test func aJumpWithNothingToEditIsTheSameQueue() {
         let start = startUpNext(simAlbum(4), start: 0)
-        #expect(jumpedTo(start, start.key("2")!) == start)
+        #expect(jumpedTo(start, start.key("2")!) == Jump(queue: start, index: 1))
     }
 }
 
@@ -176,8 +179,11 @@ import Testing
         let removed = withShuffle(withoutKey(start.at(6), start.key("9")!), true, random: Seeded(3).next)
         #expect(!removed.after.contains("9"))
         let jumped = jumpedTo(start.at(6), start.key("10")!)!
-        let overJumped = withShuffle(jumped.at(onward(jumped)!), true, random: Seeded(3).next)
+        let overJumped = withShuffle(jumped.queue.at(jumped.index), true, random: Seeded(3).next)
         #expect(overJumped.current?.id == "10" && !overJumped.after.contains("8") && !overJumped.after.contains("9"))
+        // (2.1.3) behind the song jumped to, heard this round as far as a shuffle goes
+        #expect(Array(overJumped.ids[7..<9]) == ["8", "9"])
+        #expect(overJumped.after.sorted { Int($0)! < Int($1)! } == ["1", "2", "3", "4", "11", "12"])
 
         let all = toppedUp(startUpNext(simAlbum(3), start: 0).at(0), .all)
         let lastSong = toppedUp(all.at(2), .all)
@@ -316,7 +322,7 @@ import Testing
         let mixed = startUpNext([simTrack("1"), simTrack("2", album: "Dummy", albumId: "dum")], start: 0)
         #expect(upNextView(mixed, .off).list?.title == "Still to play")
         #expect(upNextView(toppedUp(mixed.at(1), .all), .all).then == "Then the list again from the top.")
-        #expect(upNextView(.empty, .all) == UpNextView(playing: nil, added: [], list: nil, then: nil, repeatOne: false))
+        #expect(upNextView(.empty, .all) == UpNextView(history: [], playing: nil, added: [], list: nil, then: nil, repeatOne: false))
     }
 
     @Test func aLibrarysShuffleCountsWhatIsStillToCome() { // :437-465
@@ -381,6 +387,8 @@ import Testing
         #expect(UpNextWords.repeatingOne == "Repeat one: this song plays again until you skip it.")
         #expect(UpNextWords.shufflingLibrary == "Shuffling your whole library")
         #expect(UpNextWords.playNow("Angel") == "Angel, play now")
+        #expect(UpNextWords.playAgain("Angel") == "Angel, play again" && UpNextWords.playing("Angel") == "Playing Angel")
+        #expect(UpNextWords.history == "History")
         #expect([UpNextWords.moveUp("Angel"), UpNextWords.moveDown("Angel"), UpNextWords.remove("Angel")]
                 == ["Move Angel up", "Move Angel down", "Remove Angel"])
         #expect([UpNextWords.shuffleSaid(true), UpNextWords.shuffleSaid(false)] == ["Shuffle on", "Shuffle off"])
@@ -390,5 +398,156 @@ import Testing
         #expect(UpNextWords.clearedSaid == "Playing Next cleared")
         // SwiftUI's onMove: one row down (from 0 to before 2) is place 1; up (from 2 to before 0) is place 0
         #expect(UpNextWords.movedTo(from: 0, destination: 2) == 1 && UpNextWords.movedTo(from: 2, destination: 0) == 0)
+    }
+}
+
+/// (2.1.3) History, and a tap that keeps what it passes - upnext.sim.cjs's 2.1.3 section, check by check.
+@Suite struct UpNextHistoryTests {
+    /// Previous early, as the player moves: backward's place, startedAt following it down (wentBack).
+    private func previous(_ queue: UpNextQueue) -> UpNextQueue {
+        if case .go(let index) = backward(queue, position: 1) { return wentBack(queue, index) }
+        return queue
+    }
+    private func history(_ queue: UpNextQueue) -> [String] { historyRows(queue).map(\.track.id) }
+
+    @Test func jamesWalk() { // :361-374
+        var q = startUpNext(simAlbum(12), start: 0).at(4)
+        let jump = jumpedTo(q, q.key("8")!)!
+        #expect(jump.queue == q && jump.index == 7)
+        q = jump.queue.at(jump.index)
+        #expect(q.current?.id == "8" && q.ids == simAlbum(12).map(\.id) && q.upNext?.left == [])
+        #expect(upNextView(q, .off).history.map(\.track.id) == ["1", "2", "3", "4", "5", "6", "7"])
+        #expect(upNextView(q, .off).list?.rows.map(\.track.id) == ["9", "10", "11", "12"])
+        var walk: [String] = []
+        for _ in 0..<3 {
+            q = previous(q)
+            walk.append(q.current!.id)
+        }
+        #expect(walk == ["7", "6", "5"])
+        q = q.at(onward(q)!)
+        #expect(q.current?.id == "6" && q.ended.current?.id == "7")
+    }
+
+    @Test func aSongAddedStaysNextAfterTheTapAndPlaysWhereItPlayedAfterPrevious() { // :375-387
+        let start = withNext(startUpNext(simAlbum(12), start: 0).at(4), [simTrack("a", album: "Dummy", albumId: "dum")])
+        let jump = jumpedTo(start, start.key("8")!)!
+        var q = jump.queue.at(jump.index)
+        #expect(jump.index == 7 && Array(q.ids[4..<10]) == ["5", "6", "7", "8", "a", "9"])
+        #expect(upNextView(q, .off).added.map(\.track.id) == ["a"])
+        q = previous(q)
+        let v = upNextView(q, .off)
+        #expect(q.current?.id == "7" && v.added.isEmpty && v.list?.title == "From Mezzanine")
+        #expect(v.list?.rows.map(\.track.id) == ["8", "a", "9", "10", "11", "12"] && withoutAdded(q) == q)
+        let aKey = q.key("a")!
+        let tapA = jumpedTo(q, aKey)!
+        #expect(Array(movedKey(q, aKey, to: 0).after.prefix(3)) == ["a", "8", "9"])
+        #expect(Array(withoutKey(q, aKey).after.prefix(2)) == ["8", "9"])
+        #expect(tapA.queue == q && tapA.queue.at(tapA.index).current?.id == "a")
+    }
+
+    @Test func historyIsWhatIsBehindTheSongPlaying() { // :389-422
+        let fromFive = startUpNext(simAlbum(12), start: 4)
+        #expect(upNextView(fromFive, .off).history.isEmpty && backward(fromFive, position: 1) == .go(3))
+        #expect(upNextView(fromFive.at(6), .off).history.map(\.track.id) == ["5", "6"])
+        let back = previous(fromFive)
+        #expect(back.current?.id == "4" && back.upNext?.startedAt == 3 && history(back).isEmpty && back.tracks == fromFive.tracks)
+        #expect(history(back.ended) == ["4"])
+        let later = fromFive.at(6)
+        #expect(wentBack(later, 5).upNext == later.upNext && wentBack(later, 5).index == 5)
+        let plain = UpNextQueue(tracks: simAlbum(3), index: 2)
+        #expect(wentBack(plain, 1) == UpNextQueue(tracks: simAlbum(3), index: 1))
+        let shuffled = startUpNext(simAlbum(6), start: 3, shuffle: true, random: Seeded(5).next)
+        #expect(history(shuffled.at(3)) == Array(shuffled.ids.prefix(3)))
+        let library = startUpNext(simAlbum(3), start: 0, paged: Paged(token: "t", total: 9, fetched: 3, scope: .yours))
+        #expect(history(library.at(2)) == ["1", "2"])
+        // Repeat One on song 2 for three plays, then off, then on to 4
+        var one = toppedUp(startUpNext(simAlbum(5), start: 0).at(1), .one)
+        one = toppedUp(one.ended, .one).ended
+        one = toppedUp(withRepeat(one, .off), .off)
+        one = one.at(onward(one)!)
+        one = one.at(onward(one)!)
+        let oneView = upNextView(one, .off)
+        #expect(Array(one.ids.prefix(one.index + 1)) == ["1", "2", "2", "2", "3", "4"])
+        #expect(oneView.history.map(\.track.id) == ["1", "2", "3"] && oneView.history[1].key == one.upNext!.marks[1].key)
+        #expect(history(one.at(2)) == ["1"])
+        var all = toppedUp(startUpNext(simAlbum(3), start: 0), .all)
+        for _ in 0..<4 { all = toppedUp(all.ended, .all) }
+        #expect(all.current?.id == "2" && upNextView(all, .all).history.map(\.track.id) == ["1", "2", "3", "1"])
+        let long = startUpNext(simAlbum(80), start: 0).at(70)
+        let lv = upNextView(long, .off)
+        #expect(UpNext.historyBack == 50 && lv.history.count == 50)
+        #expect(lv.history.first?.track.id == "21" && lv.history.last?.track.id == "70")
+        #expect(historyRows(.empty).isEmpty)
+        #expect(UpNext.historyBack == Resume.before) // what a reload keeps, so History after one is the same
+    }
+
+    @Test func aUnitIsOneSong() { // :423-445 (review)
+        var q = toppedUp(startUpNext(simAlbum(5), start: 0).at(1), .one)
+        q = toppedUp(previous(q), .one)
+        #expect(q.ids == ["1", "1", "1", "2", "2", "2", "3", "4", "5"])
+        q = withShuffle(q, true, random: Seeded(7).next)
+        #expect(Array(q.ids.prefix(3)) == ["1", "1", "1"] && q.ids.filter { $0 == "2" }.count == 1)
+        #expect(q.upNext!.marks.filter { $0.from == .one }.count == 2)
+        q = toppedUp(q.at(onward(q)!), .one)
+        guard case .go(let index) = backward(q, position: 0) else {
+            Issue.record("Previous restarted")
+            return
+        }
+        #expect(history(q) == ["1"] && q.tracks[index].id == "1")
+        var r = toppedUp(startUpNext(simAlbum(2), start: 0).at(1), .all)
+        r = toppedUp(r.ended, .all)
+        r = toppedUp(withRepeat(r, .one), .one)
+        r = toppedUp(previous(r), .one)
+        #expect(r.current?.id == "2" && r.froms == ["o", "o", "s1", "o", "o", "s1"])
+        r = withRepeat(r, .one)
+        #expect(Array(r.ids.dropFirst(r.index)) == ["2", "2", "2"] && r.froms == ["o", "o"])
+    }
+
+    @Test func historysTapPlaysTheSongAgain() { // :447-477
+        var q = withNext(startUpNext(simAlbum(9), start: 0).at(6), [simTrack("a")])
+        let k3 = q.upNext!.marks[2].key
+        let jump = jumpedTo(q, k3)!
+        #expect(jump.index == 7 && Array(jump.queue.ids[6..<10]) == ["7", "3", "a", "8"])
+        #expect(jump.queue.upNext!.marks[jump.index].from == .added && jump.queue.tracks[jump.index] == q.tracks[2])
+        #expect(jump.queue.index == 6)
+        q = jump.queue.at(jump.index)
+        let v = upNextView(q, .off)
+        #expect(v.history.map(\.track.id) == ["1", "2", "3", "4", "5", "6", "7"] && v.history[2].key == k3)
+        #expect(v.added.map(\.track.id) == ["a"] && v.list?.rows.first?.track.id == "8")
+        #expect(previous(q).current?.id == "7" && q.at(onward(q)!).current?.id == "a")
+        q = q.at(onward(q)!)
+        #expect(Array(history(q).suffix(2)) == ["7", "3"])
+        let one = toppedUp(startUpNext(simAlbum(4), start: 0).at(2), .one)
+        let again = jumpedTo(one, one.upNext!.marks[0].key)!
+        #expect(again.index == 5 && again.queue.ids == ["1", "2", "3", "3", "3", "1", "4"])
+        #expect(toppedUp(again.queue.at(again.index), .one).ids == ["1", "2", "3", "3", "3", "1", "1", "1", "4"])
+        #expect(jumpedTo(one, one.upNext!.marks[2].key) == nil && jumpedTo(one, one.upNext!.marks[3].key) == nil)
+        #expect(jumpedTo(one, 99) == nil)
+        let fromFive = startUpNext(simAlbum(12), start: 4).at(6)
+        #expect(jumpedTo(fromFive, fromFive.upNext!.marks[1].key) == nil)
+        let long = startUpNext(simAlbum(80), start: 0).at(70)
+        let oldest = jumpedTo(long, long.upNext!.marks[20].key)!
+        #expect(jumpedTo(long, long.upNext!.marks[19].key) == nil && oldest.queue.at(oldest.index).current?.id == "21")
+        var rounds = toppedUp(startUpNext(simAlbum(3), start: 0).at(2), .all)
+        rounds = toppedUp(rounds.ended, .all)
+        let replay = jumpedTo(rounds, rounds.upNext!.marks[0].key)!
+        let replayed = replay.queue.at(replay.index)
+        #expect(replayed.upNext!.marks[replayed.index].from == .added && withRepeat(replayed, .off).after == ["2", "3"])
+    }
+
+    @Test func shuffleOffAfterAJumpInAShuffle() { // :479-487
+        let shuffled = startUpNext(simAlbum(6), start: 0, shuffle: true, random: Seeded(2).next)
+        let order = shuffled.ids
+        let jump = jumpedTo(shuffled, shuffled.upNext!.marks[3].key)!
+        let off = withShuffle(jump.queue.at(jump.index), false)
+        #expect(jump.queue == shuffled && Array(off.ids.prefix(4)) == Array(order.prefix(4)) && off.current?.id == order[3])
+        #expect(off.after == simAlbum(6).map(\.id).filter { Int($0)! > Int(order[3])! })
+    }
+
+    @Test func previousAcrossSongsAddedDrawsTheListThroughThem() { // the 2.1.3 commit: 190ebaa drew ["4"]
+        let q = previous(withNext(startUpNext(simAlbum(6), start: 0).at(3), [simTrack("a"), simTrack("b")]))
+        let v = upNextView(q, .off)
+        #expect(q.current?.id == "3" && v.added.isEmpty && v.list?.rows.map(\.track.id) == ["4", "a", "b", "5", "6"])
+        #expect(withoutAdded(q) == q)
     }
 }

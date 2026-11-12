@@ -2382,3 +2382,73 @@ album, of Your albums and All albums (the letter index's last letter above the p
 address with the keyboard up and down. Play Next something, and while its line shows, scroll a list to the end: the
 last row clears the line too. Big text (Settings > Accessibility > Larger Text): the last row still clears. Nothing
 playing: no gap at a list's foot. Push and pop pages: the mini player stays still.
+
+### Up Next's History, and a tap that keeps what it passes (port/upnext-history, the web's 2.1.3)
+
+**What James chose**, testing 0.2: tapping song 8 while 5 plays dropped 6 and 7, so Previous from 8 went to 5. He
+chose "Keep them, in order" - 6 and 7 stay behind 8, Previous from 8 plays 7, then 6 - and History in Up Next, "Both
+apps, now". The web has it as 2.1.3 (notes/app.md); this is the phone's port, held to the same vectors.
+
+**Core** (DeadwaxCore, pure, ported function by function from ui/src/lib/upNext.ts and resume.ts):
+- `UpNext.swift`: `unitEnd`/`unitStart`/`unitsIn` (a UNIT is an entry and its Repeat One copies - one row, one song),
+  `layout`'s `listEnd` (the list runs through songs added among its songs after Previous - the bug 2.1.3 fixed on the
+  way); `groupOf`, `withoutKey`, `movedKey` by units; `withoutAdded` only Playing Next; `withShuffle`'s and
+  `withRepeat`'s list songs take their copies with them; `jumpedTo` returns `Jump { queue, index }` (a list row: the
+  rows above it kept behind it, Playing Next carried after it; a Playing Next row: the same queue at a new index; a
+  History row: a new 'added' entry of its song after the song playing's copies); `historyRows(_:back:)`;
+  `wentBack` (Previous before where listening began moves `startedAt` down). `UpNext.historyBack = 50`, equal to
+  `Resume.before` (tested), so History after a pick-up is History before it.
+- `UpNextView.swift`: `history` first; `added` and `list` by units; words `history`, `playAgain`, `playing`.
+- `Resume.swift fromSnapshot`: a `startedAt` past the song playing's run - as 0.2 and the web's 2.1.2 saved it after
+  Previous before where an album began - is lowered to the run. The saved format is unchanged.
+
+**QueueController**: `jumpTo` catches up, takes the jump, and - the edit taken, or nothing to edit - sets
+intendsToPlay and moves to `jump.index` (`engine.skip(to:)`); refused (D4, a seek on its way), it finds the row again
+and plays afresh from it, as before. It returns whether the jump was made (`@discardableResult`), so the screen says
+what started only then. `previous` moves by `wentBack`. **The engine is unchanged**: `skip(to:)` is
+`begin(at:from: .beginning)`, which resets and opens any entry - forward over several as Previous goes back over one.
+A tap with nothing to edit (no Playing Next to carry, a row of Playing Next) is now a plain skip, so in a song's last
+seconds it no longer plays afresh.
+
+**The exporter** (ios/scripts/export-traces.cjs): jumpedTo recorded with its `index`, the move a `setIndex` after
+it (never `onward`); a `wentBack` op and a `historyRows` query; `history` in every view; HISTORY_BACK in the
+constants; the traces' Previous by wentBack and a tap of History's now and then; scenarios for every 2.1.3 case of
+upnext.sim (and Previous across songs added); the property digests from the sim's new loop (pick(14), ops 12 and
+13); the round trip's tap of History's and Previous half by wentBack, half as before; resume's cases: the old
+Previous case's startedAt lowered, the 0.2 pick-up, wentBack's save. UpNextPropertyTests runs the sim's new per-step
+checks (History equal to Previous's walk by place and by song, every copy its run's song, every drawn row reached by
+its tap); ResumeRoundTripTests holds History the same after every round trip.
+
+**UpNextScreen**: History is a Section above the card, headed "History" (a heading), hidden in Edit, with no moves or
+removals; its rows are "{title}, play again", a tap playing the song again with VoiceOver's focus kept on the row and
+"Playing {title}" said - only when the jump took. An Up Next row's focus goes to what plays next (after a list row,
+Playing Next's head) - only when it took. The card's title is a heading. It opens scrolled to the card, and puts the
+card back at the top when the entry playing changes or Edit goes on or off - not after a History tap, and never for
+Shuffle, Repeat, Clear or Edit's moves. **Unlike the web**, which puts back exactly what was in view when the song
+playing changes, the phone puts the card at the top (a List gives no first visible row to hold to); scrolled down the
+list as a song ends, the view goes to the card. A bottom content margin - the height less lower bounds of the card
+(120 pt) and each row after it (56 pt) - lets the card reach the top near an album's end; it can leave a little more
+blank than needed, never too little. **Also unlike the web**, which holds the row tapped under the finger by
+measuring it: once History is at its 50 entries, a History tap moves the window on (the song again is a new entry), so
+the oldest row drops off the top and the phone, which only leaves the scroll alone, shows the rows a row higher.
+
+**After review** (same branch): an Up Next row's tap sets VoiceOver's focus on what plays next only after the card is
+back at the top (`focusAtCard`, taken by the playing key's onChange and set after toCard's scrollTo) - set at once, as
+first cut, the row was pushed down by History's new rows, maybe out of the List's drawn cells, before the scroll; and
+a History tap's focus and "Playing {title}" come after the redraw (one Task), as the web says them from the draw.
+Both assumed, as the rest of VoiceOver here.
+
+**Verified**: the whole DeadwaxKit suite (the traces, scenarios, property digests and round trip re-exported, and
+iostraces.sim's check); the unsigned device build, no new warnings; check_project.py; the ios sims, upnext.sim and
+resume.sim. **Assumed**: List's scrollTo to the card after a change lands as asked (`Task` then an instant
+transaction, as AlbumsScreen does); that inserting History's new row above the card leaves the tapped row in place
+(UICollectionView keeps its offset); the bottom margin's lower bounds at the largest text sizes; VoiceOver reading 50
+History rows and the announcement after a History tap.
+
+**On the phone**:
+- Play an album from song 5, tap 8 in Up Next, then Previous three times: 7, 6, 5.
+- Scroll up: History; tap a row: it plays, the row stays under the finger; tap the same row again: it plays again.
+- Play Next a song, Previous back across it: Up Next lists it among the album's songs, not under Playing Next.
+- As songs end, through Shuffle and Repeat, and Edit on and off, the list keeps its place (the card at the top).
+- An album's last two songs: Up Next still opens with the card at the top.
+- VoiceOver: History's heading, then its rows, then the song playing's title as a heading.

@@ -369,13 +369,18 @@ final class PlayerModel {
         act { controller.setShuffle(!controller.shuffle) }
     }
 
-    /// An Up Next row tapped: that entry played from its start, paused or not (QueueController.jumpTo(key:)) - in a
-    /// song's last moments too, the queue played afresh from the row.
-    func jump(to key: Int) {
-        guard let controller else { return }
+    /// An Up Next or History row tapped: that entry played from its start, paused or not (QueueController.jumpTo(key:))
+    /// - in a song's last moments too: a skip, or, when the edit it needs can't be made then, the queue played afresh
+    /// from the row. (2.1.3) The songs it passes stay behind it;
+    /// History's plays its song again. True when the jump was made: the screen says what started only then.
+    @discardableResult
+    func jump(to key: Int) -> Bool {
+        guard let controller else { return false }
         cancelRetry()
-        act { controller.jumpTo(key: key) }
+        var took = false
+        act { took = controller.jumpTo(key: key) }
         startTicking()
+        return took
     }
 
     /// An Up Next row dragged to `index` of its own group (QueueController.moveInQueue(key:to:)).
