@@ -114,3 +114,22 @@ public enum APOWriter {
         return (sign + whole, String(digits.dropFirst(point)))
     }
 }
+
+extension APOWriter {
+    /// 3.11's two exports of an output's EQ, at the rate it plays at (48 kHz while it isn't connected): the whole
+    /// curve - the correction's filters by frequency, the tone's bands that aren't at 0, and the preamp as it plays -
+    /// or the correction alone with its own preamp (its automatic one, or yours); each ear's offset kept.
+    public static func export(_ output: EQOutputSetting, in settings: EQSettings, whole: Bool, day: String,
+                              rate: Double = 48000) -> String {
+        let c = output.correction
+        let bands = whole ? settings.gains(output.tone) : nil
+        var hand: Double?
+        if case .hand(let dB) = output.preamp { hand = dB }
+        let bank = EQBank.make(rate: rate, key: output.key, version: 0, on: true, correction: c?.filters ?? [],
+                               offsets: c?.preamp ?? .zero, bands: bands ?? EQGraphic.flat, preamp: hand)
+        let preamp = EQPreampParts(all: bank.preamp, left: c?.preamp.left ?? 0, right: c?.preamp.right ?? 0)
+        let comments = EQWords.Export.comments(output: output.shownName, day: day, correction: c,
+                                               tone: whole ? EQWords.toneName(output.tone, in: settings) : nil)
+        return write(filters: curve(correction: c?.filters ?? [], bands: bands), preamp: preamp, comments: comments)
+    }
+}
