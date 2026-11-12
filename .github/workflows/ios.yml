@@ -37,6 +37,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: swift --version
+      # the download store's SQLite (Sources/CSQLite): the image has the library, not its header
+      - name: SQLite's header
+        run: apt-get update -q && apt-get install -y -q libsqlite3-dev
       - name: DeadwaxKit
         run: swift test --package-path ios/DeadwaxKit
 

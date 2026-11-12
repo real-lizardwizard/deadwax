@@ -279,3 +279,39 @@ def test_the_test_album_is_ten_flacs_of_beeps_at_known_times_and_a_tone_across_a
     i = np.arange(join - 200, join + 200)
     expected = np.round(np.sin(2 * np.pi * 440 * i / 44100) * 10 ** (-12 / 20) * 32767)
     assert np.abs(whole[join - 200:join + 200] - expected).max() <= 1   # the very next sample of one tone
+
+
+def test_the_verifiers_fixtures_are_the_scripts_and_libsndfile_hears_what_their_md5_says():
+    """DeadwaxAudio's download verifier (notes/ios-specs/phase2-downloads.md 8.4) is tested on four small FLACs written by
+    make-test-album.py's own encoder. Here they are made again (the committed bytes are the script's), and decoded by
+    libsndfile - an independent decoder - so the Swift test's "matched" has a reference: the 16/44.1 and 24/96 files'
+    sound hashes to their STREAMINFO MD5, the changed one's doesn't (though every frame decodes), and the last has none."""
+    soundfile = pytest.importorskip("soundfile")
+    import hashlib
+
+    import numpy as np
+    from mutagen.flac import FLAC
+
+    album = load("make-test-album")
+    made = album.verifier_fixtures()
+    folder = SCRIPTS.parent / "DeadwaxKit" / "Tests" / "DeadwaxAudioTests" / "Fixtures" / "verifier"
+    assert sorted(made) == sorted(p.name for p in folder.glob("*.flac"))
+    for name, data in made.items():
+        assert (folder / name).read_bytes() == data, f"{name} isn't what the script writes: run it again"
+        info = FLAC(str(folder / name)).info
+        samples, rate = soundfile.read(str(folder / name), dtype="int32")
+        bits = info.bits_per_sample
+        ints = samples >> (32 - bits)                        # libsndfile gives them left-justified in 32 bits
+        width = (bits + 7) // 8
+        packed = b"".join(int(v).to_bytes(width, "little", signed=True) for v in ints.reshape(-1))
+        heard = int(hashlib.md5(packed).hexdigest(), 16)
+        assert rate == info.sample_rate and samples.shape == (3072, 2)
+        if name.endswith("no-md5.flac"):
+            assert info.md5_signature == 0
+        elif "changed" in name:
+            assert heard != info.md5_signature
+            original = soundfile.read(str(folder / "verify-24-96k.flac"), dtype="int32")[0] >> 8
+            assert int(np.count_nonzero(original != ints)) == 1     # one sample, and only one
+        else:
+            assert heard == info.md5_signature
+        assert ints.min() == -(1 << (bits - 1)) and ints.max() == (1 << (bits - 1)) - 1   # both extremes, for the sign

@@ -34,10 +34,13 @@ public enum AlbumSort: String, CaseIterable, Sendable {
 }
 
 /// Whose Recently added a list is (2.0.11): the collection's - when the collection got each album, Navidrome's
-/// `created` - or yours, when each entered your library, its `starred`.
+/// `created` - or yours, when each entered your library, its `starred`. And this phone's (Phase 2's Downloaded): when
+/// each album's first song arrived, which `DownloadedAlbums.index` puts in the album's `created` - so it sorts and
+/// groups as the collection's does.
 public enum AddedBy: String, Sendable {
     case collection
     case you
+    case phone
 }
 
 /// What a sort compares an album by, made once per album (`albumKeys`) - never inside a comparator.
