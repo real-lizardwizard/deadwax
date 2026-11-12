@@ -124,7 +124,13 @@ public enum DownloadWords {
 
     /// "Downloading, 40 percent".
     public static func downloading(percent fraction: Double) -> String {
-        "Downloading, \(Int((min(max(fraction, 0), 1) * 100).rounded(.down))) percent"
+        "Downloading, \(percent(fraction))"
+    }
+
+    /// "40 percent" - rounded down, so 100 only once it's here. A Downloading row's VoiceOver words end with it (6.8:
+    /// "Dummy, Portishead, 4 of 12 songs, 40 percent"), its section already saying it is downloading.
+    public static func percent(_ fraction: Double) -> String {
+        "\(Int((min(max(fraction, 0), 1) * 100).rounded(.down))) percent"
     }
 
     /// "1 song didn't download", "2 songs didn't download".

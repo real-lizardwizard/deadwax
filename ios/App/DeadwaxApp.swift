@@ -23,6 +23,7 @@ struct DeadwaxApp: App {
         let server = ServerModel(transport: transport)
         let reachability = Reachability(server: server)
         transport.listen { [weak reachability] answered in reachability?.heard(answered: answered) }
+        reachability.whenChanged { [weak reachability] in CoverCache.shared.reach(online: reachability?.online ?? true) }
         let files = SongFiles()
         let player = PlayerModel(server: server, files: files)
         let navigation = AppNavigation()

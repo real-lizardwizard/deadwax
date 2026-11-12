@@ -504,6 +504,8 @@ answering, **Try again**. It goes by itself once deadwax answers.
 - **Playing**: a song that isn't on the phone is passed over to the next one that is ("Skipped "Roads"
   - it isn't on this phone"). With nothing left that's here, the player stops on it, paused: "Not on
   this phone - it plays once deadwax is back." Play tries it again.
+- **Covers**: a downloaded album's is on the phone. Any other album's shows only if it was on screen
+  a moment ago; otherwise it's an empty square until deadwax is back.
 - **Opening the app** with no network: it opens at once, as last time, onto the strip and Downloaded.
 - Plays are kept and sent later; downloads waiting carry on once the phone, or deadwax, is back.
 

@@ -15,6 +15,7 @@ import Testing
         #expect(DownloadWords.albumLine(.downloaded(checking: true)) == "Downloaded")
         #expect(DownloadWords.controlValue(.downloading(here: 4, of: 12, fraction: 0.4)) == "Downloading, 40 percent")
         #expect(DownloadWords.controlValue(.downloading(here: 4, of: 12, fraction: 0.999)) == "Downloading, 99 percent", "100 only once it's here")
+        #expect(DownloadWords.percent(0.4) == "40 percent", "a Downloading row's last words (6.8)")
         #expect(DownloadWords.controlValue(.downloaded(checking: false)) == "Downloaded")
         #expect(DownloadWords.controlValue(.none) == nil)
         #expect(DownloadWords.controlLabel == "Download")

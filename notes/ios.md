@@ -2568,3 +2568,74 @@ warning (appintents' "Metadata extraction skipped" is the app's as before); chec
 tests/test_source_bytes.py, test_ios_contract.py, test_ios_install.py. **Assumed, not seen**: everything drawn -
 nothing has run on a simulator or a phone. What only the phone can tell is the spec's section 10 (checks 1-17) and
 section 11, and docs/ios.md's "Phase 2's checks".
+
+### Part 3: the review (p2/downloads)
+
+An adversarial pass over parts 1 and 2 (`b4ee591..76ebf0e`) against the spec and Apple's documented behaviour of a
+background `URLSession`, file protection, `NWPathMonitor` and the request's network flags. What held, fixed in
+`DownloadModel` unless named:
+
+- **Mobile data under Wi-Fi only, from resume data.** Part 1 remade the tasks out when Download over changed, but a
+  song waiting with resume data (one cancelled, or stopped by a force quit) kept it - and resume data carries the
+  request it was archived from, `allowsCellularAccess` and the rest, so its next task resumed under the old setting.
+  Changing the setting now lets every waiting song's resume data go first (`dropResumeData`), and resume data that
+  arrives from a task made under the other setting (a cancel racing the change) isn't kept (`madeUnder`).
+- **A session's cookie on disk.** The same archived request carries the `Cookie:` header. Signing out kept it in the
+  rows (plaintext, under `completeUntilFirstUserAuthentication`); signing in again tried it, was refused, and held
+  every download a minute for the 401. Now `close` drops every row's resume data with the person (one transaction),
+  and the same person signed in under a new session drops what the old one made (`resumeSession`). A song's bytes
+  so far are the cost; its download starts again.
+- **The limit overrun by songs asked from the queue.** A queue entry carries no size, so Now Playing's Download and
+  Download Up Next made records the planner counted at a transcode's 320 kbps estimate - a FLAC is about three times
+  that - and whose copy was checked against no length. Now a new record takes its size from the kept album's answer;
+  without one, its task waits for that answer (`sizeComing`, never past it: no answer lets it go at the estimate),
+  and `keepAlbum` keeps its answer through `albumAnswered`, which fills a size that was never known as well as one
+  that changed. A kept copy whose length isn't deadwax's size is fetched again; one whose size was merely unknown is
+  left alone.
+- **The streaming cache's copies ignored the limit.** They were copied in as they were asked, past the planner -
+  over the storage limit and into the phone's last 2 GB. They are now copied when the plan lets the song go, in
+  `plan()`, in place of making its task; one that doesn't hold (its length, its move) is simply downloaded.
+- **A copy here set back to wanted.** A cancel (the plan letting a task go, or Download over's remake) awaited
+  `session.cancel` and then wrote every song it named as cancelled - including one whose file had arrived meanwhile,
+  which was then fetched again (and its `done` row lost). The writes now leave a song that isn't fetching any more.
+- **An older task's whole file thrown away.** After a relaunch, a song can have a new task while an old one's end is
+  still to be delivered (iOS delivers a finished task's event when it relaunches the app, possibly after the
+  launch's settle asked again). Its file was deleted and the song fetched twice. A whole file of the right length is
+  now taken and the newer task cancelled; anything else is dropped as before.
+- **`live` cleared by another person's task**: a task of another account on the phone ending removed the signed-in
+  person's task id for the same song (two people downloading one album). Only the current store's events touch it.
+- **A check that never ran.** `queueCheck` started the sound check at once, from inside `arrive`, before the record it
+  returns was written: the check found no `done` record and dropped it, leaving the copy "Checking…" until the next
+  launch. It starts on the next turn now.
+- **An album removed while its answer was out** was kept anyway (its cover written, its row back); a cover written
+  after a sign-out landed in the next person's store. Both guarded; a kept cover is now drawn at once (`reload`).
+- **"Used" left the covers out**: 6.3 and 8.5 say used is the songs' bytes and their covers'. `bytesHere` adds each
+  kept cover's length (read once).
+- **Plays waiting counted from the wrong store**: a send that outlived a sign-out wrote the old person's count over
+  the new one's.
+- **Covers asked of a deadwax that can't be reached** (`CoverCache`, wired in `DeadwaxApp`): every tile not on the
+  phone asked and waited for its answer, the transport's silence feeding the banner. Offline, a cover is the phone's,
+  the in-memory cache's, or the empty square (5.4, Open question 13); those that failed are asked again once deadwax
+  is back, the next time they are shown.
+- **VoiceOver's Downloading row** said "..., 4 of 12 songs, Downloading, 40 percent"; 6.8's is "Dummy, Portishead, 4
+  of 12 songs, 40 percent" - its section already says it. `DownloadWords.percent` (tested).
+
+**Left as they are**:
+- **A kept play may be sent twice**: 7.6 forgets a play only on a 200, so a send that reached deadwax but whose
+  answer was lost goes again. Taking a scrobble of the same song at the same `time` once would be a server-side guard,
+  a 2.1.x patch on main - named, not built.
+- `chosenKey` (the Up Next song that stops on itself offline) is cleared only by the next failure or skip, not by
+  a jump that played - harmless: it names a song the listener chose.
+- Several screens following progress at once each poll the session four times a second (cheap; the session answers
+  from memory).
+- The album's answer, cover and loudness are asked over mobile data under Wi-Fi only: small foreground requests on
+  the app's own session, as 8.3 has the cover; only the songs' tasks carry the setting's flags.
+- `queue_pending` and the offline launch's kept queue: still part 2's "Not built".
+- `iostraces.sim.cjs` fails here as it does on `b4ee591` (`export-traces.cjs`'s `stateOf`, under Node 20.12 - below
+  the repo's `^20.19`); nothing it reads changed on this branch.
+
+**Verified here**: the whole DeadwaxKit package (603 Core tests, 93 engine tests); the unsigned device build, BUILD
+SUCCEEDED, no new warning; check_project.py; the ios sims but iostraces (above); tests/test_source_bytes.py,
+test_ios_contract.py, test_ios_install.py. **Assumed**: Apple's documented behaviour each fix rests on (resume data
+archives the request, cookies and network flags included; a relaunch delivers an old task's end) - none of it has run
+on a phone.

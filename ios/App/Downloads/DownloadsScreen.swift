@@ -363,9 +363,9 @@ private struct DownloadingSection: View {
         }
     }
 
-    /// "Dummy, Portishead, 4 of 12 songs, Downloading, 40 percent".
+    /// "Dummy, Portishead, 4 of 12 songs, 40 percent" (6.8) - the section's header already says it is downloading.
     private func spoken(_ row: DownloadShelf.Going) -> String {
-        [row.album?.name, row.album?.artist, row.line, row.fraction.map { DownloadWords.downloading(percent: $0) }]
+        [row.album?.name, row.album?.artist, row.line, row.fraction.map { DownloadWords.percent($0) }]
             .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
     }
 }

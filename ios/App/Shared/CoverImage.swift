@@ -86,6 +86,9 @@ final class CoverCache {
     private let images = NSCache<NSString, UIImage>()
     private var loading: [String: (task: Task<UIImage?, Never>, waiting: Int)] = [:]
     private var failedAt: [String: Date] = [:]
+    /// deadwax can't be reached (Reachability, phase2-downloads.md 5.4 and 7.1): a cover not kept on the phone isn't
+    /// asked for - nothing would answer - and is the empty square until deadwax is back.
+    private var offline = false
     /// How long a cover that failed isn't asked again, under the same session.
     nonisolated static let againAfter: TimeInterval = 60
 
@@ -127,6 +130,11 @@ final class CoverCache {
                     self?.landed(key, flight, image, called: false)
                     return image
                 }
+                // nothing that needs deadwax is asked while it can't be reached: a failure, forgotten when it is back
+                if self?.offline == true {
+                    self?.landed(key, flight, nil, called: false)
+                    return nil
+                }
                 let data = try? await client.cover(coverID: id, size: size)
                 // UIImage(data:) only reads the header; the pixels are decoded here, off the main thread
                 let raw = data.flatMap(UIImage.init(data:))
@@ -158,6 +166,13 @@ final class CoverCache {
     /// time a view shows them.
     func forgetFailures() {
         failedAt = [:]
+    }
+
+    /// Whether deadwax can be reached: while not, covers not on the phone aren't asked for; as it comes back, the ones
+    /// that failed meanwhile are asked again the next time a view shows them.
+    func reach(online: Bool) {
+        if online && offline { failedAt = [:] }
+        offline = !online
     }
 
     /// A fetch, and its failure, are the session's: one under a session that has ended (a 401 while the sign-in was
