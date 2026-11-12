@@ -452,6 +452,19 @@ Coming back to the app while paused, it looks again (at most every 15 seconds). 
 takes what another device saved since this phone last did. With logins off everyone shares one queue,
 and a paused phone never takes somebody else's. The break-glass `deadwax` keeps no queue.
 
+The phone also keeps the queue it last saved or picked up, in your own downloads' store on the phone:
+
+- **Opened with deadwax out of reach** (Airplane Mode, WireGuard off, deadwax or Navidrome down), it
+  puts that queue back, paused where it stopped, with no notice - so a phone opened on a plane still
+  has what you were playing. Songs not on the phone are passed over as they come (see
+  [Offline](#offline)).
+- **A save that couldn't be sent** (no network, or the app closed before deadwax answered) is kept
+  too. The next time the app opens, or you come back to it, it first asks deadwax what it has: if
+  another device or app saved a queue since this phone last saved or picked one up, that one wins and
+  is picked up as usual; otherwise the phone's own goes. While music plays, saves go as they always
+  do. A save refused because you were signed out waits for you to sign in again as the same person;
+  it's never sent for anyone else.
+
 ## The songs kept on the phone
 
 Songs come as they are: a FLAC as FLAC, an MP3 as MP3. Only Ogg, Opus and WMA files come as MP3,
@@ -525,7 +538,9 @@ answering, **Try again**. It goes by itself once deadwax answers.
   this phone - it plays once deadwax is back." Play tries it again.
 - **Covers**: a downloaded album's is on the phone. Any other album's shows only if it was on screen
   a moment ago; otherwise it's an empty square until deadwax is back.
-- **Opening the app** with no network: it opens at once, as last time, onto the strip and Downloaded.
+- **Opening the app** with no network: it opens at once, as last time, onto the strip and Downloaded,
+  with the queue you were last playing put back, paused (see
+  [Picking up where you left off](#picking-up-where-you-left-off)).
 - Plays are kept and sent later; downloads waiting carry on once the phone, or deadwax, is back.
 
 ## The checks
@@ -624,15 +639,22 @@ The tests can't reach these either. Note what happens.
 16. **VoiceOver and the largest text size**: the download button ("Download, Downloading, 40
     percent"), a song's actions, the strip as it comes and "Back online" as it goes; at the largest
     text size, You > Downloads and an album's page with nothing cut off.
+17. **The queue, kept.** Play a downloaded album, pause halfway through a song, and close the app from
+    the app switcher. Turn on Airplane Mode and open it: the mini player shows that song, paused at
+    the second you left it, with no notice, and Up Next is as you left it. Press play: it plays.
+18. **A queue saved offline, then elsewhere.** (a) Still in Airplane Mode, skip to another song and
+    pause; close the app from the app switcher. Turn Airplane Mode off and open the app: the song you
+    skipped to is there, paused, with no notice. Open the web app on the Mac with nothing playing
+    there: "Picked up from your iPhone", on that song. (b) Again in Airplane Mode, skip to another song,
+    pause and close the app; then play something else on the Mac for a minute. Turn Airplane Mode off
+    and open the phone: "Picked up from your Mac", on the Mac's song - the phone's offline queue
+    didn't overwrite it.
 
 ## What it can't do yet
 
 These are the web app's for now. Most of them come to the phone in the next phases:
 
 - **Up Next's marks**: Up Next doesn't show which songs are downloaded yet.
-- **Picking up offline**: the queue you were playing is put back from Navidrome, so a phone opened
-  with no network starts with nothing queued, and a queue save that couldn't be sent before the app
-  was closed is lost (the plays aren't: they're kept).
 - **Playlists**, **artist pages** and a **songs list**, and the Library's **Shuffle** of your whole
   library.
 - **Search**, **Get** and **Requests**.

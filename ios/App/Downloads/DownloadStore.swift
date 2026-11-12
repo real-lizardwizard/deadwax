@@ -50,6 +50,11 @@ final class DownloadStore {
 
     // MARK: where things are
 
+    /// Whose store /me names: the person signed in, or "local" with logins off.
+    static func person(_ me: Me) -> String {
+        me.loginsOn ? me.user : "local"
+    }
+
     /// Application Support/deadwax.
     static var base: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]

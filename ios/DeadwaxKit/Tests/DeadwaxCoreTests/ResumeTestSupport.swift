@@ -270,6 +270,23 @@ final class FakeResumePlayer: ResumePlayer {
     }
 }
 
+/// The person's download store's kept queue (Phase 2's queue_pending row), faked: the row, and every write in order.
+final class FakeQueueKeeper: ResumeKeeper {
+    var row: QueueKept?
+    var writes: [QueueKept?] = []
+
+    init(_ row: QueueKept? = nil) {
+        self.row = row
+    }
+
+    func read() -> QueueKept? { row }
+
+    func write(_ kept: QueueKept?) {
+        row = kept
+        writes.append(kept)
+    }
+}
+
 /// resume.sim.cjs's page(): a controller over the fakes, its queue observed and started - deadwax answering the
 /// open's ask with `answer`, if any, 20 ms on.
 final class ResumePage {
@@ -281,12 +298,14 @@ final class ResumePage {
     var setting = Normalization.auto
     var controller: ResumeController!
 
-    init(device: String = "phone-device-1", answer: QueueAnswer? = nil, playing: Bool = false) {
+    init(device: String = "phone-device-1", answer: QueueAnswer? = nil, playing: Bool = false,
+         keeper: FakeQueueKeeper? = nil) {
         player.playing = playing
         controller = ResumeController(device: device, player: player, server: server, clock: clock,
                                       session: { [unowned self] in self.session },
                                       normalization: { [unowned self] in self.setting },
-                                      say: { [unowned self] in self.said.append($0) })
+                                      say: { [unowned self] in self.said.append($0) },
+                                      keeper: keeper)
         player.controller = controller
         draw()
         controller.start()

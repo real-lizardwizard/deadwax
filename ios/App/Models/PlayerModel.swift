@@ -1018,11 +1018,21 @@ final class PlayerModel {
             client: { [weak self] in self?.server.client },
             shelve: { [weak self] songs in self?.shelve(songs) }
         )
+        // Phase 2: the person's queue kept on this phone, in their download store (7.5, 7.6)
+        let keeper: ResumeKeep? = {
+            guard let address = server.address, let me = server.me else { return nil }
+            return ResumeKeep(
+                downloads: { [weak self] in self?.downloads }, server: address.key, person: DownloadStore.person(me),
+                sizes: { [weak self] id in self?.shelf[id]?.size },
+                shelve: { [weak self] songs in self?.shelve(songs) }
+            )
+        }()
         let made = ResumeController(
             device: Self.deviceID(), label: Resume.label, player: player, server: routes, clock: resumeClock,
             session: { [weak self] in MainActor.assumeIsolated { self?.sessionGeneration() ?? 0 } },
             normalization: { [weak self] in MainActor.assumeIsolated { self?.normalization ?? .default } },
-            say: { [weak self] words in MainActor.assumeIsolated { self?.say(words) } }
+            say: { [weak self] words in MainActor.assumeIsolated { self?.say(words) } },
+            keeper: keeper
         )
         resuming = made
         resumeFor = server.person
