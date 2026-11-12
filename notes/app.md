@@ -464,7 +464,10 @@ engine files changed, as that spec said they would: `ui/src/player/usePlayer.ts`
   `upnext.sim.cjs` holds it over 2,000 seeded runs of every edit, top-up and forward move. (`jumpedTo` alone puts the row
   first, ahead of the added songs, for the moment until the engine moves onto it; and Previous, walking BACK across a song
   added during a later round, can leave the order after it as it was played - history order, which is right for Previous
-  then Next, and which Up Next then draws as far as its groups allow.)
+  then Next, and which Up Next then draws as far as its groups allow.) *(Changed in 2.1.3: `jumpedTo` no longer puts the
+  row first - its list edit puts the list's songs down to the row ahead of Playing Next, and the engine moves to the
+  index it names - and Up Next draws a song added that Previous walked back across where it plays, in the list's group;
+  "History in Up Next, and a tap that keeps what it passes (2.1.3)" below.)*
 - **Repeat is the queue, unrolled.** The stream places songs at `last + 1` and can't go back to index 0, so Repeat All
   appends the next time round once fewer than `REPEAT_AHEAD` (2) entries follow the song playing - in its order, or a
   fresh shuffle that never starts with the song that ended the round before - and Repeat One puts copies of the song
@@ -493,7 +496,8 @@ engine files changed, as that spec said they would: `ui/src/player/usePlayer.ts`
   (pinned after review: two edits held through a seek under Repeat All both made at the very update that crosses the join
   - crossInto's runHeld - and a held Play Next dropped by playing another album). A
   jump (`jumpTo`) is never held: it is a tap, done now or not at all, and goes through `next()` (a seek in the stream when
-  it holds the song, a handover, or a new stream from it). `refusedHandover` now goes by a count of the queue's moves
+  it holds the song, a handover, or a new stream from it). *(Changed in 2.1.3: it moves to the index `jumpedTo` names
+  itself, the same three ways, since the songs it passes now stay behind it.)* `refusedHandover` now goes by a count of the queue's moves
   (`state.moves`, bumped by load, moveInStream, crossInto and handOver, never by an edit): the queue's object (an edit
   replaces it) left the music stopped, and its index and song would misfire on Next then Previous.
 - **Withdrawn from the spec's wording, `withRepeat` leaving All**: the spec says it drops the passes later than the one Up
@@ -604,8 +608,8 @@ engine files changed, as that spec said they would: `ui/src/player/usePlayer.ts`
   an MP3 while streaming (it should be handed over); a reload keeping Repeat; a 24/96 album under 48 kHz with Up Next
   edits; Part B against 3,000 stand-in songs (every song once, the build's time and size, a deadwax restart mid-shuffle).
   Part B against a real Navidrome 0.64.2: search3 with songCount 2000 and offsets into the
-  tens of thousands, its time on James's NAS, and an order made while a scan runs. Not built (spec's "Left out"): history,
-  autoplay, keeping the queue across a reload (built in 2.0.0-player.64, below), long-press menus and a ••• on album tiles, saving Up Next as a playlist, a •••
+  tens of thousands, its time on James's NAS, and an order made while a scan runs. Not built (spec's "Left out"): history
+  (built in 2.1.3, below), autoplay, keeping the queue across a reload (built in 2.0.0-player.64, below), long-press menus and a ••• on album tiles, saving Up Next as a playlist, a •••
   on Up Next's own rows, dragging between groups, crossfade.
 
 ### Resume what was playing (2.0.0-player.64)
@@ -1988,3 +1992,185 @@ but the Up next icon") is changed at his request; the desktop's player bar alrea
   too is not known - Up Next's chips say it in a live region, these don't), and the round press at 320 on a real SE
   (WebKit's `aspect-ratio` on a grid item; measured in Chromium only).
 
+
+### History in Up Next, and a tap that keeps what it passes (2.1.3)
+
+James, 2026-11-11, from his Phase 1 checks on the phone: **"when playing song 5, if I tap song 8 in the queue, songs 6
+and 7 disappear after I skip back to the previous song."** Until now a row's tap (`jumpedTo`) moved the row straight
+after the copies and dropped the rows above it in its group, Apple Music's way, so Previous from 8 went to 5. He chose
+**keep them, in order: "6 and 7 stay behind 8: Previous from 8 plays 7, then 6, as on the album"**. And: **"a song
+history would be great to implement in the queue page as well, just so you can scroll up and see what's already
+played"** - he chose both apps, now: the songs already played above what is playing in Up Next, scrolled up to, a tap
+playing one again, as Apple Music has it. This is the web app's half, on main; the iPhone's Core (`ios/DeadwaxKit`,
+`UpNext.swift`, held to upnext.sim's vectors) ports it next, as its own task.
+
+- **What History is**: the entries of the queue the app holds before the song playing, from where listening began
+  (`startedAt`), oldest first - exactly what Previous walks back through, so the two can never disagree (James had just
+  defined Previous: from 8, 7 then 6). No second record: the resume snapshot already holds it, unchanged (v1), so the
+  phone and the web share it through deadwax's saved queue. *Rejected*: a separate log of songs that really played - an
+  app-level observer, a new saved field and its own iPhone port, and it would show 5 above 8 while Previous plays 7; a
+  "skipped" flag would go stale on James's own walk.
+  - **Songs a tap passed** are ordinary rows in their album place, no mark: "behind 8" is James's word.
+  - **A UNIT** - an entry and the Repeat One copies straight after it - is one row, keyed by its first entry (so a song
+    keeps its key as it moves from Up Next into History). The run playing now is the song playing, not History.
+    Repeat All's earlier rounds are there as they played, under the one heading.
+  - **The floor is `startedAt`**: an album tapped at song 5 never played 1-4, so they aren't drawn. **Previous back
+    before it moves it down (`wentBack`)**: without that, Previous from 5 to 4 and playing on left 4 - heard - out of
+    History for good (and out of Shuffle's heard songs, as before). Shuffles and library shuffles start at 0. A plain list
+    after a resume (another app's queue, songs Navidrome dropped) has `startedAt` = its index: History is empty - we
+    don't know what played.
+  - **How far back: `HISTORY_BACK` = 50** entries before the song playing - resume.ts's `RESUME_BEFORE`, exactly what a
+    reload keeps, so History after reopening is row for row the same, keys included (resume.sim). No "N earlier" line.
+    Entries, so PLAYS: each time Repeat One played a song is one of the 50 (one row for the run), and a run cut at the
+    edge isn't a row - after a long Repeat One run History shows fewer rows (docs/player.md says "50 plays").
+- **A tap on a list row** moves the playing point to it; the list's songs above it stay behind it in album order;
+  Playing Next is carried to straight after it (and its copies), so it is still next; nothing goes into `left`. **A tap
+  on a Playing Next row** leaves the queue as it is (the same object) and moves the point; the songs added above it stay
+  behind it, so Previous plays them. **A tap on a History row plays that song again, now**: a new entry of kind
+  `'added'` (the same track object, so the same level) at the head of Playing Next (after the playing song's copies),
+  moved onto; nothing after it rewound or rewritten - Playing Next and the list carry on after it as they were, and the
+  song that was playing joins History. Why not rewind: rewinding a library shuffle 20 songs back would replay the 19
+  after it, and Previous already does the album's rewind. Why `'added'`: a source mark would make `passPlaying` report
+  the old round, so a Repeat change would drop the current one. Under Repeat All it plays once; Repeat One repeats it.
+  `jumpedTo` refuses a key History doesn't draw (before `startedAt`, past the 50): every row drawn is reached by its tap,
+  and nothing else is.
+- **Shuffle and Repeat**: History never changes on either (edits keep `tracks[0..index]`). Shuffle on counts songs a tap
+  passed as heard, since they're behind the song playing - the same outcome as `left` gave them before; Shuffle off
+  inside a shuffle can bring later album songs a tap passed round again, as it already does heard ones.
+- **Found on the way, a bug on main**: playing song 4 with a and b added, Previous to 3 - Up Next drew only "4" while
+  4, a, b, 5 and 6 still played (`layout` stopped the list at the first song added after it; a run of Repeat One copies
+  among the list did the same). Decision 1 would have made it the main path - tap 8 with Playing Next waiting, Previous,
+  and Up Next showed just "8". `layout` gains `listEnd`: the list runs on through songs added among its songs (drawn
+  where they play, in the list's group, under its heading), and the rows are counted by UNITS - `unitEnd`, `unitStart`,
+  `unitsIn` - in `groupOf`, `withoutKey` and `movedKey` (a row and its copies move and go together). Clear takes only
+  Playing Next (`[copiesEnd, addedEnd)`), not a song added further on. Checked against 190ebaa's lib: the same queue
+  draws `["4"]` there and `["4","a","b","5","6"]` now. *Kept, not built*: "Previous carries Playing Next with it" -
+  a second engine change, and it would break Previous's seek inside the stream (question 2 below).
+- **The engine had to change, `jumpTo`** (`usePlayer.ts`; spec'd and approved as part of this change). Album, 5 playing at
+  i, tap 8, 6 and 7 kept behind it: the tracks must read 5, 6, 7, 8, and the stream, the standby and a song's natural end
+  all play `index + 1`, so the move must go from 5 straight to 8. After Previous three times the queue is the identical
+  data back at i, where `onward` must answer 6 (Next from 5 plays 6) - yet at the tap it had to answer 8: the same input,
+  two answers, so `jumpTo` can't be "edit, then Next". The workarounds each break something: a one-shot marker goes
+  stale; "passed over" marks break 6's end playing 7; a ghost entry replays 5; pause/restoreQueue/toggle drops the stream
+  and breaks restoreQueue's one caller; handing back a moved index sends `replaceUpcoming` into a load with no gesture.
+  So `jumpedTo` returns `{ queue, index }` and `jumpTo` moves to that index itself, the three ways Next moves - a seek in
+  the stream when it holds the song, a handover, or a new stream from it, this being a tap. Consequences, pinned in
+  player.sim: a tap on a song the stream already placed is now a seek in the same MediaSource (it was a new stream); a
+  tap that needs no edit skips the replan, so like Next it can't be refused; one that edits (Playing Next carried, or a
+  History tap) is still refused during a seek on its way and then does nothing, as before. A jump is still never held;
+  the gapless held edits are untouched; everything happens in the tap with nothing awaited. `previous()` gains one line,
+  `wentBack` (the same tracks, so the in-stream seek still applies; player.sim's traces unchanged). **The engine files'
+  diff**: `usePlayer.ts` (`jumpTo`'s tail, that line, the import, the Player comment) and `player.sim.cjs` (one case
+  changed in meaning - decision 1 - the rest additions); `streamSource.ts` and `lib/{playQueue,gapless,scrub,streamWrap,
+  streamPlan,fmp4}.ts` have none.
+- **The UI** (`app/UpNext.tsx`, one component for the phone's sheet and the desktop's panel): History - `HISTORY`,
+  "History", Apple's word, in no vocabulary ban (the Library's "Recently played" is something else) - is a section
+  above the song playing's card, hidden in Edit (Edit moves only what is still to play); its rows Search's result rows,
+  labelled "{title}, play again" (Up Next's stay "play now"), each tap `replay(row)`: the row held under the finger,
+  focus kept on it (Done if it fell off History's far end), "Playing {title}" said in the live region, `player.jumpTo`
+  last in the click, nothing awaited (app-rules pins it) - the hold, focus and words put in place only once the tap is
+  taken (after review, below). The card carries `data-playing` and its title is a heading
+  (`role="heading"`, level 3): VoiceOver's headings run History, the song, Playing Next, the list - no hidden "Playing
+  now". To a keyboard History is ONE Tab stop, a roving tabindex (the row last focused while drawn, else the newest),
+  ArrowUp/Down, Home/End inside it. **Opening and holding its place**: no new state, refs only. `measure()` keeps what is
+  in view (each row by `data-key`, the card by `data-playing`, its offset from the scroller's top, a pixel of it in view)
+  on every scroll and after every change, with the entry playing then and whether Edit was on; `restore()`, in a layout
+  effect on `[open, editing, queue, repeat]`, acts only on a change ABOVE the card - the song playing changed (History
+  grew or shrank) or Edit went on or off (History hidden or back): it puts the first kept thing still drawn back where
+  it was - for a new queue (another album tapped, a queue put back: told by its first entry's mark, which every edit
+  keeps) or with none drawn, the card at the top. A change below the card (Shuffle, Repeat, Clear, a song added, Edit's
+  moves, drags and removals) leaves scrollTop alone, as before 2.1.3 (after review, below). So it opens at the card,
+  History above; a list or Playing Next tap puts the new card at the top (focus lands on what plays next, in view, with
+  no browser scroll); a History tap keeps the row under the finger; a song ending by itself keeps whatever was topmost
+  where it was - at the card, the new card stays at the top, which keeps a desktop panel left open from creeping a row a
+  song; Edit keeps the topmost thing left, else the card. The card and everything after it sit in `.app-upnext-now`,
+  at least the scroller's height (after review), so the card can always reach the top. app.css: `.app-upnext
+  .app-info-scroll { overflow-anchor: none }` (a keyword, which test_app_css allows: Chromium's own anchoring must not
+  fight this, and WebKit has none to rely on), `.app-upnext-history { margin-bottom: var(--app-shelf-gap) }` - History's
+  last row kept off the card's border by the gap the groups below it have (`.app-card` has a border and radius; rows
+  are hairline-separated); History is not an `.app-upnext-group`, so at the scroller's top it has no gap over the
+  scroller's own, as the card had none - and `.app-upnext-now { min-height: 100% }`. test_app_css holds all three.
+  Nothing in app-desktop.css. `Cover` is `loading="lazy"`, so 50 History covers above the fold don't load as Up Next
+  opens.
+- **After review** (two reviews of the first cut, every finding that held fixed in the same 2.1.3 commit):
+  - *A unit of two songs* (rules; the cause older, 2.1.3's units made it show): Repeat One on 2, Previous to 1 - 2's run
+    now after 1 - then Shuffle on: `withShuffle` took 2 into the shuffle but left its copies (`stays` kept every
+    non-source entry), which then joined 1's run - History said 1 while Previous played 2, 1 out of Previous's reach,
+    and under Repeat One 1's end ran into 2's copies. `withRepeat` did the same dropping a later round's song (reached
+    only by asking for the mode it has, which usePlayer's setRepeat never does). Both now drop a list song's copies
+    with it; the song playing's own and songs added keep theirs. upnext.sim checks after every step that every copy is
+    of the song its run began with and that History's rows name the songs Previous plays (by song, not only place -
+    places alone had missed it), with scenarios for both; the reviewer's probe (4,000 runs each way) finds none now. A
+    queue saved before 2.1.3 with such a run reads back as it was (the window's songs must match Navidrome's), so its
+    one row stays misnamed until it falls past the 50 - rare (Repeat One, Previous, then Shuffle or Repeat).
+  - *startedAt past the song playing, from an older app* (resume): the web's 2.1.2 or the iPhone's 0.2, an album started
+    at 5, Previous to 4: startedAt stayed 4 with 4 playing. Picked up here, 4 never showed in History. `fromSnapshot` now
+    lowers startedAt to the song playing's run (`Math.min(startedAt, run)`): everything from there was heard. The one
+    resume.sim check that pinned the old reading changed with it, the round-trip property expects the lowered value,
+    and a new case plays on after such a pick-up (History 4, 5 at 6). The iPhone's Resume port mirrors it.
+  - *A tap the engine doesn't take* (UI): `jump`/`replay` set the hold (and replay said "Playing {title}") before
+    `jumpTo`, which does nothing for a key gone or an edit the stream refuses while a seek is on its way - so a refused
+    History tap said it had started, and the stale hold sent the view to the card at the next song's end. Now the tap is
+    kept in a ref (`tapped`: the queue it was made on, the row, the hold, focus and words) and put in place by the
+    restore effect only if the queue drawn shows it TAKEN - another queue, playing that row's key, or for History a new
+    entry (key from the old `nextKey` on) of that song; a draw that doesn't is let go by a no-deps layout effect. No
+    engine change: `jumpTo` stays `void`. (Its words now come with the draw after the one showing the song.)
+  - *The same words twice* (UI): the live region's text didn't change, so VoiceOver said nothing the second time. Each
+    read-out is now a new `<span key={id}>` inside the region that is always there (iOS reads only a region already in
+    the page) - react-aria's live announcer's way: a new node is spoken whatever its words.
+  - *A reorder chased the topmost row* (UI): `restore()` followed the topmost row by key through every change, so
+    Shuffle (the chip, or a desktop's player bar with the panel open) threw the view to wherever that row went (715 ->
+    1364 px measured, the focused chip off-screen), Edit's Move up on the second row in view left the moved row
+    entirely above the view (focus on its off-screen button: `focus()` doesn't scroll an element already focused), a
+    drag did the same, and Remove on the topmost row slid the rows ABOVE down into its place (a second quick ✕ landing
+    on the row above, not the one Pinned's focus picked). The hold now acts only on changes above the card (UI bullet
+    above); every case is a sim case, each failing on the first cut.
+  - *A short tail* (UI + CSS): with only a few songs after the card, the scroll stopped short of putting it at the
+    top - it opened lower, and a desktop panel crept down a row a song as the album ended (0, 0, 11, 76, 141 px
+    measured) - while the notes and the guide said otherwise. `.app-upnext-now { min-height: 100% }` round the card and
+    what follows it (the scroller has no top padding, so 100% of its content box is exactly enough). Apple Music, I
+    assume, leaves blank space under a short queue the same way - not checked. The sims' scroller fake now stops where
+    content ends (it had no maximum, so no sim could see this), modelling the min-height when the tree has the class.
+  - *Smaller*: "50 songs" in the guide is 50 plays (above); the guide's "Not yet verified on a real iPhone" list gains
+    History's items; History's double gap at the scroller's top (it was also an `.app-upnext-group`, whose margin-top
+    added to the scroller's own) is gone. *Kept as it is*: VoiceOver meets History's heading and up to 50 rows before the
+    song playing when swiping on from Done - the same order a sighted listener scrolls, and the song's title is a
+    heading for the rotor; to be judged on the phone.
+- **Open for James** (not blocking): (1) History across albums, as Apple keeps it - either `playTracks` carrying the old
+  past (an engine change, and whether Previous at a new album's first song goes into the old one) or an app-level log
+  and a new saved field on both apps; (2) Previous with songs added waiting - kept: they play where they are, drawn in
+  the list; the alternative, Playing Next always next, is another engine change.
+- **Verified**: `npm run typecheck`; upnext.sim - the property loop now taps Up Next's and History's rows and goes back by
+  `wentBack` (2,750 Previous moves, 3,405 History taps, 222,286 drawn rows checked by their taps over 2,000 runs), and
+  after every step holds startedAt at or before the index, History equal to Previous's walk (by place and by song),
+  every copy of its run's song, every drawn row reached and
+  nothing else before the song playing, nothing hidden before the next round, an Up Next tap keeping every song and a
+  History tap adding exactly one `'added'` entry of that song and never rewriting History; the scenarios above (James's
+  walk, a song added, History's rows and tap, Shuffle off after a jump in a shuffle) and the component rendered with a
+  laid-out scroller fake (56 px rows from y 100): opened at the card (112 with two rows), the headings, "play again", the
+  roving tabindex and the arrow keys, a History tap holding the view (40 stays 40) and focus, the oldest row at the cap
+  (focus to Done), a list tap (224, focus to Playing Next's head), Edit (0) and Done (224), a song's end (+56), scrolled
+  to History's top (0 stays 0), a new queue (168 - its keys a new queue's, never held by the old one's), a Playing Next
+  tap. resume.sim: History the same over every round trip (8,976 steps with a History; Previous half `wentBack`, half
+  as older apps saved it), at the window's edge (49 rows both sides) and `HISTORY_BACK === RESUME_BEFORE`. player.sim:
+  the changed tap case (a seek in one MediaSource, Previous 2 then 1, Next 2), Playing Next carried and a History tap
+  (then Previous 3), a tap past what the stream holds (a new stream, no replan), Previous before where the list began.
+  app-rules: `replay` pinned. Every new or changed case run against 190ebaa fails there (upnext.sim 18, player.sim 8,
+  resume.sim 2, app-rules 1), and four mutations each fail a sim: Previous without `wentBack` (player.sim), `jumpTo` as a
+  load only (player.sim: a new stream), an await in History's tap (app-rules), History's tap not holding the row
+  (upnext.sim). After review: each fix's cases fail against the first cut and pass now - the two property checks
+  and three unit scenarios (4 checks failing on the first cut's lib, op 5 - withShuffle - caught first), resume.sim's
+  lowered startedAt (4 checks failing on its resume.ts), and the component's (16 checks failing on its UpNext.tsx, with
+  the scroller fake that stops where content ends); the reviewers' own repro sims run against the final code agree (their scroll cases now main's numbers,
+  the orphan check passing). All 68 sims, and the whole pytest suite (test_app_css's new rule included). The build
+  (`npm run build`, vite) is CI's: this Mac's Node is 20.12.2.
+- **NOT verified - a browser's and the phone's**: the final code rendered in no real page (the first cut was, by a
+  reviewer, in Chromium: History's place, the 14 px gap to the card, opening at the card, the History tap's hold, the
+  keyboard and the headings held there) - the scroll hold in WebKit and Chromium at `deadwax.test` on both frames (a
+  song ending while open, the sheet's opening transform, real row heights and subpixel layout), `.app-upnext-now`'s
+  min-height: 100% resolving against the flexed scroller in Safari, the blank under a short queue as it looks, History's
+  top gap as it looks now, whether VoiceOver speaks the same words twice from a new node, the roving tabindex with a
+  real keyboard;
+  VoiceOver on the phone with 50 rows; the in-stream seek on a tap on ManagedMediaSource (iPhone Safari); real playback
+  after a History tap; what Apple Music itself does to its queue after a History tap. The iPhone app 0.2 still drops
+  songs on a tap until its port lands; the snapshot is unchanged, so nothing is lost either way.

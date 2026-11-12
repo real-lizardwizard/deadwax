@@ -11,13 +11,21 @@
  *  - THE INVARIANT, by property: 2,000 seeded runs of every edit, top-up and forward move, each checked after
  *    every step - marks in step with tracks, keys unique, an edit never touching the song playing or anything
  *    before it, and after the song playing copies, then added songs, then the list's songs time round by
- *    time round.
+ *    time round. (2.1.3) The runs also tap rows of Up Next and of History and go back by Previous (wentBack), and
+ *    after every step: startedAt at or before the song playing; History exactly the units Previous walks back
+ *    through, down to its floor, each row naming the song Previous plays there (review); every copy of the song its
+ *    run began with (review: Shuffle and Repeat left a list song's copies behind it); every row drawn - Up
+ *    Next's and History's - reached by its tap and nothing else before the song playing; Up Next drawing every
+ *    song before the next time round (after Previous, songs added among the list's included); an Up Next tap
+ *    landing on its own key and keeping every song, a History tap adding exactly one song added - that song - and
+ *    never rewriting History.
  *  - Play Next and Play Last's places (after Repeat One's copies; Play Last after the songs added, still ahead
- *    of the list); a row out, moved within its group and refused across; Clear; a jump into the list (Playing
- *    Next kept, after it) and into Playing Next (only the songs added above it dropped).
+ *    of the list); a row out, moved within its group and refused across; Clear; (2.1.3) a jump into the list
+ *    (the songs passed kept behind it in order, Playing Next carried after it, nothing noted as taken out) and
+ *    into Playing Next (the same queue, the songs added above it behind it).
  *  - Shuffle on: the song playing and everything before it untouched, the songs added kept in order, the
  *    list's songs not yet heard this round shuffled (an album started at song 5 and shuffled at 7: 1-4 and
- *    8-12), a song removed or jumped over not among them, entries queued keeping their keys; at a round's last
+ *    8-12), a song removed or jumped over (behind the song jumped to) not among them, entries queued keeping their keys; at a round's last
  *    song the next round shuffled; off: the list from the song playing's place, in order, less what was taken
  *    out.
  *  - Repeat: All appends whole times round until REPEAT_AHEAD follow (a fresh order with Shuffle on, never
@@ -31,6 +39,18 @@
  *    the cap and "and N more"; what comes after, for each mode; the words.
  *  - (Part B) a library's shuffle: more appended at the end of its round by token, a fresh order as the next
  *    round, Shuffle and Repeat All leaving it to its feed, the count of what is still to come.
+ *  - (2.1.3) James's walk (playing 5, tap 8: Previous plays 7, 6, 5, then Next 6), with a song added (still next
+ *    after 8; after Previous drawn in the list where it plays, Clear not taking it); History's rows (from where
+ *    listening began - Previous before it moving that down - a Repeat One run one row, Repeat All's earlier round
+ *    as it played, HISTORY_BACK) and its tap (the song again as a song added after the copies, History not
+ *    rewritten, Repeat One and Repeat All with it, a row History doesn't draw refused); Up Next rendered with
+ *    History: opened at the song playing, History's heading and "play again" rows, the song's title a heading,
+ *    one Tab stop and the arrow keys, a History tap keeping the row under the finger and saying what plays, a
+ *    list's or Playing Next's tap bringing the new card to the top with focus on what plays next, a song's end
+ *    never creeping the view, Edit hiding History, a new queue opening at its card. (review) The scroller fake stops
+ *    where the content ends, so: an album's last songs still opening at the card (.app-upnext-now) and never
+ *    creeping; Shuffle, Edit's Move, drag and Remove leaving the scroll where it is; a tap the engine doesn't take
+ *    moving, focusing and saying nothing; the same words said twice as two nodes of the live region.
  *  - (review) Up Next's focus as Edit starts and after a row's tap; the grip's drag; the player bar's Shuffle,
  *    Repeat and Up Next buttons, rendered (Repeat cycling off -> all -> one -> off, Shuffle pressed and toggling,
  *    aria-disabled during a library's shuffle; Up Next opening the panel, pressed while it shows).
@@ -172,8 +192,22 @@ console.log('\nthe invariant: 2,000 random runs of every edit, top-up and forwar
     }
     return null
   }
+  //? (2.1.3) after Previous: the order behind the place as it played - copies, then a run of songs added, then units
+  //? whose list songs' rounds never go down, songs added among them
+  const loose = (queue) => {
+    const marks = queue.upNext.marks.slice(queue.index + 1)
+    let i = 0, pass = -Infinity
+    while (marks[i]?.from === 'one') i++
+    for (; i < marks.length; i++) {
+      const mark = marks[i]
+      if (mark.from === 'source') { if (mark.pass < pass) return `pass ${mark.pass} after ${pass}`; pass = mark.pass }
+    }
+    return null
+  }
+  let walkedBack = 0, historyTaps = 0, drawnChecked = 0
   for (let run = 0; run < 2000; run++) {
     const random = seeded(run + 1)
+    let back = false
     const pick = (n) => Math.floor(random() * n)
     const size = 1 + pick(6)
     let repeat = U.REPEATS[pick(3)]
@@ -181,7 +215,7 @@ console.log('\nthe invariant: 2,000 random runs of every edit, top-up and forwar
     let extra = 0
     for (let step = 0; step < 30; step++) {
       const before = queue
-      const op = pick(12)
+      const op = pick(14)
       let edit = true
       const rowKeys = () => queue.upNext.marks.slice(queue.index + 1).map((m) => m.key)
       const someKey = () => { const keys = rowKeys(); return keys.length && random() < 0.85 ? keys[pick(keys.length)] : pick(queue.upNext.nextKey + 2) }
@@ -195,17 +229,46 @@ console.log('\nthe invariant: 2,000 random runs of every edit, top-up and forwar
       else if (op === 7) queue = U.toppedUp(queue, repeat, random)
       else {
         edit = false
-        if (op === 8) {
-          const jumped = U.jumpedTo(queue, someKey())
+        if (op === 8 || op === 12) {
+          //? (2.1.3) 12: a row of History's tap - a key History draws; 8: a row of Up Next's - its keys mostly, any key of
+          //? the queue's (one before the song playing History doesn't draw too) or none at times
+          const drawnHistory = U.historyRows(queue)
+          const key = op === 12 && drawnHistory.length ? drawnHistory[pick(drawnHistory.length)].key
+            : random() < 0.5 ? someKey() : queue.upNext.marks[pick(queue.upNext.marks.length)].key
+          const place = queue.upNext.marks.findIndex((m) => m.key === key)
+          const fromHistory = drawnHistory.some((row) => row.key === key)
+          const jumped = U.jumpedTo(queue, key)
           if (jumped) {
-            const same = jumped.tracks.slice(0, queue.index + 1).every((t, i) => t === queue.tracks[i]) && jumped.index === queue.index
-            if (!same) note(run, step, 'a jump touched the song playing or before it')
-            const next = U.onward(jumped)
-            if (next === null) note(run, step, 'a jump with nothing to move onto')
-            else queue = at(jumped, next)
-          }
+            const kept = jumped.queue.index === queue.index &&
+              jumped.queue.tracks.slice(0, queue.index + 1).every((t, i) => t === queue.tracks[i]) &&
+              jumped.queue.upNext.marks.slice(0, queue.index + 1).every((m, i) => m === queue.upNext.marks[i])
+            if (!kept) note(run, step, 'a jump\'s edit touched the song playing or before it')
+            if (!(jumped.index > queue.index && jumped.index < jumped.queue.tracks.length)) note(run, step, `a jump to ${jumped.index} from ${queue.index}`)
+            if (fromHistory) {
+              historyTaps++
+              //? the song again: exactly one entry more, a song added, that very song - and History not rewritten (only
+              //? its oldest row may fall off the cap)
+              const again = jumped.queue.upNext.marks[jumped.index]
+              if (jumped.queue.tracks[jumped.index] !== queue.tracks[place] || again.from !== 'added' || jumped.queue.tracks.length !== queue.tracks.length + 1) note(run, step, 'History\'s tap: not that song again, as one song added')
+              const was = drawnHistory.map((row) => row.key)
+              const now = U.historyRows(at(jumped.queue, jumped.index)).map((row) => row.key)
+              const gone = was.filter((k) => !now.includes(k))
+              if (gone.some((k, i) => k !== was[i]) || now.slice(0, was.length - gone.length).join() !== was.slice(gone.length).join()) note(run, step, 'History\'s tap rewrote History')
+            } else {
+              if (place <= queue.index) note(run, step, `entry ${place}, not drawn in History, jumped to`)
+              //? an Up Next tap lands on its own key and drops no song
+              if (jumped.queue.upNext.marks[jumped.index].key !== key) note(run, step, 'an Up Next tap landed elsewhere')
+              const songs = (q) => q.tracks.map((t) => t.id).sort().join()
+              if (songs(jumped.queue) !== songs(queue)) note(run, step, 'an Up Next tap dropped or added a song')
+            }
+            queue = at(jumped.queue, jumped.index)
+          } else if (fromHistory) note(run, step, 'a row History draws refused')
         } else if (op === 9) { const next = U.onward(queue); if (next !== null) queue = at(queue, next) }
-        else queue = ended(queue)
+        else if (op === 13) {
+          //? Previous, early: as the engine moves (wentBack - startedAt follows it down before where listening began)
+          const b = U.backward(queue, 0)
+          if (b.kind === 'go') { queue = U.wentBack(queue, b.index); back = true; walkedBack++ }
+        } else queue = ended(queue)
         queue = U.toppedUp(queue, repeat, random)
       }
       const { marks } = queue.upNext
@@ -218,8 +281,64 @@ console.log('\nthe invariant: 2,000 random runs of every edit, top-up and forwar
           if (queue.tracks[i] !== before.tracks[i] || marks[i] !== before.upNext.marks[i]) { note(run, step, `op ${op} changed entry ${i} of the played`); break }
         }
       }
-      const wrong = shape(queue)
+      const wrong = back ? loose(queue) : shape(queue)
       if (wrong) note(run, step, `op ${op}: ${wrong}`)
+      //? (2.1.3) History is where listening began or later, and exactly what Previous walks back through: each landing's
+      //? unit, oldest first, down to the floor (startedAt, HISTORY_BACK entries back)
+      if (queue.upNext.startedAt > queue.index) note(run, step, `startedAt ${queue.upNext.startedAt} past the song playing (${queue.index})`)
+      {
+        const floor = Math.max(queue.upNext.startedAt, queue.index - U.HISTORY_BACK, 0)
+        const walk = [], heard = []
+        for (let w = queue; ;) {
+          const b = U.backward(w, 0)
+          if (b.kind !== 'go') break
+          let unit = b.index
+          while (unit > 0 && marks[unit].from === 'one') unit--
+          if (marks[unit].from === 'one' || unit < floor) break
+          walk.unshift(unit)
+          heard.unshift(queue.tracks[b.index].id)
+          w = at(w, b.index)
+        }
+        const rows = U.historyRows(queue)
+        const drawn = rows.map((row) => marks.findIndex((m) => m.key === row.key))
+        if (drawn.join() !== walk.join()) note(run, step, `History at ${drawn} where Previous walks ${walk}`)
+        //? (2.1.3 review) ...and by SONG: each row names the song Previous plays there - the last row the song Previous
+        //? plays now. Places alone missed a run of copies left behind its song and joined to the row before it
+        if (rows.map((row) => row.track.id).join() !== heard.join()) note(run, step, `History names ${rows.map((row) => row.track.id)} where Previous plays ${heard}`)
+      }
+      //? (2.1.3 review) every copy is of the song its run began with: a unit is one song, never two
+      marks.forEach((m, i) => {
+        if (m.from !== 'one') return
+        let start = i
+        while (start > 0 && marks[start].from === 'one') start--
+        if (queue.tracks[start].id !== queue.tracks[i].id) note(run, step, `op ${op}: entry ${i}, a copy of ${queue.tracks[i].id}, in ${queue.tracks[start].id}'s run`)
+      })
+      //? every row drawn is one a tap reaches - Up Next's moves onto it, History's plays its song again; History's keys all
+      //? before the song playing, Up Next's after it, none twice
+      const view = U.upNextView(queue, repeat)
+      const ahead = [...view.added, ...(view.list?.rows ?? [])]
+      const placeOf = (key) => marks.findIndex((m) => m.key === key)
+      if (view.history.some((row) => placeOf(row.key) >= queue.index) || ahead.some((row) => placeOf(row.key) <= queue.index)) note(run, step, 'a row on the wrong side of the song playing')
+      if (new Set([...view.history, ...ahead].map((row) => row.key)).size !== view.history.length + ahead.length) note(run, step, 'a row drawn twice')
+      //? ...and Up Next draws every song that plays before the next time round (up to its cap): none hidden behind a
+      //? song added that Previous walked back across
+      {
+        const shown = U.shownPass(queue)
+        let p = queue.index + 1, want = 0
+        while (marks[p]?.from === 'one') p++
+        for (; p < marks.length; p++) {
+          if (marks[p].from === 'one') continue
+          if (marks[p].from === 'source' && marks[p].pass !== shown) break
+          want++
+        }
+        const drawn = view.added.length + (view.list ? view.list.rows.length + view.list.more - (queue.upNext.paged ? Math.max(0, queue.upNext.paged.total - queue.upNext.paged.fetched) : 0) : 0)
+        if (drawn !== want) note(run, step, `Up Next draws ${drawn} of the ${want} songs before the next round`)
+      }
+      for (const row of [...ahead, ...view.history]) {
+        const jumped = U.jumpedTo(queue, row.key)
+        drawnChecked++
+        if (!jumped || jumped.queue.tracks[jumped.index] !== row.track) { note(run, step, `row ${row.key} not reached by its tap`); break }
+      }
       marks.forEach((m, i) => {
         if (m.from === 'source' && m.at < 0) note(run, step, `entry ${i} of the list has no place in it`)
         //? a copy of a song added has no place in the list (-1); any other knows its own
@@ -228,6 +347,7 @@ console.log('\nthe invariant: 2,000 random runs of every edit, top-up and forwar
     }
   }
   check('every step of every run keeps it', problems, [])
+  check(`...the runs walked back (${walkedBack} times), tapped History (${historyTaps}) and checked every row drawn (${drawnChecked})`, [walkedBack > 500 || walkedBack, historyTaps > 500 || historyTaps, drawnChecked > 10000 || drawnChecked], [true, true, true])
 }
 
 /* ===== Play Next and Play Last ===== */
@@ -269,16 +389,16 @@ console.log('\na row\'s tap: jumped to')
 {
   const start = U.withLast(U.startUpNext(album(5), 0), [track('a'), track('b')])
   const toList = U.jumpedTo(start, keyOf(start, '4'))
-  const moved = at(toList, U.onward(toList))
-  check('into the list: it plays next, Playing Next kept after it, the songs jumped over gone', [playing(moved), after(moved)], ['4', ['a', 'b', '5']])
-  check('...and noted as taken out of the round', toList.upNext.left, [{ pass: 0, at: 1 }, { pass: 0, at: 2 }])
+  const moved = at(toList.queue, toList.index)
+  check('(2.1.3) into the list: it plays, the songs passed kept behind it in order, Playing Next after it', [playing(moved), ids(moved), moved.index, after(moved)], ['4', ['1', '2', '3', '4', 'a', 'b', '5'], 3, ['a', 'b', '5']])
+  check('...nothing noted as taken out of the round: the songs passed are behind it, not gone', toList.queue.upNext.left, [])
   const toAdded = U.jumpedTo(start, keyOf(start, 'b'))
-  const there = at(toAdded, U.onward(toAdded))
-  check('into Playing Next: only the songs added above it dropped', [playing(there), after(there)], ['b', ['2', '3', '4', '5']])
+  const there = at(toAdded.queue, toAdded.index)
+  check('(2.1.3) into Playing Next: the songs added above it kept behind it - the same queue, the place moved', [toAdded.queue === start, playing(there), ids(there).slice(0, there.index), after(there)], [true, 'b', ['1', 'a'], ['2', '3', '4', '5']])
   check('the song playing, a copy, a key it doesn\'t have: null', [U.jumpedTo(start, start.upNext.marks[0].key), U.jumpedTo(U.toppedUp(start, 'one'), U.toppedUp(start, 'one').upNext.marks[1].key), U.jumpedTo(start, 77)], [null, null, null])
   const one = U.toppedUp(U.startUpNext(album(3), 0), 'one')
   const jumped = U.jumpedTo(one, keyOf(one, '3'))
-  check('with Repeat One on: the row after the copies, and Next lands on it', playing(at(jumped, U.onward(jumped))), '3')
+  check('with Repeat One on: past the copies, onto the row', [playing(at(jumped.queue, jumped.index)), ids(jumped.queue)], ['3', ['1', '1', '1', '2', '3']])
 }
 
 /* ===== Shuffle on and off ===== */
@@ -300,8 +420,9 @@ console.log('\nShuffle on: the songs not yet heard this round')
   const removed = U.withShuffle(U.withoutKey(at(start, 6), keyOf(start, '9')), true, seeded(3))
   check('a song taken out of the round isn\'t brought back', after(removed).includes('9'), false)
   const jumped = U.jumpedTo(at(start, 6), keyOf(start, '10'))
-  const overJumped = U.withShuffle(at(jumped, U.onward(jumped)), true, seeded(3))
-  check('...nor songs jumped over (8 and 9)', [playing(overJumped), after(overJumped).includes('8'), after(overJumped).includes('9')], ['10', false, false])
+  const overJumped = U.withShuffle(at(jumped.queue, jumped.index), true, seeded(3))
+  check('...nor songs jumped over (8 and 9) - (2.1.3) behind the song jumped to, heard this round as far as a shuffle goes',
+    [playing(overJumped), after(overJumped).includes('8'), after(overJumped).includes('9'), ids(overJumped).slice(7, 9), after(overJumped).slice().sort((x, y) => x - y)], ['10', false, false, ['8', '9'], ['1', '2', '3', '4', '11', '12']])
   const all = U.toppedUp(at(U.startUpNext(album(3), 0), 0), 'all')
   const lastSong = U.toppedUp(at(all, 2), 'all')
   const shuffledEnd = U.toppedUp(U.withShuffle(lastSong, true, seeded(8)), 'all', seeded(8))
@@ -419,7 +540,7 @@ console.log('\nwhat Up Next draws')
   check('...a smaller limit', U.upNextView(long, 'off', 5).list.more, 124)
   const mixed = U.startUpNext([track('1'), track('2', { albumId: 'dum', album: 'Dummy' })], 0)
   check('several albums: "Still to play", and "the list" again', [U.upNextView(mixed, 'off').list.title, U.upNextView(U.toppedUp(at(mixed, 1), 'all'), 'all').then], ['Still to play', 'Then the list again from the top.'])
-  check('nothing playing: nothing drawn', U.upNextView(Q.EMPTY_QUEUE, 'all'), { playing: null, added: [], list: null, then: null, repeatOne: false })
+  check('nothing playing: nothing drawn', U.upNextView(Q.EMPTY_QUEUE, 'all'), { history: [], playing: null, added: [], list: null, then: null, repeatOne: false })
   check('listTitle', [U.listTitle(album(2), false), U.listTitle(album(2), true), U.listTitle([track('1'), track('2', { albumId: 'x' })], true), U.listTitle([track('1', { albumId: null })], false)],
     ['From Mezzanine', 'From Mezzanine, again', 'Still to play, again', 'Still to play'])
   check('queuedWords', [U.queuedWords('next', 'Roads'), U.queuedWords('last', 'Dummy')], ['Playing next: Roads', 'Added to Up Next: Dummy'])
@@ -430,6 +551,141 @@ console.log('\nwhat Up Next draws')
     [U.shuffleLabel(undefined), U.shuffleLabel('store'), U.shuffleLabel('yours')], ['Shuffle', 'Shuffle - shuffling all music', 'Shuffle - shuffling your whole library'])
   check('the Up Next button\'s name', [U.upNextLabel(false, 'off'), U.upNextLabel(true, 'off'), U.upNextLabel(false, 'all'), U.upNextLabel(false, 'one'), U.upNextLabel(true, 'all')],
     ['Up Next', 'Up Next - Shuffle on', 'Up Next - Repeat all', 'Up Next - Repeat one', 'Up Next - Shuffle and Repeat all'])
+}
+
+
+/* ===== (2.1.3) History, and a tap that keeps what it passes ===== */
+
+//? Previous early, as the engine moves: backward's place, startedAt following it down before where listening began
+const previous = (queue) => { const b = U.backward(queue, 1); return b.kind === 'go' ? U.wentBack(queue, b.index) : queue }
+const history = (queue) => U.historyRows(queue).map((row) => row.track.id)
+
+console.log('\n(2.1.3) James\'s walk: tap 8 while 5 plays - Previous plays 7, then 6, as on the album')
+{
+  let q = at(U.startUpNext(album(12), 0), 4)
+  const jump = U.jumpedTo(q, keyOf(q, '8'))
+  check('nothing to edit - the same queue, and the place to move to: 8\'s', [jump.queue === q, jump.index], [true, 7])
+  q = at(jump.queue, jump.index)
+  check('8 plays; nothing moved, nothing dropped, nothing noted as taken out', [playing(q), ids(q).join(), q.upNext.left], ['8', '1,2,3,4,5,6,7,8,9,10,11,12', []])
+  check('History: 1 to 7 (6 and 7 behind 8, where Previous finds them); Up Next 9 to 12', [U.upNextView(q, 'off').history.map((r) => r.track.id), U.upNextView(q, 'off').list.rows.map((r) => r.track.id)], [['1', '2', '3', '4', '5', '6', '7'], ['9', '10', '11', '12']])
+  const walk = []
+  for (let i = 0; i < 3; i++) { q = previous(q); walk.push(playing(q)) }
+  check('Previous, early, three times: 7, 6, 5', walk, ['7', '6', '5'])
+  q = at(q, U.onward(q))
+  check('...then Next: 6, as on the album (and its end: 7)', [playing(q), playing(ended(q))], ['6', '7'])
+}
+{
+  const start = U.withNext(at(U.startUpNext(album(12), 0), 4), [track('a', { album: 'Dummy', albumId: 'dum' })])
+  const jump = U.jumpedTo(start, keyOf(start, '8'))
+  let q = at(jump.queue, jump.index)
+  check('with a song added: it goes after 8, still next', [jump.index, ids(q).slice(4, 10), U.upNextView(q, 'off').added.map((r) => r.track.id)], [7, ['5', '6', '7', '8', 'a', '9'], ['a']])
+  q = previous(q)
+  const v = U.upNextView(q, 'off')
+  check('...Previous to 7: Up Next draws 8, the song added where it plays, then the rest - no Playing Next above them, no Clear to take what it doesn\'t head',
+    [playing(q), v.added.length, v.list.title, v.list.rows.map((r) => r.track.id), U.withoutAdded(q) === q], ['7', 0, 'From Mezzanine', ['8', 'a', '9', '10', '11', '12'], true])
+  const aKey = keyOf(q, 'a')
+  const tapA = U.jumpedTo(q, aKey)
+  check('...that row moves, comes out and is tapped like the list\'s', [after(U.movedKey(q, aKey, 0)).slice(0, 3), after(U.withoutKey(q, aKey)).slice(0, 2), tapA.queue === q, playing(at(tapA.queue, tapA.index))], [['a', '8', '9'], ['8', '9'], true, 'a'])
+}
+
+console.log('\n(2.1.3) History: what is behind the song playing')
+{
+  const fromFive = U.startUpNext(album(12), 4)
+  check('an album started at song 5: nothing in History - 1 to 4 were never heard (Previous still plays 4)', [U.upNextView(fromFive, 'off').history, U.backward(fromFive, 1)], [[], { kind: 'go', index: 3 }])
+  check('...at song 7: 5 and 6', U.upNextView(at(fromFive, 6), 'off').history.map((r) => r.track.id), ['5', '6'])
+  let back = previous(fromFive)
+  check('...Previous from 5 (wentBack): 4, where listening now began - History still empty, the same songs',
+    [playing(back), back.upNext.startedAt, history(back), back.tracks === fromFive.tracks], ['4', 3, [], true])
+  check('...once 4 has played: History 4', history(ended(back)), ['4'])
+  const later = at(fromFive, 6)
+  check('wentBack at or after where listening began: only the place moves, the same account', [U.wentBack(later, 5).upNext === later.upNext, U.wentBack(later, 5).index], [true, 5])
+  const plainQueue = { tracks: album(3), index: 2 }
+  const plainBack = U.wentBack(plainQueue, 1)
+  check('...a plain queue: the place, nothing else', [plainBack.index, plainBack.tracks === plainQueue.tracks, 'upNext' in plainBack], [1, true, false])
+  const shuffled = U.startUpNext(album(6), 3, true, seeded(5))
+  check('Shuffle from a song: History is what played of the shuffle', history(at(shuffled, 3)), ids(shuffled).slice(0, 3))
+  const library = U.startUpNext(album(3), 0, false, Math.random, { token: 't', total: 9, fetched: 3, scope: 'yours' })
+  check('...a library\'s shuffle: from its first song', history(at(library, 2)), ['1', '2'])
+  //? Repeat One on song 2 for three plays, then off, then on to 4
+  let one = U.toppedUp(at(U.startUpNext(album(5), 0), 1), 'one')
+  one = ended(one); one = U.toppedUp(one, 'one'); one = ended(one)
+  one = U.toppedUp(U.withRepeat(one, 'off'), 'off')
+  one = at(one, U.onward(one)); one = at(one, U.onward(one))
+  const oneView = U.upNextView(one, 'off')
+  check('Repeat One\'s copies: one row for the song, keyed by its first entry', [ids(one).slice(0, one.index + 1), oneView.history.map((r) => r.track.id), oneView.history[1].key === one.upNext.marks[1].key], [['1', '2', '2', '2', '3', '4'], ['1', '2', '3'], true])
+  check('...playing a copy: History stops before the song\'s run (Previous passes it)', history(at(one, 2)), ['1'])
+  let all = U.toppedUp(U.startUpNext(album(3), 0), 'all')
+  for (let i = 0; i < 4; i++) { all = ended(all); all = U.toppedUp(all, 'all') }
+  check('Repeat All: the earlier time round in History, as it played', [playing(all), U.upNextView(all, 'all').history.map((r) => r.track.id)], ['2', ['1', '2', '3', '1']])
+  const long = at(U.startUpNext(album(80), 0), 70)
+  const lv = U.upNextView(long, 'off')
+  check(`as far back as a reload keeps: HISTORY_BACK (${U.HISTORY_BACK}) entries`, [U.HISTORY_BACK, lv.history.length, lv.history[0].track.id, lv.history.slice(-1)[0].track.id], [50, 50, '21', '70'])
+  check('nothing playing: no History', U.historyRows(Q.EMPTY_QUEUE), [])
+}
+{
+  //? (2.1.3 review) Repeat One on 2, Previous to 1 - 2 and its copies now after 1 - then Shuffle on: 2 goes into the
+  //? shuffle WITH its copies. Left behind, they joined 1's run: History said 1 while Previous played 2, and 1 was
+  //? out of Previous's reach
+  let q = U.toppedUp(at(U.startUpNext(album(5), 0), 1), 'one')
+  q = U.toppedUp(previous(q), 'one')
+  check('Repeat One on 2, Previous: 1 and its copies, then 2\'s run, after it', ids(q), ['1', '1', '1', '2', '2', '2', '3', '4', '5'])
+  q = U.withShuffle(q, true, seeded(7))
+  check('...Shuffle on: 2\'s copies went with it, 1\'s stayed', [ids(q).slice(0, 3), ids(q).filter((id) => id === '2').length, q.upNext.marks.filter((m) => m.from === 'one').length], [['1', '1', '1'], 1, 2])
+  q = U.toppedUp(at(q, U.onward(q)), 'one')
+  const b = U.backward(q, 0)
+  check('...Next, then Previous: History\'s row and the song Previous plays the same - 1', [history(q), q.tracks[b.index].id], [['1'], '1'])
+  //? Repeat All's next round started, Repeat One on it, Previous back into the first round: Repeat One again (from All)
+  //? drops the later round's song - with its copies
+  let r = U.toppedUp(at(U.startUpNext(album(2), 0), 1), 'all')
+  r = U.toppedUp(ended(r), 'all')
+  r = U.toppedUp(U.withRepeat(r, 'one'), 'one')
+  r = U.toppedUp(previous(r), 'one')
+  check('Repeat All into round two, Repeat One there, Previous into round one: the second round\'s 1 and its copies after 2', [playing(r), froms(r)], ['2', ['o', 'o', 's1', 'o', 'o', 's1']])
+  //? (the player never asks for the mode it has - usePlayer's setRepeat - but the rule holds for any queue)
+  r = U.withRepeat(r, 'one')
+  check('...Repeat One asked of it: the later round goes, its copies with it - only the song playing\'s own left', [ids(r).slice(r.index), froms(r)], [['2', '2', '2'], ['o', 'o']])
+}
+
+console.log('\n(2.1.3) History\'s tap: the song again, then Up Next as it was')
+{
+  let q = U.withNext(at(U.startUpNext(album(9), 0), 6), [track('a')])
+  const k3 = q.upNext.marks[2].key
+  const jump = U.jumpedTo(q, k3)
+  check('a new entry of song 3, a song added - the same song object - straight after the song playing, moved to',
+    [jump.index, ids(jump.queue).slice(6, 10), jump.queue.upNext.marks[jump.index].from, jump.queue.tracks[jump.index] === q.tracks[2], jump.queue.index], [7, ['7', '3', 'a', '8'], 'added', true, 6])
+  q = at(jump.queue, jump.index)
+  const v = U.upNextView(q, 'off')
+  check('...History not rewritten - 1 to 7, the row tapped still there; Up Next as it was: Playing Next, then 8',
+    [v.history.map((r) => r.track.id), v.history[2].key === k3, v.added.map((r) => r.track.id), v.list.rows[0].track.id], [['1', '2', '3', '4', '5', '6', '7'], true, ['a'], '8'])
+  check('...Previous early: back to the song that was playing; Next: Playing Next', [playing(previous(q)), playing(at(q, U.onward(q)))], ['7', 'a'])
+  q = at(q, U.onward(q))
+  check('...once it has played, History ends as it played: 7, then 3', history(q).slice(-2), ['7', '3'])
+  const one = U.toppedUp(at(U.startUpNext(album(4), 0), 2), 'one')
+  const again = U.jumpedTo(one, one.upNext.marks[0].key)
+  check('with Repeat One on: after the song playing\'s copies - they stay behind', [again.index, ids(again.queue)], [5, ['1', '2', '3', '3', '3', '1', '4']])
+  check('...and Repeat One repeats the song played again', ids(U.toppedUp(at(again.queue, again.index), 'one')), ['1', '2', '3', '3', '3', '1', '1', '1', '4'])
+  check('the song playing, its copies, a key gone: null', [U.jumpedTo(one, one.upNext.marks[2].key), U.jumpedTo(one, one.upNext.marks[3].key), U.jumpedTo(one, 99)], [null, null, null])
+  const fromFive = at(U.startUpNext(album(12), 4), 6)
+  check('an entry before where listening began (History doesn\'t draw it): null', U.jumpedTo(fromFive, fromFive.upNext.marks[1].key), null)
+  const long = at(U.startUpNext(album(80), 0), 70)
+  const oldest = U.jumpedTo(long, long.upNext.marks[20].key)
+  check('past HISTORY_BACK: null; at it, the song again', [U.jumpedTo(long, long.upNext.marks[19].key), playing(at(oldest.queue, oldest.index))], [null, '21'])
+  let rounds = U.toppedUp(at(U.startUpNext(album(3), 0), 2), 'all')
+  rounds = U.toppedUp(ended(rounds), 'all')
+  const replay = U.jumpedTo(rounds, rounds.upNext.marks[0].key)
+  const replayed = at(replay.queue, replay.index)
+  check('Repeat All: the song played again is a song added (it plays once) - and Repeat off keeps the round playing',
+    [replayed.upNext.marks[replayed.index].from, after(U.withRepeat(replayed, 'off'))], ['added', ['2', '3']])
+}
+
+console.log('\n(2.1.3) Shuffle off after a jump in a shuffle: the album from that song\'s place')
+{
+  const shuffled = U.startUpNext(album(6), 0, true, seeded(2))
+  const order = ids(shuffled)
+  const jump = U.jumpedTo(shuffled, shuffled.upNext.marks[3].key)
+  const off = U.withShuffle(at(jump.queue, jump.index), false)
+  check('the songs the tap passed behind it, as the shuffle played them; the album on from the song jumped to\'s place', [jump.queue === shuffled, ids(off).slice(0, 4), playing(off), after(off)],
+    [true, order.slice(0, 4), order[3], album(6).map((t) => t.id).filter((id) => Number(id) > Number(order[3]))])
 }
 
 /* ===== Part B: a library's shuffle, a page at a time ===== */
@@ -467,7 +723,7 @@ console.log('\n(Part B) a library\'s shuffle, fed a page at a time')
 /* ===== the components: Up Next and the song menu ===== */
 
 const hooks = require(path.join(OUT, 'node_modules/preact/hooks.js'))
-const { UpNext, REPEATING_ONE, SHUFFLING_LIBRARY } = require(path.join(OUT, 'app/UpNext.js'))
+const { UpNext, REPEATING_ONE, SHUFFLING_LIBRARY, HISTORY } = require(path.join(OUT, 'app/UpNext.js'))
 const { QueueMenu } = require(path.join(OUT, 'app/QueueMenu.js'))
 
 function find(test, within) {
@@ -507,31 +763,56 @@ function upNextPlayer(queue, repeat = 'off') {
 function mountUpNext(player, props = {}) {
   const render = hooks.root(UpNext)
   let tree = null
+  let focused = []
   const all = () => ({ open: true, opener: { current: null }, onClose: () => W.calls.push(['close']), player: { ...player }, ...props })
   //? drawn and its effects run, as Preact does after each render - but a draw that asks focus somewhere is committed by the
   //? check, once the fakes its effect reaches are in place (focusables)
   const draw = (commit = true) => { tree = render(all()); if (commit) render.commit(); return tree }
+  //? (2.1.3) the scroller as a browser lays it out: 400 px tall from y 100; every row ([data-key]) and the song playing's
+  //? card ([data-playing]) 56 px tall, one under the other in the tree's order, less what is scrolled - never past the
+  //? top, nor (review) past where the content ends: History's rows, then the card and what follows it, which in
+  //? .app-upnext-now are at least the scroller's height (app.css min-height: 100% - test_app_css holds the rule)
+  const PITCH = 56
+  let scrolled = 0
+  const laidOut = () => find((node) => (node.type === 'li' && node.props?.['data-key'] !== undefined) || node.props?.['data-playing'] !== undefined, tree)
+  const furthest = () => {
+    const nodes = laidOut()
+    const card = nodes.findIndex((node) => node.props?.['data-playing'] !== undefined)
+    if (card < 0) return Math.max(0, nodes.length * PITCH - 400)
+    const tail = (nodes.length - card) * PITCH
+    return Math.max(0, card * PITCH + (find(byClass('app-upnext-now'), tree).length ? Math.max(tail, 400) : tail) - 400)
+  }
+  const element = (node, order) => ({
+    dataset: node.props['data-key'] !== undefined ? { key: String(node.props['data-key']) } : {},
+    getBoundingClientRect: () => ({ top: 100 + PITCH * order - scrolled, bottom: 100 + PITCH * (order + 1) - scrolled }),
+    querySelector: (selector) => {
+      if (/app-result/.test(selector)) {
+        const button = find(byClass('app-result'), node)[0]
+        return button ? { focus: () => focused.push(`play:${node.props['data-key']}`) } : null
+      }
+      const which = /app-pin-(up|down|remove)/.exec(selector)[1]
+      const button = find(byClass(`app-pin-${which}`), node)[0]
+      if (!button || (/aria-disabled/.test(selector) && button.props['aria-disabled'])) return null
+      return { focus: () => focused.push(`${which}:${node.props['data-key']}`) }
+    },
+  })
+  const box = {
+    get scrollTop() { return scrolled },
+    set scrollTop(value) { scrolled = Math.max(0, Math.min(value, furthest())) },
+    getBoundingClientRect: () => ({ top: 100, bottom: 500 }),
+    querySelectorAll: (selector) => laidOut().map(element).filter((each) => each.dataset.key !== undefined || /data-playing/.test(selector)),
+  }
   return {
     draw,
     get tree() { return tree },
+    get scrollTop() { return scrolled },
     commit: () => render.commit(),
-    //? the scroller's rows, Done and the Shuffle chip as focusable fakes - what the layout effect reaches by its refs
-    focusables(focused) {
-      const rows = find((node) => node.props?.['data-key'] !== undefined && node.type === 'li', tree)
-      const fakeRow = (row) => ({
-        dataset: { key: String(row.props['data-key']) },
-        querySelector: (selector) => {
-          if (/app-result/.test(selector)) {
-            const button = find(byClass('app-result'), row)[0]
-            return button ? { focus: () => focused.push(`play:${row.props['data-key']}`) } : null
-          }
-          const which = /app-pin-(up|down|remove)/.exec(selector)[1]
-          const button = find(byClass(`app-pin-${which}`), row)[0]
-          if (!button || (/aria-disabled/.test(selector) && button.props['aria-disabled'])) return null
-          return { focus: () => focused.push(`${which}:${row.props['data-key']}`) }
-        },
-      })
-      find(byClass('app-info-scroll'), tree)[0].props.ref.current = { querySelectorAll: () => rows.map(fakeRow), scrollTop: 0 }
+    //? the listener scrolling the sheet: the scroller moved, and its 'scroll' heard
+    scroll(to) { box.scrollTop = to; find(byClass('app-info-scroll'), tree)[0].props.onScroll() },
+    //? the scroller, Done and the Shuffle chip as fakes - what the layout effects reach by their refs
+    focusables(into) {
+      focused = into
+      find(byClass('app-info-scroll'), tree)[0].props.ref.current = box
       find(byClass('app-info-done'), tree)[0].props.ref.current = { focus: () => focused.push('done') }
       const chip = find(byClass('app-upnext-shuffle'), tree)[0]
       if (chip) chip.props.ref.current = { focus: () => focused.push('shuffle') }
@@ -647,8 +928,8 @@ console.log('\nUp Next\'s focus never left on nothing, and the grip\'s drag (2.0
     const player = upNextPlayer(queue)
     player.jumpTo = (key) => {
       player.calls.push(['jumpTo', key])
-      const edited = U.jumpedTo(player.queue, key)
-      if (edited) player.queue = { ...edited, index: U.onward(edited) }
+      const jump = U.jumpedTo(player.queue, key)
+      if (jump) player.queue = { ...jump.queue, index: jump.index }
     }
     return player
   }
@@ -725,6 +1006,224 @@ console.log('\nUp Next\'s focus never left on nothing, and the grip\'s drag (2.0
     grip().props.onPointerUp({ pointerId: 9, clientY: 110 })
     tree = view.draw()
     check('...a drag that lands where it began moves nothing', player.calls, [])
+  }
+}
+
+
+console.log('\n(2.1.3) Up Next drawn with History above the song playing, opened at the song playing')
+{
+  //? the engine's jump, as usePlayer's jumpTo makes it: jumpedTo's queue, then the entry it names
+  const jumping = (queue) => {
+    const player = upNextPlayer(queue)
+    player.jumpTo = (key) => {
+      player.calls.push(['jumpTo', key])
+      const jump = U.jumpedTo(player.queue, key)
+      if (jump) player.queue = { ...jump.queue, index: jump.index }
+    }
+    return player
+  }
+  //? a draw whose effects reach the fakes: drawn, the fakes put in, committed
+  const shown = (view, focused = []) => { const tree = view.draw(false); view.focusables(focused); view.commit(); return tree }
+  const historyOf = (tree) => find(byClass('app-result'), find(byClass('app-upnext-history'), tree)[0])
+  const keyAt = (queue, id, from = 0) => queue.upNext.marks[queue.tracks.findIndex((t, i) => i >= from && t.id === id)].key
+
+  {
+    const player = jumping(U.withNext(at(U.startUpNext(album(6), 0), 2), [track('a')]))
+    const view = mountUpNext(player)
+    let tree = shown(view)
+    check('opened at the song playing: its card at the top of the scroller, History\'s two rows above it (2 x 56 px)', view.scrollTop, 112)
+    const titles = find((node) => node.type === 'section', tree).map((node) => words(find(byClass('app-section-title'), node)))
+    check('History first - Apple Music\'s word - then Playing Next and the list', [HISTORY, titles], ['History', ['History', 'Playing Next', 'From Mezzanine']])
+    check('...its rows the songs played, oldest first, each "play again"; Up Next\'s still "play now"',
+      [historyOf(tree).map((row) => row.props['aria-label']), find(byClass('app-result'), tree).slice(2).map((row) => row.props['aria-label'])],
+      [['song 1, play again', 'song 2, play again'], ['song a, play now', 'song 4, play now', 'song 5, play now', 'song 6, play now']])
+    const name = find(byClass('app-info-name'), tree)[0]
+    check('the song playing\'s title a heading - VoiceOver\'s headings History, the song, Playing Next, the list; no hidden heading of its own',
+      [name.props.role, name.props['aria-level'], find((node) => node.type === 'h3' || node.props?.role === 'heading', tree).map(words), find(byClass('app-visually-hidden'), tree).filter((node) => node.type !== 'p').length],
+      ['heading', 3, ['History', 'song 3', 'Playing Next', 'From Mezzanine'], 0])
+
+    //? the keyboard: History one Tab stop, Up and Down inside it
+    check('History is one Tab stop: its newest row', historyOf(tree).map((row) => row.props.tabIndex), [-1, 0])
+    historyOf(tree)[0].props.onFocus()
+    tree = shown(view)
+    check('...the row last focused, once focused', historyOf(tree).map((row) => row.props.tabIndex), [0, -1])
+    const moved = []
+    const buttons = historyOf(tree).map((row) => ({ focus: () => moved.push(row.props['aria-label']) }))
+    const list = { querySelectorAll: () => buttons }
+    const key = (name, from) => { let prevented = false; find((node) => node.type === 'ul' && node.props.onKeyDown, find(byClass('app-upnext-history'), tree)[0])[0].props.onKeyDown({ key: name, currentTarget: list, target: buttons[from], preventDefault: () => { prevented = true } }); return prevented }
+    const keys = [key('ArrowDown', 0), key('ArrowUp', 1), key('End', 0), key('Home', 1), key('a', 0)]
+    check('...Down and Up move inside it, End and Home to its ends - each kept from scrolling the sheet; other keys left alone',
+      [moved, keys], [['song 2, play again', 'song 1, play again', 'song 2, play again', 'song 1, play again'], [true, true, true, true, false]])
+
+    //? History's tap, the listener scrolled up into it
+    view.scroll(40)
+    const focused = []
+    const k1 = player.queue.upNext.marks[0].key
+    historyOf(tree)[0].props.onClick()
+    tree = shown(view, focused)
+    //? (review) its words come with the draw that shows it taken - the next one
+    tree = shown(view)
+    check('a row of History\'s tap: jumpTo by its key - the song again, said aloud; the row still there, focus kept on it, the view where the listener left it',
+      [player.calls, status(tree), playing(player.queue), historyOf(tree).map((row) => row.props['aria-label']), focused, view.scrollTop],
+      [[['jumpTo', k1]], 'Playing song 1', '1', ['song 1, play again', 'song 2, play again', 'song 3, play again'], [`play:${k1}`], 40])
+  }
+  {
+    const player = jumping(at(U.startUpNext(album(80), 0), 70))
+    const view = mountUpNext(player)
+    let tree = shown(view)
+    const focused = []
+    historyOf(tree)[0].props.onClick()
+    tree = shown(view, focused)
+    check('History\'s oldest row tapped at HISTORY_BACK: the song again, its row gone off the end - focus to Done',
+      [playing(player.queue), historyOf(tree).length, historyOf(tree)[0].props['aria-label'], focused], ['21', 50, 'song 22, play again', ['done']])
+  }
+  {
+    const player = jumping(U.withNext(at(U.startUpNext(album(6), 0), 2), [track('a')]))
+    const view = mountUpNext(player)
+    let tree = shown(view)
+    const focused = []
+    const aKey = keyAt(player.queue, 'a')
+    find(byClass('app-result'), tree).find((row) => row.props['aria-label'] === 'song 5, play now').props.onClick()
+    tree = shown(view, focused)
+    check('a row of the list\'s tap (song 5): it plays, 4 behind it in History; Playing Next after it - focus to its head - and the card at the top (4 rows of History)',
+      [playing(player.queue), historyOf(tree).map((row) => row.props['aria-label']).slice(-2), focused, view.scrollTop], ['5', ['song 3, play again', 'song 4, play again'], [`play:${aKey}`], 224])
+    find(byClass('app-upnext-edit'), tree)[0].props.onClick()
+    tree = shown(view)
+    check('Edit: History hidden (it moves only what is still to play), the card at the top', [find(byClass('app-upnext-history'), tree).length, view.scrollTop], [0, 0])
+    find(byClass('app-info-done'), tree)[0].props.onClick()
+    tree = shown(view)
+    check('...Done: History back above the card, the card still at the top', [historyOf(tree).length, view.scrollTop], [4, 224])
+    player.queue = ended(player.queue)
+    tree = shown(view)
+    check('a song ending by itself with the card at the top: the new card at the top, the view a row further down - nothing creeps', [playing(player.queue), view.scrollTop], ['a', 280])
+    view.scroll(0)
+    player.queue = ended(player.queue)
+    tree = shown(view)
+    check('...scrolled to History\'s top: its first row stays where it is', [playing(player.queue), view.scrollTop], ['6', 0])
+    view.scroll(0)
+    player.queue = at(U.startUpNext(album(6), 0), 3)
+    tree = shown(view)
+    check('a new queue while open (another album, a queue put back): the card at the top - its keys are a new queue\'s, never held by the old one\'s',
+      [history(player.queue), view.scrollTop], [['1', '2', '3'], 168])
+  }
+  {
+    const player = jumping(U.withLast(U.startUpNext(album(4), 0), [track('a'), track('b')]))
+    const view = mountUpNext(player)
+    let tree = shown(view)
+    const focused = []
+    const twoKey = keyAt(player.queue, '2')
+    find(byClass('app-result'), find(byClass('app-upnext-group'), tree)[0])[1].props.onClick()
+    tree = shown(view, focused)
+    check('a row of Playing Next\'s tap (b): the song added above it behind it, in History; focus to the list\'s first; the card at the top',
+      [playing(player.queue), historyOf(tree).map((row) => row.props['aria-label']), focused, view.scrollTop], ['b', ['song 1, play again', 'song a, play again'], [`play:${twoKey}`], 112])
+    const fresh = mountUpNext(upNextPlayer(U.startUpNext(album(3), 0)))
+    check('nothing played yet: no History, the card at the top', [find(byClass('app-upnext-history'), shown(fresh)).length, fresh.scrollTop], [0, 0])
+  }
+
+  //? (2.1.3 review) a change below the card - Shuffle, Edit's moves, drags and removals - leaves the scroll where it is:
+  //? holding the topmost row there followed it wherever the change put it, out of view
+  const orderOf = (tree, key) => find((node) => (node.type === 'li' && node.props?.['data-key'] !== undefined) || node.props?.['data-playing'] !== undefined, tree).findIndex((node) => node.props['data-key'] === key)
+  const topOf = (view, key) => 100 + 56 * orderOf(view.tree, key) - view.scrollTop
+  {
+    const player = jumping(at(U.startUpNext(album(30), 0), 2))
+    const view = mountUpNext(player)
+    let tree = shown(view)
+    view.scroll(400)
+    const topmost = find((node) => node.type === 'li' && node.props?.['data-key'] !== undefined, tree)[6].props['data-key']
+    find(byClass('app-upnext-shuffle'), tree)[0].props.onClick()
+    tree = shown(view)
+    check('Shuffle (the chip), scrolled into the list: the rows reordered under a scroll that stays where it was - not chasing the row that was topmost',
+      [player.calls, view.scrollTop, orderOf(tree, topmost) !== 6], [[['setShuffle', true]], 400, true])
+    player.setShuffle(false)
+    tree = shown(view)
+    check('...the player bar\'s Shuffle, with Up Next open beside the page: the same', view.scrollTop, 400)
+  }
+  {
+    const player = jumping(U.startUpNext(album(30), 0))
+    const view = mountUpNext(player)
+    let tree = shown(view)
+    find(byClass('app-upnext-edit'), tree)[0].props.onClick()
+    tree = shown(view)
+    view.scroll(290)
+    //? the card is 0, the list's rows 1 on: at 290, row 5 (song 6) topmost at 90, row 6 (song 7) under it at 146
+    const seven = find(byClass('app-pin-row'), tree)[5].props['data-key']
+    find(byClass('app-pin-up'), find(byClass('app-pin-row'), tree)[5])[0].props.onClick()
+    tree = shown(view)
+    check('Edit\'s Move up on the second row in view: the scroll stays, the row now where the first was - in view, its button with it',
+      [view.scrollTop, topOf(view, seven)], [290, 90])
+    view.scroll(290)
+    const six = find(byClass('app-pin-row'), tree)[5].props['data-key']
+    find(byClass('app-pin-remove'), find(byClass('app-pin-row'), tree)[4])[0].props.onClick()
+    tree = shown(view)
+    check('...Remove on the topmost row: the scroll stays, the row after it sliding up into its place - where Pinned\'s focus goes',
+      [view.scrollTop, topOf(view, six)], [290, 90])
+    view.scroll(290)
+    const dragged = find(byClass('app-pin-row'), tree)[5]
+    const key = dragged.props['data-key']
+    const item = { offsetTop: 0, offsetHeight: 56, nextElementSibling: { offsetTop: 56 }, previousElementSibling: { offsetTop: -56 } }
+    find(byClass('app-pin-grip'), dragged)[0].props.onPointerDown({ button: 0, pointerId: 4, clientY: 300, currentTarget: { closest: () => item, setPointerCapture() {} }, preventDefault() {} })
+    tree = shown(view)
+    find(byClass('app-pin-grip'), find((node) => node.type === 'li' && node.props?.['data-key'] === key, tree)[0])[0].props.onPointerUp({ pointerId: 4, clientY: 244 })
+    tree = shown(view)
+    check('...a row dragged up past the topmost: the scroll stays, the row put down where the topmost was', [player.calls.slice(-1)[0][0], view.scrollTop, topOf(view, key)], ['moveInQueue', 290, 90])
+  }
+  {
+    //? a short album's end: the card and what follows it less than the scroller - they are drawn at least its height
+    const player = jumping(at(U.startUpNext(album(12), 0), 8))
+    const view = mountUpNext(player)
+    let tree = shown(view)
+    check('an album\'s last songs (12, at 9 - the card and three rows, less than the scroller): it still opens at the card, History\'s 8 rows above it',
+      [find(byClass('app-upnext-now'), tree).length, view.scrollTop, find(byClass('app-upnext-now'), tree)[0] && find((node) => node.props?.['data-playing'] !== undefined, find(byClass('app-upnext-now'), tree)[0]).length], [1, 448, 1])
+    const tops = []
+    for (let i = 0; i < 3; i++) {
+      player.queue = ended(player.queue)
+      tree = shown(view)
+      tops.push(100 + 56 * find((node) => node.type === 'li' && node.props?.['data-key'] !== undefined, find(byClass('app-upnext-history'), tree)[0]).length - view.scrollTop)
+    }
+    check('...songs ending by themselves keep the card at the top to the album\'s last - no creeping down a row a song', [playing(player.queue), tops], ['12', [100, 100, 100]])
+  }
+
+  //? (2.1.3 review) a tap the engine doesn't take - a key gone, an edit the stream can't make while a seek is on its way:
+  //? nothing moved, focused or said, then or at the next change
+  {
+    const player = upNextPlayer(U.withNext(at(U.startUpNext(album(8), 0), 4), [track('a')]))
+    const view = mountUpNext(player)
+    let tree = shown(view)
+    view.scroll(40)
+    const focused = []
+    find(byClass('app-result'), tree).find((row) => row.props['aria-label'] === 'song 7, play now').props.onClick()
+    tree = shown(view, focused)
+    const stayed = view.scrollTop
+    player.queue = ended(player.queue)
+    tree = shown(view, focused)
+    check('a list tap not taken, then a song ending by itself: the view where the listener left it, focus left alone, nothing said',
+      [player.calls.length, stayed, view.scrollTop, focused, status(tree)], [1, 40, 40, [], ''])
+  }
+  {
+    const player = upNextPlayer(at(U.startUpNext(album(6), 0), 3))
+    const view = mountUpNext(player)
+    let tree = shown(view)
+    const focused = []
+    historyOf(tree)[0].props.onClick()
+    tree = shown(view, focused)
+    tree = shown(view, focused)
+    check('a History tap not taken: nothing said to have started, focus left alone', [player.calls.length, playing(player.queue), status(tree), focused], [1, '4', '', []])
+  }
+  {
+    const player = jumping(at(U.startUpNext(album(6), 0), 3))
+    const view = mountUpNext(player)
+    let tree = shown(view)
+    const region = () => find((node) => node.props?.role === 'status', tree)[0].props.children
+    historyOf(tree)[0].props.onClick()
+    tree = shown(view)
+    tree = shown(view)
+    const first = region()
+    historyOf(tree)[0].props.onClick()
+    tree = shown(view)
+    tree = shown(view)
+    const second = region()
+    check('the same History row tapped twice: said twice - the same words, each a new node in the live region (a reader speaks a change, never the same text again)',
+      [words(first), words(second), first.type, first.key !== second.key], ['Playing song 1', 'Playing song 1', 'span', true])
   }
 }
 

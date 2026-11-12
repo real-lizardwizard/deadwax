@@ -21,10 +21,21 @@
  * random runs): after `index` the entries run Repeat One's copies, then the songs added, then the list's
  * songs time round by time round (`pass` never going down) - and every edit keeps `tracks[0..index]`,
  * `marks[0..index]` and `index` exactly: only what comes after the song playing ever changes. Every edit
- * hands back the SAME object when it changes nothing, so the engine can skip it. (jumpedTo alone puts the
- * row jumped to first, ahead of the added songs, for the moment until the engine moves onto it.) A queue
- * with no `upNext` - EMPTY_QUEUE - is a plain queue: each edit hands it back as it is, and onward,
- * backward and pastCopies answer as nextIndex and previousAction would.
+ * hands back the SAME object when it changes nothing, so the engine can skip it. (jumpedTo's list edit puts
+ * the list's songs down to the row ahead of Playing Next, for the moment until the engine moves to its
+ * index.) Previous can leave the order after the song playing as it played (a list's rounds never going
+ * down, songs added among them); Up Next draws it as it will play. A queue with no `upNext` - EMPTY_QUEUE -
+ * is a plain queue: each edit hands it back as it is, and onward, backward and pastCopies answer as
+ * nextIndex and previousAction would.
+ *
+ * HISTORY (2.1.3) is the queue's entries before the song playing - exactly what Previous walks back through,
+ * so the two never disagree: from where listening began (`startedAt`; Previous back before it moves it down,
+ * wentBack) and at most HISTORY_BACK entries back (what a reload keeps, so History after one is the same). A
+ * UNIT - an entry and the Repeat One copies straight after it - is one row there as in Up Next, keyed by its
+ * first entry, and every row either draws is reached by its tap (jumpedTo): Up Next's moves the place onto it,
+ * History's plays its song again. A unit is ONE song: whatever takes a song out of the queue takes its copies with
+ * it (withShuffle, withRepeat - 2.1.3 review), or they'd join the row before them. upnext.sim.cjs holds all of it by
+ * property.
  *
  * Pure: nothing here fetches, touches the page or imports Preact (app-rules.sim.cjs holds that).
  */
@@ -75,9 +86,11 @@ export interface UpNextState {
   source: QueueTrack[]
   shuffle: boolean
   nextKey: number
-  /** the index playTracks started at: the first time round's songs before it were never heard */
+  /** where listening began: the first time round's songs before it were never heard; Previous back before it moves
+   *  it down (wentBack) */
   startedAt: number
-  /** the list's songs taken out of a time round - removed, or jumped over - so a shuffle doesn't bring them back */
+  /** the list's songs taken out of a time round - removed only - so a shuffle doesn't bring them back (2.1.3: a song
+   *  jumped over stays behind the song jumped to, among those heard) */
   left: { pass: number; at: number }[]
   /** (Part B) the library's shuffle this queue is, when it is one - the order of its last time round */
   paged?: Paged
@@ -106,6 +119,9 @@ export const REPEAT_AHEAD = 2
 export const UP_NEXT_DRAWN = 100
 /** Seconds of a song heard (or half of a shorter one) before Repeat tops the queue up. */
 export const TOP_UP_HEARD_S = 2
+/** How far back History reaches: entries before the song playing - resume.ts's RESUME_BEFORE, what a reload keeps, so
+ *  History after one is History before it (resume.sim holds the two equal). */
+export const HISTORY_BACK = 50
 
 type Random = () => number
 
@@ -124,13 +140,44 @@ function rebuilt(queue: UpNextQueue, state: UpNextState, tracks: QueueTrack[], m
   return { ...queue, tracks, upNext: { ...state, marks, ...more } }
 }
 
-/** Where Repeat One's copies after the song playing end, and where the songs added after them end. */
-function layout(queue: UpNextQueue, state: UpNextState): { copiesEnd: number; addedEnd: number } {
+/** The end (exclusive) of the UNIT at `place`: the entry and the Repeat One copies straight after it - one row of Up
+ *  Next or History, what Next and Previous step over as one song. */
+function unitEnd(state: UpNextState, place: number): number {
+  let end = place + 1
+  while (state.marks[end]?.from === 'one') end++
+  return end
+}
+
+/** Where the song playing's unit begins: back over the copies before it - backward()'s run. */
+function unitStart(state: UpNextState, index: number): number {
+  let place = index
+  while (place > 0 && state.marks[place]?.from === 'one') place--
+  return place
+}
+
+/** Where Repeat One's copies after the song playing end, where the songs added after them (Playing Next) end, and
+ *  where the list Up Next draws after those ends - the shown round's songs, and any song added among them (Previous
+ *  walked back across it: it plays where it played). */
+function layout(queue: UpNextQueue, state: UpNextState): { copiesEnd: number; addedEnd: number; listEnd: number } {
   let copiesEnd = queue.index + 1
   while (state.marks[copiesEnd]?.from === 'one') copiesEnd++
   let addedEnd = copiesEnd
-  while (state.marks[addedEnd]?.from === 'added') addedEnd++
-  return { copiesEnd, addedEnd }
+  while (state.marks[addedEnd]?.from === 'added') addedEnd = unitEnd(state, addedEnd)
+  const shown = shownPass(queue)
+  let listEnd = addedEnd
+  while (listEnd < state.marks.length) {
+    const mark = state.marks[listEnd]!
+    if (mark.from === 'source' ? mark.pass !== shown : mark.from !== 'added') break
+    listEnd = unitEnd(state, listEnd)
+  }
+  return { copiesEnd, addedEnd, listEnd }
+}
+
+/** The unit starts in [start, end). */
+function unitsIn(state: UpNextState, start: number, end: number): number[] {
+  const units: number[] = []
+  for (let place = start; place < end; place = unitEnd(state, place)) units.push(place)
+  return units
 }
 
 /** The position of the last of the list's songs at or before `index`; -1 for none. */
@@ -245,8 +292,17 @@ export function withRepeat(queue: UpNextQueue, repeat: Repeat): UpNextQueue {
   const state = queue.upNext
   if (!state) return queue
   const round = passPlaying(state, queue.index)
-  const goes = (mark: Mark, place: number) => place > queue.index &&
-    ((repeat !== 'one' && mark.from === 'one') || (repeat !== 'all' && mark.from === 'source' && mark.pass > round))
+  //? (2.1.3 review) a later round's song goes with its own copies (Previous walked back across it): left, they'd join
+  //? the row before them - History naming one song where Previous plays another
+  const goes = (mark: Mark, place: number): boolean => {
+    if (place <= queue.index) return false
+    if (mark.from === 'one') {
+      if (repeat !== 'one') return true
+      const song = unitStart(state, place)
+      return song > queue.index && goes(state.marks[song]!, song)
+    }
+    return repeat !== 'all' && mark.from === 'source' && mark.pass > round
+  }
   if (!state.marks.some(goes)) return queue
   const marks = state.marks.filter((mark, place) => !goes(mark, place))
   //? (Part B) a library's shuffle whose later rounds went: back to the order of the last round left, so its feed
@@ -262,8 +318,9 @@ export function withRepeat(queue: UpNextQueue, repeat: Repeat): UpNextQueue {
 
 /**
  * Shuffle on or off for the queue playing; the song playing goes on, and the songs added keep their order
- * (and Repeat One's copies their place). The later times round go - the engine's toppedUp grows them again
- * in the new order. Let the round be the song playing's (the list's song at or before it).
+ * (and Repeat One's copies of the song playing their place; a list's song's copies go with it). The later times
+ * round go - the engine's toppedUp grows them again in the new order. Let the round be the song playing's (the
+ * list's song at or before it).
  *
  *  - ON: the list's songs not yet heard this time round, in a new order (Apple's way) - every place of the
  *    list but the song playing's, the places heard this round (from where the round began - `startedAt` for
@@ -311,7 +368,14 @@ export function withShuffle(queue: UpNextQueue, on: boolean, random: Random = Ma
   }
   let nextKey = state.nextKey
   const fresh: Mark[] = wanted.map((at) => queued.get(at) ?? { key: nextKey++, from: 'source', at, pass: Math.max(round, 0) })
-  const stays = (mark: Mark, place: number) => place <= index || mark.from !== 'source'
+  //? the list's songs after the song playing go - each with its Repeat One copies (Previous walked back across it), which
+  //? left would join the row before them (2.1.3 review); the song playing's own copies and the songs added, theirs
+  //? with them, stay
+  const stays = (mark: Mark, place: number) => {
+    if (place <= index) return true
+    const song = mark.from === 'one' ? unitStart(state, place) : place
+    return song <= index || state.marks[song]!.from !== 'source'
+  }
   return rebuilt(
     queue, state,
     [...queue.tracks.filter((_, place) => stays(state.marks[place]!, place)), ...fresh.map((mark) => state.source[mark.at]!)],
@@ -349,18 +413,12 @@ export function withLast(queue: UpNextQueue, tracks: readonly QueueTrack[]): UpN
 /** Where the entry `key` is, and the group of Up Next's rows it is in: Playing Next (the songs added), or the
  *  list as Up Next shows it (the shown round). Null for a key at or before the song playing, a copy, a later
  *  round, or one the queue doesn't have. */
-function groupOf(queue: UpNextQueue, state: UpNextState, key: number): { place: number; start: number; end: number } | null {
+function groupOf(queue: UpNextQueue, state: UpNextState, key: number): { place: number; start: number; end: number; added: boolean } | null {
   const place = state.marks.findIndex((mark) => mark.key === key)
-  if (place <= queue.index) return null
-  const mark = state.marks[place]!
-  const { copiesEnd, addedEnd } = layout(queue, state)
-  if (mark.from === 'added') return place < addedEnd ? { place, start: copiesEnd, end: addedEnd } : null
-  if (mark.from !== 'source') return null
-  const shown = state.marks[addedEnd]?.pass
-  if (mark.pass !== shown) return null
-  let end = addedEnd
-  while (state.marks[end]?.from === 'source' && state.marks[end]!.pass === shown) end++
-  return place < end ? { place, start: addedEnd, end } : null
+  const { copiesEnd, addedEnd, listEnd } = layout(queue, state)
+  if (place < copiesEnd || state.marks[place]!.from === 'one') return null
+  if (place < addedEnd) return { place, start: copiesEnd, end: addedEnd, added: true }
+  return place < listEnd ? { place, start: addedEnd, end: listEnd, added: false } : null
 }
 
 /** A row of Up Next out. One of the list's is noted as taken out of its round (`left`). */
@@ -370,10 +428,12 @@ export function withoutKey(queue: UpNextQueue, key: number): UpNextQueue {
   const group = groupOf(queue, state, key)
   if (!group) return queue
   const mark = state.marks[group.place]!
+  const end = unitEnd(state, group.place)
+  const stays = (_: unknown, place: number) => place < group.place || place >= end
   return rebuilt(
     queue, state,
-    queue.tracks.filter((_, place) => place !== group.place),
-    state.marks.filter((_, place) => place !== group.place),
+    queue.tracks.filter(stays),
+    state.marks.filter(stays),
     mark.from === 'source' ? { left: [...state.left, { pass: mark.pass, at: mark.at }] } : {},
   )
 }
@@ -384,55 +444,77 @@ export function movedKey(queue: UpNextQueue, key: number, to: number): UpNextQue
   if (!state) return queue
   const group = groupOf(queue, state, key)
   if (!group) return queue
-  const from = group.place - group.start
-  const dest = Math.max(0, Math.min(group.end - group.start - 1, Math.round(to)))
+  const units = unitsIn(state, group.start, group.end)
+  const from = units.indexOf(group.place)
+  const dest = Math.max(0, Math.min(units.length - 1, Math.round(to)))
   if (dest === from) return queue
-  const move = <T>(list: readonly T[]): T[] => {
-    const inside = list.slice(group.start, group.end)
-    const [taken] = inside.splice(from, 1)
-    inside.splice(dest, 0, taken!)
-    return [...list.slice(0, group.start), ...inside, ...list.slice(group.end)]
-  }
+  const order = units.map((start) => ({ start, end: unitEnd(state, start) }))
+  const [taken] = order.splice(from, 1)
+  order.splice(dest, 0, taken!)
+  const move = <T>(list: readonly T[]): T[] =>
+    [...list.slice(0, group.start), ...order.flatMap(({ start, end }) => list.slice(start, end)), ...list.slice(group.end)]
   return rebuilt(queue, state, move(queue.tracks), move(state.marks))
 }
 
-/** Clear: every song added, after the song playing, out. */
+/** Clear: Playing Next out - the songs added straight after the song playing, the group Clear heads (a song added
+ *  further on, that Previous walked back across, plays where it played and stays). */
 export function withoutAdded(queue: UpNextQueue): UpNextQueue {
   const state = queue.upNext
   if (!state) return queue
-  const goes = (mark: Mark, place: number) => place > queue.index && mark.from === 'added'
-  if (!state.marks.some(goes)) return queue
-  return rebuilt(queue, state, queue.tracks.filter((_, place) => !goes(state.marks[place]!, place)), state.marks.filter((mark, place) => !goes(mark, place)))
+  const { copiesEnd, addedEnd } = layout(queue, state)
+  if (addedEnd === copiesEnd) return queue
+  const stays = (_: unknown, place: number) => place < copiesEnd || place >= addedEnd
+  return rebuilt(queue, state, queue.tracks.filter(stays), state.marks.filter(stays))
+}
+
+/** A row's tap, as the engine makes it: the queue to put in place first (an edit of what comes after the song playing,
+ *  or the same object), and the entry to move to then. */
+export interface Jump {
+  queue: UpNextQueue
+  index: number
 }
 
 /**
- * A row's tap: the row `key` moved straight after the copies (where Play Next goes), and the rows ABOVE it in
- * its own group dropped - jumping into the list keeps Playing Next (it plays after the song jumped to), and
- * jumping into Playing Next drops only the songs added above it. The list's songs jumped over are noted as
- * taken out of their round. Null for a key it can't jump to. The engine then moves onto it as Next does.
+ * A row's tap (James, 2026-11-11: "6 and 7 stay behind 8: Previous from 8 plays 7, then 6, as on the album"). Nothing
+ * is dropped: the place moves to the row, and the rows it passes stay where they are, behind it.
+ *
+ *  - A row of the list: the place moves there; Playing Next goes straight after it (and its copies) - songs added
+ *    still play next - and the list's rows above it stay behind it, in their order, where Previous finds them.
+ *  - A row of Playing Next: the place moves there; the songs added above it stay behind it.
+ *  - A row of History (an entry before the song playing's unit): the song AGAIN - a new entry of it, a song added,
+ *    straight after the song playing's copies (where Play Next goes), moved to; the songs after are as they were, and
+ *    History is never rewritten: it is what played, and the song played again joins it as played.
+ *
+ * `index` is the entry to move to, in `queue`; the edit keeps `tracks[0..index]` of the queue it was given (the
+ * engine's replaceUpcoming takes it as any edit). Null for the song playing (or one of its copies), a key it doesn't
+ * have, a row Up Next doesn't draw (a later time round, a copy), or one History doesn't (before where listening
+ * began, past HISTORY_BACK) - every row drawn is one a tap reaches, and nothing else is.
  */
-export function jumpedTo(queue: UpNextQueue, key: number): UpNextQueue | null {
+export function jumpedTo(queue: UpNextQueue, key: number): Jump | null {
   const state = queue.upNext
-  if (!state) return null
+  if (!state || !current(queue)) return null
+  const place = state.marks.findIndex((mark) => mark.key === key)
+  if (place < 0) return null
+  const { copiesEnd, addedEnd } = layout(queue, state)
+  if (place < unitStart(state, queue.index)) {
+    if (!historyRows(queue).some((row) => row.key === key)) return null
+    return { queue: added(queue, state, [queue.tracks[place]!], copiesEnd), index: copiesEnd }
+  }
   const group = groupOf(queue, state, key)
   if (!group) return null
-  const { copiesEnd } = layout(queue, state)
-  const mark = state.marks[group.place]!
-  const over = state.marks.slice(group.start, group.place)
-  //? the new order, by old place: up to the copies, the row, then everything else but the rows above it
+  if (group.added || addedEnd === copiesEnd) return { queue, index: group.place }
+  //? into the list with songs added: they go after the row's unit; by old place, up to the copies, the list up to and
+  //? including the row, Playing Next, the rest
+  const end = unitEnd(state, group.place)
   const places: number[] = []
-  for (let place = 0; place < copiesEnd; place++) places.push(place)
-  places.push(group.place)
-  for (let place = copiesEnd; place < state.marks.length; place++) {
-    if (place >= group.start && place <= group.place) continue
-    places.push(place)
+  for (let at = 0; at < copiesEnd; at++) places.push(at)
+  for (let at = addedEnd; at < end; at++) places.push(at)
+  for (let at = copiesEnd; at < addedEnd; at++) places.push(at)
+  for (let at = end; at < state.marks.length; at++) places.push(at)
+  return {
+    queue: rebuilt(queue, state, places.map((at) => queue.tracks[at]!), places.map((at) => state.marks[at]!)),
+    index: group.place - (addedEnd - copiesEnd),
   }
-  return rebuilt(
-    queue, state,
-    places.map((place) => queue.tracks[place]!),
-    places.map((place) => state.marks[place]!),
-    mark.from === 'source' ? { left: [...state.left, ...over.map((gone) => ({ pass: gone.pass, at: gone.at }))] } : {},
-  )
 }
 
 /** Next: the first entry after the song playing that isn't one of Repeat One's copies; null if none. */
@@ -512,32 +594,31 @@ export interface UpNextRow {
 }
 
 export interface UpNextView {
+  /** History: the songs before the song playing, oldest first - one row a unit, from where the listening began
+   *  (`startedAt`) and at most HISTORY_BACK entries back */
+  history: UpNextRow[]
   playing: QueueTrack | null
   /** Playing Next: the songs added, after the copies - all of them */
   added: UpNextRow[]
-  /** the list's songs still to play this time round - the first `limit`, and how many more */
+  /** the list's songs still to play this time round - the first `limit`, and how many more (2.1.3: a song added that
+   *  Previous walked back across is among them, where it plays) */
   list: { title: string; rows: UpNextRow[]; more: number } | null
   /** what comes after: "Then … again from the top." or "Nothing after this song." */
   then: string | null
   repeatOne: boolean
 }
 
-/** What Up Next (app/UpNext.tsx) draws: neither Repeat One's copies nor the later times round. */
+/** What Up Next (app/UpNext.tsx) draws: History above the song playing (2.1.3), then what plays after it - neither
+ *  Repeat One's copies nor the later times round. */
 export function upNextView(queue: UpNextQueue, repeat: Repeat, limit: number = UP_NEXT_DRAWN): UpNextView {
   const playing = current(queue)
   const state = queue.upNext
-  if (!playing || !state) return { playing, added: [], list: null, then: null, repeatOne: false }
-  const { copiesEnd, addedEnd } = layout(queue, state)
+  if (!playing || !state) return { history: [], playing, added: [], list: null, then: null, repeatOne: false }
+  const { copiesEnd, addedEnd, listEnd } = layout(queue, state)
   const row = (place: number): UpNextRow => ({ key: state.marks[place]!.key, track: queue.tracks[place]! })
-  const addedRows: UpNextRow[] = []
-  for (let place = copiesEnd; place < addedEnd; place++) addedRows.push(row(place))
+  const addedRows = unitsIn(state, copiesEnd, addedEnd).map(row)
   const shown = shownPass(queue)
-  const listed: number[] = []
-  for (let place = addedEnd; place < state.marks.length; place++) {
-    const mark = state.marks[place]!
-    if (mark.from !== 'source' || mark.pass !== shown) break
-    listed.push(place)
-  }
+  const listed = unitsIn(state, addedEnd, listEnd)
   const paged = state.paged
   const pending = paged ? Math.max(0, paged.total - paged.fetched) : 0
   const again = shown > passPlaying(state, queue.index)
@@ -550,7 +631,32 @@ export function upNextView(queue: UpNextQueue, repeat: Repeat, limit: number = U
   const then = repeat === 'all'
     ? state.shuffle ? `Then ${name} again, in a new order.` : `Then ${name} again from the top.`
     : repeat === 'off' && queue.index >= queue.tracks.length - 1 ? 'Nothing after this song.' : null
-  return { playing, added: addedRows, list, then, repeatOne: repeat === 'one' }
+  return { history: historyRows(queue), playing, added: addedRows, list, then, repeatOne: repeat === 'one' }
+}
+
+/** History: the units before the song playing's, oldest first - from `startedAt` (the list's songs before where
+ *  listening began were never heard) and no further back than HISTORY_BACK entries before the song playing - what a
+ *  reload keeps (resume.ts toSave), so it draws the same after one. One row a unit, keyed by its first entry. A run of
+ *  copies at that edge, its song further back, isn't a row. */
+export function historyRows(queue: UpNextQueue, back: number = HISTORY_BACK): UpNextRow[] {
+  const state = queue.upNext
+  if (!state || !current(queue)) return []
+  const from = Math.max(state.startedAt, queue.index - back, 0)
+  const rows: UpNextRow[] = []
+  for (let place = from; place < unitStart(state, queue.index); place = unitEnd(state, place)) {
+    if (state.marks[place]!.from !== 'one') rows.push({ key: state.marks[place]!.key, track: queue.tracks[place]! })
+  }
+  return rows
+}
+
+/** Previous's move: `{ ...queue, index }` - and, back before where listening began, `startedAt` moved down to the
+ *  unit landed in, so History shows the songs played from there. The same tracks: the stream's seek still applies. */
+export function wentBack(queue: UpNextQueue, index: number): UpNextQueue {
+  const state = queue.upNext
+  if (!state) return { ...queue, index }
+  const start = unitStart(state, index)
+  if (start >= state.startedAt) return { ...queue, index }
+  return { ...queue, index, upNext: { ...state, startedAt: start } }
 }
 
 /** The list's heading in Up Next: "From Mezzanine" for one album's songs, else "Still to play" - with

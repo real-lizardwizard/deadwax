@@ -359,13 +359,22 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
 ## Up Next, shuffle and repeat
 
 **Up Next** on the now-playing screen (beside •••) opens **Up Next**, a sheet over it,
-the way Info opens: what plays after the song playing, with the two settings an iPhone's Music app keeps
-there. Shuffle and Repeat are on the now-playing screen itself too, at the two ends of previous, play/pause
+the way Info opens: what plays after the song playing - and, above it, what has already played - with the two
+settings an iPhone's Music app keeps there. Shuffle and Repeat are on the now-playing screen itself too, at the two ends of previous, play/pause
 and next - one setting each, so a change in either place shows in the other. On a desktop, Up Next is the
 player bar's **Up Next** button, and opens as a panel beside the page, as Info does ([on a desktop](#on-a-desktop)).
 
-- **At its top**, the song playing - and with Repeat One on, "Repeat one: this song plays again until you
-  skip it." Under it two chips, **Shuffle** and **Repeat**, purple while on; a change is read out by
+- **History**, above the song playing: what has played since you started the album, list or shuffle - songs a
+  tap skipped past included, where they are on the album - oldest at the top. Up Next opens at the song
+  playing, even with only a song or two left after it; scroll up for History. A song Repeat One played again is
+  one row; Repeat All's earlier times round are there as they played. It goes back 50 plays (as many as come back
+  when the app opens again) - each time Repeat One played a song counts as one, so after a long run of one song
+  it shows fewer rows - and starts again when you play something new. Tap one to hear it again now: Playing Next
+  and the album carry on after it as they were, and the song that was playing joins History. To a keyboard,
+  History is one stop of Tab - the up and down arrows move inside it - and VoiceOver reads it under its own
+  heading, then the song playing's title as one.
+- **The song playing, where Up Next opens** - and with Repeat One on, "Repeat one: this song plays again until
+  you skip it." Under it two chips, **Shuffle** and **Repeat**, purple while on; a change is read out by
   VoiceOver.
 - **Playing Next**: the songs you've added, in the order they'll play, with **Clear** to take them all out.
   It's there only when you've added some.
@@ -373,14 +382,20 @@ player bar's **Up Next** button, and opens as a panel beside the page, as Info d
   to play" for several albums' - up to 100 of them, then "And 380 more songs." Under it, what comes after:
   "Then Mezzanine again from the top." with Repeat All ("Then Mezzanine again, in a new order." with Shuffle
   on too), or "Nothing after this song." at the last song with Repeat off.
-- **Tap a song** to play it now - from pause too. The songs above it in its own group go: tap one of the
-  album's and the album's songs before it are skipped (Playing Next stays, and plays after it); tap one in
-  Playing Next and only the songs added above it go. Previous then goes back to the song that was playing.
+- **Tap a song** to play it now - from pause too. Nothing is taken out: tap a song further down the album and
+  the songs between stay where they are, behind it - playing song 5, tap song 8, and Previous plays 7, then 6,
+  as on the album - and Playing Next stays next, after it. Tap one in Playing Next and the songs added above it
+  are behind it the same way. Up Next keeps what plays next in view: the song you tapped at the top, what
+  follows under it. As songs end by themselves it keeps its place - left at the song playing, the new one takes
+  its place at the top - and Shuffle, Repeat, Clear and Edit's changes leave the list where you've scrolled it.
+- **After Previous**, a song you'd added that was still waiting stays where it was - after the song you went
+  back from - so Up Next lists it there, in the album's group, rather than under Playing Next; **Clear** takes
+  only the songs under Playing Next.
 - **Edit** (at the top left) turns the rows into ones you move and remove, as Home's Pinned does: **up** and
   **down**, **✕** to take one out, and a grip at the right to drag it by (only the grip drags, so the list
   still scrolls under your finger elsewhere). A song moves within its own group - Playing Next, or the
-  album's - and each change is made as you tap it, with nothing to save. **Done** ends Edit; a tap above the
-  sheet, or Escape, closes it.
+  album's - and each change is made as you tap it, with nothing to save; History isn't shown while you edit.
+  **Done** ends Edit; a tap above the sheet, or Escape, closes it.
 - It closes by itself once nothing is playing.
 
 **Play Next and Play Last.** Every song's **•••** - at the end of its row on an album page, on your library's
@@ -392,7 +407,8 @@ nothing playing - or once the queue has played to its end - either just plays it
 
 **Shuffle**, turned on while a song plays, keeps that song going and shuffles every song of the album or list
 you haven't heard this time round - the ones before where you started included (an album started at song 5
-and shuffled at song 7 shuffles songs 1-4 and 8-12) - and a song you took out of Up Next stays out. Turned
+and shuffled at song 7 shuffles songs 1-4 and 8-12) - and a song you took out of Up Next stays out, as do songs a
+tap skipped past (they're behind the song playing, so they count as heard). Turned
 off, the album's own order carries on from the song playing's place in it, so a song you heard in the
 shuffle can come round again (Apple Music does the same). Either way the song playing goes on, untouched,
 and songs you added keep their order, ahead of the rest. An album's **Shuffle** button still starts a
@@ -416,7 +432,7 @@ Previous always act on the song you're hearing: pressed in the instant one song 
 [one stream](#one-stream-for-flac), before the screen has caught up, Next goes to the song after the new one.
 
 **What is kept.** Repeat is remembered on the device, like Gapless. Shuffle belongs to what's playing (Play
-plays in order, Shuffle shuffles, and Up Next switches it), and the queue - Up Next with it -
+plays in order, Shuffle shuffles, and Up Next switches it), and the queue - Up Next with it, its History too -
 comes back when the app is opened again, paused where it stopped
 ([picking up where you left off](#picking-up-where-you-left-off)).
 
@@ -443,8 +459,8 @@ shuffle.
 ## Picking up where you left off
 
 Close the app - iOS clearing it from memory, a reload, the browser quit - and open it
-again, and what was playing is back: the song, the second it stopped at, and Up Next as it was (Playing Next,
-Shuffle, the rest of the album or list, a whole library's shuffle). It comes back **paused**: the mini player,
+again, and what was playing is back: the song, the second it stopped at, and Up Next as it was (its History,
+Playing Next, Shuffle, the rest of the album or list, a whole library's shuffle). It comes back **paused**: the mini player,
 and a desktop's player bar, show the song with the scrubber where it stopped, and nothing is loaded or played
 until you press play - iOS starts sound only from a tap. Play - on the mini player, the now-playing screen, the
 turntable, the desktop's player bar, Space in the visualizer, the lock screen - carries on from that second,
@@ -460,7 +476,8 @@ another app, by its name - "Picked up from Symfonium". From the same device noth
 
 - **Other apps.** Navidrome keeps one play queue for each person, which a Subsonic app may read and save. One
   another app saved comes back as a plain list - its songs in its order, at its song and second - without
-  Playing Next or the Shuffle chip, which only deadwax keeps. **Amperfy doesn't use Navidrome's play queue** (it
+  Playing Next or the Shuffle chip, which only deadwax keeps, and with an empty History (what played before
+  isn't known). **Amperfy doesn't use Navidrome's play queue** (it
   keeps its own on the phone), so it won't show what deadwax was playing, nor replace it - and deadwax won't
   pick up what Amperfy was playing. Which other apps use it hasn't been checked.
 - **A device left paused** - the home-screen app iOS kept in memory, a computer's tab - takes what another of
@@ -2427,7 +2444,8 @@ fixes that.
 - **[Picking up where you left off](#picking-up-where-you-left-off)** comes back from the last save - up to 30
   seconds early for an app iOS closed in a pocket - keeps 2,000 songs at most, and from another app's queue
   only the songs, as a plain list. Amperfy keeps its own queue, which deadwax can't see.
-- **Up Next** has no history of what played before the song playing (Previous walks it),
+- **Up Next**'s History goes back 50 plays and starts again with each album or list you play (it doesn't
+  reach back into the one before); Up Next has
   no "keep playing similar music" after the list, no ••• on album tiles (an album's ••• is on its page),
   no long-press or right-click menu, and no way yet to save it as a playlist.
 - **Playlists** have no folders, no cover of your own (Navidrome's 2x2 only) and no
@@ -2582,7 +2600,10 @@ question the whole player existed to answer. Still to find out:
   loop left going for an hour (memory, and how Safari lets go of what is behind); Repeat One and Repeat All
   with the phone locked, the loop's join in a pocket, and a Play Next made in the app before locking; the
   lock screen's previous and next with Repeat One; Up Next's list scrolling and its grip dragging in the
-  home-screen app, and VoiceOver through Up Next, its Edit and the song menu; Repeat One the second-player
+  home-screen app, and VoiceOver through Up Next, its Edit and the song menu; (2.1.3) **History**: Up Next
+  opening at the song playing and keeping its place as songs end, on the phone and in a desktop's panel, a tap
+  on a song further down the album moving within the one stream (a seek, not a new start) on the iPhone's own
+  player, a History row playing again, and VoiceOver through 50 rows of History before the song playing; Repeat One the second-player
   way (Gapless on, not FLAC), which hands the same song over each time (about 100 ms, as any handover) and
   downloads it again each time; **a Play Next in a song's last seconds**: whether taking the next song's
   start back out makes the phone drop a moment of the song playing's end; and all of it with AirPods.

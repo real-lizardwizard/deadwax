@@ -1589,7 +1589,7 @@ replaces it, and deadwax won't pick up what Amperfy was playing.
 ## Up Next lost Playing Next or Shuffle after picking up
 
 The queue came back as a plain list - its songs in order from the song playing, which are right - without Up
-Next's groups or the Shuffle chip, which only deadwax's own account of the queue keeps. That happens when:
+Next's groups, its History or the Shuffle chip, which only deadwax's own account of the queue keeps. That happens when:
 
 - **another app saved the queue last** - it keeps only the songs;
 - **songs were removed from the library** since - deleted and purged from Navidrome's missing files - so the
