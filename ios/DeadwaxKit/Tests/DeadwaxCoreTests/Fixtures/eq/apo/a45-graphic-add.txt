@@ -1,0 +1,4 @@
+Preamp: -1 dB
+GraphicEQ: 20 -2; 20000 -2
+GraphicEQ: 100 0; 1000 3; 10000 0
+Filter: ON PK Fc 50 Hz Gain -3 dB Q 2

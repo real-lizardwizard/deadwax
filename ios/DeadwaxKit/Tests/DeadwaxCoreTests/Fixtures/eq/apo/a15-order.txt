@@ -1,0 +1,4 @@
+Filter: ON PK Q 2 Gain -3 dB Fc 250 Hz
+Filter: ON LSC Gain 4 dB Fc 80 Hz Q 0.7
+Filter: ON PK Gain 1 dB Q 3 Fc 5000 Hz Gain 9 dB Fc 6000 Hz Q 9
+Filter: ON PK Fc 100 Gain 2 dB Fc 7000 Hz Q 1

@@ -1,0 +1,4 @@
+Channel: L
+GraphicEQ: 20 -2; 1000 0; 20000 3
+Channel: R
+GraphicEQ: 20 1; 1000 0; 20000 -2

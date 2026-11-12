@@ -1,0 +1,2 @@
+Preamp: -1 dB
+Filter: ON IIR Order 2 Coefficients 1 0 0 1 0 0

@@ -1,0 +1,2 @@
+Filter: ON HS 12dB Fc 8000 Hz Gain 3 dB
+Filter: ON LSC 24 dB Fc 100 Hz Gain 23 dB

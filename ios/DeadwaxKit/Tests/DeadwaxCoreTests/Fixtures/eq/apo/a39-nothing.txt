@@ -1,0 +1,4 @@
+# nothing here plays
+Volume: 5
+preamp: -3 dB
+Filter: ON PK Fc 1000 Hz Gain 3 dB

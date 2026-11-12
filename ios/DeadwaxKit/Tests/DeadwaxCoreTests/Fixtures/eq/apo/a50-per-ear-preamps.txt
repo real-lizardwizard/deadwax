@@ -1,0 +1,6 @@
+Channel: L
+Preamp: -6 dB
+Filter: ON PK Fc 1000 Hz Gain 3 dB Q 1
+Channel: R
+Preamp: -6 dB
+Filter: ON PK Fc 2000 Hz Gain 2 dB Q 1

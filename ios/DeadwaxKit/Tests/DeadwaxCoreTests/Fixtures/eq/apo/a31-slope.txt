@@ -1,0 +1,1 @@
+Filter: ON LSC -6 dB Fc 100 Hz Gain 3 dB

@@ -1,0 +1,4 @@
+# for the laptop
+Device: Realtek High Definition Audio Speakers; Headphones
+Preamp: -3 dB
+Filter: ON PK Fc 1000 Hz Gain 3 dB Q 1

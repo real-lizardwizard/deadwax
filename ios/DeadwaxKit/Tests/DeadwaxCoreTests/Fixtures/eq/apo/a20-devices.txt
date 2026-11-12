@@ -1,0 +1,4 @@
+Device: Speakers
+Filter: ON PK Fc 1000 Hz Gain 3 dB Q 1
+Device: Headphones
+Filter: ON PK Fc 2000 Hz Gain -3 dB Q 1

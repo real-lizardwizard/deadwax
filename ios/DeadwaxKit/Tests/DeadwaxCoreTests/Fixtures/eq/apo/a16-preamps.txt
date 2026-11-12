@@ -1,0 +1,11 @@
+Preamp: -3 dB
+Preamp: -1.5
+Channel: L
+Preamp: -1 dB
+Channel: R
+Preamp: 0.5 dB foo
+Channel: L R
+Preamp: -0.25 dB
+Channel: all
+Filter: ON PK Fc 1000 Hz Gain 3 dB Q 1
+Preamp:   -2dB

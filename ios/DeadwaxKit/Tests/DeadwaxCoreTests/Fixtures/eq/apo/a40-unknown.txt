@@ -1,0 +1,9 @@
+Volume: 5
+Preamp: abc
+: nothing before the colon
+Loudness Correction: on and on and on, a line longer than forty characters
+convolution: room.wav
+Filter: ON PK Fc 1000 Hz Gain 3 dB Q 1
+Filter: ON XYZ Fc 2000 Hz Gain 3 dB Q 1
+Filter: ON Peq Fc 3000 Hz Gain 3 dB Q 1
+Filter: ON PK Fc 4000 Hz Gain 6 Q 1

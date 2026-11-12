@@ -1,0 +1,8 @@
+# A comment
+#Preamp: -3 dB
+
+   
+Filter 1: ON PK Fc 100 Hz Gain 3 dB Q 1 # Gain 9 dB Fc 200 Hz
+this line has no colon
+   # an indented comment
+Preamp: -2 dB # headroom
