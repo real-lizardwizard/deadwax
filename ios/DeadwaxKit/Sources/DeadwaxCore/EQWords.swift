@@ -365,6 +365,8 @@ extension EQWords {
     public enum Screen {
         public static let title = "EQ"
         public static let rename = "Rename…"
+        /// The toolbar's •••, as the album page's is "More for this album" (slice 3).
+        public static let more = "More for this output"
         public static let done = "Done"
         public static let connected = "Connected now"
         public static let notConnected = "Not connected"
@@ -848,6 +850,18 @@ extension EQWords {
         public static func setAside(_ name: String) -> String {
             "eq.json couldn't be read, so it was set aside as \(name)"
         }
+
+        /// The Curve row while the output's EQ is Off (slice 3).
+        public static let curveOff = "Off"
+
+        /// Slice 3's "Start took" row (slice 2's review, item 1): what the last start of the output spent putting its
+        /// curve in - "0.031 ms, its curve made ahead" - or, at a rate the output hadn't started at before, "1.90 ms, its
+        /// curve made then, for 44.1 kHz" (three decimals under 0.1 ms, two above).
+        public static func startTook(ms: Double, ready: Bool, rate: Double) -> String {
+            let time = ms < 0.1 ? String(format: "%.3f", ms) : String(format: "%.2f", ms)
+            return ready ? "\(time) ms, its curve made ahead" : "\(time) ms, its curve made then, for \(hertz(rate))"
+        }
+        public static let startTookLabel = "Start took"
 
         public static let muffle = "Muffle what plays"
         /// Under the toggle (slice 2, check 0).
