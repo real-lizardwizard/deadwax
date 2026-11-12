@@ -24,8 +24,15 @@ import SwiftUI
 /// never for Shuffle, Repeat, Clear or Edit's moves, and not after a History tap. A bottom margin lets the card reach
 /// the top near an album's end, where scrollTo would stop short. Done ends Edit, else closes; the sheet closes by
 /// itself once nothing is queued.
+///
+/// Phase 2 (phase2-downloads.md 4.3.1): every song carries its download mark at the end of its line (the album row's
+/// DownloadMark, outside the line's words), in Edit too; and while deadwax can't be reached, a song not on this phone
+/// is dimmed - not a button out of Edit, its minus and handle still whole in it; the song playing's card is marked,
+/// never dimmed. VoiceOver hears the state as the row's value. No download control here. The mark and the dim are
+/// small views of their own, so a download's progress redraws them, never this list.
 struct UpNextScreen: View {
     @Environment(PlayerModel.self) private var player
+    @Environment(DownloadModel.self) private var downloads
     @Environment(\.dismiss) private var dismiss
     @State private var editing = false
     /// The entry a History tap moved to: its change of song keeps the scroll where it is (the row under the finger).
@@ -176,6 +183,8 @@ struct UpNextScreen: View {
                 }
             }
         }
+        // the marks' progress, once for the sheet (it asks the session only while something is fetching)
+        .task { await downloads.followProgress() }
         .onChange(of: player.hasQueue) { _, queued in
             if !queued { dismiss() }
         }
@@ -219,19 +228,30 @@ struct UpNextScreen: View {
                 .frame(width: Self.playingCover, height: Self.playingCover)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
             VStack(alignment: .leading, spacing: 2) {
-                Text(playing.title)
-                    .font(.headline)
                 let line = UpNextWords.songLine(artist: playing.artist, album: playing.album)
-                if !line.isEmpty {
-                    Text(line)
-                        .font(.subheadline)
-                        .foregroundStyle(Palette.quiet)
+                if line.isEmpty {
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        Text(playing.title)
+                            .font(.headline)
+                        UpNextSongMark(songID: playing.id)
+                    }
+                } else {
+                    Text(playing.title)
+                        .font(.headline)
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        Text(line)
+                            .font(.subheadline)
+                            .foregroundStyle(Palette.quiet)
+                        UpNextSongMark(songID: playing.id)
+                    }
                 }
             }
         }
         .accessibilityElement(children: .combine)
         //? (2.1.3) the song playing's title a heading, as the web's: between History and what's to come
         .accessibilityAddTraits(.isHeader)
+        //? marked, never dimmed: the song playing is the player's to speak for (7.3's stopped line)
+        .modifier(UpNextDownload(songID: playing.id, part: .card))
     }
 
     private var modes: some View {
@@ -287,6 +307,7 @@ struct UpNextScreen: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(UpNextWords.playNow(row.track.title))
+        .modifier(UpNextDownload(songID: row.track.id, part: .row))
     }
 
     /// (2.1.3) A row of History's: the song again, now - a new entry after the song playing. History isn't rewritten,
@@ -308,6 +329,7 @@ struct UpNextScreen: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(UpNextWords.playAgain(row.track.title))
+        .modifier(UpNextDownload(songID: row.track.id, part: .row))
     }
 
     private func rowLabel(_ row: UpNextRow) -> some View {
@@ -340,11 +362,14 @@ struct UpNextScreen: View {
             }
             .buttonStyle(.borderless)
             .accessibilityHidden(true)
+            //? offline, only the words and the mark dim: the minus and the handle stay whole, and work
             text(row)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .modifier(UpNextDownload(songID: row.track.id, part: .look))
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel([title, line].filter { !$0.isEmpty }.joined(separator: ", "))
+        .modifier(UpNextDownload(songID: row.track.id, part: .words))
         .accessibilityActions {
             //? disabled at the group's ends, as the web's are: an end has only the other way
             if index > 0 {
@@ -357,15 +382,26 @@ struct UpNextScreen: View {
         }
     }
 
+    /// The row's title and line, the song's download mark at the line's end - outside its words, so a long line wraps
+    /// before it - or, with no line, after the title (4.3.1).
     private func text(_ row: UpNextRow) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(row.track.title)
-                .foregroundStyle(.primary)
             let line = UpNextWords.songLine(artist: row.track.artist, album: row.track.album)
-            if !line.isEmpty {
-                Text(line)
-                    .font(.footnote)
-                    .foregroundStyle(Palette.quiet)
+            if line.isEmpty {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(row.track.title)
+                        .foregroundStyle(.primary)
+                    UpNextSongMark(songID: row.track.id)
+                }
+            } else {
+                Text(row.track.title)
+                    .foregroundStyle(.primary)
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(line)
+                        .font(.footnote)
+                        .foregroundStyle(Palette.quiet)
+                    UpNextSongMark(songID: row.track.id)
+                }
             }
         }
     }
@@ -408,6 +444,71 @@ struct UpNextScreen: View {
     /// VoiceOver's focus to `target` once the change has been drawn.
     private func refocus(_ target: Focus) {
         Task { @MainActor in focus = target }
+    }
+}
+
+/// A song's download mark in Up Next (phase2-downloads.md 4.3.1): 3.3's song mark - the album row's DownloadMark, at
+/// caption size, the ring alone while downloading - or nothing for a song not asked for. A view of its own, reading
+/// the download model for its one song, so a download's change or progress redraws only it, never Up Next's list.
+private struct UpNextSongMark: View {
+    let songID: String
+
+    @Environment(DownloadModel.self) private var downloads
+
+    var body: some View {
+        let state = downloads.state(songID)
+        if let mark = DownloadWords.mark(state) {
+            DownloadMark(mark: mark, fraction: DownloadWords.Mark.fraction(state), font: .caption)
+                .fixedSize()
+        }
+    }
+}
+
+/// A song's dim and VoiceOver value in Up Next (4.3.1): while deadwax can't be reached, a song not on this phone - by
+/// downloads alone, as the album page's rows - drawn at Palette.off, and a row whose tap plays it not a button; its
+/// state ("Downloaded", "Downloading, 40 percent", "Not on this phone") the value VoiceOver reads after the row's name.
+/// A modifier of its own, reading the models for its one song, so their changes redraw only it.
+private struct UpNextDownload: ViewModifier {
+    enum Part {
+        /// A row whose tap plays (the list's, Playing Next's, History's): dimmed, disabled, said.
+        case row
+        /// An Edit row's words and mark: dimmed only - its minus and the List's handle stay whole.
+        case look
+        /// An Edit row's one element: said only.
+        case words
+        /// The song playing's card: its state said, never dimmed (the player speaks for the song playing).
+        case card
+    }
+
+    let songID: String
+    let part: Part
+
+    @Environment(DownloadModel.self) private var downloads
+    @Environment(Reachability.self) private var reachability
+
+    @ViewBuilder func body(content: Content) -> some View {
+        let state = downloads.state(songID)
+        let notHere = !reachability.online && !state.isHere
+        switch part {
+        case .row:
+            content
+                .opacity(notHere ? Palette.off : 1)
+                .disabled(notHere)
+                .accessibilityValue(words(state, notHere: notHere))
+        case .look:
+            content
+                .opacity(notHere ? Palette.off : 1)
+        case .words:
+            content
+                .accessibilityValue(words(state, notHere: notHere))
+        case .card:
+            content
+                .accessibilityValue(DownloadWords.songLine(state) ?? "")
+        }
+    }
+
+    private func words(_ state: SongDownload, notHere: Bool) -> String {
+        (notHere ? DownloadWords.notOnPhone : DownloadWords.songLine(state)) ?? ""
     }
 }
 

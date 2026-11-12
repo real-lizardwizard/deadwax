@@ -314,6 +314,12 @@ played:
   too. With VoiceOver, each row's actions have Move up, Move down and Remove; with Voice Control, say
   "Show grid" to reach a minus.
 - It closes by itself once nothing is queued.
+- **Downloads**: a song asked for shows the same mark as on its album's page, at the end of its line -
+  grey filled for on the phone, dotted while waiting, a ring while it downloads, amber when it didn't
+  (VoiceOver reads it after the song: "Roads, play now, Downloaded"). Up Next has no download button
+  of its own: Now Playing's **•••** > **Download Up Next** is it. While deadwax can't be reached, songs
+  not on the phone are dimmed and a tap on one does nothing; in Edit you can still move or take them
+  out. The song playing is never dimmed.
 
 **Shuffle**, turned on while a song plays, keeps that song going and shuffles every song of the album
 or list you haven't heard this time round. Turned off, the album's own order carries on from the song
@@ -530,6 +536,7 @@ answering, **Try again**. It goes by itself once deadwax answers.
   list you were on stays, with every album not on the phone dimmed. At the top, **Your albums** (or
   **Albums**, without a library of your own) takes you to the full list, dimmed but for what's here. A pull down checks whether
   deadwax is back.
+- **Up Next** dims the songs that aren't on the phone; a tap on one does nothing (see [Up Next](#up-next)).
 - **An album's page** shows what's on the phone, dims the rest, and Play and Shuffle play only the
   songs here. An album with nothing here says "This album isn't on this phone - it plays once deadwax
   is back."
@@ -649,12 +656,22 @@ The tests can't reach these either. Note what happens.
     pause and close the app; then play something else on the Mac for a minute. Turn Airplane Mode off
     and open the phone: "Picked up from your Mac", on the Mac's song - the phone's offline queue
     didn't overwrite it.
+19. **Up Next's marks.** Play a downloaded album, then Play Last one that isn't; open Up Next: the
+    first album's songs have the grey filled mark at the end of their line, the second's none. Now
+    Playing's **•••** > **Download Up Next**, then Up Next again: the second album's songs go dotted,
+    then a ring fills, then the filled mark, and nothing else in a row moves. With VoiceOver, a row
+    says "Roads, play now, Downloaded". Do the marks look as they do on the album page, and as Apple
+    Music's would?
+20. **Up Next offline.** Play a downloaded album with one that isn't queued after it, turn on Airplane
+    Mode and open Up Next: the songs not on the phone (History's too) are dimmed, a tap on one does
+    nothing, VoiceOver says "Not on this phone, dimmed"; the song playing isn't dimmed. **Edit**: a
+    dimmed song's minus and handle still work - take one out, move one. At the largest text size,
+    each mark sits after its line, level with the line's first line, clear of the handle.
 
 ## What it can't do yet
 
 These are the web app's for now. Most of them come to the phone in the next phases:
 
-- **Up Next's marks**: Up Next doesn't show which songs are downloaded yet.
 - **Playlists**, **artist pages** and a **songs list**, and the Library's **Shuffle** of your whole
   library.
 - **Search**, **Get** and **Requests**.

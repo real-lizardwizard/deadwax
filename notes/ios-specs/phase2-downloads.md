@@ -412,9 +412,52 @@ may reach over the cover's top margin, for its 5 s). It comes in with opacity al
 ### 4.3 Up Next
 
 No download control in Up Next (it is about order, and its files are another round's): its Download is Now
-Playing's "Download Up Next". Its rows' marks and their dimming offline wait for that round to merge - one small
-change to UpNextScreen's row, drawn from the same `DownloadModel`, and Open question 11. Until then, offline, the
-skip notice (7.3) says what the rows don't.
+Playing's "Download Up Next". Its rows' marks and their dimming offline waited for that round to merge - one small
+change to UpNextScreen's row, drawn from the same `DownloadModel`, and Open question 11 - and are decided here.
+
+#### 4.3.1 The rows' marks and dimming (the finishing round)
+
+Up Next (`ios/App/UpNext/UpNextScreen.swift`) draws a song as a cover, its title, and a line under it -
+"Portishead · Dummy" (`UpNextWords.songLine`) - with nothing after: the shape of the Library's list row (5.3), not
+the album page's, which ends in a time column. Apple Music's Up Next, as remembered (iOS 17-18; not looked at again
+for this), draws its rows the same way with no download marks at all; deadwax's queue mixes songs on the phone with
+songs that need deadwax, and Download Up Next fills it, so here the marks earn their place.
+
+- **The mark** is 3.3's song mark, the same `DownloadMark` view TrackRow's slot draws - filled for here, dotted for
+  waiting, the ring alone while downloading (no stop square: the row's tap plays), amber for didn't; nothing for
+  `none`, and nothing for `unchecked` (Info says it). At `.caption`, `Palette.quiet` (amber for didn't).
+- **Where**: at the end of the row's line, outside its words - an `HStack(alignment: .firstTextBaseline, spacing: 4)`
+  with the line's `Text`, the mark `fixedSize` - as the Library row carries an album's (5.3's `ArtistLine`). So a long
+  line wraps before the mark rather than taking it, the mark stays on the line's first baseline at every text size,
+  and the trailing edge stays the drag handle's in Edit. A song with no line (neither artist nor album) carries it
+  after its title. No room is held on rows without a state: the album page holds a slot to keep its times in one
+  column, and Up Next has no column after the line.
+- **Which rows**: every song Up Next shows - History's, the song playing's card, Playing Next's and the list's -
+  and in Edit too (offline, the marks are how you choose what to take out). The card is marked but never dimmed:
+  the song playing is the player's to speak for (7.3's stopped line), and Info's Plays from (4.4).
+- **Dimmed offline** (7.4): while deadwax can't be reached (`Reachability.online` false), a row whose song isn't
+  downloaded (`SongDownload.isHere` false) is drawn at `Palette.off` - by downloads alone, as the album page's rows
+  are (3.7), though the player also plays a whole stream-cache copy (`playsHere`): "Not on this phone" means one
+  thing everywhere, and the player's check reads the disk (and touches the copy's date), which no row should do as
+  it draws. Out of Edit a dimmed row isn't a button (`disabled`): its tap would only stop on the song, "Not on this
+  phone - it plays once deadwax is back" - a History row's the same. In Edit only its words and mark dim: its red
+  minus and the List's drag handle stay whole and work, since offline is exactly when you'd take out what won't
+  play, and the order still holds for when deadwax is back.
+- **VoiceOver**: a row keeps its name ("Roads, play now", "Roads, play again" - UpNextWords, the web's words) and
+  gains the song's state as its **value**, read after the name: "Downloaded", "Downloading, 40 percent", "Waiting for
+  Wi-Fi", "Didn't download" (`DownloadWords.songLine`), and, dimmed, "Not on this phone" with iOS's own "dimmed". In
+  Edit, the row's one element ("Roads, Portishead · Dummy") gains the same value; its actions stay Move up, Move
+  down and Remove - no Download among them, as there is no download control here. The card: "Roads, Portishead ·
+  Dummy, Downloaded, heading".
+- **Cheap for a long queue**: the mark and the dim are small views of their own (`UpNextSongMark` and the
+  `upNextDownload` modifier), each reading the `DownloadModel` for its one song (`state(id)`, three dictionary
+  lookups) and `Reachability.online`. So a song arriving, or progress four times a second, redraws only those views
+  of the rows on screen - the List draws no others - never Up Next's own body, which makes Core's `upNextView` of
+  the whole queue. Progress is followed once for the sheet, in its `.task` (`followProgress()`, the album page's
+  way), and asks the session only while something is fetching: no timer per row. (History is at most 50 rows, the
+  list 100, then "And N more songs.")
+- **Unchanged**: the row's tap, its words, Edit's moves and removals, the scroll and focus rules, the sheet's
+  closing; no download item anywhere in Up Next.
 
 ### 4.4 Info - where the song plays from
 
@@ -784,7 +827,7 @@ A slim strip **at the top of each page, just under its navigation bar**, pinned 
 | Your albums / All albums (from the root's row, or the root not yet swapped) | albums not on the phone dimmed |
 | an album page | songs not on the phone dimmed; Play and Shuffle take only what's here; mine block hidden; an album with nothing here says so in place of its songs (3.7) |
 | the ••• menus | Play Next / Play Last hidden for a song not here; Download stays (it waits) |
-| Up Next | unchanged in Phase 2 (4.3); the skip notice says it |
+| Up Next | songs not on the phone dimmed, and not buttons out of Edit; in Edit their minus and handle still work; the song playing's card never dimmed (4.3.1) |
 | Now Playing, the mini player, the lock screen | unchanged, but for the line when nothing left is here (7.3) |
 | Info | what it has; rows that need deadwax keep their "…"; Plays from says "This phone - …" (4.4) |
 | You | unchanged; /me's failure is said as now ("a failed ask after a good one keeps the version", screens.md:505) |
@@ -1139,6 +1182,21 @@ The plan's six, then the design's own. Note what you see for each.
 17. **The banner under every bar.** On the Library root (with its Find field), an album page and You > Downloads,
     offline: the banner sits under the bar, the list scrolls under it without showing through, and the bar's title
     and buttons are where they always are.
+18. **Up Next's marks** (4.3.1). Queue a downloaded album, then Play Last an album that isn't; open Up Next: the
+    first album's rows carry the grey filled mark at the end of their line, the second's none. Now Playing's ••• >
+    Download Up Next, with Up Next open again: the second album's rows go dotted, then the ring fills, then the filled
+    mark - nothing else in the row moves. History's rows are marked the same. With VoiceOver: "Roads, play now,
+    Downloaded".
+19. **Up Next offline** (4.3.1). Queue a downloaded album and one that isn't, turn on Airplane Mode, open Up Next:
+    the second album's rows (and any History rows not on the phone) are dimmed, a tap on one does nothing, VoiceOver
+    says "Not on this phone, dimmed"; the song playing's card isn't dimmed. Edit: the dimmed rows' minus and handle
+    work; take one out, move one. At the largest text size, the line wraps and the mark sits after it, level with
+    its first line, clear of the handle.
+20. **The queue kept** (7.5, 7.6). Pause a downloaded album mid-song, close deadwax from the app switcher, turn on
+    Airplane Mode, open it: the song is in the mini player, paused at its second, no notice, Up Next as it was. Skip
+    to another song, pause, close it again; play something on the Mac for a minute; turn Airplane Mode off and open
+    the phone: "Picked up from your Mac" - the Mac's queue, not the phone's offline one. Without the Mac's play, the
+    phone's is put back and the web then picks it up ("Picked up from your iPhone").
 
 ## 11. What only the phone can tell
 
@@ -1192,7 +1250,8 @@ The plan's six, then the design's own. Note what you see for each.
 10. **Offline, the Library root becomes Downloaded** rather than a filter chip on Your albums. **Recommend as
     designed**: a filter on Your albums would hide what was downloaded from All albums, which is on the phone just
     the same - and the swap waits until the root isn't on screen, both ways (5.4).
-11. **Up Next's rows** (marks, dimming offline) **after the Up Next round merges**, as a small follow-up.
+11. **Up Next's rows** (marks, dimming offline) **after the Up Next round merges**, as a small follow-up. **Decided
+    and built** in the finishing round: 4.3.1.
 12. **A long press on a Library tile** (Download, Remove Download)? **Recommend later**, with Phase 4's Library work:
     a tile's menu needs the album's songs first.
 13. **Covers offline for albums not downloaded**: **recommend the empty square** (dimmed anyway); Phase 3 brings

@@ -2760,3 +2760,29 @@ launch with and without one kept; the return after an offline launch, ours and t
 one run asked about first; the 401; the break-glass; the row's round trip through DownloadDatabase and back through
 `resumed()` exactly) and every ResumeControllerTests case unchanged (no keeper: the web's rules). **Not seen**: any
 of it on the phone - Phase 2's checks 17 and 18 (docs/ios.md).
+
+### The finishing round: Up Next's marks and dimming
+
+Part 2's other "Not built", designed first as the spec's 4.3.1 (the design, in full) and built to it, in
+`UpNextScreen.swift` alone - no Core change: the rules it draws are 3.3's (`DownloadWords.mark`, `songLine`,
+`notOnPhone`, `SongDownload.isHere`), already tested.
+
+- **The mark**: the album row's `DownloadMark` at `.caption`, at the end of the row's line ("Portishead · Dummy"),
+  outside its words and fixed - the Library row's `ArtistLine` pattern, because Up Next's rows have that shape (cover,
+  title, line) and no time column; so no slot is held on rows without a state. After the title when there's no line.
+  On every song Up Next shows - History, the card, Playing Next, the list - in Edit too.
+- **Dimmed offline**: by downloads alone, as the album page's rows (the player's `playsHere` also takes a whole
+  stream-cache copy, but its check reads the disk and touches the copy's date - not for a row as it draws). Out of
+  Edit, a dimmed row is disabled; in Edit only its words and mark dim, its minus and handle work. The card is never
+  dimmed.
+- **VoiceOver**: the state as the row's value after its unchanged name ("Roads, play now, Downloaded"; "Not on this
+  phone" and iOS's "dimmed" offline); Edit's element the same; the card's its state. No download action anywhere.
+- **Cheap**: `UpNextSongMark` (a View) and `UpNextDownload` (a ViewModifier, in four parts: a tappable row, an Edit
+  row's look, its words, the card) each read the models for one song, so progress and arrivals redraw only them, never
+  the body that builds `upNextView`; one `followProgress()` for the sheet in its `.task`.
+
+**Verified here**: the unsigned device build, BUILD SUCCEEDED, no new warning; the sims; check_project.py; the iOS
+pytest files. **Not seen**: anything drawn - no simulator, no phone. What only the phone can tell: the spec's checks
+18 and 19 (docs/ios.md's 19 and 20) - the mark's place at the largest text size and in Edit beside the handle, that a
+dimmed disabled row still takes VoiceOver's focus and reads "dimmed", and whether the List redraws only the marks
+while a download's ring fills (assumed from Observation's per-view tracking, not measured).
