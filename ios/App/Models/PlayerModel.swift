@@ -501,6 +501,10 @@ final class PlayerModel {
         reporter.keep = { [weak downloads] songID, timeMs in downloads?.keepPlay(songID: songID, timeMs: timeMs) }
         book.reachable = { [weak reachability] in reachability?.online ?? true }
         book.kept = { [weak downloads] album in downloads?.keptLoudness(album) }
+        //? resume made for whoever the launch already has: one opened from the kept /me is .ready before this model
+        //? watches, and /me answering the same (or not at all, offline) changes nothing it watches. Here, not in init,
+        //? so the controller reads the person's kept queue through `downloads` (7.5)
+        serverChanged()
     }
 
     /// The app came to the front: the position read again, and resume's look for what another device played.
@@ -1018,11 +1022,21 @@ final class PlayerModel {
             client: { [weak self] in self?.server.client },
             shelve: { [weak self] songs in self?.shelve(songs) }
         )
+        // Phase 2: the person's queue kept on this phone, in their download store (7.5, 7.6)
+        let keeper: ResumeKeep? = {
+            guard let address = server.address, let me = server.me else { return nil }
+            return ResumeKeep(
+                downloads: { [weak self] in self?.downloads }, server: address.key, person: DownloadStore.person(me),
+                sizes: { [weak self] id in self?.shelf[id]?.size },
+                shelve: { [weak self] songs in self?.shelve(songs) }
+            )
+        }()
         let made = ResumeController(
             device: Self.deviceID(), label: Resume.label, player: player, server: routes, clock: resumeClock,
             session: { [weak self] in MainActor.assumeIsolated { self?.sessionGeneration() ?? 0 } },
             normalization: { [weak self] in MainActor.assumeIsolated { self?.normalization ?? .default } },
-            say: { [weak self] words in MainActor.assumeIsolated { self?.say(words) } }
+            say: { [weak self] words in MainActor.assumeIsolated { self?.say(words) } },
+            keeper: keeper
         )
         resuming = made
         resumeFor = server.person

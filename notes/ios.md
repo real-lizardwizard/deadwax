@@ -56,8 +56,8 @@ ios/
   DeadwaxKit/               Package.swift (tools 6.0; iOS 17, macOS 14)
     Sources/DeadwaxCore/    pure Swift + Foundation, Swift 6 mode, tested on Linux
     Sources/DeadwaxAudio/   the engine; every file inside #if canImport(AVFAudio); Swift 5 mode
-    Tests/DeadwaxCoreTests/ Swift Testing, 64 tests in Phase 0, 508 in 69 suites at app 0.2
-    Tests/DeadwaxAudioTests/  offline-render tests, macOS only (12 in Phase 0, 54 at app 0.2)
+    Tests/DeadwaxCoreTests/ Swift Testing, 64 tests in Phase 0, 508 in 69 suites at app 0.2, 633 in 83 at 0.3
+    Tests/DeadwaxAudioTests/  offline-render tests, macOS only (12 in Phase 0, 54 at app 0.2, 93 at 0.3)
   scripts/                  install.sh (James's), install_helper.py (its JSON/plist reading, in Xcode's
                             python3), check-linux.sh, check_project.py, make-icon.py, make-test-album.py
   README.md                 a pointer to docs/ios.md and this file
@@ -2624,13 +2624,10 @@ Every place a download is asked for or shown, on part 1's model, to the spec's s
   disclosure under it, as ErrorNote draws them.
 - **With the store unreadable**, You > Downloads draws no lists (not "Nothing downloaded yet", which would be wrong).
 
-**Not built**: Up Next's marks and dimming (4.3: they wait for the Up Next round's merge - one change to its row);
-`queue_pending` and the offline launch's kept queue (7.5's last bullet, 7.6's queue saves - the table and its three
-calls are part 1's, ResumeController isn't wired to them: sending a kept save only after resume's own `GET /queue`
-has had its say is a change to ResumeController's rule, not the screens'). A queue save that fails offline is still
-retried by ResumeController while the app runs; one pending at a force quit is lost, and an Airplane Mode launch
-starts with no queue. Server additions named, not built (a 2.1.x patch on main): a strong ETag on the raw stream
-relay, should the phone find no resume data after a force quit (check 5).
+**Not built** (here): Up Next's marks and dimming (4.3: they waited for the Up Next round's merge); `queue_pending`
+and the offline launch's kept queue (7.5's last bullet, 7.6's queue saves). Both built in the finishing round, below.
+Server additions named, not built (a 2.1.x patch on main): a strong ETag on the raw stream relay, should the phone
+find no resume data after a force quit (check 5).
 
 **Verified here**: the whole DeadwaxKit package on macOS (603 Core tests, OfflinePlayTests among them; 93 engine
 tests, the downloaded copy rendering its stream's samples); the unsigned device build, BUILD SUCCEEDED with no new
@@ -2700,7 +2697,7 @@ background `URLSession`, file protection, `NWPathMonitor` and the request's netw
   from memory).
 - The album's answer, cover and loudness are asked over mobile data under Wi-Fi only: small foreground requests on
   the app's own session, as 8.3 has the cover; only the songs' tasks carry the setting's flags.
-- `queue_pending` and the offline launch's kept queue: still part 2's "Not built".
+- `queue_pending` and the offline launch's kept queue: part 2's "Not built" (built in the finishing round).
 - `iostraces.sim.cjs` fails here as it does on `b4ee591` (`export-traces.cjs`'s `stateOf`, under Node 20.12 - below
   the repo's `^20.19`); nothing it reads changed on this branch.
 
@@ -2717,3 +2714,104 @@ One change in the merge itself, in `PlayerModel.jump(to:)`: Phase 2 marks the so
 (OfflinePlay.chosen). Up Next's History, merged first, plays a History row's song again as a new entry under a new
 key - so after a jump that took, `chosenKey` is read from the controller's queue (the entry now playing), not taken
 from the row tapped. Reasoned from the code; not seen on a phone.
+
+### The finishing round: the queue kept on the phone
+
+Part 2's first "Not built" (7.5's last bullet, 7.6's queue saves), built in Core's ResumeController - the rule, tested
+on Linux - with the App only wiring it.
+
+- **What is kept** (`QueueKept`, Core): the queue this phone last saved or took, as GET /queue would answer it had
+  deadwax kept this phone's save - the window a full save sends, its songs (`Song(track:)`, with the size the player
+  holds), this phone's own record - so `resumed()` puts it back exactly (Up Next's account, the levels, the second)
+  and says nothing. Plus the rev and the answer's signature this phone last knew, and `unsent`. One `queue_pending`
+  row in the person's download store: `kind` `unsent` or `sent`, the body its JSON. Written as each save is sent
+  (unsent - the app may be closed, or the network gone, before the answer), as a save is answered (sent - only while
+  the row is still that save's: a newer one kept meanwhile stays unsent), and as a queue is put back (taken). The
+  break-glass admin's first save answering no rev forgets it.
+- **Departure: a sent save doesn't delete the row; it marks it sent.** 7.5 needs "the last queue this phone saved or
+  took" for an offline launch, and a deleted row would leave Airplane Mode starting empty whenever the last save had
+  gone through - nearly always. The unsent save is what's cleared.
+- **The open** (`start`, as before: the queue empty, deadwax asked). Not answered - whatever the failure: offline,
+  deadwax or Navidrome away, a 401 - the kept queue is put back paused, no notice, as the baseline (nothing saved for
+  it until it is played or changed; its ids_rev not believed, so the first save after is full). Answered, with a save
+  kept unsent: a queue another device or app saved since this phone last saved or took - `newer()` with the kept rev,
+  and not the answer it already took (the kept signature; so a Symfonium queue this phone picked up before playing on
+  offline isn't "new") - wins, taken as resume takes one, and the kept save is let go; else the phone's own is put
+  back and sent at once, after the GET. Answered with nothing unsent: taken as Phase 1 takes it.
+- **The return** (`front`): with a save kept unsent and none out, deadwax is asked FIRST - before Phase 1's "changes
+  not yet saved are saved, nothing asked" - and the same rule decides. Within one run too: a save that failed offline
+  isn't sent blind at the next return; a Mac that played since wins. Only open and return wait for the ask: a save
+  due while playing, at a pause, a wait or the background goes as Phase 1's do (the queue playing here is the
+  present) - so a phone paused offline, then put in the background once deadwax is back, sends its save there without
+  asking. Named, left: asking first there would need the GET inside the background task.
+- **A 401** holds it: the row stays unsent in that person's store; a return asks and sends nothing while the session
+  is the one refused; the same person signed in again (the session moves) sends it at the next return. Someone else
+  has their own store, so their controller never sees it.
+- **The App** (`ResumeKeep`, PlayerModel+Resume.swift): reaches the store through `DownloadModel.keptQueue/keepQueue`
+  by the (server, person) the controller was made for - `DownloadModel.store(server:person:)` opens it aside when the
+  model hasn't yet (the two watch the server separately, in no set order). Sizes come from the player's shelf, and a
+  row read is shelved, so after a relaunch Info has its songs and the stream cache's whole-copy check its sizes.
+  `DownloadStore.person(_:)` names whose store /me means, for both.
+
+**Verified here**: ResumeKeptTests (16: kept unsent and sent; an older save's answer leaving a newer kept save unsent;
+a queue taken kept; the open with the Mac newer, with this phone's own older save, with the Mac older than this
+phone's last, with another app's queue taken before and saved since, with the kept queue already sent; an offline
+launch with and without one kept; the return after an offline launch, ours and the Mac's; a save that failed within
+one run asked about first; the 401; the break-glass; the row's round trip through DownloadDatabase and back through
+`resumed()` exactly) and every ResumeControllerTests case unchanged (no keeper: the web's rules). **Not seen**: any
+of it on the phone - Phase 2's checks 17 and 18 (docs/ios.md).
+
+### The finishing round: Up Next's marks and dimming
+
+Part 2's other "Not built", designed first as the spec's 4.3.1 (the design, in full) and built to it, in
+`UpNextScreen.swift` alone - no Core change: the rules it draws are 3.3's (`DownloadWords.mark`, `songLine`,
+`notOnPhone`, `SongDownload.isHere`), already tested.
+
+- **The mark**: the album row's `DownloadMark` at `.caption`, at the end of the row's line ("Portishead · Dummy"),
+  outside its words and fixed - the Library row's `ArtistLine` pattern, because Up Next's rows have that shape (cover,
+  title, line) and no time column; so no slot is held on rows without a state. After the title when there's no line.
+  On every song Up Next shows - History, the card, Playing Next, the list - in Edit too.
+- **Dimmed offline**: by downloads alone, as the album page's rows (the player's `playsHere` also takes a whole
+  stream-cache copy, but its check reads the disk and touches the copy's date - not for a row as it draws). Out of
+  Edit, a dimmed row is disabled; in Edit only its words and mark dim, its minus and handle work. The card is never
+  dimmed.
+- **VoiceOver**: the state as the row's value after its unchanged name ("Roads, play now, Downloaded"; "Not on this
+  phone" and iOS's "dimmed" offline); Edit's element the same; the card's its state. No download action anywhere.
+- **Cheap**: `UpNextSongMark` (a View) and `UpNextDownload` (a ViewModifier, in four parts: a tappable row, an Edit
+  row's look, its words, the card) each read the models for one song, so progress and arrivals redraw only them, never
+  the body that builds `upNextView`; one `followProgress()` for the sheet in its `.task`.
+
+**Verified here**: the unsigned device build, BUILD SUCCEEDED, no new warning; the sims; check_project.py; the iOS
+pytest files. **Not seen**: anything drawn - no simulator, no phone. What only the phone can tell: the spec's checks
+18 and 19 (docs/ios.md's 19 and 20) - the mark's place at the largest text size and in Edit beside the handle, that a
+dimmed disabled row still takes VoiceOver's focus and reads "dimmed", and whether the List redraws only the marks
+while a download's ring fills (assumed from Observation's per-view tracking, not measured).
+
+### The finishing round: app 0.3 (3)
+
+The app is **0.3 (3)**, Phase 2's downloads, as the spec planned for its merge (its section 1): `Base.xcconfig`'s
+`MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`, pinned with it in `check_project.py` (MARKETING_VERSION, BUILD),
+`ios.yml`'s check of the built Info.plist and `tests/test_ios_install.py`'s read of the real xcconfig - as 0.2 was.
+The guide (its opening, install.sh's line, About's App row), ios/README.md and the two doc comments giving About's
+row as an example say 0.3; the comments naming "James's check of 0.2 (2)" are history and stay. `src/__init__.py`'s
+`__version__` is the server's and wasn't touched.
+
+**Review** (the finishing round's three commits). Two fixes. (1) **Resume was never made at a launch from the kept
+/me** (part 2's 7.5): ServerModel is `.ready` from it before PlayerModel watches, and /me answering the same - the
+`@Observable` setter skips an equal `Equatable` value (checked in this Xcode's macro expansion) - or not at all
+offline changes nothing PlayerModel watches, so no queue was put back at any launch after the first, and the offline
+launch's kept queue never could be. PlayerModel now runs `serverChanged()` once at the end of `connect(downloads:)` -
+there, not in `init`, so the controller reads the person's kept queue through `downloads`. Build only; App code has no
+test target. (2) **`settleKept` let the kept save go when `take` declined** - logins off with this phone's queue
+paused here, the player refusing, an answer `resumed()` can't read: the row said sent, nothing was sent, nothing
+taken. Now only a queue put back lets it go (`take` says whether it did); otherwise the phone's own is sent, as
+Phase 1's return would have saved it (ResumeKeptTests, logins off: fails before, passes after). Measured, left: the
+row's rewrite at 2000 songs (700 KB), a debug build on this Mac, is ~12 ms at a send (toSave 5, encode 6.5, write 1)
+and ~7 ms at its answer, on the main thread, and ~13 ms to read as the controller is made; an album's queue is a
+hundredth of it. Held as built: the `write == keptWrites` guard, the store opened aside by (server, person), Up Next
+against 4.3.1 / 3.3 / 7.4 (a progress tick redraws every visible mark and modifier - Observation tracks `received`
+whole - never the list's body). For James: within one run, one failed save (online too) makes the next return ask
+first, so a queue another device saved since wins even over edits made here after it, which Phase 1's return would
+have saved; a phone with no rev yet counts any other device's record as newer; an offline launch's queue appears only
+once the open's GET fails - at once in Airplane Mode, up to the transport's 8 s with a network up and deadwax out of
+reach (Reachability isn't asked).

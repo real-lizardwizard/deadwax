@@ -9,7 +9,8 @@ import Foundation
 /// - `loudness`: its loudness answer, so it plays at the same level offline.
 /// - `song`: one row per song asked for or here (`DownloadRecord`). Progress is never kept: it is read from the tasks.
 /// - `origin`: why each song is wanted - a song with none left is removed.
-/// - `play_pending`, `queue_pending`: plays and the latest queue save kept until deadwax answers (7.6).
+/// - `play_pending`, `queue_pending`: plays kept until deadwax answers, and the queue this phone last saved or took -
+///   a save deadwax hasn't answered among them (7.5, 7.6; QueueKept).
 /// - `meta`: the store's own facts (`force_quit_at`).
 ///
 /// Not thread-safe: one owner (the App's DownloadStore) calls it from one place at a time.
@@ -280,9 +281,10 @@ public final class DownloadDatabase {
         try run("DELETE FROM play_pending WHERE id = ?", [.int(id)])
     }
 
-    /// The latest queue save not yet sent: one row, replaced by each.
+    /// The queue this phone last saved or took, and whether deadwax has it: one row, replaced by each (QueueKept
+    /// reads and writes it - `keptResume`, `keepResume`).
     public struct PendingQueue: Sendable, Equatable {
-        /// Which route it goes to: `queue` or `at` (Routes.saveQueue, saveQueueAt).
+        /// Whether deadwax has it: QueueKept's `unsent` or `sent`.
         public let kind: String
         public let body: Data
         public let keptAt: Int64

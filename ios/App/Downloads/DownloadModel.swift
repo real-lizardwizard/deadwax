@@ -449,6 +449,26 @@ final class DownloadModel {
         }
     }
 
+    // MARK: the queue kept (7.5, 7.6)
+
+    /// The person's queue kept on this phone (resume's: ResumeController reads it as it is made for them) - nil for
+    /// none, or when their store can't be opened. By (server, person), not the open store: the player's resume may be
+    /// made before this model has opened the person's store.
+    func keptQueue(server: String, person: String) -> QueueKept? {
+        guard let found = store(server: server, person: person) else { return nil }
+        return try? found.database.keptResume()
+    }
+
+    /// The person's kept queue replaced (nil: forgotten) - as resume saves or takes a queue.
+    func keepQueue(_ kept: QueueKept?, server: String, person: String) {
+        guard let found = store(server: server, person: person) else { return }
+        do {
+            try found.database.keepResume(kept, at: Int64(Date().timeIntervalSince1970 * 1000))
+        } catch {
+            note("couldn't keep the queue: \(error)")
+        }
+    }
+
     // MARK: the person and the server
 
     private func watchServer() {
@@ -473,7 +493,7 @@ final class DownloadModel {
         if let refused = refusedSession, refused != server.client?.session { refusedSession = nil }
         let key: (server: String, person: String)? = {
             guard let address = server.address, let me = server.me else { return nil }
-            return (address.key, me.loginsOn ? me.user : "local")
+            return (address.key, DownloadStore.person(me))
         }()
         if let store, key.map({ $0.server != store.server || $0.person != store.person }) ?? true {
             close(store)
@@ -913,12 +933,19 @@ final class DownloadModel {
 
     /// The store a task's end belongs in, and whether it is the signed-in person's.
     private func storeFor(_ name: DownloadTaskName) -> (DownloadStore, Bool)? {
-        if let store, store.server == name.server, store.person == name.person { return (store, true) }
-        let key = "\(name.server)|\(name.person)"
-        if let other = elsewhere[key] { return (other, false) }
-        guard let opened = try? DownloadStore(server: name.server, person: name.person) else { return nil }
+        guard let found = store(server: name.server, person: name.person) else { return nil }
+        return (found, found === store)
+    }
+
+    /// A person's store: the open one when it is theirs, else one opened aside (kept in `elsewhere`, which `open` takes
+    /// it from when they are signed in).
+    private func store(server: String, person: String) -> DownloadStore? {
+        if let store, store.server == server, store.person == person { return store }
+        let key = "\(server)|\(person)"
+        if let other = elsewhere[key] { return other }
+        guard let opened = try? DownloadStore(server: server, person: person) else { return nil }
         elsewhere[key] = opened
-        return (opened, false)
+        return opened
     }
 
     /// A finished file checked for length (8.4 step 1): the song's own name and here - playing from now on - or deleted

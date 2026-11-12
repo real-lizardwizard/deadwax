@@ -5,7 +5,8 @@ import UIKit
 // Resume what was playing (D5, resume.md 6-8): Core's ResumeController, reached the player, deadwax and the clock
 // through these. The model makes one per signed-in person (logins off: one) once /me has answered, observes it at
 // every change of the queue or of playing, tells it each position while playing and each seek, and as the app goes
-// to the back and comes to the front.
+// to the back and comes to the front. Phase 2: it is given the person's kept queue (ResumeKeep), which an app opened
+// with deadwax out of reach puts back, and which holds a save deadwax hasn't answered until it has been asked.
 
 /// The player as resume reads it: the engine's position now (a queue put back answers its parked second), and its
 /// one action, the queue put back paused (QueueController.restoreQueue).
@@ -84,6 +85,44 @@ final class ResumeRoutes: ResumeServer {
     /// read) otherwise.
     static func failure(_ error: any Error) -> ResumeFailure {
         ResumeFailure(status: (error as? APIFailure)?.status)
+    }
+}
+
+/// The person's queue kept on this phone (Phase 2, phase2-downloads.md 7.5, 7.6): their download store's queue_pending
+/// row, reached through the DownloadModel by the (server, person) the controller was made for - never anyone else's,
+/// whoever is signed in by the time it writes. The songs' sizes the player holds ride along with it, and a queue read
+/// is shelved, so after a relaunch Info has its songs and the stream cache's whole-copy check its sizes, as a queue
+/// fetched from deadwax gives them.
+final class ResumeKeep: ResumeKeeper {
+    private let downloads: @MainActor () -> DownloadModel?
+    private let server: String
+    private let person: String
+    private let sizes: @MainActor (String) -> Int64?
+    private let shelve: @MainActor ([Song]) -> Void
+
+    init(downloads: @escaping @MainActor () -> DownloadModel?, server: String, person: String,
+         sizes: @escaping @MainActor (String) -> Int64?, shelve: @escaping @MainActor ([Song]) -> Void) {
+        self.downloads = downloads
+        self.server = server
+        self.person = person
+        self.sizes = sizes
+        self.shelve = shelve
+    }
+
+    func read() -> QueueKept? {
+        MainActor.assumeIsolated {
+            let kept = downloads()?.keptQueue(server: server, person: person)
+            if let kept { shelve(kept.answer.tracks) }
+            return kept
+        }
+    }
+
+    func write(_ kept: QueueKept?) {
+        MainActor.assumeIsolated { downloads()?.keepQueue(kept, server: server, person: person) }
+    }
+
+    func size(of songID: String) -> Int64? {
+        MainActor.assumeIsolated { sizes(songID) }
     }
 }
 
