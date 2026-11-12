@@ -501,6 +501,10 @@ final class PlayerModel {
         reporter.keep = { [weak downloads] songID, timeMs in downloads?.keepPlay(songID: songID, timeMs: timeMs) }
         book.reachable = { [weak reachability] in reachability?.online ?? true }
         book.kept = { [weak downloads] album in downloads?.keptLoudness(album) }
+        //? resume made for whoever the launch already has: one opened from the kept /me is .ready before this model
+        //? watches, and /me answering the same (or not at all, offline) changes nothing it watches. Here, not in init,
+        //? so the controller reads the person's kept queue through `downloads` (7.5)
+        serverChanged()
     }
 
     /// The app came to the front: the position read again, and resume's look for what another device played.

@@ -35,8 +35,9 @@ import Foundation
 // paused, as an answer would be put back, and says nothing - it is this phone's own. While a save is kept unsent and
 // none is out, the next open or return to the front asks deadwax FIRST: a queue another device or app saved since this
 // phone last saved or took (`newer`, and not the answer it already took) wins, as a position save's 409 has it
-// (resume.md Open question 4) - taken as resume takes one, the kept save let go; else the phone's own is put back
-// (into an empty player) and sent at once. Only open and return wait for that ask: a save due while playing, a pause,
+// (resume.md Open question 4) - taken as resume takes one, the kept save let go; else, or when resume's rules don't
+// take it (logins off, this phone's queue paused here), the phone's own is put back (into an empty player) and sent at
+// once. Only open and return wait for that ask: a save due while playing, a pause,
 // a wait or the background goes as Phase 1's do - the queue playing here is the present. A 401 holds the kept save
 // for the same person (its store; saving resumes when the session moves); someone else's controller has their own.
 
@@ -377,19 +378,21 @@ public final class ResumeController {
         return "\(answer.changed_by)|\(index)|\(answer.position)|\(answer.tracks.map(\.id).joined(separator: ","))"
     }
 
-    private func take(_ answer: QueueAnswer, _ why: Why) {
-        guard let queue else { return }
-        guard let back = resumed(answer, setting: normalization(), device: device) else { return }
+    /// - Returns: whether it was put back (a kept save not sent is let go only when it was).
+    @discardableResult
+    private func take(_ answer: QueueAnswer, _ why: Why) -> Bool {
+        guard let queue else { return false }
+        guard let back = resumed(answer, setting: normalization(), device: device) else { return false }
         let sign = signature(answer)
         let untouched = parked.map { $0.queue == queue } ?? false
         if why == .front {
-            if sign == taken { return }
-            if queue.current != nil && !untouched && (answer.shared || !newer(answer)) { return }
+            if sign == taken { return false }
+            if queue.current != nil && !untouched && (answer.shared || !newer(answer)) { return false }
         }
         restoring = true
         let restored = player.restoreQueue(back.queue, position: back.position)
         restoring = false
-        guard let put = restored else { return }
+        guard let put = restored else { return false }
         taken = sign
         let position = player.position()
         parked = (put, position)
@@ -422,6 +425,7 @@ public final class ResumeController {
         let again = why == .front && untouched && said?.from == from && said?.ids == songs
         if !again, let words = pickedUpWords(back.from, shared: answer.shared) { say(words) }
         said = from.map { ($0, songs) }
+        return true
     }
 
     private func ask(_ why: Why) {
@@ -491,17 +495,13 @@ public final class ResumeController {
     /// A save kept unsent, and deadwax's answer in hand (`holdsUnsent` when it was asked): a queue another device or
     /// app saved since this phone last saved or took - newer, and not the one it already took - wins, taken as resume
     /// takes one (by its own rules: into an empty player, or a queue put back and untouched; a paused one only with
-    /// logins on), and the kept save is let go. Else this phone's own is put back into an empty player and sent now.
+    /// logins on), and the kept save is let go (the row now the queue taken). Else - or when those rules don't take it
+    /// (logins off, this phone's queue paused here: Phase 1's return saves it) - this phone's own is put back into an
+    /// empty player and sent now.
     private func settleKept(_ answer: QueueAnswer, _ why: Why) {
         guard let row = kept else { return }
-        if signature(answer) != taken && newer(answer) {
-            take(answer, why)
-            if var left = kept, left.unsent {
-                left.unsent = false
-                rewrite(left)
-            }
-            return
-        }
+        //? only a queue put back lets the kept save go: one declined leaves this phone's queue in the player, unsaved
+        if signature(answer) != taken && newer(answer) && take(answer, why) { return }
         if queue?.current == nil { putBack(row) }
         sendKept()
     }

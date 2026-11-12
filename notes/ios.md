@@ -56,7 +56,7 @@ ios/
   DeadwaxKit/               Package.swift (tools 6.0; iOS 17, macOS 14)
     Sources/DeadwaxCore/    pure Swift + Foundation, Swift 6 mode, tested on Linux
     Sources/DeadwaxAudio/   the engine; every file inside #if canImport(AVFAudio); Swift 5 mode
-    Tests/DeadwaxCoreTests/ Swift Testing, 64 tests in Phase 0, 508 in 69 suites at app 0.2, 632 in 83 at 0.3
+    Tests/DeadwaxCoreTests/ Swift Testing, 64 tests in Phase 0, 508 in 69 suites at app 0.2, 633 in 83 at 0.3
     Tests/DeadwaxAudioTests/  offline-render tests, macOS only (12 in Phase 0, 54 at app 0.2, 93 at 0.3)
   scripts/                  install.sh (James's), install_helper.py (its JSON/plist reading, in Xcode's
                             python3), check-linux.sh, check_project.py, make-icon.py, make-test-album.py
@@ -2795,3 +2795,23 @@ The app is **0.3 (3)**, Phase 2's downloads, as the spec planned for its merge (
 The guide (its opening, install.sh's line, About's App row), ios/README.md and the two doc comments giving About's
 row as an example say 0.3; the comments naming "James's check of 0.2 (2)" are history and stay. `src/__init__.py`'s
 `__version__` is the server's and wasn't touched.
+
+**Review** (the finishing round's three commits). Two fixes. (1) **Resume was never made at a launch from the kept
+/me** (part 2's 7.5): ServerModel is `.ready` from it before PlayerModel watches, and /me answering the same - the
+`@Observable` setter skips an equal `Equatable` value (checked in this Xcode's macro expansion) - or not at all
+offline changes nothing PlayerModel watches, so no queue was put back at any launch after the first, and the offline
+launch's kept queue never could be. PlayerModel now runs `serverChanged()` once at the end of `connect(downloads:)` -
+there, not in `init`, so the controller reads the person's kept queue through `downloads`. Build only; App code has no
+test target. (2) **`settleKept` let the kept save go when `take` declined** - logins off with this phone's queue
+paused here, the player refusing, an answer `resumed()` can't read: the row said sent, nothing was sent, nothing
+taken. Now only a queue put back lets it go (`take` says whether it did); otherwise the phone's own is sent, as
+Phase 1's return would have saved it (ResumeKeptTests, logins off: fails before, passes after). Measured, left: the
+row's rewrite at 2000 songs (700 KB), a debug build on this Mac, is ~12 ms at a send (toSave 5, encode 6.5, write 1)
+and ~7 ms at its answer, on the main thread, and ~13 ms to read as the controller is made; an album's queue is a
+hundredth of it. Held as built: the `write == keptWrites` guard, the store opened aside by (server, person), Up Next
+against 4.3.1 / 3.3 / 7.4 (a progress tick redraws every visible mark and modifier - Observation tracks `received`
+whole - never the list's body). For James: within one run, one failed save (online too) makes the next return ask
+first, so a queue another device saved since wins even over edits made here after it, which Phase 1's return would
+have saved; a phone with no rev yet counts any other device's record as newer; an offline launch's queue appears only
+once the open's GET fails - at once in Airplane Mode, up to the transport's 8 s with a network up and deadwax out of
+reach (Reachability isn't asked).

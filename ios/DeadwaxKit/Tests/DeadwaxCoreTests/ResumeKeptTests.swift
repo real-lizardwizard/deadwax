@@ -232,6 +232,34 @@ private func ownAnswer(_ ids: [String], _ index: Int, _ position: Double, rev: I
         #expect(p.ask(.full, 1).full?.ids == ["a", "b"])
     }
 
+    @Test func loginsOffAQueueAPausedPlayerWontTakeLeavesThePhonesOwnToSend() {
+        // logins off, a paused player never takes somebody else's queue (Phase 1): the kept save isn't let go for one it
+        // didn't take - the phone's queue is still the one here, and is sent, as Phase 1's return would have saved it
+        let keeper = FakeQueueKeeper()
+        let p = ResumePage(keeper: keeper)
+        p.set(startUpNext(queueOf(["a", "b"]), start: 0), playing: true)
+        p.play(2_250)
+        p.ask(.full, 0).ok(7, 7)
+        p.play(5_000)
+        p.set(p.player.queue, playing: false)
+        p.run(10)
+        p.ask(.at, 0).refuse(.unanswered)
+        p.run(0)
+        #expect(keeper.row?.unsent == true)
+        p.run(16_000)
+        p.focus()
+        p.asked(.get).last?.answer(answerOf(["m1"], 0, 0, shared: true, kept: keptOf(["m1"], 0, 0, rev: 9)))
+        p.run(10)
+        #expect(p.player.restored.isEmpty)
+        #expect(p.asked(.at).count == 2)
+        #expect(keeper.row?.unsent == true)
+        #expect(keeper.row?.answer.kept?.ids == ["a", "b"])
+        p.ask(.at, 1).ok(10, 7)
+        p.run(0)
+        #expect(keeper.row?.unsent == false)
+        #expect(keeper.row?.rev == 10)
+    }
+
     // MARK: a 401
 
     @Test func a401HoldsTheKeptSaveForTheSamePerson() {
