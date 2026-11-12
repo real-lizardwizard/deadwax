@@ -127,7 +127,7 @@ public enum APOReader {
         var bytes = data[...]
         if bytes.starts(with: [0xEF, 0xBB, 0xBF]) { bytes = bytes.dropFirst(3) }
         if !bytes.contains(0x0A) && bytes.dropLast().contains(0x0D) { throw EQWords.Import.crOnly }
-        return (bytes.split(separator: 0x0A, omittingEmptySubsequences: false).map { raw in
+        return (bytes.split(separator: 0x0A, omittingEmptySubsequences: false).map { (raw: ArraySlice<UInt8>) -> Line in
             let line = raw.last == 0x0D ? raw.dropLast() : raw
             let decoded = Array(String(decoding: line, as: UTF8.self).unicodeScalars)
             if !decoded.contains(replacement) { return decoded }

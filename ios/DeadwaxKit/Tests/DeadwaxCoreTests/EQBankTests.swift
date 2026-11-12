@@ -48,11 +48,43 @@ import Testing
         //? the automatic preamp over both ears, each with its offset; the levels the preamp and each ear's offset
         let ears = [EQResponse.Ear(sections: bank.left, offset: 0), EQResponse.Ear(sections: bank.right, offset: -1.5)]
         #expect(bank.preamp == EQPreamp.automatic(ears, rate: 48000) && bank.preamp < 0)
-        #expect(bank.levels == [bank.preamp, bank.preamp - 1.5, bank.preamp].map(EQPreamp.linear))
+        let shared = min(bank.preamp, EQPreamp.automatic([EQResponse.Ear(sections: bank.shared)], rate: 48000))
+        #expect(bank.levels == [bank.preamp, bank.preamp - 1.5, shared].map(EQPreamp.linear))
         //? set by hand, the preamp is yours
         let hand = Self.make(offsets: EQPreampParts(all: -6, left: -2, right: 0), preamp: -7.5)
         #expect(hand.preamp == -7.5 && hand.levels == [-9.5, -7.5, -7.5].map(EQPreamp.linear))
         #expect(bank.key == "bluetooth:1" && bank.version == 3 && bank.rate == 48000)
+    }
+
+    /// Channels 2 and up play the shared list at the preamp; automatic, its own top is counted for it when the ears'
+    /// curves aren't it (1.4): no channel over 0 dB, and the ears not lowered for it.
+    @Test func noChannelGoesOverFullScale() {
+        //? both ears cut what the shared filter boosts: the ears are flat, the shared list 6 dB up at 1 kHz
+        let cancelled = [EQFilter(id: 1, kind: .peak, fc: 1000, gain: 6, width: .q(1)),
+                         EQFilter(id: 2, kind: .peak, fc: 1000, gain: -6, width: .q(1), channel: .left),
+                         EQFilter(id: 3, kind: .peak, fc: 1000, gain: -6, width: .q(1), channel: .right)]
+        func topOver(_ sections: [EQSection], _ level: Double) -> Double {
+            EQResponse.top([EQResponse.Ear(sections: sections, offset: 20 * log10(level))], rate: 48000).db
+        }
+        let bank = Self.make(correction: cancelled)
+        #expect(bank.preamp == 0 && bank.levels[0] == 1 && bank.levels[1] == 1)
+        #expect(bank.levels[2] == EQPreamp.linear(-6))
+        #expect(topOver(bank.shared, bank.levels[2]) <= 1e-9)
+        //? both ears' offsets below 0 (a settings file's parts, not normalised): the ears' tops are 3 dB under the
+        //  shared list's
+        let quieter = Self.make(correction: [cancelled[0]], offsets: EQPreampParts(all: 0, left: -3, right: -3))
+        #expect(quieter.preamp == -3 && quieter.levels[0] == EQPreamp.linear(-6) && quieter.levels[2] == EQPreamp.linear(-6))
+        #expect(topOver(quieter.shared, quieter.levels[2]) <= 1e-9)
+        //? no per-ear filters and an ear at offset 0: the shared list is that ear's, at its level - nothing more asked
+        let plain = Self.make(correction: [cancelled[0]], offsets: EQPreampParts(all: 0, left: 0, right: -2))
+        #expect(plain.levels[2] == plain.levels[0] && plain.preamp == -6)
+        //? set by hand, the preamp is yours on every channel
+        let hand = Self.make(correction: cancelled, preamp: 0)
+        #expect(hand.levels == [1, 1, 1])
+        //? the shared list never louder than the preamp, even where its curve only cuts
+        let cuts = Self.make(correction: [EQFilter(id: 1, kind: .peak, fc: 1000, gain: -6, width: .q(1)),
+                                          EQFilter(id: 2, kind: .peak, fc: 3000, gain: 4, width: .q(1), channel: .left)])
+        #expect(cuts.levels[2] == EQPreamp.linear(cuts.preamp) && cuts.preamp < 0)
     }
 
     @Test func theCurveIsMadeAgainAtEachRate() {

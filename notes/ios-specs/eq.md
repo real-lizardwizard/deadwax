@@ -415,7 +415,11 @@ level. Core's `EQResponse` gives a curve's dB at any frequency for a given rate,
 
 **The automatic preamp** (James's decision), Core's `EQPreamp.automatic`:
 
-- The curve's **top**: its largest dB over every channel, at the rate it plays at (48 kHz while an output isn't
+- The curve's **top**: its largest dB over every channel, at the rate it plays at (as built, after slice 1's review:
+  over the two ears' curves, each with its offset, for the preamp; channels 2 and up play the shared list, and where
+  that isn't one of the ears' curves at its level - per-ear filters, or both ears' offsets below 0 - its own top is
+  counted for it alone, so its level is the preamp or lower and the ears aren't lowered for channels a stereo output
+  hasn't got) (48 kHz while an output isn't
   connected). Found in two steps: the curve at DC, every 1/48 octave from 10 Hz to just below Nyquist, each filter's
   own `f0`, and Nyquist; then **each local maximum among those points refined** - a golden-section search on log
   frequency between its two neighbours, 80 rounds (to well under 1e-6 dB), deterministic. A lone peak's top is at
@@ -1761,7 +1765,8 @@ ios/App, src/ or ui/ changed, and no version moved.
 - **Tests**: DeadwaxCore 655 tests in 86 suites before, **745 in 98** after - 12 suites, 90 tests: EQFilterTests 8,
   AutoEqProfileTests 3, EQPreampTests 8, APOReaderTests 18, APOWriterTests 6, GraphicEQFitTests 4, EQBankTests 6,
   EQRenderTests 12, EQOutputsTests 4, EQSettingsTests 6, EQWordsTests 11, EQChartTests 4. DeadwaxAudio's 93 unchanged.
-  `tests/test_ios_eq_fixtures.py`, 9 tests: the script run into a temporary folder, byte for byte what is committed.
+  `tests/test_ios_eq_fixtures.py`, 9 tests: the script run into a temporary folder, byte for byte what is committed
+  (10 since the review, and byte for byte only on the machine that wrote them - see its Review).
 - **The fixtures**: 1.5 MB - filters.json 740 KB (171 cases: 59 at 48 kHz, 16 at each other rate), render.json
   256 KB, profiles.json 97 KB, apo.json 83 KB (52 hand-made files of `apo/`), graphic.json 16 KB, preamp.json 5 KB, and
   AutoEq's own files at 7ae0f56 (16 .txt, 2 .csv, its MIT licence and a README naming each measurer).
@@ -1807,7 +1812,8 @@ ios/App, src/ or ui/ changed, and no version moved.
   - a GraphicEQ point's gain outside +-30 dB is refused with the gain's words (3.9's table; past it the fit's sums
     overflow), and `1e999` - `wcstod`'s infinity - is refused by its range ("inf Hz");
   - the automatic preamp's top is the left's and the right's, with their offsets; the shared list (channels 3 and up)
-    plays at the same preamp and isn't looked at separately - a correction with per-ear cuts could leave it louder;
+    plays at the same preamp and isn't looked at separately - a correction with per-ear cuts could leave it louder
+    (changed in the review: its own top is counted for it);
   - several ports that aren't all AirPlay are their first; AirPlay rooms are named in their UIDs' order;
   - the chart's range past 24 dB is the next multiple of 6; "decibel" is singular at exactly 1; the summary is over
     every ear's shape, without the preamp or the ears' offsets;
@@ -1820,6 +1826,40 @@ ios/App, src/ or ui/ changed, and no version moved.
   ulp, which the 1e-13 coefficient bound allows; the render's tests run on the fixtures' own coefficients, so libm
   can't differ underneath them. ios.yml itself. Any real AVAudioSession route (the output table is 3.12's, by enum,
   never by a live `portType`).
+- **Review** (2026-11-12, after merging ios at 91c2dab - the turntable's slice 1 and the lyrics; one conflict, in
+  notes/ios.md, both sections kept). Read against 5.1, 0.3-0.4, 1.3-1.7, 3.5-3.13, 4 and 8, and APO's source at
+  53d885f7f1: the four spec corrections hold (BiQuadFilterFactory.cpp:142-189, PreampFilterFactory.cpp:39-40,
+  BiQuad.cpp:37-42 and BiQuadFilter.cpp:47-58, GainIterator.cpp:74-77), and the render keeps 1.5's rules (DF1 in
+  Double in 1.5's order, nothing allocated, locked or read from a static per block, the weights and constants copied
+  into the state at allocation, the newest bank waiting, warm starts by id, the identity untouched). Changed:
+  - **The fixture test holds on any machine.** Run with every libm and numpy result moved by up to three ulps (a
+    stand-in for CI's x64 Linux), the script's output failed the old comparison in two places: the GraphicEQ fit's
+    unrounded gains moved by up to 9e-8 dB (its Jacobian is a finite difference over 0.001 dB, which magnifies the
+    curve's last bit 500 times; the old bound was 5e-9 of the gain), and Treble Reduce's top at 44.1 kHz moved from
+    DC to Nyquist (a tie at 0 dB). Now, as the turntable's fixtures do (notes/ios.md), `made.json` records the
+    machine (platform, Python, numpy, scipy) and the script's sha256: the sha is checked everywhere, every file byte
+    for byte where the machine is the maker's, and elsewhere numbers within 5e-9 of themselves, unrounded gains
+    within 1e-6 dB (GraphicEQFitTests' own bound; the script refuses a gain that close to a rounding boundary, and
+    the rounded ones are compared exactly), Float64 arrays within 1e-9 of their largest value, Float32 within two of
+    their ulps (a curve's dB also within 1e-5 - a 1 Hz filter at 192 kHz moves by 6e-7 dB), the render's input bit
+    for bit, and where a top is only where it is clear of 0 dB. The stand-in passes at one ulp and at three; a 10%
+    change to the fit's lambda, a peak's A changed by 2.5e-8 of itself, and a level by 1e-6 dB each fail it; a
+    change at the last bit (DF1's order, pi to 15 digits) fails only the maker's byte check and the sha. numpy is
+    pinned by requirements.txt (2.5.3) and scipy by tests.yml (1.18.1). The project's own .venv has no scipy, so on
+    this Mac the test runs (and the full check with it) only in a venv that has - the fixtures were written in one.
+  - **No channel over 0 dB under the automatic preamp.** Channels 2 and up played the shared list at the ears'
+    preamp, unlooked-at: a shared +6 dB peak that each ear's own filter cancels gave a 0 dB preamp and a channel
+    6 dB over full scale. `EQBank.make` now counts the shared list's own top for it when it isn't one of the ears'
+    curves at its level (1.4, above); EQBankTests.noChannelGoesOverFullScale (it fails with the change taken out).
+  - **Closures typed for Xcode 26.6's Swift**: the multi-statement closures in APOReader, EQBank, GraphicEQFit and
+    five tests say their types, as `keptQueue`'s did (17dc79d) - the runner's compiler can't infer some that 6.3
+    can; two of these (EQPreampTests' `let sections`, GraphicEQFitTests' `.map { … }.sorted`) were the same shape.
+  - **A preset's name is folded without `String.folding(options:locale:)`** - Fold's NFKD less its marks, then
+    lower-cased, the way Fold.swift already runs on Linux - since what the Linux Foundation makes of that call isn't
+    tested anywhere in Core.
+  - Not changed, agreed: every other decision above. Left for James: an export of more than 64 filters an ear (a
+    converted GraphicEQ's 60 and a tone) is written, and deadwax's own import refuses it - the import's limit could
+    be 70 (the render's 80 less the tone's 10), so every export reads back, or the export could say so first.
 
 ### 5.2 Slice 2 - the engine, on macOS
 

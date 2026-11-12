@@ -1,0 +1,5 @@
+{
+  "about": "Who wrote these fixtures, and with what: tests/test_ios_eq_fixtures.py checks each file byte for byte where made_on is the machine running it, and within a float's last bits elsewhere; and that made_with is still the script's.",
+  "made_on": {"platform": "macOS-27.2-arm64-arm-64bit-Mach-O", "machine": "arm64", "python": "3.14", "numpy": "2.5.3", "scipy": "1.18.1"},
+  "made_with": {"ios/scripts/make-eq-fixtures.py": "4ba3c8dff10b824b23399765b133240b5e4fb227fd53e0a49251e6e99562005f"}
+}

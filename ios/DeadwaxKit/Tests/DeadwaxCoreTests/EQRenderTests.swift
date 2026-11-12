@@ -50,8 +50,8 @@ import Testing
 
     static func noise(_ channels: Int, _ frames: Int, seed: UInt64) -> [[Float]] {
         var x = seed
-        return (0..<channels).map { _ in
-            (0..<frames).map { _ in
+        return (0..<channels).map { (_: Int) -> [Float] in
+            (0..<frames).map { (_: Int) -> Float in
                 x = x &* 6364136223846793005 &+ 1442695040888963407
                 return Float(Double(x >> 11) / Double(1 << 53) * 1.6 - 0.8)
             }

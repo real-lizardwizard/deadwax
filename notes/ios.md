@@ -69,8 +69,9 @@ ios/
 tests/test_ios_contract.py  the routes, fields and bounds the app relies on, against the server (8 tests)
 tests/test_ios_install.py   install_helper.py, check_project.py, install.sh against stand-ins, and the
                             test album, on Linux (18 tests)
-tests/test_ios_eq_fixtures.py  make-eq-fixtures.py run into a temporary folder, byte for byte what is
-                            committed (9 tests; skipped without scipy, which tests.yml installs pinned)
+tests/test_ios_eq_fixtures.py  make-eq-fixtures.py run into a temporary folder against what is committed:
+                            byte for byte on the machine made.json names, within a float's last bits
+                            elsewhere (10 tests; skipped without scipy, which tests.yml installs pinned)
 ```
 
 `ios` is in .dockerignore: the image never carries the app.

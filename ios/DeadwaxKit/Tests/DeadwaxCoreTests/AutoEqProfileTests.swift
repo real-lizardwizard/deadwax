@@ -8,7 +8,7 @@ import Testing
 /// them, 0.4), and deadwax's automatic preamp within 0.5 dB of the file's own `Preamp:`.
 @Suite struct AutoEqProfileTests {
     static func sections(_ filters: [EQFilter], rate: Double) -> [EQSection] {
-        filters.compactMap { f in
+        filters.compactMap { (f: EQFilter) -> EQSection? in
             let d = f.design(rate: rate)
             guard d.outcome == .plays, let f0 = d.f0, let c = d.coefficients else { return nil }
             return EQSection(id: .filter(f.id), kind: f.kind, f0: f0, coefficients: c)

@@ -43,7 +43,7 @@ import Testing
         #expect(pairs.count == 3)
         for pair in pairs {
             let rate = EQFixtures.d(pair.rate)
-            let sections = pair.filters.map(\.filter).map { f in
+            let sections: [EQSection] = pair.filters.map(\.filter).map { (f: EQFilter) -> EQSection in
                 let d = f.design(rate: rate)
                 return EQSection(id: .filter(f.id), kind: f.kind, f0: d.f0!, coefficients: d.coefficients!)
             }

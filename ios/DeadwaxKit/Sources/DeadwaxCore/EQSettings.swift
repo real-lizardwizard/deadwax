@@ -74,7 +74,12 @@ public struct EQSettings: Codable, Equatable, Sendable {
         let name = String(typed.trimmingCharacters(in: .whitespacesAndNewlines).prefix(40))
             .trimmingCharacters(in: .whitespacesAndNewlines)
         if name.isEmpty { return .failure(.empty) }
-        func folded(_ s: String) -> String { s.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil) }
+        // Fold's NFKD less its marks, lower-cased: Fold.swift's own way, run on Linux by the Core suites, where
+        // String.folding(options:locale:) is swift-corelibs-foundation's to answer
+        func folded(_ s: String) -> String {
+            String(String.UnicodeScalarView(s.decomposedStringWithCompatibilityMapping.unicodeScalars.filter { !Fold.isMark($0) }))
+                .lowercased()
+        }
         let taken = EQGraphic.presets.map(\.name) + presets.filter { $0.id != id }.map(\.name)
         if let other = taken.first(where: { folded($0) == folded(name) }) { return .failure(.taken(other)) }
         return .success(name)

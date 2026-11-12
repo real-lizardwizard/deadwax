@@ -48,7 +48,7 @@ public enum GraphicEQFit {
 
     /// The lines' summed curve at each frequency.
     public static func target(_ lines: [[GraphicEQPoint]], at frequencies: [Double]) -> [Double] {
-        frequencies.map { f in
+        frequencies.map { (f: Double) -> Double in
             var total = 0.0
             for points in lines where !points.isEmpty {
                 var j = 0

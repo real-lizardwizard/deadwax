@@ -11,7 +11,7 @@ import Testing
     static func points(_ path: String) throws -> [GraphicEQPoint] {
         let text = String(decoding: try Fixtures.data("eq/\(path)"), as: UTF8.self)
         let line = text.split(separator: "\n").first { $0.hasPrefix("GraphicEQ:") }!
-        return line.dropFirst("GraphicEQ:".count).split(separator: ";").map { pair in
+        return line.dropFirst("GraphicEQ:".count).split(separator: ";").map { (pair: Substring) -> GraphicEQPoint in
             let numbers = pair.split(separator: " ").map { Double($0)! }
             return GraphicEQPoint(numbers[0], numbers[1])
         }.sorted { $0.frequency < $1.frequency }

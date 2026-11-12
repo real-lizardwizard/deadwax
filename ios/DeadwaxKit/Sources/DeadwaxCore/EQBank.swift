@@ -18,7 +18,8 @@ public struct EQBank: Equatable, Sendable {
     public var shared: [EQSection]
     /// the preamp as it plays, dB: deadwax's automatic one or yours
     public var preamp: Double
-    /// each list's level, linear: the preamp and that ear's offset (the shared list's, the preamp alone)
+    /// each list's level, linear: the preamp and that ear's offset; the shared list's the preamp alone - or, automatic,
+    /// lower where its own curve tops above the ears' (1.4)
     public var levels: [Double]
 
     public init(rate: Double, key: String, version: Int, left: [EQSection], right: [EQSection], shared: [EQSection],
@@ -48,7 +49,8 @@ public struct EQBank: Equatable, Sendable {
     /// An output's curve at a rate (1.4, 1.6): the correction's filters for each list (`all` and the ear's own, in the
     /// correction's order) that play at this rate, then the tone's bands that aren't at 0; the preamp - deadwax's
     /// automatic one over both ears, or `preamp` when it is set by hand - and each ear's offset from the correction's
-    /// own parts (`offsets.left`, `offsets.right`; its `all` is replaced by the preamp). Off is the identity.
+    /// own parts (`offsets.left`, `offsets.right`; its `all` is replaced by the preamp); the shared list (channels 2 and
+    /// up) at the preamp, or under it where its own top needs it. Off is the identity.
     public static func make(rate: Double, key: String, version: Int, on: Bool, correction: [EQFilter],
                             offsets: EQPreampParts, bands: [Double], preamp hand: Double?) -> EQBank {
         guard on else { return identity(rate: rate, key: key, version: version) }
@@ -59,14 +61,22 @@ public struct EQBank: Equatable, Sendable {
         let left = list(.left), right = list(.right), shared = list(nil)
         let preamp = hand ?? EQPreamp.automatic([EQResponse.Ear(sections: left, offset: offsets.left),
                                                  EQResponse.Ear(sections: right, offset: offsets.right)], rate: rate)
-        let levels = [preamp + offsets.left, preamp + offsets.right, preamp].map(EQPreamp.linear)
+        //? channels 2 and up play the shared list, with no ear's filters or offset. When it is neither ear's list at
+        //  that ear's level - per-ear filters left out of it, or both ears' offsets below 0 - its own top can be above
+        //  the ears', so the automatic preamp counts it for that list alone: no channel over 0 dB, and the ears' level
+        //  (a stereo output's whole sound) not lowered for channels it doesn't have. By hand, the preamp is yours.
+        var sharedPreamp = preamp
+        if hand == nil && (left.count != shared.count || right.count != shared.count || max(offsets.left, offsets.right) < 0) {
+            sharedPreamp = min(preamp, EQPreamp.automatic([EQResponse.Ear(sections: shared)], rate: rate))
+        }
+        let levels = [preamp + offsets.left, preamp + offsets.right, sharedPreamp].map(EQPreamp.linear)
         return EQBank(rate: rate, key: key, version: version, left: left, right: right, shared: shared,
                       preamp: preamp, levels: levels)
     }
 
     /// The filters that play at a rate, as sections `.filter(id)`.
     public static func sections(_ filters: [EQFilter], rate: Double) -> [EQSection] {
-        filters.compactMap { f in
+        filters.compactMap { (f: EQFilter) -> EQSection? in
             let d = f.design(rate: rate)
             guard d.outcome == .plays, let f0 = d.f0, let c = d.coefficients else { return nil }
             return EQSection(id: .filter(f.id), kind: f.kind, f0: f0, coefficients: c)

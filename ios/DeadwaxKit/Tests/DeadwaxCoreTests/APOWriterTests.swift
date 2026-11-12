@@ -26,7 +26,7 @@ import Testing
     static func asWritten(_ filters: [EQFilter]) -> [EQFilter] {
         let perEar = filters.contains { $0.channel != .all }
         let ordered = perEar ? [EQChannel.all, .left, .right].flatMap { ear in filters.filter { $0.channel == ear } } : filters
-        return ordered.enumerated().map { i, f in
+        return ordered.enumerated().map { (i: Int, f: EQFilter) -> EQFilter in
             var f = f
             f.id = i + 1
             return f

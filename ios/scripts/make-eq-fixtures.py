@@ -28,6 +28,10 @@ it (0.3, 1.3), independently of the Swift, so the Swift is held to a second read
     preamp.json      3.6's presets (their tops, lowest points and automatic preamps) and 1.4's close pairs with
                      their true tops from a 4-million-point search.
     render.json      banks run over noise by this script's Direct Form I: input and Float32 output, bit for bit.
+    made.json        who made them (made_on: the system, Python, numpy and scipy) and with what (made_with: this
+                     script's sha256). tests/test_ios_eq_fixtures.py checks every file byte for byte on the machine
+                     that made them, and within a float's last bits elsewhere: another libm or another numpy's SIMD
+                     loops round a last bit differently, and the GraphicEQ fit's finite differences magnify that.
 
 Inputs it reads and never writes: autoeq/ (fetched from AutoEq, see autoeq/README.md).
 
@@ -37,13 +41,16 @@ to the same bits; arrays as base64 of little-endian float32 ("_f4") or float64 (
 
 import argparse
 import base64
+import hashlib
 import json
 import math
+import platform
 import re
 import sys
 from pathlib import Path
 
 import numpy as np
+import scipy
 from scipy import signal
 
 IOS = Path(__file__).resolve().parents[1]
@@ -1684,6 +1691,20 @@ def dump(path, value):
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def made_on():
+    """The machine and the maths libraries: where every file is checked byte for byte."""
+    return {"platform": platform.platform(), "machine": platform.machine(),
+            "python": "%d.%d" % sys.version_info[:2], "numpy": np.__version__, "scipy": scipy.__version__}
+
+
+def make_made():
+    return {"about": "Who wrote these fixtures, and with what: tests/test_ios_eq_fixtures.py checks each file byte "
+                     "for byte where made_on is the machine running it, and within a float's last bits elsewhere; "
+                     "and that made_with is still the script's.",
+            "made_on": made_on(),
+            "made_with": {"ios/scripts/make-eq-fixtures.py": hashlib.sha256(Path(__file__).read_bytes()).hexdigest()}}
+
+
 def main(argv):
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--out", type=Path, default=EQ, help="where to write (default: the committed folder)")
@@ -1702,6 +1723,7 @@ def main(argv):
     dump(out / "preamp.json", make_preamp())
     print("render.json")
     dump(out / "render.json", make_render())
+    dump(out / "made.json", make_made())
     return 0
 
 
