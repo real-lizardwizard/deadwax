@@ -257,3 +257,54 @@ enum EQFixtures {
         let notes: [Note]?
     }
 }
+
+extension EQFixtures {
+    /// The bytes a reading was made from: a committed file, or one made from it the way the script makes it (a UTF-16
+    /// file can't be committed - it holds NUL bytes, which tests/test_source_bytes.py forbids).
+    static func bytes(of c: APOCase) throws -> Data {
+        let data = try Fixtures.data("eq/\(c.file)")
+        switch c.transform {
+        case "none":
+            return data
+        case "utf16le", "utf16leBroken":
+            var out = Data([0xFF, 0xFE])
+            for unit in String(decoding: data, as: UTF8.self).utf16 {
+                out.append(UInt8(unit & 0xFF))
+                out.append(UInt8(unit >> 8))
+            }
+            if c.transform == "utf16leBroken" { out.append(contentsOf: [0x00, 0xD8]) }
+            return out
+        case "utf16be":
+            var out = Data([0xFE, 0xFF])
+            for unit in String(decoding: data, as: UTF8.self).utf16 {
+                out.append(UInt8(unit >> 8))
+                out.append(UInt8(unit & 0xFF))
+            }
+            return out
+        case "big":
+            return data + Data(repeating: 0x20, count: APOReader.maxBytes + 1 - data.count)
+        default:
+            fatalError("no such transform: \(c.transform)")
+        }
+    }
+
+    /// Two filters the same, every number to the bit (`==` takes -0 for 0).
+    static func sameBits(_ a: EQFilter, _ b: EQFilter, id: Bool = true) -> Bool {
+        func widthBits(_ w: EQWidth?) -> String {
+            switch w {
+            case .q(let v)?: "q \(v.bitPattern)"
+            case .bandwidth(let v)?: "bw \(v.bitPattern)"
+            case .slope(let v)?: "slope \(v.bitPattern)"
+            case nil: "none"
+            }
+        }
+        return (!id || a.id == b.id) && a.kind == b.kind && a.written == b.written && a.fc.bitPattern == b.fc.bitPattern
+            && a.gain.bitPattern == b.gain.bitPattern && widthBits(a.width) == widthBits(b.width) && a.corner == b.corner
+            && a.channel == b.channel && a.on == b.on
+    }
+
+    /// A file's reading, or its refusal.
+    static func read(_ text: String, pasted: Bool = false) -> Result<APOReading, APORefusal> {
+        APOReader.read(Data(text.utf8), pasted: pasted)
+    }
+}

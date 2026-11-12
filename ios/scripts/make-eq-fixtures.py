@@ -768,6 +768,10 @@ def read_apo_or_refuse(data, pasted):
                 if not f > 0:
                     raise Refused("graphicZero", n, "Line %d: a GraphicEQ's frequencies must be above 0 Hz (%s is "
                                                     "there)." % (n, num(f)))
+            for _, g in pairs:
+                if not -30 <= g <= 30:
+                    raise Refused("gain", n, "Line %d: a gain of %s dB is more than deadwax plays - at most 30 dB "
+                                             "either way." % (n, num(g)))
             graphic.append({"channel": channel, "line": n, "points": sorted(pairs, key=lambda p: p[0])})
         else:
             made, note = parse_filter(n, value, channel)
@@ -1315,6 +1319,10 @@ def apo_files():
         "Filter 5: ON NO Fc 60 Hz BW Oct 0",
         "Filter 6: ON BP Fc 1500 Hz Gain 6.0 dB",
     ])
+    # a GraphicEQ gain is held to a filter's +-30 dB (beyond it the fit's sums overflow to NaN)
+    files["a52-graphic-gain.txt"] = text(["GraphicEQ: 20 0; 1000 -45; 20000 0"])
+    # wcstod's overflow is HUGE_VAL, Python's float() and Swift's Double() inf - refused by the range, never read as 0
+    files["a53-overflow.txt"] = text(["Filter: ON PK Fc 1e999 Hz Gain 1 dB Q 1"])
     return files
 
 

@@ -1303,7 +1303,7 @@ and deadwax can't, or what has no sound to match - so the import offers nothing 
 | several `Device:` lines, or one after a filter | "This file has settings for more than one device (line 12). deadwax keeps a setting for each output itself - import the part for these headphones as a file of its own." |
 | `IIR` | "Line 5 gives a filter as raw coefficients, made for one sample rate - deadwax plays at several, so it can't play it." |
 | a frequency out of range | "Line 5: 30000 Hz is higher than this phone plays - the highest a filter can be is 22000 Hz." / "Line 5: a filter's frequency must be at least 1 Hz." |
-| a gain out of range | "Line 5: a gain of 45 dB is more than deadwax plays - at most 30 dB either way." |
+| a gain out of range | "Line 5: a gain of 45 dB is more than deadwax plays - at most 30 dB either way." (a filter's, or - added in slice 1, where this table was silent - a GraphicEQ point's: past it the fit's sums overflow to NaN, and APO has no sound to match. An overflowing number, `1e999`, is `wcstod`'s infinity in APO and here, so it is refused by its range: "inf Hz") |
 | a Q, width or slope out of range | "Line 5: Q -2 won't make a filter - it must be between 0.01 and 100, or left out." / "Line 5: a width of 12 octaves won't make a filter - it must be between 0.01 and 10, or left out." / "Line 5: a slope of -6 dB won't make a filter - it must be above 0." (A width or slope of exactly 0 is the type's default, as APO: 1.3.) |
 | a shelf too steep for its gain (1.3) | "Line 5: a low-shelf filter this steep (24 dB an octave) can't have 23 dB of gain - Equalizer APO can't play it either." (only a slope can make one: 1.3) |
 | a preamp out of range | "Line 1: a preamp of 45 dB is more than deadwax plays - at most 30 dB either way." |
