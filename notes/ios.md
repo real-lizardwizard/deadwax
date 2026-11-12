@@ -2156,7 +2156,7 @@ with its own embedded art its own (`mf-...`), so a change could mean a fetch eve
 - **coverAhead()**: the next song is known as soon as the queue or the engine moves (`nextIndex(queue)`, with
   Repeat's copies unrolled into the queue - the same next the stream prefetch uses, `keepAndPrefetch`). Its cover is
   fetched into the app's CoverCache at the lock screen's size (CoverSize.lockScreen, 1024) while the song before
-  plays: one ahead, once while it stays the next, not when it is this song's cover too or already kept, and not
+  plays: one ahead, one fetch at a time, not when it is this song's cover too or already kept, and not
   while the player isn't meaning to play. The fetch is never called off (an unstructured task, a waiter that never
   leaves) - it is the next song's whatever screen is shown.
 - **showNowPlaying()** looks in CoverCache first: a cover kept there is set with the song's title, in the same
@@ -2164,11 +2164,26 @@ with its own embedded art its own (`mf-...`), so a change could mean a fetch eve
   (`CoverCache.load`), so the lock screen and Now Playing's 360 pt cover (also asked at 1024 on a 3x phone) share
   one fetch and one decoded image, where they had two.
 - **Its failure rule is kept**: a lock screen cover that failed is asked again at the next change no sooner than
-  15 s on. CoverCache's own is a minute, so `load` gained `againAfter` (default a minute; the lock screen passes its
-  15 s), the failure kept per session as before.
+  15 s on. CoverCache's own is a minute, so `load` gained `againAfter` (default a minute; the lock screen passed its
+  15 s at first, 0 since the review - below), the failure kept per session as before.
 - **Memory**: a 1024 px cover decoded is 4 MB of CoverCache's 96 MB limit (NSCache, by cost). The next one is one
   more of those, and the cache may let it go under pressure (a big grid flung), when the change fetches it then, as
   before. The lock screen still holds its own reference to the cover it shows.
+
+**After review**, three changes to it:
+- **The cover asked ahead is let go once its fetch lands** (`coverAheadAsked` cleared then, and by `stop()`): it had
+  stayed marked for good, so a cover fetched ahead once was never asked ahead again - with Repeat All over two
+  albums, the second time round to a cover the cache had let go meanwhile, the change lagged again; and a fetch ahead
+  that failed once (a WireGuard blip) was never tried again while it stayed next. Now the guard is only "not while its
+  fetch is out": a kept cover isn't asked again (the cache check), and one that failed waits out the cache's minute.
+- **The next cover waits for this one's.** At a change where neither cover is kept, the two 1024 px fetches ran at
+  once over WireGuard - just the moment the lock screen was waiting. `coverAhead()` now runs once this song's cover is
+  drawn (straight away when it was kept, or when the song has none; else from its fetch's landing, which calls
+  showNowPlaying again), or once its fetch failed.
+- **The change's own fetch passes `againAfter: 0`.** The cache's failure memory is shared by the session's fetches, so
+  a fetch ahead that failed shortly before the change held the change's own back for 15 s (the lock screen's window,
+  counted from the other's failure). The lock screen's rule is `coverFailed` - its own failure, its own 15 s - and the
+  cache's minute no longer counts for it, as before this branch, when it asked deadwax straight.
 
 **Verified**: builds; the next song and the cover id come from the same queue the stream prefetch reads.
 **Assumed**: that MPNowPlayingInfoCenter shows artwork given with the song at once (it showed it at once when set

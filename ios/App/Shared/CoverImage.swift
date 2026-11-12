@@ -106,8 +106,8 @@ final class CoverCache {
     }
 
     /// The cover, fetched once however many views wait for it - nil when there is none, it failed, or the view left
-    /// (its task cancelled) before it came. A failure within `againAfter` (a minute; the lock screen's own 15 s) is
-    /// not asked again.
+    /// (its task cancelled) before it came. A failure within `againAfter` (a minute) is not asked again; the lock
+    /// screen passes 0, as it keeps its own failure rule (PlayerModel.coverFailed).
     func load(client: DeadwaxClient, id: String, size: Int, againAfter: TimeInterval = CoverCache.againAfter) async -> UIImage? {
         let key = Self.key(client, id, size)
         if let image = images.object(forKey: key as NSString) { return image }
