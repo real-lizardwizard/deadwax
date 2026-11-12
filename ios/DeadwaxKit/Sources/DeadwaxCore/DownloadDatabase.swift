@@ -296,7 +296,9 @@ public final class DownloadDatabase {
     }
 
     public func keptQueue() throws -> PendingQueue? {
-        try query("SELECT kind, body, kept_at FROM queue_pending WHERE one = 1") { row in
+        // the closure's type said: Xcode 26.6's Swift (ios.yml's runner) can't infer T from a multi-statement closure
+        // whose result is only read through `.first`, as 6.3 can
+        try query("SELECT kind, body, kept_at FROM queue_pending WHERE one = 1") { (row: Row) -> PendingQueue? in
             guard let kind = row.text(0), let body = row.blob(1) else { return nil }
             return PendingQueue(kind: kind, body: body, keptAt: row.int(2) ?? 0)
         }.first
