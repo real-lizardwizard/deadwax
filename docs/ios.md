@@ -322,6 +322,15 @@ Debug is where Phase 0's test screen lives now:
   the song to it, as any app must: an iPhone's own outputs and AirPods run at 48 kHz or lower. Under
   it, "An edit held for the next song" when one is (see [the checks](#what-only-a-phone-can-tell)), and
   the last song that failed, in its own words.
+- **Engine log**: the app's audio engine says what it does, line by line - each song's lane starting,
+  joins, a buffer played, a stream that ran dry, an edit held for the next song, a failure - and Debug
+  keeps its last 500 lines, the newest last. While a song plays it writes about two lines a second, so
+  that's about four minutes of playing. **Copy** puts the whole log on the clipboard and **Share** sends
+  it on (Mail, Messages, Files...). Each line starts with a time in seconds on the engine's own clock:
+  the gaps between lines are what count. Nothing that could sign anyone in is ever written to it. The
+  same lines go to the Mac's **Console** app as they happen, for longer than Debug keeps them: with the
+  iPhone connected, choose it in Console's sidebar, press Start, and search for
+  `subsystem:net.lizardlounge.deadwax`.
 - **Library**: how many albums each list had, whether it came new or the kept one still stood, and
   how long it took to come.
 - At the bottom, how long this install runs. In its last two days, it also says to run install.sh

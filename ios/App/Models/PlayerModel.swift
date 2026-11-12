@@ -522,6 +522,7 @@ final class PlayerModel {
         do {
             let engine = try PlaybackEngine()
             Self.lead(engine)
+            EngineTrace.attach(engine)
             engine.onChange = { [weak self] state in
                 MainActor.assumeIsolated { self?.engineChanged(state) }
             }
