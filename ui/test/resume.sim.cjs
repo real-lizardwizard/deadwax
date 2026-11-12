@@ -26,6 +26,10 @@
  *    answer dropped when a tap came first; the re-check's three cases (empty or put back and untouched; paused with
  *    logins on; paused with logins off, untouched), at most every 15 s, never while playing, unsaved changes saved
  *    instead; the notice once; the album remembered only while its song still shows.
+ *  - (2.1.3) History - Up Next's songs behind the one playing - the same rows, keys and songs after the round trip, at
+ *    every step of those runs (a row's tap of History's among them; Previous moving startedAt down as the engine does
+ *    now, and half the time leaving it as apps before 2.1.3 saved it), and at the window's edge (a run of copies cut by
+ *    it); HISTORY_BACK equal to RESUME_BEFORE.
  *  - (review) a window's focus asked only after its grace, so the click that focused it lands first; the notice not
  *    said again for the same pick-up followed; keepalive by bytes, and by the bytes of every keepalive out; a Repeat
  *    One record under Repeat off saved in full; the 30 s from playing starting; a 422 then a full save; a scrubbed
@@ -188,7 +192,7 @@ console.log('\ntoSave then fromSnapshot: 500 seeded runs of every edit, the queu
     if (queue.upNext.marks.some((m, i) => m.at >= 0 && queue.upNext.source[m.at]?.id !== queue.tracks[i].id)) return 'an entry not its place in the list'
     return null
   }
-  let compared = 0, shared = 0, behind = 0
+  let compared = 0, shared = 0, behind = 0, histories = 0
   for (let run = 0; run < 500; run++) {
     const random = seeded(run + 7)
     //? a small seed's first draw is always near 0 - which started every run from its first song, null: let it go
@@ -218,14 +222,17 @@ console.log('\ntoSave then fromSnapshot: 500 seeded runs of every edit, the queu
           p.fetched >= p.total && repeat === 'all' ? { token: `${p.token}+`, total: 3, fetched: 0, scope: p.scope, level: 'track' } : undefined)
         else queue = U.toppedUp(queue, repeat, random)
       } else if (op === 8) {
-        const jumped = U.jumpedTo(queue, someKey())
-        const next = jumped ? U.onward(jumped) : null
-        if (jumped && next !== null) queue = at(jumped, next)
+        //? (2.1.3) a row's tap - of History's now and then (an entry before the song playing)
+        const before = queue.upNext.marks.slice(0, queue.index).map((m) => m.key)
+        const jumped = U.jumpedTo(queue, before.length && random() < 0.3 ? before[pick(before.length)] : someKey())
+        if (jumped) queue = at(jumped.queue, jumped.index)
       } else if (op === 9) { const next = U.onward(queue); if (next !== null) queue = at(queue, next) }
       else if (op === 10) {
         //? Previous, early in the song: back past Repeat One's copies - before where playTracks began, too
         const back = U.backward(queue, 0)
-        if (back.kind === 'go') queue = at(queue, back.index)
+        //? (2.1.3) as the engine moves now (wentBack: startedAt follows it down), or - half the time - as an app before
+        //? 2.1.3, or the iPhone's 0.2, saved it: startedAt left above the song playing
+        if (back.kind === 'go') queue = random() < 0.5 ? U.wentBack(queue, back.index) : at(queue, back.index)
       } else queue = at(queue, Math.min(queue.index + 1, queue.tracks.length - 1))
       queue = U.toppedUp(queue, repeat, random)
 
@@ -237,16 +244,23 @@ console.log('\ntoSave then fromSnapshot: 500 seeded runs of every edit, the queu
       compared++
       if (!back) { note(run, step, 'did not read back'); continue }
       const was = queue.upNext
+      //? (2.1.3 review) startedAt past the song playing's run - an app before 2.1.3 saved it so - comes back lowered to it
+      let run = queue.index
+      while (run > 0 && was.marks[run].from === 'one') run--
       const wanted = {
         tracks: queue.tracks.slice(start, end), index: queue.index - start,
         marks: was.marks.slice(start, end), source: was.source, shuffle: was.shuffle, nextKey: was.nextKey,
-        startedAt: Math.max(0, was.startedAt - start), left: was.left, paged: was.paged, pagedRounds: was.pagedRounds,
+        startedAt: Math.min(Math.max(0, was.startedAt - start), run - start), left: was.left, paged: was.paged, pagedRounds: was.pagedRounds,
       }
       const got = {
         tracks: back.tracks, index: back.index, marks: back.upNext.marks, source: back.upNext.source, shuffle: back.upNext.shuffle,
         nextKey: back.upNext.nextKey, startedAt: back.upNext.startedAt, left: back.upNext.left, paged: back.upNext.paged, pagedRounds: back.upNext.pagedRounds,
       }
       if (JSON.stringify(got) !== JSON.stringify(wanted)) { note(run, step, `not the same: ${JSON.stringify(got).slice(0, 160)}`); continue }
+      //? (2.1.3) History after a reload is History before it - the same rows, keys and songs
+      const rows = (q) => U.upNextView(q, repeat).history.map((row) => `${row.key}:${row.track.id}`).join()
+      if (rows(back) !== rows(queue)) note(run, step, `History came back otherwise: ${rows(back)} for ${rows(queue)}`)
+      if (rows(queue)) histories++
       //? (Previous leaves played songs after the one playing, which upnext.sim's invariant - a property of what is
       //? still to come - doesn't describe: the round trip must keep whatever the queue had)
       const wrong = shape(back)
@@ -264,13 +278,27 @@ console.log('\ntoSave then fromSnapshot: 500 seeded runs of every edit, the queu
   }
   check('every step of every run read back the same, keeping the invariant', problems, [])
   check('...thousands of steps compared, and entries shared with the source', [compared >= 12_000, shared > 1_000], [true, true])
-  check('...hundreds of them gone back by Previous before where playTracks began', behind > 200 ? true : behind, true)
+  check(`...hundreds of them gone back by Previous before where playTracks began (${behind})`, behind > 100 ? true : behind, true)
+  check(`...thousands with a History, back the same (${histories})`, histories > 5_000 ? true : histories, true)
 }
 
 /* ===== the window ===== */
 
 console.log('\nthe window: 50 before, 2,000 in all')
 {
+  //? (2.1.3) History at the window's edge: song 100 played three times under Repeat One, its first play the 51st
+  //? entry back - History stops short of it, before a reload and after, so a reload never shrinks what it showed
+  {
+    let q = at(U.startUpNext(album(200), 0), 99)
+    q = U.toppedUp(q, 'one'); q = at(q, 100); q = U.toppedUp(q, 'one'); q = at(q, 101)
+    q = U.withRepeat(q, 'off')
+    q = at(q, 151)
+    const saving = R.toSave(q, 0)
+    const back = R.fromSnapshot(saving.snapshot, q.tracks.slice(saving.start, saving.start + saving.ids.length).map(bare), saving.index, 'auto')
+    const rows = (x) => U.upNextView(x, 'off').history.map((row) => `${row.key}:${row.track.id}`)
+    check('History at the window\'s edge, a run of copies cut by it: the same before and after a reload', [rows(q).length, rows(q)[0], rows(back).join() === rows(q).join()], [49, `${q.upNext.marks[102].key}:101`, true])
+    check('...History goes back as far as a reload keeps: HISTORY_BACK is RESUME_BEFORE', [U.HISTORY_BACK, U.HISTORY_BACK === R.RESUME_BEFORE], [50, true])
+  }
   const long = U.startUpNext(album(5000), 0)
   let saving = R.toSave(long, 0)
   check('a 5,000-song list from its first song: its next 2,000 - and a snapshot over the cap, left out',
@@ -335,9 +363,19 @@ console.log('\nresumed(): what is put back from what deadwax answers')
     const saving = R.toSave(live, 12)
     const tracks = live.tracks.slice(saving.start, saving.start + saving.ids.length).map(bare)
     back = R.resumed({ index: saving.index, position: 12, changed_by: 'deadwax', kept: kept({ ids: saving.ids, index: saving.index, position: 12, snapshot: saving.snapshot }) }, tracks, 'off', 'phone-1')
-    check('Previous before where the album was started (startedAt past the index): the account back, Playing Next still added',
+    check('Previous before where the album was started, as an app before 2.1.3 saved it (startedAt past the index): the account back, Playing Next still added - startedAt lowered to the song playing',
       [live.upNext.startedAt, back.queue.index, back.queue.upNext.startedAt, back.queue.upNext.marks.map((m) => m.from)],
-      [4, 3, 4, ['source', 'source', 'source', 'source', 'source', 'added', 'source', 'source', 'source', 'source', 'source']])
+      [4, 3, 3, ['source', 'source', 'source', 'source', 'source', 'added', 'source', 'source', 'source', 'source', 'source']])
+    //? (2.1.3 review) ...so, played on here, the song it went back to is in History: on the iPhone's 0.2 (or the web's
+    //? 2.1.2) an album started at 5, Previous to 4; picked up here, 4 ends, then 5 - at 6, History 4 and 5. Left past the
+    //? index, startedAt kept 4 out of it for good
+    let old = at(U.startUpNext(album(10), 4), 3)
+    const oldSaving = R.toSave(old, 12)
+    back = R.resumed({ index: oldSaving.index, position: 12, changed_by: 'deadwax', kept: kept({ ids: oldSaving.ids, index: oldSaving.index, position: 12, snapshot: oldSaving.snapshot }) },
+      old.tracks.slice(oldSaving.start, oldSaving.start + oldSaving.ids.length).map(bare), 'off', 'phone-1')
+    let on = back.queue
+    on = at(on, U.onward(on)); on = at(on, U.onward(on))
+    check('...played on after such a pick-up: the song gone back to, then 5, in History at 6', [old.upNext.startedAt, on.tracks[on.index].id, U.historyRows(on).map((row) => row.track.id)], [4, '6', ['4', '5']])
     let rounds = U.toppedUp(U.withRepeat(U.startUpNext(album(10), 4), 'all'), 'all')
     rounds = U.toppedUp(at(rounds, 9), 'all')
     rounds = at(rounds, 3)

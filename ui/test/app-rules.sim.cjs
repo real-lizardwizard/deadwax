@@ -238,7 +238,8 @@
  *    playTracks, the first page in hand) and its feed (app/useShuffleFeed.ts: extendQueue alone, called once in
  *    App); the song rows' ••• (Search's, the Library's, an album page's) call App's menu, never the player;
  *    ActionsContext isn't widened; lib/upNext.ts is pure; Up Next and the menu are sheets by the one hook with locks
- *    of their own, Up Next's scroller Info's; Now Playing's icon row has Up next always, before •••.
+ *    of their own, Up Next's scroller Info's; Now Playing's icon row has Up next always, before •••. (2.1.3) A row of
+ *    History's (replay) is jumpTo by its key, last in the click, nothing awaited, nothing else of the player.
  *  - Resume what was playing (2.0.0-player.64): the engine's restoreQueue is reached only from app/useResume.ts, and
  *    that hook reaches nothing else of the player; it is called once, in App, after useShuffleFeed; ActionsContext
  *    isn't widened; lib/resume.ts is pure; neither new file needs a secure page (no randomUUID, no crypto.subtle) -
@@ -2426,6 +2427,11 @@ console.log('\nUp Next, shuffle and repeat (2.0.0-player.57): each new action fr
   const jump = /const jump = \(group: Group, rows: readonly UpNextRow\[\], index: number\) => \{([\s\S]*?)\n  \}/.exec(upNext)?.[1] ?? ''
   check('Up Next\'s row: a tap jumps to it by its key, straight from the click',
     [/onClick=\{\(\) => jump\(group, rows, index\)\}/.test(upNext), /const row = rows\[index\]!/.test(jump), /\n\s*player\.jumpTo\(row\.key\)\s*$/.test(jump), /\bawait\b|\.then\(/.test(jump)], [true, true, true, false])
+  //? (2.1.3) History's row: the song again, by its key, straight from the click - after only the bookkeeping of where the
+  //? view is held, focus goes and what is said
+  const replay = /const replay = \(row: UpNextRow\) => \{([\s\S]*?)\n  \}/.exec(upNext)?.[1] ?? ''
+  check('(2.1.3) ...and History\'s row: the song again by its key, straight from the click',
+    [/onClick=\{\(\) => replay\(row\)\}/.test(upNext), /\n\s*player\.jumpTo\(row\.key\)\s*$/.test(replay), /\bawait\b|\.then\(/.test(replay), (replay.match(/\bplayer\.\w+\(/g) ?? []).length], [true, true, false, 1])
   check('...a desktop\'s Up Next drawer goes as an album or artist opens from the player, as Info\'s does',
     /const leaveInfoDrawer = \(\) => \{\s*if \(liesOver\(panel, upNextPanel \? 'upnext' : 'none'\)\) \{\s*upNextOpener\.current = null\s*setUpNextPanel\(false\)\s*\}/.test(app), true)
   check('...its scroller Info\'s (its own touch-action), its shell Info\'s', [/class="app-info-scroll"/.test(upNext), /class="app-info app-upnext"/.test(upNext), /class=\{`app-layer app-info-layer app-upnext-layer/.test(upNext)], [true, true, true])

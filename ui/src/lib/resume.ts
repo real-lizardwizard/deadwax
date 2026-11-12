@@ -234,7 +234,7 @@ export function savedLevels(snapshot: string | null, count: number): (Level | un
  * `index`, every level re-fitted to `setting`. Null when it doesn't read back: not JSON, another version, a source
  * song in neither Navidrome's songs nor `extra`, or a rebuilt state failing its checks - marks as long as the entries,
  * each mark's `from` one of the three, a source mark's `at` inside the source and naming its song, an added mark's
- * at and pass -1, keys unique and below nextKey, startedAt not below 0.
+ * at and pass -1, keys unique and below nextKey, startedAt not below 0 (and past the song playing's run, lowered to it).
  */
 export function fromSnapshot(snapshot: string | null, tracks: readonly QueueTrack[], index: number, setting: Normalization): UpNextQueue | null {
   if (snapshot === null) return null
@@ -251,9 +251,8 @@ export function fromSnapshot(snapshot: string | null, tracks: readonly QueueTrac
   if (!Array.isArray(source) || !source.every((id) => typeof id === 'string')) return null
   if (typeof sourceLevels !== 'string' || sourceLevels.length !== source.length || !isObject(extra)) return null
   if (typeof shuffle !== 'boolean' || !isInt(nextKey) || !isInt(startedAt) || !Array.isArray(left)) return null
-  //? startedAt is only where playTracks began, not a bound: Previous walks back before it (an album started at song 5,
-  //? then Previous), and Repeat's copies dropped since can leave it anywhere - withShuffle reads it only as where the
-  //? first round's heard songs begin, up to the song playing, so any place at or after 0 reads back as it was
+  //? startedAt is where listening began - where withShuffle's first round's heard songs begin and (2.1.3) History's
+  //? floor - so any place at or after 0 reads back; one past the song playing's run is lowered to it, below
   if (!isInt(index) || index < 0 || index >= n || startedAt < 0) return null
   //? the songs: Navidrome's where it has them, `extra` for the source's outside the window - one object per (id, level)
   const navidrome = new Map(tracks.map((track) => [track.id, bare(track)]))
@@ -284,6 +283,11 @@ export function fromSnapshot(snapshot: string | null, tracks: readonly QueueTrac
     if (from === 'one' && (at < -1 || at >= list.length)) return null
     rebuilt.push({ key, from, at, pass })
   }
+  //? (2.1.3) wentBack keeps startedAt at or before the song playing's run; a queue saved before 2.1.3 - the web's
+  //? 2.1.2, the iPhone's 0.2 - whose Previous went back before where the album began has it past that. Lowered to the
+  //? run: everything from there to the song playing was heard, so History shows it once it has played
+  let run = index
+  while (run > 0 && rebuilt[run]!.from === 'one') run--
   const gone: { pass: number; at: number }[] = []
   for (const raw of left) {
     if (!Array.isArray(raw) || raw.length !== 2 || !isInt(raw[0]) || !isInt(raw[1])) return null
@@ -306,7 +310,7 @@ export function fromSnapshot(snapshot: string | null, tracks: readonly QueueTrac
     }
   }
   const upNext: UpNextState = {
-    marks: rebuilt, source: list as LevelledTrack[], shuffle, nextKey, startedAt, left: gone,
+    marks: rebuilt, source: list as LevelledTrack[], shuffle, nextKey, startedAt: Math.min(startedAt, run), left: gone,
     ...(paged ? { paged } : {}), ...(pagedRounds ? { pagedRounds } : {}),
   }
   return { tracks: entries as LevelledTrack[], index, upNext }

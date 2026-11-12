@@ -81,7 +81,7 @@ import {
   asksForMp4, isFlac, resampledFrom, resamples, wrappedAs, wrapsFlac, type MaxRate, type Wrapped,
 } from '../lib/streamWrap'
 import {
-  TOP_UP_HEARD_S, backward, jumpedTo, movedKey, onward, pastCopies, startUpNext, toppedUp, withLast, withMore, withNext,
+  TOP_UP_HEARD_S, backward, jumpedTo, movedKey, onward, pastCopies, startUpNext, toppedUp, wentBack, withLast, withMore, withNext,
   withRepeat, withShuffle, withoutAdded, withoutKey, type Paged, type Repeat, type UpNextQueue,
 } from '../lib/upNext'
 import {
@@ -154,7 +154,8 @@ export interface Player {
    *  called in the tap, songs in hand (the gesture rule). True when it started the music. */
   playNext(tracks: QueueTrack[]): boolean
   playLast(tracks: QueueTrack[]): boolean
-  /** a row of Up Next, by key: it plays now (even from pause); the rows above it in its own group go */
+  /** a row of Up Next or History, by key: it plays now (even from pause) - lib/upNext jumpedTo: the rows it passes stay
+   *  behind it; History's plays the song again */
   jumpTo(key: number): void
   /** a row of Up Next to place `to` of its own group; one out of Up Next; every song added out (Clear) */
   moveInQueue(key: number, to: number): void
@@ -1544,7 +1545,8 @@ export function usePlayer(): Player {
           restart()
           return
         }
-        const previous = { ...state.queue, index: action.index }
+        //? (2.1.3) back before where listening began, History follows it down (lib/upNext wentBack) - the same tracks
+        const previous = wentBack(state.queue, action.index)
         if (moveInStream(previous, state.intendsToPlay)) return
         load(previous, state.intendsToPlay, true)
       },
@@ -1655,12 +1657,19 @@ export function usePlayer(): Player {
       },
       jumpTo(key: number) {
         catchUp()
-        const edited = jumpedTo(state.queue, key)
+        const jump = jumpedTo(state.queue, key)
         //? a key gone from Up Next, or a seek on its way: nothing - a jump is a tap, done now or not at all
-        if (!edited || !replaceUpcoming(edited)) return
-        //? a row's tap plays it, paused or not - next() starts what the listener means to be playing
+        if (!jump || !replaceUpcoming(jump.queue)) return
+        //? a row's tap plays it, paused or not
         state.intendsToPlay = true
-        actions.next()
+        state.change = null
+        unlockSpare()
+        //? (2.1.3) straight to the row, the songs it passes left behind it (lib/upNext jumpedTo) - moved as Next moves:
+        //? a seek in the stream when it holds the song, a handover, or a new stream from it, this being a tap
+        const next = { ...state.queue, index: jump.index }
+        if (moveInStream(next, true)) return
+        if (handOver(next, true).decision.kind === 'handover') return
+        load(next, true, true)
       },
       moveInQueue(key: number, to: number) {
         edit((queue) => movedKey(queue, key, to))

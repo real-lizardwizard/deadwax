@@ -283,7 +283,8 @@ ui/                Preact + Vite + TypeScript: the app (src/player/main.tsx -> s
                    see "Song search (2.0.0-player.53)".
                    lib/upNext.ts is PURE - Up Next's account of the queue beside the engine's
                    { tracks, index }: Play Next/Last, moves, Shuffle, Repeat unrolled into it;
-                   app/UpNext.tsx draws it (both frames), app/QueueMenu.tsx is a song's or an
+                   History (the songs behind the one playing) and a row's tap that drops nothing
+                   (2.1.3); app/UpNext.tsx draws it (both frames), app/QueueMenu.tsx is a song's or an
                    album's Play Next and Play Last, app/ShuffleSongs.tsx the Library's Shuffle and
                    app/useShuffleFeed.ts its pages - see "Up Next, shuffle and repeat".
                    app/LibraryCare.tsx is Rescan and the bulk runs (both frames; its runs

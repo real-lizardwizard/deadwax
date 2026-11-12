@@ -4961,12 +4961,58 @@ async function outcome(promise, ms = 1_000) {
     const [e0] = elements
     tap(() => p.player.playTracks(tracks(['1', '2', '3']), 0))
     await run(2_000)
+    const placed = madeStreams.length
     tap(() => p.player.jumpTo(keyIn(p, '3')))
     await run(600)
-    check('song 3 at once - a tap, so a new stream from it - and song 2 gone from the queue', [p.player.track.id, p.player.queue.tracks.map((t) => t.id), e0.playingNow, mediaSources.length], ['3', ['1', '3'], true, 2])
+    check('(2.1.3) song 3 at once - the stream holds it, so a seek in it, one MediaSource - and song 2 kept, behind it', [p.player.track.id, p.player.queue.tracks.map((t) => t.id), p.player.queue.index, e0.playingNow, mediaSources.length, madeStreams.length - placed], ['3', ['1', '2', '3'], 2, true, 1, 0])
     tap(() => p.player.previous())
     await run(400)
-    check('...Previous early in song 3: back to song 1', p.player.track.id, '1')
+    check('...Previous early in song 3: song 2, as on the album (James, 2026-11-11)', p.player.track.id, '2')
+    tap(() => p.player.previous())
+    await run(400)
+    check('...and again: song 1', p.player.track.id, '1')
+    tap(() => p.player.next())
+    await run(400)
+    check('...then Next: song 2', p.player.track.id, '2')
+  }
+  {
+    const p = streamPage({ durations: { 1: 20, 2: 20, 3: 20, 4: 20 } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(tracks(['1', '2', '3', '4']), 0))
+    await run(2_000)
+    tap(() => p.player.playNext(tracks(['9'])))
+    await run(300)
+    tap(() => p.player.jumpTo(keyIn(p, '3')))
+    await run(600)
+    check('(2.1.3) with a song added: song 3 plays, song 9 still next after it, song 2 behind it', [p.player.track.id, p.player.queue.tracks.map((t) => t.id), comingIds(p)], ['3', ['1', '2', '3', '9', '4'], ['9', '4']])
+    const history1 = p.player.queue.upNext.marks[p.player.queue.tracks.findIndex((t) => t.id === '1')].key
+    tap(() => p.player.jumpTo(history1))
+    await run(600)
+    check('(2.1.3) a row of History\'s tap (song 1): that song again, after song 3 - then Up Next as it was', [p.player.track.id, e0.playingNow, p.player.queue.tracks.map((t) => t.id), comingIds(p)], ['1', true, ['1', '2', '3', '1', '9', '4'], ['9', '4']])
+    tap(() => p.player.previous())
+    await run(400)
+    check('...Previous early: the song that was playing, song 3', p.player.track.id, '3')
+  }
+  {
+    const p = streamPage({ durations: { 1: 300, 2: 300, 3: 300, 4: 300, 5: 300, 6: 300 } })
+    const [e0] = elements
+    tap(() => p.player.playTracks(tracks(['1', '2', '3', '4', '5', '6']), 0))
+    await run(2_000)
+    const ms = mediaSources.length, made = madeStreams.length, rp = replans
+    tap(() => p.player.jumpTo(keyIn(p, '6')))
+    await run(800)
+    check('(2.1.3) a tap past what the stream holds: a new stream from it, the queue untouched, no replan', [p.player.track.id, p.player.queue.tracks.map((t) => t.id).join(), p.player.queue.index, e0.playingNow, mediaSources.length - ms, madeStreams.length - made, replans - rp], ['6', '1,2,3,4,5,6', 5, true, 1, 1, 0])
+  }
+  {
+    const p = streamPage({ durations: { 1: 20, 2: 20, 3: 20, 4: 20 } })
+    tap(() => p.player.playTracks(tracks(['1', '2', '3', '4']), 2))
+    await run(1_000)
+    tap(() => p.player.previous())
+    await run(600)
+    check('(2.1.3) Previous before where the list began: song 2, startedAt moved down to it, History empty', [p.player.track.id, p.player.queue.upNext.startedAt, UP.historyRows(p.player.queue).map((r) => r.track.id)], ['2', 1, []])
+    tap(() => p.player.next())
+    await run(600)
+    check('(2.1.3) ...then Next: song 3, History song 2', [p.player.track.id, UP.historyRows(p.player.queue).map((r) => r.track.id)], ['3', ['2']])
   }
   {
     const p = streamPage({ durations: { 1: 20, 2: 20, 3: 20 } })

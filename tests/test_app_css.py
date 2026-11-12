@@ -465,6 +465,19 @@ def test_infos_scroller_opts_out_of_now_playings_touch_action():
     assert scroller["min-height"] == "0"  # a flex child that can shrink below its content, so it scrolls
 
 
+def test_up_next_holds_its_own_place_and_its_card_reaches_the_top():
+    #? (2.1.3) Up Next puts back what was in view itself (app/UpNext.tsx), so the browser's anchoring stays out of it...
+    assert declarations(APP, ".app-upnext .app-info-scroll")["overflow-anchor"] == "none"
+    #? ...and (review) the song playing's card and what follows it are at least the scroller's height: with an album's
+    #? last song or two after it the card still reaches the scroller's top, where Up Next opens and a song's end keeps
+    #? it - not the scroll stopping short, the card creeping down a row a song. upnext.sim lays the scroller out so
+    assert declarations(APP, ".app-upnext-now")["min-height"] == "100%"
+    assert 'class="app-upnext-now"' in (Path(__file__).resolve().parent.parent / "ui" / "src" / "app" / "UpNext.tsx").read_text()
+    #? History has no gap of its own over the scroller's at its top (the card had none); only under it, before the card
+    history = declarations(APP, ".app-upnext-history")
+    assert history == {"margin-bottom": "var(--app-shelf-gap)"}
+
+
 def test_info_starts_where_its_board_does_or_under_the_status_bar():
     assert declarations(APP, ".app-info")["top"] == "max(var(--app-info-top), calc(var(--pl-safe-top) + var(--app-info-pad)))"
     assert ALL_TOKENS["--app-info-top"] == "52px"  # from the top of the screen, as NowPlayingInfo's board draws it

@@ -4905,6 +4905,16 @@ html.app-queue-menu-open { overflow: hidden; }
 .app-upnext-group,
 .app-upnext .app-store-line { margin-top: var(--app-shelf-gap); }
 
+/* (2.1.3) History above the song playing. Up Next holds its own place as the queue changes (app/UpNext.tsx: what was
+   in view put back), so the browser's scroll anchoring - Chromium's; WebKit has none - must not move it as well;
+   History's last row is kept off the card's edge by the gap the groups below it have (at the scroller's top it has no
+   gap of its own over the scroller's, as the card had none); and the card and what follows it are at least the
+   scroller's height, so the card reaches the top with only a song or two after it - where it opens, and where a song's
+   end keeps it - rather than the scroll stopping short and the card creeping down a row a song (2.1.3 review) */
+.app-upnext .app-info-scroll { overflow-anchor: none; }
+.app-upnext-history { margin-bottom: var(--app-shelf-gap); }
+.app-upnext-now { min-height: 100%; }
+
 /* (Now Playing's Up Next was tinted here while Shuffle or Repeat was on, until 2.0.14 put the two on its
    transport - "Shuffle and Repeat on Now Playing's transport (2.0.14)" below) */
 
