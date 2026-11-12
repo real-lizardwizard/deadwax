@@ -149,7 +149,11 @@ and the source differ, the source is what plays, and it is what deadwax follows:
   for PK, the shelves and BP (where nothing uses it) and ignored for LP, HP, NO and AP. Q is read, then BW Oct
   replaces it (except on a shelf, where BW is ignored), then a slope replaces both (shelves only). **With no width,
   or a width of exactly 0**: PK and AP are left out; LP, HP and BP take Q = 1/√2; NO takes Q 30; a shelf takes
-  **S = 0.9** ("found out by experimentation with RoomEQWizard"). A shelf's slope in dB becomes S = slope / 12 ("Maximum
+  **S = 0.9** ("found out by experimentation with RoomEQWizard"). **But a `BW Oct 0` keeps its kind** (corrected in
+  slice 1, 2026-11-12): the BW match sets the bandwidth flag (BiQuadFilterFactory.cpp:150-151) and the default only
+  replaces the number (:177-189, the flag left as it was), so `BW Oct 0` on LP, HP or BP is a bandwidth of 1/√2
+  **octaves** (BiQuad.cpp:41-42 - a Q of about 2.0, a 6 dB resonance), and on NO a bandwidth of **30 octaves**
+  (nearly everything notched). A shelf's slope in dB becomes S = slope / 12 ("Maximum
   S is 1 for 12 dB"). A filter with no frequency, or a PK or shelf with no gain, is left out (logged) - the rest of
   the file plays.
 - **Centre or corner** (filters/BiQuadFilter.cpp): a shelf whose type name doesn't end in `C` **and** that was given
@@ -206,7 +210,9 @@ and the source differ, the source is what plays, and it is what deadwax follows:
   `./HypetheSonics/Bruel%20&%20Kjaer%205128%20in-ear/…`, `Apple%20AirPods%20Pro%202%20(51dB%20+%20ANC)`); the rig
   folder carries the form (`711 in-ear`, `HMS II.3 over-ear`); "the target appears in parentheses when one source has
   multiple targets". The AirPods Pro appear from crinacle, Super Review, HypetheSonics and Rtings - and crinacle's
-  **AirPods Pro 2** as four rows of their own, by listening level and ANC (`Apple AirPods Pro 2 (51dB + ANC)`, …).
+  **AirPods Pro 2** as fourteen rows of their own (corrected in slice 1, read again in INDEX.md at 7ae0f56: eleven
+  listening levels with ANC, `Apple AirPods Pro 2 (51dB + ANC)` to `(91dB + ANC)`, and the ANC, passive and
+  transparency modes) - beside HypetheSonics', Harpo's and Filk's `Apple Airpods Pro 2` and Rtings' `Apple AirPods Pro2`.
   The largest sources: crinacle 2,036, Innerfidelity 933, Super Review 885, Rtings 795, oratory1990 736.
 - **Terms**: the repository's LICENSE is MIT ("Copyright (c) 2018-2022 Jaakko Pasanen"), and covers what is in it,
   results included; the measurements behind them are their sources' (crinacle's own data isn't published there).
@@ -222,8 +228,9 @@ and the source differ, the source is what plays, and it is what deadwax follows:
 2. **Every form APO plays is pinned, from its source** (0.3, read in the review - the plan, and this spec's first
    draft, had only the documentation, which gives no defaults and no centre-to-corner rule). PK with Q, and LSC/HSC
    with Q, are the cookbook's at f0 = Fc - what AutoEq computes and APO plays. The rest follow APO's code: Modal is a
-   peak; LP, HP, BP default to Q 1/√2, NO to Q 30, a shelf to S 0.9; a slope in dB is S = slope / 12; `LS`/`HS` with
-   a Q or a slope (and so `LS 6dB`, `HS 12dB`) are moved from a corner to the cookbook's f0. Only `IIR` stays refused
+   peak; LP, HP, BP default to Q 1/√2, NO to Q 30 (a `BW Oct 0` to as many octaves), a shelf to S 0.9; a slope in
+   dB is S = slope / 12; `LS`/`HS` with a Q or a slope (and so `LS 6dB`, `HS 12dB`) are moved from a corner to the
+   cookbook's f0. Only `IIR` stays refused
    (3.9). The import's rule is still "play it as APO does, or say so" - and now nothing is a guess.
 3. **`Device:` can't simply be skipped**: a file with two `Device:` sections holds two devices' filters, and skipping
    the lines would play both at once. One leading `Device:` line is skipped; several are refused (3.9).
@@ -365,16 +372,19 @@ The three AutoEq uses are byte for byte its peq.py's (0.4), and APO's for the sa
 | `LSC`, `HSC` | Low or high shelf, f0 = Fc; a Q, or `LSC <x> dB` as S = x/12 | Fc, Gain | S 0.9, f0 = Fc |
 | `LS`, `HS` with a Q, or `LS 6dB`, `LS 12dB`, `HS 6dB`, `HS 12dB` (any `<x> dB`) | Low or high shelf, **by its corner** (above) | Fc, Gain | - |
 | `LS`, `HS` with neither | Low or high shelf, f0 = Fc | Fc, Gain | S 0.9 |
-| `LP`, `LPQ`, `HP`, `HPQ` | Low or high pass, Q or BW Oct (a gain ignored) | Fc | Q 1/√2 |
-| `BP` | Band pass, 0 dB peak, Q or BW Oct (a gain ignored) | Fc | Q 1/√2 |
-| `NO` | Notch, Q or BW Oct (a gain ignored) | Fc | Q 30 |
+| `LP`, `LPQ`, `HP`, `HPQ` | Low or high pass, Q or BW Oct (a gain ignored) | Fc | Q 1/√2; `BW Oct 0`: BW 1/√2 oct |
+| `BP` | Band pass, 0 dB peak, Q or BW Oct (a gain ignored) | Fc | Q 1/√2; `BW Oct 0`: BW 1/√2 oct |
+| `NO` | Notch, Q or BW Oct (a gain ignored) | Fc | Q 30; `BW Oct 0`: BW 30 oct |
 | `AP` | All pass, Q or BW Oct (a gain ignored) | Fc | left out, as APO |
 | `IIR` | - | - | refused: its coefficients are for one rate, and the phone plays at several |
 
 A BW Oct given to a shelf is ignored, as APO ignores it (and with no Q or slope the shelf takes S 0.9). Where a line
 gives several widths, the last kind APO reads wins: a slope over BW Oct over Q. **A shelf too steep for its gain** -
 an S above 1 where `(A + 1/A)(1/S − 1) + 2` isn't positive, as `LSC 24 dB` with 23 dB of gain - has no filter (APO
-would compute the root of a negative number and play nothing sensible), so it is refused (3.9).
+would compute the root of a negative number and play nothing sensible), so it is refused (3.9). **Only a slope can
+make one** (corrected in slice 1): a shelf given a Q is made with that Q (BiQuad.cpp:37-38 - its S is never under a
+root), and a corner shelf's S from a Q, used only to move its frequency (BiQuadFilter.cpp:49-58), makes that
+expression exactly 1/Q², always positive.
 
 **How sure**: sure, every row - read from APO's source (0.3), and each held by fixtures the script computes from those
 rules written out again in Python (5.1).
@@ -1120,7 +1130,7 @@ names hold **every word of the cleaned name**:
 
 - **Exactly one**: it is offered. "Sennheiser HD 650" asks "Sennheiser HD 650" and is offered that one.
 - **Several**: none is picked for you - the row offers the choice. "James's AirPods Pro" asks "AirPods Pro", which
-  matches "Apple AirPods Pro" and crinacle's four "Apple AirPods Pro 2 (…)" rows (0.4) - and **iOS names AirPods Pro 2
+  matches "Apple AirPods Pro" and crinacle's fourteen "Apple AirPods Pro 2 (…)" rows (0.4) - and **iOS names AirPods Pro 2
   "AirPods Pro" too**, so the name can't say which generation is in your ears. (The review: the first draft offered the
   first row, which is the first generation's, to a Pro 2's owner.)
 - **None**: nothing. "JBL Flip 6" is offered nothing (AutoEq measures headphones).
@@ -1191,7 +1201,7 @@ below, with the same reach through number fields and steps (Apple's advice to of
 - The fields use the phone's own number format (a decimal comma where the phone's region writes one), the keyboard
   `.numbersAndPunctuation` - `.decimalPad` has no minus. A value out of range stays in the field, in `Palette.danger`,
   with its line under it: "Between 1 and 22000 Hz.", "Between -30 and 30 dB.", "Between 0.01 and 100." - and, for a shelf's
-  slope or Q too steep for its gain (1.3), "Too steep for this gain - at most 19.6 dB an octave." - and nothing
+  slope too steep for its gain (1.3: a Q can't be), "Too steep for this gain - at most 19.6 dB an octave." - and nothing
   changes until it is in range.
 
 **The Preamp section** (header "Preamp"):
@@ -1238,7 +1248,10 @@ plays here as it plays there, and where APO would leave something out, deadwax l
   nothing; any other line with no `:` is skipped with a note, as APO ignores it.
 - **A number** is the longest start of a run of `-+0-9.eE` that reads as a decimal number - C's `wcstod`, as APO:
   `6.5.1` is 6.5, `1e3` is 1000, and a run that starts no number reads as 0.
-- **`Preamp: <n> [dB]`**: commas become points first; the number, then `dB` or nothing; -30 to +30 dB. Several add
+- **`Preamp: <n> [dB]`**: commas become points first; the number, after any spaces - and whatever follows it, `dB`
+  or anything else, is not read (corrected in slice 1: APO's `swscanf_s(value, L" %lf dB")` counts only the number,
+  PreampFilterFactory.cpp:39-40, so `Preamp: -6 dB headroom` plays -6 dB); a line with no number there is skipped,
+  as APO makes nothing of it; -30 to +30 dB. Several add
   up, for the channels then selected (APO's rule).
 - **`Filter…: ON <type> …`**: commas become points first (so `Gain 6,5 dB` is 6.5 dB). The type is the letters
   straight after `ON` and a space; `OFF <type>` is kept, switched off (3.8) - APO plays nothing for it, and neither
@@ -1292,10 +1305,10 @@ and deadwax can't, or what has no sound to match - so the import offers nothing 
 | a frequency out of range | "Line 5: 30000 Hz is higher than this phone plays - the highest a filter can be is 22000 Hz." / "Line 5: a filter's frequency must be at least 1 Hz." |
 | a gain out of range | "Line 5: a gain of 45 dB is more than deadwax plays - at most 30 dB either way." |
 | a Q, width or slope out of range | "Line 5: Q -2 won't make a filter - it must be between 0.01 and 100, or left out." / "Line 5: a width of 12 octaves won't make a filter - it must be between 0.01 and 10, or left out." / "Line 5: a slope of -6 dB won't make a filter - it must be above 0." (A width or slope of exactly 0 is the type's default, as APO: 1.3.) |
-| a shelf too steep for its gain (1.3) | "Line 5: a low-shelf filter this steep (24 dB an octave) can't have 23 dB of gain - Equalizer APO can't play it either." (`(Q 3.00)` in place of the slope when a Q made it so) |
+| a shelf too steep for its gain (1.3) | "Line 5: a low-shelf filter this steep (24 dB an octave) can't have 23 dB of gain - Equalizer APO can't play it either." (only a slope can make one: 1.3) |
 | a preamp out of range | "Line 1: a preamp of 45 dB is more than deadwax plays - at most 30 dB either way." |
 | too many filters | "This file has 90 filters for one ear - deadwax plays up to 64." |
-| a GraphicEQ line with no pairs | "Line 2: a GraphicEQ line needs at least one frequency and its gain." (what APO plays for none isn't pinned, so it isn't guessed) |
+| a GraphicEQ line with no pairs | "Line 2: a GraphicEQ line needs at least one frequency and its gain." (corrected in slice 1: APO plays one with no points as flat - GainIterator.cpp:74-77 gives 0 dB with no nodes - so it changes nothing there; refused here all the same, as the spec decided, for James to confirm) |
 | a GraphicEQ frequency at or below 0 | "Line 2: a GraphicEQ's frequencies must be above 0 Hz (0 is there)." (its curve is on a log axis) |
 
 The frequency range is 1 Hz to 22000 Hz on every output - just under half of 44.1 kHz, the lowest rate the phone
