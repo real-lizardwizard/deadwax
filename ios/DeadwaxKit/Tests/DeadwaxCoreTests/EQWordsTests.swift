@@ -335,6 +335,8 @@ import Testing
         #expect(d.notStarted == "The output hasn't started yet")
         #expect(d.muffleFooter.hasPrefix("A test of the EQ's audio unit: a -24 dB high shelf at 2 kHz"))
         #expect(d.muffleFooter.hasSuffix("It turns itself off when you leave Debug, and it's never kept."))
+        //? slice 3: off, the output's own EQ plays - not "every sample passed through", which was slice 2's alone
+        #expect(d.muffleFooter.contains("Off, the output's own EQ plays again."))
         #expect(d.waiting == "In the graph: waiting for its first block of sound")
         #expect(d.renderBlockAsked(0) == "iOS hasn't asked for it, so no sound can go through the EQ")
         #expect(d.renderBlockAsked(1) == "iOS asked for it once")

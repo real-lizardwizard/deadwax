@@ -10,8 +10,12 @@ import SwiftUI
 /// play's tap - so it changes from the next thing played, never what is already queued (the footer says so). The
 /// rows are a radio group: one chosen, a tap picks, VoiceOver hears each choice's name, whether it is chosen, and its
 /// note.
+///
+/// Then the EQ (eq.md 3.1, app 0.5): one row - "EQ", the output now under it, its short setting at the right - pushing
+/// the EQ page of the output now; its footer ends as Normalization's does, "This is kept on this phone."
 struct PlaybackSection: View {
     @Environment(PlayerModel.self) private var player
+    @Environment(EQModel.self) private var eq
 
     var body: some View {
         Section {
@@ -33,6 +37,24 @@ struct PlaybackSection: View {
                 Text(YouWords.normalizationNote)
                 Text(YouWords.kept)
             }
+        }
+
+        Section {
+            let now = eq.now
+            EQLink(route: .now) {
+                LabeledContent {
+                    Text(now.short)
+                } label: {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(EQWords.You.row)
+                        Text(now.name)
+                            .font(.footnote)
+                            .foregroundStyle(Palette.quiet)
+                    }
+                }
+            }
+        } footer: {
+            Text(EQWords.You.footer)
         }
     }
 

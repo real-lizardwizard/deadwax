@@ -869,8 +869,8 @@ extension EQWords {
         public static let startTookLabel = "Start took"
 
         public static let muffle = "Muffle what plays"
-        /// Under the toggle (slice 2, check 0).
-        public static let muffleFooter = "A test of the EQ's audio unit: a -24 dB high shelf at 2 kHz, put in through the unit itself, so what plays sounds muffled at once and plain again when it's off - with no click either way. Off, the unit passes every sample through untouched. It turns itself off when you leave Debug, and it's never kept."
+        /// Under the toggle (slice 2, check 0). Off, the output's own EQ (slice 3) - no longer every sample passed through.
+        public static let muffleFooter = "A test of the EQ's audio unit: a -24 dB high shelf at 2 kHz, put in through the unit itself, so what plays sounds muffled at once and plain again when it's off - with no click either way. Off, the output's own EQ plays again. It turns itself off when you leave Debug, and it's never kept."
         public static let header = "EQ"
     }
 }
