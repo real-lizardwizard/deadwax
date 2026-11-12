@@ -260,6 +260,21 @@ public struct DeadwaxClient: Sendable {
         try await call(Routes.libraryRemove, sending: LibraryRemoveBody(navidromeId: navidromeID))
     }
 
+    // MARK: app 0.4's routes
+
+    /// A song's lyrics (`Routes.lyrics`, server 2.1.5) with the body as deadwax sent it - kept with a downloaded song -
+    /// or `.unchanged` when the answer kept (its ETag `ifNoneMatch`) is still the answer: deadwax sends an ETag with
+    /// every answer and a 304 with no body for one unchanged. None for the song is an answer (`lines` empty), never a
+    /// failure; a 404 is a song Navidrome won't give the asker, thrown for ErrorWords' gone sentence.
+    public func lyrics(songID: String, ifNoneMatch etag: String?) async throws -> Fetched<LyricsAnswer> {
+        var built = request(Routes.lyrics, path: ["song_id": songID])
+        if let etag, !etag.isEmpty { built.headers["If-None-Match"] = etag }
+        let response = try await answer(built, accept: built.headers["If-None-Match"] == nil ? [200] : [200, 304])
+        if response.status == 304 { return .unchanged }
+        return .fresh(LyricsAnswer(lyrics: try decode(SongLyrics.self, response), body: response.body),
+                      etag: response.header("ETag"))
+    }
+
     // MARK: answers
 
     func send(_ request: HTTPRequest) async throws -> HTTPResponse {

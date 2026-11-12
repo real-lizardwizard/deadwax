@@ -115,6 +115,10 @@ final class DownloadModel {
     @ObservationIgnored private var planAgain = false
     @ObservationIgnored private var followers = 0
     @ObservationIgnored private var albumsAsked: Set<String> = []
+    /// Songs whose lyrics are queued or being asked for (4.7 of notes/app-lyrics.md): each asked once at a time.
+    @ObservationIgnored private var lyricsAsked: Set<String> = []
+    @ObservationIgnored private var lyricsQueue: [String] = []
+    @ObservationIgnored private var askingLyrics = false
     @ObservationIgnored private var verifyQueue: [String] = []
     @ObservationIgnored private var verifying: String?
     @ObservationIgnored private var verifyStop = StopFlag()
@@ -278,6 +282,23 @@ final class DownloadModel {
 
     /// The album's kept answer as it was answered.
     func keptAlbum(_ albumID: String) -> Album? { albums[albumID] }
+
+    /// A downloaded song's kept lyrics answer and its ETag (notes/app-lyrics.md 4.7) - none for the song included.
+    func keptLyrics(_ songID: String) -> (lyrics: SongLyrics, etag: String?)? {
+        guard let kept = try? store?.database.lyrics(songID),
+              let lyrics = try? JSONDecoder().decode(SongLyrics.self, from: kept.json) else { return nil }
+        return (lyrics, kept.etag)
+    }
+
+    /// An answer the player got online, for a song downloaded here: kept in place of the one kept when it differs - so a
+    /// Get lyrics or a re-time on the server reaches the phone the next time the song plays (4.7). A 304 changes
+    /// nothing, and isn't brought here.
+    func lyricsAnswered(_ songID: String, body: Data, etag: String?) {
+        guard let store, records[songID]?.state == .done else { return }
+        let kept = try? store.database.lyrics(songID)
+        guard kept?.json != body || kept?.etag != etag else { return }
+        _ = try? store.database.putLyrics(song: songID, json: body, etag: etag, fetchedAt: ListenTracker.wallMs())
+    }
 
     /// An album page's fresh answer for an album with songs asked for or here (3.7): kept in place of the old one, as
     /// answered. A song whose file deadwax now gives another size - its audio replaced on the server - is fetched again
@@ -543,6 +564,9 @@ final class DownloadModel {
         Task { _ = await session.cancel(tasks, resume: false) }
         verifyStop.set()
         verifyQueue = []
+        // the lyrics not yet asked for were the person's before: the next store's settle queues its own
+        lyricsAsked.subtract(lyricsQueue)
+        lyricsQueue = []
         live = [:]
         madeAt = [:]
         madeUnder = [:]
@@ -602,6 +626,11 @@ final class DownloadModel {
         }
         for albumID in Set(records.values.map(\.albumID)) where albums[albumID] == nil {
             keepAlbum(albumID, client: server.client)
+        }
+        // every song here with no lyrics kept - downloaded under 0.3, or its ask failed - asked again (4.7)
+        if reachability.online {
+            let withLyrics = (try? opened.database.lyricsSongs()) ?? []
+            keepLyrics(ordered(records.values.filter { $0.state == .done && !withLyrics.contains($0.id) }).map(\.id))
         }
         rereadLoudness()
         otherBytes = DownloadStore.others(server: opened.server, except: opened.person).reduce(0) { $0 + $1.bytes }
@@ -974,6 +1003,7 @@ final class DownloadModel {
                                                    at: ListenTracker.wallMs()), to: record)
         note("\(record.id): here, \(length) bytes, \(check.rawValue)")
         if check == .unchecked, target === store { queueCheck(record.id) }
+        if target === store { keepLyrics([record.id]) }
         return arrived
     }
 
@@ -1098,6 +1128,44 @@ final class DownloadModel {
             guard let loudness = try? JSONDecoder().decode(AlbumLoudness.self, from: answer.json),
                   loudness.state != .measured || !loudness.whole else { continue }
             Task { await keepLoudness(answer.id, client: client, store: store) }
+        }
+    }
+
+    // MARK: lyrics kept (notes/app-lyrics.md 4.7)
+
+    /// The songs' lyrics asked for and kept with them, one ask at a time, never holding a download up: queued as each
+    /// song's file arrives and, for every song here with none, at each settle. Started on the next turn, as the sound
+    /// check is - a song queued as it arrives has its record written just after.
+    private func keepLyrics(_ songIDs: [String]) {
+        let fresh = songIDs.filter { lyricsAsked.insert($0).inserted }
+        guard !fresh.isEmpty else { return }
+        lyricsQueue.append(contentsOf: fresh)
+        guard !askingLyrics else { return }
+        askingLyrics = true
+        Task {
+            while !lyricsQueue.isEmpty {
+                let songID = lyricsQueue.removeFirst()
+                await keepLyrics(songID)
+                lyricsAsked.remove(songID)
+            }
+            askingLyrics = false
+        }
+    }
+
+    /// One song's: asked with the kept answer's ETag (none, for a song never kept), and kept unless the store changed
+    /// meanwhile (another person signed in) or the song is no longer here. A failure keeps nothing - the next settle
+    /// asks again.
+    private func keepLyrics(_ songID: String) async {
+        guard let store, let client = server.client, reachability.online, records[songID]?.state == .done else { return }
+        let kept = try? store.database.lyrics(songID)
+        do {
+            let fetched = try await client.lyrics(songID: songID, ifNoneMatch: kept?.etag)
+            guard case .fresh(let answer, let etag) = fetched, self.store === store, records[songID]?.state == .done,
+                  answer.body != kept?.json || etag != kept?.etag else { return }
+            try store.database.putLyrics(song: songID, json: answer.body, etag: etag, fetchedAt: ListenTracker.wallMs())
+            note("lyrics kept: \(songID)\(answer.lyrics.lines.isEmpty ? " (none)" : "")")
+        } catch {
+            if !APIFailure.isCancellation(error) { note("lyrics \(songID) not kept: \(error)") }
         }
     }
 

@@ -1,4 +1,4 @@
-# The iPhone app (early: Phase 2, downloads)
+# The iPhone app (early: app 0.4, downloads and lyrics)
 
 deadwax is getting a native iPhone app, built with SwiftUI and its own audio engine, for what a web
 page can't do well: seamless joins and normalization done on the phone, downloads to play offline,
@@ -6,14 +6,15 @@ and a song's start never lost on AirPods. It's built in phases. Phase 0, "Hello,
 single test screen that proved the tools, the connection and the audio engine. Phase 1, the player
 (app 0.2), was the first version meant for playing your music day to day: your library, album pages,
 Up Next, Now Playing, normalization, the lock screen, plays counted, and picking up where you left
-off. **This is Phase 2, downloads: app 0.3.** An album, or a song, downloaded to the
-phone plays from there, bit for bit as deadwax has it - and goes on playing when deadwax can't be
-reached (see [Downloads](#downloads) and [Offline](#offline)). Playlists, Search and the rest come in
+off. Phase 2, downloads (app 0.3), followed: an album, or a song, downloaded to the phone plays from
+there, bit for bit as deadwax has it - and goes on playing when deadwax can't be reached (see
+[Downloads](#downloads) and [Offline](#offline)). **This is app 0.4, which adds lyrics** on Now
+Playing, as the web app shows them (see [Lyrics](#lyrics)). Playlists, Search and the rest come in
 the next phases (see [What it can't do yet](#what-it-cant-do-yet)).
 
-**Nothing of Phase 2 has been seen on an iPhone yet.** It's built and tested on a Mac, and what only
-a phone can tell is what [the checks](#the-checks) are for. Until they're answered, read everything
-about downloads below as what the app is built to do.
+**Nothing of Phase 2 or the lyrics has been seen on an iPhone yet.** It's built and tested on a Mac,
+and what only a phone can tell is what [the checks](#the-checks) are for. Until they're answered,
+read everything about downloads and lyrics below as what the app is built to do.
 
 The app talks only to deadwax, never to Navidrome, through deadwax's own routes, so the phone never
 needs the Navidrome account deadwax itself uses. With logins on, you sign in with your own Navidrome
@@ -28,7 +29,8 @@ person can see in Navidrome. With an older deadwax, songs play as they are, and 
 time - the album's volume couldn't be checked" ("the song's" for a song levelled on its own). 2.1.1
 isn't a release yet: until it is, it's in the `:experimental` image, not `:latest` (see "Which image
 tag" under [The compose file](getting-started.md#the-compose-file)). You > About shows which deadwax
-you have.
+you have. [Lyrics](#lyrics) need **deadwax 2.1.5 or later** - for now also only in `:experimental` -
+and with an older one say "Couldn't load the lyrics."
 
 **Where Phase 1 is.** It's on the `ios` branch while it's being built. `main` has Phase 0, released
 with deadwax 2.1.0. install.sh builds whichever branch is checked out, so to try Phase 1, switch to
@@ -112,7 +114,7 @@ old one. It also uses up one of the few new app ids a free account may register 
 It pulls the latest code, asks GitHub whether the app's checks passed on it (and asks you before
 building one that failed or is still running), builds it (Release), and installs it **over** the app
 on the phone, so everything on the phone stays. Then it opens the app and says how long the new
-install runs: `Installed deadwax 0.3 (3), runs until Wed 18 Nov, 14:02`. It also says how long it
+install runs: `Installed deadwax 0.4 (4), runs until Wed 18 Nov, 14:02`. It also says how long it
 took and the Mac's free space before and after. Xcode doesn't need to be open.
 
 | option | what it does |
@@ -262,7 +264,8 @@ thin line along it for how far in the song is. Tap it for Now Playing.
 - **Shuffle, previous, play/pause, next, Repeat.** Previous goes back to the song before in a song's
   first 3 seconds; after that, or on the first song, it starts the song again. Repeat goes from off to
   **Repeat all** to **Repeat one** and back to off, and this phone remembers it.
-- **AirPlay**, **Up Next**, and **•••**, whose menu has **Info**, **Go to album**, **Download** (or
+- **Lyrics**, **AirPlay**, **Up Next**, and **•••** along the bottom. **Lyrics** (the speech bubble) shows
+  the song's lyrics in the cover's place (see [Lyrics](#lyrics)). The **•••** menu has **Info**, **Go to album**, **Download** (or
   Remove Download) for the song playing, and **Download Up Next** - every song still to play that
   isn't on the phone, when that's two or more. Go to album closes Now Playing and opens the album's
   page on the tab you're on. What a download item did is said for a moment at the top of Now Playing
@@ -326,6 +329,50 @@ or list you haven't heard this time round. Turned off, the album's own order car
 playing. Either way the song playing goes on, untouched, and songs you added keep their order, ahead of
 the rest.
 
+### Lyrics
+
+**Lyrics**, at the left of Now Playing's bottom row, shows the song's lyrics in the cover's place, as
+Apple Music does: the title, the scrubber and the buttons stay where they are. The speech bubble is
+filled and purple while lyrics are on. Tap it again for the cover. Lyrics stay on from song to song,
+and each time you open Now Playing, until you tap **Lyrics** again or quit the app.
+
+- **Synced lyrics** (most of what deadwax saves): the line being sung is white, the rest dimmer, and
+  it's kept about a third of the way down, the lyrics moving up as each line comes. In a long break,
+  or an intro of four seconds or more, three dots light one by one until the next line.
+- **Scroll** to read ahead or back: the lyrics stay where you put them, the line being sung still
+  lighting up. About four seconds after they come to rest they go back to the line being sung, while
+  the song plays. Paused, they stay put until you press play. Scrolling them never closes Now
+  Playing; a swipe down from the arrow's row does.
+- **Tap a line** to play the song from there, from a pause too.
+- **Lyrics saved without timings** show whole, under "These lyrics aren't synced to the song.", every
+  line white, and don't move by themselves. Their verses run together, as Navidrome reads them.
+- **A song with none** (an instrumental, or none found yet): **Lyrics** is dimmed and does nothing.
+  With lyrics on, a song with none shows its cover, **Lyrics** still lit, and the next song with
+  lyrics shows them again.
+- **"Couldn't load the lyrics."**, with **Try again**, when deadwax couldn't get them just then
+  ("Can't connect to deadwax." when the phone can't reach it). "This song isn't here any more - it
+  may have been moved or deleted." means Navidrome no longer has the song the queue names: play it
+  again from its album.
+- The background goes darker under lyrics, so the dimmer lines can be read over any cover.
+
+A song's lyrics are asked for as it starts, whether Now Playing is open or not, so **Lyrics** is right
+the moment you open it - never while the phone is locked - and, while lyrics show, the next song's a
+little before it starts. They're the lyrics deadwax saved beside each song ([the library
+guide](library.md#lyrics) has how), read through Navidrome, as the web app shows them.
+
+**Downloaded songs keep their lyrics**, so they show offline too. A song downloaded before app 0.4
+gets its lyrics the next time the app opens with deadwax in reach. Lyrics changed on deadwax (**Get
+lyrics**, or re-timed) reach a downloaded song the next time it plays with deadwax in reach. Offline,
+for a song with none kept, **Lyrics** is dimmed: "Lyrics - not on this phone". Removing a download
+removes its lyrics.
+
+**With VoiceOver**, each line says its words, its time ("1:23", and "now" on the line being sung) and
+"Plays from here."; a double tap plays from it. The rotor's Actions have "Go to the line being sung".
+While VoiceOver is on a line the lyrics don't scroll away from it. **Larger Text** makes the lines
+bigger, wrapping. **Increase Contrast** makes the dim lines brighter and the background darker;
+**Reduce Motion** makes the lyrics jump to each line rather than scroll; **Reduce Transparency**
+takes away their soft top and bottom edges. Nothing about lyrics is on the lock screen.
+
 ### Info
 
 **Info** (Now Playing's **•••**) has an **About** tab:
@@ -379,7 +426,7 @@ field Navidrome sent about the song and its album.
   If deadwax can't be reached, it says "Couldn't reach deadwax, so you're still signed in - try
   again." Changing your password is the web app's, for now.
 - **About**: deadwax's version, whether logins are on (for an admin), and the app's own version,
-  **0.3 (3)**.
+  **0.4 (4)**.
 - **This phone**: deadwax's address, **Change address**, and **Debug**, for an admin (with logins
   off, everyone is one).
 
@@ -548,6 +595,8 @@ answering, **Try again**. It goes by itself once deadwax answers.
 - **Opening the app** with no network: it opens at once, as last time, onto the strip and Downloaded,
   with the queue you were last playing put back, paused (see
   [Picking up where you left off](#picking-up-where-you-left-off)).
+- **Lyrics**: a downloaded song's are on the phone and show as online. For a song with none kept,
+  **Lyrics** is dimmed: "Lyrics - not on this phone" (see [Lyrics](#lyrics)).
 - Plays are kept and sent later; downloads waiting carry on once the phone, or deadwax, is back.
 
 ## The checks
@@ -668,6 +717,49 @@ The tests can't reach these either. Note what happens.
     dimmed song's minus and handle still work - take one out, move one. At the largest text size,
     each mark sits after its line, level with the line's first line, clear of the handle.
 
+### Lyrics' checks (app 0.4)
+
+Use a song deadwax filed with synced lyrics (Dummy's "Roads", say), one with lyrics saved without
+timings, an instrumental, and Five Finger Death Punch's "American Capitalist". Keep Apple Music to
+hand: several of these ask how it compares.
+
+- **P1 The button.** Now Playing's bottom row is Lyrics, AirPlay, Up Next, •••. Lyrics is a speech
+  bubble, filled and purple while on.
+- **P2 Opening.** Play "Roads", open Now Playing, tap Lyrics: the lyrics take the cover's place, the
+  title and the buttons don't move, the line being sung is white and about a third of the way down,
+  and the lyrics move up smoothly as each line comes. Tap Lyrics again: the cover. Scroll the lyrics
+  hard: Now Playing never starts closing; a swipe down from the arrow's row closes it.
+- **P3 Your own scroll, and a tap.** Scroll up to read ahead: it stays where you put it, the lit line
+  still changing. Let go; about four seconds after it stops, it goes back to the line being sung -
+  sooner, later or the same as Apple Music? Tap a line further on: the song jumps there and plays on.
+  Pause, tap a line: it plays from there - does Apple Music start playing too? Pause, scroll down,
+  wait ten seconds: it stays. Press Play: back to the line being sung.
+- **P4 The lead.** Tap a line and listen: does it light as the words start, a beat after, or before?
+  On "American Capitalist", does the lit line ever show the line just sung? (`LYRICS_LEAD_MS` is what
+  moves it, for every player at once.)
+- **P5 Breaks, and lyrics without timings.** A song with a long intro or a guitar break: three dots,
+  lighting one by one, then the next line. The song without timings: "These lyrics aren't synced to
+  the song." above them, every line white, nothing moving by itself.
+- **P6 None, and on from song to song.** The instrumental: Lyrics is dimmed and does nothing. With
+  lyrics on, let a song with lyrics run into it: the cover shows and Lyrics stays lit; the next song
+  with lyrics shows them again. Close Now Playing with lyrics on and open it again: still lyrics.
+- **P7 Larger Text.** Settings > Accessibility > Display & Text Size > Larger Text at the largest:
+  the lines wrap and stay readable, the line being sung clear of the soft edges, and the bottom row's
+  four buttons fit.
+- **P8 Increase Contrast, Reduce Motion, Bold Text** - and the brightest cover you have (a white
+  sleeve): the background goes darker as lyrics open, and the dim lines are still easy to read. With
+  Reduce Motion, the lyrics jump from line to line, with no spring.
+- **P9 VoiceOver.** Swipe through the lyrics: each line its words and its time, "now" on the line
+  being sung, then "Plays from here."; the rotor's Actions has "Go to the line being sung", and it
+  goes there. While you're on a line, the lyrics don't scroll away. Double tap a line: it plays from
+  there. Does a three-finger scroll hold the lyrics, and do they come back after?
+- **P10 Offline.** Download an album, turn on Airplane Mode, play it: its lyrics show and follow. A
+  song downloaded with app 0.3 shows lyrics offline once the app has been opened with deadwax in
+  reach since the update. A song not kept: Lyrics dimmed, "Lyrics - not on this phone" to VoiceOver.
+- **P11 AirPlay.** AirPlay to a speaker: do the lines still land with the words? (AirPlay delays the
+  sound by a second or two.)
+- **P12 The lock screen**: as before - no change at all - and the music plays on locked as it did.
+
 ## What it can't do yet
 
 These are the web app's for now. Most of them come to the phone in the next phases:
@@ -698,6 +790,9 @@ These are the web app's for now. Most of them come to the phone in the next phas
 | A song's line says **"The connection dropped while this song was loading"**, or the next song's says **"Skipped "..." - it wouldn't play"** | The app asks for a song once more after a moment, then goes on past it. Check the phone's network. |
 | **"This device couldn't play this song's audio"**, or **"Skipped "..." - this device couldn't play its audio"** | The file is damaged, or in a form iPhones can't play. Try it on the web app; an admin finds the details in You > Debug > Playing. |
 | Info's Normalization: **"Not this time - the album's volume couldn't be checked"** ("the song's" for a song levelled on its own) | deadwax is older than 2.1.1, or didn't answer in time. The song plays as it is; with 2.1.1 or later, the album's next play is levelled. |
+| Lyrics: **"Couldn't load the lyrics."** | deadwax, or Navidrome behind it, couldn't give them just then: **Try again**. If it's every song, deadwax may be older than 2.1.5, which has no lyrics for the app (an admin sees why, folded under it). |
+| Lyrics: **"This song isn't here any more - it may have been moved or deleted."** | Navidrome no longer has the song the queue names (a rescan moved it). Play it again from its album. |
+| **Lyrics** is dimmed | The song has none - none on LRCLIB, or none fetched yet (**Get lyrics** in the album's Edit, on the web app). Offline, "Lyrics - not on this phone": none were kept for it, which happens to a song downloaded with app 0.3 until the app has been opened with deadwax in reach. |
 | An album stays on **"Waiting for Wi-Fi"** | Download over is Wi-Fi only (You > Downloads): join a Wi-Fi network that isn't a phone's hotspot, with Low Data Mode off - or choose Wi-Fi and cellular. |
 | **"Waiting for room - the storage limit is reached"** | Raise the Storage limit in You > Downloads, or remove something there (largest first). |
 | **"Waiting for space on this phone"** | The phone itself is full: make room in Settings > General > iPhone Storage. |

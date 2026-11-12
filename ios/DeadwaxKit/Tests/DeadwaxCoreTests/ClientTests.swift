@@ -362,7 +362,7 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
     }
 
     @Test func everyRouteIsDeadwaxsOwn() {
-        #expect(Routes.all.count == 23)
+        #expect(Routes.all.count == 24)
         #expect(Set(Routes.all).count == Routes.all.count)
         for endpoint in Routes.all {
             #expect(endpoint.path.hasPrefix("/deadwax/"))
@@ -418,6 +418,44 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
         #expect(transport.last?.headers["Accept"] == "image/*")
         #expect(try await deadwax.cover(coverID: "al-1", size: CoverSize.tile, ifNoneMatch: "W/\"c1\"") == .unchanged)
         #expect(try await deadwax.cover(coverID: "al-1", size: CoverSize.lockScreen) == Data([0xFF, 0xD8]))
+    }
+
+    // MARK: app 0.4's
+
+    @Test func aSongsLyricsAreAskedWithTheirETagAndKeptAsTheyCame() async throws {
+        let (deadwax, transport) = client()
+        let body = #"{"synced":true,"lines":[{"time":18.7,"text":"The first line we sing"},{"time":22.701,"text":""}]}"#
+        transport.handle("/deadwax/navidrome/lyrics/so 1") { request in
+            if request.headers["If-None-Match"] == #""l1""# { return HTTPResponse(status: 304, headers: ["ETag": #""l1""#]) }
+            return HTTPResponse(status: 200, headers: ["etag": #""l1""#], body: Data(body.utf8))
+        }
+        let first = try await deadwax.lyrics(songID: "so 1", ifNoneMatch: nil)
+        let lyrics = SongLyrics(synced: true, lines: [LyricLine(time: 18.7, text: "The first line we sing"), LyricLine(time: 22.701, text: "")])
+        #expect(first == .fresh(LyricsAnswer(lyrics: lyrics, body: Data(body.utf8)), etag: #""l1""#))
+        #expect(transport.last?.method == "GET")
+        #expect(transport.last?.url.absoluteString == "http://192.168.3.20:8090/deadwax/navidrome/lyrics/so%201")
+        #expect(transport.last?.headers["If-None-Match"] == nil)
+        #expect(transport.last?.timeout == nil)
+        #expect(try await deadwax.lyrics(songID: "so 1", ifNoneMatch: #""l1""#) == .unchanged)
+        #expect(transport.last?.headers["If-None-Match"] == #""l1""#)
+        // an empty ETag is none sent
+        _ = try await deadwax.lyrics(songID: "so 1", ifNoneMatch: "")
+        #expect(transport.last?.headers["If-None-Match"] == nil)
+        // none for the song is an answer
+        transport.answer("/deadwax/navidrome/lyrics/so-2", 200, #"{"synced":false,"lines":[]}"#)
+        let none = try await deadwax.lyrics(songID: "so-2", ifNoneMatch: nil)
+        #expect(none == .fresh(LyricsAnswer(lyrics: SongLyrics(synced: false, lines: []), body: Data(#"{"synced":false,"lines":[]}"#.utf8)), etag: nil))
+        // a song Navidrome won't give the asker is thrown, for the gone sentence
+        transport.answer("/deadwax/navidrome/lyrics/so-3", 404, #"{"detail":"Navidrome has nothing by that id"}"#)
+        await #expect(throws: APIFailure.answered(.init(status: 404, method: "GET", path: "/navidrome/lyrics/so-3",
+                                                        detail: "Navidrome has nothing by that id"))) {
+            _ = try await deadwax.lyrics(songID: "so-3", ifNoneMatch: nil)
+        }
+        // and a 304 nobody asked for is no answer
+        transport.handle("/deadwax/navidrome/lyrics/so-4") { _ in HTTPResponse(status: 304) }
+        await #expect(throws: APIFailure.answered(.init(status: 304, method: "GET", path: "/navidrome/lyrics/so-4"))) {
+            _ = try await deadwax.lyrics(songID: "so-4", ifNoneMatch: nil)
+        }
     }
 
     @Test func coverSizesAreAFewSteps() {

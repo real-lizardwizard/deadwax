@@ -19,9 +19,15 @@ Phase 1's models are held the same way, each to the code that builds its answer 
 phone saves under), the loudness route's (2.1.1) with its album and song parts, Info's level answer, Navidrome's
 status, a play's query (sent through the real route) and the New mark's `seen` body. The Library's own models are in
 tests/test_ios_library_contract.py, which reads every DeadwaxCore file the same way.
+
+And app 0.4's lyrics (notes/app-lyrics.md 4.8): SongLyrics and LyricLine to what the lyrics route sends (src/lyrics.py
+song_lyrics(), sent whole by the route), and the answers the Swift tests decode (Fixtures/lyrics/answers.json, written
+by ios/scripts/lyrics_answers.py) to song_lyrics() itself, case by case.
 """
 
+import importlib.util
 import inspect
+import json
 import re
 import sys
 import typing
@@ -34,7 +40,7 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src import auth, levels, loudness, users  # noqa: E402
+from src import auth, levels, loudness, lyrics, users  # noqa: E402
 from src import play_queue as queue_rules  # noqa: E402
 from src.api.app import start  # noqa: E402
 from src.api.navidrome_endpoint import CLIENT_NAME  # noqa: E402
@@ -46,7 +52,7 @@ from src.store import JobStore  # noqa: E402
 
 CORE = Path(__file__).resolve().parent.parent / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore"
 ENDPOINT = re.compile(r'Endpoint\(method: "(\w+)", path: "([^"]+)", query: \[([^\]]*)\]\)')
-ROUTE_COUNT = 23
+ROUTE_COUNT = 24
 RAW_OPENING = re.compile(r'#+"')
 HASHES = re.compile(r"#*")
 
@@ -660,3 +666,50 @@ def test_seen_is_taken_as_the_app_sends_it(monkeypatch):
     for body in ({keys["releaseMBID"]: "b84ee12a-09ef-421b-82de-0441a926375b"}, {keys["albumIDs"]: [1, 2]}):
         answer = client.post("/deadwax/me/library/seen", json=body)
         assert answer.status_code == 200 and answer.json() == {"cleared": 0}, answer.text
+
+
+# ---------------------------------------------------------------------------- app 0.4: lyrics
+
+LYRICS_HELPER = Path(__file__).resolve().parent.parent / "ios" / "scripts" / "lyrics_answers.py"
+LYRICS_ANSWERS = (Path(__file__).resolve().parent.parent / "ios" / "DeadwaxKit" / "Tests" / "DeadwaxCoreTests"
+                  / "Fixtures" / "lyrics" / "answers.json")
+
+
+def _lyrics_helper():
+    spec = importlib.util.spec_from_file_location("ios_lyrics_answers", LYRICS_HELPER)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_the_lyrics_answer_is_what_the_app_decodes():
+    # the route sends song_lyrics() whole (json_with_etag of it): what the phone decodes is its two keys, and each
+    # line's two - `time` null for plain lyrics, so optional; `text` always there
+    source = inspect.getsource(navidrome.lyrics_of_song)
+    assert "json_with_etag(request, lyrics.song_lyrics(body))" in source
+    assert fields("SongLyrics") == {"synced": False, "lines": False}
+    assert fields("LyricLine") == {"time": True, "text": False}
+    cases = json.loads(LYRICS_ANSWERS.read_text(encoding="utf-8"))["cases"]
+    kinds = set()
+    for case in cases:
+        answer = lyrics.song_lyrics(case["navidrome"])
+        # the answer the Swift tests decode is the server's own, today
+        assert answer == case["answer"], case["name"]
+        assert_decodes("SongLyrics", answer)
+        for line in answer["lines"]:
+            assert_decodes("LyricLine", line)
+            assert set(line) == set(fields("LyricLine")), line
+        kinds.add("none" if not answer["lines"] else "synced" if answer["synced"] else "plain")
+    # every case the route answers: synced, plain, none
+    assert kinds == {"synced", "plain", "none"}
+
+
+def test_the_lyrics_answers_are_the_ones_the_helper_makes():
+    # Fixtures/lyrics/answers.json is what ios/scripts/lyrics_answers.py writes now, byte for byte - a case changed
+    # there (or the file by hand) fails until it is written again; and its snapshot is the route tests' own
+    from tests import test_navidrome_lyrics
+
+    helper = _lyrics_helper()
+    assert LYRICS_ANSWERS.read_text(encoding="utf-8") == helper.text()
+    assert helper.SNAPSHOT == test_navidrome_lyrics.SNAPSHOT
+    assert LYRICS_ANSWERS.read_bytes().isascii()

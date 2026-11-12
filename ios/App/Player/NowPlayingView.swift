@@ -4,9 +4,16 @@ import SwiftUI
 /// Now Playing, over the tabs (ui/src/player/NowPlaying.tsx, a phone's): the cover over its own blur, smaller while
 /// paused; a failure's words ABOVE the title (a line that comes and goes moves the cover, never what a finger is
 /// reaching for); the title and "Artist — Album", which goes to the album; the scrubber; the transport - Shuffle,
-/// Previous, Play/Pause, Next, Repeat (2.0.14) - and a footer of AirPlay, Up Next and •••. It closes from the chevron
-/// or a drag down its top half past PlayerWords.dismissDistance, begun past dragStartDistance - the cover and the
-/// row above it are the grip, the bar and the buttons below keep their own gestures.
+/// Previous, Play/Pause, Next, Repeat (2.0.14) - and a footer of Lyrics, AirPlay, Up Next and ••• (Apple Music's
+/// order, app 0.4). It closes from the chevron or a drag down its top half past PlayerWords.dismissDistance, begun past
+/// dragStartDistance - the cover and the row above it are the grip, the bar and the buttons below keep their own
+/// gestures.
+///
+/// LYRICS (app 0.4, notes/app-lyrics.md 4.1-4.3): with Lyrics on, the song's lyrics take the cover's place - the cover
+/// and the room around it - and the chevron's row alone is the grip, so scrolling them never drags the sheet; the title,
+/// the scrubber, the transport and the footer stay where they are. A song with none (or none kept on this phone,
+/// offline) shows the cover, the button still lit. The backdrop darkens under them so the dim lines read over the
+/// brightest cover.
 ///
 /// Every action is PlayerModel's, called straight from the tap. Shuffle and Repeat are named in Up Next's words
 /// (shuffleLabel, repeatLabel), pressed while on, tinted while on; a library's shuffle can't be turned off, so its
@@ -14,6 +21,8 @@ import SwiftUI
 struct NowPlayingView: View {
     @Environment(PlayerModel.self) private var player
     @Environment(AppNavigation.self) private var navigation
+    @Environment(LyricsModel.self) private var lyrics
+    @Environment(\.colorSchemeContrast) private var contrast
     @State private var showsUpNext = false
     @State private var showsInfo = false
     /// How far the sheet has been dragged down (points).
@@ -24,56 +33,58 @@ struct NowPlayingView: View {
 
     init() {}
 
+    /// Lyrics take the cover's place: on, and the song has some (or they are on their way, or failed).
+    private var lyricsShown: Bool { Lyrics.shows(lyrics.have, on: lyrics.showing) }
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
             if let entry = player.current {
-                Backdrop(cover: entry.track.coverArt)
+                Backdrop(cover: entry.track.coverArt,
+                         dim: Lyrics.backdropDim(lyrics: lyricsShown, increased: contrast == .increased))
                 content(entry.track)
             }
         }
         .offset(y: dragY)
         .sheet(isPresented: $showsUpNext) { UpNextScreen() }
         .sheet(isPresented: $showsInfo) { InfoView() }
+        .onAppear { lyrics.opened() }
     }
 
     private func content(_ track: QueueTrack) -> some View {
         VStack(spacing: 0) {
-            VStack(spacing: 0) {
-                HStack {
-                    Button(action: close) {
-                        Image(systemName: "chevron.down")
-                            .font(.title3.weight(.semibold))
-                            .frame(minWidth: 44, minHeight: 44)
-                            .contentShape(Rectangle())
+            // the chevron's row is the grip either way; it stays put as lyrics come and go
+            topRow
+                .contentShape(Rectangle())
+                .gesture(grip)
+            // the cover or the lyrics, crossfading in ONE place: a ZStack, so the one going and the one coming share
+            // the room through the fade rather than each taking half of it in the column (the cover shrinking and the
+            // lyrics laid out at half height, then grown)
+            ZStack {
+                if lyricsShown {
+                    // outside the grip: a scroll of the lyrics never drags the sheet
+                    lyricsFace(track)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .transition(.opacity)
+                } else {
+                    VStack(spacing: 0) {
+                        Spacer(minLength: 12)
+                        CoverImage(id: track.coverArt, size: 360)
+                            .frame(maxWidth: 360)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .shadow(color: .black.opacity(0.4), radius: 24, y: 12)
+                            .scaleEffect(player.isPlaying ? 1 : Self.pausedScale)
+                            .animation(.spring(response: 0.45, dampingFraction: 0.7), value: player.isPlaying)
+                            .padding(.horizontal, 8)
+                        Spacer(minLength: 12)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(NowPlayingWords.close)
-                    Spacer()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                    .gesture(grip)
+                    .transition(.opacity)
                 }
-                // the notice (D11), said over Now Playing - which covers the capsule over the mini player: in the top
-                // row, centred, where nothing else is, so it moves nothing and covers no button (phase2-downloads.md
-                // 4.2); in with opacity alone
-                .overlay {
-                    if let notice = player.notice {
-                        Notice(text: notice)
-                            .padding(.horizontal, 48)
-                            .transition(.opacity)
-                    }
-                }
-                .animation(.default, value: player.notice)
-                Spacer(minLength: 12)
-                CoverImage(id: track.coverArt, size: 360)
-                    .frame(maxWidth: 360)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .shadow(color: .black.opacity(0.4), radius: 24, y: 12)
-                    .scaleEffect(player.isPlaying ? 1 : Self.pausedScale)
-                    .animation(.spring(response: 0.45, dampingFraction: 0.7), value: player.isPlaying)
-                    .padding(.horizontal, 8)
-                Spacer(minLength: 12)
             }
-            .contentShape(Rectangle())
-            .gesture(grip)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             VStack(alignment: .leading, spacing: 4) {
                 if let error = player.errorLine, !error.isEmpty {
@@ -99,6 +110,85 @@ struct NowPlayingView: View {
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 8)
+    }
+
+    /// The chevron, and the notice over the row.
+    private var topRow: some View {
+        HStack {
+            Button(action: close) {
+                Image(systemName: "chevron.down")
+                    .font(.title3.weight(.semibold))
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(NowPlayingWords.close)
+            Spacer()
+        }
+        // the notice (D11), said over Now Playing - which covers the capsule over the mini player: in the top
+        // row, centred, where nothing else is, so it moves nothing and covers no button (phase2-downloads.md
+        // 4.2); in with opacity alone
+        .overlay {
+            if let notice = player.notice {
+                Notice(text: notice)
+                    .padding(.horizontal, 48)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.default, value: player.notice)
+    }
+
+    /// The lyrics' place (4.2): the lines; the spinner while they're asked with none in hand; a failure in a listener's
+    /// words and - unless the song is gone - Try again.
+    @ViewBuilder private func lyricsFace(_ track: QueueTrack) -> some View {
+        switch lyrics.face {
+        case .synced, .plain:
+            if let shown = lyrics.shown {
+                // made afresh for each song: a new song's lines start at their top
+                LyricsView(lyrics: shown, covered: showsUpNext || showsInfo)
+                    .id(track.id)
+            }
+        case .loading:
+            ProgressView()
+                .controlSize(.large)
+                .accessibilityLabel(LyricsWords.loading)
+        case .failed(let tryAgain):
+            if let failure = lyrics.failure {
+                VStack(spacing: 12) {
+                    ErrorNote(failure, gone: LyricsWords.songGone, failed: LyricsWords.failed, retry: true)
+                    if tryAgain {
+                        Button(LibraryWords.tryAgain) { lyrics.retry() }
+                            .buttonStyle(.bordered)
+                    }
+                }
+                .padding(.horizontal, 8)
+            }
+        case .cover:
+            // none: the cover - lyricsShown is false then, so not drawn here
+            EmptyView()
+        }
+    }
+
+    /// Lyrics: on, it is lit and filled (Apple Music's glyph); dimmed - its tap nothing - only while off for a song
+    /// known to have none, or none kept on this phone offline (2.7). Named for that state, selected while on.
+    private var lyricsButton: some View {
+        let have = lyrics.have
+        let on = lyrics.showing
+        let dimmed = Lyrics.dimmed(have, on: on)
+        return Button {
+            withAnimation(.easeInOut(duration: 0.25)) { lyrics.showing.toggle() }
+        } label: {
+            Image(systemName: on ? "quote.bubble.fill" : "quote.bubble")
+                .font(.title3)
+                .foregroundStyle(on ? Palette.accent : Color.primary)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(dimmed)
+        .opacity(dimmed ? Palette.off : 1)
+        .accessibilityLabel(LyricsWords.label(have))
+        .accessibilityAddTraits(on ? .isSelected : [])
     }
 
     @ViewBuilder private func byline(_ track: QueueTrack) -> some View {
@@ -169,6 +259,8 @@ struct NowPlayingView: View {
     private func footer(_ track: QueueTrack) -> some View {
         let route = PlayedAlbum.route(track, player: player)
         return HStack {
+            lyricsButton
+            Spacer()
             AirPlayButton()
                 .frame(width: 44, height: 44)
             Spacer()
@@ -231,9 +323,10 @@ private struct ModeButton: View {
 }
 
 /// Behind it all, the cover again - blurred to a wash and dimmed, asked at the size the big cover is, so it is the
-/// same picture from the cache.
+/// same picture from the cache. Dimmed further while lyrics show (Lyrics.backdropDim), the change eased in.
 private struct Backdrop: View {
     let cover: String?
+    let dim: Double
 
     var body: some View {
         GeometryReader { space in
@@ -242,7 +335,8 @@ private struct Backdrop: View {
                 .frame(width: space.size.width, height: space.size.height)
                 .clipped()
                 .blur(radius: 60)
-                .overlay(Color.black.opacity(0.55))
+                .overlay(Color.black.opacity(dim))
+                .animation(.easeInOut(duration: 0.25), value: dim)
         }
         .ignoresSafeArea()
         .accessibilityHidden(true)

@@ -61,6 +61,11 @@ public enum Routes {
     public static let libraryRemove = Endpoint(method: "POST", path: "/deadwax/me/library/remove", query: [])
     public static let librarySeen = Endpoint(method: "POST", path: "/deadwax/me/library/seen", query: [])
 
+    // app 0.4's: lyrics (server 2.1.5)
+    /// A song's lyrics for Now Playing (`SongLyrics`: synced, plain or none), as Navidrome has them for the asker,
+    /// with an ETag - asked again with it (`DeadwaxClient.lyrics(songID:ifNoneMatch:)`).
+    public static let lyrics = Endpoint(method: "GET", path: "/deadwax/navidrome/lyrics/{song_id}", query: [])
+
     /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
     public static var warmLevels: Endpoint { levelAlbum }
 
@@ -71,6 +76,7 @@ public enum Routes {
         levelAlbum, songLevel, loudness,
         queue, saveQueue, saveQueueAt,
         storeAlbum, myLibrary, libraryAdd, libraryRemove, librarySeen,
+        lyrics,
     ]
 
     /// The routes given longer than the transport's own 8 seconds to answer, in seconds: the album index reads every

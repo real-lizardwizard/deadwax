@@ -781,7 +781,7 @@ From specs/engine.md with D4 and D9, then the review's fixes (DeadwaxAudio; its 
 
 ### The API, models and errors in the listener's words
 
-- **Routes.swift** names all 23 routes the app calls, one `Endpoint(method:path:query:)` a line in the form
+- **Routes.swift** names all 24 routes the app calls (the 24th, `lyrics`, since app 0.4), one `Endpoint(method:path:query:)` a line in the form
   tests/test_ios_contract.py reads, all listed in `Routes.all`. `Routes.timeouts` gives album_index 30 s (D2),
   everything else the transport's 8 s; `CoverSize` is row 128, tile 400, hero 1024 (and the lock screen's 1024).
 - **Models.swift** reads Navidrome's pass-through answers leniently: a field of another type is absent, and a song
@@ -826,6 +826,7 @@ exporter with `--check` so tests.yml (which runs every sim, each on its own) fai
 | export-screen-vectors.cjs | SignIn.tsx, SignOutRow.tsx, QueueMenu.tsx, MiniPlayer.tsx, signIn.ts, whose.ts, scrub.ts, discTitles.ts, format.ts; lines of AlbumPage.tsx, NowPlaying.tsx and signInGate.tsx read out by pattern | screens/ | iosscreens.sim.cjs |
 | export-you-vectors.cjs | You.tsx's expressions and words, read out of the source and evaluated as written (136 cases) | you/ | iosyou.sim.cjs |
 | export-gate-vectors.cjs | NeedsNavidrome.tsx, access.ts, errorWords.ts, navidromeCheck.ts, the gate rendered against a Preact stand-in (35 cases) | gate/ | iosgate.sim.cjs |
+| export-lyrics-vectors.cjs (app 0.4) | lyricsView.ts - every rule of notes/app-lyrics.md 2.2-2.7 and the words - with lyrics.ts's lyricTime and scrub.ts's LANDED_WITHIN_S; the server's answers (src/lyrics.py song_lyrics()) through lyrics_answers.py, held by test_ios_contract.py | lyrics/ | ioslyrics.sim.cjs |
 
 `--check` makes everything again in memory and compares it byte for byte with what is committed, so a hand edit
 fails too. **A web rule changed**: its sim fails; run the exporter and commit what it writes; that touches ios/,
@@ -2815,3 +2816,37 @@ first, so a queue another device saved since wins even over edits made here afte
 have saved; a phone with no rev yet counts any other device's record as newer; an offline launch's queue appears only
 once the open's GET fails - at once in Airplane Mode, up to the transport's 8 s with a network up and deadwax out of
 reach (Reachability isn't asked).
+
+## Lyrics (app 0.4)
+
+The spec, its design review, and what was built with every departure from it are in **notes/app-lyrics.md** (section
+4, and "Built on the iPhone (app 0.4)"); here, the map. Built on `ios` after Phase 2's finishing round and the merge
+of main's 2.1.4-2.1.6 (the route, 2.1.5; the web's view as reviewed, 2.1.6), in four commits: Core with its fixtures,
+the store, the App, the version.
+
+- **Core** (`DeadwaxCore/Lyrics.swift`): `LyricLine`, `SongLyrics` and `LyricsAnswer` (the route's answer, and its
+  body as it came); `LyricsWords` (2.1, verbatim); `Lyrics`, lib/lyricsView.ts's rules ported - the clock, the lit
+  range (a binary search), the intro, the dots, following, the end room, a line's VoiceOver value, the next song's
+  ask - plus the phone's own: the button offline (`have(_:online:)`), what the face shows (`face`, `shows`), the
+  backdrop and dim-line opacities, and `failure(_:)` (a deadwax with no lyrics route); `LyricsKept` (the 50, least
+  recently used first); `LyricsHold` (the listener's scroll phases and VoiceOver's focus as one value, and the wait).
+  `Routes.lyrics` (24 routes); `DeadwaxClient.lyrics(songID:ifNoneMatch:)`.
+- **The store**: `DownloadDatabase` version 2 - the `lyrics` table and the `song_lyrics_go` trigger on `song`;
+  `putLyrics` keeps nothing for a song no longer in the table. `DownloadModel` asks as each song's file arrives and
+  fills in at every settle while deadwax can be reached; `keptLyrics(_:)` and `lyricsAnswered(_:body:etag:)` are the
+  player's way in.
+- **The App**: `Models/LyricsModel.swift` (made in DeadwaxApp beside the other models, reset with them when the person
+  changes); `Player/LyricsView.swift`; Now Playing's footer button, face and backdrop; `PlayerModel.clock()`, a read.
+  Nothing under `DeadwaxAudio/` changed, and nothing on the lock screen.
+- **Held to the web and the server**: export-lyrics-vectors.cjs and ioslyrics.sim.cjs (the table in "How the ports
+  are kept in step with the web"); `ios/scripts/lyrics_answers.py` writes `Fixtures/lyrics/answers.json` from
+  src/lyrics.py's `song_lyrics()`, which tests/test_ios_contract.py holds case by case, with `SongLyrics`' fields.
+
+Nothing of it has been seen on a phone: notes/app-lyrics.md section 6's P1-P12 (in docs/ios.md as "Lyrics' checks")
+and section 7 are what James's iPhone answers.
+
+**The version: 0.4 (4)** (the spec's Open question 11 - a version says what shipped, not which phase; the plan's
+Phase 3 ships as 0.5). Pinned as 0.3 was: `Base.xcconfig`'s `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`,
+`check_project.py`'s MARKETING_VERSION and BUILD, `ios.yml`'s check of the built Info.plist, and
+`tests/test_ios_install.py`'s read of the real xcconfig; the guide's title, opening, install.sh's line and About's App
+row, ios/README.md, and the two doc comments giving About's row as an example. `src/__init__.py` wasn't touched.

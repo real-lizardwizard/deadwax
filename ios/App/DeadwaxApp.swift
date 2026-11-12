@@ -14,6 +14,7 @@ struct DeadwaxApp: App {
     @State private var debug: DebugModel
     @State private var reachability: Reachability
     @State private var downloads: DownloadModel
+    @State private var lyrics: LyricsModel
 
     /// The one background session, made before anything else can ask it.
     private static let downloadSession = DownloadSession()
@@ -31,6 +32,7 @@ struct DeadwaxApp: App {
         let downloads = DownloadModel(server: server, reachability: reachability, files: files, session: Self.downloadSession)
         player.connect(downloads: downloads, reachability: reachability)
         let debug = DebugModel(server: server, player: player, downloads: downloads)
+        let lyrics = LyricsModel(server: server, player: player, downloads: downloads, reachability: reachability)
         reachability.start()
         // a new person (signed out, someone else signed in, another server): nothing of the last one's kept
         server.whenPersonChanges {
@@ -38,6 +40,7 @@ struct DeadwaxApp: App {
             navigation.reset()
             library.reset()
             debug.reset()
+            lyrics.reset()
         }
         _server = State(initialValue: server)
         _player = State(initialValue: player)
@@ -46,6 +49,7 @@ struct DeadwaxApp: App {
         _debug = State(initialValue: debug)
         _reachability = State(initialValue: reachability)
         _downloads = State(initialValue: downloads)
+        _lyrics = State(initialValue: lyrics)
     }
 
     var body: some Scene {
@@ -58,6 +62,7 @@ struct DeadwaxApp: App {
                 .environment(debug)
                 .environment(reachability)
                 .environment(downloads)
+                .environment(lyrics)
                 .preferredColorScheme(.dark)
                 .tint(Palette.accent)
         }
