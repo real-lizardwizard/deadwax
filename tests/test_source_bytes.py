@@ -37,7 +37,10 @@ FORBIDDEN = set(range(0x00, 0x09)) | {0x0B, 0x0C} | set(range(0x0E, 0x20)) | {0x
 # purpose: skipping it should be a deliberate one-line decision, not a silent gap.
 # .flac: the iPhone app's copy verifier's fixtures (ios/DeadwaxKit/Tests/DeadwaxAudioTests/Fixtures/verifier),
 # written by ios/scripts/make-test-album.py and checked against it by tests/test_ios_install.py.
-BINARY_SUFFIXES = {".png", ".woff2", ".flac"}
+# .f32: raw Float32 audio, the web's turntable voice output kept whole for three cases
+# (ios/DeadwaxKit/Tests/DeadwaxCoreTests/Fixtures/deck/voice), written by ios/scripts/export-deck-vectors.cjs and
+# checked against it by ui/test/iosdeck.sim.cjs - base64 in JSON would take the folder past its 3 MB budget.
+BINARY_SUFFIXES = {".png", ".woff2", ".flac", ".f32"}
 
 NEWLINE = bytes([10])
 

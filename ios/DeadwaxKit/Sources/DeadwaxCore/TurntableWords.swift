@@ -136,8 +136,8 @@ public struct DeckReport: Equatable, Sendable {
         }
     }
 
-    /// deckVoice.ts DeckHealth (:927).
-    public struct Health: Equatable, Sendable {
+    /// deckVoice.ts DeckHealth (:927) - its name kept, so it isn't taken for Models.swift's Health (the server's).
+    public struct DeckHealth: Equatable, Sendable {
         public var blocks = 0.0, lateBlocks = 0.0, worstBlockMs = 0.0
         public var frames = 0.0, slowFrames = 0.0, worstFrameMs = 0.0
         public var backMs: Double?
@@ -179,12 +179,12 @@ public struct DeckReport: Equatable, Sendable {
     public var fetched: Double
     public var lastFetchAt: Double
     public var clockStep: Double?
-    public var health: Health?
+    public var health: DeckHealth?
     public var latency: Latency?
 
     public init(context: String, problem: String? = nil, voice: String? = nil, voiceWhy: String? = nil, window: Window? = nil, loading: Bool = false,
                 refused: String? = nil, failed: String? = nil, fetched: Double = 0, lastFetchAt: Double = 0, clockStep: Double? = nil,
-                health: Health? = nil, latency: Latency? = nil) {
+                health: DeckHealth? = nil, latency: Latency? = nil) {
         self.context = context
         self.problem = problem
         self.voice = voice

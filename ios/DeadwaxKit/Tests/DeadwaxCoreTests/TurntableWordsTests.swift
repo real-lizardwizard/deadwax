@@ -77,9 +77,9 @@ import Testing
         let window = json["window"].flatMap { $0.isNull ? nil : $0 }.map {
             DeckReport.Window(start: n($0["start"]), end: n($0["end"]), kind: $0["kind"]?.string ?? "", decodedAt: n($0["decodedAt"]), bytes: n($0["bytes"]))
         }
-        var health: DeckReport.Health?
+        var health: DeckReport.DeckHealth?
         if let h = json["health"], !h.isNull {
-            var made = DeckReport.Health()
+            var made = DeckReport.DeckHealth()
             made.blocks = n(h["blocks"]); made.lateBlocks = n(h["lateBlocks"]); made.worstBlockMs = n(h["worstBlockMs"])
             made.frames = n(h["frames"]); made.slowFrames = n(h["slowFrames"]); made.worstFrameMs = n(h["worstFrameMs"])
             made.backMs = DeckFixtures.double(h["backMs"]); made.motorMs = DeckFixtures.double(h["motorMs"])
