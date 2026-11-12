@@ -573,18 +573,22 @@ then the rest by name - and its comment says so.
 - **A list that holds no results** (GitHub answering 200 with a page that isn't INDEX.md), and a list or a profile
   that isn't UTF-8, is "anything but the list": Unreachable.
 - **A failed background refresh is not tried again for 15 minutes** (`RETRY_SECONDS`) while the old list answers -
-  otherwise every search would ask GitHub again while it is down or limiting. With no list at all, every ask tries.
+  otherwise every search would ask GitHub again while it is down or limiting. With no list at all, a failed fetch is
+  not tried again for a minute (the review's - see "Review").
 - **The first list's 15 s** bound the ask, not the fetch: the fetch is a task the ask waits on through
   `asyncio.shield`, so a slow GitHub costs that ask a 503 and the next ask finds the list.
 - **A kept profile is answered only at the list's own commit** - besides the drop, a profile fetch that crossed a new
   list (and kept its text at the old commit) is fetched again rather than answered.
-- **The kept list is read under the lock**, so a second ask at the start waits for it instead of asking GitHub.
+- **The kept list is read under the lock**, so a second ask at the start waits for it rather than reading it again.
 
-### Left as the spec has it
+### Letters NFKD keeps whole (the review's)
 
-- **NFKD leaves letters that aren't a base and a mark**: `Ø`, `Æ`, `Ł`, `Đ`, `Þ` stay. "rode" doesn't find the RØDE
-  NTH-100 (finds `Dekoni earpads` names, inside a word); "røde" does. A small table of such letters would fix it -
-  not built, as the spec's rule is exact.
+Built as the spec has it, NFKD left letters that aren't a base and a mark - `Ø`, `Æ`, `Ł`, `Đ`, `Þ` - so "rode" didn't
+find the RØDE NTH-100 ("røde" did). Added in the review, asked for: folding makes them plain after casefold, from a
+small table (`LETTERS` in src/autoeq.py) - `æ` ae, `ð` d, `đ` d, `ħ` h, `ı` i, `ł` l, `ø` o, `œ` oe, `ŧ` t, `þ` th -
+so "rode", "røde" and "RØDE" find it alike, and a RØDE and a RODE of one name are one row. `ß` is still casefold's
+`ss`; `ŋ` and `ĸ`, with no one plain spelling, are left as they are. A step beyond eq.md 2.1's "NFKD, marks dropped,
+lowercased".
 
 ### Verified, and not
 
@@ -601,3 +605,63 @@ then the rest by name - and its comment says so.
 - **Not seen**: deadwax itself has never talked to GitHub - every answer it has read is the MockTransport's. GitHub's
   rate limiting, a gzip'd raw answer read through httpx, and how long the 851 KB takes from James's server are
   unwatched.
+
+### Review
+
+The same day, read against eq.md 2.1-2.6, 3.17 and the design review; no version bump (still 2.1.7). Fixed, each with
+a test in tests/test_autoeq.py that fails without it (74 tests now, 21 new):
+
+1. **A kept list was searched by the fold it was kept with.** `autoeq_list` keeps each name's `folded`, and the list
+   read back after a start trusted it - so a change to fold() (the letter table above) would not reach a kept list
+   until AutoEq's master moved, and an unchanged commit keeps a list for months: "rode" would find nothing, and nor
+   would "røde", now folded to "rode". The kept list is folded again as it is read (`kept_results`, on a worker
+   thread - about 40 ms for 8,850 names); `folded` is still written, as 2.3's table has it. A kept list with no
+   results left is no list, and the first ask fetches one - as a fetched list with none is "anything but the list".
+2. **The troubleshooting page said deadwax asks api.github.com "once per new correction"**: corrections come from
+   raw.githubusercontent.com. It says so now, and that the weekly ask is once deadwax has the list.
+
+Three the review raised as questions, decided as fixes:
+
+3. **With no list, a failed fetch is waited on for a minute** (`NO_LIST_RETRY_SECONDS`, 60). Every ask in that
+   minute - a search or a profile - is the 503 at once, GitHub not asked; the next ask after it tries again. 2.3's
+   "fetched before answering" had every ask try, so a picker that searches as it's typed into, while GitHub refused,
+   spent one api.github.com request a search out of the 60 an hour. A kept list's failed refresh still waits
+   `RETRY_SECONDS` behind the list, which answers.
+4. **A deadline on each whole fetch**, not only httpx's 15 s between pieces, under which an answer trickling in
+   could hold a fetch open as long as it trickled: 60 s for the list, master's commit asked first and counted in it
+   (`LIST_DEADLINE_SECONDS`, `AutoEqClient.latest_list`), 15 s for a profile (`PROFILE_DEADLINE_SECONDS`). Past it,
+   Unreachable (`within()` in autoeq_endpoint.py): the same 503, and the same log line, naming the deadline -
+   "AutoEq's list couldn't be fetched - GitHub took more than 60 s for AutoEq's list". The first ask still waits
+   15 s at most; the fetch carries on to its 60 for the next.
+5. **A refresh that fails in any way** - any Exception, not only Unreachable - is said in deadwax's log at warning
+   with its traceback (never `frontend`), starts the wait (the 15 minutes behind a kept list, the minute with
+   none), and comes out of `_fetch` as Unreachable, so the old list answers, a first ask is the 503 rather than a
+   500, and `_settled` only retrieves it. `stop_refreshing` lets nothing out of the shutdown, whatever the refresh
+   ends with, so the clients after it are still closed. Before, a fault left `failed_at` unset (the next search
+   would fetch again) and could escape the shutdown.
+
+Tests that passed with the code broken, now caught (each mutation tried): the size caps checked only after the whole
+answer was read (a 64 MB list and a 1 MB profile sent in pieces, refused at the piece that passes the cap); a
+redirect followed per request (a profile's 302 to an address that answers 200); stopping deadwax not cancelling a
+refresh under way; the path decoded twice (`%2541` is `%41`, never `A`); a list or a profile that isn't UTF-8
+accepted; the default `limit` (30, over forty rows); the 15 s first wait and the 15 min retry (asserted). The three
+fixes' tests move the recorded failure as age() moves the list's time, trickle answers a piece every 50 ms past a
+shortened deadline (and the commit's and the list's answers 0.3 s each past 0.5 s together), and fault the parser
+with a plain RuntimeError.
+
+Looked at and kept: the parsing (the first `](./`, the last `) by `, three segments, the source from the path when
+the line starts with it), the id, the address (`quote(segment, safe="")`, the name's segment whole), search, the
+ranking and SOURCE_ORDER; the routes' bounds, shapes, status codes and the two sentences; GitHub asked only for the
+commit, the list and paths from the list; no redirects; the agent; the shield, the lock, the background refresh,
+the drop on a new commit and the guard on a profile fetched across one; the store's five methods, which use SQLite
+as `descriptions` does (a worker thread each, failures logged and swallowed).
+
+Left, and why:
+
+- **The lock is belt and braces.** `refresh()` hands back the task under way, so two fetches never overlap without
+  it; it only keeps two first asks from reading the database twice. Harmless; the spec asks for it.
+- **The rig is the folder's, not the line's ` on <rig>`** (2.1 names both): every line at 7ae0f56 says the same in
+  each.
+- **`folded` is still written** to `autoeq_list`, though read back it is folded again: 2.3's table has it.
+- **A gzip'd answer is measured after each piece is decoded**: one compressed piece can decode to about a thousand
+  times its size before the cap sees it. Accepted, as the only host deadwax asks is GitHub's.

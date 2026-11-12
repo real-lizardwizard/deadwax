@@ -13,15 +13,17 @@ KEPT, in the database (store.py autoeq_list, autoeq_meta, autoeq_profile) and, f
     one at a time, under an asyncio.Lock - while the old one answers; with none at all, it is fetched before
     answering (FIRST_FETCH_SECONDS at most - what was being fetched carries on for the next ask). When master's
     commit is the one kept, nothing more is fetched and nothing dropped: only the time moves. A new list replaces
-    the old in one transaction, and every kept profile goes with it. A background refresh that failed is not tried
-    again for RETRY_SECONDS, while the old list answers.
+    the old in one transaction, and every kept profile goes with it. A background refresh that failed - for any
+    reason, GitHub's or a fault in deadwax - is not tried again for RETRY_SECONDS, while the old list answers; with
+    no list, a failed fetch is not tried again for NO_LIST_RETRY_SECONDS, every ask meanwhile a 503 at once. Each
+    fetch has a deadline as a whole (src/autoeq.py LIST_DEADLINE_SECONDS, PROFILE_DEADLINE_SECONDS).
   - A PROFILE once fetched, at its commit: asked again, it is answered from the database without asking GitHub -
     while the list is still at that commit.
 
 Failures in words for whoever reads them (`detail`, which the app's ErrorWords say - eq.md 3.17): no list and GitHub
 not answering with one, or a profile that can't be fetched - 503 UNREACHABLE; an id not in the list, or a profile
 GitHub answers 404 for - 404 GONE. What GitHub answered goes to deadwax's own log (the container's output) at info
-level, never the event log a listener's page could show.
+level, a fault in deadwax at warning with its traceback - never the event log a listener's page could show.
 """
 
 import asyncio
@@ -31,8 +33,8 @@ import time
 from fastapi import APIRouter, HTTPException, Path, Query, Request, Response
 
 from src.api.autoeq_endpoint import Unreachable, autoeq_client
-from src.autoeq import (FIRST_FETCH_SECONDS, ID_PATTERN, RETRY_SECONDS, Result, Row, is_stale, parse_index,
-                        profile_answer, row_answer, rows_of, search, when)
+from src.autoeq import (FIRST_FETCH_SECONDS, ID_PATTERN, NO_LIST_RETRY_SECONDS, RETRY_SECONDS, Result, Row, is_stale,
+                        kept_results, parse_index, profile_answer, row_answer, rows_of, search, when)
 from src.logger import logger
 
 router = APIRouter()
@@ -69,7 +71,8 @@ class KeptList:
 
     async def read_kept(self, store) -> None:
         """The list kept in the database, read once after a start - under the lock, so a second ask meanwhile
-        waits for it rather than finding nothing and asking GitHub."""
+        waits for it rather than reading it again. Its names are folded again as they are read (kept_results); a
+        kept list with no results left is no list."""
         if self.read:
             return
         async with self.lock:
@@ -77,7 +80,10 @@ class KeptList:
                 return
             kept = await store.autoeq_list_get() if store is not None else None
             if kept and self.sha is None:
-                self.take(kept["sha"], kept["fetched_at"], [Result(**row) for row in kept["results"]])
+                #? on a worker thread, as a fetched list is parsed: folding 8,850 names takes about 40 ms
+                results = await asyncio.to_thread(kept_results, kept["results"])
+                if results:
+                    self.take(kept["sha"], kept["fetched_at"], results)
             self.read = True
 
     def refresh(self, store) -> asyncio.Task:
@@ -88,38 +94,52 @@ class KeptList:
         return self.refreshing
 
     async def _fetch(self, store) -> None:
+        """A refresh, and how it fails: every failure is waited on (failed_at - NO_LIST_RETRY_SECONDS with no list,
+        RETRY_SECONDS with one, which answers meanwhile) and comes out as Unreachable - GitHub's said at info level, a
+        fault in deadwax at warning with its traceback, both in deadwax's own log alone."""
         async with self.lock:
             if self.sha is not None and not is_stale(self.fetched_at, time.time()):
                 return
             try:
-                sha = await autoeq_client.master_commit()
-                if sha == self.sha:
-                    now = time.time()
-                    if store is not None:
-                        await store.autoeq_list_seen(sha, now)
-                    self.fetched_at, self.failed_at = now, None
-                    logger.info(f"AutoEq's list is unchanged at {sha[:7]}")
-                    return
-                #? on a worker thread: the list is 851 KB, parsed in about 60 ms - the player's streams share this loop
-                results, skipped = await asyncio.to_thread(parse_index, await autoeq_client.index(sha))
-                if skipped:
-                    logger.info(f"AutoEq's list at {sha[:7]}: {skipped} line(s) didn't parse and were skipped")
-                if not results:
-                    raise Unreachable(f"GitHub's answer for AutoEq's list at {sha[:7]} held no results")
+                await self._refreshed(store)
             except Unreachable as e:
                 self.failed_at = time.time()
                 logger.info(f"AutoEq's list couldn't be fetched - {e}")
                 raise
+            except Exception as e:
+                self.failed_at = time.time()
+                logger.warning(f"AutoEq's list couldn't be fetched - a fault in deadwax: {type(e).__name__}: {e}",
+                               exc_info=True)
+                raise Unreachable(f"a fault in deadwax: {type(e).__name__}") from e
+
+    async def _refreshed(self, store) -> None:
+        sha, text = await autoeq_client.latest_list(self.sha)
+        if text is None:
             now = time.time()
             if store is not None:
-                await store.autoeq_list_put(sha, now, [dataclasses.asdict(result) for result in results])
-            self.take(sha, now, results)
-            logger.info(f"AutoEq's list fetched at {sha[:7]}: {len(results)} results")
+                await store.autoeq_list_seen(sha, now)
+            self.fetched_at, self.failed_at = now, None
+            logger.info(f"AutoEq's list is unchanged at {sha[:7]}")
+            return
+        #? on a worker thread: the list is 851 KB, parsed in about 60 ms - the player's streams share this loop
+        results, skipped = await asyncio.to_thread(parse_index, text)
+        if skipped:
+            logger.info(f"AutoEq's list at {sha[:7]}: {skipped} line(s) didn't parse and were skipped")
+        if not results:
+            raise Unreachable(f"GitHub's answer for AutoEq's list at {sha[:7]} held no results")
+        now = time.time()
+        if store is not None:
+            await store.autoeq_list_put(sha, now, [dataclasses.asdict(result) for result in results])
+        self.take(sha, now, results)
+        logger.info(f"AutoEq's list fetched at {sha[:7]}: {len(results)} results")
 
     async def ready(self, store) -> None:
         """A list to answer with - the kept one, refreshed behind it when a week old - or Unreachable."""
         await self.read_kept(store)
         if self.sha is None:
+            #? the last fetch failed less than a minute ago: answered at once, GitHub not asked
+            if self.failed_at is not None and time.time() - self.failed_at < NO_LIST_RETRY_SECONDS:
+                raise Unreachable("no list, and the last fetch failed under a minute ago")
             try:
                 #? shielded: a slow GitHub costs this ask its answer, not the fetch, which the next ask finds
                 await asyncio.wait_for(asyncio.shield(self.refresh(store)), FIRST_FETCH_SECONDS)
@@ -158,13 +178,10 @@ class KeptList:
 
 
 def _settled(task: asyncio.Task) -> None:
-    #? a refresh's Unreachable is logged by _fetch, and retrieved here so asyncio doesn't log it again; anything else
-    #? is a fault in deadwax, said as one
-    if task.cancelled():
-        return
-    error = task.exception()
-    if error is not None and not isinstance(error, Unreachable):
-        logger.error(f"AutoEq's list couldn't be refreshed: {type(error).__name__}: {error}")
+    #? a refresh's failure is said by _fetch (and comes out of it as Unreachable): retrieved here so asyncio doesn't
+    #? say it again as "never retrieved"
+    if not task.cancelled():
+        task.exception()
 
 
 def kept_list(request: Request) -> KeptList:
@@ -176,14 +193,15 @@ def kept_list(request: Request) -> KeptList:
 
 
 async def stop_refreshing(app) -> None:
-    """A refresh under way, cancelled - deadwax is stopping."""
+    """A refresh under way, cancelled - deadwax is stopping. Nothing it ends with gets out of here: _fetch has said
+    every failure already, and the rest of the shutdown still has clients to close."""
     kept = getattr(app.state, "autoeq", None)
     task = kept.refreshing if kept is not None else None
     if task is not None and not task.done():
         task.cancel()
         try:
             await task
-        except (asyncio.CancelledError, Unreachable):
+        except (asyncio.CancelledError, Exception):
             pass
 
 

@@ -67,6 +67,13 @@ REFRESH_SECONDS = 7 * 24 * 3600
 RETRY_SECONDS = 15 * 60
 #? With no list at all, the most a search or a profile waits for the first one
 FIRST_FETCH_SECONDS = 15.0
+#? ...and, after that fetch failed, how long every ask is answered "can't reach AutoEq" at once without asking
+#? GitHub again: a picker searching as it is typed into would otherwise spend GitHub's 60 an hour while it refuses
+NO_LIST_RETRY_SECONDS = 60
+#? The most a WHOLE fetch may take - httpx's 15 s is only between pieces, so an answer trickling in would hold a fetch
+#? open for as long as it trickled: the list's (master's commit asked first, and counted), and a profile's
+LIST_DEADLINE_SECONDS = 60.0
+PROFILE_DEADLINE_SECONDS = 15.0
 
 LINE_START = "- ["
 NAME_END = "](./"
@@ -74,6 +81,13 @@ SOURCE_START = ") by "
 RIG_START = " on "
 
 _RUNS = re.compile(r"[^\W_]+")
+
+#? Latin letters NFKD leaves whole - each is one letter, not a base and a mark, so dropping marks keeps it as it is -
+#? folded to the plain letters a person types for them, so "rode" finds the RØDE NTH-100 as "røde" does. Applied
+#? after casefold, so each is listed once, in lower case (`Ø` is `ø` by then); `ß` needs no entry, casefold makes it
+#? `ss`. Letters with no one plain spelling (`ŋ`, `ĸ`) are left as they are.
+LETTERS = str.maketrans({"æ": "ae", "ð": "d", "đ": "d", "ħ": "h", "ı": "i", "ł": "l", "ø": "o", "œ": "oe", "ŧ": "t",
+                         "þ": "th"})
 
 
 @dataclass(frozen=True)
@@ -101,10 +115,11 @@ class Row:
 
 def fold(text: str) -> str:
     """A name or a query as searching compares them: NFKD, marks dropped, lowercased (casefold, so a `ß` is `ss`),
-    every run of anything not a letter or digit one space."""
+    the letters NFKD keeps whole made plain (LETTERS: `ø` is `o`, `æ` is `ae`), every run of anything not a letter or
+    digit one space."""
     decomposed = unicodedata.normalize("NFKD", text or "")
     unmarked = "".join(c for c in decomposed if not unicodedata.combining(c))
-    return " ".join(_RUNS.findall(unmarked.casefold()))
+    return " ".join(_RUNS.findall(unmarked.casefold().translate(LETTERS)))
 
 
 def result_id(path: str) -> str:
@@ -177,6 +192,19 @@ def parse_index(text: str) -> tuple[list[Result], int]:
             seen.add(result.id)
             results.append(result)
     return results, skipped
+
+
+def kept_results(rows: list[dict]) -> list[Result]:
+    """A list kept in the database (store.py autoeq_list_get's rows) as results, every name FOLDED AGAIN as fold() is
+    now: the `folded` kept beside it is the fold of the deadwax that kept it, and an unchanged commit keeps a list for
+    months, so a change to fold() reaches it at the next start, not at AutoEq's next commit. A name that folds to
+    nothing is no result, as parse_line() has it."""
+    results = []
+    for row in rows:
+        folded = fold(row["name"])
+        if folded:
+            results.append(Result(**{**row, "folded": folded}))
+    return results
 
 
 def source_rank(result: Result) -> tuple:

@@ -2305,15 +2305,22 @@ says **"deadwax can't reach AutoEq just now."**, deadwax couldn't get an answer 
   It prints 40 letters and digits when GitHub can be reached.
 - **deadwax's log says what GitHub answered** - the container's output (`docker logs deadwax`, or the stack's log in
   Komodo), at info level, not the app's Event log: a line starting "AutoEq's list couldn't be fetched -" or naming the
-  correction that couldn't be, with GitHub's status or what stopped the connection. A `403` or `429` from api.github.com is usually
-  GitHub's limit for callers without an account, 60 requests an hour from one address: deadwax asks about once a
-  week, and once per new correction, so something else sharing your address is asking - it passes within the
-  hour.
+  correction that couldn't be, with GitHub's status, what stopped the connection, or that GitHub took too long
+  ("GitHub took more than 60 s for AutoEq's list" - 15 s for a correction). A `403` or `429` from api.github.com is usually
+  GitHub's limit for callers without an account, 60 requests an hour from one address: once deadwax has the list it
+  asks api.github.com about once a week (each correction comes from raw.githubusercontent.com), so something else
+  sharing your address is asking - it passes within the hour.
 - **It only matters until the list is kept.** Once deadwax has AutoEq's list it keeps it in its database and answers
   from it, GitHub or not; a week on, it asks GitHub again behind the old list, and if GitHub can't be reached the old
   list goes on answering (asked again 15 minutes later at the soonest). A correction once fetched is kept too. So
   "can't reach AutoEq" means either deadwax has never fetched the list - a first search, after a new install or a
   new database - or the correction you picked hasn't been fetched since AutoEq's list last changed.
+- **With no list yet, a failed fetch is waited on for a minute**: for that minute every search answers "can't reach
+  AutoEq" at once without asking GitHub, so searching again straight away changes nothing. Fix what stopped it,
+  wait a minute, and search again.
+- **"a fault in deadwax"** in that log line, at warning level with a traceback under it, is a bug in deadwax rather
+  than GitHub's answer: worth reporting, with the traceback. It's waited on like GitHub's failures - the old list
+  goes on answering, if there is one.
 
 **"AutoEq doesn't have that measurement any more."** is different: AutoEq's list no longer has the headphone the
 phone asked about (its list changed since the phone found it), or GitHub has no correction file for it. Search again

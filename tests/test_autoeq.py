@@ -15,6 +15,7 @@ The fake GitHub answers as the real one was seen to on 2026-11-12 (by hand, with
 """
 
 import asyncio
+import dataclasses
 import hashlib
 import logging
 import re
@@ -34,6 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from src import __version__  # noqa: E402
 from src import autoeq as A  # noqa: E402
 from src.api.app import start  # noqa: E402
+from src.api import autoeq_endpoint  # noqa: E402
 from src.api.autoeq_endpoint import Unreachable, autoeq_client  # noqa: E402
 from src.config import Config  # noqa: E402
 from src.routes import eq as eq_route  # noqa: E402
@@ -69,9 +71,35 @@ def rid(path: str) -> str:
 
 # ----------------------------------------------------------------- the fake GitHub
 
+class Pieces(httpx.AsyncByteStream):
+    """An answer GitHub sends a piece at a time - `pause` seconds before each - counting the pieces deadwax has
+    taken."""
+
+    def __init__(self, pieces: list[bytes], pause: float = 0.0):
+        self.pieces, self.pause, self.taken = pieces, pause, 0
+
+    @classmethod
+    def of(cls, body: str, size: int, pause: float) -> "Pieces":
+        data = body.encode("utf-8")
+        return cls([data[at:at + size] for at in range(0, len(data), size)], pause)
+
+    async def __aiter__(self):
+        for piece in self.pieces:
+            if self.pause:
+                await asyncio.sleep(self.pause)
+            self.taken += 1
+            yield piece
+
+
+def answer(body: str | bytes | Pieces, status: int = 200, headers: dict | None = None) -> httpx.Response:
+    if isinstance(body, Pieces):
+        return httpx.Response(status, stream=body, headers=headers)
+    return httpx.Response(status, content=body if isinstance(body, bytes) else body.encode("utf-8"), headers=headers)
+
+
 class GitHub:
     """api.github.com's commit and raw.githubusercontent.com's files, as AutoEq's repository has them: `lists` by
-    commit, `files` by (commit, decoded path under results/). Every request kept."""
+    commit, `files` by (commit, decoded path under results/) - each text, bytes, or Pieces. Every request kept."""
 
     def __init__(self):
         self.master = OLD
@@ -80,8 +108,8 @@ class GitHub:
                       (OLD, f"{HD650}/Sennheiser HD 650 ParametricEQ.txt"): HD650_TEXT}
         self.requests: list[httpx.Request] = []
         self.down = False
-        #? answered instead, by kind - "commit", "list" or "profile" - as (status, body)
-        self.instead: dict[str, tuple[int, str]] = {}
+        #? answered instead, by kind - "commit", "list" or "profile" - as (status, body[, headers])
+        self.instead: dict[str, tuple] = {}
         self.delay = 0.0
 
     async def handle(self, request: httpx.Request) -> httpx.Response:
@@ -95,7 +123,7 @@ class GitHub:
             if url.raw_path.decode() != "/repos/jaakkopasanen/AutoEq/commits/master":
                 return httpx.Response(404, json={"message": "Not Found"})
             if "commit" in self.instead:
-                return httpx.Response(self.instead["commit"][0], text=self.instead["commit"][1])
+                return self.answer_instead("commit")
             if request.headers.get("accept") != "application/vnd.github.sha":
                 return httpx.Response(200, json={"sha": self.master})
             return httpx.Response(200, text=self.master)
@@ -108,14 +136,18 @@ class GitHub:
         sha, _, rest = raw[len(prefix):].partition("/")
         if rest == "results/INDEX.md":
             if "list" in self.instead:
-                return httpx.Response(self.instead["list"][0], text=self.instead["list"][1])
+                return self.answer_instead("list")
             found = self.lists.get(sha)
-            return httpx.Response(200, text=found) if found is not None else httpx.Response(404, text="404: Not Found")
+            return answer(found) if found is not None else httpx.Response(404, text="404: Not Found")
         if "profile" in self.instead:
-            return httpx.Response(self.instead["profile"][0], text=self.instead["profile"][1])
+            return self.answer_instead("profile")
         #? decoded ONCE, as GitHub does
         found = self.files.get((sha, unquote(rest[len("results/"):]))) if rest.startswith("results/") else None
-        return httpx.Response(200, text=found) if found is not None else httpx.Response(404, text="404: Not Found")
+        return answer(found) if found is not None else httpx.Response(404, text="404: Not Found")
+
+    def answer_instead(self, kind: str) -> httpx.Response:
+        status, body, *headers = self.instead[kind]
+        return answer(body, status, headers[0] if headers else None)
 
     def asked(self) -> list[str]:
         return [f"{request.url.host}{request.url.raw_path.decode()}" for request in self.requests]
@@ -184,6 +216,12 @@ def age(env, days: float) -> None:
     kept.fetched_at -= days * 86400
     with sqlite3.connect(env.db) as connection:
         connection.execute("UPDATE autoeq_meta SET fetched_at = ?", (kept.fetched_at,))
+
+
+def a_minute_on(env) -> None:
+    """The clock moved past the minute a failed first fetch is waited on (the recorded failure made that much
+    older, as age() makes the list older)."""
+    env.app.state.autoeq.failed_at -= A.NO_LIST_RETRY_SECONDS
 
 
 def kept_profiles(env) -> list[tuple[str, str]]:
@@ -272,6 +310,16 @@ def test_the_path_runs_to_the_last_by():
     assert (result.path, result.source) == ("src/in-ear/Foo (made) by Bar", "src")
 
 
+def test_a_path_is_decoded_exactly_once():
+    """A `%` the list encodes (`%25`) is a `%` in the folder's name: decoded once, `%2541` is `%41`, never `A` - and
+    encoded again for its address, `%2541` once more. Written for this test; AutoEq's list has no such name."""
+    result = A.parse_line("- [Foo %41](./src/in-ear/Foo%20%2541) by src")
+    assert (result.path, result.name) == ("src/in-ear/Foo %41", "Foo %41")
+    assert A.profile_url(OLD, result.path) == (
+        f"https://raw.githubusercontent.com/jaakkopasanen/AutoEq/{OLD}/results/src/in-ear/Foo%20%2541/"
+        "Foo%20%2541%20ParametricEQ.txt")
+
+
 def test_a_source_with_on_in_its_name_stays_whole():
     line = "- [Thing](./Hang%20on%20Audio/in-ear/Thing) by Hang on Audio"
     assert A.parse_line(line).source == "Hang on Audio"
@@ -311,6 +359,33 @@ def test_folding_drops_marks_case_and_punctuation():
     assert A.fold("Bose QuietComfort 35 II Gaming Headset" + chr(0x200B)) == "bose quietcomfort 35 ii gaming headset"
     assert A.fold("Straße") == "strasse"
     assert A.fold("!!!") == ""
+
+
+def test_letters_nfkd_keeps_whole_fold_to_plain_ones():
+    """Ø, Æ, Ł and the like are one letter each, not a base and a mark, so NFKD leaves them: LETTERS makes them the
+    plain letters a person types - in either case, inside a word or alone."""
+    assert A.fold("RØDE NTH-100") == A.fold("Røde NTH-100") == A.fold("RODE nth 100") == "rode nth 100"
+    assert A.fold("Æ æ Œ œ Ø ø") == "ae ae oe oe o o"
+    assert A.fold("Łódź") == "lodz"
+    assert A.fold("Đ đ Ð ð") == "d d d d"
+    assert A.fold("Þ þ Ħ ħ Ŧ ŧ") == "th th h h t t"
+    assert A.fold("Kırmızı İstanbul") == "kirmizi istanbul"
+    #? ß is still casefold's: ss, as ẞ is
+    assert A.fold("Straße STRAẞE") == "strasse strasse"
+    #? a letter with no one plain spelling is left as it is
+    assert A.fold("Ŋ ĸ") == "ŋ ĸ"
+
+
+def test_rode_finds_the_rode_nth_100():
+    """The line written for this test in AutoEq's shape (`R%C3%98DE`, as its list encodes the Ø), beside the
+    fixture's: "rode", "røde" and "RØDE" find it alike, and the names fold to one row with a plain RODE's."""
+    rode = A.parse_line("- [RØDE NTH-100](./Test/over-ear/R%C3%98DE%20NTH-100) by Test")
+    plain = A.parse_line("- [RODE NTH-100](./Other/over-ear/RODE%20NTH-100) by Other")
+    assert rode.path == "Test/over-ear/RØDE NTH-100" and rode.folded == "rode nth 100"
+    rows = A.rows_of(A.parse_index(INDEX)[0] + [rode, plain])
+    for q in ("rode", "røde", "RØDE nth100", "Rode NTH-100"):
+        assert [[result.name for result in row.results] for row in A.search(rows, q)] == [
+            ["RODE NTH-100", "RØDE NTH-100"]], q
 
 
 ROWS = A.rows_of(A.parse_index(INDEX)[0])
@@ -421,12 +496,39 @@ def test_after_a_restart_the_list_is_answered_from_the_database(env):
     assert len(env.hub.requests) == asked == 2
 
 
+def test_a_kept_list_is_folded_again_as_it_is_read(env):
+    """A list kept as an older fold() left it - here the RØDE's `folded` as 5f9487a kept it, "røde nth 100" - is
+    searched by today's: "rode" finds it after a restart, and GitHub isn't asked."""
+    results = [A.parse_line("- [RØDE NTH-100](./Test/over-ear/R%C3%98DE%20NTH-100) by Test")] + A.parse_index(INDEX)[0]
+    rows = [dict(dataclasses.asdict(result), folded="røde nth 100" if result.source == "Test" else result.folded)
+            for result in results]
+    assert asyncio.run(env.store.autoeq_list_put(OLD, time.time(), rows))
+    with serving(env.store) as (_, client):
+        answer = client.get("/deadwax/eq/autoeq", params={"q": "rode"})
+    assert answer.status_code == 200 and [row["name"] for row in answer.json()["results"]] == ["RØDE NTH-100"]
+    assert env.hub.requests == []
+
+
+def test_a_kept_list_with_nothing_in_it_is_no_list(env):
+    assert asyncio.run(env.store.autoeq_list_put(OLD, time.time(), []))
+    with serving(env.store) as (_, client):
+        assert client.get("/deadwax/eq/autoeq", params={"q": "hd 650"}).json()["total"] == 6
+    assert len(env.hub.requests) == 2
+
+
 def test_limit_cuts_the_rows_and_total_counts_them_all(env):
     body = search(env, "airpods", limit=3).json()
     assert len(body["results"]) == 3 and body["total"] == 17
     assert search(env, "airpods").json()["total"] == 17
     assert len(search(env, "airpods").json()["results"]) == 17
     assert search(env, "!!!").json() == {"results": [], "total": 0, "list_from": body["list_from"]}
+
+
+def test_limit_is_30_unless_asked(env):
+    #? forty rows written for this test, after the fixture's
+    env.hub.lists[OLD] = INDEX + "".join(f"- [Test {i}](./Test/in-ear/Test%20{i}) by Test\n" for i in range(40))
+    body = search(env, "test").json()
+    assert body["total"] == 40 and len(body["results"]) == 30
 
 
 def test_a_list_a_week_old_is_refreshed_in_the_background_while_the_old_one_answers(env):
@@ -519,8 +621,9 @@ def test_no_list_and_github_down_is_a_503_in_its_words(env):
     for answer in (search(env, "hd 650"), profile(env, AIRPODS_PRO)):
         assert answer.status_code == 503
         assert answer.json() == {"detail": "deadwax can't reach AutoEq just now."}
-    #? nothing kept of a failure: the next ask tries again
+    #? nothing kept of a failure: a minute on, the next ask tries again
     env.hub.down = False
+    a_minute_on(env)
     assert search(env, "hd 650").status_code == 200
 
 
@@ -555,6 +658,44 @@ def test_a_slow_first_list_costs_that_ask_but_is_kept_for_the_next(env, monkeypa
     assert len(env.hub.requests) == 2
 
 
+def test_the_times_are_the_spec_s():
+    assert A.REFRESH_SECONDS == 7 * 24 * 3600
+    assert A.RETRY_SECONDS == eq_route.RETRY_SECONDS == 15 * 60
+    assert A.FIRST_FETCH_SECONDS == eq_route.FIRST_FETCH_SECONDS == 15.0
+    assert A.NO_LIST_RETRY_SECONDS == eq_route.NO_LIST_RETRY_SECONDS == 60
+    assert A.LIST_DEADLINE_SECONDS == autoeq_endpoint.LIST_DEADLINE_SECONDS == 60.0
+    assert A.PROFILE_DEADLINE_SECONDS == autoeq_endpoint.PROFILE_DEADLINE_SECONDS == 15.0
+
+
+def test_with_no_list_a_failed_fetch_is_answered_at_once_for_a_minute(env):
+    """A picker searching as it is typed into, while GitHub refuses: one ask of GitHub, then a minute of 503s that
+    ask nothing - a search's and a profile's alike - then the next search tries again."""
+    env.hub.down = True
+    assert search(env, "hd 650").status_code == 503
+    assert len(env.hub.requests) == 1
+    env.hub.down = False
+    kept = env.app.state.autoeq
+    #? 59 s on
+    kept.failed_at -= A.NO_LIST_RETRY_SECONDS - 1
+    for answer in (search(env, "h"), search(env, "hd"), search(env, "hd 6"), profile(env, AIRPODS_PRO)):
+        assert answer.status_code == 503 and answer.json() == {"detail": "deadwax can't reach AutoEq just now."}
+    assert len(env.hub.requests) == 1
+    #? a minute on
+    kept.failed_at -= 1
+    assert search(env, "hd 650").json()["total"] == 6
+    assert len(env.hub.requests) == 3
+
+
+def test_with_a_list_the_minute_s_wait_is_not_used(env):
+    """A kept list's failed refresh waits RETRY_SECONDS behind the answering list, never the minute's 503s."""
+    old = search(env, "hd 650").json()
+    age(env, 8)
+    env.hub.down = True
+    search(env, "hd 650")
+    settle(env)
+    assert search(env, "hd 650").json()["results"] == old["results"]
+
+
 def test_a_failed_refresh_keeps_the_old_list_and_waits_before_asking_again(env):
     old = search(env, "hd 650").json()
     age(env, 8)
@@ -576,8 +717,114 @@ def test_a_list_past_8_mb_is_refused(env):
     assert A.LIST_MAX_BYTES == 8 * 1024 * 1024
     env.hub.lists[OLD] = INDEX + "x" * (A.LIST_MAX_BYTES - len(INDEX.encode("utf-8")) + 1)
     assert search(env, "hd 650").status_code == 503
+    a_minute_on(env)
     env.hub.lists[OLD] = INDEX + "x" * (A.LIST_MAX_BYTES - len(INDEX.encode("utf-8")))
     assert search(env, "hd 650").status_code == 200
+
+
+def test_a_list_is_refused_as_it_passes_8_mb_not_after_it_is_all_read(env):
+    """64 MB sent a megabyte at a time: deadwax stops at the piece that passes 8 MB."""
+    endless = Pieces([b"x" * (1024 * 1024)] * 64)
+    env.hub.lists[OLD] = endless
+    assert search(env, "hd 650").status_code == 503
+    assert endless.taken == 9
+
+
+def test_a_list_trickling_past_its_deadline_is_a_503(env, monkeypatch, caplog):
+    """The list sent a piece every 50 ms - each piece well inside httpx's 15 s, the whole well past the deadline."""
+    caplog.set_level(logging.INFO)
+    monkeypatch.setattr(autoeq_endpoint, "LIST_DEADLINE_SECONDS", 0.3)
+    trickle = Pieces.of(INDEX, 128, 0.05)
+    env.hub.lists[OLD] = trickle
+    assert search(env, "hd 650").status_code == 503
+    assert trickle.taken < len(trickle.pieces)
+    said = [record.getMessage() for record in caplog.records if "couldn't be fetched" in record.getMessage()]
+    assert said == ["AutoEq's list couldn't be fetched - GitHub took more than 0.3 s for AutoEq's list"]
+
+
+def test_the_list_s_deadline_counts_the_commit_s_ask(env, monkeypatch):
+    """The commit's answer and the list's, 0.3 s each: each inside a 0.5 s deadline, the two together past it."""
+    monkeypatch.setattr(autoeq_endpoint, "LIST_DEADLINE_SECONDS", 0.5)
+    env.hub.delay = 0.3
+    assert search(env, "hd 650").status_code == 503
+    assert len(env.hub.requests) == 2
+
+
+def test_a_list_that_isn_t_utf_8_is_a_503(env):
+    env.hub.lists[OLD] = INDEX.encode("utf-8") + b"\xff\xfe"
+    assert search(env, "hd 650").status_code == 503
+    a_minute_on(env)
+    env.hub.lists[OLD] = INDEX
+    assert search(env, "hd 650").status_code == 200
+
+
+def test_stopping_deadwax_cancels_a_refresh_under_way(env, monkeypatch):
+    monkeypatch.setattr(eq_route, "FIRST_FETCH_SECONDS", 0.05)
+    #? GitHub slow enough that the fetch is still waiting when deadwax stops
+    env.hub.delay = 5
+    assert search(env, "hd 650").status_code == 503
+    task = env.app.state.autoeq.refreshing
+    assert not task.done()
+    env.client.portal.call(eq_route.stop_refreshing, env.app)
+    assert task.cancelled()
+    assert env.app.state.autoeq.sha is None
+
+
+def test_a_refresh_that_fails_with_a_fault_in_deadwax_is_said_waited_on_and_answered_around(env, monkeypatch, caplog):
+    """Not GitHub's failure but deadwax's own - a plain RuntimeError: said once with its traceback at warning, in
+    deadwax's log alone; the old list answering; not tried again for RETRY_SECONDS; and nothing out of the shutdown."""
+    caplog.set_level(logging.INFO)
+    old = search(env, "hd 650").json()
+    env.hub.master = NEW
+    env.hub.lists[NEW] = INDEX
+
+    def fault(text):
+        raise RuntimeError("a fault in the parser")
+    monkeypatch.setattr(eq_route, "parse_index", fault)
+    age(env, 8)
+    assert search(env, "hd 650").json()["results"] == old["results"]
+    settle(env)
+    said = [record for record in caplog.records if "a fault in deadwax" in record.getMessage()]
+    assert len(said) == 1 and said[0].levelno == logging.WARNING
+    assert said[0].exc_info and said[0].exc_info[0] is RuntimeError
+    assert not getattr(said[0], "frontend", False)
+    assert not [record for record in caplog.records if record.levelno >= logging.ERROR]
+    #? waited on: the old list answers, and GitHub isn't asked again
+    asked = len(env.hub.requests)
+    assert search(env, "hd 650").json()["results"] == old["results"]
+    assert len(env.hub.requests) == asked
+    assert env.app.state.autoeq.sha == OLD
+    env.app.state.autoeq.failed_at -= A.RETRY_SECONDS
+    monkeypatch.undo()
+    search(env, "hd 650")
+    settle(env)
+    assert env.app.state.autoeq.sha == NEW
+    env.client.portal.call(eq_route.stop_refreshing, env.app)
+
+
+def test_a_fault_as_a_refresh_is_stopped_stays_inside_the_shutdown(env, monkeypatch):
+    search(env, "hd 650")
+
+    async def fault(kept):
+        try:
+            await asyncio.sleep(5)
+        except asyncio.CancelledError:
+            raise RuntimeError("a fault on the way out")
+    monkeypatch.setattr(autoeq_client, "latest_list", fault)
+    age(env, 8)
+    search(env, "hd 650")
+    task = env.app.state.autoeq.refreshing
+    assert not task.done()
+    env.client.portal.call(eq_route.stop_refreshing, env.app)
+    assert task.done()
+
+
+def test_a_first_fetch_that_fails_with_a_fault_in_deadwax_is_a_503(env, monkeypatch):
+    def fault(text):
+        raise RuntimeError("a fault in the parser")
+    monkeypatch.setattr(eq_route, "parse_index", fault)
+    answer = search(env, "hd 650")
+    assert answer.status_code == 503 and answer.json()["detail"] == "deadwax can't reach AutoEq just now."
 
 
 # ----------------------------------------------------------------- the routes: a profile
@@ -627,6 +874,16 @@ def test_github_s_other_answers_for_the_file_are_a_503(env, status):
     assert kept_profiles(env) == []
 
 
+def test_a_redirect_for_the_file_is_not_followed(env):
+    """GitHub's 302 to the list's own address (which would answer 200): a 503, and nothing asked at the Location."""
+    search(env, "hd 650")
+    env.hub.instead["profile"] = (302, "", {"location": A.index_url(OLD)})
+    asked = len(env.hub.requests)
+    answer = profile(env, AIRPODS_PRO)
+    assert answer.status_code == 503 and answer.json()["detail"] == "deadwax can't reach AutoEq just now."
+    assert len(env.hub.requests) == asked + 1
+
+
 def test_github_down_for_the_file_is_a_503(env):
     search(env, "hd 650")
     env.hub.down = True
@@ -641,6 +898,35 @@ def test_a_profile_past_64_kb_is_refused(env):
     assert kept_profiles(env) == []
     env.hub.files[key] = "x" * A.PROFILE_MAX_BYTES
     assert profile(env, AIRPODS_PRO).status_code == 200
+
+
+def test_a_profile_is_refused_as_it_passes_64_kb_not_after_it_is_all_read(env):
+    endless = Pieces([b"x" * (16 * 1024)] * 64)
+    env.hub.files[(OLD, f"{AIRPODS_PRO}/Apple AirPods Pro ParametricEQ.txt")] = endless
+    assert profile(env, AIRPODS_PRO).status_code == 503
+    assert endless.taken == 5
+    assert kept_profiles(env) == []
+
+
+def test_a_profile_trickling_past_its_deadline_is_a_503_and_not_kept(env, monkeypatch, caplog):
+    caplog.set_level(logging.INFO)
+    search(env, "hd 650")
+    monkeypatch.setattr(autoeq_endpoint, "PROFILE_DEADLINE_SECONDS", 0.3)
+    trickle = Pieces.of(AIRPODS_PRO_TEXT, 16, 0.05)
+    env.hub.files[(OLD, f"{AIRPODS_PRO}/Apple AirPods Pro ParametricEQ.txt")] = trickle
+    answer = profile(env, AIRPODS_PRO)
+    assert answer.status_code == 503 and answer.json()["detail"] == "deadwax can't reach AutoEq just now."
+    assert trickle.taken < len(trickle.pieces)
+    assert kept_profiles(env) == []
+    said = [record.getMessage() for record in caplog.records if "couldn't be fetched" in record.getMessage()]
+    assert said == [f"AutoEq's crinacle 'Apple AirPods Pro' couldn't be fetched - GitHub took more than 0.3 s for "
+                    f"{AIRPODS_PRO} at {OLD[:7]}"]
+
+
+def test_a_profile_that_isn_t_utf_8_is_a_503_and_not_kept(env):
+    env.hub.files[(OLD, f"{AIRPODS_PRO}/Apple AirPods Pro ParametricEQ.txt")] = b"Preamp: -6.0 dB\n\xff"
+    assert profile(env, AIRPODS_PRO).status_code == 503
+    assert kept_profiles(env) == []
 
 
 # ----------------------------------------------------------------- what GitHub is asked, and as whom

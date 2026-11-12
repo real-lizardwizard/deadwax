@@ -6,21 +6,26 @@ Only GitHub's three kinds of address are ever asked, each made by src/autoeq.py:
 and one result's ParametricEQ.txt at that commit, its path from deadwax's own list (raw.githubusercontent.com).
 Nothing from a request is ever part of an address.
 
-One client, 15 s (10 s to connect), redirects NOT followed. Every request carries the user agent
+One client, 15 s (10 s to connect) between pieces, and a deadline on each fetch as a whole (src/autoeq.py
+LIST_DEADLINE_SECONDS for the list, master's commit included, PROFILE_DEADLINE_SECONDS for a profile), so an answer
+trickling in is Unreachable too; redirects NOT followed. Every request carries the user agent
 `deadwax/<version>` - GitHub's API refuses a request with none - and nothing more: not
 Config.musicbrainz_user_agent(), which Wikipedia's client sends (wikipedia_endpoint.py), since that one carries the
 contact address MUSICBRAINZ_EMAIL gives it, which MusicBrainz and Wikimedia ask callers for and GitHub doesn't.
 
 Three outcomes kept apart, as wikipedia_endpoint.py keeps them: an answer, a definite 404 (a profile GitHub doesn't
-have at that commit - None), and Unreachable (nothing answered, any other status, a redirect, an answer too big or
-not what was asked for), which the route keeps nothing of. An answer is read a piece at a time and refused as soon
-as it passes its size (src/autoeq.py LIST_MAX_BYTES, PROFILE_MAX_BYTES), never read whole first.
+have at that commit - None), and Unreachable (nothing answered, any other status, a redirect, an answer too big,
+too slow or not what was asked for), which the route keeps nothing of. An answer is read a piece at a time and
+refused as soon as it passes its size (src/autoeq.py LIST_MAX_BYTES, PROFILE_MAX_BYTES), never read whole first.
 """
+
+import asyncio
 
 import httpx
 
 from src import __version__
-from src.autoeq import COMMIT_ACCEPT, COMMIT_URL, LIST_MAX_BYTES, PROFILE_MAX_BYTES, SHA, index_url, profile_url
+from src.autoeq import (COMMIT_ACCEPT, COMMIT_URL, LIST_DEADLINE_SECONDS, LIST_MAX_BYTES, PROFILE_DEADLINE_SECONDS,
+                        PROFILE_MAX_BYTES, SHA, index_url, profile_url)
 
 #? A person is waiting on the first list and on a profile; the list is 851 KB
 TIMEOUT = httpx.Timeout(15.0, connect=10.0)
@@ -30,6 +35,15 @@ COMMIT_MAX_BYTES = 1024
 
 class Unreachable(Exception):
     """GitHub gave no usable answer - nothing to keep, ask again next time."""
+
+
+async def within(seconds: float, what: str, asking):
+    """What `asking` (a coroutine) answers, or Unreachable once it has taken `seconds` in all."""
+    try:
+        async with asyncio.timeout(seconds):
+            return await asking
+    except TimeoutError as e:
+        raise Unreachable(f"GitHub took more than {seconds:g} s for {what}") from e
 
 
 class AutoEqClient:
@@ -80,6 +94,14 @@ class AutoEqClient:
             raise Unreachable("GitHub's answer for AutoEq's commit wasn't a commit")
         return sha
 
+    async def latest_list(self, kept: str | None) -> tuple[str, str | None]:
+        """master's commit, and results/INDEX.md at it - None for the list when the commit is `kept`, which needs
+        nothing more fetched. LIST_DEADLINE_SECONDS for the two together."""
+        async def both() -> tuple[str, str | None]:
+            sha = await self.master_commit()
+            return sha, (None if sha == kept else await self.index(sha))
+        return await within(LIST_DEADLINE_SECONDS, "AutoEq's list", both())
+
     async def index(self, sha: str) -> str:
         """results/INDEX.md at the commit, as text."""
         body = await self._get(index_url(sha), f"AutoEq's list at {sha[:7]}", LIST_MAX_BYTES)
@@ -91,8 +113,10 @@ class AutoEqClient:
             raise Unreachable(f"AutoEq's list at {sha[:7]} wasn't UTF-8") from e
 
     async def profile(self, sha: str, path: str) -> str | None:
-        """A result's ParametricEQ.txt at the commit, as AutoEq wrote it - None when GitHub has no such file."""
-        body = await self._get(profile_url(sha, path), f"{path} at {sha[:7]}", PROFILE_MAX_BYTES)
+        """A result's ParametricEQ.txt at the commit, as AutoEq wrote it - None when GitHub has no such file.
+        PROFILE_DEADLINE_SECONDS in all."""
+        what = f"{path} at {sha[:7]}"
+        body = await within(PROFILE_DEADLINE_SECONDS, what, self._get(profile_url(sha, path), what, PROFILE_MAX_BYTES))
         if body is None:
             return None
         try:
