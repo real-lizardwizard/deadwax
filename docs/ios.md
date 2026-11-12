@@ -197,7 +197,8 @@ the Library tab or the app, and when you pull down.
   number. **Tap a song** to play the album from it. Under the songs: how many and how long ("10
   songs, 42 min").
 - **•••** at the end of a song's row has **Play Next** and **Play Last** for that song; the **•••**
-  at the top has them for the whole album (see [Up Next](#up-next)).
+  at the top has them for the whole album (see [Up Next](#up-next)). Each menu opens from the •••
+  you tapped, and a tap anywhere else closes it.
 - **Add to my library** and **Remove from my library**, with logins on. Removing takes the album out
   of your library only: "it's still in the collection, and nothing was deleted."
 - The artist's name is plain text for now: artist pages come in a later phase.

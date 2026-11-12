@@ -1962,3 +1962,45 @@ another.
     stream, but each person's own, not the `server` permission's), server work on main as a 2.1.x patch. A
     stream sees only the saves made through deadwax: another app's, saved straight to Navidrome, would need
     deadwax to ask Navidrome as well.
+
+## Phase 1 on James's iPhone (app 0.2 (2), 2026-11-11)
+
+James ran Phase 1's checks on his iPhone 17 Pro (iOS 27.2). What came of them was fixed on `fix/p1-phone`, one
+commit each; nothing here has been drawn or played anywhere yet, so each part ends with what only the phone shows.
+
+### The ••• menus open from the •••
+
+**What James saw.** On Up Next's check: "the dialog for play next and play last shows up in the wrong spot" - the
+••• menu.
+
+**Why.** The queue menu was a `.confirmationDialog` applied to the whole album page (`.queueMenu($menu)` on
+AlbumView's List), opened by a state the row's ••• and the bar's ••• set. Since iOS 26 a confirmation dialog is
+drawn as a popover from the view it is attached to, so it came up from the page, away from the ••• tapped. (That
+it anchors to the page is from what James saw on iOS 27.2, not from Apple's documentation.)
+
+**What changed.**
+- **QueueMenu** is a view now, not a modifier: a SwiftUI `Menu` whose label is the ••• itself, as Apple's own •••
+  are. The row's ••• (TrackRow) and the bar's (AlbumView's toolbar) each hold one, so each opens from itself. Its
+  items, words and actions are the dialog's: Play Next, then Play Last, each `PlayerModel.choose` in the tap, so the
+  levels, the album remembered and the notice after ("Playing next: Roads", none when the music started from it)
+  are unchanged. The title the dialog showed (QueuePick.title) is the menu's one Section's header.
+- **No Cancel row.** A menu closes with a tap anywhere else, and Apple's menus have none. QueuePickWords.cancel
+  stays in Core: it is the web's word, held to queue.json.
+- **`menuOrder(.fixed)`** (iOS 16+): left to itself iOS puts the first item nearest the tap, so a menu opening
+  upward from a row low on the screen would have shown Play Last first.
+- **The bar's ••• is dimmed** until the album's songs are in (QueueMenu disables itself with no request), as the
+  button was. QueueMenuRequest lost its UUID: nothing presents it by identity any more.
+- **NowPlayingMenu** was a confirmationDialog too, attached to its own button, so it already came from its •••;
+  it is a Menu now as well, so every ••• in the app works one way: Info, then Go to album for a song that names its
+  album, no Cancel, the order fixed.
+- VoiceOver's names are the same strings on the same controls ("More for Roads", "More for this album", "More:
+  info, go to album").
+
+**Verified**: the app builds for iOS 17 with it (xcodebuild, unsigned). **Assumed**, for the phone: that a
+Section's title shows as the menu's header on iOS 17 and 27; that the row's ••• opens only its menu inside a List
+row whose song button is beside it (both plain-styled, as the button was).
+
+**On the phone**: open an album, tap a song's •••: the menu opens from that •••, with the song's name over Play Next
+and Play Last. Try it on a song near the bottom of the screen too - Play Next still first. Tap away: it closes and
+nothing is queued. The ••• at the top right does the same for the whole album, and Now Playing's ••• opens Info and
+Go to album from itself.

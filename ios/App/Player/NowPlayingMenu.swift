@@ -2,34 +2,31 @@ import DeadwaxCore
 import SwiftUI
 
 /// Now Playing's ••• (app/ActionMenu.tsx): Info, and Go to album for a song that names its album - left out, not
-/// greyed, for one that doesn't - then Cancel. Phase 1 has neither the web's Add to a playlist… nor its pin. The
-/// button's name says what the menu holds (NowPlayingWords.more).
+/// greyed, for one that doesn't. Phase 1 has neither the web's Add to a playlist… nor its pin. The button's name says
+/// what the menu holds (NowPlayingWords.more). A SwiftUI Menu on the button, opened from it, as the album page's •••
+/// are (QueueMenu): it was a confirmationDialog on the button until the queue menus moved, and a menu has no Cancel
+/// row - a tap anywhere else closes it. The order is fixed, Info first.
 struct NowPlayingMenu: View {
     /// The song playing names its album: Go to album is in the menu.
     let hasAlbum: Bool
     let onInfo: () -> Void
     let onAlbum: () -> Void
 
-    @State private var shown = false
-
     var body: some View {
-        Button {
-            shown = true
+        Menu {
+            Button(NowPlayingWords.info, action: onInfo)
+            if hasAlbum {
+                Button(NowPlayingWords.goToAlbum, action: onAlbum)
+            }
         } label: {
             Image(systemName: "ellipsis")
                 .font(.title3)
                 .frame(minWidth: 44, minHeight: 44)
                 .contentShape(Rectangle())
         }
+        .menuOrder(.fixed)
         .buttonStyle(.plain)
         .accessibilityLabel(NowPlayingWords.more(hasAlbum: hasAlbum))
-        .confirmationDialog(NowPlayingWords.menu, isPresented: $shown, titleVisibility: .hidden) {
-            Button(NowPlayingWords.info, action: onInfo)
-            if hasAlbum {
-                Button(NowPlayingWords.goToAlbum, action: onAlbum)
-            }
-            Button(QueuePickWords.cancel, role: .cancel) {}
-        }
     }
 }
 

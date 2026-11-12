@@ -22,7 +22,6 @@ struct AlbumView: View {
     @State private var model: AlbumModel
     /// On screen - the page on top of its tab.
     @State private var shown = false
-    @State private var menu: QueueMenuRequest?
     /// The hero's title has scrolled away: the bar shows it.
     @State private var titleInBar = false
     @AccessibilityFocusState private var noteFocused: Bool
@@ -89,18 +88,12 @@ struct AlbumView: View {
                     .accessibilityHidden(!titleInBar)
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    if let album = model.album, let pick = model.albumPick {
-                        menu = QueueMenuRequest(pick: pick, album: album)
-                    }
-                } label: {
+                QueueMenu(request: albumMenu) {
                     Image(systemName: "ellipsis.circle")
                 }
                 .accessibilityLabel(AlbumPageLines.moreForAlbum)
-                .disabled(model.albumPick == nil)
             }
         }
-        .queueMenu($menu)
         .task(id: taskKey) {
             await model.load(key: taskKey, client: server.client, personal: server.access.hasLibrary, player: player)
         }
@@ -143,8 +136,14 @@ struct AlbumView: View {
             TrackRow(song: song, albumArtist: album.artist, current: PlayingBars.marks(song, heard: heard),
                      playing: player.isPlaying,
                      play: { play(at: index) },
-                     more: { menu = QueueMenuRequest(pick: .song(song, of: album), album: album) })
+                     menu: QueueMenuRequest(pick: .song(song, of: album), album: album))
         }
+    }
+
+    /// The bar's •••: the whole album, as an album - nil (the ••• dimmed) until its songs are in.
+    private var albumMenu: QueueMenuRequest? {
+        guard let album = model.album, let pick = model.albumPick else { return nil }
+        return QueueMenuRequest(pick: pick, album: album)
     }
 
     /// Play, Shuffle and a row's tap: the album's songs, as the album, from `index` (nil with Shuffle: any song

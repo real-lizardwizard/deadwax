@@ -4,7 +4,7 @@ import SwiftUI
 /// One song of an album page (screens.md 4's track list): its number - or, for the song the player has, its playing
 /// bars, still while paused (PlayingBars) - its title, its own artist only when it isn't the album's
 /// (AlbumPageLines.artistShown), its time (Format.trackTime). A tap plays the album from it; its ••• ("More for
-/// {title}") opens the queue menu with the one song.
+/// {title}") opens the queue menu from itself, with the one song.
 struct TrackRow: View {
     let song: Song
     let albumArtist: String?
@@ -13,7 +13,8 @@ struct TrackRow: View {
     /// The player means to play (the bars move); false while paused.
     let playing: Bool
     let play: () -> Void
-    let more: () -> Void
+    /// What the row's ••• queues: the one song, as a song.
+    let menu: QueueMenuRequest
 
     @ScaledMetric(relativeTo: .body) private var numberWidth: CGFloat = 28
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -46,7 +47,7 @@ struct TrackRow: View {
             }
             .buttonStyle(.plain)
 
-            Button(action: more) {
+            QueueMenu(request: menu) {
                 Image(systemName: "ellipsis")
                     .font(.body.weight(.semibold))
                     .foregroundStyle(Palette.quiet)
