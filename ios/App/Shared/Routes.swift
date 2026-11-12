@@ -125,15 +125,19 @@ final class AppNavigation {
 }
 
 extension View {
-    /// Every AppRoute's page, for a tab's NavigationStack.
+    /// Every AppRoute's page, for a tab's NavigationStack - each given room at its foot for the player over it
+    /// (`clearsPlayer()`, MainTabs.swift).
     func appRoutes() -> some View {
         navigationDestination(for: AppRoute.self) { route in
-            switch route {
-            case .album(let album): AlbumView(route: album)
-            case .albums(let scope): AlbumsScreen(scope: scope, root: false)
-            case .serverAddress: ServerAddressView()
-            case .debug: DebugView()
+            Group {
+                switch route {
+                case .album(let album): AlbumView(route: album)
+                case .albums(let scope): AlbumsScreen(scope: scope, root: false)
+                case .serverAddress: ServerAddressView()
+                case .debug: DebugView()
+                }
             }
+            .clearsPlayer()
         }
     }
 }
