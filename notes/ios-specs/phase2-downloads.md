@@ -812,7 +812,8 @@ A slim strip **at the top of each page, just under its navigation bar**, pinned 
   **"Skipped "Roads" - it isn't on this phone"**, and for a run of them within the notice's 5 s, **"Skipped 3 songs
   that aren't on this phone"** - the plan's "one line saying how many". A play started offline never meets one: the
   album page and Downloaded queue only what is here (3.7).
-- **Nothing left that is here**: when every song still to come is off the phone (or the one tapped in Up Next is),
+- **Nothing left that is here**: when every song still to come is off the phone (or the one tapped in Up Next is - a
+  tap made just as deadwax went away, since offline 4.3.1 makes those rows no button),
   the player stops on the first of them, paused, its cover and title shown, its line - the mini player's second line
   and Now Playing's error line, where Phase 1's playback errors go (screens.md 6) - **"Not on this phone - it plays
   once deadwax is back."** Play then tries it again: from the stream if deadwax answers, else the same line. The
