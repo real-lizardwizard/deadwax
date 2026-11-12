@@ -1750,6 +1750,77 @@ pinned with it, as 0.3 was. The server's version moves only for slice 4's routes
 - **Must not touch**: DeadwaxAudio, ios/App, the server, ui/.
 - **Verified**: check-linux.sh; ios.yml's ubuntu and macOS jobs; tests.yml (the fixture test). No Simulator.
 
+#### Slice 1, built (2026-11-12)
+
+Built on `ios`, in a spec correction and six commits: the four corrections from APO's source (0.3, 3.8, 3.9, 0.4 -
+each with its source line in its commit), then the fixtures and their script; the filters, the response and the
+preamp; the GraphicEQ fit; APO's files read and written; the bank and the render; settings, outputs, words and the
+chart. The files are 5.1's, and `EQFixtures.swift`, the tests' readers of the fixtures. Nothing under DeadwaxAudio,
+ios/App, src/ or ui/ changed, and no version moved.
+
+- **Tests**: DeadwaxCore 655 tests in 86 suites before, **745 in 98** after - 12 suites, 90 tests: EQFilterTests 8,
+  AutoEqProfileTests 3, EQPreampTests 8, APOReaderTests 18, APOWriterTests 6, GraphicEQFitTests 4, EQBankTests 6,
+  EQRenderTests 12, EQOutputsTests 4, EQSettingsTests 6, EQWordsTests 11, EQChartTests 4. DeadwaxAudio's 93 unchanged.
+  `tests/test_ios_eq_fixtures.py`, 9 tests: the script run into a temporary folder, byte for byte what is committed.
+- **The fixtures**: 1.5 MB - filters.json 740 KB (171 cases: 59 at 48 kHz, 16 at each other rate), render.json
+  256 KB, profiles.json 97 KB, apo.json 83 KB (52 hand-made files of `apo/`), graphic.json 16 KB, preamp.json 5 KB, and
+  AutoEq's own files at 7ae0f56 (16 .txt, 2 .csv, its MIT licence and a README naming each measurer).
+- **The cookbook**: every coefficient **bit-identical** to the script's Python (the 1e-13 bound holds with nothing
+  used); the response within **7.2e-6 dB** of `freqz`.
+- **AutoEq's profiles**: within **2.4e-7 dB** of peq.py; against the CSV's `parametric_eq`, the HD 650 within
+  **0.107 dB** and the AirPods Max **0.072 dB** (bound 0.15). The preamps, the file's and deadwax's: crinacle's AirPods
+  Pro -6.0/-6.0, AirPods Pro 2 (ANC) -3.3/-3.3; oratory1990's HD 650 -6.1/**-6.4** (its top 6.4 dB at DC, the shelves'
+  gains summed), its FixedBandEQ -7.4/-7.5, AirPods Max -4.7/-4.8, ER2XR -5.6/-5.6; Super Review's AirPods Pro
+  -3.2/-3.3; HypetheSonics' -5.8/-5.8; Rtings' -3.2/-3.2 and DT 770 Pro -6.4/-6.3; crinacle's HD 650 -6.3/-6.3;
+  Innerfidelity's -6.3/**-6.7**, Headphone.com's -6.2/**-6.6**, Kuulokenurkka's HD 6XX -6.3/**-6.6** - all within
+  0.5 dB. The four gaps over 0.1 dB are each a top at DC (0 Hz), where 1.4 has deadwax look and, it seems, AutoEq's
+  preamp doesn't - inferred from the numbers, not read in AutoEq's code.
+- **The preamp's close pairs** (1.4): the grid and the f0s alone fall short by 0.057, 0.039 and 0.135 dB (two Q 30
+  peaks 1/30 octave apart, Q 10 at 1/8, Q 100 at 1/100 - the spec said 0.045/0.042/0.073); refined, off by 2.5e-11,
+  5.9e-12 and 4.0e-12.
+- **The presets** at 48 kHz, top and preamp: Bass Boost 6.03/-6.1, Treble Boost 4.77/-4.8, Vocal 3.26/-3.3, Loudness
+  5.85/-5.9, Small Speakers 3.08/-3.1, Spoken Word 3.69/-3.7 (3.6's table, held).
+- **GraphicEQ, converted** (3.10): the HD 650 in 5 rounds, 54 filters, RMS 0.063 and at most 0.473 dB to 16 kHz,
+  4.94 dB above it (at 20.8 kHz; 8.22 dB at 44.1 kHz); the AirPods Pro in 4 rounds, 60 filters, RMS 0.056 and at most
+  0.350 dB, 3.76 dB above (6.04 at 44.1 kHz). The unrounded gains within 2.6e-8 and 6.1e-8 dB of NumPy's.
+- **The render**: bit for bit with the script's Direct Form I, Float32 out included, at blocks of 1, 7, 512 and 4096 -
+  stereo (5000 frames, its largest sample 0.7595), eight channels and one (1500 frames each, 0.7860 and 0.7647), none
+  over full scale; 148 impulses, 18944 samples, bit for bit.
+- **APO's files**: 440 exports (every fixture, and every preset on top of each) read back to the same filters bit for
+  bit, and 10 refused as more than 64 an ear; each of the 14 AutoEq profiles (13 ParametricEQ, one FixedBandEQ) read
+  and written back byte for byte.
+- **Mutations** (each applied by an exact replace, the whole Core suite run, the file restored byte for byte): all 18
+  fail, none by failing to compile - with Channel R's done twice, in the bank and in the reader. What each failed:
+  `alpha = s / Q`, 12 tests (the fixtures' coefficients, the profiles, the presets, the fit, the summaries);
+  `A = 10^(g/20)` for a peak, 14; the low shelf's `+ 2√A·alpha` as `-`, 6 (the fixtures, DC and Nyquist counted, the
+  profiles); BW's `w0 / s` dropped, the fixtures; S as slope / 6, 4 (the corner, too steep, the defaults, the
+  fixtures); the corner's move skipped, 3 (the corner, the 0.49 rule, the fixtures); a comma not read, 3 (the comma
+  test, the reader's fixtures, the writer's round trips); `1.000 Hz` as 1, 2 (thousands, the reader's fixtures); a
+  keyword matched in any case, 3 (case, the fixtures, the round trips); GraphicEQ unsorted, 2 (sorted, the fixtures);
+  the refinement skipped, 3 (a sum's top where no filter is, the files' preamps, the presets); the preamp rounded
+  toward louder, 5 (rounded toward quieter, one for both ears, the presets, the files' preamps, the export); Channel R
+  on the left in the bank, each channel's list; in the reader, 5 (Channel lines, preamps per channel, case, the
+  fixtures, the round trips); the crossfade linear, 4 (the weights, warm starts, Off and On, the newest wins); the
+  identity at 0.0001 dB, a ten-thousandth of a decibel; the warm start skipped (every incoming state zeroed), 2
+  (warm starts by id, Off and On); by index, warm starts by id; a second `Device:` skipped, its own test.
+- **Decided where the spec was silent** (James to confirm; 8's answers otherwise taken as recommended):
+  - a GraphicEQ point's gain outside +-30 dB is refused with the gain's words (3.9's table; past it the fit's sums
+    overflow), and `1e999` - `wcstod`'s infinity - is refused by its range ("inf Hz");
+  - the automatic preamp's top is the left's and the right's, with their offsets; the shared list (channels 3 and up)
+    plays at the same preamp and isn't looked at separately - a correction with per-ear cuts could leave it louder;
+  - several ports that aren't all AirPlay are their first; AirPlay rooms are named in their UIDs' order;
+  - the chart's range past 24 dB is the next multiple of 6; "decibel" is singular at exactly 1; the summary is over
+    every ear's shape, without the preamp or the ears' offsets;
+  - a preset's name over 40 characters is cut, not refused; Debug's port names other than "Bluetooth (A2DP)" are mine,
+    as are the export's comments for a file or built correction;
+  - an export over 64 filters an ear (a converted GraphicEQ and a tone) is written, but its import refuses it; and a
+    whole curve topping 30 dB writes an automatic preamp under -30 dB, which import refuses the same way.
+- **Not verified**: Swift on Linux - everything above ran on macOS (`swift test`, and check-linux.sh's other two
+  steps); ios.yml's ubuntu job is the first Linux run. glibc's `sin`, `cos` and `pow` may differ from Apple's by an
+  ulp, which the 1e-13 coefficient bound allows; the render's tests run on the fixtures' own coefficients, so libm
+  can't differ underneath them. ios.yml itself. Any real AVAudioSession route (the output table is 3.12's, by enum,
+  never by a live `portType`).
+
 ### 5.2 Slice 2 - the engine, on macOS
 
 - **Files**: `Sources/CAudioRing/` (a C target: the triple buffer's atomic word and the counters, C11 `stdatomic`,

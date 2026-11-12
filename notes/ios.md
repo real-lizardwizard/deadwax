@@ -56,10 +56,12 @@ ios/
   DeadwaxKit/               Package.swift (tools 6.0; iOS 17, macOS 14)
     Sources/DeadwaxCore/    pure Swift + Foundation, Swift 6 mode, tested on Linux
     Sources/DeadwaxAudio/   the engine; every file inside #if canImport(AVFAudio); Swift 5 mode
-    Tests/DeadwaxCoreTests/ Swift Testing, 64 tests in Phase 0, 508 in 69 suites at app 0.2, 633 in 83 at 0.3
+    Tests/DeadwaxCoreTests/ Swift Testing, 64 tests in Phase 0, 508 in 69 suites at app 0.2, 633 in 83 at 0.3,
+                            745 in 98 with the EQ's slice 1 (its fixtures in Fixtures/eq/, 1.5 MB)
     Tests/DeadwaxAudioTests/  offline-render tests, macOS only (12 in Phase 0, 54 at app 0.2, 93 at 0.3)
   scripts/                  install.sh (James's), install_helper.py (its JSON/plist reading, in Xcode's
-                            python3), check-linux.sh, check_project.py, make-icon.py, make-test-album.py
+                            python3), check-linux.sh, check_project.py, make-icon.py, make-test-album.py,
+                            make-eq-fixtures.py (the EQ's fixtures; numpy and scipy, run with python -I)
   README.md                 a pointer to docs/ios.md and this file
 .github/workflows/ios.yml   branches '**' + paths: ios/** and itself (never a tag: GitHub applies no paths
                             filter to a tag push) - linux (swift:6.4.1-noble), project (check_project.py),
@@ -67,6 +69,8 @@ ios/
 tests/test_ios_contract.py  the routes, fields and bounds the app relies on, against the server (8 tests)
 tests/test_ios_install.py   install_helper.py, check_project.py, install.sh against stand-ins, and the
                             test album, on Linux (18 tests)
+tests/test_ios_eq_fixtures.py  make-eq-fixtures.py run into a temporary folder, byte for byte what is
+                            committed (9 tests; skipped without scipy, which tests.yml installs pinned)
 ```
 
 `ios` is in .dockerignore: the image never carries the app.
@@ -2850,3 +2854,14 @@ Phase 3 ships as 0.5). Pinned as 0.3 was: `Base.xcconfig`'s `MARKETING_VERSION` 
 `check_project.py`'s MARKETING_VERSION and BUILD, `ios.yml`'s check of the built Info.plist, and
 `tests/test_ios_install.py`'s read of the real xcconfig; the guide's title, opening, install.sh's line and About's App
 row, ios/README.md, and the two doc comments giving About's row as an example. `src/__init__.py` wasn't touched.
+
+## The EQ, slice 1: Core (2026-11-12)
+
+The design is notes/ios-specs/eq.md. Its slice 1 (5.1) is the EQ's pure part, in DeadwaxCore and tested like the rest
+of it: the cookbook as Equalizer APO computes it (`EQFilter`), the response and the automatic preamp (`EQResponse`,
+`EQPreamp`), the ten bands and the presets (`EQGraphic`), a GraphicEQ curve fitted as filters (`GraphicEQFit`), APO's
+files read and written (`APOReader`, `APOWriter`), the bank and its Direct Form I render (`EQBank`, `EQRender`),
+eq.json's model (`EQSettings`), the outputs (`EQOutputs`), every word (`EQWords`) and the chart (`EQChart`) - held to
+`ios/scripts/make-eq-fixtures.py`, which writes the cookbook, APO's reading rules and the fit again in Python. What was
+built, measured and decided, and what wasn't verified: eq.md's "Slice 1, built". Nothing in the App or DeadwaxAudio
+uses it yet (slice 2), and the app's version didn't move.
