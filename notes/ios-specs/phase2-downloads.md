@@ -996,7 +996,7 @@ other one waits.
   space - what the started units have yet to receive - this unit ≥ **2 GB** (the plan's reserve). Expected bytes
   are `size`; a transcode's is its duration at 320 kbps, an upper bound.
 - **Nothing is ever evicted in Phase 2**: everything here was asked for by hand, and hand downloads never go by
-  themselves (Choice 19). Lowering the limit below what's here makes new units wait `room` and says so (6.3, 6.4) -
+  themselves (Choice 19). Lowering the limit below what's here makes new units wait `room` and says so (6.3, 3.1) -
   check 6's "it says what didn't fit". Phase 3 adds your library's albums, evicted by order, below these.
 - **The waits**, in order: no network -> `connection`; deadwax unreachable -> `deadwax`; signed out -> `signIn`;
   Wi-Fi only on mobile data -> `wifi`; Wi-Fi only on a hotspot (Wi-Fi, expensive) -> `hotspot`; Wi-Fi only in Low
