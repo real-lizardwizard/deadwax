@@ -65,6 +65,28 @@ import Testing
         #expect(low.lines[0].db[(half + 1)...].allSatisfy { $0 == low.lines[0].db[half] })
     }
 
+    /// The simple face's curve morphs point for point (EQCurveView's EQVector): so every tone - each preset, Custom, a
+    /// band at any value, Off - is drawn at the grid's frequencies alone, the bands' centres being on it (slice 3).
+    @Test func everyToneIsDrawnOnTheGrid() {
+        var tones: [EQTone] = EQGraphic.presets.map { .preset($0.id) }
+        tones.append(.custom([12, -12, 0.5, -0.5, 7, -3, 1.5, 0, -8, 11.5]))
+        for band in 0..<10 {
+            var gains = EQGraphic.flat
+            gains[band] = -12
+            tones.append(.custom(gains))
+        }
+        for tone in tones {
+            for rate in [44_100.0, 48_000] {
+                for on in [true, false] {
+                    let (s, o) = Self.settings(tone, on: on)
+                    let d = EQDrawing.make(o, in: s, rate: rate)
+                    #expect(d.frequencies == EQChart.grid, "\(tone) at \(rate), on \(on)")
+                    #expect(d.lines.allSatisfy { $0.db.count == EQChart.grid.count })
+                }
+            }
+        }
+    }
+
     /// The y axis grows when a curve goes past ±15 dB (a cut has no preamp to bring it back).
     @Test func theRangeGrows() {
         let deep = EQTone.custom([-12, -12, -12, -12, -12, -12, -12, -12, -12, -12])

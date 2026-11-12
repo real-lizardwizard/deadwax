@@ -50,7 +50,9 @@ ios/
                             PlayerModel and its +Engine/+Resume, LoudnessBook, PlayReporter, LibraryModel,
                             AlbumIndexStore, AlbumModel, DebugModel), Root/ (the gates, MainTabs), Shared/
                             (Routes, CoverImage, ErrorNote, Notice), Library/, Album/, Player/, UpNext/,
-                            Info/, You/ (DebugView is Phase 0's test screen); URLSessionTransport,
+                            Info/, You/ (DebugView is Phase 0's test screen), EQ/ (app 0.5: EQModel,
+                            EQStore, EQRouteReader, and the screens - EQScreen, EQCurveView, EQSliders,
+                            EQPresetsScreen, EQOutputViews, EQNameAlert, EQRoute); URLSessionTransport,
                             SessionKeychain, AudioSessionController, NowPlayingController, SongFiles (stream
                             cache, downloads); Icon/ loose PNGs
   DeadwaxKit/               Package.swift (tools 6.0; iOS 17, macOS 14)
@@ -61,9 +63,10 @@ ios/
                             floating point, nothing Apple's - built on Linux too)
     Tests/DeadwaxCoreTests/ Swift Testing, 64 tests in Phase 0, 508 in 69 suites at app 0.2, 633 in 83 at 0.3,
                             745 in 98 with the EQ's slice 1 (its fixtures in Fixtures/eq/, 1.5 MB), 809 in
-                            110 at its slice 2 (the turntable's slice 1 between)
+                            110 at its slice 2 (the turntable's slice 1 between), 849 in 113 at its slice 3
     Tests/DeadwaxAudioTests/  offline-render tests, macOS only (12 in Phase 0, 54 at app 0.2, 93 at 0.3, 111 in 8
-                            suites with the EQ's slice 2 and its review - EQRealTimeTests bounded in a release build)
+                            suites with the EQ's slice 2 and its review - EQRealTimeTests bounded in a release build;
+                            114 in 9 at its slice 3, EQStartTests the start's bank made ahead)
     Tests/CAllocHook/       test-only C: malloc_logger counting one thread's allocations, proved by a canary
                             (turntable.md 4.3, built first for the EQ)
   scripts/                  install.sh (James's), install_helper.py (its JSON/plist reading, in Xcode's
@@ -3056,3 +3059,25 @@ does (the review's: with it, a "waiting" state, Muffle off when Debug closes, th
 than 8 channels, and a reconnect after a failed start that no longer throws). Every number, every departure from the
 spec, the review and what wasn't verified: eq.md's "Slice 2, built". A Debug build of the app (`install.sh --debug`) is no test of the EQ's real-time behaviour: its
 unoptimised Core allocates on the render. The app's version didn't move.
+
+## The EQ, slice 3: the simple face (app 0.5, 2026-11-12)
+
+eq.md's slice 3 (5.3): the EQ as a listener uses it. **EQModel** (App/EQ/, `@MainActor @Observable`, made in
+DeadwaxApp before the player and handed to it; never reset when the person changes - the EQ is the phone's) holds
+every output's setting and your presets, read once from **EQStore** (`Application Support/deadwax/eq.json`, written
+whole 0.5 s after the last change and never under a finger; an unreadable file set aside as `eq-unreadable-<day>.json`,
+a protected one left alone until the phone's first unlock), follows the route (`routeChangeNotification`, through
+**EQRouteReader**, a new output met Off) and puts each change in through Core's **EQStartDesk**: one version counter
+for changes, route changes and starts, raised before the host's rate is read, and every output's banks made ahead off
+the main thread, so the engine's start (`eqStart`, EQModel's `startHook`) only looks its curve up. Debug's Muffle and
+the unit's rows moved from PlayerModel to it.
+
+The screens draw Core's **EQScreenRules** (which output a page shows and when it may switch - only the EQ page, only on
+top, never under a finger; a pushed page bound to its output; a change while Off turning it on; the short setting;
+Other outputs' order; the line under the curve; a slider's drag) and **EQDrawing** (the curve with its preamp, and its
+audio graph): `EQScreen` (3.2-3.3), `EQCurveView` (3.4), `EQSliders` and the stepper rows (3.5, 3.15),
+`EQPresetsScreen` (3.6), `EQOutputViews` (3.12), `EQNameAlert`, and `EQRoute` - the pages on You's stack as
+`AppRoute.eq` and on the sheet's own over Now Playing. The ways in: You > Playback's EQ row, Now Playing's ••• item
+and its sheet (the lyrics' `covered` joined by `showsEQ`), Info's Sound and Debug rows. Correction (slice 4), Preamp
+and Advanced (slice 5) aren't drawn yet. The start's time, measured, the departures, and what only the phone can show:
+eq.md's "Slice 3, built". docs/ios.md's EQ section and checks E1-E16 are James's.
