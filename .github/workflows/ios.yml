@@ -75,9 +75,11 @@ jobs:
       # AVAudioPlayerNode did at 70cbef6 and 307384f, held off longer (notes/ios.md "A node's buffers, taken
       # late"): the engine's offline settle must cover it with room to spare, whatever this run's own timing.
       # At 09781a5 this failed 12 of 87 with the settle at 30 ms. The hook's 10 ms was a Thread.sleep, which
-      # the system lets run late where it coalesces timers - most likely here: a Mac under `taskpolicy -b`
-      # fails 8 of those 12 the same way - and so was the settle's wait. Both are on a strict timer now and
-      # the settle is 100 ms, 90 ms over the lag; the measured line says how much of it this runner uses.
+      # the system lets run late where it coalesces timers, and so was the settle's wait. A Mac under
+      # `taskpolicy -b` fails 6-9 of those 12 the same way - but -b also fails a test this runner passed
+      # (playAfterAPauseWaitsForThisRunsFirstRender), so it is harsher than this runner, and coalescing here is
+      # likely, not seen. Both waits are on a strict timer now and the settle is 100 ms, 90 ms over the lag -
+      # under load the margin is what carries it; the measured line says how much of it this runner uses.
       # (At 10 ms the old 10 ms settle failed most of the suite; at 0.5 ms a 2 ms settle passed.)
       - name: The engine's offline renders, its buffers taken late
         if: ${{ !cancelled() }}

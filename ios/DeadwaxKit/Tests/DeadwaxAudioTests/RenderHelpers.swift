@@ -81,7 +81,7 @@ func completionsHandled(_ engine: PlaybackEngine, seconds: Double = 5,
     // not handled, the engine's own queue held off
     let arrived = engine.callbacksArrived, handled = engine.callbacksDone
     let which = arrived == handled
-        ? "every callback AVAudioEngine made was handled, so the node's clock has passed a buffer it hasn't called back: AVAudioPlayerNode took the buffer late, its clock counting it on time (notes/ios.md \"A node's buffers, taken late\"; how late this machine takes one: the line \"AVAudioPlayerNode taking a buffer, measured\" in this run's log)"
+        ? "every callback AVAudioEngine made was handled, so the node's clock has passed a buffer it hasn't called back: \(takenLate)"
         : "AVAudioEngine called back \(arrived), the engine handled \(handled): its queue is held off"
     try #require(engine.completionsDue == 0,
                  "the completions of what was rendered, handled within \(seconds) s - \(which); \(engine.lanesSaid)",
@@ -99,10 +99,17 @@ func runOutCalledBack(_ engine: PlaybackEngine, seconds: Double = 5,
                       sourceLocation: SourceLocation = #_sourceLocation) throws {
     let until = Date().addingTimeInterval(seconds)
     while !engine.runOutCalledBack, Date() < until { Thread.sleep(forTimeInterval: 0.001) }
+    // No render comes while this waits, so a buffer the node took late - its clock past it, its audio a render
+    // behind - is never called back: that, unless the test holds AVAudioEngine's callbacks off itself (callbackLag)
     try #require(engine.runOutCalledBack,
-                 "AVAudioEngine's callbacks of every buffer on a node run out, within \(seconds) s; \(engine.lanesSaid)",
+                 "AVAudioEngine's callbacks of every buffer on a node run out, within \(seconds) s - not come, so most likely \(takenLate); \(engine.lanesSaid)",
                  sourceLocation: sourceLocation)
 }
+
+/// What a callback that can't come says: the node's clock counted a buffer it took a render late (ios.yml's runner).
+let takenLate = "AVAudioPlayerNode took the buffer late, its clock counting it on time (notes/ios.md \"A node's buffers, "
+    + "taken late\"; how late this machine takes one: the line \"AVAudioPlayerNode taking a buffer, measured\" in this "
+    + "run's log)"
 
 /// The engine's trace, each line with the seconds since the test began - printed when a test fails, to
 /// say what the engine did and when.

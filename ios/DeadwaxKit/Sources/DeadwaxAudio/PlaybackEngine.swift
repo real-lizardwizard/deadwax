@@ -434,12 +434,59 @@ public final class PlaybackEngine {
     /// Tests: how long after the engine asks AVAudioPlayerNode to schedule a buffer the node takes it - its
     /// CommandQueue slow, as on ios.yml's runner, made certain: each scheduleBuffer is performed this much
     /// later, in order, and drained before any node or engine stops (as AVAudioPlayerNode's StopImpl does).
-    /// Timed on a strict timer (`sleep(until:)`): on a Thread.sleep, as it was, a 10 ms lag ran 10-15 ms here
-    /// and 17-210 ms under `taskpolicy -b` - most likely ios.yml's 12 of 87 at 09781a5 (notes/ios.md "A node's
-    /// buffers, taken late"). Set before `play`.
+    /// Timed on a strict timer (`waitStrictly(until:)`): on a Thread.sleep, as it was, a 10 ms lag ran 10-15 ms
+    /// here and up to about 240 ms under `taskpolicy -b` (notes/ios.md "A node's buffers, taken late"). Its call
+    /// into the node is made off the engine's queue, so a render could begin while one is held up - which the
+    /// engine's own call, on its queue, never lets happen: renderOffline waits for one (`hookCalls`). Set before
+    /// `play`.
     var scheduleLag: TimeInterval = 0
     private let scheduleQueue = DispatchQueue(label: "deadwax.engine.schedule-lag", qos: .userInitiated)
     private func drainScheduling() { if scheduleLag > 0 { scheduleQueue.sync {} } }
+    /// Tests: the scheduleLag hook's blocks not yet done, by due time in order (its queue is serial), and whether
+    /// one is inside its call into the node. That call blocked once for 184 ms under `taskpolicy -b` (1 of about
+    /// 2,900), from before the settle ended into the render, and the buffers behind it missed the render
+    /// (notes/ios.md "A node's buffers, taken late", the verifier's finding 1).
+    private final class HookCalls {
+        private let condition = NSCondition()
+        private var dues: [Double] = []
+        private var calling = false
+        private var called = 0
+        func asked(due: Double) { condition.lock(); dues.append(due); condition.unlock() }
+        /// A call into the node begun: how many began before it.
+        func calls() -> Int {
+            condition.lock()
+            defer { condition.unlock() }
+            calling = true
+            called += 1
+            return called - 1
+        }
+        func done() {
+            condition.lock()
+            if !dues.isEmpty { dues.removeFirst() }
+            calling = false
+            condition.broadcast()
+            condition.unlock()
+        }
+        /// Only with a call into the node under way: waits (at most `seconds`) until it and every block due by
+        /// now has run - those behind it on the hook's serial queue, which the engine's own queue would have
+        /// called in turn. A block still waiting on its own timer is the late take the hook is there to make, and
+        /// is left to it. Whether it waited, and whether it gave up with one still to run.
+        func waitIfCalling(seconds: Double) -> (waited: Bool, gaveUp: Bool) {
+            condition.lock()
+            defer { condition.unlock() }
+            guard calling else { return (false, false) }
+            let now = PlaybackEngine.hostSeconds()
+            let until = Date(timeIntervalSinceNow: seconds)
+            while let first = dues.first, first <= now {
+                if !condition.wait(until: until) { return (true, true) }
+            }
+            return (true, false)
+        }
+    }
+    private let hookCalls = HookCalls()
+    /// Tests: the hook's first call into a node held up this long, inside the call - as one was for 184 ms under
+    /// `taskpolicy -b` (finding 1's test). Set before `play`.
+    var scheduleCallHeld: TimeInterval = 0
     /// Tests: the offline settle taken out (a mutation, for the test that shows it is needed).
     var offlineSettle: TimeInterval = PlaybackEngine.offlineScheduleSettle
     /// Offline (tests) only: when a buffer last went onto a node, or a node was last started (host seconds);
@@ -451,11 +498,15 @@ public final class PlaybackEngine {
     /// needs; offline a render can come microseconds after one (notes/ios.md "A node's buffers, taken late").
     /// A bound, not a fence (there is none). 100 ms since ios.yml's runner failed 12 of 87 at 30 ms with every
     /// buffer taken 10 ms late: that hook and this wait were Thread.sleeps, which the system lets run late (timer
-    /// coalescing - half the interval, up to 10 ms, here; up to 200 ms under `taskpolicy -b`, where the old code
-    /// fails 8 of those 12 the same way), so the 30 ms was never the margin it looked. Both wait on a strict
-    /// timer now (`sleep(until:)`) and this is the wait: 100 ms over the node's own queue (at most 1.3 ms here,
-    /// -b included), 90 ms over ios.yml's 10 ms hook; about 22 s more on the Audio suite here (38 s to 60 s).
-    /// BufferTakeMeasuredTests prints how late the node takes a buffer on the machine running the tests.
+    /// coalescing - half the interval, up to 10 ms, here; up to about 230 ms under `taskpolicy -b`, where the old
+    /// code fails 6-9 of those 12, though -b is harsher than the runner: it fails a test the runner passed), so
+    /// the 30 ms was never the margin it looked. Both wait on a strict timer now (`waitStrictly(until:)`) and this
+    /// is the wait: 100 ms over the node's own queue (under 0.4 ms idle here; over many runs, up to 7 ms with CPU
+    /// hogs, 10 ms under -b, 16 ms under both) and 90 ms over ios.yml's 10 ms hook, whose own timer ran up to
+    /// 12 ms late with hogs, 17 ms under -b. Under load the margin is what carries it, not the strict timer: at
+    /// 30 ms, strict timers and all, a 20 ms lag with 7 hogs failed 1 run of 2. About 22 s more on the Audio
+    /// suite here (38 s to 60 s). BufferTakeMeasuredTests prints how late the node takes a buffer on the machine
+    /// running the tests.
     static let offlineScheduleSettle: Double = 0.100
     /// The output was started and no song has been started on it since: the next start from silence takes
     /// the start lead. A start on an output already running plays at the next render.
@@ -672,8 +723,19 @@ public final class PlaybackEngine {
             }
             if let scheduled = lastScheduledAt {
                 // a buffer just put on, or a node just started: the node takes it on its own queue first
-                Self.sleep(until: scheduled + offlineSettle)
+                Self.waitStrictly(until: scheduled + offlineSettle)
                 lastScheduledAt = nil
+                // tests: the late-buffer hook's call into a node still under way as the settle ends (held up: 184 ms
+                // once). The engine's own call is made on this queue, so a render would wait for it to return and
+                // then the settle: so here
+                let held = scheduleLag > 0 ? hookCalls.waitIfCalling(seconds: 5) : (waited: false, gaveUp: false)
+                if held.waited {
+                    note(held.gaveUp
+                         ? "the late-buffer hook's call into a node still not back after 5 s: rendering anyway"
+                         : "the late-buffer hook's call into a node under way as the settle ended: waited for it, "
+                            + "and the settle after")
+                    Self.waitStrictly(until: Self.hostSeconds() + offlineSettle)
+                }
             }
             var done: AVAudioFrameCount = 0
             var silent: AVAudioFrameCount = 0
@@ -780,12 +842,15 @@ public final class PlaybackEngine {
     static func hostSeconds() -> Double { AVAudioTime.seconds(forHostTime: mach_absolute_time()) }
 
     /// Offline renders and the tests' hooks only: the calling thread held until `due` (host seconds), never
-    /// before it, and on a strict timer, so not much after. Thread.sleep, usleep, mach_wait_until and a
-    /// semaphore's timeout are all let run late by the system's timer coalescing - half the interval, up to
-    /// 10 ms, on this Mac (a 10 ms sleep woke 10-15 ms after), up to 200 ms under `taskpolicy -b` - where a strict
-    /// timer with no leeway woke within about 0.1 ms in both, a few ms late now and then (7 ms once in a few
-    /// hundred) (notes/ios.md "A node's buffers, taken late").
-    static func sleep(until due: Double) {
+    /// before it, and on a strict timer, so later only by how long the system takes to run it. Thread.sleep,
+    /// usleep, mach_wait_until and a semaphore's timeout are all let run late by the system's timer coalescing -
+    /// half the interval, up to 10 ms, on this Mac (a 10 ms sleep woke 10-15 ms after), up to about 230 ms under
+    /// `taskpolicy -b`. A strict timer with no leeway woke within about 0.1-0.6 ms idle here; with 7 CPU hogs, 622
+    /// of 1,401 of the hook's wakes over 1 ms late, 104 over 5 ms, and up to 12 ms over many runs; under -b up to
+    /// 17 ms (and the settle's own wait 87 and 119 ms late, where late is harmless) - so under load the waits it
+    /// times are not exact, and the settle's margin is what covers it (notes/ios.md "A node's buffers, taken late").
+    /// Not `sleep`: that is the engine's own, which stops the phone's output.
+    static func waitStrictly(until due: Double) {
         while true {
             let left = due - hostSeconds()
             guard left > 0 else { return }
@@ -1251,8 +1316,14 @@ public final class PlaybackEngine {
         if scheduleLag > 0 {
             let node = lane.node
             let due = Self.hostSeconds() + scheduleLag
+            let hook = hookCalls // not `calls`: that is the lane's, the completion's
+            let held = scheduleCallHeld
+            hook.asked(due: due)
             scheduleQueue.async {
-                Self.sleep(until: due)
+                Self.waitStrictly(until: due)
+                let before = hook.calls()
+                defer { hook.done() }
+                if before == 0, held > 0 { Self.waitStrictly(until: Self.hostSeconds() + held) }
                 // a node detached meanwhile takes nothing (scheduling on one is an exception)
                 guard node.engine != nil else { return }
                 node.scheduleBuffer(buffer, completionCallbackType: .dataRendered, completionHandler: completion)

@@ -48,16 +48,17 @@ enum BufferTake {
 
         var atOnce: [Double] = [], untaken = 0
         for _ in 0..<Self.atOnce {
-            let (late, _) = try trial(format: format, buffer: buffer, lag: 0, hook: hook)
-            if late == nil { untaken += 1 }
-            atOnce.append(late ?? giveUp)
+            let taken = try trial(format: format, buffer: buffer, lag: 0, hook: hook)
+            if taken.late == nil { untaken += 1 }
+            atOnce.append(taken.late ?? giveUp)
         }
-        var pastDue: [Double] = [], hop: [Double] = []
+        var pastDue: [Double] = [], hop: [Double] = [], calls: [Double] = []
         for _ in 0..<Self.behindTheHook {
-            let (late, blockLate) = try trial(format: format, buffer: buffer, lag: lag, hook: hook)
-            if late == nil { untaken += 1 }
-            pastDue.append(late ?? giveUp)
-            if let blockLate { hop.append(blockLate) }
+            let taken = try trial(format: format, buffer: buffer, lag: lag, hook: hook)
+            if taken.late == nil { untaken += 1 }
+            pastDue.append(taken.late ?? giveUp)
+            if let blockLate = taken.blockLate { hop.append(blockLate) }
+            if let call = taken.call { calls.append(call) }
         }
         // what the hook and the settle waited with until both were put on the strict timer: how late the system lets
         // an ordinary 10 ms sleep run on this machine (its timer coalescing)
@@ -73,6 +74,8 @@ enum BufferTake {
             + " - behind a \(ms(lag)) ms scheduleLag hook, its due time to the first render carrying it: "
             + spread(pastDue, over: [0.010, 0.020, 0.030], settle: settle - lag, named: "the settle less the lag")
             + "; the hook's own block past its due time: " + spread(hop, over: [], settle: nil, named: "")
+            + "; the hook's call into the node, how long it took: "
+            + spread(calls, over: [0.001, 0.010], settle: settle - lag, named: "the settle less the lag")
             + " - never taken within \(whole(giveUp)) ms: \(untaken) - a 10 ms Thread.sleep past its time: "
             + spread(sleeps, over: [0.005, 0.020], settle: nil, named: "")
     }
@@ -81,11 +84,12 @@ enum BufferTake {
     /// started, then a new node attached and connected while it runs (every lane is), the buffer put on it - at once,
     /// or through the hook `lag` later - and play() at once; then rendered `piece` frames at a time until the output
     /// carries it. Seconds from when the node was asked to take it (the call, or the hook's due time) to the start of
-    /// that render - an upper bound, within one poll - or nil past `giveUp`; and how late the hook's block ran past
-    /// its due time (behind the hook, the render waits for the hook's call: below). A fresh engine's node takes its first buffer later than one on an engine long running (median
+    /// that render - an upper bound, within one poll - or nil past `giveUp`; and, behind the hook, how late its
+    /// block ran past its due time and how long its call into the node took (the render waits for that call:
+    /// below). A fresh engine's node takes its first buffer later than one on an engine long running (median
     /// 0.26 ms here, against 0.00), so this is the worse of the two.
     static func trial(format: AVAudioFormat, buffer: AVAudioPCMBuffer, lag: TimeInterval,
-                      hook: DispatchQueue) throws -> (Double?, Double?) {
+                      hook: DispatchQueue) throws -> Taken {
         let engine = AVAudioEngine()
         try engine.enableManualRenderingMode(.offline, format: format, maximumFrameCount: 4_096)
         _ = engine.mainMixerNode
@@ -100,33 +104,47 @@ enum BufferTake {
             engine.detach(node)
             engine.stop()
         }
-        let blockLate = Late()
+        let blockLate = Late(), call = Late()
         let asked = PlaybackEngine.hostSeconds() + lag
         if lag > 0 {
             hook.async {
-                PlaybackEngine.sleep(until: asked)
-                blockLate.set(PlaybackEngine.hostSeconds() - asked)
+                PlaybackEngine.waitStrictly(until: asked)
+                let woke = PlaybackEngine.hostSeconds()
+                blockLate.set(woke - asked)
                 node.scheduleBuffer(buffer, completionCallbackType: .dataRendered) { _ in }
+                call.set(PlaybackEngine.hostSeconds() - woke)
             }
         } else {
             node.scheduleBuffer(buffer, completionCallbackType: .dataRendered) { _ in }
         }
         node.play()
         // No render until the hook's call has returned, as in the engine (its render comes the settle after the
-        // buffer was asked for, the hook's call the lag after): a scheduleBuffer called on one thread while an
-        // offline render runs on another can block for a timed wait (5-6 ms here, now and then; up to 164 ms in a
-        // background process), which is a path the tests never take - measured, it would only mislead.
+        // buffer was asked for, the hook's call the lag after, and it waits for a call still under way then): a
+        // scheduleBuffer called on one thread while an offline render runs on another can block for a timed wait
+        // (5-6 ms here, now and then; up to 164 ms in a background process), which the engine's own calls never
+        // meet (they are on the queue its renders are) - measured, it would only mislead. How long the hook's call
+        // itself takes is printed: once, under `taskpolicy -b`, 184 ms, past the settle.
         if lag > 0 { hook.sync {} }
         while true {
             let began = PlaybackEngine.hostSeconds()
-            if began - asked > giveUp { return (nil, blockLate.value) }
-            guard try engine.renderOffline(piece, to: out) == .success else { return (nil, blockLate.value) }
+            if began - asked > giveUp { return Taken(late: nil, blockLate: blockLate.value, call: call.value) }
+            guard try engine.renderOffline(piece, to: out) == .success else {
+                return Taken(late: nil, blockLate: blockLate.value, call: call.value)
+            }
             let left = out.floatChannelData![0]
             if (0..<Int(out.frameLength)).contains(where: { left[$0] != 0 }) {
-                return (max(0, began - asked), lag > 0 ? blockLate.value : nil)
+                return Taken(late: max(0, began - asked), blockLate: blockLate.value, call: call.value)
             }
-            PlaybackEngine.sleep(until: PlaybackEngine.hostSeconds() + poll)
+            PlaybackEngine.waitStrictly(until: PlaybackEngine.hostSeconds() + poll)
         }
+    }
+
+    /// One trial's times, in seconds: from the ask to the first render carrying the buffer (nil: never taken), and
+    /// behind the hook, its block past its due time and its call into the node (nil when there is no hook).
+    struct Taken {
+        let late: Double?
+        let blockLate: Double?
+        let call: Double?
     }
 
     /// min / median / p90 / p99 / max in ms, and the share over each of `over` and `settle`.
