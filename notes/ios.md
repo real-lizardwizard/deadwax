@@ -1998,7 +1998,12 @@ it anchors to the page is from what James saw on iOS 27.2, not from Apple's docu
 
 **Verified**: the app builds for iOS 17 with it (xcodebuild, unsigned). **Assumed**, for the phone: that a
 Section's title shows as the menu's header on iOS 17 and 27; that the row's ••• opens only its menu inside a List
-row whose song button is beside it (both plain-styled, as the button was).
+row whose song button is beside it (both plain-styled, as the button was). After review, the row's QueueMenu and
+NowPlayingMenu carry `.menuStyle(.button)` (iOS 16+) before `.buttonStyle(.plain)`: Apple pairs ButtonMenuStyle with
+a button style, and doesn't say whether the automatic menu style reads one - the project's rule is that two
+automatic-styled buttons in one List row both fire, so the plain style must surely reach the menu's own button. It
+also keeps Now Playing's ••• drawn untinted, as the plain button was. The bar's ••• is left to the toolbar's own
+style. NowPlayingWords.menu ("More"), the dialog's hidden title, went with the dialog: nothing used it.
 
 **On the phone**: open an album, tap a song's •••: the menu opens from that •••, with the song's name over Play Next
 and Play Last. Try it on a song near the bottom of the screen too - Play Next still first. Tap away: it closes and

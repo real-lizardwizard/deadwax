@@ -25,6 +25,8 @@ struct NowPlayingMenu: View {
                 .contentShape(Rectangle())
         }
         .menuOrder(.fixed)
+        // drawn as the plain button it was (no tint): a button-styled menu with .buttonStyle, as Apple pairs them
+        .menuStyle(.button)
         .buttonStyle(.plain)
         .accessibilityLabel(NowPlayingWords.more(hasAlbum: hasAlbum))
     }

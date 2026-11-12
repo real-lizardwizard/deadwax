@@ -54,6 +54,9 @@ struct TrackRow: View {
                     .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
+            // a button-styled menu, so the plain button style is sure to reach it (as Apple pairs .menuStyle(.button)
+            // with .buttonStyle): in a List row beside the song's own button, each takes only its own tap
+            .menuStyle(.button)
             .buttonStyle(.plain)
             .accessibilityLabel(AlbumPageLines.moreForSong(song.title ?? ""))
         }
