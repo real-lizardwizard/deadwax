@@ -100,13 +100,19 @@ export function Lyrics({
     setLitShown(next)
   }
   const clock = () => lyricsClock(live.current.player.position(), reported.current)
-  const followsNow = () => follows(performance.now(), heldAt.current, live.current.player.playing, focused.current)
+  //? (review) keyboard focus holds following only while it is still in the lyrics: a line taken away under it - the
+  //? next song's lines not in hand yet, the spinner in their place - fires no focusout in Safari, and would otherwise
+  //? hold following for good
+  const focusHolds = () => focused.current && !!scroller.current?.contains(document.activeElement)
+  const followsNow = () => follows(performance.now(), heldAt.current, live.current.player.playing, focusHolds())
 
-  //? the lit line to the anchor - the top before the first line (an intro too short for its dots)
+  //? the lit line to the anchor - the top before the first line (an intro too short for its dots). (review) Synced
+  //? lyrics only: plain ones have no lit line, and "following" them was a jump back to their top - four seconds after
+  //? the listener scrolled down to read them, at every play, at every change of size
   const follow = (smooth: boolean) => {
     const box = scroller.current
     const range = litNow.current.range
-    if (!box) return
+    if (!box || !live.current.synced) return
     const line = range ? (list.current?.children[range.first] as HTMLElement | undefined) : undefined
     const top = line ? followTop(line.offsetTop, box.clientHeight) : 0
     box.scrollTo({ top, behavior: smooth && !reducedMotion() ? 'smooth' : 'auto' })
@@ -144,6 +150,8 @@ export function Lyrics({
     reported.current = live.current.player.position()
     draw(clock())
     if (scroller.current) scroller.current.scrollTop = 0
+    //? (review) the tab stop back on the lit line when the line focus was on went with the last song's
+    if (!scroller.current?.contains(document.activeElement)) setFocusAt(null)
   }, [answers.song])
 
   //? its answer come (or come again): the lit line, followed at once if following
@@ -228,13 +236,27 @@ export function Lyrics({
     }
     const onPointer = (event: PointerEvent) => {
       pointered.current = true
-      //? on the scroller itself, not a line in it: its scroll bar
-      if (event.target === box) hold()
+      //? on the scroller itself, not a line in it: its scroll bar - a mouse's or a pen's. (review) Never a finger's: a
+      //? phone draws no scroll bar, and a thumb resting in the sides or the top fade - the scroller's own padding -
+      //? held following for nothing; a touch that scrolls holds it by its touchmove
+      if (event.target === box && event.pointerType !== 'touch') hold()
+    }
+    //? (review) a press is over once its click comes (after any focus it gave - a touch's comes at its compatibility
+    //? mousedown, after the finger lifts), or once it became a scroll: what focuses a line after that - a Tab from
+    //? outside, VoiceOver - isn't the press's. Kept until then, Safari (which focuses no button it clicks) would have
+    //? taken the next keyboard focus for the press's
+    const onPressOver = () => {
+      pointered.current = false
     }
     const onFocusIn = (event: FocusEvent) => {
       const at = Number((event.target as HTMLElement | null)?.dataset?.line)
       setFocusAt(Number.isInteger(at) ? at : null)
-      if (pointered.current) return
+      if (pointered.current) {
+        //? (review) the press's focus - which lets go of the keyboard's, if it was in the lyrics before the click
+        pointered.current = false
+        focused.current = false
+        return
+      }
       focused.current = true
       stopTimer()
     }
@@ -249,6 +271,8 @@ export function Lyrics({
     box.addEventListener('touchmove', hold, { passive: true })
     box.addEventListener('keydown', onKey)
     box.addEventListener('pointerdown', onPointer)
+    box.addEventListener('click', onPressOver)
+    box.addEventListener('pointercancel', onPressOver)
     box.addEventListener('focusin', onFocusIn)
     box.addEventListener('focusout', onFocusOut)
     return () => {
@@ -256,6 +280,8 @@ export function Lyrics({
       box.removeEventListener('touchmove', hold)
       box.removeEventListener('keydown', onKey)
       box.removeEventListener('pointerdown', onPointer)
+      box.removeEventListener('click', onPressOver)
+      box.removeEventListener('pointercancel', onPressOver)
       box.removeEventListener('focusin', onFocusIn)
       box.removeEventListener('focusout', onFocusOut)
       stopTimer()

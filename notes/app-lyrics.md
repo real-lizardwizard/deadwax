@@ -1198,3 +1198,42 @@ again while paused, a shared stamp lighting one line, the clock always the repor
 over a newer one for the same song, asking while hidden, the next song asked twice, a song with none hiding its cover,
 the record not woken, the bar's dimmed click); the whole pytest suite; the bundle built with the rolldown workaround.
 Not verified: a real browser, the phone, a real Navidrome - section 6's W1-W17 and D1-D5.
+
+### Review
+
+The same day, read against the spec and both commits; no version bump (still 2.1.6). Five fixes, all in
+`player/Lyrics.tsx`, each with a check in lyrics.sim that fails without it (a section of its own, "the view, after
+review"):
+
+1. **Plain lyrics were "followed" back to their top** - four seconds after the listener scrolled down to read them
+   (while playing), at every play after a pause, at every change of size: `follow()` scrolls to the lit line or else
+   the top, and plain lyrics have none. Following is synced lyrics' alone now, as 2.5 and docs/player.md ("don't move
+   by themselves") already said.
+2. **A press stayed "the pointer's" until a key was pressed in the lyrics**: in Safari, which focuses no button it
+   clicks, the next keyboard focus after a tap on a line - a Tab in from outside - was taken for the press's and held
+   nothing. A press is over at its click or its pointercancel, or once it has given its one focus.
+3. **Keyboard focus kept its hold after a click** on another line: `focused` stayed on until focus left the lyrics.
+   The press's focus lets go of it.
+4. **Focus taken away held following for good**: a focused line removed with the last song's lines (the spinner
+   while the next song's are asked) fires no focusout in Safari. Focus holds only while it is in the lyrics
+   (`document.activeElement`), and the tab stop goes back to the lit line when the line it was on has gone.
+5. **A finger resting on the scroller's own padding** (its 28px sides, the top fade) held following as its scroll bar
+   does. Only a mouse's or a pen's press on the scroller holds now; a finger that scrolls holds by its touchmove.
+
+Looked at and kept: the route as built (one getLyricsBySongId as the asker with the id alone, "user", `_fail`, the
+ETag, all-one-stamp answered plain, LYRICS_LEAD_MS never applied at read time); useLyrics (latestOnly per ask, the
+render-time guard against another song's answer, the retry, the next song's ask, the 50 kept); Now Playing (no record
+mounted under lyrics, the transport the cover's while they show, the deck woken turning them off over the
+turntable, the grip the top row); the panel and the one-panel rule; the tokens, errorWords, no secure-context API, the
+engine files untouched; and every departure in "Built (2.1.6)". Not changed: in the gapless stream, a tap on a line
+less than 1.5 s from where the song is can light the line before for the frames until its seek lands - 2.2's rule
+(LANDED_WITHIN_S), which can't see the engine's pending seek without an engine change; the next song's ask and the
+join's can both be on their way for one song (the second a 304). For James: a synced file with ONE line of words is
+answered plain - rule 3's "all one time" holds trivially for it (a lone shout at 1:23); lighting it would need a rule
+of its own.
+
+Verified: the whole pytest suite; `npm run typecheck`; every sim on its own (69; lyrics.sim 111 checks); each fix
+mutated back and caught; the bundle rebuilt. And deadwax run against a stand-in Navidrome (a small fake Subsonic
+server outside the repo, shaped as the route's tests fake v0.64.2) - the page, the album, streaming, and the route
+answering synced, plain, none, all-one-stamp and a duet's shared stamp, a 304 and a 404. Not verified: a real
+browser, the phone, a real Navidrome - section 6's checks still stand.

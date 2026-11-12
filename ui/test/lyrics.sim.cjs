@@ -428,6 +428,8 @@ async function main() {
     //? keyboard focus in the lines holds it, for as long as it is there
     run(10)
     box.dispatch('keydown', { key: 'Tab' })
+    //? (review) focused as a browser focuses it - the page's focus on it, then its focusin
+    lines()[1].element.focus()
     lines()[1].element.dispatch('focusin')
     const focusedAt = scrolls()
     run(25)
@@ -525,6 +527,100 @@ async function main() {
     draw({ lyrics: { synced: true, lines: SONG } }, null)
     check('nothing playing: said so, as the bar does', text(view.one(byClass('app-lyrics-none'))), 'Nothing playing')
     check('...and synced lyrics\' section no tab stop of its own - its lines are', (draw({ lyrics: { synced: true, lines: SONG } }), view.one(byClass('app-lyrics')).props.tabIndex), undefined)
+  }
+
+  console.log('\nthe view, after review: plain lyrics never followed; a press over; focus that has gone')
+  {
+    const reported = new Set()
+    const state = { position: 0, playing: true }
+    const player = {
+      track: { id: 'song-r' },
+      position: () => state.position,
+      onPosition: (fn) => { reported.add(fn); return () => reported.delete(fn) },
+      seek() {},
+      toggle() {},
+    }
+    const answers = { song: 'song-r', lyrics: { synced: false, lines: [at(null, 'Plain words, the first'), at(null, 'Plain words, the second')] }, asking: false, error: null, retry() {} }
+    const view = mount(Lyrics)
+    const props = () => ({ player: { ...player, playing: state.playing }, answers, shows: true, covered: false, place: 'face' })
+    view.render(props())
+    const box = view.one(byClass('app-lyrics')).element
+    box.clientHeight = 200
+    const resized = () => { for (const observer of observers) if (observer.box === box && !observer.gone) observer.fn() }
+    resized()
+    view.render(props())
+    const scrolls = () => box.scrolls.length
+    const lines = () => view.find((node) => node.type === 'button' && byClass('app-lyric')(node))
+    const report = (seconds) => { for (const fn of reported) fn(seconds) }
+    const run = (seconds) => { state.position = seconds; report(seconds - 0.25); frame(); view.render(props()) }
+
+    //? plain lyrics: scrolled down to read, then the wait run out, a pause and a play, a change of size
+    const plain = scrolls()
+    box.scrollTop = 300
+    box.dispatch('wheel')
+    wait(4000)
+    state.playing = false
+    view.render(props())
+    state.playing = true
+    view.render(props())
+    resized()
+    view.render(props())
+    check('plain lyrics stay where the listener scrolled them: never "followed" back to their top - not after the wait, a play, or a change of size',
+      [scrolls(), box.scrollTop], [plain, 300])
+
+    //? synced lyrics from here
+    const LINES = [at(1, 'A first line'), at(6, 'A second line'), at(11, 'A third line'), at(16, 'A fourth line')]
+    answers.song = 'song-s'
+    answers.lyrics = { synced: true, lines: LINES }
+    state.position = 0
+    view.render(props())
+    run(1)
+
+    //? a finger resting on the scroller's own padding - its sides, the top fade - is no scroll bar
+    box.dispatch('pointerdown', { target: box, pointerType: 'touch' })
+    box.dispatch('pointercancel', { target: box, pointerType: 'touch' })
+    const thumb = scrolls()
+    run(6)
+    check('a finger on the scroller\'s own padding holds nothing: the next line followed', scrolls(), thumb + 1)
+
+    //? a press on the scroller (its scroll bar) and its click: the press is over - Safari focused nothing
+    box.dispatch('pointerdown', { target: box, pointerType: 'mouse' })
+    box.dispatch('click', { target: box })
+    wait(4000)
+    lines()[1].element.focus()
+    lines()[1].element.dispatch('focusin')
+    const tabbed = scrolls()
+    run(6)
+    run(11)
+    check('a press over - its click come - then a Tab into the lines from outside: held, as keyboard focus holds', scrolls(), tabbed)
+
+    //? ...then a click on another line, its focus there
+    lines()[3].element.dispatch('pointerdown')
+    lines()[3].element.focus()
+    lines()[3].element.dispatch('focusin')
+    lines()[3].element.dispatch('click')
+    const clicked = scrolls()
+    run(16)
+    check('...then a click on a line: the keyboard\'s hold let go - following again', scrolls(), clicked + 1)
+
+    //? keyboard focus on a line, and the next song's lines not in hand: the spinner where they were. The line focus was
+    //? on goes with them, which leaves the page's focus on its body with no focusout (Safari's own) - modelled here
+    box.dispatch('keydown', { key: 'Tab' })
+    lines()[0].element.focus()
+    lines()[0].element.dispatch('focusin')
+    answers.song = 'song-t'
+    answers.lyrics = null
+    answers.asking = true
+    state.position = 0
+    view.render(props())
+    document.activeElement = document.body
+    answers.lyrics = { synced: true, lines: LINES }
+    answers.asking = false
+    view.render(props())
+    const gone = scrolls()
+    run(6)
+    check('keyboard focus on a line taken away with the last song\'s lines holds nothing: the next song is followed', scrolls(), gone + 1)
+    check('...and its tab stop is the lit line, not where focus was', lines().map((node) => node.props.tabIndex), [-1, 0, -1, -1])
   }
 
   console.log('\nthe answers (2.6): asked at every song change, the newest alone drawn')
