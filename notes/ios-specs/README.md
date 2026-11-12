@@ -28,3 +28,14 @@ patterns. The app is then built to the spec and reviewed against it. notes/ios.m
   checks and open questions. Reviewed the same day (its "Design review (2026-11-12)": the clock anchored on the
   block's end, the handover's predictor, target and judge, the window's grid and its two tests, the porting and
   real-time rules, the press and the deck's owner, the lock screen after a wind-down, the look's faces and type).
+- `eq.md` - the EQ (James's decisions of 2026-11-12, ~/Desktop/Code/deadwax-plans/eq.md), designed 2026-11-12
+  against 2.1.6 / ios b03ac65: one in-process unit between the main mixer and the output, the RBJ filters in Core in
+  Double, Off passing every sample through untouched (and how that is measured), crossfaded changes, the curve put in
+  at the engine's start on a new route, the deck and the fader beside it; the automatic preamp; AutoEq through
+  deadwax (two routes, a 2.1.x on main); the screen (the output, the curve as an audio graph, Correction, the ten
+  sliders, presets, Advanced's filters, handles and preamp, import from Files, Paste and the share sheet with every
+  refusal's words, GraphicEQ converted, export), per output naming and switching, storage per phone, five slices,
+  James's checks and open questions. Reviewed the same day against Equalizer APO's own source and AutoEq's data
+  (its "Design review (2026-11-12)": every form APO plays is played, its reading rules as its code has them, the
+  unit's block size and allocation, no denormal flush, the bank copied in and matched by id, the crossfade measured,
+  the list's path encoding, "pick yours" when several rows match, a pushed page kept on its output).
