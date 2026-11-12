@@ -91,6 +91,9 @@ function patch(file, from, to, what) {
 patch('lib/playSpeed.js', '(exports.SPEED_MAX / exports.SPEED_MIN) ** at', 'Math.pow((exports.SPEED_MAX / exports.SPEED_MIN), at)', 'speedAt\'s **')
 //? the deck's audio listener, its voice-ready reading and its window's arrival, told to the trace (rules/, below)
 patch('player/deck.js', 'onAudio = () => {', 'onAudio = () => { globalThis.__deckTrace?.audio(this);', 'onAudio')
+patch('player/deck.js', 'sleepDeckAudio();', 'globalThis.__deckTrace?.effect("sleep"); sleepDeckAudio();', 'setShowing\'s sleep')
+patch('player/deck.js', 'closeDeckAudio();', 'globalThis.__deckTrace?.effect("close"); closeDeckAudio();', 'destroy\'s close')
+patch('player/deck.js', 'function voiceReady() {', 'globalThis.__deckAudio = () => audio;\nfunction voiceReady() {', 'the audio, read')
 
 /* ===== a Math that records ===== */
 
@@ -825,6 +828,871 @@ function syntheticVoiceCases() {
   return cases
 }
 
+/* ===== rules/: the real Deck, every input and every effect ===== */
+
+//? The Deck is driven through deck.sim's own harness (ui/test/deckHarness.cjs) with its context's clock the page's
+//? (`contextFollowsClock`), so every stamp is the page's time over 1000 but where the one mapping says otherwise - those
+//? few are written down (`stamps`). Its world moves on one clock: the deck's timers, its frames on a 16 ms grid, and
+//? the voice - lib/deckVoice.ts itself, fed every message the deck posts, rendering blocks of 128 at 48 kHz while the
+//? context runs and handing each report back as the worklet does (`heard`), so what the deck hears is a real voice's.
+//? INPUTS (base64: each an op byte, the page time in ms and the op's arguments, all little-endian doubles - a song
+//? as its index in `songs`, a word as its index in `words`, true and false as 1 and 0):
+const RULE_OPS = {
+  new: [0, 'song playing at reduced ready made'], world: [1, 'song playing at ready made'], position: [2, 'at'],
+  timer: [3, 'n'], frame: [4, ''], audio: [5, 'ready made'], heard: [6, 'pos rate gain'],
+  answer: [7, 'ask first samples rate frames decodedRate bytes channels'], refuse: [8, 'ask status word'],
+  live: [10, ''], taken: [11, ''], anchor: [12, ''], setShowing: [13, 'on'], setWindDown: [14, 'on'],
+  speedChanged: [15, 'speed'], playingChanged: [16, 'on'], songChanged: [17, 'song'], pressed: [18, 'time'],
+  holdStill: [19, 'held'], touched: [20, 'time turned offset'], takeOver: [21, 'time quick'], hand: [22, 'time turned at'],
+  release: [23, 'time cancel'], pausing: [24, ''], resuming: [25, ''], armTaken: [26, ''], destroy: [27, ''], reduced: [28, 'on'],
+}
+const RULE_ARITY = (name) => (RULE_OPS[name][1] ? RULE_OPS[name][1].split(' ').length : 0)
+const RETURNS = new Set(['live', 'taken', 'anchor', 'takeOver', 'release', 'pausing', 'resuming'])
+const EFFECT_SPAN = 512
+const EFFECTS_WHOLE = 400
+const FRAME_MS = 16
+const VOICE_BLOCK = 128
+const CONTEXT_RATE = 48000
+const RULES_SONG = { id: 'time', length: 425, flac: true, kind: 'FLAC' }
+
+let rulesHarness = null
+function rulesWorld() {
+  if (rulesHarness) return rulesHarness
+  const H = require(path.join(UI, 'test', 'deckHarness.cjs')).install(OUT)
+  H.contextFollowsClock = true
+  const { ApiError } = load('api/http.js')
+  const T = { H, ApiError, on: false }
+  const hSet = globalThis.setTimeout, hClear = globalThis.clearTimeout
+  const hFrame = globalThis.requestAnimationFrame, hUnframe = globalThis.cancelAnimationFrame
+  //? the deck's timers numbered as it makes them - but its clock's own tick (the phone's clock is its voice host's,
+  //? and DeckRules has none), which runs here as it does on the page and is told to no one
+  globalThis.setTimeout = (run, ms = 0) => {
+    const id = hSet(run, ms)
+    if (T.on && !(T.deck && run === T.deck.onClockTick)) {
+      const n = T.timerCount++
+      T.timerIds.set(id, n)
+      T.effect(`timer ${n} ${hex(ms)}`)
+    }
+    return id
+  }
+  globalThis.clearTimeout = (id) => {
+    if (T.on && T.timerIds.has(id) && H.timers.some((timer) => timer.id === id)) T.effect(`clear ${T.timerIds.get(id)}`)
+    hClear(id)
+  }
+  globalThis.requestAnimationFrame = (run) => {
+    const id = hFrame(run)
+    if (T.on) {
+      T.effect('raf')
+      if (T.frameAskedAt === null) T.frameAskedAt = H.clock
+    }
+    return id
+  }
+  globalThis.cancelAnimationFrame = (id) => {
+    if (T.on && H.frames.some((frame) => frame.id === id)) T.effect('unraf')
+    hUnframe(id)
+    if (!H.frames.length) T.frameAskedAt = null
+  }
+  const realPost = H.Deck.prototype.post
+  H.Deck.prototype.post = function post(message, transfer) {
+    if (T.on) {
+      T.effect(postWords(message))
+      T.voiceQueue.push(message)
+    }
+    return realPost.call(this, message, transfer)
+  }
+  const realStamp = H.Deck.prototype.stamp
+  H.Deck.prototype.stamp = function stamp(time) {
+    const stamped = realStamp.call(this, time)
+    if (T.on && hex(stamped) !== hex(time / 1000)) T.stamps.push(time, stamped)
+    return stamped
+  }
+  //? the window's bytes stand for what the answer said; decoded as the recipe's soft noise (the rules don't listen)
+  const decodedChannels = new Map()
+  H.decodeWith = (bytes, done) => {
+    const info = T.windowsAnswered.get(bytes)
+    if (!decodedChannels.has(info.frames)) decodedChannels.set(info.frames, [0, 1].map((ch) => recipeChannel('soft', 3, ch, info.frames)))
+    const channels = decodedChannels.get(info.frames).slice(0, info.channels)
+    done({ numberOfChannels: info.channels, sampleRate: info.decodedRate, length: info.frames, getChannelData: (c) => channels[c] })
+  }
+  globalThis.__deckTrace = {
+    audio: () => {
+      if (!T.on) return
+      const world = T.world()
+      T.record('audio', [world[3], world[4]])
+      T.lastWorld = world
+    },
+    effect: (words) => { if (T.on) T.effect(words) },
+  }
+  rulesHarness = T
+  return T
+}
+
+function postWords(m) {
+  switch (m.type) {
+    case 'window': return `post window ${hex(m.start)} ${hex(m.rate)} ${m.channels.length} ${m.channels[0]?.length ?? 0}`
+    case 'take': return `post take ${hex(m.at)} ${hex(m.rate)} ${hex(m.time)} ${hex(m.until)}`
+    case 'drive': return `post drive ${hex(m.at)} ${hex(m.rate)} ${m.accel === undefined ? '-' : hex(m.accel)} ${hex(m.time)} ${hex(m.until)}`
+    case 'hand': return `post hand ${hex(m.at)} ${hex(m.time)}`
+    case 'fade': return `post fade ${hex(m.seconds)}`
+    case 'stop': return 'post stop'
+  }
+  throw new Error(`a voice message the rules trace doesn't know: ${m.type}`)
+}
+
+/** A new case: the world afresh, and the helpers that move it. */
+function rulesCase() {
+  const T = rulesWorld()
+  const H = T.H
+  H.timers = []
+  H.frames = []
+  H.portMessages = []
+  H.clockReads = []
+  //? the clock never goes back: the deck's audio and its clock's mapping are the page's, kept from case to case
+  H.clock = Math.ceil(H.clock / 1000) * 1000 + 1000
+  H.reduced = false
+  Object.assign(T, {
+    on: true, deck: null, host: null, inputs: [], effects: [], stamps: [], timerIds: new Map(), timerCount: 0,
+    frameAskedAt: null, frameBase: H.clock, songs: [], words: [], asks: [], voice: null, voiceQueue: [], block: null,
+    lastWorld: null, windowsAnswered: new WeakMap(), speed: 1, toldPlaying: null, destroyed: false,
+  })
+  //? each effect after the number of the input it came in: an effect at another input is another trace
+  T.effect = (words) => T.effects.push(`${T.inputs.length - 1} ${words}`)
+  T.songIndex = (song) => {
+    if (!song) return -1
+    let i = T.songs.findIndex((s) => s.id === song.id && s.length === song.length && s.flac === song.flac && s.kind === song.kind)
+    if (i < 0) i = T.songs.push(song) - 1
+    return i
+  }
+  T.wordIndex = (word) => {
+    if (word === null || word === undefined) return -1
+    let i = T.words.indexOf(word)
+    if (i < 0) i = T.words.push(word) - 1
+    return i
+  }
+  T.world = () => {
+    const audio = globalThis.__deckAudio()
+    const ready = audio.context?.state === 'running' && !!audio.voice?.ready
+    const made = !!audio.voice?.ready && !!audio.context && audio.context.state !== 'closed'
+    const host = T.host
+    return [T.songIndex(host.songValue), host.isPlaying ? 1 : 0, host.at, ready ? 1 : 0, made ? 1 : 0]
+  }
+  T.record = (name, args) => {
+    const op = RULE_OPS[name][0]
+    if (op !== 0 && op !== 1) {
+      const world = T.world()
+      if (!T.lastWorld || world.some((value, i) => !Object.is(value, T.lastWorld[i]))) T.inputs.push({ op: 1, t: H.clock, args: world })
+    }
+    if (args.length !== RULE_ARITY(name)) throw new Error(`rules: ${name} takes ${RULE_ARITY(name)} arguments, not ${args.length}`)
+    T.inputs.push({ op, t: H.clock, args: args.map(Number) })
+  }
+  //? an input: recorded, done, and the world as it left it noted - then the player told if its playing changed (the
+  //? effect Turntable runs on player.playing, the deck's own hold and resume included)
+  T.do = (name, args, run) => {
+    T.record(name, args)
+    const out = run()
+    T.lastWorld = T.world()
+    if (RETURNS.has(name)) T.effect(`return ${returnWords(out)}`)
+    T.tellPlaying()
+    return out
+  }
+  T.tellPlaying = () => {
+    if (!T.deck || T.toldPlaying === null || T.host.isPlaying === T.toldPlaying) return
+    T.toldPlaying = T.host.isPlaying
+    T.call('playingChanged', [T.host.isPlaying])
+  }
+  T.call = (name, args = []) => {
+    if (name === 'destroy') T.destroyed = true
+    return T.callNow(name, args)
+  }
+  T.callNow = (name, args) => T.do(name, args.map((a) => (typeof a === 'boolean' ? (a ? 1 : 0) : a)), () => {
+    switch (name) {
+      case 'songChanged': return T.deck.songChanged(T.songs[args[0]]?.id ?? '')
+      case 'release': return T.deck.release(args[0], args[1] ? 'cancel' : 'up')
+      case 'takeOver': return T.deck.takeOver(args[0], !!args[1])
+      case 'reduced': H.reduced = !!args[0]; return T.deck.onReduced()
+      default: return T.deck[name](...args)
+    }
+  })
+  T.make = async ({ song = RULES_SONG, playing = true, at = 60, reduced = false, wake = true, windDown = true, speed = 1 } = {}) => {
+    T.host = rulesHost(T, song, playing, at)
+    H.reduced = reduced
+    const world = T.world()
+    T.do('new', [world[0], world[1], world[2], reduced ? 1 : 0, world[3], world[4]], () => { T.deck = new H.Deck(T.host) })
+    T.toldPlaying = playing
+    if (!windDown) T.call('setWindDown', [false])
+    if (speed !== 1) T.speedTo(speed)
+    T.call('setShowing', [true])
+    if (wake) await T.wake()
+  }
+  //? a gesture's wakeDeckAudio (Turntable's tap, the look button): the context made and resumed, the worklet loaded
+  T.wake = async () => {
+    H.wakeDeckAudio()
+    for (let i = 0; i < 4; i++) await H.settle()
+  }
+  T.speedTo = (speed) => {
+    T.speed = speed
+    T.call('speedChanged', [speed])
+  }
+  T.position = (at) => T.do('position', [at], () => T.host.moveTo(at))
+  T.setPlaying = (on) => {
+    T.host.isPlaying = on
+    T.tellPlaying()
+  }
+  T.setSong = (song, playing) => {
+    T.host.songValue = song
+    T.host.isPlaying = playing
+  }
+  //? deadwax's answer to the window asked `n`-th: from where it was asked, to the song's end at most, at 44.1 kHz,
+  //? decoded at the context's rate
+  T.answer = async (n = T.asks.length - 1, { seconds = 40, channels = 2 } = {}) => {
+    const ask = T.asks[n]
+    const length = ask.song.length
+    const first = Math.round(ask.from * 44100)
+    const samples = Math.round(Math.min(seconds, length > 0 ? Math.max(0, length - ask.from) : seconds) * 44100)
+    const frames = Math.round((samples * CONTEXT_RATE) / 44100)
+    const bytes = { byteLength: Math.round(seconds * 100000) }
+    T.windowsAnswered.set(bytes, { frames, channels, decodedRate: CONTEXT_RATE })
+    T.do('answer', [n, first, samples, 44100, frames, CONTEXT_RATE, bytes.byteLength, channels], () => ask.resolve({ bytes, first, samples, rate: 44100 }))
+    for (let i = 0; i < 3; i++) await H.settle()
+    T.lastWorld = T.world()
+    T.tellPlaying()
+  }
+  T.answerAll = async () => {
+    for (let n = 0; n < T.asks.length; n++) if (!T.asks[n].answered) await T.answer(n)
+  }
+  T.refuse = async (n, status, detail) => {
+    const ask = T.asks[n]
+    T.do('refuse', [n, status, T.wordIndex(detail)], () => ask.reject(status ? new T.ApiError(status, detail, 'refused') : new Error(detail)))
+    for (let i = 0; i < 3; i++) await H.settle()
+    T.lastWorld = T.world()
+  }
+  //? the world moved on to `ms`: the deck's timers, its frames and the voice's blocks, each at its own time
+  T.until = async (ms) => {
+    for (;;) {
+      const timer = [...H.timers].sort((a, b) => a.at - b.at)[0]
+      const asked = T.frameAskedAt ?? H.clock
+      const frameAt = H.frames.length ? T.frameBase + (Math.floor((asked - T.frameBase) / FRAME_MS) + 1) * FRAME_MS : Infinity
+      const running = T.world()[3] === 1
+      if (running && T.block === null) T.block = Math.ceil((H.clock / 1000) * CONTEXT_RATE / VOICE_BLOCK)
+      if (!running) T.block = null
+      const blockAt = running ? (((T.block + 1) * VOICE_BLOCK) / CONTEXT_RATE) * 1000 : Infinity
+      const at = Math.min(timer ? timer.at : Infinity, frameAt, blockAt)
+      if (!(at <= ms)) break
+      H.clock = Math.max(H.clock, at)
+      if (timer && timer.at === at) {
+        H.timers = H.timers.filter((t) => t !== timer)
+        if (T.timerIds.has(timer.id)) T.do('timer', [T.timerIds.get(timer.id)], () => timer.run())
+        else timer.run()
+        await H.settle()
+      } else if (blockAt === at) {
+        T.renderBlock()
+      } else {
+        const frames = H.frames
+        H.frames = []
+        T.frameAskedAt = null
+        T.do('frame', [], () => { for (const frame of frames) frame.run(H.clock) })
+      }
+    }
+    H.clock = Math.max(H.clock, ms)
+  }
+  //? one block of the voice: the messages posted since applied, rendered, and its report handed back to the deck
+  T.renderBlock = () => {
+    if (!T.voice) T.voice = voice.newVoiceState()
+    const now = (T.block * VOICE_BLOCK) / CONTEXT_RATE
+    const was = maths.on
+    maths.on = false
+    for (const message of T.voiceQueue.splice(0)) voice.voiceCommand(T.voice, message, now, CONTEXT_RATE)
+    const outs = [new Float32Array(VOICE_BLOCK), new Float32Array(VOICE_BLOCK)]
+    voice.renderVoice(T.voice, outs, VOICE_BLOCK, CONTEXT_RATE, now)
+    const heard = voice.voiceReport(T.voice, VOICE_BLOCK, CONTEXT_RATE, now, voice.REPORTS_PER_SECOND)
+    maths.on = was
+    T.block += 1
+    //? what the deck reads of a report - its time, its limiter's counts go to Debug alone (the trace leaves them out)
+    if (heard) T.do('heard', [heard.pos, heard.rate, heard.gain], () => T.deck.onHeard(heard))
+  }
+  //? the song playing on for `ms`: its position told every 250 ms while it plays, as the element's timeupdate does
+  T.play = async (ms) => {
+    const end = H.clock + ms
+    while (H.clock < end) {
+      await T.until(Math.min(end, H.clock + 250))
+      if (T.host.isPlaying) T.position(T.host.at + 0.25 * T.speed)
+    }
+  }
+  //? Turntable's release, as runMotion does it: the seek asked for, and the play when there is no coast to wait for
+  T.release = (time, cancel = false) => {
+    const { seek, play } = T.call('release', [time, cancel])
+    if (seek !== null && T.host.songValue?.length) T.position(seek)
+    if (play && !T.host.isPlaying) T.setPlaying(true)
+  }
+  return T
+}
+
+function returnWords(value) {
+  if (value === null || value === undefined) return 'null'
+  if (typeof value === 'boolean') return String(value)
+  if (typeof value === 'number') return hex(value)
+  return `${value.seek === null ? 'null' : hex(value.seek)} ${value.play}`
+}
+
+function rulesHost(T, song, playing, at) {
+  const host = {
+    songValue: song, isPlaying: playing, at, listeners: [],
+    song: () => host.songValue,
+    playing: () => host.isPlaying,
+    position: () => host.at,
+    onPosition(listener) {
+      T.effect('listen')
+      const entry = { listener }
+      host.listeners.push(entry)
+      return () => {
+        T.effect('unlisten')
+        host.listeners = host.listeners.filter((e) => e !== entry)
+      }
+    },
+    hold() { T.effect('hold'); host.isPlaying = false },
+    resume() { T.effect('resume'); host.isPlaying = true },
+    turnFace(degrees) { T.effect(`face ${hex(degrees)}`) },
+    show(at, scrubbing) { T.effect(at === null ? 'show null' : `show ${hex(at)} ${scrubbing}`) },
+    grabbed() { T.effect('grabbed') },
+    window(asked, from, seconds) {
+      const n = T.asks.length
+      T.effect(`ask ${n} ${T.songIndex(asked)} ${hex(from)} ${hex(seconds)}`)
+      return new Promise((resolve, reject) => T.asks.push({ song: asked, from, seconds, resolve: (w) => { T.asks[n].answered = true; resolve(w) }, reject: (e) => { T.asks[n].answered = true; reject(e) } }))
+    },
+    moveTo(seconds) {
+      host.at = seconds
+      for (const entry of [...host.listeners]) entry.listener(seconds)
+    },
+  }
+  return host
+}
+
+//? THE CASES. The bench's motions, as runMotion (lab/runner.ts:50) drives them: pressed and taken at the motion's
+//? start, each sample handed over once the clock has passed its time (a page behind hands over all that came due),
+//? the release RELEASE_AFTER_MS after the last - then the seek and the play it asks for, and the song played on.
+async function motionCase(motion, hz, seed) {
+  const T = rulesCase()
+  await T.make({ at: 60 })
+  await T.answerAll()
+  await T.play(500)
+  const from = T.H.clock
+  const was = maths.on
+  maths.on = false
+  motions.MOTION_HZ = hz
+  const samples = motions.motionSamples(motion, from, seededLcg(seed))
+  motions.MOTION_HZ = 60
+  maths.on = was
+  const length = T.host.songValue.length
+  T.call('pressed', [from])
+  const anchor = T.call('takeOver', [from, false])
+  let next = 1
+  while (next < samples.length) {
+    await T.until(T.H.clock + Math.max(1, samples[next].time - T.H.clock + 0.5))
+    while (next < samples.length && samples[next].time <= T.H.clock) {
+      const sample = samples[next++]
+      T.call('hand', [sample.time, sample.turned, Math.max(0, Math.min(length || Infinity, anchor + sample.moved))])
+    }
+    await T.answerAll()
+  }
+  const lift = samples[samples.length - 1].time + 8
+  if (lift > T.H.clock) await T.until(lift + 0.5)
+  T.release(lift)
+  await T.answerAll()
+  await T.play(3000)
+  T.call('destroy')
+  return T
+}
+
+//? a hand turning the record by `turns` (seconds of the song) over `ms`, a sample every `every` ms from `from`
+async function drag(T, from, ms, seconds, anchor, every = 8) {
+  for (let t = every; t <= ms; t += every) {
+    await T.until(from + t + 0.5)
+    const moved = (seconds * t) / ms
+    T.call('hand', [from + t, (moved / tt.SECONDS_PER_TURN) * 2 * Math.PI, anchor + moved])
+  }
+}
+
+const RULE_CASES = [
+  ['tap-pause-then-play', 'a tap on a playing record (Turntable\'s click): pausing() winds it down, the song paused and sought to where it stops; a tap later, resuming() plays it from what was heard', async (T) => {
+    await T.make()
+    await T.answerAll()
+    await T.play(1000)
+    const t0 = T.H.clock
+    T.call('live')
+    T.call('pressed', [t0])
+    await T.until(t0 + 80)
+    T.release(t0 + 80)
+    const x = T.call('pausing')
+    T.setPlaying(false)
+    if (x !== null) T.position(x)
+    await T.play(700)
+    const back = T.call('resuming')
+    if (back !== null) T.position(back)
+    T.setPlaying(true)
+    await T.play(1500)
+  }],
+  ['play-during-wind-down', 'a pause wound down, and played again half way: from what was heard, the platter pulled back up', async (T) => {
+    await T.make({ at: 120 })
+    await T.answerAll()
+    await T.play(600)
+    const x = T.call('pausing')
+    T.setPlaying(false)
+    if (x !== null) T.position(x)
+    await T.play(300)
+    const back = T.call('resuming')
+    if (back !== null) T.position(back)
+    T.setPlaying(true)
+    await T.play(1200)
+  }],
+  ['wind-down-off', 'with "Pause winds the record down" off: a plain pause, sought nowhere, the platter spun down', async (T) => {
+    await T.make({ windDown: false })
+    await T.answerAll()
+    await T.play(500)
+    const x = T.call('pausing')
+    T.setPlaying(false)
+    if (x !== null) T.position(x)
+    await T.play(1500)
+  }],
+  ['hold-and-let-go', 'a press that rests HOLD_MS takes the record (grabbed), held, let go from rest: the motor back to speed, the song played and handed over', async (T) => {
+    await T.make()
+    await T.answerAll()
+    await T.play(750)
+    const t0 = T.H.clock
+    T.call('pressed', [t0])
+    await T.until(t0 + 600)
+    T.call('taken')
+    T.call('anchor')
+    T.release(t0 + 600)
+    await T.answerAll()
+    await T.play(3500)
+  }],
+  ['quick-grab-flick-back', 'a quick grab (the slop crossed, touched samples before it), a flick back, let go: the plan back to speed from the hand\'s speed', async (T) => {
+    await T.make({ at: 90 })
+    await T.answerAll()
+    await T.play(1000)
+    const t0 = T.H.clock
+    T.call('pressed', [t0])
+    await T.until(t0 + 8)
+    T.call('touched', [t0 + 8, -0.004, -0.0011])
+    await T.until(t0 + 16)
+    T.call('touched', [t0 + 16, -0.009, -0.0024])
+    await T.until(t0 + 24)
+    const anchor = T.call('takeOver', [t0 + 24, true])
+    await drag(T, t0 + 24, 100, -0.6, anchor, 8)
+    T.release(T.H.clock + 4)
+    await T.answerAll()
+    await T.play(3500)
+  }],
+  ['paused-coast', 'a paused record flicked forward: a coast to a stop under friction, the song sought to where it stops and left paused', async (T) => {
+    await T.make({ playing: false, at: 100 })
+    await T.answerAll()
+    await T.play(300)
+    const t0 = T.H.clock
+    T.call('live')
+    T.call('pressed', [t0])
+    await T.until(t0 + 10)
+    const anchor = T.call('takeOver', [t0 + 10, true])
+    await drag(T, t0 + 10, 150, 0.9, anchor, 10)
+    T.release(T.H.clock + 2)
+    await T.answerAll()
+    await T.play(2500)
+  }],
+  ['backwards-coast-past-the-window', 'a paused record flicked hard backwards: the coast runs out of its window, the next asked at the release and sounded as it lands', async (T) => {
+    await T.make({ playing: false, at: 64 })
+    await T.answerAll()
+    await T.play(300)
+    const t0 = T.H.clock
+    T.call('pressed', [t0])
+    await T.until(t0 + 10)
+    const anchor = T.call('takeOver', [t0 + 10, true])
+    await drag(T, t0 + 10, 120, -2.5, anchor, 10)
+    T.release(T.H.clock + 3)
+    await T.play(400)
+    await T.answerAll()
+    await T.play(2500)
+  }],
+  ['cancel', 'a held record whose touch the system cancels: the voice stopped, the song it paused played on, nothing sought', async (T) => {
+    await T.make()
+    await T.answerAll()
+    await T.play(500)
+    const t0 = T.H.clock
+    T.call('pressed', [t0])
+    await T.until(t0 + 400)
+    await drag(T, t0 + 400, 80, 0.2, T.call('anchor'), 8)
+    T.release(T.H.clock + 1, true)
+    await T.play(1500)
+  }],
+  ['play-during-coast', 'a coast of a paused record, and the transport\'s play half way: its sound stops, the platter pulled up from where it is', async (T) => {
+    await T.make({ playing: false, at: 200 })
+    await T.answerAll()
+    const t0 = T.H.clock
+    T.call('pressed', [t0])
+    await T.until(t0 + 10)
+    const anchor = T.call('takeOver', [t0 + 10, true])
+    await drag(T, t0 + 10, 100, 1.2, anchor, 10)
+    T.release(T.H.clock + 1)
+    await T.play(250)
+    const back = T.call('resuming')
+    if (back !== null) T.position(back)
+    T.setPlaying(true)
+    await T.play(1500)
+  }],
+  ['arm-mid-coast', 'the arm taken during a coast, then the song sought elsewhere by it: quiet for the rest, its end still comes', async (T) => {
+    await T.make({ playing: false, at: 150 })
+    await T.answerAll()
+    const t0 = T.H.clock
+    T.call('pressed', [t0])
+    await T.until(t0 + 10)
+    const anchor = T.call('takeOver', [t0 + 10, true])
+    await drag(T, t0 + 10, 100, 1.5, anchor, 10)
+    T.release(T.H.clock + 1)
+    await T.play(200)
+    T.call('armTaken')
+    await T.until(T.H.clock + 50)
+    T.position(300)
+    await T.answerAll()
+    await T.play(2500)
+  }],
+  ['handover-sought-elsewhere', 'a let-go of a playing record, and the song sought far away as the handover waits: the record\'s sound fades', async (T) => {
+    await T.make()
+    await T.answerAll()
+    await T.play(500)
+    const t0 = T.H.clock
+    T.call('pressed', [t0])
+    await T.until(t0 + 300)
+    await drag(T, t0 + 300, 60, 0.3, T.call('anchor'), 6)
+    T.release(T.H.clock + 1)
+    await T.play(1200)
+    T.position(30)
+    await T.answerAll()
+    await T.play(1500)
+  }],
+  ['song-change-mid-hold', 'the song changed (Next) under a hand that took it from playing: everything of it dropped, the next played after SONG_CHANGE_SETTLE_MS', async (T) => {
+    await T.make()
+    await T.answerAll()
+    await T.play(500)
+    const t0 = T.H.clock
+    T.call('pressed', [t0])
+    await T.until(t0 + 300)
+    T.setSong({ id: 'next', length: 300, flac: true, kind: 'FLAC' }, false)
+    T.host.at = 0
+    T.call('songChanged', [T.songIndex(T.host.songValue)])
+    await T.play(600)
+    await T.answerAll()
+    await T.play(1000)
+  }],
+  ['song-change-mid-coast-back', 'Next during a run back to speed: dropped, and the next song played as the hand meant', async (T) => {
+    await T.make()
+    await T.answerAll()
+    await T.play(300)
+    const t0 = T.H.clock
+    T.call('pressed', [t0])
+    await T.until(t0 + 10)
+    const anchor = T.call('takeOver', [t0 + 10, true])
+    await drag(T, t0 + 10, 60, -0.5, anchor, 6)
+    T.release(T.H.clock + 1)
+    await T.play(200)
+    T.setSong({ id: 'next', length: 300, flac: true, kind: 'FLAC' }, false)
+    T.host.at = 0
+    T.call('songChanged', [T.songIndex(T.host.songValue)])
+    await T.play(800)
+    await T.answerAll()
+    await T.play(800)
+  }],
+  ['not-flac', 'an MP3: never asked for, refused in its own words, and a press is not the deck\'s', async (T) => {
+    await T.make({ song: { id: 'mp3', length: 200, flac: false, kind: 'MP3' } })
+    await T.play(500)
+    T.call('live')
+    await T.play(500)
+  }],
+  ['refused-415', 'deadwax refuses the window (415): the song refused for good, never asked again', async (T) => {
+    await T.make()
+    await T.refuse(0, 415, 'it is an MP4 deadwax can\'t cut')
+    T.call('live')
+    await T.play(2000)
+    T.position(200)
+    await T.play(500)
+  }],
+  ['past-the-end-416-then-retry', 'a 416, then a network failure: each retried only after RETRY_MS (under Reduce Motion, so its 21 s draw no frames)', async (T) => {
+    await T.make({ at: 30, reduced: true })
+    await T.refuse(0, 416, 'past the end')
+    await T.play(10500)
+    if (T.asks.length > 1) await T.refuse(T.asks.length - 1, 0, 'the network went away')
+    await T.play(10500)
+    await T.answerAll()
+    T.call('live')
+    await T.play(500)
+  }],
+  ['reduced-motion', 'Reduce Motion: no frames, and a let-go of a playing record plays the song in the gesture, the voice stopped', async (T) => {
+    await T.make({ reduced: true })
+    await T.answerAll()
+    await T.play(500)
+    const t0 = T.H.clock
+    T.call('pressed', [t0])
+    await T.until(t0 + 300)
+    await drag(T, t0 + 300, 60, 0.4, T.call('anchor'), 6)
+    T.release(T.H.clock + 1)
+    await T.play(800)
+    T.call('reduced', [false])
+    await T.play(500)
+    const x = T.call('pausing')
+    T.setPlaying(false)
+    if (x !== null) T.position(x)
+    await T.play(1500)
+  }],
+  ['silent-press-then-wake', 'a press before any sound (no context yet): held still, let go, turning on - then a gesture wakes the sound and the window it wanted is asked for', async (T) => {
+    await T.make({ playing: false, at: 30, wake: false })
+    T.call('live')
+    T.call('holdStill', [true])
+    await T.play(300)
+    T.call('holdStill', [false])
+    await T.wake()
+    await T.answerAll()
+    T.call('live')
+    await T.play(500)
+  }],
+  ['held-still-over-a-coast', 'a press the deck can\'t take over a coast it could not catch (hidden meanwhile): held still, the coast ended there', async (T) => {
+    await T.make({ playing: false, at: 80 })
+    await T.answerAll()
+    const t0 = T.H.clock
+    T.call('pressed', [t0])
+    await T.until(t0 + 10)
+    const anchor = T.call('takeOver', [t0 + 10, true])
+    await drag(T, t0 + 10, 100, 1.0, anchor, 10)
+    T.release(T.H.clock + 1)
+    await T.play(150)
+    T.call('setShowing', [false])
+    await T.play(100)
+    T.call('setShowing', [true])
+    T.call('live')
+    T.call('holdStill', [true])
+    await T.play(300)
+    T.call('holdStill', [false])
+    await T.play(1000)
+  }],
+  ['hidden-mid-coast-back', 'the turntable hidden during a run back to speed: its end still plays the song, and shown again it turns', async (T) => {
+    await T.make()
+    await T.answerAll()
+    await T.play(300)
+    const t0 = T.H.clock
+    T.call('pressed', [t0])
+    await T.until(t0 + 10)
+    const anchor = T.call('takeOver', [t0 + 10, true])
+    await drag(T, t0 + 10, 80, 0.8, anchor, 8)
+    T.release(T.H.clock + 1)
+    await T.play(100)
+    T.call('setShowing', [false])
+    await T.play(2500)
+    T.call('setShowing', [true])
+    await T.answerAll()
+    await T.play(1000)
+  }],
+  ['speed-changes', 'the player\'s speed changed while turning, during a spin-up, and a let-go at 2x: the motor heads for the new speed', async (T) => {
+    await T.make({ playing: false, at: 50 })
+    await T.answerAll()
+    T.setPlaying(true)
+    await T.play(150)
+    T.speedTo(1.5)
+    await T.play(600)
+    T.speedTo(2)
+    await T.play(500)
+    const t0 = T.H.clock
+    T.call('pressed', [t0])
+    await T.until(t0 + 10)
+    const anchor = T.call('takeOver', [t0 + 10, true])
+    await drag(T, t0 + 10, 80, -0.3, anchor, 8)
+    T.release(T.H.clock + 1)
+    await T.answerAll()
+    await T.play(2500)
+    T.speedTo(0.5)
+    await T.play(500)
+  }],
+  ['pause-from-elsewhere', 'paused by the lock screen, not the turntable: the platter spins down after PAUSE_SETTLE_MS; a pause shorter than that (a song change\'s) doesn\'t', async (T) => {
+    await T.make()
+    await T.answerAll()
+    await T.play(500)
+    T.setPlaying(false)
+    await T.play(100)
+    T.setPlaying(true)
+    await T.play(500)
+    T.setPlaying(false)
+    await T.play(1800)
+    T.setPlaying(true)
+    await T.play(800)
+  }],
+  ['mono-short-window', 'a mono window cut short by deadwax\'s budget (a hi-res song): the margins shrink, the next window asked sooner', async (T) => {
+    await T.make({ song: { id: 'hires', length: 300, flac: true, kind: 'FLAC' }, at: 20 })
+    await T.answer(0, { seconds: 12, channels: 1 })
+    await T.play(9000)
+    await T.answerAll()
+    await T.play(1000)
+  }],
+  ['tap-while-coasting', 'a press on a coasting record that stays a tap: the click resumes from what was heard', async (T) => {
+    await T.make({ playing: false, at: 220 })
+    await T.answerAll()
+    const t0 = T.H.clock
+    T.call('pressed', [t0])
+    await T.until(t0 + 10)
+    const anchor = T.call('takeOver', [t0 + 10, true])
+    await drag(T, t0 + 10, 100, 1.4, anchor, 10)
+    T.release(T.H.clock + 1)
+    await T.play(200)
+    const t1 = T.H.clock
+    T.call('live')
+    T.call('pressed', [t1])
+    await T.until(t1 + 60)
+    T.release(t1 + 60)
+    const back = T.call('resuming')
+    if (back !== null) T.position(back)
+    T.setPlaying(true)
+    await T.play(1500)
+  }],
+  //? three edges the cases above never reach, found by the Swift port's mutation checks: a margin at a speed under
+  //? 1x, a report at the gain that counts, a lift exactly RELEASE_TAIL_MS after the last sample
+  ['slow-short-window', 'at 0.5x, a window cut short (4 s): the next is asked its margin ahead in the song\'s own seconds - never less below 1x (under Reduce Motion: no frames)', async (T) => {
+    await T.make({ song: { id: 'hires', length: 300, flac: true, kind: 'FLAC' }, at: 20, speed: 0.5, reduced: true })
+    await T.answer(0, { seconds: 8 })
+    await T.play(8000)
+    await T.answerAll()
+    await T.play(500)
+  }],
+  ['silent-coast-sounds-on-arrival', 'a hand that leaves its window, let go: the coast starts silent, and sounds from where it has got to as the next window lands', async (T) => {
+    await T.make({ playing: false, at: 62 })
+    await T.answerAll()
+    const t0 = T.H.clock
+    T.call('pressed', [t0])
+    await T.until(t0 + 10)
+    const anchor = T.call('takeOver', [t0 + 10, true])
+    await drag(T, t0 + 10, 120, -6, anchor, 10)
+    T.release(T.H.clock + 1)
+    await T.play(150)
+    await T.answerAll()
+    await T.play(2500)
+  }],
+  ['handover-judged-closely', 'the song heard 0.015 s past where the handover waits, then 0.025 s: the record\'s sound fades at the second', async (T) => {
+    await T.make()
+    await T.answerAll()
+    await T.play(400)
+    const t0 = T.H.clock
+    T.call('pressed', [t0])
+    await T.until(t0 + 300)
+    await drag(T, t0 + 300, 60, 0.3, T.call('anchor'), 6)
+    T.release(T.H.clock + 1)
+    const x = T.host.at
+    while (!T.host.isPlaying) await T.until(T.H.clock + 16)
+    T.position(x + 0.015)
+    await T.until(T.H.clock + 16)
+    T.position(x + 0.025)
+    await T.play(600)
+  }],
+  ['heard-at-half-gain', 'what the voice says, fresh, just under the gain that counts and at it (0.45, 0.5), each a moment before a frame: only the second is shown', async (T) => {
+    await T.make()
+    await T.answerAll()
+    await T.play(300)
+    const t0 = T.H.clock
+    T.call('pressed', [t0])
+    await T.until(t0 + 300)
+    for (const gain of [0.45, 0.5]) {
+      const frameAt = T.frameBase + (Math.floor((T.H.clock - T.frameBase) / FRAME_MS) + 2) * FRAME_MS
+      await T.until(frameAt - 1)
+      const heard = { time: 0, pos: 61.25, rate: 0.5, gain, held: 0, peaks: 0, lowest: 0 }
+      T.do('heard', [heard.pos, heard.rate, heard.gain], () => T.deck.onHeard(heard))
+      await T.until(frameAt)
+    }
+    T.release(T.H.clock + 1)
+    await T.play(500)
+  }],
+  ['release-at-the-tail', 'a let-go exactly RELEASE_TAIL_MS after the last sample: the plan still from that sample', async (T) => {
+    await T.make({ playing: false, at: 140 })
+    await T.answerAll()
+    const t0 = T.H.clock
+    T.call('pressed', [t0])
+    await T.until(t0 + 10)
+    const anchor = T.call('takeOver', [t0 + 10, true])
+    await drag(T, t0 + 10, 80, 0.7, anchor, 8)
+    const last = t0 + 10 + 80
+    await T.until(last + 40)
+    T.release(last + 40)
+    await T.play(2000)
+  }],
+]
+
+/* ===== press/: Turntable.tsx's handlers, hashed ===== */
+
+//? TurntablePress.swift ports these; their traces through a mounted Turntable are not written yet (a departure, in
+//? the spec's 7.0) - so each handler's text is hashed here, and a change to any of them fails iosdeck.sim until the
+//? port is looked at again
+function pressFixture() {
+  const pieces = [
+    piece('player/Turntable.tsx', /\/\/\? \(2\.0\.7\) the silent record's line[\s\S]*?useEffect\(\(\) => \(\) => onSilent\?\.\(null\), \[\]\)/, 'the silent line (:286-290)'),
+    piece('player/Turntable.tsx', /const pressable = [\s\S]*?const onArmKey = [\s\S]*?\n  }\n/, 'pressable, onRecordDown, onArmDown, onMove, onRelease, onRecordClick, onArmKey (:301-422)'),
+    piece('player/Turntable.tsx', /grabbed: \(\) => \{[\s\S]*?\n      },\n/, 'the host\'s grabbed (:237)'),
+    piece('player/NowPlaying.tsx', /const onToggle = \(\) => \{[\s\S]*?\n  }\n/, 'the turntable\'s toggle (:282)'),
+  ]
+  return {
+    about: 'The handlers TurntablePress.swift ports, each read out of the web\'s source and hashed: a change to one fails ui/test/iosdeck.sim.cjs until the port follows and this is written again. (Their traces through a mounted Turntable are still to come - the spec\'s 7.0.)',
+    made_by: MADE_BY,
+    made_from: Object.fromEntries(pieces.map((p) => p.from)),
+  }
+}
+
+function encodeInputs(inputs) {
+  const bytes = []
+  const scratch8 = Buffer.alloc(8)
+  for (const { op, t, args } of inputs) {
+    bytes.push(op)
+    for (const value of [t, ...args]) {
+      scratch8.writeDoubleLE(value)
+      for (const byte of scratch8) bytes.push(byte)
+    }
+  }
+  return Buffer.from(bytes).toString('base64')
+}
+
+function effectsOut(effects) {
+  const spans = []
+  for (let i = 0; i < effects.length; i += EFFECT_SPAN) {
+    const state = [...FNV_START]
+    for (const words of effects.slice(i, i + EFFECT_SPAN)) fnvBytes(state, Buffer.from(words + '\n', 'utf8'))
+    spans.push(fnvHex(state))
+  }
+  return { count: effects.length, spans, whole: effects.length <= EFFECTS_WHOLE ? effects : null }
+}
+
+async function rulesFixtures() {
+  const made = []
+  const finish = (name, about, T) => {
+    T.on = false
+    made.push([`rules/${name}.json`, {
+      about,
+      made_by: MADE_BY,
+      made_from: Object.fromEntries([whole('player/deck.ts'), whole('lib/platter.ts'), whole('lib/deckVoice.ts'), whole('lab/motions.ts')]),
+      name,
+      songs: T.songs.map((song) => [song.id, d(song.length), song.flac, song.kind]),
+      words: T.words,
+      inputs: { count: T.inputs.length, bytes: encodeInputs(T.inputs) },
+      stamps: f64s(T.stamps),
+      effects: effectsOut(T.effects),
+    }, 2])
+  }
+  //? all eight at 60 Hz; at 120 Hz the five whose shapes differ - the steady 0.5x, 0.25x and 2x are steady1's at
+  //? another speed, and the folder's 3 MB had no room for them twice (the spec's 7.0 budget; a departure, written there)
+  for (const hz of [60, 120]) {
+    for (const [i, motion] of motions.MOTIONS.entries()) {
+      if (hz === 120 && ['half', 'quarter', 'double'].includes(motion.id)) continue
+      const T = await motionCase(motion, hz, 900 + i + hz)
+      finish(`motion-${motion.id}-${hz}`, `the bench's "${motion.label}" (lab/motions.ts) at ${hz} Hz with seeded jitter, driven as lab/runner.ts runMotion drives it: taken at its start, let go ${8} ms after its last sample, the seek and play its release asks for, the song played on 3 s`, T)
+    }
+  }
+  for (const [name, about, run] of RULE_CASES) {
+    const T = rulesCase()
+    await run(T)
+    if (T.deck && !T.destroyed) T.call('destroy')
+    finish(name, about, T)
+  }
+  return made
+}
+
 /* ===== the run ===== */
 
 async function main() {
@@ -834,6 +1702,8 @@ async function main() {
   emit('turntable.json', turntableFixture(), 3)
   emit('words.json', wordsFixture(), 3)
   for (const [name, value, depth] of voiceFixtures(syntheticVoiceCases())) emit(name, value, depth)
+  for (const [name, value, depth] of await rulesFixtures()) emit(name, value, depth)
+  emit('press/handlers.json', pressFixture(), 2)
   maths.on = false
   emit('maths.json', mathsFixture(), 2)
 

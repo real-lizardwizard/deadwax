@@ -59,6 +59,15 @@ public struct VoiceHeard: Equatable, Sendable {
     public var held: Double
     public var peaks: Double
     public var lowest: Double
+    public init(pos: Double, rate: Double, gain: Double, time: Double, held: Double, peaks: Double, lowest: Double) {
+        self.pos = pos
+        self.rate = rate
+        self.gain = gain
+        self.time = time
+        self.held = held
+        self.peaks = peaks
+        self.lowest = lowest
+    }
 }
 
 /// The voice's state (deckVoice.ts:124) - every field the web's, its typed arrays as buffers made in

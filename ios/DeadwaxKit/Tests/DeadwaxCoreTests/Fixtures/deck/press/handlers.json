@@ -1,0 +1,10 @@
+{
+  "about": "The handlers TurntablePress.swift ports, each read out of the web's source and hashed: a change to one fails ui/test/iosdeck.sim.cjs until the port follows and this is written again. (Their traces through a mounted Turntable are still to come - the spec's 7.0.)",
+  "made_by": "ios/scripts/export-deck-vectors.cjs - never edit by hand: change the TypeScript and run it again",
+  "made_from": {
+    "ui/src/player/Turntable.tsx the silent line (:286-290)": "2dda97a2a53c0f724b1d68fbbd0d26e830ba54375059293fa0ad63baaab41db0",
+    "ui/src/player/Turntable.tsx pressable, onRecordDown, onArmDown, onMove, onRelease, onRecordClick, onArmKey (:301-422)": "15e2d6708683d022d2c8d7bc53b1da3be1cbaeee466115e38e34d5fdf05d15fb",
+    "ui/src/player/Turntable.tsx the host's grabbed (:237)": "e433931e708525d79b7542d72e65b9711e7ca69be00968e0d2ba5de14b2e6941",
+    "ui/src/player/NowPlaying.tsx the turntable's toggle (:282)": "64f00a4f057a47be137fe281b2d206f96f6061f826341e7d0db494f742a077bb"
+  }
+}
