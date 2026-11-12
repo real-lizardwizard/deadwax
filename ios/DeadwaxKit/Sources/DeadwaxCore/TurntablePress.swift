@@ -3,10 +3,10 @@
 // silent line's rule (:288-290) - and NowPlaying.tsx's turntable toggle (:282), ported as a state machine over the
 // deck (`PressDeck`, which DeckRules is) and the player (`PressHost`). The touch views only turn touches into its
 // calls: `recordDown`, `armDown`, `moved` (every coalesced sample, as PointerSamples has them), `ended` (.up or
-// .cancel) and `armKey`. UIKit has no click after a lift, so a record's `ended(.up)` runs the click's rule
-// (onRecordClick) after the release's own work, in the same call - the order the web's events come in.
-// The handlers' source is hashed into Fixtures/deck/press/handlers.json, so a change to any of them fails
-// iosdeck.sim until this follows.
+// .cancel) and `armKey`. UIKit has no click after a lift, so the lift of a touch that came down on the record runs the
+// click's rule (onRecordClick) after the release's own work, in the same call - the order the web's events come in.
+// Held to the web by Fixtures/deck/press/*.json (the real Turntable mounted and driven, every call its handlers make);
+// the handlers' source is hashed there too, so a change to any of them fails iosdeck.sim until this follows.
 
 /// What a press asks of the player and the screen.
 public protocol PressHost: AnyObject {
@@ -72,6 +72,12 @@ public final class TurntablePress<M: DeckMaths> {
     public private(set) var turnedSilent: String?
     /// told each time the drag changes (setDrag)
     public var dragChanged: ((TurntableDrag?) -> Void)?
+    /// The touch the turntable follows: the web's primary pointer (`pressable`'s isPrimary, :301) - the first finger
+    /// down on the record or the arm, until it lifts or is cancelled. A second finger meanwhile (on the arm while the
+    /// record is held, or the other way round) is no primary pointer on the web and starts nothing; the phone's views
+    /// each follow a touch of their own, so the rule is kept here. `onRecord`: it came down on the record, whose lift
+    /// the click follows - the drag gone under it (the song changed) or not, as a browser's click still comes.
+    var following: (pointer: Int, onRecord: Bool)?
 
     public init(deck: PressDeck, host: PressHost, maths: M) {
         self.deck = deck
@@ -108,6 +114,8 @@ public final class TurntablePress<M: DeckMaths> {
 
     /// onRecordDown (:303): a finger on the record - the deck's press when it can sound there, .11's otherwise.
     public func recordDown(pointer: Int, x: Double, y: Double, time: Double?) {
+        if let following, following.pointer != pointer { return }
+        following = (pointer, true)
         turned = false
         let box = host.box()
         pressBox = box
@@ -118,6 +126,9 @@ public final class TurntablePress<M: DeckMaths> {
 
     /// onArmDown (:316)
     public func armDown(pointer: Int, x: Double, y: Double) {
+        if let following, following.pointer != pointer { return }
+        //? a press on an arm with no length is still the primary pointer, which a second finger isn't
+        following = (pointer, false)
         if !(host.length() > 0) { return }
         pressBox = host.box()
         deck.armTaken()
@@ -160,12 +171,13 @@ public final class TurntablePress<M: DeckMaths> {
         setDrag(next)
     }
 
-    /// onRelease (:363), and for the record's lift the click's rule after it (onRecordClick, :401).
+    /// onRelease (:363), and for the lift of a touch that came down on the record the click's rule after it
+    /// (onRecordClick, :401) - a cancel has none, nor has a second finger, which a browser sends no click for.
     public func ended(pointer: Int, how: DeckLetGo, time: Double?) {
-        let now = drag
-        let onRecord = now?.kind == .record && now?.pointer == pointer
+        let followed = following?.pointer == pointer ? following : nil
+        if followed != nil { following = nil }
         released(pointer: pointer, how: how, time: time)
-        if how == .up && onRecord { recordClick() }
+        if how == .up && followed?.onRecord == true { recordClick() }
     }
 
     func released(pointer: Int, how: DeckLetGo, time: Double?) {

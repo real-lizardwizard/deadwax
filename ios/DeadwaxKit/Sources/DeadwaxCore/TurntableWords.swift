@@ -1,3 +1,5 @@
+import Foundation
+
 /// Every word the turntable and the fader say (notes/ios-specs/turntable.md 2.9), and Debug's turntable rows - the
 /// web's, moved into Core and held to what the web's own functions make (Fixtures/deck/words.json, TurntableWordsTests).
 /// Where the web names the browser the phone says "phone"; where the phone has something the web hasn't, the words are

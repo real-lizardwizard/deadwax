@@ -58,7 +58,7 @@ const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-deck-vectors-'))
 
 const SOURCES = [
   'src/lib/platter.ts', 'src/lib/deckVoice.ts', 'src/player/deck.ts', 'src/lib/turntable.ts', 'src/lib/playSpeed.ts',
-  'src/lib/deckClock.ts', 'src/lib/debugRows.ts', 'src/player/Turntable.tsx', 'src/lab/motions.ts',
+  'src/lib/deckClock.ts', 'src/lib/debugRows.ts', 'src/player/Turntable.tsx', 'src/player/NowPlaying.tsx', 'src/lab/motions.ts',
 ]
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
   ...SOURCES,
@@ -94,6 +94,8 @@ patch('player/deck.js', 'onAudio = () => {', 'onAudio = () => { globalThis.__dec
 patch('player/deck.js', 'sleepDeckAudio();', 'globalThis.__deckTrace?.effect("sleep"); sleepDeckAudio();', 'setShowing\'s sleep')
 patch('player/deck.js', 'closeDeckAudio();', 'globalThis.__deckTrace?.effect("close"); closeDeckAudio();', 'destroy\'s close')
 patch('player/deck.js', 'function voiceReady() {', 'globalThis.__deckAudio = () => audio;\nfunction voiceReady() {', 'the audio, read')
+//? the turntable's render, told what it drew - the press traces' (press/, below), and nothing else changed
+patch('player/Turntable.js', 'const needle = (0, turntable_1.needleAt)(shown, length);', 'globalThis.__press?.rendered({ shown, handTurn, noAudio, position, length, track, flac: !!windows.current || (player.track ? (0, streamWrap_1.isFlac)(player.track) : false) });\n    const needle = (0, turntable_1.needleAt)(shown, length);', 'the render\'s values')
 
 /* ===== a Math that records ===== */
 
@@ -130,15 +132,62 @@ const fnvHex = (state) => state[0].toString(16).padStart(8, '0') + state[1].toSt
 const callBytes = new Uint8Array(17)
 const callView = new DataView(callBytes.buffer)
 
+/** A double from its bits, 16 hex digits. */
+function fromHex(bits) {
+  scratch.setUint32(0, parseInt(bits.slice(0, 8), 16))
+  scratch.setUint32(4, parseInt(bits.slice(8), 16))
+  return scratch.getFloat64(0)
+}
+
+//? The answers the committed fixtures were made with (maths.json), answered again to the same calls whichever Node
+//? runs this: V8's Math is not the same in every version (sin and cos took glibc's code in 2023, behind a build
+//? flag), and the fixtures are one V8's answers held together - the traces and the table the Swift replays them with.
+//? Node's own answer is still worked out, and any that differs is counted (`drift`) and told. A call the table
+//? doesn't hold - a new one, or one made while recording is off (the bench's motions, the harness's tone, the deck's
+//? frames between a press trace's inputs: about 32,000, too many to keep) - is Node's, so a Node whose Math differs
+//? still remakes those files otherwise, and --check fails naming the Math as why (the spec's 7.0).
+const KEPT = keptAnswers()
+const drift = Object.fromEntries(RECORDED.map((name) => [name, new Set()]))
+function keptAnswers() {
+  const kept = Object.fromEntries(RECORDED.map((name) => [name, new Map()]))
+  const at = path.join(FIXTURES, 'maths.json')
+  if (!fs.existsSync(at)) return kept
+  let table
+  try {
+    table = JSON.parse(fs.readFileSync(at, 'utf8')).table
+  } catch {
+    return kept
+  }
+  for (const name of RECORDED) {
+    const one = table && table[name]
+    if (!one) continue
+    const bytes = Buffer.from(one.bits, 'base64')
+    const words = ARITY[name] + 1
+    if (bytes.length !== one.calls * words * 8) continue
+    for (let i = 0; i < one.calls; i++) {
+      const bits = []
+      for (let j = 0; j < words; j++) bits.push(bytes.readBigUInt64LE((i * words + j) * 8).toString(16).padStart(16, '0'))
+      kept[name].set(bits.slice(0, -1).join(''), bits[words - 1])
+    }
+  }
+  return kept
+}
+
 for (const name of RECORDED) {
   const real = REAL[name]
   const index = RECORDED.indexOf(name)
+  const kept = KEPT[name]
   Math[name] = function recorded(...args) {
-    const answer = real.apply(Math, args)
+    let answer = real.apply(Math, args)
+    const inputs = args.slice(0, ARITY[name])
+    while (inputs.length < ARITY[name]) inputs.push(undefined)
+    const key = inputs.map((x) => hex(Number(x))).join('')
+    const was = kept.get(key)
+    if (was !== undefined && was !== hex(answer)) {
+      drift[name].add(key)
+      answer = fromHex(was)
+    }
     if (maths.on) {
-      const inputs = args.slice(0, ARITY[name])
-      while (inputs.length < ARITY[name]) inputs.push(undefined)
-      const key = inputs.map((x) => hex(Number(x))).join('')
       const table = maths.table[name]
       const had = table.get(key)
       if (had === undefined) table.set(key, hex(answer))
@@ -1617,23 +1666,588 @@ const RULE_CASES = [
   }],
 ]
 
-/* ===== press/: Turntable.tsx's handlers, hashed ===== */
+/* ===== press/: Turntable.tsx's handlers, through the real Turntable ===== */
 
-//? TurntablePress.swift ports these; their traces through a mounted Turntable are not written yet (a departure, in
-//? the spec's 7.0) - so each handler's text is hashed here, and a change to any of them fails iosdeck.sim until the
-//? port is looked at again
-function pressFixture() {
-  const pieces = [
+//? The real Turntable (player/Turntable.tsx) mounted as ui/test/turntable.sim.cjs mounts it (its `mount`, :180: JSX as
+//? plain objects, Preact's hooks as a cursor, a document whose stage is drawn 1:1) over the rules' harness - its clock,
+//? timers, frames, audio context and window route - and a fake player, driven by what a browser sends it: pointer
+//? events (a down; a move with its coalesced samples; on the record an up, then lostpointercapture, then the click; a
+//? cancel), the arm's keys, and Now Playing's transport (NowPlaying.tsx, mounted the same way, its deck the
+//? turntable's). TurntablePress.swift ports the handlers, so the trace is what they do, in order:
+//?
+//?   ["world", {...}]   what the handlers read, before an input - only what changed: the player's playing, the render's
+//?                      length, track, drawnAt and shown, the clock (now), flac and noAudio (the silent line's), and the
+//?                      deck's live(), taken() and anchor()
+//?   an input           ["down", pointer, x, y, time] ["armDown", pointer, x, y] ["move", pointer, coalesced | null,
+//?                      event] ["up", pointer, time] ["cancel", pointer, time] ["key", key] ["nowPlaying"] ["song", id]
+//?                      ["grabbed"] (the deck's, between inputs: a press taken by resting)
+//?   an effect          a call a handler makes: to the deck (pressed, holdStill, touched, takeOver, hand, release,
+//?                      pausing, resuming, armTaken), to the player (seek, toggle) or wakeDeckAudio (wake) - its
+//?                      arguments, then "->" and what it returned; each followed by ["after", {...}] when the player's
+//?                      playing or the deck's live, taken or anchor moved under it
+//?   ["turn", deg]      the record's turn as the render draws it (handTurn, Turntable.tsx:426), when it changes
+//?   ["silent", words]  the silent line Now Playing is told (:288-290), when it changes
+//?
+//? A call the deck makes to the player inside another (its own hold and resume) is in "after" alone: DeckRules makes
+//? it, not TurntablePress, and the rules traces hold it.
+const PRESS_BOX = { left: 0, top: 0, width: 372, height: 368 }
+const PRESS_CALLS = new Set(['pressed', 'holdStill', 'touched', 'takeOver', 'hand', 'release', 'pausing', 'resuming', 'armTaken'])
+const PRESS_QUIET = ['live', 'taken', 'anchor', 'setShowing', 'playingChanged', 'setWindDown', 'speedChanged', 'songChanged', 'destroy']
+const PRESS_FLAC = { id: 'time', title: 'Time', artist: 'Pink Floyd', album: 'The Dark Side of the Moon', albumId: 'dsotm', coverArt: 'cover-dsotm', suffix: 'flac', contentType: 'audio/flac', duration: 425 }
+const PRESS_MP3 = { id: 'money', title: 'Money', artist: 'Pink Floyd', album: 'The Dark Side of the Moon', albumId: 'dsotm', coverArt: 'cover-dsotm', suffix: 'mp3', contentType: 'audio/mpeg', duration: 382 }
+const PRESS_NEXT = { id: 'us-and-them', title: 'Us and Them', artist: 'Pink Floyd', album: 'The Dark Side of the Moon', albumId: 'dsotm', coverArt: 'cover-dsotm', suffix: 'flac', contentType: 'audio/flac', duration: 462 }
+
+/** The handlers' source, piece by piece (press/handlers.json, and each trace's made_from). */
+function handlerPieces() {
+  return [
     piece('player/Turntable.tsx', /\/\/\? \(2\.0\.7\) the silent record's line[\s\S]*?useEffect\(\(\) => \(\) => onSilent\?\.\(null\), \[\]\)/, 'the silent line (:286-290)'),
     piece('player/Turntable.tsx', /const pressable = [\s\S]*?const onArmKey = [\s\S]*?\n  }\n/, 'pressable, onRecordDown, onArmDown, onMove, onRelease, onRecordClick, onArmKey (:301-422)'),
     piece('player/Turntable.tsx', /grabbed: \(\) => \{[\s\S]*?\n      },\n/, 'the host\'s grabbed (:237)'),
+    piece('player/Turntable.tsx', /const handTurn = [^\n]*\n/, 'the record\'s turn as drawn (:426)'),
     piece('player/NowPlaying.tsx', /const onToggle = \(\) => \{[\s\S]*?\n  }\n/, 'the turntable\'s toggle (:282)'),
   ]
+}
+
+function pressFixture() {
   return {
-    about: 'The handlers TurntablePress.swift ports, each read out of the web\'s source and hashed: a change to one fails ui/test/iosdeck.sim.cjs until the port follows and this is written again. (Their traces through a mounted Turntable are still to come - the spec\'s 7.0.)',
+    about: 'The handlers TurntablePress.swift ports, each read out of the web\'s source and hashed: a change to one fails ui/test/iosdeck.sim.cjs until the port follows and this is written again - even where the traces beside it (press/*.json, the Turntable mounted and driven) don\'t move.',
     made_by: MADE_BY,
-    made_from: Object.fromEntries(pieces.map((p) => p.from)),
+    made_from: Object.fromEntries(handlerPieces().map((p) => p.from)),
   }
+}
+
+let pressStage = null
+function pressWorld() {
+  if (pressStage) return pressStage
+  const T = rulesWorld()
+  const H = T.H
+  //? turntable.sim's stand-ins (:69-101): Preact as plain objects and a hook cursor, no covers or glyphs, and the
+  //? position hook reading the player's position
+  const stubs = {
+    'node_modules/preact/jsx-runtime.js': 'exports.jsx = exports.jsxs = (type, props, key) => ({ type, props: props || {}, key })\nexports.Fragment = \'fragment\'\n',
+    'node_modules/preact/hooks.js': [
+      'let current = null',
+      'function slot(init) { const i = current.cursor++; if (!(i in current.slots)) current.slots[i] = init(); return current.slots[i] }',
+      'const changed = (a, b) => !a || !b || a.length !== b.length || a.some((v, i) => !Object.is(v, b[i]))',
+      'exports.useState = (v) => { const s = slot(() => ({ v: typeof v === \'function\' ? v() : v })); return [s.v, (x) => { s.v = typeof x === \'function\' ? x(s.v) : x }] }',
+      'exports.useMemo = (f, deps) => { const s = slot(() => ({})); if (changed(s.deps, deps)) { s.v = f(); s.deps = deps } return s.v }',
+      'exports.useCallback = (f, deps) => exports.useMemo(() => f, deps)',
+      'exports.useRef = (v) => slot(() => ({ current: v }))',
+      'exports.useEffect = exports.useLayoutEffect = (f, deps) => { const s = slot(() => ({})); if (changed(s.deps, deps)) { s.deps = deps; current.effects.push(s); s.f = f } }',
+      'exports.root = (component) => {',
+      '  const root = { slots: [], cursor: 0, effects: [] }',
+      '  const render = (props) => { const outer = current; current = root; root.cursor = 0; try { return component(props) } finally { current = outer } }',
+      '  render.commit = () => { for (const s of root.effects.splice(0)) { if (typeof s.cleanup === \'function\') s.cleanup(); s.cleanup = s.f() } }',
+      '  render.unmount = () => { for (const s of root.slots) if (s && typeof s.cleanup === \'function\') s.cleanup() }',
+      '  return render',
+      '}',
+    ].join('\n') + '\n',
+    'player/Cover.js': 'exports.Cover = function Cover() { return null }\n',
+    'player/icons.js': 'module.exports = new Proxy({}, { get: (_, name) => { const f = function () { return null }; Object.defineProperty(f, \'name\', { value: String(name) }); return f } })\n',
+    'player/usePlayer.js': 'exports.usePosition = (player) => player.position()\nexports.useSpeed = (player) => (player.speed ? player.speed() : 1)\n',
+  }
+  for (const [file, text] of Object.entries(stubs)) {
+    const at = path.join(OUT, file)
+    if (require.cache[at]) throw new Error(`press: ${file} was loaded before its stand-in was written`)
+    fs.mkdirSync(path.dirname(at), { recursive: true })
+    fs.writeFileSync(at, text)
+  }
+  //? a document that knows the stage's box (1:1 - a point of the drawing is a point on screen), and is showing
+  class FakeElement {
+    constructor(name) { this.name = name; this.style = {}; this.classList = { toggle() {} } }
+    focus() { globalThis.document.activeElement = this }
+    querySelector() { return null }
+    getBoundingClientRect() { return { ...PRESS_BOX, right: PRESS_BOX.left + PRESS_BOX.width, bottom: PRESS_BOX.top + PRESS_BOX.height } }
+  }
+  globalThis.document = {
+    body: new FakeElement('body'), documentElement: new FakeElement('html'), activeElement: null, visibilityState: 'visible',
+    addEventListener() {}, removeEventListener() {},
+  }
+  globalThis.HTMLElement = FakeElement
+  globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} }
+  const S = { T, H, FakeElement, P: null }
+  //? the render's own values, told as it draws (a patch to the compiled Turntable that reads and changes nothing)
+  globalThis.__press = { rendered: (values) => { if (S.P) S.P.rendered = values } }
+  S.hooks = load('node_modules/preact/hooks.js')
+  S.Turntable = load('player/Turntable.js').Turntable
+  S.NowPlaying = load('player/NowPlaying.js').NowPlaying
+  //? wakeDeckAudio, as the handlers reach it (the module's export, read at each call)
+  const realWake = H.deckModule.wakeDeckAudio
+  S.wake = realWake
+  H.deckModule.wakeDeckAudio = () => (S.P ? S.P.call('wake', [], () => realWake()) : realWake())
+  //? a window that never comes, for a press before the record can sound
+  const harnessFetch = globalThis.fetch
+  globalThis.fetch = (url, init) => (S.P?.holdWindows ? new Promise(() => {}) : harnessFetch(url, init))
+  pressStage = S
+  return S
+}
+
+/** turntable.sim's mount (:180): renders, gives each element a FakeElement (its ref's), and finds by class. */
+function pressMount(S, component, name) {
+  const render = S.hooks.root(component)
+  const elements = new Map()
+  let tree = null
+  const walk = (node, where) => {
+    if (!node || typeof node !== 'object') return
+    if (Array.isArray(node)) { node.forEach((child, i) => walk(child, `${where}.${i}`)); return }
+    if (typeof node.type === 'string') {
+      const key = `${where}:${node.type}`
+      if (!elements.has(key)) elements.set(key, new S.FakeElement(`${name} ${node.type}`))
+      node.element = elements.get(key)
+      if (node.props.ref) node.props.ref.current = node.element
+    }
+    walk(node.props?.children, `${where}/`)
+  }
+  const find = (className) => {
+    const hits = []
+    const visit = (node) => {
+      if (!node || typeof node !== 'object') return
+      if (Array.isArray(node)) { node.forEach(visit); return }
+      if (typeof node.props?.class === 'string' && node.props.class.split(' ').includes(className)) hits.push(node)
+      visit(node.props?.children)
+    }
+    visit(tree)
+    return hits[0]
+  }
+  return {
+    render(props) { tree = render(props); walk(tree, ''); render.commit(); return tree },
+    unmount: () => render.unmount(),
+    find,
+  }
+}
+
+/** A new press case: the harness's world afresh, a fake player, and the helpers that drive the Turntable. */
+function pressCase() {
+  const S = pressWorld()
+  const { T, H } = S
+  T.on = false
+  Object.assign(H, { decodeWith: null, decodeMode: 'now', answer: 'window', windowSeconds: 40, reduced: false, timers: [], frames: [], portMessages: [] })
+  H.clock = Math.ceil(H.clock / 1000) * 1000 + 1000
+  const P = {
+    S, H, events: [], recording: false, inHandler: false, depth: 0, holdWindows: false, rendered: null, last: {},
+    turn: null, told: null, said: null, frameAt: H.clock + 16, tickAt: H.clock + 250, points: new Map(), windDown: true,
+  }
+  S.P = P
+  P.push = (entry) => { if (P.recording) P.events.push(entry) }
+  const quiet = (run) => {
+    const was = maths.on
+    maths.on = false
+    try { return run() } finally { maths.on = was }
+  }
+  //? a call a handler makes, recorded with what it returned and the state after it - one made inside another isn't
+  P.call = (name, args, run, returned) => {
+    if (!P.inHandler || P.depth > 0 || !P.recording) {
+      P.depth++
+      try { return quiet(run) } finally { P.depth-- }
+    }
+    P.depth++
+    let out
+    try { out = quiet(run) } finally { P.depth-- }
+    P.push([name, ...args, ...(returned ? ['->', ...returned(out)] : [])])
+    P.after()
+    return out
+  }
+  const proto = H.Deck.prototype
+  P.query = (name) => quiet(() => proto[name].call(P.deck))
+  P.state = () => ({ playing: P.player.playing, live: P.query('live'), taken: P.query('taken'), anchor: d(P.query('anchor')) })
+  const changed = (now) => {
+    const out = {}
+    for (const [key, value] of Object.entries(now)) if (P.last[key] !== value) out[key] = value
+    Object.assign(P.last, now)
+    return out
+  }
+  P.after = () => {
+    const moved = changed(P.state())
+    if (Object.keys(moved).length) P.push(['after', moved])
+  }
+  P.world = () => {
+    const r = P.rendered
+    const moved = changed({
+      ...P.state(), length: d(r.length), track: r.track, drawnAt: d(r.position), shown: d(r.shown), now: d(H.clock), flac: r.flac, noAudio: r.noAudio,
+    })
+    if (Object.keys(moved).length) P.push(['world', moved])
+  }
+  P.props = () => ({
+    player: P.player, open: true, discArt: null, onPreview() {}, deck: P.deckRef, windDown: P.windDown,
+    onSilent: (note) => { P.told = note },
+  })
+  P.draw = () => quiet(() => P.view.render(P.props()))
+  //? the turn and the silent line, as the render drew and told them - outside an input, with the world they came from
+  P.results = (inside) => {
+    const turn = d(P.rendered.handTurn)
+    if (turn !== P.turn || P.told !== P.said) {
+      if (!inside) P.world()
+      if (turn !== P.turn) P.push(['turn', turn])
+      if (P.told !== P.said) P.push(['silent', P.told])
+      P.turn = turn
+      P.said = P.told
+    }
+  }
+  //? an input: the world it finds, the handler run (its own Math recorded), the render after it
+  P.input = (entry, run) => {
+    P.world()
+    P.push(entry)
+    P.inHandler = true
+    maths.on = true
+    try { run() } finally { maths.on = false; P.inHandler = false }
+    P.draw()
+    P.results(true)
+  }
+  //? the world moving on: the deck's timers at their own times, its frames every 16 ms, the song's position told every
+  //? 250 ms while it plays (the element's timeupdate), the promises settled, and the turntable drawn
+  P.wait = async (ms) => {
+    const end = H.clock + ms
+    while (H.clock < end) {
+      const step = Math.min(end, P.frameAt, P.tickAt)
+      quiet(() => H.advance(step - H.clock))
+      if (H.clock === P.frameAt) {
+        P.frameAt += 16
+        const frames = H.frames
+        H.frames = []
+        quiet(() => { for (const frame of frames) frame.run(H.clock) })
+      }
+      if (H.clock === P.tickAt) {
+        P.tickAt += 250
+        if (P.player.playing) quiet(() => P.player.moveTo(P.player.at + 0.25))
+      }
+      for (let i = 0; i < 3; i++) await H.settle()
+      P.draw()
+    }
+    P.results(false)
+  }
+  P.make = async ({ track = PRESS_FLAC, at = 60, playing = true, wake = true, windows = true } = {}) => {
+    P.player = pressPlayer(P, track, at, playing)
+    P.deckRef = { current: null }
+    P.view = pressMount(S, S.Turntable, 'turntable')
+    P.holdWindows = !windows
+    P.draw()
+    const deck = P.deck = P.deckRef.current
+    //? the deck's calls, as the handlers make them
+    for (const name of PRESS_CALLS) {
+      const real = proto[name]
+      deck[name] = (...args) => P.call(name, args.map(pressWord), () => real.apply(deck, args), PRESS_RETURNS[name])
+    }
+    for (const name of PRESS_QUIET) {
+      const real = proto[name]
+      deck[name] = (...args) => {
+        P.depth++
+        try { return quiet(() => real.apply(deck, args)) } finally { P.depth-- }
+      }
+    }
+    const grabbed = deck.host.grabbed
+    deck.host.grabbed = () => {
+      if (P.inHandler) throw new Error('press: the deck grabbed the record inside a handler - the trace has no place for that')
+      if (!P.recording) return grabbed()
+      //? an input of its own (the deck's timer, the last thing it does): the world it finds, then the render after it
+      P.world()
+      P.push(['grabbed'])
+      grabbed()
+      P.draw()
+      P.results(true)
+    }
+    //? the audio woken (a tap before the case) and the window let in
+    if (wake) quiet(() => S.wake())
+    await P.wait(400)
+    P.recording = true
+    //? the whole world, the first time
+    P.last = {}
+    P.world()
+    //? a turntable mounted afresh: unturned and saying nothing (TurntablePressTests starts from there)
+    if (P.rendered.handTurn !== 0 || P.told !== null) throw new Error('press: a fresh turntable drawn turned, or saying something')
+    P.turn = d(P.rendered.handTurn)
+    P.said = P.told
+  }
+  P.end = async () => {
+    P.recording = false
+    P.view.unmount()
+    P.nowPlayingView?.unmount()
+    for (let i = 0; i < 3; i++) await H.settle()
+    S.P = null
+  }
+  //? a pointer event, a browser's
+  const pointer = (id, point, time, extra = {}) => ({
+    pointerId: id, isPrimary: true, pointerType: 'touch', button: 0, clientX: point.x, clientY: point.y, timeStamp: time,
+    currentTarget: { setPointerCapture() {} }, ...extra,
+  })
+  const part = (which) => P.view.find(which === 'arm' ? 'app-tt-handle' : 'app-tt-record')
+  P.down = (point, { id = 1, primary = true, at = H.clock } = {}) => {
+    P.points.set(id, point)
+    P.input(['down', id, d(point.x), d(point.y), d(at)], () => part('record').props.onPointerDown(pointer(id, point, at, { isPrimary: primary })))
+  }
+  P.armDown = (point, { id = 2, primary = true, at = H.clock } = {}) => {
+    P.points.set(id, point)
+    P.input(['armDown', id, d(point.x), d(point.y)], () => part('arm').props.onPointerDown(pointer(id, point, at, { isPrimary: primary })))
+  }
+  //? a move: its samples ({t, x, y}, the last the event's own), coalesced as iOS and Chrome keep them - or none
+  P.move = (which, samples, { id = 1, primary = true, coalesced = true } = {}) => {
+    const last = samples[samples.length - 1]
+    P.points.set(id, last)
+    const event = pointer(id, last, last.t, { isPrimary: primary })
+    if (coalesced) event.getCoalescedEvents = () => samples.map((s) => pointer(id, s, s.t, { isPrimary: primary }))
+    const triple = (s) => [d(s.t), d(s.x), d(s.y)]
+    P.input(['move', id, coalesced ? samples.map(triple) : null, triple(last)], () => part(which).props.onPointerMove(event))
+  }
+  //? a lift: pointerup, then lostpointercapture (a cancel to the handlers, nothing after an up), then on the record
+  //? the click - one call on the phone; a second finger, never captured and never primary, has the pointerup alone
+  P.up = (which, { id = 1, primary = true, at = H.clock } = {}) => P.input(['up', id, d(at)], () => {
+    const el = part(which)
+    const event = pointer(id, P.points.get(id), at, { isPrimary: primary })
+    el.props.onPointerUp(event)
+    if (!primary) return
+    el.props.onLostPointerCapture(event)
+    if (which === 'record') el.props.onClick()
+  })
+  P.cancel = (which, { id = 1, at = H.clock } = {}) => P.input(['cancel', id, d(at)], () => {
+    const el = part(which)
+    const event = pointer(id, P.points.get(id), at)
+    el.props.onPointerCancel(event)
+    el.props.onLostPointerCapture(event)
+  })
+  P.key = (key) => P.input(['key', key], () => part('arm').props.onKeyDown({ key, preventDefault() {} }))
+  //? Now Playing's transport, on the turntable, its deck the turntable's
+  P.nowPlaying = () => {
+    if (!P.nowPlayingView) {
+      P.nowPlayingView = pressMount(S, S.NowPlaying, 'now playing')
+      P.nowPlayingProps = { player: P.player, open: true, covered: false, opener: { current: null }, onClose() {}, onMore() {}, onAlbum() {}, openAs: 'turntable' }
+      quiet(() => P.nowPlayingView.render(P.nowPlayingProps))
+    }
+    const tree = quiet(() => P.nowPlayingView.render(P.nowPlayingProps))
+    const turntable = (function find(node) {
+      if (!node || typeof node !== 'object') return null
+      if (Array.isArray(node)) { for (const child of node) { const hit = find(child); if (hit) return hit } return null }
+      if (node.type === S.Turntable) return node
+      return find(node.props?.children)
+    })(tree)
+    turntable.props.deck.current = P.deck
+    P.input(['nowPlaying'], () => P.nowPlayingView.find('is-main').props.onClick())
+  }
+  //? the song changes: the turntable drawn for it, its effect dropping a drag for the song before
+  P.song = (track) => {
+    P.player.track = track
+    P.player.duration = track.duration
+    P.player.at = 0
+    P.draw()
+    P.world()
+    P.push(['song', track.id])
+    P.results(true)
+  }
+  //? where things are: a point on the record `degrees` round from its right, `r` from the spindle; the arm's handle
+  P.onRecord = (degrees, r = 100) => quiet(() => ({ x: tt.RECORD.x + r * Math.cos((degrees / 180) * Math.PI), y: tt.RECORD.y + r * Math.sin((degrees / 180) * Math.PI) }))
+  P.handleAt = () => quiet(() => tt.needleAt(P.rendered.shown, P.rendered.length))
+  //? a turn of the record from `from` to `to` degrees over `ms`, a sample every `every` ms, `per` to an event (a
+  //? 120 Hz digitizer under 60 Hz events is 8 and 2)
+  P.turnRecord = async (from, to, ms, { every = 8, per = 2, id = 1, r = 100 } = {}) => {
+    const t0 = H.clock
+    let batch = []
+    for (let t = every; t <= ms; t += every) {
+      batch.push({ t: t0 + t, ...P.onRecord(from + ((to - from) * t) / ms, r) })
+      if (batch.length === per || t + every > ms) {
+        await P.wait(batch[batch.length - 1].t - H.clock)
+        P.move('record', batch, { id })
+        batch = []
+      }
+    }
+  }
+  P.live = () => P.query('live')
+  return P
+}
+
+const PRESS_RETURNS = {
+  takeOver: (out) => [d(out)],
+  release: (out) => [out.seek === null ? null : d(out.seek), out.play],
+  pausing: (out) => [out === null ? null : d(out)],
+  resuming: (out) => [out === null ? null : d(out)],
+}
+const pressWord = (value) => (typeof value === 'number' ? d(value) : value)
+
+function pressPlayer(P, track, at, playing) {
+  const player = {
+    track, playing, duration: track.duration, at, listeners: new Set(),
+    seek(t) { return P.call('seek', [d(t)], () => { player.at = t }) },
+    toggle() { return P.call('toggle', [], () => { player.playing = !player.playing }) },
+    position: () => player.at,
+    onPosition(listener) { player.listeners.add(listener); return () => player.listeners.delete(listener) },
+    moveTo(seconds) { player.at = seconds; for (const listener of [...player.listeners]) listener(seconds) },
+    //? what Now Playing reads besides (turntable.sim's)
+    buffering: false, error: null, airplay: false, gapless: false, previous() {}, next() {}, showAirPlay() {},
+    shuffle: false, repeat: 'off', queue: { tracks: [], index: 0 }, setShuffle() {}, setRepeat() {},
+  }
+  return player
+}
+
+//? THE CASES: each the spec's 7.0 asks for, in as few inputs as says it
+const PRESS_CASES = [
+  ['tap-pause-then-play', 'a tap on a playing record pauses it in the click, winding down; a tap 0.1 s in plays from where the record is; then Now Playing\'s transport does both', async (P) => {
+    await P.make()
+    const at = P.onRecord(0)
+    P.down(at)
+    await P.wait(80)
+    P.up('record')
+    await P.wait(100)
+    P.down(at)
+    await P.wait(60)
+    P.up('record')
+    await P.wait(600)
+    P.nowPlaying()
+    await P.wait(100)
+    P.nowPlaying()
+    await P.wait(300)
+  }],
+  ['turn-then-tap', 'a turn past a tap, coalesced at 120 Hz: taken from the press, let go to the motor; its click no tap - and a tap after it plays or pauses again', async (P) => {
+    await P.make()
+    P.down(P.onRecord(0))
+    await P.turnRecord(0, 50, 96)
+    await P.wait(8)
+    P.up('record')
+    await P.wait(700)
+    P.down(P.onRecord(50))
+    await P.wait(70)
+    P.up('record')
+    await P.wait(200)
+  }],
+  ['hold-then-let-go', 'a press held still past HOLD_MS: the deck takes it (grabbed), and let go it spins back up - its click no tap', async (P) => {
+    await P.make()
+    P.down(P.onRecord(200))
+    await P.wait(320)
+    P.up('record')
+    await P.wait(500)
+  }],
+  ['rest-then-nudge', 'a press nudged inside a tap\'s few pixels, then resting: taken (grabbed - the hand\'s turn counts from there), nudged again and let go: the record stays where the hand left it', async (P) => {
+    await P.make({ playing: false })
+    P.down(P.onRecord(90))
+    await P.turnRecord(90, 91.5, 32, { every: 16, per: 1 })
+    await P.wait(300)
+    await P.turnRecord(91.5, 93, 32, { every: 16, per: 1 })
+    P.up('record')
+    await P.wait(300)
+  }],
+  ['turn-back-past-the-start', 'a playing record near the start of the song, pressed as its position is told, and turned back a whole turn: held at 0:00 from where the deck took it, not from where the song was last drawn', async (P) => {
+    await P.make({ at: 0.6 })
+    P.down(P.onRecord(0))
+    await P.wait(120)
+    await P.turnRecord(0, -400, 80, { every: 8, per: 2 })
+    P.up('record')
+    await P.wait(400)
+  }],
+  ['flick-paused-and-tap-while-coasting', 'a paused record flicked: let go it coasts, sought to where it stops, left paused; a tap while it coasts plays from where it is', async (P) => {
+    await P.make({ playing: false, at: 120 })
+    P.down(P.onRecord(-30))
+    await P.turnRecord(-30, 60, 80, { every: 8, per: 2 })
+    P.up('record')
+    await P.wait(150)
+    P.down(P.onRecord(60))
+    await P.wait(50)
+    P.up('record')
+    await P.wait(400)
+  }],
+  ['press-while-coasting-back', 'a flick back on a playing record, then a press catching it as it comes back to speed, turned on and let go', async (P) => {
+    await P.make({ at: 200 })
+    P.down(P.onRecord(40))
+    await P.turnRecord(40, -20, 64, { every: 8, per: 2 })
+    P.up('record')
+    await P.wait(120)
+    P.down(P.onRecord(-20))
+    await P.turnRecord(-20, -5, 48, { every: 16, per: 1 })
+    P.up('record')
+    await P.wait(800)
+  }],
+  ['silent-press', 'a FLAC before its window has come: .11\'s press - the record held still, the song playing on under the finger, sought where the turn lets go; its click no tap, the next a pause; no silent line (it will sound)', async (P) => {
+    await P.make({ windows: false })
+    P.down(P.onRecord(10))
+    await P.turnRecord(10, 70, 64, { every: 16, per: 1 })
+    P.up('record')
+    await P.wait(100)
+    P.down(P.onRecord(70))
+    await P.wait(60)
+    P.up('record')
+    await P.wait(200)
+  }],
+  ['not-flac', 'an MP3 turned: silent, the line said from the first turn of the song; let go it is sought; a tap pauses; the song changing takes the line away', async (P) => {
+    await P.make({ track: PRESS_MP3 })
+    P.down(P.onRecord(0))
+    await P.wait(30)
+    P.move('record', [{ t: P.H.clock, ...P.onRecord(1) }], { coalesced: false })
+    await P.turnRecord(1, 30, 48, { every: 16, per: 1 })
+    P.up('record')
+    await P.wait(100)
+    P.down(P.onRecord(30))
+    await P.wait(70)
+    P.up('record')
+    await P.wait(100)
+    P.song(PRESS_NEXT)
+    await P.wait(200)
+  }],
+  ['the-arm', 'the arm: no seek inside its slop, held past it round the pivot, let go and sought; its keys; and a cancel that seeks nowhere', async (P) => {
+    await P.make({ at: 100 })
+    const handle = P.handleAt()
+    P.armDown(handle, { id: 2 })
+    await P.wait(16)
+    P.move('arm', [{ t: P.H.clock, x: handle.x + 3, y: handle.y + 2 }], { id: 2, coalesced: false })
+    for (let step = 1; step <= 4; step++) {
+      await P.wait(16)
+      P.move('arm', [{ t: P.H.clock - 8, x: handle.x - 6 * step + 3, y: handle.y + 7 * step - 2 }, { t: P.H.clock, x: handle.x - 6 * step, y: handle.y + 7 * step }], { id: 2 })
+    }
+    P.up('arm', { id: 2 })
+    await P.wait(100)
+    for (const key of ['ArrowRight', 'PageDown', 'Home', 'End', 'a']) {
+      P.key(key)
+      await P.wait(50)
+    }
+    const again = P.handleAt()
+    P.armDown(again, { id: 3 })
+    await P.wait(16)
+    P.move('arm', [{ t: P.H.clock, x: again.x - 20, y: again.y + 25 }], { id: 3, coalesced: false })
+    P.cancel('arm', { id: 3 })
+    await P.wait(100)
+  }],
+  ['cancel-a-taken-press', 'a press taken by a turn, then cancelled (the system took the touch): nothing sought, the song it paused plays on - and no click', async (P) => {
+    await P.make()
+    P.down(P.onRecord(120))
+    await P.turnRecord(120, 135, 48, { every: 8, per: 2 })
+    P.cancel('record')
+    await P.wait(300)
+  }],
+  ['second-finger', 'a finger on the record, and a second on the arm meanwhile: the second starts nothing, moves nothing and lets go of nothing', async (P) => {
+    await P.make()
+    P.down(P.onRecord(0))
+    await P.wait(20)
+    const handle = P.handleAt()
+    P.armDown(handle, { id: 2, primary: false })
+    await P.wait(16)
+    P.move('arm', [{ t: P.H.clock, x: handle.x - 30, y: handle.y + 30 }], { id: 2, primary: false, coalesced: false })
+    P.up('arm', { id: 2, primary: false })
+    await P.turnRecord(0, 20, 48, { every: 16, per: 1 })
+    P.up('record')
+    await P.wait(300)
+  }],
+  ['song-change-under-a-press', 'the song changes under a still press the deck can\'t take (its window not come): the drag goes, and the lift\'s click is a tap all the same - it pauses the new song', async (P) => {
+    await P.make({ windows: false })
+    P.down(P.onRecord(45))
+    await P.wait(100)
+    P.song(PRESS_NEXT)
+    await P.wait(100)
+    P.up('record')
+    await P.wait(200)
+  }],
+]
+
+async function pressFixtures() {
+  const made = []
+  const from = () => Object.fromEntries([...handlerPieces().map((p) => p.from), whole('player/deck.ts'), whole('lib/turntable.ts'), whole('lib/deckClock.ts'), whole('lib/scrub.ts')])
+  for (const [name, about, run] of PRESS_CASES) {
+    const P = pressCase()
+    await run(P)
+    await P.end()
+    made.push([`press/${name}.json`, {
+      about,
+      made_by: MADE_BY,
+      made_from: from(),
+      name,
+      box: [d(PRESS_BOX.left), d(PRESS_BOX.top), d(PRESS_BOX.width), d(PRESS_BOX.height)],
+      events: P.events,
+    }, 2])
+  }
+  return made
 }
 
 function encodeInputs(inputs) {
@@ -1704,10 +2318,15 @@ async function main() {
   for (const [name, value, depth] of voiceFixtures(syntheticVoiceCases())) emit(name, value, depth)
   for (const [name, value, depth] of await rulesFixtures()) emit(name, value, depth)
   emit('press/handlers.json', pressFixture(), 2)
+  for (const [name, value, depth] of await pressFixtures()) emit(name, value, depth)
   maths.on = false
   emit('maths.json', mathsFixture(), 2)
 
   fs.rmSync(OUT, { recursive: true, force: true })
+  const drifted = RECORDED.filter((name) => drift[name].size).map((name) => `${name} ${drift[name].size}`)
+  if (drifted.length) {
+    console.log(`Node ${process.version}'s Math answers some calls otherwise than the Node that made maths.json (${drifted.join(', ')}). The committed answers were used where maths.json holds them; the calls it doesn't hold are this Node's, so a file made from them can differ for that alone.`)
+  }
   const total = Object.values(files).reduce((sum, body) => sum + Buffer.byteLength(body), 0)
   if (CHECK) {
     const differ = []

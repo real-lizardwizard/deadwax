@@ -37,10 +37,17 @@ FORBIDDEN = set(range(0x00, 0x09)) | {0x0B, 0x0C} | set(range(0x0E, 0x20)) | {0x
 # purpose: skipping it should be a deliberate one-line decision, not a silent gap.
 # .flac: the iPhone app's copy verifier's fixtures (ios/DeadwaxKit/Tests/DeadwaxAudioTests/Fixtures/verifier),
 # written by ios/scripts/make-test-album.py and checked against it by tests/test_ios_install.py.
-# .f32: raw Float32 audio, the web's turntable voice output kept whole for three cases
-# (ios/DeadwaxKit/Tests/DeadwaxCoreTests/Fixtures/deck/voice), written by ios/scripts/export-deck-vectors.cjs and
-# checked against it by ui/test/iosdeck.sim.cjs - base64 in JSON would take the folder past its 3 MB budget.
-BINARY_SUFFIXES = {".png", ".woff2", ".flac", ".f32"}
+BINARY_SUFFIXES = {".png", ".woff2", ".flac"}
+# Binary only in one folder, and checked everywhere else: .f32 is raw Float32 audio, the web's turntable voice output
+# kept whole for three cases, written by ios/scripts/export-deck-vectors.cjs and checked against it byte for byte by
+# ui/test/iosdeck.sim.cjs - base64 in JSON would take the folder past its 3 MB budget. A .f32 anywhere else is a new
+# decision, as a new suffix is.
+BINARY_IN = {".f32": "ios/DeadwaxKit/Tests/DeadwaxCoreTests/Fixtures/deck/voice/"}
+
+
+def _binary(rel):
+    suffix = Path(rel).suffix
+    return suffix in BINARY_SUFFIXES or (suffix in BINARY_IN and rel.startswith(BINARY_IN[suffix]))
 
 NEWLINE = bytes([10])
 
@@ -49,7 +56,7 @@ def _tracked_text_files():
     listing = subprocess.run(
         ["git", "ls-files"], cwd=REPO, capture_output=True, text=True, check=True
     ).stdout.splitlines()
-    return [p for p in listing if Path(p).suffix not in BINARY_SUFFIXES]
+    return [p for p in listing if not _binary(p)]
 
 
 def test_no_tracked_source_file_holds_a_raw_control_byte():
@@ -89,3 +96,14 @@ def test_the_binary_skip_list_only_covers_real_binaries():
     assert BINARY_SUFFIXES <= suffixes, (
         "BINARY_SUFFIXES lists a format no longer tracked: %s" % (BINARY_SUFFIXES - suffixes)
     )
+    for suffix, folder in BINARY_IN.items():
+        assert any(p.startswith(folder) and p.endswith(suffix) for p in tracked), (
+            "BINARY_IN lists %s in %s, which no longer holds one" % (suffix, folder)
+        )
+
+
+def test_a_binary_allowed_in_one_folder_is_checked_everywhere_else():
+    assert _binary("ios/DeadwaxKit/Tests/DeadwaxCoreTests/Fixtures/deck/voice/swap.f32")
+    assert not _binary("ios/DeadwaxKit/Tests/DeadwaxCoreTests/Fixtures/deck/swap.f32")
+    assert not _binary("ui/src/swap.f32")
+    assert _binary("interface/player/icon.png")

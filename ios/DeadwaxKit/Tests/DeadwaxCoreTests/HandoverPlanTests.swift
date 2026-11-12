@@ -131,6 +131,168 @@ import Testing
         #expect(Swift.abs((out.seek ?? 0) - (landing + 0.15)) < 1e-9, "\(out.seek ?? .nan)")
     }
 
+    /// A post's numbers, in order: a take's at, rate, time and until; a drive's at, rate, accel (nil for "-"),
+    /// time and until.
+    func numbers(_ effect: String) -> [Double?] {
+        effect.split(separator: " ").dropFirst(2).map { $0 == "-" ? nil : Double(bitPattern: UInt64($0, radix: 16)!) }
+    }
+
+    /// The song heard at `at`: the engine's report, to every listener (the judge among them).
+    func heard(_ world: TraceWorld, _ at: Double) {
+        world.at = at
+        for listener in world.listeners { listener.run(at) }
+    }
+
+    /// A playing record held at 60 from 1300, turned a little back over 60 ms and let go, the lead as given - the
+    /// window answered first, or left for later. The release's answer; the plan's timer and its end (page ms); the
+    /// second timer set - the resume's, when the lead leaves time for one (the judge's, when it doesn't).
+    func letGo(_ world: TraceWorld, _ rules: DeckRules<PlatformMaths>, lead: Double, answered: Bool = true)
+        -> (out: DeckReleased, plan: Int?, end: Double, resume: Int?) {
+        rules.handoverLead = { _, _ in lead }
+        rules.setShowing(true)
+        if answered { answer(world) }
+        rules.pressed(1000)
+        world.time = 1300
+        rules.takeOver(1300)
+        rules.playingChanged(false)
+        for k in 1...6 {
+            world.time = 1300 + Double(k) * 10
+            rules.hand(world.time, turned: -0.02 * Double(k), at: 60 - 0.006 * Double(k))
+        }
+        world.effects = []
+        let out = rules.release(world.time, cancel: false)
+        let timers = world.effects.filter { $0.hasPrefix("timer ") }.map { $0.split(separator: " ") }
+        let key = { (i: Int) -> Int? in i < timers.count ? Int(timers[i][1])! : nil }
+        let ms = timers.first.map { Double(bitPattern: UInt64($0[2], radix: 16)!) } ?? .nan
+        return (out, key(0), world.time + ms, key(1))
+    }
+
+    @Test func reduceMotionsTakeHoldsUntilTheSongIsHeard() throws {
+        let world = world()
+        let rules = DeckRules(host: world, clock: world, maths: PlatformMaths(), reduced: true)
+        rules.handoverLead = { _, _ in 0.15 }
+        rules.setShowing(true)
+        answer(world)
+        rules.pressed(1000)
+        world.time = 1300
+        rules.takeOver(1300)
+        world.effects = []
+        let out = rules.release(1300, cancel: false)
+        let take = try #require(world.effects.first { $0.hasPrefix("post take ") })
+        let n = numbers(take)
+        let landing = PlatterPlans(PlatformMaths()).motor(60, 0, 425, 1).x
+        #expect(n[0] == landing && n[1] == 1 && n[2] == 1.3)
+        //? held until the judge hears the song - not a take's 0.12 s, which would go still for the lead's rest
+        #expect(Swift.abs(n[3]! - n[2]! - DeckConstants.handoverMaxS) < 1e-9, "\(take)")
+        //? the gesture's play: paused where it was sought, nothing fades; heard past it, the voice fades
+        world.isPlaying = true
+        rules.playingChanged(true)
+        world.effects = []
+        heard(world, out.seek!)
+        #expect(!world.effects.contains { $0.hasPrefix("post fade") }, "\(world.effects)")
+        heard(world, out.seek! + 0.03)
+        #expect(world.effects.contains { $0.hasPrefix("post fade") }, "\(world.effects)")
+    }
+
+    @Test func aLateResumeIsJudgedAtItsTargetAndEndsThePlan() throws {
+        let world = world()
+        let rules = DeckRules(host: world, clock: world, maths: PlatformMaths(), reduced: false)
+        let (out, plan, _, _) = letGo(world, rules, lead: 5)
+        //? played in the gesture, no timer asks it: its second timer is the judge's HANDOVER_MAX_S
+        #expect(out.play && rules.resumeAsked && rules.ledTimer == nil && !world.effects.contains("resume"))
+        let target = try #require(out.seek)
+        //? the gesture's play is the deck's own: the plan runs on
+        world.isPlaying = true
+        rules.playingChanged(true)
+        guard case .plan = rules.motion else { Issue.record("the plan ended at the play"); return }
+        //? the song still where it was sought, far past plan.x: a judge at plan.x would fade the voice here
+        world.effects = []
+        heard(world, target)
+        #expect(!world.effects.contains { $0.hasPrefix("post fade") }, "\(world.effects)")
+        //? heard past its target before the plan's end: the coast is over - faded, turning, the plan's timer gone
+        heard(world, target + 0.03)
+        #expect(world.effects.contains { $0.hasPrefix("post fade") }, "\(world.effects)")
+        guard case .turning = rules.motion else { Issue.record("not turning: \(rules.motion)"); return }
+        let planKey = try #require(plan)
+        #expect(rules.planTimer == nil && world.timers[planKey] == nil, "\(world.effects)")
+        #expect(!world.effects.contains("resume"))
+    }
+
+    @Test func aPlanResumedEarlyHoldsAtItsEndAndAsksNoSecondResume() throws {
+        let world = world()
+        let rules = DeckRules(host: world, clock: world, maths: PlatformMaths(), reduced: false)
+        let (out, plan, end, resume) = letGo(world, rules, lead: 0.2)
+        let x = try #require(out.seek)
+        world.time = end - 200
+        world.timers.removeValue(forKey: try #require(resume))?()
+        rules.playingChanged(true)
+        //? the song paused at plan.x, not yet heard: the judge waits
+        world.effects = []
+        heard(world, x)
+        #expect(!world.effects.contains { $0.hasPrefix("post fade") })
+        //? the plan's end: only the hold - the song's speed from plan.x, stamped at the end, HANDOVER_MAX_S long
+        world.time = end
+        world.timers.removeValue(forKey: try #require(plan))?()
+        #expect(!world.effects.contains("resume") && !rules.resumeAsked, "\(world.effects)")
+        let drives = world.effects.filter { $0.hasPrefix("post drive ") }
+        #expect(drives.count == 1, "\(world.effects)")
+        let n = numbers(try #require(drives.first))
+        #expect(n[0] == x && n[1] == 1 && n[2] == nil)
+        #expect(Swift.abs(n[3]! - end / 1000) < 1e-9 && Swift.abs(n[4]! - n[3]! - DeckConstants.handoverMaxS) < 1e-9)
+        guard case .turning = rules.motion else { Issue.record("not turning: \(rules.motion)"); return }
+        heard(world, x + 0.03)
+        #expect(world.effects.contains { $0.hasPrefix("post fade") }, "\(world.effects)")
+    }
+
+    @Test func aResumeAskedForOnePlanIsNotTheNexts() throws {
+        let world = world()
+        let rules = DeckRules(host: world, clock: world, maths: PlatformMaths(), reduced: false)
+        let (_, _, end, resume) = letGo(world, rules, lead: 0.2)
+        world.time = end - 200
+        world.timers.removeValue(forKey: try #require(resume))?()
+        #expect(rules.resumeAsked)
+        //? taken again before the player says it plays, and let go again: a new plan, whose resume is still to come
+        rules.pressed(world.time)
+        rules.takeOver(world.time)
+        for k in 1...6 {
+            world.time += 10
+            rules.hand(world.time, turned: -0.02 * Double(k), at: 60 - 0.006 * Double(k))
+        }
+        let out = rules.release(world.time, cancel: false)
+        #expect(!out.play)
+        guard case .plan = rules.motion else { Issue.record("no new plan: \(rules.motion)"); return }
+        #expect(!rules.resumeAsked)
+    }
+
+    @Test func aPlanThatSoundsOnlyAfterItsResumeIsStillHandedOver() throws {
+        let world = world()
+        let rules = DeckRules(host: world, clock: world, maths: PlatformMaths(), reduced: false)
+        let (out, plan, end, resume) = letGo(world, rules, lead: 0.2, answered: false)
+        let x = try #require(out.seek)
+        //? the resume, with no window yet: no judge
+        world.effects = []
+        world.time = end - 200
+        world.timers.removeValue(forKey: try #require(resume))?()
+        rules.playingChanged(true)
+        #expect(world.effects.contains("resume") && !world.effects.contains("listen"), "\(world.effects)")
+        //? the window comes in the plan's last 200 ms: the record's sound takes up the coast
+        world.time = end - 100
+        world.effects = []
+        answer(world)
+        #expect(world.effects.contains { $0.hasPrefix("post take ") }, "\(world.effects)")
+        //? at the plan's end the judge starts, and the voice holds the song's speed from plan.x
+        world.effects = []
+        world.time = end
+        world.timers.removeValue(forKey: try #require(plan))?()
+        #expect(world.effects.contains("listen") && !world.effects.contains("resume"), "\(world.effects)")
+        let drive = try #require(world.effects.first { $0.hasPrefix("post drive ") })
+        #expect(numbers(drive)[0] == x)
+        heard(world, x)
+        #expect(!world.effects.contains { $0.hasPrefix("post fade") })
+        heard(world, x + 0.03)
+        #expect(world.effects.contains { $0.hasPrefix("post fade") }, "\(world.effects)")
+    }
+
     @Test func withNoLeadTheWebsShortcutStands() {
         let world = world()
         let rules = DeckRules(host: world, clock: world, maths: PlatformMaths(), reduced: true)

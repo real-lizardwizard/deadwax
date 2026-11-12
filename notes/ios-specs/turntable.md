@@ -624,9 +624,19 @@ wakeDeckAudio - `box`, `drawnAt`, `shown`, `now`, `flac`, `noAudio`). Its calls 
 `moved(pointer:samples:)`, `ended(pointer:how:time:)` and `armKey`, with `grabbed()` (the host's, :237),
 `songChanged` and the static `toggle(deck, host)` (NowPlaying's, :282). There is no `tapped`: a record's
 `ended(.up)` runs onRecordClick's rule after the release's own work, as above; the arm's lift runs none (the web's
-click handler is the record's alone). **Held by hand-built cases only** (TurntablePressTests, each the calls the
-web's handlers make, read line by line) - the exported press traces of 7.0 were not built in slice 1; the handlers'
-hashes are, so a change to them fails iosdeck.sim.
+click handler is the record's alone). **Held by the press traces of 7.0** (TurntablePressTraceTests: 13 of them,
+every call bit for bit with the web's Math and within 1e-9 with the platform's, the drawn turn and the silent line
+after every input) and by hand-built cases (TurntablePressTests); the handlers' hashes fail iosdeck.sim on any change.
+
+**Review (slice 1).** The traces found two places the port wasn't the web, both now kept by `following`, the touch
+the turntable follows: **one pointer at a time** - the web's `pressable` (:301) takes the primary pointer only, so a
+second finger, on the arm while the record is held or the other way round, starts nothing (this is the web's, and
+contradicts 3.1's "two fingers can turn the record and move the fader at once": SpeedFader.tsx:61 asks isPrimary
+too - a question for James, 10); and **the click follows the touch, not the drag** - a lift whose drag a song change
+dropped (`songChanged`) still runs onRecordClick, as a browser's click still comes, so the new song is paused. Not
+kept: a browser's primary pointer is the first of a gesture with no other finger down, so a third finger landing
+after the first lifted while the second stays is not primary there and is here - three fingers on a 372-point
+turntable.
 
 ### 3.2 The clock
 
@@ -907,6 +917,20 @@ question 2).
   judge or HANDOVER_MAX_S, the web's timer.
 - Held by HandoverPlanTests' hand-built cases only (the arithmetic; DeckRules with leads of 0.2, 5, and 0.15 under
   Reduce Motion; none, the web's shortcut). The two-engine HandoverTimingTests are 7.2's.
+
+**Review (slice 1).** Read against the above and deck.ts, two things were wrong and are fixed: **Reduce Motion's
+take held only a take's DRIVE_FOR_S** (0.12 s) - with the judge alone after it (no hold drive), the voice ran out
+and slowed to still for the lead less 0.12 s before the song was heard, most of a second for a stream deep in a
+song; it now holds the player's speed for HANDOVER_MAX_S, until the judge fades it. And **a plan silent at its early
+resume whose window came before its end** got no judge (none was made at the resume) and so no hold at the end -
+the voice ran out over the song, unfaded; the plan's end now makes the judge, at what the song was sought to, when
+none runs, and posts the hold. Six tests added, each seen to fail on a mutation of the rule it holds: the Reduce
+Motion take's hold and its judge; the late resume judged at its target (a judge at `plan.x` would fade a paused
+song's voice) and ending the plan when it fires first (plan timer cleared, turning, no resume); a plan resumed early
+holding at its end with one drive, stamped at the end, and no second resume; a resume asked for one plan not taken
+by the next (`startPlan`); the plan that sounds only after its resume. **Left as it is, for James**: the judge's
+HANDOVER_MAX_S runs from the resume, so with a lead over 3 s (a stream past about 14 minutes in) it fires before
+the plan's end and cuts the coast short - turning at the player's speed early - where the web's runs from the end.
 
 ---
 
@@ -1447,7 +1471,8 @@ recorded stamps.
 - **Palette**: the tokens of 2.14 read out of theme.css by the exporter (`tokens.json`), and a Linux test holding
   `TurntablePalette`'s Core-side values (the RGBA each Palette colour is made from) to them.
 
-**As built (slice 1, 2026-11-12).** 61 files, 2986 KB of the 3 MB. Where it isn't the table above, and why:
+**As built (slice 1, 2026-11-12).** 61 files, 2986 KB of the 3 MB - since its review 74, 3056 KB (the press
+traces). Where it isn't the table above, and why:
 
 - **`rules/`, 42 cases.** The eight motions at 60 Hz, and five of them (steady1, back1, wobble, ramp, scratch) at
   120 Hz - half, quarter and double not at 120 Hz, for the budget - each with 500 ms of play before and 3000 ms
@@ -1465,16 +1490,37 @@ recorded stamps.
   speed) passed with every effect in order and one ask at another position report. A case's effects are kept whole
   at 400 or fewer, else as the count and an FNV-1a 64 per 512 (the budget); the PlatformMaths replay compares a
   hashed case by its count only. The stamp pairs are recorded only where the stamp isn't the identity - none yet.
-- **`press/` holds no traces**: mounting Turntable.tsx through turntable.sim's `mount` over the harness was not
-  built in slice 1. `press/handlers.json` is the `made_from` alone - the sha256 of the silent line (:286-290), the
-  handlers (:301-422), the host's `grabbed` (:237) and NowPlaying's toggle (:282) - so a change to any fails
-  iosdeck.sim; TurntablePress is held by hand-built cases (3.1). **Still owed**: the traces.
+- **`press/`, 13 traces** (built in slice 1's review): the real Turntable and NowPlaying, compiled from the web's
+  TypeScript, mounted through turntable.sim's own stand-in Preact over the deck harness and a fake player (seek and
+  toggle as the player's), the real Deck under them, driven by pointer events - down, coalesced moves, up (then
+  lostpointercapture and the click, as a browser sends them), cancel - and arm keys: a tap to pause and to play (and
+  Now Playing's toggle), a turn then a tap, a hold then the let-go, a rest then a nudge (the take by rest, `grabbed`),
+  a turn back past the song's start, a flick while paused and a tap while it coasts, a press while coasting back, a
+  silent press (the window held back), a silent turn on an MP3 (the silent line, gone at the song change), the arm
+  (slop, drag, lift, five keys, a cancel), a cancel of a taken press, a second finger, a song change under a press.
+  Each input is followed by every call the handlers made - deck and player, arguments and returns - and the deck's
+  state after each (live, taken, the anchor; the replay's deck is a script that answers with them); the world (playing, length, the
+  song, drawnAt, shown, now, flac, noAudio, live, taken, anchor) only when it changed; the drawn turn and the silent
+  line whenever they changed, after inputs and between them. The deck's own work between inputs (its frames, its
+  timers, the position's ticks) is the world's, not the trace's. `press/handlers.json` still hashes the handlers
+  (:286-290, :301-422, :426, :237, NowPlaying :282), and the press files the whole of deck.ts, turntable.ts,
+  deckClock.ts and scrub.ts they ran over. Turntable.js gets one patch, at its render, to tell the exporter what it
+  drew.
 - **`voice/` is eight cases of its own**, not every rules case's messages (the budget): hand turns, the wind-down, a
   handover with its fade, a window swapped mid-block with a mono window and a missing one, a loud hand at 120 Hz, a
   step, rests and out-of-order samples, a song that runs out - each at 48 and 44.1 kHz in blocks of 128, 333, 512,
   1024 and 1 (72 runs); three keep 48 kHz stretches whole, as raw Float32 (`.f32`, one of test_source_bytes.py's
   binary suffixes - base64 would pass the budget). 880 KB.
 - `tokens.json` (2.14's) and `jsmath.json` as planned; `maths.json` is written last, over every run above.
+- **One Node's answers** (the review): the exporter answers every Math call `maths.json` already holds with the
+  committed answer, worked out by the running Node too and told when it differs - so a Node whose V8 answers
+  otherwise remakes the table the Swift replays unchanged, and says why. (V8 moved its sin and cos to glibc-derived
+  code behind a build flag in 2023; whether CI's Node 22 has it is unchecked - only Node 20.12 is on this Mac.) It
+  can't hold the rest: about 32,000 calls made with the recording off - the bench's motions (lab/motions.ts's
+  sines and noise), the harness's tone, the deck's frames between a press trace's inputs - are the running Node's,
+  and feed the traces' inputs and worlds; storing them would take about 600 KB. So a Node whose sin, cos or log
+  differ from 20.12's still fails iosdeck's --check on the rules, press and voice files, naming the Math as the
+  cause; written again under it, the fixtures are consistent and the Swift passes unchanged.
 
 ### 7.1 Slice 1 - Core: the physics and the voice
 

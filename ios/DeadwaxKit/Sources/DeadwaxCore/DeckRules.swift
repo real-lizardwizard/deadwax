@@ -693,7 +693,13 @@ public final class DeckRules<M: DeckMaths> {
         if reduced {
             post(.stop)
             let sounds = sounding(plan.x)
-            if sounds { take(plan.x, speed, now) }
+            if sounds {
+                //? the take holds the song's speed until the judge hears the song (HANDOVER_MAX_S at most): the
+                //? handover below is the judge alone, so a take's own DRIVE_FOR_S would leave the voice slowing to
+                //? still for the lead less 0.12 s before the song is heard
+                let stamped = stamp(now)
+                post(.take(at: plan.x, rate: Platter.voiceRate(speed), time: stamped, until: stamped + DeckConstants.handoverMaxS))
+            }
             motion = .turning(since: now, from: angleNow())
             host.show(nil, scrubbing: false)
             loop()
@@ -875,8 +881,10 @@ public final class DeckRules<M: DeckMaths> {
             self.motion = .turning(since: now, from: angle)
             host.show(nil, scrubbing: false)
             if motion.resumed {
-                //? (3.5) resumed early by the lead, its judge already running: the voice holds the song's speed from here
-                if handoverJudge != nil && motion.sounding && !motion.quiet {
+                //? (3.5) resumed early by the lead: the voice holds the song's speed from here, and asks no second resume
+                if motion.sounding && !motion.quiet {
+                    //? silent at the resume, its window come since: the judge from here, at what the song was sought to
+                    if handoverJudge == nil { handOver(motion.sought, true, now, judgeOnly: true) }
                     let stamped = stamp(motion.since + motion.plan.duration * 1000)
                     post(.drive(at: motion.plan.x, rate: Platter.voiceRate(speed), accel: nil, time: stamped, until: stamped + DeckConstants.handoverMaxS))
                 }
