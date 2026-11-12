@@ -80,6 +80,7 @@ extension EngineRenderTests {
         let (engine, gate, song, trace) = try behind(lag: 0.25)
         _ = try render(engine, frames: 19_200, piece: 4_800)
         _ = try engine.renderOffline(4_800 + 512)
+        try runOutCalledBack(engine)
         let handled = engine.callbacksDone
         gate.release() // the retry (every 50 ms) reads them well before the last completion is handled
         waitFor(engine) { engine.callbacksDone > handled && engine.phase == .playing }
@@ -129,6 +130,7 @@ extension EngineRenderTests {
         engine.play([A, B], from: 0)
         engine.settle()
         var out = samples(try engine.renderOffline(28_800), channel: 0) // 4800 past what has arrived
+        try runOutCalledBack(engine)
         gate.release()
         waitFor(engine) { engine.callbacksDone >= 5 && engine.phase == .playing }
         try #require(engine.callbacksDone >= 5 && engine.phase == .playing, "A's five completions handled, A on again (\(engine.phase))\n\(trace)")

@@ -64,14 +64,23 @@ jobs:
           ls -d /Applications/Xcode*.app || true
 
       # Core again, and the engine rendered offline, sample by sample: a join is the two songs end to
-      # end, a 24-bit file decodes exactly, a stream decodes what the file does
+      # end, a 24-bit file decodes exactly, a stream decodes what the file does. This run and the next each
+      # print one line, "AVAudioPlayerNode taking a buffer, measured": how late this runner's nodes take a
+      # buffer, against the engine's offline settle, and how late it lets a 10 ms sleep run - a print, never
+      # a check (BufferTakeMeasuredTests.swift; how to read it: notes/ios.md "A node's buffers, taken late")
       - name: DeadwaxKit, with the engine's offline renders
         run: swift test --package-path ios/DeadwaxKit
 
       # The engine's renders again with every buffer reaching its node 10 ms late - what this runner's
       # AVAudioPlayerNode did at 70cbef6 and 307384f, held off longer (notes/ios.md "A node's buffers, taken
-      # late"): the engine's offline settle (30 ms) must cover it with room to spare, whatever this run's own
-      # timing. At 10 ms the old 10 ms settle failed most of the suite; at 0.5 ms a settle cut back to 2 ms passed.
+      # late"): the engine's offline settle must cover it with room to spare, whatever this run's own timing.
+      # At 09781a5 this failed 12 of 87 with the settle at 30 ms. The hook's 10 ms was a Thread.sleep, which
+      # the system lets run late where it coalesces timers, and so was the settle's wait. A Mac under
+      # `taskpolicy -b` fails 6-9 of those 12 the same way - but -b also fails a test this runner passed
+      # (playAfterAPauseWaitsForThisRunsFirstRender), so it is harsher than this runner, and coalescing here is
+      # likely, not seen. Both waits are on a strict timer now and the settle is 100 ms, 90 ms over the lag -
+      # under load the margin is what carries it; the measured line says how much of it this runner uses.
+      # (At 10 ms the old 10 ms settle failed most of the suite; at 0.5 ms a 2 ms settle passed.)
       - name: The engine's offline renders, its buffers taken late
         if: ${{ !cancelled() }}
         env:

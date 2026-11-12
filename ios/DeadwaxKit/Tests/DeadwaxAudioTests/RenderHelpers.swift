@@ -31,8 +31,9 @@ func liveEngine(rate: Double, channels: AVAudioChannelCount = 2, ahead: Double =
 
 /// Every test engine's buffers taken late by AVAudioPlayerNode, as on ios.yml's runner: DEADWAX_TEST_SCHEDULE_LAG
 /// seconds (unset: none). 0.0005 s failed 37 of EngineRenderTests' 53 before the engine's offline settle; ios.yml
-/// runs the audio tests a second time at 0.010 s, which the 30 ms settle covers and the first 10 ms one didn't
-/// (notes/ios.md "A node's buffers, taken late").
+/// runs the audio tests a second time at 0.010 s, which the 100 ms settle covers 90 ms over. At 30 ms the runner
+/// failed 12 of 87 there, with the hook then on a Thread.sleep the system let run late; it is on a strict timer
+/// now (notes/ios.md "A node's buffers, taken late").
 let testScheduleLag: TimeInterval = Double(ProcessInfo.processInfo.environment["DEADWAX_TEST_SCHEDULE_LAG"] ?? "") ?? 0
 
 /// An offline engine with the phone's own buffering - a second scheduled before a start from silence, 2 s
@@ -80,12 +81,35 @@ func completionsHandled(_ engine: PlaybackEngine, seconds: Double = 5,
     // not handled, the engine's own queue held off
     let arrived = engine.callbacksArrived, handled = engine.callbacksDone
     let which = arrived == handled
-        ? "every callback AVAudioEngine made was handled, so the node's clock has passed a buffer it hasn't called back: AVAudioPlayerNode took the buffer late, its clock counting it on time (notes/ios.md \"A node's buffers, taken late\")"
+        ? "every callback AVAudioEngine made was handled, so the node's clock has passed a buffer it hasn't called back: \(takenLate)"
         : "AVAudioEngine called back \(arrived), the engine handled \(handled): its queue is held off"
     try #require(engine.completionsDue == 0,
                  "the completions of what was rendered, handled within \(seconds) s - \(which); \(engine.lanesSaid)",
                  sourceLocation: sourceLocation)
 }
+
+/// Waits (bounded) until AVAudioEngine has called back every buffer on each node its clock says has played all on
+/// it, then requires it - before a test lets bytes come to a lane run dry, its completions handled late, and looks
+/// for them held ("entry 0 held"): the engine holds them only once those callbacks are in (`ranOut`). Offline they
+/// come on AVAudioEngine's own thread after the render, at no set time, and since the settle is 100 ms the stream's
+/// retry (every 50 ms) is always waiting when the render ends, so it reads the bytes at once: with 5 CPU hogs here,
+/// once, before the callbacks came - not held, as the engine is built to do, and B laid over A's end
+/// (notes/ios.md "A node's buffers, taken late").
+func runOutCalledBack(_ engine: PlaybackEngine, seconds: Double = 5,
+                      sourceLocation: SourceLocation = #_sourceLocation) throws {
+    let until = Date().addingTimeInterval(seconds)
+    while !engine.runOutCalledBack, Date() < until { Thread.sleep(forTimeInterval: 0.001) }
+    // No render comes while this waits, so a buffer the node took late - its clock past it, its audio a render
+    // behind - is never called back: that, unless the test holds AVAudioEngine's callbacks off itself (callbackLag)
+    try #require(engine.runOutCalledBack,
+                 "AVAudioEngine's callbacks of every buffer on a node run out, within \(seconds) s - not come, so most likely \(takenLate); \(engine.lanesSaid)",
+                 sourceLocation: sourceLocation)
+}
+
+/// What a callback that can't come says: the node's clock counted a buffer it took a render late (ios.yml's runner).
+let takenLate = "AVAudioPlayerNode took the buffer late, its clock counting it on time (notes/ios.md \"A node's buffers, "
+    + "taken late\"; how late this machine takes one: the line \"AVAudioPlayerNode taking a buffer, measured\" in this "
+    + "run's log)"
 
 /// The engine's trace, each line with the seconds since the test began - printed when a test fails, to
 /// say what the engine did and when.
