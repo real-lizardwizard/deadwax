@@ -218,8 +218,9 @@ struct DeckRulesTests {
     }
 }
 
+/// A double's bits as the exporter writes them (any NaN as 0x7ff8000000000000 - RecordedMaths.bits).
 func hex(_ x: Double) -> String {
-    String(x.bitPattern, radix: 16).leftPadded(16)
+    String(RecordedMaths.bits(x), radix: 16).leftPadded(16)
 }
 
 /// The world a trace was made in: the host, the clock, the player's position and the deck engine's state, recording

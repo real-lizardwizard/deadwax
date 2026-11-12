@@ -827,7 +827,7 @@ exporter with `--check` so tests.yml (which runs every sim, each on its own) fai
 | export-you-vectors.cjs | You.tsx's expressions and words, read out of the source and evaluated as written (136 cases) | you/ | iosyou.sim.cjs |
 | export-gate-vectors.cjs | NeedsNavidrome.tsx, access.ts, errorWords.ts, navidromeCheck.ts, the gate rendered against a Preact stand-in (35 cases) | gate/ | iosgate.sim.cjs |
 | export-lyrics-vectors.cjs (app 0.4) | lyricsView.ts - every rule of notes/app-lyrics.md 2.2-2.7 and the words - with lyrics.ts's lyricTime and scrub.ts's LANDED_WITHIN_S; the server's answers (src/lyrics.py song_lyrics()) through lyrics_answers.py, held by test_ios_contract.py | lyrics/ | ioslyrics.sim.cjs |
-| export-deck-vectors.cjs | platter.ts, turntable.ts, playSpeed.ts, deckClock.ts's pointerSamples, debugRows.ts, deckVoice.ts, and the real deck.ts driven through ui/test/deckHarness.cjs (deck.sim's own fakes) with deckVoice.ts rendering beside it; theme.css's turntable tokens; the words of Turntable.tsx, SpeedFader.tsx, SpeedChip.tsx, LookChoice.tsx, WindDownChoice.tsx and You.tsx; every Math call recorded (maths.json, its committed answers reused); the real Turntable.tsx and NowPlaying.tsx mounted over it and driven by pointer events and keys (press/, 13 traces), its handlers hashed | deck/ (74 files, 3 MB budget) | iosdeck.sim.cjs |
+| export-deck-vectors.cjs | platter.ts, turntable.ts, playSpeed.ts, deckClock.ts's pointerSamples, debugRows.ts, deckVoice.ts, and the real deck.ts driven through ui/test/deckHarness.cjs (deck.sim's own fakes) with deckVoice.ts rendering beside it; theme.css's turntable tokens; the words of Turntable.tsx, SpeedFader.tsx, SpeedChip.tsx, LookChoice.tsx, WindDownChoice.tsx and You.tsx; every Math call recorded (maths.json, its committed answers reused); the real Turntable.tsx and NowPlaying.tsx mounted over it and driven by pointer events and keys (press/, 13 traces), its handlers hashed; made.json, who made them | deck/ (75 files, 3 MB budget) | iosdeck.sim.cjs - byte for byte on the maker's Node, platform and arch, the sources elsewhere |
 
 `--check` makes everything again in memory and compares it byte for byte with what is committed, so a hand edit
 fails too. **A web rule changed**: its sim fails; run the exporter and commit what it writes; that touches ios/,
@@ -2966,8 +2966,8 @@ fire in `handOver`'s `done`) is in no web trace; TurntablePress has no trace at 
   holds with the committed answer, and says when Node's own differs - which keeps maths.json and every file made
   only from recorded calls the same on any Node. About 32,000 calls are made with the recording off (the bench's
   motions, the harness's tone, the deck's frames between press inputs) and stay Node's: tried with sin, cos and exp
-  one ulp off on half their inputs, --check failed on 22 files (48 without the guard), now naming the Math as why. Not seen on Node
-  22 - only 20.12 is on this Mac.
+  one ulp off on half their inputs, --check failed on 22 files (48 without the guard), now naming the Math as why.
+  Not seen on Node 22 then - since seen, and the check made to hold on any machine (below).
 - **Read and found right**: JSMath's six helpers against 4.2 and ECMAScript (round's halves and -0, min's and
   max's zeros and NaN, ToInt32's modulo, fround through Float); `DeckHealth`, the web's own name, which keeps
   test_ios_contract.py's `struct Health` reader on the server's. Linux: the slice's Core files import only libm, but
@@ -2978,3 +2978,40 @@ fire in `handOver`'s `done`) is in no web trace; TurntablePress has no trace at 
 (`** BUILD SUCCEEDED **`, no warning from the code) and check_project.py ok; all 76 sims (iosdeck: 74 fixtures,
 3056 KB of 3072); the five iOS pytest files, 126 passed. **Still assumed**: Linux (ios.yml's ubuntu job, not run
 here); Node 22's Math; the lead path against an engine (slice 2).
+
+**A check that holds on any machine** (2026-11-12, after the merge into ios). CI's tests.yml failed iosdeck.sim on
+ubuntu x64 with Node v22.23.4: jsmath.json, turntable.json and maths.json differed. The same Node on this Mac
+(arm64, fetched into the scratchpad) changed a different set: maths.json, press/turn-back-past-the-start.json and
+rules/motion-{ramp,scratch}-{60,120}.json. So what the exporter writes depends on the CPU as well as on the Node,
+and byte-equal regeneration can't hold on every machine. The Swift passed either way: it replays maths.json.
+
+- **A NaN is written as one.** x64's arithmetic makes 0xfff8000000000000, arm64's 0x7ff8000000000000, and V8 passes
+  them through Math.min, Math.max and the arithmetic, but JavaScript can't see a NaN's sign. The exporter writes
+  every double and Float32 through `setF64` and `setF32` - the hex, the base64, the hashes of the voice's output and
+  reports, the Math table's keys and its run hashes - and they write any NaN as 0x7ff8000000000000 (a Float32's as
+  0x7fc00000). The Swift tests write theirs the same way (`RecordedMaths.bits`, which also looks up and hashes a call
+  by it, so a NaN made on x64 Linux finds the table's; `DeckFixtures.bits` for a Float32; TraceWorld's `hex`), held
+  by DeckFixturesTests' `everyNaNIsOne`. On this Mac it changed no committed byte. A stand-in for x64 (a preload
+  giving every Math function's NaN the sign bit) reproduced CI's failure exactly with the old exporter - jsmath.json,
+  turntable.json, maths.json - and passes the full check with the new.
+- **The maker, recorded**: `made.json` holds the Node, platform and arch that made the fixtures (`made_on`: v20.12.2
+  darwin/arm64, this Mac's /usr/local/bin/node) and the sha256 of the exporter and ui/test/deckHarness.cjs
+  (`made_with`). Writing the fixtures makes the running Node their maker - so write them on it.
+- **Two kinds of check.** --check still makes everything again in memory. On the maker's Node, platform and arch,
+  every file must be the same byte for byte (a full check). Anywhere else, a differing file fails if its sources
+  (`made_from`) changed, if it is new, missing or stray, or if no Math answer reaches it (EXACT: jsmath.json,
+  tokens.json, voice/windows.json, press/handlers.json); a change to the exporter or the harness (`made_with`)
+  fails everywhere. Otherwise it differs only by that Node's Math: listed, not failed (a sources-only check).
+  iosdeck's PASS line names the kind that ran.
+- **Files that had no `made_from`** got one rather than being taken for Math's: jsmath.json the sha256 of
+  `jsmathFixture`'s own text, voice/windows.json that of `recipeChannel` and `recipeWindow`, and maths.json every
+  other file's together. jsmath.json and windows.json are also EXACT - nothing in them is a Math function's answer,
+  and ECMAScript defines the rest - so a difference in them on any machine is a failure, not a note. The .f32
+  stretches are judged by their case's .json.
+- **Verified**: on Node 20.12.2 (the maker) the full check passes; on Node v22.23.4 arm64 it passes sources-only,
+  with 68 files byte for byte and 6 differing by its Math alone (maths.json, press/turn-back-past-the-start.json,
+  rules/motion-{ramp,scratch}-{60,120}.json) - V8 22 answers 13 of the recorded calls otherwise (exp 3, log 1, sin
+  6, cos 2, atan2 1); with the x64 stand-in on Node 22 as well, the same. lib/platter.ts's MAX_SPEED changed from 24
+  to 25: both Nodes fail (the maker's on every file it reaches, Node 22's as "its sources changed"); a comment added
+  to the exporter: both fail. **Not seen**: x64 itself - Rosetta isn't installed here, so node-v22.23.4-darwin-x64
+  wasn't run; CI's next run is the first.

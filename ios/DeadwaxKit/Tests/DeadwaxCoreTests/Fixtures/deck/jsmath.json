@@ -1,6 +1,9 @@
 {
   "about": "Math.round, Math.fround over awkward numbers; Math.min and Math.max over pairs (NaN and -0 among them); ToInt32 (x | 0) and the masks the voice indexes with (x & 1023, x & 8191) - as Node answers them.",
   "made_by": "ios/scripts/export-deck-vectors.cjs - never edit by hand: change the TypeScript and run it again",
+  "made_from": {
+    "ios/scripts/export-deck-vectors.cjs jsmathFixture": "d7add5ee1e7e76a5a14b2882cc8c1aeb5b8175d8fd07d225f5e78aa1a7557c7d"
+  },
   "round": [
     ["3fe0000000000000 0.5","3ff0000000000000 1"],
     ["bfe0000000000000 -0.5","8000000000000000 -0"],

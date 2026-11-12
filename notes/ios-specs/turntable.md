@@ -1422,7 +1422,7 @@ handover's predicted and actual `E`.
 As Phase 1's (`ios/scripts/export-traces.cjs`, `export-level-vectors.cjs`, …): one script,
 **`ios/scripts/export-deck-vectors.cjs`**, compiles the web's own TypeScript with tsc into TMPDIR (as the sims do)
 and writes `ios/DeadwaxKit/Tests/DeadwaxCoreTests/Fixtures/deck/`; **`ui/test/iosdeck.sim.cjs`** runs it with
-`--check` (made again, compared byte for byte), so a change to a web rule the Swift mirrors fails tests.yml until
+`--check` (made again, compared byte for byte - on the Node that made them; see the as-built), so a change to a web rule the Swift mirrors fails tests.yml until
 the vectors are written again, and the Swift then fails until it is ported. Never edited by hand. Doubles are
 written as their IEEE bits in hex beside a readable decimal, so nothing is lost to JSON's printing.
 
@@ -1471,8 +1471,8 @@ recorded stamps.
 - **Palette**: the tokens of 2.14 read out of theme.css by the exporter (`tokens.json`), and a Linux test holding
   `TurntablePalette`'s Core-side values (the RGBA each Palette colour is made from) to them.
 
-**As built (slice 1, 2026-11-12).** 61 files, 2986 KB of the 3 MB - since its review 74, 3056 KB (the press
-traces). Where it isn't the table above, and why:
+**As built (slice 1, 2026-11-12).** 61 files, 2986 KB of the 3 MB - since its review 75, 3061 KB (the press
+traces, made.json). Where it isn't the table above, and why:
 
 - **`rules/`, 42 cases.** The eight motions at 60 Hz, and five of them (steady1, back1, wobble, ramp, scratch) at
   120 Hz - half, quarter and double not at 120 Hz, for the budget - each with 500 ms of play before and 3000 ms
@@ -1518,9 +1518,16 @@ traces). Where it isn't the table above, and why:
   code behind a build flag in 2023; whether CI's Node 22 has it is unchecked - only Node 20.12 is on this Mac.) It
   can't hold the rest: about 32,000 calls made with the recording off - the bench's motions (lab/motions.ts's
   sines and noise), the harness's tone, the deck's frames between a press trace's inputs - are the running Node's,
-  and feed the traces' inputs and worlds; storing them would take about 600 KB. So a Node whose sin, cos or log
-  differ from 20.12's still fails iosdeck's --check on the rules, press and voice files, naming the Math as the
-  cause; written again under it, the fixtures are consistent and the Swift passes unchanged.
+  and feed the traces' inputs and worlds; storing them would take about 600 KB.
+- **The check, on any machine** (after the merge: CI's x64 Node 22 failed it, and Node 22 on arm64 differed in
+  other files). Any NaN is written as 0x7ff8000000000000 (x64 makes 0xfff8...; JavaScript can't tell), and the Swift
+  tests write and look up theirs the same way (`RecordedMaths.bits`). `made.json` records the maker - Node,
+  platform, arch - and the exporter's and harness's sha256. --check on the maker compares every file byte for byte;
+  anywhere else a file whose `made_from` is unchanged may differ by that Node's Math alone and is listed, not failed,
+  while a changed source, a new, missing or stray file, a change to the exporter or harness, or a difference in a
+  file no Math answer reaches (jsmath.json, tokens.json, voice/windows.json, press/handlers.json) fails. jsmath.json
+  and voice/windows.json gained a `made_from` (their functions' own text), maths.json every other file's. The
+  whole account: notes/ios.md's slice 1, "A check that holds on any machine".
 
 ### 7.1 Slice 1 - Core: the physics and the voice
 

@@ -192,8 +192,8 @@ import Testing
         render(c, run, maths) { outputs, n, done, heard in
             for i in 0..<n {
                 if all { out.samples.append(outputs[0][i]); out.samples.append(outputs[1][i]) }
-                span.add32(outputs[0][i].bitPattern)
-                span.add32(outputs[1][i].bitPattern)
+                span.add32(DeckFixtures.bits(outputs[0][i]))
+                span.add32(DeckFixtures.bits(outputs[1][i]))
                 if let whole = run.whole {
                     let k = done + i - whole.from
                     if k >= 0 && k < whole.frames { out.whole.append(outputs[0][i]); out.whole.append(outputs[1][i]) }
@@ -209,7 +209,7 @@ import Testing
                 let values = [heard.time, heard.pos, heard.rate, heard.gain, heard.held, heard.peaks, heard.lowest]
                 out.reportCount += 1
                 out.reports.append(contentsOf: values)
-                for value in values { out.reportHash.add64(value.bitPattern) }
+                for value in values { out.reportHash.add64(RecordedMaths.bits(value)) }
             }
         }
         if inSpan > 0 { out.spans.append(span.hex) }
@@ -263,7 +263,7 @@ import Testing
                         for k in 0..<whole.frames {
                             let l = UInt32(littleEndian: raw.loadUnaligned(fromByteOffset: 4 * k, as: UInt32.self))
                             let r = UInt32(littleEndian: raw.loadUnaligned(fromByteOffset: 4 * (whole.frames + k), as: UInt32.self))
-                            if out.whole[2 * k].bitPattern != l || out.whole[2 * k + 1].bitPattern != r { differ += 1 }
+                            if DeckFixtures.bits(out.whole[2 * k]) != l || DeckFixtures.bits(out.whole[2 * k + 1]) != r { differ += 1 }
                         }
                     }
                     #expect(differ == 0, "\(what): \(differ) of \(whole.frames) frames differ from \(whole.file)")

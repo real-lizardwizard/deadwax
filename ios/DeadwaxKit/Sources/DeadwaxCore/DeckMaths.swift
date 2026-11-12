@@ -91,6 +91,13 @@ public final class RecordedMaths: DeckMaths {
     public static let fnvStart: UInt64 = 0xcbf2_9ce4_8422_2325
     public static let fnvPrime: UInt64 = 0x0000_0100_0000_01b3
 
+    /// A double's bits as the fixtures write them: any NaN as 0x7ff8000000000000. A NaN's sign and payload are the
+    /// CPU's (x64 makes 0xfff8000000000000, arm64 0x7ff8000000000000) and JavaScript can't see them, so the exporter
+    /// writes one NaN, and a call is looked up and hashed by the same bits here on any machine.
+    @inlinable public static func bits(_ x: Double) -> UInt64 {
+        x.isNaN ? 0x7FF8_0000_0000_0000 : x.bitPattern
+    }
+
     public init(answers: [Call: UInt64]) {
         self.answers = answers
     }
@@ -122,14 +129,14 @@ public final class RecordedMaths: DeckMaths {
         return Double(bitPattern: bits)
     }
 
-    public func exp(_ x: Double) -> Double { answer(Call(.exp, x.bitPattern), inputs: 1) }
-    public func log(_ x: Double) -> Double { answer(Call(.log, x.bitPattern), inputs: 1) }
-    public func sin(_ x: Double) -> Double { answer(Call(.sin, x.bitPattern), inputs: 1) }
-    public func cos(_ x: Double) -> Double { answer(Call(.cos, x.bitPattern), inputs: 1) }
-    public func atan2(_ y: Double, _ x: Double) -> Double { answer(Call(.atan2, y.bitPattern, x.bitPattern), inputs: 2) }
-    public func hypot(_ a: Double, _ b: Double) -> Double { answer(Call(.hypot, a.bitPattern, b.bitPattern), inputs: 2) }
-    public func pow(_ base: Double, _ exponent: Double) -> Double { answer(Call(.pow, base.bitPattern, exponent.bitPattern), inputs: 2) }
-    public func log10(_ x: Double) -> Double { answer(Call(.log10, x.bitPattern), inputs: 1) }
+    public func exp(_ x: Double) -> Double { answer(Call(.exp, Self.bits(x)), inputs: 1) }
+    public func log(_ x: Double) -> Double { answer(Call(.log, Self.bits(x)), inputs: 1) }
+    public func sin(_ x: Double) -> Double { answer(Call(.sin, Self.bits(x)), inputs: 1) }
+    public func cos(_ x: Double) -> Double { answer(Call(.cos, Self.bits(x)), inputs: 1) }
+    public func atan2(_ y: Double, _ x: Double) -> Double { answer(Call(.atan2, Self.bits(y), Self.bits(x)), inputs: 2) }
+    public func hypot(_ a: Double, _ b: Double) -> Double { answer(Call(.hypot, Self.bits(a), Self.bits(b)), inputs: 2) }
+    public func pow(_ base: Double, _ exponent: Double) -> Double { answer(Call(.pow, Self.bits(base), Self.bits(exponent)), inputs: 2) }
+    public func log10(_ x: Double) -> Double { answer(Call(.log10, Self.bits(x)), inputs: 1) }
 }
 
 /// The JavaScript number rules the ports lean on, as JavaScript has them (the spec's 4.2) - held to Node's own

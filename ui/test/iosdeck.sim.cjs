@@ -10,6 +10,15 @@
  * the iPhone's port tested against what the TypeScript used to do. The fix is to port the change to the Swift, run
  * the exporter and commit what it writes. It also holds the folder to its 3 MB budget (the spec's 7.0).
  *
+ * Two kinds of check, by who runs it. On the Node, platform and arch that made the fixtures (Fixtures/deck/made.json)
+ * every file must be what the exporter makes now, byte for byte - a full check. On any other (CI's Node 22 on x64),
+ * the Math functions can answer otherwise - V8's own code differs between versions - so a file whose sources
+ * (`made_from`) are unchanged may differ by that alone: it is listed, not failed - a sources-only check. A changed
+ * source, a new, missing or stray file, a file no Math answer reaches (jsmath.json, tokens.json, voice/windows.json,
+ * press/handlers.json), or a change to the exporter or ui/test/deckHarness.cjs fails either way. The Swift replays
+ * maths.json's answers, so it passes on fixtures made by any Node. A NaN is written as one, whatever its sign: x64
+ * and arm64 make different ones, and JavaScript can't see them.
+ *
  * Run it with:  TMPDIR=<writable> node ui/test/iosdeck.sim.cjs   (ui/node_modules installed: the exporter compiles with tsc)
  */
 
@@ -24,7 +33,10 @@ const BUDGET = 3 * 1024 * 1024;
 let failures = 0;
 try {
   const said = execFileSync(process.execPath, [EXPORTER, '--check'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-  console.log(`PASS  the iPhone's turntable fixtures are what the TypeScript does now\n      ${said.trim()}`);
+  //? which kind of check ran: "full, on the maker's Node (...)" or "sources only, on Node ... (made on ...)"
+  const kind = (said.match(/^Check: (.*)$/m) || [])[1] || 'of an unknown kind';
+  const rest = said.split('\n').filter((line) => line.trim() && !line.startsWith('Check: '));
+  console.log(`PASS  the iPhone's turntable fixtures are what the TypeScript does now - a ${kind.replace(/^full/, 'full check').replace(/^sources only/, 'sources-only check')}\n${rest.map((line) => `      ${line}`).join('\n')}`);
 } catch (error) {
   failures++;
   const said = `${error.stdout ?? ''}${error.stderr ?? ''}`.trim() || String(error.message ?? error);

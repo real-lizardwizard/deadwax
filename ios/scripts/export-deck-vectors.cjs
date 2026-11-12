@@ -30,15 +30,23 @@
  *                   the reports, and three short cases' whole output
  *   maths.json      every exp, log, sin, cos, atan2, hypot, pow and log10 the ported code evaluated in all of the
  *                   above, its inputs' and answer's bits (each voice run's count and order are in its own file)
+ *   made.json       who made them: the Node, platform and arch (`made_on`), and this script's and its harness's
+ *                   sha256 (`made_with`)
  *
  * Doubles are written as their IEEE bits in hex, then a space and the number as JavaScript writes it ("3ff8000000000000
- * 1.5"): the Swift reads the hex, a person the rest. Long runs of doubles are base64 of their little-endian bytes.
- * Each file names the sources it was made from with their sha256, so ui/test/iosdeck.sim.cjs - which runs this with
- * --check - fails when one changes, in what it does or only in its text, until the fixtures are written again and
- * the Swift follows. The folder's budget is 3 MB (iosdeck.sim checks it). Never edit a fixture by hand.
+ * 1.5"): the Swift reads the hex, a person the rest. Long runs of doubles are base64 of their little-endian bytes. Any
+ * NaN is written as 0x7ff8000000000000 (setF64). Each file names the sources it was made from with their sha256
+ * (`made_from`), so ui/test/iosdeck.sim.cjs - which runs this with --check - fails when one changes, in what it does
+ * or only in its text, until the fixtures are written again and the Swift follows. The folder's budget is 3 MB
+ * (iosdeck.sim checks it). Never edit a fixture by hand.
  *
- *   node ios/scripts/export-deck-vectors.cjs           write the fixtures
- *   node ios/scripts/export-deck-vectors.cjs --check   write nothing; exit 1 when a fixture differs
+ * --check makes everything again in memory. On the maker's Node, platform and arch (made.json) every file must be
+ * the same byte for byte - a full check. On any other, the Math functions can answer otherwise, so a file whose
+ * made_from is unchanged may differ by that alone and is listed, not failed - a sources-only check (`check`, below).
+ * Write the fixtures on the maker's Node, so the files only its Math reaches stay as they are.
+ *
+ *   node ios/scripts/export-deck-vectors.cjs           write the fixtures (and make this Node their maker)
+ *   node ios/scripts/export-deck-vectors.cjs --check   write nothing; exit 1 when a fixture differs where it must not
  *
  * Needs ui/node_modules (tsc) and a writable TMPDIR, as the sims do.
  */
@@ -105,9 +113,26 @@ const ARITY = { exp: 1, log: 1, sin: 1, cos: 1, log10: 1, atan2: 2, hypot: 2, po
 const maths = { on: true, table: Object.fromEntries(RECORDED.map((name) => [name, new Map()])), run: null }
 
 const scratch = new DataView(new ArrayBuffer(8))
+//? A NaN's bits are the CPU's - x64 makes 0xfff8000000000000 where arm64 makes 0x7ff8000000000000, and V8 passes
+//? them through Math.min, Math.max and the arithmetic - and JavaScript can't see them. So every double and Float32 this
+//? writes, in hex, base64 or a hash, goes through setF64 or setF32, which write any NaN as 0x7ff8000000000000 (a
+//? Float32's as 0x7fc00000): the same bytes on every machine. The Swift tests write theirs the same way.
+const NAN_HIGH = 0x7ff80000, NAN32 = 0x7fc00000
+function setF64(view, at, x, little = false) {
+  if (x !== x) {
+    view.setUint32(at + (little ? 4 : 0), NAN_HIGH, little)
+    view.setUint32(at + (little ? 0 : 4), 0, little)
+  } else view.setFloat64(at, x, little)
+}
+function setF32(view, at, x, little = false) {
+  if (x !== x) view.setUint32(at, NAN32, little)
+  else view.setFloat32(at, x, little)
+}
+/** A view over a Buffer's own bytes. */
+const viewOf = (bytes) => new DataView(bytes.buffer, bytes.byteOffset, bytes.length)
 /** A double's bits, 16 hex digits. */
 function hex(x) {
-  scratch.setFloat64(0, x)
+  setF64(scratch, 0, x)
   return scratch.getUint32(0).toString(16).padStart(8, '0') + scratch.getUint32(4).toString(16).padStart(8, '0')
 }
 /** A double as the fixtures hold it: its bits, and then as JavaScript writes it. */
@@ -197,7 +222,7 @@ for (const name of RECORDED) {
         //? the call's place in the run: the function, then each input's bits, little-endian - as the Swift hashes it
         callBytes[0] = index
         for (let i = 0; i < inputs.length; i++) {
-          callView.setFloat64(1 + 8 * i, Number(inputs[i]), true)
+          setF64(callView, 1 + 8 * i, Number(inputs[i]), true)
         }
         fnvBytes(run.hash, callBytes.subarray(0, 1 + 8 * inputs.length))
         run.calls += 1
@@ -232,15 +257,30 @@ function laid(value, depth, indent = '') {
   return '{\n' + keys.map((key) => inner + flat(key) + ': ' + laid(value[key], depth - 1, inner)).join(',\n') + '\n' + indent + '}'
 }
 const files = {}
+/** Each file's made_from, as written (maths.json's is all of theirs; --check compares them). */
+const madeFrom = {}
 const emit = (name, value, depth) => {
+  if (!Buffer.isBuffer(value) && value.made_from) madeFrom[name] = value.made_from
   files[name] = Buffer.isBuffer(value) ? value : laid(value, depth) + '\n'
 }
 const MADE_BY = 'ios/scripts/export-deck-vectors.cjs - never edit by hand: change the TypeScript and run it again'
+//? Who made the fixtures and with what (made.json): the Node, platform and CPU - the one thing besides the sources
+//? that moves what they hold, through the Math functions' answers - and this script and its harness, by sha256.
+const MADE_ON = { node: process.version, platform: process.platform, arch: process.arch }
+const MADE_WITH = Object.fromEntries([
+  ['ios/scripts/export-deck-vectors.cjs', __filename],
+  ['ui/test/deckHarness.cjs', path.join(UI, 'test', 'deckHarness.cjs')],
+].map(([name, at]) => [name, sha256(fs.readFileSync(at, 'utf8'))]))
+//? The files no Math function's answer reaches - a check, the tokens, the windows' integer recipes, the handlers'
+//? hashes - which must be the same on any machine.
+const EXACT = new Set(['jsmath.json', 'tokens.json', 'voice/windows.json', 'press/handlers.json'])
+const onText = (on) => `${on.node} ${on.platform}/${on.arch}`
 
 /** Doubles as base64 of their little-endian bytes. */
 function f64s(values) {
   const bytes = Buffer.alloc(values.length * 8)
-  values.forEach((value, i) => bytes.writeDoubleLE(value, i * 8))
+  const view = viewOf(bytes)
+  values.forEach((value, i) => setF64(view, i * 8, value, true))
   return bytes.toString('base64')
 }
 
@@ -269,6 +309,7 @@ function jsmathFixture() {
   return {
     about: 'Math.round, Math.fround over awkward numbers; Math.min and Math.max over pairs (NaN and -0 among them); ToInt32 (x | 0) and the masks the voice indexes with (x & 1023, x & 8191) - as Node answers them.',
     made_by: MADE_BY,
+    made_from: { 'ios/scripts/export-deck-vectors.cjs jsmathFixture': sha256(jsmathFixture.toString()) },
     round: cases.map((x) => [d(x), d(Math.round(x))]),
     fround: cases.map((x) => [d(x), d(Math.fround(x))]),
     minmax: pairs.map(([a, b]) => [d(a), d(b), d(Math.min(a, b)), d(Math.max(a, b))]),
@@ -697,8 +738,8 @@ function runVoice(messages, rate, block, from, frames, keep) {
     voice.renderVoice(state, outs, n, rate, now)
     const heard = voice.voiceReport(state, n, rate, now, voice.REPORTS_PER_SECOND)
     for (let i = 0; i < n; i++) {
-      frameView.setFloat32(0, outs[0][i], true)
-      frameView.setFloat32(4, outs[1][i], true)
+      setF32(frameView, 0, outs[0][i], true)
+      setF32(frameView, 4, outs[1][i], true)
       fnvBytes(span, frameBytes)
       const k = done + i - (keep ? keep[0] : 0)
       if (kept && k >= 0 && k < keep[1]) {
@@ -715,7 +756,7 @@ function runVoice(messages, rate, block, from, frames, keep) {
       const values = [heard.time, heard.pos, heard.rate, heard.gain, heard.held, heard.peaks, heard.lowest]
       reportCount += 1
       if (keepReports) reports.push(...values)
-      values.forEach((value, i) => reportView.setFloat64(8 * i, value, true))
+      values.forEach((value, i) => setF64(reportView, 8 * i, value, true))
       fnvBytes(reportHash, reportBytes)
     }
     done += n
@@ -749,8 +790,9 @@ function voiceFixtures(cases) {
         wholeFile = `voice/${c.name}.f32`
         //? the first channel's Float32s, then the second's, little-endian
         const bytes = Buffer.alloc(keep[1] * 8)
-        run.kept[0].forEach((value, i) => bytes.writeFloatLE(value, 4 * i))
-        run.kept[1].forEach((value, i) => bytes.writeFloatLE(value, 4 * (keep[1] + i)))
+        const view = viewOf(bytes)
+        run.kept[0].forEach((value, i) => setF32(view, 4 * i, value, true))
+        run.kept[1].forEach((value, i) => setF32(view, 4 * (keep[1] + i), value, true))
         out.push([wholeFile, bytes])
       }
     }
@@ -767,6 +809,7 @@ function voiceFixtures(cases) {
   out.push(['voice/windows.json', {
     about: `The windows the voice cases read, made from integer recipes (export-deck-vectors.cjs recipeChannel; DeckVoiceTests makes them the same way): ${WINDOW_SECONDS} s at \`rate\`, each sample an Int16 over 32768 - noise (xorshift32 seeded seed * 2 + channel + 1, its top 16 bits less 32768; soft: that shifted right 3), sweep (a triangle whose step is 1 + ((i >> 7) % 600) * (channel + 1)), clicks (+32767 then -32768 every 2400 + 7 seed + 331 channel samples), step (silence, then 32767 on the first channel and -32768 on the second from half way, the second 9601 samples later). \`hash\`: FNV-1a 64 of the channels' Float32 bits in order, little-endian.`,
     made_by: MADE_BY,
+    made_from: { 'ios/scripts/export-deck-vectors.cjs recipeChannel, recipeWindow': sha256(recipeChannel.toString() + recipeWindow.toString()) },
     windows: [...windowCache.values()].map((w) => ({ ...w.key, hash: w.hash })),
   }, 2])
   return out
@@ -2252,11 +2295,11 @@ async function pressFixtures() {
 
 function encodeInputs(inputs) {
   const bytes = []
-  const scratch8 = Buffer.alloc(8)
+  const scratch8 = new Uint8Array(8), view8 = new DataView(scratch8.buffer)
   for (const { op, t, args } of inputs) {
     bytes.push(op)
     for (const value of [t, ...args]) {
-      scratch8.writeDoubleLE(value)
+      setF64(view8, 0, value, true)
       for (const byte of scratch8) bytes.push(byte)
     }
   }
@@ -2321,35 +2364,20 @@ async function main() {
   for (const [name, value, depth] of await pressFixtures()) emit(name, value, depth)
   maths.on = false
   emit('maths.json', mathsFixture(), 2)
+  emit('made.json', {
+    about: 'Who made these fixtures, and with what. Each file names the web sources it was made from (`made_from`); besides them only the Math functions\' answers move what a file holds, and those are the Node\'s, the platform\'s and the CPU\'s (V8 is not the same everywhere; nor is a NaN\'s sign, which the files write as one). So iosdeck.sim\'s --check, run on `made_on`, compares every file byte for byte; on any other Node, platform or arch it checks the sources: a file whose made_from is unchanged may differ by that Node\'s Math alone, and is listed rather than failed - except the files no Math answer reaches (jsmath.json, tokens.json, voice/windows.json, press/handlers.json), which must match anywhere. `made_with`: this script and its harness - a change to either fails the check everywhere until the fixtures are written again.',
+    made_by: MADE_BY,
+    made_on: MADE_ON,
+    made_with: MADE_WITH,
+  }, 2)
 
   fs.rmSync(OUT, { recursive: true, force: true })
-  const drifted = RECORDED.filter((name) => drift[name].size).map((name) => `${name} ${drift[name].size}`)
-  if (drifted.length) {
-    console.log(`Node ${process.version}'s Math answers some calls otherwise than the Node that made maths.json (${drifted.join(', ')}). The committed answers were used where maths.json holds them; the calls it doesn't hold are this Node's, so a file made from them can differ for that alone.`)
-  }
   const total = Object.values(files).reduce((sum, body) => sum + Buffer.byteLength(body), 0)
   if (CHECK) {
-    const differ = []
-    for (const [name, body] of Object.entries(files)) {
-      const at = path.join(FIXTURES, name)
-      if (!fs.existsSync(at)) differ.push(`${name} (missing)`)
-      else if (!fs.readFileSync(at).equals(Buffer.isBuffer(body) ? body : Buffer.from(body))) differ.push(name)
-    }
-    const kept = listFiles(FIXTURES)
-    const stray = kept.filter((name) => !(name in files))
-    if (differ.length || stray.length) {
-      if (differ.length) console.log(`The turntable's fixtures differ from what the web's TypeScript does now: ${differ.join(', ')}.`)
-      if (stray.length) console.log(`Fixtures/deck holds files this script no longer writes: ${stray.join(', ')}.`)
-      console.log('Run node ios/scripts/export-deck-vectors.cjs, and see what the Swift ports must follow.')
-      process.exit(1)
-    }
-    if (total > BUDGET) {
-      console.log(`The turntable's fixtures are ${Math.round(total / 1024)} KB, over their ${BUDGET / 1024} KB budget.`)
-      process.exit(1)
-    }
-    console.log(`The turntable's ${Object.keys(files).length} fixtures match the web's TypeScript (${Math.round(total / 1024)} KB of ${BUDGET / 1024}).`)
+    check(total)
     return
   }
+  drifted()
   fs.rmSync(FIXTURES, { recursive: true, force: true })
   for (const [name, body] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(FIXTURES, name)), { recursive: true })
@@ -2360,6 +2388,91 @@ async function main() {
     console.log('...over the budget: hash a case rather than drop it (the spec\'s 7.0).')
     process.exit(1)
   }
+}
+
+/**
+ * --check: everything made again in memory, and held to what is committed. On the Node, platform and arch that made
+ * them (made.json's `made_on`) every file must be the same byte for byte - a full check. On any other, the Math
+ * functions may answer otherwise (V8's own code differs between versions; x64 and arm64 differ in a NaN's sign, which
+ * is written as one now, but not only there), so a file whose sources are unchanged may differ by that alone: it is
+ * listed, not failed - a sources-only check. Either way, a file whose sources changed, a new or missing one, a stray,
+ * one of EXACT's, or a change to this script or its harness fails.
+ */
+function check(total) {
+  const kept = readJson(path.join(FIXTURES, 'made.json'))
+  const maker = kept && kept.made_on
+  const full = !!maker && onText(maker) === onText(MADE_ON)
+  const toolsMoved = !kept || JSON.stringify(kept.made_with) !== JSON.stringify(MADE_WITH)
+  console.log(full
+    ? `Check: full, on the maker's Node (${onText(MADE_ON)})`
+    : `Check: sources only, on Node ${onText(MADE_ON)} (made on ${maker ? onText(maker) : 'an unknown Node'})`)
+  drifted()
+  const failed = [], mathOnly = []
+  let same = 0
+  for (const [name, body] of Object.entries(files)) {
+    const at = path.join(FIXTURES, name)
+    if (!fs.existsSync(at)) {
+      failed.push(`${name} (missing)`)
+      continue
+    }
+    if (name === 'made.json' && !full) continue
+    const committed = fs.readFileSync(at)
+    if (committed.equals(Buffer.isBuffer(body) ? body : Buffer.from(body))) {
+      same += 1
+      continue
+    }
+    if (full || toolsMoved || name === 'made.json') failed.push(name)
+    else if (EXACT.has(name)) failed.push(`${name} (no Math answer reaches it)`)
+    else if (!sameSources(name, committed)) failed.push(`${name} (its sources changed)`)
+    else mathOnly.push(name)
+  }
+  const stray = listFiles(FIXTURES).filter((name) => !(name in files))
+  if (failed.length || stray.length) {
+    if (failed.length) console.log(`The turntable's fixtures differ from what the web's TypeScript does now: ${failed.join(', ')}.`)
+    if (stray.length) console.log(`Fixtures/deck holds files this script no longer writes: ${stray.join(', ')}.`)
+    //? written again on the maker's Node, the files only its Math moves stay as they are
+    const where = maker ? ` (on ${onText(maker)}, the Node that made them, or every file its Math reaches moves too)` : ''
+    if (toolsMoved) console.log(`This script or ui/test/deckHarness.cjs changed since the fixtures were written (made.json): run node ios/scripts/export-deck-vectors.cjs again${where}, and see what the Swift ports must follow.`)
+    else console.log(`The web's code changed: port it to the Swift, run node ios/scripts/export-deck-vectors.cjs${where}, and see what the Swift ports must follow.`)
+    process.exit(1)
+  }
+  if (total > BUDGET) {
+    console.log(`The turntable's fixtures are ${Math.round(total / 1024)} KB, over their ${BUDGET / 1024} KB budget.`)
+    process.exit(1)
+  }
+  const size = `${Math.round(total / 1024)} KB of ${BUDGET / 1024}`
+  if (full) {
+    console.log(`The turntable's ${Object.keys(files).length} fixtures match the web's TypeScript (${size}).`)
+    return
+  }
+  console.log(`The turntable's ${Object.keys(files).length - 1} fixtures match the web's TypeScript in their sources (${size}): ${same} byte for byte${mathOnly.length ? `, ${mathOnly.length} differing only by this Node's Math (made on ${maker ? onText(maker) : 'an unknown Node'}, checked on ${onText(MADE_ON)}): ${mathOnly.join(', ')}` : ''}.`)
+}
+
+/** Says which recorded Math calls this Node answers otherwise than maths.json, if any. */
+function drifted() {
+  const counts = RECORDED.filter((name) => drift[name].size).map((name) => `${name} ${drift[name].size}`)
+  if (!counts.length) return
+  console.log(`Node ${process.version}'s Math answers some calls otherwise than the Node that made maths.json (${counts.join(', ')}). The committed answers were used where maths.json holds them; the calls it doesn't hold are this Node's, so a file made from them can differ for that alone.`)
+}
+
+/** A committed file's sources the same as the ones it would be made from now: its made_from, or for a voice
+ *  stretch (.f32) its case's. */
+function sameSources(name, committed) {
+  const json = name.endsWith('.f32') ? name.replace(/\.f32$/, '.json') : name
+  const had = json === name ? parseJson(committed) : readJson(path.join(FIXTURES, json))
+  return !!had && !!madeFrom[json] && JSON.stringify(had.made_from) === JSON.stringify(madeFrom[json])
+}
+
+function parseJson(bytes) {
+  try {
+    return JSON.parse(bytes.toString('utf8'))
+  } catch {
+    return null
+  }
+}
+
+function readJson(at) {
+  return fs.existsSync(at) ? parseJson(fs.readFileSync(at)) : null
 }
 
 function listFiles(root, prefix = '') {
@@ -2385,9 +2498,12 @@ function mathsFixture() {
     })
     table[name] = { calls: entries.length, bits: bytes.toString('base64') }
   }
+  const from = {}
+  for (const name of Object.keys(madeFrom).sort()) Object.assign(from, madeFrom[name])
   return {
-    about: 'Every exp, log, sin, cos, atan2, hypot, pow and log10 the web\'s ported code evaluated while the other fixtures were made - each entry its inputs\' and its answer\'s bits, as base64 of little-endian 64-bit words ([input, answer] or [a, b, answer]), sorted by input. How many calls each voice run made, and their order, is in its own voice/*.json (`maths`).',
+    about: 'Every exp, log, sin, cos, atan2, hypot, pow and log10 the web\'s ported code evaluated while the other fixtures were made - each entry its inputs\' and its answer\'s bits, as base64 of little-endian 64-bit words ([input, answer] or [a, b, answer]), sorted by input. How many calls each voice run made, and their order, is in its own voice/*.json (`maths`). `made_from`: every other file\'s.',
     made_by: MADE_BY,
+    made_from: Object.fromEntries(Object.keys(from).sort().map((key) => [key, from[key]])),
     functions: RECORDED,
     table,
   }
