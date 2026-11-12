@@ -7,9 +7,9 @@
 PRODUCT_NAME = Deadwax
 PRODUCT_BUNDLE_IDENTIFIER = net.lizardlounge.deadwax
 
-// The app's own version, apart from the server's (src/__init__.py): 0.1 was Phase 0, 0.2 Phase 1's shell, 0.3 Phase 2's downloads, 0.4 is lyrics.
-MARKETING_VERSION = 0.4
-CURRENT_PROJECT_VERSION = 4
+// The app's own version, apart from the server's (src/__init__.py): 0.1 was Phase 0, 0.2 Phase 1's shell, 0.3 Phase 2's downloads, 0.4 lyrics, 0.5 is the EQ.
+MARKETING_VERSION = 0.5
+CURRENT_PROJECT_VERSION = 5
 
 // A device build only: James's Mac has no Simulator runtime, and none is needed.
 SDKROOT = iphoneos

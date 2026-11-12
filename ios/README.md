@@ -2,10 +2,11 @@
 
 The native iPhone app: a SwiftUI app over the `DeadwaxKit` Swift package (its `DeadwaxCore` logic,
 tested on Linux, and its `DeadwaxAudio` engine), built on a Mac with Xcode and a free Apple account.
-It is early: app 0.4 - Phase 1's player (your library, album pages, Up Next, Now Playing,
+It is early: app 0.5 - Phase 1's player (your library, album pages, Up Next, Now Playing,
 normalization on the phone, the lock screen, plays and picking up where you left off), Phase 2's
-albums and songs downloaded to play offline, and lyrics on Now Playing - kept on the `ios` branch
-while it's being built. Nothing of Phase 2 or the lyrics has been seen on an iPhone yet. Phase 0's test screen lives on in the app's Debug.
+albums and songs downloaded to play offline, lyrics on Now Playing, and the EQ (ten sliders and nine
+presets, kept per output) - kept on the `ios` branch while it's being built. Nothing of Phase 2, the
+lyrics or the EQ has been seen on an iPhone yet. Phase 0's test screen lives on in the app's Debug.
 
 - **To install it, and every week after:** [docs/ios.md](../docs/ios.md) - the steps once on the Mac
   and the iPhone, the weekly `ios/scripts/install.sh`, the test album

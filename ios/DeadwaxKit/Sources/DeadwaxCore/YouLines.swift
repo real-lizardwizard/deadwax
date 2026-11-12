@@ -47,7 +47,7 @@ public enum YouWords {
     public static let debug = "Debug"
 
     /// About's row for the app's own version and build (screens.md 8.5: "Native adds App = `0.2 (build)`"), beside
-    /// deadwax's Version - its label, and its value from the bundle ("0.4 (4)").
+    /// deadwax's Version - its label, and its value from the bundle ("0.5 (5)").
     public static let app = "App"
     public static func app(version: String?, build: String?) -> String {
         "\(version ?? "?") (\(build ?? "?"))"
