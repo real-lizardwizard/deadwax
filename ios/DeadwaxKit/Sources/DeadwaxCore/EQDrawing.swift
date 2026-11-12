@@ -10,7 +10,7 @@ import Foundation
 /// value it has there, so the x axis is the same on every output and a line can morph from one output's to another's.
 public struct EQDrawing: Equatable, Sendable {
     public struct Line: Equatable, Sendable {
-        public enum Kind: Equatable, Sendable {
+        public enum Kind: Hashable, Sendable {
             /// what you hear - both ears, or the left's in state 6 - filled to 0 dB
             case heard
             /// the right ear's (state 6)

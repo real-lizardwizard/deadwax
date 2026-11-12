@@ -118,4 +118,10 @@ enum Palette {
     static let barFill = LinearGradient(colors: [Color(red: 0xB5 / 255, green: 0x6A / 255, blue: 0xF5 / 255),
                                                  Color(red: 0x93 / 255, green: 0x33 / 255, blue: 0xEA / 255)],
                                         startPoint: .top, endPoint: .bottom)
+    /// --dw-text-3 #8e8ea3: the EQ's 0 dB lines, and its gridlines under Increase Contrast (eq.md 3.18).
+    static let textTertiary = Color(red: 0x8E / 255, green: 0x8E / 255, blue: 0xA3 / 255)
+    /// --dw-accent-text #d8b4fe: the EQ curve's right ear.
+    static let accentText = Color(red: 0xD8 / 255, green: 0xB4 / 255, blue: 0xFE / 255)
+    /// --dw-toggled-bg rgba(168, 85, 247, 0.18): the fill under the EQ's curve.
+    static let toggledFill = Color(red: 168 / 255, green: 85 / 255, blue: 247 / 255).opacity(0.18)
 }

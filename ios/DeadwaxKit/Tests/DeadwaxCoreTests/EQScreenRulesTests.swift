@@ -355,6 +355,8 @@ import Testing
     @Test func theBandsWords() {
         #expect(EQWords.Tone.bandSaid(0) == "31 hertz" && EQWords.Tone.bandSaid(5) == "1 kilohertz")
         #expect(EQWords.Tone.bandSaid(9) == "16 kilohertz")
+        #expect((0..<10).map(EQWords.Tone.bandLabel) == ["31 Hz", "63 Hz", "125 Hz", "250 Hz", "500 Hz", "1 kHz", "2 kHz",
+                                                         "4 kHz", "8 kHz", "16 kHz"])
         #expect(EQWords.Screen.more == "More for this output")
         #expect(EQWords.Debug.startTook(ms: 0.0312, ready: true, rate: 48_000) == "0.031 ms, its curve made ahead")
         #expect(EQWords.Debug.startTook(ms: 1.9, ready: false, rate: 44_100) == "1.90 ms, its curve made then, for 44.1 kHz")

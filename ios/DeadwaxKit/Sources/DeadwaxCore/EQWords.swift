@@ -510,6 +510,11 @@ extension EQWords {
             return name.hasSuffix("k") ? "\(name.dropLast()) kilohertz" : "\(name) hertz"
         }
         public static let resetToZero = "Reset to 0"
+        /// A stepper row's label at the accessibility sizes (3.15): "31 Hz", "1 kHz", "16 kHz".
+        public static func bandLabel(_ band: Int) -> String {
+            let name = EQGraphic.names[band]
+            return name.hasSuffix("k") ? "\(name.dropLast()) kHz" : "\(name) Hz"
+        }
     }
 
     public enum Presets {
