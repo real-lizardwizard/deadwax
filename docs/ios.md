@@ -133,9 +133,16 @@ happens in `~/Library/Caches/deadwax-build`, and the last build's whole log is `
    deadwax gives back is kept, in the Keychain, for that address. With logins off there's no sign-in,
    and the app opens on the Library.
 
-From then on the app opens straight into your music. If deadwax doesn't answer as it opens, it says
-"Can't reach deadwax. Check you're on the right network (or your VPN is on) and try again.", with
-**Try again** and **Change address**, and it tries again by itself whenever you come back to the app.
+From then on the app opens straight into your music. It keeps who deadwax last said you are, so it
+opens at once and asks deadwax behind it: if your sign-in has ended, the sign-in comes up over the
+app, and if deadwax doesn't answer, the app stays open (You says it couldn't check). Only a phone that
+has never been let in at that address waits for deadwax; if it doesn't answer, that one says "Can't
+reach deadwax. Check you're on the right network (or your VPN is on) and try again.", with **Try
+again** and **Change address**, and tries again by itself whenever you come back to the app.
+
+A play made while deadwax can't be reached isn't lost: it's kept on the phone with the time you played
+it, and sent - oldest first - as soon as deadwax answers again, so Navidrome (and Last.fm or
+ListenBrainz behind it) count it.
 
 If your sign-in ends while you're using the app (it ran out after 30 days unused, an admin reset
 your password, or your password was changed from another device), the sign-in comes up over the
@@ -311,10 +318,11 @@ Debug is where Phase 0's test screen lives now:
 
 - **deadwax**: **Check** (it runs as Debug opens) says deadwax's version and whether logins are on.
 - **Test sounds**, once Check is OK: the test album's songs. Tap one to play the album from it.
-  **Streamed** or **Downloaded** chooses which copy plays: Downloaded plays the copies on the phone (a
-  song with none is streamed). Each song's row has a download button, **Download all 10** downloads
-  the lot, and **Remove the downloads** deletes them. These, and the hi-res song below, are the only
-  downloads in Phase 1.
+  Each song's row has a download button, **Download all 10** downloads the lot, and **Remove the
+  downloads** deletes them - through the app's own downloads, so they go on in the background, wait for
+  Wi-Fi unless you've said otherwise, and are checked once here. A song on the phone plays from there,
+  as every downloaded song does; **Stream even when downloaded** streams it instead, to hear the two
+  side by side (it's off again the next time the app opens).
 - **Hi-res**: **Find a 24/192 FLAC** looks through the library (up to 10,000 songs) for a 24-bit
   192 kHz FLAC, or the highest rate there is, to play. This needs a Navidrome that says each song's
   sample rate (OpenSubsonic's `samplingRate`).
@@ -445,7 +453,9 @@ The tests can't reach these either. Note what happens.
 
 These are the web app's for now. Most of them come to the phone in the next phases:
 
-- **Downloads** to play offline. Only Debug's test songs and the hi-res one can be downloaded.
+- **Downloads** to play offline: the app can download and check songs now, but the buttons to ask
+  for them come in the next part of Phase 2. Until then only Debug's test songs and the hi-res one can
+  be downloaded.
 - **Playlists**, **artist pages** and a **songs list**, and the Library's **Shuffle** of your whole
   library.
 - **Search**, **Get** and **Requests**.

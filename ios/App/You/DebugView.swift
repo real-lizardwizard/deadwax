@@ -10,6 +10,7 @@ struct DebugView: View {
     @Environment(DebugModel.self) private var model
     @Environment(PlayerModel.self) private var player
     @Environment(LibraryModel.self) private var library
+    @Environment(DownloadModel.self) private var downloads
 
     init() {}
 
@@ -77,10 +78,8 @@ struct DebugView: View {
 
     private var testSounds: some View {
         Section {
-            Picker("Play", selection: Binding(get: { model.source }, set: { model.source = $0 })) {
-                ForEach(DebugModel.Source.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
+            Toggle("Stream even when downloaded", isOn: Binding(get: { downloads.streamEvenWhenDownloaded },
+                                                                set: { downloads.streamEvenWhenDownloaded = $0 }))
             ForEach(Array(model.testSongs.enumerated()), id: \.element.id) { index, song in
                 songRow(song, playing: player.current?.track.id == song.id) {
                     model.play(model.testSongs, at: index)
@@ -89,7 +88,7 @@ struct DebugView: View {
             if !model.testSongs.isEmpty {
                 let missing = model.testSongs.filter { !model.downloaded.contains($0.id) }
                 Button(missing.isEmpty ? "All downloaded" : "Download all \(model.testSongs.count)") {
-                    Task { await model.download(model.testSongs) }
+                    model.download(model.testSongs)
                 }
                 .disabled(missing.isEmpty || !model.downloading.isEmpty)
                 if !model.downloaded.isEmpty {
@@ -97,11 +96,10 @@ struct DebugView: View {
                 }
             }
             if let words = model.testWords { Text(words).font(.footnote) }
-            if let words = model.downloadWords { Text(words).font(.footnote).foregroundStyle(.red) }
         } header: {
             Text("Test sounds")
         } footer: {
-            Text("Songs 1 to 8 are three beeps each: tap one to play the album from it and count the beeps - all three, every time? Songs 9 and 10 are one tone cut in two: played one into the other, the tone should never break. \"Downloaded\" plays the copies on the phone (a song with none is streamed).")
+            Text("Songs 1 to 8 are three beeps each: tap one to play the album from it and count the beeps - all three, every time? Songs 9 and 10 are one tone cut in two: played one into the other, the tone should never break. A song downloaded to this phone plays from there, as every song does; \"Stream even when downloaded\" streams it instead, to hear the two side by side.")
         }
     }
 
@@ -123,7 +121,7 @@ struct DebugView: View {
                 ProgressView()
             } else {
                 Button {
-                    Task { await model.download([song]) }
+                    model.download([song])
                 } label: {
                     Image(systemName: model.downloaded.contains(song.id) ? "checkmark.circle.fill" : "arrow.down.circle")
                 }

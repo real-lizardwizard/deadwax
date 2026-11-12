@@ -1,4 +1,5 @@
 import DeadwaxCore
+import ImageIO
 import SwiftUI
 import UIKit
 
@@ -119,6 +120,13 @@ final class CoverCache {
             loading[flight] = (task, asking.waiting + 1)
         } else {
             task = Task<UIImage?, Never> { [weak self] in
+                // a downloaded album's cover is on the phone (phase2-downloads.md 8.8): its 1024 drawn down to the size
+                // asked, with no network - deadwax asked only when it isn't
+                if let kept = KeptCovers.shared.url(for: id),
+                   let image = await Task.detached(priority: .userInitiated, operation: { Self.thumbnail(kept, size: size) }).value {
+                    self?.landed(key, flight, image, called: false)
+                    return image
+                }
                 let data = try? await client.cover(coverID: id, size: size)
                 // UIImage(data:) only reads the header; the pixels are decoded here, off the main thread
                 let raw = data.flatMap(UIImage.init(data:))
@@ -133,6 +141,17 @@ final class CoverCache {
         } onCancel: {
             Task { @MainActor in self.left(flight, task) }
         }
+    }
+
+    /// A kept cover decoded at `size` pixels on its longer side (ImageIO's thumbnail, decoded here, not at its first draw).
+    nonisolated static func thumbnail(_ url: URL, size: Int) -> UIImage? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true,
+                                        kCGImageSourceCreateThumbnailWithTransform: true,
+                                        kCGImageSourceShouldCacheImmediately: true,
+                                        kCGImageSourceThumbnailMaxPixelSize: max(size, 1)]
+        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        return UIImage(cgImage: image)
     }
 
     /// The app came back to the front (a WireGuard tunnel up again, say): covers that failed are asked again the next

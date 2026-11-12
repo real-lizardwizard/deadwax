@@ -7,9 +7,9 @@ import Testing
 private let gb: Int64 = 1_000_000_000
 
 /// An album's songs asked for as an album, `each` bytes apiece, asked at `at`.
-private func album(_ id: String, songs: Int, each: Int64, at: Int64) -> [DownloadPlan.Song] {
+private func album(_ id: String, songs: Int, each: Int64, at: Int64) -> [DownloadPlan.Asked] {
     (1...songs).map { n in
-        DownloadPlan.Song(id: "\(id)-\(n)", albumID: id, disc: 1, track: n, wantedAt: at, origins: [.album(id)], expected: each)
+        DownloadPlan.Asked(id: "\(id)-\(n)", albumID: id, disc: 1, track: n, wantedAt: at, origins: [.album(id)], expected: each)
     }
 }
 
@@ -57,9 +57,9 @@ private func facts(here: Int64 = 0, limit: StorageLimit = .gb20, free: Int64 = 1
     }
 
     @Test func aLimitLoweredBelowWhatsHereRemovesNothingAndNewUnitsWaitForRoom() {
-        let started = [DownloadPlan.Song(id: "s-1", albumID: "s", track: 1, wantedAt: 1, origins: [.album("s")], expected: gb,
+        let started = [DownloadPlan.Asked(id: "s-1", albumID: "s", track: 1, wantedAt: 1, origins: [.album("s")], expected: gb,
                                          received: gb / 2, out: true),
-                       DownloadPlan.Song(id: "s-2", albumID: "s", track: 2, wantedAt: 1, origins: [.album("s")], expected: gb)]
+                       DownloadPlan.Asked(id: "s-2", albumID: "s", track: 2, wantedAt: 1, origins: [.album("s")], expected: gb)]
         let fresh = album("new", songs: 1, each: 100, at: 2)
         let plan = DownloadPlan.plan(started + fresh, facts(here: 8 * gb, limit: .gb5))
         #expect(plan["s-1"] == DownloadPlan.Decision(wait: .queued, task: true), "a started album goes on: never half an album for room")
@@ -68,9 +68,9 @@ private func facts(here: Int64 = 0, limit: StorageLimit = .gb20, free: Int64 = 1
     }
 
     @Test func aSongAskedAloneIsAUnitOfItsOwnAndOneWithItsAlbumGoesWithIt() {
-        let alone = DownloadPlan.Song(id: "x", albumID: "al", wantedAt: 1, origins: [.song], expected: 4 * gb)
-        let both = DownloadPlan.Song(id: "y", albumID: "al2", wantedAt: 2, origins: [.song, .album("al2")], expected: gb)
-        let sibling = DownloadPlan.Song(id: "z", albumID: "al2", wantedAt: 3, origins: [.album("al2")], expected: 20 * gb)
+        let alone = DownloadPlan.Asked(id: "x", albumID: "al", wantedAt: 1, origins: [.song], expected: 4 * gb)
+        let both = DownloadPlan.Asked(id: "y", albumID: "al2", wantedAt: 2, origins: [.song, .album("al2")], expected: gb)
+        let sibling = DownloadPlan.Asked(id: "z", albumID: "al2", wantedAt: 3, origins: [.album("al2")], expected: 20 * gb)
         let plan = DownloadPlan.plan([alone, both, sibling], facts(here: 10 * gb))
         #expect(plan["x"]?.task == true)
         #expect(plan["y"]?.wait == .room && plan["z"]?.wait == .room, "y is planned with its album, whole")
@@ -109,7 +109,7 @@ private func facts(here: Int64 = 0, limit: StorageLimit = .gb20, free: Int64 = 1
     }
 
     @Test func aTaskOutStaysOutUnlessSignedOut() {
-        let out = [DownloadPlan.Song(id: "o", albumID: "a", wantedAt: 1, origins: [.album("a")], expected: 100, out: true)]
+        let out = [DownloadPlan.Asked(id: "o", albumID: "a", wantedAt: 1, origins: [.album("a")], expected: 100, out: true)]
         #expect(DownloadPlan.plan(out, facts(reach: .unreachable))["o"] == DownloadPlan.Decision(wait: .deadwax, task: true))
         #expect(DownloadPlan.plan(out, facts(signedIn: false))["o"] == DownloadPlan.Decision(wait: .signIn, task: false), "cancelled, resume kept")
     }
@@ -124,7 +124,7 @@ private func facts(here: Int64 = 0, limit: StorageLimit = .gb20, free: Int64 = 1
 
     @Test func aTranscodesEstimateIsWhatsPlanned() {
         let record = DownloadRecord(id: "t", albumID: "a", format: "mp3", suffix: "mp3", duration: 250, wantedAt: 1)
-        let song = DownloadPlan.Song(record, origins: [.album("a")])
+        let song = DownloadPlan.Asked(record, origins: [.album("a")])
         #expect(song.expected == 10_000_000)
         #expect(DownloadPlan.plan([song], facts(here: StorageLimit.gb5.bytes! - 9_999_999, limit: .gb5))["t"]?.wait == .room)
     }

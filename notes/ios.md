@@ -2337,3 +2337,96 @@ later, so it should).
 **On the phone**: play an album whose songs have their own covers, or a few albums with Play Last, lock the phone,
 and let one song run into the next: the lock screen's cover changes with the title, not a moment after. Skip with
 Next on the lock screen too (the song after next has had less time - a skip two ahead may still take a moment).
+
+## Phase 2: downloads (app 0.3)
+
+The spec is notes/ios-specs/phase2-downloads.md. Built in two parts on `p2/downloads`: the machinery first (below),
+then the screens.
+
+### Part 1: the machinery (p2/downloads)
+
+**Core** (pure, tested on Linux and macOS): `DownloadModels` (a song's state, the waits, the failures as codes, the
+origins, `DownloadRecord`, the two settings `DownloadOver` and `StorageLimit`, `NetworkPath`, `DownloadTaskName`),
+`DownloadRules` (every transition of 2.1, the album's state of 2.2, the menus' items of 2.5, what Remove takes),
+`DownloadPlan` (8.5), `DownloadWords` (every line of the spec; the vocabulary sim's ban list ported, over
+`DownloadWords.everyLine`), `Bytes.words` (8.6), `FLACMD5` (RFC 1321 MD5 and FLAC's packing), `Offline` (`OfflineRule`,
+`PendingPlays`, `LibraryRoot`, `AlbumList`, `DownloadedAlbums`, the gate's two rules; `AddedBy.phone`) and
+`DownloadDatabase` over the `CSQLite` system library (8.2's schema, `user_version` 1, WAL). **DeadwaxAudio**:
+`FLACVerifier`, the one addition - it reads, never plays.
+
+**The App** (`App/Downloads/`, `App/Models/Reachability.swift`):
+- `DownloadStore` - one person's folder, database and files: protection (`completeUntilFirstUserAuthentication` on
+  every folder, file and the database), backups off, free space, other accounts, Phase 0's folder retired.
+- `DownloadSession` - the one background session. The delegate moves a finished file to `music/<name>.part` before
+  it returns, from the task's name alone, and tells the model on the main thread synchronously, so the store has every
+  event before `urlSessionDidFinishEvents` lets `.backgroundTask(.urlSession(...))` end (capped at 25 s).
+- `DownloadModel` - what the screens bind to (below), and everything in step: the plan run at every ask, finish,
+  failure, setting, path and reachability change and coming to the front; tasks made, cancelled and re-adopted after a
+  relaunch; the length check and rename (`done(unchecked)` plays at once); the sound check one song at a time at
+  utility priority inside `beginBackgroundTask` (a check iOS stops is checked again later, never a try); albums' answers,
+  covers (1024) and loudness kept; plays kept and sent.
+- `Reachability` - NWPathMonitor, the transport's every answer or silence (`URLSessionTransport.listen`), the 3 s probe
+  on its own ephemeral session, a 5 s tick for the 30 s probe.
+- Wired in: the engine plays `SongFiles.downloads` (a `PlayableCopies` index the model keeps) before any stream, and
+  prefetches nothing for a song on the phone; Phase 0's downloads and the link's `copies` are gone; Debug's test songs
+  download through the model, its Streamed/Downloaded picker is "Stream even when downloaded"; PlayReporter keeps a
+  play it can't send (not online, or no answer); LoudnessBook puts a downloaded album's kept loudness on the shelf at
+  `at` 0 and fails a read at once while deadwax can't be reached (7.3); CoverCache draws a kept cover from the phone
+  first (8.8); ServerModel keeps every good /me as `me.json` and opens from it, /me asked behind (7.5).
+
+**The model's surface** (`DownloadModel`, in the environment):
+- reading: `state(_ songID) -> SongDownload`, `album(_ songs) / album(id:) -> AlbumDownload`, `choices(song:)`,
+  `choices(songs:gone:)`, `upNextCount(_:paged:)`, `isHere(_:)`, `anythingHere`, `downloadedAlbums: [IndexAlbum]` (the
+  Library's Downloaded, `AlbumList.downloaded`), `song(_:)` and `keptAlbum(_:)` (rows' names from the kept answers),
+  `downloading` / `failed` / `downloaded` (You > Downloads' sections, in the order they go), `summary` (You's row),
+  `bytesHere`, `otherBytes`, `forceQuitShown`, `storeProblem`, `playsWaiting`; Debug's `log`, `checkSeconds`,
+  `debugTasks()`.
+- the settings: `downloadOver`, `storageLimit` (UserDefaults, the spec's defaults), `streamEvenWhenDownloaded`.
+- acting, in the tap: `download(_ song)`, `download(album:)`, `download(songs:)`, `remove(_ songID)`,
+  `remove(album:)`, `remove(songs:)`, `tryAgain(_:)`, `tryAllAgain()`, `removeAll()`, `removeOthers()`.
+- progress: a screen that shows it runs `await downloads.followProgress()` in its `.task`; read four times a second
+  from the session, never kept (a song with no byte yet shows its wait).
+- `Reachability` (in the environment too): `reach`, `online`, `path`, `probing`, `tryNow()` (the banner's Try again,
+  a pull).
+
+**Departures from the spec, and why**:
+- `song` gains a `duration REAL` column: a transcode's estimate (8.5) is its duration at 320 kbps, and the row is all
+  the planner reads.
+- The task's name is `<server>|<person>|<song id>|<suffix>`, each part `safeName`d: the delegate names the `.part`
+  from it before any store is open (a background relaunch knows no one yet).
+- `DownloadStore` is a class used on the main actor, not an actor: every write is ordered with the model's state, and
+  the delegate's one file move needs no store at all.
+- **Download over changed: the tasks out are made again from the start, not from resume data.** Resume data carries
+  the request it was made from, its network flags included, so a task resumed from it would keep the old setting (Wi-Fi
+  only still waiting for Wi-Fi, or "Wi-Fi only" still using mobile data). At most the three songs fetching lose their
+  bytes; the rest hadn't started.
+- The planner makes tasks under the network waits (with the request's own flags, so iOS holds them until the network
+  allows) but never under deadwax's or the sign-in's; a task out stays out under any wait but a sign-out's; at most 100
+  tasks out.
+- A download answered 401 asks /me (the background session never goes through DeadwaxClient's 401 hook) and holds
+  every download under that session for a minute - else the plan would make the refused task again at once.
+- Resume data is spent on the task made from it (cleared from the row at once), so data that won't resume can't loop.
+- `OfflineRule`: a failed probe while deadwax already isn't online is unreachable at once (the path back, a pull).
+
+**Verified here**: the whole DeadwaxKit package on macOS (Core's new suites; the offline renders: a downloaded copy
+plays the samples its stream does, Off and at -6.02 dB, an album of copies joins sample-exact, the verifier matches
+the 16/44.1 and 24/96 fixtures, finds the changed sample, says "by size" with no MD5, and hashes exactly what FileSource
+decodes); the unsigned device build with no new warning; check_project.py; the sims; tests/test_source_bytes.py,
+test_ios_contract.py (no route added) and test_ios_install.py (the verifier's fixtures are make-test-album.py's, and
+libsndfile hears what their MD5s say). **Not run**: Linux (no toolchain on this Mac) - ios.yml installs
+libsqlite3-dev first. **Nothing of the App half has run**: no simulator, no phone.
+
+**What only the phone can tell** (the spec's checks 1-12 and section 11, plus): whether the relaunch delivers a force
+quit's cancels with `NSURLErrorBackgroundTaskCancelledReasonKey` and resume data; whether Navidrome's raw stream sends
+a validator (no resume data without one - then the 2.1.x patch on main is a strong ETag on the raw relay, not built);
+whether a resumed task's `countOfBytesExpectedToReceive` is the rest (progress adds what came before on that
+assumption); how long a check takes on a 24/192 album (Debug's `checkSeconds`); that a locked phone opens a downloaded
+next song (file protection); the kept /me launch in Airplane Mode.
+
+**Left for part 2**: every screen - the album page's control, ring, hero line, rows, menus, footer and notices; Now
+Playing's ••• (Download, Download Up Next) and its notices; Info's Plays from; the Library's Downloaded list and the
+offline root swap, the gate's Downloaded row, the marks on every Albums screen; You > Downloads and its row; the
+offline banner (`showsOfflineBanner()`, after the inset round); Debug's Downloads section (the model has its data);
+the player's offline skip (`PlayerWords.afterEngineFailure`'s `notOnPhone`, its notice words are in DownloadWords) and
+no prefetch offline; the album page reading its kept answer offline (3.7); Up Next's marks (after its round);
+`queue_pending` (7.6's queue saves kept - the table is there, ResumeController isn't wired to it yet).

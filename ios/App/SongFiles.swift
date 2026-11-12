@@ -11,10 +11,8 @@ import Foundation
 ///   still the song's. The least recently played go first once the cache passes 2,000,000,000 bytes;
 ///   iOS may empty Caches itself under pressure, and then songs are fetched again. A song skipped past
 ///   has its fetch let go and its part deleted.
-/// - **Downloaded** (Phase 0's, kept for the Test sounds screen): the original as deadwax sends it
-///   (`format=raw`), kept in Application Support (not Caches, which iOS deletes under pressure),
-///   excluded from backup, and readable while the phone is locked after its first unlock - so a locked
-///   phone can open the next song.
+/// - **Downloaded** (Phase 2's, DownloadModel): the file as a stream of it is sent, kept per person in
+///   Application Support - `downloads` is the index the engine plays them from, before any stream.
 ///
 /// Opened from the engine's queue and the main thread, so everything is behind one lock.
 final class SongFiles: @unchecked Sendable {
@@ -26,20 +24,17 @@ final class SongFiles: @unchecked Sendable {
     /// never evicted.
     private var kept: Set<String> = []
     let cache: StreamCacheFolder
-    let downloadFolder: URL
+    /// The songs downloaded to this phone, by id (DownloadModel keeps it): played from there, never streamed.
+    let downloads = PlayableCopies()
 
     init() {
         let manager = FileManager.default
         let caches = manager.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-        let support = manager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         cache = StreamCacheFolder(url: caches.appendingPathComponent("deadwax/stream", isDirectory: true))
-        downloadFolder = support.appendingPathComponent("deadwax/phase0", isDirectory: true)
         // the parts of fetches the app was stopped in, and anything the cache doesn't name, deleted
         // (everything, once, in the folder 0.1 left: its fetches wrote under the song's own name, so a
         // song cut short there would pass for whole); the songs kept, down to the limit
         cache.sweep()
-        try? manager.createDirectory(at: downloadFolder, withIntermediateDirectories: true)
-        Self.keepOffBackups(downloadFolder)
     }
 
     // MARK: streaming
@@ -118,7 +113,7 @@ final class SongFiles: @unchecked Sendable {
     /// The first bytes of the song's file, wherever it is on the phone - for the readout's FLAC
     /// STREAMINFO.
     func header(of song: Song) -> Data? {
-        if let url = downloadedURL(for: song) {
+        if let url = downloads.url(for: song.id) {
             return try? FileHandle(forReadingFrom: url).read(upToCount: 64 * 1024)
         }
         if let fetch = lock.withLock({ fetches[song.id] }) {
@@ -126,60 +121,5 @@ final class SongFiles: @unchecked Sendable {
         }
         guard let name = StreamCache.name(for: song), cache.bytes(of: name) != nil else { return nil }
         return try? FileHandle(forReadingFrom: cache.url(for: name)).read(upToCount: 64 * 1024)
-    }
-
-    // MARK: downloads
-
-    func downloadedURL(for song: Song) -> URL? {
-        guard let name = LocalFiles.name(songID: song.id, suffix: StreamFormat.suffix(for: song)) else { return nil }
-        let url = downloadFolder.appendingPathComponent(name)
-        return FileManager.default.fileExists(atPath: url.path) ? url : nil
-    }
-
-    /// Downloads the original, checks its length against Navidrome's size, and keeps it.
-    func download(_ song: Song, client: DeadwaxClient) async throws {
-        guard let name = LocalFiles.name(songID: song.id, suffix: StreamFormat.suffix(for: song)) else {
-            throw AudioFailure("That song's id can't name a file.", kind: .unsupported)
-        }
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.httpShouldSetCookies = false
-        configuration.httpCookieAcceptPolicy = .never
-        configuration.allowsCellularAccess = true
-        let session = URLSession(configuration: configuration)
-        defer { session.finishTasksAndInvalidate() }
-        let request = URLRequest(client.streamRequest(songID: song.id, format: StreamFormat.format(for: song)))
-        let (temporary, response) = try await session.download(for: request)
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        guard status == 200 else {
-            try? FileManager.default.removeItem(at: temporary)
-            throw status == 401
-                ? AudioFailure("deadwax says this phone isn't signed in (401). Sign in again.", kind: .signedOut, status: 401)
-                : AudioFailure("deadwax answered \(status) for this song.", kind: .unsupported, status: status)
-        }
-        let length = (try? FileManager.default.attributesOfItem(atPath: temporary.path)[.size] as? NSNumber)?.int64Value ?? 0
-        guard StreamFormat.format(for: song) != "raw" || LocalFiles.lengthMatches(length, song: song) else {
-            try? FileManager.default.removeItem(at: temporary)
-            throw AudioFailure("The download was \(length) bytes, not the \(song.size ?? 0) Navidrome says - left out.",
-                               kind: .network)
-        }
-        let target = downloadFolder.appendingPathComponent(name)
-        try? FileManager.default.removeItem(at: target)
-        try FileManager.default.moveItem(at: temporary, to: target)
-        try? FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
-                                               ofItemAtPath: target.path)
-        Self.keepOffBackups(target)
-    }
-
-    func removeDownloads() {
-        try? FileManager.default.removeItem(at: downloadFolder)
-        try? FileManager.default.createDirectory(at: downloadFolder, withIntermediateDirectories: true)
-        Self.keepOffBackups(downloadFolder)
-    }
-
-    private static func keepOffBackups(_ url: URL) {
-        var url = url
-        var values = URLResourceValues()
-        values.isExcludedFromBackup = true
-        try? url.setResourceValues(values)
     }
 }

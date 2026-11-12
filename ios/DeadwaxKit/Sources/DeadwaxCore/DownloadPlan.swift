@@ -27,7 +27,7 @@ public enum DownloadPlan {
     public static let maxOut = 100
 
     /// One song asked for and not yet here.
-    public struct Song: Sendable, Equatable {
+    public struct Asked: Sendable, Equatable {
         public let id: String
         public let albumID: String
         public let disc: Int?
@@ -136,11 +136,11 @@ public enum DownloadPlan {
     }
 
     /// Each song's decision, by id.
-    public static func plan(_ songs: [Song], _ facts: Facts) -> [String: Decision] {
+    public static func plan(_ songs: [Asked], _ facts: Facts) -> [String: Decision] {
         let shared = sharedWait(facts)
         // a task is out, and stays out, under any wait but a sign-out's: a running task has its own answer
         let outsKept = shared != .signIn
-        var units: [String: [Song]] = [:]
+        var units: [String: [Asked]] = [:]
         for song in songs { units[song.unit, default: []].append(song) }
         let order = units.keys.sorted { a, b in
             let x = units[a]!.map(\.wantedAt).min() ?? 0, y = units[b]!.map(\.wantedAt).min() ?? 0

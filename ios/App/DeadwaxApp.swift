@@ -1,7 +1,10 @@
 import SwiftUI
 
-/// deadwax for iPhone (app 0.2, Phase 1's shell): the server and its gates, two tabs, and the models every screen
-/// reads from the environment - see docs/ios.md and notes/ios.md.
+/// deadwax for iPhone (app 0.2, Phase 1's shell; Phase 2's downloads): the server and its gates, two tabs, and the
+/// models every screen reads from the environment - see docs/ios.md and notes/ios.md.
+///
+/// Downloads go through one background URLSession (DownloadSession), made at every launch - a background relaunch for
+/// its events included, which `.backgroundTask(.urlSession(...))` holds open until the store has them.
 @main
 struct DeadwaxApp: App {
     @State private var server: ServerModel
@@ -9,14 +12,25 @@ struct DeadwaxApp: App {
     @State private var navigation: AppNavigation
     @State private var library: LibraryModel
     @State private var debug: DebugModel
+    @State private var reachability: Reachability
+    @State private var downloads: DownloadModel
+
+    /// The one background session, made before anything else can ask it.
+    private static let downloadSession = DownloadSession()
 
     init() {
-        let server = ServerModel()
+        let transport = URLSessionTransport()
+        let server = ServerModel(transport: transport)
+        let reachability = Reachability(server: server)
+        transport.listen { [weak reachability] answered in reachability?.heard(answered: answered) }
         let files = SongFiles()
         let player = PlayerModel(server: server, files: files)
         let navigation = AppNavigation()
         let library = LibraryModel(server: server)
-        let debug = DebugModel(server: server, player: player, files: files)
+        let downloads = DownloadModel(server: server, reachability: reachability, files: files, session: Self.downloadSession)
+        player.connect(downloads: downloads, reachability: reachability)
+        let debug = DebugModel(server: server, player: player, downloads: downloads)
+        reachability.start()
         // a new person (signed out, someone else signed in, another server): nothing of the last one's kept
         server.whenPersonChanges {
             player.reset()
@@ -29,6 +43,8 @@ struct DeadwaxApp: App {
         _navigation = State(initialValue: navigation)
         _library = State(initialValue: library)
         _debug = State(initialValue: debug)
+        _reachability = State(initialValue: reachability)
+        _downloads = State(initialValue: downloads)
     }
 
     var body: some Scene {
@@ -39,8 +55,13 @@ struct DeadwaxApp: App {
                 .environment(navigation)
                 .environment(library)
                 .environment(debug)
+                .environment(reachability)
+                .environment(downloads)
                 .preferredColorScheme(.dark)
                 .tint(Palette.accent)
+        }
+        .backgroundTask(.urlSession(DownloadSession.identifier)) {
+            await Self.downloadSession.eventsDelivered()
         }
     }
 }

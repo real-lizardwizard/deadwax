@@ -15,8 +15,19 @@ final class URLSessionTransport: HTTPTransport, @unchecked Sendable {
 
     private let lock = NSLock()
     private var sessions: [Double: URLSession] = [:]
+    private var listener: (@Sendable (_ answered: Bool) -> Void)?
 
     init() {}
+
+    /// `listener` hears every request's end: deadwax answered (any status), or nothing did - not a request called off
+    /// (Reachability, phase2-downloads.md 7.1).
+    func listen(_ listener: @escaping @Sendable (_ answered: Bool) -> Void) {
+        lock.withLock { self.listener = listener }
+    }
+
+    private func heard(_ answered: Bool) {
+        lock.withLock { listener }?(answered)
+    }
 
     private func session(waiting timeout: Double) -> URLSession {
         lock.lock()
@@ -37,7 +48,15 @@ final class URLSessionTransport: HTTPTransport, @unchecked Sendable {
         let timeout = request.timeout ?? Self.standardTimeout
         var sent = URLRequest(request)
         sent.timeoutInterval = timeout
-        let (data, response) = try await session(waiting: timeout).data(for: sent)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session(waiting: timeout).data(for: sent)
+        } catch let error as URLError where error.code != .cancelled {
+            heard(false)
+            throw error
+        }
+        heard(true)
         guard let http = response as? HTTPURLResponse else {
             throw APIFailure.other("The answer wasn't http.")
         }

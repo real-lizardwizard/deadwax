@@ -8,12 +8,6 @@ import Observation
 @MainActor
 @Observable
 final class DebugModel {
-    enum Source: String, CaseIterable, Identifiable {
-        case stream = "Streamed"
-        case downloaded = "Downloaded"
-        var id: String { rawValue }
-    }
-
     // Check's report
     private(set) var checking = false
     private(set) var report: CheckReport?
@@ -21,10 +15,16 @@ final class DebugModel {
     // the test sounds and the hi-res row
     private(set) var testSongs: [Song] = []
     private(set) var testWords: String?
-    var source: Source = .stream
-    private(set) var downloaded: Set<String> = []
-    private(set) var downloading: Set<String> = []
-    private(set) var downloadWords: String?
+    /// The test songs on this phone, and those asked for and not here yet - DownloadModel's, as the album page has them.
+    var downloaded: Set<String> { Set(debugSongs.map(\.id).filter { downloads.isHere($0) }) }
+    var downloading: Set<String> {
+        Set(debugSongs.map(\.id).filter { id in
+            switch downloads.state(id) {
+            case .waiting, .fetching: return true
+            default: return false
+            }
+        })
+    }
     private(set) var hiRes: Song?
     private(set) var hiResWords: String?
     private(set) var findingHiRes = false
@@ -34,12 +34,12 @@ final class DebugModel {
 
     private let server: ServerModel
     private let player: PlayerModel
-    private let files: SongFiles
+    private let downloads: DownloadModel
 
-    init(server: ServerModel, player: PlayerModel, files: SongFiles) {
+    init(server: ServerModel, player: PlayerModel, downloads: DownloadModel) {
         self.server = server
         self.player = player
-        self.files = files
+        self.downloads = downloads
         installLine = InstallExpiry.line(expiration: Self.profile()?.expiration, now: Date())
     }
 
@@ -76,7 +76,6 @@ final class DebugModel {
             testWords = testSongs.isEmpty
                 ? "The beep album isn't in the library: copy \"Start test (2026)\" by \"deadwax test\" into it, let Navidrome scan, and Check again."
                 : nil
-            refreshDownloaded()
         } catch {
             testWords = words(error)
         }
@@ -101,7 +100,6 @@ final class DebugModel {
             return
         }
         hiRes = best
-        refreshDownloaded()
         if let best {
             hiResWords = HiRes.isTwentyFourOneNinetyTwo(best) ? nil
                 : "No 24/192 FLAC in the library; this is the highest rate there is."
@@ -111,33 +109,22 @@ final class DebugModel {
         }
     }
 
-    func refreshDownloaded() {
-        downloaded = Set((testSongs + (hiRes.map { [$0] } ?? [])).filter { files.downloadedURL(for: $0) != nil }.map(\.id))
+    private var debugSongs: [Song] { testSongs + (hiRes.map { [$0] } ?? []) }
+
+    /// "Download all 10" and a row's download: DownloadModel's, as the album page asks.
+    func download(_ songs: [Song]) {
+        downloads.download(songs: songs.filter { !downloads.isHere($0.id) })
     }
 
-    func download(_ songs: [Song]) async {
-        guard let client = server.client else { return }
-        downloadWords = nil
-        for song in songs where !downloaded.contains(song.id) {
-            downloading.insert(song.id)
-            do {
-                try await files.download(song, client: client)
-                downloaded.insert(song.id)
-            } catch {
-                downloadWords = "\(song.name): \(words(error))"
-            }
-            downloading.remove(song.id)
-        }
-    }
-
+    /// "Remove the downloads": the test songs' and the hi-res row's.
     func removeDownloads() {
-        files.removeDownloads()
-        refreshDownloaded()
+        downloads.remove(songs: debugSongs.map(\.id))
     }
 
-    /// A test song's tap: the songs played from `index`, their downloaded copies with Downloaded chosen.
+    /// A test song's tap: the songs played from `index` - their copies on this phone first, as every song is, unless
+    /// "Stream even when downloaded" is on.
     func play(_ songs: [Song], at index: Int) {
-        player.playTest(songs, at: index, copies: source == .downloaded)
+        player.playTest(songs, at: index)
     }
 
     /// The person changed: nothing of theirs kept.
@@ -147,8 +134,6 @@ final class DebugModel {
         testWords = nil
         hiRes = nil
         hiResWords = nil
-        downloadWords = nil
-        refreshDownloaded()
     }
 
     // MARK: words

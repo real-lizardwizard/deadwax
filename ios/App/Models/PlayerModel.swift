@@ -220,7 +220,7 @@ final class PlayerModel {
                                             albumArtist: album.artist, albumCoverArt: album.coverArt, level: level) }
         remember(album)
         shelve(songs)
-        startQueue(copies: false) { $0.playTracks(tracks, start: index, shuffle: shuffle) }
+        startQueue { $0.playTracks(tracks, start: index, shuffle: shuffle) }
     }
 
     /// Play Next from a ••• menu: the pick queued straight after the song playing's copies (pick.choose(.next,
@@ -247,7 +247,7 @@ final class PlayerModel {
         shelve(queued.tracks)
         var started = false
         // only songs added: a song that failed keeps its retry (the web's addSongs leaves the retry's timer alone)
-        startQueue(copies: false, cancelsRetry: false) { controller in
+        startQueue(cancelsRetry: false) { controller in
             started = choice == .next ? controller.playNext(tracks) : controller.playLast(tracks)
         }
         if started { cancelRetry() }
@@ -456,6 +456,17 @@ final class PlayerModel {
         book.leavePage(id)
     }
 
+    /// Phase 2's downloads wired in (DeadwaxApp, once): a play that can't be sent is kept in the person's download
+    /// store; an album's loudness kept with its download is put on the shelf for a queue (marked old, so a read is still
+    /// asked for first when deadwax answers); and while deadwax can't be reached, no level read is asked - each is
+    /// failed at once, so a first song's wait ends and it is levelled from the answer kept (7.3).
+    func connect(downloads: DownloadModel, reachability: Reachability) {
+        reporter.online = { [weak reachability] in reachability?.online ?? true }
+        reporter.keep = { [weak downloads] songID, timeMs in downloads?.keepPlay(songID: songID, timeMs: timeMs) }
+        book.reachable = { [weak reachability] in reachability?.online ?? true }
+        book.kept = { [weak downloads] album in downloads?.keptLoudness(album) }
+    }
+
     /// The app came to the front: the position read again, and resume's look for what another device played.
     func becameActive() {
         tick()
@@ -468,12 +479,12 @@ final class PlayerModel {
         resuming?.background()
     }
 
-    /// Debug's test songs and hi-res row: `songs` played from `index` as they are (no album; Off), their downloaded
-    /// copies when `copies` (a song with none is streamed).
-    func playTest(_ songs: [Song], at index: Int, copies: Bool) {
+    /// Debug's test songs and hi-res row: `songs` played from `index` as they are (no album; Off) - from their copies
+    /// downloaded to this phone, as every song is, unless Debug says to stream them.
+    func playTest(_ songs: [Song], at index: Int) {
         let tracks = songs.map { QueueTrack(song: $0, albumId: $0.albumId ?? "", albumName: $0.album ?? "") }
         shelve(songs)
-        startQueue(copies: copies) { $0.playTracks(tracks, start: index) }
+        startQueue { $0.playTracks(tracks, start: index) }
     }
 
     // MARK: the controller
@@ -483,11 +494,11 @@ final class PlayerModel {
     /// is false (Play Next and Play Last, which may only add songs). The songs kept for the queue are pruned only when
     /// a new queue did start: songs added by an edit held for the join (D4) are not in the queue yet, and keep their
     /// Navidrome song (its size, for the stream cache's length check; Info's fields) for when they are.
-    private func startQueue(copies: Bool, cancelsRetry: Bool = true, _ body: (QueueController) -> Void) {
+    private func startQueue(cancelsRetry: Bool = true, _ body: (QueueController) -> Void) {
         guard let controller = ensureController(), let link else { return }
         if cancelsRetry { cancelRetry() }
         let generation = link.generation
-        link.beginStart(copies: copies)
+        link.beginStart()
         act { body(controller) }
         link.endStart()
         if link.generation != generation { pruneShelf() }
@@ -782,8 +793,9 @@ final class PlayerModel {
         guard queued.indices.contains(queue.index) else { return }
         let (inUse, ahead) = StreamCache.kept(queued, shown: queue.index, engineAt: link.position()?.index)
         files.keep(inUse, ahead: ahead)
-        guard controller?.intendsToPlay == true, !link.copies, let client = server.client, let next = nextIndex(queue),
-              queued.indices.contains(next) else { return }
+        // nothing fetched for a song on the phone: it plays from there
+        guard controller?.intendsToPlay == true, let client = server.client, let next = nextIndex(queue),
+              queued.indices.contains(next), files.downloads.url(for: queued[next].id) == nil else { return }
         files.prefetch(queued[next], client: client)
     }
 
@@ -950,7 +962,7 @@ final class PlayerModel {
     /// fetched, fitted to this device's Repeat - a new queue, its listen from where it was left.
     private func putBack(_ saved: UpNextQueue, position at: Double) -> UpNextQueue? {
         guard let controller = ensureController(), let link else { return nil }
-        link.beginStart(copies: false)
+        link.beginStart()
         listenFrom = at
         var made: UpNextQueue?
         act { made = controller.restoreQueue(saved, position: at) }

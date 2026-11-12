@@ -281,7 +281,7 @@ public final class DownloadDatabase {
     }
 
     /// The latest queue save not yet sent: one row, replaced by each.
-    public struct KeptQueue: Sendable, Equatable {
+    public struct PendingQueue: Sendable, Equatable {
         /// Which route it goes to: `queue` or `at` (Routes.saveQueue, saveQueueAt).
         public let kind: String
         public let body: Data
@@ -293,10 +293,10 @@ public final class DownloadDatabase {
                 [.text(kind), .blob(body), .int(at)])
     }
 
-    public func keptQueue() throws -> KeptQueue? {
+    public func keptQueue() throws -> PendingQueue? {
         try query("SELECT kind, body, kept_at FROM queue_pending WHERE one = 1") { row in
             guard let kind = row.text(0), let body = row.blob(1) else { return nil }
-            return KeptQueue(kind: kind, body: body, keptAt: row.int(2) ?? 0)
+            return PendingQueue(kind: kind, body: body, keptAt: row.int(2) ?? 0)
         }.first
     }
 
