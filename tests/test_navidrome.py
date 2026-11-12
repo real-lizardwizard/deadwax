@@ -1579,6 +1579,115 @@ def test_a_scrobble_from_deadwaxs_own_page_goes_through(upstream, client):
     assert seen[0].url.path == "/rest/scrobble"
 
 
+# ---------------------------------------------------------------- a play counted once (2.1.4)
+
+@pytest.fixture(autouse=True)
+def no_plays_counted():
+    """Each test starts with no play remembered as counted."""
+    navidrome_routes.forget_plays_counted()
+    yield
+    navidrome_routes.forget_plays_counted()
+
+
+def scrobbles(seen: list[httpx.Request]) -> list[tuple[str, str, str | None]]:
+    return [(query(r)["id"], query(r)["submission"], query(r).get("time")) for r in seen if r.url.path == "/rest/scrobble"]
+
+
+def test_a_play_sent_again_with_its_time_is_counted_once(upstream, client):
+    """The iPhone app sends a kept play again when its first answer was lost: Navidrome would count both."""
+    _, seen = upstream
+    play = "/deadwax/navidrome/scrobble/song-1?submission=true&time=1727000000000"
+
+    first, again = client.post(play), client.post(play)
+
+    assert (first.status_code, again.status_code) == (200, 200)
+    assert again.json() == {"ok": True}
+    assert scrobbles(seen) == [("song-1", "true", "1727000000000")]
+
+
+def test_the_same_song_at_another_time_is_another_play(upstream, client):
+    _, seen = upstream
+
+    client.post("/deadwax/navidrome/scrobble/song-1?submission=true&time=1727000000000")
+    client.post("/deadwax/navidrome/scrobble/song-1?submission=true&time=1727000300000")
+    client.post("/deadwax/navidrome/scrobble/song-2?submission=true&time=1727000000000")
+
+    assert len(scrobbles(seen)) == 3
+
+
+def test_a_play_without_a_time_and_now_playing_are_always_sent(upstream, client):
+    """With no time, hearing a song twice can't be told from one play sent twice - the web's plays carry none."""
+    _, seen = upstream
+
+    for _ in range(2):
+        client.post("/deadwax/navidrome/scrobble/song-1?submission=true")
+        client.post("/deadwax/navidrome/scrobble/song-1?time=1727000000000")
+
+    assert scrobbles(seen) == [("song-1", "true", None), ("song-1", "false", "1727000000000")] * 2
+
+
+def test_a_play_navidrome_refused_is_sent_again(upstream, client):
+    state, seen = upstream
+    state["handler"] = lambda request: httpx.Response(503)
+    play = "/deadwax/navidrome/scrobble/song-1?submission=true&time=1727000000000"
+
+    refused = client.post(play)
+    state["handler"] = lambda request: httpx.Response(200, json=ok())
+    taken, again = client.post(play), client.post(play)
+
+    assert refused.status_code >= 500
+    assert (taken.status_code, again.status_code) == (200, 200)
+    assert len(scrobbles(seen)) == 2
+
+
+def test_a_resend_while_the_first_is_on_its_way_waits_for_it():
+    """Taken, the resend is answered as taken; refused, the resend goes itself - never an answer for no play."""
+    async def run(first_fails: bool) -> tuple[list, int]:
+        sent, gate = 0, asyncio.Event()
+
+        async def send():
+            nonlocal sent
+            sent += 1
+            if sent == 1:
+                await gate.wait()
+                if first_fails:
+                    raise NavidromeError("refused")
+
+        async def first():
+            try:
+                return await navidrome_routes._counted_once(("local", "song-1", 1), send)
+            except NavidromeError:
+                return "refused"
+
+        one = asyncio.create_task(first())
+        await asyncio.sleep(0)
+        two = asyncio.create_task(navidrome_routes._counted_once(("local", "song-1", 1), send))
+        await asyncio.sleep(0)
+        assert sent == 1
+        gate.set()
+        return [await one, await two], sent
+
+    navidrome_routes.forget_plays_counted()
+    assert asyncio.run(run(first_fails=False)) == ([True, False], 1)
+    navidrome_routes.forget_plays_counted()
+    assert asyncio.run(run(first_fails=True)) == (["refused", True], 2)
+
+
+def test_what_is_remembered_of_plays_is_bounded(monkeypatch):
+    monkeypatch.setattr(navidrome_routes, "PLAYS_KEPT", 3)
+
+    async def nothing():
+        return None
+
+    async def run():
+        for at in range(5):
+            assert await navidrome_routes._counted_once(("local", "song-1", at), nothing)
+        return [await navidrome_routes._counted_once(("local", "song-1", at), nothing) for at in (0, 4)]
+
+    assert asyncio.run(run()) == [True, False]
+    assert len(navidrome_routes._plays_counted) == 3
+
+
 # ---------------------------------------------------------------- the page itself
 
 def test_the_player_page_is_always_revalidated(client):

@@ -2154,6 +2154,10 @@ played" and Navidrome's own Last.fm or ListenBrainz scrobbling carry on working.
   ([the player as you](#the-player-as-you-with-logins-on)).
 - A play that can't be reported doesn't interrupt the music, and nothing on the phone says so.
   If plays aren't turning up, see [troubleshooting](troubleshooting.md#plays-dont-show-up-in-navidrome).
+- **A play sent twice counts once.** The [iPhone app](ios.md) keeps a play it couldn't send and sends it
+  when deadwax answers again, dated from when you heard it; if the first one did arrive and only its answer
+  was lost, deadwax counts that play once, so it isn't doubled in Navidrome or on Last.fm. (Two people
+  hearing the same song at the same moment are two plays.) deadwax remembers this until it restarts.
 
 ## Formats, and Navidrome's Players page
 

@@ -698,18 +698,82 @@ async def loudness_of_album(request: Request, album_id: str = PathParam(..., min
     return await player_cache.cache.levels.album_loudness(album_id)
 
 
+# ---------------------------------------------------------------- a play counted once (2.1.4)
+
+#? how many plays sent with their `time` are remembered as counted - weeks of anyone's listening
+PLAYS_KEPT = 20_000
+#? (user, song, time) -> True once Navidrome took that play, or the Future of its send while one is on its way
+_plays_counted: "OrderedDict[tuple[str, str, int], asyncio.Future | bool]" = OrderedDict()
+
+
+def forget_plays_counted() -> None:
+    """Every play forgotten (the tests)."""
+    _plays_counted.clear()
+
+
+async def _counted_once(play: tuple[str, str, int], send) -> bool:
+    """
+    (2.1.4) `send()` a play unless this one was counted already: True if it went to Navidrome now, False if it had.
+
+    The iPhone app keeps a play it couldn't send and sends it again once deadwax answers - so a play whose answer was
+    lost on the way back (the tunnel dropping as the 200 left) arrives twice, and Navidrome, given the same song at
+    the same time twice, counts it twice and passes both on to Last.fm. A play carrying the moment its listen began
+    is the same play however often it comes. One still on its way is waited for: taken, the second is answered as
+    taken; refused, the second is sent itself - so a resend can never be answered for a play nobody counted.
+
+    In memory, the oldest forgotten past PLAYS_KEPT: a restart between a play and its resend counts it twice, as it
+    always did. One loop's sends only, as _queue_lock is (another loop's in flight are a test's leftovers).
+    """
+    loop = asyncio.get_running_loop()
+    while True:
+        known = _plays_counted.get(play)
+        if known is True:
+            _plays_counted.move_to_end(play)
+            return False
+        if isinstance(known, asyncio.Future) and not known.done() and known.get_loop() is loop:
+            await asyncio.shield(known)
+            continue
+        break
+    mine = loop.create_future()
+    _plays_counted[play] = mine
+    _plays_counted.move_to_end(play)
+    while len(_plays_counted) > PLAYS_KEPT:
+        _plays_counted.popitem(last=False)
+    try:
+        await send()
+    except BaseException:
+        if _plays_counted.get(play) is mine:
+            del _plays_counted[play]
+        raise
+    finally:
+        if not mine.done():
+            mine.set_result(None)
+    if _plays_counted.get(play) is mine:
+        _plays_counted[play] = True
+    return True
+
+
 @router.post("/scrobble/{song_id}")
-async def scrobble(song_id: str, request: Request, submission: bool = False, time: int | None = Query(None, ge=0)):
+async def scrobble(song_id: str, request: Request, submission: bool = False, time: int | None = Query(None, ge=0),
+                   user: str = Depends(current_user)):
     """
     Tell Navidrome what is playing (`submission=false`) or that it was played (`true`).
 
     The second is what counts a play in Navidrome and passes it on to Last.fm or ListenBrainz
-    if they are set up there; the first is what shows under "now playing".
+    if they are set up there; the first is what shows under "now playing". A play sent again with the same
+    `time` - the iPhone app's, its first answer lost - is counted once (2.1.4, _counted_once); one with no
+    `time` is always sent, as two listens can't be told from one sent twice without it.
     """
-    try:
+    async def send() -> None:
         await client_for(request).call("scrobble", {
             "id": song_id, "submission": "true" if submission else "false", "time": time,
         })
+
+    try:
+        if submission and time is not None:
+            await _counted_once((user, song_id, time), send)
+        else:
+            await send()
     except NavidromeError as e:
         raise _fail(e)
 

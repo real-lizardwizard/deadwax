@@ -503,3 +503,29 @@ serving an undecodable "Broken" song and a "Flaky" one that fails once:
   667x375 and 844x390 the cover no longer reaches the title or the scrubber, and the scrubber
   takes touches while paused.
 - Not exercised: resuming a song that dropped part-way (the stub can't cut a stream mid-song).
+
+### A play counted once (2.1.4)
+
+The iPhone app's Phase 2 keeps a play it couldn't send (`play_pending`, notes/ios.md "Phase 2: downloads") and
+sends it again once deadwax answers, forgetting it on a 200. A play whose 200 was lost on the way back - the
+WireGuard tunnel dropping as the answer left - therefore arrives twice, and Navidrome, given the same song at the
+same `time` twice, counts both and passes both on to Last.fm. So `POST /scrobble/{id}?submission=true&time=T` is
+counted once per (user, song, time): `_counted_once` in src/routes/navidrome.py.
+
+- **Only a play that carries its `time`.** The web's plays carry none (Navidrome dates them on arrival), and
+  without one two listens can't be told from one sent twice, so they are always sent. "Now playing" is never
+  judged either: it counts nothing.
+- **Keyed by the person** (`current_user`): two people hearing the same song at the same moment are two plays
+  (test_player_as_you).
+- **A resend that arrives while the first is still on its way waits for it**: taken, the resend is answered
+  200 as taken; refused, the resend is sent itself - so a 200 never stands for a play nobody counted. A refused
+  play is forgotten, so its resend goes.
+- **In memory, bounded** (`PLAYS_KEPT`, 20,000, the oldest forgotten first): a restart between a play and its
+  resend counts it twice, as before. Not worth a table - the window is the phone's next answer, seconds to hours.
+- The answer to a repeat is the plain `{"ok": true}`: the phone forgets its kept play either way.
+
+Verified: the route tests (a resend counted once, another time or song counted, no `time` and now-playing always
+sent, a refused play sent again, a resend in flight waiting for the first both ways, the bound) and the per-person
+test in test_player_as_you; each part of the guard was mutated and caught but deleting a refused play's entry,
+which the wait loop's own check (a finished send left behind is not a counted one) makes harmless. Not verified:
+a real Navidrome, and the phone resending through it.

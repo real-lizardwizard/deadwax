@@ -1061,6 +1061,20 @@ def test_plays_and_now_playing_are_each_users_own(player):
     assert james.get(f"{PLAYER}/songs/{SONG}").json()["playCount"] == 1
 
 
+def test_a_play_sent_twice_is_counted_once_for_its_own_person_alone(player):
+    """(2.1.4) The same song at the same moment is two plays when two people heard it - one when it came twice."""
+    navidrome_routes.forget_plays_counted()
+    ethan, james = signed_in(player, "ethan"), signed_in(player, "james")
+    play = f"{PLAYER}/scrobble/{SONG}?submission=true&time=1727000000000"
+
+    ethan.post(play)
+    ethan.post(play)
+    james.post(play)
+
+    assert player.fake.plays == {("ethan", SONG): 1, ("james", SONG): 1}
+    navidrome_routes.forget_plays_counted()
+
+
 # ----------------------------------------------------------------- Remove from my library, and Add at once
 
 def test_remove_unstars_it_as_you_and_takes_it_out_of_your_library_alone(player):
