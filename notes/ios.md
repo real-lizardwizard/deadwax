@@ -513,3 +513,91 @@ paused records the new song's start before stopping (`begin` sets `held`, and `r
   the next press plays on from where it was; the app's own pause - ▶; song 10 run to its end - ▶, and a
   press plays it again; song 1 tapped after a pause - all three beeps, the first as loud.
 - docs/ios.md says how a pause works now (it said the output stopped after a minute, to save battery).
+
+## The EQ's AutoEq routes (2.1.7)
+
+The server half of the EQ's slice 4 (notes/ios-specs/eq.md on `ios`: section 2, 5.4's server bullet, 3.17's words),
+on main as 2.1.7, before the phone's half: the phone finds a correction for its headphones in AutoEq's list, and
+fetches it, through deadwax - it never talks to GitHub.
+
+- **`src/autoeq.py`** (pure): INDEX.md's lines parsed - the name between `- [` and the first `](./`, the path to the
+  LAST `) by `, the source and rig from ` by <source>[ on <rig>]`, the form from the rig folder (`in-ear`, `over-ear`,
+  `earbud`, else none), the rig shown as the folder less that word. The path is decoded once (`unquote`) and kept
+  decoded; an address encodes each segment whole (`quote(segment, safe="")`). The id is 16 hex of SHA-1 of
+  `"autoeq:" + path`. Folding, search, the ranking, one row per headphone in `SOURCE_ORDER`, the answers' shapes, the
+  size caps and the times (7 days; 15 s for a first list) are all here.
+- **`src/api/autoeq_endpoint.py`**: one `httpx.AsyncClient` (15 s, 10 to connect, no redirects), `deadwax/<version>`
+  as the user agent on every request - never `Config.musicbrainz_user_agent()`, which carries MUSICBRAINZ_EMAIL's
+  address. An answer, a 404 (None, a profile only) and `Unreachable` kept apart. Each answer is read a piece at a
+  time and refused past its cap (8 MB the list, 64 KB a profile, 1 KB the commit).
+- **`src/routes/eq.py`**: `GET /deadwax/eq/autoeq?q&limit` and `GET /deadwax/eq/autoeq/{id}`, included with
+  `current_user` (tests/test_logins.py ROUTES, both "user"). The list lives in `app.state.autoeq` (`KeptList`), read
+  from the database at the first ask after a start; refreshed when a week old by a background task under an
+  `asyncio.Lock`, the old list answering meanwhile; fetched before answering when there is none. 503 "deadwax can't
+  reach AutoEq just now." and 404 "AutoEq doesn't have that measurement any more." in `detail`, the spec's sentences.
+  What GitHub answered goes to deadwax's log at info level, never the event log (no `frontend`).
+- **`store.py`**, beside `descriptions`: `autoeq_list`, `autoeq_meta` (one row: the commit, when), `autoeq_profile`.
+  A new list replaces the old, its commit, AND drops every kept profile, in one transaction (`autoeq_list_put`); an
+  unchanged commit only moves the time (`autoeq_list_seen`).
+- The app's shutdown cancels a refresh under way and closes the client (src/api/app.py lifespan).
+
+### The source order
+
+The spec asks for AutoEq's own order of trust "as its README states it when the slice is built". Its README (master,
+read 2026-11-12, the same file as at 7ae0f56) states none: it lists where the measurements come from (oratory1990,
+crinacle, Innerfidelity, Rtings and the legacy headphone.com ones) without ranking them, and results/README.md says
+its recommended list keeps "the one with the highest accuracy" without naming the order. So `SOURCE_ORDER` is the
+spec's fallback - oratory1990, crinacle, Super Review, HypetheSonics, Rtings, Innerfidelity, Headphone.com Legacy,
+then the rest by name - and its comment says so.
+
+### What AutoEq's list turned out to hold
+
+- **More than spaces is encoded.** eq.md 0.4 says only spaces are percent-encoded; a letter outside ASCII is too
+  (`./Kazi/in-ear/A%C3%BCR%20Audio%20Aure`, `R%C3%98DE`), while `(`, `)`, `&`, `+` and `,` stay raw. Decoding the
+  whole path with `unquote` covers both, as the spec's "decoded once" meant; the fixture holds the AüR Audio Aure.
+- **Every one of the 8,850 lines at 7ae0f56 parses** by these rules (checked over the whole file, fetched by hand):
+  each path is exactly `<source>/<rig folder>/<name>`, the line's source is always the path's first segment, its
+  ` on <rig>` always the folder less the form, its bracketed name always the last segment. 6,017 rows (headphones by
+  folded name); the whole list parses in 0.06 s and a search over it takes about 2 ms.
+- One name ends in a zero-width space (Rtings' `Bose QuietComfort 35 II Gaming Headset`): folding drops it.
+
+### Decided here (the spec didn't say)
+
+- **"Every query word starts a word of the name"** is read in the compact name: a query word counts when it is found
+  where one of the name's words begins, so "hd650" ranks Sennheiser HD 650 first as "hd 650" does.
+- **A query with no letter or digit** (`!!!`) finds nothing, rather than every row.
+- **Lowercased with `casefold()`**, so `ß` folds to `ss`.
+- **Strict lines**: a path that isn't exactly three segments, has an empty, `.` or `..` segment, or a name that folds
+  to nothing, doesn't parse (counted). A path listed twice is one result. Only lines starting `- ` are results; the
+  heading and its paragraph aren't counted.
+- **A list that holds no results** (GitHub answering 200 with a page that isn't INDEX.md), and a list or a profile
+  that isn't UTF-8, is "anything but the list": Unreachable.
+- **A failed background refresh is not tried again for 15 minutes** (`RETRY_SECONDS`) while the old list answers -
+  otherwise every search would ask GitHub again while it is down or limiting. With no list at all, every ask tries.
+- **The first list's 15 s** bound the ask, not the fetch: the fetch is a task the ask waits on through
+  `asyncio.shield`, so a slow GitHub costs that ask a 503 and the next ask finds the list.
+- **A kept profile is answered only at the list's own commit** - besides the drop, a profile fetch that crossed a new
+  list (and kept its text at the old commit) is fetched again rather than answered.
+- **The kept list is read under the lock**, so a second ask at the start waits for it instead of asking GitHub.
+
+### Left as the spec has it
+
+- **NFKD leaves letters that aren't a base and a mark**: `Ø`, `Æ`, `Ł`, `Đ`, `Þ` stay. "rode" doesn't find the RØDE
+  NTH-100 (finds `Dekoni earpads` names, inside a word); "røde" does. A small table of such letters would fix it -
+  not built, as the spec's rule is exact.
+
+### Verified, and not
+
+- **pytest**: tests/test_autoeq.py, 53 tests, through start() with a real SQLite store and an httpx MockTransport
+  for GitHub (fixtures: tests/fixtures/autoeq/ - 46 real lines of INDEX.md at 7ae0f56 and one written not to parse,
+  and two ParametricEQ.txt copied unchanged from ios's fixtures, with a README and AutoEq's LICENSE). Eight mutations
+  tried by hand (profiles kept on a new list, the MusicBrainz agent, redirects followed, the refresh awaited inline, a
+  kept profile at any commit, `&+()` left unencoded, the first `) by `, an unchanged commit fetched again) - each
+  fails a test.
+- **By hand with curl, 2026-11-12** (not deadwax): master's commit with `Accept: application/vnd.github.sha` answers
+  the bare `7ae0f56d53074872b028649617a22bbb4232feb7`; profile addresses built by `profile_url` - with `%26`, with
+  `%28`/`%2B`/`%29`, and with `%C3%BC` - answer 200, the HypetheSonics one byte for byte ios's fixture; the same
+  address double-encoded (`%2520`) answers 404.
+- **Not seen**: deadwax itself has never talked to GitHub - every answer it has read is the MockTransport's. GitHub's
+  rate limiting, a gzip'd raw answer read through httpx, and how long the 851 KB takes from James's server are
+  unwatched.

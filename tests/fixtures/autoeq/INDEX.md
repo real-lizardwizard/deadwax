@@ -1,0 +1,47 @@
+# Index
+This is a list of all equalization profiles. Target is in parentheses if there are results with multiple targets
+from the same source.
+
+- [1MORE Aero (ANC Off)](./HypetheSonics/GRAS%20RA0045%20in-ear/1MORE%20Aero%20(ANC%20Off)) by HypetheSonics on GRAS RA0045
+- [Abyss AB-1266 Phi CC Lite](./crinacle/EARS%20+%20711%20over-ear/Abyss%20AB-1266%20Phi%20CC%20Lite) by crinacle on EARS + 711
+- [Apple AirPods Pro](./crinacle/711%20in-ear/Apple%20AirPods%20Pro) by crinacle on 711
+- [Apple AirPods Pro](./Super%20Review/in-ear/Apple%20AirPods%20Pro) by Super Review
+- [Apple AirPods Pro](./HypetheSonics/Bruel%20&%20Kjaer%205128%20in-ear/Apple%20AirPods%20Pro) by HypetheSonics on Bruel & Kjaer 5128
+- [Apple AirPods Pro](./Rtings/HMS%20II.3%20in-ear/Apple%20AirPods%20Pro) by Rtings on HMS II.3
+- [Apple Airpods Pro 2](./HypetheSonics/GRAS%20RA0045%20in-ear/Apple%20Airpods%20Pro%202) by HypetheSonics on GRAS RA0045
+- [Apple Airpods Pro 2](./Harpo/in-ear/Apple%20Airpods%20Pro%202) by Harpo
+- [Apple Airpods Pro 2](./Filk/in-ear/Apple%20Airpods%20Pro%202) by Filk
+- [Apple AirPods Pro 2 (51dB + ANC)](./crinacle/711%20in-ear/Apple%20AirPods%20Pro%202%20(51dB%20+%20ANC)) by crinacle on 711
+- [Apple AirPods Pro 2 (56dB + ANC)](./crinacle/711%20in-ear/Apple%20AirPods%20Pro%202%20(56dB%20+%20ANC)) by crinacle on 711
+- [Apple AirPods Pro 2 (60dB + ANC)](./crinacle/711%20in-ear/Apple%20AirPods%20Pro%202%20(60dB%20+%20ANC)) by crinacle on 711
+- [Apple AirPods Pro 2 (65dB + ANC)](./crinacle/711%20in-ear/Apple%20AirPods%20Pro%202%20(65dB%20+%20ANC)) by crinacle on 711
+- [Apple AirPods Pro 2 (69dB + ANC)](./crinacle/711%20in-ear/Apple%20AirPods%20Pro%202%20(69dB%20+%20ANC)) by crinacle on 711
+- [Apple AirPods Pro 2 (73dB + ANC)](./crinacle/711%20in-ear/Apple%20AirPods%20Pro%202%20(73dB%20+%20ANC)) by crinacle on 711
+- [Apple AirPods Pro 2 (77dB + ANC)](./crinacle/711%20in-ear/Apple%20AirPods%20Pro%202%20(77dB%20+%20ANC)) by crinacle on 711
+- [Apple AirPods Pro 2 (81dB + ANC)](./crinacle/711%20in-ear/Apple%20AirPods%20Pro%202%20(81dB%20+%20ANC)) by crinacle on 711
+- [Apple AirPods Pro 2 (84dB + ANC)](./crinacle/711%20in-ear/Apple%20AirPods%20Pro%202%20(84dB%20+%20ANC)) by crinacle on 711
+- [Apple AirPods Pro 2 (88dB + ANC)](./crinacle/711%20in-ear/Apple%20AirPods%20Pro%202%20(88dB%20+%20ANC)) by crinacle on 711
+- [Apple AirPods Pro 2 (91dB + ANC)](./crinacle/711%20in-ear/Apple%20AirPods%20Pro%202%20(91dB%20+%20ANC)) by crinacle on 711
+- [Apple AirPods Pro 2 (ANC mode)](./crinacle/711%20in-ear/Apple%20AirPods%20Pro%202%20(ANC%20mode)) by crinacle on 711
+- [Apple AirPods Pro 2 (passive mode)](./crinacle/711%20in-ear/Apple%20AirPods%20Pro%202%20(passive%20mode)) by crinacle on 711
+- [Apple AirPods Pro 2 (transparency mode)](./crinacle/711%20in-ear/Apple%20AirPods%20Pro%202%20(transparency%20mode)) by crinacle on 711
+- [Apple AirPods Pro2](./Rtings/Bruel%20&%20Kjaer%205128%20in-ear/Apple%20AirPods%20Pro2) by Rtings on Bruel & Kjaer 5128
+- [Not a result (no source)](./crinacle/711%20in-ear/Not%20a%20result%20(no%20source))
+- [Apple EarPods](./Super%20Review/earbud/Apple%20EarPods) by Super Review
+- [Apple EarPods](./Innerfidelity/earbud/Apple%20EarPods) by Innerfidelity
+- [Apple EarPods](./Rtings/HMS%20II.3%20earbud/Apple%20EarPods) by Rtings on HMS II.3
+- [Apple EarPods](./Headphone.com%20Legacy/earbud/Apple%20EarPods) by Headphone.com Legacy
+- [AüR Audio Aure](./Kazi/in-ear/A%C3%BCR%20Audio%20Aure) by Kazi
+- [AüR Audio Aure](./Jaytiss/in-ear/A%C3%BCR%20Audio%20Aure) by Jaytiss
+- [Sennheiser HD 650](./oratory1990/over-ear/Sennheiser%20HD%20650) by oratory1990
+- [Sennheiser HD 650](./crinacle/GRAS%2043AG-7%20over-ear/Sennheiser%20HD%20650) by crinacle on GRAS 43AG-7
+- [Sennheiser HD 650](./Kuulokenurkka/over-ear/Sennheiser%20HD%20650) by Kuulokenurkka
+- [Sennheiser HD 650](./Auriculares%20Argentina/over-ear/Sennheiser%20HD%20650) by Auriculares Argentina
+- [Sennheiser HD 650](./Rtings/HMS%20II.3%20over-ear/Sennheiser%20HD%20650) by Rtings on HMS II.3
+- [Sennheiser HD 650](./Innerfidelity/over-ear/Sennheiser%20HD%20650) by Innerfidelity
+- [Sennheiser HD 650](./Headphone.com%20Legacy/over-ear/Sennheiser%20HD%20650) by Headphone.com Legacy
+- [Sennheiser HD 650 (2020)](./crinacle/GRAS%2043AG-7%20over-ear/Sennheiser%20HD%20650%20(2020)) by crinacle on GRAS 43AG-7
+- [Sennheiser HD 650 (2020, worn earpads)](./crinacle/GRAS%2043AG-7%20over-ear/Sennheiser%20HD%20650%20(2020,%20worn%20earpads)) by crinacle on GRAS 43AG-7
+- [Sennheiser HD 650 (balanced)](./Headphone.com%20Legacy/over-ear/Sennheiser%20HD%20650%20(balanced)) by Headphone.com Legacy
+- [Sennheiser HD 650 (pre-2020, semi-worn earpads)](./crinacle/GRAS%2043AG-7%20over-ear/Sennheiser%20HD%20650%20(pre-2020,%20semi-worn%20earpads)) by crinacle on GRAS 43AG-7
+- [Sennheiser HD 650 (pre-2020, worn earpads)](./crinacle/GRAS%2043AG-7%20over-ear/Sennheiser%20HD%20650%20(pre-2020,%20worn%20earpads)) by crinacle on GRAS 43AG-7

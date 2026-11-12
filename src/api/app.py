@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, RedirectResponse, Response
 from starlette.middleware.gzip import GZipMiddleware
 
 from src.routes import search_musicbrainz, interface_logs, monitor_slskd, download, library, settings, navidrome, me, pins, store_album
-from src.routes import auth as auth_routes, describe, held, my_library, own_password, people
+from src.routes import auth as auth_routes, describe, eq, held, my_library, own_password, people
 from src import auth, permissions, player_cache, stars
 from src.api import navidrome_admin
 from src.musicbrainz_cache import saved_answers
@@ -25,6 +25,7 @@ from src.api.musicbrainz_endpoint import MusicBrainzClient
 from src.api.slskd_endpoint import SlskdClient
 from src.api.lrclib_endpoint import lrclib
 from src.api.wikipedia_endpoint import wikipedia
+from src.api.autoeq_endpoint import autoeq_client
 from src.api.same_origin import SameOriginWrites
 from src.api.navidrome_endpoint import SignedOut, navidrome as navidrome_client
 from src.config import Config
@@ -178,6 +179,8 @@ async def lifespan(app: FastAPI):
     await library.artist_images_client.close_client()
     await lrclib.close_client()
     await wikipedia.close_client()
+    await eq.stop_refreshing(app)
+    await autoeq_client.close_client()
     await navidrome_client.close_client()
     await auth.login_client.close_client()
     await navidrome_admin.close_client()
@@ -450,6 +453,9 @@ def start() -> FastAPI:
     app.include_router(store_album.router, prefix="/deadwax/store", tags=["store"], dependencies=signed_in)
     #? (2.0.13) the short descriptions on the artist and album pages - a user's, like the id bridge
     app.include_router(describe.router, prefix="/deadwax/describe", tags=["describe"], dependencies=signed_in)
+    #? (2.1.7) AutoEq's corrections for the iPhone app's EQ, searched and fetched through deadwax - a user's, like
+    #? the descriptions: an outside source, read for one person's listening
+    app.include_router(eq.router, prefix="/deadwax/eq", tags=["eq"], dependencies=signed_in)
     #? signing in and out (2.0.0-player.48) - with no session, of course: see routes/auth.py
     app.include_router(auth_routes.router, prefix="/deadwax/auth", tags=["auth"])
 

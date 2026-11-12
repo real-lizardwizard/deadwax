@@ -340,6 +340,12 @@ It plays from <strong>Navidrome</strong>, and its library is Navidrome's, so dea
 A native iPhone app is being built in phases, with its own audio engine: each song decoded on the phone at its own rate, the next one joined on the very next sample, and downloads to play offline. It's built on a Mac and installed with a free Apple account, which means installing it again each week with one command, <code>ios/scripts/install.sh</code>. <strong>Phase 0 is here</strong>: a test screen that proves the install, the connection to deadwax and the audio engine on a real iPhone, with a test album of beeps and a tone. It isn't a player for every day yet. <a href="docs/ios.md">The iPhone app's guide</a> has the steps.
 </details>
 
+### AutoEq's corrections, for the iPhone app's EQ
+<details>
+<summary style="font-style:italic">Your headphones' correction, looked up by deadwax</summary>
+The iPhone app's EQ, being built on the <code>ios</code> branch, can start from a correction for your headphones made by <a href="https://github.com/jaakkopasanen/AutoEq">AutoEq</a> (Jaakko Pasanen's project, MIT-licensed) from measurements by oratory1990, crinacle and AutoEq's other sources. deadwax 2.1.7 does the looking up for it, so the phone only ever talks to deadwax: it searches AutoEq's list - 8,850 corrections as this is written - by name ("hd650" and "HD 650" both find the Sennheiser), one row per headphone with its measurers in a fixed order (oratory1990's first, then crinacle's) and the others under it, and fetches one correction when you pick it - one at a time, for the person listening, never the set. <strong>The server needs to reach <code>api.github.com</code> and <code>raw.githubusercontent.com</code></strong>: deadwax fetches AutoEq's list from GitHub the first time someone searches it and again once a week after that when someone does, and keeps the list, and each correction once fetched (until AutoEq's list changes), in its database. If it can't, the app says <em>deadwax can't reach AutoEq just now</em> - <a href="docs/troubleshooting.md#autoeq-cant-be-reached">troubleshooting</a> has what to do.
+</details>
+
 ### On a desktop
 <details>
 <summary style="font-style:italic">The same app, in a wide window</summary>

@@ -471,6 +471,36 @@ CREATE TABLE IF NOT EXISTS descriptions (
     subtitle    TEXT,
     fetched_at  REAL NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS autoeq_list (
+    -- (2.1.7) AutoEq's list of corrections (results/INDEX.md), as src/autoeq.py read it, at the commit autoeq_meta
+    -- names - kept so a restart asks GitHub nothing. Shared by everyone, like the descriptions. Replaced whole, in
+    -- one transaction with autoeq_meta and autoeq_profile, when master's commit moves (src/routes/eq.py).
+    id          TEXT PRIMARY KEY,   -- src/autoeq.py result_id: 16 hex digits of SHA-1 of "autoeq:" + path
+    name        TEXT NOT NULL,
+    source      TEXT NOT NULL,
+    rig         TEXT,
+    form        TEXT,               -- in-ear, over-ear, earbud, or NULL
+    path        TEXT NOT NULL,      -- decoded: <source>/<rig folder>/<name>
+    folded      TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS autoeq_meta (
+    -- (2.1.7) The commit of AutoEq's master the kept list was fetched at, and when it was last fetched or found
+    -- unchanged (a week on, it is asked again). One row at most.
+    one         INTEGER PRIMARY KEY CHECK (one = 1),
+    sha         TEXT NOT NULL,
+    fetched_at  REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS autoeq_profile (
+    -- (2.1.7) A result's ParametricEQ.txt as AutoEq wrote it, kept once fetched: at a commit it can't change. Every
+    -- one is dropped when the list moves to a new commit, and fetched again at it when next asked.
+    id          TEXT PRIMARY KEY,
+    sha         TEXT NOT NULL,
+    text        TEXT NOT NULL,
+    fetched_at  REAL NOT NULL
+);
 """
 
 #? (2.0.0-player.51) the states a library entry is held in - waiting or starred - beside `removed`
@@ -3427,6 +3457,106 @@ class JobStore:
             return await asyncio.to_thread(write)
         except Exception as e:
             logger.error(f"failed to keep a description: {e}")
+            return False
+
+
+    # ===== AutoEq (2.1.7) ====================================================
+    #
+    # AutoEq's list, its commit, and the profiles fetched at it (src/routes/eq.py). A failure here costs only what
+    # was to be kept: the list still answers from memory, and a profile is asked of GitHub again.
+
+    async def autoeq_list_get(self) -> dict | None:
+        """The kept list - {sha, fetched_at, results: [{id, name, source, rig, form, path, folded}]} - or None when
+        none is kept (or it can't be read)."""
+        if not self.available:
+            return None
+
+        def read():
+            with self._connect() as connection:
+                meta = connection.execute("SELECT sha, fetched_at FROM autoeq_meta WHERE one = 1").fetchone()
+                if meta is None:
+                    return None
+                rows = connection.execute(
+                    "SELECT id, name, source, rig, form, path, folded FROM autoeq_list ORDER BY rowid").fetchall()
+            return {"sha": meta["sha"], "fetched_at": float(meta["fetched_at"]), "results": [dict(row) for row in rows]}
+
+        try:
+            return await asyncio.to_thread(read)
+        except Exception as e:
+            logger.error(f"failed to read AutoEq's kept list: {e}")
+            return None
+
+    async def autoeq_list_put(self, sha: str, fetched_at: float, results: list[dict]) -> bool:
+        """A new list, at a new commit, in place of the old - and every kept profile dropped with it - in one
+        transaction."""
+        if not self.available:
+            return False
+
+        def write():
+            with self._connect() as connection:
+                connection.execute("DELETE FROM autoeq_list")
+                connection.executemany(
+                    "INSERT OR REPLACE INTO autoeq_list (id, name, source, rig, form, path, folded) "
+                    "VALUES (:id, :name, :source, :rig, :form, :path, :folded)", results)
+                connection.execute("INSERT OR REPLACE INTO autoeq_meta (one, sha, fetched_at) VALUES (1, ?, ?)",
+                                   (sha, fetched_at))
+                connection.execute("DELETE FROM autoeq_profile")
+            return True
+
+        try:
+            return await asyncio.to_thread(write)
+        except Exception as e:
+            logger.error(f"failed to keep AutoEq's list: {e}")
+            return False
+
+    async def autoeq_list_seen(self, sha: str, fetched_at: float) -> bool:
+        """master's commit found to be the kept one's: only the time moves."""
+        if not self.available:
+            return False
+
+        def write():
+            with self._connect() as connection:
+                connection.execute("UPDATE autoeq_meta SET fetched_at = ? WHERE one = 1 AND sha = ?", (fetched_at, sha))
+            return True
+
+        try:
+            return await asyncio.to_thread(write)
+        except Exception as e:
+            logger.error(f"failed to keep when AutoEq's list was checked: {e}")
+            return False
+
+    async def autoeq_profile_get(self, result_id: str) -> dict | None:
+        """A kept profile - {sha, text, fetched_at} - or None."""
+        if not self.available:
+            return None
+
+        def read():
+            with self._connect() as connection:
+                row = connection.execute("SELECT sha, text, fetched_at FROM autoeq_profile WHERE id = ?",
+                                         (result_id,)).fetchone()
+            return dict(row) if row else None
+
+        try:
+            return await asyncio.to_thread(read)
+        except Exception as e:
+            logger.error(f"failed to read a kept AutoEq profile: {e}")
+            return None
+
+    async def autoeq_profile_put(self, result_id: str, sha: str, text: str, fetched_at: float) -> bool:
+        if not self.available:
+            return False
+
+        def write():
+            with self._connect() as connection:
+                connection.execute(
+                    "INSERT OR REPLACE INTO autoeq_profile (id, sha, text, fetched_at) VALUES (?, ?, ?, ?)",
+                    (result_id, sha, text, fetched_at))
+            return True
+
+        try:
+            return await asyncio.to_thread(write)
+        except Exception as e:
+            logger.error(f"failed to keep an AutoEq profile: {e}")
             return False
 
 
