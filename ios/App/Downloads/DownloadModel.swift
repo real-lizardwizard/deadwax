@@ -27,6 +27,10 @@ final class DownloadModel {
         didSet {
             guard downloadOver != oldValue else { return }
             UserDefaults.standard.set(downloadOver.rawValue, forKey: DownloadOver.storageKey)
+            // resume data carries the request it was made from, network flags and all: a song waiting with some would
+            // resume under the old setting (mobile data used under Wi-Fi only) - so it starts again, at once, before any
+            // plan can make a task from it
+            dropResumeData()
             Task { await remakeTasks() }
         }
     }
@@ -95,6 +99,17 @@ final class DownloadModel {
     @ObservationIgnored private var live: [String: Int] = [:]
     /// When each task was made (monotonic): a failure is a try only when deadwax answered since.
     @ObservationIgnored private var madeAt: [String: Double] = [:]
+    /// The Download over each task of this launch was made under: a task's resume data is kept only while it is still
+    /// the setting (its request's network flags are in it). A task from before this launch was made under today's.
+    @ObservationIgnored private var madeUnder: [String: DownloadOver] = [:]
+    /// The session the open store's resume data was made under (nil inside: logins off) - resume data carries the
+    /// request's `Cookie:`, so another session's is dropped: it would be refused, and it is a credential kept on disk.
+    @ObservationIgnored private var resumeSession: String??
+    /// Songs asked for this launch whose whole copy was in the streaming cache: copied from there when the plan lets
+    /// them go, rather than fetched.
+    @ObservationIgnored private var cachedCopies: [String: URL] = [:]
+    /// The kept covers' lengths, by file - counted in what's used (6.3), read from disk once each.
+    @ObservationIgnored private var coverLengths: [String: Int64] = [:]
     @ObservationIgnored private var planQueued = false
     @ObservationIgnored private var planning = false
     @ObservationIgnored private var planAgain = false
@@ -267,31 +282,39 @@ final class DownloadModel {
     /// An album page's fresh answer for an album with songs asked for or here (3.7): kept in place of the old one, as
     /// answered. A song whose file deadwax now gives another size - its audio replaced on the server - is fetched again
     /// (8.4's "When the store changes a file"): the copy here is deleted and the song asked for afresh.
+    ///
+    /// The same answer gives a song asked for without its size (Now Playing's Download, Download Up Next on a queue put
+    /// back - a queue entry carries no size) the size it lacked: the planner counts it at its real bytes, not a
+    /// transcode's 320 kbps estimate (a FLAC is three times that), and its copy's length is checked against it.
     func albumAnswered(_ album: Album, body: Data) {
         guard let store, songsOfAlbum[album.id] != nil else { return }
         try? store.database.putAlbum(id: album.id, json: body, fetchedAt: ListenTracker.wallMs())
         albums[album.id] = album
-        var changed: [String: Int64] = [:]
+        // deadwax's size now, for each song whose kept size differs or was never known
+        var sizes: [String: Int64] = [:]
+        // songs whose copy here isn't that size: not the file deadwax has now
+        var refetch: Set<String> = []
         for song in album.song ?? [] {
             guard let record = records[song.id], !record.isTranscode, let size = song.size, size > 0,
-                  let kept = record.sizeExpected, kept != size else { continue }
-            changed[song.id] = size
+                  record.sizeExpected != size else { continue }
+            sizes[song.id] = size
+            if record.state == .done, record.bytes != size { refetch.insert(song.id) }
         }
-        guard !changed.isEmpty else {
+        guard !sizes.isEmpty else {
             reload()
             return
         }
-        for id in changed.keys {
-            guard let record = records[id], record.state == .done, let file = store.fileURL(record) else { continue }
+        for id in refetch {
+            guard let record = records[id], let file = store.fileURL(record) else { continue }
             try? FileManager.default.removeItem(at: file)
         }
-        update(Array(changed.keys)) { record in
+        update(Array(sizes.keys)) { record in
             var r = record
-            r.sizeExpected = changed[r.id]
-            if r.state == .done { r = DownloadRules.apply(.fileMissing, to: r) }
+            r.sizeExpected = sizes[r.id]
+            if refetch.contains(r.id), r.state == .done { r = DownloadRules.apply(.fileMissing, to: r) }
             return r
         }
-        note("album \(album.id): \(changed.count) replaced on the server, fetched again")
+        if !refetch.isEmpty { note("album \(album.id): \(refetch.count) replaced on the server, fetched again") }
         replan()
     }
 
@@ -402,7 +425,8 @@ final class DownloadModel {
         Task {
             defer {
                 sendingPlays = false
-                playsWaiting = (try? store.database.keptPlays().count) ?? 0
+                // the count is the open store's: someone else signed in meanwhile has their own
+                if self.store === store { playsWaiting = (try? store.database.keptPlays().count) ?? 0 }
             }
             for play in (try? store.database.keptPlays()) ?? [] {
                 guard self.store === store else { return }
@@ -457,6 +481,13 @@ final class DownloadModel {
         if store == nil, let key {
             open(server: key.server, person: key.person)
         }
+        // the same person signed in again (a new session): the resume data kept carries the old session's cookie - it
+        // would be refused, and every download held a minute for it
+        if store != nil {
+            let session = server.client?.session
+            if let made = resumeSession, made != session { dropResumeData() }
+            resumeSession = .some(session)
+        }
         replan()
         sendKeptPlays()
     }
@@ -480,14 +511,24 @@ final class DownloadModel {
     private func close(_ closing: DownloadStore) {
         let out = records.values.filter { $0.state == .fetching }
         let tasks = Set(out.compactMap { live[$0.id] })
-        for record in out {
-            try? closing.database.put(DownloadRules.apply(.signedOut, to: record))
+        // the tasks out become sign-in waits, and no resume data is kept past the person: it carries their session's
+        // cookie, which has no business on disk once they have signed out (and is refused after a new sign-in)
+        try? closing.database.transaction {
+            for record in records.values where record.state == .fetching || record.resume != nil {
+                var r = record.state == .fetching ? DownloadRules.apply(.signedOut, to: record) : record
+                r.resume = nil
+                try closing.database.put(r)
+            }
         }
         Task { _ = await session.cancel(tasks, resume: false) }
         verifyStop.set()
         verifyQueue = []
         live = [:]
         madeAt = [:]
+        madeUnder = [:]
+        resumeSession = nil
+        coverLengths = [:]
+        cachedCopies = [:]
         store = nil
         isOpen = false
         records = [:]
@@ -582,7 +623,14 @@ final class DownloadModel {
                         if record.state == .failed { record = DownloadRules.apply(.retry, to: record) }
                         try store.database.put(record)
                     } else {
-                        try store.database.put(DownloadRecord(song: song, albumID: id, now: at))
+                        var record = DownloadRecord(song: song, albumID: id, now: at)
+                        // a queue entry carries no size: the kept album's answer may have it (else it comes with the
+                        // album's answer, asked below, before the song's task is made)
+                        if record.sizeExpected == nil, !record.isTranscode,
+                           let size = albums[id]?.song?.first(where: { $0.id == song.id })?.size, size > 0 {
+                            record.sizeExpected = size
+                        }
+                        try store.database.put(record)
                         fresh.append(song)
                     }
                     try store.database.addOrigin(origin, song: song.id, at: at)
@@ -593,16 +641,10 @@ final class DownloadModel {
             return
         }
         note("asked: \(songs.count) (\(origin.raw))")
-        reload()
-        // a song whose whole copy is in the streaming cache is copied in - an APFS clone - and checked as any download
+        // a song whose whole copy is in the streaming cache is copied from there when the plan lets it go - so the
+        // storage limit and the phone's reserve hold for it as for any download
         for song in fresh {
-            guard let cached = files.cache.reusable(song), var record = records[song.id], let part = store.partURL(record)
-            else { continue }
-            try? FileManager.default.removeItem(at: part)
-            guard (try? FileManager.default.copyItem(at: cached, to: part)) != nil else { continue }
-            record = arrive(record, part: part, in: store)
-            try? store.database.put(record)
-            note("from the streaming cache: \(song.id)")
+            if let cached = files.cache.reusable(song) { cachedCopies[song.id] = cached }
         }
         for id in Set(songs.compactMap { albumID ?? $0.albumId }) where albums[id] == nil {
             keepAlbum(id, client: server.client)
@@ -683,6 +725,9 @@ final class DownloadModel {
             let resumes = await session.cancel(ids, resume: !signOut)
             guard self.store === store else { return }
             update(letGo.map(\.id)) { record in
+                // one that arrived (or ended otherwise) while the cancel was out is left as it is now: a copy here
+                // set back to wanted would be fetched again
+                guard record.state == .fetching else { return record }
                 let task = self.live.removeValue(forKey: record.id)
                 return signOut ? DownloadRules.apply(.signedOut, to: record)
                     : DownloadRules.apply(.cancelled(resume: task.flatMap { resumes[$0] }), to: record)
@@ -698,17 +743,43 @@ final class DownloadModel {
             r.wait = decisions[r.id]?.wait
             return r
         }
-        // tasks the plan lets go of the leash: made now, the oldest ask's album from its top
-        let toMake = ordered(records.values.filter { $0.state == .wanted && decisions[$0.id]?.task == true })
+        // tasks the plan lets go of the leash: made now, the oldest ask's album from its top - but not a song whose size
+        // is on its way with its album's answer (it would be counted at a transcode's estimate, and its copy's length
+        // checked against nothing)
+        let toMake = ordered(records.values.filter {
+            $0.state == .wanted && decisions[$0.id]?.task == true && !sizeComing($0)
+        })
         var made: [String: String] = [:]
+        var copied: [DownloadRecord] = []
         for (index, record) in toMake.enumerated() {
+            // a cached copy that didn't hold (its length, or its move) is simply downloaded, as if there were none
+            if let copy = copyFromCache(record, in: store), copy.state == .done {
+                copied.append(copy)
+                continue
+            }
             if let name = make(record, in: store, priority: max(0.1, 0.9 - Float(index) * 0.01)) { made[record.id] = name }
+        }
+        if !copied.isEmpty {
+            try? store.database.transaction {
+                for record in copied { try store.database.put(record) }
+            }
+            reload()
         }
         update(Array(made.keys)) { record in
             var r = DownloadRules.apply(.taskMade(made[record.id] ?? ""), to: record)
             r.resume = nil // spent on the task made from it
             return r
         }
+    }
+
+    /// The song's whole copy from the streaming cache, when it had one as it was asked for: copied in (an APFS clone, at
+    /// once, no data spent) and checked as any download - the record as it arrived, or nil (no copy, or it's gone).
+    private func copyFromCache(_ record: DownloadRecord, in store: DownloadStore) -> DownloadRecord? {
+        guard let cached = cachedCopies.removeValue(forKey: record.id), let part = store.partURL(record) else { return nil }
+        try? FileManager.default.removeItem(at: part)
+        guard (try? FileManager.default.copyItem(at: cached, to: part)) != nil else { return nil }
+        note("from the streaming cache: \(record.id)")
+        return arrive(record, part: part, in: store)
     }
 
     /// The song's task made: its request with the setting's network flags, from its resume data when it has some.
@@ -724,6 +795,7 @@ final class DownloadModel {
         guard let task = session.make(request, name: name, resume: record.resume, priority: priority) else { return nil }
         live[record.id] = task
         madeAt[record.id] = Monotonic.seconds()
+        madeUnder[record.id] = downloadOver
         note("task \(task): \(record.id)\(record.resume == nil ? "" : " (resumed)")")
         return name.description
     }
@@ -737,6 +809,8 @@ final class DownloadModel {
         _ = await session.cancel(ids, resume: false)
         guard self.store === store else { return }
         update(out.map(\.id)) { record in
+            // arrived while the cancel was out: kept as it is
+            guard record.state == .fetching else { return record }
             self.live[record.id] = nil
             var r = DownloadRules.apply(.cancelled(resume: nil), to: record)
             r.resume = nil
@@ -757,10 +831,20 @@ final class DownloadModel {
             }
             let (target, current) = found
             if current, let mine = live[name.songID], mine != task {
-                if let part { try? FileManager.default.removeItem(at: part) }
-                return
+                // an older task's file: one that ended while the app was gone, its event later than the launch's settle,
+                // which asked for the song again. A whole file is the song all the same - taken, and the newer task let
+                // go, rather than fetched twice; anything else is dropped and the newer task carries on.
+                guard let part, unsaved == nil, DownloadRules.isTheSong(status: status),
+                      let waiting = try? target.database.song(name.songID), waiting.state == .fetching,
+                      DownloadRules.lengthMatches(DownloadStore.length(part) ?? 0, record: waiting) else {
+                    if let part { try? FileManager.default.removeItem(at: part) }
+                    return
+                }
+                Task { _ = await session.cancel([mine], resume: false) }
+                note("\(name.songID): an older task's file taken, task \(mine) let go")
             }
-            live[name.songID] = nil
+            // `live` is the signed-in person's: another's task ending says nothing of theirs
+            if current { live[name.songID] = nil }
             guard var record = try? target.database.song(name.songID), record.state != .done else {
                 if let part { try? FileManager.default.removeItem(at: part) }
                 return
@@ -784,19 +868,21 @@ final class DownloadModel {
             guard !ours, let found = storeFor(name) else { return }
             let (target, current) = found
             if current, let mine = live[name.songID], mine != task { return }
-            live[name.songID] = nil
+            if current { live[name.songID] = nil }
+            // resume data from a task made under another Download over than now would resume under that one's flags
+            let kept = current && madeUnder[name.songID].map { $0 != downloadOver } == true ? nil : resume
             guard var record = try? target.database.song(name.songID), record.state != .done else { return }
             if forceQuit {
                 try? target.database.setMeta("force_quit_at", String(ListenTracker.wallMs()))
-                record = DownloadRules.apply(.cancelled(resume: resume), to: record)
+                record = DownloadRules.apply(.cancelled(resume: kept), to: record)
                 note("\(name.songID): force quit\(resume == nil ? "" : ", resumable")")
             } else if error.code == NSURLErrorCancelled {
-                record = DownloadRules.apply(.cancelled(resume: resume), to: record)
+                record = DownloadRules.apply(.cancelled(resume: kept), to: record)
             } else {
                 let reason = error.localizedDescription
                 let failure: DownloadFailure = error.code == NSURLErrorTimedOut ? .timeout(reason: reason) : .offline(reason: reason)
                 let counts = current && madeAt[name.songID].map { reachability.answeredSince($0) && reachability.online } ?? false
-                record = DownloadRules.apply(.noAnswer(failure, resume: resume, counts: counts), to: record)
+                record = DownloadRules.apply(.noAnswer(failure, resume: kept, counts: counts), to: record)
                 if !counts { reachability.heard(answered: false) }
                 note("\(name.songID): \(reason)\(counts ? " (a try)" : "")")
             }
@@ -866,10 +952,13 @@ final class DownloadModel {
 
     // MARK: the sound check (8.4 step 2)
 
+    /// A song's sound check queued. Started on the next turn, not now: a copy queued as it arrives has its record written
+    /// and read back just after (`arrive` returns it to be kept) - a check started at once would find it not here yet
+    /// and drop it until the next launch or return to the front.
     private func queueCheck(_ songID: String) {
         guard !verifyQueue.contains(songID), verifying != songID else { return }
         verifyQueue.append(songID)
-        checkNext()
+        Task { self.checkNext() }
     }
 
     private func checkNext() {
@@ -935,21 +1024,28 @@ final class DownloadModel {
     private func keepAlbum(_ albumID: String, client: DeadwaxClient?) {
         guard let client, let store, !albumID.isEmpty, albumsAsked.insert(albumID).inserted else { return }
         Task {
-            defer { albumsAsked.remove(albumID) }
+            defer {
+                albumsAsked.remove(albumID)
+                // its songs held for their size go now, with it or (no answer) at their estimate
+                replan()
+            }
             do {
                 let response = try await client.answer(client.request(Routes.album, path: ["album_id": albumID]))
                 let album = try client.decode(Album.self, response)
-                guard self.store === store else { return }
-                try store.database.putAlbum(id: albumID, json: response.body, fetchedAt: ListenTracker.wallMs())
-                albums[albumID] = album
+                // removed meanwhile: nothing kept of it
+                guard self.store === store, songsOfAlbum[albumID] != nil else { return }
+                // kept as an album page's answer is: a song's size learned, or a replaced file fetched again
+                albumAnswered(album, body: response.body)
                 if let cover = album.coverArt, !cover.isEmpty {
                     let data = try await client.cover(coverID: cover, size: DownloadStore.coverSize)
+                    guard self.store === store else { return }
                     let name = DownloadStore.coverName(cover, data: data)
                     let url = store.covers.appendingPathComponent(name)
                     try data.write(to: url, options: .atomic)
                     DownloadStore.protect(url)
                     try store.database.setCover(album: albumID, file: name)
                     KeptCovers.shared.keep(cover, url)
+                    reload()
                 }
                 await keepLoudness(albumID, client: client, store: store)
                 note("album kept: \(album.name ?? albumID)")
@@ -1029,16 +1125,18 @@ final class DownloadModel {
         if byAlbum != songsOfAlbum { songsOfAlbum = byAlbum }
         let kept = (try? store.database.origins()) ?? [:]
         if kept != origins { origins = kept }
-        if bytes != bytesHere { bytesHere = bytes }
         playable.set(urls)
         var keptAlbums: [String: Album] = [:]
         var covers: [String: URL] = [:]
         for answer in (try? store.database.albums()) ?? [] {
+            if let file = answer.cover { bytes += coverLength(file, in: store) }
             guard let album = albums[answer.id] ?? (try? JSONDecoder().decode(Album.self, from: answer.json)) else { continue }
             keptAlbums[answer.id] = album
             if let cover = album.coverArt, let file = answer.cover { covers[cover] = store.covers.appendingPathComponent(file) }
         }
         if keptAlbums != albums { albums = keptAlbums }
+        // what's used is the songs' bytes and their covers', as the planner counts them (6.3, 8.5)
+        if bytes != bytesHere { bytesHere = bytes }
         KeptCovers.shared.set(covers)
         let quit = (try? store.database.meta("force_quit_at")).flatMap { $0.flatMap(Double.init) }
         let at = quit.map { Date(timeIntervalSince1970: $0 / 1000) }
@@ -1048,6 +1146,33 @@ final class DownloadModel {
     }
 
     // MARK: helpers
+
+    /// A kept cover's length, read from disk once.
+    private func coverLength(_ file: String, in store: DownloadStore) -> Int64 {
+        if let known = coverLengths[file] { return known }
+        let length = DownloadStore.length(store.covers.appendingPathComponent(file)) ?? 0
+        if length > 0 { coverLengths[file] = length }
+        return length
+    }
+
+    /// Every song's resume data let go (its tasks are made from the first byte): a Download over changed, or another
+    /// session. Not a fetching song's - its task is cancelled and remade by whoever let it go.
+    private func dropResumeData() {
+        let stale = records.values.filter { $0.resume != nil && $0.state != .fetching }.map(\.id)
+        guard !stale.isEmpty else { return }
+        update(stale) { record in
+            var r = record
+            r.resume = nil
+            return r
+        }
+        note("resume data let go: \(stale.count)")
+    }
+
+    /// A song asked for without its size (a queue entry has none) whose album's answer, which has it, is being asked:
+    /// its task waits for it.
+    private func sizeComing(_ record: DownloadRecord) -> Bool {
+        !record.isTranscode && record.sizeExpected == nil && albumsAsked.contains(record.albumID)
+    }
 
     private func facts(_ song: Song) -> AlbumSongFacts { facts(id: song.id) }
 
