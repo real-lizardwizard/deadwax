@@ -115,6 +115,8 @@ public struct EngineDebug: Equatable {
     public var key: Int?
     /// The entry being decoded (the one heard, or the next once the heard one's decode has ended).
     public var feedKey: Int?
+    /// The EQ's unit (eq.md 3.13's Debug rows); nil for an engine made without one.
+    public var eq: EQUnitStatus?
 
     public init() {}
 }
@@ -152,6 +154,11 @@ public struct EngineDebug: Equatable {
 ///   after the song heard (`replaceUpcoming`) is taken when nothing it changes is on a node yet, and
 ///   refused - held by the app until the next song - when it would change a song already scheduled.
 ///   The song heard is never touched.
+/// - The EQ (notes/ios-specs/eq.md 1.1) is one unit between the main mixer and the output, at the
+///   output's rate: mixer -> EQ -> output (`EQUnit`, fed through `eq`, its `EQHost`). Off, and any flat
+///   curve, it passes every sample through untouched - proved bit for bit against an engine with no unit
+///   (EQEngineTests). Its curve for the output is put in at each start of the output (`eqStart`), so the
+///   first sample on a new route already has it.
 ///
 /// Every call hops onto the engine's own serial queue; `onChange` is called on the main queue.
 public final class PlaybackEngine {
@@ -175,6 +182,9 @@ public final class PlaybackEngine {
         public var retrySeconds: Double = 0.05
         /// Offline manual rendering in this format (the tests' render), instead of the device.
         public var offline: AVAudioFormat?
+        /// The EQ's unit between the main mixer and the output (eq.md 1.1). False only for the tests' engine
+        /// with no unit at all, which the unit Off is held to bit for bit.
+        public var eq = true
 
         public init() {}
     }
@@ -192,11 +202,21 @@ public final class PlaybackEngine {
     /// What the engine does, line by line, on its queue - each line starts with the render's sample
     /// count offline, the host time in seconds on the phone. Debug keeps the last lines for a log.
     public var trace: ((String) -> Void)?
+    /// At every start of the output, between `prepare()` and `start()` (eq.md 1.8): the EQ's host, and the
+    /// rate and channels its unit runs at - to set the output now and publish that output's curve, which the
+    /// render's first block puts in. The app sets it, as it sets `latency` (PlayerModel.eqTest); on the
+    /// engine's queue. Nothing by default: the unit plays the newest bank published, Off until one is.
+    public var eqStart: (_ host: EQHost, _ rate: Double, _ channels: Int) -> Void = { _, _, _ in }
+    /// The EQ's host: where its banks are published and its unit's state is read (eq.md 1.6). One for the
+    /// engine's life - a rebuilt engine's new unit renders for it too. Nil with `Settings.eq` false.
+    public let eq: EQHost?
 
     private let settings: Settings
     private let queue = DispatchQueue(label: "deadwax.engine", qos: .userInitiated)
     private var engine: AVAudioEngine
     private var observer: NSObjectProtocol?
+    /// The EQ's unit in this engine's graph; nil when it couldn't be made (mixer -> output, as before it).
+    private var eqNode: AVAudioUnit?
 
     private final class Lane {
         let node: AVAudioPlayerNode
@@ -558,6 +578,7 @@ public final class PlaybackEngine {
 
     public init(settings: Settings = Settings()) throws {
         self.settings = settings
+        eq = settings.eq ? EQHost() : nil
         engine = AVAudioEngine()
         try configure(engine)
     }
@@ -571,6 +592,7 @@ public final class PlaybackEngine {
             try engine.enableManualRenderingMode(.offline, format: format, maximumFrameCount: 4096)
         }
         _ = engine.mainMixerNode
+        insertEQ(engine)
         if let observer { NotificationCenter.default.removeObserver(observer) }
         // posted on AVAudioEngine's own thread: nothing there holds the engine (see `enqueue`)
         let queue = self.queue
@@ -578,6 +600,38 @@ public final class PlaybackEngine {
                                                           object: engine, queue: nil) { [weak self] _ in
             queue.async { self?.configurationChanged() }
         }
+    }
+
+    /// The EQ's unit between the main mixer and the output (eq.md 1.1, 1.2): attached and connected both ways in the
+    /// mixer's output format - the offline render's, or the output's as it is now; `matchOutput` makes both
+    /// connections again at the hardware's rate at each start. Its largest block is set before anything is
+    /// allocated. If iOS can't make it: mixer -> output as before, the engine plays on, and Debug says why.
+    private func insertEQ(_ engine: AVAudioEngine) {
+        eqNode = nil
+        guard let host = eq else { return }
+        let node: AVAudioUnit
+        do {
+            node = try EQUnit.node()
+        } catch {
+            host.notMade(error.localizedDescription)
+            note("the EQ's unit couldn't be made: \(error.localizedDescription)")
+            return
+        }
+        guard let unit = node.auAudioUnit as? EQUnit else { return }
+        unit.maximumFramesToRender = EQUnit.maximumFrames
+        unit.attach(host)
+        let mixer = engine.mainMixerNode
+        var format = settings.offline ?? mixer.outputFormat(forBus: 0)
+        if format.sampleRate <= 0 || format.channelCount == 0,
+           let standard = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2) {
+            // no output to read yet: anything valid, made right by matchOutput before the output starts
+            format = standard
+        }
+        engine.attach(node)
+        engine.connect(mixer, to: node, format: format)
+        engine.connect(node, to: engine.outputNode, format: format)
+        eqNode = node
+        host.made()
     }
 
     // MARK: the calls
@@ -678,6 +732,7 @@ public final class PlaybackEngine {
             debug.phase = state.phase
             debug.key = current
             debug.feedKey = feed?.key
+            debug.eq = eq?.status()
             return debug
         }
     }
@@ -914,9 +969,11 @@ public final class PlaybackEngine {
         if engine.isRunning { return true }
         matchOutput()
         engine.prepare()
+        startEQ()
         do {
             outputStartedAt = Self.hostSeconds()
             try engine.start()
+            if eqNode != nil { eq?.outputStarted() }
             for lane in lanes.values {
                 if settings.offline == nil {
                     lane.renderAtStart = lane.node.lastRenderTime.map { $0.sampleTime }
@@ -953,20 +1010,40 @@ public final class PlaybackEngine {
         asleep = true
     }
 
+    /// The EQ's curve for the output put in as it starts (eq.md 1.8): `eqStart`, between prepare and start, with the
+    /// unit's rate and channels - it sets the output now and publishes that output's bank, which the render's first
+    /// block after the allocation installs, states zeroed and with no crossfade. Nothing has sounded on this start
+    /// yet, so nothing can click.
+    private func startEQ() {
+        guard let host = eq, let node = eqNode else { return }
+        host.outputStarting()
+        let format = node.outputFormat(forBus: 0)
+        eqStart(host, format.sampleRate, Int(format.channelCount))
+    }
+
     /// The main mixer connected to the output at the hardware's rate - which a new route can change
     /// (AirPlay, a USB DAC) - before lanes are made for it, so iOS's output never converts a second
     /// time after a lane's own converter. Lanes made for another rate are made again. Only on a
-    /// stopped engine, never offline.
+    /// stopped engine, never offline. With the EQ: mixer -> EQ -> output, both connections made again
+    /// whenever the mixer's rate or the unit's isn't the hardware's - a configuration change leaves every
+    /// connection at its old format, so never one of them alone (eq.md 1.2).
     private func matchOutput() {
         guard settings.offline == nil, !engine.isRunning else { return }
         let hardware = engine.outputNode.outputFormat(forBus: 0)
         guard hardware.sampleRate > 0 else { return }
         let mixer = engine.mainMixerNode.outputFormat(forBus: 0)
-        if mixer.sampleRate != hardware.sampleRate {
+        let unitRate = eqNode?.outputFormat(forBus: 0).sampleRate
+        if mixer.sampleRate != hardware.sampleRate || (unitRate != nil && unitRate != hardware.sampleRate) {
             let channels = mixer.channelCount > 0 ? mixer.channelCount : min(max(hardware.channelCount, 1), 2)
             if let format = AVAudioFormat(standardFormatWithSampleRate: hardware.sampleRate, channels: channels) {
-                engine.connect(engine.mainMixerNode, to: engine.outputNode, format: format)
-                note("the mixer reconnected to the output at \(Int(hardware.sampleRate)) Hz")
+                if let eqNode {
+                    engine.connect(engine.mainMixerNode, to: eqNode, format: format)
+                    engine.connect(eqNode, to: engine.outputNode, format: format)
+                    note("the mixer and the EQ reconnected to the output at \(Int(hardware.sampleRate)) Hz")
+                } else {
+                    engine.connect(engine.mainMixerNode, to: engine.outputNode, format: format)
+                    note("the mixer reconnected to the output at \(Int(hardware.sampleRate)) Hz")
+                }
             }
         }
         let rate = engine.mainMixerNode.outputFormat(forBus: 0).sampleRate
