@@ -618,6 +618,16 @@ app leaving the front, Control Centre pulled over it, a system alert) is `ended(
 taken press as a cancel **with its intent set to rest first**, so the cancel doesn't ask the song to play into a
 call.
 
+**As built (slice 1, 2026-11-12).** `TurntablePress<M>` (TurntablePress.swift) over two protocols: `PressDeck`,
+which DeckRules conforms to, and `PressHost` (`playing`, `length`, `track`, `seek`, `toggle`, `wake` - the web's
+wakeDeckAudio - `box`, `drawnAt`, `shown`, `now`, `flac`, `noAudio`). Its calls are `recordDown`, `armDown`,
+`moved(pointer:samples:)`, `ended(pointer:how:time:)` and `armKey`, with `grabbed()` (the host's, :237),
+`songChanged` and the static `toggle(deck, host)` (NowPlaying's, :282). There is no `tapped`: a record's
+`ended(.up)` runs onRecordClick's rule after the release's own work, as above; the arm's lift runs none (the web's
+click handler is the record's alone). **Held by hand-built cases only** (TurntablePressTests, each the calls the
+web's handlers make, read line by line) - the exported press traces of 7.0 were not built in slice 1; the handlers'
+hashes are, so a change to them fails iosdeck.sim.
+
 ### 3.2 The clock
 
 **The web.** The page and the audio context have two clocks; deckClock.ts (2.0.0-player.24) maps one onto the
@@ -741,6 +751,26 @@ The behaviour, each as the web's (and docs/player.md:1205-1241 says it to a list
   refreshed within 6 s of the end, no more than every 3 s; a failure retried after 10 s; a 415 is the song refused
   for good (its words, deck.ts:2348), a 416 "deadwax said that is past the end of the song" (:2350).
 
+**As built (slice 1, 2026-11-12).** Nearest to the above, where the web's code needed more:
+
+- **`DeckHost` carries what the web reads off its module's audio** as well as the list above: `voiceMade()` (the
+  voice's state made - handWindow's test), `sleepAudio()` and `closeAudio()` (setShowing's sleepDeckAudio and
+  destroy's closeDeckAudio), and `post(DeckPost)`, the voice's messages as values. Its clock is a protocol of its
+  own, `DeckClock`: `now`, `stamp`, `after(ms, run) -> Int`, `cancel`, `frame(run) -> Int`, `cancelFrame` - the
+  web's setTimeout and requestAnimationFrame, numbered so a replay fires them by number. The deck's own clock timer
+  and readings (keepClock, readClock, deck.ts:2156-2193) are not ported: the phone's clock is the voice host's (3.2).
+- **`window` answers through a callback** with a `Result<DeckWindow, DeckWindowError>`, on the main queue, not
+  `async throws`: Core has no concurrency, and a replay must answer each ask at the moment the web's trace did. A
+  ticket drops the answer to an ask since superseded, as the web's request counter does.
+- **The errors**: `.notFlac(words?)`, `.undecodable(words)` and `.channels(n)` refuse the song for good (the 415's
+  path); `.pastTheEnd`, `.offline` and `.failed(words)` are retried after RETRY_MS (the 416's and a failed fetch's).
+  `.offline` is retried because a phone back online, or a song that has finished downloading, can then have its
+  window - the spec didn't say which.
+- **`DeckSong`** is the deck's own `{ id, length, flac, kind }`; the album and the disc are the look's (2.3).
+- **Inputs the web takes from elsewhere** come in as calls: `heard(VoiceHeard)` (the voice's report, the web's
+  port.onmessage, deck.ts:585), `audioChanged()` (the module's audioChanged telling its listeners, :553) and
+  `reducedChanged(_:)` (the reduced-motion query's change, :1367).
+
 ### 3.4 The player's part
 
 James's rule: the deck touches the player only through **pause, seek and resume** - the web's own, whose
@@ -852,6 +882,32 @@ too uneven for this (the seam over 30 ms at 1x on the phone), the alternative is
 running, so the song is heard within its output latency like the web's element - an engine change of its own (10,
 question 2).
 
+**As built (slice 1, 2026-11-12).** In DeckRules:
+
+- `handoverLead: (DeckSong, Double) -> Double` - given the song and `plan.x`, the kind and position `E` is predicted
+  from - read at each let-go of a playing record; 0 by default, when DeckRules is the web's exactly (every trace).
+- A lead above 0 takes `releaseLed`. Under Reduce Motion: the web's stop, a take at `plan.x` at the player's speed
+  stamped now, the song sought to `reducedTarget` and played in the gesture. Otherwise the handover plan starts as
+  the web's, and either a timer (`DeckClock.after`; slice 3's host makes it the `.strict` DispatchSourceTimer) asks
+  the resume at `planEnd - lead`, the release having sought the song to `plan.x` - or, that moment already past,
+  the song is played in the gesture (`play: true`) and sought to `lateTarget`. The RESUME_IN_GESTURE_S shortcut is
+  taken only with no lead.
+- The judge runs from the resume (`handOver(…, judgeOnly: true)`: the plan's own drives go on). A plan resumed early
+  (`resumed`) posts at its end only the hold drive (the song's speed from `plan.x`, HANDOVER_MAX_S), and only while
+  the judge still waits; it asks no second resume. A judge that fires before the plan's end turns the motion to
+  turning and fades - the web's play-before-speed case.
+- `resumeAsked` is set as DeckRules calls `host.resume()` (in the web's planEnded too, where it changes nothing), and
+  cleared by the next `playingChanged` **and by any new plan** (`startPlan`), so a resume asked for one plan is never
+  taken as the next one's.
+- `HandoverTiming` (DeckRules.swift) is the pure arithmetic: `voiceDelay` (`D`), `predictedLocal` (the median of the
+  last five - the host keeps a list per kind and route), `predictedStream` (least squares over the last five, slope
+  at least 0; one point, or all at one position, their mean; none, 0.3 + position / 300), `lead`, `holdsAcross`,
+  `lateTarget`, `reducedTarget`. `holdsAcross` is for the host and Debug: DeckRules needs no rule of its own for a
+  song that can't start in time - its lead runs past the plan, which is the late case, and the voice holds until the
+  judge or HANDOVER_MAX_S, the web's timer.
+- Held by HandoverPlanTests' hand-built cases only (the arithmetic; DeckRules with leads of 0.2, 5, and 0.15 under
+  Reduce Motion; none, the web's shortcut). The two-engine HandoverTimingTests are 7.2's.
+
 ---
 
 ## 4. The sound
@@ -926,6 +982,14 @@ So that the port can be held to the web's output exactly (7.0, test A), these ar
 - Nothing allocates after `newVoiceState`: every array the web makes once is made there as an
   `UnsafeMutableBufferPointer` and freed with the state; nothing the render calls makes an array, a string or a
   closure. The same code runs on Linux in the tests and on the audio thread on the phone.
+
+**As built (slice 1, 2026-11-12).** `DeckMaths` is an instance protocol - a value the port is made with - not a
+static one: `RecordedMaths` counts each test's calls, and Swift allows no static stored state in a generic type. So
+constants that need no maths live in plain enums (`Platter`, `TurntableGeometry`, `PlaySpeed`, `DeckConstants`) and
+the sums that do in small generic structs over a DeckMaths (`PlatterPlans`, `TurntableTrig`, `PlaySpeedScale`);
+platter.ts's FRICTION_DRY, computed once at load, is computed once per PlatterPlans. `RecordedMaths` answers by the
+input's bits, counts and hashes every call in order, and answers a call the web never made with NaN, recorded as
+missed (a test fails on any).
 
 ### 4.3 Its host: an AVAudioSourceNode on a second AVAudioEngine
 
@@ -1383,6 +1447,35 @@ recorded stamps.
 - **Palette**: the tokens of 2.14 read out of theme.css by the exporter (`tokens.json`), and a Linux test holding
   `TurntablePalette`'s Core-side values (the RGBA each Palette colour is made from) to them.
 
+**As built (slice 1, 2026-11-12).** 61 files, 2986 KB of the 3 MB. Where it isn't the table above, and why:
+
+- **`rules/`, 42 cases.** The eight motions at 60 Hz, and five of them (steady1, back1, wobble, ramp, scratch) at
+  120 Hz - half, quarter and double not at 120 Hz, for the budget - each with 500 ms of play before and 3000 ms
+  after, seeded 900 + its index + its rate; and 29 scenarios on deck.sim's lines (taps, a pause then a play, play
+  during a wind-down, wind-down off, hold and let go, a quick grab flicked back, a paused coast, a coast back past
+  the window, a cancel, play during a coast, the arm mid-coast, a handover sought elsewhere and one judged closely, a
+  song change mid-hold and mid-coast-back, not a FLAC, a 415, a 416 then its retry, reduced motion, a silent press
+  then the audio waking, held still over a coast, hidden mid-coast-back, the speed changing, a pause from elsewhere,
+  a mono short window, a tap while coasting, a slow short window, heard at half gain, a release at the tail, a
+  silent coast sounding on the window's arrival). The 416 case runs under reduced motion (its coast took the budget).
+- **The format**: the inputs as an op byte and little-endian doubles, base64; the world (song, playing, position,
+  ready, made) an input only when it changed; frames on a 16 ms grid; the real deckVoice.ts rendering 128-frame
+  blocks at 48 kHz while the context runs, its reports the `heard` inputs - carrying pos, rate and gain only, the
+  fields the rules read. **Each effect is numbered by the input it came in**: added when a mutation (the refresh's
+  speed) passed with every effect in order and one ask at another position report. A case's effects are kept whole
+  at 400 or fewer, else as the count and an FNV-1a 64 per 512 (the budget); the PlatformMaths replay compares a
+  hashed case by its count only. The stamp pairs are recorded only where the stamp isn't the identity - none yet.
+- **`press/` holds no traces**: mounting Turntable.tsx through turntable.sim's `mount` over the harness was not
+  built in slice 1. `press/handlers.json` is the `made_from` alone - the sha256 of the silent line (:286-290), the
+  handlers (:301-422), the host's `grabbed` (:237) and NowPlaying's toggle (:282) - so a change to any fails
+  iosdeck.sim; TurntablePress is held by hand-built cases (3.1). **Still owed**: the traces.
+- **`voice/` is eight cases of its own**, not every rules case's messages (the budget): hand turns, the wind-down, a
+  handover with its fade, a window swapped mid-block with a mono window and a missing one, a loud hand at 120 Hz, a
+  step, rests and out-of-order samples, a song that runs out - each at 48 and 44.1 kHz in blocks of 128, 333, 512,
+  1024 and 1 (72 runs); three keep 48 kHz stretches whole, as raw Float32 (`.f32`, one of test_source_bytes.py's
+  binary suffixes - base64 would pass the budget). 880 KB.
+- `tokens.json` (2.14's) and `jsmath.json` as planned; `maths.json` is written last, over every run above.
+
 ### 7.1 Slice 1 - Core: the physics and the voice
 
 - **Files**: `DeadwaxCore/DeckMaths.swift` (the protocol, `PlatformMaths`, `RecordedMaths`, and the JS helpers of
@@ -1400,6 +1493,10 @@ recorded stamps.
   identically before and after, its output byte for byte), ios/App, DeadwaxAudio, the server.
 - **Verified**: `ios/scripts/check-linux.sh` (Core built and tested with swift.org's Linux toolchain), ios.yml's
   ubuntu and macOS jobs, tests.yml's sims (iosdeck included, and deck.sim unchanged). No Simulator.
+
+**As built (slice 1, 2026-11-12)**: every file above, with the departures written into 3.1, 3.3, 3.5, 4.2 and
+7.0, and notes/ios.md's "The turntable". Verified on this Mac only (swift test, the Xcode device build, every sim,
+iosdeck's --check); check-linux.sh and ios.yml were not run - Linux by reading.
 
 ### 7.2 Slice 2 - DeckEngine and the local window
 

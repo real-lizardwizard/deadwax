@@ -826,6 +826,7 @@ exporter with `--check` so tests.yml (which runs every sim, each on its own) fai
 | export-screen-vectors.cjs | SignIn.tsx, SignOutRow.tsx, QueueMenu.tsx, MiniPlayer.tsx, signIn.ts, whose.ts, scrub.ts, discTitles.ts, format.ts; lines of AlbumPage.tsx, NowPlaying.tsx and signInGate.tsx read out by pattern | screens/ | iosscreens.sim.cjs |
 | export-you-vectors.cjs | You.tsx's expressions and words, read out of the source and evaluated as written (136 cases) | you/ | iosyou.sim.cjs |
 | export-gate-vectors.cjs | NeedsNavidrome.tsx, access.ts, errorWords.ts, navidromeCheck.ts, the gate rendered against a Preact stand-in (35 cases) | gate/ | iosgate.sim.cjs |
+| export-deck-vectors.cjs | platter.ts, turntable.ts, playSpeed.ts, deckClock.ts's pointerSamples, debugRows.ts, deckVoice.ts, and the real deck.ts driven through ui/test/deckHarness.cjs (deck.sim's own fakes) with deckVoice.ts rendering beside it; theme.css's turntable tokens; the words of Turntable.tsx, SpeedFader.tsx, SpeedChip.tsx, LookChoice.tsx, WindDownChoice.tsx and You.tsx; every Math call recorded (maths.json); hashes Turntable.tsx's handlers and NowPlaying's toggle (press/'s `made_from`) | deck/ (61 files, 3 MB budget) | iosdeck.sim.cjs |
 
 `--check` makes everything again in memory and compares it byte for byte with what is committed, so a hand edit
 fails too. **A web rule changed**: its sim fails; run the exporter and commit what it writes; that touches ios/,
@@ -2815,3 +2816,81 @@ first, so a queue another device saved since wins even over edits made here afte
 have saved; a phone with no rev yet counts any other device's record as newer; an offline launch's queue appears only
 once the open's GET fails - at once in Airplane Mode, up to the transport's 8 s with a network up and deadwax out of
 reach (Reachability isn't asked).
+
+## The turntable
+
+The turntable and the speed fader, on the iPhone: the design spec is notes/ios-specs/turntable.md, built in four
+slices (its 7.1-7.4) on the `ios` branch. Each slice's departures are written into the spec's own sections as **As
+built** paragraphs; this is the account of what was built and what was seen.
+
+### Slice 1: Core (2026-11-12)
+
+The physics, the deck's rules and the voice, in DeadwaxCore, held to the web's own TypeScript run by
+`ios/scripts/export-deck-vectors.cjs` (the table in "How the ports are kept in step with the web"). No screen, no
+audio host, nothing in ios/App or DeadwaxAudio; ui/src untouched; deck.sim.cjs changed only by its fakes moving into
+ui/test/deckHarness.cjs, its output byte for byte what it was.
+
+**What was built** (ios/DeadwaxKit/Sources/DeadwaxCore/):
+
+- `DeckMaths.swift` - the eight transcendentals behind an instance protocol: `PlatformMaths` (libm, with JavaScript's
+  pow edge cases) and `RecordedMaths` (the web's answers by input bits, every call counted and hashed, one the web
+  never made answering NaN and failing the test); `JSMath`'s round, min, max, fround, ToInt32, sign (spec 4.2).
+- `Platter.swift` (platter.ts: the plans, phases, the hand's speed, the release), `TurntableGeometry.swift`
+  (turntable.ts: the drawing, arm, drags, previews, the disc; `TurntableLayout`; deckClock.ts's pointerSamples),
+  `PlaySpeed.swift` (playSpeed.ts), `TurntableWords.swift` (the spec's 2.9 and Debug's rows),
+  `TurntablePalette.swift` (2.14, each colour named with its token).
+- `DeckVoice.swift` - deckVoice.ts line for line: the messages, the follow filter, the Hermite read, the fit, the
+  squeeze, the DC blocker, the limiter, the reports; rendering into the caller's buffers, allocating nothing per block.
+- `DeckRules.swift` - deck.ts's Deck class method for method, over `DeckHost` and `DeckClock`; the phone's handover
+  lead (`handoverLead`, `resumeAsked`, `releaseLed`) and `HandoverTiming`, the spec's 3.5 arithmetic.
+- `TurntablePress.swift` - Turntable.tsx's handlers and NowPlaying's turntable toggle, over `PressDeck` (DeckRules)
+  and `PressHost`.
+
+Tests (DeadwaxCoreTests): JSMathTests, PlatterTests, TurntableGeometryTests, PlaySpeedTests, TurntableWordsTests,
+TurntablePaletteTests, DeckFixturesTests, DeckVoiceTests (A and B), DeckRulesTests, HandoverPlanTests,
+TurntablePressTests. Fixtures/deck/: 61 files, 2986 KB of the 3 MB.
+
+**Departures** (each in the spec's section, as built):
+
+- **Press traces not exported** (7.0, 3.1): `press/` holds only the handlers' hashes; TurntablePress is held by eight
+  hand-built cases. The traces through a mounted Turntable are still owed.
+- **The budget** (7.0): 120 Hz for five of the eight motions; the motions' play trimmed to 500 ms before and 3 s
+  after; the 416 case under reduced motion; a case's effects hashed per 512 when over 400; the voice's eight cases
+  its own, not every rules case's messages.
+- **Effects numbered by their input** (7.0): a mutation (the refresh's speed) passed with every effect in order and
+  one ask at another position report; numbered, it fails.
+- **`heard` carries pos, rate and gain only** (7.0) - the fields the rules read.
+- **DeckHost and DeckClock** (3.3): the host carries `voiceMade`, `sleepAudio`, `closeAudio` and `post`; the clock
+  is its own protocol; `window` answers through a `Result` callback, not `async throws`; `.offline` is retried,
+  `.undecodable` and `.channels` refused.
+- **The lead's paths** (3.5): `resumeAsked` also cleared by any new plan; `holdsAcross` left to the host and Debug;
+  the resumed plan's end posts only the hold drive.
+- **DeckMaths an instance protocol** (4.2), the maths-free constants in enums and the sums in small generic structs.
+
+**Verified** (this Mac, Xcode's toolchain):
+
+- DeckVoiceTests A: 72 runs (8 cases x 48 and 44.1 kHz x blocks of 128, 333, 512, 1024 and 1) bit for bit - each
+  span's hash, each report, the three whole stretches, the Math calls in the web's order. B: the platform's libm
+  gave the web's output exactly (worst 0, so -inf dBFS; the bound is -100).
+- DeckRulesTests: 42 cases, 39,929 effects, equal to the web's with RecordedMaths; with the platform's libm the whole
+  cases' doubles within 4.2e-16 relative (the bound 1e-9), the hashed cases by count.
+- HandoverPlanTests 7/7, TurntablePressTests 8/8, and the pure suites.
+- Mutations, each alone: the voice's 6 and the platter's and geometry's 2, all caught; DeckRules' 11 against the
+  replay, 8 caught - the 3 survivors TAKE_BACK_S written as 0.1 (it is 0.09999999999999999; equal at the traces'
+  magnitudes), `>=` for `>` against stampedTo (unreachable: frames run before inputs at the same ms) and the
+  angle's product regrouped (exact for these speeds); the lead path's 5 and TurntablePress's 3, all caught.
+- iosdeck.sim's `--check`: the 61 files are what the web's code makes now.
+- The whole package (`swift test`: 685 tests in 94 suites, and DeadwaxAudio's 93 in 3), the app's device build
+  (`xcodebuild … generic/platform=iOS`, no warning from the code; check_project.py ok), all 76 sims, and the five
+  iOS pytest files (125 passed). Their first run caught two things the earlier commits broke: debugRows' health was
+  `struct Health`, which test_ios_contract.py's reader takes for the server's (renamed `DeckHealth`, the web's own
+  name), and the three .f32 stretches failed test_source_bytes.py (`.f32` added to its binary suffixes: raw Float32
+  audio, base64 would pass the 3 MB).
+
+**Assumed, not seen**: Linux - by reading (the files import only libm), with ios.yml's ubuntu job to say; that
+glibc's libm keeps test B inside -100 dBFS (Darwin's happened to equal V8's for the voice, not for all the
+platter's); CI's Node 22 answering V8's Math as Node 20.12 did; the order TurntablePress makes its calls in, beyond
+the hand-read cases; the lead path against a real engine (slice 2's HandoverTimingTests).
+
+**For a reviewer**: the lead path in DeckRules (`releaseLed`, the `resumed` branch of `planEnded`, the judge's early
+fire in `handOver`'s `done`) is in no web trace; TurntablePress has no trace at all; the dropped 120 Hz motions.
