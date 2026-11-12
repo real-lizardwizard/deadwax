@@ -217,9 +217,13 @@ The plan's section 3, as Phase 0 needs it:
 - **Info.plist**: `NSAllowsArbitraryLoads` ALONE (beside NSAllowsLocalNetworking, or ...ForMedia /
   ...InWebContent, iOS ignores it - from Apple's docs as remembered, unverified on iOS 27, check 3),
   `NSLocalNetworkUsageDescription`, `UIBackgroundModes: [audio]`, portrait, dark.
-- **No Simulator runtimes on CI**: GitHub's macOS runners come with them; ios.yml deletes them before
-  the device build (best effort, both lists printed), so a tool that needs one fails there as on
-  James's Mac. Even so, a green ios.yml is no stand-in for check 1 (install.sh on his Mac).
+- **Simulator runtimes on CI**: GitHub's macOS runners come with them, and ios.yml prints them and leaves them
+  alone. Until 2026-11-12 it deleted them before the device build, so that a tool needing one would fail there as
+  on James's Mac. But `simctl runtime delete all` returns before the deletion is done (the list after it still
+  shows every runtime), and a deletion finishing a few seconds later, while the build resolved its destination,
+  failed it with "iOS 26.5 is not installed" - a runner glitch only in appearance. R2 was settled on James's Mac
+  instead: Phase 0's check 1 (2026-11-10) built and installed with no Simulator runtime at any point, and
+  check_project.py refuses the asset catalogs, storyboards and xibs that would need one.
 - **check_project.py** parses the .pbxproj (an old-style plist; its own small parser), checks every
   referenced id exists, one app target and no extension, the synchronized folder and package paths,
   the linked products against Package.swift, the configs' xcconfigs, no committed team, the scheme's

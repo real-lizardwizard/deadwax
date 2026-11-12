@@ -111,18 +111,20 @@ jobs:
               while read -r report; do echo "=== $report"; head -c 60000 "$report"; echo; done
           done
 
-      # GitHub's macOS runners come with iOS Simulator runtimes, which James's Mac doesn't have; a
-      # build tool that needs one (actool, ibtool - the plan's R2) would pass here and fail there.
-      # So the runtimes go first, as far as the runner lets them (both lists are printed). Even so
-      # this is no stand-in for check 1, install.sh on James's Mac.
+      # GitHub's macOS runners come with iOS Simulator runtimes, which James's Mac doesn't have. They are
+      # printed, and left alone. This step used to delete them, so that a build tool needing one (actool,
+      # ibtool - the plan's R2) would fail here as it would there. But `simctl runtime delete all` only marks
+      # them for deletion and returns: the list after it still showed every runtime, and the deletion finished
+      # in the background some seconds later - sometimes while the next step was resolving its destination,
+      # which then failed with "iOS 26.5 is not installed" (2026-11-12, run 43318108181 and earlier). R2 is
+      # settled where it matters: install.sh built and installed on James's Mac with no Simulator runtime at
+      # any point (Phase 0's check 1, 2026-11-10), and check_project.py refuses the asset catalogs,
+      # storyboards and xibs that would need one.
       # The app's build runs whether or not a test failed (the job fails either way), so one run shows
       # both; the checks on what it made only when it built.
-      - name: No Simulator runtimes, as on James's Mac
+      - name: The Simulator runtimes this runner has (never used)
         if: ${{ !cancelled() }}
-        run: |
-          xcrun simctl list runtimes || true
-          xcrun simctl runtime delete all || sudo xcrun simctl runtime delete all || true
-          xcrun simctl list runtimes || true
+        run: xcrun simctl list runtimes || true
 
       - name: The app, an unsigned device build
         id: build
