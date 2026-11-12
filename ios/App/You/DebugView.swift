@@ -1,10 +1,11 @@
 import DeadwaxCore
 import SwiftUI
+import UIKit
 
 /// You's Debug (admins only, D1): Phase 0's one screen, moved - Check's report, the test sounds, the hi-res row,
 /// what is playing (with the engine's own words for its last failure, D7, and an Up Next edit held for the join, D4),
-/// the Library's last album list asks (how many albums, how long - check 1), and how long this install runs. The
-/// address and the sign-in are the app's own screens now.
+/// the engine's log (its last 500 lines, with Copy and Share), the Library's last album list asks (how many albums,
+/// how long - check 1), and how long this install runs. The address and the sign-in are the app's own screens now.
 struct DebugView: View {
     @Environment(DebugModel.self) private var model
     @Environment(PlayerModel.self) private var player
@@ -20,6 +21,7 @@ struct DebugView: View {
                 hiRes
             }
             playing
+            EngineLogSection()
             libraryLists
             Section {
                 Text(model.installLine)
@@ -214,4 +216,68 @@ struct DebugView: View {
     }
 
     private func clock(_ seconds: Double) -> String { Format.clock(seconds) }
+}
+
+/// The engine's log (EngineTrace): its last lines, the newest last, read again once a second while the log's row is
+/// on screen and the app is in front - and only then (not on a locked phone left on Debug with music playing) - and
+/// drawn lazily, a line at a time. Copy puts the whole log on the clipboard as it is at the tap; Share hands it on as
+/// text (Mail, Messages, Files...) as last read.
+private struct EngineLogSection: View {
+    @State private var shown = EngineLog.Snapshot.empty
+    @State private var copied = false
+    @Environment(\.scenePhase) private var phase
+
+    var body: some View {
+        Section {
+            HStack(spacing: 24) {
+                Button(copied ? "Copied" : "Copy") {
+                    UIPasteboard.general.string = EngineTrace.log.snapshot().text
+                    copied = true
+                    Task {
+                        try? await Task.sleep(for: .seconds(2))
+                        copied = false
+                    }
+                }
+                ShareLink(item: shown.text, preview: SharePreview("deadwax engine log")) {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
+                Spacer(minLength: 0)
+            }
+            .buttonStyle(.borderless)
+            .disabled(shown.lines.isEmpty)
+            Group {
+                if shown.lines.isEmpty {
+                    Text("Nothing yet: the engine writes here once something plays.")
+                        .foregroundStyle(Palette.quiet)
+                } else {
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 3) {
+                            // by each line's number, which stays its own as the window moves on
+                            ForEach(shown.first..<shown.total, id: \.self) { number in
+                                Text(shown.lines[number - shown.first])
+                            }
+                        }
+                        .font(.caption2.monospaced())
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .defaultScrollAnchor(.bottom)
+                    .frame(height: 320)
+                }
+            }
+            .task(id: phase) {
+                // while the log's row is on screen and the app in front (a locked phone is .background, no
+                // onDisappear): the log read again when it has moved
+                guard phase == .active else { return }
+                while !Task.isCancelled {
+                    if EngineTrace.log.total != shown.total { shown = EngineTrace.log.snapshot() }
+                    try? await Task.sleep(for: .seconds(1))
+                }
+            }
+        } header: {
+            Text("Engine log")
+        } footer: {
+            Text("The engine's last \(EngineTrace.log.capacity) lines, the newest last (\(shown.total) so far); once there are \(EngineTrace.log.capacity), the oldest go as new ones come, so the lines move up while you read - Copy keeps them as they are. Each line starts with a time in seconds on the phone's clock: the gaps between lines are what count. Console on a Mac shows them too, as they happen: choose the iPhone, turn on Action > Include Info Messages, press Start, then search for subsystem:net.lizardlounge.deadwax.")
+        }
+    }
 }

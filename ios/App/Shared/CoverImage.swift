@@ -85,7 +85,8 @@ final class CoverCache {
     private let images = NSCache<NSString, UIImage>()
     private var loading: [String: (task: Task<UIImage?, Never>, waiting: Int)] = [:]
     private var failedAt: [String: Date] = [:]
-    private static let againAfter: TimeInterval = 60
+    /// How long a cover that failed isn't asked again, under the same session.
+    nonisolated static let againAfter: TimeInterval = 60
 
     init() {
         images.totalCostLimit = Self.costLimit
@@ -105,12 +106,13 @@ final class CoverCache {
     }
 
     /// The cover, fetched once however many views wait for it - nil when there is none, it failed, or the view left
-    /// (its task cancelled) before it came.
-    func load(client: DeadwaxClient, id: String, size: Int) async -> UIImage? {
+    /// (its task cancelled) before it came. A failure within `againAfter` (a minute) is not asked again; the lock
+    /// screen passes 0, as it keeps its own failure rule (PlayerModel.coverFailed).
+    func load(client: DeadwaxClient, id: String, size: Int, againAfter: TimeInterval = CoverCache.againAfter) async -> UIImage? {
         let key = Self.key(client, id, size)
         if let image = images.object(forKey: key as NSString) { return image }
         let flight = Self.flightKey(key, client)
-        if let at = failedAt[flight], Date().timeIntervalSince(at) < Self.againAfter { return nil }
+        if let at = failedAt[flight], Date().timeIntervalSince(at) < againAfter { return nil }
         let task: Task<UIImage?, Never>
         if let asking = loading[flight] {
             task = asking.task

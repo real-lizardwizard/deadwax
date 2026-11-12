@@ -1953,4 +1953,242 @@ another.
   - Debug's Source row;
   - About.swift's older trackTime;
   - docs/ios.md and ios/README.md, which still describe Phase 0;
-  - the engine test `aNewRouteGoesOnFromTheFrameHeard`, which failed once on timing under load.
+  - the engine test `aNewRouteGoesOnFromTheFrameHeard`, which failed once on timing under load;
+  - later, **the play queue picked up live** between the phone and the web app, which James wants eventually
+    (decided 2026-11-11: the on-open and on-front rule of "Resume" stays for now). The two ways put to him: the
+    phone alone, asking deadwax every ~15 s while the app is on screen and paused (GET /queue reads Navidrome's
+    queue, so another Navidrome app's save shows too); or deadwax sending each change over an SSE stream the
+    app holds open while it runs (not Apple push, which a free account doesn't get; shaped like the event log's
+    stream, but each person's own, not the `server` permission's), server work on main as a 2.1.x patch. A
+    stream sees only the saves made through deadwax: another app's, saved straight to Navidrome, would reach it
+    only if deadwax itself polled Navidrome's queue.
+
+## Phase 1 on James's iPhone (app 0.2 (2), 2026-11-11)
+
+James ran Phase 1's checks on his iPhone 17 Pro (iOS 27.2). What came of them was fixed on `fix/p1-phone`, one
+commit each; nothing here has been drawn or played anywhere yet, so each part ends with what only the phone shows.
+
+### The ••• menus open from the •••
+
+**What James saw.** On Up Next's check: "the dialog for play next and play last shows up in the wrong spot" - the
+••• menu.
+
+**Why.** The queue menu was a `.confirmationDialog` applied to the whole album page (`.queueMenu($menu)` on
+AlbumView's List), opened by a state the row's ••• and the bar's ••• set. Since iOS 26 a confirmation dialog is
+drawn as a popover from the view it is attached to, so it came up from the page, away from the ••• tapped. (That
+it anchors to the page is from what James saw on iOS 27.2, not from Apple's documentation.)
+
+**What changed.**
+- **QueueMenu** is a view now, not a modifier: a SwiftUI `Menu` whose label is the ••• itself, as Apple's own •••
+  are. The row's ••• (TrackRow) and the bar's (AlbumView's toolbar) each hold one, so each opens from itself. Its
+  items, words and actions are the dialog's: Play Next, then Play Last, each `PlayerModel.choose` in the tap, so the
+  levels, the album remembered and the notice after ("Playing next: Roads", none when the music started from it)
+  are unchanged. The title the dialog showed (QueuePick.title) is the menu's one Section's header.
+- **No Cancel row.** A menu closes with a tap anywhere else, and Apple's menus have none. QueuePickWords.cancel
+  stays in Core: it is the web's word, held to queue.json.
+- **`menuOrder(.fixed)`** (iOS 16+): left to itself iOS puts the first item nearest the tap, so a menu opening
+  upward from a row low on the screen would have shown Play Last first.
+- **The bar's ••• is dimmed** until the album's songs are in (QueueMenu disables itself with no request), as the
+  button was. QueueMenuRequest lost its UUID: nothing presents it by identity any more.
+- **NowPlayingMenu** was a confirmationDialog too, attached to its own button, so it already came from its •••;
+  it is a Menu now as well, so every ••• in the app works one way: Info, then Go to album for a song that names its
+  album, no Cancel, the order fixed.
+- VoiceOver's names are the same strings on the same controls ("More for Roads", "More for this album", "More:
+  info, go to album").
+
+**Verified**: the app builds for iOS 17 with it (xcodebuild, unsigned). **Assumed**, for the phone: that a
+Section's title shows as the menu's header on iOS 17 and 27; that the row's ••• opens only its menu inside a List
+row whose song button is beside it (both plain-styled, as the button was). After review, the row's QueueMenu and
+NowPlayingMenu carry `.menuStyle(.button)` (iOS 16+) before `.buttonStyle(.plain)`: Apple pairs ButtonMenuStyle with
+a button style, and doesn't say whether the automatic menu style reads one - the project's rule is that two
+automatic-styled buttons in one List row both fire, so the plain style must surely reach the menu's own button. It
+also keeps Now Playing's ••• drawn untinted, as the plain button was. The bar's ••• is left to the toolbar's own
+style. NowPlayingWords.menu ("More"), the dialog's hidden title, went with the dialog: nothing used it.
+
+**On the phone**: open an album, tap a song's •••: the menu opens from that •••, with the song's name over Play Next
+and Play Last. Try it on a song near the bottom of the screen too - Play Next still first. Tap away: it closes and
+nothing is queued. The ••• at the top right does the same for the whole album, and Now Playing's ••• opens Info and
+Go to album from itself.
+
+### Up Next: one tap to take a song out
+
+**What James asked.** "swiping doesn't work to take one out", then, asked whether removing should stay Edit-only:
+"leave it edit only, but add swipe to remove in edit mode so I don't have to tap two different places per song".
+Until now Edit's removal was the List's own (`onDelete` only while editing): the red (-), then Delete.
+
+**Can a List row be swiped while Edit is on? No - iOS doesn't offer it.** Apple doesn't say so in one sentence;
+what it does document puts a swipe and Edit in different modes:
+- SwiftUI's `EditMode.transient` is the mode SwiftUI may engage "over the duration of a swipe gesture" - a mode of
+  its own, apart from `.active`, which is Edit (developer.apple.com/documentation/swiftui/editmode/transient).
+- UIKit's table views, which SwiftUI's List stood on until iOS 16 (a collection view list since), describe a swipe
+  as entering a "swipe to delete" mode of its own, in which the editing and reordering controls are not shown
+  (Apple's Table View Programming Guide for iOS, "Inserting and Deleting Rows and Sections").
+- In Edit, the delete control's job is to bring out what a swipe would: tapping the minus "reveals the cell's
+  trailing swipe actions" (Matt Neuburg, "Collection View Lists in iOS 14, Part 2", BiTE Interactive) - the
+  two-step James found.
+- Developers report the rest: "enabling EditMode ... disables navigation & swipe actions" (Stack Overflow 73889241,
+  September 2022, on iOS 16).
+- The most direct (found by the review, and read again for this note): in Apple's developer forums (thread 756765,
+  June 2024) a developer asked for a List's swipe actions to show while it is in editMode, for people who find the
+  swipe hard; an Apple DTS engineer answered that there is currently no way to bring a swipe action out in code, and
+  suggested a visible control on the row that deletes - what was built.
+The review could open neither the Stack Overflow question nor Neuburg's article; Apple's three are read. Not tried on
+iOS 27: there is no Simulator, and the phone hasn't been asked. If a swipe in Edit ever worked there, it would be
+news.
+
+**The option not taken**: a swipe of deadwax's own - a drag gesture on each row in Edit, taking the song out past a
+threshold. iOS doesn't stop an app drawing one, but it would contend with the List's scrolling and the drag handles
+for the same finger, and nothing here can try it; James can ask for it if one tap isn't enough.
+
+**What changed**, then, is the other way the request allowed for: Edit gives each row ONE action. Its own red (-) at the leading edge
+takes the song out at once (`UpNextScreen.editRow`), in place of the system's two-step control, and the List's drag
+handles stay (`onMove` while editing). There is no `onDelete` at all now: out of Edit it would be a swipe that loses
+a song, in it the two-step (-). Out of Edit nothing changes - no swipe, no (-), so no stray removal.
+- **VoiceOver**: the row is one element with its words read as before ("Roads, Portishead · Dummy") and the same
+  actions: Move up, Move down (none past a group's end) and Remove. The (-) is hidden from VoiceOver and the row's
+  children are ignored, so a double tap on a row in Edit does nothing - VoiceOver can't take a song out by landing
+  on it. Remove's focus move is the one the screen made already (the next row, the one before at the end, else
+  Done), and what changed is still read out ("Roads removed").
+- The (-) is drawn as the system's: `minus.circle.fill`, white on red, a 44 pt target, borderless so it takes its
+  own tap inside the row.
+
+**Verified**: builds. **Assumed**: that a borderless button in a List row takes its tap while Edit is on (controls
+in rows do; not seen here), and that with no onDelete the List draws no delete control of its own in Edit.
+
+**Two things to know, from the review.** One tap a song is what James asked for, and there is no undo: a quick double
+tap on a (-) can take out the song that slides up under the finger as well. And the (-) being hidden from
+accessibility, Voice Control has no "Tap Remove…" name or number for it, as it had for the system's control: Show
+grid reaches it (by place, not by the accessibility tree), and VoiceOver keeps Remove among the row's actions.
+Neither was changed - a pause after each removal, or the (-) as an element of its own, would be James's call.
+
+**On the phone**: open Up Next with songs added, tap Edit: each row has a red minus on the left and a drag handle
+on the right, and nothing else. One tap on a minus takes that song out - no Delete to confirm. Drag a song by its
+handle. Try swiping a row in Edit and out of it: nothing happens either way. Done ends Edit.
+
+### Debug's engine log
+
+**Why.** The engine's checks on the phone (the hold on the callbacks, the sample-time starts and joins) can only be
+read from what the engine says, and nothing listened: PlaybackEngine's `trace` (called on the engine's queue for
+every note it makes) was nil - the app never set it, so the engine built no line at all.
+
+**What changed.**
+- **Core's EngineLog** keeps the last 500 lines in memory, a ring behind one NSLock: the engine's queue appends,
+  Debug's screen reads; nothing on disk. EngineLogTests (the ring, its numbering, the scrub, four writers and a
+  reader at once) run on macOS here; ios.yml runs them on Linux too, once the branch is pushed - only APIs
+  swift-corelibs-foundation has as well.
+- **The app's EngineTrace** sets `trace` as PlayerModel makes the engine (beside `lead`, outside the main actor for
+  the same reason: the engine calls it on its own queue). Each line is scrubbed, kept, and sent to os_log through
+  `Logger(subsystem: "net.lizardlounge.deadwax", category: "engine")`, at the info level since the review (the
+  default level stores every message in the phone's log store - about 170,000 lines a day of playing, crowding it
+  and riding into any sysdiagnose; info messages stay in memory, stored only around a fault) and `.public` - it was
+  scrubbed already, and a private string shows as `<private>` once no debugger is attached. Console.app on the Mac,
+  with the iPhone chosen and Action > Include Info Messages on, streams it (search
+  `subsystem:net.lizardlounge.deadwax`). Whether `xcrun devicectl device process launch --console` shows os_log
+  lines, as it does the app's stdout and stderr, wasn't tried; Console is the sure way.
+- **You > Debug > Engine log** (Debug is an admin's, so this is too): Copy (the whole log as it is at the tap) and
+  Share (as text, as last read), the line count, and the lines in a 320 pt scroll box, monospaced, selectable,
+  anchored at the bottom so the newest line, last, is in view. Drawn lazily (a LazyVStack keyed by each line's
+  number), and read again once a second only while the log's row is on screen and the app is active - a
+  `.task(id: scenePhase)` on the log's row, which the Form cancels when it scrolls away or Debug closes, and which
+  stops when the scene leaves `.active` (a locked phone left on Debug with music playing fires no onDisappear) - and
+  only when the count has moved. (It was on the Copy and Share row at first, which scrolls off the top while the
+  320 pt box is still in view.) Once 500 lines are kept, each read drops lines at the top as it adds them at the
+  bottom, so the lines move under someone scrolled up reading; the footer says so, and Copy keeps them still.
+
+**What reaches the log - every `note()` read.** PlaybackEngine has 31 `note(...)` calls and nothing else calls
+`trace`. All but three interpolate only numbers and flags: entry keys, lane rates and channel counts, frame and
+sample counts, milliseconds, "running"/"playing". The three strings are an AudioFailure's `description` (the next
+song failed, and `fail()`) and AVAudioConverter's error's `localizedDescription`, an OSStatus's words; `fail()` is
+also handed AudioFailures made from AVAudioEngine's start and remake errors' `localizedDescription`, the same kind
+of words. An AudioFailure's words are the engine's and StreamFetch's own sentences with: an http status; a URLError's or a file error's `localizedDescription` (iOS's sentence, never the URL); a file's
+`lastPathComponent`, which is the cache's `<song id>.<suffix>`; byte counts; and, for an error that isn't an
+AudioFailure, `String(describing:)` - only an NSError's description could carry a URL, and the only URL the phone
+streams from is `/deadwax/navidrome/stream/<song id>?format=<format>`. **The session is never in a URL**: it goes as
+the request's `Cookie:` header (DeadwaxClient.request, StreamFetch with cookies off), and no failure repeats a header.
+The phone never sees Subsonic's u/t/s/p at all - deadwax adds them talking to Navidrome. So no secret reaches the log
+today; **the scrub is the guard against a new note changing that**: before a line is kept or sent to os_log,
+EngineLog.scrub takes out everything after a Cookie, Set-Cookie or Authorization header, a Bearer token, a URL's
+user:password@, and the value of a key whose name is a secret's (u, t, s, p, apiKey, token, salt, password, session,
+deadwax_session...) standing on its own, given with "=" or (since the review) ":" - `t=abc`, `token: abc`,
+`x-deadwax-session: abc`, JSON's `"password":"hunter2"`, a quoted value all of it. A secret in bare words
+("password hunter2") isn't recognised: the guard is for a note quoting a URL, a header or a request, not prose - so
+docs/ios.md says what the engine writes and what the log takes out, not "never". A line with no "=" or "@", no ":"
+right after a secret's key, and none of those names - every line the engine writes now, each with its ":" after
+"Hz" or "failed" - skips the patterns after one pass over its bytes.
+
+**What it costs the engine's queue - measured.** A benchmark on James's MacBook Air (M2, `swiftc -O`, the median
+of 7 runs of 100,000 - the iPhone 17 Pro's cores assumed no slower, not measured), with EngineLog as committed:
+- building a line as note() does (the host time through `String(format:)`, then the words): 1.4-1.6 µs;
+- EngineLog.append for a line the scrub has nothing to take out (every line today): 0.085 µs - the first look is one
+  pass over the UTF-8. Its first version used Foundation's `contains` and `range(of:options: .caseInsensitive)` and
+  cost 17 µs a line, so it was rewritten before this commit;
+- a line the scrub does rewrite (none today): 19 µs;
+- `Logger.log` with a public string: 0.26-0.39 µs (nothing streaming; Console streaming costs more, on its side);
+- all of it together: **1.9 µs a line**.
+Measured again after the review, the same way, with its ":" look-back, its two quoted-value patterns and the info
+level: a plain engine line's append 0.10 µs, a failure line with three ":" 0.19 µs, a line the scrub rewrites 50 µs
+(six patterns over the line where there were four; none today), `Logger.info` 0.41 µs against `Logger.log`'s 0.35,
+and all of it together **2.1 µs a line**.
+At the engine's steadiest rate, 2 lines a second while playing, that is about 4 µs a second, 0.0004 % of the queue's
+time (were every line rewritten, 100 µs a second, 0.01 %); the bursts (a skip, a new route, a failure) are a few
+lines each. The engine's queue isn't the render thread, which never writes a line. The app's Debug build (-Onone)
+is slower than this; install.sh builds Release. Debug's own read, a snapshot of 500 lines once a second while shown,
+is 3 µs, and the text for Share 22 µs.
+
+**On the phone**: You > Debug > Engine log, after playing an album for a minute: lines like `48210.112 lane 44100 Hz:
+a buffer rendered, 3 to go`, the newest at the bottom, about two a second while it plays, none while paused.
+Copy, and paste it into Notes: the whole log. Share opens the share sheet with it as text. In Console on the Mac,
+with the iPhone chosen, Action > Include Info Messages on and `subsystem:net.lizardlounge.deadwax` searched, the same
+lines arrive as they happen. Lock the phone on Debug with music playing and unlock it: the lines carry on from where
+the log is, nothing lost (the reading stops while locked, the keeping doesn't).
+
+### The lock screen's next cover, fetched ahead
+
+**What James saw.** The lock screen's art "takes a moment to render" at each song change. He said "Yes, fetch it
+ahead".
+
+**Why.** The lock screen's cover (`PlayerModel.showNowPlaying`, which sets MPNowPlayingInfoCenter's artwork) was
+fetched only once the new song was heard, straight from deadwax and outside the cover cache - the info centre was
+set without art first and again when it came. An album's songs often share a cover id, but Navidrome gives a song
+with its own embedded art its own (`mf-...`), so a change could mean a fetch every song.
+
+**What changed.**
+- **coverAhead()**: the next song is known as soon as the queue or the engine moves (`nextIndex(queue)`, with
+  Repeat's copies unrolled into the queue - the same next the stream prefetch uses, `keepAndPrefetch`). Its cover is
+  fetched into the app's CoverCache at the lock screen's size (CoverSize.lockScreen, 1024) while the song before
+  plays: one ahead, one fetch at a time, not when it is this song's cover too or already kept, and not
+  while the player isn't meaning to play. The fetch is never called off (an unstructured task, a waiter that never
+  leaves) - it is the next song's whatever screen is shown.
+- **showNowPlaying()** looks in CoverCache first: a cover kept there is set with the song's title, in the same
+  `nowPlayingInfo`, at once. Only a cover not kept is fetched then, and through the cache too
+  (`CoverCache.load`), so the lock screen and Now Playing's 360 pt cover (also asked at 1024 on a 3x phone) share
+  one fetch and one decoded image, where they had two.
+- **Its failure rule is kept**: a lock screen cover that failed is asked again at the next change no sooner than
+  15 s on. CoverCache's own is a minute, so `load` gained `againAfter` (default a minute; the lock screen passed its
+  15 s at first, 0 since the review - below), the failure kept per session as before.
+- **Memory**: a 1024 px cover decoded is 4 MB of CoverCache's 96 MB limit (NSCache, by cost). The next one is one
+  more of those, and the cache may let it go under pressure (a big grid flung), when the change fetches it then, as
+  before. The lock screen still holds its own reference to the cover it shows.
+
+**After review**, three changes to it:
+- **The cover asked ahead is let go once its fetch lands** (`coverAheadAsked` cleared then, and by `stop()`): it had
+  stayed marked for good, so a cover fetched ahead once was never asked ahead again - with Repeat All over two
+  albums, the second time round to a cover the cache had let go meanwhile, the change lagged again; and a fetch ahead
+  that failed once (a WireGuard blip) was never tried again while it stayed next. Now the guard is only "not while its
+  fetch is out": a kept cover isn't asked again (the cache check), and one that failed waits out the cache's minute.
+- **The next cover waits for this one's.** At a change where neither cover is kept, the two 1024 px fetches ran at
+  once over WireGuard - just the moment the lock screen was waiting. `coverAhead()` now runs once this song's cover is
+  drawn (straight away when it was kept, or when the song has none; else from its fetch's landing, which calls
+  showNowPlaying again), or once its fetch failed.
+- **The change's own fetch passes `againAfter: 0`.** The cache's failure memory is shared by the session's fetches, so
+  a fetch ahead that failed shortly before the change held the change's own back for 15 s (the lock screen's window,
+  counted from the other's failure). The lock screen's rule is `coverFailed` - its own failure, its own 15 s - and the
+  cache's minute no longer counts for it, as before this branch, when it asked deadwax straight.
+
+**Verified**: builds; the next song and the cover id come from the same queue the stream prefetch reads.
+**Assumed**: that MPNowPlayingInfoCenter shows artwork given with the song at once (it showed it at once when set
+later, so it should).
+
+**On the phone**: play an album whose songs have their own covers, or a few albums with Play Last, lock the phone,
+and let one song run into the next: the lock screen's cover changes with the title, not a moment after. Skip with
+Next on the lock screen too (the song after next has had less time - a skip two ahead may still take a moment).

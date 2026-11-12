@@ -412,8 +412,7 @@ public enum NowPlayingWords {
     public static let close = "Close"
     public static let previous = "Previous"
     public static let airPlay = "AirPlay"
-    /// The ••• menu's name, and its rows (Phase 1: Info and Go to album; the web's playlist and pin rows come later).
-    public static let menu = "More"
+    /// The ••• menu's rows (Phase 1: Info and Go to album; the web's playlist and pin rows come later).
     public static let info = "Info"
     public static let goToAlbum = "Go to album"
 
