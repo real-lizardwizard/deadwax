@@ -2073,20 +2073,27 @@ every note it makes) was nil - the app never set it, so the engine built no line
 
 **What changed.**
 - **Core's EngineLog** keeps the last 500 lines in memory, a ring behind one NSLock: the engine's queue appends,
-  Debug's screen reads; nothing on disk. Tested on Linux and macOS (EngineLogTests: the ring, its numbering, the
-  scrub, four writers and a reader at once).
+  Debug's screen reads; nothing on disk. EngineLogTests (the ring, its numbering, the scrub, four writers and a
+  reader at once) run on macOS here; ios.yml runs them on Linux too, once the branch is pushed - only APIs
+  swift-corelibs-foundation has as well.
 - **The app's EngineTrace** sets `trace` as PlayerModel makes the engine (beside `lead`, outside the main actor for
   the same reason: the engine calls it on its own queue). Each line is scrubbed, kept, and sent to os_log through
-  `Logger(subsystem: "net.lizardlounge.deadwax", category: "engine")`, at the default level (kept in the phone's log
-  store) and `.public` - it was scrubbed already, and a private string shows as `<private>` once no debugger is
-  attached. Console.app on the Mac, with the iPhone chosen, streams it (search `subsystem:net.lizardlounge.deadwax`).
-  Whether `xcrun devicectl device process launch --console` shows os_log lines, as it does the app's stdout and
-  stderr, wasn't tried; Console is the sure way.
+  `Logger(subsystem: "net.lizardlounge.deadwax", category: "engine")`, at the info level since the review (the
+  default level stores every message in the phone's log store - about 170,000 lines a day of playing, crowding it
+  and riding into any sysdiagnose; info messages stay in memory, stored only around a fault) and `.public` - it was
+  scrubbed already, and a private string shows as `<private>` once no debugger is attached. Console.app on the Mac,
+  with the iPhone chosen and Action > Include Info Messages on, streams it (search
+  `subsystem:net.lizardlounge.deadwax`). Whether `xcrun devicectl device process launch --console` shows os_log
+  lines, as it does the app's stdout and stderr, wasn't tried; Console is the sure way.
 - **You > Debug > Engine log** (Debug is an admin's, so this is too): Copy (the whole log as it is at the tap) and
   Share (as text, as last read), the line count, and the lines in a 320 pt scroll box, monospaced, selectable,
   anchored at the bottom so the newest line, last, is in view. Drawn lazily (a LazyVStack keyed by each line's
-  number), and read again once a second only while that row is on screen - a `.task` the Form cancels when it
-  scrolls away or Debug closes - and only when the count has moved.
+  number), and read again once a second only while the log's row is on screen and the app is active - a
+  `.task(id: scenePhase)` on the log's row, which the Form cancels when it scrolls away or Debug closes, and which
+  stops when the scene leaves `.active` (a locked phone left on Debug with music playing fires no onDisappear) - and
+  only when the count has moved. (It was on the Copy and Share row at first, which scrolls off the top while the
+  320 pt box is still in view.) Once 500 lines are kept, each read drops lines at the top as it adds them at the
+  bottom, so the lines move under someone scrolled up reading; the footer says so, and Copy keeps them still.
 
 **What reaches the log - every `note()` read.** PlaybackEngine has 31 `note(...)` calls and nothing else calls
 `trace`. All but three interpolate only numbers and flags: entry keys, lane rates and channel counts, frame and
@@ -2100,10 +2107,14 @@ streams from is `/deadwax/navidrome/stream/<song id>?format=<format>`. **The ses
 the request's `Cookie:` header (DeadwaxClient.request, StreamFetch with cookies off), and no failure repeats a header.
 The phone never sees Subsonic's u/t/s/p at all - deadwax adds them talking to Navidrome. So no secret reaches the log
 today; **the scrub is the guard against a new note changing that**: before a line is kept or sent to os_log,
-EngineLog.scrub takes out the value of any key=value whose key is a secret's (u, t, s, p, apiKey, token, salt,
-password, session, deadwax_session...) standing on its own, everything after a Cookie, Set-Cookie or Authorization
-header, a Bearer token, and a URL's user:password@. A line with no "=", "@" or those names - every line the engine
-writes now - skips the patterns after a few contains() checks.
+EngineLog.scrub takes out everything after a Cookie, Set-Cookie or Authorization header, a Bearer token, a URL's
+user:password@, and the value of a key whose name is a secret's (u, t, s, p, apiKey, token, salt, password, session,
+deadwax_session...) standing on its own, given with "=" or (since the review) ":" - `t=abc`, `token: abc`,
+`x-deadwax-session: abc`, JSON's `"password":"hunter2"`, a quoted value all of it. A secret in bare words
+("password hunter2") isn't recognised: the guard is for a note quoting a URL, a header or a request, not prose - so
+docs/ios.md says what the engine writes and what the log takes out, not "never". A line with no "=" or "@", no ":"
+right after a secret's key, and none of those names - every line the engine writes now, each with its ":" after
+"Hz" or "failed" - skips the patterns after one pass over its bytes.
 
 **What it costs the engine's queue - measured.** A benchmark on James's MacBook Air (M2, `swiftc -O`, the median
 of 7 runs of 100,000 - the iPhone 17 Pro's cores assumed no slower, not measured), with EngineLog as committed:
@@ -2114,15 +2125,22 @@ of 7 runs of 100,000 - the iPhone 17 Pro's cores assumed no slower, not measured
 - a line the scrub does rewrite (none today): 19 µs;
 - `Logger.log` with a public string: 0.26-0.39 µs (nothing streaming; Console streaming costs more, on its side);
 - all of it together: **1.9 µs a line**.
+Measured again after the review, the same way, with its ":" look-back, its two quoted-value patterns and the info
+level: a plain engine line's append 0.10 µs, a failure line with three ":" 0.19 µs, a line the scrub rewrites 50 µs
+(six patterns over the line where there were four; none today), `Logger.info` 0.41 µs against `Logger.log`'s 0.35,
+and all of it together **2.1 µs a line**.
 At the engine's steadiest rate, 2 lines a second while playing, that is about 4 µs a second, 0.0004 % of the queue's
-time; the bursts (a skip, a new route, a failure) are a few lines each. The engine's queue isn't the render thread,
-which never writes a line. The app's Debug build (-Onone) is slower than this; install.sh builds Release. Debug's own
-read, a snapshot of 500 lines once a second while shown, is 3 µs, and the text for Share 22 µs.
+time (were every line rewritten, 100 µs a second, 0.01 %); the bursts (a skip, a new route, a failure) are a few
+lines each. The engine's queue isn't the render thread, which never writes a line. The app's Debug build (-Onone)
+is slower than this; install.sh builds Release. Debug's own read, a snapshot of 500 lines once a second while shown,
+is 3 µs, and the text for Share 22 µs.
 
 **On the phone**: You > Debug > Engine log, after playing an album for a minute: lines like `48210.112 lane 44100 Hz:
 a buffer rendered, 3 to go`, the newest at the bottom, about two a second while it plays, none while paused.
 Copy, and paste it into Notes: the whole log. Share opens the share sheet with it as text. In Console on the Mac,
-with the iPhone chosen and `subsystem:net.lizardlounge.deadwax` searched, the same lines arrive as they happen.
+with the iPhone chosen, Action > Include Info Messages on and `subsystem:net.lizardlounge.deadwax` searched, the same
+lines arrive as they happen. Lock the phone on Debug with music playing and unlock it: the lines carry on from where
+the log is, nothing lost (the reading stops while locked, the keeping doesn't).
 
 ### The lock screen's next cover, fetched ahead
 

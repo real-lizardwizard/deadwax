@@ -328,11 +328,14 @@ Debug is where Phase 0's test screen lives now:
   joins, a buffer played, a stream that ran dry, an edit held for the next song, a failure - and Debug
   keeps its last 500 lines, the newest last. While a song plays it writes about two lines a second, so
   that's about four minutes of playing. **Copy** puts the whole log on the clipboard and **Share** sends
-  it on (Mail, Messages, Files...). Each line starts with a time in seconds on the engine's own clock:
-  the gaps between lines are what count. Nothing that could sign anyone in is ever written to it. The
+  it on (Mail, Messages, Files...). Once it holds 500 lines the oldest go as new ones come, so the lines
+  move up while you read; Copy keeps them still. Each line starts with a time in seconds on the phone's
+  clock: the gaps between lines are what count. The engine writes nothing that could sign anyone in, and
+  before keeping a line the log takes out the usual forms of one anyway: a password, token or session
+  given as a value (with = or :), a cookie or sign-in header, and a password in an address. The
   same lines go to the Mac's **Console** app as they happen, for longer than Debug keeps them: with the
-  iPhone connected, choose it in Console's sidebar, press Start, and search for
-  `subsystem:net.lizardlounge.deadwax`.
+  iPhone connected, choose it in Console's sidebar, turn on **Action > Include Info Messages**, press
+  Start, and search for `subsystem:net.lizardlounge.deadwax`.
 - **Library**: how many albums each list had, whether it came new or the kept one still stood, and
   how long it took to come.
 - At the bottom, how long this install runs. In its last two days, it also says to run install.sh

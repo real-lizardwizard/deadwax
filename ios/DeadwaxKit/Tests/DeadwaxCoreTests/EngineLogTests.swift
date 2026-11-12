@@ -75,20 +75,44 @@ import Testing
         }
     }
 
+    @Test func aKeyGivenWithAColonOrInJSONIsScrubbedToo() {
+        let cases: [(String, String)] = [
+            ("token: abc123", "token: [scrubbed]"),
+            ("t: abc", "t: [scrubbed]"),
+            ("PASSWORD : hunter2, then", "PASSWORD : [scrubbed], then"),
+            ("x-deadwax-session: s.abc", "x-deadwax-session: [scrubbed]"),
+            (#"{"password":"hunter2","username":"james"}"#, #"{"password":"[scrubbed]","username":"james"}"#),
+            (#"{"apiKey" : "k 1 2", "id": "al-3"}"#, #"{"apiKey" : "[scrubbed]", "id": "al-3"}"#),
+            ("'token': 'a b c' kept", "'token': '[scrubbed]' kept"),
+            (#"{"api_key":"abc"}"#, #"{"api_key":"[scrubbed]"}"#),
+            (#"{"t":"0a1b","s":"c19b"}"#, #"{"t":"[scrubbed]","s":"[scrubbed]"}"#),
+        ]
+        for (line, expected) in cases {
+            #expect(EngineLog.scrub(line) == expected, "\(line)")
+        }
+        // a Bearer token given as a key's value: neither word is left
+        #expect(!EngineLog.scrub("token: Bearer abc.def").contains("abc"))
+    }
+
     @Test func aKeyIsOnlyScrubbedStandingOnItsOwn() {
         // "s" and "t" are Subsonic's salt and token, but the end of a longer name is not them
         let kept = ["status=401", "frames=4096", "format=raw", "rest=2", "id=al-3f", "v=1.16.1",
-                    "write to a@b.c and back", "song@1x"]
+                    "write to a@b.c and back", "song@1x", "past: 3", "bypass: on", "Hz x 2: its node", "sets: 2",
+                    "subsession: 4", #"{"tokens":"x"}"#]
         for line in kept {
             #expect(EngineLog.scrub(line) == line, "\(line)")
         }
     }
 
     @Test func theFirstLookFindsEveryShapeTheScrubTakesOut() {
-        for line in ["a=b", "x@y", "Cookie", "xAUTHORIZATIONx", "bearer", "set-COOKIE"] {
+        for line in ["a=b", "x@y", "Cookie", "xAUTHORIZATIONx", "bearer", "set-COOKIE", "token: x", "T:x", "p :x",
+                     #""password":"x""#, "'Salt' : x", "x-deadwax-session: s", "api_key:x", "DEADWAX_SESSION:x"] {
             #expect(EngineLog.mayHoldSecret(line), "\(line)")
         }
-        for line in ["", "12.345 lane 44100 Hz x 2: its node at 48000 Hz", "cooki", "authorizatio", "beare", "b", "c"] {
+        // every engine line has a ":" - one counts only after a secret's key standing on its own
+        for line in ["", "12.345 lane 44100 Hz x 2: its node at 48000 Hz", "cooki", "authorizatio", "beare", "b", "c",
+                     "12.345 failed: The song stopped arriving: The network connection was lost.", "past: 3",
+                     "bypass: on", "x_t: 1", "2t: 1", "tokens: 2", ":x", "  : x"] {
             #expect(!EngineLog.mayHoldSecret(line), "\(line)")
         }
     }
