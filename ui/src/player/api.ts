@@ -7,6 +7,7 @@
  */
 
 import { fetchOk, get, post, url } from '../api/http'
+import type { SongLyrics } from '../api/types'
 import { levelParam, levels, type Level, type LevelAnswer, type LevelledTrack } from '../lib/loudness'
 import { createPlayedAlbums } from '../lib/playedAlbums'
 import type { QueueTrack } from '../lib/playQueue'
@@ -214,6 +215,12 @@ export function artistAlbums(id: string, signal?: AbortSignal): Promise<ArtistWi
 /** One song as Navidrome has it now (getSong) - Info's play count and writers. */
 export function songDetails(id: string, signal?: AbortSignal): Promise<Song> {
   return get<Song>(`/navidrome/songs/${encodeURIComponent(id)}`, signal)
+}
+
+/** (2.1.6) One song's lyrics, as Navidrome has them for the asker (getLyricsBySongId) - Now Playing's Lyrics. Sent
+ *  with an ETag, so the browser's own cache turns asking again for a song into a 304. */
+export function songLyrics(id: string, signal?: AbortSignal): Promise<SongLyrics> {
+  return get<SongLyrics>(`/navidrome/lyrics/${encodeURIComponent(id)}`, signal)
 }
 
 /** How many songs Library > Songs asks for at a time. */

@@ -990,6 +990,16 @@ export interface TrackLyrics {
 }
 
 /**
+ * (2.1.6) GET /navidrome/lyrics/{song_id} (2.1.5, src/lyrics.py song_lyrics()) - a song's lyrics by its Navidrome
+ * id, read through Navidrome as the asker: Now Playing's. `synced` lines carry their time, sorted, a timed empty
+ * line a break between verses; plain lines carry none. No lyrics is `{ synced: false, lines: [] }`.
+ */
+export interface SongLyrics {
+  synced: boolean
+  lines: LyricLine[]
+}
+
+/**
  * GET /deadwax/library/queue/summary (2.0.0-player.25): how many albums need a look - the app's count
  * beside "Needs a look". Read off the SAVED scan, never the disk: `total` is the albums
  * lib/metadataQueue.ts queueAlbums(albums, null) lists over that scan (an outstanding issue, or a new

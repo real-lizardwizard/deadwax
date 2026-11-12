@@ -153,7 +153,13 @@
     --pl-scrub-gap: 14px;          /* the title block to the scrubber's tap target */
     --pl-error-gap: 6px;           /* a failure's line to the title under it */
     --pl-footer-gap: 12px;         /* between the icons under the transport */
+    --pl-footer-gap-narrow: 4px;   /* ...at 320 wide, where the speed's chip, AirPlay, Lyrics, Up Next and ••• need it (2.1.6) */
     --pl-ring: 2px;                /* a focus ring's width, and its gap from what it marks */
+
+    /* (2.1.6) Now Playing's lyrics, in the cover's place, in the body's own box: its sides (the body's and the grip's
+       28px) and its width at most (the body's 520px) - so a line starts exactly where the title does */
+    --pl-lyrics-side: 28px;
+    --pl-lyrics-max: 520px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -161,6 +167,12 @@
         --pl-sheet-duration: 1ms;
         --pl-settle-duration: 1ms;
     }
+}
+
+/* At 320 wide the icon row under the transport holds the speed's chip, AirPlay, Lyrics, Up Next and ••• (2.1.6):
+   279px at the 12px gap, in a body 264px wide. The gaps give way, before anything else - never a 44px target. */
+@media (max-width: 359px) {
+    :root { --pl-footer-gap: var(--pl-footer-gap-narrow); }
 }
 
 /* ===== foundation ===== */

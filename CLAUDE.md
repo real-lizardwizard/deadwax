@@ -300,6 +300,10 @@ ui/                Preact + Vite + TypeScript: the app (src/player/main.tsx -> s
                    app/useResume.ts puts the person's play queue back paused as the app opens and
                    saves it as it plays (the engine's restoreQueue its one action), its rules the
                    pure lib/resume.ts - see "Resume what was playing".
+                   Lyrics on Now Playing (2.1.6, notes/app-lyrics.md): player/Lyrics.tsx is the view
+                   (both frames - a phone's Now Playing face, the desktop's panel app/LyricsPanel.tsx),
+                   app/useLyrics.ts the answers (called once in App), the words and rules the pure
+                   lib/lyricsView.ts - see "Lyrics on Now Playing (2.1.6)".
                    People and permissions (2.0.0-player.61, notes/logins.md "Managing accounts"):
                    app/People.tsx (with UnlockPeople, AddPerson, ResetPassword, RemovePerson and
                    usePeople), its rules lib/people.ts; what the app shows by permission
@@ -318,7 +322,7 @@ ui/                Preact + Vite + TypeScript: the app (src/player/main.tsx -> s
                    ui/src/lab/ is the turntable's test bench at /player/lab/, a third page built
                    in a pass of its own: the real Turntable and deck over signals it makes, set
                    beside an ideal turntable - see notes/turntable-bench.md.
-tests/             3971 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             3977 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ios/               the native iPhone app (SwiftUI), built on James's Mac, never in the image:
                    DeadwaxKit/ (its Core tested on Linux with swift.org's toolchain in
                    ~/.local/swift, its Audio engine on ios.yml's macOS runner), App/, the
@@ -533,7 +537,7 @@ phone's sheet.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 3971 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 3977 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see `notes/tooling.md`:
@@ -571,7 +575,7 @@ code sees before James's Mac (notes/ios.md).
 
 ## What the tests cannot tell you
 
-All 3971 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 3977 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

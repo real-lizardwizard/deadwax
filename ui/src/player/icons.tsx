@@ -112,6 +112,17 @@ export const AirPlayIcon = line(
   </>,
 )
 
+/** (2.1.6) Lyrics: a speech bubble holding a quote mark, as Apple Music's button has it - in the set's own line, its
+ *  tail at the bottom left; the quote mark's two commas filled, their tails a finer stroke, as RepeatOneIcon's one. */
+export const LyricsIcon = line(
+  <>
+    <path d="M6 4h12a2.5 2.5 0 0 1 2.5 2.5V14a2.5 2.5 0 0 1-2.5 2.5h-7L7 20v-3.5H6A2.5 2.5 0 0 1 3.5 14V6.5A2.5 2.5 0 0 1 6 4z" />
+    <circle cx="9.6" cy="11.6" r="1.35" fill="currentColor" stroke="none" />
+    <circle cx="14.6" cy="11.6" r="1.35" fill="currentColor" stroke="none" />
+    <path d="M8.3 11.4c0-1.5.6-2.5 1.9-3.2M13.3 11.4c0-1.5.6-2.5 1.9-3.2" stroke-width="1.6" />
+  </>,
+)
+
 /** Three dots in a row - "more": Now Playing's menu, as the board draws it. */
 export const MoreIcon = solid(
   <>

@@ -245,6 +245,10 @@
  *    isn't widened; lib/resume.ts is pure; neither new file needs a secure page (no randomUUID, no crypto.subtle) -
  *    the device id is persisted.ts's, from crypto.getRandomValues; the open's ask goes through latestOnly(), and the
  *    two saves through player/api.ts, the beacon by sendBeacon with its fallback.
+ *  - Lyrics on Now Playing (2.1.6): a line of the lyrics (player/Lyrics.tsx, both frames' view) plays from it in its tap
+ *    - its seek, and the player's toggle when paused, nothing awaited - so that file is allowed `toggle` alone; App, the
+ *    desktop's panel and Now Playing hand it nothing of the player's but `player`. Now Playing's icon row has Lyrics
+ *    always, before Up Next; the bar has it before Up Next; its panel is a side panel by the one-panel rule.
  *  - The page's entry renders App, and the old shell and settings sheet are gone.
  *
  * Run it with:  node ui/test/app-rules.sim.cjs
@@ -345,6 +349,8 @@ const ALLOWED = {
   'app/PlaylistPage.tsx': ['playTracks'],
   //? (2.0.0-player.64) resume what was playing: a queue put back paused - nothing that plays (the next play is a tap's)
   'app/useResume.ts': ['restoreQueue'],
+  //? (2.1.6) a line of the lyrics: a tap plays from it - its seek, and play when paused
+  'player/Lyrics.tsx': ['toggle'],
 }
 
 /** Which playback actions a file's code reaches: by name, as a member, or taken apart from one. */
@@ -425,6 +431,7 @@ console.log('\nthe playback actions only from the files allowed')
     'app/useResume.ts': ['restoreQueue'],
     'app/useShuffleFeed.ts': ['extendQueue'],
     'player/AlbumPage.tsx': ['playTracks'],
+    'player/Lyrics.tsx': ['toggle'],
     'player/MiniPlayer.tsx': ['next', 'toggle'],
     'player/NowPlaying.tsx': ['next', 'previous', 'setRepeat', 'setShuffle', 'showAirPlay', 'toggle'],
     'player/PlayerBar.tsx': ['next', 'previous', 'setRepeat', 'setShuffle', 'showAirPlay', 'toggle'],
@@ -632,6 +639,8 @@ console.log('\nevery sheet is a sheet by the one hook')
     'app/QueueMenu.tsx': 'app-queue-menu-open',
     //? Add to a playlist (2.0.0-player.58) - over everything, on both frames
     'app/PlaylistPicker.tsx': 'app-picker-open',
+    //? (2.1.6) the desktop's Lyrics panel - drawn on a desktop alone, never a sheet, so its lock is never taken
+    'app/LyricsPanel.tsx': 'app-lyrics-open',
   }
   const texts = Object.fromEntries(Object.keys(SHEETS).map((file) => [file, code(read(file))]))
   check('each calls useSheet with a scroll lock of its own',
@@ -639,8 +648,8 @@ console.log('\nevery sheet is a sheet by the one hook')
   check('...and they are the only ones', files.filter((file) => /\buseSheet\(/.test(code(read(file))) && file !== 'app/useSheet.ts').sort(), Object.keys(SHEETS).sort())
   check('each is inert while closed', Object.values(texts).map((text) => /\binert=\{!open\b/.test(text)), Object.keys(SHEETS).map(() => true))
   check('Now Playing is inert under the menu or Info, and they are hidden from it', /aria-hidden=\{!open \|\| covered\}\s*inert=\{!open \|\| covered\}/.test(texts['player/NowPlaying.tsx']), true)
-  check('the menu, Info, the sources and the artist page\'s close on their backdrop (a panel\'s is not drawn) - and Up Next and the song menu',
-    ['app/ActionMenu.tsx', 'app/InfoSheet.tsx', 'app/Sources.tsx', 'app/ArtistPanel.tsx', 'app/UpNext.tsx', 'app/QueueMenu.tsx', 'app/PlaylistPicker.tsx'].map((file) => /<div class="app-backdrop" onClick=\{onClose\} \/>/.test(texts[file])), [true, true, true, true, true, true, true])
+  check('the menu, Info, the sources and the artist page\'s close on their backdrop (a panel\'s is not drawn) - and Up Next and the song menu (and Lyrics\')',
+    ['app/ActionMenu.tsx', 'app/InfoSheet.tsx', 'app/Sources.tsx', 'app/ArtistPanel.tsx', 'app/UpNext.tsx', 'app/QueueMenu.tsx', 'app/PlaylistPicker.tsx', 'app/LyricsPanel.tsx'].map((file) => /<div class="app-backdrop" onClick=\{onClose\} \/>/.test(texts[file])), [true, true, true, true, true, true, true, true])
   //? (2.0.0-player.47, review: beside a phone's Edit sheet - a phone on its side, an iPad upright - a stray
   //? tap on the backdrop threw away an edit half made)
   check('...the Edit sheet\'s takes a tap and closes nothing - it holds typed work; its close button and Escape close it',
@@ -715,10 +724,14 @@ console.log('\nnothing below the title in Now Playing can change height')
   check('the album line is one box, link or not', (body.match(/<span class="pl-sheet-byline" dir="auto">\{byline\}<\/span>/g) ?? []).length, 2)
   const footer = body.slice(at('class="pl-sheet-footer"'))
   //? (2.0.0-player.57: Up next drawn - it opens Up Next - after AirPlay's place and before •••)
-  check('the icon row: AirPlay only with a speaker, ••• always, Up next always (opening Up Next), and no dead Lyrics',
-    [/\{player\.airplay && \(\s*<button[^>]*onClick=\{player\.showAirPlay\}/.test(footer), /onClick=\{onMore\}/.test(footer), /onClick=\{onUpNext\}/.test(footer), /Lyrics/.test(footer),
-      footer.indexOf('onClick={player.showAirPlay}') < footer.indexOf('onClick={onUpNext}') && footer.indexOf('onClick={onUpNext}') < footer.indexOf('onClick={onMore}')],
-    [true, true, true, false, true])
+  //? (2.1.6: and Lyrics, always, between AirPlay's place and Up Next - its tap turning lyrics on and off; until then no
+  //? Lyrics was drawn, as there was nothing for it to open)
+  const order = ['onClick={player.showAirPlay}', 'onClick={onLyricsButton}', 'onClick={onUpNext}', 'onClick={onMore}'].map((needle) => footer.indexOf(needle))
+  check('the icon row: AirPlay only with a speaker, ••• always, Up next always (opening Up Next), Lyrics always - AirPlay, Lyrics, Up Next, •••',
+    [/\{player\.airplay && \(\s*<button[^>]*onClick=\{player\.showAirPlay\}/.test(footer), /onClick=\{onMore\}/.test(footer), /onClick=\{onUpNext\}/.test(footer),
+      /\{[^{}]*&&\s*\(?\s*<button[^>]*onClick=\{onLyricsButton\}/.test(footer), /<button\s+type="button"\s+class=\{`pl-icon-button app-np-lyrics/.test(footer),
+      order.every((place, index) => place !== -1 && (index === 0 || place > order[index - 1]))],
+    [true, true, true, false, true, true])
   //? (2.0.14) Shuffle and Repeat on the transport row - its first and last - so they add no row and no height
   const transport = body.slice(at('class="pl-transport"'), at('class="pl-sheet-footer"'))
   const buttons = [...transport.matchAll(/onClick=\{(\w+)\}/g)].map((match) => match[1])
@@ -793,7 +806,8 @@ console.log('\nthe turntable\'s sound: its audio context only from a gesture, an
     const text = code(read(file))
     return [...text.matchAll(/\b(wakeDeckAudio|resumeDeckAudio)\(\)/g)].map((match) => `${file}: ${enclosing(text, match.index)}: ${match[1]}`)
   })
-  check('made or resumed only from gestures WebKit counts: the record\'s click and release, the transport, the look button, the mini player\'s tap - and the test bench\'s own buttons', wakes.sort(), [
+  //? (2.1.6: and Lyrics turned off over the turntable - back to the record, in that tap)
+  check('made or resumed only from gestures WebKit counts: the record\'s click and release, the transport, the look button, Lyrics, the mini player\'s tap - and the test bench\'s own buttons', wakes.sort(), [
     'app/App.tsx: openSheet: resumeDeckAudio',
     'app/App.tsx: openSheet: wakeDeckAudio',
     'lab/Bench.tsx: onCarryOn: wakeDeckAudio',
@@ -803,6 +817,7 @@ console.log('\nthe turntable\'s sound: its audio context only from a gesture, an
     'lab/Bench.tsx: onRecord: wakeDeckAudio',
     'lab/Bench.tsx: onStart: wakeDeckAudio',
     'player/NowPlaying.tsx: onLook: wakeDeckAudio',
+    'player/NowPlaying.tsx: onLyricsButton: wakeDeckAudio',
     'player/NowPlaying.tsx: onNext: wakeDeckAudio',
     'player/NowPlaying.tsx: onPrevious: wakeDeckAudio',
     'player/NowPlaying.tsx: onToggle: wakeDeckAudio',
@@ -1567,17 +1582,26 @@ console.log('\nthe desktop frame: chosen below the engine, panels beside the pag
   //? (2.0.0-player.21: and the Edit panel, each putting it away too)
   //? (2.0.0-player.45: and the artist page's panel, each putting it away and it every other)
   //? (2.0.0-player.57: and Up Next's - Sources and Info putting it away, it them, Edit and the artist's)
-  check('one side panel at a time: Sources puts Info, Up Next, Edit and the artist\'s away, and Info Sources, Edit, the artist\'s and Up Next',
-    [/setSourcesOpen\(true\)[\s\S]{0,300}?infoOpener\.current = null\s*setInfoPanel\(false\)\s*upNextOpener\.current = null\s*setUpNextPanel\(false\)\s*editOpener\.current = null\s*setEditOpen\(false\)\s*artistOpener\.current = null\s*setArtistOpen\(false\)/.test(/const openSources = useCallback[\s\S]*?\}, \[\]\)/.exec(app)?.[0] ?? ''),
-      /infoOpener\.current = takeOpener\(event\)\s*sourcesOpener\.current = null\s*setSourcesOpen\(false\)\s*editOpener\.current = null\s*setEditOpen\(false\)\s*artistOpener\.current = null\s*setArtistOpen\(false\)\s*upNextOpener\.current = null\s*setUpNextPanel\(false\)\s*setInfoPanel\(true\)/.test(app),
-      /upNextOpener\.current = takeOpener\(event\)\s*infoOpener\.current = null\s*setInfoPanel\(false\)\s*sourcesOpener\.current = null\s*setSourcesOpen\(false\)\s*editOpener\.current = null\s*setEditOpen\(false\)\s*artistOpener\.current = null\s*setArtistOpen\(false\)\s*setUpNextPanel\(true\)/.test(app)],
+  //? (2.1.6: and Lyrics' - each of them putting it away, and it each of them)
+  check('one side panel at a time: Sources puts Info, Up Next, Lyrics, Edit and the artist\'s away, Info Sources, Edit, the artist\'s, Up Next and Lyrics, Up Next all but itself - and Lyrics all of them',
+    [/setSourcesOpen\(true\)[\s\S]{0,300}?infoOpener\.current = null\s*setInfoPanel\(false\)\s*upNextOpener\.current = null\s*setUpNextPanel\(false\)\s*lyricsOpener\.current = null\s*setLyricsPanel\(false\)\s*editOpener\.current = null\s*setEditOpen\(false\)\s*artistOpener\.current = null\s*setArtistOpen\(false\)/.test(/const openSources = useCallback[\s\S]*?\}, \[\]\)/.exec(app)?.[0] ?? ''),
+      /infoOpener\.current = takeOpener\(event\)\s*sourcesOpener\.current = null\s*setSourcesOpen\(false\)\s*editOpener\.current = null\s*setEditOpen\(false\)\s*artistOpener\.current = null\s*setArtistOpen\(false\)\s*upNextOpener\.current = null\s*setUpNextPanel\(false\)\s*lyricsOpener\.current = null\s*setLyricsPanel\(false\)\s*setInfoPanel\(true\)/.test(app),
+      /upNextOpener\.current = takeOpener\(event\)\s*infoOpener\.current = null\s*setInfoPanel\(false\)\s*sourcesOpener\.current = null\s*setSourcesOpen\(false\)\s*editOpener\.current = null\s*setEditOpen\(false\)\s*artistOpener\.current = null\s*setArtistOpen\(false\)\s*lyricsOpener\.current = null\s*setLyricsPanel\(false\)\s*setUpNextPanel\(true\)/.test(app),
+      /lyricsOpener\.current = takeOpener\(event\)\s*infoOpener\.current = null\s*setInfoPanel\(false\)\s*sourcesOpener\.current = null\s*setSourcesOpen\(false\)\s*editOpener\.current = null\s*setEditOpen\(false\)\s*artistOpener\.current = null\s*setArtistOpen\(false\)\s*upNextOpener\.current = null\s*setUpNextPanel\(false\)\s*setLyricsPanel\(true\)/.test(app)],
+    [true, true, true, true])
+  //? (2.1.6) the bar's Lyrics closes the panel it opened, as Info's and Up Next's do; crossing back to the phone closes
+  //? it, as Up Next's; a drawer of it goes as the player opens an album or an artist under it, as Up Next's does
+  check('...the bar\'s Lyrics, pressed again, closes it; the phone\'s width closes it; and as a drawer it goes with Go to album',
+    [/const toggleLyrics = useCallback\(\(event: MouseEvent\) => \{\s*if \(lyricsPanelOpen\.current\) \{\s*setLyricsPanel\(false\)\s*return\s*\}/.test(app),
+      /if \(closes\.lyricsPanel\) \{\s*lyricsOpener\.current = null\s*setLyricsPanel\(false\)\s*\}/.test(app),
+      /if \(liesOver\(panel, lyricsPanel \? 'lyrics' : 'none'\)\) \{\s*lyricsOpener\.current = null\s*setLyricsPanel\(false\)\s*\}/.test(/const leaveInfoDrawer = \(\) => \{([\s\S]*?)\n  \}/.exec(app)?.[1] ?? '')],
     [true, true, true])
   //? (review) the player bar's Info closes the panel it opened - "the Info button again"
   check('...and the player bar\'s Info, pressed again, closes it',
     /const toggleInfo = useCallback\(\(event: MouseEvent\) => \{\s*if \(infoPanelOpen\.current\) \{\s*setInfoPanel\(false\)\s*return\s*\}/.test(app), true)
   //? (review) which panel shows feeds both the shell's classes: room made for a column, a drawer over the page
   check('what the panel shows - Sources or Info - makes room for a column (`.has-side`) and marks a drawer (`.has-drawer`)',
-    [/const side = sideOf\(frame, \{ sources: sourcesOpen, info: infoPanel, edit: editOpen, artist: artistOpen, upnext: upNextPanel \}\)/.test(app),
+    [/const side = sideOf\(frame, \{ sources: sourcesOpen, info: infoPanel, edit: editOpen, artist: artistOpen, upnext: upNextPanel, lyrics: lyricsPanel \}\)/.test(app),
       /\$\{makesRoom\(panel, side\) \? ' has-side' : ''\}\$\{liesOver\(panel, side\) \? ' has-drawer' : ''\}/.test(app)],
     [true, true])
   //? (review) a drawer lies over the page Go to album and Info's artist open: the Info drawer goes with them
@@ -1775,8 +1799,10 @@ console.log('\nthe desktop visualizer: a silent copy, never the player\'s elemen
   //? drag is held, the frame called off as it ends - see the playlists' section below)
   //? (2.0.0-player.59: and the Library's index - no loop: ONE frame asked per drag move, so a drag jumps at most once a
   //? frame, called off as the strip goes - see the Library's section below)
-  check('...and the only frame loops in the app are the deck\'s, the visualizer\'s and a playlist drag\'s (and the index\'s one frame a move)',
-    files.filter((file) => APP_SIDE(file) && /requestAnimationFrame\(/.test(code(read(file)))).sort(), ['app/PlaylistPage.tsx', 'app/ShelfIndex.tsx', 'player/Visualizer.tsx', 'player/deck.ts'])
+  //? (2.1.6: and the lyrics' clock - the lit line judged once a frame, only while they show, the song plays, nothing is
+  //? over them and the page is in view; redrawn only when the line changes - see the lyrics' section below)
+  check('...and the only frame loops in the app are the deck\'s, the visualizer\'s, a playlist drag\'s and the lyrics\' clock (and the index\'s one frame a move)',
+    files.filter((file) => APP_SIDE(file) && /requestAnimationFrame\(/.test(code(read(file)))).sort(), ['app/PlaylistPage.tsx', 'app/ShelfIndex.tsx', 'player/Lyrics.tsx', 'player/Visualizer.tsx', 'player/deck.ts'])
 }
 
 console.log('\nediting an album on a desktop: the Edit panel, a side panel by the same rule (2.0.0-player.21)')
@@ -2136,7 +2162,7 @@ console.log('\nthe artist page, as the main page had it (2.0.0-player.45)')
     [true, true, true, true, true])
   const toggle = /const toggleArtistManage = useCallback[\s\S]*?\}, \[\]\)/.exec(app)?.[0] ?? ''
   check('one panel at a time: it puts Sources, Info and Edit away - and Edit, on an album or a folder, puts it away',
-    [/sourcesOpener\.current = null\s*setSourcesOpen\(false\)\s*infoOpener\.current = null\s*setInfoPanel\(false\)\s*upNextOpener\.current = null\s*setUpNextPanel\(false\)\s*editOpener\.current = null\s*setEditOpen\(false\)/.test(toggle),
+    [/sourcesOpener\.current = null\s*setSourcesOpen\(false\)\s*infoOpener\.current = null\s*setInfoPanel\(false\)\s*upNextOpener\.current = null\s*setUpNextPanel\(false\)\s*lyricsOpener\.current = null\s*setLyricsPanel\(false\)\s*editOpener\.current = null\s*setEditOpen\(false\)/.test(toggle),
       /setEdit\(\{ album, key: editKeys\.current \}\)[\s\S]{0,300}?artistOpener\.current = null\s*setArtistOpen\(false\)\s*\}, \[\]\)/.test(app),
       /setEdit\(\{ \.\.\.request, key: editKeys\.current \}\)[\s\S]{0,300}?artistOpener\.current = null\s*setArtistOpen\(false\)\s*\}, \[\]\)/.test(app)],
     [true, true, true])

@@ -283,13 +283,25 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
   as [Up Next's](#up-next-shuffle-and-repeat) do (it's the same setting), and the same five on the
   turntable and on a phone on its side; and a row of buttons: at its
   left end, wherever the speed isn't 1x, [the speed's chip](#the-speed-fader) (`1.25x`; tap it for
-  1x), then an **AirPlay** button when there's a speaker on the network to send to, **Up Next** (what
-  plays next - [below](#up-next-shuffle-and-repeat)) and **•••**.
+  1x), then an **AirPlay** button when there's a speaker on the network to send to, **Lyrics** (the
+  song's lyrics - below), **Up Next** (what plays next - [below](#up-next-shuffle-and-repeat)) and **•••**.
   The button at its top right, a round record, shows it as [a turntable](#the-turntable) instead.
   Drag it down by its top half, or tap the arrow at its top, to close it (Escape closes it too). While
   it's open nothing behind it can be reached by the keyboard or VoiceOver; opening it moves to its
   close arrow, and closing it goes back to where you were. How the song was sent and how the last
   song changes and seek went are in [Info → Debug](#info--debug), and the Gapless checkbox in **You**.
+- **Lyrics** on the now-playing screen shows the song's lyrics in the cover's place as it plays: the line being
+  sung bright and the rest dimmer, kept about a third of the way down as the song moves on, and three dots filling in
+  through a long break between verses (or a long intro). Scroll them yourself and they stay where you put them;
+  four seconds after you stop, they follow the song again - paused, they wait until it plays. Tap any line to play
+  from there, from a pause too. Lyrics saved without timings show whole, under "These lyrics aren't synced to the
+  song.", and don't move by themselves. The button is purple while lyrics are on, and dimmed - "Lyrics - none for
+  this song" to VoiceOver - for a song deadwax knows has none; with lyrics on, a song with none shows its cover.
+  They stay on from song to song and each time the screen opens, until you tap **Lyrics** again or the look
+  button at the top, which shows the cover or the turntable instead. If they can't be fetched the screen says
+  "Couldn't load the lyrics." with **Try again**. They're the lyrics deadwax saved beside each song
+  ([the library guide](library.md#lyrics) has how), read through Navidrome, so a song's own embedded lyrics show
+  too.
 - **•••** on the now-playing screen opens a short menu: **Info**; **Add to a playlist…**, for the song
   playing ([Playlists](#playlists)); **Go to album**, which closes
   the now-playing screen and opens the song's album in the tab you're on, as if you'd tapped it
@@ -997,7 +1009,7 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
   the time gone and the time left at its ends (click or drag along it; its dot shows when you point
   at it) - and **Shuffle** before previous and **Repeat** after next (one button
   going off, all, one; both purple while on), as Music on a Mac has them - and at the right **AirPlay**
-  when there's a speaker to send to, **Up Next**, **Add to a playlist** (the song
+  when there's a speaker to send to, **Lyrics**, **Up Next**, **Add to a playlist** (the song
   playing, into one of [your playlists](#playlists)), **Info**, and the
   [visualizer](#the-visualizer)'s button (five bars) - and before them, wherever the speed isn't 1x,
   [the speed's chip](#the-speed-fader) (`1.25x`; click it for 1x). With nothing playing it stays,
@@ -1008,6 +1020,12 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
   [Up Next, shuffle and repeat](#up-next-shuffle-and-repeat) - one panel at a time with Info, Edit and the
   rest. **Done**, the Up Next button again, or Escape while you're in it closes it; making the window
   narrower than 1024 closes it too.
+- **Lyrics** opens the song's lyrics beside the page as a panel, the same as the now-playing screen's on a phone -
+  the line being sung lit and followed, a click on any line playing from there - one panel at a time with Up Next,
+  Info and the rest. **Done**, the Lyrics button again, or Escape while you're in it closes it; making the window
+  narrower than 1024 closes it too, and so does going to an album or an artist from the player while it lies over
+  the page. While it's closed the button is dimmed for a song with none; open, the panel says "No lyrics for this
+  song." - and with nothing playing it stays, saying so.
 - **Info** opens beside the page as a panel, with the same About - and, for an admin, Debug - as on a phone. **Done**,
   the Info button again, or Escape while you're in the panel closes it. Going to an album or an
   artist from the player - the bar's "Artist — Album", or Info's own cards - closes it too when it
@@ -2457,6 +2475,9 @@ fixes that.
   more than 2,000 songs plays but is edited elsewhere; and a song in a playlist twice shows the playing
   bars on both rows.
 - **Siri**, and a lower bit rate for mobile data.
+- **Plain lyrics' verses run together**: lyrics saved without timings reach the app (and Amperfy) as one block, as
+  Navidrome reads them - the blank lines between verses dropped. Synced lyrics keep their breaks. There are no
+  word-by-word lyrics either: deadwax saves them line by line.
 - **On its side**, the now-playing screen shrinks the cover to fit above the controls, which
   leaves it small. There's no landscape layout with the cover beside the controls yet.
 - **A saved link to an album can stop working** after you apply another release to it, since

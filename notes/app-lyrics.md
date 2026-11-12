@@ -1130,3 +1130,71 @@ sent, no ETag, asked as the shared account, the offset added, no hold at 0, all-
 untimed worded line ignored, plain edge blanks kept, the first entry taken synced or not, either bound removed,
 text over-trimmed, an empty entry chosen, a bool taken as a number, the id's length unbounded, a failure not through
 `_fail`. Not verified: a real Navidrome.
+
+## Built (2.1.6)
+
+The web app, sections 2 and 3: `lib/lyricsView.ts` (2's words and rules), `player/Lyrics.tsx` (the view, both frames),
+`app/useLyrics.ts` (2.6's answers, called once in App), `app/LyricsPanel.tsx` (3.4's panel), the Lyrics button on
+Now Playing's footer (3.1) and the player bar (3.4), `LyricsIcon`, `SongLyrics` and `songLyrics()`; the `lyrics`
+side in lib/appFrame.ts; theme.css section 10's lyric tokens and the side's and desktop's blocks, player.css's
+`--pl-footer-gap-narrow`, `--pl-lyrics-side` and `--pl-lyrics-max`, app.css's "Lyrics on Now Playing (2.1.6)"
+section and app-desktop.css's "Lyrics on a desktop (2.1.6)". Tests (3.7): `ui/test/lyrics.sim.cjs` (new, 105
+checks), app-rules (the allowlist, the footer's order, one panel at a time with Lyrics, the frame loops, the deck's
+wakes), routes (the side and the crossing), info (the icon row), errors and vocabulary (the four files, and the
+batch's own rule), and six rules in tests/test_app_css.py. Docs (3.8): README, docs/player.md, docs/troubleshooting.md,
+docs/configuration.md; the write-up is `notes/app.md` "Lyrics on Now Playing (2.1.6)".
+
+Where the spec was silent, or read one way of two, and what was done:
+
+- **"The iPhone app has them too" is left out of the README** (3.8): it isn't true until section 4 lands; that commit
+  adds it.
+- **On its side, the space between lines grows to 17px** (`--dw-lyric-space` in theme.css's side block): 3.5 gives the
+  side the title's 22px and an 8px fade but keeps the 12px space, and a one-line lyric would be 39.5px - not the tap
+  target 3.2 makes it upright. 22 x 1.25 + 17 = 44.5, as upright's 26 x 1.25 + 12. test_app_css holds both frames to it.
+- **The side's block is kept to the phone's frame** - `(max-height: 500px) and (max-width: 1023px)`, not app.css's bare
+  `(max-height: 500px)` - so a short desktop window keeps the panel's 22px rather than taking the title's (larger on a
+  desktop).
+- **A break's dots are drawn inside its half line** (`--dw-lyric-break`, 0.5em), centred, so their coming and going
+  moves nothing - 2.4 says where they light, not where they sit.
+- **Following, three ways** (2.5 says "followed"): smoothly as the lit line changes or after a hold; at once, with no
+  scroll, as the lyrics open, as the answer arrives and as the size changes (a phone turned, the column appearing); a
+  new song starts at its top. A tap on a line follows it once - by the lit line's own effect when it lights a new line,
+  directly when it was already lit - never two smooth scrolls at once.
+- **Focus a tap or a click put on a line never holds following** (2.5 holds it for "keyboard and VoiceOver focus"):
+  Chromium focuses a clicked button, and holding for that would stop following for good after one click. A pointer
+  press marks the next focus as the pointer's; a key marks it as the keyboard's. VoiceOver's focus on the web doesn't
+  always fire focusin - W13 is the check. `follows()` takes the held-by-focus as its fourth argument (`focused`).
+- **A press on the scroller itself** (not a line) holds it as its scroll bar - the one pointer input that scrolls
+  without a wheel or a touch.
+- **The end room** (so the last lines can reach the anchor) is a block after the list, `--app-lyrics-room`, set from
+  the view's height by a ResizeObserver - 0.7 of it.
+- **Plain lyrics' section is a tab stop**, so a keyboard can scroll them (they have no buttons); while it has focus the
+  ring is drawn whole and the soft edges are off, which would otherwise fade the ring away.
+- **The none, note and failure looks follow precedent**: the note and "No lyrics for this song." / "Nothing playing"
+  in the footnote size and the dim text colour (the album page's notes); a failure in the album page's `.pl-notice`
+  words and size, Try again the app's `.app-button`; the spinner the player's own.
+- **The panel is never modal and is drawn on a desktop alone**: `useSheet` with `modal: false` (focus to Done, back to
+  the bar's button, Escape from inside), so its lock class `app-lyrics-open` is never put on - app-rules' sheet list
+  names it so. A phone's lyrics are Now Playing's face; a panel left open crossing to the phone closes
+  (`closesOnCrossing`), as Up Next's.
+- **As a drawer, the panel closes going to an album or an artist from the player**, as Up Next's does (3.4 is silent;
+  `leaveInfoDrawer`'s rule for every drawer).
+- **The next song's ask listens to the position** (`player.onPosition`) rather than reading it as state, so nothing
+  re-renders App as the song plays (2.6 says when, not how).
+- **Lines are `text-align: left`**, not `start`: test_type holds every stylesheet to it - a line's own direction
+  (`dir="auto"`, an Arabic line) never moves it to the other side.
+- **The look button's icon follows the look**, not whether the record is drawn: with lyrics on over the turntable it
+  still names the cover, the look it shows when tapped (lyrics off).
+- **Tokens the spec didn't name**: `--pl-lyrics-max` (the body's 520px, beside 3.5's `--pl-lyrics-side`),
+  `--app-lyric-dot-gap`, and `--app-lyrics-room` (the end room, set inline). `LYRICS_NOT_KEPT` is exported though the
+  web never says it - 2.1's table is one table for both apps.
+- **Pure helpers beyond 2's list**, each pinned by lyrics.sim: `withIntro`, `litAt`/`sameLit`, `clockRuns`, `endRoom`,
+  `tabStop`, `lineAfterKey`, `SCROLL_KEYS`, `lineValue`, `asksAhead`, `keptLyrics`/`keepLyrics`.
+- **vocabulary.sim's batch rule also holds "embedded"** - 2.1 names it beside the four 3.7 lists.
+
+Verified: `npm run typecheck`; every sim on its own (69); lyrics.sim's 105 checks, and 13 mutations of the new code
+each failing it (a paused tap not playing, a click's focus holding, any press holding, focus not holding, following
+again while paused, a shared stamp lighting one line, the clock always the reported position, a stale answer drawn
+over a newer one for the same song, asking while hidden, the next song asked twice, a song with none hiding its cover,
+the record not woken, the bar's dimmed click); the whole pytest suite; the bundle built with the rolldown workaround.
+Not verified: a real browser, the phone, a real Navidrome - section 6's W1-W17 and D1-D5.

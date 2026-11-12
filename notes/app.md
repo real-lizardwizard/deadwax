@@ -254,7 +254,8 @@ be a switch in the global settings".
   icons: AirPlay while there is a speaker, and ••• always, at the right end. Only what does
   something today: no Lyrics, Up next or turntable buttons, and no "Now Playing opens as" setting
   (the turntable came next - see "The turntable (2.0.0-player.11)"). The two readouts and the
-  Gapless switch left it.
+  Gapless switch left it. *(Changed in 2.1.6: Lyrics is there, between AirPlay's place and Up Next - see "Lyrics on
+  Now Playing (2.1.6)".)*
 - **Nothing whose height can change sits below the title** - the rule from the 1.1.0-player.2
   review, which put the readouts ABOVE the title. With them gone, the one line that comes and goes
   is `player.error` (a failure, the skip notice), and it moved above the title too: it moves the
@@ -2174,3 +2175,44 @@ playing one again, as Apple Music has it. This is the web app's half, on main; t
   VoiceOver on the phone with 50 rows; the in-stream seek on a tap on ManagedMediaSource (iPhone Safari); real playback
   after a History tap; what Apple Music itself does to its queue after a History tap. The iPhone app 0.2 still drops
   songs on a tap until its port lands; the snapshot is unchanged, so nothing is lost either way.
+
+### Lyrics on Now Playing (2.1.6)
+
+James, 2026-11-12: **"Oh and I forgot I want to make sure you can view lyrics as well"** - both apps, **like Apple
+Music**: synced lyrics with the line being sung lit and kept in view as the song plays, a tap on a line playing from
+there, plain lyrics that just scroll, opened from a **Lyrics** button on Now Playing - and "let's not cut corners on
+design". The whole design, reviewed, is `notes/app-lyrics.md` (its sections 2 and 3 are this web half; section 4 the
+iPhone's, built separately); what was built and every departure from it, "Built (2.1.6)" at its end. The route under
+it landed as 2.1.5 (notes/player.md "Lyrics by song id (2.1.5)").
+
+- **The phone**: Now Playing's icon row gains **Lyrics** between AirPlay's place and Up Next (the speed's chip, AirPlay,
+  Lyrics, Up Next, •••); tapped, the lyrics take the cover's place - in the body's own box, so a line starts where the
+  title does - and the grip gives up the cover as it does for the turntable, so scrolling the lyrics never drags the
+  sheet. On until tapped off or the look button is tapped (which shows the look it names, lyrics off), kept in App's
+  memory across openings and songs - not a setting (Open question 1). Lyrics on over the turntable mount no record. A
+  song with none: dimmed while off ("Lyrics - none for this song"), and with lyrics on, its cover. At 320 wide the
+  icon row's gaps give way to 4px so five 44px targets and the speed's chip fit.
+- **The desktop**: the player bar's **Lyrics** (before Up Next) opens a side panel in Up Next's shell - one panel at a
+  time by the one-panel rule (lib/appFrame.ts's `lyrics` side, after Info and Up Next), closed going back to the phone
+  and, as a drawer, by going to an album or an artist from the player, as Up Next's is. Dimmed only while closed.
+- **The view** (`player/Lyrics.tsx`, both frames): the lit line by `lyricsClock()` (the element's time, or a seek's
+  target while one is on its way) once a frame while it runs, redrawn only when the line changes; followed to 0.3 of
+  the height, smoothly (a jump for Reduce Motion); the listener's wheel, touch, scroll key or scroll bar hold it for
+  4 s while playing, and until play while paused; keyboard focus in the lines holds it too - a tap's or a click's never
+  does. A tap on a line seeks there and plays when paused, in the tap (`toggle` is this file's on app-rules' allowlist).
+  One tab stop (a roving tabIndex on the lit line), Up/Down/Home/End over the lines sung. Three dots fill in through a
+  break of 4 s or more, an intro too. Plain lyrics: "These lyrics aren't synced to the song." above them, every line
+  lit, the section itself a tab stop.
+- **The answers** (`app/useLyrics.ts`, called once in App): asked at every song change on both frames, open or not, so
+  the button is right the moment it's seen; never while the page is hidden; the next song's once 20 s are left while
+  the lyrics show; the last 50 kept in memory; only the newest drawn (latestOnly, and a render-time guard on the song).
+- **Words and rules** in `lib/lyricsView.ts`, a listener's file of their own (vocabulary.sim holds it and the three
+  others to batch 4's words and to no "LRCLIB", "offset", ".lrc", "sidecar" or "embedded"); the editor's lib/lyrics.ts
+  shares only `lyricTime()`.
+- **Verified**: `npm run typecheck`; every sim on its own (69, lyrics.sim new: 105 checks - the rules, the view under the
+  fake Preact with a fake clock, timers, frames and focus, the answers, both buttons), 13 mutations of the new code each
+  failing lyrics.sim; app-rules, routes, info, errors and vocabulary updated on purpose; the whole pytest suite with
+  test_app_css's six new lyrics rules; the bundle built (rolldown, notes/tooling.md's workaround). **NOT verified**: any
+  of it in a real browser or on the phone - W1-W17 and D1-D5 in notes/app-lyrics.md section 6 are what is asked; the
+  touch-action inside the sheet (W10), VoiceOver's focus on a line holding following (W13), a smooth scrollTo's feel,
+  the mask in WebKit, the on-its-side room (W11), and a real Navidrome's answer.

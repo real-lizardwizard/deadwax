@@ -219,7 +219,7 @@ can land seconds off.
 | setting | default | what it does |
 | --- | --- | --- |
 | `FETCH_LYRICS` | `on` | look up lyrics on [LRCLIB](https://lrclib.net) for each album as it's filed, and save them as a `.lrc` file beside each track. It only ever adds files, and nothing is fetched in dry run. |
-| `LYRICS_LEAD_MS` | `0` | milliseconds to move synced lyrics *earlier* as they're written (negative moves them later), from −5000 to 5000. LRCLIB's timings are tapped along by people and tend to trail the singing a little, so if lines light up a beat late in your player, try `300`. **Re-time saved lyrics**, beside it in Server settings, applies the saved value to lyrics already saved - refused while the lead has an unsaved change. |
+| `LYRICS_LEAD_MS` | `0` | milliseconds to move synced lyrics *earlier* as they're written (negative moves them later), from −5000 to 5000. LRCLIB's timings are tapped along by people and tend to trail the singing a little, so if lines light up a beat late in your player (Now Playing's lyrics included), try `300`. **Re-time saved lyrics**, beside it in Server settings, applies the saved value to lyrics already saved - refused while the lead has an unsaved change. |
 
 ### The container
 
