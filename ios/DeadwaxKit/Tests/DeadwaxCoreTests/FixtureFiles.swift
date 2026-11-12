@@ -44,7 +44,8 @@ enum Fixtures {
 @Suite struct FixtureFilesTests {
     @Test func everyAreasFixturesAreReadFromTheCheckout() throws {
         for path in ["errors/error-words.json", "levels/levels-vectors.json", "library/dates.json", "resume/cases.json",
-                     "upnext/traces.json", "you/you.json", "gate/navidrome.json"] {
+                     "upnext/traces.json", "you/you.json", "gate/navidrome.json", "lyrics/lyrics-vectors.json",
+                     "lyrics/answers.json"] {
             #expect(try Fixtures.url(path) == Fixtures.checkout.appendingPathComponent(path), "\(path)")
         }
     }

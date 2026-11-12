@@ -1,0 +1,453 @@
+{
+ "made_from": "src/lyrics.py song_lyrics() (ios/scripts/lyrics_answers.py)",
+ "cases": [
+  {
+   "name": "Navidrome's snapshot: the synced entry, the offset taken off",
+   "navidrome": {
+    "lyricsList": {
+     "structuredLyrics": [
+      {
+       "displayArtist": "Some Artist",
+       "displayTitle": "Some Song",
+       "lang": "eng",
+       "offset": 100,
+       "synced": true,
+       "line": [
+        {
+         "start": 18800,
+         "value": "The first line we sing"
+        },
+        {
+         "start": 22801,
+         "value": "And then the second"
+        }
+       ]
+      },
+      {
+       "displayArtist": "Some Artist",
+       "displayTitle": "Some Song",
+       "lang": "xxx",
+       "offset": 100,
+       "synced": false,
+       "line": [
+        {
+         "value": "The first line we sing"
+        },
+        {
+         "value": "And then the second"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "answer": {
+    "synced": true,
+    "lines": [
+     {
+      "time": 18.7,
+      "text": "The first line we sing"
+     },
+     {
+      "time": 22.701,
+      "text": "And then the second"
+     }
+    ]
+   }
+  },
+  {
+   "name": "synced: an intro's break at 0, a verse, a long break, the last line, an outro's break",
+   "navidrome": {
+    "status": "ok",
+    "lyricsList": {
+     "structuredLyrics": [
+      {
+       "displayArtist": "A",
+       "displayTitle": "B",
+       "lang": "xxx",
+       "synced": true,
+       "line": [
+        {
+         "start": 0,
+         "value": ""
+        },
+        {
+         "start": 12500,
+         "value": "The first line sung"
+        },
+        {
+         "start": 15250,
+         "value": "The second line  "
+        },
+        {
+         "start": 21000,
+         "value": ""
+        },
+        {
+         "start": 33000,
+         "value": "After the guitar"
+        },
+        {
+         "start": 36500,
+         "value": "And the last one"
+        },
+        {
+         "start": 40000,
+         "value": ""
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "answer": {
+    "synced": true,
+    "lines": [
+     {
+      "time": 0.0,
+      "text": ""
+     },
+     {
+      "time": 12.5,
+      "text": "The first line sung"
+     },
+     {
+      "time": 15.25,
+      "text": "The second line"
+     },
+     {
+      "time": 21.0,
+      "text": ""
+     },
+     {
+      "time": 33.0,
+      "text": "After the guitar"
+     },
+     {
+      "time": 36.5,
+      "text": "And the last one"
+     },
+     {
+      "time": 40.0,
+      "text": ""
+     }
+    ]
+   }
+  },
+  {
+   "name": "synced, sorted: a hand-made file out of order",
+   "navidrome": {
+    "status": "ok",
+    "lyricsList": {
+     "structuredLyrics": [
+      {
+       "displayArtist": "A",
+       "displayTitle": "B",
+       "lang": "xxx",
+       "synced": true,
+       "line": [
+        {
+         "start": 9000,
+         "value": "Third"
+        },
+        {
+         "start": 1000,
+         "value": "First"
+        },
+        {
+         "start": 5000,
+         "value": "Second"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "answer": {
+    "synced": true,
+    "lines": [
+     {
+      "time": 1.0,
+      "text": "First"
+     },
+     {
+      "time": 5.0,
+      "text": "Second"
+     },
+     {
+      "time": 9.0,
+      "text": "Third"
+     }
+    ]
+   }
+  },
+  {
+   "name": "a duet's shared stamp stays synced",
+   "navidrome": {
+    "status": "ok",
+    "lyricsList": {
+     "structuredLyrics": [
+      {
+       "displayArtist": "A",
+       "displayTitle": "B",
+       "lang": "xxx",
+       "synced": true,
+       "line": [
+        {
+         "start": 5000,
+         "value": "Me"
+        },
+        {
+         "start": 5000,
+         "value": "You"
+        },
+        {
+         "start": 8000,
+         "value": "Together"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "answer": {
+    "synced": true,
+    "lines": [
+     {
+      "time": 5.0,
+      "text": "Me"
+     },
+     {
+      "time": 5.0,
+      "text": "You"
+     },
+     {
+      "time": 8.0,
+      "text": "Together"
+     }
+    ]
+   }
+  },
+  {
+   "name": "every worded line at one stamp is plain",
+   "navidrome": {
+    "status": "ok",
+    "lyricsList": {
+     "structuredLyrics": [
+      {
+       "displayArtist": "A",
+       "displayTitle": "B",
+       "lang": "xxx",
+       "synced": true,
+       "line": [
+        {
+         "start": 0,
+         "value": "All at once"
+        },
+        {
+         "start": 0,
+         "value": "Every one of them"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "answer": {
+    "synced": false,
+    "lines": [
+     {
+      "time": null,
+      "text": "All at once"
+     },
+     {
+      "time": null,
+      "text": "Every one of them"
+     }
+    ]
+   }
+  },
+  {
+   "name": "synced with an untimed worded line is plain",
+   "navidrome": {
+    "status": "ok",
+    "lyricsList": {
+     "structuredLyrics": [
+      {
+       "displayArtist": "A",
+       "displayTitle": "B",
+       "lang": "xxx",
+       "synced": true,
+       "line": [
+        {
+         "start": 1000,
+         "value": "Timed"
+        },
+        {
+         "value": "Not timed"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "answer": {
+    "synced": false,
+    "lines": [
+     {
+      "time": null,
+      "text": "Timed"
+     },
+     {
+      "time": null,
+      "text": "Not timed"
+     }
+    ]
+   }
+  },
+  {
+   "name": "plain: a joined line keeps its newline, the edge blanks go",
+   "navidrome": {
+    "status": "ok",
+    "lyricsList": {
+     "structuredLyrics": [
+      {
+       "displayArtist": "A",
+       "displayTitle": "B",
+       "lang": "xxx",
+       "synced": false,
+       "line": [
+        {
+         "value": ""
+        },
+        {
+         "value": "Words with no times"
+        },
+        {
+         "value": "A joined line\nkeeps its break"
+        },
+        {
+         "value": "  "
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "answer": {
+    "synced": false,
+    "lines": [
+     {
+      "time": null,
+      "text": "Words with no times"
+     },
+     {
+      "time": null,
+      "text": "A joined line\nkeeps its break"
+     }
+    ]
+   }
+  },
+  {
+   "name": "text outside ASCII",
+   "navidrome": {
+    "status": "ok",
+    "lyricsList": {
+     "structuredLyrics": [
+      {
+       "displayArtist": "A",
+       "displayTitle": "B",
+       "lang": "xxx",
+       "synced": true,
+       "line": [
+        {
+         "start": 1000,
+         "value": "Zweite Zeile"
+        },
+        {
+         "start": 2500,
+         "value": "Troisi\u00e8me ligne \u266a"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "answer": {
+    "synced": true,
+    "lines": [
+     {
+      "time": 1.0,
+      "text": "Zweite Zeile"
+     },
+     {
+      "time": 2.5,
+      "text": "Troisi\u00e8me ligne \u266a"
+     }
+    ]
+   }
+  },
+  {
+   "name": "none: lyricsList is {}",
+   "navidrome": {
+    "status": "ok",
+    "lyricsList": {}
+   },
+   "answer": {
+    "synced": false,
+    "lines": []
+   }
+  },
+  {
+   "name": "none: no lyricsList at all",
+   "navidrome": {
+    "status": "ok"
+   },
+   "answer": {
+    "synced": false,
+    "lines": []
+   }
+  },
+  {
+   "name": "none: entries whose lines are all empty",
+   "navidrome": {
+    "status": "ok",
+    "lyricsList": {
+     "structuredLyrics": [
+      {
+       "displayArtist": "A",
+       "displayTitle": "B",
+       "lang": "xxx",
+       "synced": true,
+       "line": [
+        {
+         "start": 0,
+         "value": ""
+        },
+        {
+         "start": 1000,
+         "value": " "
+        }
+       ]
+      },
+      {
+       "displayArtist": "A",
+       "displayTitle": "B",
+       "lang": "xxx",
+       "synced": false,
+       "line": [
+        {
+         "value": ""
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "answer": {
+    "synced": false,
+    "lines": []
+   }
+  }
+ ]
+}
