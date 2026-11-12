@@ -529,3 +529,60 @@ sent, a refused play sent again, a resend in flight waiting for the first both w
 test in test_player_as_you; each part of the guard was mutated and caught but deleting a refused play's entry,
 which the wait loop's own check (a finished send left behind is not a counted one) makes harmless. Not verified:
 a real Navidrome, and the phone resending through it.
+
+### Lyrics by song id (2.1.5)
+
+James: "I want to make sure you can view lyrics as well" - like Apple Music, on Now Playing, in both apps. The design
+is notes/app-lyrics.md (the reviewed spec, copied in); this is the server's half: `GET /deadwax/navidrome/lyrics/{song_id}`,
+one more entry on the player's fixed list.
+
+- **Through Navidrome, by song id.** The apps know a song only by its Navidrome id, and deadwax can't turn that
+  into a file of its own: Navidrome's Subsonic `path` is a made-up one unless ReportRealPath is on, and the id
+  bridge joins ALBUMS by their MusicBrainz release, which an untagged album has none of and which says nothing
+  about which file is which song. Navidrome answers OpenSubsonic's `getLyricsBySongId` itself, reading exactly
+  what deadwax writes: `LyricsPriority`'s default (".ttml,.yaml,.yml,.elrc,.lrc,.srt,.txt,embedded") finds the
+  `.lrc` beside the song with no configuration; a sidecar is read from disk on EVERY ask (`core/lyrics/sources.go`),
+  so a Get lyrics or a re-time shows at once, with no scan; embedded lyrics come from the scan. Access is
+  Navidrome's own - the media file repository's library filter - so a song that isn't the asker's is its
+  "not found". This is also what Amperfy shows, so the apps and Amperfy agree on a song's lyrics.
+- **One call, as the asker, with the id alone** (`client_for(request)`, never `SHARED_ACCOUNT_USES`): no `enhanced`
+  (word timings and translations, which deadwax's line-level LRC from LRCLIB doesn't have), no query parameter the
+  page sent. `"user"` in test_logins' ROUTES: lyrics are part of playing a song, as Info's song is.
+- **deadwax's own answer, not a relay**: `src/lyrics.py song_lyrics()` shapes Navidrome's `lyricsList` into
+  `{synced, lines: [{time, text}]}` - the track viewer's `LyricLine`, time in seconds or null. Three cases: synced,
+  plain, none - none a 200 with no lines, never a 404 (kept for a song Navidrome won't give them; "none" is a fact
+  about the song, as lyrics.py keeps `missing` apart from `failed`). Its rules:
+  - **Which entry**: the first that is synced (by the rule below) with a line that has words, else the first with
+    a line that has words, else none. (Several entries: an embedded tag per language.)
+  - **Times**: `max(0, start - offset) / 1000`, to the millisecond. OpenSubsonic's offset: "positive means lyrics
+    appear sooner". **`LYRICS_LEAD_MS` is never applied here** - it is already in the timestamps of every file
+    deadwax wrote, and applying it again moves them twice; lyrics deadwax didn't write are another source's
+    timings, which the lead was never about.
+  - **Synced or plain is decided by the lines**: synced only when every line with words has a time and those
+    times (after the offset) are not all one - a file LRCLIB holds with every line at 0:00 would otherwise light
+    the first line for the whole song. Two voices at one stamp and a third later stay synced (a duet). Anything
+    else is answered plain, its times dropped.
+  - **Synced lines sorted, stably**; a timed empty line kept - the break between verses the apps draw. An untimed
+    empty line inside synced lyrics dropped.
+  - **Text**: trailing spaces off each of a value's own lines, a newline inside kept (an untimed line Navidrome
+    joined onto the one before), nothing else changed; plain lyrics' empty lines at either end dropped, synced
+    lyrics' kept (the first is an intro's break at 0).
+  - **Bounded**: `LYRICS_LINES_MAX` 2,000 lines, `LYRICS_TEXT_MAX` 1,000 characters a line.
+  - `displayArtist`, `displayTitle` and `lang` aren't passed on: nothing draws them, and Navidrome's `lang` is
+    ISO 639-2 ("xxx" for an LRC), which a browser's `lang` doesn't take.
+- **What Navidrome drops**: an UNTIMED blank line, in synced and plain text alike (`model/lyrics_lrc.go`) - so
+  plain lyrics reach the apps (and Amperfy) with their verses run together. Accepted (notes/app-lyrics.md Open
+  question 9): putting them back would need the song's own file.
+- **No cache in deadwax**, an ETag instead (`json_with_etag`): a cache would show old lyrics after a Get lyrics or
+  a re-time - the one moment someone is looking - and Navidrome's read is a small local file. Unchanged, the
+  answer is a 304 with no body, as `/album_index`'s is.
+- Failures as every player route says them, through `_fail`: Navidrome's 70 a 404 (its words name Navidrome, so
+  the apps pass their own `SONG_GONE`), a refused login mid-session the 401 that ends the session, not set up a
+  503, Navidrome down or an answer that isn't Subsonic's a 502, an id over `ID_MAX` a 422 with nothing asked.
+
+Verified: tests/test_navidrome_lyrics.py - song_lyrics()'s rules one by one, the route against a fake Navidrome
+shaped from 0.64.2's snapshot (two entries, offset 100, starts 18800 and 22801), the id alone sent, every failure,
+the ETag's 304 and a changed answer's new tag, the bounds, and as ethan with logins on (his call, a song kept from
+him a 404, a refused login the 401 that ends the session); the walk in test_player_as_you holds it to one
+`getLyricsBySongId` as the asker. Each of the route's decisions was mutated once and caught. Not verified: a real
+Navidrome's answer - the fake is shaped from its source and snapshot, never recorded.

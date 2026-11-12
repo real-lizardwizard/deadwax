@@ -10,7 +10,8 @@ whole album list, 2.0.0-player.59's /album_index, getAlbumList2 a page at a time
 scope, which picks the list type - see after /albums. Resume what was playing, 2.0.0-player.64's /queue and
 /queue/at: getPlayQueueByIndex and savePlayQueueByIndex as the asker, with deadwax's own record beside them - see the
 very end. The iPhone app's Normalization, 2.1.1's /loudness/album/{album_id}: deadwax's own answer of what it has
-measured, after one getAlbum as the asker - see after /level/album.)
+measured, after one getAlbum as the asker - see after /level/album. Lyrics, 2.1.5's /lyrics/{song_id}:
+getLyricsBySongId as the asker with the id alone, shaped by src/lyrics.py song_lyrics() - see after /songs.)
 """
 
 import asyncio
@@ -28,7 +29,7 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 from starlette.background import BackgroundTask
 
-from src import library_ledger, player_cache
+from src import library_ledger, lyrics, player_cache
 from src import play_queue as queue_rules
 from src import playlists as playlist_rules
 from src.api.json_etag import json_with_etag
@@ -445,6 +446,26 @@ async def song(request: Request, song_id: str = PathParam(..., min_length=1, max
         raise _fail(e)
 
     return body.get("song") or {}
+
+
+@router.get("/lyrics/{song_id}")
+async def lyrics_of_song(request: Request, song_id: str = PathParam(..., min_length=1, max_length=ID_MAX)):
+    """
+    (2.1.5) A song's lyrics, for Now Playing: OpenSubsonic's getLyricsBySongId AS THE ASKER, with the id alone -
+    no `enhanced`, nothing else the page sends. Navidrome reads the song's `.lrc` (or another sidecar, by its
+    LyricsPriority) from disk on every ask, so lyrics deadwax has just fetched or re-timed show at once; else the
+    file's own tags from its scan. A song the asker may not have is its "not found" (a 404).
+
+    deadwax's own answer, not a relay: src/lyrics.py song_lyrics() shapes it - `{synced, lines}`, none a 200 with
+    no lines. No cache here (one would show old lyrics after a Get lyrics, the one moment someone is looking); an
+    ETag instead, so an unchanged answer is a 304 with no body. Writes nothing, asks LRCLIB nothing.
+    """
+    try:
+        body = await client_for(request).call("getLyricsBySongId", {"id": song_id})
+    except NavidromeError as e:
+        raise _fail(e)
+
+    return json_with_etag(request, lyrics.song_lyrics(body))
 
 
 @router.get("/cover/{cover_id}")

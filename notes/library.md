@@ -687,6 +687,8 @@ track view.
 - **Verified against live LRCLIB** on the scratch library: Dummy's ten tracks all synced; after
   the retry and the words-only rule, every gap on the Portishead albums filled, and Boards of
   Canada's eleven instrumentals came back as instrumental rather than missing.
+- **Since 2.1.5 deadwax answers a song's lyrics by its Navidrome id**, read through Navidrome, for the apps' Now
+  Playing - notes/player.md "Lyrics by song id".
 
 #### The lead (v0.7.1)
 

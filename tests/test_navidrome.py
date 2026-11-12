@@ -284,6 +284,10 @@ def test_there_is_no_general_proxy():
     other): nothing the page sends is passed on but the ids, the index and the position. deadwax's own record of the
     queue beside it is the asker's alone, and the break-glass admin is asked nothing - see test_play_queue.py.
 
+    `/lyrics/{song_id}` joined it in 2.1.5, deliberately: a song's lyrics for Now Playing - getLyricsBySongId as the
+    asker with the id alone, bounded, and deadwax's own shape of what it answers (src/lyrics.py song_lyrics());
+    nothing else the page sends is passed on - see test_navidrome_lyrics.py.
+
     (2.0.13) Not a route here, on purpose: the artist and album descriptions (src/routes/describe.py) are deadwax's
     own answers, which ask getArtistInfo2 / getAlbumInfo2 as the asker with the id alone - see test_describe.py
     and test_player_as_you.py.
@@ -292,8 +296,8 @@ def test_there_is_no_general_proxy():
 
     assert paths == [
         "/album_index", "/albums", "/albums/{album_id}", "/artists", "/artists/{artist_id}", "/cover/{cover_id}",
-        "/level/album/{album_id}", "/level/{song_id}", "/loudness/album/{album_id}", "/playlists", "/playlists",
-        "/playlists/{playlist_id}", "/playlists/{playlist_id}/add",
+        "/level/album/{album_id}", "/level/{song_id}", "/loudness/album/{album_id}", "/lyrics/{song_id}", "/playlists",
+        "/playlists", "/playlists/{playlist_id}", "/playlists/{playlist_id}/add",
         "/playlists/{playlist_id}/delete", "/playlists/{playlist_id}/edit", "/queue", "/queue", "/queue/at",
         "/scrobble/{song_id}", "/scrub/{song_id}", "/search", "/shuffle", "/shuffle/{token}", "/songs/{song_id}",
         "/status", "/stream/{song_id}",
