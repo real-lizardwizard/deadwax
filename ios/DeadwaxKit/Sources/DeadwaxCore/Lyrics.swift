@@ -371,6 +371,20 @@ extension Lyrics {
         return .loading
     }
 
+    /// A failed ask as the face says it. A 404 is the song gone (its own sentence, no Try again) only when deadwax's
+    /// lyrics route said so, in its words - a song Navidrome won't give the asker. FastAPI's bare "Not Found" (or no
+    /// words at all) is a deadwax with no lyrics route - one older than 2.1.5, the phone's server being whatever it
+    /// is - and is said as the lyrics not loading, never as the song gone: a song that plays isn't gone.
+    public static func failure(_ error: any Error) -> any Error {
+        guard let failure = error as? APIFailure, case .answered(let answer) = failure, answer.status == 404 else {
+            return error
+        }
+        let words = (answer.detail ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard words.isEmpty || words.caseInsensitiveCompare("Not Found") == .orderedSame else { return error }
+        return APIFailure.other("deadwax has no lyrics route (\(answer.method) \(answer.path) answered 404) - lyrics need "
+            + "deadwax 2.1.5 or later.")
+    }
+
     // MARK: the look (4.3)
 
     /// Now Playing's backdrop - the cover blurred - under a black of this opacity (Phase 1's).

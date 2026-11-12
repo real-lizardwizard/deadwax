@@ -321,6 +321,25 @@ private func have(_ raw: String) throws -> LyricsHave {
         #expect(ErrorWords.of(offline, failed: LyricsWords.failed, retry: true).kind == .offline)
     }
 
+    @Test func aDeadwaxWithNoLyricsRouteIsAFailureNotTheSongGone() {
+        let path = "/navidrome/lyrics/so-1"
+        // a deadwax older than 2.1.5: FastAPI's own 404 for a route it hasn't got
+        let old = APIFailure.answered(.init(status: 404, method: "GET", path: path, detail: "Not Found"))
+        let said = Lyrics.failure(old)
+        #expect(ErrorWords.kind(of: said) == .other)
+        #expect(Lyrics.face(nil, asking: false, failure: said) == .failed(tryAgain: true))
+        #expect(ErrorWords.of(said, gone: LyricsWords.songGone, failed: LyricsWords.failed, retry: true).text == LyricsWords.failed)
+        // whoever runs deadwax is told why, folded away
+        let detail = ErrorWords.of(said, admin: true, gone: LyricsWords.songGone, failed: LyricsWords.failed, retry: true).detail
+        #expect(detail?.contains("2.1.5") == true)
+        #expect(ErrorWords.kind(of: Lyrics.failure(APIFailure.answered(.init(status: 404, method: "GET", path: path)))) == .other)
+        // the route's own 404, in its words, is the song gone - and every other failure is as it was
+        let gone = APIFailure.answered(.init(status: 404, method: "GET", path: path, detail: "Navidrome has nothing by that id"))
+        #expect(Lyrics.failure(gone) as? APIFailure == gone)
+        let down = APIFailure.answered(.init(status: 502, method: "GET", path: path, detail: "Not Found"))
+        #expect(Lyrics.failure(down) as? APIFailure == down)
+    }
+
     /// WCAG's contrast ratio of two sRGB greys (0...1).
     private func contrast(_ a: Double, _ b: Double) -> Double {
         func luminance(_ c: Double) -> Double { c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4) }

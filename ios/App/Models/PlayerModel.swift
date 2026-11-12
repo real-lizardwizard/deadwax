@@ -914,6 +914,20 @@ final class PlayerModel {
         if !isPlaying { stopTicking() }
     }
 
+    /// The lyrics' clock (notes/app-lyrics.md 2.2): seconds into the entry heard as the engine says it NOW - "how far in
+    /// as heard", read from it each time rather than the ticker's half-second `position` - but only when the engine's
+    /// position is the entry heard's, the tick's own check: at a join it can still be answering for the song before, so
+    /// `heardSeconds()`, which checks no key, isn't used. Else `position`. A seek on its way is its target, as the
+    /// scrubber's is (Scrub.reportedPosition; the tick lets it go, Scrub.settled) - a tap on a line lights it at once.
+    /// A read: nothing changes.
+    func clock() -> Double {
+        var heard = position
+        if let link, let at = link.position(), let entry = current, at.key == link.engineKey(entry.key) {
+            heard = at.seconds
+        }
+        return Scrub.reportedPosition(pendingSeek, position: heard, now: Self.nowMs())
+    }
+
     /// Seconds into the entry heard as the engine says it now (a queue put back: its parked second).
     private func heardSeconds() -> Double {
         link?.position()?.seconds ?? position
