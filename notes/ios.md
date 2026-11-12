@@ -2383,7 +2383,15 @@ Shuffle, Repeat, Clear or Edit's moves. **Unlike the web**, which puts back exac
 playing changes, the phone puts the card at the top (a List gives no first visible row to hold to); scrolled down the
 list as a song ends, the view goes to the card. A bottom content margin - the height less lower bounds of the card
 (120 pt) and each row after it (56 pt) - lets the card reach the top near an album's end; it can leave a little more
-blank than needed, never too little.
+blank than needed, never too little. **Also unlike the web**, which holds the row tapped under the finger by
+measuring it: once History is at its 50 entries, a History tap moves the window on (the song again is a new entry), so
+the oldest row drops off the top and the phone, which only leaves the scroll alone, shows the rows a row higher.
+
+**After review** (same branch): an Up Next row's tap sets VoiceOver's focus on what plays next only after the card is
+back at the top (`focusAtCard`, taken by the playing key's onChange and set after toCard's scrollTo) - set at once, as
+first cut, the row was pushed down by History's new rows, maybe out of the List's drawn cells, before the scroll; and
+a History tap's focus and "Playing {title}" come after the redraw (one Task), as the web says them from the draw.
+Both assumed, as the rest of VoiceOver here.
 
 **Verified**: the whole DeadwaxKit suite (the traces, scenarios, property digests and round trip re-exported, and
 iostraces.sim's check); the unsigned device build, no new warnings; check_project.py; the ios sims, upnext.sim and

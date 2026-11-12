@@ -19,7 +19,7 @@ import SwiftUI
 /// VoiceOver's focus goes where the web's goes (Pinned's rule): a moved row where it went; after a removal the next
 /// row, the one before at the end, Done with none; Clear to the Shuffle chip; Edit to Done; a row's tap to the row
 /// after it - after a list row's, Playing Next's head, carried after it - (Playing Next's last to the list's first), or
-/// Done. Each opening starts at the song playing, History above it scrolled up to, out of Edit; the song playing put
+/// Done, once the card is back at the top so it lands in view. Each opening starts at the song playing, History above it scrolled up to, out of Edit; the song playing put
 /// back at the top whenever it changes (a song's end, Next, Previous, an Up Next row's tap) or Edit goes on or off -
 /// never for Shuffle, Repeat, Clear or Edit's moves, and not after a History tap. A bottom margin lets the card reach
 /// the top near an album's end, where scrollTo would stop short. Done ends Edit, else closes; the sheet closes by
@@ -30,6 +30,10 @@ struct UpNextScreen: View {
     @State private var editing = false
     /// The entry a History tap moved to: its change of song keeps the scroll where it is (the row under the finger).
     @State private var holdAt: Int?
+    /// Where an Up Next row's tap sends VoiceOver's focus - what plays next - set once the card is back at the top, so
+    /// it lands on a row in view (the web's "so focus lands in view"): History grew above the card, which pushed the
+    /// row down, maybe out of the List's drawn cells, until the scroll.
+    @State private var focusAtCard: Focus?
     @AccessibilityFocusState private var focus: Focus?
 
     /// Where VoiceOver's focus goes after a change.
@@ -141,12 +145,14 @@ struct UpNextScreen: View {
                     .environment(\.editMode, .constant(editing ? .active : .inactive))
                     .onAppear { toCard(proxy) }
                     .onChange(of: playingKey) { _, now in
+                        let target = focusAtCard
+                        focusAtCard = nil
                         if let held = holdAt, held == now {
                             holdAt = nil
                             return
                         }
                         holdAt = nil
-                        toCard(proxy)
+                        toCard(proxy, then: target)
                     }
                     .onChange(of: editing) { _, _ in toCard(proxy) }
                 }
@@ -194,12 +200,14 @@ struct UpNextScreen: View {
         return max(0, height - Self.cardAtLeast - Self.rowAtLeast * CGFloat(after))
     }
 
-    /// The song playing's card to the top, History above it scrolled off - once the change has been drawn.
-    private func toCard(_ proxy: ScrollViewProxy) {
+    /// The song playing's card to the top, History above it scrolled off - once the change has been drawn - and then
+    /// VoiceOver's focus to `target`, if any (an Up Next row's tap: what plays next, now in view).
+    private func toCard(_ proxy: ScrollViewProxy, then target: Focus? = nil) {
         Task { @MainActor in
             var instant = Transaction()
             instant.disablesAnimations = true
             withTransaction(instant) { proxy.scrollTo(Self.card, anchor: .top) }
+            if let target { focus = target }
         }
     }
 
@@ -270,9 +278,10 @@ struct UpNextScreen: View {
 
     private func playRow(_ row: UpNextRow, next: UpNextRow?) -> some View {
         Button {
-            //? it plays now, so it leaves the list: focus to what plays next - once the jump took (the card goes to the
-            //? top as the song playing changes, what plays next straight under it)
-            if player.jump(to: row.key) { refocus(next.map { .row($0.key) } ?? .done) }
+            //? it plays now, so it leaves the list: focus to what plays next - once the jump took, and only after the
+            //? card is back at the top (the song playing's change scrolls there, onChange of playingKey), what plays
+            //? next under it in view. A jump that took always changes the entry playing, so the change comes
+            if player.jump(to: row.key) { focusAtCard = next.map { .row($0.key) } ?? .done }
         } label: {
             rowLabel(row)
         }
@@ -287,8 +296,13 @@ struct UpNextScreen: View {
         Button {
             guard player.jump(to: row.key) else { return }
             holdAt = playingKey
-            Notice.announce(UpNextWords.playing(row.track.title))
-            refocus(.row(row.key))
+            //? focus kept on the row, then the words - both once the change has been drawn, as the web says them from
+            //? the draw that shows the tap taken: said during the redraw, VoiceOver can cut them off
+            let words = UpNextWords.playing(row.track.title)
+            Task { @MainActor in
+                focus = .row(row.key)
+                Notice.announce(words)
+            }
         } label: {
             rowLabel(row)
         }
