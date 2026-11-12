@@ -115,6 +115,10 @@ src/
                    text first, else Wikipedia's summary by MusicBrainz -> Wikidata -> enwiki; Wikidata's
                    one-line subtitle; kept 30 days (none 3) - see "Descriptions on the artist and album
                    pages".
+  autoeq.py        PURE. AutoEq's corrections for the iPhone app's EQ (2.1.7): results/INDEX.md parsed
+                   (its paths decoded once), folded and searched, one row per headphone in SOURCE_ORDER,
+                   each result's id and its profile's address (each segment encoded once) - see "The EQ's
+                   AutoEq routes (2.1.7)" in notes/ios.md.
   pins.py          PURE. What a pin to the app's Home keys on (store:<store_album.id>, mb:<mbid>)
                    and the PUT's list - see "Pins, and a finished Home". Never Navidrome stars.
   playlists.py     PURE. Playlists (2.0.0-player.58), Navidrome's own: whose (mine by owner, case-
@@ -203,8 +207,10 @@ src/
   api/             musicbrainz_endpoint.py, slskd_endpoint.py, coverart_endpoint.py,
                    artist_images_endpoint.py (Wikidata/Commons + TheAudioDB),
                    lrclib_endpoint.py (LRCLIB), wikipedia_endpoint.py (Wikidata's sitelinks and
-                   descriptions, Wikipedia's summaries, for descriptions), navidrome_endpoint.py (Subsonic, for
-                   the player - holds the login; client_for(request) asks as the signed-in
+                   descriptions, Wikipedia's summaries, for descriptions), autoeq_endpoint.py (GitHub, for
+                   AutoEq's list and profiles at one commit: `deadwax/<version>` as its agent, never the
+                   MusicBrainz one; no redirects; a deadline on each whole fetch), navidrome_endpoint.py
+                   (Subsonic, for the player - holds the login; client_for(request) asks as the signed-in
                    user with logins on, SHARED_ACCOUNT_USES lists what asks as the shared one),
                    navidrome_admin.py (2.0.0-player.61: Navidrome's NATIVE account API for People,
                    as the signed-in admin with their own JWT, a fixed list of six), app.py, json_etag.py (JSON with an ETag and the 304, shared by the library scan and
@@ -233,6 +239,9 @@ src/
                    own_password (/deadwax/me/password, You's Change password: yours, changed in
                    Navidrome as you - see "Changing your own password"); describe
                    (/deadwax/describe/artist|album - see "Descriptions on the artist and album pages");
+                   eq (/deadwax/eq/autoeq and /eq/autoeq/{id}, AutoEq through deadwax for the iPhone's
+                   EQ: the list kept in store.py's autoeq_list/autoeq_meta, refreshed weekly behind
+                   itself, profiles in autoeq_profile - see "The EQ's AutoEq routes (2.1.7)");
                    library's /queue/summary is the app's Needs-a-look count, from the saved
                    scan alone - see "Needs a look"
 interface/         the app's pages: player/ (the app, its stylesheets, manifest and icons),
@@ -322,7 +331,7 @@ ui/                Preact + Vite + TypeScript: the app (src/player/main.tsx -> s
                    ui/src/lab/ is the turntable's test bench at /player/lab/, a third page built
                    in a pass of its own: the real Turntable and deck over signals it makes, set
                    beside an ideal turntable - see notes/turntable-bench.md.
-tests/             4073 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             4152 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ios/               the native iPhone app (SwiftUI), built on James's Mac, never in the image:
                    DeadwaxKit/ (its Core tested on Linux with swift.org's toolchain in
                    ~/.local/swift, its Audio engine on ios.yml's macOS runner), App/, the
@@ -384,7 +393,7 @@ section of that title in notes/: `grep -rn "### X" notes/` finds it.
 | capturing screenshots | `notes/screenshots.md` |
 | the sims, one line each | `notes/sims.md` |
 | the name, why Lidarr was dropped, the old Next up list | `notes/history.md` |
-| the native iPhone app (ios/): DeadwaxKit, the audio engine, the project without Xcode, install.sh, ios.yml, the phases | `notes/ios.md` |
+| the native iPhone app (ios/): DeadwaxKit, the audio engine, the project without Xcode, install.sh, ios.yml, the phases; the EQ's AutoEq routes on the server (2.1.7) | `notes/ios.md` |
 | lyrics for listeners: the route by song id, the view on Now Playing, the phone's (design and build) | `notes/app-lyrics.md` |
 
 **A change's write-up goes into its area's notes file** (a new file for a new area, added to the
@@ -537,7 +546,7 @@ phone's sheet.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 4073 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 4152 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see `notes/tooling.md`:
@@ -575,7 +584,7 @@ code sees before James's Mac (notes/ios.md).
 
 ## What the tests cannot tell you
 
-All 4073 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 4152 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

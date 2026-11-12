@@ -2287,6 +2287,45 @@ on, play it again.
 Reload it. The page is never cached without checking, but a tab left open across an upgrade
 keeps the old page until it's reloaded.
 
+## AutoEq can't be reached
+
+The iPhone app's EQ finds a correction for your headphones in [AutoEq](https://github.com/jaakkopasanen/AutoEq)'s
+list through deadwax: the phone asks deadwax, and deadwax asks GitHub. When the app's AutoEq search or a correction
+says **"deadwax can't reach AutoEq just now."**, deadwax couldn't get an answer from GitHub:
+
+- **deadwax's container needs outbound HTTPS to two hosts**: `api.github.com`, where it asks which commit of AutoEq is
+  current, and `raw.githubusercontent.com`, where AutoEq's list and each correction are fetched from. A firewall, a
+  DNS that can't resolve them, or a network deadwax shares with a VPN container that is down stops both. From the
+  host, this asks what deadwax asks first, from inside the container (the image has Python, not curl):
+
+  ```bash
+  docker exec deadwax python -c "import urllib.request as u; print(u.urlopen(u.Request('https://api.github.com/repos/jaakkopasanen/AutoEq/commits/master', headers={'Accept': 'application/vnd.github.sha', 'User-Agent': 'deadwax'}), timeout=15).read().decode())"
+  ```
+
+  It prints 40 letters and digits when GitHub can be reached.
+- **deadwax's log says what GitHub answered** - the container's output (`docker logs deadwax`, or the stack's log in
+  Komodo), at info level, not the app's Event log: a line starting "AutoEq's list couldn't be fetched -" or naming the
+  correction that couldn't be, with GitHub's status, what stopped the connection, or that GitHub took too long
+  ("GitHub took more than 60 s for AutoEq's list" - 15 s for a correction). A `403` or `429` from api.github.com is usually
+  GitHub's limit for callers without an account, 60 requests an hour from one address: once deadwax has the list it
+  asks api.github.com about once a week (each correction comes from raw.githubusercontent.com), so something else
+  sharing your address is asking - it passes within the hour.
+- **It only matters until the list is kept.** Once deadwax has AutoEq's list it keeps it in its database and answers
+  from it, GitHub or not; a week on, it asks GitHub again behind the old list, and if GitHub can't be reached the old
+  list goes on answering (asked again 15 minutes later at the soonest). A correction once fetched is kept too. So
+  "can't reach AutoEq" means either deadwax has never fetched the list - a first search, after a new install or a
+  new database - or the correction you picked hasn't been fetched since AutoEq's list last changed.
+- **With no list yet, a failed fetch is waited on for a minute**: for that minute every search answers "can't reach
+  AutoEq" at once without asking GitHub, so searching again straight away changes nothing. Fix what stopped it,
+  wait a minute, and search again.
+- **"a fault in deadwax"** in that log line, at warning level with a traceback under it, is a bug in deadwax rather
+  than GitHub's answer: worth reporting, with the traceback. It's waited on like GitHub's failures - the old list
+  goes on answering, if there is one.
+
+**"AutoEq doesn't have that measurement any more."** is different: AutoEq's list no longer has the headphone the
+phone asked about (its list changed since the phone found it), or GitHub has no correction file for it. Search again
+and pick it from the new list.
+
 ## The iPhone app (early)
 
 The native app's own problems - it can't reach deadwax, a sign-in that's refused, a Library that says

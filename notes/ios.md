@@ -3060,3 +3060,155 @@ does (the review's: with it, a "waiting" state, Muffle off when Debug closes, th
 than 8 channels, and a reconnect after a failed start that no longer throws). Every number, every departure from the
 spec, the review and what wasn't verified: eq.md's "Slice 2, built". A Debug build of the app (`install.sh --debug`) is no test of the EQ's real-time behaviour: its
 unoptimised Core allocates on the render. The app's version didn't move.
+
+## The EQ's AutoEq routes (2.1.7)
+
+The server half of the EQ's slice 4 (notes/ios-specs/eq.md on `ios`: section 2, 5.4's server bullet, 3.17's words),
+on main as 2.1.7, before the phone's half: the phone finds a correction for its headphones in AutoEq's list, and
+fetches it, through deadwax - it never talks to GitHub.
+
+- **`src/autoeq.py`** (pure): INDEX.md's lines parsed - the name between `- [` and the first `](./`, the path to the
+  LAST `) by `, the source and rig from ` by <source>[ on <rig>]`, the form from the rig folder (`in-ear`, `over-ear`,
+  `earbud`, else none), the rig shown as the folder less that word. The path is decoded once (`unquote`) and kept
+  decoded; an address encodes each segment whole (`quote(segment, safe="")`). The id is 16 hex of SHA-1 of
+  `"autoeq:" + path`. Folding, search, the ranking, one row per headphone in `SOURCE_ORDER`, the answers' shapes, the
+  size caps and the times (7 days; 15 s for a first list) are all here.
+- **`src/api/autoeq_endpoint.py`**: one `httpx.AsyncClient` (15 s, 10 to connect, no redirects), `deadwax/<version>`
+  as the user agent on every request - never `Config.musicbrainz_user_agent()`, which carries MUSICBRAINZ_EMAIL's
+  address. An answer, a 404 (None, a profile only) and `Unreachable` kept apart. Each answer is read a piece at a
+  time and refused past its cap (8 MB the list, 64 KB a profile, 1 KB the commit).
+- **`src/routes/eq.py`**: `GET /deadwax/eq/autoeq?q&limit` and `GET /deadwax/eq/autoeq/{id}`, included with
+  `current_user` (tests/test_logins.py ROUTES, both "user"). The list lives in `app.state.autoeq` (`KeptList`), read
+  from the database at the first ask after a start; refreshed when a week old by a background task under an
+  `asyncio.Lock`, the old list answering meanwhile; fetched before answering when there is none. 503 "deadwax can't
+  reach AutoEq just now." and 404 "AutoEq doesn't have that measurement any more." in `detail`, the spec's sentences.
+  What GitHub answered goes to deadwax's log at info level, never the event log (no `frontend`).
+- **`store.py`**, beside `descriptions`: `autoeq_list`, `autoeq_meta` (one row: the commit, when), `autoeq_profile`.
+  A new list replaces the old, its commit, AND drops every kept profile, in one transaction (`autoeq_list_put`); an
+  unchanged commit only moves the time (`autoeq_list_seen`).
+- The app's shutdown cancels a refresh under way and closes the client (src/api/app.py lifespan).
+
+### The source order
+
+The spec asks for AutoEq's own order of trust "as its README states it when the slice is built". Its README (master,
+read 2026-11-12, the same file as at 7ae0f56) states none: it lists where the measurements come from (oratory1990,
+crinacle, Innerfidelity, Rtings and the legacy headphone.com ones) without ranking them, and results/README.md says
+its recommended list keeps "the one with the highest accuracy" without naming the order. So `SOURCE_ORDER` is the
+spec's fallback - oratory1990, crinacle, Super Review, HypetheSonics, Rtings, Innerfidelity, Headphone.com Legacy,
+then the rest by name - and its comment says so.
+
+### What AutoEq's list turned out to hold
+
+- **More than spaces is encoded.** eq.md 0.4 says only spaces are percent-encoded; a letter outside ASCII is too
+  (`./Kazi/in-ear/A%C3%BCR%20Audio%20Aure`, `R%C3%98DE`), while `(`, `)`, `&`, `+` and `,` stay raw. Decoding the
+  whole path with `unquote` covers both, as the spec's "decoded once" meant; the fixture holds the AüR Audio Aure.
+- **Every one of the 8,850 lines at 7ae0f56 parses** by these rules (checked over the whole file, fetched by hand):
+  each path is exactly `<source>/<rig folder>/<name>`, the line's source is always the path's first segment, its
+  ` on <rig>` always the folder less the form, its bracketed name always the last segment. 6,017 rows (headphones by
+  folded name); the whole list parses in 0.06 s and a search over it takes about 2 ms.
+- One name ends in a zero-width space (Rtings' `Bose QuietComfort 35 II Gaming Headset`): folding drops it.
+
+### Decided here (the spec didn't say)
+
+- **"Every query word starts a word of the name"** is read in the compact name: a query word counts when it is found
+  where one of the name's words begins, so "hd650" ranks Sennheiser HD 650 first as "hd 650" does.
+- **A query with no letter or digit** (`!!!`) finds nothing, rather than every row.
+- **Lowercased with `casefold()`**, so `ß` folds to `ss`.
+- **Strict lines**: a path that isn't exactly three segments, has an empty, `.` or `..` segment, or a name that folds
+  to nothing, doesn't parse (counted). A path listed twice is one result. Only lines starting `- ` are results; the
+  heading and its paragraph aren't counted.
+- **A list that holds no results** (GitHub answering 200 with a page that isn't INDEX.md), and a list or a profile
+  that isn't UTF-8, is "anything but the list": Unreachable.
+- **A failed background refresh is not tried again for 15 minutes** (`RETRY_SECONDS`) while the old list answers -
+  otherwise every search would ask GitHub again while it is down or limiting. With no list at all, a failed fetch is
+  not tried again for a minute (the review's - see "Review").
+- **The first list's 15 s** bound the ask, not the fetch: the fetch is a task the ask waits on through
+  `asyncio.shield`, so a slow GitHub costs that ask a 503 and the next ask finds the list.
+- **A kept profile is answered only at the list's own commit** - besides the drop, a profile fetch that crossed a new
+  list (and kept its text at the old commit) is fetched again rather than answered.
+- **The kept list is read under the lock**, so a second ask at the start waits for it rather than reading it again.
+
+### Letters NFKD keeps whole (the review's)
+
+Built as the spec has it, NFKD left letters that aren't a base and a mark - `Ø`, `Æ`, `Ł`, `Đ`, `Þ` - so "rode" didn't
+find the RØDE NTH-100 ("røde" did). Added in the review, asked for: folding makes them plain after casefold, from a
+small table (`LETTERS` in src/autoeq.py) - `æ` ae, `ð` d, `đ` d, `ħ` h, `ı` i, `ł` l, `ø` o, `œ` oe, `ŧ` t, `þ` th -
+so "rode", "røde" and "RØDE" find it alike, and a RØDE and a RODE of one name are one row. `ß` is still casefold's
+`ss`; `ŋ` and `ĸ`, with no one plain spelling, are left as they are. A step beyond eq.md 2.1's "NFKD, marks dropped,
+lowercased".
+
+### Verified, and not
+
+- **pytest**: tests/test_autoeq.py, 53 tests, through start() with a real SQLite store and an httpx MockTransport
+  for GitHub (fixtures: tests/fixtures/autoeq/ - 46 real lines of INDEX.md at 7ae0f56 and one written not to parse,
+  and two ParametricEQ.txt copied unchanged from ios's fixtures, with a README and AutoEq's LICENSE). Eight mutations
+  tried by hand (profiles kept on a new list, the MusicBrainz agent, redirects followed, the refresh awaited inline, a
+  kept profile at any commit, `&+()` left unencoded, the first `) by `, an unchanged commit fetched again) - each
+  fails a test.
+- **By hand with curl, 2026-11-12** (not deadwax): master's commit with `Accept: application/vnd.github.sha` answers
+  the bare `7ae0f56d53074872b028649617a22bbb4232feb7`; profile addresses built by `profile_url` - with `%26`, with
+  `%28`/`%2B`/`%29`, and with `%C3%BC` - answer 200, the HypetheSonics one byte for byte ios's fixture; the same
+  address double-encoded (`%2520`) answers 404.
+- **Not seen**: deadwax itself has never talked to GitHub - every answer it has read is the MockTransport's. GitHub's
+  rate limiting, a gzip'd raw answer read through httpx, and how long the 851 KB takes from James's server are
+  unwatched.
+
+### Review
+
+The same day, read against eq.md 2.1-2.6, 3.17 and the design review; no version bump (still 2.1.7). Fixed, each with
+a test in tests/test_autoeq.py that fails without it (74 tests now, 21 new):
+
+1. **A kept list was searched by the fold it was kept with.** `autoeq_list` keeps each name's `folded`, and the list
+   read back after a start trusted it - so a change to fold() (the letter table above) would not reach a kept list
+   until AutoEq's master moved, and an unchanged commit keeps a list for months: "rode" would find nothing, and nor
+   would "røde", now folded to "rode". The kept list is folded again as it is read (`kept_results`, on a worker
+   thread - about 40 ms for 8,850 names); `folded` is still written, as 2.3's table has it. A kept list with no
+   results left is no list, and the first ask fetches one - as a fetched list with none is "anything but the list".
+2. **The troubleshooting page said deadwax asks api.github.com "once per new correction"**: corrections come from
+   raw.githubusercontent.com. It says so now, and that the weekly ask is once deadwax has the list.
+
+Three the review raised as questions, decided as fixes:
+
+3. **With no list, a failed fetch is waited on for a minute** (`NO_LIST_RETRY_SECONDS`, 60). Every ask in that
+   minute - a search or a profile - is the 503 at once, GitHub not asked; the next ask after it tries again. 2.3's
+   "fetched before answering" had every ask try, so a picker that searches as it's typed into, while GitHub refused,
+   spent one api.github.com request a search out of the 60 an hour. A kept list's failed refresh still waits
+   `RETRY_SECONDS` behind the list, which answers.
+4. **A deadline on each whole fetch**, not only httpx's 15 s between pieces, under which an answer trickling in
+   could hold a fetch open as long as it trickled: 60 s for the list, master's commit asked first and counted in it
+   (`LIST_DEADLINE_SECONDS`, `AutoEqClient.latest_list`), 15 s for a profile (`PROFILE_DEADLINE_SECONDS`). Past it,
+   Unreachable (`within()` in autoeq_endpoint.py): the same 503, and the same log line, naming the deadline -
+   "AutoEq's list couldn't be fetched - GitHub took more than 60 s for AutoEq's list". The first ask still waits
+   15 s at most; the fetch carries on to its 60 for the next.
+5. **A refresh that fails in any way** - any Exception, not only Unreachable - is said in deadwax's log at warning
+   with its traceback (never `frontend`), starts the wait (the 15 minutes behind a kept list, the minute with
+   none), and comes out of `_fetch` as Unreachable, so the old list answers, a first ask is the 503 rather than a
+   500, and `_settled` only retrieves it. `stop_refreshing` lets nothing out of the shutdown, whatever the refresh
+   ends with, so the clients after it are still closed. Before, a fault left `failed_at` unset (the next search
+   would fetch again) and could escape the shutdown.
+
+Tests that passed with the code broken, now caught (each mutation tried): the size caps checked only after the whole
+answer was read (a 64 MB list and a 1 MB profile sent in pieces, refused at the piece that passes the cap); a
+redirect followed per request (a profile's 302 to an address that answers 200); stopping deadwax not cancelling a
+refresh under way; the path decoded twice (`%2541` is `%41`, never `A`); a list or a profile that isn't UTF-8
+accepted; the default `limit` (30, over forty rows); the 15 s first wait and the 15 min retry (asserted). The three
+fixes' tests move the recorded failure as age() moves the list's time, trickle answers a piece every 50 ms past a
+shortened deadline (and the commit's and the list's answers 0.3 s each past 0.5 s together), and fault the parser
+with a plain RuntimeError.
+
+Looked at and kept: the parsing (the first `](./`, the last `) by `, three segments, the source from the path when
+the line starts with it), the id, the address (`quote(segment, safe="")`, the name's segment whole), search, the
+ranking and SOURCE_ORDER; the routes' bounds, shapes, status codes and the two sentences; GitHub asked only for the
+commit, the list and paths from the list; no redirects; the agent; the shield, the lock, the background refresh,
+the drop on a new commit and the guard on a profile fetched across one; the store's five methods, which use SQLite
+as `descriptions` does (a worker thread each, failures logged and swallowed).
+
+Left, and why:
+
+- **The lock is belt and braces.** `refresh()` hands back the task under way, so two fetches never overlap without
+  it; it only keeps two first asks from reading the database twice. Harmless; the spec asks for it.
+- **The rig is the folder's, not the line's ` on <rig>`** (2.1 names both): every line at 7ae0f56 says the same in
+  each.
+- **`folded` is still written** to `autoeq_list`, though read back it is folded again: 2.3's table has it.
+- **A gzip'd answer is measured after each piece is decoded**: one compressed piece can decode to about a thousand
+  times its size before the cap sees it. Accepted, as the only host deadwax asks is GitHub's.
