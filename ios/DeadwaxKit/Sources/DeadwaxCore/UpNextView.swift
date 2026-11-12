@@ -28,15 +28,22 @@ public struct UpNextList: Sendable, Equatable {
 }
 
 public struct UpNextView: Sendable, Equatable {
+    /// History (2.1.3): the songs before the song playing, oldest first - one row a unit, from where the listening
+    /// began (`startedAt`) and at most UpNext.historyBack entries back
+    public let history: [UpNextRow]
     public let playing: QueueTrack?
     /// Playing Next: the songs added, after the copies - all of them
     public let added: [UpNextRow]
+    /// the list's songs still to play this time round (2.1.3: a song added that Previous walked back across is among
+    /// them, where it plays)
     public let list: UpNextList?
     /// what comes after: "Then … again from the top." or "Nothing after this song."
     public let then: String?
     public let repeatOne: Bool
 
-    public init(playing: QueueTrack?, added: [UpNextRow], list: UpNextList?, then: String?, repeatOne: Bool) {
+    public init(history: [UpNextRow] = [], playing: QueueTrack?, added: [UpNextRow], list: UpNextList?, then: String?,
+                repeatOne: Bool) {
+        self.history = history
         self.playing = playing
         self.added = added
         self.list = list
@@ -45,22 +52,18 @@ public struct UpNextView: Sendable, Equatable {
     }
 }
 
-/// What Up Next draws: neither Repeat One's copies nor the later times round.
+/// What Up Next draws: History above the song playing (2.1.3), then what plays after it - neither Repeat One's
+/// copies nor the later times round.
 public func upNextView(_ queue: UpNextQueue, _ mode: Repeat, limit: Int = UpNext.drawn) -> UpNextView {
     let playing = queue.current
     guard let playing, let state = queue.upNext else {
         return UpNextView(playing: playing, added: [], list: nil, then: nil, repeatOne: false)
     }
-    let (copiesEnd, addedEnd) = layout(queue, state)
+    let (copiesEnd, addedEnd, listEnd) = layout(queue, state)
     let row = { (place: Int) in UpNextRow(key: state.marks[place].key, track: queue.tracks[place]) }
-    let addedRows = (copiesEnd..<addedEnd).map(row)
+    let addedRows = unitsIn(state, copiesEnd, addedEnd).map(row)
     let shown = shownPass(queue)
-    var listed: [Int] = []
-    var place = addedEnd
-    while place < state.marks.count, state.marks[place].from == .source, state.marks[place].pass == shown {
-        listed.append(place)
-        place += 1
-    }
+    let listed = unitsIn(state, addedEnd, listEnd)
     let paged = state.paged
     let pending = paged.map { max(0, $0.total - $0.fetched) } ?? 0
     let again = shown > passPlaying(state.marks, queue.index)
@@ -82,7 +85,8 @@ public func upNextView(_ queue: UpNextQueue, _ mode: Repeat, limit: Int = UpNext
     case .off: then = queue.index >= queue.tracks.count - 1 ? "Nothing after this song." : nil
     case .one: then = nil
     }
-    return UpNextView(playing: playing, added: addedRows, list: list, then: then, repeatOne: mode == .one)
+    return UpNextView(history: historyRows(queue), playing: playing, added: addedRows, list: list, then: then,
+                      repeatOne: mode == .one)
 }
 
 /// The list's heading in Up Next: "From Mezzanine" for one album's songs, else "Still to play" - with `again` (a
@@ -146,6 +150,8 @@ public func upNextLabel(shuffle: Bool, repeat mode: Repeat) -> String {
 public enum UpNextWords {
     public static let title = "Up Next"
     public static let playingNext = "Playing Next"
+    /// History's heading (2.1.3)
+    public static let history = "History"
     public static let clear = "Clear"
     public static let modesGroup = "Shuffle and repeat"
     /// REPEATING_ONE, under the song playing with Repeat One on
@@ -165,6 +171,8 @@ public enum UpNextWords {
 
     /// A row's name: its tap plays it now.
     public static func playNow(_ title: String) -> String { "\(title), play now" }
+    /// A History row's name: its tap plays the song again.
+    public static func playAgain(_ title: String) -> String { "\(title), play again" }
     public static func moveUp(_ title: String) -> String { "Move \(title) up" }
     public static func moveDown(_ title: String) -> String { "Move \(title) down" }
     public static func remove(_ title: String) -> String { "Remove \(title)" }
@@ -173,6 +181,8 @@ public enum UpNextWords {
     public static func shuffleSaid(_ on: Bool) -> String { on ? "Shuffle on" : "Shuffle off" }
     public static func repeatSaid(_ mode: Repeat) -> String { mode == .off ? "Repeat off" : repeatLabel(mode) }
     public static let clearedSaid = "Playing Next cleared"
+    /// A row's tap that took: the song it plays.
+    public static func playing(_ title: String) -> String { "Playing \(title)" }
     /// A row moved: its new place (0-based `to`) of the rows drawn in its group.
     public static func movedSaid(_ title: String, to: Int, of count: Int) -> String { "\(title): \(to + 1) of \(count)" }
     public static func removedSaid(_ title: String) -> String { "\(title) removed" }

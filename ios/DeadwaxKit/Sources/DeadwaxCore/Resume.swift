@@ -299,7 +299,8 @@ public func savedLevels(_ snapshot: String?, count: Int) -> [Level?] {
 /// `index`, every level re-fitted to `setting`. Nil when it doesn't read back: not JSON, another version, a source
 /// song in neither Navidrome's songs nor `extra`, or a rebuilt state failing its checks - marks as long as the
 /// entries, each mark's `from` one of the three, a source mark's `at` inside the source and naming its song, an
-/// added mark's at and pass -1, keys unique and below nextKey, startedAt not below 0.
+/// added mark's at and pass -1, keys unique and below nextKey, startedAt not below 0 (and past the song playing's
+/// run, lowered to it).
 public func fromSnapshot(_ snapshot: String?, tracks: [QueueTrack], index: Int, setting: Normalization) -> UpNextQueue? {
     guard let snapshot, case .object(let made)? = WebJSON.parse(snapshot), case .number(1)? = made["v"] else { return nil }
     let n = tracks.count
@@ -312,8 +313,8 @@ public func fromSnapshot(_ snapshot: String?, tracks: [QueueTrack], index: Int, 
           case .object(let extra)? = made["extra"] else { return nil }
     guard case .bool(let shuffle)? = made["shuffle"], let nextKey = int(made["nextKey"]),
           let startedAt = int(made["startedAt"]), case .array(let left)? = made["left"] else { return nil }
-    //? startedAt is only where playTracks began, not a bound: Previous walks back before it, and Repeat's copies
-    //? dropped since can leave it anywhere - any place at or after 0 reads back as it was
+    //? startedAt is where listening began - where withShuffle's first round's heard songs begin and (2.1.3) History's
+    //? floor - so any place at or after 0 reads back; one past the song playing's run is lowered to it, below
     guard index >= 0, index < n, startedAt >= 0 else { return nil }
     //? the songs: Navidrome's where it has them (the last of an id, as a Map keeps it), `extra` for the source's
     //? outside the window
@@ -357,6 +358,11 @@ public func fromSnapshot(_ snapshot: String?, tracks: [QueueTrack], index: Int, 
         if from == .one && (at < -1 || at >= list.count) { return nil }
         rebuilt.append(Mark(key: key, from: from, at: at, pass: pass))
     }
+    //? (2.1.3) wentBack keeps startedAt at or before the song playing's run; a queue saved before 2.1.3 - the web's
+    //? 2.1.2, the iPhone's 0.2 - whose Previous went back before where the album began has it past that. Lowered to
+    //? the run: everything from there to the song playing was heard, so History shows it once it has played
+    var run = index
+    while run > 0 && rebuilt[run].from == .one { run -= 1 }
     var gone: [LeftOut] = []
     for raw in left {
         guard case .array(let pair) = raw, pair.count == 2, let pass = int(pair[0]), let at = int(pair[1]) else { return nil }
@@ -378,7 +384,8 @@ public func fromSnapshot(_ snapshot: String?, tracks: [QueueTrack], index: Int, 
         }
         pagedRounds = rounds
     }
-    let state = UpNextState(marks: rebuilt, source: list, shuffle: shuffle, nextKey: nextKey, startedAt: startedAt,
+    let state = UpNextState(marks: rebuilt, source: list, shuffle: shuffle, nextKey: nextKey,
+                            startedAt: min(startedAt, run),
                             left: gone, paged: paged, pagedRounds: pagedRounds)
     return UpNextQueue(tracks: entries, index: index, upNext: state)
 }

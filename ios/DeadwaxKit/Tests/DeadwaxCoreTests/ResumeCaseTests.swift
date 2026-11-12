@@ -68,7 +68,7 @@ import Testing
     @Test func theSnapshotIsTheWebsToTheUnit() throws {
         let loaded = try Self.load()
         let cases = loaded.cases["toSave", default: []]
-        #expect(cases.count == 19)
+        #expect(cases.count == 20)
         for item in cases {
             let label = item["label"]?.string ?? "?"
             let queue = try #require(loaded.songs.queue(item["queue"]), "\(label): the queue doesn't rebuild")
@@ -111,7 +111,7 @@ import Testing
     @Test func snapshotsReadAsTheWebReadsThem() throws {
         let loaded = try Self.load()
         let cases = loaded.cases["fromSnapshot", default: []]
-        #expect(cases.count == 166)
+        #expect(cases.count == 170)
         var nils = 0
         for item in cases {
             let label = item["label"]?.string ?? "?"
@@ -156,7 +156,7 @@ import Testing
     @Test func whatIsPutBack() throws {
         let loaded = try Self.load()
         let cases = loaded.cases["resumed", default: []]
-        #expect(cases.count == 50)
+        #expect(cases.count == 51)
         for item in cases {
             let label = item["label"]?.string ?? "?"
             let answer = try JSONDecoder().decode(QueueAnswer.self, from: Data(try #require(item["answer"]?.string).utf8))
