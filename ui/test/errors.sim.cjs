@@ -434,6 +434,8 @@ console.log('\nthe pages: no catch keeps an error\'s raw words for the screen')
     'app/usePlaylists.ts', 'app/PlaylistPage.tsx', 'app/PlaylistPicker.tsx', 'app/PlaylistsPage.tsx', 'app/NewPlaylistForm.tsx',
     'app/StoreState.tsx', 'app/YourLibrary.tsx', 'app/You.tsx', 'app/useGetSettings.ts', 'app/ChangePassword.tsx', 'app/NeedsNavidrome.tsx',
     'app/SignIn.tsx', 'app/signInGate.tsx', 'app/Arriving.tsx',
+    //? (2.1.6) Lyrics on Now Playing and the desktop's panel
+    'player/Lyrics.tsx', 'app/useLyrics.ts', 'app/LyricsPanel.tsx',
   ]
   //? (review) every way of putting a caught error's own words back on the screen: the instanceof test, String() of it,
   //? `(x as Error).message`, any `.message` of a caught/reason/error/e, and the error interpolated into a sentence

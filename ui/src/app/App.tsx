@@ -21,6 +21,7 @@ import { pinOf, type AlbumPinTarget } from '../lib/pins'
 import { newShelf } from '../lib/myLibrary'
 import { sidebarPlaylists, type PlaylistPick } from '../lib/playlists'
 import { songIds } from '../lib/songs'
+import { lyricsHave } from '../lib/lyricsView'
 import type { Look } from '../lib/turntable'
 import type { QueuePick } from '../lib/upNext'
 import { AlbumPage } from '../player/AlbumPage'
@@ -44,6 +45,7 @@ import { Home } from './Home'
 import { InfoSheet } from './InfoSheet'
 import { LibraryCare } from './LibraryCare'
 import { LibrarySection } from './LibrarySection'
+import { LyricsPanel } from './LyricsPanel'
 import { refreshIfOld } from './albumIndex'
 import { chooseLibrary, libraryPick, librarySongs, useLibraryPick } from './libraryPick'
 import { NeedsALook } from './NeedsALook'
@@ -60,6 +62,7 @@ import { useFrame } from './useFrame'
 import { accessNow, noteAccess, useAccess } from './access'
 import { People } from './People'
 import { useInfoDetails, useLevelAnswer } from './useInfoDetails'
+import { useLyrics } from './useLyrics'
 import { PinNotice } from './PinNotice'
 import { PlaylistPage } from './PlaylistPage'
 import { PlaylistPicker } from './PlaylistPicker'
@@ -285,6 +288,14 @@ function usePageShown(): boolean {
  * in hand, and the menu plays them in its tap. A whole library's shuffle (Part B) is fed its pages by
  * useShuffleFeed, called here once, as the player is.
  *
+ * LYRICS (2.1.6, app/useLyrics.ts, player/Lyrics.tsx, app/LyricsPanel.tsx, lib/lyricsView.ts): the song playing's
+ * lyrics are asked here at every song change, on both frames (useLyrics, called once) - so Now Playing's Lyrics and
+ * the bar's are right the moment they're seen. On a phone, Lyrics on is Now Playing's face (`lyricsOn`, kept while the
+ * page lives - in memory, not a setting); on a desktop the side panel, from the player bar's Lyrics, by the one-panel
+ * rule (it puts Info, Sources, Edit, the artist's and Up Next away, and each of them puts it away), closed going back
+ * to the phone as Up Next's is, and as a drawer when the player goes to an album or an artist. It stays open with
+ * nothing playing, saying so, as the bar does.
+ *
  * RESUME WHAT WAS PLAYING (2.0.0-player.64, app/useResume.ts, lib/resume.ts): useResume, called here once after the
  * feed, puts the person's play queue back paused as the app opens (and takes a newer one coming back to the front),
  * and saves it - to Navidrome as them, with deadwax's account of Up Next beside it - as this page plays. Its one action
@@ -365,6 +376,13 @@ export function App() {
   const upNextPanelOpen = useRef(false)
   upNextPanelOpen.current = upNextPanel
   const upNextOpener = useRef<HTMLElement | null>(null)
+  //? (2.1.6) Lyrics: on a phone Now Playing's face, on or off for as long as the page lives; on a desktop the side
+  //? panel, from the player bar - and what it gives focus back to
+  const [lyricsOn, setLyricsOn] = useState(false)
+  const [lyricsPanel, setLyricsPanel] = useState(false)
+  const lyricsPanelOpen = useRef(false)
+  lyricsPanelOpen.current = lyricsPanel
+  const lyricsOpener = useRef<HTMLElement | null>(null)
   //? the song menu: whether it shows, what it was opened with (kept as it slides away), and its •••
   const [queueMenuOpen, setQueueMenuOpen] = useState(false)
   const [queuePick, setQueuePick] = useState<QueuePick<AlbumWithSongs> | null>(null)
@@ -488,6 +506,8 @@ export function App() {
   //? What's showing, as far as the downloads go: a tab's ROOT, with Now Playing not over it - nor the
   //? desktop's visualizer, which covers the whole screen as Now Playing does a phone's
   const pageShown = usePageShown()
+  //? (2.1.6) the song playing's lyrics: asked at every song change on either frame, the next song's while they show
+  const lyrics = useLyrics(player, desktop ? lyricsPanel : sheetOpen && lyricsOn, pageShown)
   //? the desktop's full-screen visualizer is over everything (2.0.0-player.20)
   const visualizerShown = desktop && visualizing
   const watching = watchingOf({ shown: pageShown, tab: nav.tab, depth: nav.stacks[nav.tab].length, sheetOpen: sheetOpen || (desktop && visualizing) })
@@ -657,6 +677,8 @@ export function App() {
     setInfoPanel(false)
     upNextOpener.current = null
     setUpNextPanel(false)
+    lyricsOpener.current = null
+    setLyricsPanel(false)
     editOpener.current = null
     setEditOpen(false)
     artistOpener.current = null
@@ -719,6 +741,8 @@ export function App() {
     setArtistOpen(false)
     upNextOpener.current = null
     setUpNextPanel(false)
+    lyricsOpener.current = null
+    setLyricsPanel(false)
     setInfoPanel(true)
   }, [])
   const closeInfoPanel = useCallback(() => setInfoPanel(false), [])
@@ -743,9 +767,33 @@ export function App() {
     setEditOpen(false)
     artistOpener.current = null
     setArtistOpen(false)
+    lyricsOpener.current = null
+    setLyricsPanel(false)
     setUpNextPanel(true)
   }, [])
   const closeUpNextPanel = useCallback(() => setUpNextPanel(false), [])
+
+  //? (2.1.6) A desktop's Lyrics: the player bar's button opens the side panel, and closes it again - one panel at a
+  //? time, as Up Next's
+  const toggleLyrics = useCallback((event: MouseEvent) => {
+    if (lyricsPanelOpen.current) {
+      setLyricsPanel(false)
+      return
+    }
+    lyricsOpener.current = takeOpener(event)
+    infoOpener.current = null
+    setInfoPanel(false)
+    sourcesOpener.current = null
+    setSourcesOpen(false)
+    editOpener.current = null
+    setEditOpen(false)
+    artistOpener.current = null
+    setArtistOpen(false)
+    upNextOpener.current = null
+    setUpNextPanel(false)
+    setLyricsPanel(true)
+  }, [])
+  const closeLyricsPanel = useCallback(() => setLyricsPanel(false), [])
 
   //? The song menu (2.0.0-player.57): a song row's ••• or an album page's, with the songs in hand - the menu plays
   //? them in its own tap. A song from the Library's Songs comes without its album's answer (none is in hand)
@@ -808,6 +856,8 @@ export function App() {
     setInfoPanel(false)
     upNextOpener.current = null
     setUpNextPanel(false)
+    lyricsOpener.current = null
+    setLyricsPanel(false)
     artistOpener.current = null
     setArtistOpen(false)
   }, [])
@@ -827,6 +877,8 @@ export function App() {
     setInfoPanel(false)
     upNextOpener.current = null
     setUpNextPanel(false)
+    lyricsOpener.current = null
+    setLyricsPanel(false)
     artistOpener.current = null
     setArtistOpen(false)
   }, [])
@@ -850,6 +902,8 @@ export function App() {
     setInfoPanel(false)
     upNextOpener.current = null
     setUpNextPanel(false)
+    lyricsOpener.current = null
+    setLyricsPanel(false)
     editOpener.current = null
     setEditOpen(false)
   }, [])
@@ -1018,6 +1072,11 @@ export function App() {
     if (closes.upNextPanel) {
       upNextOpener.current = null
       setUpNextPanel(false)
+    }
+    //? (2.1.6) and Lyrics: a phone's lyrics are Now Playing's face, which isn't open
+    if (closes.lyricsPanel) {
+      lyricsOpener.current = null
+      setLyricsPanel(false)
     }
   }, [frame])
 
@@ -1217,6 +1276,11 @@ export function App() {
     if (liesOver(panel, upNextPanel ? 'upnext' : 'none')) {
       upNextOpener.current = null
       setUpNextPanel(false)
+    }
+    //? (2.1.6) Lyrics as a drawer the same - Up Next's shell, beside the page as Up Next is
+    if (liesOver(panel, lyricsPanel ? 'lyrics' : 'none')) {
+      lyricsOpener.current = null
+      setLyricsPanel(false)
     }
     if (!liesOver(panel, infoPanel ? 'info' : 'none')) return
     infoOpener.current = null
@@ -1584,7 +1648,7 @@ export function App() {
   const panelsCovered = visualizerShown || queueMenuOpen || pickerOpen
   //? the main area makes room for a desktop's panel only as a third column; a drawer lies over its edge
   //? (lib/appFrame.ts)
-  const side = sideOf(frame, { sources: sourcesOpen, info: infoPanel, edit: editOpen, artist: artistOpen, upnext: upNextPanel })
+  const side = sideOf(frame, { sources: sourcesOpen, info: infoPanel, edit: editOpen, artist: artistOpen, upnext: upNextPanel, lyrics: lyricsPanel })
   //? Up Next: a sheet over Now Playing on a phone; on a desktop the side panel the player bar opens
   const upNextOpen = desktop ? upNextPanel : sheetOpen && over === 'upnext'
 
@@ -1665,7 +1729,7 @@ export function App() {
 
             {/* the player: the mini player over the tab bar, or a desktop's player bar */}
             {desktop ? (
-              <PlayerBar player={player} onAlbum={toAlbum} onInfo={toggleInfo} infoOpen={infoPanel} onVisualizer={openVisualizer} onUpNext={toggleUpNext} upNextOpen={upNextPanel} onAddToPlaylist={playlistFromBar} />
+              <PlayerBar player={player} onAlbum={toAlbum} onInfo={toggleInfo} infoOpen={infoPanel} onVisualizer={openVisualizer} onUpNext={toggleUpNext} upNextOpen={upNextPanel} onAddToPlaylist={playlistFromBar} onLyrics={toggleLyrics} lyricsOpen={lyricsPanel} lyrics={lyricsHave(lyrics.lyrics)} />
             ) : (
               <MiniPlayer player={player} onOpen={openSheet} />
             )}
@@ -1686,6 +1750,9 @@ export function App() {
             pinnable={menuPinNow.current !== null}
             onUpNext={openUpNext}
             upNextOpen={over === 'upnext'}
+            lyrics={lyrics}
+            lyricsOn={lyricsOn}
+            onLyrics={setLyricsOn}
           />
           {/* over Now Playing: its menu, then Info - the menu first, so where one closes as the
               other opens, focus ends in the one that opened */}
@@ -1720,6 +1787,10 @@ export function App() {
           />
           {/* (2.0.0-player.57) Up Next: over Now Playing on a phone, a desktop's side panel - after Info, never with it */}
           <UpNext open={upNextOpen} opener={upNextOpener} onClose={desktop ? closeUpNextPanel : closeOver} player={player} panel={panel} covered={desktop && panelsCovered} />
+          {/* (2.1.6) Lyrics: a desktop's side panel, from the player bar - a phone's are Now Playing's own face */}
+          {desktop && (
+            <LyricsPanel open={lyricsPanel} opener={lyricsOpener} onClose={closeLyricsPanel} player={player} answers={lyrics} panel={panel} covered={panelsCovered} />
+          )}
           {/* the album page's Edit panel (2.0.0-player.21) - a side panel on a desktop, a sheet on a phone (2.0.0-player.47) */}
           <EditPanel open={editOpen} request={edit} opener={editOpener} onClose={closeEdit} onChanged={albumChanged} panel={panel} covered={panelsCovered} />
           {/* the artist page's panel (2.0.0-player.45) - a side panel on a desktop, a sheet on a phone */}

@@ -170,6 +170,8 @@ ROUTES = {
     ("GET", "/deadwax/navidrome/artists"): "user",
     ("GET", "/deadwax/navidrome/artists/{artist_id}"): "user",
     ("GET", "/deadwax/navidrome/songs/{song_id}"): "user",
+    #? (2.1.5) a song's lyrics, as the asker - Navidrome's access
+    ("GET", "/deadwax/navidrome/lyrics/{song_id}"): "user",
     ("GET", "/deadwax/navidrome/cover/{cover_id}"): "user",
     ("GET", "/deadwax/navidrome/stream/{song_id}"): "user",
     ("GET", "/deadwax/navidrome/scrub/{song_id}"): "user",

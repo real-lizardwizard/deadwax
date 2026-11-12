@@ -2247,3 +2247,119 @@ def test_now_playings_shuffle_and_repeat_sit_on_the_transport_as_tap_targets():
     assert "class={`pl-icon-button app-np-mode app-np-shuffle${player.shuffle ? ' is-on' : ''}`}" in sheet
     assert "class={`pl-icon-button app-np-mode app-np-repeat${player.repeat === 'off' ? '' : ' is-on'}`}" in sheet
 
+
+# ---------------------------------------------------------------- Lyrics on Now Playing (2.1.6)
+
+LYRICS_HEADING = "/* ===== Lyrics on Now Playing (2.1.6)"
+UPRIGHT, SIDE, DESK_FRAME = "", "@media (max-height: 500px) and (max-width: 1023px)", "@media (min-width: 1024px)"
+
+
+def lyric_token(name: str, frame: str) -> str:
+    """A lyrics token as a frame has it: theme.css's own block for the frame, else the upright phone's."""
+    return declarations(THEME_CSS, ":root", frame).get(name, ALL_TOKENS[name]) if frame else ALL_TOKENS[name]
+
+
+def lyric_px(name: str, frame: str) -> float:
+    value = lyric_token(name, frame)
+    found = re.fullmatch(r"var\((--[\w-]+)\)", value)
+    if found:
+        return lyric_px(found.group(1), frame)
+    assert value.endswith("px"), (name, frame, value)
+    return float(value[:-2])
+
+
+def test_the_lyrics_scroll_by_their_own_touches_inside_the_sheet():
+    """Now Playing takes every touch for its gestures (`.pl-sheet` touch-action none): the lyrics, one scroller inside
+    it, start their own count - as Info's does - and never hand a scroll on to the page; positioned, so a line's
+    offsetTop is its place in them (player/Lyrics.tsx follows by it)."""
+    scroller = declarations(APP, ".app-lyrics")
+    assert (scroller["touch-action"], scroller["overflow-y"], scroller["overflow-x"], scroller["overscroll-behavior"]) == ("pan-y", "auto", "hidden", "contain")
+    assert scroller["min-height"] == "0" and scroller["position"] == "relative"
+    #? the soft edge top and bottom: a gradient mask, never a blur - the fade also the room above the first line
+    assert scroller["mask-image"] == scroller["-webkit-mask-image"] == "var(--dw-lyrics-mask)"
+    assert ALL_TOKENS["--dw-lyrics-mask"].startswith("linear-gradient(to bottom, transparent,") and "blur" not in ALL_TOKENS["--dw-lyrics-mask"]
+    assert scroller["padding-top"] == scroller["padding-bottom"] == "var(--dw-lyrics-fade)"
+    #? plain lyrics take focus to be scrolled by keys: the ring whole while they have it
+    ring = declarations(APP, ".app-lyrics:focus-visible")
+    assert (ring["mask-image"], ring["-webkit-mask-image"], ring["outline-offset"]) == ("none", "none", "var(--app-ring-inset)")
+
+
+def test_a_phones_lyrics_sit_in_the_bodys_own_box():
+    """In the cover's place, in the box the title and the transport are in - the body's 28px sides and its 520px most -
+    so a line starts exactly where the title does; filling the room the grip gave up; no scroll bar drawn."""
+    body = declarations(PLAYER_CSS, ".pl-sheet-body")
+    assert body["padding"].split()[1] == ALL_TOKENS["--pl-lyrics-side"] == "28px"
+    assert body["max-width"] == ALL_TOKENS["--pl-lyrics-max"] == "520px"
+    assert declarations(PLAYER_CSS, ".pl-sheet-grip")["padding"] == "0 28px"
+    face = declarations(APP, ".app-lyrics.is-face")
+    assert (face["flex"], face["width"], face["max-width"], face["margin"]) == ("1 1 auto", "100%", "var(--pl-lyrics-max)", "0 auto")
+    assert face["padding-left"] == face["padding-right"] == "var(--pl-lyrics-side)"
+    assert face["scrollbar-width"] == "none" and declarations(APP, ".app-lyrics.is-face::-webkit-scrollbar") == {"display": "none"}
+
+
+def test_a_line_is_a_tap_target_whose_targets_abut_and_the_lit_line_changes_colour_alone():
+    """The space between lines is the buttons' own padding, half each side, so a tap between two lines lands on one; the
+    press box reaches past the words. A one-line lyric is a tap target tall upright and on its side. The lit line is
+    another colour and nothing else: a size change would rewrap it and move every line under the reader."""
+    lines = declarations(APP, ".app-lyric-lines")
+    assert (lines["font-size"], lines["line-height"], lines["color"], lines["font-family"], lines["font-weight"]) == (
+        "var(--dw-text-lyric)", "var(--dw-leading-lyric)", "var(--dw-lyric-dim)", "var(--dw-font-title)", "var(--dw-weight-bold)")
+    line = declarations(APP, ".app-lyric")
+    assert line["padding"] == "calc(var(--dw-lyric-space) / 2) var(--dw-lyric-press-reach)"
+    assert line["margin"] == "0 calc(-1 * var(--dw-lyric-press-reach))"
+    assert line["width"] == "calc(100% + 2 * var(--dw-lyric-press-reach))"
+    assert "margin-top" not in line and "margin-bottom" not in line  # nothing between the targets
+    for frame in (UPRIGHT, SIDE):
+        tall = lyric_px("--dw-text-lyric", frame) * ratio("--dw-leading-lyric") + lyric_px("--dw-lyric-space", frame)
+        assert tall >= px("--pl-hit"), (frame, tall)
+    #? the side's own size: the song title's, a narrower fade - the lit line clear of both in a few lines' room
+    assert lyric_token("--dw-text-lyric", SIDE) == "var(--dw-text-title)" and lyric_px("--dw-lyrics-fade", SIDE) < lyric_px("--dw-lyrics-fade", UPRIGHT)
+    #? the desktop's panel, narrower than a phone's Now Playing is tall: smaller, for a mouse
+    assert lyric_px("--dw-text-lyric", DESK_FRAME) < lyric_px("--dw-text-lyric", UPRIGHT)
+    assert declarations(APP, ".app-lyric[aria-current='true']") == {"color": "var(--dw-lyric-lit)"}
+    assert declarations(APP, ".app-lyric.is-plain") == {"color": "var(--dw-lyric-lit)"}
+    assert "font-size" not in line and "font-weight" not in line and "transform" not in line
+    #? its words' direction never moves it to the other side (test_type's rule), and a long word breaks anywhere
+    assert (line["text-align"], line["white-space"], line["overflow-wrap"]) == ("left", "pre-line", "anywhere")
+    assert declarations(APP, "button.app-lyric:active") == {"background": "var(--dw-pressed)"}
+    #? a break is half a line, its dots drawn inside it - their coming moves nothing
+    assert declarations(APP, ".app-lyric-break")["height"] == "var(--dw-lyric-break)" and ALL_TOKENS["--dw-lyric-break"] == "0.5em"
+
+
+def test_the_lyrics_buttons_lit_while_on_and_dimmed_with_no_press_while_they_open_nothing():
+    assert declarations(APP, ".app-np-lyrics.is-on") == {"color": "var(--dw-accent)"}
+    assert declarations(APP, ".app-np-lyrics[aria-disabled='true']") == {"opacity": "var(--app-pin-off)"}
+    assert declarations(APP, ".app-np-lyrics[aria-disabled='true']:active") == {"background": "none"}
+    desktop = (PLAYER / "app-desktop.css").read_text()
+    dimmed = ".app-desk .app-playbar-tools .app-playbar-button[aria-disabled='true']"
+    assert declarations(desktop, dimmed, DESK_FRAME) == {"opacity": "var(--app-pin-off)", "cursor": "default"}
+    assert declarations(desktop, f"{dimmed}:hover", DESK_FRAME) == {"background": "none", "color": "var(--dw-text-2)"}
+    #? the panel's lines reach into its padding, so the words line up with its edge - and answer the mouse
+    panel = declarations(desktop, ".app-desk .app-lyrics.is-panel", DESK_FRAME)
+    assert panel["margin-left"] == panel["margin-right"] == "calc(-1 * var(--dw-lyric-press-reach))"
+    assert panel["padding-left"] == panel["padding-right"] == "var(--dw-lyric-press-reach)"
+    assert declarations(desktop, ".app-desk button.app-lyric:hover", DESK_FRAME) == {"background": "var(--app-desk-hover)"}
+
+
+def test_the_icon_row_still_fits_five_tap_targets_at_320():
+    """The speed's chip ("1.25x"), AirPlay, Lyrics, Up Next and ••• at 320 wide: about 280px at the 12px gap, in a body
+    264px wide. The gaps give way under 360 - never a 44px target."""
+    assert declarations(PLAYER_CSS, ":root", "@media (max-width: 359px)") == {"--pl-footer-gap": "var(--pl-footer-gap-narrow)"}
+    assert declarations(PLAYER_CSS, ".pl-icon-button")["width"] == "var(--pl-hit)"
+    side = float(declarations(PLAYER_CSS, ".pl-sheet-body")["padding"].split()[1].removesuffix("px"))
+    #? the chip: five monospace figures (about 0.6em each) in its padding and its hairline border
+    chip = 5 * 0.6 * px("--dw-text-footnote") + 2 * px("--app-speed-chip-pad") + 2 * px("--dw-hairline")
+    def row(gap: float) -> float:
+        return chip + 4 * px("--pl-hit") + 4 * gap
+    assert row(px("--pl-footer-gap")) > 320 - 2 * side, "at the usual gap it would not fit - say so if that changes"
+    assert row(px("--pl-footer-gap-narrow")) <= 320 - 2 * side
+    assert row(px("--pl-footer-gap")) <= 360 - 2 * side  # from 360 the usual gap fits
+
+
+def test_the_lyrics_section_comes_before_the_phones_which_is_still_last():
+    """The lyrics' rules draw both frames (the phone's face, the desktop's panel), so they sit outside the phone's
+    managing section - which stays app.css's last (test_the_phones_section_ends_where_the_next_begins)."""
+    assert APP.index(LYRICS_HEADING) < APP.index(PHONE_HEADING)
+    lyrics = section(APP, LYRICS_HEADING)
+    assert ".app-lyrics" in lyrics and not re.search(r"\.app-shell:not\(\.app-desk\)", lyrics)
+    assert APP.rstrip().endswith(PHONE_SECTION.rstrip())

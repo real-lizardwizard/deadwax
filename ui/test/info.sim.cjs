@@ -924,10 +924,11 @@ console.log('\nNow Playing is a sheet too, and deaf under the others')
   check('...and focus goes back to the mini player', [document.activeElement === opener, locks()], [true, []])
   check('the album line goes to the album', one(view, (node) => node.type === 'button' && byClass('pl-sheet-artist')(node)).props['aria-label'], 'Go to the album: Pink Floyd — Wish You Were Here')
   const iconRow = () => within(one(view, byClass('pl-sheet-footer')), (node) => node.type === 'button' && byClass('pl-icon-button')(node))
-  check('the icon row: Up Next and •••, with no speaker to send to (2.0.0-player.57: Up Next always there)', iconRow().map((button) => button.props['aria-label']), ['Up Next', 'More: info, add to a playlist, go to album, pin'])
+  //? (2.1.6) and Lyrics, always there too, before Up Next - named plainly while the song's lyrics aren't known
+  check('the icon row: Lyrics, Up Next and •••, with no speaker to send to (2.0.0-player.57: Up Next always there; 2.1.6: Lyrics)', iconRow().map((button) => button.props['aria-label']), ['Lyrics', 'Up Next', 'More: info, add to a playlist, go to album, pin'])
   view.render({ player, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum() {}, openAs: 'cover', pinnable: false })
   check('...an album the menu has no pin for (no release id, or deadwax can\'t keep pins): ••• doesn\'t promise one',
-    iconRow().map((button) => button.props['aria-label']), ['Up Next', 'More: info, add to a playlist, go to album'])
+    iconRow().map((button) => button.props['aria-label']), ['Lyrics', 'Up Next', 'More: info, add to a playlist, go to album'])
   let albums = 0
   view.render({ player, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum: () => { albums += 1 }, openAs: 'cover' })
   one(view, (node) => node.type === 'button' && byClass('pl-sheet-artist')(node)).props.onClick()
@@ -939,7 +940,7 @@ console.log('\nNow Playing is a sheet too, and deaf under the others')
     [view.find((node) => node.type === 'button' && byClass('pl-sheet-artist')(node)).length, one(view, (node) => node.type === 'p' && byClass('pl-sheet-artist')(node)) && text(one(view, byClass('pl-sheet-byline')))],
     [0, 'Pink Floyd — Wish You Were Here'])
   check('...••• says the menu holds only Info, and AirPlay sits before it with a speaker there',
-    iconRow().map((button) => button.props['aria-label']), ['AirPlay', 'Up Next', 'More: info, add to a playlist'])
+    iconRow().map((button) => button.props['aria-label']), ['AirPlay', 'Lyrics', 'Up Next', 'More: info, add to a playlist'])
   //? (2.0.0-player.57) Up next: named and tinted by what is on, opening Up Next from its tap, expanded while it is over
   let upNexts = 0
   view.render({ player: { ...player, shuffle: true, repeat: 'all' }, open: true, covered: true, opener: openerRef, onClose() {}, onMore() {}, onAlbum() {}, openAs: 'cover', onUpNext: () => { upNexts += 1 }, upNextOpen: true })
@@ -948,7 +949,7 @@ console.log('\nNow Playing is a sheet too, and deaf under the others')
   //? (2.0.14) no longer tinted for it: Shuffle and Repeat are lit on the transport, one control for one state
   const footerButtons = () => within(one(view, byClass('pl-sheet-footer')), (node) => node.type === 'button' && byClass('pl-icon-button')(node))
   check('Up Next with Shuffle and Repeat All on: named so, not tinted (2.0.14), expanded while Up Next is over it - and ••• not, its tap App\'s',
-    [upNext.props['aria-label'], byClass('is-on')(upNext), upNext.props['aria-expanded'], upNext.props['aria-haspopup'], footerButtons().find((node) => !byClass('app-upnext-button')(node)).props['aria-expanded'], upNexts],
+    [upNext.props['aria-label'], byClass('is-on')(upNext), upNext.props['aria-expanded'], upNext.props['aria-haspopup'], footerButtons().find((node) => !byClass('app-upnext-button')(node) && !byClass('app-np-lyrics')(node)).props['aria-expanded'], upNexts],
     ['Up Next - Shuffle and Repeat all', false, true, 'dialog', false, 1])
   view.render({ player, open: true, covered: false, opener: openerRef, onClose() {}, onMore() {}, onAlbum() {}, openAs: 'cover', onUpNext() {} })
   check('...neither on: plain, and not tinted', [one(view, byClass('app-upnext-button')).props['aria-label'], byClass('is-on')(one(view, byClass('app-upnext-button')))], ['Up Next', false])

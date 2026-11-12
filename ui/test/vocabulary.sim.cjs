@@ -223,6 +223,20 @@ const BATCH4 = [
   'lib/aboutRows.ts', 'lib/aboutSound.ts', 'app/InfoSheet.tsx', 'lib/idBridge.ts', 'player/MiniPlayer.tsx', 'player/NowPlaying.tsx', 'lib/upNext.ts',
   'app/UpNext.tsx', 'player/PlayerBar.tsx', 'lib/turntable.ts', 'player/Turntable.tsx', 'lib/vizSync.ts', 'player/Visualizer.tsx', 'lib/visualizer.ts',
   'lib/musicFeel.ts', 'player/usePlayer.ts',
+  //? (2.1.6) Lyrics on Now Playing and the desktop's panel - a listener's words kept in a file of their own
+  //? (lib/lyricsView.ts), apart from the editor's lib/lyrics.ts, which says "LRCLIB" to whoever runs deadwax
+  'lib/lyricsView.ts', 'player/Lyrics.tsx', 'app/LyricsPanel.tsx', 'app/useLyrics.ts',
+]
+
+/** (2.1.6) Lyrics' files - BATCH4's last four - never say where lyrics come from or how they are kept: the words of
+ *  whoever looks after the library (Get lyrics, the editor's Retime), never a listener's (notes/app-lyrics.md 2). */
+const LYRICS_FILES = ['lib/lyricsView.ts', 'player/Lyrics.tsx', 'app/LyricsPanel.tsx', 'app/useLyrics.ts']
+const LYRICS_RULES = [
+  ['"LRCLIB"', /LRCLIB/i, 'No lyrics on LRCLIB for this song'],
+  ['"offset"', /\boffsets?\b/i, 'These lyrics run late - set an offset'],
+  ['".lrc"', /\.lrc\b/i, 'No .lrc beside this song'],
+  ['"sidecar"', /side-?car/i, "This song's sidecar couldn't be read"],
+  ['"embedded"', /\bembedded\b/i, 'Showing the embedded lyrics'],
 ]
 
 /** The words batch 4's files never say to a listener - each with a sample that says it. */
@@ -347,7 +361,7 @@ console.log('\nthe scanner sees what a listener reads, and only that')
     ['Retry cover', 'Get cover'])
   check("a string, a template and JSX text are read; comments, imports, classes, scopes and a regex's quotes are not",
     words, ['Removed from the store', 'albums in the store', 'Then the end', 'Browse the store', 'Your favourite (starred) albums.'])
-  for (const [name, rule, said] of [...BATCH_RULES, APP_RULE, ...BATCH3_RULES, ...BATCH4_RULES, ...BATCH5_RULES]) {
+  for (const [name, rule, said] of [...BATCH_RULES, APP_RULE, ...BATCH3_RULES, ...BATCH4_RULES, ...LYRICS_RULES, ...BATCH5_RULES]) {
     check(`the ${name} rule catches "${said}"`, readable(`const x = ${JSON.stringify(said)}`).some(([, text]) => rule.test(text)), true)
   }
   for (const [name, rule, said] of BATCH5_LABELS) {
@@ -400,6 +414,13 @@ for (const file of BATCH4) {
     for (const [name, rule] of BATCH4_LABELS) if (rule.test(text.trim())) labels.push(`${file}:${line} ${name}: ${text.trim().slice(0, 120)}`)
   }
   check(`${file}: none of the readout's old labels in any of its text`, labels, [])
+}
+console.log('\nLyrics\' files (2.1.6): where lyrics come from and how they are kept are not a listener\'s words')
+for (const file of LYRICS_FILES) {
+  const found = readable(fs.readFileSync(path.join(SRC, file), 'utf8'), true)
+  const broken = []
+  for (const [line, text] of found) for (const [name, rule] of LYRICS_RULES) if (rule.test(text)) broken.push(`${file}:${line} ${name}: ${text.trim().slice(0, 120)}`)
+  check(`${file}: no LRCLIB, offset, .lrc, sidecar or embedded in any of its text (${found.length} pieces read)`, broken, [])
 }
 {
   const player = fs.readFileSync(path.join(SRC, 'player/usePlayer.ts'), 'utf8')

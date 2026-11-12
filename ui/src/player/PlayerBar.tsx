@@ -1,7 +1,11 @@
 import { Cover } from './Cover'
 import { SpeedChip } from './SpeedChip'
+import { lyricsDimmed, lyricsLabel, type LyricsHave } from '../lib/lyricsView'
 import { nextRepeat, shuffleLabel } from '../lib/upNext'
-import { AirPlayIcon, InfoIcon, NextIcon, PauseIcon, PlayIcon, PlaylistAddIcon, PreviousIcon, QueueIcon, RepeatIcon, RepeatOneIcon, ShuffleIcon, VisualizerIcon } from './icons'
+import {
+  AirPlayIcon, InfoIcon, LyricsIcon, NextIcon, PauseIcon, PlayIcon, PlaylistAddIcon, PreviousIcon, QueueIcon, RepeatIcon, RepeatOneIcon,
+  ShuffleIcon, VisualizerIcon,
+} from './icons'
 import { Scrubber } from './NowPlaying'
 import type { Player } from './usePlayer'
 
@@ -30,6 +34,10 @@ import type { Player } from './usePlayer'
  *    shuffle the Shuffle button reads on and is aria-disabled, as Up Next's chip is: that order is the shuffle.
  *  - (2.0.0-player.58) Add to a playlist, between Up Next and Info: App opens the picker (app/PlaylistPicker.tsx)
  *    for the song playing from its click - no playback action.
+ *  - (2.1.6) Lyrics, before Up Next - as Music on a Mac has Lyrics before Playing Next: the song's lyrics as the side
+ *    panel (app/LyricsPanel.tsx), opened and closed as Up Next's is, lit while open. Named for a song with none
+ *    ("Lyrics - none for this song", lib/lyricsView lyricsLabel) and, while the panel is closed, dimmed for it -
+ *    aria-disabled, its click nothing - since it would open nothing; open, it can always close.
  *
  * Its transport calls the player straight from the click - nothing awaited, the gesture rule
  * (ui/test/app-rules.sim.cjs allows this file toggle, next, previous, showAirPlay, setShuffle and setRepeat). With nothing
@@ -44,6 +52,9 @@ export function PlayerBar({
   onUpNext,
   onAddToPlaylist,
   upNextOpen = false,
+  onLyrics,
+  lyricsOpen = false,
+  lyrics = 'unknown',
 }: {
   player: Player
   /** "Artist — Album": the song's album, on the tab showing; null when the song names none */
@@ -61,6 +72,12 @@ export function PlayerBar({
   onAddToPlaylist?: ((event: MouseEvent) => void) | undefined
   /** the Up Next panel is showing */
   upNextOpen?: boolean
+  /** (2.1.6) Lyrics' click - the event, as Up Next's */
+  onLyrics?: ((event: MouseEvent) => void) | undefined
+  /** (2.1.6) the Lyrics panel is showing */
+  lyricsOpen?: boolean
+  /** (2.1.6) what is known of the song's lyrics - none dims the button while the panel is closed */
+  lyrics?: LyricsHave
 }) {
   const track = player.track
   if (!track) {
@@ -78,6 +95,8 @@ export function PlayerBar({
   const paged = !!pagedScope
   //? "Artist — Album", as Now Playing has it; either alone when the other isn't known
   const byline = [track.artist, track.album].filter(Boolean).join(' — ')
+  //? (2.1.6) dimmed only while closed, for a song known to have none
+  const lyricsDim = lyricsDimmed(lyrics, lyricsOpen)
 
   return (
     <section class="app-playbar" aria-label="Player">
@@ -145,6 +164,18 @@ export function PlayerBar({
             <AirPlayIcon class="app-playbar-icon" />
           </button>
         )}
+        <button
+          type="button"
+          class={`app-playbar-button app-playbar-lyrics${lyricsOpen ? ' is-on' : ''}`}
+          onClick={(event) => {
+            if (!lyricsDim) onLyrics?.(event)
+          }}
+          aria-label={lyricsLabel(lyrics)}
+          aria-expanded={lyricsOpen}
+          aria-disabled={lyricsDim}
+        >
+          <LyricsIcon class="app-playbar-icon" />
+        </button>
         <button
           type="button"
           class={`app-playbar-button${upNextOpen ? ' is-on' : ''}`}

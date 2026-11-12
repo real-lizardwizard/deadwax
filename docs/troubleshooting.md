@@ -558,6 +558,13 @@ happening.
 - If lines light up a beat after they're sung, set `LYRICS_LEAD_MS` (try `300`), save, and press
   **Re-time saved lyrics** beside it, in **Server settings**, under **Library**. It's refused while the lead has an unsaved change ("Save the new lead
   first."), since it re-times to the saved lead.
+- **Now Playing's Lyrics is dimmed** for a song (or the desktop's Lyrics panel says "No lyrics for this song."):
+  Navidrome has no lyrics for it - none on LRCLIB, or none fetched yet (**Get lyrics** in the album's **Edit**). If
+  an album has `.lrc` files and still shows none, check Navidrome's `ND_LYRICSPRIORITY` includes `.lrc` (its default
+  does).
+- **"Couldn't load the lyrics."**: Navidrome didn't answer - as for the music itself. **Try again** asks again.
+  "This song isn't here any more" means Navidrome no longer has the song the queue names (a rescan moved it):
+  play it again from its album.
 
 ## A song shows a different picture from its album
 

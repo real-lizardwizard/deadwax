@@ -586,6 +586,18 @@
     --dw-duration: var(--duration-fast);
     --dw-ease:     var(--ease-out);
 
+    /* --- lyrics (2.1.6, notes/app-lyrics.md 3.5): Now Playing's, in the cover's place, and the desktop's panel --- */
+    --dw-text-lyric:        26px;   /* a line of lyrics: between the song in Now Playing (title, 22) and You's name (28) */
+    --dw-leading-lyric:     var(--leading-tight);  /* 1.25: a lyric's own lines, when it wraps */
+    --dw-lyric-space:       12px;   /* between two lines - the line buttons' own padding, half each side, so their targets abut */
+    --dw-lyric-press-reach: 8px;    /* how far a line's press box reaches past its words, either side */
+    --dw-lyric-break:       0.5em;  /* a break between verses: half a line */
+    --dw-lyric-dim:         var(--dw-text-3);  /* every line but the lit one: 5.7:1 on Now Playing's sheet - readable, plainly not lit */
+    --dw-lyric-lit:         var(--dw-text);    /* the line being sung, and every plain line */
+    --dw-lyrics-fade:       28px;   /* the soft edge at the lyrics' top and bottom, and the room above the first line */
+    /* that edge, as the scroller's mask: lines come in and go out softly rather than being cut - a gradient, never a blur */
+    --dw-lyrics-mask: linear-gradient(to bottom, transparent, #000 var(--dw-lyrics-fade), #000 calc(100% - var(--dw-lyrics-fade)), transparent);
+
     /* --- Search and the album you don't have (2.0.0-player.13), as their boards draw them --- */
     --dw-field:              #15141b;                    /* the search field's well (STYLE.md's darker one) */
     --dw-field-icon:         rgba(235, 235, 245, 0.6);   /* the magnifier in it */
@@ -687,5 +699,23 @@
         --dw-popover:          var(--dw-card);
         --dw-popover-border:   var(--dw-border);
         --dw-selected-row:     var(--dw-selection-bg);
+        /* (2.1.6) the Lyrics panel is narrower than a phone's Now Playing is tall */
+        --dw-text-lyric:       22px;
+        --dw-lyric-space:      10px;
+        --dw-lyrics-fade:      20px;
+    }
+}
+
+/* A phone on its side (2.1.6), app.css's own query for it - kept to the phone's frame, so a short desktop window
+   doesn't take the desktop's 30px title size: the body takes most of a 390px-tall screen, and the room left between
+   the top row and the title is a few lines. Lyrics at the song title's size and a narrower fade there, so the line
+   being sung - at 0.3 of that room - is clear of both fades, with the next line showing under it. The space between
+   lines grows as the words shrink, so a one-line lyric is still a tap target tall: 22 x 1.25 + 17 = 44.5px, as
+   upright's 26 x 1.25 + 12. */
+@media (max-height: 500px) and (max-width: 1023px) {
+    :root {
+        --dw-text-lyric:  var(--dw-text-title);
+        --dw-lyric-space: 17px;
+        --dw-lyrics-fade: 8px;
     }
 }

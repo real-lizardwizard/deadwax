@@ -426,6 +426,113 @@ def read_track_lyrics(album_path: str, library_root: str, filename: str) -> dict
     }
 
 
+# ------------------------------------------------------------------ a song's lyrics, as Navidrome answers them
+
+#? (2.1.5) The most lines a song's lyrics are answered with - far past any song (a long one runs to a
+#? hundred or so); a file that isn't lyrics at all doesn't become a megabyte answer.
+LYRICS_LINES_MAX = 2000
+#? ...and the most characters a line keeps, each line cut there
+LYRICS_TEXT_MAX = 1000
+
+
+def _number(value) -> float | None:
+    """A JSON number as a float - never a bool (which Python counts as one), a string or anything else."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+def _words(value) -> str:
+    """A line's text: trailing spaces off each of its own lines, a newline inside kept (an untimed line Navidrome
+    joined onto the one before), a line with no words at all "" - and nothing else changed."""
+    if not isinstance(value, str):
+        return ""
+    text = "\n".join(part.rstrip() for part in value.split("\n"))
+    return text if text.strip() else ""
+
+
+def _lines_of(entry) -> list[dict]:
+    """An entry's lines as `{start, text}` - `start` Navidrome's milliseconds, or None for an untimed line."""
+    lines = entry.get("line") if isinstance(entry, dict) else None
+    if not isinstance(lines, list):
+        return []
+    return [{"start": _number(line.get("start")), "text": _words(line.get("value"))}
+            for line in lines if isinstance(line, dict)]
+
+
+def _synced_lines(lines: list[dict], offset: float) -> list[dict] | None:
+    """
+    The lines as synced lyrics - times in seconds, OpenSubsonic's offset taken off, held at 0, rounded to the
+    millisecond, sorted - or None when the lines can't be trusted to light one at a time: a worded line with no
+    time, or every worded line at one time (LRCLIB holds some files stamped all at 0:00, which would light the
+    first line for the whole song). An untimed line with no words is dropped; a timed one is a break, kept.
+    """
+    timed = []
+    for line in lines:
+        if line["start"] is None:
+            if line["text"]:
+                return None
+            continue
+        timed.append({"time": round(max(0.0, line["start"] - offset) / 1000, 3), "text": line["text"]})
+    if len({line["time"] for line in timed if line["text"]}) < 2:
+        return None
+    #? stably: two voices written at one stamp keep the file's order
+    timed.sort(key=lambda line: line["time"])
+    return timed
+
+
+def song_lyrics(body: dict) -> dict:
+    """
+    (2.1.5) A song's lyrics for the apps' Now Playing, from Navidrome's getLyricsBySongId answer - deadwax's own
+    shape of it, never a relay: `{synced, lines}`, each line `{time, text}` as the track viewer's (time in seconds,
+    or None). Three cases and only three: synced (every line timed, in time order), plain (every time None, in the
+    file's order), none (`synced` false, no lines - a fact about the song, not a failure).
+
+    Which entry: Navidrome may answer several (an embedded tag per language). The first that is synced with a line
+    that has words, else the first with a line that has words, else none. Synced or plain is decided by the LINES
+    (see _synced_lines), whatever the entry's own `synced` says - an entry claiming it that can't be lit is answered
+    plain, its times dropped.
+
+    Times: `start` less the entry's `offset` (OpenSubsonic: "positive means lyrics appear sooner"), never below 0.
+    LYRICS_LEAD_MS is never applied here: it is already in the timestamps of every file deadwax wrote, and
+    applying it again would move them twice (see THE LEAD above); other sources' timings aren't LRCLIB's lateness.
+
+    Plain lyrics lose their empty lines at either end; synced keep them (the first is an intro's break, at 0).
+    Bounded: LYRICS_LINES_MAX lines, LYRICS_TEXT_MAX characters a line. `displayArtist`, `displayTitle` and `lang`
+    aren't passed on - nothing draws them.
+    """
+    listed = body.get("lyricsList") if isinstance(body, dict) else None
+    entries = listed.get("structuredLyrics") if isinstance(listed, dict) else None
+    if not isinstance(entries, list):
+        entries = []
+
+    candidates = []
+    for entry in entries:
+        lines = _lines_of(entry)
+        if not any(line["text"] for line in lines):
+            continue
+        offset = _number(entry.get("offset")) or 0.0
+        candidates.append((lines, _synced_lines(lines, offset)))
+
+    chosen = next((pair for pair in candidates if pair[1] is not None), None) or next(iter(candidates), None)
+    if chosen is None:
+        return {"synced": False, "lines": []}
+
+    lines, timed = chosen
+    if timed is not None:
+        answer = timed
+    else:
+        answer = [{"time": None, "text": line["text"]} for line in lines]
+        while answer and not answer[0]["text"]:
+            answer.pop(0)
+        while answer and not answer[-1]["text"]:
+            answer.pop()
+
+    return {"synced": timed is not None,
+            "lines": [{"time": line["time"], "text": line["text"][:LYRICS_TEXT_MAX]}
+                      for line in answer[:LYRICS_LINES_MAX]]}
+
+
 # ------------------------------------------------------------------ plan and execute
 
 

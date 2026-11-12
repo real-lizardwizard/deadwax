@@ -99,7 +99,7 @@ class Player(Navidrome):
     #? (2.0.13) the descriptions' fallback, Navidrome's own words - see the end of handle
     DESCRIBE_CALLS = frozenset({"getArtistInfo2", "getAlbumInfo2"})
     PLAYER_CALLS = frozenset({"ping", "getAlbumList2", "getArtists", "getArtist", "getSong", "getCoverArt",
-                              "stream", "scrobble"}) | PLAYLIST_CALLS | QUEUE_CALLS | DESCRIBE_CALLS
+                              "stream", "scrobble", "getLyricsBySongId"}) | PLAYLIST_CALLS | QUEUE_CALLS | DESCRIBE_CALLS
 
     def __init__(self):
         super().__init__()
@@ -108,6 +108,11 @@ class Player(Navidrome):
         self.songs = {SONG: {"id": SONG, "title": "Wandering Star", "albumId": "nd-dummy", "album": "Dummy",
                              "artist": "Portishead", "contentType": "audio/flac", "suffix": "flac", "duration": 290}}
         self.hidden: dict[str, set[str]] = {}
+        #? (2.1.5) each song's lyrics as getLyricsBySongId's `lyricsList` - one synced line unless a test says otherwise
+        self.lyrics: dict[str, dict] = {SONG: {"structuredLyrics": [
+            {"displayArtist": "Portishead", "displayTitle": "Wandering Star", "lang": "xxx", "synced": True,
+             "line": [{"start": 0, "value": ""}, {"start": 1500, "value": "The first line"},
+                      {"start": 4000, "value": "The second line"}]}]}}
         self.plays: dict[tuple[str, str], int] = {}
         self.playing: dict[str, str] = {}
         self.file, self.serve = navidrome_file(FLAC)
@@ -316,6 +321,11 @@ class Player(Navidrome):
             if song is None:
                 return httpx.Response(200, json=failed(70, "Song not found"))
             return httpx.Response(200, json=ok(song={**song, "playCount": self.plays.get((user, song["id"]), 0)}))
+        if endpoint == "getLyricsBySongId":
+            #? (2.1.5) as server/subsonic/lyrics.go answers at 0.64.2: a song it doesn't have is 70, one with none `{}`
+            if q.get("id", "") not in self.songs:
+                return httpx.Response(200, json=failed(70, "Song not found"))
+            return httpx.Response(200, json=ok(lyricsList=self.lyrics.get(q["id"], {})))
         if endpoint == "scrobble":
             if q.get("submission") == "true":
                 self.plays[(user, q["id"])] = self.plays.get((user, q["id"]), 0) + 1
@@ -404,6 +414,8 @@ WALK = {
     "/artists": [("get", "/artists")],
     "/artists/{artist_id}": [("get", "/artists/ar-1")],
     "/songs/{song_id}": [("get", f"/songs/{SONG}")],
+    #? (2.1.5) a song's lyrics for Now Playing
+    "/lyrics/{song_id}": [("get", f"/lyrics/{SONG}")],
     "/cover/{cover_id}": [("get", "/cover/al-1")],
     "/stream/{song_id}": [("get", f"/stream/{SONG}?format=raw"), ("get", f"/stream/{SONG}?format=raw&wrap=mp4"),
                           ("get", f"/stream/{SONG}?format=raw&wrap=fmp4")],
@@ -494,6 +506,8 @@ def test_every_player_route_asks_navidrome_as_the_signed_in_user(player):
     assert made["POST /level/album/nd-dummy"][0] == ("ethan", "getAlbum"), made["POST /level/album/nd-dummy"]
     #? (2.1.1) and the iPhone app's loudness of an album: ethan's getAlbum, then the album's listing as the shared account
     assert made["/loudness/album/nd-dummy"] == [("ethan", "getAlbum"), ("demo", "getAlbum")], made["/loudness/album/nd-dummy"]
+    #? (2.1.5) a song's lyrics: one getLyricsBySongId as ethan, nothing checked before it - Navidrome's answer is the check
+    assert made[f"/lyrics/{SONG}"] == [("ethan", "getLyricsBySongId")], made[f"/lyrics/{SONG}"]
     #? the stream cache's make alone asks as the shared account - and only after ethan's access is confirmed
     for path in (f"/stream/{SONG}?format=raw&wrap=mp4", f"/stream/{SONG}?format=raw&wrap=fmp4", f"/scrub/{SONG}?at=0&seconds=1"):
         assert made[path][0] == ("ethan", "getSong"), (path, made[path])
@@ -1059,6 +1073,20 @@ def test_plays_and_now_playing_are_each_users_own(player):
     assert player.fake.playing == {"ethan": SONG}
     assert ethan.get(f"{PLAYER}/songs/{SONG}").json()["playCount"] == 2
     assert james.get(f"{PLAYER}/songs/{SONG}").json()["playCount"] == 1
+
+
+def test_a_play_sent_twice_is_counted_once_for_its_own_person_alone(player):
+    """(2.1.4) The same song at the same moment is two plays when two people heard it - one when it came twice."""
+    navidrome_routes.forget_plays_counted()
+    ethan, james = signed_in(player, "ethan"), signed_in(player, "james")
+    play = f"{PLAYER}/scrobble/{SONG}?submission=true&time=1727000000000"
+
+    ethan.post(play)
+    ethan.post(play)
+    james.post(play)
+
+    assert player.fake.plays == {("ethan", SONG): 1, ("james", SONG): 1}
+    navidrome_routes.forget_plays_counted()
 
 
 # ----------------------------------------------------------------- Remove from my library, and Add at once

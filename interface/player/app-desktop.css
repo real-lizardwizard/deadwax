@@ -3389,6 +3389,29 @@
     .app-desk .app-playbar-transport .app-playbar-shuffle[aria-disabled='true'] { opacity: var(--app-pin-off); cursor: default; }
 }
 
+/* ===== Lyrics on a desktop (2.1.6) =====
+   The player bar's Lyrics, before Up Next: the tools' own button, lit while its panel is open by the tools' is-on
+   rule; dimmed for a song with none while the panel is closed - no hover then, its click nothing. The panel is Up
+   Next's shell (Info's panel rules); its body the view (player/Lyrics.tsx), its lines' press reaching into the
+   panel's padding so the words line up with the panel's edge - and a line under the mouse shows it can be clicked:
+   the tools' hover behind it, and the line a step brighter unless it is the one being sung, as Music on a Mac's
+   lyrics answer the mouse. */
+@media (min-width: 1024px) {
+    .app-desk .app-playbar-tools .app-playbar-button[aria-disabled='true'] { opacity: var(--app-pin-off); cursor: default; }
+    .app-desk .app-playbar-tools .app-playbar-button[aria-disabled='true']:hover { background: none; color: var(--dw-text-2); }
+
+    .app-desk .app-lyrics.is-panel {
+        flex: 1 1 auto;
+        margin-right: calc(-1 * var(--dw-lyric-press-reach));
+        margin-left: calc(-1 * var(--dw-lyric-press-reach));
+        padding-right: var(--dw-lyric-press-reach);
+        padding-left: var(--dw-lyric-press-reach);
+    }
+
+    .app-desk button.app-lyric:hover { background: var(--app-desk-hover); }
+    .app-desk button.app-lyric:not([aria-current='true']):hover { color: var(--dw-text-2); }
+}
+
 /* ===== playlists on a desktop (2.0.0-player.58) =====
    The sidebar's Playlists group is the desktop's way in (the Library's row is the phone root's, which a desktop never
    draws); the Playlists page's rows the readable width Library > Artists' are; and in a drawer's grid (1024-1279px) a playlist's notes - why it has no

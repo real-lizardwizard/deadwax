@@ -1,16 +1,19 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
 
+import type { LyricsAnswers } from '../app/useLyrics'
 import { useSheet } from '../app/useSheet'
+import { lyricsDimmed, lyricsHave, lyricsLabel } from '../lib/lyricsView'
 import { clock, dragEnd, dragFor, dragMove, dragStart, keyTarget, shownTime, timeAt, type Drag } from '../lib/scrub'
 import { lookButtonLabel, otherLook, playingDisc, type Look } from '../lib/turntable'
 import { nextRepeat, repeatLabel, shuffleLabel, upNextLabel } from '../lib/upNext'
 import { discArtUrl, playedAlbum } from './api'
 import { Cover } from './Cover'
 import { wakeDeckAudio, type Deck } from './deck'
+import { Lyrics } from './Lyrics'
 import { SpeedChip } from './SpeedChip'
 import {
-  AirPlayIcon, ChevronDownIcon, MoreIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon, QueueIcon, RecordIcon, RepeatIcon,
-  RepeatOneIcon, ShuffleIcon, SquareIcon,
+  AirPlayIcon, ChevronDownIcon, LyricsIcon, MoreIcon, NextIcon, PauseIcon, PlayIcon, PreviousIcon, QueueIcon, RecordIcon,
+  RepeatIcon, RepeatOneIcon, ShuffleIcon, SquareIcon,
 } from './icons'
 import { Turntable, TurntableTime, type TurntablePreview } from './Turntable'
 import { usePosition, type Player } from './usePlayer'
@@ -133,7 +136,7 @@ export function Scrubber({ player }: { player: Player }) {
  * there is a speaker to send to, and ••• for Info and "Go to album". No readout and no Gapless
  * control: how the song was sent and how the last changes and seek went are in Info > Debug
  * (app/InfoSheet.tsx), and Gapless is a setting, in You > Playback (app/GaplessChoice.tsx). The
- * board's Lyrics icon isn't drawn until there is something for it to open; Up Next opens app/UpNext.tsx
+ * board's Lyrics icon shows the song's lyrics since 2.1.6 (below); Up Next opens app/UpNext.tsx
  * (2.0.0-player.57) - the queue, with Shuffle and Repeat at its top, where the iPhone's Music app has them.
  *
  * SHUFFLE AND REPEAT ON THE TRANSPORT (2.0.14) - James: "in the mobile I need the shuffle and loop buttons
@@ -177,6 +180,20 @@ export function Scrubber({ player }: { player: Player }) {
  * speed isn't 1x, a tap back to 1x - in the row that is one fixed height, so it moves nothing. On the
  * turntable it is drawn too, and app.css shows it only on a phone on its side, where the plinth is too
  * small to read the fader's own readout.
+ *
+ * LYRICS (2.1.6, notes/app-lyrics.md 3.1) - James: "I want to make sure you can view lyrics as well", like Apple Music.
+ * The footer's Lyrics, left of Up Next (the fixed group: AirPlay still comes and goes at its left, moving nothing),
+ * puts the song's lyrics (player/Lyrics.tsx) in the cover's place - on whichever look - and everything from the title
+ * down stays exactly where it is: the anchored body is drawn as with the cover (the Scrubber, never TurntableTime), and
+ * the grip is the top row alone, as on the turntable, so scrolling the lyrics never drags the sheet down. While they
+ * show the sheet is the cover's (no app-is-turntable, whose centred titles and hidden chip are the record's) and the
+ * record isn't mounted (its deck stops, as the look button's switch to the cover stops it). The look button keeps its
+ * meaning - the other look - and lyrics give way to it. Lyrics off goes back to the look it came from, the turntable's
+ * sound woken in that tap. A song with none, lyrics on: the cover (never the turntable - no tap's moment to start a
+ * deck), the button still pressed and named for it; the next song with lyrics shows them again. On or off is App's,
+ * kept while the page lives - not a setting, and not as the look is, which every opening starts as You says. The
+ * button: aria-pressed, in the accent while on (as Shuffle and Repeat); dimmed (aria-disabled, its tap nothing) only
+ * while off for a song known to have none. Its tap moves no focus: a toggle in place, not a dialog.
  */
 export function NowPlaying({
   player,
@@ -191,6 +208,9 @@ export function NowPlaying({
   pinnable = false,
   onUpNext,
   upNextOpen = false,
+  lyrics,
+  lyricsOn = false,
+  onLyrics,
 }: {
   player: Player
   open: boolean
@@ -213,6 +233,12 @@ export function NowPlaying({
   onUpNext?: ((event: MouseEvent) => void) | undefined
   /** Up Next is over it */
   upNextOpen?: boolean
+  /** (2.1.6) the song playing's lyrics, App's (app/useLyrics.ts) */
+  lyrics?: LyricsAnswers | undefined
+  /** (2.1.6) Lyrics is on - App's, kept while the page lives */
+  lyricsOn?: boolean
+  /** (2.1.6) Lyrics turned on or off: the footer's button, or the look button giving way */
+  onLyrics?: ((on: boolean) => void) | undefined
 }) {
   const track = player.track
   const [dragY, setDragY] = useState(0)
@@ -236,7 +262,12 @@ export function NowPlaying({
   }, [open])
 
   if (!track) return null
-  const turntable = look === 'turntable'
+  //? (2.1.6) lyrics on are drawn over neither look - the record isn't mounted while they're on, a song with none
+  //? included, which shows the cover; the lyrics take the cover's place unless the song has none
+  const have = lyricsHave(lyrics?.lyrics)
+  const lyricsShown = lyricsOn && have !== 'none'
+  const turntable = look === 'turntable' && !lyricsOn
+  const lyricsDim = lyricsDimmed(have, lyricsOn)
 
   const onPointerDown = (event: PointerEvent) => {
     drag.current = { pointer: event.pointerId, startY: event.clientY, captured: false }
@@ -307,10 +338,18 @@ export function NowPlaying({
     if (!paged) player.setShuffle(!player.shuffle)
   }
   const onRepeat = () => player.setRepeat(nextRepeat(player.repeat))
-  //? switching TO the turntable is a gesture too: its deck's sound can start as it appears
+  //? switching TO the turntable is a gesture too: its deck's sound can start as it appears - (2.1.6) and lyrics on
+  //? give way to the look asked for
   const onLook = () => {
     if (look === 'cover') wakeDeckAudio()
+    if (lyricsOn) onLyrics?.(false)
     setLook(otherLook(look))
+  }
+  //? (2.1.6) Lyrics on or off - off over the turntable goes back to the record, a gesture its sound may start from
+  const onLyricsButton = () => {
+    if (lyricsDim) return
+    if (lyricsOn && look === 'turntable') wakeDeckAudio()
+    onLyrics?.(!lyricsOn)
   }
 
   return (
@@ -323,9 +362,10 @@ export function NowPlaying({
       <Cover id={track.coverArt} size={300} class="pl-sheet-backdrop" />
 
       {/* the sheet's drag to close starts here and nowhere else: the top row and the cover - and
-          on the turntable only the top row, the record and the arm being outside it */}
+          on the turntable only the top row, the record and the arm being outside it; (2.1.6) the same
+          with the lyrics showing, so scrolling them never drags the sheet */}
       <div
-        class={`pl-sheet-grip${turntable ? ' app-grip-top' : ''}`}
+        class={`pl-sheet-grip${turntable || lyricsShown ? ' app-grip-top' : ''}`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerEnd}
@@ -341,16 +381,19 @@ export function NowPlaying({
           {/* the other look, for as long as this stays open - the setting is You's */}
           <button type="button" class="app-look-button" onClick={onLook} aria-label={lookButtonLabel(look)}>
             <span class="app-look-face">
-              {turntable ? <SquareIcon class="app-look-icon" /> : <RecordIcon class="app-look-icon" />}
+              {look === 'turntable' ? <SquareIcon class="app-look-icon" /> : <RecordIcon class="app-look-icon" />}
             </span>
           </button>
         </div>
-        {!turntable && (
+        {!turntable && !lyricsShown && (
           <div class={`pl-sheet-art${player.playing ? '' : ' is-paused'}`}>
             <Cover id={track.coverArt} size={1000} class="pl-sheet-cover" />
           </div>
         )}
       </div>
+
+      {/* (2.1.6) the lyrics in the cover's place, outside the grip, in the body's own box */}
+      {lyricsShown && lyrics && <Lyrics player={player} answers={lyrics} shows={open} covered={covered} place="face" />}
 
       {turntable && (
         <Turntable
@@ -428,9 +471,9 @@ export function NowPlaying({
         </div>
 
         {/* The icon row, a tap target tall whatever is in it. ••• is always there, at the right
-            end, and Up Next (2.0.0-player.57) always beside it; AirPlay comes and goes to their left,
-            so nothing moves when a speaker does - nor the speed's chip, at the left end, when the speed
-            leaves 1x and comes back (2.0.0-player.39). */}
+            end, and Up Next (2.0.0-player.57) always beside it, and Lyrics (2.1.6) beside that; AirPlay
+            comes and goes to their left, so nothing moves when a speaker does - nor the speed's chip, at
+            the left end, when the speed leaves 1x and comes back (2.0.0-player.39). */}
         <div class="pl-sheet-footer">
           <SpeedChip player={player} />
           {player.airplay && (
@@ -438,6 +481,17 @@ export function NowPlaying({
               <AirPlayIcon class="pl-icon" />
             </button>
           )}
+          {/* (2.1.6) on and off in place - its name says when the song has none, dimmed only while off */}
+          <button
+            type="button"
+            class={`pl-icon-button app-np-lyrics${lyricsOn ? ' is-on' : ''}`}
+            onClick={onLyricsButton}
+            aria-label={lyricsLabel(have)}
+            aria-pressed={lyricsOn}
+            aria-disabled={lyricsDim}
+          >
+            <LyricsIcon class="pl-icon" />
+          </button>
           <button
             type="button"
             class="pl-icon-button app-upnext-button"

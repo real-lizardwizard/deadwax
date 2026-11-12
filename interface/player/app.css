@@ -5643,6 +5643,148 @@ html.app-picker-open { overflow: hidden; }
 /* dimmed, its tap does nothing - so it doesn't flash a press either, as the pin's and a job's Cancel don't */
 .pl-transport .app-np-mode[aria-disabled='true']:active { background: none; }
 
+/* ===== Lyrics on Now Playing (2.1.6) =====
+   James: "I want to make sure you can view lyrics as well", like Apple Music (notes/app-lyrics.md). The footer's
+   Lyrics (player/NowPlaying.tsx): the icon row's grey, in the accent while on, as the transport's Shuffle and Repeat;
+   dimmed for a song with none while off, its press not drawn, as Shuffle's during a library's shuffle. The view
+   (player/Lyrics.tsx): in the cover's place on a phone, filling the room the grip gave up, in the body's own box so a
+   line starts where the title does; the desktop panel's body by app-desktop.css. One scroller, its own touches
+   panning (the sheet takes every touch for its gestures, and a scroller starts its own count, as Info's does), a
+   soft edge top and bottom, the first line below the top one. A line is a button the line's width, half the space to
+   the next line either side its own padding - targets that abut, no gap a tap falls through, a one-line lyric a tap
+   target tall - its press a box reaching past the words; the lit one white, the rest one dimmer colour, no size
+   change (a lit line growing would rewrap and move the lines under the reader). A break between verses is half a
+   line; its three dots, while it is the lit line of a long gap, are drawn inside that half line, so their coming
+   moves nothing either. The look is theme.css section 10's lyric tokens. */
+:root {
+    --app-lyric-dot-gap: 0.3em;   /* between a break's three dots */
+    --app-lyrics-room: 0;         /* the room after the last line - set on it by the view, from its height */
+}
+
+.app-np-lyrics.is-on { color: var(--dw-accent); }
+.app-np-lyrics[aria-disabled='true'] { opacity: var(--app-pin-off); }
+/* dimmed, its tap does nothing - so it doesn't flash a press either */
+.app-np-lyrics[aria-disabled='true']:active { background: none; }
+
+/* Positioned, so a line's offsetTop is its place in the scroller (following, player/Lyrics.tsx). */
+.app-lyrics {
+    position: relative;
+    min-height: 0;
+    padding-top: var(--dw-lyrics-fade);
+    padding-bottom: var(--dw-lyrics-fade);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+    -webkit-mask-image: var(--dw-lyrics-mask);
+    mask-image: var(--dw-lyrics-mask);
+}
+
+/* a phone's Now Playing: the room the grip gave up, between the top row and the body, in the body's own box - and no
+   scroll bar drawn */
+.app-lyrics.is-face {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: var(--pl-lyrics-max);
+    margin: 0 auto;
+    padding-right: var(--pl-lyrics-side);
+    padding-left: var(--pl-lyrics-side);
+    scrollbar-width: none;
+}
+
+.app-lyrics.is-face::-webkit-scrollbar { display: none; }
+
+/* plain lyrics take focus themselves, so a keyboard can scroll them: the ring whole, the soft edges off meanwhile */
+.app-lyrics:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring-inset);
+    -webkit-mask-image: none;
+    mask-image: none;
+}
+
+/* while there are no lines to draw - the spinner, a failure and its Try again, none, or nothing playing - centred
+   where the lyrics would be */
+.app-lyrics.is-waiting {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.app-lyrics-failed {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--pl-gap);
+}
+
+/* a failure in a notice's words and look (the album page's .pl-notice) */
+.app-lyrics-error {
+    margin: 0;
+    color: var(--pl-text-2);
+    font-size: var(--pl-text-subhead);
+}
+
+/* "No lyrics for this song.", "Nothing playing" - and plain lyrics' "These lyrics aren't synced to the song." */
+.app-lyrics-none,
+.app-lyrics-note {
+    margin: 0;
+    color: var(--dw-text-3);
+    font-size: var(--dw-text-footnote);
+    line-height: var(--dw-leading-note);
+}
+
+.app-lyrics-note { margin-bottom: var(--dw-lyric-space); }
+
+.app-lyric-lines {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--dw-lyric-dim);
+    font-family: var(--dw-font-title);
+    font-size: var(--dw-text-lyric);
+    font-weight: var(--dw-weight-bold);
+    line-height: var(--dw-leading-lyric);
+}
+
+.app-lyric {
+    display: block;
+    width: calc(100% + 2 * var(--dw-lyric-press-reach));
+    margin: 0 calc(-1 * var(--dw-lyric-press-reach));
+    padding: calc(var(--dw-lyric-space) / 2) var(--dw-lyric-press-reach);
+    border-radius: var(--dw-radius-control);
+    color: inherit;
+    text-align: left;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+    transition: color var(--dw-duration) var(--dw-ease), background-color var(--dw-duration) var(--dw-ease);
+}
+
+.app-lyric[aria-current='true'],
+.app-lyric.is-plain { color: var(--dw-lyric-lit); }
+
+button.app-lyric:active { background: var(--dw-pressed); }
+
+/* the ring on the press box, inside it - the scroller clips what runs past its edges */
+.app-lyric:focus-visible {
+    outline: var(--app-ring) solid var(--dw-accent);
+    outline-offset: var(--app-ring-inset);
+}
+
+.app-lyric-break {
+    display: flex;
+    align-items: center;
+    height: var(--dw-lyric-break);
+}
+
+.app-lyric-dots { display: flex; gap: var(--app-lyric-dot-gap); }
+.app-lyric-dot { transition: color var(--dw-duration) var(--dw-ease); }
+.app-lyric-dot.is-lit { color: var(--dw-lyric-lit); }
+
+.app-lyrics-end { height: var(--app-lyrics-room); }
+
 /* ===== looking after deadwax from a phone (2.0.0-player.47) =====
    The phone gets every managing page the desktop has: the Edit panel as a sheet over the whole screen
    (app/EditPanel.tsx - the main page's editors hosted in it as they are, styled here by their own ids
