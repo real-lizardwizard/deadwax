@@ -1,7 +1,9 @@
 import SwiftUI
 
 /// The notice capsule (D11): a line said over the mini player - "Playing next: …", "Added to Up Next: …" - for
-/// `seconds`, then gone (PlayerModel.say keeps the time). VoiceOver reads it as it appears or changes.
+/// `seconds`, then gone (PlayerModel.say keeps the time). Drawn in two places since Phase 2 - over the mini player, and
+/// in Now Playing's top row (which covers the tabs) - so VoiceOver hears it from PlayerModel.say, once per notice said,
+/// never from the view as it appears (it would be heard twice, and a view under a full-screen cover may not "appear").
 struct Notice: View {
     /// How long a notice stands (PIN_NOTICE_MS, 5 s).
     static let seconds: Double = 5
@@ -16,8 +18,6 @@ struct Notice: View {
             .padding(.vertical, 8)
             .background(.thinMaterial, in: Capsule())
             .accessibilityAddTraits(.isStaticText)
-            .onAppear { Self.announce(text) }
-            .onChange(of: text) { _, now in Self.announce(now) }
     }
 
     static func announce(_ words: String) {

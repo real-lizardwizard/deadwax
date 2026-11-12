@@ -2452,3 +2452,268 @@ History rows and the announcement after a History tap.
 - As songs end, through Shuffle and Repeat, and Edit on and off, the list keeps its place (the card at the top).
 - An album's last two songs: Up Next still opens with the card at the top.
 - VoiceOver: History's heading, then its rows, then the song playing's title as a heading.
+
+## Phase 2: downloads (app 0.3)
+
+The spec is notes/ios-specs/phase2-downloads.md. Built in two parts on `p2/downloads`: the machinery first (below),
+then the screens.
+
+### Part 1: the machinery (p2/downloads)
+
+**Core** (pure, tested on Linux and macOS): `DownloadModels` (a song's state, the waits, the failures as codes, the
+origins, `DownloadRecord`, the two settings `DownloadOver` and `StorageLimit`, `NetworkPath`, `DownloadTaskName`),
+`DownloadRules` (every transition of 2.1, the album's state of 2.2, the menus' items of 2.5, what Remove takes),
+`DownloadPlan` (8.5), `DownloadWords` (every line of the spec; the vocabulary sim's ban list ported, over
+`DownloadWords.everyLine`), `Bytes.words` (8.6), `FLACMD5` (RFC 1321 MD5 and FLAC's packing), `Offline` (`OfflineRule`,
+`PendingPlays`, `LibraryRoot`, `AlbumList`, `DownloadedAlbums`, the gate's two rules; `AddedBy.phone`) and
+`DownloadDatabase` over the `CSQLite` system library (8.2's schema, `user_version` 1, WAL). **DeadwaxAudio**:
+`FLACVerifier`, the one addition - it reads, never plays.
+
+**The App** (`App/Downloads/`, `App/Models/Reachability.swift`):
+- `DownloadStore` - one person's folder, database and files: protection (`completeUntilFirstUserAuthentication` on
+  every folder, file and the database), backups off, free space, other accounts, Phase 0's folder retired.
+- `DownloadSession` - the one background session. The delegate moves a finished file to `music/<name>.part` before
+  it returns, from the task's name alone, and tells the model on the main thread synchronously, so the store has every
+  event before `urlSessionDidFinishEvents` lets `.backgroundTask(.urlSession(...))` end (capped at 25 s).
+- `DownloadModel` - what the screens bind to (below), and everything in step: the plan run at every ask, finish,
+  failure, setting, path and reachability change and coming to the front; tasks made, cancelled and re-adopted after a
+  relaunch; the length check and rename (`done(unchecked)` plays at once); the sound check one song at a time at
+  utility priority inside `beginBackgroundTask` (a check iOS stops is checked again later, never a try); albums' answers,
+  covers (1024) and loudness kept; plays kept and sent.
+- `Reachability` - NWPathMonitor, the transport's every answer or silence (`URLSessionTransport.listen`), the 3 s probe
+  on its own ephemeral session, a 5 s tick for the 30 s probe.
+- Wired in: the engine plays `SongFiles.downloads` (a `PlayableCopies` index the model keeps) before any stream, and
+  prefetches nothing for a song on the phone; Phase 0's downloads and the link's `copies` are gone; Debug's test songs
+  download through the model, its Streamed/Downloaded picker is "Stream even when downloaded"; PlayReporter keeps a
+  play it can't send (not online, or no answer); LoudnessBook puts a downloaded album's kept loudness on the shelf at
+  `at` 0 and fails a read at once while deadwax can't be reached (7.3); CoverCache draws a kept cover from the phone
+  first (8.8); ServerModel keeps every good /me as `me.json` and opens from it, /me asked behind (7.5).
+
+**The model's surface** (`DownloadModel`, in the environment):
+- reading: `state(_ songID) -> SongDownload`, `album(_ songs) / album(id:) -> AlbumDownload`, `choices(song:)`,
+  `choices(songs:gone:)`, `upNextCount(_:paged:)`, `isHere(_:)`, `anythingHere`, `downloadedAlbums: [IndexAlbum]` (the
+  Library's Downloaded, `AlbumList.downloaded`), `song(_:)` and `keptAlbum(_:)` (rows' names from the kept answers),
+  `downloading` / `failed` / `downloaded` (You > Downloads' sections, in the order they go), `summary` (You's row),
+  `bytesHere`, `otherBytes`, `forceQuitShown`, `storeProblem`, `playsWaiting`; Debug's `log`, `checkSeconds`,
+  `debugTasks()`.
+- the settings: `downloadOver`, `storageLimit` (UserDefaults, the spec's defaults), `streamEvenWhenDownloaded`.
+- acting, in the tap: `download(_ song)`, `download(album:)`, `download(songs:)`, `remove(_ songID)`,
+  `remove(album:)`, `remove(songs:)`, `tryAgain(_:)`, `tryAllAgain()`, `removeAll()`, `removeOthers()`.
+- progress: a screen that shows it runs `await downloads.followProgress()` in its `.task`; read four times a second
+  from the session, never kept (a song with no byte yet shows its wait).
+- `Reachability` (in the environment too): `reach`, `online`, `path`, `probing`, `tryNow()` (the banner's Try again,
+  a pull).
+
+**Departures from the spec, and why**:
+- `song` gains a `duration REAL` column: a transcode's estimate (8.5) is its duration at 320 kbps, and the row is all
+  the planner reads.
+- The task's name is `<server>|<person>|<song id>|<suffix>`, each part `safeName`d: the delegate names the `.part`
+  from it before any store is open (a background relaunch knows no one yet).
+- `DownloadStore` is a class used on the main actor, not an actor: every write is ordered with the model's state, and
+  the delegate's one file move needs no store at all.
+- **Download over changed: the tasks out are made again from the start, not from resume data.** Resume data carries
+  the request it was made from, its network flags included, so a task resumed from it would keep the old setting (Wi-Fi
+  only still waiting for Wi-Fi, or "Wi-Fi only" still using mobile data). At most the three songs fetching lose their
+  bytes; the rest hadn't started.
+- The planner makes tasks under the network waits (with the request's own flags, so iOS holds them until the network
+  allows) but never under deadwax's or the sign-in's; a task out stays out under any wait but a sign-out's; at most 100
+  tasks out.
+- A download answered 401 asks /me (the background session never goes through DeadwaxClient's 401 hook) and holds
+  every download under that session for a minute - else the plan would make the refused task again at once.
+- Resume data is spent on the task made from it (cleared from the row at once), so data that won't resume can't loop.
+- `OfflineRule`: a failed probe while deadwax already isn't online is unreachable at once (the path back, a pull).
+
+**Verified here**: the whole DeadwaxKit package on macOS (Core's new suites; the offline renders: a downloaded copy
+plays the samples its stream does, Off and at -6.02 dB, an album of copies joins sample-exact, the verifier matches
+the 16/44.1 and 24/96 fixtures, finds the changed sample, says "by size" with no MD5, and hashes exactly what FileSource
+decodes); the unsigned device build with no new warning; check_project.py; the sims; tests/test_source_bytes.py,
+test_ios_contract.py (no route added) and test_ios_install.py (the verifier's fixtures are make-test-album.py's, and
+libsndfile hears what their MD5s say). **Not run**: Linux (no toolchain on this Mac) - ios.yml installs
+libsqlite3-dev first. **Nothing of the App half has run**: no simulator, no phone.
+
+**What only the phone can tell** (the spec's checks 1-12 and section 11, plus): whether the relaunch delivers a force
+quit's cancels with `NSURLErrorBackgroundTaskCancelledReasonKey` and resume data; whether Navidrome's raw stream sends
+a validator (no resume data without one - then the 2.1.x patch on main is a strong ETag on the raw relay, not built);
+whether a resumed task's `countOfBytesExpectedToReceive` is the rest (progress adds what came before on that
+assumption); how long a check takes on a 24/192 album (Debug's `checkSeconds`); that a locked phone opens a downloaded
+next song (file protection); the kept /me launch in Airplane Mode.
+
+**Left for part 2**: every screen - the album page's control, ring, hero line, rows, menus, footer and notices; Now
+Playing's ••• (Download, Download Up Next) and its notices; Info's Plays from; the Library's Downloaded list and the
+offline root swap, the gate's Downloaded row, the marks on every Albums screen; You > Downloads and its row; the
+offline banner (`showsOfflineBanner()`, after the inset round); Debug's Downloads section (the model has its data);
+the player's offline skip (`PlayerWords.afterEngineFailure`'s `notOnPhone`, its notice words are in DownloadWords) and
+no prefetch offline; the album page reading its kept answer offline (3.7); Up Next's marks (after its round);
+`queue_pending` (7.6's queue saves kept - the table is there, ResumeController isn't wired to it yet).
+
+### Part 2: the screens (p2/downloads)
+
+Every place a download is asked for or shown, on part 1's model, to the spec's sections 1 and 3-7.
+
+**What was built**:
+- **The marks** (`App/Downloads/DownloadControl.swift`): `DownloadRing` (drawn - SwiftUI's circular ProgressView is a
+  spinner on iOS whatever its value - a quiet track, the accent arc from twelve o'clock, round caps, a quarter
+  second's move, none with Reduce Motion; the control's stop square), `DownloadMark` (one slot: a symbol, or the ring
+  in the frame that symbol takes at the font, so a state changing moves nothing beside it and grows with Dynamic
+  Type), `DownloadBar` (the Requests board's: --dw-track, its inset shade, --dw-border, --dw-bar-purple; amber and full
+  over the limit), `AlbumDownloadControl` (the bar's control: the accent arrow downloads at once, every other state a
+  menu from the control titled in words, `menuOrder(.fixed)`, VoiceOver "Download" with the album's line as its value,
+  `.updatesFrequently` while fetching, the Large Content Viewer) and `DownloadMenuSection` (2.5's items with their
+  symbols, a failed song's reason as the section's header). Palette gains `amberIcon`, `off` (0.45), `barTrack`,
+  `barEdge`, `barFill`.
+- **The album page** (3): the control before the •••; the hero's line under the badge (amber for didn't); each row's
+  slot before its time - on every row once any song has a state, on none otherwise - with its words for VoiceOver and
+  the song's download items as its actions; the menus' download section; the footer's "on this phone" line; the end
+  of a download asked from the page announced while it is on top. **Offline (3.7)**: the kept answer drawn first (an
+  album with songs here opens at once, online too), songs not here dimmed and their play disabled, Play and Shuffle
+  and a row's tap and Play Next/Last taking only what is here, the mine block hidden, "This album isn't on this phone"
+  in place of the songs; a pull asks Reachability; coming back asks deadwax again. An album gone from the collection
+  with songs here keeps its kept answer, says so under the hero, and offers only Remove (`AlbumModel.goneButHere`).
+- **Now Playing** (4): its ••• gains the playing song's items and Download Up Next (two or more, never paged), every
+  item with its symbol, the button's name "More: info, go to album, download"; `player.notice` drawn in its top row as
+  an overlay on the chevron's row. `PlayerModel.say` announces (Notice only draws). **Info** (4.4): Sound's "Plays
+  from" (what is heard: streamed with "Stream even when downloaded"), Debug's "On this phone".
+- **The Library** (5): `AlbumsScreen(list:root:)` (`AlbumList.downloaded` beside `.scope`) - Downloaded drawn by
+  `LibraryModel.drawnDownloaded` from `DownloadModel.downloadedAlbums`, its own empty note, no load, a pull asking
+  Reachability; the root's places (`PlaceGroup`/`PlaceRow`: All music, and On this phone > Downloaded with its count
+  once anything is asked for); every tile and row's mark at the end of its artist line, outside the artist's Text;
+  Downloaded's third line; the dim and "Not on this phone" offline; RefreshProblemNote not drawn offline.
+  `LibraryView` keeps Core's `LibraryRoot` (changed only off screen: another tab, a page pushed, the app in the
+  background) and consults the gate only while deadwax answers; the gate's screen gains the Downloaded row.
+- **You** (6): `DownloadsRow` between Playback and Account; Account's footnote gains "Your downloads stay..." with
+  anything here; **You > Downloads** (`App/Downloads/DownloadsScreen.swift`) - Storage (the amount and its rest in one
+  Text, the bar, the usage line, the amber over-limit line, the limit's menu Picker, other accounts with Remove asking
+  first, the store's problem), Download over (Normalization's radio group; the footer's now line amber while something
+  waits for the network), Downloading (by album, the bar while fetching), Didn't download (the reason, Try again, Try
+  all again as a row), Downloaded (largest first, the verdict trailing, under the size line at accessibility sizes),
+  Remove All (its dialog from the button), the empty state, the last footer. Each album row is one VoiceOver element
+  ("Dummy, Portishead, 12 songs · 412 MB, Checked"), its swipe Remove; Try again a row's action. **Debug** (6.9): a
+  Downloads section; "Stream even when downloaded" moved into it.
+- **Offline** (7): `OfflineBanner` (`showsOfflineBanner()`, beside `clearsPlayer()` on every tab root and pushed
+  page: one line in MainTabs.swift, one in Routes.swift); the player's skip (7.3): `PlayerModel.failed` asks first
+  whether deadwax is out of reach and the song not here (`playsHere`: a download, or a whole stream-cache copy), then
+  Core's `OfflinePlay.after` - skip to the next song here with the run-counted notice, else stop paused on it with
+  "Not on this phone - it plays once deadwax is back." as its error line; the engine link's `ReachBox` makes a song
+  with no copy fail at once offline (no 8 s wait for a request nothing answers); no prefetch offline.
+
+**Departures from the spec, and why**:
+- **The ring is drawn in the hidden symbol's frame**, not at a fixed 9 or 13 pt: the dotted mark, the ring and the
+  filled mark then take one frame at every text size, and nothing beside them moves as a state changes.
+- **`notOnPhone` is not a `PlayerWords.Failure` case** (the spec's 7.3): `Failure` mirrors the engine's
+  `AudioFailure.Kind` by raw value, and its `allCases` is pinned to the engine's five by ScreenPlayerTests. The rule is
+  `OfflinePlay` (Core, tested), consulted by the app before the engine's failure words.
+- **The song tapped in Up Next stops on itself** offline rather than being passed over (`chosenKey`): passing it would
+  play something the listener didn't ask for.
+- **A whole stream-cache copy plays offline too** (the player's `playsHere`): it is the same file. The album page's
+  dims and Play still go by downloads alone - the cache may be emptied at any moment.
+- **Downloaded lists albums on their way too** (5.1's tile states need them), their Recently added the moment they
+  were asked for until their first song arrives.
+- **A kept album answer whose song sizes changed** on deadwax (a re-tag, a new file) drops that song's copy and asks
+  for it again, so the copy and the length check never disagree (`DownloadModel.albumAnswered`).
+- **The root's first look waits for the phone's path** (`Reachability.pathKnown`, with a 1.5 s fallback): the app
+  opening in Airplane Mode must start on Downloaded, and `LibraryRoot` holds whatever it first draws while on screen.
+- **The gate isn't consulted on a check that failed because deadwax didn't answer** (`Checked.offline`), even once
+  deadwax is back - the albums kept on disk draw while it is asked again (`libraryShown` on coming back).
+- **The banner has a chevron** (rotating as it opens): a tap opening it needs a sign that it opens.
+- **The root's row while it is Downloaded reads "Albums" without a library of your own** (the spec: "All albums"):
+  it is named as the page it opens is titled.
+- **Other accounts' bytes sit under the row's name**, not as its trailing value: the trailing edge is Remove's, and
+  three things on one line wrap badly at large sizes.
+- **Didn't download's reason is drawn as ErrorNote's split, not ErrorNote itself**: the row is one VoiceOver element
+  (the reason in its label, Try again its action), and the raw words for whoever runs deadwax are their own
+  disclosure under it, as ErrorNote draws them.
+- **With the store unreadable**, You > Downloads draws no lists (not "Nothing downloaded yet", which would be wrong).
+
+**Not built**: Up Next's marks and dimming (4.3: they wait for the Up Next round's merge - one change to its row);
+`queue_pending` and the offline launch's kept queue (7.5's last bullet, 7.6's queue saves - the table and its three
+calls are part 1's, ResumeController isn't wired to them: sending a kept save only after resume's own `GET /queue`
+has had its say is a change to ResumeController's rule, not the screens'). A queue save that fails offline is still
+retried by ResumeController while the app runs; one pending at a force quit is lost, and an Airplane Mode launch
+starts with no queue. Server additions named, not built (a 2.1.x patch on main): a strong ETag on the raw stream
+relay, should the phone find no resume data after a force quit (check 5).
+
+**Verified here**: the whole DeadwaxKit package on macOS (603 Core tests, OfflinePlayTests among them; 93 engine
+tests, the downloaded copy rendering its stream's samples); the unsigned device build, BUILD SUCCEEDED with no new
+warning (appintents' "Metadata extraction skipped" is the app's as before); check_project.py; the ios sims;
+tests/test_source_bytes.py, test_ios_contract.py, test_ios_install.py. **Assumed, not seen**: everything drawn -
+nothing has run on a simulator or a phone. What only the phone can tell is the spec's section 10 (checks 1-17) and
+section 11, and docs/ios.md's "Phase 2's checks".
+
+### Part 3: the review (p2/downloads)
+
+An adversarial pass over parts 1 and 2 (`b4ee591..76ebf0e`) against the spec and Apple's documented behaviour of a
+background `URLSession`, file protection, `NWPathMonitor` and the request's network flags. What held, fixed in
+`DownloadModel` unless named:
+
+- **Mobile data under Wi-Fi only, from resume data.** Part 1 remade the tasks out when Download over changed, but a
+  song waiting with resume data (one cancelled, or stopped by a force quit) kept it - and resume data carries the
+  request it was archived from, `allowsCellularAccess` and the rest, so its next task resumed under the old setting.
+  Changing the setting now lets every waiting song's resume data go first (`dropResumeData`), and resume data that
+  arrives from a task made under the other setting (a cancel racing the change) isn't kept (`madeUnder`).
+- **A session's cookie on disk.** The same archived request carries the `Cookie:` header. Signing out kept it in the
+  rows (plaintext, under `completeUntilFirstUserAuthentication`); signing in again tried it, was refused, and held
+  every download a minute for the 401. Now `close` drops every row's resume data with the person (one transaction),
+  and the same person signed in under a new session drops what the old one made (`resumeSession`). A song's bytes
+  so far are the cost; its download starts again.
+- **The limit overrun by songs asked from the queue.** A queue entry carries no size, so Now Playing's Download and
+  Download Up Next made records the planner counted at a transcode's 320 kbps estimate - a FLAC is about three times
+  that - and whose copy was checked against no length. Now a new record takes its size from the kept album's answer;
+  without one, its task waits for that answer (`sizeComing`, never past it: no answer lets it go at the estimate),
+  and `keepAlbum` keeps its answer through `albumAnswered`, which fills a size that was never known as well as one
+  that changed. A kept copy whose length isn't deadwax's size is fetched again; one whose size was merely unknown is
+  left alone.
+- **The streaming cache's copies ignored the limit.** They were copied in as they were asked, past the planner -
+  over the storage limit and into the phone's last 2 GB. They are now copied when the plan lets the song go, in
+  `plan()`, in place of making its task; one that doesn't hold (its length, its move) is simply downloaded.
+- **A copy here set back to wanted.** A cancel (the plan letting a task go, or Download over's remake) awaited
+  `session.cancel` and then wrote every song it named as cancelled - including one whose file had arrived meanwhile,
+  which was then fetched again (and its `done` row lost). The writes now leave a song that isn't fetching any more.
+- **An older task's whole file thrown away.** After a relaunch, a song can have a new task while an old one's end is
+  still to be delivered (iOS delivers a finished task's event when it relaunches the app, possibly after the
+  launch's settle asked again). Its file was deleted and the song fetched twice. A whole file of the right length is
+  now taken and the newer task cancelled; anything else is dropped as before.
+- **`live` cleared by another person's task**: a task of another account on the phone ending removed the signed-in
+  person's task id for the same song (two people downloading one album). Only the current store's events touch it.
+- **A check that never ran.** `queueCheck` started the sound check at once, from inside `arrive`, before the record it
+  returns was written: the check found no `done` record and dropped it, leaving the copy "Checking…" until the next
+  launch. It starts on the next turn now.
+- **An album removed while its answer was out** was kept anyway (its cover written, its row back); a cover written
+  after a sign-out landed in the next person's store. Both guarded; a kept cover is now drawn at once (`reload`).
+- **"Used" left the covers out**: 6.3 and 8.5 say used is the songs' bytes and their covers'. `bytesHere` adds each
+  kept cover's length (read once).
+- **Plays waiting counted from the wrong store**: a send that outlived a sign-out wrote the old person's count over
+  the new one's.
+- **Covers asked of a deadwax that can't be reached** (`CoverCache`, wired in `DeadwaxApp`): every tile not on the
+  phone asked and waited for its answer, the transport's silence feeding the banner. Offline, a cover is the phone's,
+  the in-memory cache's, or the empty square (5.4, Open question 13); those that failed are asked again once deadwax
+  is back, the next time they are shown.
+- **VoiceOver's Downloading row** said "..., 4 of 12 songs, Downloading, 40 percent"; 6.8's is "Dummy, Portishead, 4
+  of 12 songs, 40 percent" - its section already says it. `DownloadWords.percent` (tested).
+
+**Left as they are**:
+- **A kept play may be sent twice**: 7.6 forgets a play only on a 200, so a send that reached deadwax but whose
+  answer was lost goes again. Taking a scrobble of the same song at the same `time` once would be a server-side guard,
+  a 2.1.x patch on main - named, not built.
+- `chosenKey` (the Up Next song that stops on itself offline) is cleared only by the next failure or skip, not by
+  a jump that played - harmless: it names a song the listener chose.
+- Several screens following progress at once each poll the session four times a second (cheap; the session answers
+  from memory).
+- The album's answer, cover and loudness are asked over mobile data under Wi-Fi only: small foreground requests on
+  the app's own session, as 8.3 has the cover; only the songs' tasks carry the setting's flags.
+- `queue_pending` and the offline launch's kept queue: still part 2's "Not built".
+- `iostraces.sim.cjs` fails here as it does on `b4ee591` (`export-traces.cjs`'s `stateOf`, under Node 20.12 - below
+  the repo's `^20.19`); nothing it reads changed on this branch.
+
+**Verified here**: the whole DeadwaxKit package (603 Core tests, 93 engine tests); the unsigned device build, BUILD
+SUCCEEDED, no new warning; check_project.py; the ios sims but iostraces (above); tests/test_source_bytes.py,
+test_ios_contract.py, test_ios_install.py. **Assumed**: Apple's documented behaviour each fix rests on (resume data
+archives the request, cookies and network flags included; a relaunch delivers an old task's end) - none of it has run
+on a phone.
+
+### Merged into ios with Up Next's History
+
+One change in the merge itself, in `PlayerModel.jump(to:)`: Phase 2 marks the song a listener taps in Up Next
+(`chosenKey`), so that offline a tapped song not on the phone is stopped on with its reason rather than passed over
+(OfflinePlay.chosen). Up Next's History, merged first, plays a History row's song again as a new entry under a new
+key - so after a jump that took, `chosenKey` is read from the controller's queue (the entry now playing), not taken
+from the row tapped. Reasoned from the code; not seen on a phone.

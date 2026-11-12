@@ -76,6 +76,10 @@ final class LoudnessBook {
     var onAnswer: ((String, AlbumLoudness) -> Void)?
     /// How many album pages stay wanted after they were shown.
     static let pagesKept = 2
+    /// Whether deadwax can be reached: while it can't, a read or a warm is failed at once rather than asked (7.3).
+    var reachable: () -> Bool = { true }
+    /// An album's loudness kept with its download, put on the shelf for a queue with nothing on it yet.
+    var kept: (String) -> AlbumLoudness? = { _ in nil }
 
     private enum Step { case read, warm }
 
@@ -123,6 +127,10 @@ final class LoudnessBook {
     func wantQueue(_ albums: [String]) {
         guard albums != queued else { return }
         queued = albums
+        // a downloaded album's kept answer, marked old (`at` 0): believed only once the wait for a read is over
+        for album in albums where shelf.answer(album).answer == nil {
+            if let answer = kept(album) { shelf.keep(answer, for: album, at: 0) }
+        }
         run()
     }
 
@@ -200,6 +208,10 @@ final class LoudnessBook {
     }
 
     private func read(_ album: String, client: DeadwaxClient) {
+        guard reachable() else {
+            readFailed(album)
+            return
+        }
         let round = self.round
         Task {
             do {

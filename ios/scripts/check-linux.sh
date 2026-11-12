@@ -23,6 +23,13 @@ if ! command -v swift >/dev/null 2>&1; then
     exit 1
 fi
 
+# The download store's database is SQLite (Sources/CSQLite): Linux needs its header and the
+# library to link against, which swift.org's own list of dependencies leaves out.
+if ! printf '#include <sqlite3.h>\n' | cc -E -x c - >/dev/null 2>&1; then
+    echo "No sqlite3.h: install SQLite's header (apt install libsqlite3-dev) - notes/ios.md." >&2
+    exit 1
+fi
+
 echo "== swift: $(swift --version 2>&1 | head -1)"
 echo "== DeadwaxKit: build and test"
 swift test --package-path "$ios/DeadwaxKit"

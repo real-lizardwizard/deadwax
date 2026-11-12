@@ -7,6 +7,8 @@ import SwiftUI
 struct QueueMenuRequest {
     let pick: QueuePick<Song>
     let album: Album
+    /// The album is gone from the collection (its songs on this phone still play): no Download.
+    var gone = false
 }
 
 /// The queue menu (screens.md 5; the web's app/QueueMenu.tsx): Play Next and Play Last, opened FROM the ••• tapped -
@@ -25,27 +27,53 @@ struct QueueMenuRequest {
 ///
 /// `request` is nil while there is nothing to queue (the album's songs not in yet): the ••• is then dimmed and opens
 /// nothing. The label is the •••, drawn by the caller; its VoiceOver name is the caller's too ("More for Roads").
+///
+/// Phase 2 (phase2-downloads.md 3.4): a second section under them, the song's or the album's download items
+/// (DownloadMenuSection), and every item carries its symbol, as Apple's menus do. While deadwax can't be reached, Play
+/// Next and Play Last queue only what is on this phone - and are left out for a song that isn't - while Download stays
+/// (it waits for deadwax).
 struct QueueMenu<Label: View>: View {
     let request: QueueMenuRequest?
     @ViewBuilder let label: () -> Label
 
     @Environment(PlayerModel.self) private var player
+    @Environment(DownloadModel.self) private var downloads
+    @Environment(Reachability.self) private var reachability
 
     var body: some View {
         Menu {
             if let request {
-                Section(request.pick.title) {
-                    ForEach(QueueChoice.allCases, id: \.self) { choice in
-                        Button(choice.label) {
-                            player.choose(choice, request.pick, album: request.album)
+                if let pick = playable(request) {
+                    Section(request.pick.title) {
+                        ForEach(QueueChoice.allCases, id: \.self) { choice in
+                            Button(choice.label, systemImage: Self.symbol(choice)) {
+                                player.choose(choice, pick, album: request.album)
+                            }
                         }
                     }
                 }
+                DownloadMenuSection(songs: request.pick.tracks,
+                                    album: request.pick.queuedAs == .album ? request.album : nil,
+                                    gone: request.gone, name: request.pick.title)
             }
         } label: {
             label()
         }
         .menuOrder(.fixed)
         .disabled(request == nil)
+    }
+
+    /// What Play Next and Play Last queue: the pick - offline, its songs on this phone (nil: none).
+    private func playable(_ request: QueueMenuRequest) -> QueuePick<Song>? {
+        guard !reachability.online || request.gone else { return request.pick }
+        let here = OfflineAlbum.playable(request.pick.tracks, here: downloads.isHere)
+        guard !here.isEmpty else { return nil }
+        return QueuePick(label: request.pick.label, tracks: here, albumIds: request.pick.albumIds,
+                         queuedAs: request.pick.queuedAs)
+    }
+
+    /// Play Next's and Play Last's symbols (iOS 16.0).
+    static func symbol(_ choice: QueueChoice) -> String {
+        choice == .next ? DownloadWords.playNextSymbol : DownloadWords.playLastSymbol
     }
 }

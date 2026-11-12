@@ -8,7 +8,11 @@ import Observation
 /// ends mid-use (SignInRules.endsSession: the music plays on under it).
 ///
 /// Every rule is Core's (SignInRules, SignOutRow, Access, ErrorWords, CheckReport); this only keeps the state and
-/// makes the requests. Read `client` afresh at every call: a sign-in makes a new one with the new session, and a
+/// makes the requests.
+///
+/// Every good /me answer is kept per server (`me.json`, phase2-downloads.md 7.5): a phone that has had one opens straight
+/// into the app from it, /me asked behind - so with no network the app opens on what is on the phone, not on a spinner
+/// and the can't-reach screen. A 401 then brings the sign-in over the app, as mid-use; no answer leaves the app as it is. Read `client` afresh at every call: a sign-in makes a new one with the new session, and a
 /// request still out under the old one says nothing about the new session when it answers 401.
 @MainActor
 @Observable
@@ -90,6 +94,8 @@ final class ServerModel {
     @ObservationIgnored private var asks = 0
     @ObservationIgnored private var loginsAskedAt: Date?
     @ObservationIgnored private var personHandlers: [@MainActor () -> Void] = []
+    /// The launch opened from the kept /me: it is asked behind the app, not in front of it.
+    @ObservationIgnored private var openedFromKept = false
 
     init(transport: URLSessionTransport = URLSessionTransport()) {
         self.transport = transport
@@ -100,6 +106,13 @@ final class ServerModel {
             session = SessionKeychain.read(parsed.key)
             launch = .checking
             client = makeClient(parsed, session: session)
+            // the last /me this phone had from this server, with a session to go with it (or logins off): the app at once
+            if let kept = Self.keptMe(parsed), session != nil || !kept.loginsOn {
+                me = kept
+                access = Access(me: kept)
+                launch = .ready
+                openedFromKept = true
+            }
         }
     }
 
@@ -109,7 +122,38 @@ final class ServerModel {
     func start() async {
         guard !started else { return }
         started = true
-        if address != nil { await check() }
+        if openedFromKept {
+            await askBehind()
+        } else if address != nil {
+            await check()
+        }
+    }
+
+    /// The launch opened from the kept /me: asked now, behind the app. 200 is taken as now (someone else: the app starts
+    /// again for them); a 401 brings the sign-in over the app, the music playing on; no answer leaves the app as it is,
+    /// and You says /me failed.
+    private func askBehind() async {
+        guard let client else { return }
+        asks += 1
+        let asked = asks
+        askingMe = true
+        do {
+            let answer = try await client.me()
+            guard asked == asks else { return }
+            askingMe = false
+            meFailure = nil
+            accept(answer, before: me?.user)
+        } catch {
+            guard asked == asks else { return }
+            askingMe = false
+            if APIFailure.isCancellation(error) { return }
+            let failure = error as? APIFailure ?? .other(String(describing: error))
+            if failure.isSignedOut {
+                bringSignIn(reason: SignInRules.launchReason(failure).reason)
+            } else {
+                meFailure = failure
+            }
+        }
     }
 
     /// Asks /me with the saved address and the session in hand: the app (200), the sign-in alone (401, its words as
@@ -221,6 +265,7 @@ final class ServerModel {
         }
         guard signOutRow.answered(failure) == .startAgain else { return }
         SessionKeychain.delete(address.key)
+        Self.keep(nil, for: address)
         session = nil
         self.client = makeClient(address, session: nil)
         asks += 1
@@ -341,6 +386,7 @@ final class ServerModel {
     private func accept(_ answer: Me, before: String?) {
         me = answer
         access = Access(me: answer)
+        if let address { Self.keep(answer, for: address) }
         if let before, Access.afterSignIn(before: before, now: answer.user) == .startAgain {
             personChanged()
         }
@@ -361,6 +407,31 @@ final class ServerModel {
         meFailure = nil
         signInOver = nil
         signOutRow = SignOutRow()
+    }
+
+    // MARK: the kept /me (7.5)
+
+    private static func keptMeURL(_ address: ServerAddress) -> URL? {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("deadwax", isDirectory: true)
+            .appendingPathComponent(KeptAlbumIndex.safeName(address.key), isDirectory: true)
+            .appendingPathComponent("me.json")
+    }
+
+    private static func keptMe(_ address: ServerAddress) -> Me? {
+        guard let url = keptMeURL(address), let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(Me.self, from: data)
+    }
+
+    /// `me` kept as this server's last answer (written whole, then moved into place), or forgotten (nil: signed out).
+    private static func keep(_ me: Me?, for address: ServerAddress) {
+        guard let url = keptMeURL(address) else { return }
+        guard let me, let data = try? JSONEncoder().encode(me) else {
+            try? FileManager.default.removeItem(at: url)
+            return
+        }
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? data.write(to: url, options: .atomic)
     }
 
     private func personChanged() {

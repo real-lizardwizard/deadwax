@@ -3,8 +3,10 @@ import Foundation
 
 /// Plays told to Navidrome (D6): one listen at a time, kept by Core's ListenTracker - "now playing" once a listen is
 /// heard, a play once it crosses the rule (a song longer than 30 s, heard for half of it or 4 minutes, whichever is
-/// less) - each sent to deadwax's scrobble route, a play with its `time` (the moment its listen began). A send that
-/// fails is dropped: the music never waits on it and nothing is sent twice.
+/// less) - each sent to deadwax's scrobble route, a play with its `time` (the moment its listen began). The music never
+/// waits on a send. A play that can't be sent - deadwax not reachable, or no answer - is kept (`keep`, the person's
+/// download store) and sent later, oldest first (phase2-downloads.md 7.6); "now playing" is never kept, it would be stale.
+/// A send deadwax answered is never sent again.
 ///
 /// The model tells it: `newListen` at every song change it made (and a restart, a queue put back from where it was
 /// left), `join` when the engine ran into the next song by itself, `seeked` at every seek and retry, `began` when the
@@ -15,6 +17,10 @@ final class PlayReporter {
     private var tracker = ListenTracker()
     /// The entry the listen is of (the engine's key, unique across queues), or nil.
     private(set) var listening: Int?
+    /// Whether deadwax can be reached now (Reachability): a play made while it can't is kept at once.
+    var online: () -> Bool = { true }
+    /// A play kept to send later: its song and its time.
+    var keep: (_ songID: String, _ timeMs: Int64) -> Void = { _, _ in }
 
     init(server: ServerModel) {
         self.server = server
@@ -58,8 +64,24 @@ final class PlayReporter {
     }
 
     private func send(_ report: PlayReport) {
-        guard let client = server.client else { return }
+        guard let client = server.client, online() else {
+            kept(report)
+            return
+        }
         let request = client.request(Routes.scrobble, path: ["song_id": report.songID], query: report.query)
-        Task { _ = try? await client.answer(request) }
+        Task {
+            do {
+                _ = try await client.answer(request)
+            } catch let failure as APIFailure where failure.answer == nil && !APIFailure.isCancellation(failure) {
+                kept(report)
+            } catch {
+                // answered (a refusal is never sent again), or called off
+            }
+        }
+    }
+
+    private func kept(_ report: PlayReport) {
+        guard PendingPlays.keeps(report), case .played(let songID, let atMs) = report else { return }
+        keep(songID, atMs)
     }
 }

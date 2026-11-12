@@ -1,4 +1,5 @@
 import DeadwaxCore
+import ImageIO
 import SwiftUI
 import UIKit
 
@@ -85,6 +86,9 @@ final class CoverCache {
     private let images = NSCache<NSString, UIImage>()
     private var loading: [String: (task: Task<UIImage?, Never>, waiting: Int)] = [:]
     private var failedAt: [String: Date] = [:]
+    /// deadwax can't be reached (Reachability, phase2-downloads.md 5.4 and 7.1): a cover not kept on the phone isn't
+    /// asked for - nothing would answer - and is the empty square until deadwax is back.
+    private var offline = false
     /// How long a cover that failed isn't asked again, under the same session.
     nonisolated static let againAfter: TimeInterval = 60
 
@@ -119,6 +123,18 @@ final class CoverCache {
             loading[flight] = (task, asking.waiting + 1)
         } else {
             task = Task<UIImage?, Never> { [weak self] in
+                // a downloaded album's cover is on the phone (phase2-downloads.md 8.8): its 1024 drawn down to the size
+                // asked, with no network - deadwax asked only when it isn't
+                if let kept = KeptCovers.shared.url(for: id),
+                   let image = await Task.detached(priority: .userInitiated, operation: { Self.thumbnail(kept, size: size) }).value {
+                    self?.landed(key, flight, image, called: false)
+                    return image
+                }
+                // nothing that needs deadwax is asked while it can't be reached: a failure, forgotten when it is back
+                if self?.offline == true {
+                    self?.landed(key, flight, nil, called: false)
+                    return nil
+                }
                 let data = try? await client.cover(coverID: id, size: size)
                 // UIImage(data:) only reads the header; the pixels are decoded here, off the main thread
                 let raw = data.flatMap(UIImage.init(data:))
@@ -135,10 +151,28 @@ final class CoverCache {
         }
     }
 
+    /// A kept cover decoded at `size` pixels on its longer side (ImageIO's thumbnail, decoded here, not at its first draw).
+    nonisolated static func thumbnail(_ url: URL, size: Int) -> UIImage? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true,
+                                        kCGImageSourceCreateThumbnailWithTransform: true,
+                                        kCGImageSourceShouldCacheImmediately: true,
+                                        kCGImageSourceThumbnailMaxPixelSize: max(size, 1)]
+        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        return UIImage(cgImage: image)
+    }
+
     /// The app came back to the front (a WireGuard tunnel up again, say): covers that failed are asked again the next
     /// time a view shows them.
     func forgetFailures() {
         failedAt = [:]
+    }
+
+    /// Whether deadwax can be reached: while not, covers not on the phone aren't asked for; as it comes back, the ones
+    /// that failed meanwhile are asked again the next time a view shows them.
+    func reach(online: Bool) {
+        if online && offline { failedAt = [:] }
+        offline = !online
     }
 
     /// A fetch, and its failure, are the session's: one under a session that has ended (a 401 while the sign-in was

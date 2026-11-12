@@ -30,6 +30,19 @@ final class ClientBox: @unchecked Sendable {
     }
 }
 
+/// Whether deadwax can be reached, as the engine's opens read it on their own queue (Reachability's, set on the main
+/// thread): while not, a song not on this phone isn't streamed - its open fails at once rather than after the
+/// request's timeout, and the player passes over it (phase2-downloads.md 7.3).
+final class ReachBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var held = true
+
+    var online: Bool {
+        get { lock.withLock { held } }
+        set { lock.withLock { held = newValue } }
+    }
+}
+
 /// QueueController's engine (Core's EngineLink): every call on the main thread, each made on PlaybackEngine.
 ///
 /// - **Keys.** The engine names an entry by `generation << 32 | Up Next's key`. Up Next's keys start again at 0 with
@@ -45,14 +58,13 @@ final class ClientBox: @unchecked Sendable {
 final class PlayerEngineLink: EngineLink {
     let engine: PlaybackEngine
     let clientBox = ClientBox()
+    let reach = ReachBox()
     /// The queue's generation: +1 with each new queue and each stop.
     private(set) var generation = 0
     /// The level decisions of the queue playing.
     private(set) var levels: LevelStore
     /// The entries last given to the engine (the engine's tracks, by place).
     private(set) var entries: [QueueEntry] = []
-    /// Debug's test songs: their downloaded copies played (a song with none is streamed).
-    private(set) var copies = false
     /// Navidrome's size of a song by its id, when the app has the song (the stream cache's length check).
     var size: (String) -> Int64? = { _ in nil }
     /// The audio session made active before anything plays; false - iOS refused - and nothing plays.
@@ -65,7 +77,6 @@ final class PlayerEngineLink: EngineLink {
     private let decided: @Sendable (LevelStore, LevelDecisions) -> Void
     /// The next play or restore starts a new queue: a new generation and new decisions.
     private var startsQueue = false
-    private var nextCopies = false
 
     init(engine: PlaybackEngine, files: SongFiles, shelf: LoudnessShelf,
          decided: @escaping @Sendable (LevelStore, LevelDecisions) -> Void) {
@@ -89,10 +100,9 @@ final class PlayerEngineLink: EngineLink {
     // MARK: the app's
 
     /// The calls made until `endStart()` may start a new queue (Play, Shuffle, a song's tap, a Play Next with nothing
-    /// queued, a queue put back): the first play or restore among them does, with Debug's copies or not.
-    func beginStart(copies: Bool) {
+    /// queued, a queue put back): the first play or restore among them does.
+    func beginStart() {
         startsQueue = true
-        nextCopies = copies
     }
 
     func endStart() {
@@ -173,28 +183,33 @@ final class PlayerEngineLink: EngineLink {
             startsQueue = false
             generation += 1
             levels = LevelStore(shelf: shelf, onDecided: decided)
-            copies = nextCopies
         }
         entries = new
     }
 
     /// The engine's tracks: each entry's song as the entry has it (`Song(track:size:)`, so the cache, the format and
-    /// the level all read the entry), opened from the cache or the stream - or Debug's downloaded copy - and handed
-    /// to the queue's LevelStore, which wraps it at the entry's gain. The closures run on the engine's queue.
+    /// the level all read the entry), opened from its copy downloaded to this phone when there is one (Phase 2, 8.7: the
+    /// file, through the FileSource a complete stream-cache copy takes - gapless and levelled the same), else from the
+    /// cache or the stream - and handed to the queue's LevelStore, which wraps it at the entry's gain. The closures run
+    /// on the engine's queue.
     private func makeTracks(_ entries: [QueueEntry]) -> [EngineTrack] {
         let generation = self.generation
-        let copies = self.copies
         let levels = self.levels
         let files = self.files
         let box = clientBox
+        let reach = self.reach
         return entries.map { entry in
             let song = Song(track: entry.track, size: size(entry.track.id))
             let level = entry.track.level
             let key = entry.key
             return EngineTrack(key: Self.engineKey(key, generation: generation), audio: entry.audio, song: song) { start in
                 let source: PCMSource
-                if copies, let url = files.downloadedURL(for: song) {
+                if let url = files.downloads.url(for: song.id) {
                     source = try FileSource(url: url, start: start)
+                } else if !reach.online, files.cache.reusable(song) == nil {
+                    // deadwax out of reach, and no whole copy kept from streaming: not asked for at all - the model
+                    // passes over it (OfflinePlay)
+                    throw AudioFailure("Not on this phone, and deadwax can't be reached.", kind: .network)
                 } else {
                     guard let client = box.client else {
                         throw AudioFailure("There's no deadwax address to stream the song from.", kind: .other)

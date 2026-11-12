@@ -35,7 +35,9 @@ FORBIDDEN = set(range(0x00, 0x09)) | {0x0B, 0x0C} | set(range(0x0E, 0x20)) | {0x
 # The only tracked formats that are genuinely binary. Everything else is checked, including
 # extensionless files like LICENSE and dockerfile. A new binary asset type fails here on
 # purpose: skipping it should be a deliberate one-line decision, not a silent gap.
-BINARY_SUFFIXES = {".png", ".woff2"}
+# .flac: the iPhone app's copy verifier's fixtures (ios/DeadwaxKit/Tests/DeadwaxAudioTests/Fixtures/verifier),
+# written by ios/scripts/make-test-album.py and checked against it by tests/test_ios_install.py.
+BINARY_SUFFIXES = {".png", ".woff2", ".flac"}
 
 NEWLINE = bytes([10])
 

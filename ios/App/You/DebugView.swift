@@ -5,11 +5,14 @@ import UIKit
 /// You's Debug (admins only, D1): Phase 0's one screen, moved - Check's report, the test sounds, the hi-res row,
 /// what is playing (with the engine's own words for its last failure, D7, and an Up Next edit held for the join, D4),
 /// the engine's log (its last 500 lines, with Copy and Share), the Library's last album list asks (how many albums,
-/// how long - check 1), and how long this install runs. The address and the sign-in are the app's own screens now.
+/// how long - check 1), and how long this install runs. Phase 2's Downloads section: the songs by state, the session's
+/// tasks, reachability, what waits to be sent, the time each check took, the download log and "Stream even when
+/// downloaded" (phase2-downloads.md 6.9). The address and the sign-in are the app's own screens now.
 struct DebugView: View {
     @Environment(DebugModel.self) private var model
     @Environment(PlayerModel.self) private var player
     @Environment(LibraryModel.self) private var library
+    @Environment(DownloadModel.self) private var downloads
 
     init() {}
 
@@ -22,6 +25,7 @@ struct DebugView: View {
             }
             playing
             EngineLogSection()
+            DownloadsDebugSection()
             libraryLists
             Section {
                 Text(model.installLine)
@@ -77,10 +81,6 @@ struct DebugView: View {
 
     private var testSounds: some View {
         Section {
-            Picker("Play", selection: Binding(get: { model.source }, set: { model.source = $0 })) {
-                ForEach(DebugModel.Source.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
             ForEach(Array(model.testSongs.enumerated()), id: \.element.id) { index, song in
                 songRow(song, playing: player.current?.track.id == song.id) {
                     model.play(model.testSongs, at: index)
@@ -89,7 +89,7 @@ struct DebugView: View {
             if !model.testSongs.isEmpty {
                 let missing = model.testSongs.filter { !model.downloaded.contains($0.id) }
                 Button(missing.isEmpty ? "All downloaded" : "Download all \(model.testSongs.count)") {
-                    Task { await model.download(model.testSongs) }
+                    model.download(model.testSongs)
                 }
                 .disabled(missing.isEmpty || !model.downloading.isEmpty)
                 if !model.downloaded.isEmpty {
@@ -97,11 +97,10 @@ struct DebugView: View {
                 }
             }
             if let words = model.testWords { Text(words).font(.footnote) }
-            if let words = model.downloadWords { Text(words).font(.footnote).foregroundStyle(.red) }
         } header: {
             Text("Test sounds")
         } footer: {
-            Text("Songs 1 to 8 are three beeps each: tap one to play the album from it and count the beeps - all three, every time? Songs 9 and 10 are one tone cut in two: played one into the other, the tone should never break. \"Downloaded\" plays the copies on the phone (a song with none is streamed).")
+            Text("Songs 1 to 8 are three beeps each: tap one to play the album from it and count the beeps - all three, every time? Songs 9 and 10 are one tone cut in two: played one into the other, the tone should never break. A song downloaded to this phone plays from there, as every song does; \"Stream even when downloaded\" (under Downloads) streams it instead, to hear the two side by side.")
         }
     }
 
@@ -123,7 +122,7 @@ struct DebugView: View {
                 ProgressView()
             } else {
                 Button {
-                    Task { await model.download([song]) }
+                    model.download([song])
                 } label: {
                     Image(systemName: model.downloaded.contains(song.id) ? "checkmark.circle.fill" : "arrow.down.circle")
                 }
@@ -279,5 +278,95 @@ private struct EngineLogSection: View {
         } footer: {
             Text("The engine's last \(EngineTrace.log.capacity) lines, the newest last (\(shown.total) so far); once there are \(EngineTrace.log.capacity), the oldest go as new ones come, so the lines move up while you read - Copy keeps them as they are. Each line starts with a time in seconds on the phone's clock: the gaps between lines are what count. Console on a Mac shows them too, as they happen: choose the iPhone, turn on Action > Include Info Messages, press Start, then search for subsystem:net.lizardlounge.deadwax.")
         }
+    }
+}
+
+/// Debug's Downloads (phase2-downloads.md 6.9): the songs by state and their bytes; the background session's tasks
+/// (running, waiting, with resume data), asked again every second while it shows; reachability, the path's facts and
+/// the last probe; the plays waiting to be sent; the time each check took (the plan's R9); the last 50 download events;
+/// and "Stream even when downloaded" - Phase 0's Streamed/Downloaded switch, kept as the admin's A/B.
+private struct DownloadsDebugSection: View {
+    @Environment(DownloadModel.self) private var downloads
+    @Environment(Reachability.self) private var reachability
+    @State private var tasks: [DownloadSession.Out] = []
+    @State private var tasksRead = false
+
+    var body: some View {
+        Section {
+            Toggle("Stream even when downloaded", isOn: Binding(get: { downloads.streamEvenWhenDownloaded },
+                                                                set: { downloads.streamEvenWhenDownloaded = $0 }))
+            ForEach(StoredState.allCases, id: \.self) { state in
+                let rows = downloads.records.values.filter { $0.state == state }
+                let bytes = rows.reduce(Int64(0)) { $0 + ($1.bytes ?? 0) }
+                LabeledContent(state.rawValue) {
+                    Text("\(rows.count) \u{00B7} \(Bytes.words(bytes))")
+                        .font(.footnote.monospacedDigit())
+                }
+            }
+            LabeledContent("Tasks") {
+                let running = tasks.filter(\.running).count
+                let resumable = downloads.records.values.filter { $0.resume != nil }.count
+                Text(tasksRead ? "\(running) running \u{00B7} \(tasks.count - running) waiting \u{00B7} \(resumable) with resume data"
+                               : "Reading\u{2026}")
+                    .font(.footnote.monospacedDigit())
+            }
+            LabeledContent("Reach") {
+                Text(reachability.reach.rawValue + (reachability.probing ? " \u{00B7} probing" : ""))
+                    .font(.footnote.monospaced())
+            }
+            LabeledContent("Path") {
+                Text(pathFacts(reachability.path))
+                    .font(.footnote.monospaced())
+            }
+            LabeledContent("Last probe") {
+                Text(reachability.lastProbe.map { "\($0.answered ? "answered" : "no answer") \u{00B7} \($0.at.formatted(date: .omitted, time: .standard))" } ?? "none yet")
+                    .font(.footnote.monospaced())
+            }
+            LabeledContent("Plays waiting to be sent") {
+                Text("\(downloads.playsWaiting)")
+                    .font(.footnote.monospacedDigit())
+            }
+            if !downloads.checkSeconds.isEmpty {
+                let times = Array(downloads.checkSeconds.values)
+                LabeledContent("Checks") {
+                    Text("\(times.count) \u{00B7} mean \(String(format: "%.2f", times.reduce(0, +) / Double(times.count))) s \u{00B7} longest \(String(format: "%.2f", times.max() ?? 0)) s")
+                        .font(.footnote.monospacedDigit())
+                }
+            }
+            if let problem = downloads.storeProblem {
+                Text(problem)
+                    .font(.footnote.monospaced())
+                    .foregroundStyle(Palette.danger)
+                    .textSelection(.enabled)
+            }
+            if downloads.log.isEmpty {
+                Text("No download events yet.")
+                    .foregroundStyle(Palette.quiet)
+            } else {
+                VStack(alignment: .leading, spacing: 3) {
+                    ForEach(Array(downloads.log.suffix(50).enumerated()), id: \.offset) { _, line in
+                        Text(line)
+                    }
+                }
+                .font(.caption2.monospaced())
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        } header: {
+            Text("Downloads")
+        }
+        .task {
+            while !Task.isCancelled {
+                tasks = await downloads.debugTasks()
+                tasksRead = true
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+    }
+
+    private func pathFacts(_ path: NetworkPath) -> String {
+        guard path.satisfied else { return "none" }
+        return [path.wifi ? "wifi" : nil, path.cellular ? "cellular" : nil, path.expensive ? "expensive" : nil,
+                path.constrained ? "constrained" : nil].compactMap { $0 }.joined(separator: " \u{00B7} ")
     }
 }

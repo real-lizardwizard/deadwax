@@ -6,7 +6,12 @@ runs it - the Mac's own (`xcrun python3`), or the server's.
 
     python3 ios/scripts/make-test-album.py <your music folder>
 
-writes "<your music folder>/deadwax test/Start test (2026)/01 - ....flac" ... "10 - ....flac" (about 6 MB),
+    python3 ios/scripts/make-test-album.py --verifier-fixtures <folder>
+
+The second writes the four small FLACs DeadwaxAudio's download verifier is tested on (notes/ios-specs/phase2-downloads.md
+8.4, 9) - see `verifier_fixtures` - into ios/DeadwaxKit/Tests/DeadwaxAudioTests/Fixtures/verifier.
+
+The first writes "<your music folder>/deadwax test/Start test (2026)/01 - ....flac" ... "10 - ....flac" (about 6 MB),
 replacing the album's own files if they are there and touching nothing else. Then let
 Navidrome scan. Write it into a folder of its own and copy that folder in, if you'd rather.
 
@@ -188,7 +193,93 @@ def flac(samples: list[int], tags: dict[str, str]) -> bytes:
     return out
 
 
+# ----------------------------------------------------------------------------- the download verifier's fixtures
+
+# FLAC's frame-header codes: the sample rate (4 bits) and the sample size (3 bits)
+RATE_CODES = {44100: 0x9, 48000: 0xA, 96000: 0xB, 192000: 0xD}
+BITS_CODES = {16: 0b100, 24: 0b110}
+
+
+def encode(channels: list[list[int]], rate: int, bits: int, block: int = 1024, md5_of: list[list[int]] | None = None,
+           md5_known: bool = True) -> bytes:
+    """A FLAC of any channels at `rate` and `bits` (16 or 24), fixed blocks of `block` frames, CONSTANT and VERBATIM
+    subframes, every CRC right - and STREAMINFO's MD5 of `md5_of`'s samples (the file's own when None; all zeros when
+    `md5_known` is false). An MD5 of other samples is a copy whose sound doesn't match, though every frame decodes."""
+    frames = len(channels[0])
+    width = (bits + 7) // 8
+    hashed = md5_of if md5_of is not None else channels
+    md5 = hashlib.md5()
+    for at in range(frames):
+        for channel in hashed:
+            md5.update((channel[at] & ((1 << (8 * width)) - 1)).to_bytes(width, "little"))
+    digest = md5.digest() if md5_known else bytes(16)
+    packed = (rate << 44) | ((len(channels) - 1) << 41) | ((bits - 1) << 36) | frames
+    info = struct.pack(">HH", block, block) + b"\x00" * 6 + packed.to_bytes(8, "big") + digest
+    vendor = b"deadwax make-test-album"
+    comment = struct.pack("<I", len(vendor)) + vendor + struct.pack("<I", 0)
+    out = b"fLaC" + bytes([0x00]) + len(info).to_bytes(3, "big") + info
+    out += bytes([0x80 | 0x04]) + len(comment).to_bytes(3, "big") + comment
+    assignment = len(channels) - 1          # independent channels
+    for number, start in enumerate(range(0, frames, block)):
+        size = min(block, frames - start)
+        header = bytes([0xFF, 0xF8, 0x70 | RATE_CODES[rate], (assignment << 4) | (BITS_CODES[bits] << 1)])
+        header += coded_number(number) + struct.pack(">H", size - 1)
+        header += bytes([crc8(header)])
+        body = b""
+        for channel in channels:
+            piece = channel[start:start + size]
+            mask = (1 << bits) - 1
+            if all(sample == piece[0] for sample in piece):
+                body += b"\x00" + (piece[0] & mask).to_bytes(width, "big")              # CONSTANT
+            else:
+                body += b"\x02" + b"".join((v & mask).to_bytes(width, "big") for v in piece)   # VERBATIM
+        data = header + body
+        out += data + struct.pack(">H", crc16(data))
+    return out
+
+
+def fixture_signal(frames: int, bits: int, seed: int) -> list[list[int]]:
+    """Two channels unlike each other, every sample its own: a tone and noise, both signs, the extremes once each, and
+    one block of digital silence (a CONSTANT subframe)."""
+    top = (1 << (bits - 1)) - 1
+    rng = random.Random(seed)
+    left, right = [], []
+    for n in range(frames):
+        if 1024 <= n < 2048:
+            left.append(0)
+            right.append(0)
+            continue
+        tone = math.sin(2 * math.pi * 997 * n / 44100) * top * 0.6
+        left.append(int(round(tone + rng.randint(-top // 8, top // 8))))
+        right.append(int(round(-tone * 0.5 + rng.randint(-top // 4, top // 4))))
+    left[5], right[5] = top, -top - 1
+    return [left, right]
+
+
+def verifier_fixtures() -> dict[str, bytes]:
+    """The verifier's four FLACs: CD's 16/44.1 and 24/96 (each matched), the 24/96 with one sample changed and STREAMINFO
+    still the original's (its frame CRCs right, so it decodes - and doesn't match), and the 16/44.1 with no MD5 (by
+    size)."""
+    cd = fixture_signal(3072, 16, 1)
+    hires = fixture_signal(3072, 24, 2)
+    changed = [list(hires[0]), list(hires[1])]
+    changed[1][2500] += 1
+    return {
+        "verify-16-44k.flac": encode(cd, 44100, 16),
+        "verify-24-96k.flac": encode(hires, 96000, 24),
+        "verify-24-96k-changed.flac": encode(changed, 96000, 24, md5_of=hires),
+        "verify-16-44k-no-md5.flac": encode(cd, 44100, 16, md5_known=False),
+    }
+
+
 def main(argv: list[str]) -> int:
+    if len(argv) == 3 and argv[1] == "--verifier-fixtures":
+        folder = Path(argv[2])
+        folder.mkdir(parents=True, exist_ok=True)
+        for name, data in verifier_fixtures().items():
+            (folder / name).write_bytes(data)
+            print(f"{name}  {len(data)} bytes")
+        return 0
     if len(argv) != 2:
         print(__doc__, file=sys.stderr)
         return 2

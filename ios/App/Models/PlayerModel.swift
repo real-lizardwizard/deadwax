@@ -120,6 +120,13 @@ final class PlayerModel {
     /// album page's, or the one deadwax's saved queue sent back (resume).
     func song(for entry: QueueEntry) -> Song? { shelf[entry.track.id] }
 
+    /// Now Playing's Download Up Next (phase2-downloads.md 4.1): the songs from the one playing to the queue's end, as
+    /// the app has them (an album page's, resume's) - else as their entries say.
+    var songsFromCurrent: [Song] {
+        guard entries.indices.contains(queue.index) else { return [] }
+        return entries[queue.index...].map { shelf[$0.track.id] ?? Song(queued: $0.track) }
+    }
+
     /// An album a queue came from, as its page last loaded it (the last 8 kept), for Info's album lines.
     func playedAlbum(id: String) -> Album? { albums.first { $0.id == id } }
 
@@ -188,6 +195,13 @@ final class PlayerModel {
     @ObservationIgnored private var sessionSeen: String?
     @ObservationIgnored private var sessionCount = 0
     @ObservationIgnored private let resumeClock = MainQueueClock()
+    // Phase 2's downloads and offline (connect)
+    @ObservationIgnored private weak var downloads: DownloadModel?
+    @ObservationIgnored private weak var reachability: Reachability?
+    /// The skips of songs not on this phone, counted for their notice.
+    @ObservationIgnored private var skipRun = OfflinePlay.SkipRun()
+    /// The Up Next entry the listener tapped: offline, a song not here is stopped on, never passed over.
+    @ObservationIgnored private var chosenKey: Int?
 
     init(server: ServerModel, files: SongFiles) {
         self.server = server
@@ -220,7 +234,7 @@ final class PlayerModel {
                                             albumArtist: album.artist, albumCoverArt: album.coverArt, level: level) }
         remember(album)
         shelve(songs)
-        startQueue(copies: false) { $0.playTracks(tracks, start: index, shuffle: shuffle) }
+        startQueue { $0.playTracks(tracks, start: index, shuffle: shuffle) }
     }
 
     /// Play Next from a ••• menu: the pick queued straight after the song playing's copies (pick.choose(.next,
@@ -247,7 +261,7 @@ final class PlayerModel {
         shelve(queued.tracks)
         var started = false
         // only songs added: a song that failed keeps its retry (the web's addSongs leaves the retry's timer alone)
-        startQueue(copies: false, cancelsRetry: false) { controller in
+        startQueue(cancelsRetry: false) { controller in
             started = choice == .next ? controller.playNext(tracks) : controller.playLast(tracks)
         }
         if started { cancelRetry() }
@@ -255,11 +269,13 @@ final class PlayerModel {
         return true
     }
 
-    /// The notice capsule says `words` for `Notice.seconds` (D11), and VoiceOver reads them.
+    /// The notice capsule says `words` for `Notice.seconds` (D11), and VoiceOver reads them - announced here, once per
+    /// notice said: two capsules draw it (the tabs' and Now Playing's), and neither announces.
     func say(_ words: String) {
         noticeShown += 1
         let shown = noticeShown
         notice = words
+        Notice.announce(words)
         Task {
             try? await Task.sleep(for: .seconds(Notice.seconds))
             if shown == noticeShown { notice = nil }
@@ -376,9 +392,16 @@ final class PlayerModel {
     @discardableResult
     func jump(to key: Int) -> Bool {
         guard let controller else { return false }
+        chosenKey = key
         cancelRetry()
         var took = false
         act { took = controller.jumpTo(key: key) }
+        if took {
+            // the entry the jump plays (Phase 2's "the song tapped", OfflinePlay.chosen): a History row's tap plays its
+            // song as a new entry under a new key, so the row's own key wouldn't name it - read it from the queue
+            let played = QueueController.entries(controller.queue)
+            if played.indices.contains(controller.queue.index) { chosenKey = played[controller.queue.index].key }
+        }
         startTicking()
         return took
     }
@@ -461,6 +484,25 @@ final class PlayerModel {
         book.leavePage(id)
     }
 
+    /// Phase 2's downloads wired in (DeadwaxApp, once): a play that can't be sent is kept in the person's download
+    /// store; an album's loudness kept with its download is put on the shelf for a queue (marked old, so a read is still
+    /// asked for first when deadwax answers); and while deadwax can't be reached, no level read is asked - each is
+    /// failed at once, so a first song's wait ends and it is levelled from the answer kept (7.3).
+    ///
+    /// And the player offline (7.3): a song not on this phone isn't streamed while deadwax can't be reached - its open
+    /// fails at once - and is passed over to the next song here, or stopped on (OfflinePlay); nothing is prefetched.
+    func connect(downloads: DownloadModel, reachability: Reachability) {
+        self.downloads = downloads
+        self.reachability = reachability
+        reachability.whenChanged { [weak self, weak reachability] in
+            self?.link?.reach.online = reachability?.online ?? true
+        }
+        reporter.online = { [weak reachability] in reachability?.online ?? true }
+        reporter.keep = { [weak downloads] songID, timeMs in downloads?.keepPlay(songID: songID, timeMs: timeMs) }
+        book.reachable = { [weak reachability] in reachability?.online ?? true }
+        book.kept = { [weak downloads] album in downloads?.keptLoudness(album) }
+    }
+
     /// The app came to the front: the position read again, and resume's look for what another device played.
     func becameActive() {
         tick()
@@ -473,12 +515,12 @@ final class PlayerModel {
         resuming?.background()
     }
 
-    /// Debug's test songs and hi-res row: `songs` played from `index` as they are (no album; Off), their downloaded
-    /// copies when `copies` (a song with none is streamed).
-    func playTest(_ songs: [Song], at index: Int, copies: Bool) {
+    /// Debug's test songs and hi-res row: `songs` played from `index` as they are (no album; Off) - from their copies
+    /// downloaded to this phone, as every song is, unless Debug says to stream them.
+    func playTest(_ songs: [Song], at index: Int) {
         let tracks = songs.map { QueueTrack(song: $0, albumId: $0.albumId ?? "", albumName: $0.album ?? "") }
         shelve(songs)
-        startQueue(copies: copies) { $0.playTracks(tracks, start: index) }
+        startQueue { $0.playTracks(tracks, start: index) }
     }
 
     // MARK: the controller
@@ -488,11 +530,11 @@ final class PlayerModel {
     /// is false (Play Next and Play Last, which may only add songs). The songs kept for the queue are pruned only when
     /// a new queue did start: songs added by an edit held for the join (D4) are not in the queue yet, and keep their
     /// Navidrome song (its size, for the stream cache's length check; Info's fields) for when they are.
-    private func startQueue(copies: Bool, cancelsRetry: Bool = true, _ body: (QueueController) -> Void) {
+    private func startQueue(cancelsRetry: Bool = true, _ body: (QueueController) -> Void) {
         guard let controller = ensureController(), let link else { return }
         if cancelsRetry { cancelRetry() }
         let generation = link.generation
-        link.beginStart(copies: copies)
+        link.beginStart()
         act { body(controller) }
         link.endStart()
         if link.generation != generation { pruneShelf() }
@@ -539,6 +581,7 @@ final class PlayerModel {
             made.activate = { [weak self] in MainActor.assumeIsolated { self?.activateSession() ?? false } }
             made.refused = { [weak self] in MainActor.assumeIsolated { self?.refusedNow = true } }
             made.clientBox.client = server.client
+            made.reach.online = reachability?.online ?? true
             link = made
             return made
         } catch {
@@ -671,6 +714,11 @@ final class PlayerModel {
     private func failed(_ state: EngineState, words: String) {
         lastFailure = words
         guard let controller, let key = state.key, key == heardEntry else { return }
+        // a song not on this phone while deadwax can't be reached: nothing to ask, nothing to retry
+        if let reachability, !reachability.online, let track = current?.track, !playsHere(track) {
+            notOnPhone(controller)
+            return
+        }
         if !askedAfterFailure {
             askedAfterFailure = true
             Task { await server.refreshMe() }
@@ -695,6 +743,35 @@ final class PlayerModel {
             controller.intendsToPlay = false
             errorLine = PlayerWords.words(failure)
         }
+    }
+
+    /// A song not on this phone, met while deadwax can't be reached (7.3, OfflinePlay): passed over at once to the next
+    /// song here, said in the notice ("Skipped "Roads" - it isn't on this phone", a run counted) - or, with nothing here
+    /// still to come or for the song tapped in Up Next, stopped on, paused, its line saying why. Play asks for it again.
+    private func notOnPhone(_ controller: QueueController) {
+        let chosen = current.map { $0.key == chosenKey } ?? false
+        chosenKey = nil
+        let here = entries.map { playsHere($0.track) }
+        let after = OfflinePlay.after(intendsToPlay: controller.intendsToPlay,
+                                      hereAfter: OfflinePlay.hereAfter(here, index: queue.index, repeatAll: repeatMode == .all),
+                                      chosen: chosen)
+        if after == .skip {
+            let title = current?.track.title
+            var skippedTo: Int?
+            act { skippedTo = controller.skipFailed() }
+            if skippedTo != nil {
+                errorLine = nil
+                say(skipRun.skipped(title: title, now: Monotonic.seconds()))
+                return
+            }
+        }
+        controller.intendsToPlay = false
+        errorLine = DownloadWords.stoppedNotHere
+    }
+
+    /// The song plays with deadwax out of reach: downloaded to this phone, or whole in the streaming cache.
+    private func playsHere(_ track: QueueTrack) -> Bool {
+        files.downloads.url(for: track.id) != nil || files.cache.reusable(Song(track: track, size: shelf[track.id]?.size)) != nil
     }
 
     /// The song asked for again from where it stopped, after the retry's delay - the same listen - unless the
@@ -787,8 +864,10 @@ final class PlayerModel {
         guard queued.indices.contains(queue.index) else { return }
         let (inUse, ahead) = StreamCache.kept(queued, shown: queue.index, engineAt: link.position()?.index)
         files.keep(inUse, ahead: ahead)
-        guard controller?.intendsToPlay == true, !link.copies, let client = server.client, let next = nextIndex(queue),
-              queued.indices.contains(next) else { return }
+        // nothing fetched for a song on the phone: it plays from there - and nothing at all while deadwax can't be reached
+        guard controller?.intendsToPlay == true, reachability?.online != false, let client = server.client,
+              let next = nextIndex(queue),
+              queued.indices.contains(next), files.downloads.url(for: queued[next].id) == nil else { return }
         files.prefetch(queued[next], client: client)
     }
 
@@ -955,7 +1034,7 @@ final class PlayerModel {
     /// fetched, fitted to this device's Repeat - a new queue, its listen from where it was left.
     private func putBack(_ saved: UpNextQueue, position at: Double) -> UpNextQueue? {
         guard let controller = ensureController(), let link else { return nil }
-        link.beginStart(copies: false)
+        link.beginStart()
         listenFrom = at
         var made: UpNextQueue?
         act { made = controller.restoreQueue(saved, position: at) }
