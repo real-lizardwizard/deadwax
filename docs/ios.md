@@ -3,10 +3,10 @@
 deadwax is getting a native iPhone app, built with SwiftUI and its own audio engine, for what a web
 page can't do well: seamless joins and normalization done on the phone, downloads to play offline,
 and a song's start never lost on AirPods. It's built in phases. Phase 0, "Hello, iPhone", was a
-single test screen that proved the tools, the connection and the audio engine. **This is Phase 1,
-the player: app 0.2**, the first version meant for playing your music day to day. It has your
-library, album pages, Up Next, Now Playing, normalization, the lock screen, plays counted, and
-picking up where you left off. **Phase 2 adds downloads**: an album, or a song, downloaded to the
+single test screen that proved the tools, the connection and the audio engine. Phase 1, the player
+(app 0.2), was the first version meant for playing your music day to day: your library, album pages,
+Up Next, Now Playing, normalization, the lock screen, plays counted, and picking up where you left
+off. **This is Phase 2, downloads: app 0.3.** An album, or a song, downloaded to the
 phone plays from there, bit for bit as deadwax has it - and goes on playing when deadwax can't be
 reached (see [Downloads](#downloads) and [Offline](#offline)). Playlists, Search and the rest come in
 the next phases (see [What it can't do yet](#what-it-cant-do-yet)).
@@ -112,7 +112,7 @@ old one. It also uses up one of the few new app ids a free account may register 
 It pulls the latest code, asks GitHub whether the app's checks passed on it (and asks you before
 building one that failed or is still running), builds it (Release), and installs it **over** the app
 on the phone, so everything on the phone stays. Then it opens the app and says how long the new
-install runs: `Installed deadwax 0.2 (2), runs until Wed 18 Nov, 14:02`. It also says how long it
+install runs: `Installed deadwax 0.3 (3), runs until Wed 18 Nov, 14:02`. It also says how long it
 took and the Mac's free space before and after. Xcode doesn't need to be open.
 
 | option | what it does |
@@ -379,7 +379,7 @@ field Navidrome sent about the song and its album.
   If deadwax can't be reached, it says "Couldn't reach deadwax, so you're still signed in - try
   again." Changing your password is the web app's, for now.
 - **About**: deadwax's version, whether logins are on (for an admin), and the app's own version,
-  **0.2 (2)**.
+  **0.3 (3)**.
 - **This phone**: deadwax's address, **Change address**, and **Debug**, for an admin (with logins
   off, everyone is one).
 

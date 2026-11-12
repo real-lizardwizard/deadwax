@@ -29,8 +29,8 @@ from pathlib import Path
 IOS = Path(__file__).resolve().parent.parent
 PROJECT = IOS / "Deadwax.xcodeproj"
 BUNDLE_ID = "net.lizardlounge.deadwax"
-MARKETING_VERSION = "0.2"
-BUILD = "2"
+MARKETING_VERSION = "0.3"
+BUILD = "3"
 DEPLOYMENT_TARGET = "17.0"
 IGNORED_BESIDE_LOCAL = ("NSAllowsLocalNetworking", "NSAllowsArbitraryLoadsForMedia", "NSAllowsArbitraryLoadsInWebContent")
 

@@ -90,7 +90,7 @@ struct YouView: View {
         }
     }
 
-    /// About's App row: "0.2 (2)", from the bundle.
+    /// About's App row: "0.3 (3)", from the bundle.
     static var appVersion: String {
         let info = Bundle.main.infoDictionary
         return YouWords.app(version: info?["CFBundleShortVersionString"] as? String, build: info?["CFBundleVersion"] as? String)

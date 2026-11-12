@@ -56,8 +56,8 @@ ios/
   DeadwaxKit/               Package.swift (tools 6.0; iOS 17, macOS 14)
     Sources/DeadwaxCore/    pure Swift + Foundation, Swift 6 mode, tested on Linux
     Sources/DeadwaxAudio/   the engine; every file inside #if canImport(AVFAudio); Swift 5 mode
-    Tests/DeadwaxCoreTests/ Swift Testing, 64 tests in Phase 0, 508 in 69 suites at app 0.2
-    Tests/DeadwaxAudioTests/  offline-render tests, macOS only (12 in Phase 0, 54 at app 0.2)
+    Tests/DeadwaxCoreTests/ Swift Testing, 64 tests in Phase 0, 508 in 69 suites at app 0.2, 632 in 83 at 0.3
+    Tests/DeadwaxAudioTests/  offline-render tests, macOS only (12 in Phase 0, 54 at app 0.2, 93 at 0.3)
   scripts/                  install.sh (James's), install_helper.py (its JSON/plist reading, in Xcode's
                             python3), check-linux.sh, check_project.py, make-icon.py, make-test-album.py
   README.md                 a pointer to docs/ios.md and this file
@@ -2786,3 +2786,12 @@ pytest files. **Not seen**: anything drawn - no simulator, no phone. What only t
 18 and 19 (docs/ios.md's 19 and 20) - the mark's place at the largest text size and in Edit beside the handle, that a
 dimmed disabled row still takes VoiceOver's focus and reads "dimmed", and whether the List redraws only the marks
 while a download's ring fills (assumed from Observation's per-view tracking, not measured).
+
+### The finishing round: app 0.3 (3)
+
+The app is **0.3 (3)**, Phase 2's downloads, as the spec planned for its merge (its section 1): `Base.xcconfig`'s
+`MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`, pinned with it in `check_project.py` (MARKETING_VERSION, BUILD),
+`ios.yml`'s check of the built Info.plist and `tests/test_ios_install.py`'s read of the real xcconfig - as 0.2 was.
+The guide (its opening, install.sh's line, About's App row), ios/README.md and the two doc comments giving About's
+row as an example say 0.3; the comments naming "James's check of 0.2 (2)" are history and stay. `src/__init__.py`'s
+`__version__` is the server's and wasn't touched.
