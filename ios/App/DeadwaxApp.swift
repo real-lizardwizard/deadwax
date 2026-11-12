@@ -3,6 +3,10 @@ import SwiftUI
 /// deadwax for iPhone (app 0.2, Phase 1's shell; Phase 2's downloads): the server and its gates, two tabs, and the
 /// models every screen reads from the environment - see docs/ios.md and notes/ios.md.
 ///
+/// The EQ (app 0.5, notes/ios-specs/eq.md): EQModel is made before the player, kept on this phone and never reset when
+/// the person changes - an output's EQ is the phone's, not the account's - and handed to the player, which gives it
+/// each engine it makes.
+///
 /// Downloads go through one background URLSession (DownloadSession), made at every launch - a background relaunch for
 /// its events included, which `.backgroundTask(.urlSession(...))` holds open until the store has them.
 @main
@@ -15,6 +19,7 @@ struct DeadwaxApp: App {
     @State private var reachability: Reachability
     @State private var downloads: DownloadModel
     @State private var lyrics: LyricsModel
+    @State private var eq: EQModel
 
     /// The one background session, made before anything else can ask it.
     private static let downloadSession = DownloadSession()
@@ -26,7 +31,9 @@ struct DeadwaxApp: App {
         transport.listen { [weak reachability] answered in reachability?.heard(answered: answered) }
         reachability.whenChanged { [weak reachability] in CoverCache.shared.reach(online: reachability?.online ?? true) }
         let files = SongFiles()
+        let eq = EQModel()
         let player = PlayerModel(server: server, files: files)
+        player.eq = eq
         let navigation = AppNavigation()
         let library = LibraryModel(server: server)
         let downloads = DownloadModel(server: server, reachability: reachability, files: files, session: Self.downloadSession)
@@ -50,6 +57,7 @@ struct DeadwaxApp: App {
         _reachability = State(initialValue: reachability)
         _downloads = State(initialValue: downloads)
         _lyrics = State(initialValue: lyrics)
+        _eq = State(initialValue: eq)
     }
 
     var body: some Scene {
@@ -63,6 +71,7 @@ struct DeadwaxApp: App {
                 .environment(reachability)
                 .environment(downloads)
                 .environment(lyrics)
+                .environment(eq)
                 .preferredColorScheme(.dark)
                 .tint(Palette.accent)
         }

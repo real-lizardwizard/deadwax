@@ -86,6 +86,9 @@ import Testing
         #expect(EQSettings.read(Data(Self.example.replacingOccurrences(of: "\"bluetoothA2DP\"", with: "\"radio\"").utf8)) == nil)
         #expect(EQSettings.read(Data("{\"version\": 1, \"advanced\": false, \"presets\": [], \"outputs\": []}".utf8)) == EQSettings())
         #expect(EQSettings.unreadableName(day: "2026-11-12") == "eq-unreadable-2026-11-12.json")
+        //? slice 3: a second one set aside the same day is never written over the first
+        #expect(EQSettings.unreadableName(day: "2026-11-12", attempt: 1) == "eq-unreadable-2026-11-12.json")
+        #expect(EQSettings.unreadableName(day: "2026-11-12", attempt: 2) == "eq-unreadable-2026-11-12-2.json")
     }
 
     @Test func tonesAndBanks() throws {

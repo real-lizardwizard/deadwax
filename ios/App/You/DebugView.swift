@@ -5,7 +5,8 @@ import UIKit
 
 /// You's Debug (admins only, D1): Phase 0's one screen, moved - Check's report, the test sounds, the hi-res row,
 /// what is playing (with the engine's own words for its last failure, D7, and an Up Next edit held for the join, D4),
-/// the EQ's unit and "Muffle what plays" (eq.md 3.13, slice 2), the engine's log (its last 500 lines, with Copy and
+/// the EQ (eq.md 3.13: the route's outputs, its key, the unit, the curve, what the last start put in and how long it
+/// took, the kept file) and "Muffle what plays" (slice 2), the engine's log (its last 500 lines, with Copy and
 /// Share), the Library's last album list asks (how many albums, how long - check 1), and how long this install runs. Phase 2's Downloads section: the songs by state, the session's
 /// tasks, reachability, what waits to be sent, the time each check took, the download log and "Stream even when
 /// downloaded" (phase2-downloads.md 6.9). The address and the sign-in are the app's own screens now.
@@ -14,6 +15,7 @@ struct DebugView: View {
     @Environment(PlayerModel.self) private var player
     @Environment(LibraryModel.self) private var library
     @Environment(DownloadModel.self) private var downloads
+    @Environment(EQModel.self) private var eq
 
     init() {}
 
@@ -41,7 +43,7 @@ struct DebugView: View {
         .task { if model.report == nil { await model.check() } }
         // Muffle is a test (eq.md 5.2): it goes off as Debug closes - back out of it, or another tab - so it can't be
         // left on under real listening. Locking the phone doesn't close it (check E0d needs Muffle on, locked).
-        .onDisappear { player.muffle = false }
+        .onDisappear { eq.muffle = false }
     }
 
     // MARK: the Library's lists
@@ -222,27 +224,27 @@ struct DebugView: View {
     private func clock(_ seconds: Double) -> String { Format.clock(seconds) }
 }
 
-/// Debug's EQ (eq.md 3.13, slice 2): the unit's rows - in the graph and what it does, the rate's sections, the
-/// changes, what the last start put in, samples over full scale, its render time - read from the EQ's host once a
-/// second while they show and the app is in front, and "Muffle what plays", the test curve through the real unit
-/// (check 0).
+/// Debug's EQ (eq.md 3.13): the route's outputs (port type, name, UID raw) and the key they make, the unit's rows -
+/// in the graph and what it does, the rate's sections, the changes, what the last start put in, samples over full
+/// scale, its render time - with the curve and its sections at this rate among them, how long the last start took to
+/// put its curve in, and what eq.json holds; read once a second while they show and the app is in front. Then
+/// "Muffle what plays", the test curve through the real unit (check 0), now EQModel's - the same door every change
+/// goes through.
 private struct EQDebugSection: View {
-    @Environment(PlayerModel.self) private var player
+    @Environment(EQModel.self) private var eq
     @Environment(\.scenePhase) private var phase
-    @State private var rows: [EQDebugRow]?
+    @State private var rows: [(label: String, value: String)] = []
 
     var body: some View {
         Section {
-            if let rows {
-                ForEach(rows, id: \.label) { row in
-                    LabeledContent(row.label) {
-                        Text(row.value).font(.footnote)
-                    }
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                LabeledContent(row.label) {
+                    Text(row.value).font(.footnote)
                 }
-            } else {
-                Text(EQWords.Debug.noEngine).foregroundStyle(Palette.quiet)
             }
-            Toggle(EQWords.Debug.muffle, isOn: Binding(get: { player.muffle }, set: { player.muffle = $0 }))
+            Toggle(EQWords.Debug.muffle, isOn: Binding<Bool>(get: { eq.muffle }, set: { (on: Bool) -> Void in
+                eq.muffle = on
+            }))
         } header: {
             Text(EQWords.Debug.header)
         } footer: {
@@ -251,7 +253,7 @@ private struct EQDebugSection: View {
         .task(id: phase) {
             guard phase == .active else { return }
             while !Task.isCancelled {
-                rows = player.eqStatus()?.rows
+                rows = eq.debugRows(eq.status())
                 try? await Task.sleep(for: .seconds(1))
             }
         }
