@@ -230,20 +230,39 @@ the songs you've already added, still ahead of the rest of the album. A line abo
 says which ("Playing next: Roads", "Added to Up Next: Dummy") for 5 seconds. With nothing playing,
 either just plays it.
 
-**Up Next** on Now Playing opens what plays after the song playing:
+**Up Next** on Now Playing opens what plays after the song playing - and, above it, what has already
+played:
 
-- **At the top**, the song playing - and with Repeat One on, "Repeat one: this song plays again until
-  you skip it." Under it, **Shuffle** and **Repeat**, the same settings as on Now Playing.
+- **History**, above the song playing: what has played since you started the album, list or shuffle -
+  songs a tap skipped past included, where they are on the album - oldest at the top. Up Next opens at
+  the song playing, even with only a song or two left after it; scroll up for History. A song Repeat One
+  played again is one row; Repeat All's earlier times round are there as they played. It goes back 50
+  plays (as many as come back when you pick the queue up on another device) - each time Repeat One
+  played a song counts as one - and starts again when you play something new. **Tap one** to hear it
+  again now ("play again", VoiceOver calls it, and says "Playing" and its title once it starts): Playing
+  Next and the album carry on after it as they were, the song that was playing joins History, and the
+  list stays where it is under your finger. VoiceOver reads History under its own heading, then the song
+  playing's title as one.
+- **The song playing**, where Up Next opens - and with Repeat One on, "Repeat one: this song plays again
+  until you skip it." Under it, **Shuffle** and **Repeat**, the same settings as on Now Playing.
 - **Playing Next**: the songs you've added, in the order they'll play, with **Clear** to take them all
   out. It's there only when you've added some.
 - **The rest of the album or list this time round**, headed "From Mezzanine" for one album's songs or
   "Still to play" for several albums', up to 100 of them, then "And 380 more songs." Under it, what
   comes after: "Then Mezzanine again from the top." with Repeat All ("Then Mezzanine again, in a new
   order." with Shuffle on too), or "Nothing after this song." at the last song with Repeat off.
-- **Tap a song** to play it now, even from a pause.
+- **Tap a song** to play it now, even from a pause. Nothing is taken out: tap a song further down the
+  album and the songs between stay where they are, behind it - playing song 5, tap song 8, and Previous
+  plays 7, then 6, as on the album - and Playing Next stays next, after it. Tap one in Playing Next and
+  the songs added above it are behind it the same way. Up Next puts the song playing back at the top
+  whenever it changes - a tap, a song ending, Next or Previous - and when Edit starts or ends; Shuffle,
+  Repeat, Clear and Edit's changes leave the list where you've scrolled it.
+- **After Previous**, a song you'd added that was still waiting stays where it was - after the song you
+  went back from - so Up Next lists it there, in the album's group, rather than under Playing Next;
+  **Clear** takes only the songs under Playing Next.
 - **Edit** gives each row a handle to drag it by and a red minus button that takes it out at once,
   one tap a song. A song moves within its own group (Playing Next, or the album's), and each change is
-  made as you make it. **Done** ends Edit. Outside Edit, a row can't be swiped away, so a song isn't
+  made as you make it. History isn't shown while you edit. **Done** ends Edit. Outside Edit, a row can't be swiped away, so a song isn't
   lost by accident. Inside Edit iOS has no swipe-to-delete, so the minus takes a song out with one
   tap - and there's no undo, so a quick double tap takes out the song that moves up under your finger
   too. With VoiceOver, each row's actions have Move up, Move down and Remove; with Voice Control, say
@@ -408,7 +427,10 @@ Phase 1 exists to answer these on the phone. Note what you see for each.
 5. **Up Next.** While an album plays: Play Next a song and Play Last another, then open Up Next. Are
    they under Playing Next, in that order? Edit: drag one, take one out with its red minus button
    (one tap), Done. Clear. Shuffle on and off: the song playing goes on untouched. Repeat One plays the
-   song again; Repeat All starts the album again after its last song.
+   song again; Repeat All starts the album again after its last song. Then **History**: play an album
+   from song 5, tap song 8 in Up Next, and press Previous three times - 7, 6, 5. Scroll up: History has
+   the songs played. Tap one: it plays again, the row stays under your finger, and Up Next carries on as
+   it was.
 6. **Picking up, both ways.** Play an album on the phone, pause it, and close the app (swipe it away).
    Open the web app on the Mac: the same queue, song and second, paused. Then play something else on
    the Mac, pause it, and open the app on the phone: it has it, paused, and says "Picked up from your
