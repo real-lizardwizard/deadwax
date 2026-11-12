@@ -244,8 +244,10 @@ either just plays it.
 - **Edit** gives each row a handle to drag it by and a red minus button that takes it out at once,
   one tap a song. A song moves within its own group (Playing Next, or the album's), and each change is
   made as you make it. **Done** ends Edit. Outside Edit, a row can't be swiped away, so a song isn't
-  lost by accident; inside it, iOS doesn't let a row be swiped at all, which is why the minus button
-  needs no second tap. With VoiceOver, each row's actions have Move up, Move down and Remove.
+  lost by accident. Inside Edit iOS has no swipe-to-delete, so the minus takes a song out with one
+  tap - and there's no undo, so a quick double tap takes out the song that moves up under your finger
+  too. With VoiceOver, each row's actions have Move up, Move down and Remove; with Voice Control, say
+  "Show grid" to reach a minus.
 - It closes by itself once nothing is queued.
 
 **Shuffle**, turned on while a song plays, keeps that song going and shuffles every song of the album

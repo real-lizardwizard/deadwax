@@ -2028,8 +2028,17 @@ what it does document puts a swipe and Edit in different modes:
   two-step James found.
 - Developers report the rest: "enabling EditMode ... disables navigation & swipe actions" (Stack Overflow 73889241,
   September 2022, on iOS 16).
-Not tried on iOS 27: there is no Simulator, and the phone hasn't been asked. If a swipe in Edit ever worked there,
-it would be news.
+- The most direct (found by the review, and read again for this note): in Apple's developer forums (thread 756765,
+  June 2024) a developer asked for a List's swipe actions to show while it is in editMode, for people who find the
+  swipe hard; an Apple DTS engineer answered that there is currently no way to bring a swipe action out in code, and
+  suggested a visible control on the row that deletes - what was built.
+The review could open neither the Stack Overflow question nor Neuburg's article; Apple's three are read. Not tried on
+iOS 27: there is no Simulator, and the phone hasn't been asked. If a swipe in Edit ever worked there, it would be
+news.
+
+**The option not taken**: a swipe of deadwax's own - a drag gesture on each row in Edit, taking the song out past a
+threshold. iOS doesn't stop an app drawing one, but it would contend with the List's scrolling and the drag handles
+for the same finger, and nothing here can try it; James can ask for it if one tap isn't enough.
 
 **What changed**, then, is the other way the request allowed for: Edit gives each row ONE action. Its own red (-) at the leading edge
 takes the song out at once (`UpNextScreen.editRow`), in place of the system's two-step control, and the List's drag
@@ -2045,6 +2054,12 @@ a song, in it the two-step (-). Out of Edit nothing changes - no swipe, no (-), 
 
 **Verified**: builds. **Assumed**: that a borderless button in a List row takes its tap while Edit is on (controls
 in rows do; not seen here), and that with no onDelete the List draws no delete control of its own in Edit.
+
+**Two things to know, from the review.** One tap a song is what James asked for, and there is no undo: a quick double
+tap on a (-) can take out the song that slides up under the finger as well. And the (-) being hidden from
+accessibility, Voice Control has no "Tap Remove…" name or number for it, as it had for the system's control: Show
+grid reaches it (by place, not by the accessibility tree), and VoiceOver keeps Remove among the row's actions.
+Neither was changed - a pause after each removal, or the (-) as an element of its own, would be James's call.
 
 **On the phone**: open Up Next with songs added, tap Edit: each row has a red minus on the left and a drag handle
 on the right, and nothing else. One tap on a minus takes that song out - no Delete to confirm. Drag a song by its
