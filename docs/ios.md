@@ -144,7 +144,8 @@ the same person carries on where you were. Signing in as someone else starts afr
 first person's queue stays.
 
 The app has two tabs, **Library** and **You**. Tapping the tab you're on goes back to its first
-screen, or to the top of it. Once something is playing, the mini player sits just above the tabs.
+screen, or to the top of it. Once something is playing, the mini player sits just above the tabs,
+and every screen scrolls far enough for its last row to come up above it.
 
 ## The Library
 

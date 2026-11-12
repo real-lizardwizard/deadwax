@@ -2337,3 +2337,42 @@ later, so it should).
 **On the phone**: play an album whose songs have their own covers, or a few albums with Play Last, lock the phone,
 and let one song run into the next: the lock screen's cover changes with the title, not a moment after. Skip with
 Next on the lock screen too (the song after next has had less time - a skip two ahead may still take a moment).
+
+### The mini player over the last row (fix/player-inset)
+
+**What James saw.** "the playbar at the bottom covers the bottom row of whatever is on screen. so to select "debug" i
+have to kind of catch it as I'm scrolling." With something queued, no list scrolled far enough for its last row
+(You's Debug) to clear the mini player.
+
+**Why.** MainTabs gave each tab's NavigationStack `.safeAreaInset(edge: .bottom) { PlayerInset() }`. That draws the
+player in the right place, above the tab bar, but the inset never reaches the pages inside the stack: their lists
+end at the tab bar, under the player. Reported to Apple as FB23732628 (developer.apple.com/forums/thread/837946, July
+2026, no reply): a `safeAreaInset` or `safeAreaBar` on a NavigationStack doesn't update the content insets of the
+views in it, root or pushed, where the same modifier on the stack's content does. That it is the stack hosting each
+page apart from the SwiftUI around it is our reading, not Apple's word; that it is so on 27.2 is what James saw.
+
+**What changed** (MainTabs.swift, Routes.swift):
+- Each tab is a **TabStack**: its NavigationStack with the player as an `.overlay(alignment: .bottom)` - the same
+  notice-over-mini-player, the same 8 pt padding, in the same place (an overlay sits inside the stack's safe area,
+  the tab bar's and the keyboard's, as the inset did). Being an overlay, it adds to no safe area.
+- The player says its height as drawn (`onGeometryChange`, iOS 16+), so the room follows the text size and the
+  notice coming and going; with nothing drawn the room is 0, whatever was measured last.
+- **Every page in the stack takes that room itself**: `clearsPlayer()`, a `safeAreaInset(edge: .bottom)` of a clear
+  frame that tall (no hit testing, hidden from VoiceOver), read from the environment (`playerClearance`). The roots
+  get it in TabStack, every pushed page in `appRoutes()`. The pages under it: the Library's root (AlbumsScreen's
+  ScrollView, or the Navidrome gate's), All albums pushed, the album page's List, You's List, Server address's Form,
+  Debug's Form. The Library's letter index is an overlay on the ScrollView, laid out in its safe area, so it stops
+  above the player too. Now Playing, Up Next and Info are over the tabs, not under the player.
+- Nothing else moves: the mini player isn't redrawn per page, so it stays put as pages push and pop. Not
+  `tabViewBottomAccessory` (a new look, and iOS 26+).
+
+**Verified**: the unsigned device build (no new Swift warnings), DeadwaxKit's tests, check_project.py, the source-bytes
+and contract tests. **Assumed**, since nothing is drawn here: that a `safeAreaInset` on a page inside the stack
+reaches its List, Form and ScrollView on iOS 17-27 (its documented behaviour, and what FB23732628 says works); that
+the overlay sits where the inset drew the player; that `onGeometryChange` reports the first height as it appears.
+
+**On the phone**: with something playing, scroll You to the bottom and tap Debug without chasing it; the same at the
+end of an album, of Your albums and All albums (the letter index's last letter above the player), and in Server
+address with the keyboard up and down. Play Next something, and while its line shows, scroll a list to the end: the
+last row clears the line too. Big text (Settings > Accessibility > Larger Text): the last row still clears. Nothing
+playing: no gap at a list's foot. Push and pop pages: the mini player stays still.
