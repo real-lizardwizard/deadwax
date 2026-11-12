@@ -1,0 +1,19 @@
+{
+  "about": "The windows the voice cases read, made from integer recipes (export-deck-vectors.cjs recipeChannel; DeckVoiceTests makes them the same way): 8 s at `rate`, each sample an Int16 over 32768 - noise (xorshift32 seeded seed * 2 + channel + 1, its top 16 bits less 32768; soft: that shifted right 3), sweep (a triangle whose step is 1 + ((i >> 7) % 600) * (channel + 1)), clicks (+32767 then -32768 every 2400 + 7 seed + 331 channel samples), step (silence, then 32767 on the first channel and -32768 on the second from half way, the second 9601 samples later). `hash`: FNV-1a 64 of the channels' Float32 bits in order, little-endian.",
+  "made_by": "ios/scripts/export-deck-vectors.cjs - never edit by hand: change the TypeScript and run it again",
+  "made_from": {
+    "ios/scripts/export-deck-vectors.cjs recipeChannel, recipeWindow": "8661be9eeb1fa0ed099842607b69222f3a1bc42d89bb7d387df0d829a84c08ca"
+  },
+  "windows": [
+    {"kind":"noise","seed":1,"rate":48000,"channels":2,"hash":"10323d016337b778"},
+    {"kind":"sweep","seed":2,"rate":44100,"channels":2,"hash":"0be71d0a2b344afc"},
+    {"kind":"noise","seed":3,"rate":48000,"channels":2,"hash":"bf7623879e1de839"},
+    {"kind":"soft","seed":4,"rate":48000,"channels":2,"hash":"c3ed2f62b293a69a"},
+    {"kind":"sweep","seed":5,"rate":48000,"channels":2,"hash":"d6523b2ebf652277"},
+    {"kind":"soft","seed":6,"rate":44100,"channels":1,"hash":"2598656f44609229"},
+    {"kind":"noise","seed":7,"rate":96000,"channels":2,"hash":"6981ef88dbc4cc5e"},
+    {"kind":"step","seed":8,"rate":48000,"channels":2,"hash":"9c439315e23dac98"},
+    {"kind":"clicks","seed":9,"rate":48000,"channels":2,"hash":"606fd72853418411"},
+    {"kind":"soft","seed":10,"rate":48000,"channels":2,"hash":"7ccbb9af6845f45d"}
+  ]
+}

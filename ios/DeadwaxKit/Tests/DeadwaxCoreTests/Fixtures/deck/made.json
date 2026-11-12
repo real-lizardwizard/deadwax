@@ -1,0 +1,13 @@
+{
+  "about": "Who made these fixtures, and with what. Each file names the web sources it was made from (`made_from`); besides them only the Math functions' answers move what a file holds, and those are the Node's, the platform's and the CPU's (V8 is not the same everywhere; nor is a NaN's sign, which the files write as one). So iosdeck.sim's --check, run on `made_on`, compares every file byte for byte; on any other Node, platform or arch it checks the sources: a file whose made_from is unchanged may differ by that Node's Math alone, and is listed rather than failed - except the files no Math answer reaches (jsmath.json, tokens.json, voice/windows.json, press/handlers.json), which must match anywhere. `made_with`: this script and its harness - a change to either fails the check everywhere until the fixtures are written again.",
+  "made_by": "ios/scripts/export-deck-vectors.cjs - never edit by hand: change the TypeScript and run it again",
+  "made_on": {
+    "node": "v20.12.2",
+    "platform": "darwin",
+    "arch": "arm64"
+  },
+  "made_with": {
+    "ios/scripts/export-deck-vectors.cjs": "d0c64bed5dd897d1167ec4de914be52bdd9085024193939f50b78be511547ce1",
+    "ui/test/deckHarness.cjs": "e096e0835d6032962eeed5dfdb62381931e06699758eb946a7ede4f1be8d5ece"
+  }
+}

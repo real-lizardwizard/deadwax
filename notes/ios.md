@@ -831,6 +831,7 @@ exporter with `--check` so tests.yml (which runs every sim, each on its own) fai
 | export-you-vectors.cjs | You.tsx's expressions and words, read out of the source and evaluated as written (136 cases) | you/ | iosyou.sim.cjs |
 | export-gate-vectors.cjs | NeedsNavidrome.tsx, access.ts, errorWords.ts, navidromeCheck.ts, the gate rendered against a Preact stand-in (35 cases) | gate/ | iosgate.sim.cjs |
 | export-lyrics-vectors.cjs (app 0.4) | lyricsView.ts - every rule of notes/app-lyrics.md 2.2-2.7 and the words - with lyrics.ts's lyricTime and scrub.ts's LANDED_WITHIN_S; the server's answers (src/lyrics.py song_lyrics()) through lyrics_answers.py, held by test_ios_contract.py | lyrics/ | ioslyrics.sim.cjs |
+| export-deck-vectors.cjs | platter.ts, turntable.ts, playSpeed.ts, deckClock.ts's pointerSamples, debugRows.ts, deckVoice.ts, and the real deck.ts driven through ui/test/deckHarness.cjs (deck.sim's own fakes) with deckVoice.ts rendering beside it; theme.css's turntable tokens; the words of Turntable.tsx, SpeedFader.tsx, SpeedChip.tsx, LookChoice.tsx, WindDownChoice.tsx and You.tsx; every Math call recorded (maths.json, its committed answers reused); the real Turntable.tsx and NowPlaying.tsx mounted over it and driven by pointer events and keys (press/, 13 traces), its handlers hashed; made.json, who made them | deck/ (75 files, 3 MB budget) | iosdeck.sim.cjs - byte for byte on the maker's Node, platform and arch, the sources elsewhere |
 
 `--check` makes everything again in memory and compares it byte for byte with what is committed, so a hand edit
 fails too. **A web rule changed**: its sim fails; run the exporter and commit what it writes; that touches ios/,
@@ -2854,6 +2855,170 @@ Phase 3 ships as 0.5). Pinned as 0.3 was: `Base.xcconfig`'s `MARKETING_VERSION` 
 `check_project.py`'s MARKETING_VERSION and BUILD, `ios.yml`'s check of the built Info.plist, and
 `tests/test_ios_install.py`'s read of the real xcconfig; the guide's title, opening, install.sh's line and About's App
 row, ios/README.md, and the two doc comments giving About's row as an example. `src/__init__.py` wasn't touched.
+
+## The turntable
+
+The turntable and the speed fader, on the iPhone: the design spec is notes/ios-specs/turntable.md, built in four
+slices (its 7.1-7.4) on the `ios` branch. Each slice's departures are written into the spec's own sections as **As
+built** paragraphs; this is the account of what was built and what was seen.
+
+### Slice 1: Core (2026-11-12)
+
+The physics, the deck's rules and the voice, in DeadwaxCore, held to the web's own TypeScript run by
+`ios/scripts/export-deck-vectors.cjs` (the table in "How the ports are kept in step with the web"). No screen, no
+audio host, nothing in ios/App or DeadwaxAudio; ui/src untouched; deck.sim.cjs changed only by its fakes moving into
+ui/test/deckHarness.cjs, its output byte for byte what it was.
+
+**What was built** (ios/DeadwaxKit/Sources/DeadwaxCore/):
+
+- `DeckMaths.swift` - the eight transcendentals behind an instance protocol: `PlatformMaths` (libm, with JavaScript's
+  pow edge cases) and `RecordedMaths` (the web's answers by input bits, every call counted and hashed, one the web
+  never made answering NaN and failing the test); `JSMath`'s round, min, max, fround, ToInt32, sign (spec 4.2).
+- `Platter.swift` (platter.ts: the plans, phases, the hand's speed, the release), `TurntableGeometry.swift`
+  (turntable.ts: the drawing, arm, drags, previews, the disc; `TurntableLayout`; deckClock.ts's pointerSamples),
+  `PlaySpeed.swift` (playSpeed.ts), `TurntableWords.swift` (the spec's 2.9 and Debug's rows),
+  `TurntablePalette.swift` (2.14, each colour named with its token).
+- `DeckVoice.swift` - deckVoice.ts line for line: the messages, the follow filter, the Hermite read, the fit, the
+  squeeze, the DC blocker, the limiter, the reports; rendering into the caller's buffers, allocating nothing per block.
+- `DeckRules.swift` - deck.ts's Deck class method for method, over `DeckHost` and `DeckClock`; the phone's handover
+  lead (`handoverLead`, `resumeAsked`, `releaseLed`) and `HandoverTiming`, the spec's 3.5 arithmetic.
+- `TurntablePress.swift` - Turntable.tsx's handlers and NowPlaying's turntable toggle, over `PressDeck` (DeckRules)
+  and `PressHost`.
+
+Tests (DeadwaxCoreTests): JSMathTests, PlatterTests, TurntableGeometryTests, PlaySpeedTests, TurntableWordsTests,
+TurntablePaletteTests, DeckFixturesTests, DeckVoiceTests (A and B), DeckRulesTests, HandoverPlanTests,
+TurntablePressTests. Fixtures/deck/: 61 files, 2986 KB of the 3 MB.
+
+**Departures** (each in the spec's section, as built):
+
+- **Press traces not exported** (7.0, 3.1): `press/` holds only the handlers' hashes; TurntablePress is held by eight
+  hand-built cases. The traces through a mounted Turntable are still owed - built in the review, below.
+- **The budget** (7.0): 120 Hz for five of the eight motions; the motions' play trimmed to 500 ms before and 3 s
+  after; the 416 case under reduced motion; a case's effects hashed per 512 when over 400; the voice's eight cases
+  its own, not every rules case's messages.
+- **Effects numbered by their input** (7.0): a mutation (the refresh's speed) passed with every effect in order and
+  one ask at another position report; numbered, it fails.
+- **`heard` carries pos, rate and gain only** (7.0) - the fields the rules read.
+- **DeckHost and DeckClock** (3.3): the host carries `voiceMade`, `sleepAudio`, `closeAudio` and `post`; the clock
+  is its own protocol; `window` answers through a `Result` callback, not `async throws`; `.offline` is retried,
+  `.undecodable` and `.channels` refused.
+- **The lead's paths** (3.5): `resumeAsked` also cleared by any new plan; `holdsAcross` left to the host and Debug;
+  the resumed plan's end posts only the hold drive.
+- **DeckMaths an instance protocol** (4.2), the maths-free constants in enums and the sums in small generic structs.
+
+**Verified** (this Mac, Xcode's toolchain):
+
+- DeckVoiceTests A: 72 runs (8 cases x 48 and 44.1 kHz x blocks of 128, 333, 512, 1024 and 1) bit for bit - each
+  span's hash, each report, the three whole stretches, the Math calls in the web's order. B: the platform's libm
+  gave the web's output exactly (worst 0, so -inf dBFS; the bound is -100).
+- DeckRulesTests: 42 cases, 39,929 effects, equal to the web's with RecordedMaths; with the platform's libm the whole
+  cases' doubles within 4.2e-16 relative (the bound 1e-9), the hashed cases by count.
+- HandoverPlanTests 7/7, TurntablePressTests 8/8, and the pure suites.
+- Mutations, each alone: the voice's 6 and the platter's and geometry's 2, all caught; DeckRules' 11 against the
+  replay, 8 caught - the 3 survivors TAKE_BACK_S written as 0.1 (it is 0.09999999999999999; equal at the traces'
+  magnitudes), `>=` for `>` against stampedTo (unreachable: frames run before inputs at the same ms) and the
+  angle's product regrouped (exact for these speeds); the lead path's 5 and TurntablePress's 3, all caught.
+- iosdeck.sim's `--check`: the 61 files are what the web's code makes now.
+- The whole package (`swift test`: 685 tests in 94 suites, and DeadwaxAudio's 93 in 3), the app's device build
+  (`xcodebuild … generic/platform=iOS`, no warning from the code; check_project.py ok), all 76 sims, and the five
+  iOS pytest files (125 passed). Their first run caught two things the earlier commits broke: debugRows' health was
+  `struct Health`, which test_ios_contract.py's reader takes for the server's (renamed `DeckHealth`, the web's own
+  name), and the three .f32 stretches failed test_source_bytes.py (`.f32` added to its binary suffixes: raw Float32
+  audio, base64 would pass the 3 MB).
+
+**Assumed, not seen**: Linux - by reading (the files import only libm), with ios.yml's ubuntu job to say; that
+glibc's libm keeps test B inside -100 dBFS (Darwin's happened to equal V8's for the voice, not for all the
+platter's); CI's Node 22 answering V8's Math as Node 20.12 did; the order TurntablePress makes its calls in, beyond
+the hand-read cases; the lead path against a real engine (slice 2's HandoverTimingTests).
+
+**For a reviewer**: the lead path in DeckRules (`releaseLed`, the `resumed` branch of `planEnded`, the judge's early
+fire in `handOver`'s `done`) is in no web trace; TurntablePress has no trace at all; the dropped 120 Hz motions.
+
+**Review** (2026-11-12, one reviewer, the same day). What was asked: the press traces, the lead path, the dropped
+120 Hz motions, test_source_bytes.py's `.f32`, and the rest - Linux, the JS helpers, `DeckHealth`, Node 22.
+
+- **The press traces, built** (spec 7.0's as-built): `press/` now holds 13 traces made by mounting the real
+  Turntable and NowPlaying over the deck harness and a fake player and driving them with pointer events and keys,
+  every call the handlers make recorded in order with what it returned and the deck's state after it, and the drawn
+  turn and the silent line as they change. TurntablePressTraceTests replays them: every call bit for bit with the
+  web's Math, again with the platform's (within 1e-9), the drawn turn and the silent line checked after every
+  input. 74 files, 3056 KB of the 3072 - 16 KB left. The one patch to the compiled web is at Turntable's render, to
+  tell the exporter what it drew.
+- **Two places TurntablePress wasn't the web, found by the traces and fixed** (spec 3.1's review): a second finger
+  started a press of its own (the web takes the primary pointer only), and a lift whose drag a song change dropped
+  ran no click (a browser's click still comes, pausing the new song). Both are `following`, the touch the turntable
+  follows. A hand test added for a release asking to play a song already playing (the web's never does, so no trace
+  can say it), which a mutation had passed.
+- **The lead path, two fixes** (spec 3.5's review): Reduce Motion's take held a take's 0.12 s where the song can
+  take most of a second to be heard - it now holds HANDOVER_MAX_S until the judge; a plan silent at its early resume
+  and sounding by its end had no judge and no hold - the plan's end now makes both. HandoverPlanTests 7 -> 12.
+- **Mutations**, each alone against the new tests, all caught: TurntablePress's 7 (the grabbed offset, the clamp
+  from drawnAt, the second finger, the click after a song change, the silent line, the hand's turn, the play
+  asked of a playing song - the last by the hand test only) and the lead path's 6 (the take's hold, the late judge,
+  `startPlan`'s clearing, the late judge at `plan.x`, `done` leaving the plan, a second resume at the end).
+- **The 120 Hz half, quarter and double: not brought back.** They are steady1 at other speeds, which 60 Hz holds
+  for all three and 120 Hz for steady1; nothing in the rules branches on the frame rate and the speed together. They
+  can't come back hashed: what makes them big is their inputs (each hand sample, about 53 KB a case), which the
+  replay must have whole - the effects already hash past 400. Room for them would come from porting
+  lab/motions.ts and its seeded generator to the Swift test (the inputs made on both sides, like the windows), or
+  from trimming turntable.json's 24 drags (438 KB).
+- **`.f32`** in test_source_bytes.py narrowed from a binary suffix anywhere to `.f32` in
+  Fixtures/deck/voice/ alone (`BINARY_IN`); a `.f32` anywhere else is read as text and fails on its bytes, which a
+  new test holds.
+- **Node 22**: the exporter recomputed every Math answer with whatever Node ran it, so a V8 answering otherwise
+  would fail iosdeck's --check on CI with nothing in the TypeScript changed. It now answers each call maths.json
+  holds with the committed answer, and says when Node's own differs - which keeps maths.json and every file made
+  only from recorded calls the same on any Node. About 32,000 calls are made with the recording off (the bench's
+  motions, the harness's tone, the deck's frames between press inputs) and stay Node's: tried with sin, cos and exp
+  one ulp off on half their inputs, --check failed on 22 files (48 without the guard), now naming the Math as why.
+  Not seen on Node 22 then - since seen, and the check made to hold on any machine (below).
+- **Read and found right**: JSMath's six helpers against 4.2 and ECMAScript (round's halves and -0, min's and
+  max's zeros and NaN, ToInt32's modulo, fround through Float); `DeckHealth`, the web's own name, which keeps
+  test_ios_contract.py's `struct Health` reader on the server's. Linux: the slice's Core files import only libm, but
+  TurntableWords' `range(of:)` and `replacingCharacters` are Foundation's, compiling only because other files import
+  it - it now imports Foundation itself.
+
+**Checked** after the review: `swift test` 694 tests in 95 suites, and DeadwaxAudio's 93 in 3; the device build
+(`** BUILD SUCCEEDED **`, no warning from the code) and check_project.py ok; all 76 sims (iosdeck: 74 fixtures,
+3056 KB of 3072); the five iOS pytest files, 126 passed. **Still assumed**: Linux (ios.yml's ubuntu job, not run
+here); Node 22's Math; the lead path against an engine (slice 2).
+
+**A check that holds on any machine** (2026-11-12, after the merge into ios). CI's tests.yml failed iosdeck.sim on
+ubuntu x64 with Node v22.23.4: jsmath.json, turntable.json and maths.json differed. The same Node on this Mac
+(arm64, fetched into the scratchpad) changed a different set: maths.json, press/turn-back-past-the-start.json and
+rules/motion-{ramp,scratch}-{60,120}.json. So what the exporter writes depends on the CPU as well as on the Node,
+and byte-equal regeneration can't hold on every machine. The Swift passed either way: it replays maths.json.
+
+- **A NaN is written as one.** x64's arithmetic makes 0xfff8000000000000, arm64's 0x7ff8000000000000, and V8 passes
+  them through Math.min, Math.max and the arithmetic, but JavaScript can't see a NaN's sign. The exporter writes
+  every double and Float32 through `setF64` and `setF32` - the hex, the base64, the hashes of the voice's output and
+  reports, the Math table's keys and its run hashes - and they write any NaN as 0x7ff8000000000000 (a Float32's as
+  0x7fc00000). The Swift tests write theirs the same way (`RecordedMaths.bits`, which also looks up and hashes a call
+  by it, so a NaN made on x64 Linux finds the table's; `DeckFixtures.bits` for a Float32; TraceWorld's `hex`), held
+  by DeckFixturesTests' `everyNaNIsOne`. On this Mac it changed no committed byte. A stand-in for x64 (a preload
+  giving every Math function's NaN the sign bit) reproduced CI's failure exactly with the old exporter - jsmath.json,
+  turntable.json, maths.json - and passes the full check with the new.
+- **The maker, recorded**: `made.json` holds the Node, platform and arch that made the fixtures (`made_on`: v20.12.2
+  darwin/arm64, this Mac's /usr/local/bin/node) and the sha256 of the exporter and ui/test/deckHarness.cjs
+  (`made_with`). Writing the fixtures makes the running Node their maker - so write them on it.
+- **Two kinds of check.** --check still makes everything again in memory. On the maker's Node, platform and arch,
+  every file must be the same byte for byte (a full check). Anywhere else, a differing file fails if its sources
+  (`made_from`) changed, if it is new, missing or stray, or if no Math answer reaches it (EXACT: jsmath.json,
+  tokens.json, voice/windows.json, press/handlers.json); a change to the exporter or the harness (`made_with`)
+  fails everywhere. Otherwise it differs only by that Node's Math: listed, not failed (a sources-only check).
+  iosdeck's PASS line names the kind that ran.
+- **Files that had no `made_from`** got one rather than being taken for Math's: jsmath.json the sha256 of
+  `jsmathFixture`'s own text, voice/windows.json that of `recipeChannel` and `recipeWindow`, and maths.json every
+  other file's together. jsmath.json and windows.json are also EXACT - nothing in them is a Math function's answer,
+  and ECMAScript defines the rest - so a difference in them on any machine is a failure, not a note. The .f32
+  stretches are judged by their case's .json.
+- **Verified**: on Node 20.12.2 (the maker) the full check passes; on Node v22.23.4 arm64 it passes sources-only,
+  with 68 files byte for byte and 6 differing by its Math alone (maths.json, press/turn-back-past-the-start.json,
+  rules/motion-{ramp,scratch}-{60,120}.json) - V8 22 answers 13 of the recorded calls otherwise (exp 3, log 1, sin
+  6, cos 2, atan2 1); with the x64 stand-in on Node 22 as well, the same. lib/platter.ts's MAX_SPEED changed from 24
+  to 25: both Nodes fail (the maker's on every file it reaches, Node 22's as "its sources changed"); a comment added
+  to the exporter: both fail. **Not seen**: x64 itself - Rosetta isn't installed here, so node-v22.23.4-darwin-x64
+  wasn't run; CI's next run is the first.
 
 ## The EQ, slice 1: Core (2026-11-12)
 
