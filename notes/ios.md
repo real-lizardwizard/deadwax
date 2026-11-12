@@ -2475,3 +2475,96 @@ offline banner (`showsOfflineBanner()`, after the inset round); Debug's Download
 the player's offline skip (`PlayerWords.afterEngineFailure`'s `notOnPhone`, its notice words are in DownloadWords) and
 no prefetch offline; the album page reading its kept answer offline (3.7); Up Next's marks (after its round);
 `queue_pending` (7.6's queue saves kept - the table is there, ResumeController isn't wired to it yet).
+
+### Part 2: the screens (p2/downloads)
+
+Every place a download is asked for or shown, on part 1's model, to the spec's sections 1 and 3-7.
+
+**What was built**:
+- **The marks** (`App/Downloads/DownloadControl.swift`): `DownloadRing` (drawn - SwiftUI's circular ProgressView is a
+  spinner on iOS whatever its value - a quiet track, the accent arc from twelve o'clock, round caps, a quarter
+  second's move, none with Reduce Motion; the control's stop square), `DownloadMark` (one slot: a symbol, or the ring
+  in the frame that symbol takes at the font, so a state changing moves nothing beside it and grows with Dynamic
+  Type), `DownloadBar` (the Requests board's: --dw-track, its inset shade, --dw-border, --dw-bar-purple; amber and full
+  over the limit), `AlbumDownloadControl` (the bar's control: the accent arrow downloads at once, every other state a
+  menu from the control titled in words, `menuOrder(.fixed)`, VoiceOver "Download" with the album's line as its value,
+  `.updatesFrequently` while fetching, the Large Content Viewer) and `DownloadMenuSection` (2.5's items with their
+  symbols, a failed song's reason as the section's header). Palette gains `amberIcon`, `off` (0.45), `barTrack`,
+  `barEdge`, `barFill`.
+- **The album page** (3): the control before the •••; the hero's line under the badge (amber for didn't); each row's
+  slot before its time - on every row once any song has a state, on none otherwise - with its words for VoiceOver and
+  the song's download items as its actions; the menus' download section; the footer's "on this phone" line; the end
+  of a download asked from the page announced while it is on top. **Offline (3.7)**: the kept answer drawn first (an
+  album with songs here opens at once, online too), songs not here dimmed and their play disabled, Play and Shuffle
+  and a row's tap and Play Next/Last taking only what is here, the mine block hidden, "This album isn't on this phone"
+  in place of the songs; a pull asks Reachability; coming back asks deadwax again. An album gone from the collection
+  with songs here keeps its kept answer, says so under the hero, and offers only Remove (`AlbumModel.goneButHere`).
+- **Now Playing** (4): its ••• gains the playing song's items and Download Up Next (two or more, never paged), every
+  item with its symbol, the button's name "More: info, go to album, download"; `player.notice` drawn in its top row as
+  an overlay on the chevron's row. `PlayerModel.say` announces (Notice only draws). **Info** (4.4): Sound's "Plays
+  from" (what is heard: streamed with "Stream even when downloaded"), Debug's "On this phone".
+- **The Library** (5): `AlbumsScreen(list:root:)` (`AlbumList.downloaded` beside `.scope`) - Downloaded drawn by
+  `LibraryModel.drawnDownloaded` from `DownloadModel.downloadedAlbums`, its own empty note, no load, a pull asking
+  Reachability; the root's places (`PlaceGroup`/`PlaceRow`: All music, and On this phone > Downloaded with its count
+  once anything is asked for); every tile and row's mark at the end of its artist line, outside the artist's Text;
+  Downloaded's third line; the dim and "Not on this phone" offline; RefreshProblemNote not drawn offline.
+  `LibraryView` keeps Core's `LibraryRoot` (changed only off screen: another tab, a page pushed, the app in the
+  background) and consults the gate only while deadwax answers; the gate's screen gains the Downloaded row.
+- **You** (6): `DownloadsRow` between Playback and Account; Account's footnote gains "Your downloads stay..." with
+  anything here; **You > Downloads** (`App/Downloads/DownloadsScreen.swift`) - Storage (the amount and its rest in one
+  Text, the bar, the usage line, the amber over-limit line, the limit's menu Picker, other accounts with Remove asking
+  first, the store's problem), Download over (Normalization's radio group; the footer's now line amber while something
+  waits for the network), Downloading (by album, the bar while fetching), Didn't download (the reason, Try again, Try
+  all again as a row), Downloaded (largest first, the verdict trailing, under the size line at accessibility sizes),
+  Remove All (its dialog from the button), the empty state, the last footer. Each album row is one VoiceOver element
+  ("Dummy, Portishead, 12 songs · 412 MB, Checked"), its swipe Remove; Try again a row's action. **Debug** (6.9): a
+  Downloads section; "Stream even when downloaded" moved into it.
+- **Offline** (7): `OfflineBanner` (`showsOfflineBanner()`, beside `clearsPlayer()` on every tab root and pushed
+  page: one line in MainTabs.swift, one in Routes.swift); the player's skip (7.3): `PlayerModel.failed` asks first
+  whether deadwax is out of reach and the song not here (`playsHere`: a download, or a whole stream-cache copy), then
+  Core's `OfflinePlay.after` - skip to the next song here with the run-counted notice, else stop paused on it with
+  "Not on this phone - it plays once deadwax is back." as its error line; the engine link's `ReachBox` makes a song
+  with no copy fail at once offline (no 8 s wait for a request nothing answers); no prefetch offline.
+
+**Departures from the spec, and why**:
+- **The ring is drawn in the hidden symbol's frame**, not at a fixed 9 or 13 pt: the dotted mark, the ring and the
+  filled mark then take one frame at every text size, and nothing beside them moves as a state changes.
+- **`notOnPhone` is not a `PlayerWords.Failure` case** (the spec's 7.3): `Failure` mirrors the engine's
+  `AudioFailure.Kind` by raw value, and its `allCases` is pinned to the engine's five by ScreenPlayerTests. The rule is
+  `OfflinePlay` (Core, tested), consulted by the app before the engine's failure words.
+- **The song tapped in Up Next stops on itself** offline rather than being passed over (`chosenKey`): passing it would
+  play something the listener didn't ask for.
+- **A whole stream-cache copy plays offline too** (the player's `playsHere`): it is the same file. The album page's
+  dims and Play still go by downloads alone - the cache may be emptied at any moment.
+- **Downloaded lists albums on their way too** (5.1's tile states need them), their Recently added the moment they
+  were asked for until their first song arrives.
+- **A kept album answer whose song sizes changed** on deadwax (a re-tag, a new file) drops that song's copy and asks
+  for it again, so the copy and the length check never disagree (`DownloadModel.albumAnswered`).
+- **The root's first look waits for the phone's path** (`Reachability.pathKnown`, with a 1.5 s fallback): the app
+  opening in Airplane Mode must start on Downloaded, and `LibraryRoot` holds whatever it first draws while on screen.
+- **The gate isn't consulted on a check that failed because deadwax didn't answer** (`Checked.offline`), even once
+  deadwax is back - the albums kept on disk draw while it is asked again (`libraryShown` on coming back).
+- **The banner has a chevron** (rotating as it opens): a tap opening it needs a sign that it opens.
+- **The root's row while it is Downloaded reads "Albums" without a library of your own** (the spec: "All albums"):
+  it is named as the page it opens is titled.
+- **Other accounts' bytes sit under the row's name**, not as its trailing value: the trailing edge is Remove's, and
+  three things on one line wrap badly at large sizes.
+- **Didn't download's reason is drawn as ErrorNote's split, not ErrorNote itself**: the row is one VoiceOver element
+  (the reason in its label, Try again its action), and the raw words for whoever runs deadwax are their own
+  disclosure under it, as ErrorNote draws them.
+- **With the store unreadable**, You > Downloads draws no lists (not "Nothing downloaded yet", which would be wrong).
+
+**Not built**: Up Next's marks and dimming (4.3: they wait for the Up Next round's merge - one change to its row);
+`queue_pending` and the offline launch's kept queue (7.5's last bullet, 7.6's queue saves - the table and its three
+calls are part 1's, ResumeController isn't wired to them: sending a kept save only after resume's own `GET /queue`
+has had its say is a change to ResumeController's rule, not the screens'). A queue save that fails offline is still
+retried by ResumeController while the app runs; one pending at a force quit is lost, and an Airplane Mode launch
+starts with no queue. Server additions named, not built (a 2.1.x patch on main): a strong ETag on the raw stream
+relay, should the phone find no resume data after a force quit (check 5).
+
+**Verified here**: the whole DeadwaxKit package on macOS (603 Core tests, OfflinePlayTests among them; 93 engine
+tests, the downloaded copy rendering its stream's samples); the unsigned device build, BUILD SUCCEEDED with no new
+warning (appintents' "Metadata extraction skipped" is the app's as before); check_project.py; the ios sims;
+tests/test_source_bytes.py, test_ios_contract.py, test_ios_install.py. **Assumed, not seen**: everything drawn -
+nothing has run on a simulator or a phone. What only the phone can tell is the spec's section 10 (checks 1-17) and
+section 11, and docs/ios.md's "Phase 2's checks".

@@ -12,6 +12,7 @@ struct AccountSection: View {
     let user: String
 
     @Environment(ServerModel.self) private var server
+    @Environment(DownloadModel.self) private var downloads
 
     var body: some View {
         let row = server.signOutRow
@@ -40,7 +41,8 @@ struct AccountSection: View {
         } header: {
             Text(YouWords.account)
         } footer: {
-            Text(SignOutRow.footnote(user: user))
+            // with anything on the phone, where someone signing out wonders: the downloads stay (6.1)
+            Text(SignOutRow.footnote(user: user) + (downloads.anythingHere ? DownloadWords.staysAfterSignOut : ""))
         }
         .onChange(of: row.problem) { _, problem in
             if let problem { Notice.announce(problem) }

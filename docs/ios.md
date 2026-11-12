@@ -1,4 +1,4 @@
-# The iPhone app (early: Phase 1, the player)
+# The iPhone app (early: Phase 2, downloads)
 
 deadwax is getting a native iPhone app, built with SwiftUI and its own audio engine, for what a web
 page can't do well: seamless joins and normalization done on the phone, downloads to play offline,
@@ -6,12 +6,14 @@ and a song's start never lost on AirPods. It's built in phases. Phase 0, "Hello,
 single test screen that proved the tools, the connection and the audio engine. **This is Phase 1,
 the player: app 0.2**, the first version meant for playing your music day to day. It has your
 library, album pages, Up Next, Now Playing, normalization, the lock screen, plays counted, and
-picking up where you left off. Downloads, playlists, Search and the rest come in the next phases
-(see [What it can't do yet](#what-it-cant-do-yet)).
+picking up where you left off. **Phase 2 adds downloads**: an album, or a song, downloaded to the
+phone plays from there, bit for bit as deadwax has it - and goes on playing when deadwax can't be
+reached (see [Downloads](#downloads) and [Offline](#offline)). Playlists, Search and the rest come in
+the next phases (see [What it can't do yet](#what-it-cant-do-yet)).
 
-**Nothing of Phase 1 has been seen on an iPhone yet.** It's built and tested on a Mac and on Linux,
-and what only a phone can tell is what [the checks](#the-checks) are for. Until they're answered,
-read everything below as what the app is built to do.
+**Nothing of Phase 2 has been seen on an iPhone yet.** It's built and tested on a Mac, and what only
+a phone can tell is what [the checks](#the-checks) are for. Until they're answered, read everything
+about downloads below as what the app is built to do.
 
 The app talks only to deadwax, never to Navidrome, through deadwax's own routes, so the phone never
 needs the Navidrome account deadwax itself uses. With logins on, you sign in with your own Navidrome
@@ -187,10 +189,24 @@ that many."
 An empty Your albums says "Nothing in your library yet.", with **See All music** to add some from
 the collection. (Its words mention Search and Get: those are the web app's, for now.)
 
+**Downloaded.** Once anything is downloaded, on its way or didn't download, the top of the Library has
+**On this phone > Downloaded**, with how many albums. It's every album with a song on this phone,
+whoever's library it's in, drawn as the other lists are: the same orders, Find, headers and index.
+Its **Recently added** means downloaded to this phone, newest first. Each album there has a third
+line: "12 songs", "3 of 12 songs", "Downloading", "Waiting", or, in amber, "Didn't download". With
+nothing on the phone it says "Nothing downloaded yet."
+
+**The download marks**, at the end of an album's artist line on every list (and on a song's row on an
+album's page): a filled arrow for downloaded (all of it, or some of its songs), a dotted one while it
+waits, a ring filling as it downloads, and an amber **!** for didn't download. VoiceOver says them in
+words after the artist: "Downloaded", "Partly downloaded", "Downloading", "Waiting to download",
+"Didn't download".
+
 **The Library needs Navidrome**: it's the albums Navidrome lists, through deadwax. If deadwax can't
 reach Navidrome, or hasn't been told where it is, the Library says so instead of showing albums (see
-[When something goes wrong](#when-something-goes-wrong)). It checks again each time you come back to
-the Library tab or the app, and when you pull down.
+[When something goes wrong](#when-something-goes-wrong)) - with **On this phone > Downloaded** under
+it when anything is downloaded, since those play from the phone. It checks again each time you come
+back to the Library tab or the app, and when you pull down.
 
 ## An album's page
 
@@ -211,6 +227,25 @@ the Library tab or the app, and when you pull down.
   of your library only: "it's still in the collection, and nothing was deleted."
 - The artist's name is plain text for now: artist pages come in a later phase.
 
+**Downloading it** (see [Downloads](#downloads)):
+
+- **The download button**, at the top right beside the •••: a tap on the arrow downloads every song
+  of the album that isn't on the phone yet. Once it's asked for, the button shows how it's going - a
+  ring filling while it downloads, a dotted arrow while it waits, a filled arrow once it's all here,
+  an amber **!** if a song didn't download - and a tap opens a menu that says so in words ("Waiting
+  for Wi-Fi" with "Download over is Wi-Fi only - in You > Downloads." under it, "Downloaded · 412 MB",
+  "2 songs didn't download" and why), with **Remove Download** (and **Download Again** when a song
+  didn't download). So a tap meant for the ••• beside it never throws a download away.
+- **Under the title**, the same in words: "Downloading - 4 of 12", "Waiting for Wi-Fi", "Downloaded",
+  "3 of 12 songs downloaded", "2 songs didn't download".
+- **Each song** has its mark before its time, and its **•••** has **Download** (or **Remove
+  Download**, or **Download Again**); the **•••** at the top has them for the whole album. Removing
+  says "Removed from this phone: Dummy".
+- **Under the songs**: "412 MB on this phone", or "3 of 12 songs on this phone · 92 MB".
+- An album that's gone from the collection, with songs of it still on the phone, says "This album
+  isn't in the collection any more - the songs on this phone still play.", and its button has only
+  Remove Download.
+
 With Normalization on, opening an album that has FLAC songs asks deadwax to measure it, if it hasn't
 yet, so its first song is less likely to wait when you play it.
 
@@ -227,8 +262,11 @@ thin line along it for how far in the song is. Tap it for Now Playing.
 - **Shuffle, previous, play/pause, next, Repeat.** Previous goes back to the song before in a song's
   first 3 seconds; after that, or on the first song, it starts the song again. Repeat goes from off to
   **Repeat all** to **Repeat one** and back to off, and this phone remembers it.
-- **AirPlay**, **Up Next**, and **•••**, whose menu has **Info** and **Go to album**. Go to album
-  closes Now Playing and opens the album's page on the tab you're on.
+- **AirPlay**, **Up Next**, and **•••**, whose menu has **Info**, **Go to album**, **Download** (or
+  Remove Download) for the song playing, and **Download Up Next** - every song still to play that
+  isn't on the phone, when that's two or more. Go to album closes Now Playing and opens the album's
+  page on the tab you're on. What a download item did is said for a moment at the top of Now Playing
+  ("Downloading: Roads", "Downloading 23 songs from Up Next").
 - The chevron at the top, or a swipe down, closes it.
 
 ### Up Next
@@ -276,10 +314,13 @@ the rest.
   **Normalization**: what was done to this song's level, and from what. For example "Album volume
   matching, 3.6 dB quieter", "Song volume matching, 2.1 dB louder - as loud as it can go without
   distorting", "Measuring the album… (3 of 10 songs)", "Off for this song - only FLAC songs are
-  adjusted", or "Off" when Normalization is off.
+  adjusted", or "Off" when Normalization is off. **Plays from**: "This phone - checked" (or "checked
+  by size", or "not checked yet") for a song downloaded to the phone, "Streamed from deadwax" for one
+  that isn't.
 
 An admin also has a **Debug** tab: the file, what was sent to the phone and how it's being played
-(**Sent as**, **Normalization** in numbers like "Album, -3.60 dB · the album at -14.4 LUFS",
+(**Sent as**, **On this phone** - the downloaded copy's check, and for a FLAC its fingerprint, bits,
+rate and channels -, **Normalization** in numbers like "Album, -3.60 dB · the album at -14.4 LUFS",
 **Gapless**, **Output**, **Conversion**, **Lane**, **Buffered ahead** and **Last start**), and every
 field Navidrome sent about the song and its album.
 
@@ -305,7 +346,11 @@ field Navidrome sent about the song and its album.
     album was still being measured" ("the song was" for a song levelled on its own). One song
     running into the next never waits. The choice is kept on this phone, and takes effect from the
     next thing you play.
+- **Downloads**: what's on this phone ("2.1 GB"), opening [You > Downloads](#you--downloads). Under
+  it, only while something is happening: "Downloading - 6 songs to go", what it's waiting for, or, in
+  amber, "2 songs didn't download".
 - **Account**, with logins on: **Sign out**. It ends this phone's session and stops what's playing.
+  With anything downloaded, it adds that your downloads stay on this phone for when you sign in again.
   If deadwax can't be reached, it says "Couldn't reach deadwax, so you're still signed in - try
   again." Changing your password is the web app's, for now.
 - **About**: deadwax's version, whether logins are on (for an admin), and the app's own version,
@@ -322,8 +367,8 @@ Debug is where Phase 0's test screen lives now:
   Each song's row has a download button, **Download all 10** downloads the lot, and **Remove the
   downloads** deletes them - through the app's own downloads, so they go on in the background, wait for
   Wi-Fi unless you've said otherwise, and are checked once here. A song on the phone plays from there,
-  as every downloaded song does; **Stream even when downloaded** streams it instead, to hear the two
-  side by side (it's off again the next time the app opens).
+  as every downloaded song does; **Stream even when downloaded** (under Downloads, below) streams it
+  instead, to hear the two side by side.
 - **Hi-res**: **Find a 24/192 FLAC** looks through the library (up to 10,000 songs) for a 24-bit
   192 kHz FLAC, or the highest rate there is, to play. This needs a Navidrome that says each song's
   sample rate (OpenSubsonic's `samplingRate`).
@@ -345,6 +390,11 @@ Debug is where Phase 0's test screen lives now:
   same lines go to the Mac's **Console** app as they happen, for longer than Debug keeps them: with the
   iPhone connected, choose it in Console's sidebar, turn on **Action > Include Info Messages**, press
   Start, and search for `subsystem:net.lizardlounge.deadwax`.
+- **Downloads**: **Stream even when downloaded** (off again the next time the app opens); how many
+  songs are in each state (wanted, fetching, done, failed) and their bytes; the background downloads
+  iOS holds (running, waiting, and how many can carry on from where they stopped); whether deadwax can
+  be reached, the phone's network (Wi-Fi, cellular, expensive, constrained) and the last check of
+  deadwax; plays waiting to be sent; how long the sound checks took; and the last 50 download events.
 - **Library**: how many albums each list had, whether it came new or the kept one still stood, and
   how long it took to come.
 - At the bottom, how long this install runs. In its last two days, it also says to run install.sh
@@ -363,7 +413,8 @@ AirPod out pauses it.
 A song is counted as played in Navidrome once you've heard half of it, or 4 minutes, whichever comes
 first. Songs of 30 seconds or less don't count. That's the rule the web app uses, and Last.fm's.
 Navidrome passes plays on to Last.fm or ListenBrainz if it's linked to them, and is told what's
-playing now. A play that can't be sent is dropped rather than sent twice.
+playing now. A play that can't be sent - deadwax out of reach - is kept on the phone with its time and
+sent once deadwax answers again (see [The first time you open it](#the-first-time-you-open-it)).
 
 ## Picking up where you left off
 
@@ -392,7 +443,69 @@ Once a song has all arrived, it's kept on the phone, so playing it again doesn't
 2,000,000,000 bytes are kept (2 GB, as iOS's Storage screen counts), and the songs played longest ago
 go first. iOS may also empty them when the phone runs short of space, and songs are then fetched
 again. A song you skip past before it has arrived is let go, and its part deleted. This isn't a way
-to play offline: a song not kept still needs deadwax. Downloads come in a later phase.
+to play offline - iOS may empty it at any time - but a song kept whole when deadwax can't be reached
+plays from it. To be sure of a song, download it: downloads are apart from these 2 GB, and are never
+removed but by you.
+
+## Downloads
+
+Download an album from its page (the arrow at the top right), a song from its **•••**, or what's
+still to play from Now Playing's **•••**. A downloaded song is the very file deadwax has - a FLAC as
+FLAC, an MP3 as MP3 (Ogg, Opus and WMA come as MP3, which iOS can play) - and it's what plays from then
+on, online or not, bit for bit as deadwax sent it, through the same seamless joins and the same
+normalization as a stream.
+
+- **In the background.** Downloads carry on with the app in the background and the phone locked, as
+  iOS allows. Closing deadwax from the app switcher stops them until you open it again.
+- **Checked once here.** Each song's size is checked against deadwax's file, and a FLAC's sound
+  against the fingerprint the file carries, so a copy that arrived damaged is fetched again (three
+  tries). A song plays before its check is done.
+- **Waiting.** A download waits, and says so, for Wi-Fi (see Download over, below), for a connection,
+  for deadwax, for you to sign in, for room under the storage limit, or for space on the phone, and
+  starts by itself when it can.
+- **Removing** one album or song needs no confirmation: it can be downloaded again. **Remove All
+  Downloads** asks first.
+- **Per person.** Each person signed in on the phone has their own downloads. Signing out keeps
+  yours, for when you sign in again; another person's are listed as "Other accounts on this phone".
+
+### You > Downloads
+
+- **Storage**: what's downloaded ("2.1 GB of 20 GB"), a bar, and "12 albums · 148 songs · 41.2 GB
+  free on this phone". **Storage limit**: 5, 10, **20 GB** (the default), 50, 100 GB, or No limit.
+  Lowering it below what's here removes nothing: new downloads wait for room, and it says so in
+  amber. The 2 GB of songs kept from streaming are apart from it. With other accounts' downloads on
+  the phone, **Other accounts on this phone** has their size and **Remove** (it asks first).
+- **Download over**: **Wi-Fi only** (the default) - never mobile data, a phone's hotspot or Low Data
+  Mode - or **Wi-Fi and cellular**. Under them, what the phone is on now ("On mobile data now -
+  downloads wait for Wi-Fi."), in amber while a download waits for it. Changing it applies at once.
+  Both settings are kept on this phone.
+- **Downloading**: each album on its way - "4 of 12 songs", or what it waits for, with a bar while it
+  downloads. **Didn't download**: each album with songs that didn't, why, and **Try again** (**Try
+  all again** when there's more than one). **Downloaded**: every album on the phone, largest first,
+  with its size and its check - **Checked** (for a file that isn't FLAC, its size is all there is
+  to check), **Checked by size** (a FLAC that carries no fingerprint), or **Checking…**. Tap a row for its album; swipe it to **Remove**.
+- **Remove All Downloads**, which asks first.
+
+## Offline
+
+When the phone has no network, or deadwax doesn't answer (WireGuard off, away from home), the app
+says so in an amber strip at the top of each page - "Offline - showing what's on this phone", or
+"Can't reach deadwax - showing what's on this phone". Tap it for more, and, when deadwax isn't
+answering, **Try again**. It goes by itself once deadwax answers.
+
+- **The Library opens on Downloaded.** It changes only when you're not looking at it (another tab, an
+  album open over it, the app in the background), so it never moves under your finger; until then the
+  list you were on stays, with every album not on the phone dimmed. At the top, **Your albums** (or
+  **Albums**, without a library of your own) takes you to the full list, dimmed but for what's here. A pull down checks whether
+  deadwax is back.
+- **An album's page** shows what's on the phone, dims the rest, and Play and Shuffle play only the
+  songs here. An album with nothing here says "This album isn't on this phone - it plays once deadwax
+  is back."
+- **Playing**: a song that isn't on the phone is passed over to the next one that is ("Skipped "Roads"
+  - it isn't on this phone"). With nothing left that's here, the player stops on it, paused: "Not on
+  this phone - it plays once deadwax is back." Play tries it again.
+- **Opening the app** with no network: it opens at once, as last time, onto the strip and Downloaded.
+- Plays are kept and sent later; downloads waiting carry on once the phone, or deadwax, is back.
 
 ## The checks
 
@@ -450,13 +563,52 @@ The tests can't reach these either. Note what happens.
   install.sh afterwards to put the Release build back.
 - **Sign out, then sign in as someone else.** Their Library, and nothing of the first person's queue.
 
+### Phase 2's checks: downloads
+
+1. **An album, on Wi-Fi.** Tap an album's download arrow: the ring fills, the line under the title
+   counts the songs, and You > Downloads shows it under Downloading with a bar. Once it's here: the
+   filled arrow, "Downloaded · ... MB" in its menu, and You > Downloads lists it with **Checked** (or
+   Checking… for a moment). Does a 24-bit 192 kHz album check in reasonable time (Debug > Downloads)?
+2. **Locked.** Ask for a big album, lock the phone and leave it for ten minutes: is it all here?
+3. **Wi-Fi only.** On mobile data, ask for an album: "Waiting for Wi-Fi", and You > Downloads' line
+   in amber. Back on Wi-Fi, does it start by itself? Then Wi-Fi and cellular: does it download on
+   mobile data?
+4. **Airplane Mode.** Turn it on with an album downloaded: the amber strip, and the Library on
+   Downloaded once you come back to it. Play the album: every join seamless, Info says "This phone -
+   checked", and Normalization says what it said online. Open an album not on the phone: it says so.
+5. **Skipping.** With Airplane Mode on, play a list (or Up Next) mixing downloaded and not: the songs
+   not here are passed over, with the notice; at the end, it stops on the first song not here.
+6. **Opening offline.** Close the app from the app switcher, turn on Airplane Mode, open it: straight
+   onto the strip and Downloaded, with no wait.
+7. **Back.** Turn Airplane Mode off: the strip goes ("Back online" with VoiceOver), the plays made
+   offline turn up in Navidrome, and the Library is your albums the next time you come to it.
+8. **WireGuard off, away from home.** The strip says "Can't reach deadwax"; **Try again** while it's
+   off, and the strip goes by itself once it's on.
+9. **Force quit mid-download.** Ask for an album, close the app from the app switcher, open it again:
+   You > Downloads says downloads stopped, and they carry on.
+10. **The storage limit.** Set it to 5 GB with more than that here: the amber line, and nothing
+    removed. A new album waits for room.
+11. **Sign out and in.** Your downloads stay through a sign-out; signed in as someone else, they're
+    "Other accounts on this phone".
+12. **Remove All Downloads**: it asks, then the screen is empty and the Library's Downloaded row goes,
+    and Settings > General > iPhone Storage > deadwax shows the space back.
+13. **A downloaded album opens at once**, online too: no spinner before its songs.
+14. **deadwax up, Navidrome down** (Navidrome's container stopped): the Library's "isn't available"
+    screen has On this phone > Downloaded under it, and a downloaded album plays.
+15. **The strip under every bar**: on the Library (with Find), an album's page and You > Downloads,
+    offline, the strip sits under the bar and the list scrolls under it without showing through.
+16. **VoiceOver and the largest text size**: the download button ("Download, Downloading, 40
+    percent"), a song's actions, the strip as it comes and "Back online" as it goes; at the largest
+    text size, You > Downloads and an album's page with nothing cut off.
+
 ## What it can't do yet
 
 These are the web app's for now. Most of them come to the phone in the next phases:
 
-- **Downloads** to play offline: the app can download and check songs now, but the buttons to ask
-  for them come in the next part of Phase 2. Until then only Debug's test songs and the hi-res one can
-  be downloaded.
+- **Up Next's marks**: Up Next doesn't show which songs are downloaded yet.
+- **Picking up offline**: the queue you were playing is put back from Navidrome, so a phone opened
+  with no network starts with nothing queued, and a queue save that couldn't be sent before the app
+  was closed is lost (the plays aren't: they're kept).
 - **Playlists**, **artist pages** and a **songs list**, and the Library's **Shuffle** of your whole
   library.
 - **Search**, **Get** and **Requests**.
@@ -483,6 +635,12 @@ These are the web app's for now. Most of them come to the phone in the next phas
 | A song's line says **"The connection dropped while this song was loading"**, or the next song's says **"Skipped "..." - it wouldn't play"** | The app asks for a song once more after a moment, then goes on past it. Check the phone's network. |
 | **"This device couldn't play this song's audio"**, or **"Skipped "..." - this device couldn't play its audio"** | The file is damaged, or in a form iPhones can't play. Try it on the web app; an admin finds the details in You > Debug > Playing. |
 | Info's Normalization: **"Not this time - the album's volume couldn't be checked"** ("the song's" for a song levelled on its own) | deadwax is older than 2.1.1, or didn't answer in time. The song plays as it is; with 2.1.1 or later, the album's next play is levelled. |
+| An album stays on **"Waiting for Wi-Fi"** | Download over is Wi-Fi only (You > Downloads): join a Wi-Fi network that isn't a phone's hotspot, with Low Data Mode off - or choose Wi-Fi and cellular. |
+| **"Waiting for room - the storage limit is reached"** | Raise the Storage limit in You > Downloads, or remove something there (largest first). |
+| **"Waiting for space on this phone"** | The phone itself is full: make room in Settings > General > iPhone Storage. |
+| **"2 songs didn't download"**, with why ("The copy kept arriving the wrong size.", "The copy's sound didn't match the original.", "This song isn't on deadwax any more.") | **Try again** in You > Downloads. If it keeps failing, the file on the server may be damaged: play it on the web app. |
+| You > Downloads: **"This phone couldn't read its downloads - close deadwax from the app switcher and open it again."** | Downloads are off until the app opens again; nothing is deleted, and downloaded songs stream meanwhile. If it lasts, the phone may be nearly full. |
+| **"Not on this phone - it plays once deadwax is back."** | The song isn't downloaded and deadwax can't be reached. Download what you want offline before you go. |
 | The beep album isn't found | Make it with `make-test-album.py` into your music library (see "What you need"), let Navidrome scan it, then Check again in You > Debug (an admin's). |
 | **"Untrusted Developer"** when opening the app | Settings > General > VPN & Device Management > your Apple ID > Trust. |
 | The app won't open at all after a week | The free install ran out. Run `install.sh` again: nothing on the phone is lost. |

@@ -58,6 +58,8 @@ final class DownloadModel {
     private(set) var received: [String: Int64] = [:]
     /// The albums' kept answers (`GET /navidrome/albums/{id}` as answered), by id.
     private(set) var albums: [String: Album] = [:]
+    /// Every album with a song asked for or here: its songs' ids.
+    private(set) var songsOfAlbum: [String: [String]] = [:]
     /// The bytes of every copy here.
     private(set) var bytesHere: Int64 = 0
     /// Other accounts' downloads on this phone, from this server (6.3).
@@ -143,11 +145,34 @@ final class DownloadModel {
         AlbumDownload.of(songs.map(facts))
     }
 
-    /// An album's state from what this phone kept of it - for a tile, where the songs aren't in hand.
+    /// An album's state from what this phone kept of it - for a tile, where the songs aren't in hand. An album with
+    /// nothing asked for is `none` at once (a Library of thousands asks this of every tile drawn).
     func album(id albumID: String) -> AlbumDownload {
+        guard let ids = songsOfAlbum[albumID] else { return .none }
         if let songs = albums[albumID]?.song, !songs.isEmpty { return album(songs) }
-        return AlbumDownload.of(records.values.filter { $0.albumID == albumID }.map { facts(id: $0.id) })
+        return AlbumDownload.of(ids.map { facts(id: $0) })
     }
+
+    /// An album's state from some of its songs' records - You > Downloads' rows, which count what was asked for.
+    func album(records: [DownloadRecord]) -> AlbumDownload {
+        AlbumDownload.of(records.map { facts(id: $0.id) })
+    }
+
+    /// How many of `songs` are on this phone, and their bytes - the album page's footer, the control's "Downloaded ·
+    /// 412 MB".
+    func here(_ songs: [Song]) -> (count: Int, bytes: Int64) {
+        var count = 0
+        var bytes: Int64 = 0
+        for song in songs {
+            guard let record = records[song.id], record.state == .done else { continue }
+            count += 1
+            bytes += record.bytes ?? 0
+        }
+        return (count, bytes)
+    }
+
+    /// Anything of the album asked for or here (its songs' records, by id) - nil for none.
+    func songIDs(album albumID: String) -> [String]? { songsOfAlbum[albumID] }
 
     /// A ••• menu's download items for one song.
     func choices(song songID: String) -> [DownloadChoice] {
@@ -170,16 +195,23 @@ final class DownloadModel {
     /// Anything at all is on this phone.
     var anythingHere: Bool { records.values.contains { $0.state == .done } }
 
-    /// The Library's Downloaded list (5.1): every album with a song here, its Recently added the moment its first song
-    /// arrived.
+    /// The Library's Downloaded list (5.1): every album on this phone - downloaded, partly, or on its way (its tile says
+    /// which) - its Recently added the moment its first song arrived, or, for one with nothing here yet, when it was
+    /// asked for.
     var downloadedAlbums: [IndexAlbum] {
         var arrived: [String: Int64] = [:]
-        for record in records.values where record.state == .done {
+        var asked: [String: Int64] = [:]
+        for record in records.values {
+            asked[record.albumID] = min(asked[record.albumID] ?? record.wantedAt, record.wantedAt)
+            guard record.state == .done else { continue }
             let at = record.doneAt ?? record.wantedAt
             arrived[record.albumID] = min(arrived[record.albumID] ?? at, at)
         }
-        return DownloadedAlbums.index(Array(albums.values), arrived: arrived)
+        return DownloadedAlbums.index(Array(albums.values), arrived: asked.merging(arrived) { _, here in here })
     }
+
+    /// How many albums Downloaded lists - the Library root's On this phone row's count (5.2).
+    var albumCount: Int { songsOfAlbum.keys.reduce(0) { $0 + (albums[$1] != nil ? 1 : 0) } }
 
     /// The song as its album's kept answer has it (a row's title and artist), or nil.
     func song(_ songID: String) -> Song? {
@@ -231,6 +263,37 @@ final class DownloadModel {
 
     /// The album's kept answer as it was answered.
     func keptAlbum(_ albumID: String) -> Album? { albums[albumID] }
+
+    /// An album page's fresh answer for an album with songs asked for or here (3.7): kept in place of the old one, as
+    /// answered. A song whose file deadwax now gives another size - its audio replaced on the server - is fetched again
+    /// (8.4's "When the store changes a file"): the copy here is deleted and the song asked for afresh.
+    func albumAnswered(_ album: Album, body: Data) {
+        guard let store, songsOfAlbum[album.id] != nil else { return }
+        try? store.database.putAlbum(id: album.id, json: body, fetchedAt: ListenTracker.wallMs())
+        albums[album.id] = album
+        var changed: [String: Int64] = [:]
+        for song in album.song ?? [] {
+            guard let record = records[song.id], !record.isTranscode, let size = song.size, size > 0,
+                  let kept = record.sizeExpected, kept != size else { continue }
+            changed[song.id] = size
+        }
+        guard !changed.isEmpty else {
+            reload()
+            return
+        }
+        for id in changed.keys {
+            guard let record = records[id], record.state == .done, let file = store.fileURL(record) else { continue }
+            try? FileManager.default.removeItem(at: file)
+        }
+        update(Array(changed.keys)) { record in
+            var r = record
+            r.sizeExpected = changed[r.id]
+            if r.state == .done { r = DownloadRules.apply(.fileMissing, to: r) }
+            return r
+        }
+        note("album \(album.id): \(changed.count) replaced on the server, fetched again")
+        replan()
+    }
 
     // MARK: actions (in the tap)
 
@@ -428,6 +491,7 @@ final class DownloadModel {
         store = nil
         isOpen = false
         records = [:]
+        songsOfAlbum = [:]
         origins = [:]
         planned = [:]
         received = [:]
@@ -960,6 +1024,9 @@ final class DownloadModel {
             }
         }
         if byID != records { records = byID }
+        var byAlbum: [String: [String]] = [:]
+        for record in songs { byAlbum[record.albumID, default: []].append(record.id) }
+        if byAlbum != songsOfAlbum { songsOfAlbum = byAlbum }
         let kept = (try? store.database.origins()) ?? [:]
         if kept != origins { origins = kept }
         if bytes != bytesHere { bytesHere = bytes }

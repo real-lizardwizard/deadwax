@@ -2,6 +2,7 @@ import DeadwaxCore
 import Foundation
 import Network
 import Observation
+import UIKit
 
 /// Whether deadwax can be reached (notes/ios-specs/phase2-downloads.md 7.1): the phone's network from NWPathMonitor,
 /// every request's answer or silence from the transport, and a probe of `/deadwax/health` (3 s) when a request goes
@@ -10,6 +11,9 @@ import Observation
 /// Three states: `online`, `noNetwork` (no request is tried), `unreachable` (two failures in a row; the probe then runs
 /// every 30 s, and at once when the path changes or someone pulls a list or presses Try again). The downloads' planner
 /// reads the path's facts too: Wi-Fi only waits out mobile data, a hotspot and Low Data Mode.
+///
+/// VoiceOver hears the offline banner's line as deadwax goes out of reach, and "Back online" as it comes back - said here,
+/// once, since every page draws its own banner (7.2).
 @MainActor
 @Observable
 final class Reachability {
@@ -20,6 +24,9 @@ final class Reachability {
     private(set) var probing = false
     /// The last probe: when, and whether deadwax answered it (Debug's).
     private(set) var lastProbe: (at: Date, answered: Bool)?
+    /// The monitor has said the phone's path once: until then `reach` is an assumption (the Library's root waits for it
+    /// to choose between your albums and Downloaded as the app opens).
+    private(set) var pathKnown = false
 
     var online: Bool { reach == .online }
 
@@ -92,6 +99,7 @@ final class Reachability {
     // MARK: the rule's wiring
 
     private func pathChanged(_ new: NetworkPath) {
+        if !pathKnown { pathKnown = true }
         act(rule.pathChanged(new, now: Monotonic.seconds()))
     }
 
@@ -128,8 +136,17 @@ final class Reachability {
         let changed = reach != rule.reach || (rule.path.map { $0 != path } ?? false)
         if probing != rule.probing { probing = rule.probing }
         guard changed else { return }
+        let was = reach
         reach = rule.reach
         if let new = rule.path { path = new }
+        if was != reach, pathKnown { announce(from: was) }
         for handler in handlers { handler() }
+    }
+
+    /// The banner's coming and going, for VoiceOver - its line as it comes (or changes), "Back online" as it goes.
+    private func announce(from was: Reach) {
+        let words = reach == .online ? DownloadWords.backOnline : DownloadWords.banner(reach)?.line
+        guard let words else { return }
+        UIAccessibility.post(notification: .announcement, argument: words)
     }
 }

@@ -15,9 +15,14 @@ import SwiftUI
 /// album answer as Navidrome sent it - asked again only for an album the queue was played from, "Not known"
 /// otherwise, as the web's is with no album in hand. A tab strip only where there is a choice; the role going
 /// while Debug shows draws About, and coming back opens on About. Each tab opens at its top.
+///
+/// Phase 2 (phase2-downloads.md 4.4): Sound gains "Plays from" after the web's three rows - this phone, and how its copy
+/// was checked, or streamed (what is heard: with Debug's "Stream even when downloaded" on, streamed) - and Debug's Sent
+/// to this device gains "On this phone", the check and STREAMINFO's facts in Debug's words.
 struct InfoView: View {
     @Environment(PlayerModel.self) private var player
     @Environment(ServerModel.self) private var server
+    @Environment(DownloadModel.self) private var downloads
     @Environment(AppNavigation.self) private var navigation
     @Environment(\.dismiss) private var dismiss
     @State private var picked: InfoTab = .about
@@ -145,6 +150,8 @@ struct InfoView: View {
             ForEach(rows, id: \.label) { row in
                 LabeledContent(row.label, value: row.value)
             }
+            // the phone's own row, apart from the web's three
+            LabeledContent(DownloadWords.playsFrom, value: playsFrom(track.id))
         }
 
         //? last: a path to copy, and a line landing late here moves no card a finger is reaching for
@@ -197,7 +204,13 @@ struct InfoView: View {
         let engine = InfoDebug.Engine(player.engineDebug(), outputName: player.outputName, readout: player.conversion)
         let sections = InfoDebug.sections(song: song, level: track.level, key: entry.key, decisions: player.levelDecisions,
                                           live: track.albumId.flatMap { player.loudness(albumID: $0) },
-                                          engine: engine, album: album)
+                                          engine: engine, album: album).map { section in
+            //? Sent to this device gains the copy on this phone (Phase 2)
+            guard section.title == Self.sentTitle else { return section }
+            let onPhone = InfoRow(label: DownloadWords.onThisPhone,
+                                  value: DownloadWords.debugOnPhone(downloads.records[track.id], channels: song.channelCount))
+            return InfoSection(title: section.title, rows: section.rows + [onPhone])
+        }
         ForEach(Array(sections.enumerated()), id: \.offset) { _, section in
             Section(section.title) {
                 ForEach(Array(section.rows.enumerated()), id: \.offset) { _, row in
@@ -205,6 +218,17 @@ struct InfoView: View {
                 }
             }
         }
+    }
+
+    /// Debug's section the copy on this phone is said in.
+    private static let sentTitle = "Sent to this device"
+
+    /// Sound's Plays from: this phone and its check, or streamed - what is heard.
+    private func playsFrom(_ songID: String) -> String {
+        guard let record = downloads.records[songID], record.state == .done, !downloads.streamEvenWhenDownloaded else {
+            return DownloadWords.streamed
+        }
+        return DownloadWords.playsFrom(record.check ?? .unchecked, isFLAC: record.suffix.lowercased() == "flac")
     }
 
     /// Debug's clock: a tick each second while it shows, none otherwise.

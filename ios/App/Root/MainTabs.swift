@@ -49,6 +49,7 @@ private struct TabStack<Root: View>: View {
         NavigationStack(path: $path) {
             root
                 .clearsPlayer()
+                .showsOfflineBanner()
                 .appRoutes()
         }
         .environment(\.playerClearance, PlayerInset.shown(player) ? playerHeight : 0)

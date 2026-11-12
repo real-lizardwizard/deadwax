@@ -220,3 +220,68 @@ extension NavidromeGate {
         return false
     }
 }
+
+/// The player while deadwax can't be reached (spec 7.3): a song not on this phone is never asked for again - nothing
+/// would answer - but passed over at once to the next song that is here; with no song here still to come, or for the
+/// song the listener chose in Up Next, the player stops on it, paused, and says why (`DownloadWords.stoppedNotHere`).
+/// Play then asks for it again: from the stream if deadwax answers by then, else the same line.
+///
+/// Not a `PlayerWords.Failure`: those are the audio engine's own kinds, by their raw values; this is the app's knowing
+/// that the song isn't on the phone and deadwax can't be reached, whatever the engine called the failed open.
+public enum OfflinePlay {
+    /// What to do about a song not on this phone, met while deadwax can't be reached. `hereAfter`: a song still to come
+    /// is on the phone; `chosen`: the listener tapped this one in Up Next (they meant it, not the next).
+    public static func after(intendsToPlay: Bool, hereAfter: Bool, chosen: Bool) -> PlayerWords.AfterFailure {
+        guard intendsToPlay, hereAfter, !chosen else { return .stop }
+        return .skip
+    }
+
+    /// Whether any song still to come is on this phone: those after `index` in the order they play - and, with Repeat
+    /// All, those before it, which come round again.
+    public static func hereAfter(_ here: [Bool], index: Int, repeatAll: Bool) -> Bool {
+        guard here.indices.contains(index) else { return false }
+        if here[(index + 1)...].contains(true) { return true }
+        return repeatAll && here[..<index].contains(true)
+    }
+
+    /// The skip's notice (the notice capsule's 5 s, D11): the song by name - "Skipped "Roads" - it isn't on this phone" -
+    /// and, for each one more within `window` seconds of the last, how many: "Skipped 3 songs that aren't on this phone"
+    /// (the plan's "one line saying how many").
+    public struct SkipRun: Sendable, Equatable {
+        /// The notice's time (Notice.seconds, PIN_NOTICE_MS).
+        public static let window: Double = 5
+        public private(set) var count = 0
+        private var last: Double = -.infinity
+
+        public init() {}
+
+        /// One more passed over at `now` (seconds on any clock that only goes forward): the notice's words.
+        public mutating func skipped(title: String?, now: Double) -> String {
+            count = now - last <= Self.window ? count + 1 : 1
+            last = now
+            guard count > 1 else {
+                let name = title.flatMap { $0.isEmpty ? nil : $0 } ?? PlayerWords.untitled
+                return DownloadWords.skippedNotHere(title: name)
+            }
+            return DownloadWords.skippedNotHere(count: count)
+        }
+    }
+}
+
+/// An album page with deadwax out of reach, or gone from the collection (spec 3.7).
+public enum OfflineAlbum {
+    /// Play and Shuffle while deadwax can't be reached: the album's songs on this phone, in the album's order.
+    public static func playable(_ songs: [Song], here: (String) -> Bool) -> [Song] {
+        songs.filter { here($0.id) }
+    }
+
+    /// The page's own quiet line, in place of its songs or under the hero - nil for none:
+    /// - the album gone from the collection (a 404 or `{}`) with songs of it on this phone: `albumGoneHere`;
+    /// - not on this phone at all (no songs in hand), opened while deadwax can't be reached: `albumNotHere` - a state,
+    ///   not a failure: nothing was asked.
+    public static func note(online: Bool, haveSongs: Bool, gone: Bool, anyHere: Bool) -> String? {
+        if gone && anyHere { return DownloadWords.albumGoneHere }
+        if !online && !haveSongs { return DownloadWords.albumNotHere }
+        return nil
+    }
+}

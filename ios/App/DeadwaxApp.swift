@@ -90,4 +90,17 @@ enum Palette {
     static let heldFill = Color(red: 52 / 255, green: 211 / 255, blue: 153 / 255).opacity(0.14)
     /// --dw-badge-green-border rgba(110, 231, 183, 0.28).
     static let heldEdge = Color(red: 110 / 255, green: 231 / 255, blue: 183 / 255).opacity(0.28)
+    /// --dw-amber-icon #fbbf24: a download that didn't arrive, its mark (an amber the listener can act on).
+    static let amberIcon = Color(red: 0xFB / 255, green: 0xBF / 255, blue: 0x24 / 255)
+    /// --app-pin-off 0.45, an opacity: "a pin, or an Edit button, that can't be used just now" - a song or an album not
+    /// on this phone while deadwax can't be reached.
+    static let off: Double = 0.45
+    /// --dw-track #121117, --dw-border #2c2a36 and --dw-bar-purple (#b56af5 to #9333ea, top to bottom): the Requests
+    /// board's bar (app.css .app-bar), You > Downloads' bars - a download on the phone looks like one on the web.
+    /// Named `bar…`: in a music app a track is a song.
+    static let barTrack = Color(red: 0x12 / 255, green: 0x11 / 255, blue: 0x17 / 255)
+    static let barEdge = Color(red: 0x2C / 255, green: 0x2A / 255, blue: 0x36 / 255)
+    static let barFill = LinearGradient(colors: [Color(red: 0xB5 / 255, green: 0x6A / 255, blue: 0xF5 / 255),
+                                                 Color(red: 0x93 / 255, green: 0x33 / 255, blue: 0xEA / 255)],
+                                        startPoint: .top, endPoint: .bottom)
 }

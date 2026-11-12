@@ -7,6 +7,12 @@ import Observation
 /// the mine block and when each is drawn), DiscHeadings, AlbumPageLines, QueuePick, AlbumGone, AddRelease - this keeps
 /// the answers, makes the requests and hands the page what the rules say of them.
 ///
+/// Phase 2 (phase2-downloads.md 3.7): an album with songs on this phone is drawn from the answer kept with them at once -
+/// online or not - and deadwax is asked behind it; its answer replaces the kept one and is kept again. While deadwax
+/// can't be reached nothing is asked (the page draws what it has, and asks once deadwax is back); the mine block, which
+/// needs deadwax, isn't drawn, and the badge is the kept album's own. An album deadwax no longer has, with songs of it
+/// here, keeps the kept answer drawn - it still plays what is here.
+///
 /// Only the newest answer draws (AlbumPage.tsx's two latestOnly): each ask takes the next number, and an answer for
 /// an older one is dropped; the page's `.task` is cancelled when the page goes, which calls its requests off. What is
 /// in hand is kept while the page is covered and shown again (a NavigationStack re-runs the task on the way back), so
@@ -40,6 +46,13 @@ final class AlbumModel {
     private(set) var refused: (any Error)?
     /// One more each time an Add or Remove is answered, taken or refused: the page moves VoiceOver to what it says.
     private(set) var answered = 0
+    /// The album is drawn from the answer this phone kept with its downloads; deadwax's own replaces it as it comes.
+    private(set) var fromPhone = false
+    /// deadwax says the album is gone (a 404 or `{}`), and songs of it are on this phone: the kept answer stays drawn.
+    private(set) var goneButHere = false
+    /// deadwax can be reached (the page's Reachability, set as it draws): while not, nothing is asked, the mine block
+    /// isn't drawn and the badge is the album's own `starred`.
+    var online = true
 
     /// Who and which album the answers in hand are for (the page's task key): another resets everything.
     @ObservationIgnored private var key: String?
@@ -77,15 +90,23 @@ final class AlbumModel {
 
     /// Whose it is, and what is offered (Whose.albumMine, wired as AlbumPage.tsx wires it).
     var mine: AlbumMine {
+        // deadwax out of reach: the bridge can't be asked, so whose it is is the album's own `starred` (as when the
+        // bridge fails)
         Whose.albumMine(personal: personal, album: album, albumFailed: albumFailed, store: store,
-                        storeFailed: storeFailed, changed: changed)
+                        storeFailed: storeFailed || (!online && store == nil), changed: changed)
     }
     /// The badge is drawn (its place held, unseen, until then) - never for an album that is gone.
-    var badgeShown: Bool { !gone && Whose.badgeShown(mine, storeDone: store != nil || storeFailed, bridgeAsked: personal) }
+    var badgeShown: Bool {
+        !gone && !goneButHere
+            && Whose.badgeShown(mine, storeDone: store != nil || storeFailed || !online, bridgeAsked: personal)
+    }
     /// The unseen placeholder holds the mine block's place.
-    var placeholderShown: Bool { !gone && Whose.placeholderShown(mine, albumIn: album != nil, refused: refused != nil) }
-    /// The mine block is drawn.
-    var mineBlockShown: Bool { !gone && Whose.mineBlockShown(mine, refused: refused != nil) }
+    var placeholderShown: Bool {
+        !gone && !goneButHere && online && Whose.placeholderShown(mine, albumIn: album != nil, refused: refused != nil)
+    }
+    /// The mine block is drawn - only while deadwax can be reached: it acts through deadwax, and nothing stale is shown
+    /// as if it could.
+    var mineBlockShown: Bool { !gone && !goneButHere && online && Whose.mineBlockShown(mine, refused: refused != nil) }
 
     /// The heading above each song, or nil (DiscHeadings: "Disc 2 · <title>", only on an album with more than one
     /// disc or a disc title).
@@ -100,8 +121,7 @@ final class AlbumModel {
     /// The page's task: the album and - with a library of your own - the bridge, at once, each as it isn't in hand;
     /// the album's levels warmed as its songs come (PlayerModel.albumShown: AlbumPageLines.warms decides). `key` is
     /// who and which album (the task's id): another than the answers in hand are for drops them all first.
-    func load(key: String, client: DeadwaxClient?, personal: Bool, player: PlayerModel) async {
-        guard let client else { return }
+    func load(key: String, client: DeadwaxClient?, personal: Bool, player: PlayerModel, downloads: DownloadModel) async {
         if key != self.key {
             self.key = key
             album = nil
@@ -112,43 +132,57 @@ final class AlbumModel {
             changed = nil
             refused = nil
             warmed = nil
+            fromPhone = false
+            goneButHere = false
         }
         self.personal = personal
-        let wantsAlbum = album == nil && !empty
+        // the answer kept with its downloads, drawn at once - online or not
+        if album == nil, let kept = downloads.keptAlbum(route.id) {
+            album = kept
+            fromPhone = true
+        }
+        // nothing that needs deadwax is asked while it can't be reached: the page asks again once it is back
+        guard let client, online else { return }
+        let wantsAlbum = (album == nil || fromPhone) && !empty && !goneButHere
         let wantsStore = personal && store == nil
         await withTaskGroup(of: Void.self) { group in
-            if wantsAlbum { group.addTask { await self.askAlbum(client, player: player, again: false) } }
+            if wantsAlbum { group.addTask { await self.askAlbum(client, player: player, downloads: downloads, again: false) } }
             if wantsStore { group.addTask { await self.askStore(client, again: false) } }
         }
     }
 
     /// A pull to refresh: both asked afresh, drawn over what is on screen (what the page last did is told by deadwax's
     /// answer now); a failure keeps what is drawn - and with nothing drawn, says it.
-    func refresh(client: DeadwaxClient?, player: PlayerModel) async {
-        guard let client else { return }
+    func refresh(client: DeadwaxClient?, player: PlayerModel, downloads: DownloadModel) async {
+        guard let client, online else { return }
         changed = nil
         refused = nil
         let asksStore = personal
         await withTaskGroup(of: Void.self) { group in
-            group.addTask { await self.askAlbum(client, player: player, again: true) }
+            group.addTask { await self.askAlbum(client, player: player, downloads: downloads, again: true) }
             if asksStore { group.addTask { await self.askStore(client, again: true) } }
         }
     }
 
-    private func askAlbum(_ client: DeadwaxClient, player: PlayerModel, again: Bool) async {
+    private func askAlbum(_ client: DeadwaxClient, player: PlayerModel, downloads: DownloadModel, again: Bool) async {
         albumAsks += 1
         let asked = albumAsks
         do {
-            let found = try await client.album(id: route.id)
+            let (found, body) = try await client.albumAnswered(id: route.id)
             guard asked == albumAsks else { return }
             failure = nil
             if let found {
                 album = found
                 empty = false
+                fromPhone = false
+                goneButHere = false
+                downloads.albumAnswered(found, body: body)
                 if warmed != found.id {
                     warmed = found.id
                     player.albumShown(found)
                 }
+            } else if keepsKept(downloads) {
+                goneButHere = true
             } else {
                 album = nil
                 empty = true
@@ -156,11 +190,21 @@ final class AlbumModel {
             }
         } catch {
             guard asked == albumAsks, !APIFailure.isCancellation(error) else { return }
-            // a refresh that fails keeps the album drawn
-            if again, album != nil { return }
+            if AlbumGone.isGone(empty: false, failure: error), keepsKept(downloads) {
+                goneButHere = true
+                return
+            }
+            // a refresh that fails keeps the album drawn - and so does an ask behind the kept answer
+            if again || fromPhone, album != nil { return }
             failure = error
             if AlbumGone.isGone(empty: false, failure: error) { player.albumGone(id: route.id) }
         }
+    }
+
+    /// deadwax says the album is gone: the kept answer stays drawn while songs of it are on this phone.
+    private func keepsKept(_ downloads: DownloadModel) -> Bool {
+        guard let album, fromPhone || downloads.keptAlbum(album.id) != nil else { return false }
+        return downloads.here(album.song ?? []).count > 0
     }
 
     private func askStore(_ client: DeadwaxClient, again: Bool) async {

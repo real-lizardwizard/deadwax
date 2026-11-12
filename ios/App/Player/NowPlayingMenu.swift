@@ -6,17 +6,41 @@ import SwiftUI
 /// what the menu holds (NowPlayingWords.more). A SwiftUI Menu on the button, opened from it, as the album page's •••
 /// are (QueueMenu): it was a confirmationDialog on the button until the queue menus moved, and a menu has no Cancel
 /// row - a tap anywhere else closes it. The order is fixed, Info first.
+///
+/// Phase 2 (phase2-downloads.md 4.1): a second section - the song playing's download items, and Download Up Next for
+/// every song from the one playing to the queue's end that isn't on this phone or didn't download, offered for two or
+/// more (one is "Download") and never during a library's shuffle (that queue is your whole library; keeping it on the
+/// phone is Phase 3's own setting). Each is said over Now Playing ("Downloading: Roads", "Downloading 23 songs from Up
+/// Next", "Removed from this phone: Roads"), which has no mark to change. Every item carries its symbol.
 struct NowPlayingMenu: View {
     /// The song playing names its album: Go to album is in the menu.
     let hasAlbum: Bool
     let onInfo: () -> Void
     let onAlbum: () -> Void
 
+    @Environment(PlayerModel.self) private var player
+    @Environment(DownloadModel.self) private var downloads
+
     var body: some View {
+        let song = player.current.map { player.song(for: $0) ?? Song(queued: $0.track) }
+        let upNext = player.songsFromCurrent
+        let upNextCount = downloads.isOpen ? downloads.upNextCount(upNext, paged: player.paged != nil) : nil
         Menu {
-            Button(NowPlayingWords.info, action: onInfo)
+            Button(NowPlayingWords.info, systemImage: DownloadWords.infoSymbol, action: onInfo)
             if hasAlbum {
-                Button(NowPlayingWords.goToAlbum, action: onAlbum)
+                Button(NowPlayingWords.goToAlbum, systemImage: DownloadWords.goToAlbumSymbol, action: onAlbum)
+            }
+            if let song {
+                DownloadMenuSection(songs: [song], name: song.title ?? "",
+                                    downloaded: { DownloadWords.downloadingSong($0.title ?? PlayerWords.untitled) })
+                if let upNextCount {
+                    Section {
+                        Button(DownloadWords.downloadUpNext, systemImage: DownloadWords.downloadSymbol) {
+                            downloadUpNext(upNext)
+                            player.say(DownloadWords.downloadingUpNext(upNextCount))
+                        }
+                    }
+                }
             }
         } label: {
             Image(systemName: "ellipsis")
@@ -28,7 +52,13 @@ struct NowPlayingMenu: View {
         // drawn as the plain button it was (no tint): a button-styled menu with .buttonStyle, as Apple pairs them
         .menuStyle(.button)
         .buttonStyle(.plain)
-        .accessibilityLabel(NowPlayingWords.more(hasAlbum: hasAlbum))
+        .accessibilityLabel(NowPlayingWords.more(hasAlbum: hasAlbum, download: downloads.isOpen))
+    }
+
+    /// Download Up Next: each song from the one playing on that isn't here or didn't download, asked for as a song.
+    private func downloadUpNext(_ songs: [Song]) {
+        let states = songs.map { downloads.state($0.id) }
+        downloads.download(songs: DownloadChoice.asked(by: states).map { songs[$0] })
     }
 }
 

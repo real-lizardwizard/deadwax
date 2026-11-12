@@ -127,6 +127,9 @@ final class LibraryModel {
     @ObservationIgnored private var serials: [AlbumScope: Int] = [:]
     @ObservationIgnored private var sortedCache: [AlbumScope: (serial: Int, sort: AlbumSort, places: [Int])] = [:]
     @ObservationIgnored private var drawnCache: [AlbumScope: DrawnShelf] = [:]
+    /// Downloaded's list (Phase 2): the albums it was made from, their Shelf, and what was last drawn of it.
+    @ObservationIgnored private var downloadedShelf: (albums: [IndexAlbum], shelf: Shelf, serial: Int)?
+    @ObservationIgnored private var downloadedDrawn: DrawnShelf?
     /// Only the newest /me/library answer counts (latestOnly).
     @ObservationIgnored private var mineAsks = 0
     /// Only the newest Navidrome check counts (navidromeCheck.ts's latestOnly).
@@ -330,6 +333,33 @@ final class LibraryModel {
         return drawn
     }
 
+    /// What the Library's Downloaded draws (phase2-downloads.md 5.1): the albums on this phone - DownloadModel's, never
+    /// asked of deadwax - as every Albums screen draws its list, with this phone's Recently added (`AddedBy.phone`: when
+    /// each album's first song arrived). Its Shelf is made again only when the albums change; a list of what fits on a
+    /// phone is made in place.
+    func drawnDownloaded(_ albums: [IndexAlbum], typed: String) -> DrawnShelf {
+        let kept: (albums: [IndexAlbum], shelf: Shelf, serial: Int)
+        if let held = downloadedShelf, held.albums == albums {
+            kept = held
+        } else {
+            kept = (albums, Shelf(albums), (downloadedShelf?.serial ?? 0) + 1)
+            downloadedShelf = kept
+        }
+        let sort = self.sort
+        if let drawn = downloadedDrawn, drawn.serial == kept.serial, drawn.sort == sort, drawn.typed == typed {
+            return drawn
+        }
+        let by = AlbumList.downloaded.addedBy
+        let view = kept.shelf.view(sort, by: by, typed: typed)
+        let groups = view.groups.enumerated().map { at, group in
+            DrawnGroup(id: at, label: group.label, albums: group.items.map { kept.shelf.albums[$0] })
+        }
+        let drawn = DrawnShelf(serial: kept.serial, sort: sort, typed: typed, albums: kept.shelf.albums, view: view,
+                               groups: groups, truncated: false)
+        downloadedDrawn = drawn
+        return drawn
+    }
+
     // MARK: Navidrome
 
     /// Asks whether deadwax has a Navidrome that answers (navidromeChecks' check): at the Library's first showing for
@@ -429,6 +459,8 @@ final class LibraryModel {
         serials = [:]
         sortedCache = [:]
         drawnCache = [:]
+        downloadedShelf = nil
+        downloadedDrawn = nil
         lastFetch = [:]
         mine.clear()
         starredCount = StarredCountWatch()

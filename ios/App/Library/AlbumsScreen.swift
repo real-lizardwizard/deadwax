@@ -1,25 +1,42 @@
 import DeadwaxCore
 import SwiftUI
 
-/// One Albums screen (app/LibrarySection.tsx AlbumSection, D2): every album of a scope - yours, or the store's - in
-/// the order chosen, under its headers, as tiles or rows; Find in place; the index down the edge; the New marks.
-/// What it draws is Core's: the body by AlbumListBody, the order, headers, Find, count and index by Shelf.view
-/// (through LibraryModel.drawn, made once per list, sort and Find), the words LibraryWords'.
+/// One Albums screen (app/LibrarySection.tsx AlbumSection, D2): every album of a list - yours, the store's, or what is
+/// on this phone (Downloaded, phase2-downloads.md 5.1) - in the order chosen, under its headers, as tiles or rows; Find
+/// in place; the index down the edge; the New marks, and each album's download mark. What it draws is Core's: the body
+/// by AlbumListBody, the order, headers, Find, count and index by Shelf.view (through LibraryModel.drawn, made once per
+/// list, sort and Find), the words LibraryWords' and DownloadWords'.
 ///
-/// The list is the model's, shared by every screen of the scope and kept on disk; this screen asks for it as it
+/// A scope's list is the model's, shared by every screen of the scope and kept on disk; this screen asks for it as it
 /// shows and again whenever its generation moves (an Add or a Remove, the starred count, older than a minute), pull
 /// to refresh asks now. A list asked again swaps in where the old one was - never emptied, the scroll kept.
+/// Downloaded is never asked of deadwax: it is DownloadModel's albums, its Recently added the moment each arrived.
 /// Choosing a sort or typing into Find goes back to the top. Tapping the Library tab again scrolls the root to its
-/// top; the store's screen is a page of the tab's own (AppRoute.albums), so the tab's tap pops it with whatever
-/// album is over it. Nothing here plays (the gesture rule): a tile opens its album.
+/// top; the other lists are pages of the tab's own (AppRoute.albums, .downloaded), so the tab's tap pops them with
+/// whatever album is over them. Nothing here plays (the gesture rule): a tile opens its album.
+///
+/// While deadwax can't be reached (5.4) an album with nothing on this phone is dimmed and opens nothing, a list that
+/// couldn't be asked again says nothing of it (the banner says it once for every page), and a pull asks whether deadwax
+/// is back.
 struct AlbumsScreen: View {
-    let scope: AlbumScope
-    /// The tab's root - All music's row above your albums, and the tab's tap scrolls it to the top.
+    let list: AlbumList
+    /// The tab's root - the places above its albums (All music, On this phone), and the tab's tap scrolls it to the top.
     let root: Bool
+
+    init(scope: AlbumScope, root: Bool) {
+        self.init(list: .scope(scope), root: root)
+    }
+
+    init(list: AlbumList, root: Bool) {
+        self.list = list
+        self.root = root
+    }
 
     @Environment(LibraryModel.self) private var library
     @Environment(ServerModel.self) private var server
     @Environment(AppNavigation.self) private var navigation
+    @Environment(DownloadModel.self) private var downloads
+    @Environment(Reachability.self) private var reachability
     /// What is typed into Find - the screen's own: leaving it clears it.
     @State private var typed = ""
     /// On screen (not covered by a page pushed over it).
@@ -35,10 +52,17 @@ struct AlbumsScreen: View {
         let generation: Int
     }
 
+    /// The scope asked of deadwax - nil for Downloaded.
+    private var scope: AlbumScope? {
+        if case .scope(let scope) = list { return scope }
+        return nil
+    }
+
     var body: some View {
         let personal = server.access.hasLibrary
-        let drawn = library.drawn(scope, typed: typed)
-        let failure = library.failures[scope]
+        let online = reachability.online
+        let drawn = self.drawn
+        let failure = scope.flatMap { library.failures[$0] }
         let finding = Find.finding(typed)
         let entries = drawn?.view.index ?? []
         let years = ShelfIndex.kind(library.sort) == .decades
@@ -49,15 +73,15 @@ struct AlbumsScreen: View {
                     Color.clear
                         .frame(height: 0)
                         .id(ShelfAnchor.top)
-                    if root && scope == .yours && personal && !finding {
-                        AllMusicRow()
+                    if root && !finding {
+                        places(personal: personal, online: online)
                     }
-                    if let drawn, !drawn.view.countText.isEmpty {
+                    if let drawn, !drawn.view.countText.isEmpty, !(list == .downloaded && drawn.albums.isEmpty) {
                         Text(drawn.view.countText)
                             .font(.footnote)
                             .foregroundStyle(Palette.quiet)
                     }
-                    if drawn != nil, let failure {
+                    if online, drawn != nil, let failure, let scope {
                         RefreshProblemNote(failure: failure) { Task { await library.load(scope) } }
                     }
                     if drawn?.truncated == true {
@@ -66,7 +90,7 @@ struct AlbumsScreen: View {
                             .foregroundStyle(Palette.quiet)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    content(drawn, failure: failure, personal: personal)
+                    content(drawn, failure: failure, personal: personal, online: online)
                 }
                 .padding(.leading, Self.edge)
                 .padding(.trailing, entries.isEmpty ? Self.edge : ShelfIndexStrip.width(years: years) + 4)
@@ -89,7 +113,7 @@ struct AlbumsScreen: View {
                 jump(proxy, to: .top, animated: true)
             }
         }
-        .navigationTitle(LibraryWords.title(scope, personal: personal))
+        .navigationTitle(title(personal: personal))
         .searchable(text: $typed, placement: .navigationBarDrawer(displayMode: .always),
                     prompt: Text(LibraryWords.findPlaceholder))
         .autocorrectionDisabled()
@@ -100,49 +124,123 @@ struct AlbumsScreen: View {
                 LibraryLayoutSwitch()
             }
         }
-        .refreshable { await library.refresh(scope) }
-        .task(id: LoadKey(person: server.person, generation: library.generations[scope] ?? 0)) {
+        .refreshable { await pulled() }
+        .task(id: LoadKey(person: server.person, generation: scope.map { library.generations[$0] ?? 0 } ?? 0)) {
+            guard let scope else { return }
             await library.load(scope)
+        }
+        // a ring moves only while it shows: the root stays in the tab's stack under its pages
+        .task(id: shown) {
+            guard shown else { return }
+            await downloads.followProgress()
         }
         .onAppear {
             shown = true
-            library.refreshIfOld(scope)
+            if let scope, online { library.refreshIfOld(scope) }
         }
         .onDisappear { shown = false }
+    }
+
+    /// The list drawn: a scope's from the model's kept list, Downloaded from the albums on this phone.
+    private var drawn: DrawnShelf? {
+        switch list {
+        case .scope(let scope): return library.drawn(scope, typed: typed)
+        case .downloaded: return library.drawnDownloaded(downloads.downloadedAlbums, typed: typed)
+        }
+    }
+
+    private func title(personal: Bool) -> String {
+        switch list {
+        case .scope(let scope): return LibraryWords.title(scope, personal: personal)
+        case .downloaded: return DownloadWords.downloadedTitle
+        }
+    }
+
+    /// A pull: the list asked again now - or, while deadwax can't be reached, whether it is back (a probe at once).
+    private func pulled() async {
+        guard reachability.online else {
+            reachability.tryNow()
+            return
+        }
+        guard let scope else { return }
+        await library.refresh(scope)
+    }
+
+    // MARK: the places above the root's albums (5.2, 5.4)
+
+    @ViewBuilder
+    private func places(personal: Bool, online: Bool) -> some View {
+        switch list {
+        case .scope(let scope):
+            if scope == .yours && personal {
+                PlaceGroup(title: LibraryWords.allMusic) {
+                    PlaceRow(symbol: "square.stack", label: LibraryWords.allAlbums, route: .albums(.store))
+                }
+            }
+            if !downloads.records.isEmpty {
+                PlaceGroup(title: DownloadWords.onThisPhone) {
+                    PlaceRow(symbol: DownloadWords.downloadSymbol, label: DownloadWords.downloadedTitle,
+                             count: downloads.albumCount, route: .downloaded)
+                }
+            }
+        case .downloaded:
+            // the root is Downloaded (deadwax couldn't be reached as it was last shown): the way back to the albums
+            VStack(alignment: .leading, spacing: 0) {
+                // named as the page it opens is titled: "Your albums", or "Albums" without a library of your own
+                PlaceRow(symbol: "square.stack", label: LibraryWords.title(library.scope, personal: personal),
+                         route: .albums(library.scope), divider: online)
+                if !online {
+                    Text(DownloadWords.onlyDownloadedPlay)
+                        .font(.footnote)
+                        .foregroundStyle(Palette.quiet)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.bottom, 10)
+                    Divider()
+                }
+            }
+        }
     }
 
     // MARK: the body (AlbumListBody)
 
     @ViewBuilder
-    private func content(_ drawn: DrawnShelf?, failure: APIFailure?, personal: Bool) -> some View {
-        switch AlbumListBody.of(scope, list: drawn?.albums, failed: failure != nil,
-                                found: drawn?.view.found.count ?? 0, typed: typed) {
-        case .loading:
-            ProgressView()
-                .controlSize(.large)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 48)
-                .accessibilityLabel(LibraryWords.loading)
-        case .failed:
-            VStack(alignment: .leading, spacing: 10) {
-                if let failure { ErrorNote(failure, retry: true) }
-                Button(LibraryWords.tryAgain) { Task { await library.load(scope) } }
+    private func content(_ drawn: DrawnShelf?, failure: APIFailure?, personal: Bool, online: Bool) -> some View {
+        if list == .downloaded, drawn?.albums.isEmpty != false {
+            NothingDownloadedNote()
+        } else {
+            switch AlbumListBody.of(scope ?? .store, list: drawn?.albums, failed: failure != nil,
+                                    found: drawn?.view.found.count ?? 0, typed: typed) {
+            case .loading:
+                ProgressView()
+                    .controlSize(.large)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 48)
+                    .accessibilityLabel(LibraryWords.loading)
+            case .failed:
+                VStack(alignment: .leading, spacing: 10) {
+                    if let failure { ErrorNote(failure, retry: true) }
+                    Button(LibraryWords.tryAgain) {
+                        if online, let scope { Task { await library.load(scope) } } else { reachability.tryNow() }
+                    }
+                    .disabled(reachability.probing)
+                }
+                .padding(.top, 8)
+            case .emptyLibrary:
+                EmptyLibraryNote()
+            case .noAlbums:
+                ShelfNote(LibraryWords.noAlbums)
+            case .noMatch(let words):
+                ShelfNote(words)
+            case .albums:
+                if let drawn { albums(drawn, personal: personal, online: online) }
             }
-            .padding(.top, 8)
-        case .emptyLibrary:
-            EmptyLibraryNote()
-        case .noAlbums:
-            ShelfNote(LibraryWords.noAlbums)
-        case .noMatch(let words):
-            ShelfNote(words)
-        case .albums:
-            if let drawn { albums(drawn, personal: personal) }
         }
     }
 
     @ViewBuilder
-    private func albums(_ drawn: DrawnShelf, personal: Bool) -> some View {
+    private func albums(_ drawn: DrawnShelf, personal: Bool, online: Bool) -> some View {
         let marks = library.marks
+        let lines = list == .downloaded
         switch library.layout {
         case .grid:
             LazyVGrid(columns: [GridItem(.flexible(), spacing: Self.gap, alignment: .top),
@@ -151,7 +249,10 @@ struct AlbumsScreen: View {
                 ForEach(drawn.groups) { group in
                     Section {
                         ForEach(group.albums) { album in
-                            LibraryTile(album: album, isNew: personal && marks.isNew(album)) { open(album) }
+                            let download = downloads.album(id: album.id)
+                            LibraryTile(album: album, isNew: personal && marks.isNew(album), download: download,
+                                        line: lines ? line(album, download) : nil,
+                                        dimmed: !online && !download.hasSongsHere) { open(album) }
                         }
                     } header: {
                         header(group)
@@ -163,7 +264,10 @@ struct AlbumsScreen: View {
                 ForEach(drawn.groups) { group in
                     Section {
                         ForEach(group.albums) { album in
-                            LibraryRow(album: album, isNew: personal && marks.isNew(album)) { open(album) }
+                            let download = downloads.album(id: album.id)
+                            LibraryRow(album: album, isNew: personal && marks.isNew(album), download: download,
+                                       line: lines ? line(album, download) : nil,
+                                       dimmed: !online && !download.hasSongsHere) { open(album) }
                             Divider().padding(.leading, LibraryRow.textInset)
                         }
                     } header: {
@@ -172,6 +276,12 @@ struct AlbumsScreen: View {
                 }
             }
         }
+    }
+
+    /// Downloaded's third line (5.1): "12 songs", "3 of 12 songs", "Downloading", "Waiting", "Didn't download".
+    private func line(_ album: IndexAlbum, _ download: AlbumDownload) -> String {
+        let count = album.songCount ?? downloads.songIDs(album: album.id)?.count ?? 0
+        return DownloadWords.tileLine(download, songCount: count) ?? ""
     }
 
     /// A group's header, in the flow (never pinned: Shelf.tsx) - what the index scrolls to.
@@ -242,21 +352,47 @@ private struct LibraryLayoutSwitch: View {
     }
 }
 
-/// With a library of your own, above your albums: All music's one row, All albums - the store's list, pushed
-/// (app/LibraryHome.tsx's group, its one Phase 1 row).
-private struct AllMusicRow: View {
+/// One group of the root's places (app/LibraryHome.tsx's groups): All music with a library of your own, On this phone
+/// once anything is downloaded, on its way or failed (5.2) - each a header and its rows, so the groups read as one list
+/// of places, as Apple Music's Library lists Downloaded among its own.
+struct PlaceGroup<Rows: View>: View {
+    let title: String
+    @ViewBuilder let rows: () -> Rows
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(LibraryWords.allMusic)
+            Text(title)
                 .font(.title3.weight(.semibold))
                 .accessibilityAddTraits(.isHeader)
-            StoreAlbumsLink {
+            rows()
+        }
+    }
+}
+
+/// A place's row: the accent mark, its name, a count (albums, quiet), the chevron and the divider - a page pushed on
+/// the tab's path (AppRoute), so the tab's tap pops it like any page.
+struct PlaceRow: View {
+    let symbol: String
+    let label: String
+    var count: Int?
+    let route: AppRoute
+    var divider = true
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            NavigationLink(value: route) {
                 HStack(spacing: 12) {
-                    Image(systemName: "square.stack")
+                    Image(systemName: symbol)
                         .foregroundStyle(Palette.accent)
                         .accessibilityHidden(true)
-                    Text(LibraryWords.allAlbums)
+                    Text(label)
                     Spacer(minLength: 8)
+                    if let count {
+                        Text("\(count)")
+                            .monospacedDigit()
+                            .foregroundStyle(Palette.quiet)
+                            .accessibilityHidden(true)
+                    }
                     Image(systemName: "chevron.right")
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(.tertiary)
@@ -266,8 +402,24 @@ private struct AllMusicRow: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            Divider()
+            .accessibilityLabel(label)
+            .accessibilityValue(count.map { Find.countText($0, one: "album", many: "albums") } ?? "")
+            if divider { Divider() }
         }
+    }
+}
+
+/// Downloaded with nothing on it (5.1): what is empty and how to fill it, left aligned in the list's flow under the
+/// title, as Your albums' empty note is.
+private struct NothingDownloadedNote: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(DownloadWords.nothingYet)
+            Text(DownloadWords.nothingYetHow)
+                .foregroundStyle(Palette.quiet)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.top, 8)
     }
 }
 

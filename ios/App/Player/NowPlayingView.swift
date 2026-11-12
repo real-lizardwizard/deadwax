@@ -51,6 +51,17 @@ struct NowPlayingView: View {
                     .accessibilityLabel(NowPlayingWords.close)
                     Spacer()
                 }
+                // the notice (D11), said over Now Playing - which covers the capsule over the mini player: in the top
+                // row, centred, where nothing else is, so it moves nothing and covers no button (phase2-downloads.md
+                // 4.2); in with opacity alone
+                .overlay {
+                    if let notice = player.notice {
+                        Notice(text: notice)
+                            .padding(.horizontal, 48)
+                            .transition(.opacity)
+                    }
+                }
+                .animation(.default, value: player.notice)
                 Spacer(minLength: 12)
                 CoverImage(id: track.coverArt, size: 360)
                     .frame(maxWidth: 360)

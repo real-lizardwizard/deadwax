@@ -12,8 +12,13 @@ enum AppTab: Hashable {
 enum AppRoute: Hashable {
     /// An album's page, by Navidrome's album id (with what the list knew, to draw before it loads).
     case album(AlbumRoute)
-    /// An Albums screen of a scope, pushed: All music's All albums (the store's), over Your albums.
+    /// An Albums screen of a scope, pushed: All music's All albums (the store's), over Your albums - and, while the root
+    /// is Downloaded, the root's own row back to your albums.
     case albums(AlbumScope)
+    /// The Library's Downloaded (Phase 2): every album on this phone, as an Albums screen.
+    case downloaded
+    /// You > Downloads (Phase 2): what's on this phone, the two settings, what's on its way and what didn't arrive.
+    case downloads
     /// You's This phone > Server: the Server address screen, pushed.
     case serverAddress
     /// You's Debug (admins only).
@@ -126,18 +131,21 @@ final class AppNavigation {
 
 extension View {
     /// Every AppRoute's page, for a tab's NavigationStack - each given room at its foot for the player over it
-    /// (`clearsPlayer()`, MainTabs.swift).
+    /// (`clearsPlayer()`, MainTabs.swift), and the offline banner at its top (`showsOfflineBanner()`).
     func appRoutes() -> some View {
         navigationDestination(for: AppRoute.self) { route in
             Group {
                 switch route {
                 case .album(let album): AlbumView(route: album)
                 case .albums(let scope): AlbumsScreen(scope: scope, root: false)
+                case .downloaded: AlbumsScreen(list: .downloaded, root: false)
+                case .downloads: DownloadsScreen()
                 case .serverAddress: ServerAddressView()
                 case .debug: DebugView()
                 }
             }
             .clearsPlayer()
+            .showsOfflineBanner()
         }
     }
 }

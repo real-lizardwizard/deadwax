@@ -416,10 +416,11 @@ public enum NowPlayingWords {
     public static let info = "Info"
     public static let goToAlbum = "Go to album"
 
-    /// The ••• button's name: what the menu holds - "Go to album" only for a song that names its album
-    /// (NowPlaying.tsx's `More: info, add to a playlist, go to album, pin`, without what Phase 1 hasn't got).
-    public static func more(hasAlbum: Bool) -> String {
-        "More: info\(hasAlbum ? ", go to album" : "")"
+    /// The ••• button's name: what the menu holds - "Go to album" only for a song that names its album, and "download"
+    /// while this phone's downloads can be used (Phase 2) - NowPlaying.tsx's `More: info, add to a playlist, go to
+    /// album, pin`, without what the app hasn't got.
+    public static func more(hasAlbum: Bool, download: Bool = false) -> String {
+        "More: info\(hasAlbum ? ", go to album" : "")\(download ? ", download" : "")"
     }
 }
 

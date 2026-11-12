@@ -30,6 +30,19 @@ final class ClientBox: @unchecked Sendable {
     }
 }
 
+/// Whether deadwax can be reached, as the engine's opens read it on their own queue (Reachability's, set on the main
+/// thread): while not, a song not on this phone isn't streamed - its open fails at once rather than after the
+/// request's timeout, and the player passes over it (phase2-downloads.md 7.3).
+final class ReachBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var held = true
+
+    var online: Bool {
+        get { lock.withLock { held } }
+        set { lock.withLock { held = newValue } }
+    }
+}
+
 /// QueueController's engine (Core's EngineLink): every call on the main thread, each made on PlaybackEngine.
 ///
 /// - **Keys.** The engine names an entry by `generation << 32 | Up Next's key`. Up Next's keys start again at 0 with
@@ -45,6 +58,7 @@ final class ClientBox: @unchecked Sendable {
 final class PlayerEngineLink: EngineLink {
     let engine: PlaybackEngine
     let clientBox = ClientBox()
+    let reach = ReachBox()
     /// The queue's generation: +1 with each new queue and each stop.
     private(set) var generation = 0
     /// The level decisions of the queue playing.
@@ -183,6 +197,7 @@ final class PlayerEngineLink: EngineLink {
         let levels = self.levels
         let files = self.files
         let box = clientBox
+        let reach = self.reach
         return entries.map { entry in
             let song = Song(track: entry.track, size: size(entry.track.id))
             let level = entry.track.level
@@ -191,6 +206,10 @@ final class PlayerEngineLink: EngineLink {
                 let source: PCMSource
                 if let url = files.downloads.url(for: song.id) {
                     source = try FileSource(url: url, start: start)
+                } else if !reach.online, files.cache.reusable(song) == nil {
+                    // deadwax out of reach, and no whole copy kept from streaming: not asked for at all - the model
+                    // passes over it (OfflinePlay)
+                    throw AudioFailure("Not on this phone, and deadwax can't be reached.", kind: .network)
                 } else {
                     guard let client = box.client else {
                         throw AudioFailure("There's no deadwax address to stream the song from.", kind: .other)

@@ -210,9 +210,15 @@ public struct DeadwaxClient: Sendable {
     /// One album with its songs; nil when Navidrome has none by that id (deadwax answers `{}`). A 404 is thrown,
     /// for `ErrorWords`' gone sentence.
     public func album(id: String) async throws -> Album? {
+        try await albumAnswered(id: id).album
+    }
+
+    /// The same, with the body as deadwax sent it - an album page keeps it for an album with songs on this phone, so
+    /// the copy kept is the answer, not a re-encoding of it (phase2-downloads.md 8.2).
+    public func albumAnswered(id: String) async throws -> (album: Album?, body: Data) {
         let response = try await answer(request(Routes.album, path: ["album_id": id]))
-        if Self.isEmptyObject(response.body) { return nil }
-        return try decode(Album.self, response)
+        if Self.isEmptyObject(response.body) { return (nil, response.body) }
+        return (try decode(Album.self, response), response.body)
     }
 
     /// One song as Navidrome has it now - its play count and credits; nil when Navidrome has none by that id.
