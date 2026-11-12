@@ -29,8 +29,7 @@
  *                   windows made from integer recipes both sides compute: a hash of every 4,096 frames' Float32 bits,
  *                   the reports, and three short cases' whole output
  *   maths.json      every exp, log, sin, cos, atan2, hypot, pow and log10 the ported code evaluated in all of the
- *                   above, its inputs' and answer's bits - and for each voice run, how many it made and a hash of
- *                   their order
+ *                   above, its inputs' and answer's bits (each voice run's count and order are in its own file)
  *
  * Doubles are written as their IEEE bits in hex, then a space and the number as JavaScript writes it ("3ff8000000000000
  * 1.5"): the Swift reads the hex, a person the rest. Long runs of doubles are base64 of their little-endian bytes.
@@ -182,7 +181,7 @@ function laid(value, depth, indent = '') {
 }
 const files = {}
 const emit = (name, value, depth) => {
-  files[name] = laid(value, depth) + '\n'
+  files[name] = Buffer.isBuffer(value) ? value : laid(value, depth) + '\n'
 }
 const MADE_BY = 'ios/scripts/export-deck-vectors.cjs - never edit by hand: change the TypeScript and run it again'
 
@@ -555,6 +554,277 @@ function wordsFixture() {
   }
 }
 
+/* ===== voice/: deckVoice.ts's four functions, run ===== */
+
+//? THE WINDOWS, made from integer recipes both sides compute (the spec's 7.0): Int16 samples over 32768, two
+//? different channels (or one), WINDOW_SECONDS long - never committed as PCM. Swift's DeckVoiceTests makes them the
+//? same way and checks each against its hash here.
+const WINDOW_SECONDS = 8
+const windowCache = new Map()
+function recipeChannel(kind, seed, ch, length) {
+  const out = new Float32Array(length)
+  let x = (seed * 2 + ch + 1) >>> 0
+  let phase = 0
+  const period = 2400 + seed * 7 + ch * 331
+  const stepAt = Math.floor(length / 2) + ch * 9601
+  for (let i = 0; i < length; i++) {
+    let v = 0
+    if (kind === 'noise' || kind === 'soft') {
+      //? xorshift32
+      x = (x ^ (x << 13)) >>> 0
+      x = (x ^ (x >>> 17)) >>> 0
+      x = (x ^ (x << 5)) >>> 0
+      v = (x >>> 16) - 32768
+      if (kind === 'soft') v >>= 3
+    } else if (kind === 'sweep') {
+      //? a triangle whose step rises every 128 samples, in integer steps
+      phase = (phase + 1 + ((i >> 7) % 600) * (ch + 1)) & 0xffff
+      v = phase < 32768 ? phase * 2 - 32768 : (65535 - phase) * 2 - 32767
+    } else if (kind === 'clicks') {
+      const at = i % period
+      v = at === 0 ? 32767 : at === 1 ? -32768 : 0
+    } else if (kind === 'step') {
+      //? silence, then one full-scale step - for the DC blocker and the limiter
+      v = i >= stepAt ? (ch === 0 ? 32767 : -32768) : 0
+    }
+    out[i] = v / 32768
+  }
+  return out
+}
+function recipeWindow(kind, seed, rate, channels) {
+  const key = `${kind} ${seed} ${rate} ${channels}`
+  if (!windowCache.has(key)) {
+    const made = []
+    for (let ch = 0; ch < channels; ch++) made.push(recipeChannel(kind, seed, ch, WINDOW_SECONDS * rate))
+    const hash = [...FNV_START]
+    for (const channel of made) fnvBytes(hash, new Uint8Array(channel.buffer))
+    windowCache.set(key, { key: { kind, seed, rate, channels }, channels: made, hash: fnvHex(hash) })
+  }
+  return windowCache.get(key)
+}
+
+/** A case's message as the voice takes it: the window's channels made from its recipe. */
+function toVoiceMessage(message) {
+  if (message.type !== 'window') return message
+  if (!message.window) return { type: 'window', channels: [], start: 0, rate: 48000 }
+  const { kind, seed, channels, start, rate } = message.window
+  return { type: 'window', channels: recipeWindow(kind, seed, rate, channels).channels, start, rate }
+}
+const messageOut = (m) => {
+  const out = { post: d(m.post), type: m.type }
+  for (const key of ['at', 'rate', 'accel', 'time', 'until', 'seconds']) if (key in m) out[key] = d(m[key])
+  if (m.type === 'window') out.window = m.window ? { kind: m.window.kind, seed: m.window.seed, channels: m.window.channels, start: d(m.window.start), rate: d(m.window.rate) } : null
+  return out
+}
+
+//? THE RUNS: each case at block sizes 128, 333, 512 and 1024 at 48 and 44.1 kHz, and in blocks of 1 over 2,000
+//? frames from just before its first take; each block given `now` = its first frame over the rate, each message
+//? applied before the first block whose `now` is at or past its post time, with that block's `now` (as a worklet
+//? applies its port's messages between blocks)
+const VOICE_CONFIGS = [[48000, 128], [48000, 333], [48000, 512], [48000, 1024], [44100, 128], [44100, 333], [44100, 512], [44100, 1024]]
+const SPAN_FRAMES = 4096
+
+function runVoice(messages, rate, block, from, frames, keep) {
+  maths.run = { hash: [...FNV_START], calls: 0 }
+  const state = voice.newVoiceState()
+  const outs = [new Float32Array(block), new Float32Array(block)]
+  const spans = []
+  let span = [...FNV_START], inSpan = 0
+  const reports = [], reportHash = [...FNV_START]
+  let reportCount = 0
+  //? `keep`: [first frame, how many] of the run's output to keep whole
+  const kept = keep ? [new Float32Array(keep[1]), new Float32Array(keep[1])] : null
+  const frameBytes = new Uint8Array(8), frameView = new DataView(frameBytes.buffer)
+  const reportBytes = new Uint8Array(56), reportView = new DataView(reportBytes.buffer)
+  const keepReports = rate === 48000 && block === 128
+  let next = 0, done = 0
+  while (done < frames) {
+    const n = Math.min(block, frames - done)
+    const now = (from + done) / rate
+    while (next < messages.length && messages[next].post <= now) voice.voiceCommand(state, toVoiceMessage(messages[next++]), now, rate)
+    voice.renderVoice(state, outs, n, rate, now)
+    const heard = voice.voiceReport(state, n, rate, now, voice.REPORTS_PER_SECOND)
+    for (let i = 0; i < n; i++) {
+      frameView.setFloat32(0, outs[0][i], true)
+      frameView.setFloat32(4, outs[1][i], true)
+      fnvBytes(span, frameBytes)
+      const k = done + i - (keep ? keep[0] : 0)
+      if (kept && k >= 0 && k < keep[1]) {
+        kept[0][k] = outs[0][i]
+        kept[1][k] = outs[1][i]
+      }
+      if (++inSpan === SPAN_FRAMES) {
+        spans.push(fnvHex(span))
+        span = [...FNV_START]
+        inSpan = 0
+      }
+    }
+    if (heard) {
+      const values = [heard.time, heard.pos, heard.rate, heard.gain, heard.held, heard.peaks, heard.lowest]
+      reportCount += 1
+      if (keepReports) reports.push(...values)
+      values.forEach((value, i) => reportView.setFloat64(8 * i, value, true))
+      fnvBytes(reportHash, reportBytes)
+    }
+    done += n
+  }
+  if (inSpan) spans.push(fnvHex(span))
+  const run = maths.run
+  maths.run = null
+  return {
+    rate, block, from, frames, keep, spans,
+    reports: { count: reportCount, hash: fnvHex(reportHash), whole: keepReports ? f64s(reports) : null },
+    maths: { calls: run.calls, hash: fnvHex(run.hash) },
+    kept,
+  }
+}
+
+function voiceFixtures(cases) {
+  const out = []
+  for (const c of cases) {
+    const messages = [...c.messages].sort((a, b) => a.post - b.post)
+    const first = messages[0].post
+    const takeAt = (messages.find((m) => m.type === 'take') ?? messages[0]).post
+    const runs = []
+    let wholeFile = null
+    for (const [rate, block] of VOICE_CONFIGS) {
+      const from = Math.floor((first - 0.01) * rate)
+      //? at 48 kHz in blocks of 128, a stretch of the output kept whole for three of the cases
+      const keep = c.whole && rate === 48000 && block === 128 ? [Math.floor(c.whole[0] * rate) - from, Math.round(c.whole[1] * rate)] : null
+      const run = runVoice(messages, rate, block, from, Math.ceil((c.until - first + 0.01) * rate), keep)
+      runs.push(run)
+      if (keep) {
+        wholeFile = `voice/${c.name}.f32`
+        //? the first channel's Float32s, then the second's, little-endian
+        const bytes = Buffer.alloc(keep[1] * 8)
+        run.kept[0].forEach((value, i) => bytes.writeFloatLE(value, 4 * i))
+        run.kept[1].forEach((value, i) => bytes.writeFloatLE(value, 4 * (keep[1] + i)))
+        out.push([wholeFile, bytes])
+      }
+    }
+    runs.push(runVoice(messages, 48000, 1, Math.floor(takeAt * 48000) - 200, 2000, null))
+    out.push([`voice/${c.name}.json`, {
+      about: `lib/deckVoice.ts's newVoiceState, voiceCommand, renderVoice and voiceReport over the "${c.name}" case (${c.about}): each run makes a new state and renders \`frames\` frames from frame \`from\` in blocks of \`block\` at \`rate\`, each block's now its first frame over the rate, each message applied before the first block whose now is at or past its \`post\`, with that now. \`spans\`: an FNV-1a 64 hash of each ${SPAN_FRAMES} frames' output (each frame the first channel's Float32 bits and the second's, little-endian); \`reports\`: how many voiceReport made at ${'30'} a second, a hash of their doubles [time, pos, rate, gain, held, peaks, lowest] little-endian, and at 48 kHz in blocks of 128 those doubles whole (base64); \`maths\`: how many Math calls the run made and the FNV hash of them in order (maths.json says how). A run with \`whole\` wrote \`frames\` frames of its output from its own frame \`from\` to \`file\`, the first channel's Float32s then the second's.`,
+      made_by: MADE_BY,
+      made_from: Object.fromEntries([whole('lib/deckVoice.ts')]),
+      name: c.name,
+      messages: messages.map(messageOut),
+      runs: runs.map((run) => ({ rate: run.rate, block: run.block, from: run.from, frames: run.frames, spans: run.spans, reports: run.reports, maths: run.maths, whole: run.keep ? { file: wholeFile, from: run.keep[0], frames: run.keep[1] } : null })),
+    }, 3])
+  }
+  out.push(['voice/windows.json', {
+    about: `The windows the voice cases read, made from integer recipes (export-deck-vectors.cjs recipeChannel; DeckVoiceTests makes them the same way): ${WINDOW_SECONDS} s at \`rate\`, each sample an Int16 over 32768 - noise (xorshift32 seeded seed * 2 + channel + 1, its top 16 bits less 32768; soft: that shifted right 3), sweep (a triangle whose step is 1 + ((i >> 7) % 600) * (channel + 1)), clicks (+32767 then -32768 every 2400 + 7 seed + 331 channel samples), step (silence, then 32767 on the first channel and -32768 on the second from half way, the second 9601 samples later). \`hash\`: FNV-1a 64 of the channels' Float32 bits in order, little-endian.`,
+    made_by: MADE_BY,
+    windows: [...windowCache.values()].map((w) => ({ ...w.key, hash: w.hash })),
+  }, 2])
+  return out
+}
+
+//? THE CASES of the voice's own (the rules cases' messages join them, rulesVoiceCases): a hand turning back and forth
+//? then let go to coast, a wind-down, a handover (a hand, the motor back to speed, held, faded), windows swapped
+//? mid-block (none, and a mono one at another rate), a loud master the limiter must hold (a 96 kHz window turned at up
+//? to 4x either way), a step for the DC blocker, a hand that rests, goes missing, repeats and comes out of order, and
+//? a drive that runs out
+function syntheticVoiceCases() {
+  const was = maths.on
+  maths.on = false
+  const rng = seededLcg(2024)
+  const jitter = (size) => (rng() - 0.5) * 2 * size
+  const FRAME = 1 / 60
+  const window = (post, kind, seed, start, rate, channels = 2) => ({ post, type: 'window', window: { kind, seed, channels, start, rate } })
+  const take = (post, at, rate, time = post, until = Infinity) => ({ post, type: 'take', at, rate, time, until })
+  const drive = (post, at, rate, accel, time = post, until = time + 0.12) => ({ post, type: 'drive', at, rate, accel, time, until })
+  const hand = (post, at, time) => ({ post, type: 'hand', at, time })
+  const fade = (post, seconds) => ({ post, type: 'fade', seconds })
+  const stop = (post) => ({ post, type: 'stop' })
+  //? a plan's drives a frame apart from `t0`, DRIVE_FOR_S ahead, as the deck posts them; returns its end
+  const drives = (list, plan, t0, motorOn, target) => {
+    for (let t = 0; t <= plan.duration + FRAME; t += FRAME) {
+      const { x, v } = platter.planAt(plan, t)
+      list.push(drive(t0 + t, x, v, platter.acceleration(v, motorOn, target)))
+    }
+    return t0 + plan.duration
+  }
+  //? a hand's samples at `hz` from `t0` for `seconds` at speed `speed(s)`, each delivered `late` after its time
+  const hands = (list, at0, t0, seconds, hz, speed, late = 0.008, wobble = 0.0005) => {
+    let at = at0, t = t0, v = 0
+    while (t < t0 + seconds) {
+      const step = 1 / hz + jitter(0.0015)
+      v = speed(t - t0)
+      at += v * step
+      t += step
+      list.push(hand(t + late, at + jitter(wobble), t))
+    }
+    return { at, t, v }
+  }
+  const cases = []
+  {
+    const m = [window(1.0, 'noise', 1, 0, 48000), take(1.0, 2, 0)]
+    const end = hands(m, 2, 1.0, 1.5, 60, (s) => 1.5 * Math.sin(2 * Math.PI * 0.7 * s) + 0.4)
+    const stopAt = drives(m, platter.coast(end.at, end.v, 425), end.t + 0.01, false, 1)
+    m.push(fade(stopAt + 0.05, 0.04))
+    cases.push({ name: 'hand-turns', about: 'a hand at 60 Hz turning back and forth, let go to coast, faded', messages: m, until: stopAt + 0.4, whole: [end.t - 0.2, 0.5] })
+  }
+  {
+    const m = [window(1.0, 'sweep', 2, 140, 44100), take(1.0, 142, 1)]
+    const stopAt = drives(m, platter.coast(142, 1, 425), 1.0, false, 1)
+    m.push(fade(stopAt, 0.04))
+    cases.push({ name: 'wind-down', about: 'the song taken at its own speed and wound down, a 44.1 kHz window', messages: m, until: stopAt + 0.4 })
+  }
+  {
+    const m = [window(1.0, 'noise', 3, 50, 48000), take(1.0, 52, 0)]
+    const end = hands(m, 52, 1.0, 0.8, 60, (s) => 2.5 * s)
+    const planEnd = drives(m, platter.motor(end.at, end.v, 425, 1), end.t + 0.01, true, 1)
+    const there = platter.planAt(platter.motor(end.at, end.v, 425, 1), 1e9).x
+    for (let t = planEnd; t < planEnd + 0.3; t += FRAME) m.push(drive(t, there + (t - planEnd), 1, 0, t, t + 3))
+    m.push(fade(planEnd + 0.3, 0.04))
+    cases.push({ name: 'handover', about: 'a hand speeding up, let go on a playing record: the motor back to speed, held, faded over HANDOVER_FADE_S', messages: m, until: planEnd + 0.8, whole: [planEnd - 0.25, 0.5] })
+  }
+  {
+    const m = [window(1.0, 'soft', 4, 0, 48000), take(1.0, 3, 1)]
+    for (let t = 1.0; t < 2.8; t += FRAME) m.push(drive(t, 3 + (t - 1.0), 1, 0))
+    m.push(window(1.5137, 'sweep', 5, 1, 48000), { post: 2.0011, type: 'window', window: null }, window(2.2003, 'soft', 6, 0, 44100, 1), stop(2.8))
+    cases.push({ name: 'swap', about: 'a record at 1x under windows swapped mid-block: another, none, a mono one at 44.1 kHz', messages: m, until: 3.0, whole: [1.4, 0.5] })
+  }
+  {
+    const m = [window(1.0, 'noise', 7, 0, 96000), take(1.0, 2, 1)]
+    const end = hands(m, 2, 1.0, 1.5, 120, (s) => 4 * Math.sin(2 * Math.PI * 1.1 * s), 0.004)
+    m.push(stop(end.t + 0.2))
+    cases.push({ name: 'loud', about: 'a full-scale 96 kHz master turned at up to 4x either way by a 120 Hz hand: the limiter, the kernel at its widest', messages: m, until: end.t + 0.4 })
+  }
+  {
+    const m = [window(1.0, 'step', 8, 0, 48000), take(1.0, 3.6, 0.5)]
+    for (let t = 1.0; t < 2.6; t += FRAME) m.push(drive(t, 3.6 + 0.5 * (t - 1.0), 0.5, 0))
+    m.push(stop(2.7))
+    cases.push({ name: 'step', about: 'a full-scale step read at 0.5x: the DC blocker, the limiter coming down and back', messages: m, until: 3.0 })
+  }
+  {
+    const m = [window(1.0, 'clicks', 9, 10, 48000), take(1.0, 12, 0)]
+    let end = hands(m, 12, 1.0, 0.5, 60, () => 1)
+    //? a rest, then on again with samples missing on the way
+    end = hands(m, end.at, end.t + 0.2, 0.3, 60, () => 1)
+    const t1 = end.t + 0.033
+    m.push(hand(t1 + 0.008, end.at + 0.033, t1))
+    //? a repeat of the same moment, and one out of order
+    m.push(hand(t1 + 0.009, end.at + 0.0331, t1), hand(t1 + 0.010, end.at + 0.02, t1 - 0.01))
+    end = hands(m, end.at + 0.033, t1, 0.3, 60, (s) => 1 - 2 * s)
+    //? a coast's frames, then the hand catching the record before them
+    const coastAt = end.t + 0.05
+    const plan = platter.coast(end.at, end.v, 425)
+    for (let k = 0; k < 6; k++) m.push(drive(coastAt + k * FRAME, platter.planAt(plan, k * FRAME).x, platter.planAt(plan, k * FRAME).v, platter.acceleration(platter.planAt(plan, k * FRAME).v, false, 1)))
+    m.push(hand(coastAt + 6 * FRAME, end.at, coastAt + 2 * FRAME))
+    hands(m, end.at, coastAt + 2 * FRAME + 0.001, 0.3, 60, () => 0.7)
+    m.push(fade(coastAt + 0.5, 0.3))
+    cases.push({ name: 'rests', about: 'a hand on clicks that rests, goes missing, repeats a moment, comes out of order, and catches a coast', messages: m, until: coastAt + 1.0 })
+  }
+  {
+    const m = [window(1.0, 'soft', 10, 0, 48000), take(1.0, 1, 1, 1.0, 1.3), drive(1.1, 1.1, 1, -0.5, 1.1, 1.25), fade(2.0, 0.2)]
+    cases.push({ name: 'runs-out', about: 'a take and a drive that run out with nothing after them, then a fade', messages: m, until: 2.4 })
+  }
+  maths.on = was
+  return cases
+}
+
 /* ===== the run ===== */
 
 async function main() {
@@ -563,7 +833,7 @@ async function main() {
   emit('platter.json', platterFixture(), 3)
   emit('turntable.json', turntableFixture(), 3)
   emit('words.json', wordsFixture(), 3)
-  if (globalThis.__deckExtra) await globalThis.__deckExtra()
+  for (const [name, value, depth] of voiceFixtures(syntheticVoiceCases())) emit(name, value, depth)
   maths.on = false
   emit('maths.json', mathsFixture(), 2)
 
@@ -627,14 +897,12 @@ function mathsFixture() {
     table[name] = { calls: entries.length, bits: bytes.toString('base64') }
   }
   return {
-    about: 'Every exp, log, sin, cos, atan2, hypot, pow and log10 the web\'s ported code evaluated while the other fixtures were made - each entry its inputs\' and its answer\'s bits, as base64 of little-endian 64-bit words ([input, answer] or [a, b, answer]), sorted by input. `runs`: for each voice run (voice/*.json, by its file and configuration), how many calls it made and an FNV-1a 64 hash of them in order (the function\'s number in exp, log, sin, cos, atan2, hypot, pow, log10, then each input\'s little-endian bytes).',
+    about: 'Every exp, log, sin, cos, atan2, hypot, pow and log10 the web\'s ported code evaluated while the other fixtures were made - each entry its inputs\' and its answer\'s bits, as base64 of little-endian 64-bit words ([input, answer] or [a, b, answer]), sorted by input. How many calls each voice run made, and their order, is in its own voice/*.json (`maths`).',
     made_by: MADE_BY,
     functions: RECORDED,
     table,
-    runs: mathsRuns,
   }
 }
-const mathsRuns = {}
 
 main().catch((caught) => {
   console.error(caught && caught.stack)

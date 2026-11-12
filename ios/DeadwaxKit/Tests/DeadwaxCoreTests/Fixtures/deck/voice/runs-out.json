@@ -1,0 +1,129 @@
+{
+  "about": "lib/deckVoice.ts's newVoiceState, voiceCommand, renderVoice and voiceReport over the \"runs-out\" case (a take and a drive that run out with nothing after them, then a fade): each run makes a new state and renders `frames` frames from frame `from` in blocks of `block` at `rate`, each block's now its first frame over the rate, each message applied before the first block whose now is at or past its `post`, with that now. `spans`: an FNV-1a 64 hash of each 4096 frames' output (each frame the first channel's Float32 bits and the second's, little-endian); `reports`: how many voiceReport made at 30 a second, a hash of their doubles [time, pos, rate, gain, held, peaks, lowest] little-endian, and at 48 kHz in blocks of 128 those doubles whole (base64); `maths`: how many Math calls the run made and the FNV hash of them in order (maths.json says how). A run with `whole` wrote `frames` frames of its output from its own frame `from` to `file`, the first channel's Float32s then the second's.",
+  "made_by": "ios/scripts/export-deck-vectors.cjs - never edit by hand: change the TypeScript and run it again",
+  "made_from": {
+    "ui/src/lib/deckVoice.ts": "66602fe62bc0e283dfb802d315cad1632aa8202e9edb4ed23ed4d4b5ca2dd978"
+  },
+  "name": "runs-out",
+  "messages": [
+    {
+      "post": "3ff0000000000000 1",
+      "type": "window",
+      "window": {"kind":"soft","seed":10,"channels":2,"start":"0000000000000000 0","rate":"40e7700000000000 48000"}
+    },
+    {
+      "post": "3ff0000000000000 1",
+      "type": "take",
+      "at": "3ff0000000000000 1",
+      "rate": "3ff0000000000000 1",
+      "time": "3ff0000000000000 1",
+      "until": "3ff4cccccccccccd 1.3"
+    },
+    {
+      "post": "3ff199999999999a 1.1",
+      "type": "drive",
+      "at": "3ff199999999999a 1.1",
+      "rate": "3ff0000000000000 1",
+      "accel": "bfe0000000000000 -0.5",
+      "time": "3ff199999999999a 1.1",
+      "until": "3ff4000000000000 1.25"
+    },
+    {
+      "post": "4000000000000000 2",
+      "type": "fade",
+      "seconds": "3fc999999999999a 0.2"
+    }
+  ],
+  "runs": [
+    {
+      "rate": 48000,
+      "block": 128,
+      "from": 47520,
+      "frames": 67680,
+      "spans": ["38714e39d38bfe9f","fc069cd931ddcb11","579c1a7eabdc7914","e21037b3ef1c66dc","f95aeb2be7bb051e","0610dd72c5a2cdd3","018fc83631062972","03f74d1f417938fe","318dcfb6cab7e65c","11d515cab1087a81","03986d4cd5c7325c","e74baebb848c2869","832e10fc3b093f6f","b276474735d55be5","fca79fc6f5a9facd","a7d8eb975c125698","5acef7b8d0b3a5b1"],
+      "reports": {"count":42,"hash":"21424e16d0e38d3f","whole":"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"},
+      "maths": {"calls":4712,"hash":"3b4e233040ab46ed"},
+      "whole": null
+    },
+    {
+      "rate": 48000,
+      "block": 333,
+      "from": 47520,
+      "frames": 67680,
+      "spans": ["a5c3d6b98f97c4d3","1496737bb112cb53","9c924805fc2a028e","b53117d19c62a273","33cf81ab3f633bf6","9d6de59db8029183","a0f44af3c8f393dd","28e36cccd1e86635","3f7a37afe1fbfc24","914a5715351b74d2","c65136b91a8ffbae","3dce939a9a1e8b06","825f50b50220faec","17850dab5da0505a","af2dbf246430b1d9","c20e85574fcfa1a9","064f0419a1ab4de4"],
+      "reports": {"count":42,"hash":"a6daba529084ef47","whole":null},
+      "maths": {"calls":2762,"hash":"f62736b4d256a61d"},
+      "whole": null
+    },
+    {
+      "rate": 48000,
+      "block": 512,
+      "from": 47520,
+      "frames": 67680,
+      "spans": ["38714e39d38bfe9f","fc069cd931ddcb11","579c1a7eabdc7914","e21037b3ef1c66dc","f95aeb2be7bb051e","0610dd72c5a2cdd3","018fc83631062972","03f74d1f417938fe","318dcfb6cab7e65c","11d515cab1087a81","03986d4cd5c7325c","650b351be1bfd797","e287d0ca1bfb6a96","e6c87c0d98d76881","25d197b858752d99","f2d28622bb633522","ba4af2c0cb3c0eab"],
+      "reports": {"count":42,"hash":"4f7ef52bc8724910","whole":null},
+      "maths": {"calls":2336,"hash":"d7eddd6b36f27801"},
+      "whole": null
+    },
+    {
+      "rate": 48000,
+      "block": 1024,
+      "from": 47520,
+      "frames": 67680,
+      "spans": ["54143b3f67602475","16cc0abd0a15cd86","ac40eb61cbc07633","639fc3b123206468","46db2b76d8745b85","883137372be2c5df","67762f7f6d978728","9bacff4a09e3a537","4242a6f3f1c97138","4e5d0929ae65198e","48ea9939b4b82383","de6b2beb7877c115","1f84eb54b7ea6e25","ad831942f6dcd705","0288e9a788fb6989","88d90ae423c55704","d2cea624b3ed2b5a"],
+      "reports": {"count":42,"hash":"b01df4831c170f6a","whole":null},
+      "maths": {"calls":1940,"hash":"e3d93c1d22fb9bbd"},
+      "whole": null
+    },
+    {
+      "rate": 44100,
+      "block": 128,
+      "from": 43659,
+      "frames": 62181,
+      "spans": ["2bf2d8230a77c719","5ed0536b64c8f377","58bb2f7377ac1905","8b2c458d23ca8b08","563d3ebed293feac","183360b4b9ee0c62","01a3795aeeedcb92","f8e330b10c23c8f9","128c681eeac08c30","15661d7b2ded294f","74ace1c58a6efb8f","034fefb8b107ec34","de6987bad966c5ba","c5987963073d912e","8c052025519758c4","527b2836d42910b6"],
+      "reports": {"count":42,"hash":"1879060cdf2d2b65","whole":null},
+      "maths": {"calls":4454,"hash":"04712e29fb529e1a"},
+      "whole": null
+    },
+    {
+      "rate": 44100,
+      "block": 333,
+      "from": 43659,
+      "frames": 62181,
+      "spans": ["0216b96d61246cac","60d6bd366a98ec3c","8c67915c5c5b4907","4c6f67306d53df99","32b3acdcc1a4fe6c","5455a55dc7d286a1","e6ea1ea65430259c","588429fc9c0b8579","7b59b87a8b92f28c","27b21e11a02541bb","566def32c95a83e5","7ea872c1d471cdad","2c50d2a226208391","9c59c0b44a10fd07","b84cd65253f9ab60","dad5b7e3774e012a"],
+      "reports": {"count":42,"hash":"81aec89f65f451ed","whole":null},
+      "maths": {"calls":2660,"hash":"761fc1f19e74fc85"},
+      "whole": null
+    },
+    {
+      "rate": 44100,
+      "block": 512,
+      "from": 43659,
+      "frames": 62181,
+      "spans": ["2bf2d8230a77c719","5ed0536b64c8f377","58bb2f7377ac1905","8b2c458d23ca8b08","563d3ebed293feac","183360b4b9ee0c62","01a3795aeeedcb92","f8e330b10c23c8f9","128c681eeac08c30","15661d7b2ded294f","74ace1c58a6efb8f","034fefb8b107ec34","de6987bad966c5ba","c5987963073d912e","8c052025519758c4","527b2836d42910b6"],
+      "reports": {"count":42,"hash":"b4aeb1c0e79ccf01","whole":null},
+      "maths": {"calls":2270,"hash":"cb763c214637b24a"},
+      "whole": null
+    },
+    {
+      "rate": 44100,
+      "block": 1024,
+      "from": 43659,
+      "frames": 62181,
+      "spans": ["1c2adc7c91c4654e","19d969c6bd20be83","41b3268a58277b3a","68f7865bb8d44e3a","41b2bb65a2920ca0","6f073c59eaf3c3af","6aeca4ead3b1c674","b655077b24402cdd","263f8ac038cdfcf3","056db656bef3d765","f25dc7617bb4fe34","3d1ddaa153326a37","7bf9cd519b3600a9","bb0f73f6835a69fe","c05603339b25b0bc","e9b8196f1a4ca925"],
+      "reports": {"count":42,"hash":"9d97a271e42526ce","whole":null},
+      "maths": {"calls":1904,"hash":"1767c18629495337"},
+      "whole": null
+    },
+    {
+      "rate": 48000,
+      "block": 1,
+      "from": 47800,
+      "frames": 2000,
+      "spans": ["371d5f63c1eb8a77"],
+      "reports": {"count":1,"hash":"88126cfbaeed4a73","whole":null},
+      "maths": {"calls":13537,"hash":"a1d95366025e5f4a"},
+      "whole": null
+    }
+  ]
+}

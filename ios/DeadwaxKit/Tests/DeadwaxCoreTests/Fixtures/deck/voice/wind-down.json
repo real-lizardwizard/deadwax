@@ -1,0 +1,669 @@
+{
+  "about": "lib/deckVoice.ts's newVoiceState, voiceCommand, renderVoice and voiceReport over the \"wind-down\" case (the song taken at its own speed and wound down, a 44.1 kHz window): each run makes a new state and renders `frames` frames from frame `from` in blocks of `block` at `rate`, each block's now its first frame over the rate, each message applied before the first block whose now is at or past its `post`, with that now. `spans`: an FNV-1a 64 hash of each 4096 frames' output (each frame the first channel's Float32 bits and the second's, little-endian); `reports`: how many voiceReport made at 30 a second, a hash of their doubles [time, pos, rate, gain, held, peaks, lowest] little-endian, and at 48 kHz in blocks of 128 those doubles whole (base64); `maths`: how many Math calls the run made and the FNV hash of them in order (maths.json says how). A run with `whole` wrote `frames` frames of its output from its own frame `from` to `file`, the first channel's Float32s then the second's.",
+  "made_by": "ios/scripts/export-deck-vectors.cjs - never edit by hand: change the TypeScript and run it again",
+  "made_from": {
+    "ui/src/lib/deckVoice.ts": "66602fe62bc0e283dfb802d315cad1632aa8202e9edb4ed23ed4d4b5ca2dd978"
+  },
+  "name": "wind-down",
+  "messages": [
+    {
+      "post": "3ff0000000000000 1",
+      "type": "window",
+      "window": {"kind":"sweep","seed":2,"channels":2,"start":"4061800000000000 140","rate":"40e5888000000000 44100"}
+    },
+    {
+      "post": "3ff0000000000000 1",
+      "type": "take",
+      "at": "4061c00000000000 142",
+      "rate": "3ff0000000000000 1",
+      "time": "3ff0000000000000 1",
+      "until": "7ff0000000000000 Infinity"
+    },
+    {
+      "post": "3ff0000000000000 1",
+      "type": "drive",
+      "at": "4061c00000000000 142",
+      "rate": "3ff0000000000000 1",
+      "accel": "c006fa128dd09437 -2.8721057013777016",
+      "time": "3ff0000000000000 1",
+      "until": "3ff1eb851eb851ec 1.12"
+    },
+    {
+      "post": "3ff0444444444444 1.0166666666666666",
+      "type": "drive",
+      "at": "4061c0855043237b 142.01627362359054",
+      "rate": "3fee8078bb07a52c 0.9531825688292535",
+      "accel": "c005f9af09d1fa50 -2.7469158904271254",
+      "time": "3ff0444444444444 1.0166666666666666",
+      "until": "3ff22fc962fc9630 1.1366666666666667"
+    },
+    {
+      "post": "3ff0888888888889 1.0333333333333334",
+      "type": "drive",
+      "at": "4061c1046010ae3a 142.03178408868717",
+      "rate": "3fed11a916e9c1c4 0.9084058234712349",
+      "accel": "c0050478744cd86f -2.6271828733397835",
+      "time": "3ff0888888888889 1.0333333333333334",
+      "until": "3ff2740da740da74 1.1533333333333333"
+    },
+    {
+      "post": "3ff0cccccccccccd 1.05",
+      "type": "drive",
+      "at": "4061c17d752b7696 142.04656465996658",
+      "rate": "3febb2d6891e67ec 0.8655808141804733",
+      "accel": "c00419f21959c4f3 -2.512668798496287",
+      "time": "3ff0cccccccccccd 1.05",
+      "until": "3ff2b851eb851eb8 1.17"
+    },
+    {
+      "post": "3ff1111111111111 1.0666666666666667",
+      "type": "drive",
+      "at": "4061c1f0d24be3d5 142.0606471521593",
+      "rate": "3fea634ea8a5ecb2 0.8246224683674852",
+      "accel": "c00339a4b492718d -2.403146181792357",
+      "time": "3ff1111111111111 1.0666666666666667",
+      "until": "3ff2fc962fc962fc 1.1866666666666665"
+    },
+    {
+      "post": "3ff1555555555555 1.0833333333333333",
+      "type": "drive",
+      "at": "4061c25eb741dc5e 142.07406199325027",
+      "rate": "3fe92266d34dfbd8 0.7854494216006698",
+      "accel": "c002631e346a789b -2.2983974547378927",
+      "time": "3ff1555555555555 1.0833333333333333",
+      "until": "3ff340da740da740 1.2033333333333331"
+    },
+    {
+      "post": "3ff199999999999a 1.1",
+      "type": "drive",
+      "at": "4061c2c76115394e 142.08683828492434",
+      "rate": "3fe7ef7bd6eb16c4 0.747983855974518",
+      "accel": "c00195f1802cf7c9 -2.1982145322535627",
+      "time": "3ff199999999999a 1.1",
+      "until": "3ff3851eb851eb86 1.2200000000000002"
+    },
+    {
+      "post": "3ff1ddddddddddde 1.1166666666666667",
+      "type": "drive",
+      "at": "4061c32b0a24cffa 142.09900386037754",
+      "rate": "3fe6c9f19e5a5d9e 0.7121513455230575",
+      "accel": "c000d1b6408177eb -2.1023983993063573",
+      "time": "3ff1ddddddddddde 1.1166666666666667",
+      "until": "3ff3c962fc962fca 1.2366666666666668"
+    },
+    {
+      "post": "3ff2222222222222 1.1333333333333333",
+      "type": "drive",
+      "at": "4061c389ea44210e 142.1105853396079",
+      "rate": "3fe5b132e2216dae 0.6778807083714378",
+      "accel": "c0001608aa5beafa -2.0107587155629263",
+      "time": "3ff2222222222222 1.1333333333333333",
+      "until": "3ff40da740da740e 1.2533333333333334"
+    },
+    {
+      "post": "3ff2666666666666 1.15",
+      "type": "drive",
+      "at": "4061c3e436d7bc7e 142.1216081822967",
+      "rate": "3fe4a4b0dc83f772 0.6451038653319598",
+      "accel": "bffec51298798883 -1.9231134372753622",
+      "time": "3ff2666666666666 1.15",
+      "until": "3ff451eb851eb852 1.27"
+    },
+    {
+      "post": "3ff2aaaaaaaaaaab 1.1666666666666667",
+      "type": "drive",
+      "at": "4061c43a22f068a0 142.13209673838446",
+      "rate": "3fe3a3e300e870e6 0.613755704663643",
+      "accel": "bffd6db9bb4eb72f -1.8392884556482831",
+      "time": "3ff2aaaaaaaaaaab 1.1666666666666667",
+      "until": "3ff4962fc962fc96 1.2866666666666666"
+    },
+    {
+      "post": "3ff2eeeeeeeeeeef 1.1833333333333333",
+      "type": "drive",
+      "at": "4061c48bdf651a56 142.14207429644256",
+      "rate": "3fe2ae46b666f780 0.5837739527266734",
+      "accel": "bffc2558216bd93a -1.7591172509688264",
+      "time": "3ff2eeeeeeeeeeef 1.1833333333333333",
+      "until": "3ff4da740da740da 1.3033333333333332"
+    },
+    {
+      "post": "3ff3333333333333 1.2",
+      "type": "drive",
+      "at": "4061c4d99aebcb63 142.1515631299363",
+      "rate": "3fe1c35f155f1172 0.5550990502747892",
+      "accel": "bffaeb46cb672d11 -1.682440561812488",
+      "time": "3ff3333333333333 1.2",
+      "until": "3ff51eb851eb851e 1.3199999999999998"
+    },
+    {
+      "post": "3ff3777777777777 1.2166666666666666",
+      "type": "drive",
+      "at": "4061c52382313ba2 142.16058454147156",
+      "rate": "3fe0e2b4a7f28798 0.527674034139852",
+      "accel": "bff9bee6014b9068 -1.609106068667666",
+      "time": "3ff3777777777777 1.2166666666666666",
+      "until": "3ff562fc962fc962 1.3366666666666664"
+    },
+    {
+      "post": "3ff3bbbbbbbbbbbc 1.2333333333333334",
+      "type": "drive",
+      "at": "4061c569bfefa92c 142.1691589051128",
+      "rate": "3fe00bd52d450a98 0.5014444240735711",
+      "accel": "bff89f9d015f0094 -1.538968091350431",
+      "time": "3ff3bbbbbbbbbbbc 1.2333333333333334",
+      "until": "3ff5a740da740da8 1.3533333333333335"
+    },
+    {
+      "post": "3ff4000000000000 1.25",
+      "type": "drive",
+      "at": "4061c5ac7d048af5 142.1773057068564",
+      "rate": "3fde7ca6bec37c11 0.476358114521589",
+      "accel": "bff78cd9b2737496 -1.4718872996084307",
+      "time": "3ff4000000000000 1.25",
+      "until": "3ff5eb851eb851ec 1.37"
+    },
+    {
+      "post": "3ff4444444444444 1.2666666666666666",
+      "type": "drive",
+      "at": "4061c5ebe08558f3 142.18504358333993",
+      "rate": "3fdcf38d77523a77 0.4523652711149348",
+      "accel": "bff68610599a8f42 -1.4077304363390373",
+      "time": "3ff4444444444444 1.2666666666666666",
+      "until": "3ff62fc962fc9630 1.3866666666666667"
+    },
+    {
+      "post": "3ff4888888888888 1.2833333333333332",
+      "type": "drive",
+      "at": "4061c6280fd36c69 142.1923903588643",
+      "rate": "3fdb7b969b55ee29 0.42941823167322696",
+      "accel": "bff58abb531660db -1.3463700528719105",
+      "time": "3ff4888888888888 1.2833333333333332",
+      "until": "3ff6740da740da74 1.4033333333333333"
+    },
+    {
+      "post": "3ff4cccccccccccd 1.3",
+      "type": "drive",
+      "at": "4061c6612eaf0257 142.1993630808017",
+      "rate": "3fda1402f8a2f304 0.40747141152296273",
+      "accel": "bff49a5ace6314df -1.287684255790104",
+      "time": "3ff4cccccccccccd 1.3",
+      "until": "3ff6b851eb851eb8 1.42"
+    },
+    {
+      "post": "3ff5111111111111 1.3166666666666667",
+      "type": "drive",
+      "at": "4061c6975f4969db 142.20597805346083",
+      "rate": "3fd8bc1bb286e5de 0.3864812129428098",
+      "accel": "bff3b4748d36fc35 -1.231556464786775",
+      "time": "3ff5111111111111 1.3166666666666667",
+      "until": "3ff6fc962fc962fc 1.4366666666666665"
+    },
+    {
+      "post": "3ff5555555555555 1.3333333333333333",
+      "type": "drive",
+      "at": "4061c6cac25667ac 142.2122508704755",
+      "rate": "3fd77331e4ca20e6 0.3664059385560122",
+      "accel": "bff2d893a557e598 -1.1778751810764785",
+      "time": "3ff5555555555555 1.3333333333333333",
+      "until": "3ff740da740da740 1.4533333333333331"
+    },
+    {
+      "post": "3ff599999999999a 1.35",
+      "type": "drive",
+      "at": "4061c6fb771cd788 142.2181964457816",
+      "rate": "3fd6389e4abee696 0.34720570849786137",
+      "accel": "bff20648452626ac -1.1265337659009829",
+      "time": "3ff599999999999a 1.35",
+      "until": "3ff7851eb851eb86 1.4700000000000002"
+    },
+    {
+      "post": "3ff5ddddddddddde 1.3666666666666667",
+      "type": "drive",
+      "at": "4061c7299b869419 142.22382904324402",
+      "rate": "3fd50bc0ea310040 0.3288423811936845",
+      "accel": "bff13d277abf195e -1.077430228689614",
+      "time": "3ff5ddddddddddde 1.3666666666666667",
+      "until": "3ff7c962fc962fca 1.4866666666666668"
+    },
+    {
+      "post": "3ff6222222222222 1.3833333333333333",
+      "type": "drive",
+      "at": "4061c7554c2fad54 142.22916230499197",
+      "rate": "3fd3ec00c20a8ded 0.31127947758997615",
+      "accel": "bff07ccafd9a2230 -1.0304670244532979",
+      "time": "3ff6222222222222 1.3833333333333333",
+      "until": "3ff80da740da740e 1.5033333333333334"
+    },
+    {
+      "post": "3ff6666666666666 1.4",
+      "type": "drive",
+      "at": "4061c77ea474f522 142.23420927851936",
+      "rate": "3fd2d8cb7c84a7ca 0.2944821086881545",
+      "accel": "bfef89a1f5092e1f -0.9855508600098267",
+      "time": "3ff6666666666666 1.4",
+      "until": "3ff851eb851eb852 1.52"
+    },
+    {
+      "post": "3ff6aaaaaaaaaaaa 1.4166666666666665",
+      "type": "drive",
+      "at": "4061c7a5be81e9a3 142.2389824426037",
+      "rate": "3fd1d19524bc3f53 0.2784169062369887",
+      "accel": "bfee29b7c3c42587 -0.9425925086554096",
+      "time": "3ff6aaaaaaaaaaaa 1.4166666666666665",
+      "until": "3ff8962fc962fc96 1.5366666666666666"
+    },
+    {
+      "post": "3ff6eeeeeeeeeeef 1.4333333333333333",
+      "type": "drive",
+      "at": "4061c7cab35e0436 142.2434937320956",
+      "rate": "3fd0d5d7df8567af 0.2630519564460156",
+      "accel": "bfecd924702fd07a -0.9015066329143473",
+      "time": "3ff6eeeeeeeeeeef 1.4333333333333333",
+      "until": "3ff8da740da740da 1.5533333333333332"
+    },
+    {
+      "post": "3ff7333333333333 1.45",
+      "type": "drive",
+      "at": "4061c7ed9af973fd 142.24775456162743",
+      "rate": "3fcfca274eb1a678 0.24835673658826685",
+      "accel": "bfeb973cd01706ee -0.8622116150147272",
+      "time": "3ff7333333333333 1.45",
+      "until": "3ff91eb851eb851e 1.5699999999999998"
+    },
+    {
+      "post": "3ff7777777777777 1.4666666666666666",
+      "type": "drive",
+      "at": "4061c80e8c394a54 142.25177584828873",
+      "rate": "3fcdfd9c1671d004 0.23430205436636709",
+      "accel": "bfea635d2f3926cd -0.8246293947533673",
+      "time": "3ff7777777777777 1.4666666666666666",
+      "until": "3ff962fc962fc962 1.5866666666666664"
+    },
+    {
+      "post": "3ff7bbbbbbbbbbbc 1.4833333333333334",
+      "type": "drive",
+      "at": "4061c82d9d031f73 142.2555680333131",
+      "rate": "3fcc4523e0da9e44 0.22085998992155187",
+      "accel": "bfe93ce8fc09b5cc -0.7886853144279313",
+      "time": "3ff7bbbbbbbbbbbc 1.4833333333333334",
+      "until": "3ff9a740da740da8 1.6033333333333335"
+    },
+    {
+      "post": "3ff8000000000000 1.5",
+      "type": "drive",
+      "at": "4061c84ae248352a 142.25914110282002",
+      "rate": "3fca9fdeadeaa9a0 0.20800384037040676",
+      "accel": "bfe8234a7810fad5 -0.7543079705281693",
+      "time": "3ff8000000000000 1.5",
+      "until": "3ff9eb851eb851ec 1.62"
+    },
+    {
+      "post": "3ff8444444444444 1.5166666666666666",
+      "type": "drive",
+      "at": "4061c86670101d51 142.26250460765235",
+      "rate": "3fc90cf641259f3a 0.19570806675914715",
+      "accel": "bfe715f26bc510f0 -0.7214290718916612",
+      "time": "3ff8444444444444 1.5166666666666666",
+      "until": "3ffa2fc962fc9630 1.6366666666666667"
+    },
+    {
+      "post": "3ff8888888888888 1.5333333333333332",
+      "type": "drive",
+      "at": "4061c8805982e969 142.26566768234923",
+      "rate": "3fc78b9db4a12ffc 0.18394824333006443",
+      "accel": "bfe61457ddb4b9c6 -0.689983304042294",
+      "time": "3ff8888888888888 1.5333333333333332",
+      "until": "3ffa740da740da74 1.6533333333333333"
+    },
+    {
+      "post": "3ff8cccccccccccd 1.55",
+      "type": "drive",
+      "at": "4061c898b0f2e88e 142.26863906329203",
+      "rate": "3fc61b1110d1b7f9 0.17270100899935395",
+      "accel": "bfe51df7ccdee593 -0.6599081994419741",
+      "time": "3ff8cccccccccccd 1.55",
+      "until": "3ffab851eb851eb8 1.67"
+    },
+    {
+      "post": "3ff9111111111112 1.5666666666666669",
+      "type": "drive",
+      "at": "4061c8af87e5f8bb 142.27142710605935",
+      "rate": "3fc4ba94e8e1a08f 0.16194402094993562",
+      "accel": "bfe43254ee138400 -0.6311440133978294",
+      "time": "3ff9111111111112 1.5666666666666669",
+      "until": "3ffafc962fc962fe 1.686666666666667"
+    },
+    {
+      "post": "3ff9555555555556 1.5833333333333335",
+      "type": "drive",
+      "at": "4061c8c4ef1e700c 142.2740398020254",
+      "rate": "3fc36975fb60ced8 0.15165591024707825",
+      "accel": "bfe350f76c3bbc6a -0.6036336053783888",
+      "time": "3ff9555555555556 1.5833333333333335",
+      "until": "3ffb40da740da742 1.7033333333333336"
+    },
+    {
+      "post": "3ff999999999999a 1.6",
+      "type": "drive",
+      "at": "4061c8d8f6a3a299 142.27648479423513",
+      "rate": "3fc22708d71ba57c 0.14181623938865673",
+      "accel": "bfe2796cab692646 -0.5773223255029698",
+      "time": "3ff999999999999a 1.6",
+      "until": "3ffb851eb851eb86 1.7200000000000002"
+    },
+    {
+      "post": "3ff9dddddddddddf 1.616666666666667",
+      "type": "drive",
+      "at": "4061c8ebadca0934 142.27876939258715",
+      "rate": "3fc0f2a983eb3e19 0.13240546170571646",
+      "accel": "bfe1ab470e8d03fa -0.5521579059787876",
+      "time": "3ff9dddddddddddf 1.616666666666667",
+      "until": "3ffbc962fc962fca 1.7366666666666668"
+    },
+    {
+      "post": "3ffa222222222224 1.6333333333333337",
+      "type": "drive",
+      "at": "4061c8fd233b0d30 142.28090058835505",
+      "rate": "3fbf97765ea506ac 0.12340488253269183",
+      "accel": "bfe0e61dbfb9dc1e -0.5280903572701197",
+      "time": "3ffa222222222224 1.6333333333333337",
+      "until": "3ffc0da740da7410 1.7533333333333339"
+    },
+    {
+      "post": "3ffa666666666668 1.6500000000000004",
+      "type": "drive",
+      "at": "4061c90d64fc7d2d 142.28288506807567",
+      "rate": "3fbd634fb97b87a8 0.11479662207014363",
+      "accel": "bfe0298c7ad317ff -0.5050718687932657",
+      "time": "3ffa666666666668 1.6500000000000004",
+      "until": "3ffc51eb851eb854 1.7700000000000005"
+    },
+    {
+      "post": "3ffaaaaaaaaaaaac 1.666666666666667",
+      "type": "drive",
+      "at": "4061c91c8077aead 142.28472922683196",
+      "rate": "3fbb47c032785e96 0.10656357986624196",
+      "accel": "bfdeea66b51f152d -0.48305671394003263",
+      "time": "3ffaaaaaaaaaaaac 1.666666666666667",
+      "until": "3ffc962fc962fc98 1.786666666666667"
+    },
+    {
+      "post": "3ffaeeeeeeeeeef1 1.6833333333333338",
+      "type": "drive",
+      "at": "4061c92a82805019 142.28643918095693",
+      "rate": "3fb943b56518e70c 0.09868940084643557",
+      "accel": "bfdd916d4f69e317 -0.4620011592410704",
+      "time": "3ffaeeeeeeeeeef1 1.6833333333333338",
+      "until": "3ffcda740da740dc 1.8033333333333337"
+    },
+    {
+      "post": "3ffb333333333336 1.7000000000000006",
+      "type": "drive",
+      "at": "4061c937775aeeaa 142.2880207801839",
+      "rate": "3fb75628e2aec002 0.09115844282382571",
+      "accel": "bfdc477d54e746b0 -0.4418633774886116",
+      "time": "3ffb333333333336 1.7000000000000006",
+      "until": "3ffd1eb851eb8522 1.8200000000000007"
+    },
+    {
+      "post": "3ffb77777777777a 1.7166666666666672",
+      "type": "drive",
+      "at": "4061c9436ac3338c 142.28947961926713",
+      "rate": "3fb57e1facea297e 0.08395574542570292",
+      "accel": "bfdb0beefb9564a1 -0.42260336464603127",
+      "time": "3ffb77777777777a 1.7166666666666672",
+      "until": "3ffd62fc962fc966 1.8366666666666673"
+    },
+    {
+      "post": "3ffbbbbbbbbbbbbe 1.7333333333333338",
+      "type": "drive",
+      "at": "4061c94e67f1db57 142.29082104909568",
+      "rate": "3fb3baa9b63599f8 0.07706700037451941",
+      "accel": "bfd9de21c9bbaa0f -0.40418286037916656",
+      "time": "3ffbbbbbbbbbbbbe 1.7333333333333338",
+      "until": "3ffda740da740daa 1.853333333333334"
+    },
+    {
+      "post": "3ffc000000000003 1.7500000000000007",
+      "type": "drive",
+      "at": "4061c95879a26b04 142.2920501873233",
+      "rate": "3fb20ae167a1a1aa 0.07047852306425875",
+      "accel": "bfd8bd7c444ec32c -0.3865652720515296",
+      "time": "3ffc000000000003 1.7500000000000007",
+      "until": "3ffdeb851eb851ee 1.8700000000000006"
+    },
+    {
+      "post": "3ffc444444444448 1.7666666666666675",
+      "type": "drive",
+      "at": "4061c961aa18a528 142.29317192853455",
+      "rate": "3fb06deb2c2306e0 0.06417722537573978",
+      "accel": "bfd7a96ba0e33716 -0.3697156020324298",
+      "time": "3ffc444444444448 1.7666666666666675",
+      "until": "3ffe2fc962fc9634 1.8866666666666676"
+    },
+    {
+      "post": "3ffc88888888888c 1.783333333333334",
+      "type": "drive",
+      "at": "4061c96a0325c24d 142.29419095396807",
+      "rate": "3fadc5ea01cf7530 0.05815058967685116",
+      "accel": "bfd6a1637b06f76c -0.3536003781736017",
+      "time": "3ffc88888888888c 1.783333333333334",
+      "until": "3ffe740da740da78 1.9033333333333342"
+    },
+    {
+      "post": "3ffcccccccccccd0 1.8000000000000007",
+      "type": "drive",
+      "at": "4061c9718e2d6f0a 142.2951117408159",
+      "rate": "3faad26c1513b764 0.052386643956068096",
+      "accel": "bfd5a4dd8cdbed0a -0.3381875873162278",
+      "time": "3ffcccccccccccd0 1.8000000000000007",
+      "until": "3ffeb851eb851ebc 1.9200000000000008"
+    },
+    {
+      "post": "3ffd111111111115 1.8166666666666675",
+      "type": "drive",
+      "at": "4061c978542a9266 142.29593857111757",
+      "rate": "3fa7ffdc5dd4f102 0.04687393803985353",
+      "accel": "bfd4b3596acf330c -0.32344661169627",
+      "time": "3ffd111111111115 1.8166666666666675",
+      "until": "3ffefc962fc96300 1.9366666666666674"
+    },
+    {
+      "post": "3ffd55555555555a 1.8333333333333344",
+      "type": "drive",
+      "at": "4061c97e5db3deee 142.29667554026622",
+      "rate": "3fa54ccb670038dc 0.04160152084669885",
+      "accel": "bfd3cc5c424a4623 -0.3093481681217744",
+      "time": "3ffd55555555555a 1.8333333333333344",
+      "until": "3fff40da740da746 1.9533333333333345"
+    },
+    {
+      "post": "3ffd99999999999e 1.850000000000001",
+      "type": "drive",
+      "at": "4061c983b30030e2 142.2973265651445",
+      "rate": "3fa2b7d9bfcef68c 0.03655891863261926",
+      "accel": "bfd2ef709b3cf1f5 -0.2958642498013256",
+      "time": "3ffd99999999999e 1.850000000000001",
+      "until": "3fff851eb851eb8a 1.970000000000001"
+    },
+    {
+      "post": "3ffddddddddddde2 1.8666666666666676",
+      "type": "drive",
+      "at": "4061c9885beabb94 142.29789539190517",
+      "rate": "3fa03fb7490d6c3c 0.03173611418488817",
+      "accel": "bfd21c261c6038e8 -0.2829680707080926",
+      "time": "3ffddddddddddde2 1.8666666666666676",
+      "until": "3fffc962fc962fce 1.9866666666666677"
+    },
+    {
+      "post": "3ffe222222222227 1.8833333333333344",
+      "type": "drive",
+      "at": "4061c98c5ff7083a 142.29838560341324",
+      "rate": "3f9bc64514571ee4 0.02712352692267829",
+      "accel": "bfd152115213d4ef -0.2706340123689434",
+      "time": "3ffe222222222227 1.8833333333333344",
+      "until": "400006d3a06d3a09 2.0033333333333343"
+    },
+    {
+      "post": "3ffe66666666666c 1.9000000000000012",
+      "type": "drive",
+      "at": "4061c98fc654c820 142.29880062636312",
+      "rate": "3f9741d01b82871c 0.02271199386507937",
+      "accel": "bfd090cb77b9431f -0.2588375729729239",
+      "time": "3ffe66666666666c 1.9000000000000012",
+      "until": "400028f5c28f5c2c 2.0200000000000014"
+    },
+    {
+      "post": "3ffeaaaaaaaaaab0 1.9166666666666679",
+      "type": "drive",
+      "at": "4061c99295e37c3b 142.29914373808592",
+      "rate": "3f92efc38a65a44c 0.018492751428685048",
+      "accel": "bfcfafe486e1200f -0.24755531869800548",
+      "time": "3ffeaaaaaaaaaab0 1.9166666666666679",
+      "until": "40004b17e4b17e4e 2.036666666666668"
+    },
+    {
+      "post": "3ffeeeeeeeeeeef4 1.9333333333333345",
+      "type": "drive",
+      "at": "4061c994d535f3f5 142.2994180730599",
+      "rate": "3f8d9bd9cc9874f0 0.014457418018589213",
+      "accel": "bfce4e4f6838a17c -0.2367648371594092",
+      "time": "3ffeeeeeeeeeeef4 1.9333333333333345",
+      "until": "40006d3a06d3a070 2.0533333333333346"
+    },
+    {
+      "post": "3fff333333333339 1.9500000000000013",
+      "type": "drive",
+      "at": "4061c9968a95a4f7 142.29962662913724",
+      "rate": "3f85b46471f1fc58 0.010597977378209375",
+      "accel": "bfccfc23c326bab5 -0.22644469288703353",
+      "time": "3fff333333333339 1.9500000000000013",
+      "until": "40008f5c28f5c292 2.070000000000001"
+    },
+    {
+      "post": "3fff77777777777e 1.9666666666666681",
+      "type": "drive",
+      "at": "4061c997bc05dda5 142.29977227349914",
+      "rate": "3f7c4a43fc44d8a0 0.00690676266486015",
+      "accel": "bfcbb8b59dcff9f7 -0.2165743847435377",
+      "time": "3fff77777777777e 1.9666666666666681",
+      "until": "4000b17e4b17e4b5 2.0866666666666682"
+    },
+    {
+      "post": "3fffbbbbbbbbbbc2 1.9833333333333347",
+      "type": "drive",
+      "at": "4061c9986f46d3ee 142.2998577483517",
+      "rate": "3f6ba8e913a8f760 0.003376441219443402",
+      "accel": "bfca83607d5a85e9 -0.20713430519849332",
+      "time": "3fffbbbbbbbbbbc2 1.9833333333333347",
+      "until": "4000d3a06d3a06d7 2.103333333333335"
+    },
+    {
+      "post": "4000000000000000 2",
+      "type": "fade",
+      "seconds": "3fa47ae147ae147b 0.04"
+    },
+    {
+      "post": "4000000000000003 2.0000000000000013",
+      "type": "drive",
+      "at": "4061c998a9d891fe 142.29988567637332",
+      "rate": "0000000000000000 0",
+      "accel": "0000000000000000 0",
+      "time": "4000000000000003 2.0000000000000013",
+      "until": "4000f5c28f5c28f9 2.1200000000000014"
+    }
+  ],
+  "runs": [
+    {
+      "rate": 48000,
+      "block": 128,
+      "from": 47520,
+      "frames": 67680,
+      "spans": ["b8cf069ba8e520ce","587f08d0e550a05d","8b9ced6d7985e08b","aa9ca3239e8525d0","0272151795b562e6","e710ad6125e1c6a7","7cf7de642b97cbf2","3cf3ea3cab2e6245","37b12ee27ec90dc2","50afdf858c76b405","8139a34e0d522573","95bb47be151ec369","cad95c267b718d01","29fb408f904d6200","2baca2f3a6a4c35d","420e94d590564c30","c985a6818bb7a4f4"],
+      "reports": {"count":42,"hash":"cf4f7c8a32ccd3db","whole":"JzEIrBxa8D9XZIIH87xhQJXX+////+8/+33fe0D97z8AAAAAAAA+QAAAAAAAAABAOAgCCdQH7j93vp8aL93wP1eUXyz5vWFApSDz////7z+xUc37///vPwAAAAAAAFxAAAAAAAAAIEA7CAIJ1AfuPzhCGb0ta/E/V4ikKRW/YUBPbun////vP179/////+8/AAAAAAAAYEAAAAAAAAAkQEk2oDxRGO4/iM+wK0Du8T+qOfgsG8BhQHdBGdL+se8/uP//////7z8AAAAAAGBiQAAAAAAAAChAb+WjWHQ97j9JUyrOPnzyP/FhId4mwWFAXKUQ3Rau7D+4///////vPwAAAAAAoGFAAAAAAAAAKEAh9a5iaVHuP5ngwTxR//I/oymMOgfCYUBSDIpxMyLqP7j//////+8/AAAAAADgYUAAAAAAAAAoQMJw47gXWO4/WmQ730+N8z+HlibH48JhQMCxl44rnOc/uP//////7z8AAAAAAKBhQAAAAAAAAChAx7akp11g7j+q8dJNYhD0P2Dtd1Wcw2FA56mltLd65T+4///////vPwAAAAAAIGJAAAAAAAAAKECH8mBysGLuP2t1TPBgnvQ/qeqlb1HEYUB+xZAyLF7jP7j//////+8/AAAAAAAgYkAAAAAAAAAoQFimxhZbZe4/uwLkXnMh9T+f9Liv6MRhQF1J2H7IleE/uP//////7z8AAAAAAEBbQAAAAAAAACJAUXYBmIRn7j98hl0Bcq/1PyXVYMh8xWFA9Dzv2f+i3z+4///////vPwAAAAAAIGFAAAAAAAAAKEDkfnd2TWnuP8wT9W+EMvY/PiBlKvjFYUCSS2THQqfcP7j//////+8/AAAAAACAXUAAAAAAAAAiQGEk2AKCcO4/jZduEoPA9j80pS6lcMZhQFGT96Jkstk/uP//////7z8AAAAAAMBaQAAAAAAAACBAaw7iwPF17j/dJAaBlUP3P0edALbUxmFAfWVo31sz1z+4///////vPwAAAAAAQFRAAAAAAAAAFEBThbBBgH3uP56ofyOU0fc/eqdMFTbHYUBEvOXNErrUP7j//////+8/AAAAAACAUUAAAAAAAAAUQBYZEjNdju4/7jUXkqZU+D/DwJSjhsdhQKfh9aZho9I/uP//////7z8AAAAAAIBRQAAAAAAAABRA5GbNN12k7j+vuZA0peL4P4CiRq3Ux2FA5Ikd4X+R0D+4///////vPwAAAAAAgExAAAAAAAAAEEBQhJcz3K/uP/9GKKO3Zfk/9k2I6BTIYUC/MOqfOaTNP7j//////+8/AAAAAACAS0AAAAAAAAAQQG3jcqCVzO4/wcqhRbbz+T+vCM3EUshhQD0T1ByALco/uP//////7z8AAAAAAABEQAAAAAAAAAhAq+Ch+r3m7j8QWDm0yHb6Px0nY1eFyGFAbwvlcNNAxz+4///////vPwAAAAAAAEFAAAAAAAAACECmwDFXgArvP9LbslbHBPs/y/BxqrXIYUAR9Yzs4lrEP7j//////+8/AAAAAAAAOEAAAAAAAAAIQO13p7pDMe8/IWlKxdmH+z+c8UzP3MhhQFzVmsJ06ME/uP//////7z8AAAAAAAAQQAAAAAAAAPA/UQN6Wp5f7z/j7MNn2BX8P8wz884ByWFAtwEbdFL3vj+4///////vPwAAAAAAAAAAAAAAAAAAAAB9lVXFfJnvPzN6W9bqmPw/d0vKYx/JYUDtpHaMB9+6P7j//////+8/AAAAAAAAAAAAAAAAAAAAAMNHLsV5xu8/9P3UeOkm/T/e73LpOslhQNHCzcoq0LY/uP//////7z8AAAAAAAAAAAAAAAAAAAAAwjK56UDe7z9Ei2zn+6n9P+vZ/H1QyWFA5j6FYgpjsz+4///////vPwAAAAAAAAAAAAAAAAAAAADoFHo6EO3vPwUP5on6N/4/D/vFFWTJYUCctHThm/uvP7j//////+8/AAAAAAAAAAAAAAAAAAAAAHTSuBLk9O8/VZx9+Ay7/j+0dHX4cslhQAoCQJ/KP6o/uP//////7z8AAAAAAAAAAAAAAAAAAAAAH4jIJcT57z8WIPeaC0n/P1CBz+1/yWFAqDE5pS2RpD+4///////vPwAAAAAAAAAAAAAAAAAAAACQg5nMV/zvP2atjgkezP8/lmJ7NonJYUAXmtDsDYqfP7j//////+8/AAAAAAAAAAAAAAAAAAAAAD51Fajy/e8/kxgEVg4tAEBEq7iekMlhQBnfokDZB5Y/yr+Jsko5tz8AAAAAAAAAAAAAAAAAAAAAeyIsz8v+7z8730+Nl24AQFaNhjeVyWFAVFvo/TkBjD8hh0Z3+0puPwAAAAAAAAAAAAAAAAAAAABcY4UPU//vPxyhjN6WtQBAdGGx+pfJYUBNYd41dy94P+nQv4DEQx4/AAAAAAAAAAAAAAAAAAAAAD20t4ua/+8/xGfYFSD3AECxetWpmMlhQO5RcycStbi+VlfnrA690z4AAAAAAAAAAAAAAAAAAAAA2HTPEcf/7z+lKRVnHz4BQHHEz6mYyWFABvM4FLCQfj7BGS43W7iDPgAAAAAAAAAAAAAAAAAAAABcVBua3v/vP0zwYJ6ofwFAfR7SqZjJYUDNj3yLO5+BPunZ2TQHuTk+AAAAAAAAAAAAAAAAAAAAANFqR0Lt/+8/LbKd76fGAUD8L9SpmMlhQA2IV64zpng+Djue4uay6T0AAAAAAAAAAAAAAAAAAAAAjGJvAfX/7z/VeOkmMQgCQC841amYyWFA4eLF4r5xTz55CjeJusKgPQAAAAAAAAAAAAAAAAAAAAC3tp/U+f/vP7Y6JngwTwJAokvVqZjJYUDSHnq4QWr/Pbg6y6K8vlA9AAAAAAAAAAAAAAAAAAAAAF8Id2H8/+8/XgFyr7mQAkCiS9WpmMlhQEg7hioffbQ9A5MyNpTXBT0AAAAAAAAAAAAAAAAAAAAAwpgU+P3/7z8+w64AudcCQKJL1amYyWFAISaa9j14ZD3JIrl+YNK1PAAAAAAAAAAAAAAAAAAAAAAFvf3O/v/vP+aJ+jdCGQNAokvVqZjJYUCpIwp0UrMaPdW+BDHRdmw8AAAAAAAAAAAAAAAAAAAAAAmc2FT//+8/"},
+      "maths": {"calls":4712,"hash":"63d3b325a40ac4f4"},
+      "whole": null
+    },
+    {
+      "rate": 48000,
+      "block": 333,
+      "from": 47520,
+      "frames": 67680,
+      "spans": ["cebf2576a112a5d0","2d28abdab928f58b","c856d62b49ed2c3f","ae2764f04ab01316","88f8dc2e5b0c861f","7b15fb9c687d8b4b","af30e4ccd81b3ac9","ccaf5ba0617bf6bc","1294b21705a4bf06","e5608d934576691a","263f38e53dad8f30","0c33c85bb14fdc8d","63194857504a6455","6a387fe52f85a234","34cc27600a2d4c93","74b139d231703820","29f959865e982b28"],
+      "reports": {"count":42,"hash":"1ab3581737bd85b2","whole":null},
+      "maths": {"calls":2762,"hash":"c0567b174de77684"},
+      "whole": null
+    },
+    {
+      "rate": 48000,
+      "block": 512,
+      "from": 47520,
+      "frames": 67680,
+      "spans": ["b8cf069ba8e520ce","587f08d0e550a05d","dec2f0d29e01e8bc","18cadcd12dd64a8e","00b1b7f2ee96deda","019a55c942184432","beea524ec1dfd7f0","b7bde6bb78e2b84f","a053ef23a0e1e670","5bd220a88889e70e","4415ee9d12dccd05","0b630819a20257fb","a2b87f218f3fe6de","e481686f884b6ebd","55cf682898c62486","4d26c4f9e92cbeba","28a108a7a802f49f"],
+      "reports": {"count":42,"hash":"06d17f3d543065ad","whole":null},
+      "maths": {"calls":2336,"hash":"0e9403df71ccd2a0"},
+      "whole": null
+    },
+    {
+      "rate": 48000,
+      "block": 1024,
+      "from": 47520,
+      "frames": 67680,
+      "spans": ["7ff4029c74ff34a4","d3b92772316551fd","e2924d382cb59818","c1a127901815469f","b40eae12d66aea11","292ab6f3faf2e0cc","103f3670b7a43096","fccaf724d529690f","63fafac1e27bb7f2","aa07d2279bf1c5a4","cabe4762929c5906","163b77b8a48a705d","f3b255850b2298b9","8d0fe51b47b93dce","dbe961af7e31368a","44749d2770eaf837","f9d0e4e7d51edf69"],
+      "reports": {"count":42,"hash":"1b89e79fd7d5f299","whole":null},
+      "maths": {"calls":1940,"hash":"b7fb91a5dfdf3a3c"},
+      "whole": null
+    },
+    {
+      "rate": 44100,
+      "block": 128,
+      "from": 43659,
+      "frames": 62181,
+      "spans": ["23130491ce66ec89","fec0f853293c4c7b","7e8a308e361eebee","1e87abc3dcc765a7","bb9770b28dc84542","f1dbd430fd405d44","cb672a1e0ea9f34d","e7d9077cc0048550","0ff5fb4647fff94c","9b9aa5d17e5893ef","e1856aaf2c0ae640","6ee07bebb06eab80","e18d06d58f6d0d0f","dd1f85c0e8f27007","7318f7abca715102","fcbf4aa44ad30671"],
+      "reports": {"count":42,"hash":"7f845dac93e24dd4","whole":null},
+      "maths": {"calls":4454,"hash":"23dcf3bb8bbe35af"},
+      "whole": null
+    },
+    {
+      "rate": 44100,
+      "block": 333,
+      "from": 43659,
+      "frames": 62181,
+      "spans": ["4bed62a9a7ef2549","594b713c18f841bb","799acdaf64db963d","116c18b0062a3678","1dc3b891dc3a00b7","3830356f081ee9c3","cf7932f198266ab8","7e3c144c36823da8","adee34e2e93b85b3","4268660c848bef90","a25f208a0262618a","4281dc706b464388","4dde8bcb7ae0dc50","7fc5c22423a8f738","016a7f01b6237277","d24a8325d73ff3dd"],
+      "reports": {"count":42,"hash":"ce7cc28e0c4fabb9","whole":null},
+      "maths": {"calls":2660,"hash":"bc1a8abc9c56f18c"},
+      "whole": null
+    },
+    {
+      "rate": 44100,
+      "block": 512,
+      "from": 43659,
+      "frames": 62181,
+      "spans": ["23130491ce66ec89","9529c9cf878e04aa","d519609079d3193e","795edb0782350e19","130cd6f9c0546218","e5de80c5d2d7b393","e9f4ce85ad87987d","c7999761476558ef","6d0330e395e2cfbd","d4363e9b0af3cbee","a1ba4ef7dc91c5cd","6ed9adcee0082993","517348283dc6e820","51114eb33dadf5bc","7a7007980d2bd08d","d4f3b57aeb7639c5"],
+      "reports": {"count":42,"hash":"e76486f798728b74","whole":null},
+      "maths": {"calls":2270,"hash":"36ca2dac76a3e7e3"},
+      "whole": null
+    },
+    {
+      "rate": 44100,
+      "block": 1024,
+      "from": 43659,
+      "frames": 62181,
+      "spans": ["d1b4f81e4f139e2e","5b67c8489c14bb59","e4b6036aad094729","e53f4e93bf01d42c","566d0a18e158e699","7bf1a8f8157814f3","f96009c31612ab50","c7999761476558ef","74ca17a4d45ad9c0","d4363e9b0af3cbee","ec467634aa8d5580","45c0dccd931d5602","495b7c15644e02fd","df78337723c54ff0","c887f8eb3e876794","3a27cbbba295cbcf"],
+      "reports": {"count":42,"hash":"64387bda87970d9c","whole":null},
+      "maths": {"calls":1904,"hash":"6e9a5740d9272476"},
+      "whole": null
+    },
+    {
+      "rate": 48000,
+      "block": 1,
+      "from": 47800,
+      "frames": 2000,
+      "spans": ["1f82c220d55dd1b5"],
+      "reports": {"count":1,"hash":"b320b67833f30f37","whole":null},
+      "maths": {"calls":13537,"hash":"a1d95366025e5f4a"},
+      "whole": null
+    }
+  ]
+}
