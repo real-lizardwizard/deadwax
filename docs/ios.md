@@ -450,6 +450,19 @@ Debug is where Phase 0's test screen lives now:
   the song to it, as any app must: an iPhone's own outputs and AirPods run at 48 kHz or lower. Under
   it, "An edit held for the next song" when one is (see [the checks](#what-only-a-phone-can-tell)), and
   the last song that failed, in its own words.
+- **EQ**: the EQ's audio unit, which sits between the app's mixer and the output whether the EQ is on
+  or not. **Unit** says what it is doing: "In the graph: passing every sample through" (off: every
+  sample goes out exactly as it came in), "filtering", "crossfading" (a change is fading in, over 20
+  ms), "the output is stopped" (paused), or "Not made" with iOS's words, when the phone couldn't make
+  it and the music plays on without it. **At this rate** is the output's rate and how many filter
+  sections each channel runs; **Changes** counts the crossfades, the changes that waited for the one
+  before, and any made for another rate; **Started with** is what was put in as the output last
+  started; **Over full scale** counts the samples the EQ pushed past the loudest a file can hold;
+  **Render** is how long the EQ takes per block of sound, against how long the block lasts.
+  **Muffle what plays** is a test, for the checks below: it puts a steep treble cut (a -24 dB high
+  shelf at 2 kHz) through the real unit, so whatever plays sounds muffled at once, and plain again
+  when you turn it off. It's off each time the app opens. The EQ itself - your settings for each
+  output - comes in a later build.
 - **Engine log**: the app's audio engine says what it does, line by line - each song's lane starting,
   joins, a buffer played, a stream that ran dry, an edit held for the next song, a failure - and Debug
   keeps its last 500 lines, the newest last. While a song plays it writes about two lines a second, so
@@ -759,6 +772,21 @@ hand: several of these ask how it compares.
 - **P11 AirPlay.** AirPlay to a speaker: do the lines still land with the words? (AirPlay delays the
   sound by a second or two.)
 - **P12 The lock screen**: as before - no change at all - and the music plays on locked as it did.
+
+### The EQ's first checks
+
+The EQ's audio unit is in this build, with nothing to set yet but Debug's test (You > Debug > EQ). Install
+the usual way, not with `--debug`: a Debug build's EQ runs far slower than the one that ships. AirPods:
+
+- **E0a Muffle.** Debug's EQ says "Unit: In the graph: passing every sample through". Play test sound 1,
+  then turn on **Muffle what plays**: the beeps sound muffled at once, with no click. Turn it off: they
+  sound as before.
+- **E0b The join.** Play songs 9 into 10 (one tone cut in two) and turn Muffle on and off ten times as it
+  plays: no click, no drop, no break at the join.
+- **E0c Nothing changed.** With Muffle off, play an album you know well: it sounds exactly as it did
+  before this build.
+- **E0d The lock screen.** Pause from the lock screen, then press an AirPod's stem: the lock screen shows
+  play after the pause, and the press plays. Do it with Muffle on, then off.
 
 ## What it can't do yet
 

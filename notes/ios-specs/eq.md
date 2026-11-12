@@ -1880,6 +1880,134 @@ ios/App, src/ or ui/ changed, and no version moved.
 - **Verified**: ios.yml's macOS job runs these; its device build compiles the app; check-linux.sh for the C target and
   Core. No Simulator.
 
+#### Slice 2, built (2026-11-12)
+
+Built on `ios` from 48d3d56 (slice 1 reviewed), in five commits: 1.7's tests first, then CAudioRing, EQUnit and EQHost
+(with the few Core additions they use), the engine's wiring, Debug and PlayerModel, and these notes. Measured on an
+Apple M2, macOS 27.2, Swift 6.3.3, offline manual rendering; nothing on a phone, and no Simulator. The app's version
+didn't move.
+
+- **Files**: `Sources/CAudioRing/` (`audio_triple` - the triple buffer's one atomic word, `atomic_exchange` acq_rel,
+  a fresh bit beside the index - and `audio_counters`, relaxed 64-bit words; C11 `stdatomic` only, nothing Apple's);
+  `DeadwaxAudio/EQUnit.swift` (the unit, its header and its render, `EQUnitRender`), `EQHost.swift` (the ring's three
+  slots, the producers' lock and 1.6's publish rule, the warm-up, `EQUnitStatus` and its Debug rows, `EQTestCurve`);
+  `PlaybackEngine.swift` (`Settings.eq`, `eq`, `eqStart`, `insertEQ` in `configure`, both connections in
+  `matchOutput`, `startEQ` between prepare and start, `debug().eq`); `Tests/CAllocHook/` (the allocation hook,
+  test-only); four test files; `Package.swift`; ios.yml's release step. In Core: `EQRender.make(…, fadeFrames:)` (nil:
+  20 ms, as before; 1 is test 3's one-step control), `EQRenderState.isCrossfading`, `EQRenderCounters.init()` made
+  public, and Debug's words for this slice. In ios/App: DebugView's EQ section and PlayerModel's `muffle`, `eqStatus()`
+  and `eqTest` (beside `lead`). Nothing else of the engine moved: the lanes, sources, GainedSource, StreamSource, the
+  timeline and AudioSessionController have no diff.
+- **Tests**: DeadwaxAudio 93 tests in 3 suites before, **107 in 7** after - EQEngineTests 6, EQClickTests 1,
+  EQRealTimeTests 4, EQDebugTests 3; Core 808 in 110 before, 809 after (EQWordsTests' slice-2 words). The release run
+  (`swift test -c release --filter EQRealTimeTests`, ios.yml's new step) passes too, as does every EQ engine suite with
+  `DEADWAX_TEST_SCHEDULE_LAG=0.010` (ios.yml's late-buffers step).
+
+1.7's ten, in its order:
+
+1. **The unit is ours, in-process**: `AVAudioUnitEffect(audioComponentDescription:)` hands back `EQUnit` (latency 0,
+   tail 0, in place, largest block 4,096) - so 1.2's fallback (`AVAudioUnit.instantiate`, waited for 1 s) is built but
+   never ran. **The 93 existing DeadwaxAudio tests pass unchanged** with the unit in every engine's graph, Off.
+2. **Off, bit for bit**: 30 s (1,440,000 frames x 2 at 48 kHz) of seeded noise then a log sweep, written as a 44.1 kHz
+   16-bit FLAC, rendered with no unit, with the unit Off, and with the unit On at a flat curve (put in at the start and
+   again every 5 s): **the same bits, all three**. The unit passed every one of 352 blocks through (0 crossfades: a
+   flat bank is the identity, and an identity offered over the identity is taken with nothing done, 1.6).
+3. **No clicks** - the click (the largest sample after the 8th-order Butterworth high-pass, in the 200 ms after the
+   change), the floor before it, and Core's render of the same changes in one step:
+
+   | change | 1 kHz tone, 1 kHz band (> 8 kHz) | 100 Hz, 125 Hz band (> 2 kHz) | 40 Hz, 63 Hz band | 40 Hz, 31 Hz band |
+   | --- | --- | --- | --- | --- |
+   | band 0 -> +12 dB | **-129.3** (one step -58.0) | **-110.6** (-75.0) | -111.8 (-87.3) | -102.0 (-93.3) |
+   | +12 -> 0 dB | -129.6 (-28.5) | -100.2 (-6.5) | -107.6 (-13.9) | -101.1 (-7.4) |
+   | 0 -> -12 dB | -141.7 (-58.0) | -110.3 (-83.6) | -110.3 (-88.2) | -109.3 (-94.2) |
+   | -12 -> 0 dB | -141.5 (-40.5) | -118.2 (-25.2) | -110.0 (-41.8) | -110.3 (-16.6) |
+   | a preset put in | -146.7 (-47.5) | -111.8 (-18.2) | -114.9 (-21.1) | -114.9 (-21.1) |
+   | swapped for another | -127.7 (-37.9) | -110.4 (-16.5) | -109.3 (-15.5) | -109.3 (-15.5) |
+   | On -> Off | -144.6 (-34.6) | -122.6 (-29.4) | -114.2 (-20.7) | -114.2 (-20.7) |
+   | Off -> On | -131.7 (-38.7) | -113.4 (-87.2) | -113.4 (-92.1) | -113.4 (-92.1) |
+   | another output's curve | -147.0 (-67.9) | -120.0 (-41.7) | -121.9 (-28.5) | -121.9 (-28.5) |
+
+   dBFS; limits -110 (the 1 kHz column) and -95 (the rest), every change under its limit. 1.6's numpy said -129/-142,
+   -102 and -119/-102/-108 crossfaded and -58/-73/-87/-93 in one step: within a dB or two of each, but for the 63 Hz
+   band's +12 dB (-111.8 here, -119 there). The floors: -138.2 to -157.8 dBFS - -150 and below with the tone at -6
+   dBFS, -138 to -144 after a +12 dB band, the tone 12 dB louder and its own leak through the high-pass with it. The
+   one-step control hears the first change of the 1 kHz and 125 Hz cases (-58.0 and -75.0), so the measure can hear
+   a click. The unit's output is Core's 20 ms render of the same changes, bit for bit. **The settle** (the 31 Hz band,
+   a 40 Hz tone): 0 -> +12 dB within 0.5 dB of its new level after **50 ms**, overshooting by **1.20 dB** (1.6: 50 ms,
+   1.3); the other three settle in 25 ms with no overshoot. Each 25 ms of +12 dB's envelope: 0.36 2.96 2.13 1.59 1.68
+   1.78 1.78 1.76 … dB.
+4. **Joins**: one 440 Hz tone cut in two near a peak (test sounds 9 and 10's shape), and a 44.1 kHz song into a 96 kHz
+   one, through Loudness at 0 dB of preamp (it boosts): the unit's output is **Core's render over the no-unit engine's
+   own render, bit for bit** (91,904 and 43,904 frames - to a block before the songs end, where the output stops on
+   its own clock).
+5. **No allocation**: the unit's render block called as the framework calls it, 10,000 times (blocks of 512, every
+   100th 4,096; passing through, a crossfade in, filtering, a bank for another rate, a bank arriving mid-crossfade, Off,
+   On again, and 1,000 calls with no buffers handed): **0 allocations and 0 frees** on that thread, release, the hook's
+   canary seen first. 5 crossfades, 1 waited, 1 for another rate - the run covered what it says.
+6. **The response**: an AutoEq-shaped correction and Bass Boost (8 sections, automatic preamp -8.6 dB), an impulse at
+   each of 44.1, 48, 88.2, 96, 176.4, 192, 352.8 and 384 kHz, rendered past the slowest section's -120 dB (11,669
+   samples at 44.1 kHz to 101,606 at 384): within **5.6e-7 dB** of `EQResponse` from 20 Hz to 20 kHz at every rate.
+   And a 1 s log sweep at each rate is Core's render, bit for bit.
+7. **A rebuilt engine** (`rebuild()`): the new unit's output, from its first sample, is Core's render of the curve
+   from a fresh start, bit for bit; 0 crossfades, 2 allocations. And **a pause** frees the unit's memory (Debug: "the
+   output is stopped") and play allocates it again with the curve put back before the first sample, no crossfade -
+   1.2's "every play after a pause allocates afresh", seen offline.
+8. **The cost**: 74 sections a channel, stereo, 192 kHz, a new bank every block of 4,096 (always crossfading): **1.83
+   ms a block, 8.6% of its 21.3 ms** (worst 2.03 ms), release - under 1.10's 10%, but above its estimate of 6%, and
+   with 1.4 points to spare on this M2; the runner's cores are their own question.
+9. **Silence**: the +12 dB Q 10 peak at 20 Hz and a high pass at 86.4 kHz at 192 kHz, a second of full-scale noise,
+   then 5 minutes of zeros: the output exactly 0 from 25.4 s; **every 10 s of silence cost 1.00x a block of noise**
+   (0.0352-0.0353 ms against 0.0352 ms, medians), through the states' fall into the subnormals. No fallback needed.
+10. **The locked screen's block**: 4,096 frames render; 4,097 is answered -10874
+    (`kAudioUnitErr_TooManyFramesToProcess`), counted (refused 1), nothing pulled, the output untouched.
+
+And Debug's **Muffle what plays** through the real engine: an 8 kHz tone **-23.458 dB**, a 200 Hz one -0.081 dB - each
+its response in `EQResponse` to the thousandth - and turned off while it plays, every sample after the crossfade as
+it went in.
+
+- **Departures from the spec, and why**:
+  - **The render block reaches the framework through the Objective-C runtime**, not a Swift
+    `override var internalRenderBlock`. Measured in release: with the override, **one allocation and one free on every
+    render** (10,000 of each in test 5) - the framework is handed a block around a Swift closure, and on each call that
+    block turns its pull block into a Swift closure, which needs a context on the heap. Now the block is
+    `@convention(block)` with the pull typed `@convention(block)` too (`EQRenderBlock`, `EQPullBlock`), made once in
+    `init` capturing only the header, as 1.2 says, and handed out by an `internalRenderBlock` getter that
+    `EQUnit.register()` adds with `class_addMethod` and `imp_implementationWithBlock` before registering the subclass.
+    Nothing on the render sends a message: the getter is asked once, at allocation. Test 5 checks the framework's
+    view of the getter (`value(forKey: "internalRenderBlock")`) is this block.
+  - **`.loadInProcess` is macOS's alone** (iOS's SDK marks it unavailable): the fallback asks for it on macOS and for
+    no options on iOS, where a subclass registered in-process is made in-process anyway. Never run (test 1 passed).
+  - **Test 9's bound** is each 10 s stretch's median block against the median noise block - not the single slowest
+    block, printed beside it: 0.10-0.12 ms (2.9-3.3x) here, at 134.8 s in one run and 278.4 s in the next, never where
+    the states go subnormal - the scheduler, which a denormal slowdown (lasting as long as the states are subnormal)
+    can't hide behind.
+  - **Test 8 bounds the mean** of the unit's own timing (`EQRender.process` per block - what Debug's Render row
+    shows), the worst printed; tests 5, 8 and 9 bound only in the release build - in debug, Core's unoptimised loops
+    allocate (about 6,000 a 512-frame block) and cost 3x the block at 192 kHz. That is the build `install.sh --debug`
+    makes: **a Debug build of the app is no test of the EQ's real-time behaviour.**
+  - **Test 6's sweep** is held bit for bit to Core's render over the no-unit engine rather than turned into a
+    response (stronger, and the impulse already gives the response).
+  - **Test 3's floor** is required to be 15 dB under each limit (it is 28 dB or more) and printed, rather than held to
+    -150 dBFS (above).
+  - **Debug's new words** (3.13 didn't have them): "In the graph: the output is stopped" (the unit holds no render
+    memory between a pause and the next play), "No audio engine yet: it's made when something first plays", and
+    Started with's "The test curve, put in …", "Off, put in …", "Nothing put in: the output started passing every
+    sample through" and "The output hasn't started yet"; the section's header "EQ" and the toggle's footer. The rows
+    shown are the unit's - Unit, At this rate, Changes, Started with, Over full scale, Render; Output, Key, Curve and
+    Kept come with slice 3's settings. At this rate's "left out" never shows yet: the host has sections, not filters.
+  - **Muffle off puts in Off** (the identity), so "the test curve or nothing" is the test curve or Off - the same
+    sound, and Debug's Started with says which.
+  - **The warm-up** (1.5) runs once a process when the first host is made - the engine's init, on the main thread -
+    rather than on a queue of its own.
+- **What only the phone can know** (6's check 0, and 7): whether iOS also hands back `EQUnit` in-process from
+  `AVAudioUnitEffect` (0a's "In the graph"; if not, Debug's "Not made: …" and the music plays on), and whether iOS's
+  framework asks the added getter as macOS's does; Muffle heard (0a), toggled across a join (0b), nothing changed with
+  it off (0c), the lock screen and AirPods with it on and off (0d); the render's time on the phone's cores (Debug's
+  Render row), and whether a locked screen asks for more than 4,096 frames (its refused count).
+- **Not verified**: Linux - CAudioRing and Core's changes compiled and ran only on macOS (check-linux.sh can't run
+  here; ios.yml's ubuntu job is the first); ios.yml's Xcode 26.6 Swift (every multi-statement closure in the new code
+  says its type); ios.yml itself, and test 8's 10% on the runner's cores.
+
 ### 5.3 Slice 3 - the simple face
 
 - **Files**: `ios/App/EQ/` - `EQModel.swift` (`@MainActor @Observable`, made once in DeadwaxApp beside PlayerModel and

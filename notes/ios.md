@@ -55,17 +55,25 @@ ios/
                             cache, downloads); Icon/ loose PNGs
   DeadwaxKit/               Package.swift (tools 6.0; iOS 17, macOS 14)
     Sources/DeadwaxCore/    pure Swift + Foundation, Swift 6 mode, tested on Linux
-    Sources/DeadwaxAudio/   the engine; every file inside #if canImport(AVFAudio); Swift 5 mode
+    Sources/DeadwaxAudio/   the engine; every file inside #if canImport(AVFAudio); Swift 5 mode - and the EQ's
+                            unit between the mixer and the output (EQUnit, EQHost: eq.md 1.2, 1.6; slice 2)
+    Sources/CAudioRing/     C11 stdatomic only: the EQ's triple buffer and its counters (indices and bits, no
+                            floating point, nothing Apple's - built on Linux too)
     Tests/DeadwaxCoreTests/ Swift Testing, 64 tests in Phase 0, 508 in 69 suites at app 0.2, 633 in 83 at 0.3,
-                            745 in 98 with the EQ's slice 1 (its fixtures in Fixtures/eq/, 1.5 MB)
-    Tests/DeadwaxAudioTests/  offline-render tests, macOS only (12 in Phase 0, 54 at app 0.2, 93 at 0.3)
+                            745 in 98 with the EQ's slice 1 (its fixtures in Fixtures/eq/, 1.5 MB), 809 in
+                            110 at its slice 2 (the turntable's slice 1 between)
+    Tests/DeadwaxAudioTests/  offline-render tests, macOS only (12 in Phase 0, 54 at app 0.2, 93 at 0.3, 107 in 7
+                            suites with the EQ's slice 2 - EQRealTimeTests bounded in a release build)
+    Tests/CAllocHook/       test-only C: malloc_logger counting one thread's allocations, proved by a canary
+                            (turntable.md 4.3, built first for the EQ)
   scripts/                  install.sh (James's), install_helper.py (its JSON/plist reading, in Xcode's
                             python3), check-linux.sh, check_project.py, make-icon.py, make-test-album.py,
                             make-eq-fixtures.py (the EQ's fixtures; numpy and scipy, run with python -I)
   README.md                 a pointer to docs/ios.md and this file
 .github/workflows/ios.yml   branches '**' + paths: ios/** and itself (never a tag: GitHub applies no paths
                             filter to a tag push) - linux (swift:6.4.1-noble), project (check_project.py),
-                            macos (swift test with the engine's renders, then the UNSIGNED device build)
+                            macos (swift test with the engine's renders, the EQ's render in release, then the
+                            UNSIGNED device build)
 tests/test_ios_contract.py  the routes, fields and bounds the app relies on, against the server (8 tests)
 tests/test_ios_install.py   install_helper.py, check_project.py, install.sh against stand-ins, and the
                             test album, on Linux (18 tests)
@@ -3031,3 +3039,18 @@ eq.json's model (`EQSettings`), the outputs (`EQOutputs`), every word (`EQWords`
 `ios/scripts/make-eq-fixtures.py`, which writes the cookbook, APO's reading rules and the fit again in Python. What was
 built, measured and decided, and what wasn't verified: eq.md's "Slice 1, built". Nothing in the App or DeadwaxAudio
 uses it yet (slice 2), and the app's version didn't move.
+
+## The EQ, slice 2: the engine (2026-11-12)
+
+eq.md's slice 2 (5.2): the EQ's unit in the player's graph - `EQUnit`, an in-process AUAudioUnit registered with
+`registerSubclass` and made as `AVAudioUnitEffect`, between the main mixer and the output in every engine
+(`Settings.eq`, false only for the tests' engine with no unit); `EQHost`, the triple buffer over CAudioRing's one
+atomic word that hands it banks and reads back its counters; `PlaybackEngine.eqStart`, called between prepare and start
+so a start's curve is in before its first sample. Off, the unit passes every sample through untouched - the 93 render
+tests before it pass unchanged with it in the graph, and a 30 s render is the same bits with it Off, flat or absent.
+The render block reaches the framework through an `internalRenderBlock` getter added with the Objective-C runtime,
+because a Swift override costs an allocation on every render (measured). The one thing to hear yet is Debug's EQ
+section (You > Debug): the unit's rows and **Muffle what plays**, a -24 dB high shelf at 2 kHz through the real unit,
+for docs/ios.md's checks E0a-E0d. Every number, every departure from the spec and what wasn't verified: eq.md's
+"Slice 2, built". A Debug build of the app (`install.sh --debug`) is no test of the EQ's real-time behaviour: its
+unoptimised Core allocates on the render. The app's version didn't move.
