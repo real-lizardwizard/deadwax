@@ -334,6 +334,11 @@ import Testing
         #expect(d.startedWithNothing == "Nothing put in: the output started passing every sample through")
         #expect(d.notStarted == "The output hasn't started yet")
         #expect(d.muffleFooter.hasPrefix("A test of the EQ's audio unit: a -24 dB high shelf at 2 kHz"))
+        #expect(d.muffleFooter.hasSuffix("It turns itself off when you leave Debug, and it's never kept."))
+        #expect(d.waiting == "In the graph: waiting for its first block of sound")
+        #expect(d.renderBlockAsked(0) == "iOS hasn't asked for it, so no sound can go through the EQ")
+        #expect(d.renderBlockAsked(1) == "iOS asked for it once")
+        #expect(d.renderBlockAsked(3) == "iOS asked for it 3 times")
         #expect(d.atRate(44_100, sections: 1, leftOut: 0) == "44.1 kHz: 1 section a channel")
         var c = EQRenderCounters()
         c.crossfades = 1

@@ -1973,8 +1973,9 @@ it went in.
     `@convention(block)` with the pull typed `@convention(block)` too (`EQRenderBlock`, `EQPullBlock`), made once in
     `init` capturing only the header, as 1.2 says, and handed out by an `internalRenderBlock` getter that
     `EQUnit.register()` adds with `class_addMethod` and `imp_implementationWithBlock` before registering the subclass.
-    Nothing on the render sends a message: the getter is asked once, at allocation. Test 5 checks the framework's
-    view of the getter (`value(forKey: "internalRenderBlock")`) is this block.
+    Nothing on the render sends a message: the getter is asked as the unit is made and at each allocation, never on
+    the render (three times a start, the Review measured). Test 5 checks the framework's view of the getter
+    (`value(forKey: "internalRenderBlock")`) is this block.
   - **`.loadInProcess` is macOS's alone** (iOS's SDK marks it unavailable): the fallback asks for it on macOS and for
     no options on iOS, where a subclass registered in-process is made in-process anyway. Never run (test 1 passed).
   - **Test 9's bound** is each 10 s stretch's median block against the median noise block - not the single slowest
@@ -1982,7 +1983,7 @@ it went in.
     the states go subnormal - the scheduler, which a denormal slowdown (lasting as long as the states are subnormal)
     can't hide behind.
   - **Test 8 bounds the mean** of the unit's own timing (`EQRender.process` per block - what Debug's Render row
-    shows), the worst printed; tests 5, 8 and 9 bound only in the release build - in debug, Core's unoptimised loops
+    shows), the worst printed (the Review made it the median, at 15%); tests 5, 8 and 9 bound only in the release build - in debug, Core's unoptimised loops
     allocate (about 6,000 a 512-frame block) and cost 3x the block at 192 kHz. That is the build `install.sh --debug`
     makes: **a Debug build of the app is no test of the EQ's real-time behaviour.**
   - **Test 6's sweep** is held bit for bit to Core's render over the no-unit engine rather than turned into a
@@ -2001,12 +2002,66 @@ it went in.
     rather than on a queue of its own.
 - **What only the phone can know** (6's check 0, and 7): whether iOS also hands back `EQUnit` in-process from
   `AVAudioUnitEffect` (0a's "In the graph"; if not, Debug's "Not made: …" and the music plays on), and whether iOS's
-  framework asks the added getter as macOS's does; Muffle heard (0a), toggled across a join (0b), nothing changed with
+  framework asks the added getter as macOS's does (Debug's Render block row, 0a); Muffle heard (0a), toggled across a join (0b), nothing changed with
   it off (0c), the lock screen and AirPods with it on and off (0d); the render's time on the phone's cores (Debug's
   Render row), and whether a locked screen asks for more than 4,096 frames (its refused count).
 - **Not verified**: Linux - CAudioRing and Core's changes compiled and ran only on macOS (check-linux.sh can't run
   here; ios.yml's ubuntu job is the first); ios.yml's Xcode 26.6 Swift (every multi-statement closure in the new code
   says its type); ios.yml itself, and test 8's 10% on the runner's cores.
+- **Review** (2026-11-12, on 48d3d56's five commits). Read against 5.2, 1.1-1.10, 3.13, checks 0/0a, 7 and the
+  Design review, the code before the account; measured on the same M2 in release, through the build lock. The
+  render keeps 1.5's rules: CAudioRing is plain C11 (`atomic_exchange_explicit` acq_rel on the triple's word, relaxed
+  counters), the bank is copied into the slot under the producers' lock and the render takes the newest by one
+  exchange, a bank for another rate is ignored and counted, and nothing on the render allocates, locks, sends a
+  message or reads a static or a Swift class. Changed:
+  - **The render block's delivery, measured three ways** (1,000 renders each, the hook's canary seen): an `override
+    var internalRenderBlock` returning a stored Swift closure, **1 allocation a render**; the override returning a
+    stored `@convention(block)`, **3**; the builder's getter added with `class_addMethod`, **0**. No plainer way
+    measures 0, so it stays. What a render costs beyond the arithmetic: one `_Block_copy`/`_Block_release` of the
+    framework's pull (an `__NSMallocBlock__`, measured, so a reference count, not a copy) and one retain/release of
+    the block's context - atomics, no allocation. The framework asks for the getter through `-[AUAudioUnit
+    renderBlock]` (AudioToolboxCore; the same Objective-C message on iOS - there is no Swift path to it), never on
+    the render: twice as the unit is made and attached, once at each allocation (3 a start; a pause and play 1 more;
+    a rebuild's new unit 3 of its own). Registration is once a process (a `static let`, so thread-safe). The getter
+    is now added with **AUAudioUnit's own type encoding** (`@?16@0:8`, read from the inherited method) rather than
+    `@@:`, which named the result an object rather than a block - harmless to `objc_msgSend`, but what KVC and
+    method signatures read. **Debug says whether it was asked**: a "Render block" row ("iOS asked for it 3 times";
+    "iOS hasn't asked for it, so no sound can go through the EQ"), counted by the getter outside the render and kept
+    across allocations; and the Unit row's new "waiting for its first block of sound" - between an allocation and
+    the first block, where it said "passing" before any sound had passed.
+  - **Through AVAudioEngine's own real-time render** (new, EQRealTimeTests.theFrameworksOwnRenderAllocatesNothing):
+    a realtime manual-rendering engine, a looping player through the main mixer and the unit, 50 blocks to warm
+    then 1,000 counted (512, every 100th 4,096), Bass Boost, a vocal preset and the identity put in at 200, 500 and
+    800: **0 allocations and 0 frees** with the unit and without it, 3 crossfades, 1,050 blocks, the getter asked 3
+    times. Test 5 called the block by hand; this is the framework calling it.
+  - **Two crashes found and stopped.** An output of **more than 8 channels** (a big USB interface): AVAudioEngine
+    answers the unit's refusal of the format with an Objective-C exception (-10868) nothing in Swift can catch -
+    measured with ten channels. `insertEQ` now leaves the unit out ("Not made: this output has 10 channels, and the
+    EQ takes at most 8"), mixer -> output as before (EQHostTests, ten channels rendered). And **a reconnect after a
+    failed start**: an engine left prepared holds the unit's render memory, and the unit refuses a new format
+    while it does (AUAudioUnit's rule) - the same exception, measured; the mixer alone takes it. `matchOutput` now
+    stops the engine first when the unit is allocated (EQHostTests pins the mechanism: prepared, `shouldChange`
+    false, stopped, reconnected at 44.1 kHz, started).
+  - **A bank for the old rate could push out the start's.** A settings change that read the rate just before a
+    start at a new one made its bank second, at the same version: `publish` took it (not older), the ring offered a
+    bank the render only ignores, and the settings would play Off until the next change. Now a bank of the last
+    published version, made for another rate when that one was made for the unit's, is dropped and counted as
+    older; a newer version always goes in (EQHostTests).
+  - **Muffle can't be left on.** It was off at each launch, but a launch can be days apart: it now goes off as
+    Debug closes (`onDisappear` - back out, or another tab). Locking the phone doesn't close Debug, so E0d still
+    runs with it on. docs/ios.md's E0a-E0d say so, and E0a asks for the Render block row's number.
+  - **Test 8 bounds the median at 15%** (was the mean at 10%, with 1.4 points to spare): measured 1.83-1.85 ms,
+    8.6-8.7%, worst 2.0-2.2 ms. A shared runner's preemptions move a mean and not a median; 15% still fails the 2x
+    slowdown (17%) the test is there to catch. Test 9 is medians already (1.00-1.07x against 2x) and stays.
+  - **Closures**: the warm-up's `withUnsafeBufferPointer` says its type; the others in the new code already did.
+    ios.yml's release step (`swift test -c release --filter EQRealTimeTests`) is right as it is.
+  - Not changed, agreed: Off is untouched on every path - configure, matchOutput, a configuration change, rebuild,
+    pause and play, a new rate (tests 2, 4 and 7, and the 93 older tests with the unit in every graph); startLead,
+    latency and positions don't read the unit (latency 0, tail 0); the fallback to mixer -> output when the unit
+    can't be made. Left for slice 3: `eqStart` makes its bank, the automatic preamp's search with it, on the start's
+    path.
+  - **Tests** after it: DeadwaxAudio **111 in 8 suites** (EQRealTimeTests 5, EQHostTests 3, both new or grown), Core
+    809, in debug and in release; the unsigned device build; check_project.py; pytest's iOS files.
 
 ### 5.3 Slice 3 - the simple face
 

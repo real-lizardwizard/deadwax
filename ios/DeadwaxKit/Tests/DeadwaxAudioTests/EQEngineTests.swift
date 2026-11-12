@@ -1,6 +1,7 @@
 #if canImport(AVFAudio)
 import AVFAudio
 import AudioToolbox
+import CAudioRing
 import DeadwaxCore
 import Foundation
 import Testing
@@ -289,6 +290,8 @@ import Testing
             #expect(frequency < 1_000 || expected < -20, "the test curve muffles: \(expected) dB at \(frequency) Hz")
             #expect(after == nil, "\(name), turned off: \(after ?? "")")
             #expect(status.rows.first == EQDebugRow(label: "Unit", value: "In the graph: passing every sample through"))
+            // asked as the unit was made, as the engine attached it, and at the start's allocation (macOS's count)
+            #expect(status.rows.contains(EQDebugRow(label: "Render block", value: "iOS asked for it 3 times")))
             #expect(status.rows.contains { $0.label == "Started with" && $0.value.hasPrefix("The test curve, put in ") })
             #expect(status.rows.contains(EQDebugRow(label: "Changes", value: "1 crossfade; 0 waited for the one before; 0 made for another rate")))
         }
@@ -325,9 +328,14 @@ import Testing
     @Test func debugsRows() {
         var s = EQUnitStatus()
         #expect(s.rows == [EQDebugRow(label: "Unit", value: "In the graph: the output is stopped"),
+                           EQDebugRow(label: "Render block", value: "iOS hasn't asked for it, so no sound can go through the EQ"),
                            EQDebugRow(label: "At this rate", value: "The output hasn't started yet")])
         s.mode = .notMade("The operation couldn't be completed.")
         #expect(s.rows == [EQDebugRow(label: "Unit", value: "Not made: The operation couldn't be completed.")])
+        s.mode = .waiting
+        s.renderBlockAsked = 3
+        #expect(s.rows.prefix(2) == [EQDebugRow(label: "Unit", value: "In the graph: waiting for its first block of sound"),
+                                     EQDebugRow(label: "Render block", value: "iOS asked for it 3 times")])
         s.mode = .filtering
         s.rate = 48_000
         s.channels = 2
@@ -341,6 +349,7 @@ import Testing
         s.started = EQUnitStatus.Started(key: EQTestCurve.key, identity: false, secondsBefore: 0.000_1)
         #expect(s.rows == [
             EQDebugRow(label: "Unit", value: "In the graph: filtering"),
+            EQDebugRow(label: "Render block", value: "iOS asked for it 3 times"),
             EQDebugRow(label: "At this rate", value: "48 kHz: 1 section a channel"),
             EQDebugRow(label: "Changes", value: "112 crossfades; 3 waited for the one before; 0 made for another rate"),
             EQDebugRow(label: "Started with", value: "The test curve, put in 0.1 ms before the output started"),
@@ -350,10 +359,87 @@ import Testing
         s.overs = 14
         s.largest = pow(10, 0.8 / 20)
         s.started = EQUnitStatus.Started(key: EQTestCurve.key, identity: true, secondsBefore: 0.002)
-        #expect(s.rows[3] == EQDebugRow(label: "Started with", value: "Off, put in 2.0 ms before the output started"))
-        #expect(s.rows[4] == EQDebugRow(label: "Over full scale", value: "14 samples since the output started, the loudest +0.8 dBFS"))
+        #expect(s.rows[4] == EQDebugRow(label: "Started with", value: "Off, put in 2.0 ms before the output started"))
+        #expect(s.rows[5] == EQDebugRow(label: "Over full scale", value: "14 samples since the output started, the loudest +0.8 dBFS"))
         s.started = EQUnitStatus.Started(key: nil, identity: true, secondsBefore: nil)
-        #expect(s.rows[3] == EQDebugRow(label: "Started with", value: "Nothing put in: the output started passing every sample through"))
+        #expect(s.rows[4] == EQDebugRow(label: "Started with", value: "Nothing put in: the output started passing every sample through"))
+    }
+}
+
+/// The review's: the host's publish rule against a start at a new rate, and the unit left out where it can't go.
+@Suite(.serialized) struct EQHostTests {
+    /// A change that read the old rate while a start at a new one made its own bank first: the same settings version,
+    /// made for the rate the unit no longer runs at. It mustn't push the start's bank out of the ring (the render could
+    /// only ignore it, and the settings would play Off until the next change); a newer version always goes in.
+    @Test func aBankForTheOldRateDoesNotPushOutTheStartsBank() {
+        let host = EQHost()
+        host.setOutput(EQTestCurve.key)
+        host.allocated(rate: 44_100, channels: 2)
+        let start = EQTestCurve.bank(on: true, rate: 44_100, version: 1)
+        #expect(host.publish(start))
+        #expect(!host.publish(EQTestCurve.bank(on: true, rate: 48_000, version: 1)))
+        #expect(host.newest == start)
+        #expect(audio_triple_take(host.triple))
+        #expect(host.slots[Int(audio_triple_front(host.triple)) * host.packedCount] == 44_100)
+        // the same version at the unit's own rate is taken (the start's bank made again), and a newer one at any rate
+        #expect(host.publish(EQTestCurve.bank(on: true, rate: 44_100, version: 1)))
+        #expect(host.publish(EQTestCurve.bank(on: false, rate: 48_000, version: 2)))
+        // before any allocation the host knows no rate, and takes the newest as before
+        let fresh = EQHost()
+        fresh.setOutput(EQTestCurve.key)
+        #expect(fresh.publish(EQTestCurve.bank(on: true, rate: 44_100, version: 1)))
+        #expect(fresh.publish(EQTestCurve.bank(on: true, rate: 48_000, version: 1)))
+    }
+
+    /// What `matchOutput` relies on when a start failed after `prepare()` left the unit holding its render memory: the
+    /// unit refuses a new format then (AUAudioUnit's rule - and AVAudioEngine answers the refusal with an exception
+    /// that ends the app, measured), and `stop()` on an engine that prepared but never ran lets the memory go, after
+    /// which the new rate connects and starts. (`matchOutput` itself runs only on the phone's engine, never offline.)
+    @Test func aPreparedEngineLetsTheUnitGoBeforeANewRate() throws {
+        EQUnit.register()
+        let at48 = try #require(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2))
+        let at44 = try #require(AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 2))
+        let engine = AVAudioEngine()
+        try engine.enableManualRenderingMode(.realtime, format: at48, maximumFrameCount: 4_096)
+        let node = try EQUnit.node()
+        engine.attach(node)
+        engine.connect(engine.mainMixerNode, to: node, format: at48)
+        engine.connect(node, to: engine.outputNode, format: at48)
+        engine.prepare()
+        #expect(node.auAudioUnit.renderResourcesAllocated && !engine.isRunning)
+        #expect(!node.auAudioUnit.shouldChange(to: at44, for: node.auAudioUnit.inputBusses[0]))
+        engine.stop()
+        #expect(!node.auAudioUnit.renderResourcesAllocated)
+        engine.connect(engine.mainMixerNode, to: node, format: at44)
+        engine.connect(node, to: engine.outputNode, format: at44)
+        try engine.start()
+        defer { engine.stop() }
+        #expect(node.outputFormat(forBus: 0).sampleRate == 44_100 && node.auAudioUnit.renderResourcesAllocated)
+    }
+
+    /// An output of more channels than the unit takes (eight): AVAudioEngine answers a connection the unit refuses with
+    /// an exception that ends the app (measured), so the unit is left out - mixer -> output as before it, the music
+    /// playing on, and Debug saying why.
+    @Test func anOutputOfMoreChannelsThanTheUnitTakesPlaysWithoutIt() throws {
+        let layout = try #require(AVAudioChannelLayout(layoutTag: kAudioChannelLayoutTag_DiscreteInOrder | 10))
+        var settings = PlaybackEngine.Settings()
+        settings.offline = AVAudioFormat(standardFormatWithSampleRate: 48_000, channelLayout: layout)
+        settings.aheadSeconds = 60
+        settings.startSeconds = 0
+        settings.bufferSeconds = 0.1
+        settings.changeSettleSeconds = 0
+        let engine = try PlaybackEngine(settings: settings)
+        engine.scheduleLag = testScheduleLag
+        engine.play([memoryTrack(tone(440, rate: 48_000, seconds: 1, level: 0.25), rate: 48_000, key: 0)], from: 0)
+        engine.settle()
+        let out = try renderChannels(engine, frames: 4_096 * 4)
+        let status = try #require(engine.eq?.status())
+        let words = "this output has 10 channels, and the EQ takes at most 8"
+        print("EQ on ten channels: \(describe(status)); \(out.count) channels rendered, the first's peak "
+              + "\(out.first?.map { abs($0) }.max() ?? 0)")
+        #expect(status.mode == .notMade(words))
+        #expect(status.rows == [EQDebugRow(label: "Unit", value: "Not made: " + words)])
+        #expect(out.count == 10 && out[0].contains { $0 != 0 }, "it plays on without the unit")
     }
 }
 

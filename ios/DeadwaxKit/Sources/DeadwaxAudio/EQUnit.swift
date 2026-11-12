@@ -26,7 +26,12 @@ import Foundation
 ///   `internalRenderBlock` getter added through the Objective-C runtime at registration - not a Swift
 ///   `override var internalRenderBlock`. A Swift override returns a Swift closure, which the framework gets wrapped in
 ///   a block that turns its pull block into a Swift closure on every call: one allocation and one free a render, measured
-///   (EQRealTimeTests.theRenderAllocatesNothing, release). Here the pull arrives as the block it is and is called as one.
+///   (EQRealTimeTests.theRenderAllocatesNothing, release; a stored `@convention(block)` returned from the override
+///   made three). Here the pull arrives as the block it is and is called as one. What a render costs beyond the
+///   arithmetic: one swift_retain/release of the closure's context and one _Block_copy/_Block_release of the
+///   framework's pull (a heap block, measured) - atomic counts on objects that outlive the call, no allocation, no
+///   lock and no message (EQRealTimeTests.theFrameworksOwnRenderAllocatesNothing, through AVAudioEngine's own
+///   real-time render).
 public final class EQUnit: AUAudioUnit {
     /// `aufx` / `dweq` / `Dwax` (Apple keeps all-lowercase manufacturer codes for itself).
     public static let component = AudioComponentDescription(
@@ -37,10 +42,17 @@ public final class EQUnit: AUAudioUnit {
     public static let maximumFrames: AUAudioFrameCount = 4_096
 
     private static let registered: Bool = {
-        // the getter the framework asks for the render block: this unit's own block, as it was made
-        let getter: @convention(block) (EQUnit) -> AnyObject = { (unit: EQUnit) -> AnyObject in unit.renderObject }
-        let added = class_addMethod(EQUnit.self, #selector(getter: AUAudioUnit.internalRenderBlock),
-                                    imp_implementationWithBlock(getter), "@@:")
+        // the getter the framework asks for the render block: this unit's own block, as it was made, the ask counted.
+        // Asked through -[AUAudioUnit renderBlock], never on the render: as the unit is made, as AVAudioEngine attaches
+        // it, and at each allocation (measured, eq.md's "Slice 2, built", Review). Its type encoding is AUAudioUnit's
+        // own getter's.
+        let selector = #selector(getter: AUAudioUnit.internalRenderBlock)
+        let getter: @convention(block) (EQUnit) -> AnyObject = { (unit: EQUnit) -> AnyObject in unit.renderBlockAsked() }
+        guard let inherited = class_getInstanceMethod(AUAudioUnit.self, selector) else {
+            preconditionFailure("AUAudioUnit has no internalRenderBlock getter")
+        }
+        let added = class_addMethod(EQUnit.self, selector, imp_implementationWithBlock(getter),
+                                    method_getTypeEncoding(inherited))
         precondition(added, "EQUnit's render block getter couldn't be added")
         AUAudioUnit.registerSubclass(EQUnit.self, as: component, name: "deadwax: EQ", version: 1)
         return true
@@ -137,12 +149,25 @@ public final class EQUnit: AUAudioUnit {
         header.deallocate()
     }
 
-    /// The host this unit renders for: its ring, its slots and its counters. Before the first allocation.
+    /// The host this unit renders for: its ring, its slots and its counters. Before the first allocation. The asks
+    /// for the render block so far (the framework's first is as the unit is made) go into the host's count, which
+    /// is this unit's from now on.
     func attach(_ host: EQHost) {
         self.host = host
         header.pointee.triple = host.triple
         header.pointee.slots = host.slots
         header.pointee.counters = host.counters
+        audio_counters_store(host.counters, EQCounter.asked.rawValue, header.pointee.asked)
+    }
+
+    /// The getter's work (never on the render): the block, the ask counted - Debug's "Render block" row says whether
+    /// iOS asks for it as macOS does (eq.md 7).
+    fileprivate func renderBlockAsked() -> AnyObject {
+        header.pointee.asked &+= 1
+        if let counters = header.pointee.counters {
+            audio_counters_store(counters, EQCounter.asked.rawValue, header.pointee.asked)
+        }
+        return renderObject
     }
 
     public override var inputBusses: AUAudioUnitBusArray { inputs }
@@ -241,6 +266,8 @@ struct EQUnitHeader {
     var blocks: UInt64 = 0
     var ticks: UInt64 = 0
     var worst: UInt64 = 0
+    /// how many times the framework asked for the render block (the getter, never the render)
+    var asked: UInt64 = 0
 
     init(channels: UnsafeMutablePointer<UnsafeMutablePointer<Float>>, packedCount: Int, buffersOffset: Int) {
         self.channels = channels

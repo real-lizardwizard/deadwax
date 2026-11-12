@@ -453,16 +453,21 @@ Debug is where Phase 0's test screen lives now:
 - **EQ**: the EQ's audio unit, which sits between the app's mixer and the output whether the EQ is on
   or not. **Unit** says what it is doing: "In the graph: passing every sample through" (off: every
   sample goes out exactly as it came in), "filtering", "crossfading" (a change is fading in, over 20
-  ms), "the output is stopped" (paused), or "Not made" with iOS's words, when the phone couldn't make
-  it and the music plays on without it. **At this rate** is the output's rate and how many filter
+  ms), "the output is stopped" (paused), "waiting for its first block of sound" (only for a moment as
+  the output starts), or "Not made" with the reason, when the phone couldn't make it - or the output
+  has more than 8 channels - and the music plays on without it. **Render block** says whether iOS
+  asked the unit for the part that does its work: "iOS asked for it 3 times" or so (twice as it's
+  made, once each time the output starts); "iOS hasn't asked for it" means no sound can go through
+  the EQ, and is worth telling me. **At this rate** is the output's rate and how many filter
   sections each channel runs; **Changes** counts the crossfades, the changes that waited for the one
   before, and any made for another rate; **Started with** is what was put in as the output last
   started; **Over full scale** counts the samples the EQ pushed past the loudest a file can hold;
   **Render** is how long the EQ takes per block of sound, against how long the block lasts.
   **Muffle what plays** is a test, for the checks below: it puts a steep treble cut (a -24 dB high
   shelf at 2 kHz) through the real unit, so whatever plays sounds muffled at once, and plain again
-  when you turn it off. It's off each time the app opens. The EQ itself - your settings for each
-  output - comes in a later build.
+  when you turn it off. It turns itself off when you leave Debug (locking the phone doesn't), and
+  it's off each time the app opens. The EQ itself - your settings for each output - comes in a
+  later build.
 - **Engine log**: the app's audio engine says what it does, line by line - each song's lane starting,
   joins, a buffer played, a stream that ran dry, an edit held for the next song, a failure - and Debug
   keeps its last 500 lines, the newest last. While a song plays it writes about two lines a second, so
@@ -778,15 +783,17 @@ hand: several of these ask how it compares.
 The EQ's audio unit is in this build, with nothing to set yet but Debug's test (You > Debug > EQ). Install
 the usual way, not with `--debug`: a Debug build's EQ runs far slower than the one that ships. AirPods:
 
-- **E0a Muffle.** Debug's EQ says "Unit: In the graph: passing every sample through". Play test sound 1,
-  then turn on **Muffle what plays**: the beeps sound muffled at once, with no click. Turn it off: they
-  sound as before.
+- **E0a Muffle.** Play test sound 1. Debug's EQ says "Unit: In the graph: passing every sample
+  through" and "Render block: iOS asked for it" some number of times (tell me the number; if it says
+  iOS hasn't, stop there and tell me). Turn on **Muffle what plays**: the beeps sound muffled at once,
+  with no click. Turn it off: they sound as before.
 - **E0b The join.** Play songs 9 into 10 (one tone cut in two) and turn Muffle on and off ten times as it
   plays: no click, no drop, no break at the join.
 - **E0c Nothing changed.** With Muffle off, play an album you know well: it sounds exactly as it did
   before this build.
-- **E0d The lock screen.** Pause from the lock screen, then press an AirPod's stem: the lock screen shows
-  play after the pause, and the press plays. Do it with Muffle on, then off.
+- **E0d The lock screen.** Stay on Debug and lock the phone. Pause from the lock screen, then press an
+  AirPod's stem: the lock screen shows play after the pause, and the press plays. Do it with Muffle
+  on, then off. (Leaving Debug turns Muffle off, so start each from Debug.)
 
 ## What it can't do yet
 

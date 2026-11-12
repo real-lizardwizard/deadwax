@@ -74,11 +74,22 @@ public final class EQHost: @unchecked Sendable {
 
     /// The bank handed to the render, if it is for the output now and from a settings version at least the last one
     /// published; dropped and counted otherwise. On the main thread or the engine's queue - never the audio thread.
+    ///
+    /// And one more drop (the review): a bank of the same version as the last one published, made for another rate
+    /// when that one was made for the rate the unit runs at, is the same settings made a moment too early - a change
+    /// that read the old rate while a start at a new one made its own bank first. Taken, it would push the start's bank
+    /// out of the ring for one the render can only ignore (1.6), and the settings would play Off until the next
+    /// change. A newer version always goes in.
     @discardableResult
     public func publish(_ bank: EQBank) -> Bool {
         state.withLock { (s: inout State) -> Bool in
             guard EQBank.publishable(key: bank.key, version: bank.version, keyNow: s.output, lastPublished: s.lastVersion) else {
                 if bank.key != s.output { s.otherOutput += 1 } else { s.older += 1 }
+                return false
+            }
+            if bank.version == s.lastVersion, let rate = s.rate, bank.rate != rate, let newest = s.newest,
+               newest.rate == rate, newest.key == bank.key {
+                s.older += 1
                 return false
             }
             s.lastVersion = bank.version
@@ -123,15 +134,18 @@ public final class EQHost: @unchecked Sendable {
     }
 
     /// The unit allocated its render's memory (every start: AVAudioEngine's stop releases it). The counters start
-    /// again, and the newest bank is offered again so the first block installs it - when it is for this rate and the
-    /// output now. The render isn't running.
+    /// again (but the asks for the render block, the unit's own), waiting for the first block; and the newest bank is
+    /// offered again so the first block installs it - when it is for this rate and the output now. The render isn't
+    /// running.
     func allocated(rate: Double, channels: Int) {
         state.withLock { (s: inout State) -> Void in
             s.rate = rate
             s.channels = channels
             s.allocations += 1
-            for index in 0..<EQCounter.count { audio_counters_store(counters, index, 0) }
-            audio_counters_store(counters, EQCounter.mode.rawValue, EQCounter.Mode.passing.rawValue)
+            for index in 0..<EQCounter.count where index != EQCounter.asked.rawValue {
+                audio_counters_store(counters, index, 0)
+            }
+            audio_counters_store(counters, EQCounter.mode.rawValue, EQCounter.Mode.waiting.rawValue)
             if let newest = s.newest, newest.rate == rate, newest.key == s.output {
                 if s.starting { s.publishedInStart = PlaybackEngine.hostSeconds() }
                 write(newest)
@@ -177,6 +191,7 @@ public final class EQHost: @unchecked Sendable {
         } else {
             switch EQCounter.Mode(rawValue: load(.mode)) ?? .stopped {
             case .stopped: status.mode = .stopped
+            case .waiting: status.mode = .waiting
             case .passing: status.mode = .passing
             case .filtering: status.mode = .filtering
             case .crossfading: status.mode = .crossfading
@@ -202,6 +217,7 @@ public final class EQHost: @unchecked Sendable {
             status.worstSeconds = Double(load(.worst)) * seconds
         }
         status.lastFrames = Int(load(.frames))
+        status.renderBlockAsked = Int(load(.asked))
         status.otherOutput = s.otherOutput
         status.older = s.older
         status.allocations = s.allocations
@@ -234,7 +250,7 @@ public final class EQHost: @unchecked Sendable {
         channels[1] = samples + frames
         let bank = EQBank.make(rate: 48_000, key: "", version: 0, on: true, correction: [],
                                offsets: .zero, bands: [6, 0, 0, 0, 0, 0, 0, 0, 0, -6], preamp: nil).packed
-        bank.withUnsafeBufferPointer { offered in
+        bank.withUnsafeBufferPointer { (offered: UnsafeBufferPointer<Double>) -> Void in
             EQRender.process(state, buffers: UnsafePointer(channels), frames: frames, offered: nil)
             EQRender.process(state, buffers: UnsafePointer(channels), frames: frames, offered: offered.baseAddress)
             EQRender.process(state, buffers: UnsafePointer(channels), frames: frames, offered: nil)
@@ -247,14 +263,16 @@ public final class EQHost: @unchecked Sendable {
 }
 
 /// The words of the render's counters, in CAudioRing's order. Written by the render after every block, read by
-/// `EQHost.status()`.
+/// `EQHost.status()` - and `asked`, written by the unit's getter as the framework asks for the render block (never
+/// on the render), kept across allocations.
 enum EQCounter: UInt32 {
-    case overs, largest, crossfades, waited, otherRate, refused, mode, blocks, ticks, worst, frames
+    case overs, largest, crossfades, waited, otherRate, refused, mode, blocks, ticks, worst, frames, asked
 
-    static let count: UInt32 = 11
+    static let count: UInt32 = 12
 
+    /// What the unit does now; `waiting`: allocated, and no block rendered yet.
     enum Mode: UInt64 {
-        case stopped, passing, filtering, crossfading
+        case stopped, passing, filtering, crossfading, waiting
     }
 }
 
@@ -266,6 +284,8 @@ public struct EQUnitStatus: Equatable, Sendable {
         case notMade(String)
         /// the output is stopped: the unit holds no render memory
         case stopped
+        /// the unit's memory is made for a start, and no block has come through it yet - a moment, normally
+        case waiting
         case passing
         case filtering
         case crossfading
@@ -301,6 +321,9 @@ public struct EQUnitStatus: Equatable, Sendable {
     public var older = 0
     /// render memory made, all told (one a start)
     public var allocations = 0
+    /// how many times the framework asked this unit for its render block (eq.md 7: whether iOS takes the getter added
+    /// through the Objective-C runtime, as macOS does - twice as it is made, once a start)
+    public var renderBlockAsked = 0
     public var started: Started?
 
     public init() {}
@@ -318,19 +341,22 @@ public struct EQUnitStatus: Equatable, Sendable {
     }
 
     /// Debug's EQ rows that are the unit's (eq.md 3.13), in 3.13's order: Unit, At this rate, Changes, Started with,
-    /// Over full scale, Render. (Output, Key, Curve and Kept are the settings' - the slices that bring them.)
+    /// Over full scale, Render - and, after Unit, slice 2's Render block (whether the framework asked for it, eq.md 7).
+    /// (Output, Key, Curve and Kept are the settings' - the slices that bring them.)
     public var rows: [EQDebugRow] {
         typealias W = EQWords.Debug
         let unit: String
         switch mode {
         case .notMade(let words): unit = W.notMade(words)
         case .stopped: unit = W.stopped
+        case .waiting: unit = W.waiting
         case .passing: unit = W.passing
         case .filtering: unit = W.filtering
         case .crossfading: unit = W.crossfading
         }
         var rows = [EQDebugRow(label: "Unit", value: unit)]
         if case .notMade = mode { return rows }
+        rows.append(EQDebugRow(label: "Render block", value: W.renderBlockAsked(renderBlockAsked)))
         guard let rate else {
             rows.append(EQDebugRow(label: "At this rate", value: W.notStarted))
             return rows

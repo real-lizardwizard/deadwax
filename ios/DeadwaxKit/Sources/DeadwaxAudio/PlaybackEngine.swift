@@ -609,6 +609,22 @@ public final class PlaybackEngine {
     private func insertEQ(_ engine: AVAudioEngine) {
         eqNode = nil
         guard let host = eq else { return }
+        let mixer = engine.mainMixerNode
+        var format = settings.offline ?? mixer.outputFormat(forBus: 0)
+        if format.sampleRate <= 0 || format.channelCount == 0,
+           let standard = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2) {
+            // no output to read yet: anything valid, made right by matchOutput before the output starts
+            format = standard
+        }
+        // An output of more channels than the unit takes (a big USB interface): AVAudioEngine answers a format a unit
+        // refuses with an exception nothing here can catch - so the unit stays out, mixer -> output as before it
+        // (the review, measured with ten channels).
+        guard format.channelCount <= AVAudioChannelCount(EQLimits.channels) else {
+            let words = "this output has \(format.channelCount) channels, and the EQ takes at most \(EQLimits.channels)"
+            host.notMade(words)
+            note("the EQ's unit left out: \(words)")
+            return
+        }
         let node: AVAudioUnit
         do {
             node = try EQUnit.node()
@@ -620,13 +636,6 @@ public final class PlaybackEngine {
         guard let unit = node.auAudioUnit as? EQUnit else { return }
         unit.maximumFramesToRender = EQUnit.maximumFrames
         unit.attach(host)
-        let mixer = engine.mainMixerNode
-        var format = settings.offline ?? mixer.outputFormat(forBus: 0)
-        if format.sampleRate <= 0 || format.channelCount == 0,
-           let standard = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2) {
-            // no output to read yet: anything valid, made right by matchOutput before the output starts
-            format = standard
-        }
         engine.attach(node)
         engine.connect(mixer, to: node, format: format)
         engine.connect(node, to: engine.outputNode, format: format)
@@ -1037,6 +1046,16 @@ public final class PlaybackEngine {
             let channels = mixer.channelCount > 0 ? mixer.channelCount : min(max(hardware.channelCount, 1), 2)
             if let format = AVAudioFormat(standardFormatWithSampleRate: hardware.sampleRate, channels: channels) {
                 if let eqNode {
+                    // The unit refuses a new format while it holds render memory (AUAudioUnit's rule, which its
+                    // allocation relies on), and AVAudioEngine answers that refusal with an exception: an engine left
+                    // prepared by a start that failed lets go of it first. stop() on an engine that isn't running only
+                    // releases; nothing is scheduled here (every caller has reset the lanes). The main mixer alone
+                    // takes a new format while prepared - measured, the review.
+                    if eqNode.auAudioUnit.renderResourcesAllocated {
+                        drainScheduling()
+                        engine.stop()
+                        note("the engine let go of what a failed start had prepared, so the EQ can be reconnected")
+                    }
                     engine.connect(engine.mainMixerNode, to: eqNode, format: format)
                     engine.connect(eqNode, to: engine.outputNode, format: format)
                     note("the mixer and the EQ reconnected to the output at \(Int(hardware.sampleRate)) Hz")

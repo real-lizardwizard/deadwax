@@ -766,6 +766,19 @@ extension EQWords {
         public static let stopped = "In the graph: the output is stopped"
         /// Slice 2's: no audio engine yet - it is made when something first plays.
         public static let noEngine = "No audio engine yet: it's made when something first plays"
+        /// Slice 2's review: the unit's memory is made for a start and nothing has come through it yet (a moment, normally;
+        /// stuck there, the output isn't asking the EQ for sound).
+        public static let waiting = "In the graph: waiting for its first block of sound"
+
+        /// Slice 2's review, the "Render block" row: whether iOS asked the unit for its render block - through the getter
+        /// added with the Objective-C runtime (eq.md 1.2, 7). macOS asks twice as the unit is made and once a start.
+        public static func renderBlockAsked(_ times: Int) -> String {
+            switch times {
+            case ..<1: "iOS hasn't asked for it, so no sound can go through the EQ"
+            case 1: "iOS asked for it once"
+            default: "iOS asked for it \(times) times"
+            }
+        }
 
         /// "10 filters for both ears + 10 tone bands; its top +6.3 dB at 8.9 kHz; preamp -6.4 dB (automatic)".
         public static func curve(both: Int, left: Int, right: Int, bands: Int, top: Double, at: Double, preamp: Double,
@@ -838,7 +851,7 @@ extension EQWords {
 
         public static let muffle = "Muffle what plays"
         /// Under the toggle (slice 2, check 0).
-        public static let muffleFooter = "A test of the EQ's audio unit: a -24 dB high shelf at 2 kHz, put in through the unit itself, so what plays sounds muffled at once and plain again when it's off - with no click either way. Off, the unit passes every sample through untouched. Nothing here is kept: it's off each time the app opens."
+        public static let muffleFooter = "A test of the EQ's audio unit: a -24 dB high shelf at 2 kHz, put in through the unit itself, so what plays sounds muffled at once and plain again when it's off - with no click either way. Off, the unit passes every sample through untouched. It turns itself off when you leave Debug, and it's never kept."
         public static let header = "EQ"
     }
 }

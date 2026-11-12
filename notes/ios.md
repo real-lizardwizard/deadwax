@@ -62,8 +62,8 @@ ios/
     Tests/DeadwaxCoreTests/ Swift Testing, 64 tests in Phase 0, 508 in 69 suites at app 0.2, 633 in 83 at 0.3,
                             745 in 98 with the EQ's slice 1 (its fixtures in Fixtures/eq/, 1.5 MB), 809 in
                             110 at its slice 2 (the turntable's slice 1 between)
-    Tests/DeadwaxAudioTests/  offline-render tests, macOS only (12 in Phase 0, 54 at app 0.2, 93 at 0.3, 107 in 7
-                            suites with the EQ's slice 2 - EQRealTimeTests bounded in a release build)
+    Tests/DeadwaxAudioTests/  offline-render tests, macOS only (12 in Phase 0, 54 at app 0.2, 93 at 0.3, 111 in 8
+                            suites with the EQ's slice 2 and its review - EQRealTimeTests bounded in a release build)
     Tests/CAllocHook/       test-only C: malloc_logger counting one thread's allocations, proved by a canary
                             (turntable.md 4.3, built first for the EQ)
   scripts/                  install.sh (James's), install_helper.py (its JSON/plist reading, in Xcode's
@@ -3051,6 +3051,8 @@ tests before it pass unchanged with it in the graph, and a 30 s render is the sa
 The render block reaches the framework through an `internalRenderBlock` getter added with the Objective-C runtime,
 because a Swift override costs an allocation on every render (measured). The one thing to hear yet is Debug's EQ
 section (You > Debug): the unit's rows and **Muffle what plays**, a -24 dB high shelf at 2 kHz through the real unit,
-for docs/ios.md's checks E0a-E0d. Every number, every departure from the spec and what wasn't verified: eq.md's
-"Slice 2, built". A Debug build of the app (`install.sh --debug`) is no test of the EQ's real-time behaviour: its
+for docs/ios.md's checks E0a-E0d - and its Render block row, whether iOS asked for the unit's render block as macOS
+does (the review's: with it, a "waiting" state, Muffle off when Debug closes, the unit left out of an output of more
+than 8 channels, and a reconnect after a failed start that no longer throws). Every number, every departure from the
+spec, the review and what wasn't verified: eq.md's "Slice 2, built". A Debug build of the app (`install.sh --debug`) is no test of the EQ's real-time behaviour: its
 unoptimised Core allocates on the render. The app's version didn't move.

@@ -127,8 +127,9 @@ final class PlayerModel {
     func eqStatus() -> EQUnitStatus? { link?.engine.eq?.status() }
 
     /// Debug's "Muffle what plays" (eq.md 5.2, check 0): slice 2's test curve - a -24 dB high shelf at 2 kHz through
-    /// the EQ's real unit - on or off. Off at each launch, kept nowhere. A change goes in at once while the output
-    /// runs (crossfaded over 20 ms), and the engine puts the setting in at each start (`eqTest`, set in `ensureLink`).
+    /// the EQ's real unit - on or off. Off at each launch and whenever Debug closes (DebugView), kept nowhere. A change
+    /// goes in at once while the output runs (crossfaded over 20 ms), and the engine puts the setting in at each start
+    /// (`eqTest`, set in `ensureLink`).
     var muffle: Bool {
         get { muffleOn }
         set {

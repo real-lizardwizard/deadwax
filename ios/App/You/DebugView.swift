@@ -39,6 +39,9 @@ struct DebugView: View {
         }
         .navigationTitle("Debug")
         .task { if model.report == nil { await model.check() } }
+        // Muffle is a test (eq.md 5.2): it goes off as Debug closes - back out of it, or another tab - so it can't be
+        // left on under real listening. Locking the phone doesn't close it (check E0d needs Muffle on, locked).
+        .onDisappear { player.muffle = false }
     }
 
     // MARK: the Library's lists
