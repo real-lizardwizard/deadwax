@@ -1,0 +1,708 @@
+{
+  "about": "lib/deckVoice.ts's newVoiceState, voiceCommand, renderVoice and voiceReport over the \"rests\" case (a hand on clicks that rests, goes missing, repeats a moment, comes out of order, and catches a coast): each run makes a new state and renders `frames` frames from frame `from` in blocks of `block` at `rate`, each block's now its first frame over the rate, each message applied before the first block whose now is at or past its `post`, with that now. `spans`: an FNV-1a 64 hash of each 4096 frames' output (each frame the first channel's Float32 bits and the second's, little-endian); `reports`: how many voiceReport made at 30 a second, a hash of their doubles [time, pos, rate, gain, held, peaks, lowest] little-endian, and at 48 kHz in blocks of 128 those doubles whole (base64); `maths`: how many Math calls the run made and the FNV hash of them in order (maths.json says how). A run with `whole` wrote `frames` frames of its output from its own frame `from` to `file`, the first channel's Float32s then the second's.",
+  "made_by": "ios/scripts/export-deck-vectors.cjs - never edit by hand: change the TypeScript and run it again",
+  "made_from": {
+    "ui/src/lib/deckVoice.ts": "66602fe62bc0e283dfb802d315cad1632aa8202e9edb4ed23ed4d4b5ca2dd978"
+  },
+  "name": "rests",
+  "messages": [
+    {
+      "post": "3ff0000000000000 1",
+      "type": "window",
+      "window": {"kind":"clicks","seed":9,"channels":2,"start":"4024000000000000 10","rate":"40e7700000000000 48000"}
+    },
+    {
+      "post": "3ff0000000000000 1",
+      "type": "take",
+      "at": "4028000000000000 12",
+      "rate": "0000000000000000 0",
+      "time": "3ff0000000000000 1",
+      "until": "7ff0000000000000 Infinity"
+    },
+    {
+      "post": "3ff060e89d87d9c5 1.0236593392888704",
+      "type": "hand",
+      "at": "402807fff5c015d8 12.015624694536129",
+      "time": "3ff0402401e1f671 1.0156593392888704"
+    },
+    {
+      "post": "3ff0a7866169d036 1.040899639626344",
+      "type": "hand",
+      "at": "402810fa54fe1f67 12.033159881611665",
+      "time": "3ff086c1c5c3ece2 1.032899639626344"
+    },
+    {
+      "post": "3ff0ee22fe624dd2 1.0581388413310049",
+      "type": "hand",
+      "at": "4028199fb77645a2 12.050046666324139",
+      "time": "3ff0cd5e62bc6a7e 1.0501388413310049"
+    },
+    {
+      "post": "3ff12ee6640f04c6 1.0739501865903534",
+      "type": "hand",
+      "at": "402821e09af4d243 12.066166727433602",
+      "time": "3ff10e21c8692172 1.0659501865903533"
+    },
+    {
+      "post": "3ff16f5aa569d035 1.089686056276162",
+      "type": "hand",
+      "at": "402829c24d1b0cf9 12.081560525467",
+      "time": "3ff14e9609c3ece1 1.081686056276162"
+    },
+    {
+      "post": "3ff1b82bc1ae1479 1.10746360450983",
+      "type": "hand",
+      "at": "402832da58aa7efb 12.099322100460531",
+      "time": "3ff1976726083125 1.09946360450983"
+    },
+    {
+      "post": "3ff200f25f7b9009 1.1252311448852217",
+      "type": "hand",
+      "at": "40283c1718df0fb5 12.117363717297716",
+      "time": "3ff1e02dc3d5acb5 1.1172311448852217"
+    },
+    {
+      "post": "3ff2484953d0369b 1.1426480554540948",
+      "type": "hand",
+      "at": "402844dd106fc964 12.134499086042247",
+      "time": "3ff22784b82a5347 1.1346480554540948"
+    },
+    {
+      "post": "3ff28c5e030624db 1.1592693441510196",
+      "type": "hand",
+      "at": "40284d3621276c8c 12.150803600370885",
+      "time": "3ff26b9967604187 1.1512693441510196"
+    },
+    {
+      "post": "3ff2d501c94c7569 1.177003656695286",
+      "type": "hand",
+      "at": "402856bbc1eb17e6 12.169401225994033",
+      "time": "3ff2b43d2da69215 1.169003656695286"
+    },
+    {
+      "post": "3ff31a9a64f513ca 1.1939948981901005",
+      "type": "hand",
+      "at": "40285f669bef87db 12.1863297204872",
+      "time": "3ff2f9d5c94f3076 1.1859948981901005"
+    },
+    {
+      "post": "3ff361786be147ac 1.2112964834272857",
+      "type": "hand",
+      "at": "402867e6737d2f1b 12.202930077582598",
+      "time": "3ff340b3d03b6458 1.2032964834272857"
+    },
+    {
+      "post": "3ff39ff3cba89e5f 1.2265508609215414",
+      "type": "hand",
+      "at": "4028700d0c87fd45 12.218849555588017",
+      "time": "3ff37f2f3002bb0b 1.2185508609215414"
+    },
+    {
+      "post": "3ff3e4e667c3ece1 1.2433837941487627",
+      "type": "hand",
+      "at": "4028789193e92174 12.235485670288405",
+      "time": "3ff3c421cc1e098d 1.2353837941487626"
+    },
+    {
+      "post": "3ff42b914ddb22cf 1.26063661968708",
+      "type": "hand",
+      "at": "4028817f1916872b 12.252922805786133",
+      "time": "3ff40accb2353f7b 1.25263661968708"
+    },
+    {
+      "post": "3ff4726eb53a06d2 1.2779376105467475",
+      "type": "hand",
+      "at": "40288a147037a328 12.26968718222777",
+      "time": "3ff451aa1994237e 1.2699376105467475"
+    },
+    {
+      "post": "3ff4b9829fece2a4 1.2952905890544253",
+      "type": "hand",
+      "at": "402892fca6ddddde 12.287083830436071",
+      "time": "3ff498be0446ff50 1.2872905890544253"
+    },
+    {
+      "post": "3ff4f8fd289374bb 1.3107883057594296",
+      "type": "hand",
+      "at": "40289af85e0f9db2 12.302676143079996",
+      "time": "3ff4d8388ced9167 1.3027883057594296"
+    },
+    {
+      "post": "3ff5413ef3900aeb 1.3284291757742561",
+      "type": "hand",
+      "at": "4028a44d86805762 12.320903971831004",
+      "time": "3ff5207a57ea2797 1.3204291757742561"
+    },
+    {
+      "post": "3ff5841ec42e6bdb 1.3447559035619097",
+      "type": "hand",
+      "at": "4028ac2fe3b6f465 12.336302867968877",
+      "time": "3ff5635a28888887 1.3367559035619097"
+    },
+    {
+      "post": "3ff5c2fcf8a9fbe6 1.3601045335233208",
+      "type": "hand",
+      "at": "4028b47f0347ef9d 12.352531530886887",
+      "time": "3ff5a2385d041892 1.3521045335233208"
+    },
+    {
+      "post": "3ff60a96f24e81b3 1.377585360060135",
+      "type": "hand",
+      "at": "4028bd536cac1e09 12.369777103434005",
+      "time": "3ff5e9d256a89e5f 1.369585360060135"
+    },
+    {
+      "post": "3ff6513e2f888887 1.3948346955080824",
+      "type": "hand",
+      "at": "4028c60c14535ee3 12.386810908486444",
+      "time": "3ff6307993e2a533 1.3868346955080824"
+    },
+    {
+      "post": "3ff695647b189373 1.4114727791249748",
+      "type": "hand",
+      "at": "4028ceb80e69374c 12.403747988075018",
+      "time": "3ff6749fdf72b01f 1.4034727791249748"
+    },
+    {
+      "post": "3ff6d8d4b646508c 1.427937232981125",
+      "type": "hand",
+      "at": "4028d727a08f7201 12.420224206457535",
+      "time": "3ff6b8101aa06d38 1.419937232981125"
+    },
+    {
+      "post": "3ff71eaec04d242c 1.4449908744593456",
+      "type": "hand",
+      "at": "4028dfe81ebdddde 12.437317810704311",
+      "time": "3ff6fdea24a740d8 1.4369908744593456"
+    },
+    {
+      "post": "3ff7689ec222d0e3 1.463042028754949",
+      "type": "hand",
+      "at": "4028e8fd4352b021 12.455057243198157",
+      "time": "3ff747da267ced8f 1.455042028754949"
+    },
+    {
+      "post": "3ff7ad2b01692171 1.4797773413757478",
+      "type": "hand",
+      "at": "4028f188188b596e 12.471741454134385",
+      "time": "3ff78c6665c33e1d 1.4717773413757478"
+    },
+    {
+      "post": "3ff7f21a46d44f2e 1.4966070906420543",
+      "type": "hand",
+      "at": "4028fa2633e8dfeb 12.48857271402081",
+      "time": "3ff7d155ab2e6bda 1.4886070906420543"
+    },
+    {
+      "post": "3ff83b139ca1cabe 1.5144230001866812",
+      "type": "hand",
+      "at": "4029031fcaaac084 12.506101926177742",
+      "time": "3ff81a4f00fbe76a 1.5064230001866812"
+    },
+    {
+      "post": "3ffbb6f65f00aec1 1.732168551544348",
+      "type": "hand",
+      "at": "40290c392e55d868 12.523873756388824",
+      "time": "3ffb9631c35acb6d 1.724168551544348"
+    },
+    {
+      "post": "3ffbf7dc0ed867c2 1.7480125980277852",
+      "type": "hand",
+      "at": "4029144f2a069218 12.539666474630437",
+      "time": "3ffbd7177332846e 1.7400125980277852"
+    },
+    {
+      "post": "3ffc40b4e0c08310 1.7657974986433977",
+      "type": "hand",
+      "at": "40291dc95fe8f5c3 12.558176991641522",
+      "time": "3ffc1ff0451a9fbc 1.7577974986433977"
+    },
+    {
+      "post": "3ffc8282fd46508c 1.781863202432791",
+      "type": "hand",
+      "at": "402925b09c7fd44f 12.573613062481085",
+      "time": "3ffc61be61a06d38 1.773863202432791"
+    },
+    {
+      "post": "3ffcc5a8d2a11bfb 1.7982567050655678",
+      "type": "hand",
+      "at": "40292e13ea4dfea3 12.589995691319308",
+      "time": "3ffca4e436fb38a7 1.7902567050655678"
+    },
+    {
+      "post": "3ffd0807ee26e977 1.8144606879055496",
+      "type": "hand",
+      "at": "4029364684d43958 12.606006766229868",
+      "time": "3ffce74352810623 1.8064606879055496"
+    },
+    {
+      "post": "3ffd4a70df1529a3 1.830674048821131",
+      "type": "hand",
+      "at": "40293ed07f5f92c5 12.622684460083642",
+      "time": "3ffd29ac436f464f 1.822674048821131"
+    },
+    {
+      "post": "3ffd8d809d7619ef 1.847046485026677",
+      "type": "hand",
+      "at": "402946f45f7d9c54 12.638583168109257",
+      "time": "3ffd6cbc01d0369b 1.839046485026677"
+    },
+    {
+      "post": "3ffdd6354a74bc69 1.8647969158589837",
+      "type": "hand",
+      "at": "4029503d903b22d0 12.656719691485165",
+      "time": "3ffdb570aeced915 1.8567969158589837"
+    },
+    {
+      "post": "3ffe1d0456900aeb 1.8820842152933277",
+      "type": "hand",
+      "at": "402958e7d3e369d0 12.673643704901139",
+      "time": "3ffdfc3fbaea2797 1.8740842152933277"
+    },
+    {
+      "post": "3ffe5cd761ece2a4 1.8976663422783213",
+      "type": "hand",
+      "at": "4029615c0356b2db 12.690155128796894",
+      "time": "3ffe3c12c646ff50 1.8896663422783213"
+    },
+    {
+      "post": "3ffe9e9be445a1ca 1.9137228886485098",
+      "type": "hand",
+      "at": "4029696ca45374bc 12.705906996905803",
+      "time": "3ffe7dd7489fbe76 1.9057228886485098"
+    },
+    {
+      "post": "3ffede9fb26508df 1.9293515175382294",
+      "type": "hand",
+      "at": "4029718bbbc9d037 12.721769207368295",
+      "time": "3ffebddb16bf258b 1.9213515175382294"
+    },
+    {
+      "post": "3fff24d4cee2a534 1.9464920121630032",
+      "type": "hand",
+      "at": "40297a27c8d11111 12.73858478118976",
+      "time": "3fff0410333cc1e0 1.9384920121630032"
+    },
+    {
+      "post": "3fff6ca76370a3d6 1.964026821553707",
+      "type": "hand",
+      "at": "402982e1fe4c49ba 12.75563044244051",
+      "time": "3fff4be2c7cac082 1.9560268215537069"
+    },
+    {
+      "post": "3fffae4e2a735ee3 1.9800550134877362",
+      "type": "hand",
+      "at": "40298b75eeaca11c 12.772384127209584",
+      "time": "3fff8d898ecd7b8f 1.9720550134877362"
+    },
+    {
+      "post": "3ffff774b3222221 1.9979140279193717",
+      "type": "hand",
+      "at": "4029946ef3060f05 12.7899089760681",
+      "time": "3fffd6b0177c3ecd 1.9899140279193717"
+    },
+    {
+      "post": "40001e8202010624 2.0148964077532288",
+      "type": "hand",
+      "at": "40299d235caf5c2a 12.806910416036846",
+      "time": "40000e1fb42e147a 2.0068964077532288"
+    },
+    {
+      "post": "4000621783072b01 2.0478964077532287",
+      "type": "hand",
+      "at": "4029ae06e6e6a7f0 12.83989640775323",
+      "time": "400051b535343957 2.0398964077532287"
+    },
+    {
+      "post": "40006423ccc18936 2.0488964077532286",
+      "type": "hand",
+      "at": "4029ae1402581d7e 12.83999640775323",
+      "time": "400051b535343957 2.0398964077532287"
+    },
+    {
+      "post": "40006630167be76b 2.0498964077532285",
+      "type": "hand",
+      "at": "4029a75ef748f5c3 12.82689640775323",
+      "time": "40003d3a53ec8b43 2.029896407753229"
+    },
+    {
+      "post": "4000814f6cbece29 2.063139772007862",
+      "type": "hand",
+      "at": "4029b5ac85425b7b 12.854831852293264",
+      "time": "400070ed1eebdc7f 2.055139772007862"
+    },
+    {
+      "post": "4000a19e74cc756a 2.0789155125518635",
+      "type": "hand",
+      "at": "4029bdbe22345832 12.870591229333602",
+      "time": "4000913c26f983c0 2.0709155125518635"
+    },
+    {
+      "post": "4000c68e6c7be76b 2.096951339274644",
+      "type": "hand",
+      "at": "4029c648c1c41397 12.887273841080782",
+      "time": "4000b62c1ea8f5c1 2.088951339274644"
+    },
+    {
+      "post": "4000e67a023fd44e 2.112537400792042",
+      "type": "hand",
+      "at": "4029cd57ca5ee47f 12.90106041344029",
+      "time": "4000d617b46ce2a4 2.104537400792042"
+    },
+    {
+      "post": "400106f22e32dbd0 2.1283916100760294",
+      "type": "hand",
+      "at": "4029d4a3f07adf89 12.915313258170288",
+      "time": "4000f68fe05fea26 2.1203916100760294"
+    },
+    {
+      "post": "4001283d2edc28f4 2.1446479474008076",
+      "type": "hand",
+      "at": "4029dbb382d153ec 12.92910393529197",
+      "time": "400117dae109374a 2.1366479474008075"
+    },
+    {
+      "post": "40014b64bac90b99 2.1618132202724607",
+      "type": "hand",
+      "at": "4029e2bce2ba8216 12.94284733320914",
+      "time": "40013b026cf619ef 2.1538132202724607"
+    },
+    {
+      "post": "40016b17ec994236 2.177291725565989",
+      "type": "hand",
+      "at": "4029e8a59989c072 12.954388425889395",
+      "time": "40015ab59ec6508c 2.169291725565989"
+    },
+    {
+      "post": "40018db6f0a0c49a 2.194196586519479",
+      "type": "hand",
+      "at": "4029ef2864e7e9c0 12.967105058011725",
+      "time": "40017d54a2cdd2f0 2.186196586519479"
+    },
+    {
+      "post": "4001af49fd7b38a8 2.2105903437832986",
+      "type": "hand",
+      "at": "4029f50a21bbfe5b 12.978592924307284",
+      "time": "40019ee7afa846fe 2.2025903437832985"
+    },
+    {
+      "post": "4001d36cae6e402a 2.2282346370120836",
+      "type": "hand",
+      "at": "4029fb4384c5ebf8 12.990749501381273",
+      "time": "4001c30a609b4e80 2.2202346370120836"
+    },
+    {
+      "post": "4001f2d240ea7ef8 2.24356508937478",
+      "type": "hand",
+      "at": "402a0069adbe0dc4 13.000806264352725",
+      "time": "4001e26ff3178d4e 2.23556508937478"
+    },
+    {
+      "post": "40021682eb7b38a7 2.2609918972949177",
+      "type": "hand",
+      "at": "402a0599cfae9408 13.010939111767598",
+      "time": "400206209da846fd 2.2529918972949177"
+    },
+    {
+      "post": "400235fcdd994236 2.276361209144194",
+      "type": "hand",
+      "at": "402a0a55820469ee 13.0201836233509",
+      "time": "4002259a8fc6508c 2.268361209144194"
+    },
+    {
+      "post": "4002570d030f5c27 2.2925052870810023",
+      "type": "hand",
+      "at": "402a0ea2a1be81cd 13.028584532265905",
+      "time": "400246aab53c6a7d 2.2845052870810023"
+    },
+    {
+      "post": "40027b193a70fb37 2.3101067128876838",
+      "type": "hand",
+      "at": "402a138622f62b54 13.038132755804021",
+      "time": "40026ab6ec9e098d 2.3021067128876838"
+    },
+    {
+      "post": "40029f2783be1f65 2.327712086906035",
+      "type": "hand",
+      "at": "402a17c571ce4c48 13.046428257401331",
+      "time": "40028ec535eb2dbb 2.319712086906035"
+    },
+    {
+      "post": "4002c0477890624c 2.343886320024728",
+      "type": "hand",
+      "at": "402a1b547bd829d4 13.05337893499101",
+      "time": "4002afe52abd70a2 2.335886320024728"
+    },
+    {
+      "post": "4002e34fbcbece28 2.3609919305543094",
+      "type": "hand",
+      "at": "402a1eb14d7ba40f 13.059946462004545",
+      "time": "4002d2ed6eebdc7e 2.3529919305543094"
+    },
+    {
+      "post": "40033953d55242e4 2.4029919305543093",
+      "type": "drive",
+      "at": "402a1eca621749f2 13.060137811034085",
+      "rate": "3fda1d00a76c8b50 0.4080201754570014",
+      "accel": "bff4a05d7b2b20b2 -1.2891516505497234",
+      "time": "40033953d55242e4 2.4029919305543093",
+      "until": "40042f1664ae6bda 2.5229919305543094"
+    },
+    {
+      "post": "40035b75f7746506 2.419658597220976",
+      "type": "drive",
+      "at": "402a222e97e4e9dc 13.066761728948158",
+      "rate": "3fd8c4b50dd3b11e 0.38700605726514137",
+      "accel": "bff3ba342895b6c5 -1.2329598985046897",
+      "time": "40035b75f7746506 2.419658597220976",
+      "until": "4004513886d08dfc 2.539658597220976"
+    },
+    {
+      "post": "40037d9819968728 2.4363252638876425",
+      "type": "drive",
+      "at": "402a2565e7c6a778 13.073043101310517",
+      "rate": "3fd77b6b4c191b43 0.3669079058785664",
+      "accel": "bff2de131baf61b2 -1.1792174416969883",
+      "time": "40037d9819968728 2.4363252638876425",
+      "until": "4004735aa8f2b01e 2.5563252638876426"
+    },
+    {
+      "post": "40039fba3bb8a94a 2.452991930554309",
+      "type": "drive",
+      "at": "402a287246bc3be2 13.078996859052442",
+      "rate": "3fd6407becc312bd 0.34768579598702926",
+      "accel": "bff20b8a62399492 -1.1278175198470177",
+      "time": "40039fba3bb8a94a 2.452991930554309",
+      "until": "4004957ccb14d240 2.572991930554309"
+    },
+    {
+      "post": "4003b0d7821f0fb0 2.4613485494355345",
+      "type": "hand",
+      "at": "402a248c570bf4e3 13.071383209428353",
+      "time": "4003a075344c1e06 2.4533485494355345"
+    },
+    {
+      "post": "4003c1dc5ddacb6d 2.469658597220976",
+      "type": "drive",
+      "at": "402a2b5593eef1ce 13.084637282293354",
+      "rate": "3fd51346c6f1e7f7 0.3293015425512062",
+      "accel": "bff1422eeb1ec6b3 -1.078658026159627",
+      "time": "4003c1dc5ddacb6d 2.469658597220976",
+      "until": "4004b79eed36f463 2.5896585972209762"
+    },
+    {
+      "post": "4003d44535eb2dba 2.4786476337810344",
+      "type": "hand",
+      "at": "402a2a8748d0b37c 13.083063388324938",
+      "time": "4003c3e2e8183c10 2.4706476337810344"
+    },
+    {
+      "post": "4003e3fe7ffced8f 2.4863252638876427",
+      "type": "drive",
+      "at": "402a2e1199a552b5 13.089978028708495",
+      "rate": "3fd3f332aced06c6 0.31171862494748515",
+      "accel": "bff0819a4fff9c31 -1.031641304487277",
+      "time": "4003e3fe7ffced8f 2.4863252638876427",
+      "until": "4004d9c10f591685 2.606325263887643"
+    },
+    {
+      "post": "4003f6c755c28f59 2.4954973888397203",
+      "type": "hand",
+      "at": "402a30bbe6affe2b 13.095183571799756",
+      "time": "4003e66507ef9daf 2.4874973888397203"
+    },
+    {
+      "post": "40040620a21f0fb1 2.5029919305543094",
+      "type": "hand",
+      "at": "402a1eca621749f2 13.060137811034085",
+      "time": "40037d9819968728 2.4363252638876425"
+    },
+    {
+      "post": "40041bd8c2da740a 2.5135970328251505",
+      "type": "hand",
+      "at": "402a37166fe511f7 13.10759305640475",
+      "time": "40040b7675078260 2.5055970328251504"
+    },
+    {
+      "post": "40043ca9442aaaa7 2.5296197248001877",
+      "type": "hand",
+      "at": "402a3d11984bf084 13.119274863500557",
+      "time": "40042c46f657b8fd 2.5216197248001877"
+    },
+    {
+      "post": "40045e10abd1eb81 2.5459302352368813",
+      "type": "hand",
+      "at": "402a42c8783a5c60 13.130435711979032",
+      "time": "40044dae5dfef9d7 2.5379302352368813"
+    },
+    {
+      "post": "40047d9beebcc1dc 2.5613325740198274",
+      "type": "hand",
+      "at": "402a4879e2e22d68 13.141554918393652",
+      "time": "40046d39a0e9d032 2.5533325740198274"
+    },
+    {
+      "post": "4004a29edc09e60a 2.5794045629998026",
+      "type": "hand",
+      "at": "402a4efe6f723cb2 13.15428493756767",
+      "time": "4004923c8e36f460 2.5714045629998026"
+    },
+    {
+      "post": "4004c6c64603126a 2.5970578641593436",
+      "type": "hand",
+      "at": "402a55319128d9b6 13.166393791424394",
+      "time": "4004b663f83020c0 2.5890578641593436"
+    },
+    {
+      "post": "4004e7bb59b69cff 2.6131503113607546",
+      "type": "hand",
+      "at": "402a5af5675bfb6e 13.177653532007493",
+      "time": "4004d7590be3ab55 2.6051503113607546"
+    },
+    {
+      "post": "4005082f64f77773 2.628996647646028",
+      "type": "hand",
+      "at": "402a607b2a6aea5d 13.188439679671484",
+      "time": "4004f7cd172485c9 2.620996647646028"
+    },
+    {
+      "post": "40052a77ea1db229 2.64573653128743",
+      "type": "hand",
+      "at": "402a669608a75d99 13.200363417082189",
+      "time": "40051a159c4ac07f 2.63773653128743"
+    },
+    {
+      "post": "40054a6a75c90b97 2.6613358690241955",
+      "type": "hand",
+      "at": "402a6c47fe47e969 13.211486765173236",
+      "time": "40053a0827f619ed 2.6533358690241955"
+    },
+    {
+      "post": "40056f5ce1fb9007 2.6793763785262885",
+      "type": "hand",
+      "at": "402a72b237193346 13.224015924287993",
+      "time": "40055efa94289e5d 2.6713763785262885"
+    },
+    {
+      "post": "4005942bdb1ba5df 2.6973492734730224",
+      "type": "hand",
+      "at": "402a7933bb5e0c17 13.236722808103918",
+      "time": "400583c98d48b435 2.6893492734730224"
+    },
+    {
+      "post": "4005b8c0c270fb34 2.7152114096383233",
+      "type": "hand",
+      "at": "402a7f4aad6b3045 13.248616618475475",
+      "time": "4005a85e749e098a 2.7072114096383233"
+    },
+    {
+      "post": "4005da245da06d35 2.731514674623805",
+      "type": "hand",
+      "at": "402a8525eff2b937 13.26005506360944",
+      "time": "4005c9c20fcd7b8b 2.723514674623805"
+    },
+    {
+      "post": "4005fc21cc591682 2.7481113400161243",
+      "type": "hand",
+      "at": "402a8b68d4e784ed 13.272284177075983",
+      "time": "4005ebbf7e8624d8 2.7401113400161243"
+    },
+    {
+      "post": "40073953d55242e4 2.9029919305543093",
+      "type": "fade",
+      "seconds": "3fd3333333333333 0.3"
+    }
+  ],
+  "runs": [
+    {
+      "rate": 48000,
+      "block": 128,
+      "from": 47520,
+      "frames": 115824,
+      "spans": ["8f6955bf94ec2325","50cf16b136ef269e","d35306e2ed9c2048","adfa92f6d27b52e9","b6a1ecc481726546","d35f277fdc95790c","959675c44ad4bd9b","f996f8163be0d8f8","823be8ac5285ccb5","6ad75fdcfd52402b","4a6b4b95cb089c63","a5dbbea6a3d83e97","e97573c86bc5f164","1091854260931788","1d7b0bdeaafd27d8","0a538b1bd973324b","20165e83b3476ac9","b36014bae102cf36","1d52f2b9c561e574","5e5b706e2544056d","b02003f058eae4f9","04006c1c3f0c218e","9c3ccebfcf7e58b6","d04561a07f5df7af","363606a1d43c1f66","a9dca882af9d8006","6bd16a1cc20da20e","48f3c8bb4fdb7e23","0069b75a90204906"],
+      "reports": {"count":72,"hash":"7b0b0e7d05fa76a2","whole":"JzEIrBxa8D8AAAAAAAAoQAAAAAAAAAAA+33fe0D97z8AAAAAAAAAAAAAAAAAAAAAAAAAAAAA8D93vp8aL93wPwAAAAAAAChAAAAAAAAAAACxUc37///vPwAAAAAAAAAAAAAAAAAAAAAAAAAAAADwPzhCGb0ta/E/AAAAAAAAKEAAAAAAAAAAAF79/////+8/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAPA/iM+wK0Du8T+PaJoEpwAoQIgmeIUo4eY/uP//////7z8AAAAAAAAAQAAAAAAAAABA5vvM8kfu7z9JUyrOPnzyP50LOAGFEyhASuikoP8C8D+4///////vPwAAAAAAAPA/AAAAAAAA8D/AQKZ6q53sP5ngwTxR//I/9whKy+IjKEATWM+Y1u7vP7j//////+8/AAAAAAAA8D8AAAAAAADwP74qVU5Ja+w/WmQ730+N8z9Kq+NXmTUoQCbewlvt9O8/uP//////7z8AAAAAAAAIQAAAAAAAAABAvipVTklr7D+q8dJNYhD0P2obg2n5RShA5rW49B8B8D+4///////vPwAAAAAAAAAAAAAAAAAAAAAAeqeIDUftP2t1TPBgnvQ/34x0jr1XKEAIChamXQbwP7j//////+8/AAAAAAAAAEAAAAAAAAAAQHkEqdBohO0/uwLkXnMh9T9G2jh3JWgoQKJ9MwS9AvA/uP//////7z8AAAAAAAAAAAAAAAAAAAAAfgSp0GiE7T98hl0Bcq/1P927JnvjeShAXXH/3ED37z+4///////vPwAAAAAAAABAAAAAAAAAAEBwJIP8ltXrP8wT9W+EMvY/mCHuf0CKKEC28ZWIkvfvP7j//////+8/AAAAAAAA8D8AAAAAAADwP/mc3Rk95Os/jZduEoPA9j8Ig4jF/5soQHzLPkuOAvA/uP//////7z8AAAAAAADwPwAAAAAAAPA/+ZzdGT3k6z/dJAaBlUP3P1arGjZnrChAPjK/OKYH8D+4///////vPwAAAAAAAABAAAAAAAAAAEB3ddrCZRXsP56ofyOU0fc/Mr+nMzG+KEDpPc3A3AjwP7j//////+8/AAAAAAAA8D8AAAAAAADwP3l12sJlFew/7jUXkqZU+D+0G8fgmM4oQALYbVDzAPA/uP//////7z8AAAAAAADwPwAAAAAAAPA/8NoyifbY6z+vuZA0peL4P4k4g0hT4ChAe7P7Kxbp7z+4///////vPwAAAAAAAAAAAAAAAAAAAADm2jKJ9tjrP/9GKKO3Zfk/F5Z8EaLwKECGoMX31cjvP7j//////+8/AAAAAAAAAAAAAAAAAAAAAAWSeImzdO0/wcqhRbbz+T9b2sksOwIpQOFWIV+js+8/uP//////7z8AAAAAAADwPwAAAAAAAPA/3a4LGEbV6z8QWDm0yHb6PwiB6PgyCClAhfCJ1qDKMj+4///////vPwAAAAAAAABAAAAAAAAAAEA5qDExl7/rP9LbslbHBPs/w6rlXjQIKUBHIvqIMVUyP7j//////+8/AAAAAAAAAAAAAAAAAAAAAECoMTGXv+s/IWlKxdmH+z8KFXVeNQgpQLqoPRrwFio/uP//////7z8AAAAAAAAAAAAAAAAAAAAAY/Ss4Z517T/j7MNn2BX8P+m0UR42CClAQWqIGZ+uIT+4///////vPwAAAAAAAAAAAAAAAAAAAABJUUsYdYLuPzN6W9bqmPw/Uw/slzYIKUDwB5VZ4qgYP7j//////+8/AAAAAAAAAAAAAAAAAAAAAEfh7FDmKe8/9P3UeOkm/T9U0H3yNggpQGyUqII8rxA/uP//////7z8AAAAAAAAAAAAAAAAAAAAAzAotG2aC7z9Ei2zn+6n9PyoH1caxEilA4FrjXDs08D+4///////vPwAAAAAAAAAAAAAAAAAAAAA5klEJhbnvPwUP5on6N/4/43pLW4UkKUAUaxp9YfvvP7j//////+8/AAAAAAAAAEAAAAAAAAAAQMxJd0Mm7es/VZx9+Ay7/j+wqvzJ3zQpQMxxtIVF7u8/uP//////7z8AAAAAAAAAAAAAAAAAAAAA1kl3Qybt6z8WIPeaC0n/P8SSJX2cRilAlR6oex0F8D+4///////vPwAAAAAAAABAAAAAAAAAAEBJDnuiasrrP2atjgkezP8/MGaBvApXKUCHVHfQ4w7wP7j//////+8/AAAAAAAA8D8AAAAAAADwP0kOe6Jqyus/kxgEVg4tAEBckNnI12gpQFss2jcNCPA/uP//////7z8AAAAAAAAAAAAAAAAAAAAA91hSiO8p7D8730+Nl24AQJ+oAM49eSlAgbhkVWz97z+4///////vPwAAAAAAAABAAAAAAAAAAECSAvZvXJjsPxyhjN6WtQBAxGSPS/iKKUBdqTu/RPHvP7j//////+8/AAAAAAAAAAAAAAAAAAAAAIkC9m9cmOw/xGfYFSD3AEBxVYIVUJspQP2rCq8f4e8/uP//////7z8AAAAAAAAAQAAAAAAAAPA/h1qDGFGc7T+lKRVnHz4BQDXEtnPhrClAJ74B4wNi7z+4///////vPwAAAAAAAPA/AAAAAAAA8D+FKoBm0IjsP0zwYJ6ofwFAXj09Wre8KUBAeIoiEV3uP7j//////+8/AAAAAAAA8D8AAAAAAADwP4cqgGbQiOw/LbKd76fGAUCj4cA5GM0pQHE2Ghnpmew/uP//////7z8AAAAAAAAAAAAAAAAAAAAAw1AzH6IK7T/VeOkmMQgCQCdmcPI52ylAKtf7qzmQ6j+4///////vPwAAAAAAAAhAAAAAAAAACEC7XI2WvNLsP7Y6JngwTwJACivDclTpKUAbNZXXW0voP7j//////+8/AAAAAAAAAAAAAAAAAAAAAMdcjZa80uw/XgFyr7mQAkB5yTE3PPUpQOXDRZ7zNeY/uP//////7z8AAAAAAAAQQAAAAAAAABBA6uzLkerL6z8+w64AudcCQGlqz1fwACpAjDf/xAwB5D+4///////vPwAAAAAAAAAAAAAAAAAAAAD37MuR6svrP+aJ+jdCGQNANP6uQqgKKkCCCERwyvDhP7j//////+8/AAAAAAAAAAAAAAAAAAAAAML+HtC58uw/x0s3iUFgA0B+8sCO9hMqQJtUm3WqNd8/uP//////7z8AAAAAAAAQQAAAAAAAABBAPrw7c89+7D9vEoPAyqEDQCcJpzVfGypAN7JdbwuQ2j+4///////vPwAAAAAAAAAAAAAAAAAAAAAYIcEMPIbsP0/UvxHK6ANAbDsEZo0gKkA2L7uZPFmgP7j//////+8/AAAAAAAAAAAAAAAAAAAAAFxApgHS9e0/95oLSVMqBEBQDB4ulCAqQASgFeUvMok/uP//////7z8AAAAAAAAAAAAAAAAAAAAANthxZvva7j/YXEiaUnEEQAgYeaZiJSpAuHxUmdHC1j+4///////vPwAAAAAAAAAAAAAAAAAAAACvWVMkGlTvP4AjlNHbsgRAIJuBT8gvKkAIvJMzlYnev7j//////+8/AAAAAAAA8D8AAAAAAADwP6h085R+7Ow/YOXQItv5BEApyajenTgqQOxFLjNfHuM/uP//////7z8AAAAAAAAAAAAAAAAAAAAAqHTzlH7s7D8IrBxaZDsFQO2ibL9VQypA/07pH+W65T+4///////vPwAAAAAAAABAAAAAAAAAAEBRHoASnOzrP+ltWatjggVAe31Zm3lPKkAr0lyuQPjlP7j//////+8/AAAAAAAAAAAAAAAAAAAAAEkegBKc7Os/kTSl4uzDBUAzYT3Qv1oqQIy2OeiLEuY/uP//////7z8AAAAAAAAAAAAAAAAAAAAAw9WAGSrN7D9x9uEz7AoGQN+dtxcEZypAJ/xYilkk5j+4///////vPwAAAAAAAABAAAAAAAAAAECC0kVGLMHrPxm9LWt1TAZA6bhtuV1yKkD39W1nNzPmP7j//////+8/AAAAAAAAAAAAAAAAAAAAAIfJp+tjL+w/+n5qvHSTBkDXnaCOsn4qQFJFCjzrQ+Y/uP//////7z8AAAAAAAAAQAAAAAAAAABAwI9LI4/m6z+iRbbz/dQGQLlape4miipA5sFDLeiX5j+4///////vPwAAAAAAAPA/AAAAAAAA8D/Cj0sjj+brP4IH80T9GwdArGsV2gOPKkCTPxaaD3ZUv7j//////+8/AAAAAAAAAAAAAAAAAAAAABXfqyi6Ve0/Ks4+fIZdB0AT1v8SAI8qQBOZP2cic0a/iuCgXQfz6D8AAAAAAAAAAAAAAAAAAAAAmDMpFf1r7j8LkHvNhaQHQOTWnYn9jipA3ZSbQiStPb86dbVEJ27fPwAAAAAAAAAAAAAAAAAAAADHKG39/BLvP7NWxwQP5gdAEpXl8fuOKkCNFclmhqg0v1ZsSHKSg9Q/AAAAAAAAAAAAAAAAAAAAAL0GhZUAe+8/kxgEVg4tCECiE2/C+o4qQPo3Vz5K8yu/zU77vr7XyT8AAAAAAAAAAAAAAAAAAAAAA9BPNvqx7z8730+Nl24IQKzzOgL6jipALfzNf898I7+HA/y8+N3APwAAAAAAAAAAAAAAAAAAAABH3VTUN9TvPxyhjN6WtQhAirsVc/mOKkB5G0rEsF4av1FYntSgP7U/AAAAAAAAAAAAAAAAAAAAAEfX48RQ5u8/xGfYFSD3CEAAq2oY+Y4qQC99khzCYhK/VP1SUa+8qz8AAAAAAAAAAAAAAAAAAAAAdIFNWZbx7z+lKRVnHz4JQFj049T4jipATHvHHwjhCL/OdP+WmHihPwAAAAAAAAAAAAAAAAAAAADoged6i/fvP0zwYJ6ofwlAG44eqviOKkA43+3up1gBvwwYiIxbzpY/AAAAAAAAAAAAAAAAAAAAAKipiGRB++8/LbKd76fGCUB43EOK+I4qQCBQo3LzePe+e7gE8/S6jD8AAAAAAAAAAAAAAAAAAAAAU6WJdDf97z/VeOkmMQgKQCSuFnb4jipAHPmFJ5ld8L7MmLLucMCCPwAAAAAAAAAAAAAAAAAAAACoeegocP7vP7Y6JngwTwpAwNkPZ/iOKkDczuVLOiXmvpkRCCJtn3c/AAAAAAAAAAAAAAAAAAAAADL7bG8V/+8/XgFyr7mQCkAURYtd+I4qQHseceZ34d6+RJGH1xTWbj8AAAAAAAAAAAAAAAAAAAAASc4aYHz/7z8+w64AudcKQPyYdFb4jipAHmmk9LXk1L6p1MKxV2xjPwAAAAAAAAAAAAAAAAAAAACyL27Isv/vP+aJ+jdCGQtAUC/3UfiOKkBWQLzXhSLNvgdrQjG1Wlk/AAAAAAAAAAAAAAAAAAAAAG8sjKvU/+8/"},
+      "maths": {"calls":6968,"hash":"65e94b3fdf832ab6"},
+      "whole": null
+    },
+    {
+      "rate": 48000,
+      "block": 333,
+      "from": 47520,
+      "frames": 115824,
+      "spans": ["8f6955bf94ec2325","69e931373bc5c0c5","0c99381ddd705f82","e762b64b5d2734da","b6a1ecc481726546","31bfff909b400417","f28b8b47b974c8cf","f996f8163be0d8f8","823be8ac5285ccb5","6ad75fdcfd52402b","37a31157dc244c44","a5dbbea6a3d83e97","9659a15604f229cc","94b746f2da0830ad","7ddd3da3d6e2ab60","d1a14b56ba37bc60","40dee892fea75a37","1842a6c1b25f1859","0a1e426f4105b8bb","dec82f72a7ae9ace","e6822c4b94939085","ed88bb26aca526e2","a99fd3ae1b2406ac","0b5f0a524b882929","be1cbc7679cd625f","3eedddf92ef53208","1ee8f921d48ba148","3b8b2ccd85492b25","d72d4ca76162ec7e"],
+      "reports": {"count":72,"hash":"ffa1c2e3943965ce","whole":null},
+      "maths": {"calls":3626,"hash":"08e007bcb626f50e"},
+      "whole": null
+    },
+    {
+      "rate": 48000,
+      "block": 512,
+      "from": 47520,
+      "frames": 115824,
+      "spans": ["8f6955bf94ec2325","69e931373bc5c0c5","db0e96f17ea28a37","5adba993beb68f15","5fc6db0c969201b1","e9d4ba8f8668159e","c5ba50e532b18478","a81fd7cdec37cb35","c0fa8ef04e9d92b2","e8359783d8e07b8b","da58c8131f4f2a7d","fe7c2e5bfd60adf0","9daa0985162ab3cd","f0760e9299f0a568","577a6a518d827e4b","7a74c4137b6445d2","3500cc0537f85185","23678840221cda2f","7e341fbed0547336","38c999887cca2b4c","b79e1e98a4b76ff1","25c048ca399685da","abb31e39ccccef6d","b0585956ed3f2c1d","80d078d42722b607","33f52832692197aa","c0a146794a681fb7","f2a2cf35320e27f8","3be4289c118cc2ad"],
+      "reports": {"count":72,"hash":"6fe8178250335b28","whole":null},
+      "maths": {"calls":2900,"hash":"c227e7cd9a1c8282"},
+      "whole": null
+    },
+    {
+      "rate": 48000,
+      "block": 1024,
+      "from": 47520,
+      "frames": 115824,
+      "spans": ["8f6955bf94ec2325","ce739468ee89f4d5","d32d99f9ff665d51","414832d8d06d8a41","fb63bd973d1d170d","fdf5b6cedf242556","42750e323c3edb9b","bacf21926a8d85b3","438412bc7775521f","7f57de06b495f7fc","2b9ec58983338330","9f507569ee70b708","3a9a66fce7d5a596","43c222faba5da935","3f94efa6d7962d55","5ab4245c45f1617f","c2d7aad7fe1010a3","0a59d8fa6c49079c","0501b9e500449c83","b5b012fc2a504d6f","c00ea2447032ed70","e6ebb9766f53782e","58e13208f0481655","7dd7226ff447d82c","55a1c45b90b201fa","875e1aa70475445f","6cef4fc19ff632ee","5002aca372b1636f","b932e59b2dcdc61a"],
+      "reports": {"count":72,"hash":"bd1b1d7c1f629038","whole":null},
+      "maths": {"calls":2222,"hash":"8dca98d6dc239862"},
+      "whole": null
+    },
+    {
+      "rate": 44100,
+      "block": 128,
+      "from": 43659,
+      "frames": 106413,
+      "spans": ["8f6955bf94ec2325","2aac7c0d34f29261","b7d97ece45a0d06e","b791421465516cb5","c967494aff778f66","c4b6ab0fe689fc38","1ea03634a89d521e","67ef9676f23ceac5","641be5d239dcf6a4","433fd83737bd6af8","cf01b67bab011051","b2b44e52749b3f3e","83d0332f244c91de","906ec741c8dcb76a","b06ea9236ac1228a","3d3bee4ebc62921b","efa89c316a287e87","d5dbe7d62e911a06","151fc12e5ac6c491","f2ca09cb326c7fdf","128ae7b79e4c30ca","142699747bfe91de","863489e964c6ee63","538be6e29c02e3ff","643a11867e71fa4e","2eff7be3e1292a7e"],
+      "reports": {"count":72,"hash":"41096f316a595e3a","whole":null},
+      "maths": {"calls":6530,"hash":"264ca91119cd22ed"},
+      "whole": null
+    },
+    {
+      "rate": 44100,
+      "block": 333,
+      "from": 43659,
+      "frames": 106413,
+      "spans": ["8f6955bf94ec2325","d6e04ace1e0393fe","57235e9ae7f8cbf4","81490afb5db45e51","ecbbe09c894abc83","fe0808f8adc9faee","c595a599a4fcc228","453e8d52477b75a7","bb8a7fa4349796a2","bc906cd28bc7e46c","9a5fcca1a82d7394","de7d509fd0f60ec9","b9853185b578d14e","0e98281629c29e87","c8b41d1452709bff","7c6e5c6b51366601","13d302ca9d0932a9","1f367ee7ac731dd8","fc59ee33504c8c19","6a5c19566dab7e33","349001a70dd18fa1","badcb25f45a4d0bb","cd98058b31bf4326","97344f2cbac8c6a6","22b912707e7de0dd","920ae42ab008c4ac"],
+      "reports": {"count":72,"hash":"57278c06ac2e55a7","whole":null},
+      "maths": {"calls":3458,"hash":"927581b7dc0497ad"},
+      "whole": null
+    },
+    {
+      "rate": 44100,
+      "block": 512,
+      "from": 43659,
+      "frames": 106413,
+      "spans": ["8f6955bf94ec2325","2467b0d67ac03320","1652c6f4d50c9b9e","7befb756e1dbebe5","d9ab52c692be2443","4fd0dfd54899fc04","4c8b5d583cec884e","f03fe333ce397f27","3362e48ef21b4a5e","dad709b94c1e9f53","ee1bcd8d34c9ca4a","46693711bf881d89","c3e79bc7f3ef35e0","eb9c75ef776f062a","9a9a8291167efdba","71216c648bf6a58f","5cebd8442ca60774","df97dd32bd00cd2d","b9e3a9c6d4872eb9","af8f885ff0ff041c","749d1e347b5f9fb2","39c9c4f43ef50023","38f41ebad3b5a011","21e70c1f6e98b6cd","836a1a7af4d09c1a","40fe9a47392dafa9"],
+      "reports": {"count":72,"hash":"60d7f256c554328e","whole":null},
+      "maths": {"calls":2786,"hash":"0ee9847cccf8feed"},
+      "whole": null
+    },
+    {
+      "rate": 44100,
+      "block": 1024,
+      "from": 43659,
+      "frames": 106413,
+      "spans": ["8f6955bf94ec2325","a00faa274a2562ef","1a45c7e82dd281d0","08f16612e6c5628f","0aa49a94a8d7b533","9010c5a4e036416a","d64a5b9228991e9b","e3e580c709608a2e","9e5eba7ffce8212f","177ec75ed00a983c","7eef4c167d8632eb","3cf277cb97ba8ed7","04461dfe73fedb1b","108f6dc323950906","725fcdd8dc3e010f","ccc022048d342983","7c31e3b91eba2427","16cb854dc2fa8e2a","4126dfcd577bc963","80cff552b53d657b","161567c5ba30b65c","e89deb6289c9914f","5af689eda4a2ea2f","ef10f1352e3f6b5b","351ea50d2ee0ce39","bf48e47cf3b7b0b7"],
+      "reports": {"count":72,"hash":"9aa8c2d3c686c234","whole":null},
+      "maths": {"calls":2162,"hash":"5c5f4202724702fd"},
+      "whole": null
+    },
+    {
+      "rate": 48000,
+      "block": 1,
+      "from": 47800,
+      "frames": 2000,
+      "spans": ["2c36c2471ceec525"],
+      "reports": {"count":1,"hash":"a48dcbc7f3f0de16","whole":null},
+      "maths": {"calls":13537,"hash":"a1d95366025e5f4a"},
+      "whole": null
+    }
+  ]
+}

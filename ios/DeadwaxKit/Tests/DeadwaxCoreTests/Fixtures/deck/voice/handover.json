@@ -1,0 +1,747 @@
+{
+  "about": "lib/deckVoice.ts's newVoiceState, voiceCommand, renderVoice and voiceReport over the \"handover\" case (a hand speeding up, let go on a playing record: the motor back to speed, held, faded over HANDOVER_FADE_S): each run makes a new state and renders `frames` frames from frame `from` in blocks of `block` at `rate`, each block's now its first frame over the rate, each message applied before the first block whose now is at or past its `post`, with that now. `spans`: an FNV-1a 64 hash of each 4096 frames' output (each frame the first channel's Float32 bits and the second's, little-endian); `reports`: how many voiceReport made at 30 a second, a hash of their doubles [time, pos, rate, gain, held, peaks, lowest] little-endian, and at 48 kHz in blocks of 128 those doubles whole (base64); `maths`: how many Math calls the run made and the FNV hash of them in order (maths.json says how). A run with `whole` wrote `frames` frames of its output from its own frame `from` to `file`, the first channel's Float32s then the second's.",
+  "made_by": "ios/scripts/export-deck-vectors.cjs - never edit by hand: change the TypeScript and run it again",
+  "made_from": {
+    "ui/src/lib/deckVoice.ts": "66602fe62bc0e283dfb802d315cad1632aa8202e9edb4ed23ed4d4b5ca2dd978"
+  },
+  "name": "handover",
+  "messages": [
+    {
+      "post": "3ff0000000000000 1",
+      "type": "window",
+      "window": {"kind":"noise","seed":3,"channels":2,"start":"4049000000000000 50","rate":"40e7700000000000 48000"}
+    },
+    {
+      "post": "3ff0000000000000 1",
+      "type": "take",
+      "at": "404a000000000000 52",
+      "rate": "0000000000000000 0",
+      "time": "3ff0000000000000 1",
+      "until": "7ff0000000000000 Infinity"
+    },
+    {
+      "post": "3ff0602626f46509 1.0234738847414653",
+      "type": "hand",
+      "at": "404a000655409375 52.00019326832891",
+      "time": "3ff03f618b4e81b5 1.0154738847414653"
+    },
+    {
+      "post": "3ff0a860cd6de8ca 1.0411079430182775",
+      "type": "hand",
+      "at": "404a0007f18d0313 52.00024241814949",
+      "time": "3ff0879c31c80576 1.0331079430182775"
+    },
+    {
+      "post": "3ff0e9dcd15e353f 1.0570953539311885",
+      "type": "hand",
+      "at": "404a0046ec0f2484 52.002164370912425",
+      "time": "3ff0c91835b851eb 1.0490953539311885"
+    },
+    {
+      "post": "3ff131da9f2bb0cf 1.0746713845829168",
+      "type": "hand",
+      "at": "404a0085e2b3bb25 52.00408586288385",
+      "time": "3ff111160385cd7b 1.0666713845829168"
+    },
+    {
+      "post": "3ff172062f057619 1.0903379284640151",
+      "type": "hand",
+      "at": "404a00d5d11fd180 52.00652517369872",
+      "time": "3ff15141935f92c5 1.082337928464015"
+    },
+    {
+      "post": "3ff1b3762b72b020 1.1063138673007487",
+      "type": "hand",
+      "at": "404a014484e54680 52.009903537703394",
+      "time": "3ff192b18fcccccc 1.0983138673007486"
+    },
+    {
+      "post": "3ff1f7abe927983b 1.122966681251923",
+      "type": "hand",
+      "at": "404a01d2cb5e9391 52.01424543493261",
+      "time": "3ff1d6e74d81b4e7 1.114966681251923"
+    },
+    {
+      "post": "3ff23a203b15d867 1.1391908939381439",
+      "type": "hand",
+      "at": "404a026ca8ba9c87 52.018941012495866",
+      "time": "3ff2195b9f6ff513 1.1311908939381439"
+    },
+    {
+      "post": "3ff2794912e76c8a 1.1546107042729852",
+      "type": "hand",
+      "at": "404a0313e57a05e7 52.024044689733095",
+      "time": "3ff2588477418936 1.1466107042729852"
+    },
+    {
+      "post": "3ff2b7b166ea2797 1.169846918116013",
+      "type": "hand",
+      "at": "404a03b8ec0ac76e 52.02908087278671",
+      "time": "3ff296eccb444443 1.161846918116013"
+    },
+    {
+      "post": "3ff2f6ce3fcd242d 1.1852552883376675",
+      "type": "hand",
+      "at": "404a0493d603aa93 52.035761596479595",
+      "time": "3ff2d609a42740d9 1.1772552883376675"
+    },
+    {
+      "post": "3ff33f8d2ef2b01f 1.2030155023485418",
+      "type": "hand",
+      "at": "404a058dac9570f1 52.0433860521024",
+      "time": "3ff31ec8934ccccb 1.1950155023485418"
+    },
+    {
+      "post": "3ff38550514b6f45 1.2200472999165453",
+      "type": "hand",
+      "at": "404a06a42324e8a9 52.05188407232465",
+      "time": "3ff3648bb5a58bf1 1.2120472999165453"
+    },
+    {
+      "post": "3ff3ccd298815d85 1.2375055272330837",
+      "type": "hand",
+      "at": "404a07cd2d6ad4da 52.060949017680926",
+      "time": "3ff3ac0dfcdb7a31 1.2295055272330837"
+    },
+    {
+      "post": "3ff411a26afae146 1.2543052843958136",
+      "type": "hand",
+      "at": "404a0912cdcff8d2 52.070886351155096",
+      "time": "3ff3f0ddcf54fdf2 1.2463052843958136"
+    },
+    {
+      "post": "3ff453b724e0f04b 1.2704383316586412",
+      "type": "hand",
+      "at": "404a0a5d6893cf3e 52.08097560136092",
+      "time": "3ff432f2893b0cf7 1.2624383316586412"
+    },
+    {
+      "post": "3ff4985a90f40da6 1.2871957456817227",
+      "type": "hand",
+      "at": "404a0bb452f3a5ad 52.0914405526813",
+      "time": "3ff47795f54e2a52 1.2791957456817227"
+    },
+    {
+      "post": "3ff4db53ea989373 1.3035468257814642",
+      "type": "hand",
+      "at": "404a0d40841aaf99 52.103531373052824",
+      "time": "3ff4ba8f4ef2b01f 1.2955468257814642"
+    },
+    {
+      "post": "3ff51e68e3fb9009 1.3199242501805222",
+      "type": "hand",
+      "at": "404a0eb640f9f07a 52.114936945000366",
+      "time": "3ff4fda44855acb5 1.3119242501805222"
+    },
+    {
+      "post": "3ff562fb5845f92a 1.3366654823472097",
+      "type": "hand",
+      "at": "404a1076039c68e9 52.12860150468061",
+      "time": "3ff54236bca015d6 1.3286654823472097"
+    },
+    {
+      "post": "3ff5a88e30cbc6a6 1.3536512285321947",
+      "type": "hand",
+      "at": "404a123d3c9b8115 52.142493797235296",
+      "time": "3ff587c99525e352 1.3456512285321947"
+    },
+    {
+      "post": "3ff5ef669afb9009 1.3709474615106976",
+      "type": "hand",
+      "at": "404a14273168948b 52.157446075501035",
+      "time": "3ff5cea1ff55acb5 1.3629474615106976"
+    },
+    {
+      "post": "3ff62f84b17513ca 1.3866011554648474",
+      "type": "hand",
+      "at": "404a15eeff01b786 52.171356082762074",
+      "time": "3ff60ec015cf3076 1.3786011554648474"
+    },
+    {
+      "post": "3ff6774314820c48 1.4041167069524523",
+      "type": "hand",
+      "at": "404a1810449d9986 52.18799646086977",
+      "time": "3ff6567e78dc28f4 1.3961167069524523"
+    },
+    {
+      "post": "3ff6c06b5853a06c 1.4219773721943296",
+      "type": "hand",
+      "at": "404a1a5fd8c7b725 52.20605001212815",
+      "time": "3ff69fa6bcadbd18 1.4139773721943296"
+    },
+    {
+      "post": "3ff704768f5867c3 1.4385896300723153",
+      "type": "hand",
+      "at": "404a1c92f315a03a 52.22323454433395",
+      "time": "3ff6e3b1f3b2846f 1.4305896300723153"
+    },
+    {
+      "post": "3ff74646a0fced90 1.4546572006791827",
+      "type": "hand",
+      "at": "404a1eba06db108e 52.24005208679692",
+      "time": "3ff7258205570a3c 1.4466572006791827"
+    },
+    {
+      "post": "3ff78b64c0746507 1.4715316312561428",
+      "type": "hand",
+      "at": "404a2134b25911f0 52.25942067479252",
+      "time": "3ff76aa024ce81b3 1.4635316312561428"
+    },
+    {
+      "post": "3ff7cce5c6d55553 1.4875238196303442",
+      "type": "hand",
+      "at": "404a238348d766e7 52.27744398610758",
+      "time": "3ff7ac212b2f71ff 1.4795238196303442"
+    },
+    {
+      "post": "3ff814f264408310 1.5051139751523728",
+      "type": "hand",
+      "at": "404a26324cdc80f8 52.29841004149233",
+      "time": "3ff7f42dc89a9fbc 1.4971139751523728"
+    },
+    {
+      "post": "3ff8580dc7d08dfc 1.521497517133752",
+      "type": "hand",
+      "at": "404a28c356860d89 52.31846124215651",
+      "time": "3ff837492c2aaaa8 1.513497517133752"
+    },
+    {
+      "post": "3ff8a16684ff92c3 1.5394044108626737",
+      "type": "hand",
+      "at": "404a2bbe8d1ff024 52.34175266322589",
+      "time": "3ff880a1e959af6f 1.5314044108626736"
+    },
+    {
+      "post": "3ff8e0437185603f 1.5547518190778786",
+      "type": "hand",
+      "at": "404a2e686423db7d 52.36256076575135",
+      "time": "3ff8bf7ed5df7ceb 1.5467518190778786"
+    },
+    {
+      "post": "3ff92a7376a6d39e 1.572864020808289",
+      "type": "hand",
+      "at": "404a318122957c9f 52.386753390304186",
+      "time": "3ff909aedb00f04a 1.564864020808289"
+    },
+    {
+      "post": "3ff97280e4cc5f90 1.5904549539027109",
+      "type": "hand",
+      "at": "404a34b402a4175f 52.41174347889204",
+      "time": "3ff951bc49267c3c 1.5824549539027108"
+    },
+    {
+      "post": "3ff9b75f5b045a1a 1.607268672499805",
+      "type": "hand",
+      "at": "404a37dc6e036010 52.43641448178107",
+      "time": "3ff9969abf5e76c6 1.599268672499805"
+    },
+    {
+      "post": "3ff9f5b448469215 1.6224863837497925",
+      "type": "hand",
+      "at": "404a3acb29d817f6 52.45932505656667",
+      "time": "3ff9d4efaca0aec1 1.6144863837497925"
+    },
+    {
+      "post": "3ffa3bbc4e1c3ecc 1.6395838786301509",
+      "type": "hand",
+      "at": "404a3e2c5f6f0abd 52.48572915002794",
+      "time": "3ffa1af7b2765b78 1.6315838786301509"
+    },
+    {
+      "post": "3ffa8048a82b4393 1.656319291029125",
+      "type": "hand",
+      "at": "404a418c8f3419ec 52.512102032127444",
+      "time": "3ffa5f840c85603f 1.6483192910291249"
+    },
+    {
+      "post": "3ffaca6dfc56f463 1.674421296789",
+      "type": "hand",
+      "at": "404a45482c3063a8 52.541265033366756",
+      "time": "3ffaa9a960b1110f 1.666421296789"
+    },
+    {
+      "post": "3ffb0fd4d203ab57 1.691365070694436",
+      "type": "hand",
+      "at": "404a48f448fe347f 52.569954990504804",
+      "time": "3ffaef10365dc803 1.683365070694436"
+    },
+    {
+      "post": "3ffb4f74bd316870 1.70689844039455",
+      "type": "hand",
+      "at": "404a4c4ceabe393b 52.596097319491",
+      "time": "3ffb2eb0218b851c 1.69889844039455"
+    },
+    {
+      "post": "3ffb9461a3cbb0cd 1.7237259290950988",
+      "type": "hand",
+      "at": "404a500e6e9d5ca8 52.62544043239296",
+      "time": "3ffb739d0825cd79 1.7157259290950988"
+    },
+    {
+      "post": "3ffbd38161b1bfd2 1.739137059801568",
+      "type": "hand",
+      "at": "404a53a2a4b2f842 52.653400981319024",
+      "time": "3ffbb2bcc60bdc7e 1.731137059801568"
+    },
+    {
+      "post": "3ffc1d29dac2d0e3 1.757119993720203",
+      "type": "hand",
+      "at": "404a57bf5069c63b 52.68552594342005",
+      "time": "3ffbfc653f1ced8f 1.749119993720203"
+    },
+    {
+      "post": "3ffc61db4b25cd79 1.773890775247166",
+      "type": "hand",
+      "at": "404a5bd52d24b5ff 52.71744312565351",
+      "time": "3ffc4116af7fea25 1.765890775247166"
+    },
+    {
+      "post": "3ffca5ff91f13cbf 1.7905269337532415",
+      "type": "hand",
+      "at": "404a5fd47466ad79 52.748671102653084",
+      "time": "3ffc853af64b596b 1.7825269337532414"
+    },
+    {
+      "post": "3ffce6ab2447ef9b 1.8063155572153622",
+      "type": "hand",
+      "at": "404a63e1f69c5a44 52.78033335337071",
+      "time": "3ffcc5e688a20c47 1.7983155572153622"
+    },
+    {
+      "post": "3ffd2c8dfcf6b2d9 1.823377597941706",
+      "type": "hand",
+      "at": "404a68413e19cc72 52.81449104556749",
+      "time": "3ffd0bc96150cf85 1.815377597941706"
+    },
+    {
+      "post": "3ffd34bf23e02bae 1.825377597941706",
+      "type": "drive",
+      "at": "404a6832b39e6818 52.81404729113291",
+      "rate": "3fffeec055951eb2 1.9957888930384056",
+      "accel": "c014a6a52ef8ce81 -5.1627394999846965",
+      "time": "3ffd34bf23e02bae 1.825377597941706",
+      "until": "3fff204442987d9a 1.945377597941706"
+    },
+    {
+      "post": "3ffd790368246ff2 1.8420442646083726",
+      "type": "drive",
+      "at": "404a6c5d8478eb10 52.846603926698776",
+      "rate": "3ffe960be84b9f22 1.911632449535269",
+      "accel": "c013c035c8babebc -4.93770517005731",
+      "time": "3ffd790368246ff2 1.8420442646083726",
+      "until": "3fff648886dcc1de 1.9620442646083727"
+    },
+    {
+      "post": "3ffdbd47ac68b437 1.8587109312750394",
+      "type": "drive",
+      "at": "404a705b61bc03a5 52.87778875046141",
+      "rate": "3ffd4c5de4984eb0 1.8311442307939778",
+      "accel": "c012e3d1b620b28e -4.722479673143097",
+      "time": "3ffdbd47ac68b437 1.8587109312750394",
+      "until": "3fffa8cccb210622 1.9787109312750393"
+    },
+    {
+      "post": "3ffe018bf0acf87b 1.875377597941706",
+      "type": "drive",
+      "at": "404a742e40fff4b9 52.90766155717706",
+      "rate": "3ffc110ea20513e6 1.7541643456363487",
+      "accel": "c0121108e2d6982e -4.516635460231596",
+      "time": "3ffe018bf0acf87b 1.875377597941706",
+      "until": "3fffed110f654a66 1.9953775979417059"
+    },
+    {
+      "post": "3ffe45d034f13cbf 1.8920442646083726",
+      "type": "drive",
+      "at": "404a77d801ffeca6 52.93627953525838",
+      "rate": "3ffae37dc6eecab0 1.6805398722469072",
+      "accel": "c01147701d2db658 -4.3197636183882295",
+      "time": "3ffe45d034f13cbf 1.8920442646083726",
+      "until": "400018aaa9d4c755 2.0120442646083725"
+    },
+    {
+      "post": "3ffe8a1479358103 1.9087109312750392",
+      "type": "drive",
+      "at": "404a7b5a6f8dfca6 52.9636973803802",
+      "rate": "3ff9c311f6f98bde 1.6101245543911697",
+      "accel": "c01086a0df9940f5 -4.131473058441988",
+      "time": "3ffe8a1479358103 1.9087109312750392",
+      "until": "40003acccbf6e977 2.028710931275039"
+    },
+    {
+      "post": "3ffece58bd79c548 1.925377597941706",
+      "type": "drive",
+      "at": "404a7eb7407c6dec 52.98996740413335",
+      "rate": "3ff8af388512e3e0 1.5427785108752161",
+      "accel": "c00f9c72391670ab -3.951389738080328",
+      "time": "3ffece58bd79c548 1.925377597941706",
+      "until": "40005ceeee190b9a 2.045377597941706"
+    },
+    {
+      "post": "3fff129d01be098c 1.9420442646083727",
+      "type": "drive",
+      "at": "404a81f0187ceb16 53.01513963794257",
+      "rate": "3ff7a76528da4f12 1.4783679576693811",
+      "accel": "c00e3bb6192e1e74 -3.779155918807925",
+      "time": "3fff129d01be098c 1.9420442646083727",
+      "until": "40007f11103b2dbc 2.0620442646083728"
+    },
+    {
+      "post": "3fff56e146024dd0 1.9587109312750393",
+      "type": "drive",
+      "at": "404a850688f5ef6c 53.03926193245465",
+      "rate": "3ff6ab11b74a0cb8 1.4167649421440682",
+      "accel": "c00cea59fd8177ea -3.614429455293238",
+      "time": "3fff56e146024dd0 1.9587109312750393",
+      "until": "4000a133325d4fde 2.0787109312750394"
+    },
+    {
+      "post": "3fff9b258a469214 1.9753775979417059",
+      "type": "drive",
+      "at": "404a87fc11cee88b 53.06238005259464",
+      "rate": "3ff5b9bdde7c00dc 1.3578470888897334",
+      "accel": "c00ba7b255bfe78c -3.456883115691147",
+      "time": "3fff9b258a469214 1.9753775979417059",
+      "until": "4000c355547f7200 2.095377597941706"
+    },
+    {
+      "post": "3fffdf69ce8ad659 1.9920442646083727",
+      "type": "drive",
+      "at": "404a8ad222337236 53.08453776847857",
+      "rate": "3ff4d2eee467f236 1.301497356616108",
+      "accel": "c00a731b0c00bc6a -3.3062039315914733",
+      "time": "3fffdf69ce8ad659 1.9920442646083727",
+      "until": "4000e57776a19422 2.1120442646083726"
+    },
+    {
+      "post": "400011d709678d4e 2.008710931275039",
+      "type": "drive",
+      "at": "404a8d8a194e0fa4 53.10577694236352",
+      "rate": "3ff3f62f6879f47c 1.2476038056477412",
+      "accel": "c0094bf731512244 -3.1620925763020598",
+      "time": "400011d709678d4e 2.008710931275039",
+      "until": "4001079998c3b644 2.128710931275039"
+    },
+    {
+      "post": "400033f92b89af71 2.025377597941706",
+      "type": "drive",
+      "at": "404a902546fac13d 53.126137611807714",
+      "rate": "3ff3230f27e141ae 1.1960593755539821",
+      "accel": "c00831b0ade53b66 -3.0242627702313483",
+      "time": "400033f92b89af71 2.025377597941706",
+      "until": "400129bbbae5d867 2.1453775979417062"
+    },
+    {
+      "post": "4000561b4dabd193 2.0420442646083727",
+      "type": "drive",
+      "at": "404a92a4ec71d18e 53.14565806920574",
+      "rate": "3ff25922c479271e 1.1467616724716616",
+      "accel": "c00723b7f4c3c5f7 -2.8924407121892233",
+      "time": "4000561b4dabd193 2.0420442646083727",
+      "until": "40014bdddd07fa89 2.162044264608373"
+    },
+    {
+      "post": "4000783d6fcdf3b5 2.0587109312750393",
+      "type": "drive",
+      "at": "404a950a3ceb3068 53.164374937857076",
+      "rate": "3ff198038e2efde2 1.0996127656979913",
+      "accel": "c0062183bac57be4 -2.766364535476429",
+      "time": "4000783d6fcdf3b5 2.0587109312750393",
+      "until": "40016dffff2a1cab 2.1787109312750395"
+    },
+    {
+      "post": "40009a5f91f015d7 2.075377597941706",
+      "type": "drive",
+      "at": "404a97565e3aaf1d 53.18232324471885",
+      "rate": "3ff0df4f4ec96a04 1.0545189931496006",
+      "accel": "c0052a90b0c30cfa -2.6457837876820323",
+      "time": "40009a5f91f015d7 2.075377597941706",
+      "until": "40019022214c3ecd 2.195377597941706"
+    },
+    {
+      "post": "4000bc81b41237f9 2.0920442646083726",
+      "type": "drive",
+      "at": "404a998a69656d6d 53.19953648998749",
+      "rate": "3ff02ea817f651e4 1.0113907753012592",
+      "accel": "c0043e6140ce3195 -2.530458933155567",
+      "time": "4000bc81b41237f9 2.0920442646083726",
+      "until": "4001b244436e60ef 2.2120442646083727"
+    },
+    {
+      "post": "4000c5c8164ac196 2.0965730420650273",
+      "type": "drive",
+      "at": "404a9a1fa77784d2 53.20409100852852",
+      "rate": "3ff0000000000000 1",
+      "accel": "0000000000000000 0",
+      "time": "4000c5c8164ac196 2.0965730420650273",
+      "until": "401462e40b2560cb 5.096573042065027"
+    },
+    {
+      "post": "4000dea3d6345a1b 2.108710931275039",
+      "type": "drive",
+      "at": "404a9a1fa77784d2 53.20409100852852",
+      "rate": "3ff0000000000000 1",
+      "accel": "0000000000000000 0",
+      "time": "4000dea3d6345a1b 2.108710931275039",
+      "until": "4001d46665908311 2.2287109312750393"
+    },
+    {
+      "post": "4000e7ea386ce3b8 2.113239708731694",
+      "type": "drive",
+      "at": "404a9c41c999a6f4 53.22075767519519",
+      "rate": "3ff0000000000000 1",
+      "accel": "0000000000000000 0",
+      "time": "4000e7ea386ce3b8 2.113239708731694",
+      "until": "401473f51c3671dc 5.113239708731694"
+    },
+    {
+      "post": "40010a0c5a8f05da 2.1299063753983605",
+      "type": "drive",
+      "at": "404a9e63ebbbc916 53.23742434186185",
+      "rate": "3ff0000000000000 1",
+      "accel": "0000000000000000 0",
+      "time": "40010a0c5a8f05da 2.1299063753983605",
+      "until": "401485062d4782ed 5.1299063753983605"
+    },
+    {
+      "post": "40012c2e7cb127fc 2.146573042065027",
+      "type": "drive",
+      "at": "404aa0860dddeb38 53.25409100852852",
+      "rate": "3ff0000000000000 1",
+      "accel": "0000000000000000 0",
+      "time": "40012c2e7cb127fc 2.146573042065027",
+      "until": "401496173e5893fe 5.146573042065027"
+    },
+    {
+      "post": "40014e509ed34a1e 2.1632397087316937",
+      "type": "drive",
+      "at": "404aa2a830000d5a 53.270757675195185",
+      "rate": "3ff0000000000000 1",
+      "accel": "0000000000000000 0",
+      "time": "40014e509ed34a1e 2.1632397087316937",
+      "until": "4014a7284f69a50f 5.163239708731694"
+    },
+    {
+      "post": "40017072c0f56c40 2.1799063753983603",
+      "type": "drive",
+      "at": "404aa4ca52222f7d 53.28742434186186",
+      "rate": "3ff0000000000000 1",
+      "accel": "0000000000000000 0",
+      "time": "40017072c0f56c40 2.1799063753983603",
+      "until": "4014b839607ab620 5.17990637539836"
+    },
+    {
+      "post": "40019294e3178e62 2.196573042065027",
+      "type": "drive",
+      "at": "404aa6ec7444519f 53.30409100852852",
+      "rate": "3ff0000000000000 1",
+      "accel": "0000000000000000 0",
+      "time": "40019294e3178e62 2.196573042065027",
+      "until": "4014c94a718bc731 5.196573042065027"
+    },
+    {
+      "post": "4001b4b70539b084 2.2132397087316935",
+      "type": "drive",
+      "at": "404aa90e966673c1 53.32075767519519",
+      "rate": "3ff0000000000000 1",
+      "accel": "0000000000000000 0",
+      "time": "4001b4b70539b084 2.2132397087316935",
+      "until": "4014da5b829cd842 5.2132397087316935"
+    },
+    {
+      "post": "4001d6d9275bd2a6 2.22990637539836",
+      "type": "drive",
+      "at": "404aab30b88895e3 53.337424341861855",
+      "rate": "3ff0000000000000 1",
+      "accel": "0000000000000000 0",
+      "time": "4001d6d9275bd2a6 2.22990637539836",
+      "until": "4014eb6c93ade953 5.22990637539836"
+    },
+    {
+      "post": "4001f8fb497df4c8 2.2465730420650267",
+      "type": "drive",
+      "at": "404aad52daaab805 53.35409100852852",
+      "rate": "3ff0000000000000 1",
+      "accel": "0000000000000000 0",
+      "time": "4001f8fb497df4c8 2.2465730420650267",
+      "until": "4014fc7da4befa64 5.246573042065027"
+    },
+    {
+      "post": "40021b1d6ba016ea 2.2632397087316933",
+      "type": "drive",
+      "at": "404aaf74fcccda27 53.370757675195186",
+      "rate": "3ff0000000000000 1",
+      "accel": "0000000000000000 0",
+      "time": "40021b1d6ba016ea 2.2632397087316933",
+      "until": "40150d8eb5d00b75 5.263239708731693"
+    },
+    {
+      "post": "40023d3f8dc2390c 2.27990637539836",
+      "type": "drive",
+      "at": "404ab1971eeefc49 53.38742434186185",
+      "rate": "3ff0000000000000 1",
+      "accel": "0000000000000000 0",
+      "time": "40023d3f8dc2390c 2.27990637539836",
+      "until": "40151e9fc6e11c86 5.27990637539836"
+    },
+    {
+      "post": "40025f61afe45b2e 2.2965730420650265",
+      "type": "drive",
+      "at": "404ab3b941111e6c 53.404091008528525",
+      "rate": "3ff0000000000000 1",
+      "accel": "0000000000000000 0",
+      "time": "40025f61afe45b2e 2.2965730420650265",
+      "until": "40152fb0d7f22d97 5.2965730420650265"
+    },
+    {
+      "post": "40028183d2067d50 2.313239708731693",
+      "type": "drive",
+      "at": "404ab5db6333408e 53.42075767519519",
+      "rate": "3ff0000000000000 1",
+      "accel": "0000000000000000 0",
+      "time": "40028183d2067d50 2.313239708731693",
+      "until": "401540c1e9033ea8 5.313239708731693"
+    },
+    {
+      "post": "4002a3a5f4289f72 2.3299063753983598",
+      "type": "drive",
+      "at": "404ab7fd855562b0 53.437424341861856",
+      "rate": "3ff0000000000000 1",
+      "accel": "0000000000000000 0",
+      "time": "4002a3a5f4289f72 2.3299063753983598",
+      "until": "401551d2fa144fb9 5.32990637539836"
+    },
+    {
+      "post": "4002c5c8164ac194 2.3465730420650264",
+      "type": "drive",
+      "at": "404aba1fa77784d2 53.45409100852852",
+      "rate": "3ff0000000000000 1",
+      "accel": "0000000000000000 0",
+      "time": "4002c5c8164ac194 2.3465730420650264",
+      "until": "401562e40b2560ca 5.346573042065026"
+    },
+    {
+      "post": "4002e7ea386ce3b6 2.363239708731693",
+      "type": "drive",
+      "at": "404abc41c999a6f4 53.47075767519519",
+      "rate": "3ff0000000000000 1",
+      "accel": "0000000000000000 0",
+      "time": "4002e7ea386ce3b6 2.363239708731693",
+      "until": "401573f51c3671db 5.363239708731693"
+    },
+    {
+      "post": "40030a0c5a8f05d8 2.3799063753983596",
+      "type": "drive",
+      "at": "404abe63ebbbc916 53.48742434186185",
+      "rate": "3ff0000000000000 1",
+      "accel": "0000000000000000 0",
+      "time": "40030a0c5a8f05d8 2.3799063753983596",
+      "until": "401585062d4782ec 5.37990637539836"
+    },
+    {
+      "post": "40032c2e7cb127fa 2.396573042065026",
+      "type": "drive",
+      "at": "404ac0860dddeb38 53.50409100852852",
+      "rate": "3ff0000000000000 1",
+      "accel": "0000000000000000 0",
+      "time": "40032c2e7cb127fa 2.396573042065026",
+      "until": "401596173e5893fd 5.396573042065026"
+    },
+    {
+      "post": "40032c2e7cb127fc 2.396573042065027",
+      "type": "fade",
+      "seconds": "3fa47ae147ae147b 0.04"
+    }
+  ],
+  "runs": [
+    {
+      "rate": 48000,
+      "block": 128,
+      "from": 47520,
+      "frames": 91516,
+      "spans": ["65befd7f9868f644","389a94858391f6d2","f75229c1b39bfd60","bb8f9296a5d6afcb","3e74973d6c1effde","c6eb74914a688bc8","355c43c9f7f0b159","3076f4c392b4bd2c","d9f44a636c929aa6","d4a57dc2a3d7471b","a9031c3083ef97a3","17eba820fbe97cfe","b5b72cfc088c28be","fdd8449005cf569d","70c230b4915a4b94","05db820bd374cd58","ba17ec9265cf8125","a3a877934c46757a","dc86e239953948e2","158b38c37da7507c","fceb4fb9f302bbeb","62916482f9c85dc0","62296b3ec954cab4"],
+      "reports": {"count":57,"hash":"dd95a32c2ab201c3","whole":"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"},
+      "maths": {"calls":5828,"hash":"9aa3ba09001043b0"},
+      "whole": {"file":"voice/handover.f32","from":41115,"frames":24000}
+    },
+    {
+      "rate": 48000,
+      "block": 333,
+      "from": 47520,
+      "frames": 91516,
+      "spans": ["0e3457565f8c715c","ace6ac024eff936f","c5202807d2cfedd1","2109a40625e8eb55","2972775564e39666","fcfb7bfc641766ff","355c43c9f7f0b159","3076f4c392b4bd2c","d9f44a636c929aa6","d4a57dc2a3d7471b","a9031c3083ef97a3","17eba820fbe97cfe","b5b72cfc088c28be","fdd8449005cf569d","70c230b4915a4b94","05db820bd374cd58","4021f5705aa3bece","54034a0f4ca050de","7810eb835dbb15c0","1775d7045d65415f","31e37cf34be8bd8e","3152c3f3775a2dda","4e20c7b13f3f736f"],
+      "reports": {"count":57,"hash":"0d43542d3d36f763","whole":null},
+      "maths": {"calls":3188,"hash":"a991864421318294"},
+      "whole": null
+    },
+    {
+      "rate": 48000,
+      "block": 512,
+      "from": 47520,
+      "frames": 91516,
+      "spans": ["65befd7f9868f644","389a94858391f6d2","f75229c1b39bfd60","bb8f9296a5d6afcb","3e74973d6c1effde","c6eb74914a688bc8","355c43c9f7f0b159","3076f4c392b4bd2c","d9f44a636c929aa6","d4a57dc2a3d7471b","a9031c3083ef97a3","17eba820fbe97cfe","b5b72cfc088c28be","fdd8449005cf569d","70c230b4915a4b94","05db820bd374cd58","ba17ec9265cf8125","a3a877934c46757a","dc86e239953948e2","158b38c37da7507c","fceb4fb9f302bbeb","62916482f9c85dc0","62296b3ec954cab4"],
+      "reports": {"count":57,"hash":"d52316bb5d05a05b","whole":null},
+      "maths": {"calls":2612,"hash":"6428248aca2f3fbc"},
+      "whole": null
+    },
+    {
+      "rate": 48000,
+      "block": 1024,
+      "from": 47520,
+      "frames": 91516,
+      "spans": ["2b7b3a5f0e7b74aa","e1390810158e6fd3","cea166a3ff62deac","0ebfb767d2925858","8ddcb0f5cfff59c9","313e6d7f2ca6b5d1","eccf890437b55675","5c2680f8ffec3ac1","fe2914087bae8236","ff21369a56599a9b","cceb7b8e1699d8c2","005bccc99dd9de3e","cac8c4dcdcfc402c","fc7f2c40c2c298fb","ff693fe3df0ce6d7","1bf7299d05092509","32a53271778af432","f271926002199233","bcbbaadfb3226473","2007b2115dc9356b","fe343a67bb977224","c0975e9f0a4b4ae9","d6d11a5cd76ef154"],
+      "reports": {"count":57,"hash":"6fa507b0bb128409","whole":null},
+      "maths": {"calls":2078,"hash":"344cadf862c02338"},
+      "whole": null
+    },
+    {
+      "rate": 44100,
+      "block": 128,
+      "from": 43659,
+      "frames": 84080,
+      "spans": ["623df29d19619096","e9ea2177533c9207","ae2fe3818f3ef332","d84a7a51ed2c7de1","c64cd40d2cec3792","c1418a55eb35df48","f384b3657bcdc7e2","f5f49f6a53c02e17","b3162ba38bfda304","b25e0fee3ed2badf","9bf5207d3745c345","98e3cc5039fcd719","26d98bf21782c0c7","2075a05587fc454e","669be3656cba74aa","2dbe8a6b01a6f360","eb36ddfddeb7cf29","f39ef976e93939de","daba0258d9420626","2238b6db96a97ed3","c806277d506a25e3"],
+      "reports": {"count":57,"hash":"f3f462dec2b0737e","whole":null},
+      "maths": {"calls":5480,"hash":"297e198c88b8946e"},
+      "whole": null
+    },
+    {
+      "rate": 44100,
+      "block": 333,
+      "from": 43659,
+      "frames": 84080,
+      "spans": ["dd8554eddc7f86c3","2a8318eb7b2a4bd6","d7545489fcb2543b","c49c1d94edee0591","19ef6e47c62064fa","fc162ec1d71b8b74","46f386a679d97e7a","14d6998cf13fc670","ab0f11961ca44cf6","9614052717379ac6","c4d86eea6edd4e48","f2781164a568a78d","6f50090104574eca","afe69f209ed3abef","c3d4ddc39201d3c5","109d3b0ff85defee","9ca7e4a185c0f159","7c0c185b8b48b8be","43bc4607b736f7ec","43f472963e1d60e2","7ecf864eb498d510"],
+      "reports": {"count":57,"hash":"d9e9693df42152a5","whole":null},
+      "maths": {"calls":3056,"hash":"8675ffd03efbdeee"},
+      "whole": null
+    },
+    {
+      "rate": 44100,
+      "block": 512,
+      "from": 43659,
+      "frames": 84080,
+      "spans": ["623df29d19619096","e9ea2177533c9207","ae2fe3818f3ef332","b8ebf9c6c12b8a1d","40584d25ba81d053","da40a0fa90f0cd2d","b4a6501171f5fedc","1a9875bdbbaa3277","cd4c8fde1361123e","69c96c43eecb3336","ee9e5d41e64e53e8","6d64993a334ea591","0891f815557ce1d8","375a83fc1442ab08","4b8e6e5c0f95719f","69aa2164957c8a6d","43154c667c4609b1","e779aff5db00bc6c","2f007e458c96152b","3384a65329ebbe3b","316cdc6d68983901"],
+      "reports": {"count":57,"hash":"d7e4a897add0ef75","whole":null},
+      "maths": {"calls":2528,"hash":"12d60b8295dad6d6"},
+      "whole": null
+    },
+    {
+      "rate": 44100,
+      "block": 1024,
+      "from": 43659,
+      "frames": 84080,
+      "spans": ["92950dc20870c135","6efc458083f57feb","0f0af429aaa9bd7e","dfcc3e15394d0885","62bf6c556971c017","b6f3517f05179a5c","064cfe12a4f5f6cb","643435d14a62531a","c17d724e1cf03d86","096b1db0fb6e801b","8e22c47318b5e4b5","4df227a2595acd78","d2bb4b4d6bc46332","2bbb80e9b04d7098","f80fc585b7cc6313","55c009b0b8019a11","f7f88828a2b23259","c7b3acb889d11ecb","3d971b32d9a40178","e5b066e45dc4abfe","28ee7dbb413a2874"],
+      "reports": {"count":57,"hash":"dc0dd540e2021162","whole":null},
+      "maths": {"calls":2036,"hash":"b5217b5169bfb6b0"},
+      "whole": null
+    },
+    {
+      "rate": 48000,
+      "block": 1,
+      "from": 47800,
+      "frames": 2000,
+      "spans": ["b685da87f42ada54"],
+      "reports": {"count":1,"hash":"6030b5df6e0fe0c0","whole":null},
+      "maths": {"calls":13537,"hash":"a1d95366025e5f4a"},
+      "whole": null
+    }
+  ]
+}

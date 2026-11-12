@@ -1,0 +1,992 @@
+{
+  "about": "lib/deckVoice.ts's newVoiceState, voiceCommand, renderVoice and voiceReport over the \"step\" case (a full-scale step read at 0.5x: the DC blocker, the limiter coming down and back): each run makes a new state and renders `frames` frames from frame `from` in blocks of `block` at `rate`, each block's now its first frame over the rate, each message applied before the first block whose now is at or past its `post`, with that now. `spans`: an FNV-1a 64 hash of each 4096 frames' output (each frame the first channel's Float32 bits and the second's, little-endian); `reports`: how many voiceReport made at 30 a second, a hash of their doubles [time, pos, rate, gain, held, peaks, lowest] little-endian, and at 48 kHz in blocks of 128 those doubles whole (base64); `maths`: how many Math calls the run made and the FNV hash of them in order (maths.json says how). A run with `whole` wrote `frames` frames of its output from its own frame `from` to `file`, the first channel's Float32s then the second's.",
+  "made_by": "ios/scripts/export-deck-vectors.cjs - never edit by hand: change the TypeScript and run it again",
+  "made_from": {
+    "ui/src/lib/deckVoice.ts": "66602fe62bc0e283dfb802d315cad1632aa8202e9edb4ed23ed4d4b5ca2dd978"
+  },
+  "name": "step",
+  "messages": [
+    {
+      "post": "3ff0000000000000 1",
+      "type": "window",
+      "window": {"kind":"step","seed":8,"channels":2,"start":"0000000000000000 0","rate":"40e7700000000000 48000"}
+    },
+    {
+      "post": "3ff0000000000000 1",
+      "type": "take",
+      "at": "400ccccccccccccd 3.6",
+      "rate": "3fe0000000000000 0.5",
+      "time": "3ff0000000000000 1",
+      "until": "7ff0000000000000 Infinity"
+    },
+    {
+      "post": "3ff0000000000000 1",
+      "type": "drive",
+      "at": "400ccccccccccccd 3.6",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff0000000000000 1",
+      "until": "3ff1eb851eb851ec 1.12"
+    },
+    {
+      "post": "3ff0444444444444 1.0166666666666666",
+      "type": "drive",
+      "at": "400cddddddddddde 3.6083333333333334",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff0444444444444 1.0166666666666666",
+      "until": "3ff22fc962fc9630 1.1366666666666667"
+    },
+    {
+      "post": "3ff0888888888888 1.0333333333333332",
+      "type": "drive",
+      "at": "400ceeeeeeeeeeef 3.6166666666666667",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff0888888888888 1.0333333333333332",
+      "until": "3ff2740da740da74 1.1533333333333333"
+    },
+    {
+      "post": "3ff0cccccccccccc 1.0499999999999998",
+      "type": "drive",
+      "at": "400d000000000000 3.625",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff0cccccccccccc 1.0499999999999998",
+      "until": "3ff2b851eb851eb8 1.17"
+    },
+    {
+      "post": "3ff1111111111110 1.0666666666666664",
+      "type": "drive",
+      "at": "400d111111111111 3.6333333333333333",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff1111111111110 1.0666666666666664",
+      "until": "3ff2fc962fc962fc 1.1866666666666665"
+    },
+    {
+      "post": "3ff1555555555554 1.083333333333333",
+      "type": "drive",
+      "at": "400d222222222222 3.6416666666666666",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff1555555555554 1.083333333333333",
+      "until": "3ff340da740da740 1.2033333333333331"
+    },
+    {
+      "post": "3ff1999999999998 1.0999999999999996",
+      "type": "drive",
+      "at": "400d333333333333 3.65",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff1999999999998 1.0999999999999996",
+      "until": "3ff3851eb851eb84 1.2199999999999998"
+    },
+    {
+      "post": "3ff1dddddddddddc 1.1166666666666663",
+      "type": "drive",
+      "at": "400d444444444444 3.658333333333333",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff1dddddddddddc 1.1166666666666663",
+      "until": "3ff3c962fc962fc8 1.2366666666666664"
+    },
+    {
+      "post": "3ff2222222222220 1.1333333333333329",
+      "type": "drive",
+      "at": "400d555555555555 3.6666666666666665",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff2222222222220 1.1333333333333329",
+      "until": "3ff40da740da740c 1.253333333333333"
+    },
+    {
+      "post": "3ff2666666666664 1.1499999999999995",
+      "type": "drive",
+      "at": "400d666666666666 3.675",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff2666666666664 1.1499999999999995",
+      "until": "3ff451eb851eb850 1.2699999999999996"
+    },
+    {
+      "post": "3ff2aaaaaaaaaaa8 1.166666666666666",
+      "type": "drive",
+      "at": "400d777777777777 3.683333333333333",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff2aaaaaaaaaaa8 1.166666666666666",
+      "until": "3ff4962fc962fc94 1.2866666666666662"
+    },
+    {
+      "post": "3ff2eeeeeeeeeeec 1.1833333333333327",
+      "type": "drive",
+      "at": "400d888888888888 3.6916666666666664",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff2eeeeeeeeeeec 1.1833333333333327",
+      "until": "3ff4da740da740d8 1.3033333333333328"
+    },
+    {
+      "post": "3ff3333333333330 1.1999999999999993",
+      "type": "drive",
+      "at": "400d999999999999 3.6999999999999997",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff3333333333330 1.1999999999999993",
+      "until": "3ff51eb851eb851c 1.3199999999999994"
+    },
+    {
+      "post": "3ff3777777777774 1.216666666666666",
+      "type": "drive",
+      "at": "400daaaaaaaaaaaa 3.708333333333333",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff3777777777774 1.216666666666666",
+      "until": "3ff562fc962fc960 1.336666666666666"
+    },
+    {
+      "post": "3ff3bbbbbbbbbbb8 1.2333333333333325",
+      "type": "drive",
+      "at": "400dbbbbbbbbbbbb 3.7166666666666663",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff3bbbbbbbbbbb8 1.2333333333333325",
+      "until": "3ff5a740da740da4 1.3533333333333326"
+    },
+    {
+      "post": "3ff3fffffffffffc 1.2499999999999991",
+      "type": "drive",
+      "at": "400dcccccccccccc 3.7249999999999996",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff3fffffffffffc 1.2499999999999991",
+      "until": "3ff5eb851eb851e8 1.3699999999999992"
+    },
+    {
+      "post": "3ff4444444444440 1.2666666666666657",
+      "type": "drive",
+      "at": "400ddddddddddddd 3.733333333333333",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff4444444444440 1.2666666666666657",
+      "until": "3ff62fc962fc962c 1.3866666666666658"
+    },
+    {
+      "post": "3ff4888888888884 1.2833333333333323",
+      "type": "drive",
+      "at": "400deeeeeeeeeeee 3.7416666666666663",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff4888888888884 1.2833333333333323",
+      "until": "3ff6740da740da70 1.4033333333333324"
+    },
+    {
+      "post": "3ff4ccccccccccc8 1.299999999999999",
+      "type": "drive",
+      "at": "400dffffffffffff 3.7499999999999996",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff4ccccccccccc8 1.299999999999999",
+      "until": "3ff6b851eb851eb4 1.419999999999999"
+    },
+    {
+      "post": "3ff511111111110c 1.3166666666666655",
+      "type": "drive",
+      "at": "400e111111111110 3.758333333333333",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff511111111110c 1.3166666666666655",
+      "until": "3ff6fc962fc962f8 1.4366666666666656"
+    },
+    {
+      "post": "3ff5555555555550 1.3333333333333321",
+      "type": "drive",
+      "at": "400e222222222221 3.766666666666666",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff5555555555550 1.3333333333333321",
+      "until": "3ff740da740da73c 1.4533333333333323"
+    },
+    {
+      "post": "3ff5999999999994 1.3499999999999988",
+      "type": "drive",
+      "at": "400e333333333332 3.7749999999999995",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff5999999999994 1.3499999999999988",
+      "until": "3ff7851eb851eb80 1.4699999999999989"
+    },
+    {
+      "post": "3ff5ddddddddddd8 1.3666666666666654",
+      "type": "drive",
+      "at": "400e444444444443 3.7833333333333328",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff5ddddddddddd8 1.3666666666666654",
+      "until": "3ff7c962fc962fc4 1.4866666666666655"
+    },
+    {
+      "post": "3ff622222222221c 1.383333333333332",
+      "type": "drive",
+      "at": "400e555555555554 3.791666666666666",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff622222222221c 1.383333333333332",
+      "until": "3ff80da740da7408 1.503333333333332"
+    },
+    {
+      "post": "3ff6666666666660 1.3999999999999986",
+      "type": "drive",
+      "at": "400e666666666665 3.7999999999999994",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff6666666666660 1.3999999999999986",
+      "until": "3ff851eb851eb84c 1.5199999999999987"
+    },
+    {
+      "post": "3ff6aaaaaaaaaaa4 1.4166666666666652",
+      "type": "drive",
+      "at": "400e777777777776 3.8083333333333327",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff6aaaaaaaaaaa4 1.4166666666666652",
+      "until": "3ff8962fc962fc90 1.5366666666666653"
+    },
+    {
+      "post": "3ff6eeeeeeeeeee8 1.4333333333333318",
+      "type": "drive",
+      "at": "400e888888888887 3.816666666666666",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff6eeeeeeeeeee8 1.4333333333333318",
+      "until": "3ff8da740da740d4 1.553333333333332"
+    },
+    {
+      "post": "3ff733333333332c 1.4499999999999984",
+      "type": "drive",
+      "at": "400e999999999998 3.8249999999999993",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff733333333332c 1.4499999999999984",
+      "until": "3ff91eb851eb8518 1.5699999999999985"
+    },
+    {
+      "post": "3ff7777777777770 1.466666666666665",
+      "type": "drive",
+      "at": "400eaaaaaaaaaaa9 3.8333333333333326",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff7777777777770 1.466666666666665",
+      "until": "3ff962fc962fc95c 1.5866666666666651"
+    },
+    {
+      "post": "3ff7bbbbbbbbbbb4 1.4833333333333316",
+      "type": "drive",
+      "at": "400ebbbbbbbbbbba 3.841666666666666",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff7bbbbbbbbbbb4 1.4833333333333316",
+      "until": "3ff9a740da740da0 1.6033333333333317"
+    },
+    {
+      "post": "3ff7fffffffffff8 1.4999999999999982",
+      "type": "drive",
+      "at": "400ecccccccccccb 3.849999999999999",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff7fffffffffff8 1.4999999999999982",
+      "until": "3ff9eb851eb851e4 1.6199999999999983"
+    },
+    {
+      "post": "3ff844444444443c 1.5166666666666648",
+      "type": "drive",
+      "at": "400edddddddddddc 3.8583333333333325",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff844444444443c 1.5166666666666648",
+      "until": "3ffa2fc962fc9628 1.636666666666665"
+    },
+    {
+      "post": "3ff8888888888880 1.5333333333333314",
+      "type": "drive",
+      "at": "400eeeeeeeeeeeed 3.866666666666666",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff8888888888880 1.5333333333333314",
+      "until": "3ffa740da740da6c 1.6533333333333315"
+    },
+    {
+      "post": "3ff8ccccccccccc4 1.549999999999998",
+      "type": "drive",
+      "at": "400efffffffffffe 3.874999999999999",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff8ccccccccccc4 1.549999999999998",
+      "until": "3ffab851eb851eb0 1.6699999999999982"
+    },
+    {
+      "post": "3ff9111111111108 1.5666666666666647",
+      "type": "drive",
+      "at": "400f11111111110f 3.8833333333333324",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff9111111111108 1.5666666666666647",
+      "until": "3ffafc962fc962f4 1.6866666666666648"
+    },
+    {
+      "post": "3ff955555555554c 1.5833333333333313",
+      "type": "drive",
+      "at": "400f222222222220 3.8916666666666657",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff955555555554c 1.5833333333333313",
+      "until": "3ffb40da740da738 1.7033333333333314"
+    },
+    {
+      "post": "3ff9999999999990 1.5999999999999979",
+      "type": "drive",
+      "at": "400f333333333331 3.899999999999999",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff9999999999990 1.5999999999999979",
+      "until": "3ffb851eb851eb7c 1.719999999999998"
+    },
+    {
+      "post": "3ff9ddddddddddd4 1.6166666666666645",
+      "type": "drive",
+      "at": "400f444444444442 3.9083333333333323",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ff9ddddddddddd4 1.6166666666666645",
+      "until": "3ffbc962fc962fc0 1.7366666666666646"
+    },
+    {
+      "post": "3ffa222222222218 1.633333333333331",
+      "type": "drive",
+      "at": "400f555555555553 3.9166666666666656",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ffa222222222218 1.633333333333331",
+      "until": "3ffc0da740da7404 1.7533333333333312"
+    },
+    {
+      "post": "3ffa66666666665c 1.6499999999999977",
+      "type": "drive",
+      "at": "400f666666666664 3.924999999999999",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ffa66666666665c 1.6499999999999977",
+      "until": "3ffc51eb851eb848 1.7699999999999978"
+    },
+    {
+      "post": "3ffaaaaaaaaaaaa0 1.6666666666666643",
+      "type": "drive",
+      "at": "400f777777777775 3.9333333333333322",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ffaaaaaaaaaaaa0 1.6666666666666643",
+      "until": "3ffc962fc962fc8c 1.7866666666666644"
+    },
+    {
+      "post": "3ffaeeeeeeeeeee4 1.683333333333331",
+      "type": "drive",
+      "at": "400f888888888886 3.9416666666666655",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ffaeeeeeeeeeee4 1.683333333333331",
+      "until": "3ffcda740da740d0 1.803333333333331"
+    },
+    {
+      "post": "3ffb333333333328 1.6999999999999975",
+      "type": "drive",
+      "at": "400f999999999997 3.949999999999999",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ffb333333333328 1.6999999999999975",
+      "until": "3ffd1eb851eb8514 1.8199999999999976"
+    },
+    {
+      "post": "3ffb77777777776c 1.7166666666666641",
+      "type": "drive",
+      "at": "400faaaaaaaaaaa8 3.958333333333332",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ffb77777777776c 1.7166666666666641",
+      "until": "3ffd62fc962fc958 1.8366666666666642"
+    },
+    {
+      "post": "3ffbbbbbbbbbbbb0 1.7333333333333307",
+      "type": "drive",
+      "at": "400fbbbbbbbbbbb9 3.9666666666666655",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ffbbbbbbbbbbbb0 1.7333333333333307",
+      "until": "3ffda740da740d9c 1.8533333333333308"
+    },
+    {
+      "post": "3ffbfffffffffff4 1.7499999999999973",
+      "type": "drive",
+      "at": "400fccccccccccca 3.9749999999999988",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ffbfffffffffff4 1.7499999999999973",
+      "until": "3ffdeb851eb851e0 1.8699999999999974"
+    },
+    {
+      "post": "3ffc444444444438 1.766666666666664",
+      "type": "drive",
+      "at": "400fdddddddddddb 3.983333333333332",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ffc444444444438 1.766666666666664",
+      "until": "3ffe2fc962fc9624 1.886666666666664"
+    },
+    {
+      "post": "3ffc88888888887c 1.7833333333333306",
+      "type": "drive",
+      "at": "400feeeeeeeeeeec 3.9916666666666654",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ffc88888888887c 1.7833333333333306",
+      "until": "3ffe740da740da68 1.9033333333333307"
+    },
+    {
+      "post": "3ffcccccccccccc0 1.7999999999999972",
+      "type": "drive",
+      "at": "400ffffffffffffd 3.9999999999999987",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ffcccccccccccc0 1.7999999999999972",
+      "until": "3ffeb851eb851eac 1.9199999999999973"
+    },
+    {
+      "post": "3ffd111111111104 1.8166666666666638",
+      "type": "drive",
+      "at": "4010088888888887 4.008333333333332",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ffd111111111104 1.8166666666666638",
+      "until": "3ffefc962fc962f0 1.9366666666666639"
+    },
+    {
+      "post": "3ffd555555555548 1.8333333333333304",
+      "type": "drive",
+      "at": "4010111111111110 4.016666666666666",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ffd555555555548 1.8333333333333304",
+      "until": "3fff40da740da734 1.9533333333333305"
+    },
+    {
+      "post": "3ffd99999999998c 1.849999999999997",
+      "type": "drive",
+      "at": "4010199999999998 4.024999999999999",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ffd99999999998c 1.849999999999997",
+      "until": "3fff851eb851eb78 1.969999999999997"
+    },
+    {
+      "post": "3ffdddddddddddd0 1.8666666666666636",
+      "type": "drive",
+      "at": "4010222222222220 4.033333333333331",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ffdddddddddddd0 1.8666666666666636",
+      "until": "3fffc962fc962fbc 1.9866666666666637"
+    },
+    {
+      "post": "3ffe222222222214 1.8833333333333302",
+      "type": "drive",
+      "at": "40102aaaaaaaaaa9 4.041666666666665",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ffe222222222214 1.8833333333333302",
+      "until": "400006d3a06d3a00 2.0033333333333303"
+    },
+    {
+      "post": "3ffe666666666658 1.8999999999999968",
+      "type": "drive",
+      "at": "4010333333333332 4.049999999999999",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ffe666666666658 1.8999999999999968",
+      "until": "400028f5c28f5c22 2.019999999999997"
+    },
+    {
+      "post": "3ffeaaaaaaaaaa9c 1.9166666666666634",
+      "type": "drive",
+      "at": "40103bbbbbbbbbba 4.058333333333332",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ffeaaaaaaaaaa9c 1.9166666666666634",
+      "until": "40004b17e4b17e44 2.0366666666666635"
+    },
+    {
+      "post": "3ffeeeeeeeeeeee0 1.93333333333333",
+      "type": "drive",
+      "at": "4010444444444442 4.066666666666665",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ffeeeeeeeeeeee0 1.93333333333333",
+      "until": "40006d3a06d3a066 2.05333333333333"
+    },
+    {
+      "post": "3fff333333333324 1.9499999999999966",
+      "type": "drive",
+      "at": "40104ccccccccccb 4.074999999999998",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3fff333333333324 1.9499999999999966",
+      "until": "40008f5c28f5c288 2.0699999999999967"
+    },
+    {
+      "post": "3fff777777777768 1.9666666666666632",
+      "type": "drive",
+      "at": "4010555555555554 4.083333333333332",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3fff777777777768 1.9666666666666632",
+      "until": "4000b17e4b17e4aa 2.0866666666666633"
+    },
+    {
+      "post": "3fffbbbbbbbbbbac 1.9833333333333298",
+      "type": "drive",
+      "at": "40105ddddddddddc 4.091666666666665",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3fffbbbbbbbbbbac 1.9833333333333298",
+      "until": "4000d3a06d3a06cc 2.10333333333333"
+    },
+    {
+      "post": "3ffffffffffffff0 1.9999999999999964",
+      "type": "drive",
+      "at": "4010666666666664 4.099999999999998",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "3ffffffffffffff0 1.9999999999999964",
+      "until": "4000f5c28f5c28ee 2.1199999999999966"
+    },
+    {
+      "post": "400022222222221a 2.016666666666663",
+      "type": "drive",
+      "at": "40106eeeeeeeeeed 4.108333333333332",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "400022222222221a 2.016666666666663",
+      "until": "400117e4b17e4b10 2.136666666666663"
+    },
+    {
+      "post": "400044444444443c 2.0333333333333297",
+      "type": "drive",
+      "at": "4010777777777776 4.116666666666665",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "400044444444443c 2.0333333333333297",
+      "until": "40013a06d3a06d32 2.1533333333333298"
+    },
+    {
+      "post": "400066666666665e 2.0499999999999963",
+      "type": "drive",
+      "at": "40107ffffffffffe 4.124999999999998",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "400066666666665e 2.0499999999999963",
+      "until": "40015c28f5c28f54 2.1699999999999964"
+    },
+    {
+      "post": "4000888888888880 2.066666666666663",
+      "type": "drive",
+      "at": "4010888888888886 4.133333333333331",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "4000888888888880 2.066666666666663",
+      "until": "40017e4b17e4b176 2.186666666666663"
+    },
+    {
+      "post": "4000aaaaaaaaaaa2 2.0833333333333295",
+      "type": "drive",
+      "at": "401091111111110f 4.141666666666665",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "4000aaaaaaaaaaa2 2.0833333333333295",
+      "until": "4001a06d3a06d398 2.2033333333333296"
+    },
+    {
+      "post": "4000ccccccccccc4 2.099999999999996",
+      "type": "drive",
+      "at": "4010999999999998 4.149999999999999",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "4000ccccccccccc4 2.099999999999996",
+      "until": "4001c28f5c28f5ba 2.219999999999996"
+    },
+    {
+      "post": "4000eeeeeeeeeee6 2.1166666666666627",
+      "type": "drive",
+      "at": "4010a22222222220 4.158333333333331",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "4000eeeeeeeeeee6 2.1166666666666627",
+      "until": "4001e4b17e4b17dc 2.236666666666663"
+    },
+    {
+      "post": "4001111111111108 2.1333333333333293",
+      "type": "drive",
+      "at": "4010aaaaaaaaaaa8 4.166666666666664",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "4001111111111108 2.1333333333333293",
+      "until": "400206d3a06d39fe 2.2533333333333294"
+    },
+    {
+      "post": "400133333333332a 2.149999999999996",
+      "type": "drive",
+      "at": "4010b33333333331 4.174999999999998",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "400133333333332a 2.149999999999996",
+      "until": "400228f5c28f5c20 2.269999999999996"
+    },
+    {
+      "post": "400155555555554c 2.1666666666666625",
+      "type": "drive",
+      "at": "4010bbbbbbbbbbba 4.183333333333332",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "400155555555554c 2.1666666666666625",
+      "until": "40024b17e4b17e42 2.2866666666666626"
+    },
+    {
+      "post": "400177777777776e 2.183333333333329",
+      "type": "drive",
+      "at": "4010c44444444442 4.191666666666665",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "400177777777776e 2.183333333333329",
+      "until": "40026d3a06d3a064 2.3033333333333292"
+    },
+    {
+      "post": "4001999999999990 2.1999999999999957",
+      "type": "drive",
+      "at": "4010ccccccccccca 4.1999999999999975",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "4001999999999990 2.1999999999999957",
+      "until": "40028f5c28f5c286 2.319999999999996"
+    },
+    {
+      "post": "4001bbbbbbbbbbb2 2.2166666666666623",
+      "type": "drive",
+      "at": "4010d55555555553 4.208333333333331",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "4001bbbbbbbbbbb2 2.2166666666666623",
+      "until": "4002b17e4b17e4a8 2.3366666666666625"
+    },
+    {
+      "post": "4001ddddddddddd4 2.233333333333329",
+      "type": "drive",
+      "at": "4010dddddddddddc 4.216666666666665",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "4001ddddddddddd4 2.233333333333329",
+      "until": "4002d3a06d3a06ca 2.353333333333329"
+    },
+    {
+      "post": "4001fffffffffff6 2.2499999999999956",
+      "type": "drive",
+      "at": "4010e66666666664 4.224999999999998",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "4001fffffffffff6 2.2499999999999956",
+      "until": "4002f5c28f5c28ec 2.3699999999999957"
+    },
+    {
+      "post": "4002222222222218 2.266666666666662",
+      "type": "drive",
+      "at": "4010eeeeeeeeeeec 4.233333333333331",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "4002222222222218 2.266666666666662",
+      "until": "400317e4b17e4b0e 2.3866666666666623"
+    },
+    {
+      "post": "400244444444443a 2.2833333333333288",
+      "type": "drive",
+      "at": "4010f77777777775 4.2416666666666645",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "400244444444443a 2.2833333333333288",
+      "until": "40033a06d3a06d30 2.403333333333329"
+    },
+    {
+      "post": "400266666666665c 2.2999999999999954",
+      "type": "drive",
+      "at": "4010fffffffffffe 4.249999999999998",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "400266666666665c 2.2999999999999954",
+      "until": "40035c28f5c28f52 2.4199999999999955"
+    },
+    {
+      "post": "400288888888887e 2.316666666666662",
+      "type": "drive",
+      "at": "4011088888888886 4.258333333333331",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "400288888888887e 2.316666666666662",
+      "until": "40037e4b17e4b174 2.436666666666662"
+    },
+    {
+      "post": "4002aaaaaaaaaaa0 2.3333333333333286",
+      "type": "drive",
+      "at": "401111111111110e 4.266666666666664",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "4002aaaaaaaaaaa0 2.3333333333333286",
+      "until": "4003a06d3a06d396 2.4533333333333287"
+    },
+    {
+      "post": "4002ccccccccccc2 2.349999999999995",
+      "type": "drive",
+      "at": "4011199999999997 4.274999999999998",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "4002ccccccccccc2 2.349999999999995",
+      "until": "4003c28f5c28f5b8 2.4699999999999953"
+    },
+    {
+      "post": "4002eeeeeeeeeee4 2.366666666666662",
+      "type": "drive",
+      "at": "4011222222222220 4.283333333333331",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "4002eeeeeeeeeee4 2.366666666666662",
+      "until": "4003e4b17e4b17da 2.486666666666662"
+    },
+    {
+      "post": "4003111111111106 2.3833333333333284",
+      "type": "drive",
+      "at": "40112aaaaaaaaaa8 4.291666666666664",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "4003111111111106 2.3833333333333284",
+      "until": "400406d3a06d39fc 2.5033333333333285"
+    },
+    {
+      "post": "4003333333333328 2.399999999999995",
+      "type": "drive",
+      "at": "4011333333333330 4.299999999999997",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "4003333333333328 2.399999999999995",
+      "until": "400428f5c28f5c1e 2.519999999999995"
+    },
+    {
+      "post": "400355555555554a 2.4166666666666616",
+      "type": "drive",
+      "at": "40113bbbbbbbbbb9 4.308333333333331",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "400355555555554a 2.4166666666666616",
+      "until": "40044b17e4b17e40 2.5366666666666617"
+    },
+    {
+      "post": "400377777777776c 2.4333333333333282",
+      "type": "drive",
+      "at": "4011444444444442 4.316666666666665",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "400377777777776c 2.4333333333333282",
+      "until": "40046d3a06d3a062 2.5533333333333283"
+    },
+    {
+      "post": "400399999999998e 2.449999999999995",
+      "type": "drive",
+      "at": "40114cccccccccca 4.3249999999999975",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "400399999999998e 2.449999999999995",
+      "until": "40048f5c28f5c284 2.569999999999995"
+    },
+    {
+      "post": "4003bbbbbbbbbbb0 2.4666666666666615",
+      "type": "drive",
+      "at": "4011555555555552 4.33333333333333",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "4003bbbbbbbbbbb0 2.4666666666666615",
+      "until": "4004b17e4b17e4a6 2.5866666666666616"
+    },
+    {
+      "post": "4003ddddddddddd2 2.483333333333328",
+      "type": "drive",
+      "at": "40115ddddddddddb 4.341666666666664",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "4003ddddddddddd2 2.483333333333328",
+      "until": "4004d3a06d3a06c8 2.603333333333328"
+    },
+    {
+      "post": "4003fffffffffff4 2.4999999999999947",
+      "type": "drive",
+      "at": "4011666666666664 4.349999999999998",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "4003fffffffffff4 2.4999999999999947",
+      "until": "4004f5c28f5c28ea 2.6199999999999948"
+    },
+    {
+      "post": "4004222222222216 2.5166666666666613",
+      "type": "drive",
+      "at": "40116eeeeeeeeeec 4.358333333333331",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "4004222222222216 2.5166666666666613",
+      "until": "400517e4b17e4b0c 2.6366666666666614"
+    },
+    {
+      "post": "4004444444444438 2.533333333333328",
+      "type": "drive",
+      "at": "4011777777777774 4.366666666666664",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "4004444444444438 2.533333333333328",
+      "until": "40053a06d3a06d2e 2.653333333333328"
+    },
+    {
+      "post": "400466666666665a 2.5499999999999945",
+      "type": "drive",
+      "at": "40117ffffffffffd 4.374999999999997",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "400466666666665a 2.5499999999999945",
+      "until": "40055c28f5c28f50 2.6699999999999946"
+    },
+    {
+      "post": "400488888888887c 2.566666666666661",
+      "type": "drive",
+      "at": "4011888888888886 4.383333333333331",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "400488888888887c 2.566666666666661",
+      "until": "40057e4b17e4b172 2.686666666666661"
+    },
+    {
+      "post": "4004aaaaaaaaaa9e 2.5833333333333277",
+      "type": "drive",
+      "at": "401191111111110e 4.391666666666664",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "4004aaaaaaaaaa9e 2.5833333333333277",
+      "until": "4005a06d3a06d394 2.703333333333328"
+    },
+    {
+      "post": "4004ccccccccccc0 2.5999999999999943",
+      "type": "drive",
+      "at": "4011999999999996 4.399999999999997",
+      "rate": "3fe0000000000000 0.5",
+      "accel": "0000000000000000 0",
+      "time": "4004ccccccccccc0 2.5999999999999943",
+      "until": "4005c28f5c28f5b6 2.7199999999999944"
+    },
+    {
+      "post": "400599999999999a 2.7",
+      "type": "stop"
+    }
+  ],
+  "runs": [
+    {
+      "rate": 48000,
+      "block": 128,
+      "from": 47520,
+      "frames": 96480,
+      "spans": ["8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","da2ac5c1f8ccc20e","4a11c571c3761a13","2b2b49a678adf7d8","d6fb37a9ce58a9a6","5db253866e0b6099","609064477b160160","90181462f119ccfb","1825ba1cb25b0c09","56bc846ac599b469","7c8a1acb8900bd3a","19369f2cbcbe036e","d62de226d324971c","f11914e63d966bcd","0723ee7dc01d0bd9"],
+      "reports": {"count":60,"hash":"4fbc4b60a96f444c","whole":"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UMWuALlXEEBwtP7////fP7j//////+8/AAAAAAAAAAAAAAAAAAAAAF9o79UVNu8/xGfYFSD3AEABt4FOG2gQQOWz/v///98/uP//////7z8AAAAAAAAAAAAAAAAAAAAAgDJFYLKO7z+lKRVnHz4BQHLn0CLbeRBAIbT+////3z+4///////vPwAAAAAAAAAAAAAAAAAAAAAruNr1h73vP0zwYJ6ofwFAKNmjcD2KEEDKs/7////fP7j//////+8/AAAAAAAAAAAAAAAAAAAAAKtBT42z2u8/LbKd76fGAUCWCfNE/ZsQQCi0/v///98/uP//////7z8AAAAAAAAAAAAAAAAAAAAAPhhncB7q7z/VeOkmMQgCQD77xZJfrBBALLT+////3z+4///////vPwAAAAAAAAAAAAAAAAAAAACAYsa3uPPvP7Y6JngwTwJArCsVZx++EEANtP7////fP7j//////+8/AAAAAAAAAAAAAAAAAAAAAJZXYwHM+O8/XgFyr7mQAkBmHei0gc4QQCG0/v///98/uP//////7z8AAAAAAIBFQAAAAAAAAABAsqaoM0y06j8+w64AudcCQMxNN4lB4BBAUbT+////3z+4///////vPwAAAAAAAAAAAAAAAAAAAAC3pqgzTLTqP+aJ+jdCGQNAjT8K16PwEEC1s/7////fP7j//////+8/AAAAAAAAAAAAAAAAAAAAAMVxkb2R6es/x0s3iUFgA0Dzb1mrYwIRQNGz/v///98/uP//////7z8AAAAAAAAAAAAAAAAAAAAA3xTiiR2a7T9vEoPAyqEDQKhhLPnFEhFAELT+////3z+4///////vPwAAAAAAAAAAAAAAAAAAAADvrsq4hafuP0/UvxHK6ANAEZJ7zYUkEUDws/7////fP7j//////+8/AAAAAAAAAAAAAAAAAAAAADZJctrpNe8/95oLSVMqBEDYg04b6DQRQNez/v///98/uP//////7z8AAAAAAAAAAAAAAAAAAAAA43oTspmO7z/YXEiaUnEEQDi0ne+nRhFAZrT+////3z+4///////vPwAAAAAAAAAAAAAAAAAAAAC9Q097eb3vP4AjlNHbsgRA+KVwPQpXEUDMs/7////fP7j//////+8/AAAAAAAAAAAAAAAAAAAAAHeEZ22r2u8/YOXQItv5BEBW1r8RymgRQBG0/v///98/uP//////7z8AAAAAAAAAAAAAAAAAAAAA0fI7rBnq7z8IrBxaZDsFQArIkl8seRFA+7P+////3z+4///////vPwAAAAAAAAAAAAAAAAAAAABqsBULtvPvP+ltWatjggVAc/jhM+yKEUANtP7////fP7j//////+8/AAAAAAAAAAAAAAAAAAAAAJyVt2/K+O8/kTSl4uzDBUAEIaST5JQRQHqBFiY0Uq4/nI9kiAC9Sj8AAAAAAAAAAAAAAAAAAAAAg2uEX/T77z9x9uEz7AoGQBQlPNF6lRFA/kxFd/tKXj8wChsxucpAPgAAAAAAAAAAAAAAAAAAAADfMhJ0oP3vPxm9LWt1TAZAqxA3dn+VEUBGQINBw8ETP5JxXJ6qpkk9AAAAAAAAAAAAAAAAAAAAAGM3MhSr/u8/+n5qvHSTBkCZoSmnf5URQMiK5qwOvcM+tnFYFu0bQDwAAAAAAAAAAAAAAAAAAAAAecj6/zf/7z+iRbbz/dQGQH/+rKh/lRFANUXy/Ci/eT6FJPQSpptIOwAAAAAAAAAAAAAAAAAAAACy2GrFj//vP4IH80T9GwdA+vC8qH+VEUBsz9g0B7kpPvzRRB156D46AAAAAAAAAAAAAAAAAAAAAPvzTym+/+8/Ks4+fIZdB0Apb72of5URQCObPWO5xuA9wqCiFX2bRzkAAAAAAAAAAAAAAAAAAAAASvoXDtv/7z8LkHvNhaQHQOVzvah/lRFA41w2ibrCkD146cM5u6Y9OAAAAAAAAAAAAAAAAAAAAACfFI5T6v/vP7NWxwQP5gdA5XO9qH+VEUAxuCErydxFPRTGRqC+pUY3AAAAAAAAAAAAAAAAAAAAAJMHhtbz/+8/"},
+      "maths": {"calls":6062,"hash":"4414a25bffd5166b"},
+      "whole": null
+    },
+    {
+      "rate": 48000,
+      "block": 333,
+      "from": 47520,
+      "frames": 96480,
+      "spans": ["8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","5276a158300c4635","ec8f9540173f443a","587f0d0f527fbbfc","de5276446c634169","90da714dc8d8c2a8","cf9a4ce2369b67ee","19a920a5a37050cc","7b5d7111d70b9cc4","95988a27e64b7736","99845b480e6f1f23","ee239f062e17a2a9","7e259f916a60a259","758220adb5b01955","6a5d65d61a03606f"],
+      "reports": {"count":60,"hash":"b5ccce475e92f214","whole":null},
+      "maths": {"calls":3278,"hash":"9bdd8aa8c7237533"},
+      "whole": null
+    },
+    {
+      "rate": 48000,
+      "block": 512,
+      "from": 47520,
+      "frames": 96480,
+      "spans": ["8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","0f37ead2627b04bf","ec8f9540173f443a","dc9538c1d151c2da","661f188c3cd7814e","743e78675f07e76f","589b00e3457cd135","696b211e32f1a84d","b817c67e387718c1","24b52de0f1fe1535","49b3673056604c6d","3d62ee20bc93b685","97652be276775ede","96a5e7983d84adcf","cabce3eaa70f5a72"],
+      "reports": {"count":60,"hash":"91aff2d7f8728f9c","whole":null},
+      "maths": {"calls":2672,"hash":"2545f167c5a4861f"},
+      "whole": null
+    },
+    {
+      "rate": 48000,
+      "block": 1024,
+      "from": 47520,
+      "frames": 96480,
+      "spans": ["8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","0f37ead2627b04bf","ec8f9540173f443a","6c8c3bb679f9be3b","bde4367fcdb896f7","843bdf6636f2fc7a","3dcff024987d4054","6391be8c44922694","5974fb6367a815a1","aae45d95479cb17f","547fd47e3058444a","8fa2386ca4e2a7c6","37287aa208995460","06d07ca931a7c167","968b7c89daa288d8"],
+      "reports": {"count":60,"hash":"a116b9384d7cebf2","whole":null},
+      "maths": {"calls":2108,"hash":"ca31bb5c5ce4fe9f"},
+      "whole": null
+    },
+    {
+      "rate": 44100,
+      "block": 128,
+      "from": 43659,
+      "frames": 88641,
+      "spans": ["8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","04062fa95bf93701","ca3296f791b49f81","1bd79028c95c0d2c","bce17e6633d97432","0ccfd4f74df417d1","6d7f9fcd5db3a4fa","408accfcd5183ba9","6cdcfcb9839e7a08","6a1a01c0eafdd6b6","f29658deb32ce06d","ae495fe8010d1a6d","7f63d75d572a63d0"],
+      "reports": {"count":60,"hash":"59cee0deaadce3a4","whole":null},
+      "maths": {"calls":5696,"hash":"d5e2adb0d3e069be"},
+      "whole": null
+    },
+    {
+      "rate": 44100,
+      "block": 333,
+      "from": 43659,
+      "frames": 88641,
+      "spans": ["8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","2283c0137b5281b9","79e452d49226aaff","00c9e9e82471768f","3f37a867289e9e05","ebb78a8b65b01cb8","cf8cde96094f752e","29975850705ef9c4","0e10d4f8d8e18677","87ccc164754e6242","f7f79ee3568119bf","961e445f70a7c4b7","89eed3364870a9a5"],
+      "reports": {"count":60,"hash":"f3677401bbaf68a6","whole":null},
+      "maths": {"calls":3140,"hash":"0728798c565e0fc0"},
+      "whole": null
+    },
+    {
+      "rate": 44100,
+      "block": 512,
+      "from": 43659,
+      "frames": 88641,
+      "spans": ["8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8fd66e2ff6e77d19","df6f4455f6487e6e","9c8719664a2b5cc3","933f7706eacf7cad","4d375d5ef30e2005","93b88d6c1491f90b","6cb440367a7b7ed2","ef842dd6102dd6d2","20c7806e69d6d294","ddffcf07e441c9e8","8270205ff67a056a","429445ea2edb44a8"],
+      "reports": {"count":60,"hash":"e8449b76695b1a7b","whole":null},
+      "maths": {"calls":2582,"hash":"4ab406e07c489cc7"},
+      "whole": null
+    },
+    {
+      "rate": 44100,
+      "block": 1024,
+      "from": 43659,
+      "frames": 88641,
+      "spans": ["8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","8f6955bf94ec2325","04062fa95bf93701","f5b5989050849084","df4e4e3ceaac9943","e1a109ce4d763dc9","9e94362cfa24b43a","2772991c753504b0","18c748011bc3d356","99da1a9d1f70df02","7b69045078f15f80","590e01d304e499d7","e17a4ecf1d9e3524","b6b10334c2bc4474"],
+      "reports": {"count":60,"hash":"f1fce0fe9d277b81","whole":null},
+      "maths": {"calls":2060,"hash":"08ada9a4a79aa6d4"},
+      "whole": null
+    },
+    {
+      "rate": 48000,
+      "block": 1,
+      "from": 47800,
+      "frames": 2000,
+      "spans": ["2c36c2471ceec525"],
+      "reports": {"count":1,"hash":"bb9628dfc0a13f13","whole":null},
+      "maths": {"calls":13537,"hash":"a1d95366025e5f4a"},
+      "whole": null
+    }
+  ]
+}
