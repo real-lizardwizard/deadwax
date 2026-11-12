@@ -2004,3 +2004,43 @@ row whose song button is beside it (both plain-styled, as the button was).
 and Play Last. Try it on a song near the bottom of the screen too - Play Next still first. Tap away: it closes and
 nothing is queued. The ••• at the top right does the same for the whole album, and Now Playing's ••• opens Info and
 Go to album from itself.
+
+### Up Next: one tap to take a song out
+
+**What James asked.** "swiping doesn't work to take one out", then, asked whether removing should stay Edit-only:
+"leave it edit only, but add swipe to remove in edit mode so I don't have to tap two different places per song".
+Until now Edit's removal was the List's own (`onDelete` only while editing): the red (-), then Delete.
+
+**Can a List row be swiped while Edit is on? No - iOS doesn't offer it.** Apple doesn't say so in one sentence;
+what it does document puts a swipe and Edit in different modes:
+- SwiftUI's `EditMode.transient` is the mode SwiftUI may engage "over the duration of a swipe gesture" - a mode of
+  its own, apart from `.active`, which is Edit (developer.apple.com/documentation/swiftui/editmode/transient).
+- UIKit's table views, which SwiftUI's List stood on until iOS 16 (a collection view list since), describe a swipe
+  as entering a "swipe to delete" mode of its own, in which the editing and reordering controls are not shown
+  (Apple's Table View Programming Guide for iOS, "Inserting and Deleting Rows and Sections").
+- In Edit, the delete control's job is to bring out what a swipe would: tapping the minus "reveals the cell's
+  trailing swipe actions" (Matt Neuburg, "Collection View Lists in iOS 14, Part 2", BiTE Interactive) - the
+  two-step James found.
+- Developers report the rest: "enabling EditMode ... disables navigation & swipe actions" (Stack Overflow 73889241,
+  September 2022, on iOS 16).
+Not tried on iOS 27: there is no Simulator, and the phone hasn't been asked. If a swipe in Edit ever worked there,
+it would be news.
+
+**What changed**, then, is the other way the request allowed for: Edit gives each row ONE action. Its own red (-) at the leading edge
+takes the song out at once (`UpNextScreen.editRow`), in place of the system's two-step control, and the List's drag
+handles stay (`onMove` while editing). There is no `onDelete` at all now: out of Edit it would be a swipe that loses
+a song, in it the two-step (-). Out of Edit nothing changes - no swipe, no (-), so no stray removal.
+- **VoiceOver**: the row is one element with its words read as before ("Roads, Portishead · Dummy") and the same
+  actions: Move up, Move down (none past a group's end) and Remove. The (-) is hidden from VoiceOver and the row's
+  children are ignored, so a double tap on a row in Edit does nothing - VoiceOver can't take a song out by landing
+  on it. Remove's focus move is the one the screen made already (the next row, the one before at the end, else
+  Done), and what changed is still read out ("Roads removed").
+- The (-) is drawn as the system's: `minus.circle.fill`, white on red, a 44 pt target, borderless so it takes its
+  own tap inside the row.
+
+**Verified**: builds. **Assumed**: that a borderless button in a List row takes its tap while Edit is on (controls
+in rows do; not seen here), and that with no onDelete the List draws no delete control of its own in Edit.
+
+**On the phone**: open Up Next with songs added, tap Edit: each row has a red minus on the left and a drag handle
+on the right, and nothing else. One tap on a minus takes that song out - no Delete to confirm. Drag a song by its
+handle. Try swiping a row in Edit and out of it: nothing happens either way. Done ends Edit.

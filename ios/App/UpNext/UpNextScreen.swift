@@ -8,7 +8,10 @@ import SwiftUI
 ///
 /// A row's tap plays it now (PlayerModel.jump, by the row's key: a song in twice is two rows, and a key gone does
 /// nothing). Edit gives each row Move up, Move down and Remove - as VoiceOver actions, and as the List's own drag
-/// handle and delete - each change made as it is made, a move staying in its group. What changed is read out, and
+/// handle and the row's own red (-), which takes the song out at once - each change made as it is made, a move
+/// staying in its group. Out of Edit a row can't be swiped away, so a song isn't lost by a stray swipe; in Edit iOS
+/// offers no swipe (a List in Edit takes none - notes/ios.md, "Up Next: one tap to take a song out"), so the (-)
+/// is the one action, in place of the system's two (its (-), then Delete). What changed is read out, and
 /// VoiceOver's focus goes where the web's goes (Pinned's rule): a moved row where it went; after a removal the next
 /// row, the one before at the end, Done with none; Clear to the Shuffle chip; Edit to Done; a row's tap to the row
 /// after it (Playing Next's last to the list's first), or Done. Each opening starts at the top, out of Edit; Done
@@ -160,7 +163,8 @@ struct UpNextScreen: View {
     // MARK: a group's rows
 
     /// One group's rows - `after` is the row a tap on its last moves focus to (Playing Next's: the list's first). In
-    /// Edit the List's own drag handle and delete work on them, a drag staying in its group.
+    /// Edit the List's own drag handle moves them, a drag staying in its group, and each row's (-) takes it out. No
+    /// onDelete, in Edit or out: out of it, it would be a swipe that loses a song; in it, the system's two-step (-).
     private func rows(_ rows: [UpNextRow], after: UpNextRow?) -> some View {
         ForEach(Array(rows.enumerated()), id: \.element.key) { index, row in
             Group {
@@ -173,7 +177,6 @@ struct UpNextScreen: View {
             .accessibilityFocused($focus, equals: .row(row.key))
         }
         .onMove(perform: mover(rows))
-        .onDelete(perform: remover(rows))
     }
 
     /// The List's drag in Edit, as a move to the row's new place (none out of Edit: no handles).
@@ -182,15 +185,6 @@ struct UpNextScreen: View {
         return { source, destination in
             guard let from = source.first, rows.indices.contains(from) else { return }
             move(rows[from], in: rows, to: UpNextWords.movedTo(from: from, destination: destination))
-        }
-    }
-
-    /// The List's delete in Edit (none out of Edit: a row's swipe is no way to lose a song by accident).
-    private func remover(_ rows: [UpNextRow]) -> ((IndexSet) -> Void)? {
-        guard editing else { return nil }
-        return { offsets in
-            guard let index = offsets.first, rows.indices.contains(index) else { return }
-            remove(rows[index], at: index, in: rows)
         }
     }
 
@@ -214,21 +208,40 @@ struct UpNextScreen: View {
         .accessibilityLabel(UpNextWords.playNow(row.track.title))
     }
 
+    /// A row in Edit: its red (-), which takes it out at once, and its words; the List draws the drag handle. One
+    /// VoiceOver element, its words read as they were and its (-) left out of it - Remove is among its actions, and
+    /// a double tap on the row does nothing, so VoiceOver can't take a song out by landing on it.
     private func editRow(_ row: UpNextRow, index: Int, rows: [UpNextRow]) -> some View {
         let title = row.track.title
-        return text(row)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityElement(children: .combine)
-            .accessibilityActions {
-                //? disabled at the group's ends, as the web's are: an end has only the other way
-                if index > 0 {
-                    Button(UpNextWords.moveUp(title)) { move(row, in: rows, to: index - 1) }
-                }
-                if index < rows.count - 1 {
-                    Button(UpNextWords.moveDown(title)) { move(row, in: rows, to: index + 1) }
-                }
-                Button(UpNextWords.remove(title)) { remove(row, at: index, in: rows) }
+        let line = UpNextWords.songLine(artist: row.track.artist, album: row.track.album)
+        return HStack(spacing: 8) {
+            Button {
+                remove(row, at: index, in: rows)
+            } label: {
+                Image(systemName: "minus.circle.fill")
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(.white, .red)
+                    .font(.title3)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.borderless)
+            .accessibilityHidden(true)
+            text(row)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel([title, line].filter { !$0.isEmpty }.joined(separator: ", "))
+        .accessibilityActions {
+            //? disabled at the group's ends, as the web's are: an end has only the other way
+            if index > 0 {
+                Button(UpNextWords.moveUp(title)) { move(row, in: rows, to: index - 1) }
+            }
+            if index < rows.count - 1 {
+                Button(UpNextWords.moveDown(title)) { move(row, in: rows, to: index + 1) }
+            }
+            Button(UpNextWords.remove(title)) { remove(row, at: index, in: rows) }
+        }
     }
 
     private func text(_ row: UpNextRow) -> some View {

@@ -241,9 +241,11 @@ either just plays it.
   comes after: "Then Mezzanine again from the top." with Repeat All ("Then Mezzanine again, in a new
   order." with Shuffle on too), or "Nothing after this song." at the last song with Repeat off.
 - **Tap a song** to play it now, even from a pause.
-- **Edit** gives each row a handle to drag it by and a button to take it out. A song moves within its
-  own group (Playing Next, or the album's), and each change is made as you make it. **Done** ends
-  Edit. Outside Edit, a row can't be swiped away, so a song isn't lost by accident.
+- **Edit** gives each row a handle to drag it by and a red minus button that takes it out at once,
+  one tap a song. A song moves within its own group (Playing Next, or the album's), and each change is
+  made as you make it. **Done** ends Edit. Outside Edit, a row can't be swiped away, so a song isn't
+  lost by accident; inside it, iOS doesn't let a row be swiped at all, which is why the minus button
+  needs no second tap. With VoiceOver, each row's actions have Move up, Move down and Remove.
 - It closes by itself once nothing is queued.
 
 **Shuffle**, turned on while a song plays, keeps that song going and shuffles every song of the album
@@ -389,9 +391,9 @@ Phase 1 exists to answer these on the phone. Note what you see for each.
 4. **Quiet and loud.** A quiet old album, then a loud new one (Play Last it): about the same
    loudness, and no distortion on the quiet one brought up. Info says how much each was changed.
 5. **Up Next.** While an album plays: Play Next a song and Play Last another, then open Up Next. Are
-   they under Playing Next, in that order? Edit: drag one, take one out, Done. Clear. Shuffle on and
-   off: the song playing goes on untouched. Repeat One plays the song again; Repeat All starts the album
-   again after its last song.
+   they under Playing Next, in that order? Edit: drag one, take one out with its red minus button
+   (one tap), Done. Clear. Shuffle on and off: the song playing goes on untouched. Repeat One plays the
+   song again; Repeat All starts the album again after its last song.
 6. **Picking up, both ways.** Play an album on the phone, pause it, and close the app (swipe it away).
    Open the web app on the Mac: the same queue, song and second, paused. Then play something else on
    the Mac, pause it, and open the app on the phone: it has it, paused, and says "Picked up from your
