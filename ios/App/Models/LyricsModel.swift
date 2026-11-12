@@ -54,6 +54,9 @@ final class LyricsModel {
     @ObservationIgnored private var etag: String?
     /// Counts the asks for the song playing: only the latest's answer draws.
     @ObservationIgnored private var generation = 0
+    /// Counts the people (reset): an answer asked for as the one before keeps nothing - in memory or with a download -
+    /// when it comes back after the change.
+    @ObservationIgnored private var person = 0
     /// The app is in front (active): asks are made only then.
     @ObservationIgnored private var active = UIApplication.shared.applicationState == .active
     /// The next song asked for ahead - once a song.
@@ -82,11 +85,14 @@ final class LyricsModel {
 
     // MARK: what Now Playing reads
 
-    /// The song playing's answer in hand - never another song's: until the model has heard of a new song, what is kept
-    /// of it in memory, else nothing.
+    /// The song playing's answer in hand - never another song's: until the model has heard of a new song (it hears on
+    /// the main queue's next turn, after the change), what is kept of it - in memory, else with its download, as
+    /// `refresh()` will draw it - so that turn draws no spinner, and offline no "not on this phone", for a song whose
+    /// lyrics are kept.
     var shown: SongLyrics? {
         guard let id = player.current?.track.id else { return nil }
-        return id == song ? lyrics : memory.peek(id)?.lyrics
+        if id == song { return lyrics }
+        return memory.peek(id)?.lyrics ?? downloads.keptLyrics(id)?.lyrics
     }
 
     /// What is known of the song playing's lyrics (2.7) - offline with none kept, "not on this phone".
@@ -122,9 +128,11 @@ final class LyricsModel {
         let next = queue.tracks[queue.index + 1].id
         guard next != askedAhead, next != song, memory.peek(next) == nil, downloads.keptLyrics(next) == nil else { return }
         askedAhead = next
+        let asker = person
         Task {
             // nothing to say of a failure: the join asks for them again
-            guard case .fresh(let answer, let etag)? = try? await client.lyrics(songID: next, ifNoneMatch: nil) else { return }
+            guard case .fresh(let answer, let etag)? = try? await client.lyrics(songID: next, ifNoneMatch: nil),
+                  asker == person else { return }
             memory.keep(next, Kept(lyrics: answer.lyrics, etag: etag))
             downloads.lyricsAnswered(next, body: answer.body, etag: etag)
         }
@@ -133,6 +141,7 @@ final class LyricsModel {
     /// The person changed (ServerModel.whenPersonChanges): nothing of the last one's kept - their answers are of songs
     /// the next may not be given. Lyrics on stays on: it is the phone's, not the person's.
     func reset() {
+        person += 1
         letGo()
         memory.removeAll()
         askedAhead = nil
@@ -198,11 +207,14 @@ final class LyricsModel {
         guard let client = server.client else { return }
         generation += 1
         let mine = generation
+        let asker = person
         let inHand = lyrics.map { Kept(lyrics: $0, etag: etag) }
         asking = true
         Task {
             do {
                 let fetched = try await client.lyrics(songID: id, ifNoneMatch: inHand?.etag)
+                // the person changed meanwhile: nothing of it kept (reset() has let the ask go)
+                guard asker == person else { return }
                 switch fetched {
                 case .fresh(let answer, let etag):
                     let fresh = Kept(lyrics: answer.lyrics, etag: etag)

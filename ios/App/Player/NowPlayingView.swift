@@ -53,31 +53,38 @@ struct NowPlayingView: View {
 
     private func content(_ track: QueueTrack) -> some View {
         VStack(spacing: 0) {
-            if lyricsShown {
-                // the chevron's row alone is the grip: a scroll of the lyrics never drags the sheet
-                topRow
-                    .contentShape(Rectangle())
-                    .gesture(grip)
-                lyricsFace(track)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .transition(.opacity)
-            } else {
-                VStack(spacing: 0) {
-                    topRow
-                    Spacer(minLength: 12)
-                    CoverImage(id: track.coverArt, size: 360)
-                        .frame(maxWidth: 360)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .shadow(color: .black.opacity(0.4), radius: 24, y: 12)
-                        .scaleEffect(player.isPlaying ? 1 : Self.pausedScale)
-                        .animation(.spring(response: 0.45, dampingFraction: 0.7), value: player.isPlaying)
-                        .padding(.horizontal, 8)
-                    Spacer(minLength: 12)
-                }
+            // the chevron's row is the grip either way; it stays put as lyrics come and go
+            topRow
                 .contentShape(Rectangle())
                 .gesture(grip)
-                .transition(.opacity)
+            // the cover or the lyrics, crossfading in ONE place: a ZStack, so the one going and the one coming share
+            // the room through the fade rather than each taking half of it in the column (the cover shrinking and the
+            // lyrics laid out at half height, then grown)
+            ZStack {
+                if lyricsShown {
+                    // outside the grip: a scroll of the lyrics never drags the sheet
+                    lyricsFace(track)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .transition(.opacity)
+                } else {
+                    VStack(spacing: 0) {
+                        Spacer(minLength: 12)
+                        CoverImage(id: track.coverArt, size: 360)
+                            .frame(maxWidth: 360)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .shadow(color: .black.opacity(0.4), radius: 24, y: 12)
+                            .scaleEffect(player.isPlaying ? 1 : Self.pausedScale)
+                            .animation(.spring(response: 0.45, dampingFraction: 0.7), value: player.isPlaying)
+                            .padding(.horizontal, 8)
+                        Spacer(minLength: 12)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                    .gesture(grip)
+                    .transition(.opacity)
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             VStack(alignment: .leading, spacing: 4) {
                 if let error = player.errorLine, !error.isEmpty {

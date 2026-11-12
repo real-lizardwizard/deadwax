@@ -349,9 +349,10 @@ and each time you open Now Playing, until you tap **Lyrics** again or quit the a
 - **A song with none** (an instrumental, or none found yet): **Lyrics** is dimmed and does nothing.
   With lyrics on, a song with none shows its cover, **Lyrics** still lit, and the next song with
   lyrics shows them again.
-- **"Couldn't load the lyrics."**, with **Try again**, when deadwax didn't answer. "This song isn't
-  here any more - it may have been moved or deleted." means Navidrome no longer has the song the
-  queue names: play it again from its album.
+- **"Couldn't load the lyrics."**, with **Try again**, when deadwax couldn't get them just then
+  ("Can't connect to deadwax." when the phone can't reach it). "This song isn't here any more - it
+  may have been moved or deleted." means Navidrome no longer has the song the queue names: play it
+  again from its album.
 - The background goes darker under lyrics, so the dimmer lines can be read over any cover.
 
 A song's lyrics are asked for as it starts, whether Now Playing is open or not, so **Lyrics** is right
@@ -789,7 +790,7 @@ These are the web app's for now. Most of them come to the phone in the next phas
 | A song's line says **"The connection dropped while this song was loading"**, or the next song's says **"Skipped "..." - it wouldn't play"** | The app asks for a song once more after a moment, then goes on past it. Check the phone's network. |
 | **"This device couldn't play this song's audio"**, or **"Skipped "..." - this device couldn't play its audio"** | The file is damaged, or in a form iPhones can't play. Try it on the web app; an admin finds the details in You > Debug > Playing. |
 | Info's Normalization: **"Not this time - the album's volume couldn't be checked"** ("the song's" for a song levelled on its own) | deadwax is older than 2.1.1, or didn't answer in time. The song plays as it is; with 2.1.1 or later, the album's next play is levelled. |
-| Lyrics: **"Couldn't load the lyrics."** | deadwax didn't answer just then: **Try again**. If it's every song, deadwax may be older than 2.1.5, which has no lyrics for the app (an admin sees why, folded under it). |
+| Lyrics: **"Couldn't load the lyrics."** | deadwax, or Navidrome behind it, couldn't give them just then: **Try again**. If it's every song, deadwax may be older than 2.1.5, which has no lyrics for the app (an admin sees why, folded under it). |
 | Lyrics: **"This song isn't here any more - it may have been moved or deleted."** | Navidrome no longer has the song the queue names (a rescan moved it). Play it again from its album. |
 | **Lyrics** is dimmed | The song has none - none on LRCLIB, or none fetched yet (**Get lyrics** in the album's Edit, on the web app). Offline, "Lyrics - not on this phone": none were kept for it, which happens to a song downloaded with app 0.3 until the app has been opened with deadwax in reach. |
 | An album stays on **"Waiting for Wi-Fi"** | Download over is Wi-Fi only (You > Downloads): join a Wi-Fi network that isn't a phone's hotspot, with Low Data Mode off - or choose Wi-Fi and cellular. |

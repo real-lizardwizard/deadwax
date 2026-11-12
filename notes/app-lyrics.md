@@ -1312,7 +1312,7 @@ Where the spec was silent, read one way of two, or couldn't be built as written 
    18 a simultaneous drag can keep the scroll view from scrolling.
 5. **The `TimelineView` is behind the lines, not around them** (4.2), driving a `lit` state, so the lines are redrawn
    only when the lit line or a dot changes, not ten times a second. Its pause is 2.2's whole list (`clockRuns`), where
-   4.2's snippet has `!player.isPlaying` alone.
+   4.2's snippet has `!player.isPlaying` alone. (The player is read in `LitClock`'s own body since the review - its 1.)
 6. **Stopped, a seek still lights its line** (2.2 has the view read `player.shownPosition`): `clock()` reads
    `position` and the pending seek, both observed, so the view is redrawn by either - a scrub or a tap while paused.
 7. **Opening is placed, not scrolled** (2.5's "at once ... when the lyrics are opened again"): the lit line is set as
@@ -1320,7 +1320,7 @@ Where the spec was silent, read one way of two, or couldn't be built as written 
    smooth only after that.
 8. **The next song's ask is made from the lyrics' view** (2.6 says when, not how): `onChange(of: player.position)` -
    the half-second tick - calls `LyricsModel.ahead()`, so only while they show; once a song, and not when memory or
-   the store already has it.
+   the store already has it. (In `LitClock` since the review - its 1.)
 9. **`Lyrics.clock(raw:reported:)` is ported though the phone doesn't use it** (2.2's phone rule is
    `PlayerModel.clock()`): one table of rules for both apps, held by the vectors, as the web exports
    `LYRICS_NOT_KEPT`. **The keyboard's rules aren't ported** (3.6's `tabStop`, `lineAfterKey`, `SCROLL_KEYS`): the
@@ -1349,3 +1349,89 @@ touch that never scrolled holding (2), the trigger deleting nothing (7, in 2 tes
 of it on a phone, a real deadwax or a real Navidrome - section 6's P1-P12 and section 7 (`onScrollPhaseChange` with
 VoiceOver's three-finger scroll, AirPlay's delay in the engine's position, the 4 s against Apple Music's); how the
 spring and the first placement look; the iOS 17 drag stand-in, which this Mac's iOS 27 SDK compiles but nothing runs.
+
+### Review
+
+The same day, read against section 4 (with 2, 5, 6, the Open questions and the Design review), the web's
+`player/Lyrics.tsx` and `lib/lyricsView.ts` as reviewed, and the four commits; still app 0.4 (4). Four fixes, all in
+the App - none is Core logic, so no Core test is new; each is held by the device build alone:
+
+1. **The lyrics' whole body was drawn again at every half-second tick.** Departure 8's `onChange(of: player.position)`
+   read the position in `LyricsView`'s body, so every line was rebuilt twice a second while the song played - what
+   departure 5's clock is there to avoid - and departure 6's paused seek was redrawn by that read rather than by the
+   clock. The player is now read only in `LitClock`'s body: it is handed the timeline's moment (new each time the
+   timeline draws) and calls `clock()` itself, so it is read ten times a second while the clock runs and, stopped,
+   whenever the position or a seek on its way changes - its own observation, which a paused scrub needs. The next
+   song's ask moved into it too. `LyricsView`'s body draws when what is lit changes, and when the song plays or
+   pauses.
+2. **Turning lyrics on or off squeezed both faces into one column.** The cover and the lyrics were the two branches
+   of an `if` in Now Playing's column, and through the 0.25 s fade the face leaving keeps its place in the layout: the
+   cover shrank and rose as it faded, the lyrics were laid out - and first placed - at half their height and then
+   grew, and the chevron's row, drawn in both branches, dipped out and back. The chevron's row is drawn once now,
+   above, the grip either way; the cover and the lyrics fade in one place, a `ZStack` taking the room both had.
+   Nothing below them moves, as before.
+3. **An answer asked for as the person before was kept after a change of person.** An ask on its way as someone else
+   signed in (or the address changed) put its answer in memory and, through `lyricsAnswered`, into the new person's
+   store if a song of that id was downloaded there: `reset()` let the ask go for drawing (the generation), not for
+   keeping. `LyricsModel` counts people now, and an ask - the song playing's or the next song's - made as the one
+   before keeps nothing.
+4. **A song change drew a spinner for a turn** - offline, the cover and "Lyrics - not on this phone" - for a
+   downloaded song not in memory: the model hears of the change on the main queue's next turn (`watchSong`;
+   `withObservationTracking` calls before the change is made), and until then `shown` looked in memory alone. It
+   falls back to the download's kept answer, as `refresh()` then draws it.
+
+And docs/ios.md: "Couldn't load the lyrics." is said when deadwax, or Navidrome behind it, couldn't give them; the
+phone not reaching deadwax is "Can't connect to deadwax." (the bullet and the troubleshooting row said "when deadwax
+didn't answer").
+
+Looked at and kept:
+
+- **Following and its hold** against the web's rules: a new lit line followed unless held; a tap follows once (the
+  lit line's change, or directly when already lit); a play after a hold run out while paused follows at once; a
+  change of size re-follows at once; plain lyrics never follow; Reduce Motion jumps and keeps the colour's ease.
+  `LyricsHold`: following's own `scrollTo` (`.animating`) and a tap (`.tracking` then `.idle`) hold nothing; the
+  wait counts from the end of a fling (`.idle`), as 4.2 says - departure 3, a second or so later than the web's last
+  input, and what docs/ios.md says ("after they come to rest").
+- **The first placement** (`onAppear`, then `follow` on the main queue's next turn, and again by the geometry's first
+  height): with the ZStack the view is laid out at its full height from the start. Whether a song opened in its last
+  seconds lands at the anchor at once, or only at its next line - the end room comes with the first height - is a
+  device's to say (P2).
+- **iOS 17's stand-in** (a `@GestureState` drag, minimum 10 pt, simultaneous): a tap moves less than 10 pt, so lines
+  still take it; iOS 17 is reported to scroll under a simultaneous drag (18 is where that stopped). Nothing here
+  runs iOS 17.
+- **A tap on a line**: `seek(to:)` then `toggle()` when not `isPlaying` - PlayerModel's own calls, straight from the
+  tap; `isPlaying` counts loading, so a song loading isn't paused by it.
+- **VoiceOver**: focus on a line holds, the wait starting as it leaves; "Go to the line being sung" on every line but
+  the lit one, moving the focus; the container named Lyrics; breaks, dots and both rooms hidden; nothing announced.
+  Dynamic Type (the lines wrap, a size change re-follows), Reduce Transparency (no mask), Increase Contrast.
+- **The clock's pause** is `clockRuns`' whole list (covered, the scene not active, paused); while covered, the
+  half-second position still moves what is lit (by observation, as before), so the line is followed when the sheet
+  goes.
+- **`LyricsModel`**: the generation (an answer draws only for the latest ask; a stale one is still kept in memory),
+  `shown` never another song's, Lyrics on outliving a person, the next song asked once and only with nothing kept,
+  the store read when the song changes and offline, no asks while the app isn't active.
+- **`Lyrics.failure(_:)`**: the route's own 404 always has words - "Navidrome has nothing by that id" (Subsonic's code
+  70) or "getLyricsBySongId was answered with a 404 - ..." (`navidrome_endpoint.py`); an older deadwax's unknown path
+  falls through the router to the `StaticFiles` mount, whose 404 FastAPI answers `{"detail": "Not Found"}` (there is
+  no `404.html` in interface/); a proxy's HTML 404 has no detail. So "no words or Not Found" is never the song gone.
+- **`DownloadDatabase` v2**: the migration in one transaction, a version-1 file's rows kept; the trigger takes a
+  song's lyrics by `deleteSong`, by `removeOrigins` (a last origin) and by `removeAll`; `put`'s INSERT OR REPLACE
+  fires no delete trigger (SQLite's recursive_triggers is off), so a song written again keeps its lyrics;
+  `putLyrics`' `WHERE EXISTS` keeps nothing for a song gone; the ETag kept and sent. All tested.
+- **The CI's older Swift**: the new generic calls over multi-statement closures (`query`'s two) say their types; the
+  rest are single expressions or `Void`.
+- **The 0.4 pins** (the xcconfig, check_project.py, ios.yml, test_ios_install.py, the guide, ios/README.md, About's
+  comments), docs/ios.md's P1-P12 and "### Lyrics", and the README's iPhone paragraph, each against the code.
+
+For James: should the follow-again wait count from the finger lifting, as the web's does, or from the lyrics coming to
+rest, as built (P3)? A song with none, reached with lyrics on, swaps to its cover at once while the button's own
+turning on and off fades - fade that swap too? At the largest accessibility sizes the lines grow to the title style's
+largest, leaving a window of a few lines (P7): keep them growing, or cap them? And the web review's own, carried
+over: a synced file with one line of words is answered plain.
+
+Verified: `swift test` (655 tests in 86 suites, and the 93 audio ones in 3); the app built for a device (Debug,
+unsigned, `generic/platform=iOS`) with no Swift warnings - its first run was killed by the system mid-build (this
+Mac's 8 GB) and the second succeeded; check_project.py; the eight ios sims, lyrics.sim and vocabulary.sim; and
+test_source_bytes with the four iOS pytest files (128). Not verified: any of it on a phone, iOS 17 or 18 - how the
+fade looks, that `LitClock`'s observation redraws a paused scrub (SwiftUI's documented observation, not seen), the
+first placement near a song's end; section 6's P1-P12 and section 7 still stand.

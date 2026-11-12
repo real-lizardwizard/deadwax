@@ -7,8 +7,8 @@ import SwiftUI
 ///
 /// - THE LIT LINE is judged from PlayerModel.clock() - the engine's position as heard, a seek on its way its target - in
 ///   a TimelineView ten times a second while the clock runs (`Lyrics.clockRuns`: synced, playing, nothing over Now
-///   Playing, the app active), and redrawn only when it or a break's dots change. Stopped, it is still redrawn on a
-///   seek: clock() reads the player's observed position and seek.
+///   Playing, the app active), and redrawn only when it or a break's dots change - the player read in LitClock's body
+///   alone. Stopped, it is still redrawn on a seek: clock() reads the player's observed position and seek.
 /// - FOLLOWING: the lit line scrolled to `Lyrics.anchor` of the view's height - a spring, or a jump for Reduce Motion.
 ///   The listener's own scroll holds it (a scroll phase of theirs, iOS 18; a drag on iOS 17), and so does VoiceOver's
 ///   focus on a line; `Lyrics.followAgainMs` after the last of them let go it comes back, while the song plays - paused,
@@ -25,7 +25,6 @@ struct LyricsView: View {
     let covered: Bool
 
     @Environment(PlayerModel.self) private var player
-    @Environment(LyricsModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorSchemeContrast) private var contrast
@@ -99,8 +98,8 @@ struct LyricsView: View {
                 if hold.follows(now: Self.nowMs(), playing: player.isPlaying) { follow(proxy, smooth: false) }
             }
             .background {
-                TimelineView(.animation(minimumInterval: 0.1, paused: !runs)) { _ in
-                    LitClock(lit: synced ? Lyrics.litAt(lines, at: player.clock()) : .unlit) { lit = $0 }
+                TimelineView(.animation(minimumInterval: 0.1, paused: !runs)) { context in
+                    LitClock(lines: lines, synced: synced, moment: context.date) { lit = $0 }
                 }
                 .accessibilityHidden(true)
             }
@@ -131,9 +130,6 @@ struct LyricsView: View {
             }
             .onChange(of: focus) { _, line in
                 hold.focus(onLine: line != nil, at: Self.nowMs())
-            }
-            .onChange(of: player.position) {
-                model.ahead()
             }
             .task(id: hold) {
                 // the wait after the last scroll or VoiceOver's leaving: following back once it has run, while playing
@@ -252,15 +248,28 @@ struct LyricsView: View {
     private static func nowMs() -> Double { Monotonic.seconds() * 1000 }
 }
 
-/// The lit lines as the clock last said, handed up when they change.
+/// The clock: the lines lit as the player says now, handed up when they change - and the next song's ask as the
+/// position moves (LyricsModel.ahead, 2.6). The player is read in THIS body, never the lyrics': it is read again at each
+/// of the timeline's moments while the clock runs (`moment`, new each time), and - the clock stopped - whenever what it
+/// reads of the player changes (its position, a seek on its way), so a seek while paused still lights its line. The
+/// lyrics' own body is drawn again only when what is lit changes - not at every half-second tick of the position, as
+/// an `onChange(of: player.position)` there would have it.
 private struct LitClock: View {
-    let lit: Lit
+    let lines: [LyricLine]
+    let synced: Bool
+    /// The timeline's moment: a new one each time it draws, so this body is read again.
+    let moment: Date
     let changed: (Lit) -> Void
 
+    @Environment(PlayerModel.self) private var player
+    @Environment(LyricsModel.self) private var model
+
     var body: some View {
+        let now = synced ? Lyrics.litAt(lines, at: player.clock()) : Lit.unlit
         Color.clear
-            .onAppear { changed(lit) }
-            .onChange(of: lit) { _, new in changed(new) }
+            .onAppear { changed(now) }
+            .onChange(of: now) { _, new in changed(new) }
+            .onChange(of: player.position) { model.ahead() }
     }
 }
 
