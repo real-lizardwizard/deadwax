@@ -15,4 +15,7 @@ patterns. The app is then built to the spec and reviewed against it. notes/ios.m
   (the two settings, what's used, downloading, didn't download, Remove All), offline (how the app knows, the
   banner, opening with no network, plays and queue saves kept), the machinery (the store, the background session,
   the checks, the planner), tests, James's checks and open questions. No server addition; its line numbers are
-  the code's at b4ee591.
+  the code's at b4ee591. Reviewed the same day against Phase 1's screens and Apple's patterns (a second commit:
+  the hero's line on its own, Download over drawn as Normalization is, the banner under each page's bar, the
+  Library never swapping under a finger, the Navidrome gate and a gone album with music on the phone, Info's
+  Plays from).

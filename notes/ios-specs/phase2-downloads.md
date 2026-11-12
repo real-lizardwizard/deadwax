@@ -63,8 +63,13 @@ symbol newer than iOS 17 is used without `if #available`.
   Get, Soulseek. A download to the phone is the same raw stream the person may already play, so it is never gated
   by it: anyone who can play a song can download it.
 - **Files other rounds are working on** (MainTabs.swift and the screens' bottom insets; Up Next's Core,
-  QueueController and UpNextScreen): this spec touches MainTabs by one modifier per tab (section 7.2) and leaves
-  Up Next's files alone (section 4.3).
+  QueueController and UpNextScreen): this spec adds one modifier beside that round's `clearsPlayer()` - in its
+  TabStack and in `appRoutes()` (`ios/App/Shared/Routes.swift:129`), built after it merges (section 7.2) - and
+  leaves Up Next's files alone (section 4.3). New screens (Downloads, Downloaded) take the mini player's room the
+  way that round settles, nothing of their own.
+
+*Reviewed the same day* (a second commit), as a demanding designer would read it against Phase 1's screens, the
+app as built and Apple's patterns: the changes are in place below, and the review's list is in the commit message.
 
 ## 1. Words and marks
 
@@ -78,6 +83,8 @@ symbol newer than iOS 17 is used without `if #available`.
   "Browse" or "everything" (`ui/test/vocabulary.sim.cjs:5-6`). Never "offline mode", "sync", "cache", "MD5" or
   "checksum" for a listener: a check is "checked", and what it checked is said in plain words (6.6). Debug, an
   admin's, names MD5.
+- **"Wi-Fi and cellular"** is James's own name for the choice (binding); the lines under it say **"mobile data"**,
+  as his phone's Settings does (check 2 reads "Settings > Mobile Data"). Open question 21.
 - Errors in a listener's words (CLAUDE.md "Errors in a listener's words"): a failed HTTP request or transport is
   said by Core's ErrorWords, through an `APIFailure` made for the stream's path (`/navidrome/stream/...`, so its
   service is the music server's, `ErrorWords.service(of:)`, ErrorWords.swift:93); only the download's own
@@ -93,37 +100,45 @@ symbol newer than iOS 17 is used without `if #available`.
 | --- | --- | --- | --- | --- |
 | not downloaded (the control) | `arrow.down.circle` | 13.0 | `Palette.accent` (the tint) | Apple Music's download button |
 | waiting | `arrow.down.circle.dotted` | 17.0 | `Palette.quiet` | Apple Music's "waiting" mark; the symbol is the one SF Symbols 5 added for it |
-| downloading | the ring (1.3), a `stop.fill` square at its centre | 13.0 | accent arc on a quiet track | Apple Music's progress ring |
+| downloading | the ring (1.3) - on the control with a `stop.fill` square at its centre, everywhere else the ring alone | 13.0 | accent arc on a quiet track | Apple Music's progress ring |
 | downloaded | `arrow.down.circle.fill` | 13.0 | `Palette.quiet` | Apple Music's grey downloaded mark beside a song |
 | didn't download | `exclamationmark.circle.fill` | 13.0 | `Palette.amberIcon` (new) | deadwax's own: the web's amber is a warning that can be acted on |
 | not on this phone (offline) | the row or tile at `Palette.off` (new), no mark | - | - | iOS's own "dimmed"; the web's `--app-pin-off` |
 | checked (You > Downloads) | `checkmark.circle` + "Checked" | 13.0 | `Palette.held` | the web's green "In your library" badge |
-| offline (the banner) | `wifi.slash` / `icloud.slash` | 13.0 | `Palette.amber` on `Palette.amberFill` | the web's amber badge |
+| offline (the banner) | `wifi.slash` (no network) / `wifi.exclamationmark` (deadwax not answering) | 13.0 | `Palette.amber` on `Palette.amberFill` | the web's amber badge; `wifi.exclamationmark` is the app's own can't-reach mark (`ios/App/Root/UnreachableView.swift:23`) |
 
 Not used, though they fit: `arrow.down.circle.badge.pause` and `.badge.xmark` (iOS 26.0), `.badge.clock` and
 `.badge.checkmark` (iOS 27.2) - newer than the app's iOS 17 target, and one look on every phone is worth more than
 a richer one on James's alone. `network.slash` (iOS 17.0) reads as a broken network, which isn't always so - deadwax
-may be the one not answering.
+may be the one not answering. `icloud.slash` reads as iCloud, which deadwax isn't.
+
+**One place, one meaning.** Wherever a song or an album shows its state - a row, a tile, the hero's line, the
+Library's rows - it is the same slot with the same mark, so a reader learns it once: filled for here, dotted for
+waiting, the ring for on its way, amber for didn't. The stop square is the control's alone: it is the one ring that
+can be tapped, and a square that promised a stop where a tap plays the song would lie.
 
 ### 1.3 The ring
 
 Drawn by the app (SwiftUI's circular `ProgressView` is a spinner on iOS whatever its value): a `Circle` stroked
 `Palette.quiet.opacity(0.35)` for the track, a second trimmed `0...fraction`, stroked `Palette.accent` with round
-caps, rotated -90° so it fills from twelve o'clock, and `stop.fill` at about a third of the diameter in the centre -
-Apple Music's own. Line width 2 pt (toolbar) / 1.5 pt (rows). The fraction moves with `.linear(duration: 0.25)`,
-and not at all with Reduce Motion. Before the first byte (no fraction yet) a quarter arc turns once a second; with
-Reduce Motion the waiting mark stands in for it.
+caps, rotated -90° so it fills from twelve o'clock, and - on the control only (1.2) - `stop.fill` at about a third
+of the diameter in the centre, Apple Music's own. Line width 2 pt (toolbar) / 1.5 pt (rows, tiles). The fraction
+moves with `.linear(duration: 0.25)`, and not at all with Reduce Motion.
+
+The ring is always determinate - nothing turns, so there is nothing for Reduce Motion to stop. A task out with no
+byte yet is `waiting(queued)` and draws the dotted mark (2.1); a transcode, which has no size, fills by its bytes
+over its estimate (8.5), held under 95% until it lands.
 
 ### 1.4 Palette additions (`ios/App/DeadwaxApp.swift:51-72`, each named for its token)
 
 - `amberIcon` - `--dw-amber-icon` `#fbbf24` (`interface/styles/theme.css:513`).
 - `off` - an opacity, `--app-pin-off` `0.45` (`interface/player/app.css:298`: "a pin, or an Edit button, that
   can't be used just now").
-- `track` - `--dw-track` `#121117` (theme.css:491), `border` - `--dw-border` `#2c2a36` (:497), and
+- `barTrack` - `--dw-track` `#121117` (theme.css:491), `barEdge` - `--dw-border` `#2c2a36` (:497), and
   `barFill` - `--dw-bar-purple`, `#b56af5` to `#9333ea` top to bottom (:538): the Requests board's bar,
   `.app-bar` (app.css:1614-1630), 6 pt tall (`--dw-bar`, :539), radius 2 (`--dw-radius-track`, :547) with a 1 pt
   fill radius (:548), a hairline border and the track's inset shade. You > Downloads draws its bars with it, so a
-  download on the phone looks like one on the web.
+  download on the phone looks like one on the web. (Named `bar…`, not `track`: in a music app a track is a song.)
 
 ## 2. A download's state (DeadwaxCore: the rules every screen draws)
 
@@ -133,17 +148,19 @@ Reduce Motion the waiting mark stands in for it.
 | --- | --- | --- |
 | `none` | not asked for | the stream |
 | `waiting(reason)` | asked for; not being fetched now | the stream |
-| `fetching(fraction?)` | a task is running; the fraction is bytes received over bytes expected, nil before the first byte or for a transcode | the stream |
+| `fetching(fraction)` | its first bytes have come; the fraction is bytes received over bytes expected (a transcode's over its estimate, 1.3) | the stream |
 | `done(check)` | on the phone, its length checked | **the phone** |
 | `failed(reason)` | given up on after three tries (8.3) | the stream |
 
-`check` is `unchecked` (a FLAC not yet decoded), `matched` (its decoded sound's MD5 is STREAMINFO's), `bySize`
-(not a FLAC, a FLAC whose MD5 is all zeros, or one over 24 bits - 8.4) or `mismatched` (never kept: deleted and
-fetched again, 8.4).
+`check` is `unchecked` (a FLAC not yet decoded), `matched` (its decoded sound's MD5 is STREAMINFO's) or `bySize`
+(not a FLAC, a FLAC whose MD5 is all zeros, or one over 24 bits - 8.4). A copy whose sound doesn't match is never a
+state: it is deleted and is a try, back to `waiting` (8.4).
 
-Waiting reasons, in the order the planner gives them (8.5): `deadwax` (deadwax can't be reached), `signIn` (a 401:
-the session ended), `wifi`, `lowData`, `room` (the storage limit), `phoneFull` (2 GB of the phone must stay free),
-`queued` (behind the three already fetching).
+Waiting reasons, in the order the planner gives them (8.5): `connection` (no network at all), `deadwax` (the network
+is there, deadwax doesn't answer), `signIn` (a 401: the session ended), `wifi` (Wi-Fi only, on mobile data),
+`hotspot` (Wi-Fi only, on a Wi-Fi that is a phone's hotspot - iOS calls it expensive), `lowData`, `room` (the
+storage limit), `phoneFull` (2 GB of the phone must stay free), `queued` (its task is out and hasn't had a byte yet -
+the session fetches three at a time, 8.3).
 
 ### 2.2 An album (`AlbumDownload.of(songs)`)
 
@@ -159,23 +176,33 @@ From the album's songs as deadwax lists them, in this order:
 
 ### 2.3 The words (DownloadWords, every one tested)
 
-| state | the album's line (hero, 3.2) and the control's VoiceOver value | a song's (row, VoiceOver) |
-| --- | --- | --- |
-| none | (nothing) | (nothing) |
-| partial | "3 of 12 songs downloaded" | - |
-| downloading | "Downloading - 4 of 12 songs" (value: "Downloading, 40 percent") | "Downloading, 40 percent" |
-| waiting `queued` | "Waiting to download" | the same |
-| waiting `wifi` | "Waiting for Wi-Fi" | the same |
-| waiting `lowData` | "Waiting - Low Data Mode is on" | the same |
-| waiting `deadwax` | "Waiting for deadwax" | the same |
-| waiting `signIn` | "Waiting for you to sign in" | the same |
-| waiting `room` | "Waiting for room - the storage limit is reached" | the same |
-| waiting `phoneFull` | "Waiting for space on this phone" | the same |
-| failed | "1 song didn't download" / "2 songs didn't download" | "Didn't download" |
-| downloaded | "Downloaded" | "Downloaded" |
-| offline, not here | (the page's own lines, 3.7) | "Not on this phone" |
+| state | the album's line (hero, 3.2) and the control's VoiceOver value | a song's (row, VoiceOver) | a tile's line (Downloaded, 5.1) |
+| --- | --- | --- | --- |
+| none | (nothing) | (nothing) | - |
+| partial | "3 of 12 songs downloaded" | - | "3 of 12 songs" |
+| downloading | "Downloading - 4 of 12 songs" (value: "Downloading, 40 percent") | "Downloading, 40 percent" | "Downloading" |
+| waiting `queued` | "Waiting to download" | the same | "Waiting" |
+| waiting `connection` | "Waiting for a connection" | the same | "Waiting" |
+| waiting `deadwax` | "Waiting for deadwax" | the same | "Waiting" |
+| waiting `signIn` | "Waiting for you to sign in" | the same | "Waiting" |
+| waiting `wifi` | "Waiting for Wi-Fi" | the same | "Waiting" |
+| waiting `hotspot` | "Waiting - this Wi-Fi is a hotspot" | the same | "Waiting" |
+| waiting `lowData` | "Waiting - Low Data Mode is on" | the same | "Waiting" |
+| waiting `room` | "Waiting for room - the storage limit is reached" | the same | "Waiting" |
+| waiting `phoneFull` | "Waiting for space on this phone" | the same | "Waiting" |
+| failed | "1 song didn't download" / "2 songs didn't download" | "Didn't download" | "Didn't download" (amber) |
+| downloaded | "Downloaded" | "Downloaded" | "12 songs" |
+| offline, not here | (the page's own line, 3.7) | "Not on this phone" | (dimmed, "Not on this phone" spoken) |
 
-"1 song" / "2 songs" as `AlbumPageLines.footer` counts them (`Format.swift:80-85`).
+"1 song" / "2 songs" as `AlbumPageLines.footer` counts them (`Format.swift:80-85`). A tile has one short line
+(lineLimit 1 at a tile's width); its VoiceOver words are the album's line in full.
+
+Two more lines, each the page's (3.7):
+
+- an album deadwax no longer has, with songs of it on this phone: **"This album isn't in the collection any more -
+  the songs on this phone still play."**;
+- an album not on this phone, opened while deadwax can't be reached: **"This album isn't on this phone - it plays
+  once deadwax is back."**
 
 ### 2.4 Why a song didn't download
 
@@ -193,8 +220,8 @@ Said in the row's ••• (3.4), in You > Downloads (6.5), and as the reason a
   - iOS couldn't open or decode it: **"This phone couldn't read the copy."** (as ErrorWords' media words say "This
     device couldn't play this song's audio", ErrorWords.swift:466 - "this phone" being the app's own word)
   - the file couldn't be written: **"This phone couldn't save it."**
-- 401 and the network gone are never failures: they are `signIn` and `deadwax` waits, and carry on by themselves.
-  A full phone is `phoneFull`.
+- 401 and the network gone are never failures: they are `signIn`, `connection` and `deadwax` waits, and carry on
+  by themselves. A full phone is `phoneFull`.
 
 ### 2.5 What each menu offers (`DownloadChoices.for(songs)`)
 
@@ -220,7 +247,7 @@ state (2.2):
 | state | drawn | a tap |
 | --- | --- | --- |
 | none, partial | `arrow.down.circle`, accent | **downloads at once** - every song not on the phone, as the album |
-| waiting | `arrow.down.circle.dotted`, quiet | opens a menu: its title the album's line ("Waiting for Wi-Fi"), and "Remove Download" |
+| waiting | `arrow.down.circle.dotted`, quiet | opens a menu: its title the album's line ("Waiting for Wi-Fi") - for a wait a setting causes, a second line naming it ("Download over is Wi-Fi only - in You > Downloads.", "The storage limit is 20 GB - in You > Downloads.") - and "Remove Download" |
 | downloading | the ring | a menu: "Downloading - 4 of 12 songs", and "Remove Download" |
 | failed | `exclamationmark.circle.fill`, amber | a menu: "2 songs didn't download", the first reason under it, "Download Again", "Remove Download" |
 | downloaded | `arrow.down.circle.fill`, quiet | a menu: "Downloaded · 412 MB", and "Remove Download" |
@@ -229,7 +256,10 @@ state (2.2):
   SwiftUI `Menu` from the control itself (the rule Phase 1 learned, notes/ios.md "The ••• menus open from the
   •••"), `menuOrder(.fixed)`, whose title says in words what the mark only shows. Apple Music stops a download at a
   tap on its ring; here the ring's tap says how far it has got and offers Remove, so a tap meant for the ••• beside
-  it never throws a download away (Open question 5).
+  it never throws a download away (Open question 5). The menu's title is one `Section` header of one or two lines
+  (a newline between them); iOS wraps a menu's title, which check 7 sees.
+- A wait a setting causes says where the setting is, in the menu, rather than offering to get round it ("download
+  over mobile data this time"): one place for each setting, and the words point to it.
 - Disabled, as the ••• is, until the album's songs are in (`model.album != nil`): a download needs them. A
   downloaded album's page has them at once from the phone (3.7), so its control is live at once.
 - **VoiceOver**: label "Download" in every state; value the album's line (2.3), "Downloading, 40 percent" while
@@ -242,24 +272,31 @@ state (2.2):
 
 ### 3.2 The hero's line
 
-Under the badge (AlbumHero.swift:48-51), in the badge row: the album's line (2.3) beside "In your library" /
-"In the collection", drawn in the "In the collection" style (caption, semibold, `Palette.quiet`, no box) with the
+A line of its own **directly under the badge** (AlbumHero.swift:48-51), centred, above Play and Shuffle: the
+album's line (2.3) drawn in the "In the collection" style (caption, semibold, `Palette.quiet`, no box) with the
 state's mark in front at caption size - `arrow.down.circle.fill` for downloaded and partial, the dotted mark for
 waiting, a 9 pt ring for downloading, amber `exclamationmark.circle.fill` (and amber words) for failed. Nothing at
-all in `none`, so an album never downloaded looks exactly as in Phase 1.
+all in `none` - no space held - so an album never downloaded looks exactly as in Phase 1.
 
-- The two sit in one `ViewThatFits`: side by side, else one above the other (at the largest text sizes, or a long
-  "Waiting for room - ..."). The held badge keeps its place unseen while pending (as now), so the download line
-  never moves when the badge appears.
+- **Its own line, not beside the badge.** Side by side, centred, the badge would slide sideways each time the
+  count changed ("4 of 12" to "10 of 12"), and the pair would jump between one row and two as a wait's words grew
+  ("Waiting for room - …") - the hero's own rule is that nothing slides or flips (the badge's place is held unseen
+  for it). Alone on its line it only re-centres itself, and wraps at the largest sizes (`fixedSize(horizontal:
+  false, vertical: true)`).
+- It appears with a state, moving Play and Shuffle down one caption line. That happens only from the person's own
+  tap at the top of the page (the control, the bar's •••, a row's •••) or as the page draws - `DownloadModel` holds
+  every state in memory from launch, so a page never learns its state late and never jumps after it is drawn.
+  The move is animated (`.default`), not with Reduce Motion.
 - The line is the words the control's mark stands for: a reader who doesn't know a dotted circle reads "Waiting for
   Wi-Fi". It is the hero's only addition: no third button beside Play and Shuffle.
-- VoiceOver reads it in the hero's order. It is not a button; the control is.
+- VoiceOver reads it in the hero's order, after the badge. It is not a button; the control is.
 
 ### 3.3 The rows
 
 TrackRow (TrackRow.swift:22-63) gains a **state slot** between the title and the time, inside the row's play
-button: the song's mark at `.caption` (`@ScaledMetric(relativeTo: .caption)` 13 pt for the ring), `Palette.quiet`
-(amber for failed).
+button: the song's mark at `.caption` (`@ScaledMetric(relativeTo: .caption)` 13 pt for the ring - the ring alone,
+no stop square: the row's tap plays the song), `Palette.quiet` (amber for failed), aligned to the title's first
+baseline (`alignmentGuide(.firstTextBaseline)`), as the row's HStack is (TrackRow.swift:25).
 
 - The slot is drawn on every row of an album where **any** song has a state, and on none where none does, so the
   times stay in one column and an album never downloaded is Phase 1's page exactly.
@@ -288,7 +325,10 @@ Roads                        Dummy
   "Remove Download".
 - Every item gets its symbol (Open question 17): Play Next `text.line.first.and.arrowtriangle.forward`, Play Last
   `text.line.last.and.arrowtriangle.forward` (iOS 16.0 each), the download items as 2.5 says - Apple's menus carry
-  one on every item, and a menu where two items had one and two hadn't would look unfinished.
+  one on every item, and a menu where two items had one and two hadn't would look unfinished. The same holds for
+  Now Playing's ••• (4.1): Info `info.circle`, Go to album `square.stack` (the app's own albums mark - the Library
+  tab's and All albums', MainTabs.swift:19, AlbumsScreen.swift:255), iOS 13.0 each. `Button(_:systemImage:)`, so
+  the symbol is the menu's own trailing image and VoiceOver reads the words alone.
 - Each item is carried out in its tap, through `DownloadModel` (8.9). A download never starts the music, so the
   gesture rule's allowlist (`ui/test/app-rules.sim.cjs`'s, CLAUDE.md "The player") is untouched.
 - The bar's ••• is dimmed until the songs are in, as now.
@@ -322,9 +362,18 @@ storage limit spends.
     badge stays, from the kept album's `starred`;
   - the footer's second line says what is here, as online: **"3 of 12 songs on this phone · 92 MB"**;
   - a pull to refresh asks deadwax at once (7.1's probe) and changes nothing if it isn't there; the banner says why.
-- An album not on the phone, opened offline (Now Playing's Go to album, a queue made before): the hero from what
-  opened it, and ErrorNote's offline words ("Can't connect to deadwax." / "Check your connection, then try
-  again.") where the songs would be, as Phase 1 does.
+- **An album not on the phone, opened while deadwax can't be reached** (Now Playing's Go to album, Info's album
+  card, a queue made before): the hero from what opened it, and where the songs would be, quiet, **"This album isn't
+  on this phone - it plays once deadwax is back."** Nothing was asked (7.1: nothing that needs deadwax is asked while
+  it can't be reached), so there is no failure to say - this is a state, in DownloadWords, not ErrorNote's offline
+  words, which stay for an ask that went out and failed (online a moment ago, Phase 1's case). The control and the
+  ••• are dimmed (no songs in hand). It is drawn again from deadwax as soon as the banner goes.
+- **An album deadwax no longer has** (404, or Navidrome's `{}` - AlbumModel.swift:152-162), with songs of it on
+  this phone: the page keeps the kept answer - hero, rows, Play, the songs on the phone - and in place of Phase 1's
+  "This album isn't here any more" (`ErrorWords.albumGone`), quiet, under the hero, **"This album isn't in the
+  collection any more - the songs on this phone still play."** Songs not on the phone are dimmed as offline; the
+  control offers Remove Download (and Download is gone: there is nothing to fetch). Nothing is deleted by itself: it
+  was downloaded by hand (Choice 19). With nothing of it on the phone, Phase 1's page, unchanged.
 
 ## 4. Now Playing, and Up Next
 
@@ -335,7 +384,10 @@ NowPlayingMenu (`ios/App/Player/NowPlayingMenu.swift:15-32`) gains a second sect
 - for the song playing, 2.5's one-song items ("Download", "Remove Download", "Download Again");
 - **"Download Up Next"** - every song from the one playing to the end of the queue that is `none` or `failed`, each
   asked for as a song (a hand download, 8.2) - shown only when there are at least two such songs, so it never
-  duplicates "Download".
+  duplicates "Download". **Not offered during a library's shuffle** (`player.paged`, NowPlayingView.swift:118): that
+  queue is your whole library in pages, and keeping your library on the phone is Phase 3's own setting, with its
+  limit and its order - not a menu item that would start tens of thousands of downloads.
+- Every item carries its symbol (3.4): Info `info.circle`, Go to album `square.stack`, the download items 2.5's.
 - The button's name becomes `NowPlayingWords.more` with ", download" (`Info.swift:420`, "More: info, go to album,
   download").
 
@@ -344,8 +396,18 @@ NowPlayingMenu (`ios/App/Player/NowPlayingMenu.swift:15-32`) gains a second sect
 Now Playing has no mark to change, so these are said: **"Downloading: Roads"** (as "Playing next: Roads" is),
 **"Downloading 23 songs from Up Next"** ("1 song"), **"Removed from this phone: Roads"**. Now Playing is a
 `fullScreenCover` over the tabs (MainTabs.swift:30), so the notice capsule behind it can't be seen: NowPlayingView
-draws `player.notice` itself, the same `Notice` view, just above its footer (NowPlayingView.swift:158), for its 5 s.
-Announced as every notice is.
+draws `player.notice` itself, the same `Notice` view, for its 5 s - **in its top row, centred, as an overlay** on
+the chevron's row (NowPlayingView.swift:43-53), where nothing else is. Not above the footer: the footer sits 12 pt
+under the transport (:84-87), so a capsule there would either push Play and Next up under a finger or cover them.
+In the top row it moves nothing and covers nothing but the space beside the chevron (at the largest text sizes it
+may reach over the cover's top margin, for its 5 s). It comes in with opacity alone.
+
+- **Announced once, by whoever says it.** Two capsules now draw the one `player.notice` - the tabs' (PlayerInset,
+  MainTabs.swift:46-49, behind the cover) and Now Playing's - and each `Notice` announces as it appears
+  (Notice.swift:19-20), so VoiceOver would hear it twice; and whether a view under a full-screen cover still
+  "appears" isn't known here. So the announcement moves out of the view into `PlayerModel.say`
+  (PlayerModel.swift:259), once per notice said, and `Notice` only draws. Nothing changes for a notice over the
+  mini player.
 
 ### 4.3 Up Next
 
@@ -353,6 +415,21 @@ No download control in Up Next (it is about order, and its files are another rou
 Playing's "Download Up Next". Its rows' marks and their dimming offline wait for that round to merge - one small
 change to UpNextScreen's row, drawn from the same `DownloadModel`, and Open question 11. Until then, offline, the
 skip notice (7.3) says what the rows don't.
+
+### 4.4 Info - where the song plays from
+
+The plan has a downloaded song "shown as 'not yet checked'" until its check is done, and its check 1 that "every
+song shows 'checked'": the album page draws nothing per row for that (3.3), so the song's own place to say it is
+Info, the sheet that already says how it sounds.
+
+- **About > Sound** (InfoView.swift:142-148) gains a fourth row under Format, Gapless and Normalization: **"Plays
+  from"** - **"This phone - checked"** (`matched`, or an MP3's `bySize`), **"This phone - checked by size"** (a
+  FLAC with no fingerprint), **"This phone - not checked yet"** (`unchecked`), or **"Streamed from deadwax"**. With
+  Debug's "Stream even when downloaded" on, the last - the row says what is heard, not what is kept.
+- It is drawn by the App from DownloadWords, **after** `LevelWords.soundRows`' three, so those stay the web's
+  (aboutSound.ts's rows, held to its vectors) and the phone's own row is apart from them.
+- **Info > Debug** (admins), "Sent to this device", gains **"On this phone"**: the check and STREAMINFO's facts in
+  Debug's words ("matched - MD5 4f1c…e2, 24-bit 96 kHz, 2 ch"; "not kept" for a song not on the phone).
 
 ## 5. The Library
 
@@ -369,11 +446,18 @@ albums"), the headers, the index at 50+ albums, tiles or rows. Its albums are th
   as it means added to your library on Your albums and to the collection on All albums (`AddedBy`, Shelves.swift:38,
   its groups :212; `AlbumScope.addedBy`, LibraryModels.swift:16). `AddedBy` gains `.phone`.
 - An album in it is downloaded, partly downloaded, or on its way:
-  - tiles and rows carry the album's mark after the artist line (5.3);
-  - a partial album's tile has a third line, **"3 of 12 songs"**, footnote, quiet;
-  - an album downloading has the ring (9 pt) where the New mark would be, at the cover's top left.
-- Its empty state, `ContentUnavailableView` (iOS 17): **"Nothing downloaded yet"**, `arrow.down.circle`, and
-  **"Download an album from its page, and it plays here even when deadwax can't be reached."**
+  - tiles and rows carry the album's mark in the one slot at the end of the artist line (5.3) - the filled mark,
+    the dotted mark, the ring (9 pt, no stop square) or the amber mark - never on the cover, whose top left is the
+    New mark's (LibraryTiles.swift:16-18);
+  - **every** tile and row here has a third line, footnote, quiet: the tile's line of 2.3 - "12 songs", "3 of 12
+    songs", "Downloading", "Waiting", amber "Didn't download". Every tile, not only the partial ones, so the grid's
+    rows keep one height (LazyVGrid sizes a row by its tallest tile, AlbumsScreen.swift:148-150) - and on the one
+    list that is about this phone, the state in words is worth its line.
+- **Empty** (offline with nothing downloaded, or the last album removed while it shows): the Library's own empty
+  note, as Your albums' is (EmptyLibraryNote, AlbumsScreen.swift:287-301) - **"Nothing downloaded yet."**, and
+  quiet under it **"Download an album from its page, and it plays here even when deadwax can't be reached."** Left
+  aligned in the list's flow, under the title - not a `ContentUnavailableView`: the app has none, and an empty list
+  here reads as Your albums' does.
 - Find with no match: LibraryWords' own "No albums match “…”.".
 - Core: the list is `AlbumList.downloaded` beside `.scope(AlbumScope)` - **`AlbumScope` itself is left alone**,
   since it names kept files (KeptAlbumIndex.swift:59-62) and Downloaded is never asked of deadwax.
@@ -393,26 +477,51 @@ On this phone
 
 - Shown once anything is downloaded, on its way, or failed - never as an empty row for someone who only streams.
 - The count is albums, `.monospacedDigit()`, quiet. Hidden while finding, as All music is.
+- Drawn as All music's row is (the header in `.title3.weight(.semibold)`, the accent mark, the chevron, the divider),
+  so the two groups read as one list of places - as Apple Music's Library lists Downloaded among its own.
+- The same row sits under the Navidrome gate's buttons when the gate is closed while deadwax answers (5.4).
 
 ### 5.3 Marks on every Albums screen
 
-LibraryTile and LibraryRow (`ios/App/Library/LibraryTiles.swift:6-80`): an album with any song on the phone carries
-`arrow.down.circle.fill` at `.caption2`, quiet, at the end of its artist line - where Apple Music puts it in its
-Library's grid. One mark for downloaded and partly downloaded; their difference is in the words. VoiceOver: the
-tile's words (`LibraryTile.spoken`, :38) gain **"Downloaded"** or **"Partly downloaded"** after the artist, before
-"New in your library".
+LibraryTile and LibraryRow (`ios/App/Library/LibraryTiles.swift:6-80`): an album with a state carries its mark at
+`.caption2`, quiet (amber for failed), at the end of its artist line - where Apple Music puts it in its Library's
+grid: `arrow.down.circle.fill` for downloaded and partly downloaded (one mark; their difference is in the words),
+the dotted mark while waiting, the ring while downloading, amber `exclamationmark.circle.fill` for didn't.
+
+- The mark sits **outside** the artist's `Text`, in an `HStack(spacing: 4)` with it, `fixedSize`, so a long artist
+  truncates before the mark rather than taking it with it (the tile's lines are `lineLimit(1)`, :27).
+- VoiceOver: the tile's words (`LibraryTile.spoken`, :38) gain the state after the artist, before "New in your
+  library": **"Downloaded"**, **"Partly downloaded"**, **"Downloading"**, **"Waiting to download"**, **"Didn't
+  download"** - and, dimmed offline, **"Not on this phone"**.
 
 ### 5.4 Offline
 
 - **The root shows Downloaded** in place of Your albums (or Albums): the plan's "Downloaded filter on by itself".
   LibraryView already swaps its root by scope with its own scroll and Find (`.id(library.scope)`,
-  LibraryView.swift:45-47), so this is one more case of it. It swaps back when deadwax answers again. Both moves
-  follow Reachability's own rule (7.1), which changes no more often than its probe, so a WireGuard blip doesn't
-  flip the list under a finger.
-- The root's top group then holds one row: **"Your albums"** (**"All albums"** without a library of your own), with
-  **"Only downloaded albums play until deadwax is back."** under it, footnote, quiet. It opens the kept list
-  (Phase 1's, drawn from disk, notes/ios.md "The Library (p1/app-library)") with every album not on the phone at
-  `Palette.off`, disabled (VoiceOver "dimmed", and **"Not on this phone"** in its words).
+  LibraryView.swift:45-47), so this is one more case of it.
+- **The root never swaps under a finger** (Core's `LibraryRoot.shown`, pure): it changes only while the root isn't
+  on screen - another tab chosen, a page pushed over it, the app in the background - and the app opening while
+  deadwax can't be reached starts on Downloaded. While the root is on screen when deadwax goes away, it stays the
+  list it was, with every album not on the phone dimmed (the next bullet's look), and the banner comes; it becomes
+  Downloaded the next time it is shown. Coming back is the same rule the other way: Downloaded stays until the
+  root is next shown, its top row (below) then reading plainly **"Your albums"**, so one tap takes you there. And
+  Reachability changes no more often than its probe (7.1), so a WireGuard blip moves nothing at all.
+- The root's top group, while it is Downloaded, holds one row: **"Your albums"** (**"All albums"** without a
+  library of your own), with **"Only downloaded albums play until deadwax is back."** under it, footnote, quiet,
+  while deadwax can't be reached. It opens the kept list (Phase 1's, drawn from disk, notes/ios.md "The Library
+  (p1/app-library)") with every album not on the phone at `Palette.off`, disabled (VoiceOver "dimmed", and **"Not on
+  this phone"** in its words). A partly downloaded album isn't dimmed: some of it plays.
+- **"Couldn't update this list - showing it as it was."** (RefreshProblemNote, AlbumsScreen.swift:60-62,303-320) is
+  not drawn while deadwax can't be reached: the banner says it once for every screen, and a box with its own Try
+  again on each list would say it twice. It is drawn as now for a failure while deadwax answers.
+- **The Navidrome gate** (LibraryView.swift:43-55, NavidromeGate): a check that fails because deadwax didn't answer
+  (`Checked.offline`) closes the Library today - "Your music isn't available right now", with no way to what is on
+  the phone. So:
+  - while deadwax can't be reached the gate isn't consulted - the root is the list above - and its check runs
+    again when deadwax answers;
+  - when deadwax answers but its Navidrome doesn't (the gate closed, online), the gate's screen gains the Downloaded
+    row (5.2) under its buttons, whenever anything is on the phone: the songs on the phone play from the phone, and
+    Navidrome being down is no reason to hide them.
 - Their covers: a downloaded album's from the phone (8.8); any other's only if the in-memory cover cache still has
   it, else the empty square (Open question 13).
 
@@ -425,12 +534,18 @@ YouView (`ios/App/You/YouView.swift:34-39`) gains a section between Playback and
 all when none), and a footer only while something is happening: **"Downloading - 6 songs to go"**, the first wait
 ("Waiting for Wi-Fi"), or, amber, **"2 songs didn't download"**. Kept to one line, so You stays calm.
 
+You > Account's footnote (`DeadwaxCore/SignInRules.swift:195`, screens.md 3's "Signing out ends this device's
+session and stops what's playing.") gains, when anything is on the phone, **" Your downloads stay on this phone
+for when you sign in again."** - Sign out is where someone wonders, and the Downloads screen's own footer (6.2) is a
+screen away.
+
 ### 6.2 The screen, top to bottom
 
 An inset-grouped `List`, title **"Downloads"**:
 
-1. **What's used** (6.3) - the bar and its words.
-2. **The two settings** (6.4), each with what's used now under it.
+1. **Storage** (6.3) - what's used, the bar, and the **Storage limit** under it: the limit is shown with what's
+   used now by sitting beside it.
+2. **Download over** (6.4) - its two choices, with the network in use now under them.
 3. **Downloading** - only while something waits or fetches (6.5).
 4. **Didn't download** - only when something failed (6.5).
 5. **Downloaded** - every album with a song on the phone, largest first (6.6).
@@ -438,62 +553,88 @@ An inset-grouped `List`, title **"Downloads"**:
 7. The screen's last footer: **"Closing deadwax from the app switcher stops downloads until you open it again;
    locking the phone doesn't. Downloads stay on this phone when you sign out."**
 
-With nothing downloaded, waiting or failed, 3-6 give way to `ContentUnavailableView`: **"Nothing downloaded yet"**,
-`arrow.down.circle`, **"Download an album from its page, and it plays here even when deadwax can't be
-reached."** The settings stay above it: they are chosen before the first download.
+With nothing downloaded, waiting or failed, 3-6 give way to one section, **Downloaded**, holding one quiet row:
+**"Nothing downloaded yet."** and under it **"Download an album from its page, and it plays here even when deadwax
+can't be reached."** - the Library's own empty words (5.1), drawn as a list row is, not a `ContentUnavailableView`
+(the app has none; its empty states are lines, AlbumsScreen.swift:287-335). The settings stay above it: they are
+chosen before the first download. The last footer stays too.
 
-### 6.3 What's used
+**When the store can't be read** (the database won't open: a full disk at its migration, a damaged file): downloads
+are off for this launch, nothing is deleted, and the screen holds, under Storage, **"This phone couldn't read its
+downloads - close deadwax from the app switcher and open it again."** - for `seesDetail` with SQLite's own words
+under "For whoever runs deadwax" (ErrorNote's split). The You row's value is "…" and its footer says the same in
+amber. What was downloaded plays from the stream meanwhile.
 
-One row, drawn as iOS's own iPhone Storage draws a total:
+### 6.3 Storage - what's used, and the limit
 
-- **"2.1 GB"** in `.title2.bold()`, then **"of 20 GB"** in quiet (with No limit: **"downloaded"**).
+The section's first row, drawn as iOS's own iPhone Storage draws a total:
+
+- **"2.1 GB"** in `.title2.bold()` (as You's own headline, YouView.swift:59), then **"of 20 GB"** in quiet (with No
+  limit: **"downloaded"**) - one `Text`, so at the largest sizes it wraps as a sentence.
 - The bar (1.4's, full width): the fill is downloads over the limit; with No limit, over the downloads plus the
   phone's free space.
 - **"12 albums · 148 songs · 41.2 GB free on this phone"**, footnote, quiet.
 - Over the limit (the limit lowered below what's here): the fill is amber and full, and the line, amber: **"More
   than the 10 GB limit - nothing is removed for it, but new downloads wait for room."**
+- Nothing here yet: **"Nothing downloaded yet"** in its place (headline), the bar empty, and the free-space line.
 - VoiceOver: one element, label "Downloads", value "2.1 GB of 20 GB used, 41.2 GB free on this phone".
 
 "Used" is the songs' bytes and their covers', as the planner counts them (8.5).
 
-### 6.4 The two settings (binding)
+The second row, **Storage limit** (binding): a `Picker` in the menu style (a grouped list's default, as iOS's own
+Settings draws a choice of many) - **"5 GB"**, **"10 GB"**, **"20 GB"** (the default), **"50 GB"**, **"100 GB"**,
+**"No limit"** - its choice on the right. What's used now is the row above it, so the row needs no line of its own
+(two lines saying "2.1 GB" one above the other would be one too many).
 
-Each is a `Picker` in `.menu` style - the choice on the right, a menu from it - with what's used now as a second line
-under the label (James's "shown with what's used now"):
+- With other accounts' downloads on this phone (8.1), a third row: **"Other accounts on this phone"**, its value
+  their bytes ("1.2 GB"), and a borderless **"Remove"**, which asks first (its `confirmationDialog` from the button,
+  as Remove All's): **"Remove other accounts' downloads?"** / **"1.2 GB of music downloaded by other accounts goes
+  from this phone. They can download it again when they sign in."** / **"Remove"** (destructive). It deletes
+  someone else's, so it asks.
+- The section's footer: **"The storage limit is what downloads may take - songs kept from streaming (up to 2 GB) are
+  apart from it."**
 
-**Download over** - **"Wi-Fi only"** (the default) / **"Wi-Fi and cellular"**. Its line, from NWPathMonitor (7.1):
+### 6.4 Download over (binding)
+
+Drawn **as Normalization is** (PlaybackSection.swift:25-65, You's one other setting): a section headed **"Download
+over"**, one row per choice - its name, its note under it in footnote quiet, a checkmark on the chosen one in the
+accent - a radio group for VoiceOver (each choice's name, "selected", its note as the hint). Two choices whose
+difference needs saying are read best with both in view, as iOS's Photos settings show their two; a menu would hide
+the second.
+
+- **"Wi-Fi only"** (the default) - **"Downloads use Wi-Fi alone - never mobile data, a hotspot or Low Data Mode."**
+- **"Wi-Fi and cellular"** - **"Downloads use mobile data too, whenever there's no Wi-Fi."**
+
+The section's footer: first **what's used now** (James's binding), from NWPathMonitor (7.1) - amber while
+something waits for it - then **"These are kept on this phone."** (as `YouWords.kept` is, Normalization's footer):
 
 | now | Wi-Fi only | Wi-Fi and cellular |
 | --- | --- | --- |
 | on Wi-Fi | "On Wi-Fi now." | "On Wi-Fi now." |
-| on mobile data | **"On mobile data now - downloads wait for Wi-Fi."** (amber while something waits) | "On mobile data now - downloads use it." |
-| on a phone's hotspot | "On a hotspot now - downloads wait for Wi-Fi." (amber while waiting) | "On a hotspot now - downloads use it." |
+| on mobile data | **"On mobile data now - downloads wait for Wi-Fi."** | "On mobile data now - downloads use it." |
+| on a phone's hotspot | "On a hotspot now - downloads wait until you're off it." | "On a hotspot now - downloads use it." |
 | Low Data Mode | "Low Data Mode is on - downloads wait until it's off." | "Low Data Mode is on - downloads use it." |
 | no network | "No connection now." | "No connection now." |
 
-**Storage limit** - **"5 GB"**, **"10 GB"**, **"20 GB"** (the default), **"50 GB"**, **"100 GB"**, **"No limit"**.
-Its line: **"2.1 GB used · 17.9 GB left"**; with No limit **"2.1 GB used"**; over the limit, amber, **"17.2 GB
-used - over the limit"**.
-
-The section's footer: **"Wi-Fi only also waits out a hotspot and Low Data Mode. The storage limit is what downloads
-may take - songs kept from streaming (up to 2 GB) are apart from it. These are kept on this phone."**
-
-- Kept per device in UserDefaults (`downloadOver`: `wifi` | `any`; `storageLimit`: `5` | `10` | `20` | `50` |
-  `100` | `none`), as Normalization is. GB here is 1,000,000,000 bytes, as iOS's Storage counts them (and as
-  StreamCache's limit is, StreamCache.swift:22).
+- Both settings are kept per device in UserDefaults (`downloadOver`: `wifi` | `any`; `storageLimit`: `5` | `10` |
+  `20` | `50` | `100` | `none`), as Normalization is. GB here is 1,000,000,000 bytes, as iOS's Storage counts them
+  (and as StreamCache's limit is, StreamCache.swift:22).
 - A change applies at once: tasks waiting or running are made again under it (8.3), and the planner runs (8.5).
   Raising the limit starts what waited for room; lowering it removes nothing (Choice 19: hand downloads are never
-  evicted) - it says what doesn't fit.
-- VoiceOver: each picker reads its label, its choice, then the line as its hint.
+  evicted) - it says what doesn't fit (6.3's amber line).
+- VoiceOver: Storage limit reads "Storage limit, 20 GB, pop-up button" with the usage row read just before it;
+  Download over's choices as Normalization's, and the footer's line after them.
 
 ### 6.5 Downloading, and Didn't download
 
 **Downloading** (header), a row per album with something asked for, in the order asked:
 
 - the cover (44 pt, `@ScaledMetric`, from the phone or at 128), the album, the artist;
-- **"4 of 12 songs"** (of the songs of it asked for - "1 of 1 song" for a song downloaded alone), or the wait's
-  words in place of it ("Waiting for Wi-Fi");
+- **"4 of 12 songs"** - the album page's own count (2.3), of the songs of it asked for - or the wait's words in
+  place of it ("Waiting for Wi-Fi"); when all that is asked of the album is one song, **the song's title** instead
+  ("Roads") - never "1 of 1 song";
 - while fetching, the bar (1.4) under it, the album's fraction;
+- a tap opens the album's page, as a Downloaded row's does (6.6);
 - a swipe: **"Remove"** (destructive, `trash`) - the album's Remove Download; VoiceOver has it as an action.
 - Footer, when it applies: all waiting for Wi-Fi -> **"Downloads wait for Wi-Fi - Download over is set to Wi-Fi
   only."**; after a force quit -> **"Downloads stopped when deadwax was closed from the app switcher, and carried on
@@ -502,11 +643,12 @@ may take - songs kept from streaming (up to 2 GB) are apart from it. These are k
 **Didn't download** (header), a row per album with failed songs:
 
 - the cover, the album, and amber with its mark: **"2 songs didn't download"**; under it the first reason (2.4)
-  and its advice, quiet; for `seesDetail` the raw words (status, the transport's code) in the data face,
-  selectable - ErrorNote's own split (`ios/App/Shared/ErrorNote.swift`);
+  and its advice, quiet; for `seesDetail` the raw words (status, the transport's code) under "For whoever runs
+  deadwax" - ErrorNote itself (`ios/App/Shared/ErrorNote.swift`), so the split is the app's one;
 - a trailing **"Try again"** (borderless): its songs asked for afresh, tries from 0;
 - a swipe: **"Remove"** - its songs no longer asked for;
-- with more than one row, the section's footer holds **"Try all again"**.
+- with more than one row, a last row of its own, **"Try all again"** (accent, leading) - a row, not a button in the
+  footer: a footer is read as a note, and VoiceOver reaches a row in the list's order.
 
 ### 6.6 Downloaded
 
@@ -518,7 +660,9 @@ Library's Downloaded (5.1). Each row:
 - **"12 songs · 412 MB"**, or **"3 of 12 songs · 92 MB"**;
 - trailing, the album's check: **"Checked"** with `checkmark.circle`, `Palette.held`, when every song is `matched`
   or checked by size where that is all a file allows (an MP3); **"Checked by size"**, quiet, when a FLAC carries no
-  sound fingerprint (8.4); **"Checking…"**, quiet, while any is `unchecked`;
+  sound fingerprint (8.4); **"Checking…"**, quiet, while any is `unchecked`. At accessibility sizes it moves under
+  the size line, leading (`typeSize.isAccessibilitySize`, as TrackRow reads it), so the title never shares a line
+  with it;
 - a tap opens the album's page (pushed on You's stack, `navigation.open(.album(...))`); a swipe: **"Remove"**.
 - The section's footer: **"Each song is checked once it's here: its size against deadwax's file, and a FLAC's sound
   against the fingerprint it carries. A song plays before its check is done."**
@@ -544,10 +688,10 @@ the menu, then the item - stand in for one. Remove All is the one that can cost 
 
 - Rows keep the cover at the leading edge and let every line wrap at accessibility sizes (no `lineLimit` there),
   as TrackRow does; the bar stays under the text.
-- Each album row is one element: "Dummy, Portishead, 12 songs, 412 MB, Checked", with Remove (and Try again) as
-  actions.
-- The settings rows read their line as a hint, so a VoiceOver user hears "Download over, Wi-Fi only, On mobile data
-  now - downloads wait for Wi-Fi."
+- Each album row is one element: "Dummy, Portishead, 12 songs, 412 MB, Checked"; a Downloading row "Dummy,
+  Portishead, 4 of 12 songs, 40 percent" (`.updatesFrequently`); with Remove (and Try again) as actions.
+- Download over's choices read as Normalization's do: "Wi-Fi only, selected", its note as the hint; the footer's
+  "On mobile data now - downloads wait for Wi-Fi." after them.
 
 ### 6.9 Debug (an admin's)
 
@@ -578,17 +722,30 @@ charging"); and **"Stream even when downloaded"** - Phase 0's Streamed/Downloade
 
 ### 7.2 The banner
 
-A slim strip **at the top**, above each tab's navigation bar: `.safeAreaInset(edge: .top)` on each tab's
-NavigationStack in MainTabs (one modifier each, MainTabs.swift:14-28), drawing `OfflineBanner`.
+A slim strip **at the top of each page, just under its navigation bar**, pinned there as the page scrolls:
+`OfflineBanner`, applied by one modifier, `showsOfflineBanner()` - a `.safeAreaInset(edge: .top, spacing: 0)` on
+**the page's own content** - beside the inset round's `clearsPlayer()`, in the same two places: TabStack's roots and
+`appRoutes()` (Routes.swift:129), so every page has it, root or pushed.
 
-- `Palette.amberFill` with an `amberEdge` hairline at its foot, `Palette.amber` words, footnote semibold, one line
-  (two at the largest sizes, `dynamicTypeSize(...accessibility2)`), 6 pt above and below:
+- **Never on the NavigationStack.** An inset on the stack doesn't reach the pages inside it - the lesson of the mini
+  player covering the last row (ios `ae2fe30`, FB23732628) - and above the navigation bar it would sit where iOS
+  draws its own call and recording pills, pushing the large title down. On the page, under the bar (and under the
+  Library's Find field, `.searchable`'s drawer), it is where an app's own "no connection" strip is expected.
+- Its look: `Palette.amber` words, footnote semibold, its mark in front, on `Palette.amberFill` laid **over the
+  bar's own material** (`.background(.bar)` under the fill - as the New mark lays its tint over a solid,
+  LibraryTiles.swift:90-95): a page's content scrolls up under the inset, and a 14% fill alone would let it show
+  through. An `amberEdge` hairline at its foot. 6 pt above and below, the page's side margins. One line; two at
+  the larger sizes, the text capped at `accessibility2` (`dynamicTypeSize(...)`, as the Library's index is capped,
+  AlbumsScreen.swift:81) - a pinned strip must leave the page room.
   - no network: `wifi.slash` **"Offline - showing what's on this phone"** (the plan's words);
-  - deadwax unreachable: `icloud.slash` **"Can't reach deadwax - showing what's on this phone"**.
-- It is a button: a tap opens it to a second line and a button -
-  - no network: **"Turn off Airplane Mode or join a network to see everything again."**;
+  - deadwax unreachable: `wifi.exclamationmark` **"Can't reach deadwax - showing what's on this phone"**.
+- It is a button: a tap opens it to a second line and a button (and closes it again) -
+  - no network: **"Turn off Airplane Mode or join a network to play what isn't on this phone."**;
   - unreachable: **"Check you're on the right network (or your VPN is on)."** (`ErrorWords.unreached`'s own advice,
-    ErrorWords.swift:420, its "and try again" being the button) and **"Try again"**, which probes at once.
+    ErrorWords.swift:420, its "and try again" being the button) and **"Try again"** (borderless, amber), which
+    probes at once - **"Trying…"** and dimmed while it asks (3 s at worst), as Sign in says "Signing in…".
+  - VoiceOver: one button, its words the line, its value "Shows more" / "Showing more" as it is closed or open;
+    Try again its own button once open.
 - It slides down in and up out (`.move(edge: .top)` with opacity; opacity alone with Reduce Motion), and is
   announced as it comes; as it goes, VoiceOver hears **"Back online"**. Nothing is drawn for coming back.
 - **Why the top**: the bottom is the notice's and the mini player's (MainTabs.swift:40-58), and they say what just
@@ -612,21 +769,26 @@ NavigationStack in MainTabs (one modifier each, MainTabs.swift:14-28), drawing `
   **"Skipped "Roads" - it isn't on this phone"**, and for a run of them within the notice's 5 s, **"Skipped 3 songs
   that aren't on this phone"** - the plan's "one line saying how many". A play started offline never meets one: the
   album page and Downloaded queue only what is here (3.7).
+- **Nothing left that is here**: when every song still to come is off the phone (or the one tapped in Up Next is),
+  the player stops on the first of them, paused, its cover and title shown, its line - the mini player's second line
+  and Now Playing's error line, where Phase 1's playback errors go (screens.md 6) - **"Not on this phone - it plays
+  once deadwax is back."** Play then tries it again: from the stream if deadwax answers, else the same line. The
+  queue is kept as it is.
 - No prefetch for a song on the phone, and none at all offline.
 
 ### 7.4 What's dimmed and what's hidden (`Palette.off`, disabled, VoiceOver "dimmed")
 
 | where | offline |
 | --- | --- |
-| Library root | Downloaded in place of your albums (5.4) |
-| Your albums / All albums (from the root's row) | albums not on the phone dimmed |
-| an album page | songs not on the phone dimmed; Play and Shuffle take only what's here; mine block hidden (3.7) |
+| Library root | Downloaded in place of your albums, swapped only while the root isn't on screen (5.4); "Couldn't update this list" not drawn; the Navidrome gate not consulted |
+| Your albums / All albums (from the root's row, or the root not yet swapped) | albums not on the phone dimmed |
+| an album page | songs not on the phone dimmed; Play and Shuffle take only what's here; mine block hidden; an album with nothing here says so in place of its songs (3.7) |
 | the ••• menus | Play Next / Play Last hidden for a song not here; Download stays (it waits) |
 | Up Next | unchanged in Phase 2 (4.3); the skip notice says it |
-| Now Playing, the mini player, the lock screen | unchanged |
-| Info | what it has; rows that need deadwax keep their "…" |
+| Now Playing, the mini player, the lock screen | unchanged, but for the line when nothing left is here (7.3) |
+| Info | what it has; rows that need deadwax keep their "…"; Plays from says "This phone - …" (4.4) |
 | You | unchanged; /me's failure is said as now ("a failed ask after a good one keeps the version", screens.md:505) |
-| You > Downloads | all of it works; downloads wait for deadwax |
+| You > Downloads | all of it works; downloads wait for a connection, or for deadwax |
 | Search, Get, Requests | not in the app yet; their phases say they need deadwax |
 
 ### 7.5 The app opening with no network
@@ -653,9 +815,10 @@ NavigationStack in MainTabs (one modifier each, MainTabs.swift:14-28), drawing `
   `time`, the moment its listen began) that can't be sent - not `online`, or no HTTP answer - is kept in
   `play_pending` with that time. "Now playing" (`submission=false`) is never kept: it would be stale. When deadwax
   answers again, they are sent **oldest first, one at a time**, each forgotten on a 200; a 401 holds them until
-  someone signs in again; any other 4xx (a song gone, a refused time) drops that one; a 5xx or no answer stops the
-  run until the next. Plays older than Last.fm's 14 days are sent too: Navidrome counts them, Last.fm turns them
-  away on its own (Open question 19). Navidrome takes `time` (`navidrome.py:701-716` passes it on).
+  the same person signs in again (they are in that person's store, below); any other 4xx (a song gone, a refused
+  time) drops that one; a 5xx or no answer stops the run until the next. Plays older than Last.fm's 14 days are
+  sent too: Navidrome counts them, Last.fm turns them away on its own (Open question 19). Navidrome takes `time`
+  (`navidrome.py:701-716` passes it on).
 - **Queue saves**: ResumeController already tries again at the next trigger, at most every 30 s
   (`DeadwaxCore/ResumeController.swift:18-25`); Phase 2 keeps **the latest unsent save** on disk too
   (`queue_pending`, one row), so a force quit offline doesn't lose it. At the next open or return, resume's own rule
@@ -686,8 +849,9 @@ Caches/deadwax/stream/...                              the streaming cache (unch
   on each file and the database: a locked phone must open the next song and record a finished download in a
   background relaunch. Set explicitly, so a change of default can't turn it off (as SongFiles.swift:168 does).
 - **Per person** (Open question 3): another sign-in on the same phone has its own downloads; the first person's
-  stay for them. You > Downloads then has a line **"Other sign-ins' downloads on this phone: 1.2 GB"** with
-  **"Remove"**, shown only when there are some.
+  stay for them. You > Downloads then has a row **"Other accounts on this phone"** with their bytes and **"Remove"**
+  (6.3), shown only when there are some. (Logins turned on after downloading with them off is such a case: "local"
+  becomes another account.)
 - The phase0 folder is deleted once (0.3's first launch).
 
 ### 8.2 The store (SQLite, `PRAGMA user_version = 1`, WAL)
@@ -763,18 +927,20 @@ CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);    -- 'force_quit_at', the
   `allowsExpensiveNetworkAccess` and `allowsConstrainedNetworkAccess` are set **on each request** (false, false,
   false with Wi-Fi only; true with Wi-Fi and cellular), so a change of setting is a new request, not a new session.
 - **Order**: an album's cover first (a foreground request: it is small, and the page has it), then its songs in the
-  album's order, each task's `priority` stepping down - a part-downloaded album plays from the top. Every task of
-  something asked for in front is made at once, while the app is in front: a task made in the background is
-  treated as discretionary by iOS and may wait for power and Wi-Fi.
+  album's order, each task's `priority` stepping down - a part-downloaded album plays from the top. Every task the
+  planner lets go (8.5) is made at once, while the app is in front: a task made in the background is treated as
+  discretionary by iOS and may wait for power and Wi-Fi. The session itself fetches three at a time
+  (`httpMaximumConnectionsPerHost`); a task out with no byte yet is `waiting(queued)`, and becomes `fetching` with
+  its first byte - so "three at a time" is the session's, not the planner's, and the two never disagree.
 - **A task that finishes**: `didFinishDownloadingTo` moves the file to `music/<name>.part` before it returns (the
   system deletes it after), and then the store is told. A status other than 200 (206 for a resumed task) is a
   failure, whatever the body: a background download "succeeds" with an error page.
 - **A task that fails** with resume data keeps it in `song.resume` and is made again from it. A failure counts as a
   **try** only when deadwax answered since the task began: one that failed because deadwax went away is a `deadwax`
-  wait, made again when it answers, and a 401 is a `signIn` wait, made again - from the start, since resume data
-  carries the old cookie - once the same person has signed in. Three tries -> `failed` (8.4), with the last reason.
-  Failed songs get one more try at the app's next launch (Phase 3's sync takes this over), and any number from "Try
-  again".
+  (or `connection`) wait, made again when it answers, and a 401 is a `signIn` wait, made again - from the start,
+  since resume data carries the old cookie - once the same person has signed in. Three tries -> `failed` (8.4),
+  with the last reason. Failed songs get one more try at the app's next launch (Phase 3's sync takes this over), and
+  any number from "Try again".
 - **A setting changed, or the person signing out**: every task out is cancelled `byProducingResumeData`, and made
   again under the new request (or after sign-in).
 - **A force quit**: iOS cancels the session's tasks; at the next launch each comes back with
@@ -832,9 +998,10 @@ other one waits.
 - **Nothing is ever evicted in Phase 2**: everything here was asked for by hand, and hand downloads never go by
   themselves (Choice 19). Lowering the limit below what's here makes new units wait `room` and says so (6.3, 6.4) -
   check 6's "it says what didn't fit". Phase 3 adds your library's albums, evicted by order, below these.
-- **The waits**, in order: no network or deadwax unreachable -> `deadwax`; signed out -> `signIn`; Wi-Fi only on
-  cellular or a hotspot -> `wifi`; Wi-Fi only in Low Data Mode -> `lowData`; over the limit -> `room`; under the
-  reserve -> `phoneFull`; three already fetching -> `queued`.
+- **The waits**, in order: no network -> `connection`; deadwax unreachable -> `deadwax`; signed out -> `signIn`;
+  Wi-Fi only on mobile data -> `wifi`; Wi-Fi only on a hotspot (Wi-Fi, expensive) -> `hotspot`; Wi-Fi only in Low
+  Data Mode -> `lowData`; over the limit -> `room`; under the reserve -> `phoneFull`. A song the planner lets go is
+  `queued` until its task's first byte (8.3).
 - Run at every ask, finish, failure, setting change, path change, reachability change and coming to the front.
 
 ### 8.6 Sizes in words (Core: `Bytes.words`)
@@ -845,8 +1012,8 @@ GB"). Tested on Linux with the edges (999,999,999 bytes, 1 GB exactly, 99.95 GB)
 
 ### 8.7 The player prefers a downloaded copy
 
-`makeTracks` (PlayerModel+Engine.swift:184-205): `if let url = downloads.playable(song)` - `done`, any check but
-`mismatched` - the song opens as `FileSource(url:start:)`; else the stream as now. Debug's "Stream even when
+`makeTracks` (PlayerModel+Engine.swift:184-205): `if let url = downloads.playable(song)` - `done`, whatever its
+check - the song opens as `FileSource(url:start:)`; else the stream as now. Debug's "Stream even when
 downloaded" turns it off. `keepAndPrefetch` (PlayerModel.swift:779) prefetches nothing for a song on the phone;
 `SongFiles.header(of:)` (SongFiles.swift:120) reads the downloaded copy first. **No DeadwaxAudio change is needed
 to play one**: it is the path a complete stream-cache copy takes today. Removing a download while it plays is safe
@@ -868,9 +1035,9 @@ album's cover with no network, through the one cache they share.
 | `DownloadPlan` - the planner (8.5), `StorageLimit`, `DownloadOver` | `DownloadStore` (an actor) - DownloadDatabase and the files: protection, backup, free space |
 | `DownloadWords` - every word in this spec | `Reachability` - NWPathMonitor, the probe, its timer |
 | `Bytes` (8.6), `FLACMD5` (8.4) | `FLACVerifier` (DeadwaxAudio) - the decode |
-| `DownloadDatabase` + `CSQLite` - the schema, migrations, queries (8.2) | `OfflineBanner`, `DownloadControl` (the control, the ring, the row mark), `DownloadsScreen`, the Library's Downloaded row and root |
-| `OfflineRule` (7.1), `PendingPlays` (7.6), `AlbumList`, `AddedBy.phone` (5.1) | ServerModel's kept `Me` (7.5), PlayReporter's kept plays, LoudnessBook's seeding (7.3) |
-| `PlayerWords.afterEngineFailure`'s `notOnPhone` and the skip words (7.3) | |
+| `DownloadDatabase` + `CSQLite` - the schema, migrations, queries (8.2) | `OfflineBanner` and `showsOfflineBanner()` (7.2), `DownloadControl` (the control, the ring, the one mark slot), `DownloadsScreen`, the Library's Downloaded row and root, the gate's Downloaded row |
+| `OfflineRule` (7.1), `PendingPlays` (7.6), `AlbumList`, `AddedBy.phone` (5.1), `LibraryRoot.shown` (5.4) | ServerModel's kept `Me` (7.5), PlayReporter's kept plays, LoudnessBook's seeding (7.3) |
+| `PlayerWords.afterEngineFailure`'s `notOnPhone`, the skip words and the stopped line (7.3) | Info's Plays from and Debug's On this phone (4.4); the notice announced from `PlayerModel.say`, Now Playing's capsule (4.2) |
 
 New App files go in the synchronized folder with no project change (notes/ios.md "The project without Xcode");
 check_project.py must pass. Proposed: `App/Downloads/` (DownloadModel, DownloadSession, DownloadStore,
@@ -885,14 +1052,21 @@ DownloadControl, DownloadsScreen), `App/Root/OfflineBanner.swift`, `App/Models/R
   over failed); the menu items of 2.5 for each mix.
 - `DownloadPlan`: an album that fits whole, one that doesn't (it waits and a smaller one after it goes), the 2 GB
   reserve, No limit, a limit lowered below what's here (nothing removed, new units wait `room`), a transcode's
-  estimate, the waits' order, three at a time.
-- `DownloadWords`: every line of 2.3, 2.4, 6 and 7, and none containing "Navidrome", "the store", "cache", "sync",
-  "MD5" or "offline mode" (the vocabulary sim's rule, ported for these words).
+  estimate (and its fraction held under 95%), the waits' order - `connection` before `deadwax`, `wifi` on mobile
+  data and `hotspot` on an expensive Wi-Fi, neither with Wi-Fi and cellular - and `queued` until a first byte.
+- `DownloadWords`: every line of 2.3 (the tile's short lines included), 2.4, 3.7, 4.4, 6 and 7, and none containing
+  "Navidrome", "the store", "cache", "sync", "MD5", "offline mode" or "everything" (the vocabulary sim's rule,
+  ported for these words); the waits a setting causes name it (3.1).
+- `LibraryRoot.shown`: offline at launch -> Downloaded; deadwax going while the root is on screen -> unchanged until
+  it is off screen; back while Downloaded is on screen -> unchanged until it is off screen; a blip shorter than the
+  probe -> nothing.
 - `Bytes`: 8.6's edges. `FLACMD5`: RFC 1321's seven vectors; 16- and 24-bit packing, sign included.
 - `DownloadDatabase`: the schema made, a song through every state, origins added and taken (a song with none goes),
   plays kept and given back oldest first, queue_pending's one row, the migration from nothing.
 - `OfflineRule`: no network at once; two failures to unreachable; any HTTP answer back; the probe's 30 s and the
   path change's "at once".
+- The Navidrome gate (NavidromeGate's own tests, extended): not consulted while not `online`; closed while online
+  with something on the phone -> its Downloaded row.
 - The Library: `Shelf` over `AlbumList.downloaded` with `AddedBy.phone` - its months, the four other sorts as the
   other lists have them (the existing vectors' rules, new albums).
 
@@ -903,7 +1077,8 @@ DownloadControl, DownloadsScreen), `App/Root/OfflineBanner.swift`, `App/Models/R
   -6.02 dB through `GainedSource`.
 - `anAlbumOfDownloadedCopiesJoinsSampleExact`: the existing gapless render test over FileSources from the store.
 - `theVerifierHashesWhatPlaybackDecodes`: the 16-bit 44.1 kHz and 24-bit 96 kHz fixtures `matched`; one audio byte
-  flipped (its FLAC frame CRC fixed up, so it decodes) `mismatched`; a zero MD5 `bySize`.
+  flipped (its FLAC frame CRC fixed up, so it decodes) found not to match (the verifier's answer, never a kept
+  state); a zero MD5 `bySize`.
 - The fixtures come from `ios/scripts/make-test-album.py`'s own encoder (it writes STREAMINFO's MD5, and
   `tests/test_ios_install.py` checks its files with libsndfile and mutagen), extended to 24-bit; pytest checks the
   fixtures' MD5 against a decode by libsndfile, so the Swift test's "matched" has an independent reference.
@@ -912,12 +1087,14 @@ DownloadControl, DownloadsScreen), `App/Root/OfflineBanner.swift`, `App/Models/R
 
 The plan's six, then the design's own. Note what you see for each.
 
-1. **An album, locked.** On Wi-Fi, open an album, tap ⬇ at the top: the ring fills; lock the phone. Unlock later:
-   the album says "Downloaded", every row has the grey mark, and You > Downloads lists it with "Checked".
+1. **An album, locked.** On Wi-Fi, open an album, tap ⬇ at the top: the dotted mark for a moment, then the ring
+   fills, and "Downloading - 0 of 12 songs" appears under the badge, counting up; lock the phone. Unlock later:
+   the album says "Downloaded", every row has the grey mark, You > Downloads lists it with "Checked", and Info on
+   any of its songs says "Plays from: This phone - checked".
 2. **Wi-Fi only.** On mobile data **with WireGuard on** (as away from home), download an album: it says "Waiting for
-   Wi-Fi" on the page and in You > Downloads, where Download over's line says "On mobile data now - downloads wait
-   for Wi-Fi.". Nothing arrives (Settings > Mobile Data shows deadwax using nothing more). Switch to "Wi-Fi and
-   cellular": it downloads.
+   Wi-Fi" on the page and in You > Downloads, where Download over's footer says "On mobile data now - downloads wait
+   for Wi-Fi." in amber; the control's menu names the setting. Nothing arrives (Settings > Mobile Data shows deadwax
+   using nothing more). Choose "Wi-Fi and cellular": it downloads.
 3. **Airplane mode.** Turn it on, force-quit deadwax, open it: no spinner and no can't-reach screen - the banner
    "Offline - showing what's on this phone", and the Library showing Downloaded. Play the album: every join
    seamless, and Info's Normalization says the same as it did online. Lock the phone: the lock screen shows the
@@ -932,23 +1109,36 @@ The plan's six, then the design's own. Note what you see for each.
 6. **The limit.** With more than 5 GB downloaded, set Storage limit to 5 GB: nothing goes, the bar turns amber and
    says "More than the 5 GB limit - nothing is removed for it, but new downloads wait for room."; download one more
    album: it waits, "Waiting for room - the storage limit is reached". Set it back: it downloads.
-7. **The marks, beside Apple Music.** An album page: ⬇, the ring, the filled mark; a song's ••• Download on another
-   album, then Remove Download ("Removed from this phone: ..."). Open Apple Music beside it: do the marks read the
-   same way? Anything that looks foreign to the phone, note.
-8. **Now Playing.** ••• > Download on a song: "Downloading: ..." shows over Now Playing. ••• > Download Up Next:
-   "Downloading N songs from Up Next".
+7. **The marks, beside Apple Music.** An album page: ⬇, the ring, the filled mark; a tap of the ring or the dotted
+   mark - its menu's title, on two lines where a setting causes the wait; a song's ••• Download on another album,
+   then Remove Download ("Removed from this phone: ..."). Open Apple Music beside it: do the marks read the same
+   way? Anything that looks foreign to the phone, note.
+8. **Now Playing.** ••• > Download on a song: "Downloading: ..." shows in Now Playing's top row, beside the
+   chevron, and nothing else moves. ••• > Download Up Next: "Downloading N songs from Up Next". With VoiceOver on,
+   each is heard once. During a library's shuffle, Download Up Next isn't in the menu.
 9. **deadwax away, the network not.** On home Wi-Fi with WireGuard off, away from home (or deadwax's container
    stopped): the banner says "Can't reach deadwax - showing what's on this phone"; tap it: Try again. Turn WireGuard
    on: the banner goes within a few seconds (the path changing sets off a probe).
 10. **A queue that meets offline.** Queue an album you haven't downloaded after one you have, then go offline as the
-    first plays: at its end, "Skipped N songs that aren't on this phone", and the music stops or goes on to what is
-    here.
+    first plays: at its end, "Skipped N songs that aren't on this phone", and the music goes on to what is here -
+    or, with nothing here left, stops paused on the first song not here, its line "Not on this phone - it plays once
+    deadwax is back."
 11. **VoiceOver.** The control ("Download, Downloading, 40 percent"), a row's actions (Download, Remove Download), the
-    banner as it appears and "Back online" as it goes, You > Downloads' rows.
-12. **The largest text size.** You > Downloads and an album page with marks: nothing cut off, nothing overlapping.
+    banner as it appears (and "Shows more" on it) and "Back online" as it goes, You > Downloads' rows and Download
+    over's choices (as Normalization's).
+12. **The largest text size.** You > Downloads and an album page with marks and its download line: nothing cut off,
+    nothing overlapping; the banner two lines at most, the page still usable under it.
 13. **Remove All.** You > Downloads > Remove All Downloads: the question comes from the button; after it, the
     Library's Downloaded row is gone and iOS's Settings > General > iPhone Storage > deadwax shows the space back.
 14. **A downloaded album opens at once**, online too - no spinner before its songs.
+15. **deadwax up, Navidrome down.** With Navidrome's container stopped (deadwax's running): the Library shows its
+    "isn't available" screen **with the Downloaded row under it**, and a downloaded album plays from it.
+16. **Going offline on the Library.** With Your albums on screen, turn on Airplane Mode: the banner comes and the
+    albums not on the phone dim, but the list doesn't change under your finger; switch to You and back: it is
+    Downloaded. Turn Airplane Mode off: the banner goes and Downloaded stays until you leave the tab and come back.
+17. **The banner under every bar.** On the Library root (with its Find field), an album page and You > Downloads,
+    offline: the banner sits under the bar, the list scrolls under it without showing through, and the bar's title
+    and buttons are where they always are.
 
 ## 11. What only the phone can tell
 
@@ -963,7 +1153,13 @@ The plan's six, then the design's own. Note what you see for each.
   for a CD song, unmeasured), and whether it ever stutters playback (it runs at utility priority beside the engine).
 - Whether a **pull to refresh or a tap of the banner** while unreachable answers quickly enough to feel like a
   button (3 s at worst).
-- Whether `ContentUnavailableView`, the menus' section headers and `menuOrder(.fixed)` look as described on 27.2.
+- Whether the menus' two-line section headers (3.1) and `menuOrder(.fixed)` look as described on 27.2.
+- Whether **the bar's glass group** (iOS 26 and later draw a bar's trailing items in one glass capsule) keeps the
+  control's colours - the accent arrow, the quiet filled mark, the amber one - or draws them all in the label
+  colour, as it may a plain bar button. If it flattens them, the shape alone still carries each state (1.2).
+- Whether **a page's own top inset** reaches its List or ScrollView on 17-27 - the same thing the inset round
+  assumes for the bottom (its notes: "the pushed-page update is assumed") - check 17.
+- Whether a view under a full-screen cover still "appears" - moot once the notice is announced from `say` (4.2).
 
 ## Open questions (each with what the build does until James answers)
 
@@ -972,7 +1168,7 @@ The plan's six, then the design's own. Note what you see for each.
    stream is (audio fidelity first); Up to 48 kHz saves space only on hi-res albums and nothing he can hear on
    AirPods. Revisit if the limit bites.
 2. **The streaming cache's own settings** (2 GB, "Keep a stream's copy")? **Recommend: none in Phase 2**; the cache
-   stays 2 GB, and the Download settings' footer says it is apart from the limit.
+   stays 2 GB, and the Storage section's footer says it is apart from the limit (6.3).
 3. **Downloads per person or per phone?** **Recommend per (server, person)** (8.1): a song another person can't play
    must not play for them offline from someone else's copy (deadwax checks a song is theirs before streaming it,
    `_theirs`, `navidrome.py:133`). For James's one sign-in it changes nothing.
@@ -980,7 +1176,8 @@ The plan's six, then the design's own. Note what you see for each.
    it is the one he uses daily - with "this phone" wherever the two could meet, and Requests keeping "Get" and
    its own section names under its own tab.
 5. **The ring's tap**: Apple Music stops at once; **recommend a menu** that says how far it has got, with Remove
-   Download, so a near miss of the ••• beside it never throws a download away.
+   Download, so a near miss of the ••• beside it never throws a download away. The stop square stays on the
+   control's ring - it still leads to stopping, one tap on - and nowhere else (1.2).
 6. **No confirmation for Remove Download** on a song or an album (the menu is the second step); only Remove All
    asks. **Recommend as designed.**
 7. **Download and your library are separate.** Apple Music downloads only what is in its library. **Recommend: a
@@ -990,10 +1187,11 @@ The plan's six, then the design's own. Note what you see for each.
 8. **Over the limit**: **recommend waiting, never refusing at the tap and never evicting a hand download** (Choice
    19), said in 6.3 and on the album.
 9. **Wi-Fi only also waits out a hotspot and Low Data Mode** (the plan's table: `allowsConstrainedNetworkAccess =
-   false`). **Recommend yes** - a hotspot is a phone's data - with the footer saying so.
+   false`). **Recommend yes** - a hotspot is a phone's data - with Wi-Fi only's own note saying so (6.4), and a
+   wait of its own, "Waiting - this Wi-Fi is a hotspot", since "Waiting for Wi-Fi" on a Wi-Fi would read as wrong.
 10. **Offline, the Library root becomes Downloaded** rather than a filter chip on Your albums. **Recommend as
     designed**: a filter on Your albums would hide what was downloaded from All albums, which is on the phone just
-    the same.
+    the same - and the swap waits until the root isn't on screen, both ways (5.4).
 11. **Up Next's rows** (marks, dimming offline) **after the Up Next round merges**, as a small follow-up.
 12. **A long press on a Library tile** (Download, Remove Download)? **Recommend later**, with Phase 4's Library work:
     a tile's menu needs the album's songs first.
@@ -1005,11 +1203,19 @@ The plan's six, then the design's own. Note what you see for each.
     size". Rare.
 16. **Copying from the streaming cache** when it holds the song whole (8.3): **recommend yes** - the same bytes, no
     data spent, checked as any download.
-17. **A symbol on every menu item**, Play Next and Play Last included (3.4). **Recommend yes** in Phase 2: Apple's
-    menus carry one on each, and the download items need theirs.
+17. **A symbol on every menu item**, Play Next and Play Last included (3.4), and Now Playing's Info and Go to album
+    (4.1). **Recommend yes** in Phase 2: Apple's menus carry one on each, and the download items need theirs.
 18. **Downloaded's "Recently added" means downloaded to this phone.** **Recommend yes** (5.1).
 19. **Plays older than 14 days**: **recommend sending them anyway** - Navidrome counts them; Last.fm drops them by
     its own rule.
 20. **SQLite or a JSON file?** Phase 1 keeps its lists as JSON files. **Recommend SQLite** (8.2): a state change per
     song would rewrite a ledger of every song (Phase 3: tens of thousands) many times over; SQLite changes a row.
     The cost is the CSQLite target and libsqlite3-dev on Linux.
+21. **"Wi-Fi and cellular" or "Wi-Fi and mobile data"?** James named the choice "Wi-Fi and cellular"; his phone's
+    Settings say "Mobile Data", and the lines under it say "mobile data" (1.1). **The build uses his words for the
+    choice**; one word for both would read better, and it is his to change.
+22. **Signed out, with music on the phone.** A 401 brings the sign-in over the app (screens.md 1, step 3), and if
+    signing in can't work just then (Navidrome down: a 503), what is on the phone can't be reached behind it.
+    **Recommend later**: a "Not now" on the sign-in when this person has downloads, closing it into the banner's
+    third state, "Signed out - showing what's on this phone", whose tap brings the sign-in back. **The build keeps
+    Phase 1's sign-in as it is** until James says.
