@@ -22,7 +22,7 @@ private func withDatabase(_ body: (DownloadDatabase, String) throws -> Void) thr
             #expect(try db.keptQueue() == nil)
             // opened again: nothing made twice
             let again = try DownloadDatabase(path: path)
-            #expect(try again.userVersion() == 1)
+            #expect(try again.userVersion() == 2)
         }
     }
 
@@ -153,6 +153,94 @@ private func withDatabase(_ body: (DownloadDatabase, String) throws -> Void) thr
             #expect(stopped)
             let left = try db.songs()
             #expect(left.isEmpty)
+        }
+    }
+
+    // MARK: version 2: lyrics (notes/app-lyrics.md 4.7)
+
+    private static let synced = Data(#"{"synced":true,"lines":[{"time":1.5,"text":"One"}]}"#.utf8)
+    private static let none = Data(#"{"synced":false,"lines":[]}"#.utf8)
+
+    @Test func aSongsLyricsAreKeptOnlyWhileTheSongIs() throws {
+        try withDatabase { db, _ in
+            // a song not in the store - removed while its ask was on its way - keeps nothing
+            #expect(try db.putLyrics(song: "a", json: Self.synced, etag: #""l1""#, fetchedAt: 10) == false)
+            #expect(try db.lyrics("a") == nil)
+            let a = DownloadRecord(id: "a", albumID: "al", suffix: "flac", wantedAt: 1)
+            try db.put(a)
+            #expect(try db.putLyrics(song: "a", json: Self.synced, etag: #""l1""#, fetchedAt: 10))
+            #expect(try db.lyrics("a") == .init(songID: "a", json: Self.synced, etag: #""l1""#, fetchedAt: 10))
+            // replaced when it differs - none for the song is kept too, with no ETag
+            #expect(try db.putLyrics(song: "a", json: Self.none, etag: nil, fetchedAt: 20))
+            #expect(try db.lyrics("a") == .init(songID: "a", json: Self.none, etag: nil, fetchedAt: 20))
+            // the song's row written again (INSERT OR REPLACE) keeps them: no delete trigger fires
+            var done = a
+            done.state = .done
+            try db.put(done)
+            #expect(try db.lyrics("a")?.json == Self.none)
+            try db.put(DownloadRecord(id: "b", albumID: "al", suffix: "flac", wantedAt: 2))
+            #expect(try db.lyricsSongs() == ["a"])
+            try db.putLyrics(song: "b", json: Self.synced, etag: nil, fetchedAt: 30)
+            #expect(try db.lyricsSongs() == ["a", "b"])
+        }
+    }
+
+    @Test func everyWayASongGoesTakesItsLyrics() throws {
+        try withDatabase { db, _ in
+            for id in ["a", "b", "c", "d", "e"] {
+                try db.put(DownloadRecord(id: id, albumID: "al", suffix: "flac", wantedAt: 1))
+                try db.addOrigin(.album("al"), song: id, at: 1)
+                try db.putLyrics(song: id, json: Self.synced, etag: nil, fetchedAt: 1)
+            }
+            try db.addOrigin(.song, song: "c", at: 2)
+            // deleteSong
+            try db.deleteSong("a")
+            #expect(try db.lyrics("a") == nil)
+            // removeOrigins: the album's Remove Download takes b (its last origin) - c keeps its lyrics while the song
+            // it was asked for as still holds it
+            #expect(try db.removeOrigins([.album("al")], songs: ["b", "c"]) == ["b"])
+            #expect(try db.lyrics("b") == nil)
+            #expect(try db.lyrics("c") != nil)
+            #expect(try db.removeOrigins([.song], songs: ["c"]) == ["c"])
+            #expect(try db.lyrics("c") == nil)
+            // removeAll
+            #expect(try db.lyricsSongs() == ["d", "e"])
+            try db.removeAll()
+            #expect(try db.lyricsSongs().isEmpty)
+            // a song asked for again after its removal starts with none: none were left behind
+            try db.put(DownloadRecord(id: "d", albumID: "al", suffix: "flac", wantedAt: 3))
+            #expect(try db.lyrics("d") == nil)
+        }
+    }
+
+    @Test func aVersionOneFileIsGivenTheLyricsTableEveryRowKept() throws {
+        try withDatabase { _, path in
+            // the file withDatabase made is version 2: a version-1 file is made beside it, as Phase 2 left one
+            let old = URL(fileURLWithPath: path).deletingLastPathComponent().appendingPathComponent("v1.sqlite").path
+            let song = DownloadRecord(id: "a", albumID: "al", suffix: "flac", wantedAt: 1)
+            do {
+                let v1 = try DownloadDatabase(path: old, upTo: 1)
+                #expect(try v1.userVersion() == 1)
+                try v1.put(song)
+                try v1.addOrigin(.album("al"), song: "a", at: 1)
+                try v1.putAlbum(id: "al", json: Data("{}".utf8), fetchedAt: 1)
+                try v1.keepPlay(songID: "a", timeMs: 5)
+                // no lyrics table in version 1
+                #expect(throws: DownloadDatabase.Failure.self) {
+                    try v1.putLyrics(song: "a", json: Self.synced, etag: nil, fetchedAt: 1)
+                }
+            }
+            let v2 = try DownloadDatabase(path: old)
+            #expect(try v2.userVersion() == 2)
+            #expect(try v2.songs() == [song])
+            #expect(try v2.origins() == ["a": [.album("al")]])
+            #expect(try v2.albums().map(\.id) == ["al"])
+            #expect(try v2.keptPlays().map(\.songID) == ["a"])
+            #expect(try v2.lyricsSongs().isEmpty)
+            #expect(try v2.putLyrics(song: "a", json: Self.synced, etag: #""l1""#, fetchedAt: 2))
+            // and the trigger came with the table
+            try v2.deleteSong("a")
+            #expect(try v2.lyrics("a") == nil)
         }
     }
 

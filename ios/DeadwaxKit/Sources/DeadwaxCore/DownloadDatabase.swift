@@ -12,11 +12,14 @@ import Foundation
 /// - `play_pending`, `queue_pending`: plays kept until deadwax answers, and the queue this phone last saved or took -
 ///   a save deadwax hasn't answered among them (7.5, 7.6; QueueKept).
 /// - `meta`: the store's own facts (`force_quit_at`).
+/// - `lyrics` (version 2, app 0.4): each downloaded song's lyrics answer (`GET /navidrome/lyrics/{song_id}`'s body as it
+///   came, none included) and its ETag, so they show offline (notes/app-lyrics.md 4.7). Kept only for a song in `song`,
+///   and gone with its row whichever way the row goes - the trigger `song_lyrics_go`.
 ///
 /// Not thread-safe: one owner (the App's DownloadStore) calls it from one place at a time.
 public final class DownloadDatabase {
-    /// The schema's version (`PRAGMA user_version`).
-    public static let version = 1
+    /// The schema's version (`PRAGMA user_version`): 1, Phase 2's (app 0.3); 2, the lyrics (app 0.4).
+    public static let version = 2
 
     /// SQLite said no: its own words, for whoever runs deadwax.
     public struct Failure: Error, Equatable, CustomStringConvertible {
@@ -27,7 +30,12 @@ public final class DownloadDatabase {
     private var db: OpaquePointer?
 
     /// Opens (or makes) the database at `path` and brings its schema up to `version`.
-    public init(path: String) throws {
+    public convenience init(path: String) throws {
+        try self.init(path: path, upTo: Self.version)
+    }
+
+    /// ...up to `target` - an older version's file, for the tests of a migration from it.
+    init(path: String, upTo target: Int) throws {
         var handle: OpaquePointer?
         let opened = sqlite3_open_v2(path, &handle, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX, nil)
         guard opened == SQLITE_OK, let handle else {
@@ -39,7 +47,7 @@ public final class DownloadDatabase {
         sqlite3_busy_timeout(handle, 2_000)
         try execute("PRAGMA journal_mode = WAL")
         try execute("PRAGMA synchronous = NORMAL")
-        try migrate()
+        try migrate(to: target)
     }
 
     deinit {
@@ -101,15 +109,37 @@ public final class DownloadDatabase {
         "CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT)",
     ]
 
-    /// The schema made from nothing (version 0), in one transaction.
-    private func migrate() throws {
+    /// Version 2's (app 0.4): a downloaded song's lyrics, and the trigger that takes them with the song's row - by
+    /// `deleteSong`, by `removeOrigins` taking a song's last origin, by `removeAll`, and by any way added later, in the
+    /// same transaction. (`put`'s INSERT OR REPLACE of a song already there fires no delete trigger - SQLite's
+    /// recursive_triggers is off - so a song's row written again keeps its lyrics.)
+    static let lyricsSchema: [String] = [
+        """
+        CREATE TABLE lyrics (
+          song_id TEXT PRIMARY KEY,
+          json BLOB NOT NULL,
+          etag TEXT,
+          fetched_at INTEGER NOT NULL)
+        """,
+        """
+        CREATE TRIGGER song_lyrics_go AFTER DELETE ON song
+          BEGIN DELETE FROM lyrics WHERE song_id = OLD.id; END
+        """,
+    ]
+
+    /// The schema brought from the file's version up to `target` (the newest, but in a test), in one transaction: made
+    /// from nothing (version 0), or a version-1 file - Phase 2's, every row kept - given the lyrics table.
+    private func migrate(to target: Int) throws {
         let current = try integer("PRAGMA user_version") ?? 0
-        guard current < Self.version else { return }
+        guard current < target else { return }
         try transaction {
             if current < 1 {
                 for statement in Self.schema { try execute(statement) }
             }
-            try execute("PRAGMA user_version = \(Self.version)")
+            if current < 2, target >= 2 {
+                for statement in Self.lyricsSchema { try execute(statement) }
+            }
+            try execute("PRAGMA user_version = \(target)")
         }
     }
 
@@ -144,7 +174,7 @@ public final class DownloadDatabase {
         ])
     }
 
-    /// The song's row and its origins gone.
+    /// The song's row and its origins gone - and its lyrics, by the trigger.
     public func deleteSong(_ id: String) throws {
         try transaction {
             try run("DELETE FROM origin WHERE song_id = ?", [.text(id)])
@@ -254,6 +284,46 @@ public final class DownloadDatabase {
         }
     }
 
+    // MARK: lyrics (version 2, notes/app-lyrics.md 4.7)
+
+    /// A downloaded song's lyrics answer as it is kept.
+    public struct KeptLyrics: Sendable, Equatable {
+        public let songID: String
+        /// The route's body as it came - none for the song included.
+        public let json: Data
+        /// Its ETag, for the next ask to be a 304.
+        public let etag: String?
+        /// ms since 1970.
+        public let fetchedAt: Int64
+    }
+
+    /// The song's lyrics answer kept (made, or replaced) - only while the song has a row: false, and nothing kept, for
+    /// a song not in the store (removed while its ask was on its way), so no lyrics are ever left without their song.
+    @discardableResult
+    public func putLyrics(song: String, json: Data, etag: String?, fetchedAt: Int64) throws -> Bool {
+        // the SELECT's WHERE keeps SQLite from reading ON CONFLICT's ON as a join's
+        try run("""
+            INSERT INTO lyrics (song_id, json, etag, fetched_at)
+              SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM song WHERE id = ?)
+            ON CONFLICT (song_id) DO UPDATE SET json = excluded.json, etag = excluded.etag, fetched_at = excluded.fetched_at
+            """, [.text(song), .blob(json), .text(etag), .int(fetchedAt), .text(song)])
+        return sqlite3_changes(db) > 0
+    }
+
+    /// The song's lyrics answer, when one is kept.
+    public func lyrics(_ song: String) throws -> KeptLyrics? {
+        // the closure's type said, for ios.yml's older Swift (as keptQueue's)
+        try query("SELECT song_id, json, etag, fetched_at FROM lyrics WHERE song_id = ?", [.text(song)]) { (row: Row) -> KeptLyrics? in
+            guard let id = row.text(0), let json = row.blob(1) else { return nil }
+            return KeptLyrics(songID: id, json: json, etag: row.text(2), fetchedAt: row.int(3) ?? 0)
+        }.first
+    }
+
+    /// The songs with lyrics kept - the backfill's "which done songs have none".
+    public func lyricsSongs() throws -> Set<String> {
+        Set(try query("SELECT song_id FROM lyrics") { (row: Row) -> String? in row.text(0) })
+    }
+
     // MARK: plays and the queue kept for later (7.6)
 
     /// A play deadwax couldn't be told of, with when its listen began (ms).
@@ -324,8 +394,8 @@ public final class DownloadDatabase {
 
     // MARK: everything
 
-    /// Remove All Downloads: every song, origin, album and loudness - the plays and the queue save kept (they aren't
-    /// downloads).
+    /// Remove All Downloads: every song, origin, album and loudness, and (by the trigger) every song's lyrics - the
+    /// plays and the queue save kept (they aren't downloads).
     public func removeAll() throws {
         try transaction {
             for table in ["origin", "song", "album", "loudness"] { try execute("DELETE FROM \(table)") }
