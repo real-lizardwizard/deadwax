@@ -2844,3 +2844,9 @@ the store, the App, the version.
 
 Nothing of it has been seen on a phone: notes/app-lyrics.md section 6's P1-P12 (in docs/ios.md as "Lyrics' checks")
 and section 7 are what James's iPhone answers.
+
+**The version: 0.4 (4)** (the spec's Open question 11 - a version says what shipped, not which phase; the plan's
+Phase 3 ships as 0.5). Pinned as 0.3 was: `Base.xcconfig`'s `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION`,
+`check_project.py`'s MARKETING_VERSION and BUILD, `ios.yml`'s check of the built Info.plist, and
+`tests/test_ios_install.py`'s read of the real xcconfig; the guide's title, opening, install.sh's line and About's App
+row, ios/README.md, and the two doc comments giving About's row as an example. `src/__init__.py` wasn't touched.
