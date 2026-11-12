@@ -323,4 +323,20 @@ import Testing
         #expect(d.setAside(EQSettings.unreadableName(day: "2026-11-12")) == "eq.json couldn't be read, so it was set aside as eq-unreadable-2026-11-12.json")
         #expect(d.muffle == "Muffle what plays")
     }
+
+    @Test func slice2sDebugWords() {
+        let d = W.Debug.self
+        #expect(d.header == "EQ")
+        #expect(d.stopped == "In the graph: the output is stopped")
+        #expect(d.noEngine == "No audio engine yet: it's made when something first plays")
+        #expect(d.startedWithTest(msBefore: 0.14) == "The test curve, put in 0.1 ms before the output started")
+        #expect(d.startedOff(msBefore: 2.06) == "Off, put in 2.1 ms before the output started")
+        #expect(d.startedWithNothing == "Nothing put in: the output started passing every sample through")
+        #expect(d.notStarted == "The output hasn't started yet")
+        #expect(d.muffleFooter.hasPrefix("A test of the EQ's audio unit: a -24 dB high shelf at 2 kHz"))
+        #expect(d.atRate(44_100, sections: 1, leftOut: 0) == "44.1 kHz: 1 section a channel")
+        var c = EQRenderCounters()
+        c.crossfades = 1
+        #expect(d.changes(c) == "1 crossfade; 0 waited for the one before; 0 made for another rate")
+    }
 }

@@ -17,6 +17,8 @@ public struct EQRenderCounters: Equatable, Sendable {
     public var otherRate = 0
     /// blocks of more than `maximumFrames`, answered with an error and left untouched
     public var refused = 0
+
+    public init() {}
 }
 
 /// The render's own memory, made off the audio thread by `EQRender.make` for one rate, channel count and largest
@@ -54,15 +56,21 @@ public struct EQRenderState {
 
     /// The live bank is the identity and no crossfade is running: a block passes through untouched.
     public var passesThrough: Bool { !fading && live[1] == 1 }
+
+    /// A crossfade is under way (Debug's "In the graph: crossfading").
+    public var isCrossfading: Bool { fading }
 }
 
 public enum EQRender {
     /// The render's memory for a rate (off the audio thread: at `allocateRenderResources`). Live is the identity.
-    public static func make(rate: Double, channels: Int, maximumFrames: Int) -> UnsafeMutablePointer<EQRenderState> {
+    /// `fadeFrames` is a test's own crossfade length - 1 makes every change in one step (eq.md 1.7 test 3's control,
+    /// which must click); left out, 20 ms.
+    public static func make(rate: Double, channels: Int, maximumFrames: Int,
+                            fadeFrames: Int? = nil) -> UnsafeMutablePointer<EQRenderState> {
         precondition((1...EQLimits.channels).contains(channels) && maximumFrames > 0)
         let slots = EQLimits.sectionsPerChannel
         let packed = EQBank.packedCount
-        let fade = max(1, Int((0.020 * rate).rounded()))
+        let fade = max(1, fadeFrames ?? Int((0.020 * rate).rounded()))
         func zeros(_ n: Int) -> UnsafeMutablePointer<Double> {
             let p = UnsafeMutablePointer<Double>.allocate(capacity: n)
             p.initialize(repeating: 0, count: n)

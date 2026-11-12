@@ -762,6 +762,10 @@ extension EQWords {
         public static let crossfading = "In the graph: crossfading"
         public static func notMade(_ words: String) -> String { "Not made: \(words)" }
         public static let outOfTheGraph = "Out of the graph while Off"
+        /// Slice 2's: the output stopped, so the unit holds no render memory until it starts again (1.2).
+        public static let stopped = "In the graph: the output is stopped"
+        /// Slice 2's: no audio engine yet - it is made when something first plays.
+        public static let noEngine = "No audio engine yet: it's made when something first plays"
 
         /// "10 filters for both ears + 10 tone bands; its top +6.3 dB at 8.9 kHz; preamp -6.4 dB (automatic)".
         public static func curve(both: Int, left: Int, right: Int, bands: Int, top: Double, at: Double, preamp: Double,
@@ -797,6 +801,19 @@ extension EQWords {
             "\(name)'s curve, put in \(String(format: "%.1f", msBefore)) ms before the output started"
         }
 
+        /// Slice 2's, while the only curve is Debug's test: "The test curve, put in 0.1 ms before the output started".
+        public static func startedWithTest(msBefore: Double) -> String {
+            "The test curve, put in \(String(format: "%.1f", msBefore)) ms before the output started"
+        }
+
+        /// "Off, put in 0.1 ms before the output started".
+        public static func startedOff(msBefore: Double) -> String {
+            "Off, put in \(String(format: "%.1f", msBefore)) ms before the output started"
+        }
+
+        public static let startedWithNothing = "Nothing put in: the output started passing every sample through"
+        public static let notStarted = "The output hasn't started yet"
+
         /// "None since the output started" - "14 samples since the output started, the loudest +0.8 dBFS".
         public static func overFullScale(_ c: EQRenderCounters) -> String {
             guard c.overs > 0 else { return "None since the output started" }
@@ -820,5 +837,8 @@ extension EQWords {
         }
 
         public static let muffle = "Muffle what plays"
+        /// Under the toggle (slice 2, check 0).
+        public static let muffleFooter = "A test of the EQ's audio unit: a -24 dB high shelf at 2 kHz, put in through the unit itself, so what plays sounds muffled at once and plain again when it's off - with no click either way. Off, the unit passes every sample through untouched. Nothing here is kept: it's off each time the app opens."
+        public static let header = "EQ"
     }
 }
