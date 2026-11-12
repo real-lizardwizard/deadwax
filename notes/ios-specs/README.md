@@ -19,3 +19,12 @@ patterns. The app is then built to the spec and reviewed against it. notes/ios.m
   the hero's line on its own, Download over drawn as Normalization is, the banner under each page's bar, the
   Library never swapping under a finger, the Navidrome gate and a gone album with music on the phone, Info's
   Plays from).
+- `turntable.md` - the turntable and the speed fader (James's decision of 2026-11-12, overruling choice 22),
+  designed 2026-11-12 against 2.1.4 / ios 944d787: the screen (the look switch, the plinth, the face, the arm,
+  120 Hz drawing, the close drag, every state and word, VoiceOver, Dynamic Type, Reduce Motion, the Palette), the
+  deck's rules and the press ported, the clock, the handover timed by the engine's start, the voice ported line
+  for line on a second engine, the window from the phone's own file with `/scrub` behind it, the audio session,
+  the fader's engine change and what is measured first, the four slices with their fixtures and tests, James's
+  checks and open questions. Reviewed the same day (its "Design review (2026-11-12)": the clock anchored on the
+  block's end, the handover's predictor, target and judge, the window's grid and its two tests, the porting and
+  real-time rules, the press and the deck's owner, the lock screen after a wind-down, the look's faces and type).
