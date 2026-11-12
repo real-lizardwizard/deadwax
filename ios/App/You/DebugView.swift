@@ -1,11 +1,12 @@
+import DeadwaxAudio
 import DeadwaxCore
 import SwiftUI
 import UIKit
 
 /// You's Debug (admins only, D1): Phase 0's one screen, moved - Check's report, the test sounds, the hi-res row,
 /// what is playing (with the engine's own words for its last failure, D7, and an Up Next edit held for the join, D4),
-/// the engine's log (its last 500 lines, with Copy and Share), the Library's last album list asks (how many albums,
-/// how long - check 1), and how long this install runs. Phase 2's Downloads section: the songs by state, the session's
+/// the EQ's unit and "Muffle what plays" (eq.md 3.13, slice 2), the engine's log (its last 500 lines, with Copy and
+/// Share), the Library's last album list asks (how many albums, how long - check 1), and how long this install runs. Phase 2's Downloads section: the songs by state, the session's
 /// tasks, reachability, what waits to be sent, the time each check took, the download log and "Stream even when
 /// downloaded" (phase2-downloads.md 6.9). The address and the sign-in are the app's own screens now.
 struct DebugView: View {
@@ -24,6 +25,7 @@ struct DebugView: View {
                 hiRes
             }
             playing
+            EQDebugSection()
             EngineLogSection()
             DownloadsDebugSection()
             libraryLists
@@ -215,6 +217,42 @@ struct DebugView: View {
     }
 
     private func clock(_ seconds: Double) -> String { Format.clock(seconds) }
+}
+
+/// Debug's EQ (eq.md 3.13, slice 2): the unit's rows - in the graph and what it does, the rate's sections, the
+/// changes, what the last start put in, samples over full scale, its render time - read from the EQ's host once a
+/// second while they show and the app is in front, and "Muffle what plays", the test curve through the real unit
+/// (check 0).
+private struct EQDebugSection: View {
+    @Environment(PlayerModel.self) private var player
+    @Environment(\.scenePhase) private var phase
+    @State private var rows: [EQDebugRow]?
+
+    var body: some View {
+        Section {
+            if let rows {
+                ForEach(rows, id: \.label) { row in
+                    LabeledContent(row.label) {
+                        Text(row.value).font(.footnote)
+                    }
+                }
+            } else {
+                Text(EQWords.Debug.noEngine).foregroundStyle(Palette.quiet)
+            }
+            Toggle(EQWords.Debug.muffle, isOn: Binding(get: { player.muffle }, set: { player.muffle = $0 }))
+        } header: {
+            Text(EQWords.Debug.header)
+        } footer: {
+            Text(EQWords.Debug.muffleFooter)
+        }
+        .task(id: phase) {
+            guard phase == .active else { return }
+            while !Task.isCancelled {
+                rows = player.eqStatus()?.rows
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+    }
 }
 
 /// The engine's log (EngineTrace): its last lines, the newest last, read again once a second while the log's row is

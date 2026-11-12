@@ -2,7 +2,15 @@ import DeadwaxAudio
 import DeadwaxCore
 import Foundation
 import Observation
+import os
 import UIKit
+
+/// Debug's Muffle (eq.md 5.2), as the engine's queue reads it at a start: on or off, and the settings version of the
+/// last change - the EQ's publish rule keeps the newest (1.6).
+private struct EQTestState: Sendable {
+    var on = false
+    var version = 0
+}
 
 /// The player every screen draws and taps: the queue as Up Next has it, the entry heard, where it is, Repeat,
 /// Shuffle, Normalization, the song's failure words and the notice - and the actions, each the Core call named on it.
@@ -113,6 +121,33 @@ final class PlayerModel {
 
     /// An Up Next edit made in a song's last moments is held for the join (D4), for Debug.
     var holdsAnEdit: Bool { controller?.holdsAnEdit ?? false }
+
+    /// The EQ's unit, for Debug's EQ rows (eq.md 3.13): read under the host's own lock, never the engine's queue. Nil
+    /// before anything played.
+    func eqStatus() -> EQUnitStatus? { link?.engine.eq?.status() }
+
+    /// Debug's "Muffle what plays" (eq.md 5.2, check 0): slice 2's test curve - a -24 dB high shelf at 2 kHz through
+    /// the EQ's real unit - on or off. Off at each launch, kept nowhere. A change goes in at once while the output
+    /// runs (crossfaded over 20 ms), and the engine puts the setting in at each start (`eqTest`, set in `ensureLink`).
+    var muffle: Bool {
+        get { muffleOn }
+        set {
+            guard newValue != muffleOn else { return }
+            muffleOn = newValue
+            let now = muffleState.withLock { (s: inout EQTestState) -> EQTestState in
+                s.on = newValue
+                s.version += 1
+                return s
+            }
+            // before the output first started, the host has no output or rate yet: the start puts it in
+            guard let host = link?.engine.eq, let rate = host.rate else { return }
+            host.publish(EQTestCurve.bank(on: now.on, rate: rate, version: now.version))
+        }
+    }
+
+    private var muffleOn = false
+    /// Muffle as the engine's queue reads it at a start, and the settings version each change made.
+    @ObservationIgnored private let muffleState = OSAllocatedUnfairLock(initialState: EQTestState())
 
     // MARK: Info's readings (D8)
 
@@ -576,6 +611,7 @@ final class PlayerModel {
         do {
             let engine = try PlaybackEngine()
             Self.lead(engine)
+            Self.eqTest(engine, muffleState)
             EngineTrace.attach(engine)
             engine.onChange = { [weak self] state in
                 MainActor.assumeIsolated { self?.engineChanged(state) }
@@ -601,6 +637,17 @@ final class PlayerModel {
         engine.startLead = { AudioSessionController.startLead() }
         engine.latency = { AudioSessionController.latency() }
         engine.ioBuffer = { AudioSessionController.ioBuffer() }
+    }
+
+    /// The EQ's start (eq.md 1.8) while its only curve is Debug's test (slice 2), on the engine's queue between prepare
+    /// and start: the output now is the test's, and the test curve - or Off - goes in for the rate the output starts
+    /// at, before its first sample. A change made meanwhile on the main thread has the newer version and wins.
+    private nonisolated static func eqTest(_ engine: PlaybackEngine, _ state: OSAllocatedUnfairLock<EQTestState>) {
+        engine.eqStart = { (host: EQHost, rate: Double, _: Int) -> Void in
+            let now = state.withLock { $0 }
+            host.setOutput(EQTestCurve.key)
+            host.publish(EQTestCurve.bank(on: now.on, rate: rate, version: now.version))
+        }
     }
 
     /// A level decided on the engine's queue, drawn on the main one - made outside the main actor for the same reason.
