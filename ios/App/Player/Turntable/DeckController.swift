@@ -569,10 +569,11 @@ final class DeckController {
         }
     }
 
-    /// The deck engine started - never on AirPlay, during an interruption, or after a start that failed (until
-    /// DeckStartFailure forgets it: no post or frame retries a failed start).
+    /// The deck engine started - never while the app isn't active (a tick's drive as the app leaves would start an
+    /// output in the background, where the run rule has it off), on AirPlay, during an interruption, or after a start
+    /// that failed (until DeckStartFailure forgets it: no post or frame retries a failed start).
     private func startEngine(forPress: Bool) {
-        guard let engine, !airPlay, !interrupted, failure.words == nil else { return }
+        guard let engine, active, !airPlay, !interrupted, failure.words == nil else { return }
         let began = CACurrentMediaTime()
         do {
             // the session is the app's (4.6): made active, as pressing Play would - never its category changed
