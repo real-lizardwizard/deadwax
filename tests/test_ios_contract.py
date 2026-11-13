@@ -58,7 +58,7 @@ from src.store import JobStore  # noqa: E402
 
 CORE = Path(__file__).resolve().parent.parent / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore"
 ENDPOINT = re.compile(r'Endpoint\(method: "(\w+)", path: "([^"]+)", query: \[([^\]]*)\]\)')
-ROUTE_COUNT = 27
+ROUTE_COUNT = 28
 RAW_OPENING = re.compile(r'#+"')
 HASHES = re.compile(r"#*")
 

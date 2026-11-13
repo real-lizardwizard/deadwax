@@ -205,6 +205,19 @@ public struct DeadwaxClient: Sendable {
         return .fresh(response.body, etag: response.header("ETag"))
     }
 
+    /// The CD art for a disc of an album (turntable.md 2.3: `TurntableGeometry.playingDisc`'s disc).
+    public func discArtRequest(albumID: String, disc: Int) -> HTTPRequest {
+        var built = request(Routes.discArt, query: [("album", albumID), ("disc", String(max(disc, 1)))])
+        built.headers["Accept"] = "image/*"
+        return built
+    }
+
+    /// A disc's CD art, or nil when the album has none (deadwax's 404) - the plain record with the cover as its label.
+    public func discArt(albumID: String, disc: Int) async throws -> Data? {
+        let response = try await answer(discArtRequest(albumID: albumID, disc: disc), accept: [200, 404])
+        return response.status == 404 ? nil : response.body
+    }
+
     // MARK: Phase 1's routes
 
     /// One album with its songs; nil when Navidrome has none by that id (deadwax answers `{}`). A 404 is thrown,
