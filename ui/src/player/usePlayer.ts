@@ -88,7 +88,7 @@ import {
   readPlayerGapless, readPlayerMaxRate, readPlayerRepeat, readPlayerSpeed, writePlayerGapless, writePlayerMaxRate, writePlayerRepeat,
   writePlayerSpeed,
 } from '../state/persisted'
-import { coverUrl, fragmentedUrl, scrobble, streamFormat, streamUrl } from './api'
+import { coverUrl, fragmentedUrl, scrobble, started, streamFormat, streamUrl } from './api'
 import { StreamSource, mediaSourceEngine, type StreamEvents, type StreamFailure } from './streamSource'
 
 export interface Player {
@@ -585,7 +585,7 @@ export function usePlayer(): Player {
       const { listen, nowPlaying } = listenStarted(state.listen, Date.now())
       state.listen = listen
       const track = current(state.queue)
-      if (track && nowPlaying) scrobble(track.id, false)
+      if (track && nowPlaying) started(track, listen.startedAt, state.queue)
     }
 
     /** The ONE place a stream is taken off an element: whatever it is given next, or nothing. */

@@ -13,8 +13,10 @@
  *    within - a seek on its way, and its target - so 2x speed's half second behind stays the element's.
  *  - The dots (2.4): only a lit break with the next line sung GAP_DOTS_S or more after it, in three steps by thirds; an
  *    outro none; an intro of 4 s or more given a break at 0, never a second one.
- *  - Following (2.5): held by the listener's own scroll for FOLLOW_AGAIN_MS while the song plays, paused held until it
- *    plays, held while the keyboard's focus is in the lines - never a tap's - and the lit line put at LYRICS_ANCHOR.
+ *  - Following (2.5): held by the listener's own scroll until FOLLOW_AGAIN_MS after it stops while the song plays (2.1.11:
+ *    its last movement - a fling's coast, a wheel's momentum - and a finger that scrolled held while it rests on them;
+ *    following's own scrolls never hold), paused held until it plays, held while the keyboard's focus is in the lines -
+ *    never a tap's - and the lit line put at LYRICS_ANCHOR.
  *  - The words (2.1) verbatim, and the button's name and dimming for every row of 2.7.
  *  - The view: a tap on a line seeks there and plays when paused - in the tap - and lights it at once; the arrows move
  *    between the lines sung; one tab stop; the spinner, the failure (no Try again for a gone), none, nothing playing,
@@ -157,7 +159,9 @@ class FakeElement {
   dispatch(name, event = {}) {
     for (let at = this; at; at = at.parent) for (const fn of [...(at.listeners.get(name) ?? [])]) fn({ target: this, ...event })
   }
-  scrollTo(to) { this.scrolls.push(to); this.scrollTop = to.top }
+  //? (2.1.11) a scroll moves it, and says so as a browser's does - its scroll event (here at once, a browser's a frame
+  //? later) - so following's own scrolls are seen by the view as a listener's are, and must hold nothing
+  scrollTo(to) { this.scrolls.push(to); this.scrollTop = to.top; this.dispatch('scroll') }
 }
 const document = new FakeElement('#document')
 document.visibilityState = 'visible'
@@ -306,6 +310,9 @@ async function main() {
   check('held: 3,999 ms after the last input still held, 4,000 following again', [V.follows(5999, 2000, true), V.follows(6000, 2000, true)], [false, true])
   check('paused, held past 4 s - and playing again, following', [V.follows(60000, 2000, false), V.follows(60000, 2000, true)], [false, true])
   check('keyboard focus in the lines holds it, held or not', [V.follows(60000, null, true, true), V.follows(60000, 2000, true, true)], [false, false])
+  check('(2.1.11) a scroll moves the hold on only while the listener\'s scroll holds it - never following\'s own: not held, held 3,999 ms ago, 4,000, paused long after',
+    [V.scrollHolds(60000, null, true), V.scrollHolds(5999, 2000, true), V.scrollHolds(6000, 2000, true), V.scrollHolds(60000, 2000, false)],
+    [false, true, false, true])
   check('the lit line to the anchor: the top before it can reach it, a third of the way down after', [V.followTop(28, 400), V.followTop(500, 400), V.followTop(120, 400)], [0, 380, 0])
   check('the room after the last line lets it reach the anchor too', [V.endRoom(400), V.endRoom(0), V.endRoom(-5)], [280, 0, 0])
 
@@ -407,8 +414,51 @@ async function main() {
     check('...3,999 ms on, still held', scrolls(), held)
     wait(1)
     check('...4,000 ms after it, following again - smoothly, to the lit line', [scrolls(), lastScroll()], [held + 1, { top: PAD_PX + 4 * LINE_PX - 60, behavior: 'smooth' }])
+    run(30)
+    check('...its own scroll holding nothing: the next line followed', scrolls(), held + 2)
+
+    //? (2.1.11) the wait counts from where the listener's scroll stops, as the phone's does - not from their last input
+    //? a moment of the scroll's own movement, every 100 ms for `ms`, as a browser fires its scroll event
+    const coast = (ms) => { for (let gone = 0; gone < ms; gone += 100) { wait(100); box.dispatch('scroll') } }
+    run(10)
+    box.dispatch('touchmove')
+    box.dispatch('touchend')
+    const flung = scrolls()
+    coast(1500)
+    run(25)
+    wait(3999)
+    check('(2.1.11) a fling: held 3,999 ms after its coast stops - 5.5 s after the finger lifted', scrolls(), flung)
+    wait(1)
+    check('...and following again 4,000 ms after it', scrolls(), flung + 1)
+
+    run(10)
+    box.dispatch('wheel')
+    const wheeled = scrolls()
+    coast(800)
+    run(25)
+    wait(3999)
+    check('a wheel\'s or a trackpad\'s momentum: held 3,999 ms after its last movement', scrolls(), wheeled)
+    wait(1)
+    check('...and following again 4,000 ms after it', scrolls(), wheeled + 1)
+
+    run(10)
+    box.dispatch('touchmove')
+    const resting = scrolls()
+    wait(10_000)
+    run(25)
+    check('a finger that scrolled them resting on them: held for as long as it stays, as the phone\'s scroll phase', scrolls(), resting)
+    box.dispatch('touchend')
+    wait(3999)
+    check('...lifted with no fling: held 3,999 ms after it lifts', scrolls(), resting)
+    wait(1)
+    check('...and following again 4,000 ms after it', scrolls(), resting + 1)
+    box.dispatch('touchend')
+    box.dispatch('scroll')
+    run(30)
+    check('a tap\'s lift and a scroll with no scroll of the listener\'s before it hold nothing: the next line followed', scrolls(), resting + 2)
 
     box.dispatch('touchmove')
+    box.dispatch('touchend')
     state.playing = false
     view.render(props())
     const paused = scrolls()

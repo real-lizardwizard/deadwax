@@ -1,19 +1,29 @@
 # Organizing
 
 When a download finishes, its files are tagged from the release you picked and filed into your
-library. This is the only thing deadwax does to your filesystem on its own, so it's cautious by
-default.
+library. This is the only thing deadwax does to your filesystem on its own, so it's careful: it never
+overwrites a file the library already has, and never deletes audio it didn't file.
 
-## The four modes
+## Every download is moved
 
-`ORGANIZE_MODE`, set in Settings → Library → Organizing or in your compose file:
+When a download finishes, its files are **moved** out of slskd's folder (`SLSKD_DOWNLOAD_PATH`) into
+your library (`LIBRARY_PATH`), tagged, and filed; slskd's emptied folder is cleaned up afterwards
+([below](#clean-up-after-a-move)). That happens whenever both folders are set - the image sets them,
+to `/downloads` and `/music` - and there is no setting for it.
 
-| mode | what happens when a download finishes |
-| --- | --- |
-| `off` | nothing; the files stay where slskd put them |
-| `dry_run` *(the default)* | the event log says where each file would be filed, and nothing is written. Use it to check your paths. |
-| `copy` | files are tagged and **copied** into the library, and slskd's copies stay where they are |
-| `move` | files are tagged and **moved** into the library, and slskd's folder is cleaned up afterwards (below) |
+**There used to be one.** Until 2.1.13, `ORGANIZE_MODE` chose between off, a dry run (the log said
+where each file would go, and nothing was written), copy (slskd's copies stayed) and move. Now
+deadwax only ever moves, so the setting was taken out: an `ORGANIZE_MODE` line left in your
+compose file or `.env` is ignored, start-up says so in the log, and it can be deleted. A value once
+saved in Server settings is cleared at start-up. If yours was `dry_run` (the old default), `off` or
+`copy`, downloads are now moved into the library as they finish - check both mounts before the next
+one. deadwax moves files out of slskd's folder, so it has to be able to write there: `/downloads`
+mounted **read-write** (no `:ro`), and slskd and deadwax running as the same user and group (slskd
+makes each download's folder as its own user). Where it can't, it refuses to file that download,
+before moving a file, and says why on the download's row, in the log and in Settings → Library; the
+download is filed by itself once it can (at a restart, or within 15 minutes) - don't get it again.
+`/downloads` and `/music` must be two separate folders, neither inside the other: while they overlap
+nothing is filed, since moving out of the one would be moving out of the other.
 
 Settings → Library says whether organizing is ready, and lists everything stopping it (a
 path that doesn't exist from inside the container, say) all at once.
@@ -117,19 +127,22 @@ without a word.
   filed (unless `FETCH_LYRICS` is off), and saved as a `.lrc` file with the track's own name,
   beside it. Synced lyrics are saved when LRCLIB has them, plain ones otherwise; an
   instrumental gets nothing. Navidrome, Jellyfin and Kodi read `.lrc` files with no
-  configuration. Nothing is fetched in dry run.
+  configuration.
 
 ## Clean-up after a move
 
-In `move` mode, once every file of a download has been filed, the folder slskd downloaded into
+Once every file of a download has been filed, the folder slskd downloaded into
 is removed, along with anything left in it. That's the files nobody chose to keep
-(`Thumbs.db`, checksums, a `Scans/` folder), since the sidecars worth keeping have already moved
-with the tracks. The log names what was removed.
+(`Thumbs.db`, checksums, rip reports, a `Scans/` folder or a PDF booklet), since the sidecars worth
+keeping have already moved with the tracks. The log names what was removed.
 
-**Audio stops it.** If any audio file is still anywhere in that folder, it's left alone and
-reported: that's music that was never filed, perhaps from a second download into the same
-folder that's still arriving. Nothing is removed if any file of the download failed or was
-skipped.
+**Anything else stops it.** Only art, scans, booklets, checksums and rip reports (`.md5`, `.ffp`,
+`.accurip` and the like), the `.cue`/`.log`/`.nfo`/`.txt`/playlist sidecars and system clutter
+(`Thumbs.db`, `desktop.ini`, `.DS_Store`, `._` files) may go with the folder. If anything else is
+still anywhere in it - music in any format, DSD and Musepack included, a video, a file deadwax
+doesn't recognise - it's left alone and reported: that's something that was never filed, perhaps
+from a second download into the same folder that's still arriving. Nothing is removed if any file
+of the download failed or was skipped, and never a folder in your library or holding it.
 
 With `SLSKD_INCOMPLETE_PATH` set, the empty folders slskd leaves behind in its incomplete
 folder are also swept every ten minutes. It only ever removes *empty* folders, never one that

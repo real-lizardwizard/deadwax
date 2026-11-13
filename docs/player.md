@@ -292,11 +292,13 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
   song changes and seek went are in [Info → Debug](#info--debug), and the Gapless checkbox in **You**.
 - **Lyrics** on the now-playing screen shows the song's lyrics in the cover's place as it plays: the line being
   sung bright and the rest dimmer, kept about a third of the way down as the song moves on, and three dots filling in
-  through a long break between verses (or a long intro). Scroll them yourself and they stay where you put them;
-  four seconds after you stop, they follow the song again - paused, they wait until it plays. Tap any line to play
-  from there, from a pause too. Lyrics saved without timings show whole, under "These lyrics aren't synced to the
-  song.", and don't move by themselves. The button is purple while lyrics are on, and dimmed - "Lyrics - none for
-  this song" to VoiceOver - for a song deadwax knows has none; with lyrics on, a song with none shows its cover.
+  through a long break between verses (or a long intro). Scroll them yourself - a finger, a wheel or a trackpad -
+  and they stay where you put them, for as long as your finger rests on them; four seconds after they come to rest
+  (a flick's glide, or a trackpad's, counts as still scrolling), they follow the song again - paused, they wait
+  until it plays. Tap any line to play from there, from a pause too. Lyrics saved without timings show whole, under
+  "These lyrics aren't synced to the song.", and don't move by themselves. The button is purple while lyrics are
+  on, and dimmed - "Lyrics - none for this song" to VoiceOver - for a song deadwax knows has none; with lyrics on, a
+  song with none shows its cover.
   They stay on from song to song and each time the screen opens, until you tap **Lyrics** again or the look
   button at the top, which shows the cover or the turntable instead. If they can't be fetched the screen says
   "Couldn't load the lyrics." with **Try again**. They're the lyrics deadwax saved beside each song
@@ -376,15 +378,27 @@ settings an iPhone's Music app keeps there. Shuffle and Repeat are on the now-pl
 and next - one setting each, so a change in either place shows in the other. On a desktop, Up Next is the
 player bar's **Up Next** button, and opens as a panel beside the page, as Info does ([on a desktop](#on-a-desktop)).
 
-- **History**, above the song playing: what has played since you started the album, list or shuffle - songs a
-  tap skipped past included, where they are on the album - oldest at the top. Up Next opens at the song
-  playing, even with only a song or two left after it; scroll up for History. A song Repeat One played again is
-  one row; Repeat All's earlier times round are there as they played. It goes back 50 plays (as many as come back
-  when the app opens again) - each time Repeat One played a song counts as one, so after a long run of one song
-  it shows fewer rows - and starts again when you play something new. Tap one to hear it again now: Playing Next
-  and the album carry on after it as they were, and the song that was playing joins History. To a keyboard,
-  History is one stop of Tab - the up and down arrows move inside it - and VoiceOver reads it under its own
-  heading, then the song playing's title as one.
+- **What you've played**, above the song playing (since 2.1.15): one list, newest nearest the song playing,
+  with no headings, dates or times - scroll up and it keeps going, back through every song you've started in the
+  app, on any of your devices, for as long as you've had 2.1.15. Up Next opens at the song playing, even with only
+  a song or two left after it; scroll up for the rest. Nearest the song playing is what has played since you
+  started the album, list or shuffle - songs a tap skipped past included, where they are on the album; above that,
+  everything you played before it, in the order you played it. A song Repeat One played again, or that you started
+  again, is one row; Repeat All's earlier times round are there as they played. A song you skipped after a second
+  is there like any other. As you scroll near the top the next older songs come, a spinner showing while they do
+  (and, if they can't, a line saying so with **Try again**). Tap any of them to hear it again now: Playing Next and
+  the album carry on after it as they were, and the song that was playing joins the list. To a keyboard, the list
+  is one stop of Tab - the up and down arrows move inside it - and VoiceOver reads it as one list, "History", then
+  the song playing's title as a heading.
+  - **What goes in it**: every song that starts playing - the moment Navidrome is told "now playing" - skips
+    included. Pausing and playing again, seeking, a wait for the network or a song tried again from where it
+    stopped are the same play, so they add nothing; a song put back [where you left off](#picking-up-where-you-left-off)
+    and played on from the middle was already in it when it began (unless the native iPhone app began it - below).
+    Plays in other apps (Amperfy, Symfonium) aren't, as deadwax isn't told of them; nor are the native
+    [iPhone app](ios.md)'s, which doesn't send them yet.
+  - **Kept by deadwax, for ever**, in its own database - with logins on, each person's own, so it follows you from
+    the phone to a computer; with logins off, one list for everyone who uses this deadwax. There's no Clear yet.
+    (Removing a person in People, or Forget, takes theirs with the rest of what deadwax kept for them.)
 - **The song playing, where Up Next opens** - and with Repeat One on, "Repeat one: this song plays again until
   you skip it." Under it two chips, **Shuffle** and **Repeat**, purple while on; a change is read out by
   VoiceOver.
@@ -406,7 +420,7 @@ player bar's **Up Next** button, and opens as a panel beside the page, as Info d
 - **Edit** (at the top left) turns the rows into ones you move and remove, as Home's Pinned does: **up** and
   **down**, **✕** to take one out, and a grip at the right to drag it by (only the grip drags, so the list
   still scrolls under your finger elsewhere). A song moves within its own group - Playing Next, or the
-  album's - and each change is made as you tap it, with nothing to save; History isn't shown while you edit.
+  album's - and each change is made as you tap it, with nothing to save; what you've played isn't shown while you edit.
   **Done** ends Edit; a tap above the sheet, or Escape, closes it.
 - It closes by itself once nothing is playing.
 
@@ -488,8 +502,8 @@ another app, by its name - "Picked up from Symfonium". From the same device noth
 
 - **Other apps.** Navidrome keeps one play queue for each person, which a Subsonic app may read and save. One
   another app saved comes back as a plain list - its songs in its order, at its song and second - without
-  Playing Next or the Shuffle chip, which only deadwax keeps, and with an empty History (what played before
-  isn't known). **Amperfy doesn't use Navidrome's play queue** (it
+  Playing Next or the Shuffle chip, which only deadwax keeps, and with nothing of its own above the song (what played
+  before in it isn't known - what you played in deadwax is still there, above that). **Amperfy doesn't use Navidrome's play queue** (it
   keeps its own on the phone), so it won't show what deadwax was playing, nor replace it - and deadwax won't
   pick up what Amperfy was playing. Which other apps use it hasn't been checked.
 - **A device left paused** - the home-screen app iOS kept in memory, a computer's tab - takes what another of
@@ -1232,7 +1246,9 @@ below.
   it is says how far through the song you are. The line under the song's name says the time:
   "2:31 of 7:05".
 - **Tap the record** to pause, or to play. A pause from the record winds its sound down with it
-  (see **Pause winds the record down** below).
+  (see **Pause winds the record down** below). If the song changes while your finger is on the
+  record - it reaches its end under a resting finger, say - lifting your finger does nothing to the
+  new song: it plays on, or stays paused, just as the change left it, and the record follows it.
 - **Turn the record** to move through the song: a whole turn is 1.8 seconds, as a real record at
   33⅓ turns, and turning it back goes back. While you turn, the time line says **Scrubbing** and
   where the record is.
@@ -2039,7 +2055,7 @@ it is that once - and so does any other song of the album that comes up while it
 straight away, without a wait of its own. Info's **Normalization** row says so (`Played as it is this
 time`), and the turntable plays it as it is too. Once the album is measured, its songs play levelled. An
 album is measured once: the measurements are kept, and a download deadwax files is measured as it's
-filed (not in dry run). After that, a song waits only while its levelled copy is made, a second or so,
+filed. After that, a song waits only while its levelled copy is made, a second or so,
 and with Gapless off or while AirPlaying the next song's copy is asked for a few seconds into each song.
 
 **Nothing is written to your files.** The measurements live in deadwax's database, kept by each FLAC
@@ -2639,7 +2655,9 @@ question the whole player existed to answer. Still to find out:
   home-screen app, and VoiceOver through Up Next, its Edit and the song menu; (2.1.3) **History**: Up Next
   opening at the song playing and keeping its place as songs end, on the phone and in a desktop's panel, a tap
   on a song further down the album moving within the one stream (a seek, not a new start) on the iPhone's own
-  player, a History row playing again, and VoiceOver through 50 rows of History before the song playing; Repeat One the second-player
+  player, a History row playing again, and VoiceOver through 50 rows of History before the song playing; (2.1.15)
+  **what you've played** scrolled back through months of it on the phone (there is no windowing: a month is a few
+  thousand rows), an older song tapped while the one stream plays, and the songs played in a pocket reaching deadwax; Repeat One the second-player
   way (Gapless on, not FLAC), which hands the same song over each time (about 100 ms, as any handover) and
   downloads it again each time; **a Play Next in a song's last seconds**: whether taking the next song's
   start back out makes the phone drop a moment of the song playing's end; and all of it with AirPods.

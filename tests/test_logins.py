@@ -202,6 +202,8 @@ ROUTES = {
     ("GET", "/deadwax/me/pins"): "user",
     ("PUT", "/deadwax/me/pins"): "user",
     ("POST", "/deadwax/me/pins/toggle"): "user",
+    ("GET", "/deadwax/me/history"): "user",
+    ("POST", "/deadwax/me/history"): "user",
     ("GET", "/deadwax/store/album"): "user",
     #? (2.0.13) the artist and album pages' descriptions
     ("GET", "/deadwax/describe/artist"): "user",
@@ -325,8 +327,8 @@ def on(monkeypatch, tmp_path):
     monkeypatch.setattr(Config, "DEADWAX_SECRET_KEY", SECRET)
     monkeypatch.setattr(Config, "DEADWAX_ADMIN_PASSWORD", GLASS)
     monkeypatch.setattr(Config, "NAVIDROME_URL", "http://navidrome:4533")
-    #? (2.0.0-player.49) logins need organizing on - copy or move, both folders set - or every route is a 503
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "copy")
+    #? (2.0.0-player.49) logins need organizing on - both folders set (2.1.13: no mode any more) - or every route
+    #? is a 503
     monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(tmp_path / "slskd"))
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path / "library"))
     monkeypatch.setattr(auth, "throttle", auth.Throttle())
@@ -1933,7 +1935,8 @@ def test_the_example_files_logins_lines_lock_nobody_out():
     an empty line under environment: beats .env, and then nobody can sign in. (2.0.3, the compose prune) The compose
     example has no environment: block at all now, so no line of it can beat .env, and it names no login setting; it
     points at .env, which carries the three login lines, commented out, saying logins need organizing set to copy or move
-    first and the key in .env only."""
+    first and the key in .env only. (2.1.13) Organizing on is both folders set now - filing always moves - and the
+    line says so."""
     repo = Path(__file__).resolve().parent.parent
     compose = (repo / "docker-compose.example.yml").read_text()
     env = (repo / ".env.example").read_text()
@@ -1945,7 +1948,8 @@ def test_the_example_files_logins_lines_lock_nobody_out():
     for line in ("#AUTH_MODE=on", "#DEADWAX_SECRET_KEY=", "#DEADWAX_ADMIN_PASSWORD="):
         assert line in env.splitlines(), line
     #? (2.0.3, after review) and to set it BEFORE turning logins on: after, nothing can be reached to set it
-    assert "BEFORE you turn it" in env and "Organizing set to copy or move" in env
+    assert "BEFORE you turn it" in env and "Organizing on - SLSKD_DOWNLOAD_PATH and LIBRARY_PATH both set" in env
+    assert "copy or move" not in env and "dry run" not in env
     assert "beats this file even when it's empty" in env
     #? (2.0.0-player.68) no prerelease history - a reader comes from 1.1.8 and never ran those versions
     for text in (compose, env):

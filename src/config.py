@@ -361,6 +361,50 @@ DEADWAX_ADMINS_IGNORED = (
     "DEADWAX_ADMINS out of compose."
 )
 
+#? (2.1.13) Settings deadwax no longer reads. ORGANIZE_MODE went when James decided filing only ever moves
+#? (2026-11-13: "I would like it to only move the files, I don't think we need anything else"): one
+#? still in the environment is ignored, one saved in Server settings is passed over by apply_overrides
+#? and cleared from the database as deadwax starts (src/api/app.py), and start-up says so once
+#? (describe_organize_mode_ignored).
+RETIRED_SETTINGS = ("ORGANIZE_MODE",)
+
+
+async def clear_retired_settings(store, stored: dict[str, str]) -> list[str]:
+    """
+    (2.1.13) Clear from the database each setting deadwax no longer reads that Server settings had saved -
+    `stored`, as start-up read it - and return the keys cleared. Once, at start-up: no row of Server
+    settings shows one any more, to revert it from, and a row left would only ever be passed over. A
+    clearing that fails costs nothing but the row (store.clear_setting logs it): apply_overrides passes
+    over it all the same.
+    """
+    cleared = []
+    for key in RETIRED_SETTINGS:
+        if key in stored and await store.clear_setting(key):
+            cleared.append(key)
+    return cleared
+
+
+def describe_organize_mode_ignored(environment: str | None, saved: str | None) -> str | None:
+    """
+    What start-up says, once, when the removed ORGANIZE_MODE is still set (2.1.13): `environment` is the
+    container's value (compose or .env; None when it has none), `saved` the value Server settings had
+    saved (None when none). None when it is set nowhere. Plain words for whoever runs deadwax: it isn't
+    read any more, finished downloads are always moved into the library, and what to do about the line.
+    """
+    places = []
+    if environment is not None:
+        places.append(f"in {setting_source('ORGANIZE_MODE') or 'the environment'} ({environment or 'empty'})")
+    if saved is not None:
+        places.append(f"in Server settings ({saved}), where it has now been cleared")
+    if not places:
+        return None
+    then = (" Delete the ORGANIZE_MODE line from compose or .env: it does nothing now."
+            if environment is not None else " Nothing needs doing.")
+    return (f"ORGANIZE_MODE is set {' and '.join(places)}, but deadwax no longer reads it (since 2.1.13): every "
+            f"finished download is moved into the library whenever SLSKD_DOWNLOAD_PATH and LIBRARY_PATH are "
+            f"both set - there is no dry run, copy or off any more.{then}")
+
+
 #? Why the settings tab can't change any of them, in the words it renders under each.
 LOGINS_LOCKED = (
     "Logins are set in the container's environment and nowhere else: a value saved here would beat "
@@ -437,10 +481,10 @@ class Config:
     LIBRARY_PATH = _env("LIBRARY_PATH")
     DB_PATH = _env("DB_PATH") or default_db_path()
 
-    #? off | dry_run | copy | move. Defaults to dry_run deliberately: organizing is the only
-    #? thing here that writes to your filesystem, so a fresh install reports what it would
-    #? have done rather than acting on a possibly mis-mapped volume.
-    ORGANIZE_MODE = _env("ORGANIZE_MODE", "dry_run")
+    #? (2.1.13) No ORGANIZE_MODE any more: a finished download is always MOVED into LIBRARY_PATH,
+    #? whenever it and SLSKD_DOWNLOAD_PATH are both set (organizing_enabled). Until then it was off,
+    #? dry_run (the default), copy or move. Still set, it is ignored, and start-up says so
+    #? (RETIRED_SETTINGS, describe_organize_mode_ignored).
 
     #? How big a cover to fetch from the Cover Art Archive: 250 | 500 | 1200 | full. 500 is the
     #? size deadwax always fetched, and it stays the default - `full` pulls the original
@@ -450,7 +494,7 @@ class Config:
 
     #? on | off. Whether an album filed from a download gets its lyrics looked up on LRCLIB and
     #? written as a .lrc beside each track. On by default because it only ever ADDS files, and
-    #? only once organizing actually writes - a dry run fetches nothing. Off is for anyone who
+    #? only beside an album a download actually filed. Off is for anyone who
     #? would rather this container didn't ask a third party about every track they download.
     FETCH_LYRICS = _env("FETCH_LYRICS", "on")
 
@@ -581,7 +625,6 @@ class Config:
         #? Still editable, so an override stored under it can be seen and reverted. The tab
         #? only shows its row while it is set - see the settings route.
         "MUSICBRAINZ_USERAGENT": "musicbrainz",
-        "ORGANIZE_MODE": None,
         "SLSKD_DOWNLOAD_PATH": None,
         "SLSKD_INCOMPLETE_PATH": None,
         "LIBRARY_PATH": "library",
@@ -665,6 +708,11 @@ class Config:
         cls.OVERRIDDEN = set()
 
         for key, value in stored.items():
+            #? (2.1.13) a setting deadwax no longer reads, saved before it went: passed over without a
+            #? word here - start-up said so once, and cleared the row (src/api/app.py) - so a save made
+            #? before that clearing could, or if it failed, never logs it again
+            if key in RETIRED_SETTINGS:
+                continue
             if key not in cls.EDITABLE:
                 logger.warning(f"ignoring stored setting {key!r}, which is not editable")
                 continue
@@ -828,14 +876,14 @@ class Config:
     @classmethod
     def report_slskd(cls) -> None:
         """
-        Say whether deadwax can reach slskd, where its address came from, and what organizing will do.
+        Say whether deadwax can reach slskd, where its address came from, and whether downloads are filed.
 
         Called once the settings tab's overrides are in, beside report_musicbrainz() and
         report_navidrome() and for the same reason (2.0.3, the compose prune's review): from check(), an
         slskd set up in Server settings - the way the short compose example leaves it to be set - was
         logged as "SLSKD_URL is unusable (not set)" to the app's Log on every restart while it worked,
-        and the line told the reader to put it back in compose. The paths and the organize mode can be
-        saved there too, so they are said here as well. Never logs the key - only whether one is set.
+        and the line told the reader to put it back in compose. The paths can be saved there too, so they
+        are said here as well. Never logs the key - only whether one is set.
         """
         def source(name: str) -> str:
             return ("Server settings" if name in cls.OVERRIDDEN
@@ -888,9 +936,20 @@ class Config:
         else: logger.info(f"LIBRARY_PATH found! (from {source('LIBRARY_PATH')})")
 
         if cls.organizing_enabled():
-            logger.info(f"organizing enabled in '{cls.ORGANIZE_MODE}' mode")
+            logger.info("organizing enabled: finished downloads are moved into LIBRARY_PATH")
 
-        else: logger.info("organizing disabled (needs SLSKD_DOWNLOAD_PATH + LIBRARY_PATH, and ORGANIZE_MODE not 'off')")
+        else: logger.info("organizing disabled (needs SLSKD_DOWNLOAD_PATH and LIBRARY_PATH both set)")
+
+    @classmethod
+    def report_retired(cls, saved: dict[str, str] | None = None) -> None:
+        """
+        Say once at start-up that ORGANIZE_MODE, removed in 2.1.13, is ignored - when it is still in the
+        environment, or was saved in Server settings (`saved`: the stored settings as start-up read them,
+        before it cleared that row). Nothing at all when it is set nowhere.
+        """
+        said = describe_organize_mode_ignored(os.getenv("ORGANIZE_MODE"), (saved or {}).get("ORGANIZE_MODE"))
+        if said:
+            logger.warning(said, extra={"frontend": True})
 
     @classmethod
     def exists(cls, env_var: str):
@@ -916,8 +975,7 @@ class Config:
         #? Named before anything else, because an empty environment variable beating a good
         #? .env line is invisible from the value alone - the setting simply reads as unset
         #? while the .env line sits there looking correct.
-        for name in ("SLSKD_URL", "SLSKD_APIKEY", "MUSICBRAINZ_EMAIL", "ORGANIZE_MODE",
-                     "COVER_ART_SIZE"):
+        for name in ("SLSKD_URL", "SLSKD_APIKEY", "MUSICBRAINZ_EMAIL", "COVER_ART_SIZE"):
             if shadowed_by_empty_env(name):
                 logger.error(
                     f"{name} is set to an EMPTY value in the container environment, which "
@@ -926,14 +984,6 @@ class Config:
                     f"`{name}=${{{name}}}` entry does this whenever the outer variable is unset.",
                     extra={"frontend": True},
                 )
-
-        if cls.ORGANIZE_MODE not in ("off", "dry_run", "copy", "move"):
-            logger.error(
-                f"ORGANIZE_MODE is '{cls.ORGANIZE_MODE}', expected one of off/dry_run/copy/move. "
-                f"Falling back to dry_run.",
-                extra={"frontend": True},
-            )
-            cls.ORGANIZE_MODE = "dry_run"
 
         if cls.COVER_ART_SIZE not in COVER_ART_SIZES:
             logger.error(
@@ -1010,7 +1060,11 @@ class Config:
 
     @classmethod
     def organizing_enabled(cls) -> bool:
-        return bool(cls.SLSKD_DOWNLOAD_PATH and cls.LIBRARY_PATH and cls.ORGANIZE_MODE != "off")
+        """
+        Whether a finished download is filed - MOVED into LIBRARY_PATH: whenever both folders are set.
+        (2.1.13) There is no mode any more; until then a mode of `off` stopped it here too.
+        """
+        return bool(cls.SLSKD_DOWNLOAD_PATH and cls.LIBRARY_PATH)
 
     @classmethod
     def describe_logins_organizing(cls) -> str | None:
@@ -1018,22 +1072,11 @@ class Config:
         Why logins can't be on with organizing as it is - or None when it files (2.0.0-player.49).
 
         With logins on, downloads are each person's own, and what someone asked for is theirs once it is
-        FILED: under dry_run (or off) nothing ever is, so nothing could be granted to the people who
-        asked, nor found already held for the next. So logins need ORGANIZE_MODE copy or move, with
-        both of organizing's folders set (organizing_enabled). Said where the value comes from: a mode
-        saved in the settings tab beats the environment, and with logins refused that tab can't be
-        reached - so the way back is through logins off.
+        FILED: with either folder unset nothing ever is, so nothing could be granted to the people who
+        asked, nor found already held for the next. So logins need both of organizing's folders set,
+        SLSKD_DOWNLOAD_PATH and LIBRARY_PATH (organizing_enabled). (2.1.13) Until then they needed
+        the mode copy or move too; filing always moves now, so the folders are the whole rule.
         """
-        if cls.ORGANIZE_MODE not in ("copy", "move"):
-            where = (
-                "it's saved in Server settings, which beats the environment: switch logins off "
-                "(AUTH_MODE=off), set Organize mode there to copy or move, and switch them on again"
-                if "ORGANIZE_MODE" in cls.OVERRIDDEN
-                else "set ORGANIZE_MODE=copy or move in the container's environment and recreate the container"
-            )
-            return (f"ORGANIZE_MODE is '{cls.ORGANIZE_MODE}', so nothing downloaded would ever be filed into "
-                    f"the library - and with logins on each download is the person's who asked for it, which "
-                    f"needs it filed. Until it's copy or move nobody can use deadwax: {where}.")
         missing = [name for name in ("SLSKD_DOWNLOAD_PATH", "LIBRARY_PATH") if not getattr(cls, name)]
         if missing:
             return (f"{' and '.join(missing)} {'is' if len(missing) == 1 else 'are'} not set, so nothing "

@@ -193,9 +193,10 @@ def unusable() -> str | None:
     """Why nobody can sign in at all right now, in words for whoever asks - or None. Logins on only.
 
     The secret key missing; and (2.0.0-player.49) organizing not on: downloads are per person with
-    logins on, and under ORGANIZE_MODE dry_run (or off) nothing is ever filed, so nothing could be
-    granted to the people who asked or found already held - logins are refused until it's copy or move
-    (Config.describe_logins_organizing), every protected route answering 503 with the reason, as for the key."""
+    logins on, and with SLSKD_DOWNLOAD_PATH or LIBRARY_PATH unset nothing is ever filed, so nothing could
+    be granted to the people who asked or found already held - logins are refused until both are set
+    (Config.describe_logins_organizing; until 2.1.13 the organize mode had to file too), every
+    protected route answering 503 with the reason, as for the key."""
     problem = describe_secret_key(Config.DEADWAX_SECRET_KEY)
     if problem:
         return (f"Logins are on, but DEADWAX_SECRET_KEY {problem}, so deadwax can't sign anyone in. "

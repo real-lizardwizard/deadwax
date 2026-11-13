@@ -33,7 +33,11 @@ The first one is where almost every first-run problem comes from. A finished dow
 written into slskd's own downloads folder, and deadwax has to find those files to file them. So the
 host folder you mount at `/downloads` must be **the same host folder** slskd's container has
 mounted as its downloads directory. If the two disagree, downloads still work but organizing
-quietly finds nothing.
+quietly finds nothing. deadwax **moves** each finished download out of that folder into `/music`,
+so it has to be able to write to both: mount `/downloads` read-write, never `:ro`, and run slskd as
+the same user and group as deadwax (`PUID`/`PGID`, below) - slskd makes each download's folder as its
+own user, and deadwax refuses to file a download it can't move out (it says so, and files it by itself
+once it can). Keep `/downloads` and `/music` two separate folders, neither inside the other.
 
 ```
 host: /srv/media/slskd/downloads ──┬── mounted into slskd  as its downloads folder
@@ -81,7 +85,7 @@ A few things to know:
 - **`PUID` and `PGID`** are the user and group the app runs as, and so who owns every file it
   writes into your library. Set them to the same values as slskd and your other media
   containers. `id yourname` on the host prints them. Both are 1000 unless `.env` says otherwise.
-- **Everything else** - slskd's address and key, MusicBrainz's email, Navidrome, organizing, cover art,
+- **Everything else** - slskd's address and key, MusicBrainz's email, Navidrome, folder names, cover art,
   lyrics, the caches - starts at a default and is set in **Server settings** after the first start
   ([below](#the-first-run)). Any of it can be an environment variable instead:
   [every variable deadwax reads](configuration.md#environment-variables), with its default, where it's
@@ -97,10 +101,10 @@ recreate the container, and set the setting again in Server settings. It can't b
 Server settings saves only a value that differs from the one it shows, so typing in the one compose
 already gives saves nothing, and taking the line out would then lose it. An address goes with its key
 or password - take both out, and type both in the same save. Leave `DB_PATH` and any path you mounted
-somewhere other than `/downloads` and `/music` where they are. **With logins on, leave `ORGANIZE_MODE`
-and the three `NAVIDROME_` lines too** (or switch logins off while you trim): with organizing back at
-dry run nobody can reach Server settings to set it again, and without Navidrome only the break-glass
-`deadwax` can sign in.
+somewhere other than `/downloads` and `/music` where they are. **With logins on, leave the three
+`NAVIDROME_` lines too** (or switch logins off while you trim): without Navidrome only the break-glass
+`deadwax` can sign in. An `ORGANIZE_MODE` line can simply go: deadwax no longer reads it (since 2.1.13
+every finished download is moved into the library), and says so in its log while it's there.
 
 ## The first run
 
@@ -129,13 +133,13 @@ dry run nobody can reach Server settings to set it again, and without Navidrome 
 4. **Download something small.** Search for an album, open it, pick a pressing, press **Get the
    album**, then **Get** on a good source. [Finding music](finding-music.md) and
    [Downloading](downloading.md) walk through it.
-5. **Watch the log** (the sidebar's **Event log**, or **You → Manage → Event log** on a phone). Organizing starts in **dry run**, so when
-   the download finishes the log says where each file *would* have been filed, and nothing is
-   written. Check the paths look right.
-6. **Switch organizing on.** In Settings → Library → Organizing, set `ORGANIZE_MODE` to `copy`
-   (files are copied into the library and slskd's copies stay) or `move` (they're moved, and
-   slskd's emptied folder is cleaned up). A setting saved in Server settings takes effect
-   straight away, with no restart.
+5. **Watch the log** (the sidebar's **Event log**, or **You → Manage → Event log** on a phone). When
+   the download finishes it's **moved** into your library, tagged and filed - there is no dry run,
+   and no setting to switch it on - and the log names the folder it went into. slskd's emptied
+   folder is cleaned up after it.
+6. **Check where it landed.** Look in your library folder on the host for the new album, in a folder
+   named after its artist. If the log says *not found on disk* and *nothing to organize* instead,
+   the `/downloads` mount isn't slskd's folder ([above](#the-three-folders)).
 7. **Set up Navidrome.** Point Navidrome at the same music folder you mounted at `/music`, then fill
    in `NAVIDROME_URL` (Navidrome's address as this container sees it, such as
    `http://navidrome:4533`), `NAVIDROME_USER` and `NAVIDROME_PASSWORD` in Settings → Connections (or uncomment the three
@@ -191,8 +195,8 @@ DEADWAX_SECRET_KEY=<the key>
 
 To manage deadwax you sign in as a **Navidrome admin** account - make yours one in Navidrome's own Users
 page if it isn't, or keep a separate admin account for managing. Navidrome has to be set up (step 7),
-since signing in asks it, and organizing has to be on -
-`ORGANIZE_MODE` `copy` or `move` (step 6) - or deadwax refuses everything, saying why. Recreate the
+since signing in asks it, and organizing has to be on - `SLSKD_DOWNLOAD_PATH` and `LIBRARY_PATH` both
+set, which the image does - or deadwax refuses everything, saying why. Recreate the
 container, open deadwax, and sign in. Put HTTPS in front of it before reaching it from outside your
 own network; plain http is fine there and over WireGuard.
 

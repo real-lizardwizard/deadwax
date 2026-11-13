@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { getServerSettings, saveServerSettings, type ServerSetting, type ServerSettings as Settings, type SettingUpdate } from '../api/settings'
-import { OrganizeModes, OrganizingVerdict, ServerGroup, editedEnvDraft, tabForGroup, tabMarks, type SettingsTab } from '../components/SettingsView'
+import { OrganizingVerdict, ServerGroup, editedEnvDraft, tabForGroup, tabMarks, type SettingsTab } from '../components/SettingsView'
 import { RetimeLyrics } from '../components/RetimeLyrics'
 import { MusicBrainzAnswers } from '../components/MusicBrainzAnswers'
 import { SAVED_ANSWERS_GROUP, SAVED_ANSWERS_PATH, savedAnswersKey } from '../lib/musicbrainzAnswers'
@@ -317,7 +317,6 @@ export function ServerSettings({
                   )}
                 </ServerGroup>
               ))}
-              {tab === 'library' && <OrganizeModes modes={server.organize_modes} />}
             </div>
           </>
         )}

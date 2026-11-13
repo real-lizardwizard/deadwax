@@ -202,7 +202,7 @@ export function OrganizingVerdict({ organizing }: { organizing: ServerSettings['
     <div class={`settings-verdict${organizing.enabled ? ' ok' : ''}`} role="status">
       <span class="settings-verdict-title">
         {organizing.enabled
-          ? 'Organizing is active — finished downloads will be tagged and filed.'
+          ? 'Organizing is active — finished downloads will be moved into the library, tagged and filed.'
           : 'Organizing will not file anything right now.'}
       </span>
 
@@ -214,25 +214,6 @@ export function OrganizingVerdict({ organizing }: { organizing: ServerSettings['
         </ul>
       ) : null}
     </div>
-  )
-}
-
-/** What ORGANIZE_MODE can be set to, least to most destructive. */
-export function OrganizeModes({ modes }: { modes: ServerSettings['organize_modes'] }) {
-  return (
-    <Section
-      title="Organize modes"
-      note="What each ORGANIZE_MODE does with a finished download, from the safest to the one that moves files."
-    >
-      <div class="settings-env-list">
-        {Object.entries(modes).map(([mode, description]) => (
-          <div key={mode} class="settings-mode">
-            <code class="settings-mode-name">{mode}</code>
-            <span class="settings-mode-note">{description}</span>
-          </div>
-        ))}
-      </div>
-    </Section>
   )
 }
 
@@ -265,7 +246,7 @@ export function SettingRow({
     <span class="settings-env-locked" title={setting.locked_reason ?? undefined}>Locked</span>
   ) : setting.choices ? (
     //? A setting that only takes certain values is offered only those values, as the server
-    //? lists them - ORGANIZE_MODE and COVER_ART_SIZE. A text box would take anything and then
+    //? lists them - COVER_ART_SIZE and FETCH_LYRICS, say. A text box would take anything and then
     //? refuse it on save.
     <select
       class="settings-env-input"

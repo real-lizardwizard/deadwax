@@ -18,7 +18,7 @@
 /**
  * Statuses a job can hold. `complete` means downloaded; `organized` means filed into the
  * library. The split matters because organizing is the only step that writes to the user's
- * filesystem and can be off (ORGANIZE_MODE=dry_run) while downloads still succeed.
+ * filesystem, and is off (SLSKD_DOWNLOAD_PATH or LIBRARY_PATH unset) while downloads still succeed.
  */
 export type JobStatus =
   | 'queued'
@@ -144,8 +144,8 @@ export type LibraryGrant = 'added' | 'incomplete' | 'flagged' | 'looked'
 
 /**
  * How a download ended (src/poller.py job_outcome). null for one still going, and for one that
- * finished without filing for another reason - a dry run, organizing off (ORGANIZE_MODE 'off', or
- * LIBRARY_PATH or SLSKD_DOWNLOAD_PATH not set), nothing that could be filed, no track filed -
+ * finished without filing for another reason - organizing off (LIBRARY_PATH or SLSKD_DOWNLOAD_PATH
+ * not set), a dry run (before 2.1.13), nothing that could be filed, no track filed -
  * which its `error` states (and organizing off leaves it none). With logins on (2.0.0-player.51) a
  * download nothing of could be filed is `not_filed`, which "try the next peer" can start again.
  */

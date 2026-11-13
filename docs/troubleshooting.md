@@ -9,8 +9,11 @@ MusicBrainz's own words where there are any.
 
 In order of likelihood:
 
-1. **Organizing is in dry run.** It's the default. The log says where each file *would* have
-   gone. Set `ORGANIZE_MODE` to `copy` or `move` in Settings → Library → Organizing.
+1. **`SLSKD_DOWNLOAD_PATH` or `LIBRARY_PATH` isn't set.** A finished download is moved into the
+   library whenever both are set, and only then; Settings → Library says organizing is off and names
+   which one is missing. The image sets them to `/downloads` and `/music`, so this happens only when
+   a line such as `LIBRARY_PATH=` with nothing after it took one away, or outside the image. There is
+   no dry run or off any more: an `ORGANIZE_MODE` line is ignored (since 2.1.13), and can be deleted.
 2. **`/downloads` isn't slskd's downloads folder.** The host folder mounted at `/downloads` has
    to be the same one slskd writes finished downloads into. If they differ, the files are
    downloaded but deadwax can't find them. Compare the two containers' volume lines. See
@@ -22,7 +25,30 @@ In order of likelihood:
    container looks perfectly correct from outside.
 4. **Permissions.** Files are written as `PUID`/`PGID`. If the library folder belongs to someone
    else, writing fails and the log says so.
-5. **The album was already there.** A track the album's folder already has (in any format) is
+5. **deadwax can't move files out of slskd's download folder.** A download is moved out of the
+   folder slskd made for it, so deadwax has to be able to write there too. It can't when:
+   - `/downloads` is mounted `:ro` (fine before 2.1.13, when organizing could copy). Settings →
+     Library lists "SLSKD_DOWNLOAD_PATH is mounted read-only". Drop `:ro` from the `/downloads`
+     volume and recreate the container.
+   - more often, **slskd and deadwax run as different users**. slskd makes each download's folder as
+     its own user, and deadwax (`PUID`/`PGID`) may not be allowed to write in it, even though
+     `/downloads` itself is fine. Settings → Library looks at the download folders already there:
+     it marks `SLSKD_DOWNLOAD_PATH` *Needs attention*, naming a folder, its owner and the user deadwax
+     runs as. When none of them can be written, it also lists "deadwax can't move files out of
+     slskd's download folders". Run slskd and deadwax as the same user and group (deadwax's are
+     `PUID`/`PGID`), or give deadwax's user write access to slskd's downloads.
+
+   Either way deadwax refuses before moving anything: the files stay where slskd put them, and the
+   download's row says so. The event log names each folder and which of the two it is. **Don't get the
+   album again**: a second download would land beside the first. Once deadwax can write there, each
+   refused download is filed by itself: when the container restarts, and every 15 minutes meanwhile.
+6. **slskd's folder and the library overlap.** `SLSKD_DOWNLOAD_PATH` and `LIBRARY_PATH` are the same
+   folder, or one is inside the other (`/downloads/music`, or a parent of both mounted as
+   `/downloads`). deadwax finds a download's files by name, then moves them and clears the folders
+   they leave. With the two overlapping, that could take music out of your library, so nothing is
+   filed at all. Settings → Library says how they overlap. Mount them as two separate folders,
+   neither inside the other; the downloads refused meanwhile are filed by themselves, as above.
+7. **The album was already there.** A track the album's folder already has (in any format) is
    never filed again, so a second copy of an album is left in slskd's folder, and the download's
    row in Requests says it was already there ("You already had it" - with logins
    on, "Already in the collection, added to your library"). See [organizing](organizing.md).
@@ -51,8 +77,8 @@ Requests says **Stopped while being added to your library** (with "Tell whoever 
 else; an admin sees the download's own words, "deadwax stopped while filing this - check the library and
 slskd's folder"). deadwax was stopped or restarted while it was filing that album, so it can't tell how far it got.
 Look at the album in the library (**Library care → Rescan** first) and in slskd's downloads folder:
-in move mode, whatever hadn't been filed yet is still in slskd's folder, and in copy mode all of it
-is. Anything missing is dealt with as in the section above. **Clear done** removes the row.
+whatever hadn't been filed yet is still in slskd's folder. Anything missing is dealt with as in the
+section above. **Clear done** removes the row.
 
 ## Requests says why a download stopped, or wasn't added
 
@@ -80,8 +106,20 @@ runs deadwax can put it right, everyone else is told **"Tell whoever runs deadwa
   and the row's own words say which - most often permissions, or a full disk).
 - **"It downloaded, but none of its songs could be added to your library."** / **"2 files couldn't be
   added to your library."**: some or all of its files failed to organize ([above](#a-download-says-n-files-couldnt-be-added)).
-- **"Downloaded, but not added to your library: deadwax is set to rehearse adding albums, without
-  moving any files."**: organizing is in dry run (`ORGANIZE_MODE` `dry_run`).
+- **"Downloaded, but not added to your library: back then, deadwax only rehearsed adding albums,
+  without moving any files."**: a download from before 2.1.13, when organizing could be a dry run.
+  Its files are still in slskd's folder: deadwax doesn't go back to file it. Downloads now are always
+  moved into the library.
+- **"It downloaded, but deadwax can't move its files into your library yet."**: deadwax can't write
+  in slskd's download folder (whoever runs deadwax sees *deadwax can't move files out of slskd's
+  download folder, nothing was moved - drop :ro, or run slskd and deadwax as the same PUID/PGID; it is
+  filed by itself once fixed*). Nothing was filed or left half-done, and it is filed by itself once
+  that's fixed ([deadwax can't move files out of slskd's download folder](#downloads-finish-but-nothing-appears-in-my-library)).
+- **"It downloaded, but deadwax isn't set up to add it to your library yet."**: slskd's folder and the
+  library overlap (whoever runs deadwax sees *slskd's download folder and the library overlap, nothing
+  was moved - set SLSKD_DOWNLOAD_PATH and LIBRARY_PATH to separate folders; it is filed by itself once
+  fixed*). Nothing was filed, and it is filed by itself once they're apart
+  ([slskd's folder and the library overlap](#downloads-finish-but-nothing-appears-in-my-library)).
 - **"Downloaded, but not added to your library"** on a Done row, alone: organizing is off
   ([Downloads finish, but nothing appears in my library](#downloads-finish-but-nothing-appears-in-my-library)).
 - **"Its files were already in the collection, so nothing was added."** / **"Every song was already in
@@ -680,16 +718,16 @@ deadwax** - tap it to read it.
 - **"deadwax isn't ready for signing in, so nobody can use it just now. Tell whoever runs deadwax."**,
   with one of the two below under **For whoever runs deadwax** - every page of the app says it too,
   since everything but the health check and the pages answers 503 until it's put right:
-- **"Logins are on, but ORGANIZE_MODE is 'dry_run', so nothing downloaded would ever be filed into
-  the library"** (or `'off'`, or "LIBRARY_PATH is not set"): with logins on,
-  each download is the person's who asked for it once it's filed, so organizing has to be on -
-  `ORGANIZE_MODE` `copy` or `move`, with `LIBRARY_PATH` and `SLSKD_DOWNLOAD_PATH` set. Until it is,
-  everything but the health check and the pages answers 503 saying so, the break-glass sign-in
-  included. Set it in compose and recreate the container. If the message says it's **saved in the
-  settings** - a value saved in Server settings beats compose, and Server settings can't be reached
-  while this stands - set `AUTH_MODE=off`, recreate, set `ORGANIZE_MODE` to `copy` or `move` in Server
-  settings (or revert it to compose's), and switch logins on again. While logins are on, Server settings
-  refuses to switch organizing off ("they need organizing to stay on").
+- **"Logins are on, but LIBRARY_PATH is not set, so nothing downloaded would ever be filed into the
+  library"** (or `SLSKD_DOWNLOAD_PATH`, or both): with logins on, each download is the person's who
+  asked for it once it's filed, so organizing has to be on - `LIBRARY_PATH` and `SLSKD_DOWNLOAD_PATH`
+  both set. The image sets them, so look for a line that empties one (`LIBRARY_PATH=` with nothing
+  after it). Until both are set, everything but the health check and the pages answers 503 saying so,
+  the break-glass sign-in included. Set it in compose and recreate the container, or set
+  `AUTH_MODE=off`, recreate, set it in Server settings, and switch logins on again. While logins are
+  on, Server settings refuses to empty either folder ("they need organizing to stay on"). (Before
+  2.1.13 this also said `ORGANIZE_MODE` had to be `copy` or `move`; that setting is gone, and an old
+  line of it stops nothing.)
 - **"Logins are on, but DEADWAX_SECRET_KEY isn't set"** (or "is shorter than 32 characters"): logins
   don't work without the key: the pages load, but everything they ask deadwax for (the health check
   aside) answers 503 until it's set, and the sign-in screen says so (under **For whoever runs
@@ -955,8 +993,8 @@ didn't get an answer. Check in Navidrome's own Users page that they have a libra
 ### People can't make an account: "deadwax still keeps pins, settings or a library for an earlier …"
 
 deadwax still keeps something under that name - an account removed in Navidrome's own Users page, or a
-removal deadwax couldn't finish - and a new person must not inherit someone else's library, pins, play queue or
-permissions. Find the name under **Known only to deadwax** at the foot of People and **Forget** it, then
+removal deadwax couldn't finish - and a new person must not inherit someone else's library, pins, play queue,
+played songs or permissions. Find the name under **Known only to deadwax** at the foot of People and **Forget** it, then
 make the account; or choose another name.
 
 ### Signed in over HTTPS, and now the http address won't sign in
@@ -1619,6 +1657,32 @@ Next's groups, its History or the Shuffle chip, which only deadwax's own account
 - **Counted in Navidrome, but not on Last.fm or ListenBrainz**: that part is Navidrome's. Check
   the account has them linked there, and that scrobbling is switched on for the `deadwax` player
   on Navidrome's **Players** page.
+
+## Up Next doesn't show a song I played, or "Couldn't load the songs you played before"
+
+Scrolled up past the song playing, Up Next goes back through every song you've started in the app
+([Up Next](player.md#up-next-shuffle-and-repeat)). A song can be missing from it because:
+
+- **it was played before 2.1.15**, or in **another app** (Amperfy, Symfonium) - deadwax isn't told of those - or in
+  the native [iPhone app](ios.md), which doesn't send its plays yet;
+- **deadwax couldn't be reached when it started**: the app tries again at the next song, and by itself 30 seconds
+  on, then a minute, two, and so on up to every 10 minutes while deadwax still can't take it - but a reload or a
+  closed tab before then loses it, and so do the oldest of more than 500 songs waiting;
+- **you're signed in as someone else** - with logins on each person's list is their own; with logins off everyone
+  shares one;
+- **it's the song you picked up mid-way** ([where you left off](player.md#picking-up-where-you-left-off)): it went
+  in when it first began - if that was in deadwax's app in a browser. One the native [iPhone app](ios.md) began
+  isn't in it, as that app doesn't send its plays yet.
+
+**A song shows twice**, once among the older songs and once just above the song playing: while the native iPhone
+app was the last to save your queue (it doesn't keep which queue it is yet), a page reloaded since can't tell its own
+earlier plays in that queue from older ones. Nothing is kept twice - it's only how they're drawn - and it goes once
+the queue changes (another album tapped) or the songs have moved on past the last 50.
+
+**"Couldn't load the songs you played before"**, with **Try again**, at the top of the list means deadwax didn't
+answer, or couldn't read its database just then; the container's log says so ("couldn't read …'s play history").
+A deadwax with no database (`DB_PATH` unwritable) keeps no history at all and shows only what's in the current
+queue.
 
 ## The app's page is blank
 

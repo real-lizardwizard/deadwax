@@ -8,14 +8,19 @@ Moved verbatim from CLAUDE.md (2026-10-07), where it was loaded into every sessi
 
 - **Matching is pure.** `matching.py` does no I/O so it's testable without slskd. Keep it that way.
 - **Plan/execute split in the organizer.** `plan_organization()` is pure; `execute_plan()` acts.
-  This is what makes dry-run trustworthy — it runs the *identical* plan and declines to execute.
+  This is what made dry-run trustworthy — it ran the *identical* plan and declined to execute.
+  **(2.1.13) There is no dry run any more** (see "Filing only moves", below), and the split stays:
+  the plan is what the tests check without touching a file, what the poller marks as being filed
+  before anything is written (`on_plan`), and the one place every guard - never overwrite, a
+  track the album already has, two files to one name - is decided before anything moves.
 - **The release is stored denormalized** in the job row, not as a bare MBID. MusicBrainz goes
   down often (it did, repeatedly, during development); organizing a finished download must not
   depend on it being reachable.
 - **Progress is never persisted.** slskd owns it, it changes every second. Derived on read,
   divided by files *wanted* rather than files slskd currently reports.
-- **`ORGANIZE_MODE` defaults to `dry_run`.** Organizing is the only thing that writes to the
-  user's filesystem. A fresh install reports what it *would* do.
+- ~~**`ORGANIZE_MODE` defaults to `dry_run`.**~~ Organizing is the only thing that writes to the
+  user's filesystem. A fresh install reported what it *would* do. **Superseded in 2.1.13** by
+  "Filing only moves", below - kept as the history of why it was once otherwise.
 - **Edition matching is a weighted signal, never a filter.** See above.
 - **The folder is named after the album's year, not the pressing's.** A 2011 remaster of a
   1975 record files under `Wish You Were Here (1975) [Remastered]`. The year identifies the
@@ -215,7 +220,9 @@ Moved verbatim from CLAUDE.md (2026-10-07), where it was loaded into every sessi
   folder, its files still arriving, or tracks of it nobody asked for - and no library has a copy
   of it. Those folders are kept and reported exactly as before. Every other guard is unchanged,
   and the "nothing failed or was skipped" one matters MORE now: a skip means files of this
-  download never reached the library.
+  download never reached the library. (2.1.13, review: "audio" was matching's list, without DSD
+  or Musepack; now anything not known to be disposable keeps the folder, and a folder in, holding
+  or over the library is never removed - see "Filing only moves".)
 - **The artist folder a re-file empties is removed too** (v0.6.20).
   `_tidy_emptied_artist` after the move in `execute_retag`, with `rmdir` and never `rmtree`, so
   another album or anything else kept in there means it stays and nothing is weighed up. Filing
@@ -281,6 +288,96 @@ Moved verbatim from CLAUDE.md (2026-10-07), where it was loaded into every sessi
   page looks fine. slskd logged out and MusicBrainz down deliberately do NOT count: an
   orchestrator restarting deadwax for another service's outage fixes nothing. The check is a
   Python one-liner (the slim image has no curl) against the fixed port 8080.
+### Filing only moves (2.1.13)
+
+- **Filing always moves; `ORGANIZE_MODE` is gone** (James, 2026-11-13: "can we remove the 'organize
+  mode' functionality? I would like it to only move the files, I don't think we need anything
+  else."). A finished download is moved into the library, tagged and filed whenever
+  `SLSKD_DOWNLOAD_PATH` and `LIBRARY_PATH` are both set (`Config.organizing_enabled()`); there is
+  no off, dry run or copy. It undoes "defaults to dry_run" because James decided it (the quote is
+  the whole of his reasoning given); what dry run guarded against - a wrong mount writing somewhere
+  unexpected - is still named before any download by Settings → Library's path checks and the
+  organizing verdict, and the image has set both paths since 2.0.3. What did NOT change: the move itself (never overwrite an existing
+  file; a duplicate stays in slskd's folder and counts as skipped) and the clean-up's guards (never
+  past music - widened in review to anything not known to be disposable, below - nothing after a
+  failure or a skip, never outside or at the download root) - see "A move-organize clears the slskd
+  folder out", which now describes every filing.
+- **An old setting is ignored, safely and visibly.** `ORGANIZE_MODE` in the environment is no
+  longer read (not an attribute of Config any more); `Config.report_retired()` says once at
+  start-up, as a warning the event log shows, where it was set and that it can be deleted. A row
+  Server settings saved for it is passed over without a word by `apply_overrides` (every save
+  re-applies the store, so a warning there would repeat), cleared at start-up by
+  `clear_retired_settings` (a row no page shows can never be reverted by hand), and named in the
+  same line. The settings route refuses a VALUE for it (400, `RETIRED` - "no longer a setting")
+  and lets a revert (null) through, which clears the row: a page drawn before the upgrade may
+  send either. A start with dry_run, copy, off, move or junk in the environment is otherwise
+  exactly as before (tests/test_organize_move_only.py runs each in a fresh interpreter).
+- **The logins rule is the two folders** (`describe_logins_organizing`, `_stops_organizing`): with
+  logins on, a download is the asker's once it is filed, which needs both folders set; the words
+  never name ORGANIZE_MODE.
+- **Old rows keep their words.** A job that ended "dry run - not organized" before 2.1.13 is not
+  re-filed (its files are still in slskd's folder) and still renders, in the past tense
+  (errorWords: "back then, deadwax only rehearsed adding albums"); the poller no longer writes it.
+- **The upgrade risk, worst first**, said in the README, configuration.md and organizing.md: an
+  install left at the old default (or off) starts MOVING downloads into /music with the next one
+  that finishes; an install on copy loses slskd's copies (slskd stops seeding them, and the
+  emptied folder goes); slskd's download folders must be writable by deadwax (`:ro`, or slskd as
+  another user, refuses every filing until fixed); a downgrade won't find the saved row again.
+- **A read-only slskd folder is refused before anything moves** (asked for in review of the above,
+  2026-11-13). On a `:ro` mount - fine with copy - shutil.move copies the file across, then can't
+  remove the original (checked: PermissionError, both copies left), so every file counted as failed
+  and left an untagged copy in the library, on every download. Now `plan_organization` asks
+  `can_move_out_of()` - `os.access(folder, W_OK | X_OK)`, which the kernel answers no for a
+  read-only mount (EROFS, root included) as well as for permissions - of every folder a file would
+  actually be moved OUT of (not a duplicate's, nor one whose target is already there), and lists
+  the ones it can't leave as `read_only_dirs`. Any at all and `organize_job` refuses before
+  `on_plan`, the move and the clean-up (`execute_plan` refuses too, for any other caller); the
+  poller ends the job `complete` with `READ_ONLY_DOWNLOADS` (errorWords: "can't move its files into
+  your library yet", told to whoever runs deadwax), which is NOT `not_filed` - another source would
+  land in the same place. tests/test_organize_move_only.py.
+- **The review of moving-always (2026-11-13) - four findings, all fixed before 2.1.13 shipped.**
+  tests/test_filing_guards.py holds each.
+  1. **The library is never searched, moved out of or cleared.** Reproduced with the real
+     organize_job: SLSKD_DOWNLOAD_PATH a parent "media", LIBRARY_PATH media/music, the job's file
+     absent from slskd's folder - find_local_file's search by name found the library's own track
+     (and with slskd's there too, preferred the library's `Artist/Album (1998)/`, agreeing with the
+     peer's folders better than slskd's `Album (1998)/`), which was moved, retagged as the new
+     release, its cover taken and its album folder removed by the clean-up. Now: `folders_overlap()`
+     - the same folder, or one inside the other, links resolved and a second mount known by its
+     (st_dev, st_ino) identity among the parents - refuses the whole filing in `plan_organization`
+     (`plan["overlap"]`, before any search) and is a Server settings blocker by the very same test,
+     so the two never disagree; the poller writes `FOLDERS_OVERLAP`. `find_local_file` walks with
+     `folders_under()`, which never enters LIBRARY_PATH's folder (by identity, so a bind mount of it
+     under /downloads too) and passes over any hit `in_library()`; a source the plan finds in the
+     library refuses the filing anyway; and `cleanup_source_dirs` never removes a folder in the
+     library, holding it, or with it mounted beneath. Found on the way: `rglob(basename)` read `[`
+     as a glob, so every name with brackets ("Song [Live].flac") was "not found on disk" - the walk
+     compares names with `[` literal (`?` and `*` still wildcards, as rglob had them, in case slskd
+     rewrites characters).
+  2. **Server settings asks what filing asks.** The draft checked the ROOT for writing: slskd makes
+     each download's folder as its own user, so with slskd and deadwax as different users every
+     filing was refused while Settings said organizing was active, and the words said "drop :ro"
+     where there was none; and a root deadwax can't write, over folders it can, was a blocker though
+     filing worked. Now the root's permissions are never a blocker; a read-only mount
+     (`mounted_read_only`, statvfs's ST_RDONLY) is; and `_probe_downloads` asks `can_move_out_of` of
+     the download folders holding music (the first 40, at most 400 folders walked, never the
+     library). All refused: a blocker; some: the row's *Needs attention*, naming a folder, its owner
+     and deadwax's uid/gid. `why_cannot_move_out_of` names each cause and its fix - `:ro`, or the
+     same PUID/PGID - in the event log and the row; READ_ONLY_DOWNLOADS names both.
+  3. **A refused download files by itself.** The refusals (`REFUSED_FILING`: read-only, overlap)
+     guarantee nothing moved, so `refile_refused` plans each again at the poller's start (a mount
+     put right means a restart) and every 15 minutes (`REFILE_POLLS`), and files it through the
+     usual `_organize_if_enabled` once the plan is no longer refused and finds its files - never
+     "get it again", which would download a second copy beside the first. Only those two errors are
+     tried (`store.jobs_with_error`); INTERRUPTED_FILING stays unfiled, as decided in v1.1.3.
+  4. **The clean-up keeps what it doesn't know.** "Never past audio" judged by matching's
+     AUDIO_EXTENSIONS let dsf, dff, mpc, tta, mka or m4b go with the folder, and the clean-up now
+     runs after every filing. The test is turned round: a folder goes only when all that is left in
+     it is `disposable` - the companions, scans and booklets (tif, tiff, jfif, heic, avif, pdf),
+     checksums and rip reports (md5, sha*, crc, ffp, st5, accurip, sfk, pk, url) and OS clutter
+     (Thumbs.db, desktop.ini, .DS_Store, `._*`). Matching's list is unchanged.
+  Mutations of each fix were each caught by the tests (the commit message lists them).
+
 - **Errors degrade rather than crash.** Unwritable DB → downloads still work, untracked.
   Unreachable slskd → stored jobs still listed, no live progress. Unwritable DB → the metadata
   queue still works, it just stops remembering what you ignored.

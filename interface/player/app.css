@@ -6896,7 +6896,6 @@ html.app-edit-open { overflow: hidden; }
 
 .app-shell:not(.app-desk) .app-settings .settings-section-note,
 .app-shell:not(.app-desk) .app-settings .settings-env-effect,
-.app-shell:not(.app-desk) .app-settings .settings-mode-note,
 .app-shell:not(.app-desk) .app-settings .settings-retime-note,
 .app-shell:not(.app-desk) .app-settings .settings-answers-note {
     margin: 0;
@@ -6919,7 +6918,6 @@ html.app-edit-open { overflow: hidden; }
 .app-shell:not(.app-desk) .app-settings .settings-env-list { display: flex; flex-direction: column; }
 
 .app-shell:not(.app-desk) .app-settings .settings-env,
-.app-shell:not(.app-desk) .app-settings .settings-mode,
 .app-shell:not(.app-desk) .app-settings .settings-retime,
 .app-shell:not(.app-desk) .app-settings .settings-answers {
     display: flex;
@@ -6931,7 +6929,6 @@ html.app-edit-open { overflow: hidden; }
 }
 
 .app-shell:not(.app-desk) .app-settings .settings-env + .settings-env,
-.app-shell:not(.app-desk) .app-settings .settings-mode + .settings-mode,
 .app-shell:not(.app-desk) .app-settings .settings-retime,
 .app-shell:not(.app-desk) .app-settings .settings-answers { border-top: var(--dw-hairline) solid var(--dw-row-border); }
 
@@ -6946,8 +6943,7 @@ html.app-edit-open { overflow: hidden; }
     min-width: 0;
 }
 
-.app-shell:not(.app-desk) .app-settings .settings-env-key,
-.app-shell:not(.app-desk) .app-settings .settings-mode-name {
+.app-shell:not(.app-desk) .app-settings .settings-env-key {
     min-width: 0;
     color: var(--dw-text);
     font-family: var(--dw-font-mono);
@@ -6955,8 +6951,6 @@ html.app-edit-open { overflow: hidden; }
     font-weight: var(--dw-weight-semibold);
     overflow-wrap: anywhere;
 }
-
-.app-shell:not(.app-desk) .app-settings .settings-mode-name { color: var(--dw-accent-text); }
 
 /* where the value came from, the row's badge, a setting that can't be changed here */
 .app-shell:not(.app-desk) .app-settings .settings-env-source,

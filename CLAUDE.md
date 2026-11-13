@@ -134,7 +134,7 @@ src/
                    words - GET /search_musicbrainz/saved, Search's saved rows - see "Search what's
                    saved (2.0.0-player.56)".
   poller.py        background task: slskd transfers -> job status transitions.
-  organizer.py     writes downloads into the library. Plan/execute split, dry_run default.
+  organizer.py     writes downloads into the library - always a move (2.1.13). Plan/execute split.
   retag.py         the metadata manager's write half - applies a chosen release to an album
                    already on disk. Same plan/execute split, for the same reasons.
   scan_wait.py     PURE. Whether Navidrome has finished a scan that began after an apply's
@@ -204,6 +204,8 @@ src/
   play_queue.py    PURE. Resume what was playing (2.0.0-player.64): the window kept, GET /queue's
                    answer from Navidrome's play queue and deadwax's record (store.py play_queue) -
                    see "Resume what was playing".
+  play_history.py  PURE. Play history that lasts (2.1.14): a start as its play_history row (or skipped), the page -
+                   routes/play_history.py's /deadwax/me/history, see notes/play-history.md.
   api/             musicbrainz_endpoint.py, slskd_endpoint.py, coverart_endpoint.py,
                    artist_images_endpoint.py (Wikidata/Commons + TheAudioDB),
                    lrclib_endpoint.py (LRCLIB), wikipedia_endpoint.py (Wikidata's sitelinks and
@@ -243,7 +245,8 @@ src/
                    EQ: the list kept in store.py's autoeq_list/autoeq_meta, refreshed weekly behind
                    itself, profiles in autoeq_profile - see "The EQ's AutoEq routes (2.1.7)");
                    library's /queue/summary is the app's Needs-a-look count, from the saved
-                   scan alone - see "Needs a look"
+                   scan alone - see "Needs a look"; play_history (/deadwax/me/history, every song each
+                   person started, kept for ever - see notes/play-history.md)
 interface/         the app's pages: player/ (the app, its stylesheets, manifest and icons),
                    player/lab/ (the bench), styles/theme.css and its fonts; `/` (and
                    /index.html) redirects to /player/ (307) - see "The main page retired".
@@ -313,6 +316,8 @@ ui/                Preact + Vite + TypeScript: the app (src/player/main.tsx -> s
                    (both frames - a phone's Now Playing face, the desktop's panel app/LyricsPanel.tsx),
                    app/useLyrics.ts the answers (called once in App), the words and rules the pure
                    lib/lyricsView.ts - see "Lyrics on Now Playing (2.1.6)".
+                   Play history (2.1.15, notes/play-history.md): lib/playHistory.ts (pure: a start, the join,
+                   the older rows), player/historyOutbox.ts (this page's starts, sent), app/usePlayHistory.ts.
                    People and permissions (2.0.0-player.61, notes/logins.md "Managing accounts"):
                    app/People.tsx (with UnlockPeople, AddPerson, ResetPassword, RemovePerson and
                    usePeople), its rules lib/people.ts; what the app shows by permission
@@ -331,7 +336,7 @@ ui/                Preact + Vite + TypeScript: the app (src/player/main.tsx -> s
                    ui/src/lab/ is the turntable's test bench at /player/lab/, a third page built
                    in a pass of its own: the real Turntable and deck over signals it makes, set
                    beside an ideal turntable - see notes/turntable-bench.md.
-tests/             4174 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             4341 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ios/               the native iPhone app (SwiftUI), built on James's Mac, never in the image:
                    DeadwaxKit/ (its Core tested on Linux with swift.org's toolchain in
                    ~/.local/swift, its Audio engine on ios.yml's macOS runner), App/, the
@@ -395,6 +400,7 @@ section of that title in notes/: `grep -rn "### X" notes/` finds it.
 | the name, why Lidarr was dropped, the old Next up list | `notes/history.md` |
 | the native iPhone app (ios/): DeadwaxKit, the audio engine, the project without Xcode, install.sh, ios.yml, the phases; the EQ's AutoEq routes on the server (2.1.7) | `notes/ios.md` |
 | lyrics for listeners: the route by song id, the view on Now Playing, the phone's (design and build) | `notes/app-lyrics.md` |
+| play history that lasts: every song started, per person, kept for ever - the table, the routes, Up Next's list | `notes/play-history.md` |
 
 **A change's write-up goes into its area's notes file** (a new file for a new area, added to the
 table above), never here. Add to this file only a rule that holds everywhere.
@@ -439,10 +445,12 @@ table above), never here. Add to this file only a rule that holds everywhere.
 One line each; the reasoning, and what went wrong before each was made, is in `notes/decisions.md`.
 
 - **Matching is pure** (`matching.py` does no I/O).
-- **The organizer is plan/execute**; dry run runs the identical plan and declines to act.
+- **The organizer is plan/execute, and filing only ever moves** (James, 2026-11-13: ORGANIZE_MODE - off,
+  dry run, copy - removed in 2.1.13); tests plan without executing.
 - **The release is stored denormalized** in the job row: filing must not depend on MusicBrainz.
 - **Progress is never persisted**: derived from slskd on read, divided by the files wanted.
-- **`ORGANIZE_MODE` defaults to `dry_run`.**
+- **An old `ORGANIZE_MODE` is ignored, not obeyed** (2.1.13): start-up says so once and clears a saved row;
+  organizing is on whenever `SLSKD_DOWNLOAD_PATH` and `LIBRARY_PATH` are both set.
 - **Edition is a weighted signal, never a filter.**
 - **The folder is named after the album's year** (the release group's first release, `original_year`),
   not the pressing's; the `date` tag keeps the pressing's.
@@ -465,7 +473,9 @@ One line each; the reasoning, and what went wrong before each was made, is in `n
 - **Review rows of gone albums are pruned only after a scan that found albums**; deadwax's own delete
   forgets its row at once.
 - **The new-import prompt is recorded at import time**, a partly filed download included.
-- **A move-organize clears the slskd folder, but never past audio.**
+- **A filing (always a move) clears the slskd folder, but never past anything not known to be disposable**
+  (music in any format keeps it), and **never touches the library**: nothing is filed while
+  SLSKD_DOWNLOAD_PATH and LIBRARY_PATH overlap, and a refused filing files itself once fixed.
 - **An artist folder a re-file empties is removed with `rmdir`** only.
 - **Cancelling removes partials only with `SLSKD_INCOMPLETE_PATH` set**, and more strictly than
   `find_local_file` guesses; deadwax also clears slskd's empty incomplete folders (rmdir, older than
@@ -546,7 +556,7 @@ phone's sheet.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 4174 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 4341 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see `notes/tooling.md`:
@@ -584,7 +594,7 @@ code sees before James's Mac (notes/ios.md).
 
 ## What the tests cannot tell you
 
-All 4174 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 4341 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

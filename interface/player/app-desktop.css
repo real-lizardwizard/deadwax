@@ -2740,8 +2740,7 @@
 
     .app-desk .app-settings .settings-env-list { display: flex; flex-direction: column; }
 
-    .app-desk .app-settings .settings-env,
-    .app-desk .app-settings .settings-mode {
+    .app-desk .app-settings .settings-env {
         display: flex;
         flex-direction: column;
         gap: var(--app-desk-set-row-gap);
@@ -2750,8 +2749,7 @@
         border-left: var(--app-desk-set-edge) solid transparent;
     }
 
-    .app-desk .app-settings .settings-env + .settings-env,
-    .app-desk .app-settings .settings-mode + .settings-mode { border-top: var(--dw-hairline) solid var(--dw-row-border); }
+    .app-desk .app-settings .settings-env + .settings-env { border-top: var(--dw-hairline) solid var(--dw-row-border); }
 
     /* an edit still only a draft: marked at its edge until it is saved */
     .app-desk .app-settings .settings-env.is-edited { border-left-color: var(--dw-amber-icon); background: var(--dw-tint-amber); }
@@ -2764,18 +2762,13 @@
         min-width: 0;
     }
 
-    .app-desk .app-settings .settings-env-key,
-    .app-desk .app-settings .settings-mode-name {
+    .app-desk .app-settings .settings-env-key {
         color: var(--dw-text);
         font-family: var(--dw-font-mono);
         font-size: var(--dw-text-data);
         font-weight: var(--dw-weight-semibold);
         overflow-wrap: anywhere;
     }
-
-    .app-desk .app-settings .settings-mode { flex-direction: row; align-items: baseline; gap: var(--app-desk-set-lines); }
-    .app-desk .app-settings .settings-mode-name { flex: none; color: var(--dw-accent-text); }
-    .app-desk .app-settings .settings-mode-note { color: var(--dw-text-2); font-size: var(--dw-text-footnote); }
 
     /* where the value came from, the row's badge, a setting that can't be changed here */
     .app-desk .app-settings .settings-env-source,

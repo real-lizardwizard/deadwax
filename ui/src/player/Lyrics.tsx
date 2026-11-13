@@ -7,7 +7,8 @@ import { errorKind } from '../lib/errorWords'
 import { lyricTime } from '../lib/lyrics'
 import {
   FOLLOW_AGAIN_MS, LOADING_LYRICS, LYRICS, LYRICS_FAILED, NO_LYRICS, NOT_SYNCED, NOTHING_PLAYING, SCROLL_KEYS, SONG_GONE,
-  clockRuns, endRoom, follows, followTop, lineAfterKey, litAt, lyricsClock, sameLit, sung, tabStop, withIntro, type Lit,
+  clockRuns, endRoom, follows, followTop, lineAfterKey, litAt, lyricsClock, sameLit, scrollHolds, sung, tabStop, withIntro,
+  type Lit,
 } from '../lib/lyricsView'
 import type { Player } from './usePlayer'
 
@@ -42,8 +43,10 @@ function usePageVisible(): boolean {
  *    from the player's reported position alone, so a seek while paused lights its line. Nothing announced as lines
  *    change: no live region.
  *  - FOLLOWING: the lit line is scrolled to LYRICS_ANCHOR of the view's height - smoothly, or a jump for Reduce
- *    Motion. The listener's own wheel, touch, scroll key or scroll bar holds it, and it comes back FOLLOW_AGAIN_MS after
- *    the last such input while the song plays - a timer, not the clock; paused, it stays put until the song plays.
+ *    Motion. The listener's own wheel, touch, scroll key or scroll bar holds it - a finger that scrolled them for as
+ *    long as it stays on them - and it comes back FOLLOW_AGAIN_MS after their scroll stops (2.1.11, the phone's rule:
+ *    its last movement, a fling's coast or a wheel's momentum included) while the song plays - a timer, not the clock;
+ *    paused, it stays put until the song plays.
  *    Keyboard focus in the lines holds it too, while there and for FOLLOW_AGAIN_MS after it leaves - never focus a tap
  *    or a click put there (Chromium focuses a clicked button), which would stop following for good after a click. A new
  *    song starts at its top, and opening the lyrics and a change of size follow at once, without a scroll.
@@ -84,8 +87,11 @@ export function Lyrics({
   const [focusAt, setFocusAt] = useState<number | null>(null)
   const focused = useRef(false)
   const pointered = useRef(false)
-  //? when the listener last scrolled the lyrics themselves (performance.now()), null while following
+  //? when the listener's own scroll of the lyrics last moved them (performance.now()), null while following
   const heldAt = useRef<number | null>(null)
+  //? (2.1.11) a finger that has scrolled the lyrics is still on them: held until it lifts, as the phone's scroll phase is
+  //? until it goes idle
+  const touching = useRef(false)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   //? the player's last reported position - a seek's target until it lands (lib/scrub reportedPosition)
   const reported = useRef(player.position())
@@ -104,7 +110,7 @@ export function Lyrics({
   //? next song's lines not in hand yet, the spinner in their place - fires no focusout in Safari, and would otherwise
   //? hold following for good
   const focusHolds = () => focused.current && !!scroller.current?.contains(document.activeElement)
-  const followsNow = () => follows(performance.now(), heldAt.current, live.current.player.playing, focusHolds())
+  const followsNow = () => follows(performance.now(), heldAt.current, live.current.player.playing, focusHolds() || touching.current)
 
   //? the lit line to the anchor - the top before the first line (an intro too short for its dots). (review) Synced
   //? lyrics only: plain ones have no lit line, and "following" them was a jump back to their top - four seconds after
@@ -146,6 +152,7 @@ export function Lyrics({
   //? begun, so the clock starts from where the player says the new song is
   useLayoutEffect(() => {
     heldAt.current = null
+    touching.current = false
     stopTimer()
     reported.current = live.current.player.position()
     draw(clock())
@@ -167,6 +174,7 @@ export function Lyrics({
     wasShowing.current = shows
     if (!opened) return
     heldAt.current = null
+    touching.current = false
     stopTimer()
     reported.current = live.current.player.position()
     draw(clock())
@@ -225,11 +233,25 @@ export function Lyrics({
     if (followsNow()) follow(false)
   }, [height])
 
-  //? the listener's own scroll: a wheel, a touch that moves, a scroll key, the scroll bar - never the scroll event,
-  //? which following's own scrolls fire too
+  //? the listener's own scroll: a wheel, a touch that moves, a scroll key, the scroll bar - and then (2.1.11) every
+  //? movement of it until it stops: the scroll event, counted only while their scroll holds following (scrollHolds), as
+  //? following's own scrolls fire it too
   useEffect(() => {
     const box = scroller.current
     if (!box) return
+    const onTouchMove = () => {
+      touching.current = true
+      hold()
+    }
+    //? the finger lifted (or the browser took the touch): the wait from here, unless a fling's coast moves it on
+    const onTouchEnd = () => {
+      if (!touching.current) return
+      touching.current = false
+      hold()
+    }
+    const onScroll = () => {
+      if (scrollHolds(performance.now(), heldAt.current, live.current.player.playing)) hold()
+    }
     const onKey = (event: KeyboardEvent) => {
       pointered.current = false
       if (SCROLL_KEYS.includes(event.key)) hold()
@@ -268,7 +290,10 @@ export function Lyrics({
       hold()
     }
     box.addEventListener('wheel', hold, { passive: true })
-    box.addEventListener('touchmove', hold, { passive: true })
+    box.addEventListener('touchmove', onTouchMove, { passive: true })
+    box.addEventListener('touchend', onTouchEnd, { passive: true })
+    box.addEventListener('touchcancel', onTouchEnd, { passive: true })
+    box.addEventListener('scroll', onScroll, { passive: true })
     box.addEventListener('keydown', onKey)
     box.addEventListener('pointerdown', onPointer)
     box.addEventListener('click', onPressOver)
@@ -277,7 +302,10 @@ export function Lyrics({
     box.addEventListener('focusout', onFocusOut)
     return () => {
       box.removeEventListener('wheel', hold)
-      box.removeEventListener('touchmove', hold)
+      box.removeEventListener('touchmove', onTouchMove)
+      box.removeEventListener('touchend', onTouchEnd)
+      box.removeEventListener('touchcancel', onTouchEnd)
+      box.removeEventListener('scroll', onScroll)
       box.removeEventListener('keydown', onKey)
       box.removeEventListener('pointerdown', onPointer)
       box.removeEventListener('click', onPressOver)

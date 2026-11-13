@@ -286,10 +286,10 @@ phone and a desktop alike (on a desktop it's the sidebar's **Requests**):
   [troubleshooting](troubleshooting.md#a-download-says-n-files-couldnt-be-added)), **Stopped while
   being added to your library** (deadwax stopped part-way; see
   [troubleshooting](troubleshooting.md#a-download-says-it-stopped-while-being-added-to-your-library)), the
-  reason it wasn't added, in plain words ("Downloaded, but not added to your library: deadwax is set to
-  rehearse adding albums, without moving any files." for a dry run, say, or "It downloaded, but none of its songs
+  reason it wasn't added, in plain words ("It downloaded, but deadwax couldn't find its files to add them to
+  your library.", say, or "It downloaded, but none of its songs
   could be added to your library."; [every one](troubleshooting.md#requests-says-why-a-download-stopped-or-wasnt-added)),
-  and **Downloaded, but not added to your library** when organizing is off - `ORGANIZE_MODE` set to `off`, or `LIBRARY_PATH` or
+  and **Downloaded, but not added to your library** when organizing is off - `LIBRARY_PATH` or
   `SLSKD_DOWNLOAD_PATH` not set (Settings → Library names which; see
   [troubleshooting](troubleshooting.md#downloads-finish-but-nothing-appears-in-my-library)).
   A done download whose album is in your library - filed, partly filed, or already there - **opens
@@ -423,11 +423,11 @@ rather than joined.
   refuses; after 30 seconds' wait (slskd stuck on one) it starts anyway, and a start slskd still
   hasn't answered after 30 seconds gives up its turn, so one stuck search holds the others up once,
   not until deadwax restarts.
-- **Organizing has to be on.** With logins on, `ORGANIZE_MODE` must be `copy` or `move`, with
-  `LIBRARY_PATH` and `SLSKD_DOWNLOAD_PATH` set: in dry run nothing is ever filed, so nothing could
-  become the people's who asked for it. Until it is, deadwax refuses everything but the health check
-  and the pages, saying why (see [troubleshooting](troubleshooting.md#locked-out-nobody-can-sign-in)),
-  and Server settings won't switch organizing off while logins are on.
+- **Organizing has to be on.** With logins on, `LIBRARY_PATH` and `SLSKD_DOWNLOAD_PATH` must both be
+  set (the image sets them): with either unset nothing is ever filed, so nothing could become the
+  people's who asked for it. Until both are, deadwax refuses everything but the health check and the
+  pages, saying why (see [troubleshooting](troubleshooting.md#locked-out-nobody-can-sign-in)), and
+  Server settings won't empty either folder while logins are on.
 - Downloads made while logins were off are taken over by the first admin to sign in, with the pins
   and Getting albums settings - or, when an admin's session outlived the restart that switched logins
   on (logins switched off and on again, say), by the first admin to use deadwax after it starts
@@ -446,7 +446,7 @@ rather than joined.
     checked it** after their **Dismiss**;
   - **some files failed to file** - added, marked incomplete: **In your library - 2 files couldn't be
     added**;
-  - **a dry run**, or organizing off (with logins off only - on, organizing must be on), **failed**, or
+  - organizing off (with logins off only - on, organizing must be on), **failed**, or
     **nothing could be filed** - nothing; the row says why, as it always has. A download that arrived but
     of which nothing could be filed (nothing found where `SLSKD_DOWNLOAD_PATH` says, filing that failed,
     no track filed) is under **Needs attention** with **Another source** - not **Same source again**, since the same

@@ -44,6 +44,7 @@ thing entirely - they live in localStorage, they ARE editable, and the backend n
 them. See ui/src/state/persisted.ts.
 """
 
+import asyncio
 import os
 from pathlib import Path
 
@@ -54,12 +55,15 @@ from src import __version__, musicbrainz_cache, player_cache
 from src.api.musicbrainz_endpoint import MusicBrainzClient
 from src.config import (COVER_ART_SIZES, DEFAULT_MUSICBRAINZ_CACHE_MB, DEFAULT_PLAYER_CACHE_MB, LYRICS_LEAD_LIMIT_MS,
                         MUSICBRAINZ_CACHE_FILE, MUSICBRAINZ_CACHE_MB_RANGE, PLAYER_CACHE_MB_RANGE,
-                        RENAME_WAIT_RANGE, SEARCH_TIMEOUT_RANGE, Config, describe_admin_password, describe_auth_mode, describe_secret_key,
+                        RENAME_WAIT_RANGE, RETIRED_SETTINGS, SEARCH_TIMEOUT_RANGE, Config, describe_admin_password, describe_auth_mode, describe_secret_key,
                         build_user_agent, is_the_database, musicbrainz_cache_file, musicbrainz_cache_megabytes,
                         musicbrainz_cache_path, parse_musicbrainz_cache_mb, parse_player_cache_mb,
                         parse_rename_wait, parse_search_timeout,
                         describe_contact, describe_navidrome_url, describe_slskd_url, parse_lyrics_lead,
                         setting_source, shadowed_by_empty_env, without_login)
+from src.matching import AUDIO_EXTENSIONS, file_extension
+from src.organizer import (can_move_out_of, folders_overlap, folders_under, mounted_read_only,
+                           why_cannot_move_out_of)
 from src.scan_wait import SCAN_WAIT_CAP_SECONDS
 from src.logger import logger
 from src.users import current_user, is_admin
@@ -67,18 +71,9 @@ from src.users import current_user, is_admin
 router = APIRouter()
 
 
-#? Modes the organizer understands, with what each one actually does to your filesystem.
-#? Ordered least to most destructive, which is the order the tab renders them in.
-ORGANIZE_MODES = {
-    "off": "Never organize - downloads stay where slskd put them",
-    "dry_run": "Log what would happen, write nothing",
-    "copy": "Copy into the library, leave slskd's copy alone",
-    "move": "Move into the library",
-}
-
-#? What ORGANIZE_MODE's dropdown names each mode (2.0.1): the values stay ORGANIZE_MODES' own, what compose takes,
-#? and the Organize modes list under the group names them by those.
-ORGANIZE_MODE_CHOICES = {"off": "Off", "dry_run": "Dry run", "copy": "Copy", "move": "Move"}
+#? (2.1.13) What a save carrying ORGANIZE_MODE is told - a page drawn before the upgrade can still send it.
+RETIRED = ("no longer a setting: every finished download is moved into the library, whenever "
+           "SLSKD_DOWNLOAD_PATH and LIBRARY_PATH are both set")
 
 #? What COUNTRY_IN_FOLDER can be set to, as the dropdown names them.
 COUNTRY_CHOICES = {
@@ -853,6 +848,35 @@ async def read_settings(user: str = Depends(current_user)):
     return _as_seen_by(await settings(), user)
 
 
+#? (2.1.13, review) how far Server settings looks into slskd's folder for download folders deadwax can't move
+#? files out of: the first PROBE_FOLDERS holding music, among at most PROBE_VISITS folders walked - an answer
+#? quick on a big folder, and on the likeliest fault (slskd and deadwax as different users) every one says so
+PROBE_FOLDERS = 40
+PROBE_VISITS = 400
+
+
+def _probe_downloads(download_root: str, library_root: str | None) -> dict:
+    """
+    The download folders under SLSKD_DOWNLOAD_PATH filing would move music out of, asked as filing asks them
+    (organizer.can_move_out_of): {"checked": how many, "refused": those deadwax can't}. Bounded (PROBE_FOLDERS,
+    PROBE_VISITS), never inside the library (organizer.folders_under), and nothing written. Never raises.
+    """
+    checked, refused = 0, []
+    try:
+        for visited, (folder, names) in enumerate(folders_under(Path(download_root),
+                                                                Path(library_root) if library_root else None)):
+            if visited >= PROBE_VISITS or checked >= PROBE_FOLDERS:
+                break
+            if not any(file_extension(name) in AUDIO_EXTENSIONS for name in names):
+                continue
+            checked += 1
+            if not can_move_out_of(folder):
+                refused.append(folder)
+    except OSError:
+        pass
+    return {"checked": checked, "refused": refused}
+
+
 async def settings():
     """
     Everything the settings tab renders: the server configuration as this process actually
@@ -865,27 +889,63 @@ async def settings():
     )
 
     url_problem = describe_slskd_url(Config.SLSKD_URL)
-    organize_mode = Config.ORGANIZE_MODE
-    organize_known = organize_mode in ORGANIZE_MODES
 
-    #? Organizing needs BOTH paths and a mode that acts. Stated as one derived fact because
-    #? "why did nothing get filed" has four possible causes and checking them one at a time
-    #? is how people end up convinced the feature is broken.
+    #? (2.1.13) Filing always moves, so each download is taken OUT of slskd's folder - and refused, before anything
+    #? moves, when deadwax can't (organizer.can_move_out_of), or when the two folders overlap (folders_overlap).
+    #? What can be known here is asked the way filing asks it (review): not the root's own permissions - slskd
+    #? makes each download's folder, as its own user, and that is what a move needs to write - but a read-only
+    #? mount, the download folders already there (_probe_downloads), and the overlap, by the very same test.
+    overlap = folders_overlap(Config.SLSKD_DOWNLOAD_PATH, Config.LIBRARY_PATH)
+    read_only_mount = download_status == "ok" and mounted_read_only(Config.SLSKD_DOWNLOAD_PATH)
+    probe = {"checked": 0, "refused": []}
+    if download_status == "ok" and not read_only_mount and not overlap:
+        probe = await asyncio.to_thread(_probe_downloads, Config.SLSKD_DOWNLOAD_PATH, Config.LIBRARY_PATH)
+    unmovable = probe["refused"]
+    #? each folder's own check, before the overlap and the probe are written onto its row
+    downloads_usable, library_usable = download_status == "ok", library_status != "error"
+
+    if read_only_mount:
+        download_status, download_detail = "error", (
+            f"{Config.SLSKD_DOWNLOAD_PATH} is mounted read-only, so no finished download can be moved out of it "
+            f"into the library - remove :ro from the /downloads volume. Downloads refused meanwhile are filed by "
+            f"themselves once it is fixed."
+        )
+    elif unmovable:
+        more = f" (and {len(unmovable) - 1} more)" if len(unmovable) > 1 else ""
+        download_status, download_detail = "error", (
+            f"deadwax can't move files out of {len(unmovable)} of the {probe['checked']} download folder(s) it "
+            f"looked at, so those downloads are refused filing: {why_cannot_move_out_of(unmovable[0])}{more}. "
+            f"They are filed by themselves once it can."
+        )
+    overlap_detail = (f"{overlap}, so filing would move music out of the library - set the two to separate "
+                      f"folders, neither inside the other") if overlap else None
+    if overlap and download_status == "ok":
+        download_status, download_detail = "error", overlap_detail
+    if overlap and library_status == "ok":
+        library_status, library_detail = "error", overlap_detail
+
+    #? Organizing - moving each finished download into the library - needs BOTH paths, set and
+    #? usable. Stated as one derived fact because "why did nothing get filed" has several possible
+    #? causes and checking them one at a time is how people end up convinced the feature is broken.
+    #? (2.1.13) There is no mode any more: a mode of Off or Dry run was a blocker here too. A blocker is
+    #? what stops ALL filing; some download folders deadwax can't write, among others it can, is the row's.
     organizing_blockers = []
     if not Config.SLSKD_DOWNLOAD_PATH:
         organizing_blockers.append("SLSKD_DOWNLOAD_PATH is not set")
-    elif download_status == "error":
+    elif read_only_mount:
+        organizing_blockers.append("SLSKD_DOWNLOAD_PATH is mounted read-only, so nothing can be moved out of it")
+    elif not downloads_usable:
         organizing_blockers.append("SLSKD_DOWNLOAD_PATH does not resolve inside this container")
+    elif unmovable and len(unmovable) == probe["checked"]:
+        organizing_blockers.append(
+            "deadwax can't move files out of slskd's download folders - run slskd and deadwax as the same "
+            "PUID/PGID, or give deadwax write access to them")
     if not Config.LIBRARY_PATH:
         organizing_blockers.append("LIBRARY_PATH is not set")
-    elif library_status == "error":
+    elif not library_usable:
         organizing_blockers.append("LIBRARY_PATH is not usable")
-    if organize_mode == "off":
-        organizing_blockers.append("ORGANIZE_MODE is set to Off")
-    elif organize_mode == "dry_run":
-        organizing_blockers.append(
-            "ORGANIZE_MODE is set to Dry run, so organizing reports what it would do and writes nothing"
-        )
+    if overlap:
+        organizing_blockers.append(f"{overlap}, so filing would move music out of the library")
 
     return {
         #? Rendered in the tab's footer. "What version are you running" is the first question
@@ -1027,24 +1087,11 @@ async def settings():
                 "id": "organizing",
                 "label": "Organizing",
                 "note": (
-                    "Organizing is the only setting here that files or moves your music, which "
-                    "is why it starts in Dry run."
+                    "A finished download is moved out of slskd's folder into your library, tagged, "
+                    "and filed in a folder named as set below - whenever SLSKD_DOWNLOAD_PATH and "
+                    "LIBRARY_PATH are both set. Nothing already in the library is overwritten."
                 ),
                 "settings": [
-                    _setting(
-                        "ORGANIZE_MODE",
-                        organize_mode,
-                        effect=ORGANIZE_MODES.get(
-                            organize_mode, "unrecognised - the organizer falls back to Dry run"
-                        ),
-                        status="ok" if organize_known else "error",
-                        detail=(
-                            None
-                            if organize_known
-                            else f"expected one of {', '.join(ORGANIZE_MODES)}"
-                        ),
-                        choices=ORGANIZE_MODE_CHOICES,
-                    ),
                     _country_row(),
                     _album_folder_row(),
                     _rename_wait_row(),
@@ -1099,7 +1146,6 @@ async def settings():
                 "settings": _logins_rows(),
             },
         ],
-        "organize_modes": ORGANIZE_MODES,
         "organizing": {
             "enabled": not organizing_blockers,
             "blockers": organizing_blockers,
@@ -1125,7 +1171,7 @@ def _validate(key: str, value: str) -> str | None:
     The line drawn here is between DEFINITIONALLY wrong and ENVIRONMENTALLY wrong, and it
     matters:
 
-      Definitionally wrong is rejected. An ORGANIZE_MODE of "sideways" or a URL with no
+      Definitionally wrong is rejected. A COVER_ART_SIZE of "huge" or a URL with no
       scheme can never work, whatever else changes, so storing it would only produce a
       confusing failure later somewhere less informative.
 
@@ -1134,9 +1180,6 @@ def _validate(key: str, value: str) -> str | None:
       broken setup is to edit the compose file - which is exactly what this tab exists to
       avoid. The row renders its own validation state, so nothing is hidden by allowing it.
     """
-    if key == "ORGANIZE_MODE" and value not in ORGANIZE_MODES:
-        return f"expected one of {', '.join(ORGANIZE_MODES)}"
-
     #? Required, so an empty one is wrong too - and since 1.0.5 held to what NAVIDROME_URL is: no
     #? login, no ? or #. Every request to it carries the API key. See describe_slskd_url.
     if key == "SLSKD_URL":
@@ -1296,8 +1339,9 @@ def _moved_without_secret(updates: list[SettingUpdate]) -> dict[str, str]:
     return refused
 
 
-#? the settings logins need organizing to keep (Config.describe_logins_organizing)
-ORGANIZING_KEYS = ("ORGANIZE_MODE", "SLSKD_DOWNLOAD_PATH", "LIBRARY_PATH")
+#? the settings logins need organizing to keep (Config.describe_logins_organizing) - since 2.1.13 the two
+#? folders alone: filing always moves, and the mode is no setting any more
+ORGANIZING_KEYS = ("SLSKD_DOWNLOAD_PATH", "LIBRARY_PATH")
 
 
 def _stops_organizing(updates: list[SettingUpdate]) -> dict[str, str]:
@@ -1305,7 +1349,7 @@ def _stops_organizing(updates: list[SettingUpdate]) -> dict[str, str]:
     Each setting this batch may not change while logins are on, with why (2.0.0-player.49). Empty
     when it may - always, with logins off.
 
-    Logins need organizing on (ORGANIZE_MODE copy or move, both folders set): without it every route
+    Logins need organizing on (both folders set - 2.1.13 took away the mode): without it every route
     answers 503 - this tab's own save included - so a save that switched organizing off would lock
     everyone out, the admin who saved it too, with the way back only through logins off. What the
     batch would leave is worked out first: a value saved, or a revert (None) to what the environment
@@ -1325,11 +1369,11 @@ def _stops_organizing(updates: list[SettingUpdate]) -> dict[str, str]:
             value = Config.ENV_VALUES.get(key, getattr(Config, key)) if Config.ENV_VALUES else getattr(Config, key)
         return (value or "").strip()
 
-    if after("ORGANIZE_MODE") in ("copy", "move") and after("SLSKD_DOWNLOAD_PATH") and after("LIBRARY_PATH"):
+    if after("SLSKD_DOWNLOAD_PATH") and after("LIBRARY_PATH"):
         return {}
-    reason = ("logins are on, and they need organizing to stay on - Organize mode copy or move, with "
-              "SLSKD_DOWNLOAD_PATH and LIBRARY_PATH set - since each download is the person's who asked "
-              "for it once it's filed. Switch logins off (AUTH_MODE=off) first to change this")
+    reason = ("logins are on, and they need organizing to stay on - SLSKD_DOWNLOAD_PATH and LIBRARY_PATH "
+              "both set - since each download is the person's who asked for it once it's filed. Switch "
+              "logins off (AUTH_MODE=off) first to change this")
     return {key: reason for key in wanted}
 
 
@@ -1358,7 +1402,12 @@ async def update_settings(updates: list[SettingUpdate], request: Request, user: 
     #? Validate the whole batch before writing any of it.
     problems = {}
     for update in updates:
-        if update.key in Config.NOT_EDITABLE:
+        if update.key in RETIRED_SETTINGS:
+            #? (2.1.13) a page drawn before the upgrade can still send it: a revert is let through (it
+            #? clears a saved row, if one is somehow left), a value is refused in words that say why
+            if update.value is not None:
+                problems[update.key] = RETIRED
+        elif update.key in Config.NOT_EDITABLE:
             problems[update.key] = Config.NOT_EDITABLE[update.key]
         elif update.key not in Config.EDITABLE:
             problems[update.key] = "not a setting that can be changed here"
@@ -1396,6 +1445,8 @@ async def update_settings(updates: list[SettingUpdate], request: Request, user: 
         else:
             await store.set_setting(update.key, update.value)
 
+        if update.key in RETIRED_SETTINGS:
+            continue
         changed.append(update.key)
         target = Config.EDITABLE.get(update.key)
         if target:

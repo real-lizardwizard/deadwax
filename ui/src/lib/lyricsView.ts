@@ -47,8 +47,8 @@ export const GO_TO_LIT = 'Go to the line being sung'
 
 /** where the line being sung is held: this share of the lyrics' height from their top (2.5) */
 export const LYRICS_ANCHOR = 0.3
-/** how long after the listener's last scroll, wheel or key - or focus leaving the lyrics - following comes back,
- *  while the song plays (2.5) */
+/** how long after the listener's scroll stops - its last movement, a fling's coast included - or focus leaving the
+ *  lyrics, following comes back, while the song plays (2.5) */
 export const FOLLOW_AGAIN_MS = 4000
 /** the shortest gap between a break and the next line sung that draws the three dots - an intro too (2.4) */
 export const GAP_DOTS_S = 4
@@ -197,14 +197,24 @@ export function endRoom(height: number): number {
   return Math.max(0, Math.round(height * (1 - LYRICS_ANCHOR)))
 }
 
-/** Whether the view follows the song: not while the keyboard's or VoiceOver's focus is in the lyrics; else always, until
- *  the listener's own scroll, wheel or key holds it (`heldAt`, ms) - and then again FOLLOW_AGAIN_MS after the last such
- *  input, while the song plays. Paused, it stays where the listener put it: nothing is moving to follow, and someone
- *  reading ahead with the song paused is reading - a play brings it back at once, the wait long past. */
+/** Whether the view follows the song: not while `focused` - the keyboard's or VoiceOver's focus in the lyrics, or a
+ *  finger that has scrolled them still on them (the phone's LyricsHold passes its `scrolling` here too); else always,
+ *  until the listener's own scroll holds it (`heldAt`, ms) - and then again FOLLOW_AGAIN_MS after that scroll stops,
+ *  while the song plays. Paused, it stays where the listener put it: nothing is moving to follow, and someone reading
+ *  ahead with the song paused is reading - a play brings it back at once, the wait long past. */
 export function follows(now: number, heldAt: number | null, playing: boolean, focused = false): boolean {
   if (focused) return false
   if (heldAt === null) return true
   return playing && now - heldAt >= FOLLOW_AGAIN_MS
+}
+
+/** Whether a scroll of the lyrics - the browser's `scroll` event, a movement whatever moved them - moves the hold on to
+ *  `now` (2.1.11): it is the listener's scroll still moving - a fling's coast, a wheel's or a trackpad's momentum, a
+ *  scroll key's smooth scroll - so the wait counts from where it stops, as the phone's counts from its scroll phase
+ *  going idle. Only while their scroll holds following (`heldAt`) and it hasn't come back: following scrolls only
+ *  while it follows, so its own scrolls never hold it. */
+export function scrollHolds(now: number, heldAt: number | null, playing: boolean): boolean {
+  return heldAt !== null && !follows(now, heldAt, playing)
 }
 
 // ----------------------------------------------------------------------------- the keyboard (3.6)

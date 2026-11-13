@@ -27,7 +27,7 @@
 
 import type { Level, LevelledTrack, Normalization } from './loudness'
 import { current, type QueueTrack } from './playQueue'
-import { startUpNext, type Mark, type Paged, type UpNextQueue, type UpNextState } from './upNext'
+import { queueId, startUpNext, type Mark, type Paged, type UpNextQueue, type UpNextState } from './upNext'
 
 /** The most entries saved, and of them the most before the song playing - the history Previous walks. */
 export const RESUME_MAX = 2000
@@ -108,6 +108,9 @@ type FromChar = 's' | 'a' | 'o'
 /** Snapshot v1, as toSave writes it. */
 interface SnapshotV1 {
   v: 1
+  /** (2.1.15) the queue's id (UpNextState.id) - absent from the web's before 2.1.15 and the phone's before its port: a
+   *  queue put back without one is given a new one */
+  id?: string
   levels: string
   marks: [number, FromChar, number, number][]
   source: string[]
@@ -125,8 +128,9 @@ const levelChar = (level: Level | undefined): LevelChar => (level === 'album' ? 
 const charLevel = (char: string | undefined): Level | undefined => (char === 'a' ? 'album' : char === 't' ? 'track' : undefined)
 const fromChar = (from: Mark['from']): FromChar => (from === 'source' ? 's' : from === 'added' ? 'a' : 'o')
 
-/** A song as the queue needs it, without its level - what `extra` keeps. */
-function bare(track: QueueTrack): QueueTrack {
+/** A song as the queue needs it, without its level - what `extra` keeps, and (2.1.15) what a start of it is kept with
+ *  (lib/playHistory.ts). */
+export function bare(track: QueueTrack): QueueTrack {
   return {
     id: track.id, title: track.title, artist: track.artist, album: track.album, albumId: track.albumId, coverArt: track.coverArt,
     duration: track.duration, contentType: track.contentType, suffix: track.suffix, sampleRate: track.sampleRate,
@@ -170,6 +174,7 @@ export function toSave(queue: UpNextQueue, position: number): Saving {
   for (const track of state.source) if (!inWindow.has(track.id) && !(track.id in extra)) extra[track.id] = bare(track)
   const made: SnapshotV1 = {
     v: 1,
+    id: state.id,
     levels: entries.map((track) => levelChar(track.level)).join(''),
     marks: state.marks.slice(start, end).map((mark) => [mark.key, fromChar(mark.from), mark.at, mark.pass]),
     source: state.source.map((track) => track.id),
@@ -194,6 +199,10 @@ export function relevel(level: Level | undefined, setting: Normalization): Level
   if (setting === 'album') return 'album'
   return level ?? 'track'
 }
+
+/** (2.1.15) What a queue's id is (lib/upNext.ts queueId; src/play_history.py QUEUE_ID): anything else read back is
+ *  replaced. */
+const QUEUE_ID = /^[A-Za-z0-9_-]{1,64}$/
 
 const isInt = (value: unknown): value is number => typeof value === 'number' && Number.isInteger(value)
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -236,7 +245,8 @@ export function savedLevels(snapshot: string | null, count: number): (Level | un
  * each mark's `from` one of the three, a source mark's `at` inside the source and naming its song, an added mark's
  * at and pass -1, keys unique and below nextKey, startedAt not below 0 (and past the song playing's run, lowered to it).
  */
-export function fromSnapshot(snapshot: string | null, tracks: readonly QueueTrack[], index: number, setting: Normalization): UpNextQueue | null {
+export function fromSnapshot(snapshot: string | null, tracks: readonly QueueTrack[], index: number, setting: Normalization,
+  holding: UpNextQueue | null = null): UpNextQueue | null {
   if (snapshot === null) return null
   let made: unknown
   try {
@@ -309,11 +319,38 @@ export function fromSnapshot(snapshot: string | null, tracks: readonly QueueTrac
       pagedRounds.push({ pass: held.pass as number, paged: read })
     }
   }
+  //? (2.1.15) the queue's id as it was saved - the same queue on this device as on the one that saved it - or, saved
+  //? without one (or one that isn't), a new one: unless it is the queue this page holds (`holding`), saved by an app
+  //? that keeps no id (the iPhone app before its port) - then the page's, so the starts made here in it stay its rows
+  const saved = typeof made.id === 'string' && QUEUE_ID.test(made.id) ? made.id : null
   const upNext: UpNextState = {
+    id: saved ?? queueId(),
     marks: rebuilt, source: list as LevelledTrack[], shuffle, nextKey, startedAt: Math.min(startedAt, run), left: gone,
     ...(paged ? { paged } : {}), ...(pagedRounds ? { pagedRounds } : {}),
   }
-  return { tracks: entries as LevelledTrack[], index, upNext }
+  const queue: UpNextQueue = { tracks: entries as LevelledTrack[], index, upNext }
+  const kept = holding?.upNext?.id
+  return saved === null && kept && sameQueue(holding!, queue) ? { ...queue, upNext: { ...upNext, id: kept } } : queue
+}
+
+/** (2.1.15 review) Whether `put` - read back from a snapshot saved without an id - is the queue `held`: the same list,
+ *  in the same order, and at least one entry under a key both have, every such key the same song in each. The keys
+ *  are the queue's own numbering (nextKey), carried on by whichever app edits it, so another queue - an album tapped,
+ *  its keys from 0 again - has other songs under them; the same album tapped again is the one case it can't tell, and
+ *  then the page's earlier starts in it are its rows, not older ones. */
+export function sameQueue(held: UpNextQueue, put: UpNextQueue): boolean {
+  const a = held.upNext
+  const b = put.upNext
+  if (!a || !b || a.source.length !== b.source.length || a.source.some((track, i) => track.id !== b.source[i]!.id)) return false
+  const songs = new Map(a.marks.map((mark, i) => [mark.key, held.tracks[i]?.id]))
+  let common = 0
+  for (const [i, mark] of b.marks.entries()) {
+    const song = songs.get(mark.key)
+    if (song === undefined) continue
+    if (song !== put.tracks[i]?.id) return false
+    common++
+  }
+  return common > 0
 }
 
 /** A plain list: the songs in order, from `index`, as playTracks(tracks, index) queues them - each at its level,
@@ -354,7 +391,7 @@ export interface Resumed {
  *  - a song played to its end (within a second of its length): the next entry at 0, or - the queue's last - it at 0.
  */
 export function resumed(answer: Pick<QueueAnswer, 'index' | 'position' | 'changed_by' | 'kept'>, tracks: readonly QueueTrack[],
-  setting: Normalization, deviceId: string): Resumed | null {
+  setting: Normalization, deviceId: string, holding: UpNextQueue | null = null): Resumed | null {
   const n = tracks.length
   if (!n) return null
   const ids = tracks.map((track) => track.id)
@@ -368,7 +405,7 @@ export function resumed(answer: Pick<QueueAnswer, 'index' | 'position' | 'change
   const survivors = kept ? kept.ids.filter((id) => present.has(id)) : []
   if (kept && same(ids, kept.ids) && kept.index === answer.index) {
     exact = true
-    queue = fromSnapshot(kept.snapshot, tracks, kept.index, setting) ?? plain(tracks, kept.index, savedLevels(kept.snapshot, n), setting)
+    queue = fromSnapshot(kept.snapshot, tracks, kept.index, setting, holding) ?? plain(tracks, kept.index, savedLevels(kept.snapshot, n), setting)
     position = kept.position
     from = keptFrom
   } else if (kept && survivors.length < kept.ids.length && same(survivors, ids)) {

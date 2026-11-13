@@ -1,12 +1,16 @@
-import { useLayoutEffect, useRef, useState } from 'preact/hooks'
+import { useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { panelIsModal, type PanelStyle } from '../lib/appFrame'
 import { dragOffset, dropIndex } from '../lib/pins'
+import { LOAD_WITHIN, pastRows, type PastRow } from '../lib/playHistory'
 import type { QueueTrack } from '../lib/playQueue'
 import { nextRepeat, repeatLabel, upNextView, type Mark, type UpNextQueue, type UpNextRow } from '../lib/upNext'
 import { Cover } from '../player/Cover'
 import { ChevronDownIcon, ChevronUpIcon, CloseIcon, GripIcon, RepeatIcon, RepeatOneIcon, ShuffleIcon } from '../player/icons'
+import { queued } from '../player/levelling'
 import type { Player } from '../player/usePlayer'
+import { errorNote } from './ErrorNote'
+import type { PlayHistory } from './usePlayHistory'
 import { useSheet } from './useSheet'
 
 /** Which of Up Next's two groups a row is in: the songs added (Playing Next), or the list's. */
@@ -23,9 +27,10 @@ interface Drag {
   pointer: number
 }
 
-/** (2.1.3) Where a thing in Up Next's scroller sat, from the scroller's top: a row by its key, or the song playing's card. */
+/** (2.1.3) Where a thing in Up Next's scroller sat, from the scroller's top: a row of the queue's by its key, (2.1.15) an
+ *  older row by its own (a string with a colon in it, never 'card'), or the song playing's card. */
 interface Spot {
-  to: 'card' | number
+  to: 'card' | number | string
   offset: number
 }
 
@@ -36,18 +41,20 @@ interface Anchor {
   first: Mark | undefined
   playing: number | undefined
   editing: boolean
+  /** (2.1.15) what was drawn above the queue's own rows - the older rows, the line at the top (`aboveOf`) */
+  above: string
   spots: Spot[]
 }
 
 /** Where focus goes once a change has drawn - see `refocus` below. */
-type Refocus = { key: number; which: 'up' | 'down' | 'remove' | 'play' } | 'done' | 'shuffle' | null
+type Refocus = { key: number | string; which: 'up' | 'down' | 'remove' | 'play' } | 'done' | 'shuffle' | null
 
 /** (2.1.3 review) A row's tap, kept for the draw after it: the queue it was made on, the row, and what it does to the
  *  view, focus and words - put in place only if that draw shows the tap taken (`took`). */
 interface Tap {
   from: UpNextQueue
-  key: number
-  /** a row of History's: the song again, a new entry */
+  key: number | string
+  /** a row of History's, or (2.1.15) an older row's: the song again, a new entry */
   again: boolean
   track: QueueTrack
   anchor: Anchor
@@ -55,8 +62,15 @@ interface Tap {
   said: string | null
 }
 
-/** (2.1.3) The heading over the songs already played - Apple Music's word. */
+/** (2.1.3) The songs already played - Apple Music's word: since 2.1.15 their list's name to a screen reader, no heading
+ *  drawn (James: one continuous list). */
 export const HISTORY = 'History'
+/** (2.1.15) While an older page of them is on its way, at the list's top. */
+export const LOADING_EARLIER = 'Loading earlier songs'
+/** ...and when it couldn't come - errorNote's `failed` (lib/errorWords.ts). */
+export const EARLIER_FAILED = "Couldn't load the songs you played before."
+/** No older rows: one array for every render. */
+const NO_PAST: readonly PastRow[] = []
 /** What Up Next says under the song playing with Repeat One on. */
 export const REPEATING_ONE = 'Repeat one: this song plays again until you skip it.'
 /** ...and under the Shuffle chip for a whole library's shuffle (Part B), whose order is the shuffle. */
@@ -96,8 +110,18 @@ const plural = (count: number) => `And ${count.toLocaleString('en-US')} more ${c
  * off for this scroller (app.css), so the two never fight.
  *
  * HISTORY, to a keyboard and VoiceOver: one Tab stop for all of it (a roving tabindex - the newest row, or the one
- * last focused), Up and Down, Home and End inside it; its heading, then the song playing's title as one, then
- * Playing Next's and the list's. Hidden in Edit, which moves only what is still to play.
+ * last focused), Up and Down, Home and End inside it; the song playing's title a heading, then Playing Next's and the
+ * list's. Hidden in Edit, which moves only what is still to play.
+ *
+ * PLAY HISTORY THAT LASTS (2.1.15, notes/play-history.md - James: "so you can always look back and see what you played
+ * yesterday"): above History, ONE CONTINUOUS LIST goes on back through every song the person has played, on this app
+ * or the iPhone - no heading anywhere, no days, no times (James), skips like the rest, newest nearest the song
+ * playing. `history` (app/usePlayHistory.ts) holds deadwax's pages and this page's own starts; lib/playHistory.ts
+ * pastRows() leaves out every start the queue's own rows draw, so each is drawn once. Its next older page is asked for
+ * as the scroller comes within LOAD_WITHIN of its height of the top - a spinner there while it comes, the error in a
+ * listener's words with Try again if it can't - and a page landing above holds the view where it was, as History's
+ * changes do. An older row's tap plays its song again, now, as History's does: Play Next's entry (queued at the
+ * Normalization setting's level), moved to - the queue carrying on after it - in the click, nothing awaited.
  *
  * EDIT, as Home's Pinned does it: each group's rows with Move up, Move down and Remove, and a grip to drag by
  * (lib/pins.ts dropIndex and dragOffset - only the grip takes the pointer, so the sheet still scrolls under a
@@ -114,13 +138,16 @@ export function UpNext({
   opener,
   onClose,
   player,
+  history,
   panel = 'sheet',
   covered = false,
 }: {
   open: boolean
   opener?: { current: HTMLElement | null } | undefined
   onClose: () => void
-  player: Pick<Player, 'queue' | 'track' | 'playing' | 'shuffle' | 'repeat' | 'setShuffle' | 'setRepeat' | 'jumpTo' | 'moveInQueue' | 'removeFromQueue' | 'clearPlayingNext'>
+  player: Pick<Player, 'queue' | 'track' | 'playing' | 'shuffle' | 'repeat' | 'setShuffle' | 'setRepeat' | 'jumpTo' | 'playNext' | 'moveInQueue' | 'removeFromQueue' | 'clearPlayingNext'>
+  /** (2.1.15) the songs played before History's: none without it */
+  history?: Pick<PlayHistory, 'plays' | 'more' | 'loading' | 'error' | 'older' | 'retry'> | undefined
   /** how it is drawn: a sheet over Now Playing (a phone), or a desktop's side panel */
   panel?: PanelStyle
   /** something over it - the desktop's visualizer: inert, out of a screen reader's reach, until it goes */
@@ -136,8 +163,9 @@ export function UpNext({
   //? what is read out, each a new node in the region (`id`) - so the same words twice are said twice (2.1.3 review)
   const [said, setSaid] = useState<{ text: string; id: number }>({ text: '', id: 0 })
   const say = (text: string) => setSaid((was) => ({ text, id: was.id + 1 }))
-  //? (2.1.3) History's one Tab stop: the row last focused, while it is drawn - else the newest
-  const [historyStop, setHistoryStop] = useState<number | null>(null)
+  //? (2.1.3) History's one Tab stop: the row last focused, while it is drawn - else the newest (2.1.15: an older row's
+  //? key too)
+  const [historyStop, setHistoryStop] = useState<number | string | null>(null)
   //? where focus goes once a change has drawn - Pinned's rule: a move's button where the row went, the next
   //? row's Remove after a removal, Done with none left, the Shuffle chip after Clear; Done as Edit starts (the
   //? Edit button pressed goes from the head); after a row's tap - that row now the song playing, so gone from the
@@ -145,25 +173,43 @@ export function UpNext({
   //? after it otherwise, or Done with none (focus never left on nothing, where Escape can't reach the panel); after
   //? History's, that row still (Done if it fell off History's far end)
   const refocus = useRef<Refocus>(null)
+  //? (2.1.15) the older rows above History - none in Edit - and what is drawn above the queue's rows, which the view is
+  //? held through (`above`). Built and drawn only while open (the review): closed, Up Next stays mounted, and a month
+  //? scrolled back is thousands of rows rebuilt and re-diffed at every song's change. The rows drawn as it closes stay
+  //? until the queue next changes - the sheet long gone by then - so nothing above the card moves as it slides away
+  const drawnPast = useRef<{ queue: UpNextQueue; rows: readonly PastRow[] }>({ queue: player.queue, rows: NO_PAST })
+  const past = useMemo(() => {
+    const rows = !history || editing
+      ? NO_PAST
+      : open
+        ? pastRows(history.plays, player.queue)
+        : drawnPast.current.queue === player.queue ? drawnPast.current.rows : NO_PAST
+    drawnPast.current = { queue: player.queue, rows }
+    return rows
+  }, [open, history?.plays, player.queue, editing])
+  const loadingEarlier = !editing && !!history?.loading
+  const earlierFailed = !editing && history?.error ? history.error : null
+  const above = `${past.length}:${past[0]?.key ?? ''}:${past[past.length - 1]?.key ?? ''}:${loadingEarlier ? 1 : 0}:${earlierFailed ? 1 : 0}`
   //? (2.1.3) where the view is held - see "WHERE IT OPENS" above
-  const anchor = useRef<Anchor>({ first: undefined, playing: undefined, editing: false, spots: [{ to: 'card', offset: 0 }] })
+  const anchor = useRef<Anchor>({ first: undefined, playing: undefined, editing: false, above: '', spots: [{ to: 'card', offset: 0 }] })
   //? (2.1.3 review) the last row's tap, until the draw after it
   const tapped = useRef<Tap | null>(null)
   useSheet({ open, covered, onClose, lockClass: 'app-upnext-open', first: done, opener, modal, area: box })
 
   const marks0 = () => player.queue.upNext?.marks[0]
   const playingKey = () => player.queue.upNext?.marks[player.queue.index]?.key
-  const atCard = (): Anchor => ({ first: marks0(), playing: undefined, editing, spots: [{ to: 'card', offset: 0 }] })
+  const atCard = (): Anchor => ({ first: marks0(), playing: undefined, editing, above, spots: [{ to: 'card', offset: 0 }] })
   /** Every row and the card in the scroller, top first, where it sits from the scroller's top - and whether a pixel of
    *  it is in view. Found by their own data, never a selector built from a key. */
   const placed = (): { spot: Spot; seen: boolean }[] => {
     const scroll = scroller.current
     if (!scroll) return []
     const view = scroll.getBoundingClientRect()
-    return [...scroll.querySelectorAll<HTMLElement>('[data-key], [data-playing]')].map((element) => {
+    return [...scroll.querySelectorAll<HTMLElement>('[data-key], [data-past], [data-playing]')].map((element) => {
       const rect = element.getBoundingClientRect()
+      const to = element.dataset.key !== undefined ? Number(element.dataset.key) : element.dataset.past ?? 'card'
       return {
-        spot: { to: element.dataset.key !== undefined ? Number(element.dataset.key) : 'card', offset: rect.top - view.top },
+        spot: { to, offset: rect.top - view.top },
         seen: rect.bottom - view.top >= 1 && view.bottom - rect.top >= 1,
       }
     })
@@ -171,17 +217,25 @@ export function UpNext({
   /** What is in view now, kept to hold the place by - nothing in view (hidden, closed): what was kept before. */
   const measure = () => {
     const seen = placed().filter((each) => each.seen).map((each) => each.spot)
-    if (seen.length) anchor.current = { first: marks0(), playing: playingKey(), editing, spots: seen }
+    if (seen.length) anchor.current = { first: marks0(), playing: playingKey(), editing, above, spots: seen }
+  }
+  /** (2.1.15) Near the top - within LOAD_WITHIN of the scroller's height - the next older page asked for: only while one
+   *  is there to ask, none is on its way, and the last didn't fail (Try again asks then). */
+  const nearTop = () => {
+    const scroll = scroller.current
+    if (!scroll || !history || editing || !player.track || !history.more || history.loading || history.error) return
+    if (scroll.scrollTop < scroll.clientHeight * LOAD_WITHIN) history.older()
   }
   /** The view put back: the first thing kept that is still drawn, where it was - for a new queue (another album
    *  tapped, a queue put back) or with none of them drawn, the song playing's card at the top. With the same song
-   *  playing and Edit as it was, nothing above the card changed: the scroll stays where it is. */
+   *  playing, Edit as it was and (2.1.15) the same drawn above History, nothing above the card changed: the scroll
+   *  stays where it is. */
   const restore = () => {
     const scroll = scroller.current
     if (!scroll) return
     const held = anchor.current
     const same = held.first === marks0()
-    if (same && held.playing !== undefined && held.playing === playingKey() && held.editing === editing) return
+    if (same && held.playing !== undefined && held.playing === playingKey() && held.editing === editing && held.above === above) return
     const spots: Spot[] = same ? held.spots : [{ to: 'card', offset: 0 }]
     const now = placed()
     const found = spots.map((spot) => ({ spot, there: now.find((each) => each.spot.to === spot.to) })).find((each) => each.there)
@@ -212,7 +266,9 @@ export function UpNext({
     }
     restore()
     measure()
-  }, [open, editing, player.queue, player.repeat])
+    //? (2.1.15) ...and, held where it was, still near the top: the next older page
+    nearTop()
+  }, [open, editing, player.queue, player.repeat, above])
 
   //? (2.1.3 review) ...and a tap the draw after it doesn't show taken is let go: the view, focus and words as they were
   useLayoutEffect(() => {
@@ -227,9 +283,9 @@ export function UpNext({
       ;(wanted === 'done' ? done.current : shuffleChip.current)?.focus()
       return
     }
-    //? by the row's own data, never a selector built from it
+    //? by the row's own data, never a selector built from it - a queue row's key, or (2.1.15) an older row's
     const row = scroller.current
-      ? [...scroller.current.querySelectorAll<HTMLElement>('[data-key]')].find((each) => each.dataset.key === String(wanted.key))
+      ? [...scroller.current.querySelectorAll<HTMLElement>('[data-key], [data-past]')].find((each) => (each.dataset.key ?? each.dataset.past) === String(wanted.key))
       : undefined
     const live = (which: string) => row?.querySelector<HTMLButtonElement>(`.app-pin-${which}:not([aria-disabled="true"])`) ?? null
     const target = wanted.which === 'play'
@@ -248,7 +304,9 @@ export function UpNext({
     { group: 'list', rows: view.list?.rows ?? [] },
   ]
   const editable = view.added.length + (view.list?.rows.length ?? 0) > 0
-  const stop = view.history.some((row) => row.key === historyStop) ? historyStop : view.history[view.history.length - 1]?.key
+  //? (2.1.15) the older rows and History's one list: one Tab stop across both
+  const played = [...past.map((row) => row.key), ...view.history.map((row) => row.key)]
+  const stop = historyStop !== null && played.includes(historyStop) ? historyStop : played[played.length - 1]
 
   const toggleShuffle = () => {
     if (paged) return
@@ -322,12 +380,15 @@ export function UpNext({
   }
 
   /** Whether the queue drawn now shows `tap` taken: another queue than the one it was made on, playing the row tapped -
-   *  or, for History's, a new entry of its song. */
+   *  or, for History's and (2.1.15) an older row's, a new entry of its song (or a new queue of it: Play Next on a queue
+   *  played out plays it from the first). */
   const took = (tap: Tap): boolean => {
     const queue = player.queue
     const mark = queue.upNext?.marks[queue.index]
     if (queue === tap.from || !mark) return false
-    return tap.again ? mark.key >= (tap.from.upNext?.nextKey ?? Infinity) && queue.tracks[queue.index]?.id === tap.track.id : mark.key === tap.key
+    if (!tap.again) return mark.key === tap.key
+    const fresh = queue.upNext?.id !== tap.from.upNext?.id
+    return (fresh || mark.key >= (tap.from.upNext?.nextKey ?? Infinity)) && queue.tracks[queue.index]?.id === tap.track.id
   }
 
   /** A row's tap: it plays now, so it leaves the list - focus to what plays next: after a list row's, Playing Next's
@@ -350,9 +411,27 @@ export function UpNext({
     const spots = [...(under ? [under.spot] : []), ...now.filter((each) => each.seen).map((each) => each.spot)]
     tapped.current = {
       from: player.queue, key: row.key, again: true, track: row.track,
-      anchor: { first: marks0(), playing: undefined, editing, spots }, refocus: { key: row.key, which: 'play' }, said: `Playing ${row.track.title}`,
+      anchor: { first: marks0(), playing: undefined, editing, above, spots }, refocus: { key: row.key, which: 'play' }, said: `Playing ${row.track.title}`,
     }
     player.jumpTo(row.key)
+  }
+
+  /** (2.1.15) An older row's tap: the song again, now - as History's, a new entry after the song playing's copies that
+   *  plays at once, the queue carrying on after it: Play Next's (queued at the setting's level, as a song's ••• queues
+   *  it) moved to by the key it is given. With nothing to play next to (a queue played out) Play Next plays it from the
+   *  first itself. An edit the stream can't take this moment is held, the key isn't there yet, and the song waits as
+   *  Playing Next - as a History tap's refusal leaves it. Held under the finger and said, once taken, as History's. */
+  const replayPast = (row: PastRow) => {
+    const now = placed()
+    const under = now.find((each) => each.spot.to === row.key)
+    const spots = [...(under ? [under.spot] : []), ...now.filter((each) => each.seen).map((each) => each.spot)]
+    tapped.current = {
+      from: player.queue, key: row.key, again: true, track: row.track,
+      anchor: { first: marks0(), playing: undefined, editing, above, spots }, refocus: { key: row.key, which: 'play' }, said: `Playing ${row.track.title}`,
+    }
+    const key = player.queue.upNext?.nextKey
+    const began = player.playNext(queued([row.track], 'songs'))
+    if (!began && key !== undefined) player.jumpTo(key)
   }
 
   /** (2.1.3) Inside History, one Tab stop: Up and Down to the row before and after, Home and End to its ends. */
@@ -462,35 +541,62 @@ export function UpNext({
         {/* what a change made here was, read out - always in the page, as iOS reads only a region already there */}
         <p class="app-visually-hidden" role="status" aria-live="polite" aria-atomic="true">{said.text && <span key={said.id}>{said.text}</span>}</p>
 
-        <div ref={scroller} class="app-info-scroll" tabIndex={0} onScroll={() => { if (open) measure() }}>
+        <div ref={scroller} class="app-info-scroll" tabIndex={0} onScroll={() => { if (open) { measure(); nearTop() } }}>
           {playing && (
             <>
-              {/* (2.1.3) the songs already played, above the song playing - scrolled up to; not in Edit */}
-              {!editing && view.history.length > 0 && (
-                <section class="app-upnext-history" aria-labelledby="app-upnext-history">
-                  <div class="app-section-head">
-                    <h3 id="app-upnext-history" class="app-section-title">{HISTORY}</h3>
-                  </div>
-                  <ul class="app-results" onKeyDown={moveInHistory}>
-                    {view.history.map((row) => (
-                      <li key={row.key} data-key={row.key}>
-                        <button
-                          type="button"
-                          class="app-result"
-                          aria-label={`${row.track.title}, play again`}
-                          tabIndex={row.key === stop ? 0 : -1}
-                          onFocus={() => setHistoryStop(row.key)}
-                          onClick={() => replay(row)}
-                        >
-                          <Cover id={row.track.coverArt} size={96} class="app-result-cover" />
-                          <span class="app-result-text">
-                            <span class="app-result-title" dir="auto">{row.track.title}</span>
-                            <span class="app-result-line">{songLine(row)}</span>
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+              {/* (2.1.3) the songs already played, above the song playing - scrolled up to; not in Edit. (2.1.15) One list
+                  with no heading: every song played before, oldest at the top, then the queue's own History */}
+              {!editing && (played.length > 0 || loadingEarlier || earlierFailed) && (
+                <section class="app-upnext-history" aria-label={HISTORY}>
+                  {loadingEarlier && <div class="pl-spinner" aria-label={LOADING_EARLIER} />}
+                  {earlierFailed ? (
+                    <div class="pl-notice">
+                      {errorNote(earlierFailed, { failed: EARLIER_FAILED, retry: true })}
+                      <button type="button" class="pl-text-button" onClick={history?.retry}>
+                        Try again
+                      </button>
+                    </div>
+                  ) : null}
+                  {played.length > 0 && (
+                    <ul class="app-results" onKeyDown={moveInHistory}>
+                      {past.map((row) => (
+                        <li key={row.key} data-past={row.key}>
+                          <button
+                            type="button"
+                            class="app-result"
+                            aria-label={`${row.track.title}, play again`}
+                            tabIndex={row.key === stop ? 0 : -1}
+                            onFocus={() => setHistoryStop(row.key)}
+                            onClick={() => replayPast(row)}
+                          >
+                            <Cover id={row.track.coverArt} size={96} class="app-result-cover" />
+                            <span class="app-result-text">
+                              <span class="app-result-title" dir="auto">{row.track.title}</span>
+                              <span class="app-result-line">{songLine(row)}</span>
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                      {view.history.map((row) => (
+                        <li key={row.key} data-key={row.key}>
+                          <button
+                            type="button"
+                            class="app-result"
+                            aria-label={`${row.track.title}, play again`}
+                            tabIndex={row.key === stop ? 0 : -1}
+                            onFocus={() => setHistoryStop(row.key)}
+                            onClick={() => replay(row)}
+                          >
+                            <Cover id={row.track.coverArt} size={96} class="app-result-cover" />
+                            <span class="app-result-text">
+                              <span class="app-result-title" dir="auto">{row.track.title}</span>
+                              <span class="app-result-line">{songLine(row)}</span>
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </section>
               )}
 

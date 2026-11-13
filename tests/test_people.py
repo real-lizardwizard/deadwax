@@ -89,7 +89,6 @@ def nd(monkeypatch, tmp_path):
     monkeypatch.setattr(Config, "NAVIDROME_URL", NAVIDROME)
     monkeypatch.setattr(Config, "NAVIDROME_USER", "demo")
     monkeypatch.setattr(Config, "NAVIDROME_PASSWORD", "shared-pw")
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "copy")
     monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(tmp_path / "slskd"))
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path / "library"))
     monkeypatch.setattr(auth, "throttle", auth.Throttle())

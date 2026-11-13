@@ -40,6 +40,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from src import library_ledger
+from src import play_history as play_history_rules
 from src.config import Config
 from src.logger import logger
 from src.peer_speed import merge_observation
@@ -501,6 +502,36 @@ CREATE TABLE IF NOT EXISTS autoeq_profile (
     text        TEXT NOT NULL,
     fetched_at  REAL NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS play_history (
+    -- (2.1.14) Every song each person started, in either app - what Up Next shows above the song playing, scrolled
+    -- up past the queue's own History. deadwax's own: Navidrome keeps a play count and a last-played time per song,
+    -- no log. Keyed on src/users.py's user (`local` with logins off: one history for everyone), the moment the
+    -- listen began by the device's clock in ms (the counted scrobble's `time`, which sets `counted` by the same key)
+    -- and the song: a retry or an offline batch sent again is the same row. The song as the queue plays it, so a
+    -- row reads and plays after a rescan or a delete; `queue` and `entry` (the queue's id, its entry's key) only the
+    -- app reads. Kept for ever (src/play_history.py HISTORY_KEPT_MAX is a guard), forgotten with the person
+    -- (PERSON_TABLES), `local`'s moved to the first admin (adopt_local). notes/play-history.md.
+    user          TEXT NOT NULL,
+    started_at    INTEGER NOT NULL,
+    song_id       TEXT NOT NULL,
+    title         TEXT NOT NULL,
+    artist        TEXT NOT NULL,
+    album         TEXT NOT NULL,
+    album_id      TEXT,
+    cover_art     TEXT,
+    duration      REAL NOT NULL DEFAULT 0,
+    content_type  TEXT,
+    suffix        TEXT,
+    sample_rate   INTEGER NOT NULL DEFAULT 0,
+    bit_depth     INTEGER NOT NULL DEFAULT 0,
+    channels      INTEGER NOT NULL DEFAULT 0,
+    counted       INTEGER NOT NULL DEFAULT 0,
+    queue         TEXT,
+    entry         INTEGER,
+    recorded_at   INTEGER NOT NULL,   -- the server's ms when it arrived: a late offline send tells itself
+    PRIMARY KEY (user, started_at, song_id)
+) WITHOUT ROWID;
 """
 
 #? (2.0.0-player.51) the states a library entry is held in - waiting or starred - beside `removed`
@@ -542,7 +573,10 @@ SESSION_COLUMNS = {
 #? name, which People's removal and Forget clear in one transaction (forget_person), sessions FIRST so
 #? live_credentials can't copy a session's login back in. The value: what of it is a "live" row, counted.
 PERSON_TABLES = ("sessions", "user_credentials", "library_membership", "pins", "user_prefs", "job_requests",
-                 "permissions", "play_queue")
+                 "permissions", "play_queue", "play_history")
+
+#? (2.1.14) A play_history row's columns but `user`, in the order they are written - src/play_history.py's
+PLAY_HISTORY_COLUMNS = play_history_rules.COLUMNS
 
 #? (2.0.0-player.61) The break-glass admin's name until then, and its name since (src/auth.py BREAK_GLASS_USER) - for
 #? the one-time step below. Literals: src/auth.py imports this module.
@@ -1016,6 +1050,27 @@ class JobStore:
 
         except Exception:
             logger.error(f"failed to read jobs in {statuses}")
+            return []
+
+    async def jobs_with_error(self, status: str, errors: tuple[str, ...]) -> list[dict]:
+        """Every job in `status` whose error is exactly one of `errors`, oldest first (2.1.13: refile_refused)."""
+        if not self.available or not errors:
+            return []
+
+        def read():
+            placeholders = ",".join("?" for _ in errors)
+            with self._connect() as connection:
+                rows = connection.execute(
+                    f"SELECT * FROM jobs WHERE status = ? AND error IN ({placeholders}) ORDER BY id",
+                    (status, *errors),
+                ).fetchall()
+                return [self._row_to_job(r) for r in rows]
+
+        try:
+            return await asyncio.to_thread(read)
+
+        except Exception:
+            logger.error(f"failed to read {status} jobs by their error")
             return []
 
     async def update_status(self, job_id: int, status: str, error: str | None = None) -> None:
@@ -1524,11 +1579,12 @@ class JobStore:
             return None
 
     def local_has_anything(self) -> bool:
-        """Whether `local` has anything an admin's take-over would move - pins, preferences or requests.
+        """Whether `local` has anything an admin's take-over would move - pins, preferences, requests, its library or
+        (2.1.14) the songs played while logins were off.
         SYNCHRONOUS (src/auth.py's first-admin check runs in FastAPI's thread pool); raises on an error."""
         with self._connect() as connection:
             return any(connection.execute(f"SELECT 1 FROM {table} WHERE user = ? LIMIT 1", (LOCAL_USER,)).fetchone()
-                       for table in ("job_requests", "pins", "user_prefs", "library_membership"))
+                       for table in ("job_requests", "pins", "user_prefs", "library_membership", "play_history"))
 
     def adopt_local_now(self, user: str) -> tuple[int, int, int]:
         """adopt_local's write, SYNCHRONOUS - for src/auth.py's first admin seen after a start, which runs
@@ -1576,6 +1632,14 @@ class JobStore:
                     "removed_why, COALESCE(seen_at, ?), 0, NULL, NULL, ? FROM library_membership WHERE user = ?",
                     (user, _now(), _now(), LOCAL_USER))
                 connection.execute("DELETE FROM library_membership WHERE user = ?", (LOCAL_USER,))
+
+                #? (2.1.14) and the songs played while logins were off - deadwax's own, like the pins (unlike the
+                #? play queue, which mirrors the shared Navidrome account's): a start they already have keeps theirs;
+                #? not counted, as the library isn't
+                connection.execute(
+                    f"INSERT OR IGNORE INTO play_history (user, {', '.join(PLAY_HISTORY_COLUMNS)}) "
+                    f"SELECT ?, {', '.join(PLAY_HISTORY_COLUMNS)} FROM play_history WHERE user = ?", (user, LOCAL_USER))
+                connection.execute("DELETE FROM play_history WHERE user = ?", (LOCAL_USER,))
             return taken, preferences, requests
 
         return write()
@@ -3127,7 +3191,7 @@ class JobStore:
     def known_users(self) -> dict[str, dict]:
         """
         Every name deadwax keeps anything for - sessions, a kept login, library entries, pins, Getting albums
-        settings, requests, permissions, (2.0.0-player.64) a play queue - with how much of each: what People's "Known only to deadwax" lists
+        settings, requests, permissions, (2.0.0-player.64) a play queue, (2.1.14) songs played - with how much of each: what People's "Known only to deadwax" lists
         for the names Navidrome has no account for. Never a reserved name (`local` is logins-off's user).
         """
         from src.auth import RESERVED_NAMES
@@ -3135,7 +3199,8 @@ class JobStore:
 
         def of(user):
             return found.setdefault(user, {"user": user, "sessions": 0, "credential": False, "library": 0, "pins": 0,
-                                           "preferences": False, "requests": 0, "permissions": 0, "queue": False})
+                                           "preferences": False, "requests": 0, "permissions": 0, "queue": False,
+                                           "history": 0})
 
         with self._connect() as connection:
             for row in connection.execute("SELECT user, COUNT(*) AS n FROM sessions GROUP BY user"):
@@ -3163,6 +3228,9 @@ class JobStore:
             #? keeps_anything refuses a new account for, so it is listed here, to be forgotten
             for row in connection.execute("SELECT user FROM play_queue"):
                 of(row["user"])["queue"] = True
+            #? (2.1.14) the songs they played - kept for ever, so a name may have nothing else left
+            for row in connection.execute("SELECT user, COUNT(*) AS n FROM play_history GROUP BY user"):
+                of(row["user"])["history"] = row["n"]
         return {user: facts for user, facts in found.items() if user not in RESERVED_NAMES}
 
     def keeps_anything(self, user: str) -> bool:
@@ -3175,8 +3243,8 @@ class JobStore:
     def forget_person(self, user: str) -> dict[str, int]:
         """
         Everything deadwax keeps under `user`, gone - sessions first (so live_credentials can't copy one's login
-        back in), then their kept login, library, pins, Getting albums settings, requests, permissions and
-        (2.0.0-player.64) play queue - in
+        back in), then their kept login, library, pins, Getting albums settings, requests, permissions,
+        (2.0.0-player.64) play queue and (2.1.14) the songs they played - in
         ONE immediate transaction: all of it or none. How many rows of each. Never for a reserved name
         (ValueError): `local` is logins-off's user, and `deadwax` the break-glass admin's. The store's albums,
         the jobs (a download only they wanted carries on and files for nobody) and library_flags' history stay.
@@ -3257,6 +3325,63 @@ class JobStore:
                 "UPDATE play_queue SET rev = ?, idx = ?, position = ?, device = ?, label = ?, saved_at = ? WHERE user = ?",
                 (rev, index, position, device, label, _now(), user))
         return rev, ids_rev
+
+    # ----- the songs each person played (2.1.14, src/play_history.py; SYNCHRONOUS; they raise)
+
+    def record_starts(self, user: str, rows: list[dict]) -> int:
+        """Starts as src/play_history.py clean_start() made them, in ONE transaction - each new one kept, one already
+        kept (the same moment and song: a retry, an offline batch sent again) left as it was but for `counted`, which
+        only ever goes from 0 to 1. How many rows changed: new ones, and ones newly counted."""
+        if not rows:
+            return 0
+        columns = ", ".join(PLAY_HISTORY_COLUMNS)
+        marks = ", ".join("?" * (len(PLAY_HISTORY_COLUMNS) + 1))
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            before = connection.total_changes
+            for row in rows:
+                connection.execute(
+                    f"INSERT INTO play_history (user, {columns}) VALUES ({marks}) "
+                    "ON CONFLICT (user, started_at, song_id) DO UPDATE SET counted = MAX(counted, excluded.counted) "
+                    "WHERE excluded.counted > counted",
+                    (user, *(row[column] for column in PLAY_HISTORY_COLUMNS)))
+            return connection.total_changes - before
+
+    def history_page(self, user: str, limit: int, before_at: int | None = None, before_id: str = "") -> list[dict]:
+        """Up to `limit` of `user`'s starts, newest first - before (`before_at`, `before_id`) when given, which is the
+        last row of the page before: the moment, then the song, so two songs begun the same millisecond still page."""
+        with self._connect() as connection:
+            if before_at is None:
+                found = connection.execute(
+                    "SELECT * FROM play_history WHERE user = ? ORDER BY started_at DESC, song_id DESC LIMIT ?",
+                    (user, limit))
+            else:
+                found = connection.execute(
+                    "SELECT * FROM play_history WHERE user = ? AND (started_at, song_id) < (?, ?) "
+                    "ORDER BY started_at DESC, song_id DESC LIMIT ?", (user, before_at, before_id, limit))
+            return [dict(row) for row in found]
+
+    def mark_counted(self, user: str, song_id: str, started_at: int) -> int:
+        """The start a counted play's scrobble names (its `time` is the start's moment) marked counted - 1, or 0 when
+        it isn't kept (yet: the app's outbox ORs it in when its start is sent after)."""
+        with self._connect() as connection:
+            return connection.execute(
+                "UPDATE play_history SET counted = 1 WHERE user = ? AND started_at = ? AND song_id = ? AND counted = 0",
+                (user, started_at, song_id)).rowcount
+
+    def trim_history(self, user: str, keep: int) -> int:
+        """`user`'s oldest starts past the newest `keep`, gone - the guard (src/play_history.py HISTORY_KEPT_MAX).
+        How many went."""
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            edge = connection.execute(
+                "SELECT started_at, song_id FROM play_history WHERE user = ? "
+                "ORDER BY started_at DESC, song_id DESC LIMIT 1 OFFSET ?", (user, keep)).fetchone()
+            if edge is None:
+                return 0
+            return connection.execute(
+                "DELETE FROM play_history WHERE user = ? AND (started_at, song_id) <= (?, ?)",
+                (user, edge["started_at"], edge["song_id"])).rowcount
 
     # ----- the store seeded into the first admin's library, once ever (SYNCHRONOUS; raises)
 

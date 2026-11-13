@@ -30,6 +30,9 @@
  *    every step of those runs (a row's tap of History's among them; Previous moving startedAt down as the engine does
  *    now, and half the time leaving it as apps before 2.1.3 saved it), and at the window's edge (a run of copies cut by
  *    it); HISTORY_BACK equal to RESUME_BEFORE.
+ *  - (2.1.15) the queue's id back with it at every step of those runs; a snapshot without one, or with one that isn't,
+ *    given a new one - unless, saved without one (the iPhone app before its port), it is the queue the page holds:
+ *    then the page's (the review: else the web's own songs in it showed twice in Up Next).
  *  - (review) a window's focus asked only after its grace, so the click that focused it lands first; the notice not
  *    said again for the same pick-up followed; keepalive by bytes, and by the bytes of every keepalive out; a Repeat
  *    One record under Repeat off saved in full; the 30 s from playing starting; a 422 then a full save; a scrubbed
@@ -257,6 +260,8 @@ console.log('\ntoSave then fromSnapshot: 500 seeded runs of every edit, the queu
         nextKey: back.upNext.nextKey, startedAt: back.upNext.startedAt, left: back.upNext.left, paged: back.upNext.paged, pagedRounds: back.upNext.pagedRounds,
       }
       if (JSON.stringify(got) !== JSON.stringify(wanted)) { note(run, step, `not the same: ${JSON.stringify(got).slice(0, 160)}`); continue }
+      //? (2.1.15) the same queue: its id back with it
+      if (back.upNext.id !== was.id) note(run, step, `its id came back as ${back.upNext.id} for ${was.id}`)
       //? (2.1.3) History after a reload is History before it - the same rows, keys and songs
       const rows = (q) => U.upNextView(q, repeat).history.map((row) => `${row.key}:${row.track.id}`).join()
       if (rows(back) !== rows(queue)) note(run, step, `History came back otherwise: ${rows(back)} for ${rows(queue)}`)
@@ -339,6 +344,34 @@ console.log('\nresumed(): what is put back from what deadwax answers')
     [true, ['1', '2', '3', 'x', '4', '5'], 2, 61, null, 'added', ['album', 'album', 'album', 'track', 'album', 'album']])
   back = R.resumed({ index: 2, position: 61, changed_by: 'deadwax', kept: kept() }, all, 'auto', 'desk-2')
   check('...from another device: named by its label', back.from, { device: 'iPhone' })
+  //? (2.1.15) the queue's id, saved and put back - so the starts of its songs on one device are the same queue's on the
+  //? other; a snapshot without one (the web before 2.1.15, the phone before its port) or with one that isn't: a new one
+  {
+    const made = JSON.parse(saved.snapshot)
+    const put = (snapshot) => R.resumed({ index: 2, position: 61, changed_by: 'deadwax', kept: kept({ snapshot }) }, all, 'auto', 'phone-1').queue.upNext.id
+    const fresh = [put(JSON.stringify({ ...made, id: undefined })), put(JSON.stringify({ ...made, id: 'not one!' })), put(JSON.stringify({ ...made, id: 'x'.repeat(65) }))]
+    check('(2.1.15) the queue\'s id saved in the snapshot and put back with it; none, or one that isn\'t, a new one each time',
+      [/^[A-Za-z0-9_-]{1,64}$/.test(made.id), put(saved.snapshot) === made.id, fresh.every((id) => /^[A-Za-z0-9_-]{1,64}$/.test(id) && id !== made.id), new Set(fresh).size],
+      [true, true, true, 3])
+  }
+  {
+    //? (2.1.15 review) saved WITHOUT an id by an app that keeps none (the iPhone app before its port) - but of the queue
+    //? this page holds (the same list, the same songs under the keys both have): the page's id kept, so the starts this
+    //? page made in it stay its rows rather than being drawn again above. Any other queue held, or none: a new one
+    const made = JSON.parse(saved.snapshot)
+    const noId = JSON.stringify({ ...made, id: undefined })
+    const put = (snapshot, holding) => R.resumed({ index: 2, position: 61, changed_by: 'deadwax', kept: kept({ snapshot }) }, all, 'auto', 'desk-2', holding).queue.upNext.id
+    const holding = U.withNext(U.startUpNext(list.map((t) => ({ ...t, level: 'album' })), 2), [track('x', { level: 'track' })])
+    const otherAlbum = U.startUpNext(album(5, 'o'), 2)
+    const otherSong = U.withNext(U.startUpNext(list, 2), [track('y')])
+    const reordered = U.startUpNext([...list].reverse(), 2)
+    const fresh = [put(noId, otherAlbum), put(noId, otherSong), put(noId, reordered), put(noId, null), put(noId, { tracks: [], index: -1 })]
+    check('(2.1.15 review) no id saved, of the queue this page holds: its id kept; another album, another song under a key, the list reordered, or nothing held: a new one',
+      [put(noId, holding) === holding.upNext.id, fresh.every((id) => /^[A-Za-z0-9_-]{1,64}$/.test(id) && ![holding.upNext.id, otherAlbum.upNext.id, otherSong.upNext.id, reordered.upNext.id].includes(id))],
+      [true, true])
+    check('...an id saved wins over the queue held, the same queue or not', [put(saved.snapshot, holding), put(saved.snapshot, otherAlbum)], [made.id, made.id])
+    check('...sameQueue: the same queue a step on (one song further, one more added) still is', R.sameQueue(holding, U.withLast({ ...holding, index: 3 }, [track('z')])), true)
+  }
   for (const [label, snapshot] of [['not JSON', '{nope'], ['v2', JSON.stringify({ ...JSON.parse(saved.snapshot), v: 2 })],
     ['a mark out of its source', JSON.stringify({ ...JSON.parse(saved.snapshot), marks: JSON.parse(saved.snapshot).marks.map((m, i) => (i === 0 ? [m[0], 's', 99, 0] : m)) })],
     ['a key twice', JSON.stringify({ ...JSON.parse(saved.snapshot), marks: JSON.parse(saved.snapshot).marks.map((m) => [0, m[1], m[2], m[3]]) })],
@@ -568,6 +601,16 @@ async function play(p, ms, from = p.player.at) {
     answerAsk(asked('album')[0], { id: 'nd-dummy', name: 'Dummy' })
     await run(10)
     check('...and remembered, its song still showing', W.remembered, ['nd-dummy'])
+    //? (2.1.15) deadwax's own queue put back mid-song: the song playing on from there is the listen it was - its start was
+    //? kept when it began - so the play history keeps none for it (player/historyOutbox.ts)
+    {
+      const H = require(path.join(OUT, 'player/historyOutbox.js'))
+      const PH = require(path.join(OUT, 'lib/playHistory.js'))
+      const queue = p.player.queue
+      H.record(PH.startOf(queue.tracks[queue.index], Date.now(), queue))
+      check('(2.1.15) put back at 95 s and played on: no start kept for the song carrying on', [H.ownStarts().length, H.pendingStarts().length], [0, 0])
+      H.forgetStarts()
+    }
     await run(120_000)
     p.draw()
     doc.visibilityState = 'hidden'

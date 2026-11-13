@@ -4,7 +4,7 @@
  * compiled with the repo's TypeScript and rendered by the small stand-in for Preact the other page sims
  * use (needslook.sim, group.sim) - here with function components drawn through, since the settings page
  * is drawn from the parts of what was the main page's settings tab (components/SettingsView.tsx's
- * ServerGroup, SettingRow, OrganizingVerdict, OrganizeModes), which this renders for real.
+ * ServerGroup, SettingRow, OrganizingVerdict), which this renders for real.
  *
  * What it pins:
  *
@@ -294,7 +294,6 @@ const setting = (key, more = {}) => ({
 const SETTINGS = () => ({
   version: '2.0.0-player.33', editable: true,
   organizing: { enabled: false, blockers: ['SLSKD_DOWNLOAD_PATH is not set'] },
-  organize_modes: { off: 'Nothing is filed', dry_run: 'Says what it would do', copy: 'Copies', move: 'Moves' },
   groups: [
     { id: 'connections', label: 'Connections', note: '', settings: [
       setting('NAVIDROME_URL', { value: 'http://navidrome:4533', source: 'the container environment' }),
@@ -305,8 +304,8 @@ const SETTINGS = () => ({
       setting('DB_PATH', { value: '/config/deadwax.db', editable: false, locked_reason: 'It is the database the overrides live in.' }),
       setting('SLSKD_DOWNLOAD_PATH', { status: 'error', detail: 'Not set: nothing can be filed.' }),
     ] },
-    { id: 'organizing', label: 'Organizing', note: '', settings: [
-      setting('ORGANIZE_MODE', { value: 'dry_run', choices: { off: 'Off', dry_run: 'Dry run', copy: 'Copy', move: 'Move' } }),
+    { id: 'cover-art', label: 'Cover art', note: '', settings: [
+      setting('COVER_ART_SIZE', { value: '500', choices: { 250: 'Small', 500: 'Medium', 1200: 'Large', full: 'Full size' } }),
     ] },
     { id: 'lyrics', label: 'Lyrics', note: '', settings: [setting('LYRICS_LEAD_MS', { value: '0' })] },
     { id: 'soulseek', label: 'Soulseek searches', note: '', settings: [setting('SLSKD_SEARCH_TIMEOUT', { value: '8' })] },
@@ -437,7 +436,7 @@ async function settingsPage() {
     opened.draw()
     check('the page drawn at Connections, its groups', [find((node) => node.props?.role === 'tab' && node.props['aria-selected']).map((node) => node.props['data-tab']), classed('settings-section-title').map(words)],
       [['connections'], ['Connections']])
-    type('ORGANIZE_MODE', 'copy')
+    type('COVER_ART_SIZE', '1200')
     showServerSettingsTab('library')
     opened.draw()
     check('...another tab asked for: shown, a draft left as it was', [tab('library').props['aria-selected'], savebar()], [true, '1 unsaved change'])
@@ -500,9 +499,9 @@ async function settingsPage() {
   page.draw()
   check('the three server tabs, Library first', find((node) => node.props?.role === 'tab').map((node) => [node.props['data-tab'], node.props['aria-selected']]),
     [['library', true], ['downloads', false], ['connections', false]])
-  check('Library: the organizing verdict, its blockers, the library groups, then the organize modes',
+  check('Library: the organizing verdict, its blockers, then the library groups - no list of organize modes (2.1.13: filing always moves)',
     [words(classed('settings-verdict-title')[0]), classed('settings-verdict-list')[0] && words(classed('settings-verdict-list')[0]), classed('settings-section-title').map(words)],
-    ['Organizing will not file anything right now.', 'SLSKD_DOWNLOAD_PATH is not set', ['Paths', 'Organizing', 'Lyrics', 'Organize modes']])
+    ['Organizing will not file anything right now.', 'SLSKD_DOWNLOAD_PATH is not set', ['Paths', 'Cover art', 'Lyrics']])
   check('no browser preference of the main page\'s',
     [find((node) => /Results per search|Auto-grab|Studio albums|Open the log on start/.test(typeof node === 'string' ? node : '')).length,
       words(tree).includes('Results per search'), words(tree).includes('Auto-grab')],
@@ -520,7 +519,7 @@ async function settingsPage() {
     [words(row('LIBRARY_PATH')).includes('Set here'), words(row('SLSKD_DOWNLOAD_PATH')).includes('Needs attention'), words(row('SLSKD_DOWNLOAD_PATH')).includes('Not set: nothing can be filed.'), words(row('LIBRARY_PATH')).includes('what LIBRARY_PATH does')],
     [true, true, true, true])
   check('...a setting that can\'t be edited says so, and why', [words(row('DB_PATH')).includes('Locked'), words(row('DB_PATH')).includes('the database the overrides live in'), find((node) => node.type === 'input', row('DB_PATH')).length], [true, true, 0])
-  check('...choices as a dropdown', [input('ORGANIZE_MODE').type, find((node) => node.type === 'option', row('ORGANIZE_MODE')).map(words)], ['select', ['Off', 'Dry run', 'Copy', 'Move']])
+  check('...choices as a dropdown', [input('COVER_ART_SIZE').type, find((node) => node.type === 'option', row('COVER_ART_SIZE')).map(words)], ['select', ['Small', 'Medium', 'Large', 'Full size']])
   check('...an override offers to revert to the environment', !!button('Revert to the environment (/data/music)'), true)
   check('a tab holding a setting that needs attention is marked', classed('app-settings-mark', tab('library')).map((node) => node.props.class), ['app-settings-mark is-attention'])
   check('the save bar there and saying nothing; no save button yet', [classed('app-settings-savebar').length, savebar(), !!button('Save changes')], [1, '', false])
@@ -532,7 +531,7 @@ async function settingsPage() {
   //? ...and one never let go, to count every save taken after the first is let go
   const everySave = []
   onServerSettingsSaved((keys) => everySave.push(keys))
-  type('ORGANIZE_MODE', 'copy')
+  type('COVER_ART_SIZE', '1200')
   page.draw()
   tab('connections').props.onClick()
   page.draw()
@@ -569,7 +568,7 @@ async function settingsPage() {
   button('Save changes').props.onClick()
   page.draw()
   check('ONE batch with every draft, whichever tab it was made on', W.saves.map((save) => [...save.updates].sort((a, b) => a.key.localeCompare(b.key))),
-    [[{ key: 'NAVIDROME_PASSWORD', value: 'hunter2' }, { key: 'NAVIDROME_URL', value: 'http://elsewhere:4533' }, { key: 'ORGANIZE_MODE', value: 'copy' }]])
+    [[{ key: 'COVER_ART_SIZE', value: '1200' }, { key: 'NAVIDROME_PASSWORD', value: 'hunter2' }, { key: 'NAVIDROME_URL', value: 'http://elsewhere:4533' }]])
   check('...saying so meanwhile, and refusing a second save', [words(button('Saving…')), button('Saving…').props['aria-disabled']], ['Saving…', 'true'])
   W.saves[0].reject(refusal("NAVIDROME_URL: has a user name or password in it - leave the login to NAVIDROME_USER"))
   await settle()
@@ -591,7 +590,7 @@ async function settingsPage() {
   await settle()
   page.draw()
   check('saved: the server\'s answer drawn, the drafts gone, "Saved."', [input('NAVIDROME_URL').props.value, savebar(), classed('is-edited').filter(byClass('settings-env')).length], ['http://elsewhere:4533', 'Saved.', 0])
-  check('...and told, with the keys it carried (App asks Navidrome again for one of these)', told, [['NAVIDROME_PASSWORD', 'NAVIDROME_URL', 'ORGANIZE_MODE']])
+  check('...and told, with the keys it carried (App asks Navidrome again for one of these)', told, [['COVER_ART_SIZE', 'NAVIDROME_PASSWORD', 'NAVIDROME_URL']])
   page.draw({ live: false })
   page.draw({ live: true })
   check('back with no draft: read again (a volume just fixed shows as fixed)', W.reads.length, 2)
@@ -629,24 +628,24 @@ async function settingsPage() {
     W.reads[0].resolve(SETTINGS())
     await settle()
     raced.draw()
-    type('ORGANIZE_MODE', 'move')
+    type('COVER_ART_SIZE', 'full')
     raced.draw()
     //? a read out when the save begins (here, begun by hand) must not land over the save's answer
     raced.draw({ live: false })
     button('Discard').props.onClick()
     raced.draw({ live: true })
     const out = W.reads[1]
-    type('ORGANIZE_MODE', 'move')
+    type('COVER_ART_SIZE', 'full')
     raced.draw()
     button('Save changes').props.onClick()
     const saved = SETTINGS()
-    saved.groups[2].settings[0].value = 'move'
+    saved.groups[2].settings[0].value = 'full'
     W.saves[0].resolve(saved)
     await settle()
     out.resolve(SETTINGS())
     await settle()
     raced.draw()
-    check('a read still out as a save began lands over nothing: the save\'s answer stands', [out.signal.aborted, input('ORGANIZE_MODE').props.value], [true, 'move'])
+    check('a read still out as a save began lands over nothing: the save\'s answer stands', [out.signal.aborted, input('COVER_ART_SIZE').props.value], [true, 'full'])
   }
 
   console.log('\nserver settings: an edit made while a save is on its way')
@@ -657,32 +656,32 @@ async function settingsPage() {
     W.reads[0].resolve(SETTINGS())
     await settle()
     busy.draw()
-    type('ORGANIZE_MODE', 'copy')
+    type('COVER_ART_SIZE', '1200')
     busy.draw()
     button('Save changes').props.onClick()
     busy.draw()
     //? the rows stay editable while it saves
     type('LYRICS_LEAD_MS', '300')
-    type('ORGANIZE_MODE', 'move')
+    type('COVER_ART_SIZE', 'full')
     busy.draw()
     const saved = SETTINGS()
-    saved.groups[2].settings[0].value = 'copy'
+    saved.groups[2].settings[0].value = '1200'
     W.saves[0].resolve(saved)
     await settle()
     busy.draw()
-    check('the save carried what was there at the click', W.saves[0].updates, [{ key: 'ORGANIZE_MODE', value: 'copy' }])
+    check('the save carried what was there at the click', W.saves[0].updates, [{ key: 'COVER_ART_SIZE', value: '1200' }])
     check('...an edit made meanwhile stays a draft - a key it never sent, and a key typed again since - never wiped under "Saved."',
-      [savebar(), input('LYRICS_LEAD_MS').props.value, input('ORGANIZE_MODE').props.value, classed('is-edited').filter(byClass('settings-env')).length],
-      ['2 unsaved changes', '300', 'move', 2])
+      [savebar(), input('LYRICS_LEAD_MS').props.value, input('COVER_ART_SIZE').props.value, classed('is-edited').filter(byClass('settings-env')).length],
+      ['2 unsaved changes', '300', 'full', 2])
     button('Discard').props.onClick()
     busy.draw()
     check('...Discarded instead: the bar says nothing - never "Saved." for what Discard dropped', savebar(), '')
     type('LYRICS_LEAD_MS', '300')
-    type('ORGANIZE_MODE', 'move')
+    type('COVER_ART_SIZE', 'full')
     busy.draw()
     button('Save changes').props.onClick()
     check('...and the next save carries them', [...W.saves[1].updates].sort((a, b) => a.key.localeCompare(b.key)),
-      [{ key: 'LYRICS_LEAD_MS', value: '300' }, { key: 'ORGANIZE_MODE', value: 'move' }])
+      [{ key: 'COVER_ART_SIZE', value: 'full' }, { key: 'LYRICS_LEAD_MS', value: '300' }])
     busy.unmount()
   }
 
@@ -717,18 +716,18 @@ async function settingsPage() {
     W.reads[0].resolve(SETTINGS())
     await settle()
     refused.draw()
-    type('ORGANIZE_MODE', 'move')
+    type('COVER_ART_SIZE', 'full')
     refused.draw()
     button('Save changes').props.onClick()
-    W.saves[0].reject(refusal('ORGANIZE_MODE: no'))
+    W.saves[0].reject(refusal('COVER_ART_SIZE: no'))
     await settle()
     refused.draw()
-    check('refused: said in the bar', [savebar(), classed('app-settings-savebar')[0].props.class], ['Not saved: ORGANIZE_MODE: no', 'app-settings-savebar has-error is-said'])
+    check('refused: said in the bar', [savebar(), classed('app-settings-savebar')[0].props.class], ['Not saved: COVER_ART_SIZE: no', 'app-settings-savebar has-error is-said'])
     button('Discard').props.onClick()
     refused.draw()
     check('...Discard: the drafts and the refusal gone, the bar saying nothing', [savebar(), classed('app-settings-savebar')[0].props.class], ['', 'app-settings-savebar'])
     //? (2.0.8, UX batch 5) a save that never reached deadwax is said in words (lib/errorWords.ts) - never fetch's own
-    type('ORGANIZE_MODE', 'move')
+    type('COVER_ART_SIZE', 'full')
     refused.draw()
     button('Save changes').props.onClick()
     W.saves[1].reject(new TypeError('Failed to fetch'))
@@ -747,7 +746,7 @@ async function settingsPage() {
     W.reads[0].resolve(SETTINGS())
     await settle()
     first.draw()
-    type('ORGANIZE_MODE', 'move')
+    type('COVER_ART_SIZE', 'full')
     first.draw()
     tab('connections').props.onClick()
     first.draw()
@@ -766,7 +765,7 @@ async function settingsPage() {
       ['Not saved: NAVIDROME_PASSWORD: type it again', true, 'http://elsewhere:4533', 1])
     tab('library').props.onClick()
     again.draw()
-    check('...and the other tab\'s draft too', [input('ORGANIZE_MODE').props.value, classed('is-edited').filter(byClass('settings-env')).length], ['move', 1])
+    check('...and the other tab\'s draft too', [input('COVER_ART_SIZE').props.value, classed('is-edited').filter(byClass('settings-env')).length], ['full', 1])
     check('...nothing read over them', W.reads.length, 1)
     tab('connections').props.onClick()
     again.draw()
@@ -774,18 +773,18 @@ async function settingsPage() {
     again.draw()
     button('Save changes').props.onClick()
     check('...and Save sends them all, those made before it was left included', [...W.saves[1].updates].sort((a, b) => a.key.localeCompare(b.key)),
-      [{ key: 'NAVIDROME_PASSWORD', value: 'hunter2' }, { key: 'NAVIDROME_URL', value: 'http://elsewhere:4533' }, { key: 'ORGANIZE_MODE', value: 'move' }])
+      [{ key: 'COVER_ART_SIZE', value: 'full' }, { key: 'NAVIDROME_PASSWORD', value: 'hunter2' }, { key: 'NAVIDROME_URL', value: 'http://elsewhere:4533' }])
     //? left while the save is on its way: its answer still lands
     again.unmount()
     const saved = SETTINGS()
-    saved.groups[2].settings[0].value = 'move'
+    saved.groups[2].settings[0].value = 'full'
     W.saves[1].resolve(saved)
     await settle()
     const third = mount(ServerSettings, { live: false })
     third.draw()
     tab('library').props.onClick()
     third.draw()
-    check('left while saving: back to what the save answered - "Saved.", no draft', [savebar(), input('ORGANIZE_MODE').props.value, classed('is-edited').filter(byClass('settings-env')).length], ['Saved.', 'move', 0])
+    check('left while saving: back to what the save answered - "Saved.", no draft', [savebar(), input('COVER_ART_SIZE').props.value, classed('is-edited').filter(byClass('settings-env')).length], ['Saved.', 'full', 0])
     third.draw({ live: true })
     check('...and, with no draft, read again as it shows', W.reads.length, 2)
     W.reads[1].resolve(saved)
@@ -832,30 +831,30 @@ async function settingsPage() {
     kept.draw()
     classed('app-settings-savebar-text')[0].props.ref.current = { focus() { focused++ } }
     check('what the bar says can take focus, out of the tab order', classed('app-settings-savebar-text')[0].props.tabIndex, -1)
-    type('ORGANIZE_MODE', 'move')
+    type('COVER_ART_SIZE', 'full')
     kept.draw()
     button('Save changes').props.onClick()
     W.saves[0].resolve(SETTINGS())
     await settle()
     kept.draw()
     check('saved, the buttons gone with the drafts, focus fallen to the page: given to what the bar says', focused, 1)
-    type('ORGANIZE_MODE', 'copy')
+    type('COVER_ART_SIZE', '1200')
     kept.draw()
     button('Discard').props.onClick()
     kept.draw()
     check('...and the same for Discard', focused, 2)
-    type('ORGANIZE_MODE', 'copy')
+    type('COVER_ART_SIZE', '1200')
     kept.draw()
     globalThis.document.activeElement = { elsewhere: true }
     button('Discard').props.onClick()
     kept.draw()
     check('...focus somewhere else meanwhile is left where it went', focused, 2)
     globalThis.document.activeElement = BODY
-    type('ORGANIZE_MODE', 'copy')
+    type('COVER_ART_SIZE', '1200')
     kept.draw()
     //? set back to the saved value, the last draft goes with focus still in the field
     globalThis.document.activeElement = { field: true }
-    type('ORGANIZE_MODE', 'dry_run')
+    type('COVER_ART_SIZE', '500')
     kept.draw()
     check('...nor when typing a value back takes the buttons away with focus in the field', [savebar(), focused], ['', 2])
     delete globalThis.document
@@ -906,7 +905,7 @@ async function settingsPage() {
     type('LYRICS_LEAD_MS', '0')
     lead.draw()
     check('...typed back to the saved value: no draft, offered again', refused(), false)
-    type('ORGANIZE_MODE', 'move')
+    type('COVER_ART_SIZE', 'full')
     lead.draw()
     check('...another setting\'s draft refuses nothing', refused(), false)
     button('Revert to the environment (/data/music)').props.onClick()

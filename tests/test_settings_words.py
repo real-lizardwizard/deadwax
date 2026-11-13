@@ -90,13 +90,13 @@ PLAIN = {}
 FILLED = {
     "SLSKD_URL": "http://slskd:5030", "SLSKD_APIKEY": "key", "NAVIDROME_URL": "http://navidrome:4533",
     "NAVIDROME_USER": "deadwax", "NAVIDROME_PASSWORD": "pw", "MUSICBRAINZ_EMAIL": "me@example.com",
-    "MUSICBRAINZ_USERAGENT": "old/1.0 ( me@example.com )", "ORGANIZE_MODE": "move", "COUNTRY_IN_FOLDER": "on",
+    "MUSICBRAINZ_USERAGENT": "old/1.0 ( me@example.com )", "COUNTRY_IN_FOLDER": "on",
     "AUTO_RETRY_PEER": "on", "FETCH_LYRICS": "off", "LYRICS_LEAD_MS": "300", "COVER_ART_SIZE": "full",
     "RETAG_RENAME_WAIT": "0", "AUTH_MODE": "on", "DEADWAX_SECRET_KEY": "x" * 64, "DEADWAX_ADMIN_PASSWORD": "short",
 }
 BROKEN = {
     "SLSKD_URL": "slskd", "NAVIDROME_URL": "navidrome", "NAVIDROME_USER": None, "MUSICBRAINZ_EMAIL": "nobody",
-    "MUSICBRAINZ_USERAGENT": "no contact here", "ORGANIZE_MODE": "sideways", "COUNTRY_IN_FOLDER": "maybe",
+    "MUSICBRAINZ_USERAGENT": "no contact here", "COUNTRY_IN_FOLDER": "maybe",
     "AUTO_RETRY_PEER": "often", "FETCH_LYRICS": "sometimes", "LYRICS_LEAD_MS": "soon", "COVER_ART_SIZE": "huge",
     "RETAG_RENAME_WAIT": "later", "SLSKD_SEARCH_TIMEOUT": "forever", "PLAYER_CACHE_MB": "lots",
     "MUSICBRAINZ_CACHE_MB": "lots", "ALBUM_FOLDER_TEMPLATE": "{nope}", "AUTH_MODE": "maybe",
@@ -114,7 +114,7 @@ def test_no_server_setting_reads_as_a_test_note(monkeypatch, values):
 
 def test_no_table_a_setting_is_described_from_reads_as_a_test_note():
     tables = [
-        settings_route.ORGANIZE_MODES, settings_route.ORGANIZE_MODE_CHOICES, settings_route.COUNTRY_CHOICES,
+        settings_route.RETIRED, settings_route.COUNTRY_CHOICES,
         settings_route.AUTO_RETRY_CHOICES, settings_route.LYRICS_CHOICES, settings_route.COVER_ART_SIZE_CHOICES,
         settings_route.COVER_ART_SIZE_NOTES, settings_route.ADMINS_ONLY, settings_route.PLAYER_CACHE_IS,
         settings_route.MUSICBRAINZ_CACHE_IS, Config.NOT_EDITABLE, config.LOGINS_LOCKED,
@@ -136,11 +136,6 @@ def test_no_string_the_settings_route_can_say_reads_as_a_test_note():
             continue
         said.append(token.string)
     assert said and offending(said) == []
-
-
-def test_the_organize_modes_dropdown_names_them_in_words_with_the_values_compose_takes():
-    assert list(settings_route.ORGANIZE_MODE_CHOICES) == list(settings_route.ORGANIZE_MODES)
-    assert all(label[0].isupper() and "_" not in label for label in settings_route.ORGANIZE_MODE_CHOICES.values())
 
 
 @pytest.mark.parametrize("path", APP_FILES)
@@ -182,14 +177,14 @@ def test_deadwax_s_own_account_is_not_said_to_carry_everything(monkeypatch):
     assert any("each person plays as their own account" in text for text in strings_in(answer))
 
 
-def test_organizing_names_its_modes_in_the_dropdown_s_words(monkeypatch, tmp_path):
-    for mode, label in (("dry_run", "Dry run"), ("off", "Off")):
-        answer = answer_under(monkeypatch, SLSKD_DOWNLOAD_PATH=str(tmp_path), LIBRARY_PATH=str(tmp_path), ORGANIZE_MODE=mode)
-        blockers = answer["organizing"]["blockers"]
-        assert blockers == [b for b in blockers if "'" not in b and "dry_run" not in b]
-        assert any(f"set to {label}" in blocker for blocker in blockers)
-    group = next(g for g in answer_under(monkeypatch)["groups"] if g["id"] == "organizing")
-    assert "Dry run" in group["note"] and "dry_run" not in group["note"]
+def test_organizing_says_a_download_is_moved_in_plain_words(monkeypatch, tmp_path):
+    """(2.1.13) The group's note says what happens to a finished download - moved into the library - and names
+    no mode, which there isn't any more; its blockers are the two folders', in words."""
+    answer = answer_under(monkeypatch, SLSKD_DOWNLOAD_PATH=None, LIBRARY_PATH=None)
+    assert answer["organizing"]["blockers"] == ["SLSKD_DOWNLOAD_PATH is not set", "LIBRARY_PATH is not set"]
+    group = next(g for g in answer["groups"] if g["id"] == "organizing")
+    assert "moved out of slskd's folder into your library" in group["note"]
+    assert not any(word in group["note"] for word in ("Dry run", "dry_run", "Copy", "ORGANIZE_MODE"))
     #? the caches write files too: organizing is the one that files or moves your music
     assert "only thing here that writes" not in group["note"]
 

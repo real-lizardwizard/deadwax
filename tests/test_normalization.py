@@ -793,11 +793,12 @@ def test_a_filed_flac_album_is_measured_and_its_first_levelled_play_measures_not
     assert seen == [], "measured at filing - by the same key Navidrome's copy has"
 
 
-@pytest.mark.parametrize("mode", ["copy", "dry_run"])
-def test_the_poller_measures_what_it_files_and_nothing_in_a_dry_run(tmp_path, monkeypatch, mode):
+@pytest.mark.parametrize("case", ["filed", "nothing filed"])
+def test_the_poller_measures_what_it_files_and_nothing_else(tmp_path, monkeypatch, case):
     """Part B through the poller itself: a download organized for real has its FLAC songs measured in the
     background, keyed by the STREAMINFO they carry - the very key Navidrome's copy of them has, the tags the
-    organizer wrote notwithstanding. A dry run files nothing, and measures nothing."""
+    organizer wrote notwithstanding. A download nothing of was filed - its files not where SLSKD_DOWNLOAD_PATH
+    says - measures nothing. (Until 2.1.13 that case was a dry run.)"""
     np, sf, _ = libs()
     from src.config import Config
     from test_poller import FakeSlskd, _all_done, make_store, seed_job
@@ -807,9 +808,9 @@ def test_the_poller_measures_what_it_files_and_nothing_in_a_dry_run(tmp_path, mo
     downloads.mkdir(parents=True)
     for name, data in zip(("01.flac", "02.flac"), files.values()):
         (downloads / name).write_bytes(data)
-    monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(tmp_path / "downloads"))
+    monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH",
+                        str(tmp_path / ("downloads" if case == "filed" else "elsewhere")))
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path / "music"))
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", mode)
     monkeypatch.setattr(Config, "FETCH_LYRICS", "off")
     kept = make_store(tmp_path)
     seed_job(kept)
@@ -820,7 +821,7 @@ def test_the_poller_measures_what_it_files_and_nothing_in_a_dry_run(tmp_path, mo
         await asyncio.gather(*list(poller._measure_tasks))
 
     asyncio.run(poll())
-    if mode == "dry_run":
+    if case == "nothing filed":
         assert seen == [] and kept_rows(kept) == []
         return
     filed = sorted((tmp_path / "music").rglob("*.flac"))

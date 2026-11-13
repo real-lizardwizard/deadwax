@@ -7,18 +7,20 @@ two halves that are deliberately kept apart:
   plan_organization()  - pure. Works out what *would* happen. No disk writes, fully testable.
   execute_plan()       - does it, and only what the plan says.
 
-That split is what makes dry-run trustworthy rather than a second code path that might
-disagree with the real one: dry-run runs the identical plan and simply declines to execute.
-
-Defaults are cautious on purpose - copy rather than move, never overwrite, and ORGANIZE_MODE
-starts at dry_run so a first deploy with a mis-mapped volume reports what it would have done
-instead of scattering a music library.
+Filing always MOVES (2.1.13, James: "I would like it to only move the files, I don't think we
+need anything else"). Until then ORGANIZE_MODE chose off, dry_run (the default), copy or move;
+it is no longer read, and filing happens whenever SLSKD_DOWNLOAD_PATH and LIBRARY_PATH are both
+set. The split stays all the same: the plan is what the tests check without touching a disk, and
+what the poller hands the store index before anything is written. A move never overwrites, and
+its clean-up never deletes past audio (cleanup_source_dirs).
 """
 
 import asyncio
+import fnmatch
 import os
 import re
 import shutil
+import stat
 import time
 from pathlib import Path
 
@@ -30,12 +32,6 @@ from src.matching import (AUDIO_EXTENSIONS, file_extension, match_tracks_to_file
                           split_remote_path)
 
 
-#? off      - never organize, downloads just sit in slskd's folder
-#? dry_run  - plan and log, touch nothing (default: safe first deploy)
-#? copy     - copy into the library, leave slskd's copy alone
-#? move     - move into the library
-ORGANIZE_MODES = ("off", "dry_run", "copy", "move")
-
 INVALID_FILENAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
 #? Non-audio files worth carrying into the library alongside the tracks. Cover art especially -
@@ -43,6 +39,28 @@ INVALID_FILENAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 COMPANION_EXTENSIONS = {
     "jpg", "jpeg", "png", "gif", "webp", "bmp", "cue", "log", "nfo", "txt", "m3u", "m3u8", "sfv"
 }
+
+#? (2.1.13, review) What clearing slskd's folder after a filing may delete with it - everything else keeps the
+#? folder. Since filing always moves, the clean-up runs after every one, and "never past audio" judged by
+#? matching's AUDIO_EXTENSIONS let a DSD or Musepack file (dsf, dff, mpc, tta, mka, m4b...) go with the folder.
+#? So the test is turned round: a folder is cleared only when all that is left in it is known - the
+#? companions (moved already, or a second cover a name clash left), scans and booklets, checksums and rip
+#? reports, and the junk an OS leaves. Anything else - music in any format, a video, a name unknown - is
+#? somebody's, and the folder stays. A list of its own, not matching's: what a search takes for audio is
+#? unchanged.
+DISPOSABLE_EXTENSIONS = COMPANION_EXTENSIONS | {
+    "tif", "tiff", "jfif", "heic", "avif", "pdf",
+    "md5", "sha1", "sha256", "sha512", "crc", "ffp", "st5", "accurip", "url", "sfk", "pk",
+}
+DISPOSABLE_NAMES = {"thumbs.db", "ehthumbs.db", "desktop.ini", ".ds_store"}
+
+
+def disposable(name: str) -> bool:
+    """Whether a file left in slskd's folder after a filing may be deleted with the folder (DISPOSABLE_EXTENSIONS)."""
+    lowered = name.lower()
+    #? `._name` is macOS's AppleDouble record of another file's attributes, never content of its own
+    return (lowered in DISPOSABLE_NAMES or lowered.startswith("._")
+            or file_extension(name) in DISPOSABLE_EXTENSIONS)
 
 
 def sanitize_filename(name: str, fallback: str = "unknown") -> str:
@@ -159,7 +177,52 @@ def build_target_path(
     return Path(library_root) / artist / build_album_dirname(release, discriminator) / filename
 
 
-def find_local_file(download_root: str, remote_filename: str, remote_directory: str = "") -> Path | None:
+def _name_matcher(basename: str):
+    """
+    The test a file's name is put to, as rglob(basename) put it until 2.1.13 - `?` and `*` still match any
+    character - except that a `[` is itself: as a glob a bracket opens a set, so `Song [Live].flac` matched
+    `Song L.flac` and never itself, and every name with brackets in it was "not found on disk".
+    """
+    if "*" not in basename and "?" not in basename and "[" not in basename:
+        return lambda name: name == basename
+    pattern = basename.replace("[", "[[]")
+    return lambda name: fnmatch.fnmatchcase(name, pattern)
+
+
+def folders_under(root: Path, library: Path | None):
+    """
+    (folder, file names) for `root` and every folder beneath it, top-down in the order rglob went, never
+    following a link to a folder (rglob didn't) and never entering the library: LIBRARY_PATH's own folder,
+    known by its identity, so a bind mount of it under slskd's folder is passed by too (2.1.13, review).
+    """
+    library_id = _identity(library) if library is not None else None
+    pending = [root]
+    while pending:
+        folder = pending.pop()
+        try:
+            with os.scandir(folder) as listing:
+                entries = list(listing)
+        except OSError:
+            continue
+        names, subfolders = [], []
+        for entry in entries:
+            try:
+                if entry.is_dir(follow_symlinks=False):
+                    if library_id is not None:
+                        status = entry.stat(follow_symlinks=False)
+                        if (status.st_dev, status.st_ino) == library_id:
+                            continue
+                    subfolders.append(Path(entry.path))
+                elif entry.is_file():
+                    names.append(entry.name)
+            except OSError:
+                continue
+        yield folder, names
+        pending.extend(reversed(subfolders))
+
+
+def find_local_file(download_root: str, remote_filename: str, remote_directory: str = "",
+                    library_root: str = "") -> Path | None:
     """
     Locate what slskd actually wrote to disk for a given remote file.
 
@@ -175,6 +238,12 @@ def find_local_file(download_root: str, remote_filename: str, remote_directory: 
     directory is the album folder while each file sits in its "CD 1" or "CD 2", and both discs
     can hold an `01 - Wish You Were Here.flac`. The hit agreeing on the most folders, counted up
     from the file, wins; that is one folder under the default pattern and more under the full one.
+
+    (2.1.13, review) NEVER a file in the library. Filing moves what this finds, and with LIBRARY_PATH under
+    SLSKD_DOWNLOAD_PATH a search by name found the library's own copy - an `Artist/Album (1998)/` agreeing with
+    the peer's folders better than slskd's `/downloads/Album (1998)/` did - which was moved, retagged as the new
+    release, and its album folder removed. The library's folder is never entered (folders_under) and a hit that
+    leads into it anyway (a link) is passed over (in_library).
     """
     root = Path(download_root)
     if not root.is_dir():
@@ -184,7 +253,16 @@ def find_local_file(download_root: str, remote_filename: str, remote_directory: 
     if not basename:
         return None
 
-    matches = [p for p in root.rglob(basename) if p.is_file()]
+    library = Path(library_root) if library_root else None
+    wanted = _name_matcher(basename)
+    matches = [
+        folder / name
+        for folder, names in folders_under(root, library)
+        for name in names
+        if wanted(name)
+    ]
+    if library is not None:
+        matches = [path for path in matches if not in_library(path, library)]
 
     if len(matches) < 2:
         return matches[0] if matches else None
@@ -221,6 +299,63 @@ def is_within(child: Path, parent: Path) -> bool:
         return True
     except (ValueError, OSError):
         return False
+
+
+def _identity(path: Path | str | None) -> tuple[int, int] | None:
+    """A folder's (device, inode): the same for every path that reaches it - a bind mount or a link included."""
+    if not path:
+        return None
+    try:
+        status = os.stat(path)
+    except (OSError, ValueError):
+        return None
+    return status.st_dev, status.st_ino
+
+
+def in_library(path: Path, library: Path) -> bool:
+    """
+    Whether `path` is in the library (2.1.13, review): beneath LIBRARY_PATH once links are resolved, or beneath a
+    folder that IS LIBRARY_PATH's by identity - the library seen through a second mount of it.
+    """
+    if is_within(path, library):
+        return True
+    library_id = _identity(library)
+    if library_id is None:
+        return False
+    try:
+        parents = Path(os.path.abspath(path)).parents
+    except (OSError, ValueError):
+        return False
+    return any(_identity(parent) == library_id for parent in parents)
+
+
+def folders_overlap(download_root: str | None, library_root: str | None) -> str | None:
+    """
+    How SLSKD_DOWNLOAD_PATH and LIBRARY_PATH overlap - one folder, or one inside the other, links resolved and a
+    second mount of the same folder known by its identity - in words for whoever runs deadwax; None when they
+    are apart, or either is unset or missing (2.1.13, review). Filing moves files out of slskd's folder and
+    clears what it leaves, so with the two overlapping it would be moving and clearing the library itself:
+    plan_organization refuses the whole filing, and Server settings says so - one test for both.
+    """
+    if not download_root or not library_root:
+        return None
+    downloads, library = Path(download_root), Path(library_root)
+    downloads_id, library_id = _identity(downloads), _identity(library)
+    if downloads_id is None or library_id is None:
+        return None
+    try:
+        downloads_real, library_real = downloads.resolve(), library.resolve()
+    except (OSError, RuntimeError):
+        return None
+    if downloads_id == library_id or downloads_real == library_real:
+        return "SLSKD_DOWNLOAD_PATH and LIBRARY_PATH are the same folder"
+    if library_real.is_relative_to(downloads_real) or any(
+            _identity(parent) == downloads_id for parent in library_real.parents):
+        return "LIBRARY_PATH is inside SLSKD_DOWNLOAD_PATH"
+    if downloads_real.is_relative_to(library_real) or any(
+            _identity(parent) == library_id for parent in downloads_real.parents):
+        return "SLSKD_DOWNLOAD_PATH is inside LIBRARY_PATH"
+    return None
 
 
 def find_companion_files(source_dir: Path, placed: set[str]) -> list[Path]:
@@ -423,6 +558,46 @@ def resolve_album_dir(library_root: str, release: dict, quiet: bool = False) -> 
     return fallback, wanted_mbid[:8] or "alt"
 
 
+def can_move_out_of(folder: Path) -> bool:
+    """
+    Whether deadwax may take a file out of this folder: writable and searchable to it (2.1.13). A move
+    removes the file from slskd's folder, which needs exactly that - and os.access asks the kernel, which
+    answers no for a read-only mount (a `:ro` volume, EROFS) as well as for the folder's permissions, as
+    root too. Nothing is written to find out.
+    """
+    return os.access(folder, os.W_OK | os.X_OK)
+
+
+def mounted_read_only(folder: Path | str) -> bool:
+    """Whether the filesystem `folder` is on is mounted read-only - a `:ro` volume. statvfs's flag; nothing written."""
+    try:
+        return bool(os.statvfs(folder).f_flag & getattr(os, "ST_RDONLY", 1))
+    except (OSError, AttributeError, ValueError):
+        return False
+
+
+def why_cannot_move_out_of(folder: Path | str) -> str:
+    """
+    Why can_move_out_of says no of a folder, and what to change, for whoever runs deadwax (2.1.13, review). Two
+    causes: a read-only mount (`:ro`), or - the likelier, with no `:ro` anywhere - a folder slskd made as its own
+    user that deadwax's PUID/PGID can't write, which no change to the mount mends.
+    """
+    if mounted_read_only(folder):
+        return f"{folder} is on a read-only mount - remove :ro from the /downloads volume"
+    uid = os.geteuid() if hasattr(os, "geteuid") else None
+    try:
+        status = os.stat(folder)
+    except OSError as e:
+        return f"{folder} can't be written by deadwax ({e})"
+    mode = stat.filemode(status.st_mode)
+    if uid is not None and status.st_uid == uid:
+        return f"{folder} is deadwax's own but not writable ({mode}) - give its owner write access"
+    runs_as = f"uid {uid}, gid {os.getegid()}" if uid is not None else "another user"
+    return (f"{folder} is owned by uid {status.st_uid}, gid {status.st_gid} ({mode}) and deadwax runs as "
+            f"{runs_as} - run slskd and deadwax as the same PUID/PGID, or give deadwax write access to "
+            f"slskd's downloads")
+
+
 def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
     """
     Work out every file operation this job implies. Touches nothing.
@@ -435,6 +610,17 @@ def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
     release = job.get("release") or {}
     tracks = release.get("tracks") or []
     files = job.get("files") or []
+
+    #? (2.1.13, review) slskd's folder and the library overlapping - one folder, or one inside the other - and a
+    #? move out of the one is a move out of the other: the whole filing is refused, nothing searched or written
+    #? (organize_job, execute_plan). The test Server settings makes too, so the two never disagree.
+    overlap = folders_overlap(download_root, library_root)
+    if overlap:
+        return {
+            "job_id": job.get("id"), "album_dir": None, "operations": [], "companion_count": 0,
+            "source_dirs": [], "read_only_dirs": [], "overlap": overlap,
+            "problems": [], "matched_tracks": 0, "total_tracks": len(tracks), "same_release": False,
+        }
 
     mapping = match_tracks_to_files(tracks, files) if tracks else {}
     track_by_filename = {
@@ -460,11 +646,17 @@ def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
 
     for file_entry in files:
         remote_filename = file_entry.get("filename", "")
-        source = find_local_file(download_root, remote_filename, job.get("directory", ""))
+        source = find_local_file(download_root, remote_filename, job.get("directory", ""), library_root)
 
         if source is None:
             problems.append(f"not found on disk: {remote_filename}")
             continue
+
+        #? (2.1.13, review) never a file already in the library, however it was reached: find_local_file passes
+        #? them over, and this is the plan's own word on it - the whole filing is refused, as for an overlap
+        if library_root and in_library(source, Path(library_root)):
+            overlap = f"{source} is in LIBRARY_PATH"
+            break
 
         _, basename = split_remote_path(remote_filename)
         track = track_by_filename.get(remote_filename)
@@ -496,6 +688,14 @@ def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
             if duplicate:
                 operation["duplicate_of"] = duplicate
         operations.append(operation)
+
+    if overlap:
+        return {
+            "job_id": job.get("id"), "album_dir": None, "operations": [], "companion_count": 0,
+            "source_dirs": [], "read_only_dirs": [], "overlap": overlap,
+            "problems": problems, "matched_tracks": len(mapping), "total_tracks": len(tracks),
+            "same_release": False,
+        }
 
     album_dir = Path(operations[0]["target"]).parent if operations else None
 
@@ -530,12 +730,28 @@ def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
                     "exists": target.exists(),
                 })
 
+    #? (2.1.13) Filing always moves, and a move out of a folder deadwax can't write to goes wrong in the
+    #? worst way: shutil.move copies the file into the library, then fails to remove the original, so
+    #? every file "fails" and leaves an untagged copy behind. Before 2.1.13 a `:ro` /downloads was fine
+    #? with copy. So every folder a file would actually be moved out of - not a duplicate's, which
+    #? stays, nor one whose target is already there, which is skipped - is asked first, and the whole
+    #? filing is refused (organize_job, execute_plan) before anything is written when any can't be left.
+    moving_from = {Path(op["source"]).parent for op in operations + companions
+                   if not op.get("duplicate_of") and not op.get("exists")}
+    read_only_dirs = sorted(str(folder) for folder in moving_from if not can_move_out_of(folder))
+
     return {
         "job_id": job.get("id"),
         "album_dir": str(album_dir) if album_dir else None,
         "operations": operations + companions,
         "companion_count": len(companions),
         "source_dirs": sorted(str(d) for d in source_dirs),
+        #? (2.1.13) the folders a file would be moved out of that deadwax can't write to - any at all, and
+        #? nothing is filed
+        "read_only_dirs": read_only_dirs,
+        #? (2.1.13, review) how slskd's folder and the library overlap (folders_overlap), or a source found in the
+        #? library - set, and nothing is filed
+        "overlap": None,
         "problems": problems,
         "matched_tracks": len(mapping),
         "total_tracks": len(tracks),
@@ -585,8 +801,8 @@ def tag_values(release: dict, track: dict | None, current: dict | None = None) -
 
     Split out from write_tags() so the retag preview can show what applying a release WOULD
     change without duplicating the rules. Two copies of this would drift, and a preview that
-    disagrees with the write it is previewing is worse than no preview - the same reason
-    dry-run runs the identical plan rather than a parallel one.
+    disagrees with the write it is previewing is worse than no preview - the same reason the
+    organizer's plan and its execute share one plan rather than a parallel one.
 
     `current` is what the file carries now, as far as the caller has read it. Only one rule
     depends on it - a stray disc number, below - and both callers pass the same reading of the
@@ -734,20 +950,24 @@ def write_tags(path: Path, release: dict, track: dict | None, drop_stale_release
         logger.warning(f"could not write tags to {path.name}: {e}")
 
 
-def execute_plan(plan: dict, release: dict, mode: str = "dry_run") -> dict:
+def execute_plan(plan: dict, release: dict) -> dict:
     """
-    Carry out a plan. `mode` decides how far it goes; dry_run stops before touching anything.
+    Carry out a plan: MOVE each file to its target, then tag it. The only way filing goes since
+    2.1.13 - there is no mode (off, dry run and copy are gone).
     """
-    if mode not in ORGANIZE_MODES:
-        mode = "dry_run"
-
     #? `tracks_organized` is how many of `organized` were audio rather than a cover or sidecar: a
     #? folder that ends up holding only a cover.jpg is not an album to the scan, so the poller
     #? enrols a filed album for review only when a track reached it (v1.1.2)
-    results = {"organized": 0, "tracks_organized": 0, "skipped": 0, "duplicates": 0, "failed": 0,
-               "dry_run": mode == "dry_run", "mode": mode}
+    results = {"organized": 0, "tracks_organized": 0, "skipped": 0, "duplicates": 0, "failed": 0}
 
-    if mode == "off":
+    #? (2.1.13, review) slskd's folder and the library overlap: nothing is moved (plan_organization's overlap)
+    if plan.get("overlap"):
+        results["overlap"] = plan["overlap"]
+        return results
+    #? (2.1.13) a folder a file would be moved out of is read-only to deadwax: nothing is moved, so
+    #? nothing is copied in half-way and left untagged (plan_organization's read_only_dirs)
+    if plan.get("read_only_dirs"):
+        results["read_only"] = list(plan["read_only_dirs"])
         return results
 
     for operation in plan["operations"]:
@@ -759,18 +979,10 @@ def execute_plan(plan: dict, release: dict, mode: str = "dry_run") -> dict:
         #? move's clean-up keeps that folder rather than deleting unfiled music.
         if operation.get("duplicate_of"):
             logger.info(
-                f"{'[dry run] ' if mode == 'dry_run' else ''}already in the store as "
-                f"{operation['duplicate_of']}, not filing {source.name} beside it"
+                f"already in the store as {operation['duplicate_of']}, not filing {source.name} beside it"
             )
             results["skipped"] += 1
             results["duplicates"] += 1
-            continue
-
-        if mode == "dry_run":
-            logger.info(f"[dry run] would place {source.name} -> {target}")
-            results["organized"] += 1
-            if not operation.get("companion"):
-                results["tracks_organized"] += 1
             continue
 
         #? never clobber. An existing destination is far more likely to be a real album the
@@ -783,10 +995,7 @@ def execute_plan(plan: dict, release: dict, mode: str = "dry_run") -> dict:
         try:
             target.parent.mkdir(parents=True, exist_ok=True)
 
-            if mode == "move":
-                shutil.move(str(source), str(target))
-            else:
-                shutil.copy2(str(source), str(target))
+            shutil.move(str(source), str(target))
 
             if not operation.get("companion"):
                 write_tags(target, release, operation.get("track"), drop_stale_release_id=True)
@@ -801,25 +1010,31 @@ def execute_plan(plan: dict, release: dict, mode: str = "dry_run") -> dict:
     return results
 
 
-def cleanup_source_dirs(plan: dict, download_root: str, results: dict) -> list[str]:
+def cleanup_source_dirs(plan: dict, download_root: str, results: dict, library_root: str = "") -> list[str]:
     """
     Remove the slskd folders a completed move emptied of music.
 
     Every guard here is deliberate, because this is the only code in deadwax that deletes
     anything:
 
-      - move only. copy exists precisely to leave the original alone.
+      - after a move only - every filing, since 2.1.13. (Until then a copy left the original
+        alone and never came here, and a dry run wrote nothing.)
       - nothing failed or was skipped, so we never delete beside a half-finished job.
       - the directory must resolve to somewhere inside the download root, so a stray path or
         symlink can't walk the delete out into the wider filesystem.
       - never the download root itself.
-      - NO AUDIO ANYWHERE BENEATH IT. That is the guard that replaced `rmdir` (v0.6.20, asked
-        for: "I'd like the album folder to be deleted when the songs are"). rmdir refuses a
-        non-empty folder by construction, which kept every share that came with a Thumbs.db, a
-        .md5 or a Scans/ folder - the tracks gone, the folder left for ever. Deleting whatever
-        is left is what was wanted; deleting audio is not, and audio left here is somebody
+      - (2.1.13, review) never the library: not a folder in it, not one holding it, not one with
+        a second mount of it beneath. A review reproduced the library's own album folder being
+        removed here, after filing had taken its tracks with LIBRARY_PATH under SLSKD_DOWNLOAD_PATH.
+      - NOTHING LEFT BENEATH IT BUT WHAT IS KNOWN TO GO (`disposable`). That is the guard that replaced
+        `rmdir` (v0.6.20, asked for: "I'd like the album folder to be deleted when the songs are").
+        rmdir refuses a non-empty folder by construction, which kept every share that came with a
+        Thumbs.db, a .md5 or a Scans/ folder - the tracks gone, the folder left for ever. Deleting
+        whatever is left is what was wanted; deleting music is not, and music left here is somebody
         else's: a second job still downloading into the same peer folder, or files of it that
-        nobody asked for. Those are kept and reported exactly as before.
+        nobody asked for. Until 2.1.13 "music" was matching's AUDIO_EXTENSIONS, which has no dsf,
+        dff, mpc, tta, mka or m4b; now a folder stays when anything is left in it that isn't
+        art, a scan, a sidecar, a checksum or OS junk - and is reported exactly as before.
 
     Note the sidecars worth having are already in the library by now - art, cue, log, nfo, txt,
     m3u and sfv are moved with the tracks (COMPANION_EXTENSIONS). What a delete here takes is
@@ -829,6 +1044,8 @@ def cleanup_source_dirs(plan: dict, download_root: str, results: dict) -> list[s
         return []
 
     root = Path(download_root)
+    library = Path(library_root) if library_root else None
+    library_id = _identity(library)
     removed = []
 
     for raw in plan.get("source_dirs", []):
@@ -841,15 +1058,28 @@ def cleanup_source_dirs(plan: dict, download_root: str, results: dict) -> list[s
             logger.warning(f"refusing to remove {directory}, it is not inside {download_root}")
             continue
 
-        held_audio = [
-            entry for entry in directory.rglob("*")
-            if entry.is_file() and file_extension(entry.name) in AUDIO_EXTENSIONS
-        ]
+        if library is not None and (in_library(directory, library) or is_within(library, directory)):
+            logger.warning(f"refusing to remove {directory}, the library is in it or it is in the library",
+                           extra={"frontend": True, "src": "slskd"})
+            continue
 
-        if held_audio:
+        kept: list[str] = []
+        holds_library = False
+        for folder, subfolders, names in os.walk(directory):
+            if library_id is not None and any(_identity(Path(folder) / name) == library_id for name in subfolders):
+                holds_library = True
+                break
+            kept.extend(name for name in names if not disposable(name))
+
+        if holds_library:
+            logger.warning(f"refusing to remove {directory}, the library is mounted inside it",
+                           extra={"frontend": True, "src": "slskd"})
+            continue
+
+        if kept:
             logger.warning(
-                f"left {directory.name} in place, it still holds "
-                f"{len(held_audio)} track(s) nothing filed",
+                f"left {directory.name} in place, it still holds {len(kept)} file(s) nothing filed: "
+                f"{', '.join(sorted(kept)[:6])}",
                 extra={"frontend": True, "src": "slskd"},
             )
             continue
@@ -863,8 +1093,8 @@ def cleanup_source_dirs(plan: dict, download_root: str, results: dict) -> list[s
             if leftovers:
                 #? said out loud: these were deleted, not carried into the library
                 logger.info(
-                    f"removed {directory.name} and the {len(leftovers)} non-audio file(s) left "
-                    f"in it: {', '.join(leftovers[:6])}",
+                    f"removed {directory.name} and the {len(leftovers)} leftover file(s) in "
+                    f"it: {', '.join(leftovers[:6])}",
                     extra={"frontend": True, "src": "slskd"},
                 )
             else:
@@ -1032,12 +1262,11 @@ def remove_incomplete_downloads(
     return results
 
 
-async def organize_job(job: dict, download_root: str, library_root: str, mode: str,
-                       on_plan=None) -> dict:
+async def organize_job(job: dict, download_root: str, library_root: str, on_plan=None) -> dict:
     """
-    Plan then execute, with the logging the UI's event log surfaces. `on_plan(plan)`, when
-    given, is told the plan before anything is written - the poller marks the album folder as
-    being filed, so a scan landing mid-copy doesn't take it for an album moved there by hand.
+    Plan then execute - a move - with the logging the UI's event log surfaces. `on_plan(plan)`,
+    when given, is told the plan before anything is written - the poller marks the album folder as
+    being filed, so a scan landing mid-move doesn't take it for an album moved there by hand.
     """
     label = f"{job.get('artist')} - {job.get('album')}"
     plan = await asyncio.to_thread(plan_organization, job, download_root, library_root)
@@ -1045,25 +1274,46 @@ async def organize_job(job: dict, download_root: str, library_root: str, mode: s
     for problem in plan["problems"]:
         logger.warning(f"{label}: {problem}", extra={"frontend": True, "src": "slskd"})
 
+    #? (2.1.13, review) refused whole, before anything is searched, marked, moved or cleaned up: the poller says
+    #? why on the row, and files it by itself once the folders are apart (refile_refused)
+    if plan.get("overlap"):
+        logger.error(
+            f"not filing {label}: {plan['overlap']}, so filing would move music out of the library and clear "
+            f"its folders. Set SLSKD_DOWNLOAD_PATH and LIBRARY_PATH to two separate folders, neither inside "
+            f"the other.",
+            extra={"frontend": True, "src": "slskd"},
+        )
+        return {"organized": 0, "tracks_organized": 0, "skipped": 0, "duplicates": 0, "failed": 0,
+                "overlap": plan["overlap"], "plan": plan}
+
     if not plan["operations"]:
         logger.error(f"nothing to organize for {label}", extra={"frontend": True, "src": "slskd"})
-        return {"organized": 0, "tracks_organized": 0, "skipped": 0, "failed": 0,
-                "dry_run": mode == "dry_run", "mode": mode, "plan": plan}
+        return {"organized": 0, "tracks_organized": 0, "skipped": 0, "failed": 0, "plan": plan}
+
+    #? (2.1.13) refused before anything is marked, moved or cleaned up: the poller says why on the row
+    if plan.get("read_only_dirs"):
+        #? (review) each folder's own cause - a `:ro` mount, or slskd's user owning it - since the fixes differ
+        logger.error(
+            f"not filing {label}: deadwax can't move files out of slskd's download folder, so nothing was "
+            f"moved. {'; '.join(why_cannot_move_out_of(folder) for folder in plan['read_only_dirs'])}. It is "
+            f"filed by itself once that is fixed.",
+            extra={"frontend": True, "src": "slskd"},
+        )
+        return {"organized": 0, "tracks_organized": 0, "skipped": 0, "duplicates": 0, "failed": 0,
+                "read_only": list(plan["read_only_dirs"]), "plan": plan}
 
     if on_plan is not None:
         on_plan(plan)
-    results = await asyncio.to_thread(execute_plan, plan, job.get("release") or {}, mode)
+    results = await asyncio.to_thread(execute_plan, plan, job.get("release") or {})
 
-    if mode == "move":
-        results["removed_dirs"] = await asyncio.to_thread(
-            cleanup_source_dirs, plan, download_root, results
-        )
+    results["removed_dirs"] = await asyncio.to_thread(
+        cleanup_source_dirs, plan, download_root, results, library_root
+    )
 
-    verb = "would organize" if results.get("dry_run") else "organized"
     companions = plan.get("companion_count") or 0
     extra = f" (+{companions} cover/sidecar file(s))" if companions else ""
     logger.info(
-        f"{verb} {results['organized']} file(s){extra} for {label} into {plan['album_dir']}",
+        f"organized {results['organized']} file(s){extra} for {label} into {plan['album_dir']}",
         extra={"frontend": True, "src": "slskd"},
     )
 

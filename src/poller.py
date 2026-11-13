@@ -20,7 +20,7 @@ from src.levels import measure_filed
 from src.library_ledger import grant_job
 from src.logger import logger
 from src.lyrics import fetch_album_lyrics
-from src.organizer import organize_job, remove_empty_incomplete_dirs, remove_incomplete_downloads
+from src.organizer import organize_job, plan_organization, remove_empty_incomplete_dirs, remove_incomplete_downloads
 from src.peer_speed import RateAccumulator, measured_rate, observe
 from src.store import RETRYABLE_STATUSES, index_transfers_by_user, settled_transfer_ids, summarize_transfers
 from src.store_index import (already_have, filing_finished, filing_started, index_folder, release_lock,
@@ -201,6 +201,18 @@ NOTHING_FILED = "nothing was filed"
 NOTHING_ORGANIZED = "nothing could be organized, check SLSKD_DOWNLOAD_PATH"
 #? ...and filing that raised: "organize failed: <why>"
 ORGANIZE_FAILED = "organize failed:"
+#? (2.1.13) refused before anything moved: a folder of the download is read-only to deadwax, and filing always
+#? moves. Two causes (review): a `:ro` /downloads, or - likelier, with no `:ro` anywhere - a folder slskd made
+#? as its own user that deadwax's PUID/PGID can't write; the event log names which (organizer.why_cannot_move_out_of).
+#? Not `not_filed` (job_outcome): another source would land in the same place and be refused the same way. Filed
+#? by itself once the folder can be written (refile_refused) - never "get it again", which downloads a second copy.
+READ_ONLY_DOWNLOADS = "deadwax can't move files out of slskd's download folder, nothing was moved - drop :ro, or run slskd and deadwax as the same PUID/PGID; it is filed by itself once fixed"
+#? (2.1.13, review) refused before anything moved: SLSKD_DOWNLOAD_PATH and LIBRARY_PATH overlap, so a move out of
+#? slskd's folder could take music out of the library (organizer.folders_overlap). Filed by itself once fixed.
+FOLDERS_OVERLAP = "slskd's download folder and the library overlap, nothing was moved - set SLSKD_DOWNLOAD_PATH and LIBRARY_PATH to separate folders; it is filed by itself once fixed"
+#? the refusals filing makes before anything moves - the download still whole in slskd's folder, so filing it
+#? later files it as it would have been (refile_refused)
+REFUSED_FILING = (READ_ONLY_DOWNLOADS, FOLDERS_OVERLAP)
 #? (2.0.0-player.51) the errors job_outcome's `not_filed` takes, as SQL LIKE patterns - what list_jobs reads
 #? the runners-up of, with logins on, beside failed and cancelled. A pattern may match a little more than
 #? the exact test (LIKE folds case; `_` is any character), never less: retryable() decides.
@@ -229,16 +241,14 @@ async def _organize_if_enabled(job: dict, store) -> None:
         filing.append(filing_started(Config.LIBRARY_PATH or "", plan.get("album_dir")))
 
     try:
-        results = await organize_job(
-            job, Config.SLSKD_DOWNLOAD_PATH, Config.LIBRARY_PATH, Config.ORGANIZE_MODE, on_plan=plan_made
-        )
+        results = await organize_job(job, Config.SLSKD_DOWNLOAD_PATH, Config.LIBRARY_PATH, on_plan=plan_made)
 
         #? Whatever status the job ends on - organized, or complete with some files failed - the
         #? tracks that did land are in the library, and everything that has to know is told BEFORE
         #? the status is written.
         plan = results.get("plan") or {}
         album_id = None
-        if results.get("organized") and not results.get("dry_run"):
+        if results.get("organized"):
             #? The store index learns the folder (step 2): until the status moves on from
             #? `organizing` a Find of this release sees the job in flight, and after it the index has
             #? to say the album is here, or there is a moment where neither is true and a second
@@ -257,7 +267,7 @@ async def _organize_if_enabled(job: dict, store) -> None:
                 #? (2.0.0-player.62) its FLAC songs measured for the player's Normalization, in the
                 #? background, so the album's first levelled play waits only for its make
                 _measure_later(results, store)
-        elif results.get("skipped") and not results.get("dry_run") and plan.get("album_dir"):
+        elif results.get("skipped") and plan.get("album_dir"):
             #? nothing filed, everything already there: the folder it was all in, for the grant below
             album_id = await index_folder(store, Config.LIBRARY_PATH, plan.get("album_dir"))
         #? (2.0.0-player.51) what it gives those who asked, before the status says how it ended - so the
@@ -267,9 +277,15 @@ async def _organize_if_enabled(job: dict, store) -> None:
             filing_finished(key)
         filing.clear()
 
-        if results.get("dry_run"):
-            #? nothing actually moved, so don't claim it did
-            await store.update_status(job["id"], "complete", "dry run - not organized")
+        if results.get("overlap"):
+            #? (2.1.13, review) refused before anything was searched or written (organize_job): slskd's
+            #? folder and the library overlap
+            await store.update_status(job["id"], "complete", FOLDERS_OVERLAP)
+
+        elif results.get("read_only"):
+            #? (2.1.13) refused before anything was written (organize_job): the files are all still in
+            #? slskd's folder, and the row says what to change
+            await store.update_status(job["id"], "complete", READ_ONLY_DOWNLOADS)
 
         elif results["failed"]:
             #? `organized` counts whatever landed, a cover included, so it is the TRACKS that say
@@ -377,9 +393,8 @@ def _fetch_lyrics_later(results: dict, client=None):
     job is already organized and the album already in the library. Making the poller wait on
     lyrics would delay every other download's progress for words nobody has asked to read yet.
 
-    Only reached for a job that really was organized, so a dry run fetches nothing - dry run
-    writes nothing, and a .lrc is a write. Never raises: failing to find lyrics says nothing
-    about whether the download worked.
+    Only reached for a job that really was organized - one whose files were moved into the
+    library. Never raises: failing to find lyrics says nothing about whether the download worked.
     """
     if (Config.FETCH_LYRICS or "on") == "off":
         return None
@@ -752,7 +767,7 @@ def job_outcome(status: str | None, error: str | None, not_filed: bool = False) 
     How a download ended, for the app's Requests tab (2.0.0-player.12), from its status and the
     named messages this module writes - never parsed out of free text:
 
-    - `filed`: organized - filed into the library, nothing failing (a dry run ends `complete`).
+    - `filed`: organized - filed into the library, nothing failing.
     - `already_there`: every track was already in the album folder, so nothing new was filed
       (ALREADY_THERE). The download itself did happen: its files are still in slskd's folder.
     - `partly_filed`: some files failed to file and some tracks landed (FAILED_TO_ORGANIZE, with
@@ -766,9 +781,11 @@ def job_outcome(status: str | None, error: str | None, not_filed: bool = False) 
       no track filed (NO_TRACK_FILED). The plan's table: nothing given, "the row says why and offers the
       next peer" (retryable). With logins off it stays None, as it always was.
     - None while it is still going (queued, downloading, organizing), and for a download that
-      finished without filing for another reason its row states: a dry run, organizing off (or
-      no library or slskd folder set), and - logins off - nothing that could be filed, filing that
-      raised, or no track filing.
+      finished without filing for another reason its row states: organizing off (no library or
+      slskd folder set), a dry run (a row from before 2.1.13, when filing had one), a download refused
+      because slskd's folder is read-only to deadwax (READ_ONLY_DOWNLOADS) or overlaps the library
+      (FOLDERS_OVERLAP) - another source would be refused the same way, and it is filed by itself once fixed
+      (refile_refused) - and - logins off - nothing that could be filed, filing that raised, or no track filing.
     """
     if status == "organized":
         return "filed"
@@ -832,6 +849,49 @@ async def settle_interrupted_filing(store) -> int:
         return 0
 
 
+#? (2.1.13, review) every fifteen minutes at the poll interval: a refused download is tried again by itself
+#? (refile_refused) - a permission put right while deadwax runs is found that soon, a mount by the restart
+REFILE_POLLS = 180
+
+
+async def refile_refused(store) -> int:
+    """
+    Downloads whose filing was refused before anything moved (REFUSED_FILING: slskd's folder read-only to
+    deadwax, or overlapping the library), filed now if they can be - at start, since a mount put right means
+    a container restarted, and every REFILE_POLLS (2.1.13, review). Each is planned again first and left as it
+    is while that plan would still be refused, or finds none of its files (taken out of slskd's folder by
+    hand); otherwise it is filed just as when it finished downloading, its row moving on and those who asked
+    given it. The refusal guarantees nothing had moved, so this is the filing it would have been - and never a
+    second download: getting the album again put a second copy beside the first.
+
+    Returns how many were handed to filing. Never raises: the poller must not stop over it.
+    """
+    if not Config.organizing_enabled():
+        return 0
+    try:
+        refused = await store.jobs_with_error("complete", REFUSED_FILING)
+    except Exception as e:
+        logger.error(f"couldn't read the downloads refused filing: {e}")
+        return 0
+
+    handed = 0
+    for job in refused:
+        try:
+            plan = await asyncio.to_thread(
+                plan_organization, job, Config.SLSKD_DOWNLOAD_PATH, Config.LIBRARY_PATH)
+            if plan.get("overlap") or plan.get("read_only_dirs") or not plan.get("operations"):
+                continue
+            logger.info(
+                f"filing {job.get('artist')} - {job.get('album')} now: what stopped it before is put right",
+                extra={"frontend": True, "src": "slskd"},
+            )
+            await _organize_if_enabled(job, store)
+            handed += 1
+        except Exception as e:
+            logger.error(f"couldn't try filing {job.get('artist')} - {job.get('album')} again: {e}")
+    return handed
+
+
 #? every ten minutes at the poll interval - the empty-folder sweep is a walk of slskd's
 #? incomplete folder, cheap but not free, and nothing about it is urgent
 EMPTY_DIR_SWEEP_POLLS = 120
@@ -862,6 +922,7 @@ async def run_download_poller(slskd_client, store) -> None:
     rate_samples: dict[int, RateAccumulator] = {}
 
     await settle_interrupted_filing(store)
+    await refile_refused(store)
     await tidy_cancelled_on_start(slskd_client, store)
     await sweep_empty_incomplete_dirs()
     polls = 0
@@ -874,6 +935,8 @@ async def run_download_poller(slskd_client, store) -> None:
             polls += 1
             if polls % EMPTY_DIR_SWEEP_POLLS == 0:
                 await sweep_empty_incomplete_dirs()
+            if polls % REFILE_POLLS == 0:
+                await refile_refused(store)
 
         except asyncio.CancelledError:
             logger.info("download poller stopped")

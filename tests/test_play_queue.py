@@ -497,7 +497,7 @@ def test_a_name_with_only_a_queue_left_is_listed_to_be_forgotten(player):
     player.store.put_play_queue("olduser", ["a"], 0, 1.0, None, DEVICE, "iPhone")
     assert player.store.known_users()["olduser"] == {"user": "olduser", "sessions": 0, "credential": False, "library": 0,
                                                      "pins": 0, "preferences": False, "requests": 0, "permissions": 0,
-                                                     "queue": True}
+                                                     "queue": True, "history": 0}
 
 
 def test_an_existing_database_gains_the_table(tmp_path):

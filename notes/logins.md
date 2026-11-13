@@ -467,7 +467,11 @@ stops at it - worded "failed - moving to the next peer", nothing said about canc
   and notes/backend-gotchas.md say so since the review (they still blamed "two tabs").
 - **Organizing must be on** (`Config.describe_logins_organizing`): with logins on, `ORGANIZE_MODE`
   `copy` or `move` and both of organizing's folders set - under dry_run nothing is filed, so nothing
-  could be granted or deduplicated. Otherwise `auth.unusable()` says why, exactly as for a missing
+  could be granted or deduplicated. **(2.1.13) The two folders alone**: filing always moves now
+  (James, 2026-11-13 - "Filing only moves (2.1.13)" in notes/decisions.md), so the rule, its words
+  and `_stops_organizing` name only SLSKD_DOWNLOAD_PATH and LIBRARY_PATH, never ORGANIZE_MODE - an old
+  one in the environment stops no login (test_an_old_organize_mode_stops_no_logins), and the
+  "saved in the settings tab" branch below went with the mode. What follows is as it was built. Otherwise `auth.unusable()` says why, exactly as for a missing
   secret key: every protected route and the sign-in answer 503 with it (the app's sign-in screen
   shows it; the break-glass admin is refused too), the health check and pages stay 200, and
   `report_logins` logs it at start-up - saying where the value comes from: a mode saved in the
@@ -583,8 +587,8 @@ methods, `src/routes/my_library.py` (`/deadwax/me/library`, a user's) and
   folder (a second copy of a release held is never filed beside the first: organizer's duplicate rule,
   v1.0.1), FLAGGED in an untagged or other folder (`library_flags`, a row of its own so the requesters
   clearing the job can't lose it before an admin looks; the event log says so too); some files failed -
-  INCOMPLETE when a track landed (entries `incomplete`), nothing when none did; a dry run, nothing that
-  could be filed, filing that raised - nothing. Each ACTIVE requester (`store.requesters`: asked, not
+  INCOMPLETE when a track landed (entries `incomplete`), nothing when none did; a dry run (until 2.1.13,
+  when there stopped being one), nothing that could be filed, filing that raised - nothing. Each ACTIVE requester (`store.requesters`: asked, not
   left, not hidden) gets it - who left gets nothing - and only one who can have a library
   (`library_ledger.has_library`: never the break-glass admin, whose entry would never be starred or
   shown yet would count as held; with none left nothing is recorded). With logins off a FLAGGED filing is

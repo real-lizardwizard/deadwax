@@ -774,6 +774,17 @@ async def _counted_once(play: tuple[str, str, int], send) -> bool:
     return True
 
 
+async def _mark_counted(request: Request, user: str, song_id: str, time_ms: int) -> None:
+    """(2.1.14) The start a counted play is of, marked counted in play_history - see scrobble()."""
+    store = _queue_store(request)
+    if store is None:
+        return
+    try:
+        await asyncio.to_thread(store.mark_counted, user, song_id, time_ms)
+    except Exception as e:
+        logger.error(f"couldn't mark {user}'s play counted in their history ({e})")
+
+
 @router.post("/scrobble/{song_id}")
 async def scrobble(song_id: str, request: Request, submission: bool = False, time: int | None = Query(None, ge=0),
                    user: str = Depends(current_user)):
@@ -784,7 +795,14 @@ async def scrobble(song_id: str, request: Request, submission: bool = False, tim
     if they are set up there; the first is what shows under "now playing". A play sent again with the same
     `time` - the iPhone app's, its first answer lost - is counted once (2.1.4, _counted_once); one with no
     `time` is always sent, as two listens can't be told from one sent twice without it.
+
+    (2.1.14) A play with its `time` also marks the start it is of `counted` in deadwax's own history (the start's
+    moment IS that time) - first, and whatever Navidrome answers: it is a fact about listening, not about
+    Navidrome. Never in the way: a database that can't is logged, and the scrobble goes on.
     """
+    if submission and time is not None:
+        await _mark_counted(request, user, song_id, time)
+
     async def send() -> None:
         await client_for(request).call("scrobble", {
             "id": song_id, "submission": "true" if submission else "false", "time": time,

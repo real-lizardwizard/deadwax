@@ -10,10 +10,13 @@ import { fetchOk, get, post, url } from '../api/http'
 import type { SongLyrics } from '../api/types'
 import { levelParam, levels, type Level, type LevelAnswer, type LevelledTrack } from '../lib/loudness'
 import { createPlayedAlbums } from '../lib/playedAlbums'
+import { HISTORY_PAGE, startOf, type Cursor, type HistoryPage } from '../lib/playHistory'
 import type { QueueTrack } from '../lib/playQueue'
 import type { QueueAnswer } from '../lib/resume'
 import { asksForMp4, resamples, type MaxRate } from '../lib/streamWrap'
 import { discArtPath } from '../lib/turntable'
+import type { UpNextQueue } from '../lib/upNext'
+import * as history from './historyOutbox'
 
 export interface NavidromeStatus {
   configured: boolean
@@ -617,12 +620,32 @@ export function warmLevels(albumId: string): void {
 /** The albums whose warmLevels() is on its way. */
 const warming = new Set<string>()
 
-/** Fire and forget: a play that isn't counted is not worth interrupting the music over. */
+/** Fire and forget: a play that isn't counted is not worth interrupting the music over. (2.1.15) A counted one marks its
+ *  start counted in this page's own starts (player/historyOutbox.ts) - deadwax marks the one it holds by the same
+ *  `time`. */
 export function scrobble(id: string, submission: boolean, time?: number): void {
+  if (submission && time) history.counted(id, time)
   const query = `submission=${submission}${time ? `&time=${time}` : ''}`
   post(`/navidrome/scrobble/${encodeURIComponent(id)}?${query}`).catch((error: unknown) => {
     console.warn('deadwax player: Navidrome did not take the scrobble', error)
   })
+}
+
+/**
+ * (2.1.15) A song begun - the engine's beginListen, at a listen's first sound (never a resume, a seek or a wait), `at`
+ * the listen's `startedAt`: Navidrome told "now playing", exactly as before, and the start kept - sent to deadwax for
+ * the person's play history (player/historyOutbox.ts), with the queue's id and its entry's key. Fire and forget.
+ */
+export function started(track: QueueTrack, at: number, queue: UpNextQueue): void {
+  scrobble(track.id, false)
+  history.record(startOf(track, at, queue))
+}
+
+/** (2.1.15) A page of the person's play history (src/routes/play_history.py), newest first - the one before `before`
+ *  (a page's `next`) when given. */
+export function historyPage(before: Cursor | null, signal?: AbortSignal): Promise<HistoryPage> {
+  const from = before ? `&before_at=${before.at}&before_id=${encodeURIComponent(before.id)}` : ''
+  return get<HistoryPage>(`/me/history?limit=${HISTORY_PAGE}${from}`, signal)
 }
 
 export function toQueueTrack(song: Song, fallback: AlbumWithSongs): QueueTrack {

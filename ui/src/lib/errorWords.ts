@@ -285,8 +285,14 @@ export const JOB_ERRORS: Readonly<Record<string, { text: string; tell?: boolean 
   'cancelled from deadwax': { text: 'Cancelled.' },
   //? poller.py: downloaded, and nothing filed
   //? (2.0.6, UX batch 3) "adding", never "filing"
-  'dry run - not organized': { text: 'Downloaded, but not added to your library: deadwax is set to rehearse adding albums, without moving any files.', tell: true },
+  //? (2.1.13) a dry run's: no longer written - filing always moves - but a row from before still says it
+  'dry run - not organized': { text: 'Downloaded, but not added to your library: back then, deadwax only rehearsed adding albums, without moving any files.', tell: true },
   'nothing could be organized, check SLSKD_DOWNLOAD_PATH': { text: "It downloaded, but deadwax couldn't find its files to add them to your library.", tell: true },
+  //? (2.1.13) filing always moves, and refused before anything moved: slskd's folder read-only to deadwax (a `:ro`
+  //? /downloads, or slskd's user owning its folders), or overlapping the library. Each is filed by itself once fixed:
+  //? "yet", and nothing to do but tell
+  "deadwax can't move files out of slskd's download folder, nothing was moved - drop :ro, or run slskd and deadwax as the same PUID/PGID; it is filed by itself once fixed": { text: "It downloaded, but deadwax can't move its files into your library yet.", tell: true },
+  "slskd's download folder and the library overlap, nothing was moved - set SLSKD_DOWNLOAD_PATH and LIBRARY_PATH to separate folders; it is filed by itself once fixed": { text: "It downloaded, but deadwax isn't set up to add it to your library yet.", tell: true },
   [`deadwax stopped while filing this - check the library and slskd's folder`]: { text: 'deadwax stopped while it was adding this to your library.', tell: true },
 }
 
