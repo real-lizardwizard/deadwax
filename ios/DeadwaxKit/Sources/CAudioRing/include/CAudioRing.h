@@ -58,6 +58,35 @@ void audio_counters_free(audio_counters *counters);
 void audio_counters_store(audio_counters *counters, uint32_t index, uint64_t value);
 uint64_t audio_counters_load(const audio_counters *counters, uint32_t index);
 
+// ------------------------------------------------------------ the queue (turntable.md 4.3)
+//
+// A single-producer, single-consumer queue of `capacity` slots (a power of two), whose storage the caller keeps; this
+// holds only the two counts. The deck's messages need every one, in order - a hand's knots are a path, not a newest
+// value - which the triple buffer can't give. The producer `reserve`s the next slot, writes it, and `commit`s it
+// (release); the consumer `peek`s the oldest (acquire), reads it, and `release`s it. A full queue refuses the
+// reserve: the producer drops and counts, never waits.
+
+typedef struct audio_fifo audio_fifo;
+
+/// Empty, `capacity` slots - a power of two, at least 2. NULL if it isn't, or out of memory.
+audio_fifo *audio_fifo_make(uint32_t capacity);
+void audio_fifo_free(audio_fifo *fifo);
+
+uint32_t audio_fifo_capacity(const audio_fifo *fifo);
+
+/// The producer: the slot to write, in `*slot`, and true - or false when the queue is full.
+bool audio_fifo_reserve(const audio_fifo *fifo, uint32_t *slot);
+/// The producer: the slot reserved is written; the consumer may read it.
+void audio_fifo_commit(audio_fifo *fifo);
+
+/// The consumer: the oldest slot written, in `*slot`, and true - or false when there is none.
+bool audio_fifo_peek(const audio_fifo *fifo, uint32_t *slot);
+/// The consumer: done with the slot peeked; the producer may write it again.
+void audio_fifo_release(audio_fifo *fifo);
+
+/// How many are written and not yet released (from either side: a moment's answer).
+uint32_t audio_fifo_count(const audio_fifo *fifo);
+
 #ifdef __cplusplus
 }
 #endif

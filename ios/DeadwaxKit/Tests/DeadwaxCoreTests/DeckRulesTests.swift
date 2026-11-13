@@ -315,7 +315,7 @@ final class TraceWorld: DeckHost, DeckClock {
     }
     func post(_ message: DeckPost) {
         switch message {
-        case .window(let w): record("post window \(hex(w.start)) \(hex(w.rate)) \(w.channels.count) \(w.channels.first?.count ?? 0)")
+        case .window(let w): record("post window \(hex(w.start)) \(hex(w.rate)) \(w.channelCount) \(w.frames)")
         case let .take(at, rate, time, until): record("post take \(hex(at)) \(hex(rate)) \(hex(time)) \(hex(until))")
         case let .drive(at, rate, accel, time, until): record("post drive \(hex(at)) \(hex(rate)) \(accel.map(hex) ?? "-") \(hex(time)) \(hex(until))")
         case let .hand(at, time): record("post hand \(hex(at)) \(hex(time))")

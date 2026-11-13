@@ -356,6 +356,38 @@ public enum TurntableDebugRows {
     }
 }
 
+/// The phone's own rows (turntable.md 6.2, **new**: no web words to hold them to), as slice 2 shows them under Test
+/// sounds' "The record's engine beside the song" and slice 3 in the Turntable section.
+extension TurntableDebugRows {
+    static func ms(_ seconds: Double) -> String { "\(jsFixed(seconds * 1000, 1)) ms" }
+
+    /// "Clock" (3.2): `L` and the largest lead under the last hand - or, with no hand since the engine started, the
+    /// largest over the last 1.5 s. Nil `lead`: nothing rendered yet.
+    public static func clockRow(lead: Double?, largest: Double?, underHand: Bool) -> InfoRow {
+        let label = "Clock"
+        guard let lead, lead.isFinite else { return InfoRow(label: label, value: "The record's engine hasn't rendered yet") }
+        var value = "The record's clock runs \(ms(lead)) behind the render's time stamps"
+        if let largest, largest.isFinite {
+            value += underHand ? "; the largest lead under the last hand \(ms(largest))"
+                : "; the largest lead over the last 1.5 s \(ms(largest))"
+        }
+        return InfoRow(label: label, value: value)
+    }
+
+    /// "Messages dropped" (4.3): shown only when not 0.
+    public static func messagesDroppedRow(_ dropped: Int) -> InfoRow? {
+        guard dropped > 0 else { return nil }
+        return InfoRow(label: "Messages dropped",
+                       value: dropped == 1 ? "1 of the record's messages was dropped" : "\(dropped) of the record's messages were dropped")
+    }
+
+    /// "Window made in" (4.4): decode, level and conversion, for `seconds` of a song at `rate`.
+    public static func windowMadeRow(took: Double, seconds: Double, rate: Double) -> InfoRow {
+        InfoRow(label: "Window made in",
+                value: "\(jsFixed(took, 2)) s for \(JSNumber.string((seconds * 10).rounded() / 10)) s of a \(khz(rate)) song")
+    }
+}
+
 extension String {
     /// `String.prototype.replace(text, with)`: the first occurrence only.
     func replacingFirst(_ text: String, with replacement: String) -> String {
