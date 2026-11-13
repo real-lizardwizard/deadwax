@@ -60,7 +60,7 @@ struct EQCorrectionScreen: View {
         let shownAbove = Set(suggested.map(\.id))
         List {
             Section {
-                choiceRow(EQWords.Picker.none, note: nil, chosen: setting.correction == nil) {
+                choiceRow(EQWords.Picker.none, note: nil, chosen: setting.correction == nil) { () -> Void in
                     eq.use(nil, for: output)
                     dismiss()
                 }
@@ -128,9 +128,12 @@ struct EQCorrectionScreen: View {
         } else if let failed {
             Section {
                 VStack(alignment: .leading, spacing: 10) {
-                    ErrorNote(failed.error, retry: true)
-                    Button(EQWords.Picker.tryAgain) { attempt += 1 }
-                        .buttonStyle(.bordered)
+                    // a 404 to the search is a deadwax from before its AutoEq routes
+                    ErrorNote(failed.error, gone: EQWords.Picker.tooOld, retry: true)
+                    if ErrorWords.kind(of: failed.error) != .notFound {
+                        Button(EQWords.Picker.tryAgain) { attempt += 1 }
+                            .buttonStyle(.bordered)
+                    }
                 }
                 .padding(.vertical, 4)
             } header: {

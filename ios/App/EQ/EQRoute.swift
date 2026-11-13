@@ -29,9 +29,23 @@ extension EnvironmentValues {
     /// Set in the sheet over Now Playing, whose pages are on its own stack (not You's): it closes the sheet, from its
     /// "Done" on every page.
     @Entry var eqDone: DismissAction? = nil
-    /// Set in the sheet: back to its EQ page, every page over it popped ("Use for …", 3.7). On You's stack,
-    /// AppNavigation's `backToEQPage()` does it.
-    @Entry var eqBackToPage: (@MainActor () -> Void)? = nil
+}
+
+/// The sheet's own stack (3.1): the pages pushed over its EQ page - put in the sheet's environment, so a page on it
+/// can go back to the EQ page ("Use for …", 3.7). On You's stack, AppNavigation's `backToEQPage()` does it.
+@MainActor
+@Observable
+final class EQSheetStack {
+    var path: [EQRoute] = []
+
+    /// Every page over the topmost EQ page popped at once.
+    func backToPage() {
+        if let page = path.lastIndex(where: { $0.isPage }) {
+            path.removeSubrange((page + 1)...)
+        } else {
+            path.removeAll()
+        }
+    }
 }
 
 /// A link to an EQ page, on whichever stack the page is on.
@@ -71,23 +85,17 @@ struct EQSheet: View {
     /// The sheet's own (read outside its stack, so it closes the sheet rather than popping a page).
     @Environment(\.dismiss) private var dismiss
     /// The pages pushed over the EQ page.
-    @State private var path: [EQRoute] = []
+    @State private var stack = EQSheetStack()
 
     var body: some View {
-        NavigationStack(path: $path) {
+        NavigationStack(path: $stack.path) {
             EQScreen(opened: .now)
                 .navigationDestination(for: EQRoute.self) { route in
                     EQDestination(route: route)
                 }
         }
         .environment(\.eqDone, dismiss)
-        .environment(\.eqBackToPage, { () -> Void in
-            if let page = path.lastIndex(where: { $0.isPage }) {
-                path.removeSubrange((page + 1)...)
-            } else {
-                path.removeAll()
-            }
-        })
+        .environment(stack)
     }
 }
 

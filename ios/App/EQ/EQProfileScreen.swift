@@ -19,7 +19,8 @@ struct EQProfileScreen: View {
     @Environment(EQModel.self) private var eq
     @Environment(ServerModel.self) private var server
     @Environment(AppNavigation.self) private var navigation
-    @Environment(\.eqBackToPage) private var backToPage
+    /// The sheet's stack, over Now Playing - none on You's.
+    @Environment(EQSheetStack.self) private var sheetStack: EQSheetStack?
 
     @State private var loaded: Loaded?
     @State private var failed: (any Error)?
@@ -161,8 +162,8 @@ struct EQProfileScreen: View {
     /// The profile made this output's correction - the EQ on with it - and back to the EQ page, on whichever stack.
     private func use(_ correction: EQCorrection, for output: EQOutput) {
         eq.use(correction, for: output)
-        if let backToPage {
-            backToPage()
+        if let sheetStack {
+            sheetStack.backToPage()
         } else {
             navigation.backToEQPage()
         }

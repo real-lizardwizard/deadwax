@@ -159,6 +159,17 @@ enum AutoEqAnswers {
             #expect(line.kind == .notFound)
             #expect(line.text == "AutoEq doesn't have that measurement any more." && line.advice == "")
         }
+        // a deadwax from before the AutoEq routes answers the search FastAPI's own 404: the picker says so
+        let (older, olderTransport) = client()
+        olderTransport.answer("/deadwax/eq/autoeq", 404, #"{"detail":"Not Found"}"#)
+        do {
+            _ = try await older.autoEq(search: "AirPods Pro")
+            Issue.record("an older deadwax's 404 didn't fail")
+        } catch {
+            let line = ErrorWords.of(error, admin: false, gone: EQWords.Picker.tooOld, retry: true)
+            #expect(line.text == "This deadwax is too old for AutoEq's corrections: they need deadwax 2.1.7 or later.")
+            #expect(line.advice == "")
+        }
         // offline: ErrorWords' own, beside the page's Try again
         let (deadwax, transport) = client()
         transport.goAway()

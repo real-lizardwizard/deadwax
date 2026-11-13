@@ -2269,6 +2269,92 @@ aPushedPageStaysOnItsOutput with 6 issues. Restored.
 - **Must not touch**: the engine; the reader (used as it is); any other route.
 - **Verified**: pytest (main and ios); Core on Linux; the device build; checks 17-21.
 
+#### Slice 4, built (2026-11-12)
+
+The phone's half, built on `ios` from 37e6ce1 (slice 3 and main's 2.1.7 merged), in three commits: the contract, the
+answers and the suggestion's rule in Core; the screens; the docs and these notes. Nothing drawn or heard on a phone,
+and no Simulator: every look, touch and sound here is checks E17-E21's (docs/ios.md, 6's 17-21).
+
+- **Files**: in Core, `AutoEq.swift` (AutoEqMeasurement, AutoEqResult, AutoEqResults, AutoEqProfile and its
+  `correction()` through APOReader as it is, AutoEqPage, AutoEqAsk - the limit 50, the longest query 100 scalars,
+  the 0.3 s pause - and DeadwaxClient's `autoEq(search:limit:)` and `autoEqProfile(id:)`), `EQSuggestion.swift`
+  (EQSuggestion, EQSuggestionRules, `EQSettings.use` and `.mark`, `EQOutputSetting.uses`, `EQDrawing.profile`), the
+  two Routes, and words (`Picker.tryAgain`, `Picker.tooOld`, `Profile.gitHubAddress`; `models` says "1 model"). In
+  ios/App/EQ: `EQCorrectionScreen`, `EQProfileScreen`, EQModel's suggestion, `use` and `mark`, EQScreen's Correction
+  section and `EQSuggestionRow`, EQRoute's `.correction` and `.profile` (and `isPage`), `EQSheetStack` (the sheet's
+  path, in its environment), AppNavigation's `backToEQPage()`, and EQCurveView's crossfade. The project file is
+  unchanged: the App folder is synchronised. No diff in DeadwaxAudio or src/.
+- **The answers the tests read are the server's**: `ios/scripts/autoeq_answers.py` asks the whole app (start(), a real
+  store) over tests/test_autoeq.py's own fake GitHub and fixtures, the routes' clock held at 2026-11-12T09:30:00Z, and
+  writes `Fixtures/autoeq/answers.json` (18 KB, ASCII): seven searches, two profiles, two 404s (a result GitHub has no
+  file for, an id not in the list), a 503 for a profile (GitHub gone after the list was kept) and one for a search (no
+  list). test_ios_contract.py holds the file to what the helper makes now (as lyrics'), every answer in it to the
+  models, the models' fields to `row_answer`, `profile_answer` and the search's literal, and AutoEqAsk's two numbers to
+  the route's bounds; ROUTE_COUNT 24 -> 26 in the Routes' commit. AutoEqTests asks DeadwaxClient each case's path and
+  query and reads back what the server sent, and says each failure through ErrorWords as 3.17 has it.
+- **Measured** (on the fixture's 46 lines of the list at 7ae0f56, which hold every AirPods Pro and HD 650 row 0.4
+  names): "Sennheiser HD 650" finds 6 rows (the name, and "(2020)", "(balanced)", "(2020, worn earpads)",
+  "(pre-2020, worn earpads)", "(pre-2020, semi-worn earpads)"); "AirPods Pro" 17, 16 of them with both words whole
+  (Rtings' "Apple AirPods Pro2" isn't); "apple" 18 with a limit of 3. Five mutations of EQSuggestion each fail
+  EQSuggestionTests: several offering the first (3 tests), the other-model check dropped, a part answer picked from,
+  the server's run-together words (3), and 3.7's exactly-one rule as written (the HD 650's).
+- **Departures, and why**:
+  1. **One is one headphone, not one row.** 3.7's "exactly one row holds every word" offers its own example, the HD
+     650, nothing: the real list has six HD 650 rows. Now one is offered when every row holding the words is that
+     headphone - its name alone, or its name with a qualifier in parentheses (Fold.key drops a bracketed aside) - and
+     exactly one is the name alone; or when one row holds them at all. A row with another word outside parentheses is
+     another model, so "Apple AirPods Pro" (an output renamed with its maker) is still the choice, never the first
+     generation. And only from a whole answer: when deadwax found more than the limit let through, a row not seen
+     could be another model. James's to confirm (design question 1).
+  2. **16 models, not 5**: 3.7 and 6's check 17 were written from the 40-line fixture's four Pro 2 rows; crinacle
+     measured the Pro 2 fourteen ways (0.4). The words count what is there; docs/ios.md says "16" with "or however
+     many AutoEq has". `models` says "1 model" - only a part answer with one row seen can make it.
+  3. **Whole words, folded as the Library folds** (Fold.findText: marks off, `&` as "and"), so "aur audio" holds
+     "AüR Audio Aure"; `EQOutputs.suggested` (slice 1's, hand rows) now asks the same `holdsEveryWord`, so there is
+     one rule. deadwax's own search runs words together ("hd650" finds the HD 650); the suggestion doesn't - an
+     output named "HD650" is offered nothing, and the picker still finds it.
+  4. **The picker's AutoEq section leaves out the rows "Suggested for …" shows** (one list, not the same rows twice);
+     Rtings' "Pro2" is under them. **The correction there is goes back** when tapped (3.7 says only that it can be
+     "chosen back"): nothing in the picker takes it away but None, which goes back itself.
+  5. **The picker opens searched from the suggestion's own answer**, kept by EQModel for the launch, so a choice
+     never asks twice - and only while the suggestion shows (no correction, not Not now, online).
+  6. **Once per launch counts answers, not tries**: a failed suggestion (offline, a 503, an older deadwax's 404) keeps
+     nothing and is asked again the next time the page shows - and when deadwax comes back in reach (the page's
+     `.task` is keyed on the output, reach and the correction) - never on a timer.
+  7. **None leaves the switch alone.** 3.2's "any change turns it on" is for a change you'd want to hear; taking the
+     correction away with the EQ Off turns nothing on. Using a profile turns it on, as 3.7 says.
+  8. **The suggestion's query is the name iOS gives**, not yours from Rename ("Gym buds" would find nothing).
+  9. **"10 filters, preamp -6.0 dB" is the file's own preamp** (`Preamp:`), the profile's fact; the curve above it
+     plays deadwax's automatic one (within 0.5 dB, AutoEqProfileTests).
+  10. **A 404 to the search is an older deadwax** (no AutoEq routes before 2.1.7): FastAPI's "Not Found" would have
+     been said as ErrorWords' "It isn't there any more." - so the picker says "This deadwax is too old for AutoEq's
+     corrections: they need deadwax 2.1.7 or later." (new words, design question 3). A 404 on either page has no Try
+     again: asking again won't bring it back.
+  11. **The curve crossfades when its frequencies change** (EQCurveView: `.id(drawing.frequencies)` on the plot), as
+     slice 3's review asked: a correction chosen or taken away, and On/Off with one, crossfade over the same 0.25 s
+     instead of morphing; presets with or without a correction still morph (the tone's f0s are on the grid).
+  12. **"shown" is kept when the row is first drawn** (4's field), as `EQSettings.mark` - never over Not now, which is
+     for good. Nothing reads "shown" yet; neither mark publishes a curve.
+  13. **The Preamp is slice 5's**: 3.2 puts the Preamp section only in Advanced, so this slice adds no Preamp line.
+  14. **The app's version stays 0.5 (5)**: one minor per feature (0.3 downloads, 0.4 lyrics), and 5's "the version
+     moves at the EQ's merge" - slice 3 took 0.5 (5) for the EQ, and slices 1 and 2 didn't move it.
+- **Design questions for James** (built as recommended; each a word to change):
+  1. One headphone, not one row (departure 1) - or offer the HD 650's six as a choice too.
+  2. The Pro 2's fourteen under one "pick yours" with the first generation and the other sources' Pro 2s (16 rows),
+     or group them - the picker would need a level of its own.
+  3. The older-deadwax sentence (departure 10), said to everyone - or ErrorWords' own for a listener and this for
+     whoever runs deadwax.
+- **Only the phone shows**: the Correction section in its place and the suggestion row (its symbol, the swipe's Not
+  now and VoiceOver's action); the picker's search field always showing, its 0.3 s pause as you type, "Searching…",
+  and the field opening searched; a profile's curve, the full-width button and its checkmark; Use popping back to the
+  EQ page in one move on You's stack and in the sheet; the correction heard (E18); the crossfade when a correction
+  comes or goes (E18 asks); AutoEq on GitHub opening Safari with the music playing; and whether the real list gives
+  the AirPods Pro the 16 rows the fixture does.
+- **Tests**: Core **871 in 116** (AutoEqTests 6, EQSuggestionTests 8, EQCorrectionChoiceTests 4 - all new), Audio 114
+  in 9; pytest's iOS files, test_autoeq.py and test_source_bytes.py; the unsigned Release device build; check_project.py;
+  the ios sims. Not verified: ios.yml's Xcode 26.6 Swift (every multi-statement closure's type is spelled out), a real
+  deadwax or AutoEq, and anything on a phone.
+
 ### 5.5 Slice 5 - Advanced
 
 - **Files**: the Advanced parts of `EQScreen.swift` (3.8), `EQFilterEditor.swift`, the handles in `EQCurveView.swift`,

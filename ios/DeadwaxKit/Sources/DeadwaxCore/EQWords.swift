@@ -466,6 +466,9 @@ extension EQWords {
         public static let tryTheModel = "Try the model alone, like \"hd650\"."
         /// Beside a failed search, and a profile that couldn't be fetched (3.17: ErrorWords' advice leaves it to this).
         public static let tryAgain = "Try again"
+        /// The search answered 404: a deadwax from before AutoEq's routes (2.1.7) - ErrorWords' own "It isn't there
+        /// any more." would say nothing true.
+        public static let tooOld = "This deadwax is too old for AutoEq's corrections: they need deadwax 2.1.7 or later."
     }
 
     public enum Profile {
