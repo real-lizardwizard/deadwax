@@ -64,4 +64,34 @@ public enum HeardEstimate {
     public static func atStop(_ reading: HeardReading, now: Double?, rate: Double, end: Int64) -> Int64 {
         heard(rendered: rendered(reading, now: now, rate: rate, end: end), latency: reading.latency, rate: rate)
     }
+
+    /// The song's seconds that `latency` of output holds, rendered up to a reading at host time `at` (notes/ios-specs/
+    /// turntable.md 5.2): each output second carries the speed it was rendered at, so the span is the speed summed
+    /// over the latency before the reading - `changes` oldest first, each from its moment on, `before` the speed
+    /// before the first.
+    public static func songSeconds(latency: Double, at: Double, changes: [SpeedChange], before: Double) -> Double {
+        guard latency > 0, latency.isFinite else { return 0 }
+        let from = at - latency
+        var speed = before
+        for change in changes where change.at <= from { speed = change.speed }
+        // the whole latency at the speed it began at, and each change within it from its moment to the reading
+        var total = latency * speed
+        for change in changes where change.at > from && change.at < at {
+            total += (at - change.at) * (change.speed - speed)
+            speed = change.speed
+        }
+        return total
+    }
+}
+
+/// The speed a song plays at from host time `at` on (notes/ios-specs/turntable.md 5.2): `speed` of the song's seconds
+/// to the output's second.
+public struct SpeedChange: Sendable, Equatable {
+    public var at: Double
+    public var speed: Double
+
+    public init(at: Double, speed: Double) {
+        self.at = at
+        self.speed = speed
+    }
 }

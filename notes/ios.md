@@ -3205,6 +3205,42 @@ turntable's checks (app 0.6)").
 Info.plist, `tests/test_ios_install.py`; the guide's title, opening, install.sh's line and About's row, ios/README.md,
 and YouView's doc comment. `src/__init__.py` wasn't touched.
 
+### Slice 4, first half: the recorder, and the speed measured (2026-11-13)
+
+The turntable spec's slice 4 up to the fader's view (notes/ios-specs/turntable.md "Slice 4, first half, built", with
+the numbers). Two commits; the app stays 0.6 (6), since nothing calls the speed yet.
+
+- **Debug's recorder and its replay** (ae84f26, spec 6.3): "Record 20 s" writes deck.ts's own recording file with
+  the phone's keys beside it, from rings the deck engine's render fills (no allocation on that thread, release-built);
+  `swift run replay-deck-recording` plays a phone or a web recording through the Swift voice. Both replay exactly.
+- **The speed in PlaybackEngine** (spec 5.2): an AVAudioUnitVarispeed per lane, **out of the sound's path at 1x** -
+  the node straight into the mixer, so every sample at 1x is today's. `setSpeed(_:)`, 0.25 to 4, is the fader's API.
+  Positions stay in the song's time at any speed: the varispeed's own delay (48 of the node's frames, measured) and
+  the output's latency counted at the speeds it was rendered at (`HeardEstimate.songSeconds`) come off the node's
+  frame. A change of lane at speed starts the next lane in its own node's time.
+
+#### The speed, measured
+
+5.3's eight, as tests on ios.yml's macOS job (VarispeedMeasuredTests, and VarispeedCostTests again in a release
+build). The short of it:
+
+- **1x is bit for bit**, the varispeed out of the path: 30 s of noise and a sweep from a FLAC, every sample the file's
+  own. Bypassed in the path it was every sample right but 47 frames late, failing 62 of the 147 audio tests; at rate 1,
+  48 frames late and filtered, failing 64. Every test engine reads `DEADWAX_VARISPEED_AT_ONE` (`outOfPath`,
+  `bypassed`, `atRateOne`), so that comparison can be run again.
+- **Its quality** is far past the lane converter's bar: a 1 kHz tone 133-145 dB above everything else at 0.25x-2x,
+  and what 1.5x and 2x put past 24 kHz left at -113 to -120 dB.
+- **The position** is within 0.00 output frames of the clicks heard, with latency and without.
+- **Joins at speed** are exact on a lane (-130 dB and under); a change of lane is no worse than at 1x, where the two
+  converters ring at a cut mid-waveform (-46.6 dB, in today's engine too).
+- **A speed changed while playing**, and a drag through 1x, make no click and no jump.
+- **Its cost** is 0.14% of a block at 2x on a 192 kHz file.
+
+The departures (the first move off 1x begins the lane again, a short gap; back at 1x the varispeed stays in at rate 1
+until a fresh start; a change of lane at speed waits one render of its node) and what only the phone shows are in
+the spec's section. **Left for the fader's half**: the lock screen's rate (NowPlayingController) and plays at speed -
+`Plays.listenedStep` caps a step at the clock times its `rate`, which PlayReporter leaves at 1.
+
 ## The EQ, slice 1: Core (2026-11-12)
 
 The design is notes/ios-specs/eq.md. Its slice 1 (5.1) is the EQ's pure part, in DeadwaxCore and tested like the rest

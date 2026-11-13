@@ -185,9 +185,26 @@ public final class PlaybackEngine {
         /// The EQ's unit between the main mixer and the output (eq.md 1.1). False only for the tests' engine
         /// with no unit at all, which the unit Off is held to bit for bit.
         public var eq = true
+        /// Where the varispeed is at 1x (turntable.md 5.2, 5.3 item 1): out of the sound's path - the one measured
+        /// bit for bit against the engine before it, and the only one the app uses. The others are kept for that
+        /// measurement, which runs the render tests with each (`DEADWAX_VARISPEED_AT_ONE`, RenderHelpers).
+        public var varispeedAtOne: VarispeedAtOne = .outOfPath
 
         public init() {}
     }
+
+    /// The varispeed at 1x: out of the path (the lane's node straight into the mixer), in it and bypassed, or in it
+    /// at rate 1.
+    public enum VarispeedAtOne: String, Sendable { case outOfPath, bypassed, atRateOne }
+
+    /// The speed's range: AVAudioUnitVarispeed's own 0.25 to 4 (the web's playbackRate is clamped to it too).
+    public static let speedRange: ClosedRange<Double> = 0.25...4
+    /// The varispeed's own delay, in the frames it reads (the node's, at the output's rate), measured at every speed:
+    /// a click at the node's frame f comes out at output frame (f + 48) / s (5.3, item 8). Its
+    /// kAudioUnitProperty_Latency says 0.
+    public static let varispeedDelayFrames: Int64 = 48
+    /// How long each change of speed is kept for the latency's count (`songBehind`): past any output's latency.
+    static let speedHistorySeconds = 5.0
 
     /// The lead before a song started from silence plays: the app sets it from AVAudioSession
     /// (outputLatency + ioBufferDuration). Zero plays at once.
@@ -220,6 +237,12 @@ public final class PlaybackEngine {
 
     private final class Lane {
         let node: AVAudioPlayerNode
+        /// The speed (turntable.md 5.2): after the node, before the mixer - in the sound's path only while it is
+        /// needed (`inPath`), its rate the engine's speed. Attached with the node, connected by `fitPath`.
+        let varispeed: AVAudioUnitVarispeed
+        /// Connected node -> varispeed -> mixer (else node -> mixer). Decided as the lane begins (its first buffer
+        /// after a clear): a node reconnected while it plays stops, its schedule dropped (measured).
+        var inPath = false
         /// The songs' own format, as decoded. The timeline counts in its frames.
         let format: AVAudioFormat
         /// The format the node is connected in: the output's rate, the songs' channels - the songs'
@@ -263,8 +286,10 @@ public final class PlaybackEngine {
         let calls = Calls()
         var epoch = 0
 
-        init(node: AVAudioPlayerNode, format: AVAudioFormat, nodeFormat: AVAudioFormat, converter: AVAudioConverter?) {
+        init(node: AVAudioPlayerNode, varispeed: AVAudioUnitVarispeed, format: AVAudioFormat, nodeFormat: AVAudioFormat,
+             converter: AVAudioConverter?) {
             self.node = node
+            self.varispeed = varispeed
             self.format = format
             self.nodeFormat = nodeFormat
             self.converter = converter
@@ -393,6 +418,13 @@ public final class PlaybackEngine {
     typealias Spot = (key: Int, at: StartPoint)
 
     private var lanes: [LaneKey: Lane] = [:]
+    /// The speed the song plays at (turntable.md 5.2); 1 is the song as it is. Every lane in its varispeed's path
+    /// plays at it.
+    private var speedNow = 1.0
+    /// When each speed took effect (host seconds), oldest first, and the speed before the first: what the output's
+    /// latency carries of the song (`songBehind`). Live only: offline there is no host time to place them by.
+    private var speedChanges: [SpeedChange] = []
+    private var speedBefore = 1.0
     private var heardLane: LaneKey?
     /// The lane the song scheduled last went on: the one that plays last.
     private var tail: LaneKey?
@@ -1069,6 +1101,7 @@ public final class PlaybackEngine {
         for (key, lane) in lanes where lane.nodeFormat.sampleRate != rate && lane.timeline.isEmpty {
             drainScheduling()
             engine.detach(lane.node)
+            engine.detach(lane.varispeed)
             lanes[key] = nil
         }
     }
@@ -1112,6 +1145,12 @@ public final class PlaybackEngine {
         if let lane = lanes[key] { return lane }
         let node = AVAudioPlayerNode()
         engine.attach(node)
+        let varispeed = AVAudioUnitVarispeed()
+        engine.attach(varispeed)
+        // the most its resampler has (5.3, item 2): kRenderQuality_Max
+        var quality: UInt32 = 127
+        AudioUnitSetProperty(varispeed.audioUnit, kAudioUnitProperty_RenderQuality, kAudioUnitScope_Global, 0, &quality,
+                             UInt32(MemoryLayout<UInt32>.size))
         let output = outputRate
         var nodeFormat = format
         var converter: AVAudioConverter?
@@ -1126,10 +1165,103 @@ public final class PlaybackEngine {
             converter = made
         }
         engine.connect(node, to: engine.mainMixerNode, format: nodeFormat)
-        let lane = Lane(node: node, format: format, nodeFormat: nodeFormat, converter: converter)
+        let lane = Lane(node: node, varispeed: varispeed, format: format, nodeFormat: nodeFormat, converter: converter)
         lanes[key] = lane
         note("lane \(Int(format.sampleRate)) Hz x \(format.channelCount): its node at \(Int(nodeFormat.sampleRate)) Hz")
         return lane
+    }
+
+    // MARK: the speed (turntable.md 5.2)
+
+    /// The varispeed in the lane's path or not, as the lane begins - nothing on its node. In it while the song plays
+    /// at a speed, or when a lane already playing is in it (a join takes the path of the lane it follows: the two at
+    /// one rate, through like resamplers); out of it at 1x otherwise - the song's own samples to the mixer, as before
+    /// the speed (5.3, item 1). `Settings.varispeedAtOne` keeps it in at 1x, for that measurement only.
+    private func fitPath(_ lane: Lane) {
+        guard !lane.started else { return }
+        let followed = lanes.values.contains { $0 !== lane && $0.started && $0.inPath }
+        let measuring = settings.varispeedAtOne != .outOfPath
+        let want = speedNow != 1 || followed || measuring
+        lane.varispeed.bypass = speedNow == 1 && !followed && settings.varispeedAtOne == .bypassed
+        lane.varispeed.rate = Float(speedNow)
+        guard want != lane.inPath else { return }
+        engine.disconnectNodeOutput(lane.node)
+        if want {
+            engine.connect(lane.node, to: lane.varispeed, format: lane.nodeFormat)
+            engine.connect(lane.varispeed, to: engine.mainMixerNode, format: lane.nodeFormat)
+        } else {
+            engine.disconnectNodeOutput(lane.varispeed)
+            engine.connect(lane.node, to: engine.mainMixerNode, format: lane.nodeFormat)
+        }
+        lane.inPath = want
+        note("lane \(Int(lane.format.sampleRate)) Hz: its varispeed \(want ? "in the path at \(speedNow)x" : "out of the path")")
+    }
+
+    /// The speed the song plays at: 0.25 to 4 (`speedRange`), the pitch moving with it - a record deck's, not a
+    /// time-stretch. A lane playing through its varispeed takes it at the next render. A lane playing at 1x straight
+    /// to the mixer is begun again with its varispeed in, from the frame the render reached (a node can't be
+    /// reconnected while it plays: one render or two of silence on the phone). Back at 1x, the varispeed stays in at
+    /// rate 1 until the lanes next begin afresh - a pause, a seek, a song that isn't a gapless join - and is out of
+    /// the path from there (5.3, item 7).
+    public func setSpeed(_ speed: Double) {
+        let s = min(max(speed.isFinite ? speed : 1, Self.speedRange.lowerBound), Self.speedRange.upperBound)
+        queue.async { self.changeSpeed(to: s) }
+    }
+
+    /// The speed, as last set.
+    public var speed: Double { queue.sync { speedNow } }
+
+    private func changeSpeed(to s: Double) {
+        guard s != speedNow else { return }
+        speedNow = s
+        if settings.offline == nil {
+            let now = Self.hostSeconds()
+            speedChanges.append(SpeedChange(at: now, speed: s))
+            // kept while an output's latency can still hold them (AirPlay's is about 2 s; a drag is a change a frame):
+            // an older one only says the speed before the rest
+            while let first = speedChanges.first, first.at < now - Self.speedHistorySeconds || speedChanges.count > 4_096 {
+                speedBefore = first.speed
+                speedChanges.removeFirst()
+            }
+        }
+        for lane in lanes.values where lane.inPath {
+            lane.varispeed.bypass = false
+            lane.varispeed.rate = Float(s)
+        }
+        note("speed \(s)x")
+        // a lane with something on it straight to the mixer: begun again with its varispeed in
+        guard s != 1, lanes.values.contains(where: { !$0.inPath && ($0.started || $0.scheduled > 0) }) else { return }
+        if wantsPlay {
+            let at = renderedSpot() ?? heard()
+            reset()
+            resumeFrom(at, playing: true)
+        } else {
+            held = heard()
+            reset()
+        }
+    }
+
+    /// Where the render has got to on the heard lane: its last render's first frame and the IO buffer it rendered -
+    /// what the output already holds plays out, so a lane begun again there neither repeats the latency nor skips.
+    private func renderedSpot() -> Spot? {
+        guard let laneKey = heardLane, let lane = lanes[laneKey], let read = sample(of: lane) else { return nil }
+        let frame = min(read + HeardEstimate.frames(max(ioBuffer(), 0), rate: songRate(lane)), lane.timeline.end)
+        guard let found = lane.timeline.locate(frame), let key = entryKey[found.entry.id] else { return nil }
+        return (key, .frame(found.songFrame, rate: lane.format.sampleRate))
+    }
+
+    /// The speed a lane's node is read at: the engine's through its varispeed, 1 straight to the mixer.
+    private func speedOf(_ lane: Lane) -> Double { lane.inPath ? speedNow : 1 }
+
+    /// The song's frames to the output's second on a lane: its rate, times its speed.
+    private func songRate(_ lane: Lane) -> Double { lane.format.sampleRate * speedOf(lane) }
+
+    /// The song's seconds that `latency` of output holds, rendered up to the reading at host time `at`: the latency at
+    /// each speed it was rendered at - or at the speed now, with no time to place it by (offline).
+    private func songBehind(_ latency: Double, at: Double?) -> Double {
+        guard latency > 0 else { return 0 }
+        guard let at else { return latency * speedNow }
+        return HeardEstimate.songSeconds(latency: latency, at: at, changes: speedChanges, before: speedBefore)
     }
 
     /// One line for `trace`.
@@ -1157,6 +1289,15 @@ public final class PlaybackEngine {
         if settings.offline == nil {
             at = nodeTime.isHostTimeValid ? AVAudioTime.seconds(forHostTime: nodeTime.hostTime) : Self.hostSeconds()
         }
+        if lane.inPath {
+            // through the varispeed (5.2): less its own delay, in the node's frames, and the latency after it counted
+            // in the song's time - kept as a reading at the song's rate times the speed, which the estimates read
+            let behind = songBehind(currentLatency(), at: at)
+            lane.lastRead = HeardReading(frame: max(frame - lane.songFrames(Self.varispeedDelayFrames), 0), at: at,
+                                         latency: behind / speedNow)
+            lane.stopped = nil
+            return frame
+        }
         // the latency of the route this reading was taken on, read with it: the estimate after iOS stops
         // the engine takes it back from the frame. It was the latency read before - offline 0 until a
         // buffer's completion had read one, and on the phone the old route's for the first reading on a
@@ -1170,9 +1311,9 @@ public final class PlaybackEngine {
     /// can't be read because iOS stopped the engine before telling it (or it is dead), estimated from
     /// the last reading, once, and kept.
     private func heardFrame(of lane: Lane, readingNodes: Bool = true) -> Int64? {
-        let rate = lane.format.sampleRate
+        let rate = songRate(lane)
         if readingNodes, let rendered = sample(of: lane) {
-            return HeardEstimate.heard(rendered: rendered, latency: lastLatency, rate: rate)
+            return heardFrom(rendered, on: lane)
         }
         if let stopped = lane.stopped { return stopped }
         guard let reading = lane.lastRead else { return nil }
@@ -1184,6 +1325,15 @@ public final class PlaybackEngine {
             note("the clock gone: heard at frame \(estimate), from a reading at \(reading.frame)")
         }
         return estimate
+    }
+
+    /// The frame heard, from the frame `sample(of:)` has just read: the latency behind it - and through the
+    /// varispeed, its delay and the latency counted in the song's time (the reading it kept).
+    private func heardFrom(_ rendered: Int64, on lane: Lane) -> Int64 {
+        guard lane.inPath, let read = lane.lastRead else {
+            return HeardEstimate.heard(rendered: rendered, latency: lastLatency, rate: lane.format.sampleRate)
+        }
+        return HeardEstimate.heard(rendered: read.frame, latency: read.latency, rate: songRate(lane))
     }
 
     private func ahead(_ lane: Lane) -> Int64 {
@@ -1379,6 +1529,7 @@ public final class PlaybackEngine {
     /// on that queue, which traps (a test's engine let go with completions on their way, under load).
     private func enqueue(_ buffer: AVAudioPCMBuffer, on lane: Lane, key: LaneKey) {
         guard buffer.frameLength > 0 else { return }
+        if lane.scheduled == 0 { fitPath(lane) }
         lane.nodeFrames += Int64(buffer.frameLength)
         lane.ends.append(lane.nodeFrames)
         lane.scheduled += 1
@@ -1589,15 +1740,34 @@ public final class PlaybackEngine {
         let waiting = lanes.filter { $0.key != heardKey && !$0.value.started && !$0.value.timeline.isEmpty }
         guard let (key, lane) = waiting.min(by: { ($0.value.timeline.entries.first?.id ?? .max) < ($1.value.timeline.entries.first?.id ?? .max) }),
               ready(lane, key) else { return }
-        guard end >= now + margin() else {
+        guard end >= now + AVAudioFramePosition((Double(margin()) * speedOf(heard)).rounded()) else {
             note("lane \(Int(lane.format.sampleRate)) Hz not started at \(end): the render is at \(now) already")
             return
         }
-        lane.node.play(at: AVAudioTime(sampleTime: end, atRate: outputRate))
+        // through varispeeds each node counts in its own time - the song's frames, from when it joined the graph -
+        // and at one rate the two differ by a constant (measured): the end, in the heard lane's time, put into this one's
+        var start = end
+        if heard.inPath || lane.inPath {
+            guard let offset = nodeOffset(lane, from: heard) else { return }
+            start = end + offset
+        }
+        lane.node.play(at: AVAudioTime(sampleTime: start, atRate: outputRate))
         if settings.offline != nil { lastScheduledAt = Self.hostSeconds() }
-        lane.origin = end
+        lane.origin = start
         lane.started = true
-        note("lane \(Int(lane.format.sampleRate)) Hz to start at \(end), when lane \(Int(heard.format.sampleRate)) Hz ends")
+        note("lane \(Int(lane.format.sampleRate)) Hz to start at \(start)\(start != end ? " (\(end) on the heard lane)" : ""), when lane \(Int(heard.format.sampleRate)) Hz ends")
+    }
+
+    /// How far `lane`'s node time is ahead of `other`'s, both read at one render (read again while a render came
+    /// between) - nil while either has no time yet (a node put through its varispeed has none until a render pulls it).
+    private func nodeOffset(_ lane: Lane, from other: Lane) -> AVAudioFramePosition? {
+        for _ in 0..<3 {
+            guard let a = other.node.lastRenderTime, a.isSampleTimeValid,
+                  let b = lane.node.lastRenderTime, b.isSampleTimeValid,
+                  let again = other.node.lastRenderTime, again.isSampleTimeValid else { return nil }
+            if again.sampleTime == a.sampleTime { return b.sampleTime - a.sampleTime }
+        }
+        return nil
     }
 
     /// Where the render is, in the lane's node time, and the host time of it: offline, the render's own count (a
@@ -1608,7 +1778,11 @@ public final class PlaybackEngine {
     /// sample time"). Nil with none yet.
     private func renderTime(_ lane: Lane) -> RenderTime? {
         let read: RenderTime
-        if settings.offline != nil {
+        if settings.offline != nil, lane.inPath {
+            // its node's time runs at the speed, from when it joined the graph: its own clock, never the render's count
+            guard let time = lane.node.lastRenderTime, time.isSampleTimeValid else { return nil }
+            read = RenderTime(sample: time.sampleTime, host: renderHostAhead.map { Self.hostSeconds() + $0 })
+        } else if settings.offline != nil {
             if lane.staleReads > 0, let stale = lane.staleReading {
                 lane.staleReads -= 1
                 read = stale
@@ -1697,21 +1871,28 @@ public final class PlaybackEngine {
             lane.node.play()
             lane.origin = nil
         } else if !noRenderTime, let now = renderTime(lane) {
-            var at = now.sample + margin()
+            // a node through its varispeed counts the song's frames: `s` of them to an output frame
+            let s = speedOf(lane)
+            var at = now.sample + AVAudioFramePosition((Double(margin()) * s).rounded())
             if clockAhead > 0 {
                 at = now.sample - clockAhead
             } else if lead > 0, let host = now.host {
-                at = max(at, now.sample + AVAudioFramePosition(((asked + lead - host) * rate).rounded()))
+                at = max(at, now.sample + AVAudioFramePosition(((asked + lead - host) * rate * s).rounded()))
             } else if lead > 0 {
-                at = now.sample + frames(lead, rate)
+                at = now.sample + frames(lead * s, rate)
             }
             lane.node.play(at: AVAudioTime(sampleTime: at, atRate: rate))
             lane.origin = at
-            let after = Double(at - now.sample) / rate
+            let after = Double(at - now.sample) / (rate * s)
             ahead = max(now.host.map { $0 + after - Self.hostSeconds() } ?? after, 0)
             if startAsked != nil {
                 note(String(format: "lane %d Hz: this run's first render after %.1f ms", Int(lane.format.sampleRate), (Self.hostSeconds() - asked) * 1000))
             }
+        } else if lane.inPath && settings.offline != nil {
+            // offline, a node just put through its varispeed has no time until a render has pulled it: at once, its
+            // clock counting from its first sample
+            lane.node.play()
+            lane.origin = nil
         } else if Self.hostSeconds() - asked < renderWaitBound() {
             if startAsked == nil { note("lane \(Int(lane.format.sampleRate)) Hz: no render of this run of the output yet, waiting for one") }
             startAsked = asked
@@ -1935,8 +2116,8 @@ public final class PlaybackEngine {
         songChange?.cancel()
         songChange = nil
         guard let laneKey = heardLane, let lane = lanes[laneKey], let rendered = sample(of: lane) else { return }
-        let rate = lane.format.sampleRate
-        let heardAt = HeardEstimate.heard(rendered: rendered, latency: lastLatency, rate: rate)
+        let rate = songRate(lane)
+        let heardAt = heardFrom(rendered, on: lane)
         guard let heardEntry = lane.timeline.locate(heardAt) else { return }
         if let key = entryKey[heardEntry.entry.id], key != current { current = key }
         guard let renderedEntry = lane.timeline.locate(rendered), renderedEntry.entry.id != heardEntry.entry.id,
@@ -1958,7 +2139,7 @@ public final class PlaybackEngine {
     private func forgetPlayed() {
         for lane in lanes.values where lane.timeline.entries.count > 2 {
             guard let rendered = lane.lastRead?.frame else { continue }
-            let behind = HeardEstimate.frames(lastLatency + 1, rate: lane.format.sampleRate)
+            let behind = HeardEstimate.frames(lastLatency + 1, rate: songRate(lane))
             let before = lane.timeline.entries.map(\.id)
             lane.timeline.forget(before: rendered - behind)
             let kept = Set(lane.timeline.entries.map(\.id))
@@ -2153,7 +2334,10 @@ public final class PlaybackEngine {
         let playing = wantsPlay
         reset()
         // the output's rate may be another now: the lanes are made again, converting to it
-        for lane in lanes.values { engine.detach(lane.node) }
+        for lane in lanes.values {
+            engine.detach(lane.node)
+            engine.detach(lane.varispeed)
+        }
         lanes.removeAll()
         matchOutput()
         sleep()

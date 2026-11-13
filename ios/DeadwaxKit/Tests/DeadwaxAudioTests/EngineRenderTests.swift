@@ -80,6 +80,7 @@ func offlineEngine(rate: Double, channels: AVAudioChannelCount, changeSettle: Do
     settings.startSeconds = 0
     settings.bufferSeconds = 0.1
     settings.changeSettleSeconds = changeSettle
+    settings.varispeedAtOne = testVarispeedAtOne
     let engine = try PlaybackEngine(settings: settings)
     engine.scheduleLag = testScheduleLag
     return engine
