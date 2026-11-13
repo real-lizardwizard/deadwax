@@ -10,7 +10,9 @@ import UIKit
 /// took, the kept file) and "Muffle what plays" (slice 2), the engine's log (its last 500 lines, with Copy and
 /// Share), the Library's last album list asks (how many albums, how long - check 1), and how long this install runs. Phase 2's Downloads section: the songs by state, the session's
 /// tasks, reachability, what waits to be sent, the time each check took, the download log and "Stream even when
-/// downloaded" (phase2-downloads.md 6.9). The address and the sign-in are the app's own screens now.
+/// downloaded" (phase2-downloads.md 6.9). Phase 3's Your library (phase3-autodownload.md 3.5): Follow your library, what
+/// is followed, the albums and their songs read, the last check, the first read's time and what would fit. The address
+/// and the sign-in are the app's own screens now.
 struct DebugView: View {
     @Environment(DebugModel.self) private var model
     @Environment(PlayerModel.self) private var player
@@ -33,6 +35,7 @@ struct DebugView: View {
             EQDebugSection()
             EngineLogSection()
             DownloadsDebugSection()
+            LibraryFollowDebugSection()
             libraryLists
             Section {
                 Text(model.installLine)
@@ -576,5 +579,98 @@ private struct DownloadsDebugSection: View {
         guard path.satisfied else { return "none" }
         return [path.wifi ? "wifi" : nil, path.cellular ? "cellular" : nil, path.expensive ? "expensive" : nil,
                 path.constrained ? "constrained" : nil].compactMap { $0 }.joined(separator: " \u{00B7} ")
+    }
+}
+
+/// Phase 3's Your library (phase3-autodownload.md 3.5, slice 1): your library followed onto this phone, read-only -
+/// its own switch, off by default; what is followed and how much of it is read; the last check; the first read's time
+/// (R13, check L0a); and what would fit at the storage limit. The library's log lines are the Downloads section's.
+private struct LibraryFollowDebugSection: View {
+    @Environment(DownloadModel.self) private var downloads
+    @State private var freeSpace: Int64?
+
+    var body: some View {
+        let follower = downloads.follower
+        Section {
+            Toggle(LibraryFollowWords.follow, isOn: Binding(get: { follower.following },
+                                                           set: { follower.following = $0 }))
+            if follower.following {
+                facts(follower)
+            } else {
+                Text(LibraryFollowWords.notFollowing)
+                    .foregroundStyle(Palette.quiet)
+            }
+        } header: {
+            Text(LibraryFollowWords.section)
+        } footer: {
+            Text(LibraryFollowWords.followNote)
+        }
+        .task {
+            // the phone's free space, read now and then (a file system call)
+            while !Task.isCancelled {
+                freeSpace = DownloadStore.freeSpace()
+                try? await Task.sleep(for: .seconds(5))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func facts(_ follower: LibraryFollower) -> some View {
+        let now = ListenTracker.wallMs()
+        let albums = follower.ordered
+        let listed = albums.filter(\.isListed).count
+        let read = albums.filter { $0.isListed && $0.songs != nil }.count
+        if let scope = follower.scope {
+            LabeledContent("Following") {
+                Text(LibraryFollowWords.scope(scope))
+                    .font(.footnote)
+            }
+        }
+        LabeledContent("Albums") {
+            Text(LibraryFollowWords.count(albums.count))
+                .font(.footnote.monospacedDigit())
+        }
+        LabeledContent("Songs read") {
+            Text(LibraryFollowWords.read(read, of: listed)
+                 + (follower.readingNow > 0 ? " \u{00B7} reading \(follower.readingNow)" : ""))
+                .font(.footnote.monospacedDigit())
+        }
+        LabeledContent("Missing") {
+            Text(LibraryFollowWords.missing(albums, now: now))
+                .font(.footnote.monospacedDigit())
+        }
+        LabeledContent("Held back") {
+            Text(LibraryFollowWords.held(follower.held))
+                .font(.footnote)
+        }
+        LabeledContent("Last check") {
+            Text(follower.checking ? "Checking\u{2026}"
+                 : follower.lastCheck.map { LibraryFollowWords.lastCheck($0, now: now) } ?? LibraryFollowWords.noCheckYet)
+                .font(.footnote.monospacedDigit())
+        }
+        if let first = follower.firstRead {
+            LabeledContent("First read") {
+                Text(LibraryFollowWords.firstRead(seconds: first.seconds, albums: first.albums))
+                    .font(.footnote.monospacedDigit())
+            }
+        }
+        if let freeSpace {
+            let plan = follower.wouldFit(limit: downloads.storageLimit, hand: downloads.handBytes(), freeSpace: freeSpace)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(LibraryFollowWords.wouldFit(plan, limit: downloads.storageLimit))
+                Text(LibraryFollowWords.fitDetail(plan))
+                    .font(.footnote)
+                    .foregroundStyle(Palette.quiet)
+            }
+            .accessibilityElement(children: .combine)
+        }
+        if let problem = follower.problem {
+            Text(problem)
+                .font(.footnote.monospaced())
+                .foregroundStyle(Palette.danger)
+                .textSelection(.enabled)
+        }
+        Button(LibraryFollowWords.checkNow) { follower.check(.byHand) }
+            .disabled(follower.checking)
     }
 }

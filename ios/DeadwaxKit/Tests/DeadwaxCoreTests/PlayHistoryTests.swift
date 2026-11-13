@@ -176,7 +176,7 @@ import Testing
                     try v2.keepStart(Played(at: 1, queue: nil, entry: nil, song: rTrack("a")))
                 }
             }
-            let v3 = try DownloadDatabase(path: old)
+            let v3 = try DownloadDatabase(path: old, upTo: 3)
             #expect(try v3.userVersion() == 3)
             // every row of every table as it was
             #expect(try v3.songs() == [done, waiting])
