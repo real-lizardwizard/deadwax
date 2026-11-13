@@ -131,7 +131,8 @@ instructions for how to use it are a little annoying". The boards are `NowPlayin
   element holding the pointer) - so the first cut paused the new song. **It is cleared by the next
   primary press**, because not every drag has a click after it (WebKit synthesises none after a
   moved touch): cleared only by a click, it would swallow the next real tap. A second finger is no
-  press, and doesn't clear it.
+  press, and doesn't clear it. **Since 2.1.12 a press on the record the song changed under sets it too**,
+  moved or not - see "Letting go after the song changed (2.1.12)".
 - **No per-frame work while the page is hidden.** (2.0.0-player.14 turned the platter frame by frame
   in player/deck.ts instead, under the same rule - no frame while closed or hidden.) The spin is a CSS animation on `.app-tt-face`,
   `animation-play-state: paused` unless `is-spinning`, which is `spinning()`: playing AND Now
@@ -895,3 +896,53 @@ Bluetooth earbuds, mostly on his iPhone, over plain http. The spec is the scratc
   there - the turntable is the phone's); the stream's buffering scaled to the speed; the visualizer's
   window margin (`VIZ_AHEAD_S`, song seconds like the deck's was - a late window there stops the picture a
   moment, nothing heard).
+
+### Letting go after the song changed (2.1.12)
+
+James, 2026-11-13: if the song changes while you hold the record (it reaches its end under a resting finger, say),
+lifting the finger paused the new song. He chose: **lifting does nothing to the new song** - it is left exactly as
+the change left it, playing or not, and the record follows it as it already did.
+
+**Where the pause came from - Turntable.tsx's click, not the deck's let-go.** `Deck.release()` already did nothing
+after a song change: `songChanged()` drops the press (`dropPress`), and the release of a dropped press returns
+`{ seek: null, play: false }` - and is never even called, since Turntable's song-change effect has dropped the drag
+(`dragFor`), so `onRelease` finds none. But a still press leaves `turned` false, and the click the lift makes (a
+touch that never moved has one; a mouse's always comes) went to `onRecordClick` as a TAP: `pausing()` and the
+player's toggle - the new song paused. Both presses did it: 2.0.0-player.11's (the record can't sound yet - its
+window not come, an MP3 - so the song plays on under the finger and reaches its end) and the deck's own before it
+is taken (inside a tap, under HOLD_MS). A press the deck had TAKEN was already safe: `grabbed()` sets `turned`, and
+the deck's `songChanged` plays the next song SONG_CHANGE_SETTLE_MS later when the hand had taken it from playing -
+part of the change, not of the let-go, and unchanged.
+
+**The rule, and the one change**: the song-change effect in `player/Turntable.tsx`, which drops a drag begun on the
+song before, now also sets `turned` when that drag was the RECORD's - so the click after its lift is no tap. The
+arm's drag sets nothing: its pointer's click goes to the arm, never the record, and a flag set for it would swallow
+the record's next click from the keyboard. `turned` is cleared by the next primary press, as ever, so a lift with no
+click after it (WebKit's after a moved touch, a cancel) swallows nothing later. deck.ts is untouched; no engine file.
+
+turntable.sim: a still press on a playing record (.11's) with the song changed under it - its lift and click toggle
+nothing and seek nothing, and the next tap is one again; the arm held as the song changes, then the record's click
+from the keyboard - a tap as ever; and with the deck's sound running, a press inside a tap with the song changed
+under it (the end reached), lifted and clicked, 400 ms on - the new song still playing, nothing toggled, nothing
+sought. The first and third failed before the change (the new song paused - `['pause']`). Mutated and caught: the
+change taken out (3 checks), and `turned` set for any drag, the arm's too (1).
+
+**For the iPhone's port** (later, on `ios`): the exporter's press trace `press/song-change-under-a-press`
+(export-deck-vectors.cjs's PRESS_CASES: a still press on a record that can't sound, the song changed under it, the
+lift) was written as "the lift's click is a tap all the same - it pauses the new song"; regenerated after this, its
+lift toggles nothing. The song-change effect is NOT one of the exporter's hashed `handlerPieces()` (the silent line,
+pressable...onArmKey, grabbed, handTurn, NowPlaying's onToggle), so no `made_from` moves: iosdeck.sim's full check
+on the fixtures' maker (byte for byte) fails on the trace's events, but a sources-only check elsewhere only lists
+it - worth adding the effect to `handlerPieces()` with the port. The rules vectors (`rules/*.json`, deck.ts driven) don't change: no deck rule moved, and
+`song-change-mid-hold` / `song-change-mid-coast-back` have no let-go after the change. The phone's rule to follow:
+after the song changes under a press on the record, the lift does nothing - no tap, no seek, no play or pause; the
+new song keeps whatever state the change gave it, and the record follows it.
+
+Verified: `npm run build` (typecheck included) on Node 22; every sim (69); the whole pytest suite (4052 passed); no
+engine file differs. And in a real Chromium - headless Brave over CDP, the phone frame with touch, the lyrics
+harness's stand-in Navidrome, `http://deadwax.test:8091` - Now Playing on the turntable, the song sought to 77.8 s by
+the arm's keys, a finger put on the record at 79.9 s (inside a tap: the deck's press, not yet taken), the song ending
+under it and the next starting about 200 ms later, the finger lifted 700 ms after that: with this change the new
+song played on (2.2 s in); built without it, the same run left the new song PAUSED at 1 s - the bug, seen. Not seen:
+.11's still press in a browser (the harness's songs are FLACs whose windows arrive at once, so its presses were the
+deck's - turntable.sim holds .11's), a real finger, and the iPhone.

@@ -1234,7 +1234,9 @@ below.
   it is says how far through the song you are. The line under the song's name says the time:
   "2:31 of 7:05".
 - **Tap the record** to pause, or to play. A pause from the record winds its sound down with it
-  (see **Pause winds the record down** below).
+  (see **Pause winds the record down** below). If the song changes while your finger is on the
+  record - it reaches its end under a resting finger, say - lifting your finger does nothing to the
+  new song: it plays on, or stays paused, just as the change left it, and the record follows it.
 - **Turn the record** to move through the song: a whole turn is 1.8 seconds, as a real record at
   33⅓ turns, and turning it back goes back. While you turn, the time line says **Scrubbing** and
   where the record is.

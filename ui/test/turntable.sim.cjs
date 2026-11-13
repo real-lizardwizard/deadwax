@@ -20,7 +20,9 @@
  *  - A tap is a press that never travels TAP_SLOP_PX: it seeks nowhere, and its click plays or
  *    pauses, IN the click. A drag seeks where it lets go - only there - and the click after it is
  *    not a tap, however it ends (a mouse's click after a turn the song changed under included). A
- *    cancel seeks nowhere; a drag begun on a song that has since changed is dropped. Both drags
+ *    cancel seeks nowhere; a drag begun on a song that has since changed is dropped - and (2.1.12) the
+ *    click after a press on the record the song changed under, still or not, the deck's or not, is no
+ *    tap: lifting it does nothing to the new song. Both drags
  *    capture the pointer; the preview goes with the turntable when it unmounts.
  *  - The time line: "2:31 of 7:05", and what the drag says while there is one.
  *  - The speed fader (2.0.0-player.39): drawn on the stage when Now Playing hands the turntable its player
@@ -621,6 +623,39 @@ console.log('\nthe record: a tap plays or pauses, in the click; a turn seeks whe
   player.track = { ...player.track, id: 'time' }
   draw()
 
+  //? (2.1.12) a STILL press the song changed under - the song reached its end under a resting finger, and the next
+  //? plays: lifting it does nothing to the new song. Its click (a touch that never moved has one) is no tap - until
+  //? 2.1.12 it was, and paused the new song
+  const still = player.toggles
+  record().props.onPointerDown(pointer(at))
+  player.track = { ...player.track, id: 'breathe' }
+  draw()
+  record().props.onPointerUp(pointer(at))
+  record().props.onLostPointerCapture(pointer(at))
+  draw()
+  record().props.onClick()
+  check('(2.1.12) a still press the song changed under: lifting it does nothing to the new song - no tap, nothing sought',
+    [player.toggles - still, player.seeks.length === seeks], [0, true])
+  record().props.onPointerDown(pointer(at))
+  record().props.onPointerUp(pointer(at))
+  record().props.onClick()
+  check('...and the next tap is one again', player.toggles - still, 1)
+  player.track = { ...player.track, id: 'time' }
+  draw()
+  //? ...the arm held as the song changes is no press on the record: the record's next click - a key's, no press
+  //? before it - is a tap as ever
+  const handle = () => view.find(byClass('app-tt-handle'))[0]
+  const armed = player.toggles
+  handle().props.onPointerDown(pointer(tt.needleAt(151, LENGTH)))
+  player.track = { ...player.track, id: 'breathe' }
+  draw()
+  handle().props.onPointerUp(pointer(tt.needleAt(151, LENGTH)))
+  draw()
+  record().props.onClick()
+  check('...the arm held as the song changed is no press on the record: the record\'s next click, a key\'s, a tap as ever', player.toggles - armed, 1)
+  player.track = { ...player.track, id: 'time' }
+  draw()
+
   //? a second finger on the record while the first turns it starts nothing: the first finger's
   //? turn carries on, and lets go where it was turned to
   player.seeks.length = 0
@@ -1084,6 +1119,25 @@ async function liveChecks() {
     if (!player.playing) player.toggle()
     draw()
     check('a quick grab of a playing record, a slow start crossing the slop 96 and 240 ms after the press, frames drawn through it: taken (the song paused there), and the face as drawn carries straight on - its step at the crossing the platter\'s own turn since the last frame, no more', steps, [['pause', 0], ['pause', 0]])
+  }
+
+  //? (2.1.12) the deck's press, still inside a tap - the song plays on under it - and the song changes under it (the
+  //? end reached, the next playing): lifting it does nothing to the new song, which plays on, sought nowhere
+  {
+    player.seeks.length = 0
+    const before = player.toggles.length
+    record().props.onPointerDown(pointer(at))
+    advance(100)
+    player.track = { ...player.track, id: 'breathe' }
+    player.at = 0
+    draw()
+    record().props.onPointerUp(pointer(at))
+    record().props.onLostPointerCapture(pointer(at))
+    record().props.onClick()
+    advance(400)
+    draw()
+    check('(2.1.12) the deck\'s press the song changed under, let go: nothing done to the new song - playing, not paused, nothing sought',
+      [player.toggles.slice(before), player.playing, player.seeks], [[], true, []])
   }
 
   //? a hi-res song under "Up to 48 kHz": its window asked at the cap the song is played at, so it is cut

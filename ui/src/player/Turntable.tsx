@@ -267,9 +267,15 @@ export function Turntable({
   }, [])
 
   //? the song changed under the finger: the drag was for the song before, and seeks nowhere - nor
-  //? does anything the deck had of it
+  //? does anything the deck had of it. (2.1.12) Nor does lifting it do anything to the new song: the click
+  //? after a press on the record that the song changed under is no tap - a still one included, whose click
+  //? paused the new song - so the new song is left as the change left it, playing or not
   useEffect(() => {
-    if (held.current && !dragFor(held.current, track)) setDrag(null)
+    const now = held.current
+    if (now && !dragFor(now, track)) {
+      if (now.kind === 'record') turned.current = true
+      setDrag(null)
+    }
     deck.songChanged(track)
   }, [track])
 
