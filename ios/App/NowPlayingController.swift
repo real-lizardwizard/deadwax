@@ -42,14 +42,18 @@ final class NowPlayingController {
     /// What the lock screen shows: the entry heard - its title, artist and album as the queue has them, and its
     /// length (the engine's decoded length once known, else Navidrome's). iOS runs the clock on from `elapsed` at
     /// `rate`, so this is set when something changes, not every second. `elapsed` is what is heard (the engine takes
-    /// the output's latency off). No queue index or count since 0.2: Repeat's copies and Up Next's edits make them
-    /// mean nothing a listener could use.
+    /// the output's latency off), in the song's own seconds at any speed. No queue index or count since 0.2: Repeat's
+    /// copies and Up Next's edits make them mean nothing a listener could use.
+    ///
+    /// The speed (turntable.md 5.2, app 0.7): playing, the rate is the speed - so the lock screen's scrubber moves at
+    /// it, the web's "the lock screen's scrubber moves at the speed" - and 0 paused; the default rate stays 1.0, the
+    /// song's own speed (Apple's meaning: the normal rate).
     func show(title: String, artist: String?, album: String?, duration: Double?, elapsed: Double, playing: Bool,
-              artwork: UIImage?) {
+              rate: Double, artwork: UIImage?) {
         var info: [String: Any] = [
             MPMediaItemPropertyTitle: title,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: elapsed,
-            MPNowPlayingInfoPropertyPlaybackRate: playing ? 1.0 : 0.0,
+            MPNowPlayingInfoPropertyPlaybackRate: playing ? rate : 0.0,
             MPNowPlayingInfoPropertyDefaultPlaybackRate: 1.0,
             MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.audio.rawValue,
         ]

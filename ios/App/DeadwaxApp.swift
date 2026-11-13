@@ -128,8 +128,12 @@ enum Palette {
     static let textTertiary = Color(red: 0x8E / 255, green: 0x8E / 255, blue: 0xA3 / 255)
     /// --dw-accent-text #d8b4fe: the EQ curve's right ear.
     static let accentText = Color(red: 0xD8 / 255, green: 0xB4 / 255, blue: 0xFE / 255)
-    /// --dw-toggled-bg rgba(168, 85, 247, 0.18): the fill under the EQ's curve.
+    /// --dw-toggled-bg rgba(168, 85, 247, 0.18): the fill under the EQ's curve, and the speed chip's face.
     static let toggledFill = Color(red: 168 / 255, green: 85 / 255, blue: 247 / 255).opacity(0.18)
+    /// --dw-toggled-border: the speed chip's edge (turntable.md 5.1).
+    static let toggledEdge = colour(TurntablePalette.toggledEdge)
+    /// --dw-pressed rgba(255, 255, 255, 0.06): the speed chip's face under a finger (app.css .app-speed-chip:active).
+    static let pressed = Color.white.opacity(0.06)
 
     // The turntable's look button (turntable.md 2.1, 2.14), from Core's TurntablePalette - the web's tokens' values,
     // held to theme.css there. The plinth's own colours are drawn by DeadwaxTurntable from the same table.

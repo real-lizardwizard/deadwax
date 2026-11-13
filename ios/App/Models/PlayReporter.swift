@@ -10,7 +10,7 @@ import Foundation
 ///
 /// The model tells it: `newListen` at every song change it made (and a restart, a queue put back from where it was
 /// left), `join` when the engine ran into the next song by itself, `seeked` at every seek and retry, `began` when the
-/// entry heard is playing, `tick` from the ticker, `stop` at a stop or a new person.
+/// entry heard is playing, `tick` from the ticker, `stop` at a stop or a new person, `speedChanged` at every speed.
 @MainActor
 final class PlayReporter {
     private let server: ServerModel
@@ -36,6 +36,12 @@ final class PlayReporter {
 
     func seeked() {
         tracker.seeked()
+    }
+
+    /// The speed the song plays at (turntable.md 5.2): a step is capped at the clock times it, so at 2x the song's
+    /// time heard counts in full - half the song makes a play in half the time.
+    func speedChanged(_ speed: Double) {
+        tracker.speedChanged(speed)
     }
 
     func stop() {

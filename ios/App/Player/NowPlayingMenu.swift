@@ -5,7 +5,7 @@ import SwiftUI
 /// greyed, for one that doesn't. Phase 1 has neither the web's Add to a playlist… nor its pin. The button's name says
 /// what the menu holds (NowPlayingWords.more). A SwiftUI Menu on the button, opened from it, as the album page's •••
 /// are (QueueMenu): it was a confirmationDialog on the button until the queue menus moved, and a menu has no Cancel
-/// row - a tap anywhere else closes it. The order is fixed, Info first.
+/// row - a tap anywhere else closes it. The order is fixed, Info first (after the speed's line, when it shows).
 ///
 /// Phase 2 (phase2-downloads.md 4.1): a second section - the song playing's download items, and Download Up Next for
 /// every song from the one playing to the queue's end that isn't on this phone or didn't download, offered for two or
@@ -16,9 +16,15 @@ import SwiftUI
 /// The EQ (eq.md 3.1, app 0.5): a last section, one item - "EQ", `slider.vertical.3`, the output now's short setting
 /// as its subtitle ("Off", "Bass Boost") - opening the EQ as a sheet over Now Playing. "EQ", not "EQ…": it opens a
 /// page, as Info does.
+///
+/// The speed (app 0.7, notes/ios-specs/turntable.md 5.1): off 1x on the cover at the accessibility sizes, where the
+/// chip isn't drawn, a first section of one item - "Speed 1.25x - back to normal speed", `speedometer` - the chip's
+/// action.
 struct NowPlayingMenu: View {
     /// The song playing names its album: Go to album is in the menu.
     let hasAlbum: Bool
+    /// The menu says the speed, the chip not drawn.
+    let saysSpeed: Bool
     let onInfo: () -> Void
     let onEQ: () -> Void
     let onAlbum: () -> Void
@@ -32,6 +38,13 @@ struct NowPlayingMenu: View {
         let upNext = player.songsFromCurrent
         let upNextCount = downloads.isOpen ? downloads.upNextCount(upNext, paged: player.paged != nil) : nil
         Menu {
+            if saysSpeed {
+                Section {
+                    Button(TurntableWords.menuBackToNormal(player.speed), systemImage: "speedometer") {
+                        player.setSpeed(PlaySpeed.normal)
+                    }
+                }
+            }
             Button(NowPlayingWords.info, systemImage: DownloadWords.infoSymbol, action: onInfo)
             if hasAlbum {
                 Button(NowPlayingWords.goToAlbum, systemImage: DownloadWords.goToAlbumSymbol, action: onAlbum)

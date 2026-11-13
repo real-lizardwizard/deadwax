@@ -32,8 +32,9 @@ final class PlayerModel {
     /// waits the retry's 1.5 s - Play shows, busy (`isLoading`), as the web's retry does (setPlaying(false),
     /// setBuffering(true)); a tap on it asks for the song now.
     var isPlaying: Bool { engineState.phase == .playing || engineState.phase == .loading }
-    /// The song is loading (the spinner over Play/Pause): its bytes, its level's wait, or the retry's 1.5 s.
-    var isLoading: Bool { retrying || engineState.phase == .loading }
+    /// The song is loading (the spinner over Play/Pause): its bytes, its level's wait, or the retry's 1.5 s - never the
+    /// few milliseconds the engine takes to begin its lanes again for the speed (SpeedRestartHold).
+    var isLoading: Bool { retrying || (engineState.phase == .loading && !speedHold.hiding) }
     /// Seconds into the entry heard, as the engine last said (twice a second while it plays).
     private(set) var position: Double = 0
     /// What the scrubber and both clocks show: a seek's target while it is on its way (Scrub.reportedPosition, let
@@ -64,6 +65,11 @@ final class PlayerModel {
             UserDefaults.standard.set(newValue.rawValue, forKey: Normalization.storageKey)
         }
     }
+
+    /// The speed (notes/ios-specs/turntable.md 5): 0.25x to 2x, the pitch moving with it - a record deck's - kept on
+    /// this phone under the web's key. The fader on the turntable, its readout, the cover's chip and the ••• menu's
+    /// line set it; at 1x the engine plays the song's own samples.
+    var speed: Double { speedControl.speed }
 
     // MARK: Debug's readings
 
@@ -210,11 +216,23 @@ final class PlayerModel {
     /// The Up Next entry the listener tapped: offline, a song not here is stopped on, never passed over.
     @ObservationIgnored private var chosenKey: Int?
 
+    /// The speed, and what the engine was told (Core's SpeedControl: exact again at 1x on a let-go).
+    private var speedControl = SpeedControl(speed: PlaySpeed.read(UserDefaults.standard.string(forKey: PlaySpeed.storageKey)))
+    /// The engine's `.loading` while it begins its lanes again for the speed, shown as playing.
+    private var speedHold = SpeedRestartHold()
+    /// The lock screen told a drag's speed four times a second at most.
+    @ObservationIgnored private var speedPublishing = SpeedPublishing()
+    /// The song's own pace, measured for Debug (playSpeed.ts paceStep): steps of song against the clock, from a tick
+    /// that followed another while playing the same entry, with no seek or speed change between.
+    @ObservationIgnored private var pace: [PlaySpeed.PaceSample] = []
+    @ObservationIgnored private var paceFrom: (entry: Int, position: Double, at: Double)?
+
     init(server: ServerModel, files: SongFiles) {
         self.server = server
         self.files = files
         book = LoudnessBook(server: server)
         reporter = PlayReporter(server: server)
+        reporter.speedChanged(speedControl.speed)
         book.onAnswer = { [weak self] album, answer in self?.loudnessAnswers[album] = answer }
         session.onInterruption = { [weak self] began, shouldResume in self?.interruption(began: began, shouldResume: shouldResume) }
         session.onOldDeviceGone = { [weak self] in self?.pause() }
@@ -367,6 +385,7 @@ final class PlayerModel {
         follow()
         pendingSeek = Scrub.PendingSeek(target: seconds, since: Self.nowMs())
         reporter.seeked()
+        paceFrom = nil
         link.seek(to: seconds)
         resuming?.position(seconds)
         // paused, the ticker is stopped and the engine says nothing of a seek: the position read back now (the
@@ -583,6 +602,8 @@ final class PlayerModel {
         do {
             let engine = try PlaybackEngine()
             Self.lead(engine)
+            // the kept speed, before any lane begins: at 1x nothing (the chain is never made)
+            if let send = speedControl.atStart { engine.setSpeed(send.speed, exact: send.exact) }
             // the EQ's start: each output's curve put in before its first sample (eq.md 1.8; EQModel.startHook)
             eq?.attach(engine)
             EngineTrace.attach(engine)
@@ -631,6 +652,90 @@ final class PlayerModel {
         UserDefaults.standard.set(mode.rawValue, forKey: Repeat.storageKey)
     }
 
+    // MARK: the speed (notes/ios-specs/turntable.md 5)
+
+    /// The fader moved mid-drag (DeckController, in the touch): the speed it is at now. Through 1x the engine plays on
+    /// in its chain at rate 1 - no gap at the mark.
+    func dragSpeed(to speed: Double) {
+        apply(speedControl.dragged(to: speed))
+    }
+
+    /// The fader let go, or its touch taken by the system: at 1x after a drag, the song's own samples again (James,
+    /// 2026-11-13: exact again on let-go) - one short gap.
+    func speedLetGo() {
+        apply(speedControl.letGo())
+    }
+
+    /// A jump: the readout's tap, the chip's, the ••• menu's line, a VoiceOver step - exact when it lands on 1x.
+    func setSpeed(_ speed: Double) {
+        apply(speedControl.set(speed))
+    }
+
+    /// What the player does with the speed, for Debug's Speed row (playSpeed.ts SpeedReading): the speed asked for, the
+    /// engine's as it reads it back, the pitch moving with it (a varispeed's: always), the song's pace measured. Debug's
+    /// alone: the engine's read waits on its queue.
+    func speedReading() -> SpeedReading {
+        SpeedReading(speed: speedControl.speed, rate: link?.engine.speed ?? speedControl.speed, pitch: "moves",
+                     measured: PlaySpeed.paceOf(pace))
+    }
+
+    /// A send to the engine: kept on the phone, the plays told, the pace measured afresh (the web's setSpeed: a step
+    /// across the change would be part old speed, part new), the restart's loading held off the screen while the song
+    /// plays, and the lock screen told.
+    private func apply(_ send: SpeedControl.Send?) {
+        guard let send else { return }
+        UserDefaults.standard.set(PlaySpeed.stored(send.speed), forKey: PlaySpeed.storageKey)
+        reporter.speedChanged(send.speed)
+        pace = []
+        paceFrom = nil
+        if let link {
+            if send.restarts, engineState.phase == .playing || speedHold.hiding, let key = engineState.key {
+                speedHold.asked(entry: key, at: Monotonic.seconds())
+                DispatchQueue.main.asyncAfter(deadline: .now() + SpeedRestartHold.seconds) { [weak self] in
+                    MainActor.assumeIsolated {
+                        // a restart still loading past the hold is a real wait: it shows
+                        guard let self, self.speedHold.expired(at: Monotonic.seconds()) else { return }
+                        self.showNowPlaying()
+                    }
+                }
+            }
+            link.engine.setSpeed(send.speed, exact: send.exact)
+        }
+        speedToLockScreen()
+    }
+
+    /// The lock screen's clock runs at the speed (MPNowPlayingInfoPropertyPlaybackRate): told at once, then four times a
+    /// second at most through a drag, its last speed always (SpeedPublishing) - the position read afresh each time.
+    private func speedToLockScreen() {
+        guard hasQueue else { return }
+        switch speedPublishing.changed(at: Monotonic.seconds()) {
+        case .now:
+            tellLockScreenSpeed()
+        case .at(let time):
+            DispatchQueue.main.asyncAfter(deadline: .now() + max(0, time - Monotonic.seconds())) { [weak self] in
+                MainActor.assumeIsolated { self?.tellLockScreenSpeed() }
+            }
+        case .waiting:
+            break
+        }
+    }
+
+    private func tellLockScreenSpeed() {
+        guard hasQueue else { return }
+        tick()
+        showNowPlaying()
+    }
+
+    /// A tick's step of playing, for the pace: from the tick before, the same entry, no seek, pause or speed between.
+    private func measurePace() {
+        guard let entry = heardEntry else { return }
+        let now = Monotonic.seconds()
+        if let from = paceFrom, from.entry == entry, position >= from.position {
+            pace = PlaySpeed.paceStep(pace, PlaySpeed.PaceSample(media: position - from.position, wall: now - from.at))
+        }
+        paceFrom = (entry, position, now)
+    }
+
     // MARK: following the queue and the engine
 
     /// The queue changed (QueueController.onChange): drawn, the song change handled, the albums it needs asked about,
@@ -665,6 +770,7 @@ final class PlayerModel {
         refusalSaid = false
         retried = false
         askedAfterFailure = false
+        paceFrom = nil
         cancelRetry()
         guard let entry, let track = current?.track else {
             reporter.stop()
@@ -697,6 +803,9 @@ final class PlayerModel {
         }
         let was = engineState
         engineState = state
+        speedHold.phase(loading: state.phase == .loading, playing: state.phase == .playing, entry: state.key,
+                        at: Monotonic.seconds())
+        if state.phase != .playing { paceFrom = nil }
         outputName = session.outputName
         follow()
         switch state.phase {
@@ -916,6 +1025,7 @@ final class PlayerModel {
             pendingSeek = Scrub.settled(pendingSeek, position: at.seconds, now: Self.nowMs())
         }
         if engineState.phase == .playing {
+            measurePace()
             reporter.tick(position: position, duration: duration)
             controller?.tick(heard: reporter.heard, length: length)
             resuming?.position(position)
@@ -961,8 +1071,10 @@ final class PlayerModel {
                         artist: track.artist.isEmpty ? nil : track.artist,
                         album: track.album.isEmpty ? nil : track.album,
                         duration: duration > 0 ? duration : nil,
-                        elapsed: shownPosition, playing: engineState.phase == .playing,
+                        elapsed: shownPosition, playing: engineState.phase == .playing || speedHold.hiding,
+                        rate: speedControl.speed,
                         artwork: cover != nil && artwork?.id == cover ? artwork?.image : nil)
+        speedPublishing.told(at: Monotonic.seconds())
         let now = Monotonic.seconds()
         let failedLately = coverFailed.map { $0.id == cover && now - $0.at < Self.coverAgainSeconds } ?? false
         if let cover, artwork?.id != cover, coverAsked != cover, !failedLately, let client = server.client {
