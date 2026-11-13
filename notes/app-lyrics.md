@@ -352,10 +352,14 @@ exporter ports exactly the view's rules and nothing of the editor's.
   height) lets the last line reach the anchor too. A new lit line scrolls smoothly; Reduce Motion jumps.
 - **The listener's own scroll holds it**: a touch that moves the lyrics, a wheel, a scroll key in them, a drag of the
   scroll bar - each sets `heldAt = now`. While held, the lit line still lights, and the lyrics stay where the listener
-  put them.
-- **It comes back** `FOLLOW_AGAIN_MS` (4,000 ms) after the last such input **while the song plays**
-  (`follows(now, heldAt, playing)`), scrolling back smoothly. Measured from the last input, not the last scroll, so a
-  fling's momentum (no input, still scrolling) runs out first. **Paused, it stays where the listener put it** - nothing
+  put them. **A finger that has scrolled them holds them for as long as it stays on them** (2.1.11), as the phone's
+  scroll phase does until it goes idle.
+- **It comes back** `FOLLOW_AGAIN_MS` (4,000 ms) after the listener's scroll **stops** **while the song plays**
+  (`follows(now, heldAt, playing)`), scrolling back smoothly. **Since 2.1.11 the stop is the scroll's last movement**
+  (James, 2026-11-13: the phone's way, on both): a fling's coast after the finger lifts, a wheel's or a trackpad's
+  momentum and a scroll key's smooth scroll are all still scrolling, so each movement while held moves `heldAt` on
+  (`scrollHolds`). Until 2.1.11 the web measured from the last input - the finger lifting - so a fling's coast ate into
+  the wait. **Paused, it stays where the listener put it** - nothing
   is moving to follow, and someone reading ahead with the song paused is reading; a play (the transport's, or a tap on
   a line) brings it back at once, the 4 s long past. A timer, not the clock: it fires with no frame being drawn.
 - **The lit line is never under a fade**: the lines start below the top fade (the list's top padding is the fade's
@@ -510,8 +514,9 @@ answer state (from `app/useLyrics.ts`, 2.6) and whether it shows.
 - **Following** (2.5): `scroller.scrollTo({ top: followTop(...), behavior: reduced ? 'auto' : 'smooth' })`, `reduced`
   read from `matchMedia('(prefers-reduced-motion: reduce)')` - an explicit `smooth` would override the theme's
   `scroll-behavior: auto !important` (`theme.css:420-430`). Listener input from `wheel`, `touchmove`, `keydown` (scroll
-  keys) and `pointerdown` on the scroller itself (its scroll bar) - never the `scroll` event, which following's own
-  scrolls fire too.
+  keys) and `pointerdown` on the scroller itself (its scroll bar) starts a hold; the `scroll` event never starts one,
+  as following's own scrolls fire it too - since 2.1.11 it moves a hold already started on (`scrollHolds`), and
+  `touchend`/`touchcancel` start the wait for a finger that scrolled.
 - **Its clock runs** (2.2) only while it shows, the song plays, nothing is over it (`covered`) and
   `document.visibilityState === 'visible'`; stopped, it redraws only on `usePosition`'s updates (a seek).
 - **On a desktop, a line under the mouse** shows it can be clicked: `cursor: pointer`, the press box's
@@ -873,7 +878,7 @@ check). How sure, and what this spec does:
 | Lines not being sung slightly blurred | fairly sure (iOS 16+) | no - deadwax's "no blur" (theme.css:445); the phone could, Open question 5 |
 | A tap on a line plays from it | sure | yes |
 | ...from a pause too | not sure | seek and play (Open question 2, check W3/P3) |
-| Scrolling by hand stops the following; it returns after a few seconds | sure it stops; fairly sure it returns; not sure of the delay | 4 s from the last input while playing; paused, held until play (check W2, W15; Open question 14) |
+| Scrolling by hand stops the following; it returns after a few seconds | sure it stops; fairly sure it returns; not sure of the delay | 4 s after the scroll stops (a fling's coast included, 2.1.11) while playing; paused, held until play (check W2, W15; Open question 14) |
 | While scrolling by hand, the other lines lose their blur, to be read | fairly sure (iOS 16+) | the dim lines are readable all along: 5.7:1 on the web; on the phone the backdrop darkens under lyrics so they are (4.3) |
 | Three dots filling during an instrumental break or intro | fairly sure | yes, lit one by one by the clock (2.4) |
 | The playback controls fade away after a few seconds while lyrics play; a tap brings them back | fairly sure (iOS 16+) | no (Open question 3) |
@@ -899,7 +904,8 @@ Use songs whose albums deadwax filed (synced from LRCLIB - e.g. Dummy's "Roads")
   cover's place, the title and the buttons don't move, the line being sung is white and about a third of the way down,
   and the lyrics move up smoothly as each line comes. Tap it again: the cover.
 - **W2** Scroll up to read ahead: it stays where you put it, the lit line still changing. Let go; about four seconds
-  later it scrolls back to the line being sung. Compare with Apple Music: sooner, later, or the same?
+  after the lyrics come to rest (a flick's glide included, 2.1.11) it scrolls back to the line being sung. Compare with
+  Apple Music: sooner, later, or the same?
 - **W3** Tap a line further on: the song jumps there and plays on. Pause, tap a line: it plays from there. Do the same in
   Apple Music while paused - does it start playing too?
 - **W4** The lead: tap a line and listen - does its line light as the words start, a beat after, or before? On "American
@@ -930,7 +936,8 @@ Use songs whose albums deadwax filed (synced from LRCLIB - e.g. Dummy's "Roads")
 
 - **D1** The player bar's **Lyrics** (left of Up Next) opens Lyrics beside the page; Up Next or Info put it away and
   it puts them away; **Done** and Escape close it, focus back on the button.
-- **D2** Wheel up through the lyrics: they hold, and come back four seconds after. Tab into them: the focus lands on
+- **D2** Wheel up through the lyrics: they hold, and come back four seconds after they stop moving (a trackpad's glide
+  included, 2.1.11). Tab into them: the focus lands on
   the line being sung; arrow keys move; Enter plays from there.
 - **D3** The instrumental with the panel open: "No lyrics for this song."; closed, the bar's Lyrics dimmed.
 - **D4** Narrow the window below 1024: the panel closes, the music plays on.
@@ -997,8 +1004,10 @@ Use songs whose albums deadwax filed (synced from LRCLIB - e.g. Dummy's "Roads")
 11. **The iPhone app's version** - Phase 2 ships as 0.3. **The build: 0.4** (`MARKETING_VERSION`, `ios/Config/
     Base.xcconfig:11`, with check_project.py, ios.yml and `tests/test_ios_install.py` pinned with it, as 0.2 and 0.3 were),
     and the plan's Phase 3 ships as 0.5 - a version says what shipped, not which phase.
-12. **The follow-again delay** - **4 s** from the last touch, wheel or key; changed after W2 if Apple Music's feels
-    different.
+12. **The follow-again delay** - **4 s** after the listener's scroll stops; changed after W2 if Apple Music's feels
+    different. **Where the 4 s counts from - answered 2026-11-13 (2.1.11)**: the web counted from the last input (the
+    finger lifting), the phone from its scroll phase going idle (the fling's coast over). James chose the phone's, on
+    both: the web's wait now counts from the scroll's last movement, and a finger resting after a scroll holds.
 13. **One commit or two on main** (1.9) - **two**: the route as 2.1.N (nothing visible), the web app as 2.1.N+1 with the
     docs - so the route is on `:experimental` for the phone's build even if the web's needs another pass.
 14. **Reading ahead while paused** (added in review) - does following come back on its own while the song is paused?
@@ -1237,3 +1246,45 @@ mutated back and caught; the bundle rebuilt. And deadwax run against a stand-in 
 server outside the repo, shaped as the route's tests fake v0.64.2) - the page, the album, streaming, and the route
 answering synced, plain, none, all-one-stamp and a duet's shared stamp, a 304 and a 404. Not verified: a real
 browser, the phone, a real Navidrome - section 6's checks still stand.
+
+## Built (2.1.11): the wait counts from where the scroll stops
+
+James, 2026-11-13: on the web, following came back 4 s after the finger lifted; on the iPhone app 4 s after the scroll
+stopped, a fling's coast counted as still scrolling (`LyricsHold.phase`, the ios branch's departure 3). He chose the
+phone's way on both. The web now:
+
+- **Counts from the last movement.** A listener's input still starts the hold (a wheel, a touch that moves, a scroll
+  key, a press on the scroll bar); every `scroll` event while that hold stands then moves `heldAt` on to its moment
+  (`hold()`, which re-arms the timer). So a fling's coast, a wheel's smooth scroll, a trackpad's glide and a scroll
+  key's smooth scroll all count as scrolling, and the 4 s run from where the lyrics come to rest.
+- **`scrollHolds(now, heldAt, playing)`** (lib/lyricsView.ts, pure) is the rule: a scroll counts only while the
+  listener's scroll holds following - `heldAt !== null && !follows(now, heldAt, playing)`. Following scrolls only while
+  it follows (every path to `follow()` clears `heldAt` first or has `follows()` true), so its own scrolls - which fire
+  the same event - never hold it, and a scroll with no hold before it (a focus brought into view) starts nothing.
+- **A finger resting on the lyrics after scrolling them holds them** (`touching`, passed to `follows()` as its fourth
+  argument beside the keyboard's focus) until `touchend` or `touchcancel`, which starts the wait - the phone's
+  `scrolling`, held through `.interacting`, `.tracking` and `.decelerating` until `.idle`. A tap (no `touchmove`) holds
+  nothing. A touch whose end the scroller never hears (its target removed under the finger) holds until the next
+  touch's end, the song changing or the lyrics opening again - each of which clears it.
+- Unchanged: the timer (it already re-armed itself for a `heldAt` moved on), paused waiting until play, keyboard focus,
+  a tap following at once, plain lyrics never followed.
+
+Departures: the web has no scroll phase, so "the scroll stopped" is its last `scroll` event - the same moment the
+phone's `.idle` comes, within a frame. A mouse held still on the scroll bar's thumb past 4 s is not held (no reliable
+pointerup from a scroll bar); the phone has no such thing.
+
+lyrics.sim: the fake scroller's `scrollTo` now fires `scroll`, so every following in the sim also checks that its own
+scroll holds nothing; `scrollHolds` (not held, 3,999 / 4,000 ms, paused); the view - a fling held 3,999 ms after its
+coast stops (5.5 s after the lift) and back at 4,000; a wheel's momentum the same; a finger resting 10 s held, then
+lifted, back 4 s after the lift; a tap's lift and a stray scroll holding nothing. The old check's `touchmove` gained
+its `touchend` (a touch always ends). Mutated and caught: `scrollHolds` without its `follows` test, no `scroll`
+listener, a resting finger not holding, the lift not starting the wait, every scroll holding.
+
+Verified: `npm run build` (typecheck included) on Node 22; every sim (69); the whole pytest suite (4052 passed). And in a
+real Chromium - headless Brave over CDP, the phone frame (390x844, touch), deadwax from the worktree against the
+lyrics harness's stand-in Navidrome, opened as `http://deadwax.test:8091` (not a secure context): a touch flick with
+its fling kept (`Input.synthesizeScrollGesture`, `preventFling: false`) coasted 582 ms after the last touch event,
+and following came back 4,033 ms after the last movement - 4,615 ms after the finger lifted; a mouse wheel, back
+4,033 ms after its last movement, following on after it (six scrolls more as lines lit - its own scroll held
+nothing). Not seen: a real finger on a phone (the resting finger is the sim's alone), Safari's scroll events during
+iOS momentum (expected, not watched), and James's W2 and D2.

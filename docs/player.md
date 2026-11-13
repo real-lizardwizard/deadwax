@@ -292,11 +292,13 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
   song changes and seek went are in [Info → Debug](#info--debug), and the Gapless checkbox in **You**.
 - **Lyrics** on the now-playing screen shows the song's lyrics in the cover's place as it plays: the line being
   sung bright and the rest dimmer, kept about a third of the way down as the song moves on, and three dots filling in
-  through a long break between verses (or a long intro). Scroll them yourself and they stay where you put them;
-  four seconds after you stop, they follow the song again - paused, they wait until it plays. Tap any line to play
-  from there, from a pause too. Lyrics saved without timings show whole, under "These lyrics aren't synced to the
-  song.", and don't move by themselves. The button is purple while lyrics are on, and dimmed - "Lyrics - none for
-  this song" to VoiceOver - for a song deadwax knows has none; with lyrics on, a song with none shows its cover.
+  through a long break between verses (or a long intro). Scroll them yourself - a finger, a wheel or a trackpad -
+  and they stay where you put them, for as long as your finger rests on them; four seconds after they come to rest
+  (a flick's glide, or a trackpad's, counts as still scrolling), they follow the song again - paused, they wait
+  until it plays. Tap any line to play from there, from a pause too. Lyrics saved without timings show whole, under
+  "These lyrics aren't synced to the song.", and don't move by themselves. The button is purple while lyrics are
+  on, and dimmed - "Lyrics - none for this song" to VoiceOver - for a song deadwax knows has none; with lyrics on, a
+  song with none shows its cover.
   They stay on from song to song and each time the screen opens, until you tap **Lyrics** again or the look
   button at the top, which shows the cover or the turntable instead. If they can't be fetched the screen says
   "Couldn't load the lyrics." with **Try again**. They're the lyrics deadwax saved beside each song
