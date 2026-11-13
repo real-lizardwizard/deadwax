@@ -115,6 +115,8 @@ enum AutoEqAnswers {
             #expect(items.map(\.name) == one.query.map(\.0), "\(one.name)")
             #expect(items.map { (item: URLQueryItem) -> String in item.value ?? "" } == one.query.map(\.1), "\(one.name)")
             #expect(sent.headers["Cookie"] != nil)
+            // given longer than the transport's 8 s: deadwax may wait 15 s for AutoEq's list or a file (the review)
+            #expect(sent.timeout == 20, "\(one.name)")
         }
     }
 
@@ -153,23 +155,47 @@ enum AutoEqAnswers {
         #expect(ErrorWords.of(refused, admin: true, gone: EQWords.Profile.gone, retry: true).advice == "")
         let profileDown = try #require(file.profiles.first { $0.status == 503 })
         #expect(ErrorWords.of(try await failure(profileDown), retry: true).text == "deadwax can't reach AutoEq just now.")
-        // a measurement AutoEq no longer has (a 404): the page's own gone, no advice
+        // a measurement AutoEq no longer has (a 404 in deadwax's words): the page's own gone, no advice - as the pages
+        // say it, through AutoEqAsk.failure
         for gone in file.profiles where gone.status == 404 {
-            let line = ErrorWords.of(try await failure(gone), admin: false, gone: EQWords.Profile.gone, retry: true)
+            let said = AutoEqAsk.failure(try await failure(gone))
+            let line = ErrorWords.of(said, admin: false, gone: EQWords.Profile.gone, retry: true)
             #expect(line.kind == .notFound)
             #expect(line.text == "AutoEq doesn't have that measurement any more." && line.advice == "")
         }
-        // a deadwax from before the AutoEq routes answers the search FastAPI's own 404: the picker says so
-        let (older, olderTransport) = client()
-        olderTransport.answer("/deadwax/eq/autoeq", 404, #"{"detail":"Not Found"}"#)
-        do {
-            _ = try await older.autoEq(search: "AirPods Pro")
-            Issue.record("an older deadwax's 404 didn't fail")
-        } catch {
-            let line = ErrorWords.of(error, admin: false, gone: EQWords.Picker.tooOld, retry: true)
-            #expect(line.text == "This deadwax is too old for AutoEq's corrections: they need deadwax 2.1.7 or later.")
-            #expect(line.advice == "")
+        // a deadwax from before the AutoEq routes answers FastAPI's own 404 (or one with no words), to the search and
+        // to a profile: never "gone" - for a listener ErrorWords' own words for what didn't work, and the version it
+        // needs only for whoever runs deadwax (the review: the sentence was said to everyone)
+        for (path, body) in [("/deadwax/eq/autoeq", #"{"detail":"Not Found"}"#),
+                             ("/deadwax/eq/autoeq/0123456789abcdef", #"{"detail":"Not Found"}"#),
+                             ("/deadwax/eq/autoeq", "")] {
+            let (older, olderTransport) = client()
+            olderTransport.answer(path, 404, body)
+            do {
+                if path == Routes.autoEqSearch.path {
+                    _ = try await older.autoEq(search: "AirPods Pro")
+                } else {
+                    _ = try await older.autoEqProfile(id: "0123456789abcdef")
+                }
+                Issue.record("an older deadwax's 404 didn't fail")
+            } catch {
+                let said = AutoEqAsk.failure(error)
+                #expect(ErrorWords.kind(of: said) == .other, "\(path)")
+                let listener = ErrorWords.of(said, admin: false, gone: EQWords.Profile.gone, retry: true)
+                #expect(listener.text == "Something went wrong." && listener.detail == nil, "\(path)")
+                #expect(listener.advice == "If it keeps happening, tell whoever runs deadwax.")
+                #expect(!listener.said.contains("2.1.7"))
+                let admin = ErrorWords.of(said, admin: true, gone: EQWords.Profile.gone, retry: true)
+                #expect(admin.text == "Something went wrong." && admin.advice == "")
+                let detail = try #require(admin.detail)
+                #expect(detail.hasPrefix(EQWords.Picker.tooOld + " (GET /eq/autoeq"), "\(detail)")
+                #expect(detail.hasSuffix(" answered 404)"))
+            }
         }
+        // every other failure is as it was
+        let refusedAgain = AutoEqAsk.failure(refused)
+        #expect(refusedAgain as? APIFailure == refused as? APIFailure)
+        #expect(ErrorWords.of(refusedAgain, retry: true).text == "deadwax can't reach AutoEq just now.")
         // offline: ErrorWords' own, beside the page's Try again
         let (deadwax, transport) = client()
         transport.goAway()
@@ -272,9 +298,74 @@ enum AutoEqAnswers {
     }
 
     @Test func oneRowIsOfferedAndALetterOutsideASCIIIsTheSameWord() throws {
-        let suggestion = EQSuggestion.of("aur audio", answer: try AutoEqAnswers.search("aur audio"))
+        // deadwax's one row for "aur audio" is the AüR Audio Aure: named by its model, it is offered
+        let answer = try AutoEqAnswers.search("aur audio")
+        let suggestion = EQSuggestion.of("Aur Audio Aure", answer: answer)
         #expect(suggestion.rows.map(\.name) == ["A\u{FC}R Audio Aure"])
         if case .one = suggestion {} else { Issue.record("offered \(suggestion)") }
+        // ...by its maker alone, it is a choice: AüR Audio's one measured model needn't be yours (the review)
+        guard case .several(_, let rows) = EQSuggestion.of("aur audio", answer: answer) else {
+            Issue.record("the maker's one model was offered as the output")
+            return
+        }
+        #expect(rows.map(\.name) == ["A\u{FC}R Audio Aure"])
+    }
+
+    static func answer(_ rows: [AutoEqResult]) -> AutoEqResults {
+        AutoEqResults(results: rows, total: rows.count, listFrom: "2026-11-12T09:30:00Z")
+    }
+
+    static func row(_ name: String, _ id: String) -> AutoEqResult {
+        AutoEqResult(id: id, name: name, source: "Rtings", rig: "HMS II.3", form: "in-ear", others: [])
+    }
+
+    @Test func theOnlyRowIsOfferedOnlyWhenItIsThisHeadphone() throws {
+        // a list holding the Pro 2's ANC mode and no first generation: the one row under "AirPods Pro" has a word
+        // after the name, so it is another model - a choice, never the Pro 2 offered as the AirPods Pro (the review:
+        // "exactly one row" offered it)
+        let airpods = try AutoEqAnswers.search("AirPods Pro")
+        let pro2 = try #require(airpods.results.first { $0.name == "Apple AirPods Pro 2 (ANC mode)" })
+        guard case .several(let asked, let rows) = EQSuggestion.of("AirPods Pro", answer: Self.answer([pro2])) else {
+            Issue.record("the Pro 2 alone was offered to the AirPods Pro")
+            return
+        }
+        #expect(asked == "AirPods Pro" && rows == [pro2])
+        // it is the Pro 2's own: the name after its maker, a qualifier in parentheses aside
+        #expect(EQSuggestion.of("AirPods Pro 2", answer: Self.answer([pro2])) == .one(pro2))
+        // the first generation alone is the AirPods Pro's (3.7's exactly one), as the maker's name before it is
+        let first = try #require(airpods.results.first { $0.name == "Apple AirPods Pro" })
+        #expect(EQSuggestion.of("AirPods Pro", answer: Self.answer([first])) == .one(first))
+        #expect(EQSuggestion.of("Apple AirPods Pro", answer: Self.answer([first])) == .one(first))
+        // a word among the name's is another model: the Galaxy Buds 2 Pro aren't the Galaxy Buds Pro
+        let buds2 = Self.row("Samsung Galaxy Buds 2 Pro", "0123456789abcdef")
+        #expect(EQSuggestion.of("Galaxy Buds Pro", answer: Self.answer([buds2])) == .several(query: "Galaxy Buds Pro", rows: [buds2]))
+        #expect(EQSuggestion.of("Galaxy Buds 2 Pro", answer: Self.answer([buds2])) == .one(buds2))
+        // the name ends the row's at a word's start, not inside one ("earbuds pro" ends "buds pro")
+        let earbuds = Self.row("Samsung Galaxy Buds Earbuds Pro", "0123456789abcdee")
+        #expect(EQSuggestion.of("Buds Pro", answer: Self.answer([earbuds])) == .several(query: "Buds Pro", rows: [earbuds]))
+        // two rows that are each the name alone (deadwax keeps "&" and "and" apart, the phone doesn't): a choice
+        let ampersand = Self.row("Bang & Olufsen Beoplay H9", "0123456789abcded")
+        let and = Self.row("Bang and Olufsen Beoplay H9", "0123456789abcdec")
+        #expect(EQSuggestion.of("Bang & Olufsen Beoplay H9", answer: Self.answer([ampersand, and]))
+            == .several(query: "Bang & Olufsen Beoplay H9", rows: [ampersand, and]))
+    }
+
+    @Test func aPlusIsAWordOfTheName() {
+        // Apple's "Beats Studio Buds +" aren't the Beats Studio Buds, though folding drops the "+" (deadwax's search
+        // does too): offered nothing from the Studio Buds alone, the Studio Buds+ when AutoEq has them - and the
+        // Studio Buds never the Studio Buds+ (the review)
+        let buds = Self.row("Beats Studio Buds", "0123456789abcde0")
+        let plus = Self.row("Beats Studio Buds+", "0123456789abcde1")
+        #expect(EQSuggestion.of("Beats Studio Buds +", answer: Self.answer([buds])) == .none)
+        #expect(EQSuggestion.of("Beats Studio Buds +", answer: Self.answer([buds, plus])) == .one(plus))
+        #expect(EQSuggestion.of("Beats Studio Buds", answer: Self.answer([plus])) == .several(query: "Beats Studio Buds", rows: [plus]))
+        #expect(EQSuggestion.of("Beats Studio Buds", answer: Self.answer([buds, plus])).rows == [buds, plus])
+        // a "+" and a "Plus" are the one word
+        let t2 = Self.row("Tin HiFi T2+", "0123456789abcde2")
+        #expect(EQSuggestion.of("Tin HiFi T2 Plus", answer: Self.answer([t2])) == .one(t2))
+        #expect(EQSuggestion.holdsEveryWord("T2+", "Tin HiFi T2 Plus"))
+        // a "+" inside a qualifier stays inside it
+        #expect(EQSuggestion.folded("Apple AirPods Pro 2 (51dB + ANC)", key: true) == "apple airpods pro 2")
     }
 
     @Test func aPartAnswerIsNeverPickedFrom() throws {
@@ -355,6 +446,15 @@ enum AutoEqAnswers {
         let kept = try #require(settings.output(Self.airpods.key))
         #expect(kept.on && kept.correction == correction && kept.uses(profile.id))
         #expect(!kept.uses("0123456789abcdef"))
+        // kept in eq.json and read back after a relaunch the same: the file's text, its filters and their ids
+        let written = try settings.written()
+        let reread = try #require(EQSettings.read(written))
+        #expect(reread == settings && reread.output(Self.airpods.key)?.correction?.text == profile.text)
+        // a correction of a kind this build doesn't know, or one garbled, is a file it can't read - set aside (4)
+        let text = String(decoding: written, as: UTF8.self)
+        #expect(text.contains("\"autoeq\"") && text.contains("\"nextFilterID\""))
+        #expect(EQSettings.read(Data(text.replacingOccurrences(of: "\"autoeq\"", with: "\"graphic\"").utf8)) == nil)
+        #expect(EQSettings.read(Data(text.replacingOccurrences(of: "\"nextFilterID\"", with: "\"next\"").utf8)) == nil)
         // already on: used again, nothing to turn on
         let changed2 = settings.use(correction, for: Self.airpods)
         #expect(!changed2)

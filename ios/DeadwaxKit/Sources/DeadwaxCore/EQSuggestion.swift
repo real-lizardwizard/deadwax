@@ -6,17 +6,21 @@ import Foundation
 /// (iOS names both "AirPods Pro" - the design review's case).
 ///
 /// The rows looked at are those whose names hold **every word of the cleaned name**, as whole words - folded as the
-/// Library folds (`Fold.findText`: marks off, lowercased, `&` as "and", anything not a letter or a digit a gap) - so
-/// "AirPods Pro" holds "Apple AirPods Pro 2 (ANC mode)" but not Rtings' "Apple AirPods Pro2". deadwax's own search is
-/// wider (its words run together, so "hd650" finds "Sennheiser HD 650"); the picker shows all of it.
+/// Library folds (`Fold.findText`: marks off, lowercased, `&` as "and", anything not a letter or a digit a gap), and a
+/// `+` as the word "plus" (`folded`) - so "AirPods Pro" holds "Apple AirPods Pro 2 (ANC mode)" but not Rtings' "Apple
+/// AirPods Pro2", and "Beats Studio Buds +" doesn't hold "Beats Studio Buds". deadwax's own search is wider (its words
+/// run together, so "hd650" finds "Sennheiser HD 650", and it drops a `+`); the picker shows all of it.
 ///
-/// **One** is offered when only one row holds them, or when every row is one headphone - its name exactly, or its name
-/// with a qualifier in parentheses (AutoEq's "Sennheiser HD 650 (2020)", "(balanced)", "(pre-2020, worn earpads)") -
-/// and exactly one of them is the name alone: "Sennheiser HD 650" is offered the HD 650. (Departure from 3.7's
-/// "exactly one row": AutoEq's real list has six HD 650 rows, so that rule offered 3.7's own example nothing.) A row
-/// with another word outside parentheses is another model ("Apple AirPods Pro 2" beside "Apple AirPods Pro"), so an
-/// output named "Apple AirPods Pro" is still offered the choice. And only from a whole answer: when deadwax found more
-/// than the limit let through, a row not seen could be another model, so it is a choice.
+/// **One** is offered when only one row holds them and it is this headphone - its name, or its name after a maker's
+/// ("Apple AirPods Max" for "AirPods Max"), a qualifier in parentheses aside - or when every row is one headphone -
+/// its name exactly, or its name with a qualifier in parentheses (AutoEq's "Sennheiser HD 650 (2020)", "(balanced)",
+/// "(pre-2020, worn earpads)") - and exactly one of them is the name alone: "Sennheiser HD 650" is offered the HD 650.
+/// (Departure from 3.7's "exactly one row": AutoEq's real list has six HD 650 rows, so that rule offered 3.7's own
+/// example nothing.) A row with another word after the name, or among its words, outside parentheses, is another
+/// model ("Apple AirPods Pro 2" beside "Apple AirPods Pro"; "Samsung Galaxy Buds 2 Pro" for "Galaxy Buds Pro"), so it
+/// is a choice even when it is the only row - an output named "Apple AirPods Pro" is still offered the choice. And
+/// only from a whole answer: when deadwax found more than the limit let through, a row not seen could be another
+/// model, so it is a choice.
 public enum EQSuggestion: Equatable, Sendable {
     case none
     /// the one row, offered
@@ -28,14 +32,22 @@ public enum EQSuggestion: Equatable, Sendable {
     public static func of(_ query: String, answer: AutoEqResults) -> EQSuggestion {
         let rows = answer.results.filter { holdsEveryWord(query, $0.name) }
         guard let first = rows.first else { return .none }
-        if rows.count == 1 && answer.complete { return .one(first) }
-        let asked = Fold.findText(query)
-        let headphone = Fold.key(query)
-        let alone = rows.filter { Fold.findText($0.name) == asked }
-        if answer.complete, alone.count == 1, rows.allSatisfy({ Fold.key($0.name) == headphone }) {
+        let several = EQSuggestion.several(query: query, rows: rows)
+        guard answer.complete else { return several }
+        let headphone = folded(query, key: true)
+        guard !headphone.isEmpty else { return several }
+        if rows.count == 1 {
+            // the one row is offered only when it is this headphone: a word after the name, or among its words, is
+            // another model - "Apple AirPods Pro 2 (ANC mode)" alone isn't the AirPods Pro's
+            let name = folded(first.name, key: true)
+            return name == headphone || name.hasSuffix(" " + headphone) ? .one(first) : several
+        }
+        let asked = folded(query, key: false)
+        let alone = rows.filter { folded($0.name, key: false) == asked }
+        if alone.count == 1, rows.allSatisfy({ folded($0.name, key: true) == headphone }) {
             return .one(alone[0])
         }
-        return .several(query: query, rows: rows)
+        return several
     }
 
     /// Whether `name` holds every word of `query` as a whole word, folded. A query with no word holds nothing.
@@ -47,7 +59,15 @@ public enum EQSuggestion: Equatable, Sendable {
     }
 
     static func words(_ text: String) -> [String] {
-        Fold.findText(text).split(separator: " ").map(String.init)
+        folded(text, key: false).split(separator: " ").map(String.init)
+    }
+
+    /// A name as the suggestion compares it: `Fold.findText` (or `Fold.key`, a bracketed aside dropped), with a `+` as
+    /// the word "plus" - which Fold drops as punctuation, and which names another model: Apple's "Beats Studio Buds +"
+    /// isn't the Beats Studio Buds, and AutoEq's "T2+" is the "T2 Plus".
+    static func folded(_ text: String, key: Bool) -> String {
+        let plus = text.replacingOccurrences(of: "+", with: " plus ")
+        return key ? Fold.key(plus) : Fold.findText(plus)
     }
 
     /// The rows the picker's "Suggested for" section shows: the one, or the several - none for nothing.

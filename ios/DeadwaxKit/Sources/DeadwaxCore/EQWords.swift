@@ -466,8 +466,8 @@ extension EQWords {
         public static let tryTheModel = "Try the model alone, like \"hd650\"."
         /// Beside a failed search, and a profile that couldn't be fetched (3.17: ErrorWords' advice leaves it to this).
         public static let tryAgain = "Try again"
-        /// The search answered 404: a deadwax from before AutoEq's routes (2.1.7) - ErrorWords' own "It isn't there
-        /// any more." would say nothing true.
+        /// FastAPI's own 404 to an AutoEq route: a deadwax from before them (2.1.7) - said only to whoever runs deadwax,
+        /// in the error's detail (`AutoEqAsk.failure`); a listener reads ErrorWords' own words, as for the lyrics.
         public static let tooOld = "This deadwax is too old for AutoEq's corrections: they need deadwax 2.1.7 or later."
     }
 

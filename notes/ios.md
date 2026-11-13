@@ -804,7 +804,8 @@ From specs/engine.md with D4 and D9, then the review's fixes (DeadwaxAudio; its 
 
 - **Routes.swift** names all 26 routes the app calls (`lyrics` the 24th, since app 0.4; the EQ's `autoEqSearch` and `autoEqProfile` since its slice 4), one `Endpoint(method:path:query:)` a line in the form
   tests/test_ios_contract.py reads, all listed in `Routes.all`. `Routes.timeouts` gives album_index 30 s (D2),
-  everything else the transport's 8 s; `CoverSize` is row 128, tile 400, hero 1024 (and the lock screen's 1024).
+  AutoEq's two 20 s (deadwax waits up to 15 s for AutoEq's list or a file - EQ slice 4's review), everything else the
+  transport's 8 s; `CoverSize` is row 128, tile 400, hero 1024 (and the lock screen's 1024).
 - **Models.swift** reads Navidrome's pass-through answers leniently: a field of another type is absent, and a song
   that can't be read is left out rather than losing the album. Me's version, permissions and
   permissions_unverified are optional, so an older server still reads. `NavidromeStatus` was added at the merge

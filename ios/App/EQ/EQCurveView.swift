@@ -39,12 +39,16 @@ struct EQCurveView: View {
 
     var body: some View {
         VStack(spacing: 4) {
-            plot
-                // a new set of frequencies is a new plot: the lines can't morph between point counts (EQVector's
-                // difference across lengths is zero), so it crossfades instead - a correction chosen or taken away
-                // adds or drops its f0s (slice 3's review)
-                .id(drawing.frequencies)
-                .frame(height: Self.height)
+            // in a ZStack of its own, so the plot going and the plot coming lie over each other while they crossfade
+            // - a VStack would stack the two for the 0.25 s, the row twice as tall
+            ZStack {
+                plot
+                    // a new set of frequencies is a new plot: the lines can't morph between point counts (EQVector's
+                    // difference across lengths is zero), so it crossfades instead - a correction chosen or taken away
+                    // adds or drops its f0s (slice 3's review)
+                    .id(drawing.frequencies)
+            }
+            .frame(height: Self.height)
             foot
         }
         .padding(.vertical, 10)

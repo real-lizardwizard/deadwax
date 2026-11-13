@@ -87,8 +87,10 @@ public enum Routes {
     ]
 
     /// The routes given longer than the transport's own 8 seconds to answer, in seconds: the album index reads every
-    /// album of a scope from Navidrome, a page at a time, before it answers.
-    public static let timeouts: [Endpoint: Double] = [albumIndex: 30]
+    /// album of a scope from Navidrome, a page at a time, before it answers; AutoEq's search may wait for deadwax's
+    /// first fetch of AutoEq's list (src/autoeq.py FIRST_FETCH_SECONDS, 15 s) and a profile for its file
+    /// (PROFILE_DEADLINE_SECONDS, 15 s) - tests/test_ios_contract.py holds each above the server's.
+    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20]
 }
 
 /// The cover sizes the app asks for (`Routes.cover`'s `size`) - the contract test checks each is within the server's

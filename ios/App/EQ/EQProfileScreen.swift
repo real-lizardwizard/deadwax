@@ -179,7 +179,8 @@ struct EQProfileScreen: View {
             loaded = Loaded(profile: profile, reading: profile.correction())
         } catch {
             guard !Task.isCancelled, !(error is CancellationError) else { return }
-            failed = error
+            // a 404 in deadwax's words is the measurement gone; FastAPI's own, a deadwax older than its AutoEq routes
+            failed = AutoEqAsk.failure(error)
         }
     }
 }

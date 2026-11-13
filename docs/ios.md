@@ -36,8 +36,9 @@ you have. [Lyrics](#lyrics) need **deadwax 2.1.5 or later** - for now also only 
 and with an older one say "Couldn't load the lyrics." The EQ's
 [AutoEq corrections](#autoeq-a-correction-for-your-headphones) need **deadwax 2.1.7 or later**, also only
 in `:experimental` for now: with an older one, no suggestion appears and the correction picker's search
-says "This deadwax is too old for AutoEq's corrections: they need deadwax 2.1.7 or later." The rest of
-the EQ is on the phone and needs nothing of deadwax.
+says "Something went wrong." - an admin sees why, folded under it: "This deadwax is too old for AutoEq's
+corrections: they need deadwax 2.1.7 or later." The rest of the EQ is on the phone and needs nothing of
+deadwax.
 
 **Where Phase 1 is.** It's on the `ios` branch while it's being built. `main` has Phase 0, released
 with deadwax 2.1.0. install.sh builds whichever branch is checked out, so to try Phase 1, switch to
@@ -625,7 +626,9 @@ under the Correction row:
 - **Several**: "AutoEq has corrections for AirPods Pro", "16 models - pick yours" (as many as AutoEq
   has). Nothing is picked
   for you. Tap it for the picker, with "AirPods Pro" already searched and the models under
-  **Suggested for James's AirPods Pro**.
+  **Suggested for James's AirPods Pro**. A name with another word in it is another model - "Apple
+  AirPods Pro 2" isn't the AirPods Pro, "Beats Studio Buds +" aren't the Beats Studio Buds - so it
+  is a choice even when it's the only one AutoEq has.
 - **Nothing** (a speaker, a car, a name AutoEq doesn't have): no row.
 
 It's only ever a suggestion - nothing changes until you tap **Use**. Swipe it for **Not now** (or
@@ -666,8 +669,9 @@ for when they're back - never on the speaker, and the top of the page says they 
 **When it can't.** Offline: "Can't connect to deadwax." and "Check your connection." with **Try
 again**; the correction you have plays on. deadwax unable to reach GitHub: "deadwax can't reach
 AutoEq just now." (see [AutoEq can't be reached](troubleshooting.md#autoeq-cant-be-reached)). A
-correction AutoEq no longer has: "AutoEq doesn't have that measurement any more." If AutoEq ever
-changed its files so the app can't read one: "deadwax couldn't read this correction."
+correction AutoEq no longer has: "AutoEq doesn't have that measurement any more." A deadwax older
+than 2.1.7, which has no AutoEq: "Something went wrong." (an admin sees why, folded under it). If
+AutoEq ever changed its files so the app can't read one: "deadwax couldn't read this correction."
 
 **Thanks.** The corrections are AutoEq's (MIT licence, Copyright (c) 2018-2022 Jaakko Pasanen), made
 from measurements by oratory1990, crinacle, Rtings, Super Review, Innerfidelity, HypetheSonics and
@@ -1092,6 +1096,7 @@ files.
 | Lyrics: **"Couldn't load the lyrics."** | deadwax, or Navidrome behind it, couldn't give them just then: **Try again**. If it's every song, deadwax may be older than 2.1.5, which has no lyrics for the app (an admin sees why, folded under it). |
 | Lyrics: **"This song isn't here any more - it may have been moved or deleted."** | Navidrome no longer has the song the queue names (a rescan moved it). Play it again from its album. |
 | **Lyrics** is dimmed | The song has none - none on LRCLIB, or none fetched yet (**Get lyrics** in the album's Edit, on the web app). Offline, "Lyrics - not on this phone": none were kept for it, which happens to a song downloaded with app 0.3 until the app has been opened with deadwax in reach. |
+| The EQ's correction picker: **"Something went wrong."**, with **Try again** | deadwax answered with an error. If it's every search, deadwax may be older than 2.1.7, which has no AutoEq for the app (an admin sees why, folded under it). |
 | An album stays on **"Waiting for Wi-Fi"** | Download over is Wi-Fi only (You > Downloads): join a Wi-Fi network that isn't a phone's hotspot, with Low Data Mode off - or choose Wi-Fi and cellular. |
 | **"Waiting for room - the storage limit is reached"** | Raise the Storage limit in You > Downloads, or remove something there (largest first). |
 | **"Waiting for space on this phone"** | The phone itself is full: make room in Settings > General > iPhone Storage. |

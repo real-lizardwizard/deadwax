@@ -2354,6 +2354,57 @@ and no Simulator: every look, touch and sound here is checks E17-E21's (docs/ios
   in 9; pytest's iOS files, test_autoeq.py and test_source_bytes.py; the unsigned Release device build; check_project.py;
   the ios sims. Not verified: ios.yml's Xcode 26.6 Swift (every multi-statement closure's type is spelled out), a real
   deadwax or AutoEq, and anything on a phone.
+- **Review** (2026-11-12, on 37e6ce1..24a83e9's three commits). Read against 2.2, 3.2-3.4, 3.7, 3.13, 3.14, 3.17, 4,
+  5.4, 6's 17-21, the Design review and slice 3's review, the code before the account; the server's half (src/routes/
+  eq.py, src/autoeq.py) read for what the phone is answered. Changed:
+  - **The one row was offered even when it was another model.** Departure 1 says a word outside parentheses is
+    another model, but held it only among several rows: a list with the Pro 2's "(ANC mode)" and no first generation
+    offered it to "AirPods Pro", "Samsung Galaxy Buds 2 Pro" to "Galaxy Buds Pro", and AüR Audio's one model to an
+    output named by the maker alone. The one row is offered now only when it is this headphone - its name, or its name
+    after a maker's ("Apple AirPods Max" for "AirPods Max"), a qualifier in parentheses aside - else it is a choice
+    ("1 model - pick yours"). `theOnlyRowIsOfferedOnlyWhenItIsThisHeadphone`; the AüR test asks by the model's name.
+  - **A `+` was folded away**, by Fold (and by deadwax's search), so Apple's "Beats Studio Buds +" would have been
+    offered the Beats Studio Buds. The suggestion reads a `+` as the word "plus" (`EQSuggestion.folded`), so "T2+"
+    is the "T2 Plus" too. `aPlusIsAWordOfTheName`.
+  - **An older deadwax's sentence was said to everyone** (departure 10; the coordinator's project rule, design
+    question 3 settled): a listener reads ErrorWords' own words for what didn't work ("Something went wrong." and
+    "If it keeps happening, tell whoever runs deadwax."), and whoever runs deadwax the version it needs, folded under
+    "For whoever runs deadwax" - `AutoEqAsk.failure`, as Lyrics.failure does for the lyrics. It tells the two 404s
+    apart by their words, not by route: FastAPI's bare "Not Found" (or none) is a deadwax with no AutoEq routes, on the
+    picker and a profile's page alike; deadwax's own "AutoEq doesn't have that measurement any more." is the
+    measurement gone, with no Try again. An older deadwax now has Try again beside it, as the lyrics do.
+  - **The phone gave up before deadwax did**: the search may wait 15 s for deadwax's first fetch of AutoEq's list
+    (src/autoeq.py FIRST_FETCH_SECONDS) and a profile 15 s for its file (PROFILE_DEADLINE_SECONDS), and both were
+    asked with the transport's 8 s - "That took too long." where deadwax would have answered. `Routes.timeouts` gives
+    them 20 s; test_ios_contract.py's `test_the_app_waits_for_autoeq_as_long_as_deadwax_does` holds them above the
+    server's, ClientTests the requests.
+  - **The curve's crossfade would have stacked two plots**: `.id` inside the VStack leaves the plot going and the plot
+    coming both laid out for the 0.25 s, the row twice as tall; the plot is in a ZStack of its own now (not seen on a
+    phone - E18 asks).
+  - **Tests**: the correction kept in eq.json and read back the same after a relaunch, and one of an unknown kind or
+    garbled refusing the file (4: set aside); mutations - the one row offered as before, offered only by an equal
+    name, matched mid-word, the `+` dropped, the failure passed through or every 404 taken for an older deadwax, the
+    timeouts as before, two rows each the name alone offered, a part answer picked from - each fails a test; and the
+    contract's (a byte of answers.json, AutoEqAsk.longest at 101, a route's path) fail pytest.
+    ios/scripts/autoeq_answers.py writes the same file twice running, byte for byte the committed one.
+  - **Agreed, not changed**: the picker's latest-only (`.task(id:)` cancels the last ask, which draws nothing once
+    cancelled; a query come back to is the answer there, not asked again), its bounds (50, 100 scalars, trimmed, an
+    empty or blank field asking nothing), offline as ErrorWords' own; "Use for …" copying the profile's text and
+    filters into the bound output's setting through `EQModel.output(key)`, crossfaded, the EQ turned on, back to the EQ
+    page in one move on either stack (`EQSheetStack` read optionally, so You's stack never finds one); the contract
+    (ROUTE_COUNT 26, the models held to `row_answer`, `profile_answer` and the search's literal); the credit; no
+    newer-only API, `@Observable` and the optional `@Environment` both iOS 17's, and every multi-statement closure's
+    type stated. Departures 2-9 and 11-14 sound as given; 7 is listed below for James.
+  - **Left, for the server** (src/ not touched): deadwax's fold drops a `+`, so two models named apart only by one
+    ("Beats Studio Buds" and "Beats Studio Buds +") would be one row, the other's measurement under "Other
+    measurements" with nothing to say it's another model; and "&" and "and" are kept apart there.
+  - **James's to decide** (design, not changed): one row of another model as "1 model - pick yours" rather than no
+    row; None leaving the EQ Off (departure 7 - 3.2 says any change turns it on); Other measurements showing source and
+    form only, so one source measuring a headphone on two rigs draws two rows alike.
+  - **Tests**: Core **873 in 116** (`theOnlyRowIsOfferedOnlyWhenItIsThisHeadphone`, `aPlusIsAWordOfTheName`, and
+    expects added to five more - the timeouts' renamed `theAlbumIndexAndAutoEqAreGivenLonger…`), Audio 114 in 9; pytest's iOS files, test_autoeq.py and test_source_bytes.py (210, 1
+    skipped); the unsigned Release device build (Xcode 27.2); check_project.py; the ios sims and vocabulary. Not
+    verified: ios.yml's Xcode 26.6 Swift, a real deadwax or AutoEq, and anything on a phone.
 
 ### 5.5 Slice 5 - Advanced
 

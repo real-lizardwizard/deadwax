@@ -148,6 +148,20 @@ public enum AutoEqAsk {
 
     /// The picker's search waits this long after the last key (3.7).
     public static let typingPause: Duration = .milliseconds(300)
+
+    /// A failed ask, as the picker and a profile's page say it (3.17). A 404 in deadwax's words is AutoEq's: a
+    /// measurement it no longer has (the profile's `gone`). FastAPI's bare "Not Found" (or no words at all) is a deadwax
+    /// with no AutoEq routes - one older than 2.1.7 - and is said as Lyrics.failure says an older deadwax: to a listener
+    /// in ErrorWords' own words for something that didn't work, and to whoever runs deadwax, in the detail only they
+    /// see (`Access.seesDetail`), the version it needs. Every other failure is as it was.
+    public static func failure(_ error: any Error) -> any Error {
+        guard let failure = error as? APIFailure, case .answered(let answer) = failure, answer.status == 404 else {
+            return error
+        }
+        let words = (answer.detail ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard words.isEmpty || words.caseInsensitiveCompare("Not Found") == .orderedSame else { return error }
+        return APIFailure.other("\(EQWords.Picker.tooOld) (\(answer.method) \(answer.path) answered 404)")
+    }
 }
 
 extension DeadwaxClient {

@@ -128,8 +128,9 @@ struct EQCorrectionScreen: View {
         } else if let failed {
             Section {
                 VStack(alignment: .leading, spacing: 10) {
-                    // a 404 to the search is a deadwax from before its AutoEq routes
-                    ErrorNote(failed.error, gone: EQWords.Picker.tooOld, retry: true)
+                    // a deadwax from before its AutoEq routes is AutoEqAsk.failure's: ErrorWords' own words, and
+                    // the version it needs for whoever runs deadwax
+                    ErrorNote(failed.error, retry: true)
                     if ErrorWords.kind(of: failed.error) != .notFound {
                         Button(EQWords.Picker.tryAgain) { attempt += 1 }
                             .buttonStyle(.bordered)
@@ -252,7 +253,7 @@ struct EQCorrectionScreen: View {
             searching = false
         } catch {
             guard !Task.isCancelled, !(error is CancellationError) else { return }
-            failed = Failed(query: query, error: error)
+            failed = Failed(query: query, error: AutoEqAsk.failure(error))
             searching = false
         }
     }

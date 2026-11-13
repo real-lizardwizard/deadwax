@@ -817,3 +817,14 @@ def test_what_the_app_asks_autoeq_is_within_the_routes_bounds(monkeypatch):
     lengths = {type(rule).__name__: rule for rule in query.field_info.metadata}
     assert lengths["MinLen"].min_length == 1
     assert longest == lengths["MaxLen"].max_length == 100
+
+
+def test_the_app_waits_for_autoeq_as_long_as_deadwax_does():
+    # a search may wait for deadwax's first fetch of AutoEq's list, and a profile for its file: the phone asking with
+    # the transport's own 8 s would give up first - "That took too long." where deadwax would have answered
+    text = (CORE / "Routes.swift").read_text(encoding="utf-8")
+    literal = re.search(r"public static let timeouts: \[Endpoint: Double\] = \[([^\]]*)\]", text)
+    assert literal, "no Routes.timeouts"
+    timeouts = {name: float(seconds) for name, seconds in re.findall(r"(\w+): ([\d.]+)", literal.group(1))}
+    assert timeouts["autoEqSearch"] > autoeq.FIRST_FETCH_SECONDS
+    assert timeouts["autoEqProfile"] > autoeq.PROFILE_DEADLINE_SECONDS
