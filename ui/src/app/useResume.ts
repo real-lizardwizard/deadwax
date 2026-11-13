@@ -10,6 +10,7 @@ import {
 } from '../lib/resume'
 import type { UpNextQueue } from '../lib/upNext'
 import { album, playedAlbum, rememberAdded, resumeQueue, saveQueue, saveQueueAt, type SavedQueue, type Song } from '../player/api'
+import { continuing } from '../player/historyOutbox'
 import type { Player } from '../player/usePlayer'
 import { readPlayerDevice, readPlayerNormalization } from '../state/persisted'
 import { sayPins } from './usePins'
@@ -220,7 +221,9 @@ export function createResume(): Resume {
 
   function take(answer: QueueAnswer<Song>, why: 'open' | 'front') {
     if (!player || !queue) return
-    const back = resumed(answer, answer.tracks.map(shuffledTrack), readPlayerNormalization(), device)
+    //? (2.1.15 review) the queue this page holds: a snapshot of it saved without an id (the iPhone app before its port)
+    //? keeps the page's, so the songs played here in it aren't drawn again among the older plays
+    const back = resumed(answer, answer.tracks.map(shuffledTrack), readPlayerNormalization(), device, queue)
     if (!back) return
     const sign = signature(answer)
     const untouched = parked !== null && parked.queue === queue
@@ -233,6 +236,11 @@ export function createResume(): Resume {
     taken = sign
     const position = player.position()
     parked = { queue: put, position }
+    //? (2.1.15) deadwax's own queue put back mid-song: that song began before - its start kept then, here or on the
+    //? phone - so playing it on from here is no new start (player/historyOutbox.ts). Another app's, or at 0 s, is one.
+    //? Meant: while the iPhone app keeps no history (before its port), a song it began and this page plays on is in
+    //? nobody's - recording it here would draw it twice once the phone records its own
+    continuing(answer.kept && position > 0 ? put : null)
     clock.saved = { tracks: put.tracks, upNext: put.upNext, index: put.index, position, start: 0, count: put.tracks.length }
     //? a position save is made against deadwax's ids only while the queue put back is exactly them
     clock.idsRev = answer.kept && back.exact && sameIds(put, answer.kept.ids) ? answer.kept.ids_rev : null

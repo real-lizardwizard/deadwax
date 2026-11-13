@@ -69,6 +69,12 @@
  * exact; a levelled first song's head given the minute a resampled one gets; and a levelled copy refused or that
  * won't decode asked for as the file itself, without its level, from then on.
  *
+ * And (2.1.15) the songs played kept for the play history: its fake deadwax takes POST /deadwax/me/history and keeps
+ * every start sent, which the address traces leave out as they leave out the scrobbles. Across every scenario here a
+ * start is sent for each "now playing" and for nothing else - so never for a pause and play, a seek, a wait or a
+ * retry, and once for each restart and each Repeat One copy - in the same order, each dated by its listen; every
+ * counted play's time is its start's, and marks it counted in the page's own starts.
+ *
  * A script for the same reason as the other sims: there is no JS test runner here. It compiles
  * usePlayer.ts and what it imports with the repo's TypeScript into a temporary folder, beside a
  * ten-line preact/hooks that renders by calling the hook again.
@@ -211,6 +217,9 @@ const NET = { fetchDelay: 50, seekDelay: 300, staleClockWhileSeeking: false, ans
   //? new; off, each 250 ms tick is wholly at the rate it finds, as before
   rateAtWrite: false }
 const net = { ...NET }
+//? (2.1.15) every scrobble the page sent ({ id, submission, time }) and every start it sent for the play history, in order
+const scrobbled = []
+const startsSent = []
 const fetched = []
 //? what the page let go of before its answer came - the same labels as `fetched`
 const abandoned = []
@@ -287,7 +296,17 @@ const resampledTo = (id, maxRate) => (maxRate === '48000' ? RESAMPLED[songs[id]?
 
 define('fetch', (address, init = {}) => {
   address = String(address)
-  if (address.includes('/scrobble/')) return Promise.resolve({ ok: true, status: 200, json: async () => ({}) })
+  if (address.includes('/scrobble/')) {
+    const [, id, submission, time] = /\/scrobble\/([^?]+)\?submission=(true|false)(?:&time=(\d+))?/.exec(address)
+    scrobbled.push({ id: decodeURIComponent(id), submission: submission === 'true', time: time ? Number(time) : null })
+    return Promise.resolve({ ok: true, status: 200, json: async () => ({}) })
+  }
+  //? (2.1.15) deadwax keeping the songs played: every start taken, at once
+  if (address.includes('/me/history')) {
+    const { starts } = JSON.parse(init.body)
+    startsSent.push(...starts)
+    return Promise.resolve({ ok: true, status: 200, json: async () => ({ taken: starts.length, skipped: 0 }) })
+  }
   if (/[?&]wrap=fmp4(&|$)/.test(address)) return fetchFmp4(address, init)
   const [, id, format] = /\/stream\/([^?]+)\?format=(\w+)/.exec(address)
   const wrap = /[?&]wrap=mp4(&|$)/.test(address)
@@ -5528,7 +5547,7 @@ async function outcome(promise, ms = 1_000) {
   const asking = []
   const fetchBefore = globalThis.fetch
   define('fetch', (address, init = {}) => {
-    if (!String(address).includes('/scrobble/')) asking.push(['fetch', String(address), headerIn(init.headers, 'Range') ?? null])
+    if (!/\/scrobble\/|\/me\/history/.test(String(address))) asking.push(['fetch', String(address), headerIn(init.headers, 'Range') ?? null])
     return fetchBefore(address, init)
   })
   const srcBefore = Object.getOwnPropertyDescriptor(FakeAudio.prototype, 'src')
@@ -5762,7 +5781,7 @@ async function outcome(promise, ms = 1_000) {
   Object.defineProperty(proto64, 'currentTime', { configurable: true, get: before64.currentTime.get, set(value) { note(`e${this.n} currentTime ${r6(value)}`); before64.currentTime.set.call(this, value) } })
   define('fetch', (address, init = {}) => {
     const range = headerIn(init.headers, 'Range')
-    if (!String(address).includes('/scrobble/')) note(`fetch ${address}${range ? ` ${range}` : ''}`)
+    if (!/\/scrobble\/|\/me\/history/.test(String(address))) note(`fetch ${address}${range ? ` ${range}` : ''}`)
     return before64.fetch(address, init)
   })
   let shownMeta = before64.metadata, shownState = before64.playbackState
@@ -6306,6 +6325,23 @@ async function outcome(promise, ms = 1_000) {
   console.warn = realWarn
 
   define('fetch', realFetch)
+
+  console.log('\n(2.1.15) the songs played, kept: a start for every "now playing", and for nothing else')
+  {
+    await run(10)
+    const outbox = require(path.join(OUT, 'player/historyOutbox.js'))
+    const nowPlaying = scrobbled.filter((each) => !each.submission)
+    check('every scenario above: a start sent for each "now playing", the same songs in the same order - none for a pause and play, a seek, a wait or a retry',
+      [startsSent.length === nowPlaying.length, startsSent.map((start) => start.song.id).join() === nowPlaying.map((each) => each.id).join(), startsSent.length > 100], [true, true, true])
+    const plays = scrobbled.filter((each) => each.submission)
+    const at = new Map(startsSent.map((start) => [`${start.at}:${start.song.id}`, start]))
+    check('...each counted play dated by its start: its time is a start\'s, of the same song', plays.filter((each) => !at.has(`${each.time}:${each.id}`)).map((each) => each.id), [])
+    const own = new Map(outbox.ownStarts().map((start) => [`${start.at}:${start.song.id}`, start]))
+    check('...and marks that start counted in the page\'s own starts', plays.filter((each) => own.has(`${each.time}:${each.id}`) && !own.get(`${each.time}:${each.id}`).counted).length, 0)
+    check('...every start carries its queue\'s id and its entry\'s key, the song as the queue holds it (no level)',
+      startsSent.filter((start) => !/^[A-Za-z0-9_-]{1,64}$/.test(start.queue ?? '') || !Number.isInteger(start.entry) || 'level' in start.song || typeof start.song.title !== 'string').length, 0)
+    check('...and nothing is left waiting to be sent', outbox.pendingStarts().length, 0)
+  }
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed')
   process.exit(failures ? 1 : 0)

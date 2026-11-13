@@ -51,6 +51,13 @@
  *    where the content ends, so: an album's last songs still opening at the card (.app-upnext-now) and never
  *    creeping; Shuffle, Edit's Move, drag and Remove leaving the scroll where it is; a tap the engine doesn't take
  *    moving, focusing and saying nothing; the same words said twice as two nodes of the live region.
+ *  - (2.1.15) the play history above History (built and drawn only while open - those drawn as it closes kept until
+ *    the queue changes): one list with no heading - the older rows, then History's - each start
+ *    drawn once (the queue's own by its rows; one falling past HISTORY_BACK, or of another queue, above), one Tab stop
+ *    across both, an older row's tap (Play Next with the song at the setting's level, then jumpTo the entry it made -
+ *    said, the row held under the finger), Edit hiding them, the next older page asked within the scroller's height of
+ *    the top and a page landing above holding the view, the spinner while it comes, a failure in a listener's words
+ *    with Try again and no more asks until it is pressed. (history.sim.cjs holds the rules by property.)
  *  - (review) Up Next's focus as Edit starts and after a row's tap; the grip's drag; the player bar's Shuffle,
  *    Repeat and Up Next buttons, rendered (Repeat cycling off -> all -> one -> off, Shuffle pressed and toggling,
  *    aria-disabled during a library's shuffle; Up Next opening the panel, pressed while it shows).
@@ -774,7 +781,8 @@ function mountUpNext(player, props = {}) {
   //? .app-upnext-now are at least the scroller's height (app.css min-height: 100% - test_app_css holds the rule)
   const PITCH = 56
   let scrolled = 0
-  const laidOut = () => find((node) => (node.type === 'li' && node.props?.['data-key'] !== undefined) || node.props?.['data-playing'] !== undefined, tree)
+  //? (2.1.15) the play history's older rows ([data-past]) too, above History's
+  const laidOut = () => find((node) => (node.type === 'li' && (node.props?.['data-key'] !== undefined || node.props?.['data-past'] !== undefined)) || node.props?.['data-playing'] !== undefined, tree)
   const furthest = () => {
     const nodes = laidOut()
     const card = nodes.findIndex((node) => node.props?.['data-playing'] !== undefined)
@@ -783,12 +791,12 @@ function mountUpNext(player, props = {}) {
     return Math.max(0, card * PITCH + (find(byClass('app-upnext-now'), tree).length ? Math.max(tail, 400) : tail) - 400)
   }
   const element = (node, order) => ({
-    dataset: node.props['data-key'] !== undefined ? { key: String(node.props['data-key']) } : {},
+    dataset: node.props['data-key'] !== undefined ? { key: String(node.props['data-key']) } : node.props['data-past'] !== undefined ? { past: node.props['data-past'] } : {},
     getBoundingClientRect: () => ({ top: 100 + PITCH * order - scrolled, bottom: 100 + PITCH * (order + 1) - scrolled }),
     querySelector: (selector) => {
       if (/app-result/.test(selector)) {
         const button = find(byClass('app-result'), node)[0]
-        return button ? { focus: () => focused.push(`play:${node.props['data-key']}`) } : null
+        return button ? { focus: () => focused.push(`play:${node.props['data-key'] ?? node.props['data-past']}`) } : null
       }
       const which = /app-pin-(up|down|remove)/.exec(selector)[1]
       const button = find(byClass(`app-pin-${which}`), node)[0]
@@ -799,8 +807,9 @@ function mountUpNext(player, props = {}) {
   const box = {
     get scrollTop() { return scrolled },
     set scrollTop(value) { scrolled = Math.max(0, Math.min(value, furthest())) },
+    clientHeight: 400,
     getBoundingClientRect: () => ({ top: 100, bottom: 500 }),
-    querySelectorAll: (selector) => laidOut().map(element).filter((each) => each.dataset.key !== undefined || /data-playing/.test(selector)),
+    querySelectorAll: (selector) => laidOut().map(element).filter((each) => each.dataset.key !== undefined || each.dataset.past !== undefined || /data-playing/.test(selector)),
   }
   return {
     draw,
@@ -1033,14 +1042,16 @@ console.log('\n(2.1.3) Up Next drawn with History above the song playing, opened
     let tree = shown(view)
     check('opened at the song playing: its card at the top of the scroller, History\'s two rows above it (2 x 56 px)', view.scrollTop, 112)
     const titles = find((node) => node.type === 'section', tree).map((node) => words(find(byClass('app-section-title'), node)))
-    check('History first - Apple Music\'s word - then Playing Next and the list', [HISTORY, titles], ['History', ['History', 'Playing Next', 'From Mezzanine']])
+    //? (2.1.15) no heading over the songs played - James: one continuous list - its name for a screen reader alone
+    check('History first - Apple Music\'s word, its list\'s name, no heading drawn - then Playing Next and the list',
+      [HISTORY, find(byClass('app-upnext-history'), tree)[0].props['aria-label'], titles], ['History', 'History', ['', 'Playing Next', 'From Mezzanine']])
     check('...its rows the songs played, oldest first, each "play again"; Up Next\'s still "play now"',
       [historyOf(tree).map((row) => row.props['aria-label']), find(byClass('app-result'), tree).slice(2).map((row) => row.props['aria-label'])],
       [['song 1, play again', 'song 2, play again'], ['song a, play now', 'song 4, play now', 'song 5, play now', 'song 6, play now']])
     const name = find(byClass('app-info-name'), tree)[0]
-    check('the song playing\'s title a heading - VoiceOver\'s headings History, the song, Playing Next, the list; no hidden heading of its own',
+    check('the song playing\'s title a heading - VoiceOver\'s headings the song, Playing Next, the list; no hidden heading of its own',
       [name.props.role, name.props['aria-level'], find((node) => node.type === 'h3' || node.props?.role === 'heading', tree).map(words), find(byClass('app-visually-hidden'), tree).filter((node) => node.type !== 'p').length],
-      ['heading', 3, ['History', 'song 3', 'Playing Next', 'From Mezzanine'], 0])
+      ['heading', 3, ['song 3', 'Playing Next', 'From Mezzanine'], 0])
 
     //? the keyboard: History one Tab stop, Up and Down inside it
     check('History is one Tab stop: its newest row', historyOf(tree).map((row) => row.props.tabIndex), [-1, 0])
@@ -1224,6 +1235,166 @@ console.log('\n(2.1.3) Up Next drawn with History above the song playing, opened
     const second = region()
     check('the same History row tapped twice: said twice - the same words, each a new node in the live region (a reader speaks a change, never the same text again)',
       [words(first), words(second), first.type, first.key !== second.key], ['Playing song 1', 'Playing song 1', 'span', true])
+  }
+}
+
+console.log('\n(2.1.15) the play history above History: one list, no heading - each start drawn once, older pages as it is scrolled, a tap plays it again')
+{
+  const P = require(path.join(OUT, 'lib/playHistory.js'))
+  const L = require(path.join(OUT, 'lib/loudness.js'))
+  const persisted = require(path.join(OUT, 'state/persisted.js'))
+  const { LOADING_EARLIER } = require(path.join(OUT, 'app/UpNext.js'))
+  //? the engine's jump and Play Next, as usePlayer makes them
+  const replaying = (queue) => {
+    const player = upNextPlayer(queue)
+    player.jumpTo = (key) => {
+      player.calls.push(['jumpTo', key])
+      const jump = U.jumpedTo(player.queue, key)
+      if (jump) player.queue = { ...jump.queue, index: jump.index }
+    }
+    player.playNext = (tracks) => {
+      player.calls.push(['playNext', tracks.map((t) => t.id), tracks.map((t) => t.level ?? null)])
+      player.queue = U.withNext(player.queue, tracks)
+      return false
+    }
+    return player
+  }
+  const shown = (view, focused = []) => { const tree = view.draw(false); view.focusables(focused); view.commit(); return tree }
+  const listOf = (tree) => find(byClass('app-result'), find(byClass('app-upnext-history'), tree)[0])
+  const labels = (tree) => listOf(tree).map((row) => row.props['aria-label'].replace(', play again', ''))
+  const pastKeys = (tree) => find((node) => node.type === 'li' && node.props?.['data-past'] !== undefined, tree).map((node) => node.props['data-past'])
+  const T = 1_800_000_000_000
+  const start = (id, at, queue = 'an-old-queue', entry = 0) => ({ at, counted: false, queue, entry, song: track(id, { title: `song ${id}` }) })
+  //? deadwax's pages and this page's starts, newest first, as usePlayHistory hands them
+  const book = (plays, more = false) => {
+    const history = { plays, more, loading: false, error: null, asked: 0, retried: 0, older() { history.asked++ }, retry() { history.retried++ } }
+    return history
+  }
+  const playedHere = (queue) => {
+    const id = queue.upNext.id
+    return [start('3', T, id, 2), start('2', T - 100, id, 1), start('1', T - 200, id, 0), start('x', T - 300), start('x', T - 400), start('y', T - 500, 'an-old-queue', 3),
+      { ...start('z', T - 600), queue: null, entry: null }]
+  }
+
+  {
+    const player = replaying(at(U.startUpNext(album(6), 0), 2))
+    const history = book(playedHere(player.queue))
+    const view = mountUpNext(player, { history })
+    let tree = shown(view)
+    check('one list above the song playing, oldest at the top: the songs played before this queue, then its own History - no heading over either',
+      [labels(tree), find((node) => node.type === 'h3', find(byClass('app-upnext-history'), tree)[0]).length, find((node) => node.type === 'ul', find(byClass('app-upnext-history'), tree)[0]).length],
+      [['song z', 'song y', 'song x', 'song 1', 'song 2'], 0, 1])
+    check('...each start drawn once: this queue\'s own (1, 2 and 3, playing) by its rows alone; x begun twice running one row, keyed by its first start',
+      [pastKeys(tree), find((node) => node.type === 'li' && node.props?.['data-key'] !== undefined, find(byClass('app-upnext-history'), tree)[0]).length], [[`${T - 600}:z`, `${T - 500}:y`, `${T - 400}:x`], 2])
+    check('...no times, nothing for a skip - a row is History\'s own: the cover, the title, "artist · album"',
+      [words(listOf(tree)[0]), find((node) => node.type === 'time', tree).length], ['song zMassive Attack · Mezzanine', 0])
+    check('opened at the song playing: its card at the top, the five rows above it (5 x 56 px)', view.scrollTop, 280)
+    check('one Tab stop for all of it: the newest row', listOf(tree).map((row) => row.props.tabIndex), [-1, -1, -1, -1, 0])
+    listOf(tree)[1].props.onFocus()
+    tree = shown(view)
+    check('...an older row, once focused', listOf(tree).map((row) => row.props.tabIndex), [-1, 0, -1, -1, -1])
+    check('nothing more to ask for: no older page asked, however near the top', [history.asked, (view.scroll(0), history.asked)], [0, 0])
+
+    //? an older row's tap, scrolled so y is at the top
+    view.scroll(56)
+    const focused = []
+    const next = player.queue.upNext.nextKey
+    listOf(tree)[1].props.onClick()
+    tree = shown(view, focused)
+    tree = shown(view)
+    const level = L.levelled([track('y')], persisted.readPlayerNormalization(), 'songs')[0].level ?? null
+    check('an older row\'s tap: Play Next with its song (queued as songs are, at the setting\'s level), then jumpTo the entry it made - the song again, now',
+      [player.calls, playing(player.queue), U.historyRows(player.queue).map((row) => row.track.id)], [[['playNext', ['y'], [level]], ['jumpTo', next]], 'y', ['1', '2', '3']])
+    check('...said, focus kept on its row, the row under the finger: the view where it was',
+      [status(tree), focused, view.scrollTop], ['Playing song y', [`play:${T - 500}:y`], 56])
+    history.plays = [start('y', T + 100, player.queue.upNext.id, next), ...history.plays]
+    tree = shown(view)
+    check('...its new start, the song playing, drawn by the queue alone: the older rows as they were, History grown by the song it followed',
+      [labels(tree), pastKeys(tree), view.scrollTop], [['song z', 'song y', 'song x', 'song 1', 'song 2', 'song 3'], [`${T - 600}:z`, `${T - 500}:y`, `${T - 400}:x`], 56])
+    find(byClass('app-upnext-edit'), tree)[0].props.onClick()
+    tree = shown(view)
+    check('Edit: the older rows hidden with History', find(byClass('app-upnext-history'), tree).length, 0)
+  }
+  {
+    //? (review) closed - Up Next stays mounted - the older rows are neither built nor drawn at a song's change: those
+    //? drawn as it closed stay until the queue changes (nothing above the card moves as the sheet slides away)
+    const player = replaying(at(U.startUpNext(album(6), 0), 2))
+    const history = book(playedHere(player.queue))
+    const opts = { history }
+    const view = mountUpNext(player, opts)
+    let tree = shown(view)
+    const opened = pastKeys(tree).length
+    opts.open = false
+    tree = shown(view)
+    const closing = pastKeys(tree).length
+    player.queue = ended(player.queue)
+    tree = shown(view)
+    const closedOn = pastKeys(tree).length
+    history.plays = [...history.plays, ...Array.from({ length: 50 }, (_, i) => start(`w${i}`, T - 1000 - i * 100))]
+    player.queue = ended(player.queue)
+    tree = shown(view)
+    const later = pastKeys(tree).length
+    opts.open = true
+    tree = shown(view)
+    check('closed: the older rows drawn as it closed stay, gone at the next song - none drawn while closed, 50 more played meanwhile included; open again, every one',
+      [opened, closing, closedOn, later, pastKeys(tree).length], [3, 3, 0, 0, 53])
+  }
+  {
+    //? a song ending, the queue's History reaching HISTORY_BACK: its oldest start, no longer the queue's row, moves above
+    const queue = at(U.startUpNext(album(80), 0), 70)
+    const id = queue.upNext.id
+    const player = replaying(queue)
+    const history = book([start('71', T, id, 70), start('21', T - 100, id, 20), start('20', T - 200, id, 19)])
+    const view = mountUpNext(player, { history })
+    let tree = shown(view)
+    check('History\'s 50 (21 to 70): a start of 20, past it, is an older row; of 21, its own', [pastKeys(tree), labels(tree).length], [[`${T - 200}:20`], 51])
+    history.plays = [start('72', T + 100, id, 71), ...history.plays]
+    player.queue = ended(player.queue)
+    tree = shown(view)
+    check('...the next song: 21 falls past it and joins the older rows - still drawn once', [pastKeys(tree), labels(tree).length, labels(tree).filter((title) => title === 'song 21').length], [[`${T - 200}:20`, `${T - 100}:21`], 52, 1])
+    check('...the card still at the top - the row that moved above it held', view.scrollTop, 52 * 56)
+  }
+  {
+    //? another queue (an album tapped): every start of the old one is an older row
+    const old = U.startUpNext(album(3), 0)
+    const player = replaying(at(old, 2))
+    const history = book([start('3', T, old.upNext.id, 2), start('2', T - 100, old.upNext.id, 1), start('1', T - 200, old.upNext.id, 0)])
+    const view = mountUpNext(player, { history })
+    let tree = shown(view)
+    player.queue = U.startUpNext(album(2, 'b'), 0)
+    history.plays = [start('b1', T + 100, player.queue.upNext.id, 0), ...history.plays]
+    tree = shown(view)
+    check('another queue: what was played in the last one all above the new song, oldest first', [labels(tree), view.scrollTop], [['song 1', 'song 2', 'song 3'], 168])
+  }
+  {
+    //? paging: near the top the next older page asked for; a page landing above holds the view
+    const player = replaying(at(U.startUpNext(album(6), 0), 2))
+    const history = book(playedHere(player.queue), true)
+    const view = mountUpNext(player, { history })
+    let tree = shown(view)
+    check('more to ask for: opened with the card under 400 px from the top - within the scroller\'s height - the next page asked for at once', [view.scrollTop, history.asked], [280, 1])
+    history.plays = [...history.plays, ...Array.from({ length: 10 }, (_, i) => start(`w${i}`, T - 1000 - i * 100))]
+    tree = shown(view)
+    check('...it lands above: ten more rows, oldest first, and the card held at the top - nothing moves under the eye; far from the top now, nothing more asked',
+      [labels(tree).slice(0, 3), labels(tree).length, view.scrollTop, history.asked], [['song w9', 'song w8', 'song w7'], 15, 280 + 560, 1])
+    view.scroll(500)
+    check('...scrolled to 500 px from the top: nothing yet', history.asked, 1)
+    view.scroll(300)
+    check('...to within 400 px: the next page', history.asked, 2)
+    history.loading = true
+    tree = shown(view)
+    view.scroll(200)
+    check('while it comes: a spinner at the list\'s top, said as such, and no second ask', [find(byClass('pl-spinner'), tree).map((node) => node.props['aria-label']), history.asked, LOADING_EARLIER], [[LOADING_EARLIER], 2, 'Loading earlier songs'])
+    history.loading = false
+    history.error = new TypeError('Failed to fetch')
+    tree = shown(view)
+    view.scroll(100)
+    const notice = find(byClass('pl-notice'), find(byClass('app-upnext-history'), tree)[0])
+    const again = find((node) => node.type === 'button', notice)[0]
+    check('it couldn\'t come: said in a listener\'s words, with Try again - and scrolling asks no more until it is pressed',
+      [find(byClass('pl-spinner'), tree).length, words(notice).startsWith("Can't connect to deadwax."), words(again), history.asked], [0, true, 'Try again', 2])
+    again.props.onClick()
+    check('...Try again: the ask that failed, again', history.retried, 1)
   }
 }
 

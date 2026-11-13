@@ -316,6 +316,8 @@ ui/                Preact + Vite + TypeScript: the app (src/player/main.tsx -> s
                    (both frames - a phone's Now Playing face, the desktop's panel app/LyricsPanel.tsx),
                    app/useLyrics.ts the answers (called once in App), the words and rules the pure
                    lib/lyricsView.ts - see "Lyrics on Now Playing (2.1.6)".
+                   Play history (2.1.15, notes/play-history.md): lib/playHistory.ts (pure: a start, the join,
+                   the older rows), player/historyOutbox.ts (this page's starts, sent), app/usePlayHistory.ts.
                    People and permissions (2.0.0-player.61, notes/logins.md "Managing accounts"):
                    app/People.tsx (with UnlockPeople, AddPerson, ResetPassword, RemovePerson and
                    usePeople), its rules lib/people.ts; what the app shows by permission

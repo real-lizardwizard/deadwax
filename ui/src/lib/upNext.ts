@@ -80,6 +80,11 @@ export interface Paged {
 }
 
 export interface UpNextState {
+  /** (2.1.15) the queue's identity, made as it starts (queueId) and carried by every edit of it - by the snapshot too, so
+   *  a queue put back on another device is the same queue: what a start of a song says it was begun in
+   *  (lib/playHistory.ts), so each start is drawn once - by this queue's own rows while they show its entry, else among
+   *  the older plays above them */
+  id: string
   /** one per entry of the queue's tracks, in step with them: always the same length */
   marks: Mark[]
   /** the list as playTracks was given it, in its own order */
@@ -124,6 +129,19 @@ export const TOP_UP_HEARD_S = 2
 export const HISTORY_BACK = 50
 
 type Random = () => number
+
+/** (2.1.15) A queue's id: the time in base 36 and eight random characters - no crypto.randomUUID (a plain http page
+ *  has none), and never a call of startUpNext's `random`, so a shuffle's order is the same as before ids were. The
+ *  random part from crypto.getRandomValues where there is one (a plain http page has it), Math.random otherwise.
+ *  Always [A-Za-z0-9_-], 1 to 64 characters - what deadwax keeps (src/play_history.py QUEUE_ID). */
+export function queueId(now: number = Date.now()): string {
+  const digits = '0123456789abcdefghijklmnopqrstuvwxyz'
+  const bytes = new Uint8Array(8)
+  const crypto = (globalThis as { crypto?: { getRandomValues?: (array: Uint8Array) => Uint8Array } }).crypto
+  if (typeof crypto?.getRandomValues === 'function') crypto.getRandomValues(bytes)
+  else for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256)
+  return `${Math.max(0, Math.floor(now)).toString(36)}-${[...bytes].map((byte) => digits[byte % 36]).join('')}`
+}
 
 /** Fisher-Yates over a copy, exactly as startQueue() shuffles: the same calls of `random`, in the same order. */
 function shuffled<T>(list: readonly T[], random: Random): T[] {
@@ -204,10 +222,11 @@ function oneAlbum(source: readonly QueueTrack[]): string | null {
  * The queue playTracks plays: exactly startQueue()'s tracks and index for the same `random` - the shuffle
  * done again over the list's places, with the same Fisher-Yates and the same calls, so every entry knows its
  * place in the list. Every entry the list's, in its first time round; `startedAt` the index it starts at (0
- * when shuffled). `paged` (Part B): the first page of a whole library's shuffle - its order is the shuffle.
+ * when shuffled). `paged` (Part B): the first page of a whole library's shuffle - its order is the shuffle. `id`
+ * (2.1.15): a new queue's own, made after the shuffle.
  */
 export function startUpNext(
-  tracks: QueueTrack[], start: number | null, shuffle = false, random: Random = Math.random, paged?: Paged,
+  tracks: QueueTrack[], start: number | null, shuffle = false, random: Random = Math.random, paged?: Paged, id?: string,
 ): UpNextQueue {
   if (!tracks.length) return EMPTY_QUEUE
   const index = Math.min(Math.max(start ?? 0, 0), tracks.length - 1)
@@ -217,6 +236,7 @@ export function startUpNext(
     tracks: order.map((at) => tracks[at]!),
     index: shuffle ? 0 : index,
     upNext: {
+      id: id ?? queueId(),
       marks: order.map((at, key) => ({ key, from: 'source', at, pass: 0 })),
       source: [...tracks],
       shuffle: shuffle || !!paged,
@@ -641,12 +661,45 @@ export function upNextView(queue: UpNextQueue, repeat: Repeat, limit: number = U
 export function historyRows(queue: UpNextQueue, back: number = HISTORY_BACK): UpNextRow[] {
   const state = queue.upNext
   if (!state || !current(queue)) return []
-  const from = Math.max(state.startedAt, queue.index - back, 0)
+  const from = historyFloor(queue, state, back)
   const rows: UpNextRow[] = []
   for (let place = from; place < unitStart(state, queue.index); place = unitEnd(state, place)) {
     if (state.marks[place]!.from !== 'one') rows.push({ key: state.marks[place]!.key, track: queue.tracks[place]! })
   }
   return rows
+}
+
+/** How far back History reaches: from where listening began, no further than `back` entries before the song playing. */
+function historyFloor(queue: UpNextQueue, state: UpNextState, back: number = HISTORY_BACK): number {
+  return Math.max(state.startedAt, queue.index - back, 0)
+}
+
+/** (2.1.15) Where the entries Up Next's rows stand for begin - History's first row (its floor, past a run of copies there
+ *  whose song is further back, never a row), or the song playing's unit if that comes first. The queue's length with
+ *  nothing playing. */
+function shownFrom(queue: UpNextQueue, state: UpNextState): number {
+  if (!current(queue)) return queue.tracks.length
+  const playing = unitStart(state, queue.index)
+  let place = historyFloor(queue, state)
+  while (place < playing && state.marks[place]?.from === 'one') place++
+  return Math.min(place, playing)
+}
+
+/** (2.1.15) The keys of the entries Up Next's rows stand for - exactly what upNextView(queue, _, limit) draws, each row's
+ *  entry with its copies: History's units, the song playing's, the songs added, and the list's first `limit` rows. One
+ *  run, from shownFrom to the end of the last list row drawn - NEVER a later time round (Repeat All's, which Up Next
+ *  sums up in a line) or a list row past `limit` ("And N more songs"), though Previous can leave songs begun there.
+ *  lib/playHistory.ts draws a start of any other entry among the older plays above History, so each is drawn once
+ *  (history.sim judges it by the view's own rows). None with nothing playing. */
+export function shownKeys(queue: UpNextQueue, limit: number = UP_NEXT_DRAWN): Set<number> {
+  const state = queue.upNext
+  const keys = new Set<number>()
+  if (!state || !current(queue)) return keys
+  const { addedEnd, listEnd } = layout(queue, state)
+  const listed = unitsIn(state, addedEnd, listEnd)
+  const end = listed.length > limit ? listed[limit]! : listEnd
+  for (let place = shownFrom(queue, state); place < end; place++) keys.add(state.marks[place]!.key)
+  return keys
 }
 
 /** Previous's move: `{ ...queue, index }` - and, back before where listening began, `startedAt` moved down to the

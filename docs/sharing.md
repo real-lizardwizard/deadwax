@@ -48,6 +48,9 @@ deadwax too, in **People**. Then, for each person:
   account of Up Next beside it, so it follows them between devices: they stop on the phone, open deadwax on the
   computer, and it's there, paused where they stopped. Nobody else's queue is ever put back for them.
   ([Picking up where you left off](player.md#picking-up-where-you-left-off).)
+- **Their own play history** (2.1.15). Every song they start in the app is kept on deadwax as theirs, for ever, and
+  scrolled up to in Up Next above what's playing, on every device they sign in on. Nobody else sees it.
+  ([Up Next](player.md#up-next-shuffle-and-repeat).)
 - **Their own playlists.** Playlists are Navidrome's, made as them, so they're theirs in Amperfy too.
   One they share (**Shared with everyone**) shows to the others under **Shared with you** - playable,
   but only its owner can change it. A private one is never shown to anyone else in deadwax - though
@@ -158,7 +161,8 @@ beat compose, so a wrong one could lock everyone out with no way back from the p
      them out. Shorter than 16 characters, the log at start-up and its
      row in Server settings say so (it still works). It has no Navidrome account behind it, so no library of its own,
      its player plays as `NAVIDROME_USER`, it keeps no play queue (nothing is put back or saved for it), and it
-     can't use **People** (which asks Navidrome as you).
+     can't use **People** (which asks Navidrome as you). It does keep a **play history** of its own (2.1.15): what
+     you play while signed in as `deadwax` is kept under `deadwax`, shown only to that sign-in, never anyone else's.
 3. **Behind a reverse proxy**, if it rewrites the `Host` header (nginx does, unless told
    `proxy_set_header Host $http_host`), also set `TRUSTED_ORIGINS` to the address you open deadwax
    at, such as `https://music.example.com` - otherwise every change, plays included, looks like it
@@ -199,8 +203,9 @@ logins came on, and everything in it fails with "Sign in to use deadwax." until 
 You were deadwax's one user until now (deadwax calls that user `local`). When logins come on:
 
 - **The first Navidrome admin to sign in takes it over**, in one step: the pins on Home, the Getting
-  albums settings, and every download made before (they show in that admin's Requests). What that admin
-  had already set wins over the old. If an admin is still signed in from earlier - a session lasts 30
+  albums settings, every download made before (they show in that admin's Requests), and the play history -
+  every song played in deadwax while logins were off (2.1.15), which becomes that admin's own, shown in their
+  Up Next and nobody else's. What that admin had already set wins over the old. If an admin is still signed in from earlier - a session lasts 30
   days and outlives a restart - it's taken over on their first visit instead.
 - **The collection goes into the first Navidrome admin's library**, once ever: every album already in it is
   put in that admin's library and **starred for them in Navidrome** - so their Navidrome favourites, and
@@ -390,8 +395,9 @@ something else that asks for a password.
   plays as `NAVIDROME_USER` again, so plays, playlists and the play queue are that account's, shared by
   everyone.
   Nothing is starred while logins are off.
-- **Switched on again later**, what was got and pinned meanwhile goes to the first Navidrome admin back,
-  as it did the first time, and a session used within the last 30 days is still signed in.
+- **Switched on again later**, what was got and pinned meanwhile - and the songs played meanwhile, the play
+  history while logins were off - goes to the first Navidrome admin back, as it did the first time, and a session
+  used within the last 30 days is still signed in.
 
 ## What it doesn't do
 

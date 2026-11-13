@@ -1658,6 +1658,32 @@ Next's groups, its History or the Shuffle chip, which only deadwax's own account
   the account has them linked there, and that scrobbling is switched on for the `deadwax` player
   on Navidrome's **Players** page.
 
+## Up Next doesn't show a song I played, or "Couldn't load the songs you played before"
+
+Scrolled up past the song playing, Up Next goes back through every song you've started in the app
+([Up Next](player.md#up-next-shuffle-and-repeat)). A song can be missing from it because:
+
+- **it was played before 2.1.15**, or in **another app** (Amperfy, Symfonium) - deadwax isn't told of those - or in
+  the native [iPhone app](ios.md), which doesn't send its plays yet;
+- **deadwax couldn't be reached when it started**: the app tries again at the next song, and by itself 30 seconds
+  on, then a minute, two, and so on up to every 10 minutes while deadwax still can't take it - but a reload or a
+  closed tab before then loses it, and so do the oldest of more than 500 songs waiting;
+- **you're signed in as someone else** - with logins on each person's list is their own; with logins off everyone
+  shares one;
+- **it's the song you picked up mid-way** ([where you left off](player.md#picking-up-where-you-left-off)): it went
+  in when it first began - if that was in deadwax's app in a browser. One the native [iPhone app](ios.md) began
+  isn't in it, as that app doesn't send its plays yet.
+
+**A song shows twice**, once among the older songs and once just above the song playing: while the native iPhone
+app was the last to save your queue (it doesn't keep which queue it is yet), a page reloaded since can't tell its own
+earlier plays in that queue from older ones. Nothing is kept twice - it's only how they're drawn - and it goes once
+the queue changes (another album tapped) or the songs have moved on past the last 50.
+
+**"Couldn't load the songs you played before"**, with **Try again**, at the top of the list means deadwax didn't
+answer, or couldn't read its database just then; the container's log says so ("couldn't read …'s play history").
+A deadwax with no database (`DB_PATH` unwritable) keeps no history at all and shows only what's in the current
+queue.
+
 ## The app's page is blank
 
 This only happens running deadwax from source. `/player/` loads a script built from `ui/`, which

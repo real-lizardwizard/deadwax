@@ -63,6 +63,7 @@ import { accessNow, noteAccess, useAccess } from './access'
 import { People } from './People'
 import { useInfoDetails, useLevelAnswer } from './useInfoDetails'
 import { useLyrics } from './useLyrics'
+import { usePlayHistory } from './usePlayHistory'
 import { PinNotice } from './PinNotice'
 import { PlaylistPage } from './PlaylistPage'
 import { PlaylistPicker } from './PlaylistPicker'
@@ -286,7 +287,9 @@ function usePageShown(): boolean {
  * is. It closes by itself once nothing plays. Every song row's ••• and an album page's own open the song menu
  * (QueueMenu.tsx: Play Next, Play Last) over everything - the page behind inert, a side panel too - with the songs
  * in hand, and the menu plays them in its tap. A whole library's shuffle (Part B) is fed its pages by
- * useShuffleFeed, called here once, as the player is.
+ * useShuffleFeed, called here once, as the player is. (2.1.15) Scrolled up past the song playing, Up Next goes on into
+ * every song the person has played, on this app or the iPhone - usePlayHistory, called here once, its pages asked as
+ * Up Next opens and as it is scrolled (notes/play-history.md).
  *
  * LYRICS (2.1.6, app/useLyrics.ts, player/Lyrics.tsx, app/LyricsPanel.tsx, lib/lyricsView.ts): the song playing's
  * lyrics are asked here at every song change, on both frames (useLyrics, called once) - so Now Playing's Lyrics and
@@ -1651,6 +1654,8 @@ export function App() {
   const side = sideOf(frame, { sources: sourcesOpen, info: infoPanel, edit: editOpen, artist: artistOpen, upnext: upNextPanel, lyrics: lyricsPanel })
   //? Up Next: a sheet over Now Playing on a phone; on a desktop the side panel the player bar opens
   const upNextOpen = desktop ? upNextPanel : sheetOpen && over === 'upnext'
+  //? (2.1.15) the songs played, scrolled up to in Up Next: its newest page as it opens, older ones as it is scrolled
+  const playHistory = usePlayHistory(upNextOpen, pageShown)
 
   //? The ••• menu's pin (2.0.0-player.18): the playing song's album, by its release where the answer
   //? it was played from says it (none at all, "", and it can't be pinned), else by Navidrome's id,
@@ -1786,7 +1791,7 @@ export function App() {
             covered={panelsCovered}
           />
           {/* (2.0.0-player.57) Up Next: over Now Playing on a phone, a desktop's side panel - after Info, never with it */}
-          <UpNext open={upNextOpen} opener={upNextOpener} onClose={desktop ? closeUpNextPanel : closeOver} player={player} panel={panel} covered={desktop && panelsCovered} />
+          <UpNext open={upNextOpen} opener={upNextOpener} onClose={desktop ? closeUpNextPanel : closeOver} player={player} history={playHistory} panel={panel} covered={desktop && panelsCovered} />
           {/* (2.1.6) Lyrics: a desktop's side panel, from the player bar - a phone's are Now Playing's own face */}
           {desktop && (
             <LyricsPanel open={lyricsPanel} opener={lyricsOpener} onClose={closeLyricsPanel} player={player} answers={lyrics} panel={panel} covered={panelsCovered} />
