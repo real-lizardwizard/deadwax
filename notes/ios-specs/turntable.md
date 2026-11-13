@@ -1780,6 +1780,158 @@ Questions for slice 3, and for James:
   the slice needs a Simulator: what the macOS render can't show - touch, VoiceOver, Dynamic Type in SwiftUI, the
   120 Hz frame, the sound - is the phone's list.
 
+#### Slice 3, built (2026-11-13)
+
+**What was built.**
+
+- **Core**:
+  - `TurntableScreen.swift`: `TurntableFace`, the web's numbers in points (app.css, theme.css, icons.tsx), which
+    tests/test_ios_turntable_face.py holds to the stylesheets and the icons. `TurntableFit`, the plinth as big as the
+    cover's room allows both ways, at most 440 pt. `TurntableFaceParts`. 2.8's states as pure functions:
+    `soundReady`, `noAudio`, `silentLine`, `framesRun` and `engineWant` (question 13's C, with its 0.5 s quiet
+    hold). `TurntableSettings`: the two settings under the web's keys, and the look and lyrics taps. Debug's
+    Turntable section: the web's rows in the web's order, with the phone's own beside them (Window from, Handover,
+    Position read in, Touches under a hand, Slow starts), and `phoneReport`, the deck's report as the phone has it.
+  - `TurntableLayout` centres the label and the spindle on the record (a departure, below).
+  - `TurntablePress`: `handTurn`, the drawn turn round the deck's angle (Turntable.tsx:426), and
+    `cancelFollowed()`, for an interruption.
+  - `DeckRules`: `interrupted()`, Debug's reads of the report (`reportWindow`, `fetchedBytes`, `lastFetchedAt`,
+    `health(_:)`), and `windowDropped()`, for the engine's route change.
+  - `Routes.discArt` and `DeadwaxClient.discArt` (nil for deadwax's 404). ROUTE_COUNT is 28.
+- **DeadwaxAudio**: slice 2's six review questions, answered in DeckEngine, DeckVoiceHost, DeckWindows and
+  EQStartDesk (below).
+- **DeadwaxTurntable**, a new module (QuartzCore and CoreGraphics only, Swift 5 mode for CALayer's statics):
+  `TurntableLayers`, 2.4's layer tree - the plinth with its top highlight, the platter, the face (the vinyl, the
+  cover as the label with its ring, CD art over the whole face, the grooves as a per-pixel image of the web's
+  gradient, the spindle), the conic sheen, the arm in a container turned round its pivot, the dashed handle, and
+  slice 4's fader and readout, drawn and hidden. DeadwaxTurntableTests renders every state 7.3 names at the iPhone
+  16's plinth (321 pt) and the SE's (284 pt) at 3x to `$TURNTABLE_RENDERS`, which ios.yml sets and uploads.
+- **ios/App/Player/Turntable/**:
+  - `DeckController.swift`: the deck, one per app run, in the environment. `DeckWorld` adapts Core's DeckHost,
+    DeckClock and PressHost to the main actor. The clock is `CACurrentMediaTime()` in ms; timers are strict
+    DispatchSourceTimers on the main queue; the frame is a CADisplayLink at 80-120 Hz, run as `framesRun` says.
+    Windows come from the download, else the player's whole copy (`SongFiles.wholeCopy`), else `/scrub` while
+    online, else none. The engine runs as `engineWant` says, checked by a 10 Hz rule that stops itself when there is
+    nothing to watch. The song's position is read by `DeckPositionFeed`, a 120 Hz utility queue under an unfair lock,
+    a reading older than 50 ms counting as none. The handover's `E` is predicted per kind (local or streamed) and
+    per route from the last five starts. It follows interruptions, route changes, media resets, the scene, Reduce
+    Motion and Increase Contrast, and loads the cover (CoverCache) and the disc's CD art.
+  - `TurntableDeckView.swift`: the layers in a UIView; the record's and the arm's round touch views, which pass
+    every coalesced sample in ms; and the two VoiceOver elements, the record a button and the arm adjustable.
+  - `TurntableView.swift`: the plinth fitted to the cover's room, the time line, the foot line, and the look
+    button with its own face (`LookFace`, 36 pt in a 44 pt target, the web's glyphs as Shapes).
+- **The rest of ios/App**: NowPlayingView (2.1: the look button, the crossfade, the centred titles, the time line in
+  the scrubber's row, the foot line, the grip, Play/Pause the deck's on the turntable); You > Playback's two settings
+  (6.1); Debug's Turntable section (6.2), read 4x a second; DeadwaxApp's Palette additions (2.14);
+  `PlayerModel.engineForDeck`, read-only (3.4); `AudioSessionController.activateShared()` and `onAirPlay()`;
+  `NowPlayingController.republishPaused(elapsed:)` (4.6, question 16 A); `EQModel.attachDeck` (eq.md 1.9).
+- **The project**: DeadwaxTurntable linked into the app, Info.plist's `CADisableMinimumFrameDurationOnPhone`, and
+  check_project.py requiring both. App 0.6 (6).
+
+**Slice 2's questions, answered** (80f1149, each with a test that fails without it):
+
+1. **The live clock's fallback**: a render block with no host time follows the last one (its host time plus a
+   block) at the `L` the clock has, and `L` isn't fed the guess. The sample clock is never mixed in.
+2. **`L` on a route change**: `DeckEngine.routeChanged()` stops the engine and starts `L` again from its floor
+   whatever the rate. A new hardware rate also remakes the voice and drops the window, said through
+   `windowDropped`, which the app wires to `DeckRules.windowDropped()` to ask for it again.
+3. and 4. **Messages across a stop**: a stop leaves the voice quiet with nothing timed waiting. What wasn't rendered
+   is drained: the newest window is kept aside, and every timed message is dropped and counted as `stale`. A post
+   while stopped does the same as it comes, so the ring can't fill while stopped and no old knot plays at the next
+   start. 4.6 only stops the engine with the record quiet, so nothing heard changes.
+5. **The EQ's banks**: `EQStartDesk.changed(hosts:)` makes one version and each host's bank at its own rate.
+   `start(record:)` lets the deck's start install without becoming the song's "last start" in Debug.
+6. **The smaller gaps**: the deck's EQ times its own process into the EQ counters; DeckWindows cancels the previous
+   `/scrub` task when a newer window is asked for; and the session is made active before the deck engine starts,
+   in the app and in Debug's trial.
+
+**Measured on this Mac.**
+
+| What | Result |
+| --- | --- |
+| The plinth (TurntableFit) | 321 pt in a 393 pt phone's room (345 wide, tall enough); 440 at most; 284 pt in the SE's room, held by its height |
+| The renders, asserted | The sheen brightest at 48 deg from the top, within 2 deg; the label's ring where the web's is; the grooves' period 4 pt; the readout's colours the Palette's; the head 5 units up when lifted; the face turning with the CD art over the label; the handle brighter under Increase Contrast |
+| swift test | Core 953, DeadwaxAudio 139, DeadwaxTurntable 9: all passed |
+| The unsigned Release device build | Builds, with no warnings in the app's sources |
+| pytest tests/test_ios_*.py tests/test_source_bytes.py | 146 passed, 1 skipped |
+
+Nothing about the app's timing was measured: every number that matters (the touch rate, `E`, the handover's lateness,
+the frame rate, the delay behind the hand) comes from a phone, and Debug's section is there to show it.
+
+**What the renders show** (20 PNGs, 10 states at both sizes, looked at): the plinth with the record and its platter
+ring; the test cover upright as the label, grooves running across it as the web's do; the sheen brightest at the top
+right and the lower left; the arm from its top-right pivot with the counterweight reaching past the plinth's top
+edge, into the 24 pt kept clear for it; the head over the dashed handle's circle, larger when lifted; CD art over the
+whole face, turned 90 deg with it; with no cover, the plain label colour with its ring; the fader's slot, knob and
+mark and the purple `1.25x` readout at the corner (slice 4's, hidden in the app).
+
+**Departures, and why.**
+
+- **The label and the spindle are centred on the record.** The web's are content-box: their 2 and 3 px rings sit
+  outside a box placed by its top left, so the web's are 2 and 3 pt off centre and wobble as the record turns. The
+  phone draws them centred (question 25 below).
+- **The readout's inset shadow isn't drawn, and its face is Menlo.** Both are slice 4's to judge, when the readout
+  shows.
+- **The pbxproj was edited by hand** to link DeadwaxTurntable: one build file and one product dependency, the
+  same shape as DeadwaxAudio's. No Xcode was opened.
+- **Two touch views, not three.** The fader's is slice 4's.
+- **Under Reduce Motion the display link runs for a held record** (`framesRun`'s `held`). The web's loop asks for a
+  frame for a held record whatever the motion setting (deck.ts:2074), to show the time line under the hand and
+  count its frames. The platter still never turns by itself.
+- **Recording (6.3) and the replay of a recording on the Mac aren't built** (question 7 had A, in slice 3). The
+  slice was already the largest, and the recorder needs a tap on the deck engine's output, which is DeadwaxAudio's,
+  not the app's. Check 23's A/B is by ear alone until it comes (question 23 below).
+- **No custom actions** on the record (question 9's A comes after the web's own answer): the web's roles alone.
+- **The Handover row's seam isn't measured** (nil). The song's first heard sample, against the record's sound,
+  needs both engines' render times compared, which neither reports to the app. The row says how early the song was
+  resumed, for what start, how long the start took and how late the timer fired.
+- **The song engine's configuration change** (a hardware reset that AVAudioEngine notifies) is caught by the 10 Hz
+  run rule, which sees the engine stopped, rather than by the notification: PlaybackEngine's AVAudioEngine isn't
+  the app's to observe, and the engine is not to be touched.
+- **The previous engine start is read at the let-go**, with a sync read of the engine's debug state on the main
+  thread while the song is held and its queue idle, so `E` is recognised as a new start after the resume. A second
+  let-go inside the same 4 s position run isn't recorded as an `E`: it is dropped after twice the run's length.
+- **Debug's report stands while the deck lives**, as the web's does (deck.ts publishes null only at destroy): after
+  Now Playing closes on the turntable, Debug still shows what it last did. On the phone Debug is under You, so the
+  rows can only be read with Now Playing closed. Sound health is reset each time the turntable shows.
+- **"Window made in"'s song rate is the track's sample rate** as Navidrome gives it.
+- **Disc art is kept in memory, the last eight discs** (question 11's B). A disc with none is asked again at the
+  next opening, as the web's is.
+- **The look button is named for the look, not for what shows** (NowPlaying.tsx:382). Over the lyrics, the
+  turntable's square still says a tap shows the cover, which it then does.
+- **Linux wasn't run**: no swift.org toolchain on this Mac. Core's new code is Foundation-only, and ios.yml's
+  ubuntu job is its first Linux build.
+
+**Mutations, each one alone, against Core's tests**: six, all caught (scratchpad's mutate.py: applied to TurntableScreen.swift, DeadwaxCoreTests run,
+restored).
+
+| Mutation | Caught by |
+| --- | --- |
+| The silent line shown over the player's failure | theSilentLineIsAirPlaysFirstThenNoSoundThenNotAFLAC |
+| No frames for a held record under Reduce Motion | framesRunOnlyWhenAskedShowingActiveAndMotionAllowed |
+| A lock-screen pause, the record quiet, not resting the engine at once | theDeckEngineRunsAsQuestion13Says (2 issues) |
+| Sound counted ready during an interruption | soundIsReadyOnlyPreparedAndAllowed |
+| The plinth without its 24 pt clear | thePlinthFitsTheRoomBothWaysAtMost440 |
+| The engine running with the scene in the background | theDeckEngineRunsAsQuestion13Says |
+
+**What only the phone shows**: section 8's checks 1-24 (in docs/ios.md as "The turntable's checks (app 0.6)", 23 by
+ear only) and section 9: the touch rate, the 120 Hz frame, the real `E` and the handover by ear, the window's making
+on the phone, the lock screen after a wind-down with two engines, Bluetooth's delay, VoiceOver, Dynamic Type in
+SwiftUI, and heat and battery over an album.
+
+**Questions**, numbered on from section 10's (my recommendation first):
+
+23. **Recording**: build Debug's Record 20 s and the Mac's replay as the first part of slice 4, before the fader, or
+    leave the A/B by ear? **Build it first in slice 4**: the A/B against Safari is the question James is asking, and a
+    recording is what makes it a test rather than an impression.
+24. **The Handover row's seam**: give DeckEngine and PlaybackEngine a render-time stamp the app can read, or leave the
+    seam to the ear? **To the ear first** (check 8): measuring it means touching the engine, and the timing the app
+    does see (the start's `E` and the timer's lateness) may be enough to say whether question 2's B is needed.
+25. **The centred label**: keep it centred, or draw the web's 2-3 pt offset? **Centred**: the web's offset is a CSS
+    box-model side effect, and a wobbling label reads as a fault on a record.
+26. **The kept disc art**: eight in memory, or on disk with the download (question 11's A)? **Eight in memory** until
+    an offline album with CD art is seen showing the plain record.
+
 ### 7.4 Slice 4 - the fader
 
 - **Files**: PlaybackEngine.swift (5.2 - the change this slice is for, its own commit, measured first: 5.3);

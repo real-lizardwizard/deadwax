@@ -1,4 +1,4 @@
-# The iPhone app (early: app 0.5, downloads, lyrics and the EQ)
+# The iPhone app (early: app 0.6, downloads, lyrics, the EQ and the turntable)
 
 deadwax is getting a native iPhone app, built with SwiftUI and its own audio engine, for what a web
 page can't do well: seamless joins and normalization done on the phone, downloads to play offline,
@@ -9,16 +9,19 @@ Up Next, Now Playing, normalization, the lock screen, plays counted, and picking
 off. Phase 2, downloads (app 0.3), followed: an album, or a song, downloaded to the phone plays from
 there, bit for bit as deadwax has it - and goes on playing when deadwax can't be reached (see
 [Downloads](#downloads) and [Offline](#offline)). App 0.4 added lyrics on Now Playing, as the web app
-shows them (see [Lyrics](#lyrics)). **This is app 0.5, which adds the EQ**: ten sliders and nine
-presets, kept for each output on its own - your headphones, the speaker, the car - and switching by
-itself when the output changes, a correction for your headphones from AutoEq's measurements, and -
-under Advanced - filters and a preamp of your own and Equalizer APO files in and out (see
-[EQ](#eq)). Playlists, Search and the rest come in the next
-phases (see [What it can't do yet](#what-it-cant-do-yet)).
+shows them (see [Lyrics](#lyrics)). App 0.5 added the EQ: ten sliders and nine presets, kept for each
+output on its own - your headphones, the speaker, the car - and switching by itself when the output
+changes, a correction for your headphones from AutoEq's measurements, and - under Advanced - filters
+and a preamp of your own and Equalizer APO files in and out (see [EQ](#eq)). **This is app 0.6,
+which adds the turntable**: Now Playing's second look, as the web app has it - a record you can turn
+by hand and hear as you turn it, with the album's CD art on its face (see [The
+turntable](#the-turntable)). Playlists, Search and the rest come in the next phases (see [What it
+can't do yet](#what-it-cant-do-yet)).
 
-**Nothing of Phase 2, the lyrics or the EQ has been seen on an iPhone yet.** It's built and tested on
-a Mac, and what only a phone can tell is what [the checks](#the-checks) are for. Until they're
-answered, read everything about downloads, lyrics and the EQ below as what the app is built to do.
+**Nothing of Phase 2, the lyrics, the EQ or the turntable has been seen on an iPhone yet.** It's
+built and tested on a Mac, and what only a phone can tell is what [the checks](#the-checks) are for.
+Until they're answered, read everything about downloads, lyrics, the EQ and the turntable below as
+what the app is built to do.
 
 The app talks only to deadwax, never to Navidrome, through deadwax's own routes, so the phone never
 needs the Navidrome account deadwax itself uses. With logins on, you sign in with your own Navidrome
@@ -123,7 +126,7 @@ old one. It also uses up one of the few new app ids a free account may register 
 It pulls the latest code, asks GitHub whether the app's checks passed on it (and asks you before
 building one that failed or is still running), builds it (Release), and installs it **over** the app
 on the phone, so everything on the phone stays. Then it opens the app and says how long the new
-install runs: `Installed deadwax 0.5 (5), runs until Wed 18 Nov, 14:02`. It also says how long it
+install runs: `Installed deadwax 0.6 (6), runs until Wed 18 Nov, 14:02`. It also says how long it
 took and the Mac's free space before and after. Xcode doesn't need to be open.
 
 | option | what it does |
@@ -280,7 +283,76 @@ thin line along it for how far in the song is. Tap it for Now Playing.
   ("Off", "Bass Boost"), which opens the [EQ](#eq) over Now Playing. Go to album closes Now Playing
   and opens the album's page on the tab you're on. What a download item did is said for a moment at
   the top of Now Playing ("Downloading: Roads", "Downloading 23 songs from Up Next").
+- **The button at the top right** shows Now Playing as [a turntable](#the-turntable) instead, and back.
 - The chevron at the top, or a swipe down, closes it.
+
+### The turntable
+
+Now Playing has a second look, as the web app's does: the song on a record turning on a turntable.
+**The button at the top right** - a round record on the cover, a square on the turntable - switches
+between the two for as long as Now Playing stays open. Which one it opens as is **Now Playing opens
+as** in [You](#you) > Playback: **Cover**, the default, or **Turntable**. The button never changes
+that: close Now Playing and open it again, and it's back to what You says. With lyrics showing, the
+button turns them off and shows the other look; **Lyrics** shows them in the record's place, and
+turning them off brings the record back.
+
+On the turntable, the record takes the cover's place, as big as fits. The title and "artist — album"
+move to the middle, and the time line ("2:31 of 7:05") takes the scrubber's place in the same row, so
+nothing below it moves: the buttons and the row under them stay as they are. The two looks crossfade
+(at once with Reduce Motion on).
+
+- **The record's face is the album's CD art**: the `disc.jpg` (or `.png`) that the web app's **Get CD
+  art** saves beside the tracks, or a disc's own (`disc2.jpg` for a song on disc 2). With none, it's a
+  black record with the album's cover as its label. The app asks deadwax for it, so an album with no
+  MusicBrainz release in its tags gets the plain record, as on the web. A disc with none is asked again
+  the next time Now Playing opens; the app keeps the last eight it has shown, so CD art you replace
+  shows once that disc has dropped out of those eight, or the app has started again.
+- **It turns at 33⅓ rpm** while the song plays: a turn every 1.8 seconds. Press play and it spins up
+  over about 0.4 seconds; pause and it slows to a stop. It doesn't turn while Now Playing is closed,
+  the phone is locked or the app is in the background, and with **Reduce Motion** on it doesn't turn
+  by itself at all.
+- **The arm** moves in from the edge towards the middle as the song plays. **Drag it** to go anywhere
+  in the song - its middle end is the song's end. While you hold it, the time line says **Needle up**
+  and where letting go will go; the song jumps there as you let go.
+- **Tap the record** to pause or play. **Play/pause** under it does the same on the turntable, and a
+  pause from either winds the record down (see **Pause winds the record down** in [You](#you)).
+- **Turn the record** to move through the song, a turn being 1.8 seconds of it, backwards too. Take
+  hold of it while it plays and the song pauses under your finger; turn it and you hear it, faster or
+  slower as your hand goes, backwards when you turn it back, and nothing while your finger rests. The
+  time line says **Scrubbing**. Let go and the record carries on at your hand's speed: if the song was
+  playing, the motor brings the record back up to speed and the song carries on from there, taking
+  over from the record's sound; if it was paused, the record coasts to a stop and the song stays
+  paused where it stopped - play starts from there. Tap play while a paused record coasts and the song
+  starts from where the record has got to.
+- **The sound is about an eighth of a second behind your hand** (0.12 s, by design: late enough
+  that the touches on either side of each moment have arrived, so the pitch stays steady), and then
+  whatever the output itself adds - Bluetooth earbuds add a good deal more. Debug's **Delay behind
+  the hand** says what iOS reports of it.
+- **Where the record's sound comes from**: a stretch of about 40 seconds of the song round where the
+  record is, made on the phone from the song's download, or from the copy the app keeps of a song it
+  has played - so it costs no data. A song still coming in has its stretches from deadwax instead
+  (small FLAC files, cut from the same copy the phone plays), while the turntable shows and the song
+  plays, and as you take hold of the record. Offline, a song that isn't all on the phone yet turns
+  silently.
+- **FLAC songs only**, as on the web: an MP3 or anything else turns silently, and the first time you
+  turn one, a line over the foot of the turntable says **The record makes sound for FLAC songs only -
+  this one moves silently.** It stays until the song changes. **Over AirPlay** the record is silent
+  too (its sound would come about two seconds late), and the line says **The record makes no sound
+  over AirPlay - turning it still moves through the song.** Silent or not, turning it still moves
+  through the song.
+- **A call or Siri** stops the record's sound, and a record you were holding is let go without the
+  song starting into the call. Going Home while it coasts stops its sound at once; come back and the
+  song is where the record was going.
+- **With Reduce Motion on**, a flick lands where its momentum says at once rather than coasting, and
+  a pause doesn't wind down. Turning the record still has its sound.
+- **VoiceOver**: after the look button, the record is a button that says what a tap does ("The
+  record: a tap pauses the song"), and the arm is "Tonearm: position in the song", read as "2:31 of
+  7:05": swipe up or down to move 5 seconds.
+- **Closing**: on the turntable, only a swipe down from the top row (or the chevron) closes Now
+  Playing - a drag on the record or the arm never does. A record coasting back to speed as you close
+  it still hands the song back where it was going.
+- The web's **speed fader**, at the turntable's corner, isn't here yet: it comes next (see [What it
+  can't do yet](#what-it-cant-do-yet)).
 
 ### Up Next
 
@@ -415,6 +487,14 @@ album.
 - **Playback**:
   - **Gapless**: On. "Albums play straight through, with no gap between songs." It isn't a setting:
     the app always plays this way.
+  - **Now Playing opens as**: **Cover** (the default) or **Turntable** - what Now Playing shows each
+    time it opens. "What you see first when you open Now Playing. The button at its top right switches
+    between the two while it's open." See [The turntable](#the-turntable).
+  - **Pause winds the record down**: on by default. On the turntable, a pause - a tap on the record,
+    or play/pause while it shows - slows the music to a stop over about a second, as a real record deck
+    does, and the song stays paused where the sound stopped. Off, the sound stops at once (the record
+    still spins down). Pausing from the cover, the lock screen or the mini player always stops at once.
+    Both are kept on this phone.
   - **Normalization**: brings songs to an even loudness, the way the web app's does. Four choices:
 
     | choice | what it does |
@@ -442,7 +522,7 @@ album.
   If deadwax can't be reached, it says "Couldn't reach deadwax, so you're still signed in - try
   again." Changing your password is the web app's, for now.
 - **About**: deadwax's version, whether logins are on (for an admin), and the app's own version,
-  **0.5 (5)**.
+  **0.6 (6)**.
 - **This phone**: deadwax's address, **Change address**, and **Debug**, for an admin (with logins
   off, everyone is one).
 
@@ -458,7 +538,8 @@ Debug is where Phase 0's test screen lives now:
   as every downloaded song does; **Stream even when downloaded** (under Downloads, below) streams it
   instead, to hear the two side by side.
   At the end, **The record's engine beside the song** and its **Start** and **Stop** buttons. It is
-  the turntable's own sound engine, which hasn't got a screen yet. Here it plays a run of its own over
+  the turntable's own sound engine, the one [the turntable](#the-turntable) plays its record through.
+  Here it plays a run of its own over
   whatever is playing: a chord, taken from 1 second, scratched back and forth twice and let go, over
   and over. Under the button:
   - **The record's engine**: its rate, how many blocks it has rendered, and how many times it has started.
@@ -476,6 +557,28 @@ Debug is where Phase 0's test screen lives now:
   the song to it, as any app must: an iPhone's own outputs and AirPods run at 48 kHz or lower. Under
   it, "An edit held for the next song" when one is (see [the checks](#what-only-a-phone-can-tell)), and
   the last song that failed, in its own words.
+- **Turntable**: what [the turntable](#the-turntable) is doing, mostly in the web app's own rows.
+  Until the turntable has shown, and again once you've switched Now Playing back to the cover, one
+  row: "Off: the turntable isn't showing". While it shows - and after you close Now Playing on it, so
+  you can read them here - what it last did.
+  - **Turntable sound**: "Ready: 1:10-1:50, FLAC, decoded at 48 kHz" - the stretch of the song the
+    record can play - or "Off:" and why: no stretch yet, one loading, a song that isn't FLAC, AirPlay,
+    the record's engine couldn't start.
+  - **Window from**: "This phone's download", "The copy kept on this phone", "deadwax - the song is
+    still coming in", or that the phone is offline with the song not all on it.
+  - **Voice** (on its own audio thread), **Clock step** (the output's block), **Clock** (as in Test
+    sounds, above), and **Data used** - what came from deadwax since the turntable showed.
+  - **Turntable timing**: how long after the last let-go of a playing record the song was back.
+    **Handover**: how early the song was resumed before the record's sound would end, for the start
+    the app expected the audio engine to take, and how long it really took. **Position read in**: the longest the app waited on
+    the audio engine for the song's place during the last handover. **Window made in**: how long the
+    last stretch took to make on the phone.
+  - **Limiter** (peaks held under full scale since the turntable showed), **Frames under a hand** (how
+    many were drawn while a hand was on the record, and how many late), **Touches under a hand** (how
+    many touch samples a second the screen gave), **Delay behind the hand** (the 0.12 s by design,
+    then what iOS says the output adds), and, only when there are some, **Messages dropped**, **Not
+    restarted**, **Interruptions** and **Slow starts** (presses whose sound began late because the
+    record's engine was slow to start).
 - **EQ**: what the [EQ](#eq) is doing. **Output** is the route as iOS gives it - each output's kind,
   name and ID, raw ("Bluetooth (A2DP) · James's AirPods Pro · 60:F8:…"), one line each - and **Key**
   the name the EQ keeps that output's setting under. Then the EQ's audio unit, which sits between the
@@ -1233,9 +1336,83 @@ You > Debug > Test sounds > **The record's engine beside the song**. Install the
   has settled, the first number moves by no more than a millisecond or two. Tell me both numbers,
   for each.
 
+### The turntable's checks (app 0.6)
+
+These come with the build that puts [the turntable](#the-turntable) on Now Playing. Earbuds or the
+speaker unless a check says. The numbers are the turntable plan's, so answers can say "check 8".
+
+- **1 The settings.** You > Playback: Gapless, then **Now Playing opens as** (Cover ticked), then
+  **Pause winds the record down** (on), then Normalization - each with its note under it. Choose
+  **Turntable**.
+- **2 Opens as.** Play an album and open Now Playing: it opens on the turntable. The top-right button
+  switches to the cover and back. Close and open it again: it opens on the turntable, whatever you
+  switched to.
+- **3 Nothing jumps.** Switch between the two: the title and the artist move to the middle and back,
+  and nothing moves up or down - the time line sits in the scrubber's row, and the buttons below stay
+  put. The record fills its room, and nothing overlaps.
+- **4 CD art.** An album you've saved CD art for (the web app's **Get CD art**): the record's face is
+  the CD art. A two-disc album with a `disc2.jpg`: a disc 2 song shows it. An album with none: a black
+  record with the cover as its label.
+- **5 It turns.** While playing, a turn every 1.8 seconds, smoothly. Debug > Turntable's **Frames under
+  a hand** (after a turn by hand) should show few late.
+- **6 Tap and wind down.** Tap the record: the song pauses, its sound slowing to a stop over about a
+  second with the platter. Tap again: it plays. Turn **Pause winds the record down** off: the pause is
+  instant. Pause from the cover: always instant.
+- **7 Hold and turn.** Hold the record while it plays: the song pauses under your finger. Turn it
+  slowly, quickly, backwards: you hear it follow, a little more than an eighth of a second behind;
+  resting your finger is silence.
+- **8 The handover.** Let go mid-turn: the record carries on at your hand's speed, the motor brings it
+  back up, and the song carries on. Listen to the moment the song takes over: no jump back, no repeat,
+  no gap - and nothing that sounds doubled or briefly louder. Ten times, with a downloaded song and
+  with one streaming; tell me Debug's **Handover** row after a few.
+- **9 The coast.** Pause, then flick the record: it coasts to a stop with its sound, and the song stays
+  paused where it stopped; play starts from there.
+- **10 The arm.** Drag the arm: the head lifts, the time line says "Needle up · ..."; let go and the
+  song plays from there.
+- **11 An MP3.** Turn the record on one: silent, with "The record makes sound for FLAC songs only -
+  this one moves silently." over the foot of the turntable until the next song.
+- **12 Still coming in.** A song never played before (not downloaded), turned while it's still coming
+  in: it has its sound, and Debug's **Window from** says "deadwax - the song is still coming in".
+  Played again later: "The copy kept on this phone".
+- **13 Offline.** A downloaded album, in Airplane mode: the record has its sound, and **Window from**
+  says "This phone's download".
+- **14 Hi-res.** A 96 kHz album: let go at a playing record's own speed - the record's sound and the
+  song are the same loudness and tone across the handover. The same with Normalization on.
+- **15 Interruptions.** While holding the record, have Siri speak, or take a call: the record's sound
+  stops, nothing sticks, and the song doesn't start into the call. Take AirPods out mid-turn: no burst
+  of sound from the speaker.
+- **16 Going Home.** Flick the record and go Home while it coasts: the sound stops at once. Come back:
+  the song is where the record was going.
+- **17 AirPlay.** AirPlay to a speaker: turning the record is silent, with the AirPlay line.
+- **18 VoiceOver.** The look button, then the record ("The record: a tap pauses the song"), then the
+  arm ("Tonearm: position in the song", "2:31 of 7:05"; swiping up and down moves 5 seconds), in that
+  order.
+- **19 Reduce Motion.** On: the record doesn't turn by itself; a let-go goes straight on - no coast,
+  and no gap before the song; a pause is instant. The hand still has its sound.
+- **20 The largest text.** The time line stays on one line; a long press on the look button shows its
+  large version.
+- **21 The lock screen after a wind-down.** With the wind-down on, tap the record to pause and lock the
+  phone straight away: within two seconds the lock screen shows the song paused. Press the AirPods'
+  stem (or the lock screen's play): it plays. Pause from the lock screen while the turntable shows: the
+  platter runs down silently. Then the same with the wind-down off.
+- **22 Debug.** Debug > Turntable after a few turns: every row has a value, and **Delay behind the
+  hand** names more on Bluetooth earbuds than on the speaker.
+- **23 Against Safari.** The same song on the turntable in Safari (at deadwax's address) and in the
+  app. Someone else hands you the phone with one or the other open, ten times; eyes closed, take the
+  record, scratch it, flick it and let it hand back, then say which. Tell me how many you got right,
+  and anything that sounded different, and in which. (The web's Record 20 s isn't in the app yet, so
+  no recordings this time.)
+- **24 A whole album.** Leave the turntable showing for a whole album: no warmer than the cover, and
+  the battery about the same - a little more, as the record's engine runs beside the song's while it
+  plays.
+
 ## What it can't do yet
 
 These are the web app's for now. Most of them come to the phone in the next phases:
+
+- **The speed fader** on the turntable, and its chip on the cover - next, in the turntable's last
+  part.
+- **The visualizer**: it stays the web app's, on a desktop.
 
 - **Playlists**, **artist pages** and a **songs list**, and the Library's **Shuffle** of your whole
   library.

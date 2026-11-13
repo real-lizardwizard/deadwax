@@ -167,7 +167,7 @@ jobs:
           test -f "$app/AppIcon60x60@3x.png"
           test ! -e "$app/Assets.car"
           test "$(plutil -extract CFBundleIdentifier raw "$app/Info.plist")" = net.lizardlounge.deadwax
-          test "$(plutil -extract CFBundleShortVersionString raw "$app/Info.plist")" = 0.5
+          test "$(plutil -extract CFBundleShortVersionString raw "$app/Info.plist")" = 0.6
           test "$(plutil -extract UIBackgroundModes.0 raw "$app/Info.plist")" = audio
           test "$(plutil -extract NSAppTransportSecurity.NSAllowsArbitraryLoads raw "$app/Info.plist")" = true
           python3 ios/scripts/check_project.py

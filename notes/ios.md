@@ -3113,6 +3113,67 @@ ubuntu job is their first Linux build. ios.yml itself hasn't run either: nothing
 New tests cover full rings, a window's give-back and `L`'s slew in the render. The judgement on each area asked about,
 and the questions left for slice 3, are in the spec's "Slice 2, built", under Review.
 
+### Slice 3: the turntable on Now Playing (2026-11-13)
+
+The record on Now Playing, as the web's turntable has it (spec section 2, 3, 4.6 and 6). It takes the hand and sounds
+through slice 2's engine, and it hands the song back where the hand left it. App 0.6 (6).
+
+- **Core**: `TurntableScreen.swift`, the screen's rules as pure functions. `TurntableFace` holds the web's numbers in
+  points, held to the stylesheets by tests/test_ios_turntable_face.py. `TurntableFit` sizes the plinth. 2.8's states
+  are `soundReady`, `silentLine`, `framesRun` and `engineWant`. `TurntableSettings` holds the two settings and the
+  look and lyrics taps, and Debug's section has the web's rows in its order with the phone's own beside them. Also
+  `TurntablePress.handTurn` and `cancelFollowed()`, `DeckRules.interrupted()` and Debug's reads, and the `discArt`
+  route (ROUTE_COUNT 28).
+- **DeadwaxTurntable**, a new module: the layer tree (`TurntableLayers`, QuartzCore only), rendered by its tests at
+  the iPhone 16's plinth and the SE's to PNGs that ios.yml uploads, with pixel assertions for what needs no eye.
+- **The app**: `ios/App/Player/Turntable/`, with DeckController, the deck for the app's run, which outlives Now
+  Playing so a coast still hands the song back after a close. TurntableDeckView holds the layers, the two touch
+  views and the VoiceOver elements, and TurntableView fits the plinth and draws the lines and the look button.
+  NowPlayingView gains the look button and the swap. You > Playback gains **Now Playing opens as** and **Pause winds
+  the record down**, and Debug gains a Turntable section. PlayerModel gains only `engineForDeck`, read-only, and the
+  engine and DeckEngine have no diff in the app's commit.
+- **Slice 2's six questions** are answered in the deck engine, each with a test that fails without it: the
+  clock's fallback holds the host time, a route change restarts `L` and drops a window of the wrong rate, a stop
+  leaves nothing timed waiting, each EQ host gets its bank at its own rate, the deck's EQ counts its ticks, a newer
+  `/scrub` ask cancels the older, and the session is active before the deck engine starts.
+
+The full account - what was built, the renders, every departure and why, and the questions - is the spec's
+"Slice 3, built", under 7.3. In brief:
+
+**Departures**: the label and spindle centred (the web's sit 2-3 pt off and wobble); recording (6.3) not built, so
+check 23's A/B is by ear; the Handover row without its seam, which needs both engines' render times; two touch views,
+the fader's being slice 4's; no custom VoiceOver actions; the song engine's reset caught by the 10 Hz rule rather
+than its notification; disc art kept in memory, the last eight; the pbxproj edited by hand.
+
+**Mutations, each alone** (scratchpad's mutate.py: applied to TurntableScreen.swift, Core's tests run, restored):
+| Mutation | Caught by |
+| --- | --- |
+| The silent line over the player's failure | theSilentLineIsAirPlaysFirstThenNoSoundThenNotAFLAC |
+| No frames for a held record under Reduce Motion | framesRunOnlyWhenAskedShowingActiveAndMotionAllowed |
+| A lock-screen pause not resting the engine at once | theDeckEngineRunsAsQuestion13Says |
+| Sound ready during an interruption | soundIsReadyOnlyPreparedAndAllowed |
+| The plinth without its 24 pt clear | thePlinthFitsTheRoomBothWaysAtMost440 |
+| The engine running in the background | theDeckEngineRunsAsQuestion13Says |
+
+All six caught. The app's own code (DeckController, the views) has no tests on this Mac: it is the device build and
+the phone's checks.
+
+**Verified**:
+- `swift test`: Core 953, DeadwaxAudio 139 and DeadwaxTurntable 9, with the 20 renders looked at.
+- The unsigned iPhone Release build, with no warnings in the app's sources. It found the missing `import
+  DeadwaxTurntable` that the package's own build couldn't.
+- check_project.py, the iOS pytest files (146 passed, 1 skipped), and every ios sim, with iosdeck's full check on
+  Node 20.12.2.
+
+**Not run**: check-linux.sh (no swift.org toolchain here), and ios.yml, since nothing was pushed.
+
+**Only the phone can show** the screen in the hand: the spec's section 8, checks 1-24 (docs/ios.md's "The
+turntable's checks (app 0.6)").
+
+**The version: 0.6 (6)**, pinned where 0.5 was: `Base.xcconfig`, `check_project.py`, `ios.yml`'s check of the built
+Info.plist, `tests/test_ios_install.py`; the guide's title, opening, install.sh's line and About's row, ios/README.md,
+and YouView's doc comment. `src/__init__.py` wasn't touched.
+
 ## The EQ, slice 1: Core (2026-11-12)
 
 The design is notes/ios-specs/eq.md. Its slice 1 (5.1) is the EQ's pure part, in DeadwaxCore and tested like the rest
