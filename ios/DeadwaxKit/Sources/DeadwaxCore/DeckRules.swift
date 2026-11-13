@@ -425,6 +425,24 @@ public final class DeckRules<M: DeckMaths> {
         press?.intent = .pause
     }
 
+    /// (new, 4.6; question 27) The output went away - headphones out - and the player paused the song, as Apple asks: the
+    /// record rests rather than playing the song on the speaker. A taken press's let-go rests (its intent made a pause,
+    /// as an interruption's); a resume still to come is dropped - a song change's, a led handover's timer - and a
+    /// handover plan becomes a quiet coast from where the record is, so its end asks for none and the time line stays
+    /// on the paused song. A departure: the web's page plays on in whatever outputs next.
+    public func outputGone() {
+        press?.intent = .pause
+        clearTimer(resumeTimer)
+        resumeTimer = nil
+        clearLed()
+        guard case .plan(let current) = motion, current.role == .handover else { return }
+        endHandover()
+        let (x, v) = plans.planAt(current.plan, (now - current.since) / 1000)
+        if current.sounding { post(.stop) }
+        startPlan(plans.coast(x, v, host.song()?.length ?? 0), .coast, x, false)
+        if case .plan(let coast) = motion { quieten(coast) }
+    }
+
     /// deck.ts:1426
     public func taken() -> Bool {
         press?.taken ?? false

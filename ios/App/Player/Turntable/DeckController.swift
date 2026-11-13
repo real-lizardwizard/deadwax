@@ -1120,8 +1120,10 @@ final class DeckController {
             }
         })
         observers.append(center.addObserver(forName: AVAudioSession.routeChangeNotification, object: session,
-                                            queue: .main) { [weak self] (_: Notification) -> Void in
-            MainActor.assumeIsolated { () -> Void in self?.routeChanged() }
+                                            queue: .main) { [weak self] (note: Notification) -> Void in
+            let reason = note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt
+            let gone = reason == AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue
+            MainActor.assumeIsolated { () -> Void in self?.routeChanged(outputGone: gone) }
         })
         observers.append(center.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification, object: session,
                                             queue: .main) { [weak self] (_: Notification) -> Void in
@@ -1184,8 +1186,16 @@ final class DeckController {
     /// Earbuds in or out, Bluetooth, a car (4.6): the voice stopped and the engine with it, `L` from its floor, a window
     /// at the old rate dropped (DeckEngine says so through windowDropped), AirPlay looked at again - the engine started
     /// again when the run rule says. Only a change of the outputs counts: the notification comes for a category set
-    /// too, which moves nothing.
-    private func routeChanged() {
+    /// too, which moves nothing. An output gone (headphones out) also rests the record (DeckRules.outputGone).
+    private func routeChanged(outputGone: Bool) {
+        if outputGone {
+            // headphones out (question 27, a departure from the web): the player paused the song, as Apple asks, and
+            // the record rests with it - a held press let go as a cancel that rests, no resume left to play the song
+            // on the speaker
+            rules?.outputGone()
+            press?.cancelFollowed()
+            touchSince = nil
+        }
         let now = Self.routeNow()
         guard now != routeKey else { return }
         routeKey = now

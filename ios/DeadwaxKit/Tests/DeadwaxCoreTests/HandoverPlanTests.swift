@@ -119,6 +119,82 @@ import Testing
         #expect(plain.effects.contains("resume") && plain.playing, "the web's cancel plays on: \(plain.effects)")
     }
 
+    /// (slice 3's review, question 27) Headphones out mid-turn: the record rests and nothing resumes the song on the
+    /// speaker - a held press's let-go, a led handover's timer, a handover's end with no lead. Each against the same case
+    /// without `outputGone()`, which resumes.
+    @Test func theOutputGoneResumesNothing() throws {
+        /// Every timer run, in the order set, until none is left (those set meanwhile included).
+        func runTimers(_ world: TraceWorld) {
+            var left = 50
+            while let id = world.timers.keys.min(), left > 0 {
+                left -= 1
+                world.time += 10
+                world.timers.removeValue(forKey: id)?()
+            }
+        }
+        func taken(lead: Double) -> (world: TraceWorld, rules: DeckRules<PlatformMaths>) {
+            let world = world()
+            let rules = DeckRules(host: world, clock: world, maths: PlatformMaths(), reduced: false)
+            rules.handoverLead = { _, _ in lead }
+            rules.setShowing(true)
+            answer(world)
+            rules.pressed(1000)
+            world.time = 1300
+            rules.takeOver(1300)
+            rules.playingChanged(false)
+            return (world, rules)
+        }
+        // a held press, let go after the output went
+        for gone in [true, false] {
+            let (world, rules) = taken(lead: 0)
+            if gone { rules.outputGone() }
+            world.effects = []
+            let out = rules.release(1310, cancel: false)
+            runTimers(world)
+            let resumed = out.play || world.effects.contains("resume")
+            #expect(resumed == !gone, "held, gone \(gone): \(out) \(world.effects)")
+        }
+        // a let-go with a lead, its resume on a timer still to come
+        for gone in [true, false] {
+            let (world, rules) = taken(lead: 0.2)
+            for k in 1...6 {
+                world.time = 1300 + Double(k) * 10
+                rules.hand(world.time, turned: -0.02 * Double(k), at: 60 - 0.006 * Double(k))
+            }
+            let out = rules.release(world.time, cancel: false)
+            try #require(!out.play && world.timers.count == 2, "a plan and its led resume: \(world.effects)")
+            world.effects = []
+            if gone { rules.outputGone() }
+            runTimers(world)
+            #expect(world.effects.contains("resume") == !gone, "led, gone \(gone): \(world.effects)")
+            if gone { #expect(!world.effects.contains { $0.hasPrefix("post drive") }, "quiet: \(world.effects)") }
+        }
+        // a handover with no lead: the song resumed at the plan's end
+        for gone in [true, false] {
+            let (world, rules) = taken(lead: 0)
+            for k in 1...6 {
+                world.time = 1300 + Double(k) * 10
+                rules.hand(world.time, turned: -0.02 * Double(k), at: 60 - 0.006 * Double(k))
+            }
+            let out = rules.release(world.time, cancel: false)
+            try #require(!out.play, "a handover plan: \(out)")
+            world.effects = []
+            if gone { rules.outputGone() }
+            runTimers(world)
+            #expect(world.effects.contains("resume") == !gone, "no lead, gone \(gone): \(world.effects)")
+        }
+        // the song changed under the hand: its resume on a timer, once the new song settles
+        for gone in [true, false] {
+            let (world, rules) = taken(lead: 0)
+            rules.songChanged("next")
+            try #require(!world.timers.isEmpty, "the settle's resume: \(world.effects)")
+            world.effects = []
+            if gone { rules.outputGone() }
+            runTimers(world)
+            #expect(world.effects.contains("resume") == !gone, "song change, gone \(gone): \(world.effects)")
+        }
+    }
+
     @Test func aLeadResumesTheSongEarlyAndItsPlayIsItsOwn() throws {
         let world = world()
         let rules = DeckRules(host: world, clock: world, maths: PlatformMaths(), reduced: false)
