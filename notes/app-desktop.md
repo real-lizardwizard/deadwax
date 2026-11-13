@@ -1832,3 +1832,71 @@ phone or a desktop"); the README's desktop paragraph has a sentence.
   VoiceOver or another screen reader through the segmented controls (their roles and states are unchanged), a
   real side panel or drawer open over You, and Change password's "done" state (its line is laid out by the same
   rule as the open form).
+
+### You across the main area (2.1.10)
+
+James, on 2.1.8: "on desktop the width of "you" still doesn't match the screen really". Measured as an admin with
+no side panel, against the other tabs (the main area runs from the sidebar's 232px to the window's right edge):
+
+| page | 1280 | 1440 | 1920 |
+| --- | --- | --- | --- |
+| Home, the Library | to the 32px edges | to the 32px edges | to the 32px edges |
+| You (2.1.8) | 848px wide, 168px empty at its right | 328px empty | 808px empty |
+| Requests | 696px wide, 320px empty | 480px empty | 960px empty |
+| Search | the same 760px cap as Requests | | |
+
+You stopped at 912px with its edges (2.1.8's cap, at the main area's left edge as Requests and Search are), so at
+1920 most of the page was black beside it, where Home's and the Library's grids widen with the window.
+
+**Tried and rejected: 2.1.8's layout stretched to the edges.** Its cards and lists became bars 1,370px wide at
+1920, their words in the left third and the tick at the far right - the "bar with something at its end" 2.1.8
+fixed for the checkboxes. Prototyped live and shot; not built.
+
+**The design**, shown to James with the measurements and the prototype's shots at 1280, 1440 and 1920, approved
+("Build it"): from 1280px with no panel beside it, the page is two equal columns across the whole main area, to the
+32px edges Home and the Library keep.
+
+- **Left**: what you get (Your library, Getting albums), then the rest (Connections, Account, About). **Right**:
+  Playback, the tallest section (Gapless and its note, Maximum quality's and Normalization's cards).
+- **The grid** is `.app-you` with rows `auto auto 1fr`: the header spans both columns; what you get is row 2,
+  column 1; Playback rows 2-3, column 2; the rest row 3, column 1. The rest's row is the flexible one, so
+  Playback's extra height only ever adds space under the rest, never between the left column's sections. Column
+  gap 56px (`--app-desk-you-columns-gap`, set in the 1280 context's `:root`, as `--app-desk-bar-side` is).
+- **Titles above their settings again**: a column is 468px at 1280, too narrow for the 200px title column beside
+  its settings. The rail's rules (the absolute title, the section's padding-left, the footnote's indent) are undone
+  in this mode alone; the two columns' first rules line up.
+- **A card's sentence at the notes' measure** (`.app-radio-note` capped at `--app-desk-set-note`, 62ch): a column
+  is 784px at 1920 and its lines ran 120 letters. This cap is in the two-column mode only - first written for
+  every desktop mode, it rewrapped the cards beside a side panel and at 1100, and their pages grew taller than
+  2.1.8's (side-1440 2,484px against 2,393; 1100 2,270 against 2,251).
+- **Below 1280** (where two columns would be under 400px each) You keeps 2.1.8's title column, now running to the
+  main area's right edge too (`max-width: none`, its settings column as wide as is left). At 1100 that is no
+  change: the main area is 868px, under 912. **Beside a third column (`.has-side`)** it stays the one 760px column
+  every list drawn for a phone keeps, and **under a drawer (`.has-drawer`)** Server settings' measure - both as
+  2.1.8 had them, and both why the switch is the frame's classes, not a media query.
+- **You.tsx's three parts**: `.app-you-part` divs, `.app-you-get`, `.app-you-play` and `.app-you-more`, round its
+  sections in their existing order - no words, no behaviour, and nothing of their own on a phone (plain blocks; a
+  phone's You is byte-for-byte the same). 2.1.8's `.app-you > .app-section` selectors became
+  `.app-you-part > .app-section`. app-rules.sim's checks on You.tsx read through the wrappers unchanged.
+- **The cost**: Tab order on a desktop runs down the left column's first part, then Playback on the right, then
+  back to Connections on the left - the page's own order, the phone's. And with a side panel open at 1920, You is
+  still one 760px column.
+
+Docs: player.md's On a desktop bullet for You says two columns from 1280 (Playback down the right, each title
+above its settings), the title column below that, and one column beside a side panel; the README's desktop
+paragraph says the same in a clause.
+
+- **Verified**, against deadwax on a stand-in Navidrome (an admin, a listener; logins on, and off), in headless
+  Chromium: the other tabs' extents measured at 1280, 1440 and 1920 (the table above); after shots of the admin
+  at 1100, 1280, 1440 and 1920 (the page 1,495px tall at 1280 and 1440, 1,477 at 1920, against 2,233 at 1440 in
+  2.1.8), a listener (1,178 at 1440) and logins off (1,142); a coarse pointer at 1440 (1,615: the two Now Playing
+  settings back in Playback, every target 44px); `.has-side` at 1440 (2,393, as 2.1.9) and 1920 (2,412, the one 760px
+  column) and `.has-drawer` at 1100 (2,771, as 2.1.8) - the classes set on the shell, the panels themselves not
+  opened; the 1100 page against 2.1.9's pixel by pixel (the only difference a hover on the sidebar's Needs a look,
+  where the mouse sat). The phone at 375 (admin, listener, logins off): screenshots byte-identical to 2.1.9.
+  pytest, every sim, `npm run build`.
+- **NOT verified**: Safari and Firefox on a desktop; a real side panel or drawer open over You; a real iPad on its
+  side (its coarse pointer emulated); a screen reader through the new reading order (the DOM order is unchanged).
+- The checkout lives in an iCloud-synced folder whose `.venv` and `ui/node_modules` macOS had evicted
+  (`ls -lO` shows `dataless`): each read downloaded them again, so the server took minutes to start and a build
+  about eight. Not deadwax's; worth knowing before timing anything in that checkout.

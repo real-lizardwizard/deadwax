@@ -255,192 +255,201 @@ export function You({
         </div>
       </header>
 
-      {/* (2.0.0-player.51) with logins on: your library - your starred albums - and how far its starring has got */}
-      <YourLibrary current={current} onRequestAgain={onRequestAgain} />
+      {/* (2.1.10) the page in three parts - what you get, how it plays, and the rest - plain blocks that change nothing
+          in a phone's page; a wide window sets them side by side (app-desktop.css, "You across the main area") */}
+      <div class="app-you-part app-you-get">
+        {/* (2.0.0-player.51) with logins on: your library - your starred albums - and how far its starring has got */}
+        <YourLibrary current={current} onRequestAgain={onRequestAgain} />
 
-      <section class="app-section" aria-labelledby="app-getting-title">
-        <h2 id="app-getting-title" class="app-section-title">
-          Getting albums
-        </h2>
-        <GettingChoices settings={getting.settings} onChoose={(values) => void chooseGetSettings(values)} />
-        <p id="app-get-note" class="app-footnote">
-          “Show me the sources” lets you choose each download yourself. “Pick the best source for me”
-          downloads the best match that meets your quality floor, and shows you the sources instead when
-          nothing matches well, or when you already have the album or are getting it. The quality floor is also what the sources start filtered to. Format:
-          Prefer lossless ranks lossless downloads higher, and Lossless only leaves out anything without
-          a lossless file. All three are kept for you on deadwax, so they follow you to every device.
-        </p>
-        {/* what went wrong keeping those three, right under them and their note - never under this
-            device's own setting below, which deadwax's database has no part in */}
-        {!getting.canSave && (
-          <p class="app-footnote app-error">{GETTING_UNSAVED}{runsDeadwax ? '' : ` ${TELL}`}</p>
-        )}
-        {/* always in the page, so VoiceOver hears a choice that wasn't kept (it reads a region only
-            once it is already there) - and, empty or not, the gap before the next choice */}
-        <div class="app-choice-gap" aria-live="polite" aria-atomic="true">
-          {getting.problem && <p class="app-footnote app-error">{getting.problem}</p>}
-        </div>
-        <ConfirmCancelChoice
-          on={confirmCancel}
-          onChange={(on) => {
-            writeConfirmCancel(on)
-            setConfirmCancel(on)
-          }}
-        />
-        <p id="app-confirm-cancel-note" class="app-footnote">
-          The ✕ on a download in Requests asks first. Kept on this device.
-        </p>
-      </section>
-
-      <section class="app-section" aria-labelledby="app-playback-title">
-        <h2 id="app-playback-title" class="app-section-title">
-          Playback
-        </h2>
-        <GaplessChoice player={player} />
-        <p id="app-gapless-note" class="app-footnote app-choice-gap">
-          Plays one song straight into the next. In Safari and Chrome, FLAC albums play through with no
-          pause at all, as they were recorded; other songs change with a much shorter pause. It
-          downloads the next song ahead, which uses more data, and on a slow connection that can stop
-          helping: turn it off if song changes are no quicker.
-        </p>
-        <LookChoice look={opensAs} onChange={onOpensAs} />
-        <p id="app-look-note" class="app-footnote app-choice-gap">
-          What you see first when you open Now Playing. The button at its top right switches between
-          the two while it's open. For phones: a big screen has no Now Playing view.
-        </p>
-        <WindDownChoice on={windDown} onChange={onWindDown} />
-        <p id="app-wind-down-note" class="app-footnote app-choice-gap">
-          On the turntable, pausing slows the music to a stop over about a second, as a real record
-          deck does. Turn it off to stop at once. Pausing from the cover always stops at once. For
-          phones: a big screen has no turntable.
-        </p>
-        <QualityChoice player={{ maxRate: player.maxRate, setMaxRate: actions.setMaxRate }} />
-        <NormalizationChoice />
-        <p id="app-normalization-note" class="app-footnote app-choice-gap">
-          Evens out FLAC songs only - other files play as they are. The first time an album is levelled,
-          deadwax measures it, so its first song can take a few seconds to start.
-        </p>
-        <p class="app-footnote">
-          These are kept on this device. Maximum quality changes from the next song, and Normalization from
-          the next thing you play.
-        </p>
-      </section>
-
-      {/* (2.0.4) whoever runs deadwax's alone - an admin, or someone with Settings and the log (access.ts seesDetail):
-          what slskd's key or Navidrome's address is doing is nothing anyone else can act on */}
-      {runsDeadwax && (
-        <section class="app-section" aria-labelledby="app-connections-title">
-          <div class="app-section-head">
-            <h2 id="app-connections-title" class="app-section-title">
-              Connections
-            </h2>
-            <button type="button" class="app-text-button" onClick={checkAll} disabled={!checks}>
-              Check again
-            </button>
-          </div>
-          <ul class="app-group">
-            {SERVICES.map((service) => {
-              const check = checks?.[service.id] ?? PENDING
-              return (
-                <li key={service.id} class="app-row app-status-row" aria-live="polite" aria-atomic="true">
-                  <span class="app-row-label">{service.label}</span>
-                  <span class="app-row-value">
-                    <span class={`app-dot is-${check.state}`} aria-hidden="true" />
-                    <span class="app-status-text">{check.text}</span>
-                  </span>
-                  {check.detail && <span class="app-row-detail">{check.detail}</span>}
-                </li>
-              )
-            })}
-          </ul>
-        </section>
-      )}
-
-      {access.unverified && <p class="app-footnote app-you-unverified">{UNVERIFIED}</p>}
-
-      {managing.any && (
-        <section class="app-section" aria-labelledby="app-managing-title">
-          <h2 id="app-managing-title" class="app-section-title">
-            Manage
+        <section class="app-section" aria-labelledby="app-getting-title">
+          <h2 id="app-getting-title" class="app-section-title">
+            Getting albums
           </h2>
-          <div class="app-group">
-            {managing.queue && (
-              <button
-                type="button"
-                class="app-row app-link-row app-queue-link-row"
-                {...(needsLook ? { 'aria-label': needsLookLabel('Needs a look', needsLook) } : {})}
-                onClick={() => onNeedsLook?.()}
-              >
-                <span class="app-row-label">Needs a look</span>
-                {badgeText(needsLook ?? 0) && (
-                  <span class="app-queue-badge" aria-hidden="true">
-                    {badgeText(needsLook ?? 0)}
-                  </span>
-                )}
-                <ChevronRightIcon class="app-chevron" />
-              </button>
-            )}
-            {managing.care && (
-              <button type="button" class="app-row app-link-row app-queue-link-row" onClick={() => onManaging?.('care')}>
-                <span class="app-row-label">Library care</span>
-                <ChevronRightIcon class="app-chevron" />
-              </button>
-            )}
-            {managing.people && (
-              <button type="button" class="app-row app-link-row app-queue-link-row" onClick={() => onManaging?.('people')}>
-                <span class="app-row-label">People</span>
-                <ChevronRightIcon class="app-chevron" />
-              </button>
-            )}
-            {managing.settings && (
-              <button type="button" class="app-row app-link-row app-queue-link-row" onClick={() => onManaging?.('settings')}>
-                <span class="app-row-label">Server settings</span>
-                <ChevronRightIcon class="app-chevron" />
-              </button>
-            )}
-            {managing.log && (
-              <button type="button" class="app-row app-link-row app-queue-link-row" onClick={() => onManaging?.('log')}>
-                <span class="app-row-label">Event log</span>
-                <ChevronRightIcon class="app-chevron" />
-              </button>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* (2.0.8, UX batch 5) Account: your own password and Sign out, together - they were under About.
-          Only with logins on: off, there is no account and nobody to sign out */}
-      {who?.auth === 'on' && (
-        <section class="app-section" aria-labelledby="app-account-title">
-          <h2 id="app-account-title" class="app-section-title">
-            Account
-          </h2>
-          {/* (2.0.2) your own Navidrome password - a Navidrome sign-in only (never break-glass) */}
-          {changeOffered(who) && <ChangePassword user={who.user} />}
-          {/* (2.0.0-player.48) */}
-          <SignOutRow user={who.user} />
-        </section>
-      )}
-
-      <section class="app-section" aria-labelledby="app-about-title">
-        <h2 id="app-about-title" class="app-section-title">
-          About
-        </h2>
-        <dl class="app-group">
-          <div class="app-row">
-            <dt class="app-row-label">Version</dt>
-            <dd class="app-row-value app-mono">{who?.version ?? (whoFailed ? NOT_KNOWN : '…')}</dd>
-          </div>
-          {/* (2.0.8) whether logins are on is an admin's to know (and change): nobody else is shown it */}
-          {access.admin && (
-            <div class="app-row">
-              <dt class="app-row-label">Logins</dt>
-              <dd class="app-row-value">{who ? (who.auth === 'off' ? 'Off' : 'On') : whoFailed ? NOT_KNOWN : '…'}</dd>
-            </div>
+          <GettingChoices settings={getting.settings} onChoose={(values) => void chooseGetSettings(values)} />
+          <p id="app-get-note" class="app-footnote">
+            “Show me the sources” lets you choose each download yourself. “Pick the best source for me”
+            downloads the best match that meets your quality floor, and shows you the sources instead when
+            nothing matches well, or when you already have the album or are getting it. The quality floor is also what the sources start filtered to. Format:
+            Prefer lossless ranks lossless downloads higher, and Lossless only leaves out anything without
+            a lossless file. All three are kept for you on deadwax, so they follow you to every device.
+          </p>
+          {/* what went wrong keeping those three, right under them and their note - never under this
+              device's own setting below, which deadwax's database has no part in */}
+          {!getting.canSave && (
+            <p class="app-footnote app-error">{GETTING_UNSAVED}{runsDeadwax ? '' : ` ${TELL}`}</p>
           )}
-        </dl>
-        {whoFailed ? errorNote(whoFailed, { class: 'app-footnote app-error' }) : null}
-      </section>
+          {/* always in the page, so VoiceOver hears a choice that wasn't kept (it reads a region only
+              once it is already there) - and, empty or not, the gap before the next choice */}
+          <div class="app-choice-gap" aria-live="polite" aria-atomic="true">
+            {getting.problem && <p class="app-footnote app-error">{getting.problem}</p>}
+          </div>
+          <ConfirmCancelChoice
+            on={confirmCancel}
+            onChange={(on) => {
+              writeConfirmCancel(on)
+              setConfirmCancel(on)
+            }}
+          />
+          <p id="app-confirm-cancel-note" class="app-footnote">
+            The ✕ on a download in Requests asks first. Kept on this device.
+          </p>
+        </section>
+      </div>
+
+      <div class="app-you-part app-you-play">
+        <section class="app-section" aria-labelledby="app-playback-title">
+          <h2 id="app-playback-title" class="app-section-title">
+            Playback
+          </h2>
+          <GaplessChoice player={player} />
+          <p id="app-gapless-note" class="app-footnote app-choice-gap">
+            Plays one song straight into the next. In Safari and Chrome, FLAC albums play through with no
+            pause at all, as they were recorded; other songs change with a much shorter pause. It
+            downloads the next song ahead, which uses more data, and on a slow connection that can stop
+            helping: turn it off if song changes are no quicker.
+          </p>
+          <LookChoice look={opensAs} onChange={onOpensAs} />
+          <p id="app-look-note" class="app-footnote app-choice-gap">
+            What you see first when you open Now Playing. The button at its top right switches between
+            the two while it's open. For phones: a big screen has no Now Playing view.
+          </p>
+          <WindDownChoice on={windDown} onChange={onWindDown} />
+          <p id="app-wind-down-note" class="app-footnote app-choice-gap">
+            On the turntable, pausing slows the music to a stop over about a second, as a real record
+            deck does. Turn it off to stop at once. Pausing from the cover always stops at once. For
+            phones: a big screen has no turntable.
+          </p>
+          <QualityChoice player={{ maxRate: player.maxRate, setMaxRate: actions.setMaxRate }} />
+          <NormalizationChoice />
+          <p id="app-normalization-note" class="app-footnote app-choice-gap">
+            Evens out FLAC songs only - other files play as they are. The first time an album is levelled,
+            deadwax measures it, so its first song can take a few seconds to start.
+          </p>
+          <p class="app-footnote">
+            These are kept on this device. Maximum quality changes from the next song, and Normalization from
+            the next thing you play.
+          </p>
+        </section>
+      </div>
+
+      <div class="app-you-part app-you-more">
+
+        {/* (2.0.4) whoever runs deadwax's alone - an admin, or someone with Settings and the log (access.ts seesDetail):
+            what slskd's key or Navidrome's address is doing is nothing anyone else can act on */}
+        {runsDeadwax && (
+          <section class="app-section" aria-labelledby="app-connections-title">
+            <div class="app-section-head">
+              <h2 id="app-connections-title" class="app-section-title">
+                Connections
+              </h2>
+              <button type="button" class="app-text-button" onClick={checkAll} disabled={!checks}>
+                Check again
+              </button>
+            </div>
+            <ul class="app-group">
+              {SERVICES.map((service) => {
+                const check = checks?.[service.id] ?? PENDING
+                return (
+                  <li key={service.id} class="app-row app-status-row" aria-live="polite" aria-atomic="true">
+                    <span class="app-row-label">{service.label}</span>
+                    <span class="app-row-value">
+                      <span class={`app-dot is-${check.state}`} aria-hidden="true" />
+                      <span class="app-status-text">{check.text}</span>
+                    </span>
+                    {check.detail && <span class="app-row-detail">{check.detail}</span>}
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        )}
+
+        {access.unverified && <p class="app-footnote app-you-unverified">{UNVERIFIED}</p>}
+
+        {managing.any && (
+          <section class="app-section" aria-labelledby="app-managing-title">
+            <h2 id="app-managing-title" class="app-section-title">
+              Manage
+            </h2>
+            <div class="app-group">
+              {managing.queue && (
+                <button
+                  type="button"
+                  class="app-row app-link-row app-queue-link-row"
+                  {...(needsLook ? { 'aria-label': needsLookLabel('Needs a look', needsLook) } : {})}
+                  onClick={() => onNeedsLook?.()}
+                >
+                  <span class="app-row-label">Needs a look</span>
+                  {badgeText(needsLook ?? 0) && (
+                    <span class="app-queue-badge" aria-hidden="true">
+                      {badgeText(needsLook ?? 0)}
+                    </span>
+                  )}
+                  <ChevronRightIcon class="app-chevron" />
+                </button>
+              )}
+              {managing.care && (
+                <button type="button" class="app-row app-link-row app-queue-link-row" onClick={() => onManaging?.('care')}>
+                  <span class="app-row-label">Library care</span>
+                  <ChevronRightIcon class="app-chevron" />
+                </button>
+              )}
+              {managing.people && (
+                <button type="button" class="app-row app-link-row app-queue-link-row" onClick={() => onManaging?.('people')}>
+                  <span class="app-row-label">People</span>
+                  <ChevronRightIcon class="app-chevron" />
+                </button>
+              )}
+              {managing.settings && (
+                <button type="button" class="app-row app-link-row app-queue-link-row" onClick={() => onManaging?.('settings')}>
+                  <span class="app-row-label">Server settings</span>
+                  <ChevronRightIcon class="app-chevron" />
+                </button>
+              )}
+              {managing.log && (
+                <button type="button" class="app-row app-link-row app-queue-link-row" onClick={() => onManaging?.('log')}>
+                  <span class="app-row-label">Event log</span>
+                  <ChevronRightIcon class="app-chevron" />
+                </button>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* (2.0.8, UX batch 5) Account: your own password and Sign out, together - they were under About.
+            Only with logins on: off, there is no account and nobody to sign out */}
+        {who?.auth === 'on' && (
+          <section class="app-section" aria-labelledby="app-account-title">
+            <h2 id="app-account-title" class="app-section-title">
+              Account
+            </h2>
+            {/* (2.0.2) your own Navidrome password - a Navidrome sign-in only (never break-glass) */}
+            {changeOffered(who) && <ChangePassword user={who.user} />}
+            {/* (2.0.0-player.48) */}
+            <SignOutRow user={who.user} />
+          </section>
+        )}
+
+        <section class="app-section" aria-labelledby="app-about-title">
+          <h2 id="app-about-title" class="app-section-title">
+            About
+          </h2>
+          <dl class="app-group">
+            <div class="app-row">
+              <dt class="app-row-label">Version</dt>
+              <dd class="app-row-value app-mono">{who?.version ?? (whoFailed ? NOT_KNOWN : '…')}</dd>
+            </div>
+            {/* (2.0.8) whether logins are on is an admin's to know (and change): nobody else is shown it */}
+            {access.admin && (
+              <div class="app-row">
+                <dt class="app-row-label">Logins</dt>
+                <dd class="app-row-value">{who ? (who.auth === 'off' ? 'Off' : 'On') : whoFailed ? NOT_KNOWN : '…'}</dd>
+              </div>
+            )}
+          </dl>
+          {whoFailed ? errorNote(whoFailed, { class: 'app-footnote app-error' }) : null}
+        </section>
+      </div>
     </section>
   )
 }
