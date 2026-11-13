@@ -464,6 +464,8 @@ extension EQWords {
         public static let empty = "Search by name or model - \"hd650\" finds the Sennheiser HD 650. Corrections come from AutoEq, which works out one for each headphone it has a measurement of."
         public static func noMatch(_ query: String) -> String { "AutoEq has no headphones called \"\(query)\"." }
         public static let tryTheModel = "Try the model alone, like \"hd650\"."
+        /// Beside a failed search, and a profile that couldn't be fetched (3.17: ErrorWords' advice leaves it to this).
+        public static let tryAgain = "Try again"
     }
 
     public enum Profile {
@@ -484,6 +486,9 @@ extension EQWords {
             ([source] + (form.map { [$0] } ?? [])).joined(separator: " · ")
         }
         public static let gitHub = "AutoEq on GitHub"
+        /// Where "AutoEq on GitHub" goes (opened in Safari; the music keeps playing): the project, its MIT licence and
+        /// the measurers it credits.
+        public static let gitHubAddress = "https://github.com/jaakkopasanen/AutoEq"
         public static let footer = "From AutoEq, which works out a correction from each measurement to make headphones sound neutral. It's a starting point: how in-ears sit in your ears changes what you hear."
         public static let notRead = "deadwax couldn't read this correction."
         public static let gone = "AutoEq doesn't have that measurement any more."

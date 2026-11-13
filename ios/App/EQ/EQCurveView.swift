@@ -14,7 +14,9 @@ import SwiftUI
 ///   as a 1 pt dashed `quiet` line (1.5 pt under Increase Contrast), the tone alone dotted. Off: flat, grey, at
 ///   `Palette.off`.
 /// - **Moves**: a preset, On/Off or another output morph the lines over 0.25 s; the axis grows the same way; a drag
-///   moves them with the finger, never animated (`animated` false); all of it at once under Reduce Motion.
+///   moves them with the finger, never animated (`animated` false); all of it at once under Reduce Motion. A curve
+///   drawn at other frequencies - a correction's f0s added or dropped - crossfades rather than morphs: the lines
+///   have a different number of points.
 /// - **VoiceOver**: one element, "The EQ's curve", its value the summary (3.14), and an audio graph
 ///   (`accessibilityChartDescriptor`) - the rotor's Play Audio Graph plays it as a rising and falling tone. Not
 ///   given `.allowsDirectInteraction`. Marked as a picture for Smart Invert.
@@ -38,6 +40,10 @@ struct EQCurveView: View {
     var body: some View {
         VStack(spacing: 4) {
             plot
+                // a new set of frequencies is a new plot: the lines can't morph between point counts (EQVector's
+                // difference across lengths is zero), so it crossfades instead - a correction chosen or taken away
+                // adds or drops its f0s (slice 3's review)
+                .id(drawing.frequencies)
                 .frame(height: Self.height)
             foot
         }

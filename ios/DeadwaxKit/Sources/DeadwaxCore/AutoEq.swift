@@ -44,6 +44,39 @@ public struct AutoEqResult: Codable, Equatable, Hashable, Sendable, Identifiable
 
     /// The best source's measurement - the row's own.
     public var measurement: AutoEqMeasurement { AutoEqMeasurement(id: id, source: source, rig: rig, form: form) }
+
+    /// Every measurement of the headphone, the best source's first: what a profile's page and its "Other
+    /// measurements" are made from.
+    public var measurements: [AutoEqMeasurement] { [measurement] + others }
+}
+
+/// One profile's page, as pushed (eq.md 3.7): the output it is for (bound - 3.2), the headphone, which of its
+/// measurements is shown, and all of them, so "Other measurements" is the rest without asking again.
+public struct AutoEqPage: Hashable, Sendable {
+    public let output: String
+    public let name: String
+    public let shown: AutoEqMeasurement
+    public let measurements: [AutoEqMeasurement]
+
+    public init(output: String, name: String, shown: AutoEqMeasurement, measurements: [AutoEqMeasurement]) {
+        self.output = output
+        self.name = name
+        self.shown = shown
+        self.measurements = measurements
+    }
+
+    /// A search's row, opened at its best source's measurement.
+    public init(output: String, row: AutoEqResult) {
+        self.init(output: output, name: row.name, shown: row.measurement, measurements: row.measurements)
+    }
+
+    /// The other measurements of the headphone, each pushing its own page.
+    public var others: [AutoEqMeasurement] { measurements.filter { $0.id != shown.id } }
+
+    /// Another of them, as its own page.
+    public func showing(_ other: AutoEqMeasurement) -> AutoEqPage {
+        AutoEqPage(output: output, name: name, shown: other, measurements: measurements)
+    }
 }
 
 /// `GET /deadwax/eq/autoeq`'s answer: the rows found, best first, at most the limit asked; how many were found in

@@ -79,6 +79,53 @@ public enum EQSuggestion: Equatable, Sendable {
     }
 }
 
+/// Choosing a correction (3.7) and the suggestion's two marks (4), as the settings keep them.
+extension EQSettings {
+    /// A correction used ("Use for …"): the output's correction from now on, crossfaded, and the EQ turned on if it was
+    /// Off - true when it turned it on, for VoiceOver's "EQ on". `nil` ("None"): the correction taken away, the switch
+    /// left as it is (nothing new to hear is turned on for). An output never met is given its setting first.
+    @discardableResult
+    public mutating func use(_ correction: EQCorrection?, for o: EQOutput) -> Bool {
+        guard let correction else {
+            if let i = outputs.firstIndex(where: { $0.key == o.key }) { outputs[i].correction = nil }
+            return false
+        }
+        return change(o, always: true) { $0.correction = correction }
+    }
+
+    /// The suggestion's mark (4): "Not now", for good; "shown", the first time it is drawn - never over a Not now.
+    /// True when anything changed (the file is written; nothing is heard differently).
+    @discardableResult
+    public mutating func mark(_ suggestion: EQOutputSetting.Suggestion, for o: EQOutput) -> Bool {
+        if output(o.key) == nil { outputs.append(EQSettings.newOutput(o, seen: "")) }
+        guard let i = outputs.firstIndex(where: { $0.key == o.key }) else { return false }
+        let now: EQOutputSetting.Suggestion = suggestion == .notNow || outputs[i].suggestion == .notNow ? .notNow : .shown
+        guard outputs[i].suggestion != now else { return false }
+        outputs[i].suggestion = now
+        return true
+    }
+}
+
+extension EQOutputSetting {
+    /// Whether AutoEq's profile `id` is this output's correction now ("Used for …").
+    public func uses(_ id: String) -> Bool {
+        correction?.kind == .autoeq && correction?.id == id
+    }
+}
+
+extension EQDrawing {
+    /// A profile's page's curve (3.7): the correction alone - no tone, the EQ on - at 48 kHz, with its own automatic
+    /// preamp, whatever the output's own setting is.
+    public static func profile(_ correction: EQCorrection, for o: EQOutput, in settings: EQSettings) -> EQDrawing {
+        var alone = EQSettings.newOutput(o, seen: "")
+        alone.on = true
+        alone.correction = correction
+        alone.tone = .preset("flat")
+        alone.preamp = .automatic
+        return make(alone, in: settings, rate: 48_000)
+    }
+}
+
 /// Whether the suggestion is asked for and shown (3.7): Bluetooth and USB outputs only (8, question 20), with no
 /// correction, not put away with "Not now" - and shown only once answered with something, online.
 public enum EQSuggestionRules {

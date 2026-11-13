@@ -328,3 +328,90 @@ enum AutoEqAnswers {
         #expect(EQSuggestionRules.asks(usb, EQSettings.newOutput(usb, seen: "")))
     }
 }
+
+/// Choosing a correction and the suggestion's marks, as the settings keep them (3.7, 4), and a profile's page.
+@Suite struct EQCorrectionChoiceTests {
+    static let airpods = EQOutput(key: "bluetooth:60:F8", port: .bluetoothA2DP, portType: "BluetoothA2DPOutput",
+                                  uid: "60:F8", name: "James's AirPods Pro", symbol: "airpodspro")
+
+    @Test func usingAProfileIsTheCorrectionAndTurnsTheEQOn() throws {
+        let profile = try AutoEqAnswers.profile("crinacle's AirPods Pro")
+        let correction = try profile.correction().get()
+        var settings = EQSettings()
+        // never met: given its setting first, Off - and using turns it on
+        let changed1 = settings.use(correction, for: Self.airpods)
+        #expect(changed1)
+        let kept = try #require(settings.output(Self.airpods.key))
+        #expect(kept.on && kept.correction == correction && kept.uses(profile.id))
+        #expect(!kept.uses("0123456789abcdef"))
+        // already on: used again, nothing to turn on
+        let changed2 = settings.use(correction, for: Self.airpods)
+        #expect(!changed2)
+        // None: taken away, the switch left on
+        let changed3 = settings.use(nil, for: Self.airpods)
+        #expect(!changed3)
+        #expect(settings.output(Self.airpods.key)?.correction == nil && settings.output(Self.airpods.key)?.on == true)
+        // None while Off leaves it Off
+        settings.setOn(false, for: Self.airpods)
+        settings.use(correction, for: Self.airpods)
+        settings.setOn(false, for: Self.airpods)
+        let changed4 = settings.use(nil, for: Self.airpods)
+        #expect(!changed4)
+        #expect(settings.output(Self.airpods.key)?.on == false)
+        // a file's correction of the same name isn't AutoEq's profile
+        var file = correction
+        file.kind = .file
+        settings.use(file, for: Self.airpods)
+        #expect(settings.output(Self.airpods.key)?.uses(profile.id) == false)
+    }
+
+    @Test func theSuggestionsMarksAreKeptAndNotNowIsForGood() {
+        var settings = EQSettings()
+        let changed5 = settings.mark(.shown, for: Self.airpods)
+        #expect(changed5)
+        #expect(settings.output(Self.airpods.key)?.suggestion == .shown)
+        let changed6 = settings.mark(.shown, for: Self.airpods)
+        #expect(!changed6)
+        let changed7 = settings.mark(.notNow, for: Self.airpods)
+        #expect(changed7)
+        #expect(settings.output(Self.airpods.key)?.suggestion == .notNow)
+        // drawn again after a Not now (it isn't, but if it were): still Not now
+        let changed8 = settings.mark(.shown, for: Self.airpods)
+        #expect(!changed8)
+        #expect(settings.output(Self.airpods.key)?.suggestion == .notNow)
+        // a mark is no sound: the output stays Off
+        #expect(settings.output(Self.airpods.key)?.on == false)
+    }
+
+    @Test func aProfilesPageKnowsTheHeadphonesOtherMeasurements() throws {
+        let row = try #require(try AutoEqAnswers.search("Sennheiser HD 650").results.first)
+        let page = AutoEqPage(output: Self.airpods.key, row: row)
+        #expect(page.name == "Sennheiser HD 650" && page.shown.source == "oratory1990")
+        #expect(page.measurements.count == 7 && page.others.count == 6)
+        #expect(!page.others.contains(page.shown))
+        let other = try #require(page.others.first)
+        let next = page.showing(other)
+        #expect(next.shown == other && next.output == page.output && next.name == page.name)
+        // the best source is among the next page's others, and the one shown isn't
+        #expect(next.others.contains(row.measurement) && !next.others.contains(other) && next.others.count == 6)
+    }
+
+    @Test func aProfilesCurveIsTheCorrectionAloneAt48kHz() throws {
+        let correction = try AutoEqAnswers.profile("crinacle's AirPods Pro").correction().get()
+        var settings = EQSettings()
+        // the output's own setting - Bass Boost, Off, a preamp by hand - changes nothing on the profile's page
+        settings.choose(.preset("bassBoost"), for: Self.airpods)
+        settings.setOn(false, for: Self.airpods)
+        let drawing = EQDrawing.profile(correction, for: Self.airpods, in: settings)
+        #expect(drawing.on && drawing.rate == 48_000)
+        #expect(drawing.lines.map(\.kind) == [.heard])
+        // deadwax's automatic preamp, within 0.5 dB of the file's own -6.0 (AutoEqProfileTests)
+        #expect(abs(drawing.preamp - -6.0) <= 0.5)
+        var alone = EQSettings.newOutput(Self.airpods, seen: "")
+        alone.on = true
+        alone.correction = correction
+        #expect(drawing == EQDrawing.make(alone, in: EQSettings(), rate: 48_000))
+        // the correction's f0s are among the curve's frequencies: so many points, not the grid's 241
+        #expect(drawing.frequencies.count > EQChart.grid.count)
+    }
+}

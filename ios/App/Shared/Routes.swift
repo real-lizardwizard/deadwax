@@ -122,6 +122,22 @@ final class AppNavigation {
         open(.album(album))
     }
 
+    /// Back to the EQ page a page was pushed from ("Use for …", eq.md 3.7): every page over the topmost EQ page on the
+    /// tab shown popped at once. Nothing when the tab holds no EQ page.
+    func backToEQPage() {
+        func popped(_ stack: inout [AppRoute]) {
+            guard let page = stack.lastIndex(where: { (route: AppRoute) -> Bool in
+                if case .eq(let eq) = route { return eq.isPage }
+                return false
+            }) else { return }
+            stack.removeSubrange((page + 1)...)
+        }
+        switch tab {
+        case .library: popped(&library)
+        case .you: popped(&you)
+        }
+    }
+
     /// The person changed: every page popped, Now Playing closed, Library shown.
     func reset() {
         library.removeAll()
