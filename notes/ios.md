@@ -3617,3 +3617,36 @@ a34's refusal text and made.json's sha.
 **Not verified**: anything on the phone - docs/ios.md's checks E31-E33 (Bass Reduce's line; a file's "- changed"; a
 GraphicEQ with all ten sliders moved, exported whole and read back) are James's; and ios.yml's runner (Linux's
 `swift test`, its release cost on slower cores).
+
+## Main's 2.1.11 to 2.1.15 merged (2026-11-13)
+
+Main at 330476a merged into ios, and what the phone needs of it ported. The app stays **0.7 (7)**: small
+follow-ups don't move it. `src/__init__.py` came in at main's 2.1.15 with the merge, and nothing here moved it.
+
+### 2.1.11, the lyrics' wait: nothing to port
+
+The web's wait now counts from where the listener's scroll stops, a fling's coast included (`scrollHolds`, a
+movement while their scroll holds moving the hold on). That was already the phone's way: `LyricsHold.phase` holds
+through `interacting` and `decelerating` (a finger down, `tracking`, too) and starts the wait at `idle`. `follows`
+and FOLLOW_AGAIN_MS are unchanged, so the lyrics vectors are current (ioslyrics.sim passed on the merged tree
+untouched), and nothing on the phone changed.
+
+### 2.1.12, the record's let-go after a song change (James: "Fix on both")
+
+`TurntablePress.songChanged` now sets `turned` when the drag it drops is the record's - the web's song-change effect
+(Turntable.tsx:269-280) - so the click the lift runs (the phone runs onRecordClick's rule after every lift of a touch
+that came down on the record) is no tap: the new song is left as the change left it, playing or not. Before, a still
+press the song ended under - .11's (a song the record can't sound: not a FLAC, its window not come) or the deck's
+inside a tap - paused the new song as the finger lifted. The arm's drag sets nothing, as on the web, where the flag
+would swallow the record's next keyboard click; on the phone every click on the record follows a press, which clears
+it, and VoiceOver's activate is `toggle`, so the arm's half is parity only. `turned` is still cleared by the next
+press.
+
+The deck's export hashes the song-change effect into handlers.json now (`handlerPieces`: before, iosdeck.sim's
+sources-only check passed on Node 22 with the change merged), and the trace `press/song-change-under-a-press`
+changed with it: the lift wakes and nothing else - no pausing, no toggle. Written again on Node 20.12.2, the maker's
+(made.json, maths.json, handlers.json and every press trace's made_from). TurntablePressTests: a still press and the
+deck's, the song changed under each, then the lift - only the click's wake, the deck asked nothing more - and the next
+tap a tap again; the arm held as the song changes, then the record's click and its next press, both taps. Mutations:
+the line taken out (the new test and both replays of the trace fail), and set for the arm's drag too (the arm's test
+fails). docs/ios.md says it under Tap the record, in the words docs/player.md uses.

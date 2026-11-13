@@ -206,6 +206,54 @@ import Testing
         #expect(!p.armKey("a"))
     }
 
+    /// (2.1.12) The song changed under a press on the record - it reached its end under a resting finger: the lift does
+    /// nothing to the new song. No tap (it paused the new song before), no seek, no release asked of the deck - for a
+    /// still press the record can't sound under (.11's) and for the deck's own before it takes the record.
+    @Test func aLiftAfterTheSongChangedUnderThePressDoesNothingToTheNewSong() {
+        for live in [false, true] {
+            let deck = FakeDeck(), host = FakeHost()
+            deck.isLive = live
+            let p = press(deck, host)
+            let at = onRecord(45)
+            p.recordDown(pointer: 1, x: at.x, y: at.y, time: 1000)
+            p.songChanged("us-and-them")
+            #expect(p.drag == nil, "the drag was the song before's")
+            host.time = 1200
+            p.ended(pointer: 1, how: .up, time: 1200)
+            #expect(host.calls == ["wake"], "the click's wake alone, live \(live): \(host.calls)")
+            #expect(deck.calls == (live ? ["live", "pressed 1000.0"] : ["live", "holdStill true"]), "\(deck.calls)")
+            //? the next tap is one again
+            deck.calls = []
+            host.calls = []
+            p.recordDown(pointer: 2, x: at.x, y: at.y, time: 1300)
+            p.ended(pointer: 2, how: .up, time: 1350)
+            #expect(host.calls.contains("toggle"), "live \(live): \(host.calls)")
+        }
+    }
+
+    /// (2.1.12) The arm's drag dropped by a song change sets nothing: the record's next click is a tap as ever, and so is
+    /// its next press. The click with no press before it is the web's (a keyboard's click on the record), kept for the
+    /// port's parity: on the phone every click follows a press, which clears the flag anyway, and VoiceOver's activate is
+    /// `toggle` - so only the press half is the phone's own behaviour.
+    @Test func theArmHeldAsTheSongChangesLeavesTheRecordsNextClickATap() {
+        let deck = FakeDeck(), host = FakeHost()
+        deck.landing = 3
+        let p = press(deck, host)
+        p.armDown(pointer: 1, x: 250, y: 40)
+        #expect(p.drag?.kind == .arm)
+        p.songChanged("us-and-them")
+        p.ended(pointer: 1, how: .up, time: 1100)
+        #expect(p.drag == nil && !host.calls.contains("toggle"))
+        host.calls = []
+        p.recordClick()
+        #expect(host.calls == ["wake", "toggle", "seek 3.0"], "\(host.calls)")
+        host.calls = []
+        let at = onRecord(0)
+        p.recordDown(pointer: 2, x: at.x, y: at.y, time: 1300)
+        p.ended(pointer: 2, how: .up, time: 1350)
+        #expect(host.calls.contains("toggle"), "\(host.calls)")
+    }
+
     @Test func nowPlayingsToggle() {
         let deck = FakeDeck(), host = FakeHost()
         deck.landing = 64

@@ -116,9 +116,16 @@ public final class TurntablePress<M: DeckMaths> {
         }
     }
 
-    /// The song changed (:270): a drag for the song before goes, and seeks nowhere.
+    /// The song changed (:269-280): a drag for the song before goes, and seeks nowhere. (2.1.12) Nor does lifting it
+    /// do anything to the new song: a dropped drag on the record makes the lift's click no tap - a still press
+    /// included, whose click paused the new song - so the new song stays as the change left it, playing or not. Not
+    /// for the arm's drag: its lift has no click on the record, and the flag would swallow the record's next tap. The
+    /// next press on the record clears it, as ever.
     public func songChanged(_ track: String) {
-        if let drag, TurntableGeometry.dragFor(drag, track) == nil { setDrag(nil) }
+        if let drag, TurntableGeometry.dragFor(drag, track) == nil {
+            if drag.kind == .record { turned = true }
+            setDrag(nil)
+        }
     }
 
     /// onRecordDown (:303): a finger on the record - the deck's press when it can sound there, .11's otherwise.

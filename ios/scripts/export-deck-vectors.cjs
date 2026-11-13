@@ -1750,6 +1750,8 @@ function handlerPieces() {
     piece('player/Turntable.tsx', /const pressable = [\s\S]*?const onArmKey = [\s\S]*?\n  }\n/, 'pressable, onRecordDown, onArmDown, onMove, onRelease, onRecordClick, onArmKey (:301-422)'),
     piece('player/Turntable.tsx', /grabbed: \(\) => \{[\s\S]*?\n      },\n/, 'the host\'s grabbed (:237)'),
     piece('player/Turntable.tsx', /const handTurn = [^\n]*\n/, 'the record\'s turn as drawn (:426)'),
+    //? (2.1.12) the song changed under the finger: the drag dropped, and a record's click after it no tap
+    piece('player/Turntable.tsx', /\/\/\? the song changed under the finger[\s\S]*?deck\.songChanged\(track\)\n  \}, \[track\]\)/, 'the song-change effect (:269-280)'),
     piece('player/NowPlaying.tsx', /const onToggle = \(\) => \{[\s\S]*?\n  }\n/, 'the turntable\'s toggle (:282)'),
   ]
 }
@@ -2266,7 +2268,7 @@ const PRESS_CASES = [
     P.up('record')
     await P.wait(300)
   }],
-  ['song-change-under-a-press', 'the song changes under a still press the deck can\'t take (its window not come): the drag goes, and the lift\'s click is a tap all the same - it pauses the new song', async (P) => {
+  ['song-change-under-a-press', 'the song changes under a still press the deck can\'t take (its window not come): the drag goes, and (2.1.12) the lift does nothing to the new song - its click is no tap, so nothing is paused or sought', async (P) => {
     await P.make({ windows: false })
     P.down(P.onRecord(45))
     await P.wait(100)

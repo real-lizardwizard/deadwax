@@ -320,7 +320,10 @@ nothing below it moves: the buttons and the row under them stay as they are. The
   in the song - its middle end is the song's end. While you hold it, the time line says **Needle up**
   and where letting go will go; the song jumps there as you let go.
 - **Tap the record** to pause or play. **Play/pause** under it does the same on the turntable, and a
-  pause from either winds the record down (see **Pause winds the record down** in [You](#you)).
+  pause from either winds the record down (see **Pause winds the record down** in [You](#you)). If
+  the song changes while your finger is on the record - it reaches its end under a resting finger,
+  say - lifting your finger does nothing to the new song: it plays on, or stays paused, just as the
+  change left it, and the record follows it.
 - **Turn the record** to move through the song, a turn being 1.8 seconds of it, backwards too. Take
   hold of it while it plays and the song pauses under your finger; turn it and you hear it, faster or
   slower as your hand goes, backwards when you turn it back, and nothing while your finger rests. The

@@ -633,8 +633,10 @@ the turntable follows: **one pointer at a time** - the web's `pressable` (:301) 
 second finger, on the arm while the record is held or the other way round, starts nothing (this is the web's, and
 contradicts 3.1's "two fingers can turn the record and move the fader at once": SpeedFader.tsx:61 asks isPrimary
 too - a question for James, 10); and **the click follows the touch, not the drag** - a lift whose drag a song change
-dropped (`songChanged`) still runs onRecordClick, as a browser's click still comes, so the new song is paused. Not
-kept: a browser's primary pointer is the first of a gesture with no other finger down, so a third finger landing
+dropped (`songChanged`) still runs onRecordClick, as a browser's click still comes, so the new song is paused.
+**Since 2.1.12, on both** (James: "Fix on both"): the song change sets `turned` when the drag it drops was the
+record's, so that click is no tap and the new song is left as the change left it - see notes/ios.md "Main's 2.1.11 to
+2.1.15 merged". Not kept: a browser's primary pointer is the first of a gesture with no other finger down, so a third finger landing
 after the first lifted while the second stays is not primary there and is here - three fingers on a 372-point
 turntable.
 

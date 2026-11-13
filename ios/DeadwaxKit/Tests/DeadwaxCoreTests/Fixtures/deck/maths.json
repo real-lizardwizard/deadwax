@@ -29,6 +29,7 @@
     "ui/src/player/Turntable.tsx the record's aria-label": "1ccbb5e0701589180bae18c3652fd8da50f5b369aa5fe27a1a3ebce7dd382006",
     "ui/src/player/Turntable.tsx the record's turn as drawn (:426)": "fb790de62b6b097f0320ea6b7c5d707c0c454d36ef5dc5c4c5663b304189feb3",
     "ui/src/player/Turntable.tsx the silent line (:286-290)": "2dda97a2a53c0f724b1d68fbbd0d26e830ba54375059293fa0ad63baaab41db0",
+    "ui/src/player/Turntable.tsx the song-change effect (:269-280)": "bafe1e174116abfdc321df053e5f19e6157f880a45fd79cc1930d28503f44124",
     "ui/src/player/deck.ts": "7b1b18dc391a651d10560a43fd0c67eb44babd08138ebea133ddbf37ebc6278c"
   },
   "functions": ["exp","log","sin","cos","atan2","hypot","pow","log10"],
