@@ -1,4 +1,4 @@
-# The iPhone app (early: app 0.6, downloads, lyrics, the EQ and the turntable)
+# The iPhone app (early: app 0.7, downloads, lyrics, the EQ and the turntable)
 
 deadwax is getting a native iPhone app, built with SwiftUI and its own audio engine, for what a web
 page can't do well: seamless joins and normalization done on the phone, downloads to play offline,
@@ -12,11 +12,13 @@ there, bit for bit as deadwax has it - and goes on playing when deadwax can't be
 shows them (see [Lyrics](#lyrics)). App 0.5 added the EQ: ten sliders and nine presets, kept for each
 output on its own - your headphones, the speaker, the car - and switching by itself when the output
 changes, a correction for your headphones from AutoEq's measurements, and - under Advanced - filters
-and a preamp of your own and Equalizer APO files in and out (see [EQ](#eq)). **This is app 0.6,
-which adds the turntable**: Now Playing's second look, as the web app has it - a record you can turn
-by hand and hear as you turn it, with the album's CD art on its face (see [The
-turntable](#the-turntable)). Playlists, Search and the rest come in the next phases (see [What it
-can't do yet](#what-it-cant-do-yet)).
+and a preamp of your own and Equalizer APO files in and out (see [EQ](#eq)). App 0.6 added the
+turntable: Now Playing's second look, as the web app has it - a record you can turn by hand and hear
+as you turn it, with the album's CD art on its face (see [The turntable](#the-turntable)). **This is
+app 0.7, which adds the turntable's speed fader**: the song faster or slower, its pitch moving with
+it, as a record deck's does - and at 1x the song exactly as it is (see [The
+speed](#the-speed)). Playlists, Search and the rest come in the next phases (see [What it can't do
+yet](#what-it-cant-do-yet)).
 
 **Nothing of Phase 2, the lyrics, the EQ or the turntable has been seen on an iPhone yet.** It's
 built and tested on a Mac, and what only a phone can tell is what [the checks](#the-checks) are for.
@@ -126,7 +128,7 @@ old one. It also uses up one of the few new app ids a free account may register 
 It pulls the latest code, asks GitHub whether the app's checks passed on it (and asks you before
 building one that failed or is still running), builds it (Release), and installs it **over** the app
 on the phone, so everything on the phone stays. Then it opens the app and says how long the new
-install runs: `Installed deadwax 0.6 (6), runs until Wed 18 Nov, 14:02`. It also says how long it
+install runs: `Installed deadwax 0.7 (7), runs until Wed 18 Nov, 14:02`. It also says how long it
 took and the Mac's free space before and after. Xcode doesn't need to be open.
 
 | option | what it does |
@@ -283,6 +285,9 @@ thin line along it for how far in the song is. Tap it for Now Playing.
   ("Off", "Bass Boost"), which opens the [EQ](#eq) over Now Playing. Go to album closes Now Playing
   and opens the album's page on the tab you're on. What a download item did is said for a moment at
   the top of Now Playing ("Downloading: Roads", "Downloading 23 songs from Up Next").
+- **The speed**, when it isn't 1x: a purple `1.25x` between AirPlay and Up Next - tap it to go back to
+  1x. At the largest text sizes it isn't drawn; the **•••** menu's first line says it instead ("Speed
+  1.25x - back to normal speed"), and does the same. The speed is set on [the turntable](#the-speed).
 - **The button at the top right** shows Now Playing as [a turntable](#the-turntable) instead, and back.
 - The chevron at the top, or a swipe down, closes it.
 
@@ -351,8 +356,40 @@ nothing below it moves: the buttons and the row under them stay as they are. The
 - **Closing**: on the turntable, only a swipe down from the top row (or the chevron) closes Now
   Playing - a drag on the record or the arm never does. A record coasting back to speed as you close
   it still hands the song back where it was going.
-- The web's **speed fader**, at the turntable's corner, isn't here yet: it comes next (see [What it
-  can't do yet](#what-it-cant-do-yet)).
+
+#### The speed
+
+**The fader** stands at the turntable's right, beside the record, as a record deck's pitch fader does:
+slide its knob **up to go faster** and down to go slower, from 0.25x at the bottom to 2x at the top,
+1x two thirds of the way up (at the mark, which is green while the speed is exactly 1x). Each octave
+is the same distance: 0.25x, 0.5x, 1x and 2x are evenly spaced. As on the web, it's a record deck's
+speed, not a time-stretch: the pitch moves with it, and the record turns at it - 50 rpm at 1.5x. A turn
+of the hand is still 1.8 seconds of the song.
+
+- **Dragging** starts once your finger has moved a little, from the speed it's at, so a touch never
+  makes it jump. The speed follows your finger as you go. Coming back near the mark it snaps to exactly
+  1x, with **one small tick** under your thumb, and a drag let go there stays at exactly 1x.
+- **The readout** at the turntable's bottom right corner says the speed - `1.00x`, `1.25x` - in purple
+  while it isn't 1x. **Tap it** to go straight back to 1x. It stays above a line laid over the
+  turntable's foot. At the largest text sizes its words stop growing at what its corner can hold; a
+  long press shows them large.
+- **The cover** says the speed too, between AirPlay and Up Next (see [Playing](#playing)). The mini
+  player doesn't show it.
+- **At 1x the song is played exactly as it is**, sample for sample, as it was before the fader existed.
+  Leaving 1x, and letting go of the fader at 1x (or tapping back to it), each make a very short gap - a
+  few milliseconds - as the song moves into and out of the speed's path. Passing through 1x in the middle
+  of a drag doesn't.
+- **It stays where you left it**, on this phone, for every song, until you change it - opening the app
+  again included.
+- **The lock screen's clock runs at the speed**, and how far in the song is stays in the song's own
+  time. **Plays** count the song heard, whatever the speed: at 2x a song counts in half the time.
+- **One finger at a time**: while you hold the record or the arm, the fader takes no touch, and the
+  other way round. The fader's touch area stops short of the record, so the record keeps every touch
+  on itself.
+- **VoiceOver**: after the arm, the fader - "Speed", read as "normal speed" or "1.25 times"; swipe up
+  or down to change it by a hundredth (from 1x, up is 1.01x). Then the readout: "Speed 1.25x: back to
+  normal speed", a double-tap going back to 1x - at 1x it says "Speed: normal" and is dimmed. The chip
+  on the cover reads "1.25x, 1.25 times the song's speed: back to normal speed".
 
 ### Up Next
 
@@ -522,7 +559,7 @@ album.
   If deadwax can't be reached, it says "Couldn't reach deadwax, so you're still signed in - try
   again." Changing your password is the web app's, for now.
 - **About**: deadwax's version, whether logins are on (for an admin), and the app's own version,
-  **0.6 (6)**.
+  **0.7 (7)**.
 - **This phone**: deadwax's address, **Change address**, and **Debug**, for an admin (with logins
   off, everyone is one).
 
@@ -593,6 +630,10 @@ Debug is where Phase 0's test screen lives now:
     On the Mac, `swift run --package-path ios/DeadwaxKit replay-deck-recording <file>` plays it again
     through the app's own code and says whether it made the same sound (it should, to the bit). The
     same command takes a recording from the web app's Debug, with `--song <the song's file>`.
+  - **Speed**, last, whether or not the turntable has shown: "Normal (1.00x) - the song as it is,
+    nothing changed", or "1.25x, the pitch moving with it". After a few seconds of playing, a note
+    under it says how fast the song is really moving: "The song moved at 1.25x over the last few
+    seconds of playing" (the last 8 seconds, once there are 2). A new speed starts that count again.
 - **EQ**: what the [EQ](#eq) is doing. **Output** is the route as iOS gives it - each output's kind,
   name and ID, raw ("Bluetooth (A2DP) · James's AirPods Pro · 60:F8:…"), one line each - and **Key**
   the name the EQ keeps that output's setting under. Then the EQ's audio unit, which sits between the
@@ -934,13 +975,14 @@ won't import it back.
 The lock screen and Control Center show the song, its artist, album, cover and how far in it is. The
 next song's cover is fetched while a song plays, so the lock screen's cover changes with the song.
 Play, pause, next and previous work there, as does dragging the position, and the AirPods' presses
-work too. A phone call or Siri pauses the music, and it carries on when they're done. Taking an
+work too. At [a speed](#the-speed) other than 1x its clock runs at that speed. A phone call or Siri pauses the music, and it carries on when they're done. Taking an
 AirPod out pauses it.
 
 ## Plays
 
 A song is counted as played in Navidrome once you've heard half of it, or 4 minutes, whichever comes
-first. Songs of 30 seconds or less don't count. That's the rule the web app uses, and Last.fm's.
+first - of the song's own time, at any [speed](#the-speed): at 2x that comes in half the time. Songs of
+30 seconds or less don't count. That's the rule the web app uses, and Last.fm's.
 Navidrome passes plays on to Last.fm or ListenBrainz if it's linked to them, and is told what's
 playing now. A play that can't be sent - deadwax out of reach - is kept on the phone with its time and
 sent once deadwax answers again (see [The first time you open it](#the-first-time-you-open-it)).
@@ -1417,18 +1459,59 @@ speaker unless a check says. The numbers are the turntable plan's, so answers ca
 - **23 Against Safari.** The same song on the turntable in Safari (at deadwax's address) and in the
   app. Someone else hands you the phone with one or the other open, ten times; eyes closed, take the
   record, scratch it, flick it and let it hand back, then say which. Tell me how many you got right,
-  and anything that sounded different, and in which. (The web's Record 20 s isn't in the app yet, so
-  no recordings this time.)
+  and anything that sounded different, and in which. Then record 20 seconds in each (Debug > **Record
+  20 s**, the same song and a similar motion) and send both files.
 - **24 A whole album.** Leave the turntable showing for a whole album: no warmer than the cover, and
   the battery about the same - a little more, as the record's engine runs beside the song's while it
   plays.
+
+### The speed's checks (app 0.7)
+
+These come with the build that adds [the speed fader](#the-speed). Earbuds or the speaker unless a
+check says; the numbers carry on from the turntable's.
+
+- **25 The fader.** On the turntable, drag the knob up: the song speeds up and its pitch rises, the
+  readout says `1.25x` in purple, and the record turns faster. Back near the mark it snaps to exactly
+  1x with one small tick under your thumb, and the mark goes green.
+- **26 The readout.** Off 1x, tap the readout: straight back to 1x.
+- **27 The cover.** Off 1x, switch to the cover: `1.25x` between AirPlay and Up Next, nothing in that
+  row moved; tap it - 1x, and it's gone. The mini player shows nothing.
+- **28 1x as before.** At 1x everything sounds as it did before the fader existed: Test sounds 9 and
+  10 unbroken.
+- **29 At 2x and 0.5x.** Test sounds 9 and 10 still unbroken at each; lock the phone - the lock
+  screen's clock moves at the speed.
+- **30 The record at speed.** At 1.5x, take hold of the record and let go: it comes back to 1.5x
+  (50 rpm), and the song carries on at 1.5x.
+- **31 Through the mark.** While a song plays, drag the fader slowly up through 1x and back down
+  through it, several times: no click or jump at the mark either way. Then let go at the mark: one
+  short gap (a few milliseconds), then the song exactly as before the fader existed. The first move
+  off 1x has a short gap too.
+- **32 No flicker.** Watch play/pause under the record while you move the fader off 1x and let go at
+  1x, a few times: it stays a pause button - no spinner, no flash of play. Then lock the phone at
+  1.25x: the lock screen shows the song playing, its clock at the speed. Open Control Center while
+  it plays at 1.25x: it agrees with Now Playing's clock when you close it.
+- **33 Plays at 2x.** At 2x, play a song of four minutes or more to just past its half, then skip:
+  it counts as played (its play count in Navidrome, or Last.fm) - about a minute of the clock for a
+  four-minute song. At 1x, the same minute doesn't count.
+- **34 The tick.** Drag slowly back and forth across the mark: one tick each time you come into it,
+  none as you leave it. A tap on the readout, the cover's `1.25x`, and VoiceOver's swipes give none.
+- **35 Kept.** Set 1.25x, close the app from the app switcher and open it again: still 1.25x, from the
+  first note - the readout and the cover say so. Back at 1x the same way: 1x.
+- **36 One finger at a time.** Hold the record and put another finger on the fader: nothing moves.
+  Hold the fader's knob and tap the record: no pause. Close Now Playing while holding the fader: the
+  speed stays where your finger had it.
+- **37 VoiceOver.** After the arm: the fader ("Speed", "normal speed"; a swipe up says "1.01 times"),
+  then the readout ("Speed 1.01x: back to normal speed"; a double-tap goes back to 1x, and it then
+  says "Speed: normal", dimmed). On the cover off 1x, the chip: "1.25x, 1.25 times the song's speed:
+  back to normal speed".
+- **38 The largest text.** At an accessibility text size: the readout's words stay inside its corner,
+  and a long press on it shows `1.25x` large. On the cover, off 1x, there's no chip: the **•••**
+  menu's first line is "Speed 1.25x - back to normal speed", and it goes back to 1x.
 
 ## What it can't do yet
 
 These are the web app's for now. Most of them come to the phone in the next phases:
 
-- **The speed fader** on the turntable, and its chip on the cover - next, in the turntable's last
-  part.
 - **The visualizer**: it stays the web app's, on a desktop.
 
 - **Playlists**, **artist pages** and a **songs list**, and the Library's **Shuffle** of your whole

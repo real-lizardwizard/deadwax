@@ -2216,6 +2216,101 @@ while the speed is never moved, and found:
    the song's seconds kept instead); a join followed only a lane already started (a lane with buffers on it counts
    now); `nodeOffset` reads one render by its host time too; the trace's speed lines are a drag's every half second.
 
+#### Slice 4, second half, built (2026-11-13)
+
+The fader's view, its readout, the cover's chip and the ••• menu's line, the speed kept, and what the first half left
+for this one: the lock screen's rate, plays counted at speed, and no flicker while the engine begins its lanes again.
+App 0.7 (7). PlaybackEngine has no diff; nor have PCMSource, GainedSource, StreamSource, the EQ's render, ui/ and src/.
+
+**What was built.**
+
+- **Core** (PlaySpeed.swift). The kept speed - `deadwax-player-speed`, read by the web's rule (decimal text, a speed
+  in 0.25-2, rounded to a hundredth; anything else 1x) and written as the web writes it. The pace measured for
+  Debug (PACE_WINDOW_S 8, PACE_MIN_S 2, `paceStep`, `paceOf`). `ticks(from:to:)`, the tick's rule: into exactly 1x
+  from any other speed. And three small machines the app runs:
+  - `SpeedControl` - what the engine is told. A drag's every speed as it comes (`restarts` when it leaves 1x, the
+    lanes begun again in the chain), through 1x at rate 1 in the chain; a let-go at 1x after a drag
+    `setSpeed(1, exact: true)` (James's answer), the only time a let-go sends anything; a jump - the readout's tap,
+    the chip, the menu's line, a VoiceOver step - exact when it lands on 1x; the kept speed at the engine's start
+    (`atStart`, nil at 1x, so at 1x the chain is never made).
+  - `SpeedRestartHold` - the `.loading` a restart publishes, shown as playing: armed by a send that may begin the
+    lanes again while the entry plays, it hides that entry's loading for up to 1 s. Playing ends it, and so does any
+    phase but loading (a pause, a failure, the end are never hidden); past the second, a loading still there shows.
+  - `SpeedPublishing` - the lock screen told a new speed at once, then no more than every 0.25 s through a drag,
+    the last change of a run always told at the end of its gap.
+- **Plays** (Plays.swift). ListenTracker keeps the speed (`speedChanged`): a step is capped at the clock times the
+  fastest speed it spanned, so at 2x the song's seconds count in full, and a step across a change from 2x down isn't
+  cut to the slower speed. The speed outlives a stop, a new listen and a join.
+- **The drawing.** DeadwaxTurntable's `TurntableReadout`: the readout's face as a layer tree of its own - the fill
+  laid on the plinth's colour, the hairline edge, at 1x the well and its inset band (1 pt inside the top edge,
+  following the corners), off 1x the toggled face - sized by its words (0.6 em a figure, 0.15 em by 0.4 em of
+  padding). TurntableLayers draws it in the renders; the app hosts the same face in a control (`drawsReadout =
+  false` there). `TurntableLayout.faderSpan` (the knob's travel, 6 past each end of the slot) and `readoutTarget`
+  (min(44, 14% of the plinth)); `TurntableFace.chipFace` and `chipPad`; `TurntablePress.follows`.
+- **The app.** TurntableDeckView: FaderTouchView over `faderTarget` by `faderSpan`, following one touch, refused
+  while the record or the arm follows one (and the record and the arm refuse a touch while the fader is held - one
+  counter numbers the three views' touches, as a browser numbers pointers); FaderElement and ReadoutElement, the
+  reading order record, arm, fader, readout. DeckController: the fader's down, move and end (the web's faderMove over
+  PlaySpeedScale), the light impact as a drag crosses into the detent, the readout's tap, VoiceOver's steps
+  (`speedKey`'s ArrowUp and ArrowDown), the knob held while the drag has taken hold, Debug's Speed row last.
+  TurntableView: `TurntableReadoutLayer` and `ReadoutControl` (below). NowPlayingView: the chip; NowPlayingMenu: the
+  speed's line, first. PlayerModel: the speed - kept, sent, held, published, measured; NowPlayingController: the rate.
+
+**Tests**: SpeedControlTests (10: the kept speed, a drag through 1x and its let-go, a jump to 1x, the tick, the hold
+three ways, the publishing, the pace, the span and the target) and PlaysAtSpeedTests (4: half the song in half the
+time at 2x, the same steps at 1x short of a play, a step across a change, the speed kept); one render test (the well's
+inset at 1x, none off it, the readout not drawn when the app draws its own); `test_the_speed_chip_is_the_webs`
+(chipFace and chipPad against app.css's tokens). DeadwaxCore 976, DeadwaxAudio 158, DeadwaxTurntable 11, all passing;
+the release real-time and cost tests passing.
+
+**Departures, and why.**
+
+- **The readout is laid over Now Playing's column, not drawn in the plinth's layers.** 5.1 asks for it "a layer
+  above the overlay lines", but the foot line is SwiftUI, laid over the titles' row below the plinth, so nothing in
+  the plinth's UIView can be above it. The plinth gives its bounds as an anchor preference (`PlinthPlaceKey`), and
+  the column's `overlayPreferenceValue` places a `ReadoutControl` (a UIControl drawing TurntableReadout) at READOUT
+  in them: above the foot line, as the web's z-index puts it. Its VoiceOver element stays in the deck view, in the
+  web's order after the fader; the control is hidden from VoiceOver. It fades with the look's swap.
+- **The words' face**: the system's monospaced font in the app (2.11), Menlo in the Mac's renders - both 0.6 em a
+  figure, so the face is the same size either way.
+- **The inset's 1 px blur isn't drawn**: a 1 pt band of black at 0.5.
+- **The restart's loading is hidden for up to a second** (`SpeedRestartHold`): on Play/Pause's spinner and on the
+  lock screen, which would otherwise show the song paused for the few milliseconds the lanes take. A restart still
+  loading past a second is a real wait, and shows. The platter needed nothing: it already turns through `.loading`.
+- **The lock screen's rate is told four times a second at most through a drag**, the last always, each time with the
+  position read afresh (MPNowPlayingInfoCenter is another process; a drag is a change a frame).
+- **The chip's words stop growing at xxLarge.** 5.1 measured the gap at about 100 pt, but the footer has had Lyrics
+  at its left since app 0.4: between AirPlay's and Up Next's 44 pt targets there are about 56 pt on a 393 pt phone
+  and 50 on a 375 pt one (about 76 and 70 between their glyphs). The widest chip, `0.25x`, is about 55 pt at the
+  default size, 67 at xxLarge and 73 at xxxLarge, past the glyphs on the smaller phone - so its text stops at
+  xxLarge, and at the accessibility sizes the ••• menu says it (as 5.1). Its 44 pt target can overlap the
+  neighbours' targets by a few points at their outer edges (the chip above), never their glyphs.
+- **The ••• menu's speed line is its first section**: at those sizes it is the only place the cover says the speed.
+- **No custom actions on the fader** (question 9's A comes after the web's own answer), as slice 3 left them off the
+  record: the web's roles alone.
+- **Smaller**: the recorder's write (the first half's) captured self strongly in its outer closure - Xcode's one
+  warning in the app's sources; weak now. docs/ios.md's check 23 still said the app had no recorder; it asks for
+  both recordings now, as 8's does.
+
+**Mutations, each caught** (SpeedControlTests and PlaysAtSpeedTests, fifteen): the let-go at 1x not exact; a drag
+not marking the chain (so its let-go sends nothing); the first move off 1x not a restart; the engine told 1x at its
+start; a jump onto 1x not exact; the hold hiding any entry's loading; the hold never running out; the hold kept
+through a pause (the one that first survived - a test of a pause during a hidden restart added); the lock screen told
+every change; the last change of a drag's run dropped; the tick leaving 1x instead of entering it; the kept speed not
+rounded; the pace's window unbounded; plays at the clock alone; plays at the speed now rather than the fastest a step
+spanned.
+
+**Left as it is**: Debug's handover timing counts the engine's starts by its phase (HandoverStarts), and a speed's
+restart is a start - only a fader moved in the fraction of a second between a let-go of the record and the song
+being heard could make the Handover row read the restart's start rather than the handover's.
+
+**What only the phone shows.** All of the app's half: the fader under a thumb (its target, the slop, the speed
+following, the knob lit while held), the tick and its timing, the readout's place over the plinth's corner and over
+the foot line, its tap, the large content viewer, the chip's place and its fit at each text size, the menu's line,
+VoiceOver's order and steps, the hold hiding the restart (live, the restart is 5-20 ms unlocked, more locked), the
+lock screen's clock at the speed and its position across a drag, plays at 2x counted by Navidrome, the speed kept
+across a launch, and the gaps at the first move off 1x and at a let-go, heard. Checks 25-38.
+
 ---
 
 ## 8. James's checks on his iPhone
@@ -2310,6 +2405,22 @@ usual question buttons.
 31. While a song plays, drag the fader slowly up through 1x and back down through it, several times: no click
     or jump at the mark either way. Then let go at the mark: one short gap (a few ms), then the song exactly as
     before the fader existed (James's answer: exact again on let-go). The first move off 1x has a short gap too.
+32. No flicker: watch Play/Pause under the record while moving the fader off 1x and letting go at 1x, a few
+    times - it stays a pause button, no spinner, no flash of play. Lock the phone at 1.25x: the lock screen shows
+    the song playing, its clock at the speed; Control Center's clock agrees with Now Playing's.
+33. Plays at 2x: a song of four minutes or more played at 2x to just past its half, then skipped, counts as played
+    (Navidrome's play count) - about a minute of the clock for a four-minute song; at 1x the same minute doesn't.
+34. The tick: drag slowly back and forth across the mark - one tick each time into it, none leaving it; none from
+    the readout's tap, the chip or VoiceOver's steps.
+35. Kept: set 1.25x, close the app from the app switcher, open it again - still 1.25x from the first note.
+36. One finger at a time: holding the record, a finger on the fader moves nothing; holding the fader, a tap on the
+    record doesn't pause. Close Now Playing while holding the fader: the speed stays where the finger had it.
+37. VoiceOver: after the arm, the fader ("Speed", "normal speed"; a swipe up "1.01 times"), then the readout
+    ("Speed 1.01x: back to normal speed"; a double-tap goes to 1x, then "Speed: normal", dimmed). On the cover off
+    1x, the chip: "1.25x, 1.25 times the song's speed: back to normal speed".
+38. An accessibility text size: the readout's words stay inside its corner; a long press on it shows `1.25x` large.
+    On the cover off 1x, no chip: the ••• menu's first line is "Speed 1.25x - back to normal speed", and it goes
+    back to 1x.
 
 ---
 
