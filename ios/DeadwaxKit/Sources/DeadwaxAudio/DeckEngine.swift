@@ -308,14 +308,21 @@ public final class DeckEngine {
         return true
     }
 
-    /// The voice quiet, and the ring emptied of what it hadn't applied: a window kept aside for the next start, the
-    /// rest dropped as stale. Only while stopped.
+    /// The voice quiet, and the ring emptied of what it hadn't applied: its newest window kept aside for the next start,
+    /// the rest dropped as stale. Only while stopped. A window already kept aside is newer than any in the ring - it
+    /// came after the output stopped (the system's stop, settled here by the next `start()`), and nothing reaches the
+    /// ring until that start has posted it - so the ring's windows are then let go of, never put back over it.
     private func settleStopped() {
+        let newer = pending != nil
         var slot: UInt32 = 0
         while audio_fifo_peek(host.pointee.messages, &slot) {
             let message = host.pointee.slots[Int(slot)]
             if message.tag == DeckSlot.Tag.window.rawValue, let pcm = live.removeValue(forKey: message.id) {
-                keepAside(message, pcm)
+                if newer {
+                    windowQueue.async { _ = pcm.capacity }
+                } else {
+                    keepAside(message, pcm)
+                }
             } else {
                 stale += 1
             }

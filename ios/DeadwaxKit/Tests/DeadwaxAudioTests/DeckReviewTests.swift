@@ -128,6 +128,30 @@ import Testing
         #expect((0..<1_024).allSatisfy { left[$0] == 0 }, "silent: no stale knot played")
     }
 
+    /// Slice 3's review: a window posted while the system had stopped the output (started, not running) is newer than
+    /// any the ring still holds - the start that settles that stop lets the ring's go and applies the newer one, never
+    /// the older over it.
+    @Test func theWindowKeptAsideIsNewerThanTheRings() throws {
+        let deck = try DeckCases.offlineDeck(rate: Self.rate, eq: false)
+        func window(_ pcm: DeckPCM) -> DeckPost {
+            .window(DeckWindow(pcm: pcm, start: 0, end: 0.1, rate: Self.rate, source: .file, bytes: 0, madeIn: 0))
+        }
+        let older = DeckPCM([[Float](repeating: 0.1, count: 4_800)])
+        let newer = DeckPCM([[Float](repeating: 0.2, count: 4_800)])
+        try deck.start()
+        deck.setOfflineClock(frames: 0)
+        // in the ring, not yet applied - then the system stops the output (a configuration change), with no stop of ours
+        #expect(deck.post(window(older)))
+        deck.engine.stop()
+        #expect(deck.post(window(newer)), "kept aside as it comes")
+        try deck.start()
+        defer { deck.stop() }
+        _ = try deck.renderOffline(1_024)
+        deck.collect()
+        #expect(deck.live.values.contains { (pcm: DeckPCM) -> Bool in pcm === newer }, "the newer window is the voice's")
+        #expect(!deck.live.values.contains { (pcm: DeckPCM) -> Bool in pcm === older }, "the ring's older one let go")
+    }
+
     /// Question 2: a route change stops the voice and starts `L` again from twice the IO buffer, whatever the rate;
     /// offline (no hardware to ask) it reports no new rate, and the window is kept.
     @Test func aRouteChangeRestartsTheClockFromItsFloor() throws {
