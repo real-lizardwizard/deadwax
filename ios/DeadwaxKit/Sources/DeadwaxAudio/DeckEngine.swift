@@ -96,6 +96,8 @@ public final class DeckEngine {
     public let eq: EQHost?
 
     let engine = AVAudioEngine()
+    /// The output's rate as a test has the route: in place of the hardware's, or the offline format's (`outputRateNow`)
+    var rateForTests: Double?
     private(set) var node: AVAudioSourceNode?
     let settings: Settings
     let host: UnsafeMutablePointer<DeckHostState>
@@ -201,13 +203,8 @@ public final class DeckEngine {
         if started { stop() }
         Self.warm()
         let began = PlaybackEngine.hostSeconds()
-        let rate: Double
-        if let format = settings.offline {
-            rate = format.sampleRate
-        } else {
-            let hardware = engine.outputNode.outputFormat(forBus: 0).sampleRate
-            rate = hardware > 0 ? hardware : 48_000
-        }
+        let now = outputRateNow()
+        let rate = now > 0 ? now : 48_000
         if node == nil || rate != host.pointee.rate {
             let changed = node != nil
             if let old = node {
@@ -295,8 +292,8 @@ public final class DeckEngine {
     public func routeChanged() -> Bool {
         stop()
         host.pointee.lead.pointee.restart(floor: 2 * ioBuffer())
-        guard settings.offline == nil, let old = node else { return false }
-        let hardware = engine.outputNode.outputFormat(forBus: 0).sampleRate
+        guard let old = node else { return false }
+        let hardware = outputRateNow()
         guard hardware > 0, hardware != host.pointee.rate else { return false }
         let had = host.pointee.window != 0 || pending != nil
         resetStopped()
@@ -306,6 +303,14 @@ public final class DeckEngine {
         host.pointee.rate = hardware
         if had { tellWindowDropped() }
         return true
+    }
+
+    /// The rate the output runs at now: the offline format's, else the hardware's (0 when it can't say) - or the test's
+    /// `rateForTests`, a route at another rate, which offline has no hardware to give.
+    private func outputRateNow() -> Double {
+        if let rateForTests { return rateForTests }
+        if let format = settings.offline { return format.sampleRate }
+        return engine.outputNode.outputFormat(forBus: 0).sampleRate
     }
 
     /// The voice quiet, and the ring emptied of what it hadn't applied: its newest window kept aside for the next start,

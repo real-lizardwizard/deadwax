@@ -3,6 +3,8 @@
 // floor, whatever its rate (2); nothing timed waiting through a stop - a window kept aside, every timed message
 // dropped and counted, the voice quiet - so a stop's doc and its code agree and no number of posts fills the ring
 // (3, 4); the deck's EQ time counted as the song's is (6); a newer /scrub ask cancelling the fetch before it (6).
+// And slice 3's review's: a window kept aside is newer than the ring's, and a route at a new rate drops the window and
+// says so (2's other half, through `rateForTests`).
 #if canImport(AVFAudio)
 import AVFAudio
 @testable import DeadwaxAudio
@@ -168,6 +170,50 @@ import Testing
         DispatchQueue.main.async { main.signal() }
         _ = main.wait(timeout: .now() + 1)
         #expect(dropped.get() == 0, "the same rate: the window kept")
+    }
+
+    /// Question 2's other half (slice 3's review): a route at another rate - routeChanged() says so, makes the voice
+    /// again and tells the deck its window went (`windowDropped`), and the next start makes the node at the new rate
+    /// with no second word; a start that finds the rate changed by itself (the system stopped the output, no route
+    /// change seen) does the same.
+    @Test func aNewRateDropsTheWindowAndSaysSo() throws {
+        let deck = try DeckCases.offlineDeck(rate: Self.rate, eq: false)
+        let dropped = Locked(0)
+        deck.windowDropped = { dropped.set(dropped.get() + 1) }
+        func window() -> DeckPost {
+            .window(DeckWindow(pcm: DeckPCM([[Float](repeating: 0.1, count: 4_800)]), start: 0, end: 0.1, rate: Self.rate,
+                               source: .file, bytes: 0, madeIn: 0))
+        }
+        func settle() {
+            let main = DispatchSemaphore(value: 0)
+            DispatchQueue.main.async { main.signal() }
+            _ = main.wait(timeout: .now() + 1)
+        }
+        try deck.start()
+        deck.setOfflineClock(frames: 0)
+        #expect(deck.post(window()))
+        _ = try deck.renderOffline(512)
+        #expect(deck.host.pointee.window != 0, "the voice has its window")
+        // the route moves to 44.1 kHz
+        deck.rateForTests = 44_100
+        #expect(deck.routeChanged(), "a new rate")
+        settle()
+        #expect(dropped.get() == 1, "the window dropped, and said")
+        #expect(deck.rate == 44_100 && deck.node == nil && deck.host.pointee.window == 0 && deck.live.isEmpty)
+        try deck.start()
+        settle()
+        #expect(dropped.get() == 1 && deck.rate == 44_100 && deck.node != nil, "started at it: nothing more to drop")
+        #expect(deck.post(window()))
+        _ = try deck.renderOffline(512)
+        // the system stops the output and the rate moves back, with no route change seen: the start finds it
+        deck.engine.stop()
+        deck.rateForTests = 48_000
+        try deck.start()
+        defer { deck.stop() }
+        settle()
+        #expect(dropped.get() == 2 && deck.rate == 48_000, "the start's own word: \(dropped.get())")
+        // the same rate again: routeChanged keeps the window
+        #expect(!deck.routeChanged())
     }
 
     /// Question 6: the deck's EQ counts its render time as the song's EQUnit does - ticks and the longest block.
