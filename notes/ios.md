@@ -3102,6 +3102,17 @@ ubuntu job is their first Linux build. ios.yml itself hasn't run either: nothing
 
 **Only the phone can show**: checks 0a-0c, the real `E`, and the phone's "Window made in".
 
+**Review (2026-11-13).** Four fixes, each with its own test:
+- The deck's EQ state is made again at every start, so a restart is eq.md 1.9's fresh install and Off is bit-exact
+  from its first block.
+- `X-Deadwax-Window` refuses what a FLAC can't say, and the plan can't trap on a number from outside.
+- Unread reports are capped at the ring's 64.
+- The allocation hook is held by one suite at a time. Run alongside EQRealTimeTests, the window's 16.12 MB had read
+  15.80, so the "15.8" above is probably that.
+
+New tests cover full rings, a window's give-back and `L`'s slew in the render. The judgement on each area asked about,
+and the questions left for slice 3, are in the spec's "Slice 2, built", under Review.
+
 ## The EQ, slice 1: Core (2026-11-12)
 
 The design is notes/ios-specs/eq.md. Its slice 1 (5.1) is the EQ's pure part, in DeadwaxCore and tested like the rest

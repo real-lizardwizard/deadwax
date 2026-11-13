@@ -303,6 +303,8 @@ private func scrubFixture() throws -> (flac: Data, header: DeckScrub.Header, tex
         // the decoder's and the converter's first-time costs outside the count
         _ = try DeckWindows.window(of: file, from: 0, seconds: 2, outputRate: Self.output, factor: nil)
         guard alloc_hook_available() else { return }
+        allocationHookInUse.lock()
+        defer { allocationHookInUse.unlock() }
         alloc_hook_install()
         defer { alloc_hook_remove() }
         alloc_hook_watch_this_thread()

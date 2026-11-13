@@ -93,6 +93,35 @@ import Testing
         #expect(throws: DeckWindowError.pastTheEnd) { try DeckScrub.plan(from: 2, seconds: 40, header: past, outputRate: 48_000).get() }
     }
 
+    /// The header is deadwax's answer, read as untrusted bytes (the review): a number past what a FLAC can say - its
+    /// samples in 36 bits, its rate in 20 - is no header, and nothing a header or a caller gives makes the plan's
+    /// arithmetic trap (each of these crashed the process before: `first + samples` overflowing, and a Double too
+    /// large for an Int).
+    @Test func aHeaderPastWhatAFLACCanSayIsRefusedAndNothingTraps() throws {
+        for bad in ["9223372036854775807/1/44100", "68719476736/0/44100", "0/68719476736/44100", "0/1/1048576",
+                    "0/1/9223372036854775807", "99999999999999999999/1/44100"] {
+            #expect(DeckScrub.Header.parse(bad) == nil, "\(bad)")
+        }
+        let widest = try #require(DeckScrub.Header.parse("68719476735/68719476735/1048575"))
+        #expect(widest.end == 2 * 68_719_476_735)
+        // the widest a header can be, at the slowest rate: a plan, capped, not a trap
+        let slow = try #require(DeckScrub.Header.parse("0/68719476735/1"))
+        let placed = try DeckScrub.plan(from: 2, seconds: 40, header: slow, outputRate: 48_000).get()
+        #expect(placed.plan.frames == DeckScrub.maxFrames && placed.skip == 2)
+        // made by hand past the parser's bounds: still no trap
+        #expect(DeckScrub.Header(first: .max, samples: 1, rate: 44_100).end == .max)
+        let huge = DeckScrub.Header(first: 0, samples: 1, rate: .max)
+        #expect(throws: DeckWindowError.pastTheEnd) { try DeckScrub.plan(from: 2, seconds: 40, header: huge, outputRate: 48_000).get() }
+        // and a caller's numbers: nil, never a trap
+        #expect(DeckScrub.plan(from: 1e300, seconds: 40, fileRate: 44_100, fileFrames: nil, outputRate: 48_000) == nil)
+        #expect(DeckScrub.plan(from: 2, seconds: 1e300, fileRate: 44_100, fileFrames: nil, outputRate: 48_000)?.frames
+                == DeckScrub.maxFrames)
+        #expect(DeckScrub.plan(from: 2, seconds: 40, fileRate: 44_100, fileFrames: .max, outputRate: 48_000)?.frames
+                == DeckScrub.maxFrames)
+        #expect(DeckScrub.plan(from: 2, seconds: 40, fileRate: 44_100, fileFrames: nil, outputRate: 48_000,
+                               preRoll: .infinity) == nil)
+    }
+
     @Test func scrubsStatusesAreTheDecksWords() {
         #expect(DeckScrub.failure(status: 204, detail: nil, words: "x") == nil)
         #expect(DeckScrub.failure(status: 415, detail: "it is MP3", words: "x") == .notFlac("it is MP3"))

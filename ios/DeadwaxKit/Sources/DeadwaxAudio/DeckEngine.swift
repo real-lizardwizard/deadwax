@@ -96,7 +96,8 @@ public final class DeckEngine {
     /// What the render's output pointers hold before the first block binds them (the render rebinds them to each
     /// block's buffers, so this, not `outputs[0]`, is what is freed)
     private let scratch: UnsafeMutablePointer<Float>
-    private var live: [UInt32: DeckPCM] = [:]
+    /// the windows posted that the voice hasn't let go of, by the id their message carried
+    private(set) var live: [UInt32: DeckPCM] = [:]
     private var nextID: UInt32 = 1
     private var dropped = 0
     private var heard: [VoiceHeard] = []
@@ -220,10 +221,11 @@ public final class DeckEngine {
             node = made
         }
         if let eq {
-            if host.pointee.eq == nil || host.pointee.eq?.pointee.rate != rate {
-                if let old = host.pointee.eq { EQRender.free(old) }
-                host.pointee.eq = EQRender.make(rate: rate, channels: 2, maximumFrames: settings.maximumFrames)
-            }
+            // made again at every start, as the song's EQUnit makes its render memory at every allocation (eq.md 1.6,
+            // 1.9): its first block installs the newest bank - states zeroed, no crossfade - rather than crossfading
+            // from the bank and the filters' state of the run before the stop. The render isn't running.
+            if let old = host.pointee.eq { EQRender.free(old) }
+            host.pointee.eq = EQRender.make(rate: rate, channels: 2, maximumFrames: settings.maximumFrames)
             eq.allocated(rate: rate, channels: 2)
             eq.outputStarting()
             eqStart(eq, rate, 2)
@@ -323,6 +325,9 @@ public final class DeckEngine {
             heard.append(host.pointee.heard[Int(slot)].heard)
             audio_fifo_release(host.pointee.reports)
         }
+        // kept for `reports()` as the ring keeps them, the newest 2 s: every post collects, so with no one reading them
+        // (Debug's run) they would otherwise pile up for as long as it plays
+        if heard.count > Int(Self.reportCapacity) { heard.removeFirst(heard.count - Int(Self.reportCapacity)) }
     }
 
     /// The voice's reports since the last call, oldest first.

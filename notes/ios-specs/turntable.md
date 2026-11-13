@@ -1685,6 +1685,72 @@ iosdeck's --check); check-linux.sh and ios.yml were not run - Linux by reading.
    bound get more room, or the pieces get smaller (0.5 s)? **Smaller pieces first**: the margin is what 4.4 step 5
    promises.
 
+**Review (2026-11-13).** Read against 4.1-4.7, eq.md 1.9 and deck.ts, and mutated. Four things were wrong and are
+fixed, each with a test that fails without it:
+- **The deck's EQ started from its last run.** `start()` made the EQ's render state only when there was none or the
+  rate was new. So a stop and a start at the same rate kept the filters' old state and counts, and crossfaded from
+  the old bank. eq.md 1.9 asks for the same install as the song's at the first block after the engine's own start,
+  and an Off set while stopped wasn't bit-exact for the crossfade's 20 ms. The state is now made again at every
+  start, as the song's EQUnit makes its own at every allocation (`theDecksEQStartsAfreshAtEveryStart`: the first
+  block after a restart is a fresh EQRender's, bit for bit, and Off after a restart is the plain deck's).
+- **`X-Deadwax-Window` could trap.** `first + samples` overflowed an Int64, and a large count or rate made a Double
+  too big for the Int the plan converts it to. The reader now refuses what a FLAC can't say: samples under 2^36 and
+  the rate under 2^20, STREAMINFO's widths. `end` saturates. `plan` holds every product under 2^40 before
+  converting, so a number from outside gives a plan or nil
+  (`aHeaderPastWhatAFLACCanSayIsRefusedAndNothingTraps`).
+- **Reports nobody read piled up.** `collect()` appended to `heard` without bound, so a caller that seldom reads
+  `reports()`, like Debug's trial, grew it by about 1.7 KB/s, 6 MB an hour. It now keeps the newest 64, the ring's
+  depth (`unreadReportsDontPileUp`).
+- **The memory and allocation counts could pass low.** CAllocHook watches one thread for the whole process, and
+  Swift Testing runs suites in parallel. So EQRealTimeTests' count and DeckWindowTests' could overlap, and either
+  could count the other's thread instead of its own. The 40 s window's bytes, 16.12 MB every time it ran alone, read
+  as low as 15.80 in the full suite: the table's range above is probably that. Both now hold one lock round the
+  hook.
+
+New tests for what had none:
+- full rings drop, keep and count (`fullRingsDropKeepAndCount`);
+- the window given back is the old one, and only once the voice has let go (`aWindowIsGivenBackOnlyOnceTheVoiceLetsGoOfIt`,
+  reading `live`, now `private(set)`);
+- the render's `L` slews under a sound and moves freely in quiet (`theRendersClockSlewsUnderASound`).
+
+Six mutations, each alone, are caught by these tests: the EQ state reused, reports unbounded, the new window given
+back, never sounding, a drop not counted, and the header's bounds gone. One mutation is caught by nothing: a fold
+that doesn't sum `held` and `peaks`. That count only feeds Debug's words, so it is left untested.
+
+Judged and left as built:
+- **The render is real-time safe.** Release counts 0 allocations in both tests. It takes no locks and makes no
+  runtime calls. DeckLead and DeckVoice read static lets, which is fine in release once the warm-up has run.
+- **DeckWindows' `@unchecked Sendable` holds.** `ticket` is behind its lock and the rest is `let`. `answer` is
+  called only on the answers queue. DeckPCM is mutable behind its own `@unchecked`, which is safe only because a
+  window is filled before it is posted. A write after posting would be a race that no type catches.
+- **The second EQHost is eq.md 1.9's**: its own triple buffer and state, after the limiter. Off is bit-exact from
+  the first block of a start.
+- **The handover's arithmetic is 3.5's** (`r = planEnd + D - E`). The quantum of 32 proves it to 0.67 ms. On the
+  phone the resume isn't quantized to blocks, so the bound there is tighter than the spec's.
+- **ios.yml runs the release step** beside the EQ's. The must-not-touch files have no diff. ROUTE_COUNT is 27, and
+  the `/scrub` client asks only `at` and `seconds`.
+- **Swift 6.3.3 with the 26.5 SDK** (CI's Xcode 26.6) compiles Core and Audio. The test targets weren't checked
+  under it: the Command Line Tools' Testing macros don't match their own framework. The review's closures state
+  their types, except `#expect(throws:)`'s, a form CI already compiles in eight places.
+- **The memory bound measures the right thing, with a 0.53 MB margin.** The overhead above the window is a constant
+  1.47 MB at every length, and about 1.0-1.16 MB of that is AVAudioFile's own FLAC open. CI's load won't move it,
+  but another OS's decoder could. Smaller pieces buy little: the pieces' own transient is about 0.4 MB, so 0.5 s
+  pieces would save about 0.2 MB. That answers question 3 the other way. If the bound fails on CI, subtract the
+  decoder's open cost, measured as a one-frame window's, rather than shrink the pieces or loosen the bound.
+
+Questions for slice 3, and for James:
+- **The live clock's fallback.** It falls back to sample time if the host time is ever invalid, but that is a
+  different time base, so `L` would jump. Should it hold the last host time instead?
+- **`L` on a route change.** 4.6 restarts `L` at every route change. DeckEngine restarts it only on a new rate,
+  and has no call for a route change at the same rate.
+- **A rate change drops messages.** Its `resetStopped()` drops what was posted while stopped, which `stop()`'s doc
+  says is applied at the next start.
+- **Messages posted while stopped.** They are applied at the next start with their old times, and enough of them
+  fill the ring.
+- **The EQ's banks.** When the deck's EQ is wired, EQModel must make each host's bank at that host's own rate.
+- **Smaller gaps.** DeckTrial doesn't activate the session. The deck's EQ counters don't record its render's
+  ticks. A `/scrub` fetch isn't cancelled by a newer ask.
+
 ### 7.3 Slice 3 - the look, the touch views, the deck's rules, settings, Debug, docs
 
 - **Files**: `ios/App/Player/Turntable/` - `TurntableView.swift` (SwiftUI: the plinth's place, the time line, the

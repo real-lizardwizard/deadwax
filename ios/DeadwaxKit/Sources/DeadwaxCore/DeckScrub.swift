@@ -18,6 +18,9 @@ public enum DeckScrub {
     /// What `/scrub` is asked for beyond the window and its pre-roll: deadwax starts its answer at a FLAC frame (or a
     /// fragment of about a second) at or before `at` (src/flac_window.py).
     public static let slackS = 1.0
+    /// More frames than any song has (2^40: about 130 days at 96 kHz), and small enough that its products with any
+    /// rate stay whole in a Double and inside an Int64.
+    static let largest = Double(Int64(1) << 40)
 
     /// A window planned (4.4): where it starts in the song, where decoding starts, what of the converter's output is
     /// the pre-roll's, and how many frames at the voice's rate it holds.
@@ -48,15 +51,19 @@ public enum DeckScrub {
     /// when nothing of the song is left from `from`.
     public static func plan(from: Double, seconds: Double, fileRate: Double, fileFrames: Int64?, outputRate: Double,
                             preRoll: Double = preRollS) -> Plan? {
-        guard fileRate > 0, outputRate > 0, from.isFinite, seconds.isFinite, seconds > 0 else { return nil }
-        let startFrame = Int64((Swift.max(0, from) * fileRate).rounded())
-        let preRollFrames = Swift.min(startFrame, Int64((Swift.max(0, preRoll) * fileRate).rounded()))
-        let drop = Int((Double(preRollFrames) * outputRate / fileRate).rounded())
-        var frames = Swift.min(Int((seconds * outputRate).rounded(.down)), maxFrames)
+        guard fileRate > 0, outputRate > 0, from.isFinite, seconds.isFinite, seconds > 0, preRoll.isFinite else { return nil }
+        // every product turned into an integer is first held to a size no song has (`largest`), so a number from
+        // outside - a `/scrub` header's, say - is a plan or nil, never a trap converting a Double too large for an Int
+        let start = (Swift.max(0, from) * fileRate).rounded()
+        guard start.isFinite, start <= Self.largest else { return nil }
+        let startFrame = Int64(start)
+        let preRollFrames = Swift.min(startFrame, Int64(Swift.min((Swift.max(0, preRoll) * fileRate).rounded(), Self.largest)))
+        let drop = Int(Swift.min((Double(preRollFrames) * outputRate / fileRate).rounded(), Self.largest))
+        var frames = Int(Swift.min((seconds * outputRate).rounded(.down), Double(maxFrames)))
         if let fileFrames {
             let left = fileFrames - startFrame
             guard left > 0 else { return nil }
-            frames = Swift.min(frames, Int((Double(left) * outputRate / fileRate).rounded(.down)))
+            frames = Swift.min(frames, Int(Swift.min((Double(left) * outputRate / fileRate).rounded(.down), Double(maxFrames))))
         }
         guard frames > 0 else { return nil }
         return Plan(startFrame: startFrame, decodeFrom: startFrame - preRollFrames, dropFrames: drop, frames: frames,
@@ -94,17 +101,27 @@ public enum DeckScrub {
             self.rate = rate
         }
 
-        /// Nil unless it is three whole numbers, the rate above 0.
+        /// FLAC's own widths (its STREAMINFO): a song's samples in 36 bits, its rate in 20 - so `first + samples` and
+        /// every plan made from them stay far inside an Int64.
+        public static let samplesLimit: Int64 = 1 << 36
+        public static let rateLimit = 1 << 20
+
+        /// Nil unless it is three whole numbers a FLAC can say: `first` and `samples` under 2^36, the rate above 0 and
+        /// under 2^20. The header is read from deadwax's answer, so a number past them is refused, not trusted.
         public static func parse(_ text: String?) -> Header? {
             guard let parts = text?.trimmingCharacters(in: .whitespaces).split(separator: "/", omittingEmptySubsequences: false),
                   parts.count == 3, parts.allSatisfy({ !$0.isEmpty && $0.allSatisfy(\.isASCIIDigit) }),
-                  let first = Int64(parts[0]), let samples = Int64(parts[1]), let rate = Int(parts[2]), rate > 0
+                  let first = Int64(parts[0]), let samples = Int64(parts[1]), let rate = Int(parts[2]),
+                  first < samplesLimit, samples < samplesLimit, rate > 0, rate < rateLimit
             else { return nil }
             return Header(first: first, samples: samples, rate: rate)
         }
 
-        /// The song frame after its last.
-        public var end: Int64 { first + samples }
+        /// The song frame after its last (as far as an Int64 goes, for a header made by hand).
+        public var end: Int64 {
+            let (sum, over) = first.addingReportingOverflow(samples)
+            return over ? .max : sum
+        }
     }
 
     /// A `/scrub` answer's window: the plan at the answer's own rate, its end from `first + samples` (deadwax cuts at
