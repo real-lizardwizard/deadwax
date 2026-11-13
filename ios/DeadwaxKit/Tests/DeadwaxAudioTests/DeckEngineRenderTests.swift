@@ -111,9 +111,14 @@ import Testing
         plain.stop()
         try start(withEQ)
         try start(plain)
+        // a stop leaves the voice quiet (slice 3's review), so the restart is taken again, stamped a hand's delay back
+        // so that it sounds from the first block
+        for deck in [withEQ, plain] {
+            #expect(deck.post(.take(at: 1.5, rate: 1, time: Double(done) / rate - 0.12, until: .infinity), keeping: nil))
+        }
         let filtered = try block(withEQ), voice = try block(plain)
         done += frames
-        #expect(voice[0].contains { $0 != 0 }, "the record sounds across the restart")
+        #expect(voice[0].contains { $0 != 0 }, "the record sounds from the restart's first block")
         // the curve installed afresh - a state just made, the bank offered at its first block - over the voice's block
         let fresh = EQRender.make(rate: rate, channels: 2, maximumFrames: frames)
         let channels = UnsafeMutablePointer<UnsafeMutablePointer<Float>>.allocate(capacity: 2)

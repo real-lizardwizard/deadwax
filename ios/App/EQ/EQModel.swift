@@ -52,6 +52,8 @@ final class EQModel {
     /// Core's book of versions and banks made ahead, shared with the engine's queue.
     nonisolated let desk: EQStartDesk
     @ObservationIgnored private weak var host: EQHost?
+    /// The turntable's deck engine's EQ (eq.md 1.9, turntable.md 4.3): the same curve, at its own rate.
+    @ObservationIgnored private weak var deckHost: EQHost?
     private let store: EQStore
     @ObservationIgnored private var writable: Bool
     @ObservationIgnored private var saveTask: Task<Void, Never>?
@@ -138,6 +140,20 @@ final class EQModel {
     nonisolated static func startHook(_ desk: EQStartDesk) -> (EQHost, Double, Int) -> Void {
         { (host: EQHost, rate: Double, _: Int) -> Void in
             desk.start(EQRouteReader.output().key, rate: rate, host: Self.taker(host))
+        }
+    }
+
+    /// The turntable's deck engine made (DeckController): its host takes every change as the song's does, and its start
+    /// puts the output's curve in at its own rate - not recorded as the song's start (Debug's Start took is the song's).
+    func attachDeck(_ engine: DeckEngine) {
+        deckHost = engine.eq
+        engine.eqStart = Self.deckStartHook(desk)
+        publish()
+    }
+
+    nonisolated static func deckStartHook(_ desk: EQStartDesk) -> (EQHost, Double, Int) -> Void {
+        { (host: EQHost, rate: Double, _: Int) -> Void in
+            desk.start(EQRouteReader.output().key, rate: rate, host: Self.taker(host), record: false)
         }
     }
 
@@ -478,11 +494,13 @@ final class EQModel {
             settings.met(output, at: Self.now())
             dirty = true
         }
-        guard let host else {
+        let hosts = [host, deckHost].compactMap { (each: EQHost?) -> EQHost? in each }
+        guard !hosts.isEmpty else {
             _ = desk.take(settings, muffle: muffleOn)
             return
         }
-        desk.changed(settings, route: route.key, muffle: muffleOn, host: Self.taker(host))
+        // one version, each host's bank at its own rate (the deck engine may run at another than the song's unit)
+        _ = desk.changed(settings, route: route.key, muffle: muffleOn, hosts: hosts.map(Self.taker))
         readUnit()
     }
 

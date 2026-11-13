@@ -38,6 +38,9 @@ public struct DeckEngineStatus: Sendable, Equatable {
     public var failure: String?
     /// the EQ's blocks on the deck (eq.md 1.9)
     public var eqBlocks = 0
+    /// Messages dropped because their time had passed: posted while the engine was stopped, or left unapplied by a
+    /// stop (slice 2's review, questions 3 and 4). Not the full ring's `dropped`.
+    public var stale = 0
 
     /// Debug's Clock row (6.2).
     public var clockRow: InfoRow {
@@ -82,14 +85,23 @@ public final class DeckEngine {
     public var ioBuffer: () -> TimeInterval = { 0 }
     /// The deck engine's own `outputLatency + ioBufferDuration` - its part of `D` (3.5). The app sets it.
     public var latency: () -> TimeInterval = { 0 }
+    /// At every start, first (slice 2's review, question 6): the app's audio session made active, as a play makes it -
+    /// before the output's rate is read, so the voice is made at the rate the route will run at. A throw is the start's
+    /// failure, nothing started. The app sets it; nothing by default (the tests' offline engines).
+    public var activate: () throws -> Void = {}
     /// At every start, between prepare and start (eq.md 1.8): the deck's EQ host, its rate and channels - the app
     /// publishes the output's curve here, as it does for the song's engine.
     public var eqStart: (_ host: EQHost, _ rate: Double, _ channels: Int) -> Void = { _, _, _ in }
+    /// The voice's window is gone - its rate no longer the output's (a route change, a start at a new rate) - so the
+    /// deck's rules must ask for it again (DeckRules.windowDropped). On the main queue, after the call that dropped it.
+    public var windowDropped: () -> Void = {}
     /// The deck's EQ host (eq.md 1.9): banks published here are rendered after the voice's limiter. Nil with
     /// `Settings.eq` false.
     public let eq: EQHost?
 
     let engine = AVAudioEngine()
+    /// The output's rate as a test has the route: in place of the hardware's, or the offline format's (`outputRateNow`)
+    var rateForTests: Double?
     private(set) var node: AVAudioSourceNode?
     let settings: Settings
     let host: UnsafeMutablePointer<DeckHostState>
@@ -105,6 +117,11 @@ public final class DeckEngine {
     private var stops = 0
     private var lastStart: Double?
     private var failure: String?
+    /// started and not stopped by `stop()` - the system may have stopped the engine meanwhile (a configuration change)
+    private var started = false
+    /// the newest window posted while stopped, or left in the ring by a stop: applied at the next start's first block
+    private var pending: (slot: DeckSlot, pcm: DeckPCM)?
+    private var stale = 0
     private let windowQueue = DispatchQueue(label: "deadwax.deck.windows", qos: .utility)
 
     public init(settings: Settings = Settings()) {
@@ -185,23 +202,30 @@ public final class DeckEngine {
     /// changed (a new route: a window at the old rate is dropped and made again, 4.4). Warmed first, once, off the
     /// audio thread (4.3).
     public func start() throws {
-        guard !engine.isRunning else { return }
+        if started && engine.isRunning { return }
+        // stopped by the system (its configuration changed, 4.6): settled as a stop of ours first
+        if started { stop() }
+        do {
+            try activate()
+        } catch {
+            failure = error.localizedDescription
+            throw error
+        }
         Self.warm()
         let began = PlaybackEngine.hostSeconds()
-        let rate: Double
-        if let format = settings.offline {
-            rate = format.sampleRate
-        } else {
-            let hardware = engine.outputNode.outputFormat(forBus: 0).sampleRate
-            rate = hardware > 0 ? hardware : 48_000
-        }
+        let now = outputRateNow()
+        let rate = now > 0 ? now : 48_000
         if node == nil || rate != host.pointee.rate {
             let changed = node != nil
             if let old = node {
                 engine.disconnectNodeOutput(old)
                 engine.detach(old)
             }
-            if changed { resetStopped() }
+            if changed {
+                let had = host.pointee.window != 0 || pending != nil
+                resetStopped()
+                if had { tellWindowDropped() }
+            }
             host.pointee.rate = rate
             host.pointee.lead.pointee.restart(floor: 2 * ioBuffer())
             guard let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 2) else {
@@ -230,6 +254,13 @@ public final class DeckEngine {
             eq.outputStarting()
             eqStart(eq, rate, 2)
         }
+        // the clock starts afresh (a block with no host time is placed after the last one, which a stop has made old),
+        // and the window posted while it rested goes in first
+        host.pointee.lastHostOut = -1
+        if let waiting = pending {
+            pending = nil
+            if post(waiting.slot, keeping: waiting.pcm) == false { windowQueue.async { _ = waiting.pcm.capacity } }
+        }
         engine.prepare()
         do {
             try engine.start()
@@ -238,20 +269,98 @@ public final class DeckEngine {
             eq?.deallocated()
             throw error
         }
+        started = true
         eq?.outputStarted()
         failure = nil
         starts += 1
         lastStart = PlaybackEngine.hostSeconds() - began
     }
 
-    /// Stopped: the voice keeps its state and its window, as the web's suspended context does, and messages posted
-    /// meanwhile are applied at the next start's first block.
+    /// Stopped: the voice keeps its window, as the web's suspended context does, and goes quiet - the sound it was
+    /// making went with the output, and its knots' times will have passed by the next start. So nothing timed waits
+    /// for that start (slice 2's review, questions 3 and 4): a message the voice hadn't applied is dropped here, and
+    /// one posted while stopped is dropped as it comes (both counted, `stale`) - except a window, the newest of which
+    /// is kept aside and applied at the next start's first block, outside the ring, so no number of posts while
+    /// stopped can fill it. The DeckController starts the engine before it posts a sound (4.6), so the deck's rules
+    /// post only windows and stops while it rests. At a new rate the next start makes the voice again, the window
+    /// with it (it was made at the old rate), and says so (`windowDropped`).
     public func stop() {
-        guard engine.isRunning else { return }
-        engine.stop()
+        guard started else { return }
+        started = false
+        if engine.isRunning { engine.stop() }
         eq?.deallocated()
         stops += 1
+        settleStopped()
         collect()
+    }
+
+    /// A route change (4.6; slice 2's review, question 2): the voice stopped - quiet, then the engine - and `L` started
+    /// again from its floor on the new route, whatever its rate. When the output's rate is no longer the voice's, the
+    /// voice is made again now, its window dropped (`windowDropped`), and the source node remade at the next start.
+    /// True when the rate changed.
+    @discardableResult
+    public func routeChanged() -> Bool {
+        stop()
+        host.pointee.lead.pointee.restart(floor: 2 * ioBuffer())
+        guard let old = node else { return false }
+        let hardware = outputRateNow()
+        guard hardware > 0, hardware != host.pointee.rate else { return false }
+        let had = host.pointee.window != 0 || pending != nil
+        resetStopped()
+        engine.disconnectNodeOutput(old)
+        engine.detach(old)
+        node = nil
+        host.pointee.rate = hardware
+        if had { tellWindowDropped() }
+        return true
+    }
+
+    /// The rate the output runs at now: the offline format's, else the hardware's (0 when it can't say) - or the test's
+    /// `rateForTests`, a route at another rate, which offline has no hardware to give.
+    private func outputRateNow() -> Double {
+        if let rateForTests { return rateForTests }
+        if let format = settings.offline { return format.sampleRate }
+        return engine.outputNode.outputFormat(forBus: 0).sampleRate
+    }
+
+    /// The voice quiet, and the ring emptied of what it hadn't applied: its newest window kept aside for the next start,
+    /// the rest dropped as stale. Only while stopped. A window already kept aside is newer than any in the ring - it
+    /// came after the output stopped (the system's stop, settled here by the next `start()`), and nothing reaches the
+    /// ring until that start has posted it - so the ring's windows are then let go of, never put back over it.
+    private func settleStopped() {
+        let newer = pending != nil
+        var slot: UInt32 = 0
+        while audio_fifo_peek(host.pointee.messages, &slot) {
+            let message = host.pointee.slots[Int(slot)]
+            if message.tag == DeckSlot.Tag.window.rawValue, let pcm = live.removeValue(forKey: message.id) {
+                if newer {
+                    windowQueue.async { _ = pcm.capacity }
+                } else {
+                    keepAside(message, pcm)
+                }
+            } else {
+                stale += 1
+            }
+            audio_fifo_release(host.pointee.messages)
+        }
+        // quiet: a voice made afresh round the window it had - no knot, no gain, and the limiter's lookahead and the DC
+        // blocker empty, so the next start doesn't play the last 1.5 ms of the sound the stop cut (a fade wouldn't
+        // reach those: they are already past the gain)
+        let voice = host.pointee.voice
+        let window = voice.pointee.window
+        voice.pointee.deallocate()
+        voice.pointee = DeckRender.newState()
+        voice.pointee.window = window
+    }
+
+    /// The newest window waiting for a start; the one it replaces freed off the main thread.
+    private func keepAside(_ slot: DeckSlot, _ pcm: DeckPCM) {
+        if let older = pending { windowQueue.async { _ = older.pcm.capacity } }
+        pending = (slot, pcm)
+    }
+
+    private func tellWindowDropped() {
+        DispatchQueue.main.async { [weak self] in self?.windowDropped() }
     }
 
     /// The voice made again, every window let go of and freed, the rings emptied - only while stopped (the deck gone,
@@ -264,6 +373,8 @@ public final class DeckEngine {
     private func resetStopped() {
         var slot: UInt32 = 0
         while audio_fifo_peek(host.pointee.messages, &slot) { audio_fifo_release(host.pointee.messages) }
+        if let waiting = pending { windowQueue.async { _ = waiting.pcm.capacity } }
+        pending = nil
         collect()
         let voice = host.pointee.voice
         voice.pointee.deallocate()
@@ -276,9 +387,20 @@ public final class DeckEngine {
 
     // MARK: messages
 
-    /// A message for the voice, as the deck posts it. False when the ring was full: dropped and counted.
+    /// A message for the voice, as the deck posts it. False when the ring was full (dropped and counted), or when the
+    /// engine is stopped and it isn't a window (dropped as stale - see `stop()`); a window posted while stopped waits
+    /// for the next start, the newest only.
     @discardableResult
     public func post(_ message: DeckPost) -> Bool {
+        if !(started && engine.isRunning) {
+            guard case .window(let window) = message else {
+                stale += 1
+                return false
+            }
+            let pcm = window.pcm ?? DeckPCM(window.channels)
+            keepAside(DeckSlot(.window(pcm.voiceWindow(start: window.start, rate: window.rate))), pcm)
+            return true
+        }
         switch message {
         case .window(let window):
             let pcm = window.pcm ?? DeckPCM(window.channels)
@@ -292,22 +414,29 @@ public final class DeckEngine {
         }
     }
 
-    /// A voice message; a window's PCM kept alive until the voice lets go of it.
+    /// A voice message straight into the ring, running or not (the tests' and the warm-up's way in); a window's PCM
+    /// kept alive until the voice lets go of it.
     @discardableResult
     func post(_ message: VoiceMessage, keeping pcm: DeckPCM?) -> Bool {
+        post(DeckSlot(message), keeping: pcm)
+    }
+
+    @discardableResult
+    private func post(_ message: DeckSlot, keeping pcm: DeckPCM?) -> Bool {
         collect()
         var slot: UInt32 = 0
         guard audio_fifo_reserve(host.pointee.messages, &slot) else {
             dropped += 1
             return false
         }
-        var id: UInt32 = 0
+        var made = message
+        made.id = 0
         if let pcm {
-            id = nextID
+            made.id = nextID
             nextID = nextID == UInt32.max ? 1 : nextID + 1
-            live[id] = pcm
+            live[made.id] = pcm
         }
-        host.pointee.slots[Int(slot)] = DeckSlot(message, id: id)
+        host.pointee.slots[Int(slot)] = made
         audio_fifo_commit(host.pointee.messages)
         return true
     }
@@ -391,6 +520,7 @@ public final class DeckEngine {
         status.lastStartSeconds = lastStart
         status.failure = failure
         status.eqBlocks = load(.eqBlocks)
+        status.stale = stale
         return status
     }
 

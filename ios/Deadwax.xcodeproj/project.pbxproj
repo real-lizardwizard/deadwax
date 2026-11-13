@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		DA0000000000000000000018 /* DeadwaxCore in Frameworks */ = {isa = PBXBuildFile; productRef = DA0000000000000000000016 /* DeadwaxCore */; };
 		DA0000000000000000000019 /* DeadwaxAudio in Frameworks */ = {isa = PBXBuildFile; productRef = DA0000000000000000000017 /* DeadwaxAudio */; };
+		DA000000000000000000001B /* DeadwaxTurntable in Frameworks */ = {isa = PBXBuildFile; productRef = DA000000000000000000001A /* DeadwaxTurntable */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -34,6 +35,7 @@
 			files = (
 				DA0000000000000000000018 /* DeadwaxCore in Frameworks */,
 				DA0000000000000000000019 /* DeadwaxAudio in Frameworks */,
+				DA000000000000000000001B /* DeadwaxTurntable in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -90,6 +92,7 @@
 			packageProductDependencies = (
 				DA0000000000000000000016 /* DeadwaxCore */,
 				DA0000000000000000000017 /* DeadwaxAudio */,
+				DA000000000000000000001A /* DeadwaxTurntable */,
 			);
 			productName = Deadwax;
 			productReference = DA0000000000000000000005 /* Deadwax.app */;
@@ -219,6 +222,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = DA0000000000000000000015 /* XCLocalSwiftPackageReference "DeadwaxKit" */;
 			productName = DeadwaxAudio;
+		};
+		DA000000000000000000001A /* DeadwaxTurntable */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DA0000000000000000000015 /* XCLocalSwiftPackageReference "DeadwaxKit" */;
+			productName = DeadwaxTurntable;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

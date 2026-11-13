@@ -30,8 +30,8 @@ from pathlib import Path
 IOS = Path(__file__).resolve().parent.parent
 PROJECT = IOS / "Deadwax.xcodeproj"
 BUNDLE_ID = "net.lizardlounge.deadwax"
-MARKETING_VERSION = "0.5"
-BUILD = "5"
+MARKETING_VERSION = "0.6"
+BUILD = "6"
 DEPLOYMENT_TARGET = "17.0"
 IGNORED_BESIDE_LOCAL = ("NSAllowsLocalNetworking", "NSAllowsArbitraryLoadsForMedia", "NSAllowsArbitraryLoadsInWebContent")
 
@@ -171,8 +171,8 @@ def check_pbxproj(problems: list) -> dict:
     manifest = (IOS / "DeadwaxKit" / "Package.swift").read_text(encoding="utf-8")
     products = set(re.findall(r'\.library\(name:\s*"([^"]+)"', manifest))
     linked = {objects.get(d, {}).get("productName") for d in target.get("packageProductDependencies", [])}
-    if linked != {"DeadwaxCore", "DeadwaxAudio"}:
-        problems.append(f"the target links {sorted(n for n in linked if n)}, not DeadwaxCore and DeadwaxAudio")
+    if linked != {"DeadwaxCore", "DeadwaxAudio", "DeadwaxTurntable"}:
+        problems.append(f"the target links {sorted(n for n in linked if n)}, not DeadwaxCore, DeadwaxAudio and DeadwaxTurntable")
     for name in linked - products:
         problems.append(f"the target links {name}, which Package.swift doesn't make")
 
@@ -270,6 +270,10 @@ def check_info_plist(problems: list) -> None:
         problems.append("Info.plist: no NSLocalNetworkUsageDescription - a LAN connection would just fail")
     if "audio" not in info.get("UIBackgroundModes", []):
         problems.append("Info.plist: UIBackgroundModes has no audio - nothing would play locked")
+    # the turntable's display link asks for up to 120 Hz (turntable.md 2.6): without this key an iPhone holds every
+    # app's CADisplayLink to 60 whatever its preferredFrameRateRange says
+    if info.get("CADisableMinimumFrameDurationOnPhone") is not True:
+        problems.append("Info.plist: CADisableMinimumFrameDurationOnPhone isn't YES - the turntable would draw at 60 Hz")
     if "UILaunchScreen" not in info:
         problems.append("Info.plist: no UILaunchScreen (the launch screen without a storyboard)")
     for key in ("UILaunchStoryboardName", "UIMainStoryboardFile", "CFBundleIconName"):

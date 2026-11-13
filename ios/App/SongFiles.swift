@@ -78,6 +78,12 @@ final class SongFiles: @unchecked Sendable {
         for fetch in gone { fetch.cancel() }
     }
 
+    /// The song's complete copy in the cache, for the turntable's window (turntable.md 4.4) - none while a fetch of it
+    /// is running.
+    func wholeCopy(of song: Song) -> URL? {
+        cached(song)
+    }
+
     /// The cache's complete copy, unless a fetch of the song is running (which will replace it).
     private func cached(_ song: Song) -> URL? {
         let fetching = lock.withLock { fetches[song.id] != nil }

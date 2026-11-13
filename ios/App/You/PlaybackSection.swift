@@ -11,11 +11,17 @@ import SwiftUI
 /// rows are a radio group: one chosen, a tap picks, VoiceOver hears each choice's name, whether it is chosen, and its
 /// note.
 ///
+/// Between them, in the web's order (You.tsx:296-320), the turntable's two (turntable.md 6.1, app 0.6): "Now Playing
+/// opens as" - Cover or Turntable, a radio group as Normalization's is - and "Pause winds the record down", each a
+/// Section with the web's note as its footer, less the note's last sentence about the web's desktop frame. Both
+/// DeckController's, kept on this phone under the web's keys.
+///
 /// Then the EQ (eq.md 3.1, app 0.5): one row - "EQ", the output now under it, its short setting at the right - pushing
 /// the EQ page of the output now; its footer ends as Normalization's does, "This is kept on this phone."
 struct PlaybackSection: View {
     @Environment(PlayerModel.self) private var player
     @Environment(EQModel.self) private var eq
+    @Environment(DeckController.self) private var deck
 
     var body: some View {
         Section {
@@ -24,6 +30,24 @@ struct PlaybackSection: View {
             Text(YouWords.playback)
         } footer: {
             Text(YouWords.gaplessLine)
+        }
+
+        Section {
+            ForEach(TurntableSettings.Look.allCases, id: \.self) { (look: TurntableSettings.Look) in
+                lookRow(look)
+            }
+        } header: {
+            Text(TurntableWords.opensAs)
+        } footer: {
+            Text(TurntableWords.lookNote)
+        }
+
+        Section {
+            Toggle(TurntableWords.windDown, isOn: Binding<Bool>(get: { deck.windDown }, set: { (on: Bool) -> Void in
+                deck.windDown = on
+            }))
+        } footer: {
+            Text(TurntableWords.windDownNote)
         }
 
         Section {
@@ -56,6 +80,29 @@ struct PlaybackSection: View {
         } footer: {
             Text(EQWords.You.footer)
         }
+    }
+
+    /// A look: its name, the checkmark on the chosen one (LookChoice.tsx's radio).
+    private func lookRow(_ look: TurntableSettings.Look) -> some View {
+        let chosen = deck.opensAs == look
+        let label = look == .turntable ? TurntableWords.lookTurntable : TurntableWords.lookCover
+        return Button {
+            deck.opensAs = look
+        } label: {
+            HStack(spacing: 12) {
+                Text(label)
+                    .foregroundStyle(.primary)
+                Spacer(minLength: 8)
+                Image(systemName: "checkmark")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Palette.accent)
+                    .opacity(chosen ? 1 : 0)
+            }
+            .contentShape(Rectangle())
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(chosen ? [.isButton, .isSelected] : .isButton)
     }
 
     private func row(_ choice: Normalization) -> some View {

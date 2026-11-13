@@ -77,6 +77,9 @@ public enum Routes {
     /// its place in the song in `X-Deadwax-Window` (`DeckScrub.Header`). Asked without `max_rate` and `level`, so it
     /// is the original's own frames: the phone converts and levels them as it does a local file's.
     public static let scrub = Endpoint(method: "GET", path: "/deadwax/navidrome/scrub/{song_id}", query: ["at", "seconds"])
+    // the turntable's face (turntable.md 2.3)
+    /// An album's CD art for one disc: `disc<N>.*`, then `disc.*`, in the album's folder; a 404 when it has none.
+    public static let discArt = Endpoint(method: "GET", path: "/deadwax/library/disc_art/navidrome", query: ["album", "disc"])
 
     /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
     public static var warmLevels: Endpoint { levelAlbum }
@@ -90,7 +93,7 @@ public enum Routes {
         storeAlbum, myLibrary, libraryAdd, libraryRemove, librarySeen,
         lyrics,
         autoEqSearch, autoEqProfile,
-        scrub,
+        scrub, discArt,
     ]
 
     /// The routes given longer than the transport's own 8 seconds to answer, in seconds: the album index reads every

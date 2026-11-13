@@ -70,9 +70,22 @@ jobs:
       # end, a 24-bit file decodes exactly, a stream decodes what the file does. This run and the next each
       # print one line, "AVAudioPlayerNode taking a buffer, measured": how late this runner's nodes take a
       # buffer, against the engine's offline settle, and how late it lets a 10 ms sleep run - a print, never
-      # a check (BufferTakeMeasuredTests.swift; how to read it: notes/ios.md "A node's buffers, taken late")
+      # a check (BufferTakeMeasuredTests.swift; how to read it: notes/ios.md "A node's buffers, taken late").
+      # DeadwaxTurntableTests draws the turntable with CALayer.render(in:) in each state of turntable.md 2.8 at
+      # the iPhone 16's and the SE's plinth, at 3x, and writes the PNGs to TURNTABLE_RENDERS (uploaded below).
       - name: DeadwaxKit, with the engine's offline renders
+        env:
+          TURNTABLE_RENDERS: ${{ runner.temp }}/turntable-renders
         run: swift test --package-path ios/DeadwaxKit
+
+      # The turntable's renders, to look at beside the web's screenshots of the same states (turntable.md 7.3)
+      - name: The turntable's renders
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: turntable-renders
+          path: ${{ runner.temp }}/turntable-renders
+          if-no-files-found: warn
 
       # The engine's renders again with every buffer reaching its node 10 ms late - what this runner's
       # AVAudioPlayerNode did at 70cbef6 and 307384f, held off longer (notes/ios.md "A node's buffers, taken
@@ -154,7 +167,7 @@ jobs:
           test -f "$app/AppIcon60x60@3x.png"
           test ! -e "$app/Assets.car"
           test "$(plutil -extract CFBundleIdentifier raw "$app/Info.plist")" = net.lizardlounge.deadwax
-          test "$(plutil -extract CFBundleShortVersionString raw "$app/Info.plist")" = 0.5
+          test "$(plutil -extract CFBundleShortVersionString raw "$app/Info.plist")" = 0.6
           test "$(plutil -extract UIBackgroundModes.0 raw "$app/Info.plist")" = audio
           test "$(plutil -extract NSAppTransportSecurity.NSAllowsArbitraryLoads raw "$app/Info.plist")" = true
           python3 ios/scripts/check_project.py

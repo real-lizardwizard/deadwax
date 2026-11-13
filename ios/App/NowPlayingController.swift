@@ -65,6 +65,17 @@ final class NowPlayingController {
     func clear() {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
+
+    /// The paused state published again (turntable.md 4.6): rate 0 at `elapsed`, the rest as it stands - for the
+    /// turntable's deck engine stopping after the song had paused (a wind-down), as iOS goes by the app's running
+    /// output and may not have taken the pause while the deck's still ran. Nothing when nothing is shown.
+    static func republishPaused(elapsed: Double) {
+        let center = MPNowPlayingInfoCenter.default()
+        guard var info = center.nowPlayingInfo else { return }
+        info[MPNowPlayingInfoPropertyPlaybackRate] = 0.0
+        info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = elapsed
+        center.nowPlayingInfo = info
+    }
 }
 
 /// The remote commands' handlers come on the main thread in practice; this holds whatever thread

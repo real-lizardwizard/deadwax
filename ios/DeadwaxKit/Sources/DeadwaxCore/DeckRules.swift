@@ -419,6 +419,30 @@ public final class DeckRules<M: DeckMaths> {
         return sounding(recordAt())
     }
 
+    /// (3.1, 4.6) An audio interruption began (a call, Siri): a taken press is to rest when its touch is cancelled - its
+    /// intent made a pause first, so the cancel doesn't ask the song to play into the call.
+    public func interrupted() {
+        press?.intent = .pause
+    }
+
+    /// (new, 4.6; question 27) The output went away - headphones out - and the player paused the song, as Apple asks: the
+    /// record rests rather than playing the song on the speaker. A taken press's let-go rests (its intent made a pause,
+    /// as an interruption's); a resume still to come is dropped - a song change's, a led handover's timer - and a
+    /// handover plan becomes a quiet coast from where the record is, so its end asks for none and the time line stays
+    /// on the paused song. A departure: the web's page plays on in whatever outputs next.
+    public func outputGone() {
+        press?.intent = .pause
+        clearTimer(resumeTimer)
+        resumeTimer = nil
+        clearLed()
+        guard case .plan(let current) = motion, current.role == .handover else { return }
+        endHandover()
+        let (x, v) = plans.planAt(current.plan, (now - current.since) / 1000)
+        if current.sounding { post(.stop) }
+        startPlan(plans.coast(x, v, host.song()?.length ?? 0), .coast, x, false)
+        if case .plan(let coast) = motion { quieten(coast) }
+    }
+
     /// deck.ts:1426
     public func taken() -> Bool {
         press?.taken ?? false
@@ -850,6 +874,17 @@ public final class DeckRules<M: DeckMaths> {
     /// The deck engine changed - made, prepared, rested, its voice made (deck.ts:2432, the web's onAudio).
     public func audioChanged() {
         handWindow()
+        keepHere()
+        report()
+    }
+
+    /// (new) The voice's window is gone - the deck engine made the voice again at a new output rate (a route change,
+    /// 4.6) - so the window is asked for again, where the record is. The web's context never changes its rate.
+    public func windowDropped() {
+        window = nil
+        decodedWindow = nil
+        requestTicket += 1
+        pending = nil
         keepHere()
         report()
     }
@@ -1289,6 +1324,30 @@ public final class DeckRules<M: DeckMaths> {
     public var refusedWhy: String? { refused.flatMap { $0.song == host.song()?.id ? $0.why : nil } }
     public var failedWhy: String? { failed.flatMap { $0.song == host.song()?.id ? $0.why : nil } }
     public var loading: Bool { pending != nil }
+
+    /// The report's window, for this song only (deck.ts report(), :2463-2469).
+    public var reportWindow: DeckReport.Window? {
+        guard let window, let song = host.song(), window.song == song.id else { return nil }
+        return DeckReport.Window(start: window.start, end: window.end, kind: song.kind.isEmpty ? "FLAC" : song.kind,
+                                 decodedAt: window.decodedAt, bytes: Double(window.bytes))
+    }
+
+    /// `/scrub`'s bytes since the turntable showed, and the last window's place (deck.ts report(), :2473-2474).
+    public var fetchedBytes: Double { Double(fetched) }
+    public var lastFetchedAt: Double { lastFetchAt }
+
+    /// The report's health (deck.ts health(), :2450): the voice's part as the host counted it, the deck's own frames
+    /// and hand-backs over it.
+    public func health(_ sound: DeckReport.DeckHealth) -> DeckReport.DeckHealth {
+        var health = sound
+        health.frames = Double(frames)
+        health.slowFrames = Double(slowFrames)
+        health.worstFrameMs = worstFrameMs
+        health.backMs = backMs
+        health.motorMs = motorMs
+        health.notBack = Double(notBack)
+        return health
+    }
 }
 
 /// The handover's arithmetic on the phone (3.5): the voice's delay as heard, the song's predicted start, the lead,
@@ -1352,5 +1411,35 @@ public enum HandoverTiming {
     /// when the song is heard.
     public static func reducedTarget(planX: Double, speed: Double, lead: Double) -> Double {
         planX + speed * lead
+    }
+
+    /// The handover's actual `E`: the `deck.position` queue's read of the engine's last start, once it is this let-go's
+    /// - a start seen since the let-go (more than `startsAtLetGo`), and the read begun no earlier than that start was
+    /// seen, so the engine had written it (it writes a start's time before it says it plays). nil: not yet, or none.
+    public static func actualStart(startsAtLetGo: Int, starts: HandoverStarts, read: Double?, readAt: Double) -> Double? {
+        guard starts.count > startsAtLetGo, readAt >= starts.lastSeenAt, let read, read.isFinite, read >= 0 else {
+            return nil
+        }
+        return read
+    }
+}
+
+/// The song's engine's starts, as the main thread sees its phase (2.6, 3.5): one counted each time it says it plays
+/// after saying anything else, and when the last was seen. The let-go keeps the count rather than asking the engine
+/// for its last start: that ask waits on the engine's queue, and a gesture's thread waits on nothing.
+public struct HandoverStarts: Equatable, Sendable {
+    public private(set) var count = 0
+    public private(set) var lastSeenAt = -Double.infinity
+    private var playing = false
+
+    public init() {}
+
+    /// The engine's phase as seen at `time`: playing, or anything else (loading, paused, ended, failed).
+    public mutating func phase(playing now: Bool, at time: Double) {
+        if now && !playing {
+            count += 1
+            lastSeenAt = time
+        }
+        playing = now
     }
 }

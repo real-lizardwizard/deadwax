@@ -55,8 +55,23 @@ final class AudioSessionController {
 
     /// Before the first play (and again after an interruption).
     func activate() throws {
-        try configure()
-        try AVAudioSession.sharedInstance().setActive(true)
+        try Self.activateShared()
+    }
+
+    /// The same, from where the controller isn't to hand: the turntable's deck engine before it starts (turntable.md
+    /// 4.6 - a press on a paused record takes the sound as pressing Play would), Debug's record engine. The category is
+    /// the one `configure()` sets, so it is never changed - only made active. Idempotent.
+    nonisolated static func activateShared() throws {
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(.playback, mode: .default, policy: .longFormAudio, options: [])
+        try session.setActive(true)
+    }
+
+    /// The route has an AirPlay output: the record makes no sound there (turntable.md 2.8, question 5).
+    nonisolated static func onAirPlay() -> Bool {
+        AVAudioSession.sharedInstance().currentRoute.outputs.contains { (port: AVAudioSessionPortDescription) -> Bool in
+            port.portType == .airPlay
+        }
     }
 
     /// How far ahead a song started from silence is scheduled: the output's latency and one IO

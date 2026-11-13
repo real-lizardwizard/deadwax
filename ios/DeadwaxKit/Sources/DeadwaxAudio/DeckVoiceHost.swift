@@ -63,6 +63,11 @@ struct DeckHostState {
     var offline: Bool
     var offlineFrames: Double = 0
     var offlineLead: Double = 0
+    /// the last block's presentation time and length, live: a block whose time stamp has no host time is placed
+    /// after it (slice 2's review, question 1) - never on the sample-time clock, a different origin, which would
+    /// jump the voice's `now` by the time since boot. -1: no block yet.
+    var lastHostOut: Double = -1
+    var lastSeconds: Double = 0
 
     // the EQ after the limiter (eq.md 1.9): its own render state, fed by the deck's EQHost's triple
     var eq: UnsafeMutablePointer<EQRenderState>?
@@ -71,6 +76,10 @@ struct DeckHostState {
     var eqCounters: OpaquePointer?
     var eqPacked: Int = 0
     var eqBlocks: UInt64 = 0
+    /// the EQ's render time, host ticks: all of it and the longest block (slice 2's review, question 6 - the song's
+    /// EQUnit counts its own the same way, so Debug's EQ rows read both alike)
+    var eqTicks: UInt64 = 0
+    var eqWorst: UInt64 = 0
 }
 
 enum DeckVoiceHost {
@@ -101,13 +110,24 @@ enum DeckVoiceHost {
         let now: Double
         let stamp = timestamp.pointee
         let hostValid = stamp.mFlags.contains(.hostTimeValid) && stamp.mHostTime != 0
-        if h.pointee.offline || !hostValid {
+        if h.pointee.offline {
             now = (stamp.mSampleTime + h.pointee.offlineFrames) / rate - h.pointee.offlineLead
-        } else {
+        } else if hostValid {
             let hostOut = Double(stamp.mHostTime) * h.pointee.secondsPerTick
             let lead = h.pointee.lead.pointee.block(hostOut: hostOut, frames: frames, rate: rate, entry: entry,
                                                      sounding: DeckRender.sounding(voice))
             now = hostOut - lead
+            h.pointee.lastHostOut = hostOut
+            h.pointee.lastSeconds = Double(frames) / rate
+        } else {
+            // no host time on this block (slice 2's review, question 1): it is placed straight after the last one, at
+            // the `L` the clock has - the lead isn't fed a guess. With no block before it, where a block entered now
+            // would be presented: `L` ahead of the entry, so `now` is the entry itself.
+            let lead = h.pointee.lead.pointee.value
+            let hostOut = h.pointee.lastHostOut >= 0 ? h.pointee.lastHostOut + h.pointee.lastSeconds : entry + lead
+            now = hostOut - lead
+            h.pointee.lastHostOut = hostOut
+            h.pointee.lastSeconds = Double(frames) / rate
         }
 
         // the messages, in order
@@ -133,9 +153,15 @@ enum DeckVoiceHost {
         if let eq = h.pointee.eq, let triple = h.pointee.eqTriple, let slots = h.pointee.eqSlots {
             let offered: UnsafePointer<Double>? = audio_triple_take(triple)
                 ? UnsafePointer(slots + Int(audio_triple_front(triple)) * h.pointee.eqPacked) : nil
+            let began = mach_absolute_time()
             EQRender.process(eq, buffers: UnsafePointer(h.pointee.outputs), frames: frames, offered: offered)
+            let took = mach_absolute_time() &- began
             h.pointee.eqBlocks &+= 1
-            if let eqCounters = h.pointee.eqCounters { storeEQ(eq, eqCounters, h.pointee.eqBlocks, frames) }
+            h.pointee.eqTicks &+= took
+            if took > h.pointee.eqWorst { h.pointee.eqWorst = took }
+            if let eqCounters = h.pointee.eqCounters {
+                storeEQ(eq, eqCounters, h.pointee.eqBlocks, frames, ticks: h.pointee.eqTicks, worst: h.pointee.eqWorst)
+            }
         }
 
         h.pointee.blocks &+= 1
@@ -199,7 +225,7 @@ enum DeckVoiceHost {
 
     /// The EQ's render counts, where the deck's EQHost reads them (as EQUnit's render writes them).
     static func storeEQ(_ eq: UnsafeMutablePointer<EQRenderState>, _ counters: OpaquePointer, _ blocks: UInt64,
-                        _ frames: Int) {
+                        _ frames: Int, ticks: UInt64, worst: UInt64) {
         let counted = eq.pointee.counters
         audio_counters_store(counters, EQCounter.overs.rawValue, UInt64(counted.overs))
         audio_counters_store(counters, EQCounter.largest.rawValue, counted.largest.bitPattern)
@@ -211,6 +237,8 @@ enum DeckVoiceHost {
         let mode: EQCounter.Mode = passes ? .passing : (eq.pointee.isCrossfading ? .crossfading : .filtering)
         audio_counters_store(counters, EQCounter.mode.rawValue, mode.rawValue)
         audio_counters_store(counters, EQCounter.blocks.rawValue, blocks)
+        audio_counters_store(counters, EQCounter.ticks.rawValue, ticks)
+        audio_counters_store(counters, EQCounter.worst.rawValue, worst)
         audio_counters_store(counters, EQCounter.frames.rawValue, UInt64(frames))
     }
 }

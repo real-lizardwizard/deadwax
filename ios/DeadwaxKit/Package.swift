@@ -8,6 +8,9 @@
 //   DeadwaxAudio  the audio engine: AVAudioEngine and AudioToolbox. Every file is inside
 //                 `#if canImport(AVFAudio)`, so on Linux it compiles to nothing; it is built and its
 //                 offline-render tests run on ios.yml's macOS job.
+//   DeadwaxTurntable  the turntable's drawing (turntable.md 2.4): a Core Animation layer tree, QuartzCore and
+//                 CoreGraphics only - no UIKit - so ios.yml's macOS job renders it to PNGs without a Simulator. Inside
+//                 `#if canImport(QuartzCore)`: nothing on Linux.
 //   CAudioRing    C11 atomics for the real-time renders (the EQ's triple buffer and counters; the turntable's
 //                 rings): indices and bits, no floating point, nothing Apple's - so it builds on Linux too.
 //
@@ -21,6 +24,7 @@ let package = Package(
     products: [
         .library(name: "DeadwaxCore", targets: ["DeadwaxCore"]),
         .library(name: "DeadwaxAudio", targets: ["DeadwaxAudio"]),
+        .library(name: "DeadwaxTurntable", targets: ["DeadwaxTurntable"]),
     ],
     targets: [
         // SQLite, for the download store (Phase 2): the system's own - Apple's SDKs carry it, and Linux gets it from
@@ -33,6 +37,8 @@ let package = Package(
         // and nothing here can be compiled on Linux to catch a strict-concurrency error early.
         .target(name: "DeadwaxAudio", dependencies: ["DeadwaxCore", "CAudioRing"],
                 swiftSettings: [.swiftLanguageMode(.v5)]),
+        // Swift 5 mode, as DeadwaxAudio: Core Animation's layers and actions aren't Sendable.
+        .target(name: "DeadwaxTurntable", dependencies: ["DeadwaxCore"], swiftSettings: [.swiftLanguageMode(.v5)]),
         // Test-only: the allocation detector the real-time tests use (turntable.md 4.3, built first for the EQ's
         // EQRealTimeTests). No product, so the app never links it; stubs off Apple's platforms.
         .target(name: "CAllocHook", path: "Tests/CAllocHook"),
@@ -45,6 +51,10 @@ let package = Package(
                     resources: [.copy("Fixtures")]),
         .testTarget(name: "DeadwaxAudioTests", dependencies: ["DeadwaxAudio", "DeadwaxCore", "CAudioRing", "CAllocHook"],
                     resources: [.copy("Fixtures")],
+                    swiftSettings: [.swiftLanguageMode(.v5)]),
+        // The turntable's drawing rendered with CALayer.render(in:) and checked by its pixels; the PNGs are written to
+        // $TURNTABLE_RENDERS (ios.yml uploads them), else a folder in the temporary directory.
+        .testTarget(name: "DeadwaxTurntableTests", dependencies: ["DeadwaxTurntable", "DeadwaxCore"],
                     swiftSettings: [.swiftLanguageMode(.v5)]),
     ]
 )

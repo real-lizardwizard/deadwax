@@ -1,3 +1,4 @@
+import DeadwaxCore
 import SwiftUI
 
 /// deadwax for iPhone (app 0.2, Phase 1's shell; Phase 2's downloads): the server and its gates, two tabs, and the
@@ -20,6 +21,7 @@ struct DeadwaxApp: App {
     @State private var downloads: DownloadModel
     @State private var lyrics: LyricsModel
     @State private var eq: EQModel
+    @State private var deck: DeckController
 
     /// The one background session, made before anything else can ask it.
     private static let downloadSession = DownloadSession()
@@ -40,6 +42,8 @@ struct DeadwaxApp: App {
         player.connect(downloads: downloads, reachability: reachability)
         let debug = DebugModel(server: server, player: player, downloads: downloads)
         let lyrics = LyricsModel(server: server, player: player, downloads: downloads, reachability: reachability)
+        // the turntable's deck (turntable.md 2.1): beside the player for the app's run, as Now Playing's cover comes and goes
+        let deck = DeckController(player: player, server: server, files: files, reachability: reachability, eq: eq)
         reachability.start()
         // a new person (signed out, someone else signed in, another server): nothing of the last one's kept
         server.whenPersonChanges {
@@ -58,6 +62,7 @@ struct DeadwaxApp: App {
         _downloads = State(initialValue: downloads)
         _lyrics = State(initialValue: lyrics)
         _eq = State(initialValue: eq)
+        _deck = State(initialValue: deck)
     }
 
     var body: some Scene {
@@ -72,6 +77,7 @@ struct DeadwaxApp: App {
                 .environment(downloads)
                 .environment(lyrics)
                 .environment(eq)
+                .environment(deck)
                 .preferredColorScheme(.dark)
                 .tint(Palette.accent)
         }
@@ -124,4 +130,26 @@ enum Palette {
     static let accentText = Color(red: 0xD8 / 255, green: 0xB4 / 255, blue: 0xFE / 255)
     /// --dw-toggled-bg rgba(168, 85, 247, 0.18): the fill under the EQ's curve.
     static let toggledFill = Color(red: 168 / 255, green: 85 / 255, blue: 247 / 255).opacity(0.18)
+
+    // The turntable's look button (turntable.md 2.1, 2.14), from Core's TurntablePalette - the web's tokens' values,
+    // held to theme.css there. The plinth's own colours are drawn by DeadwaxTurntable from the same table.
+
+    /// --dw-secondary-bg, top to bottom; --dw-secondary-bg-active, the same reversed.
+    static let secondaryFill = LinearGradient(colors: [colour(TurntablePalette.secondaryFillTop),
+                                                       colour(TurntablePalette.secondaryFillBottom)],
+                                              startPoint: .top, endPoint: .bottom)
+    static let secondaryFillPressed = LinearGradient(colors: [colour(TurntablePalette.secondaryFillBottom),
+                                                              colour(TurntablePalette.secondaryFillTop)],
+                                                     startPoint: .top, endPoint: .bottom)
+    /// --dw-secondary-border.
+    static let secondaryEdge = colour(TurntablePalette.secondaryEdge)
+    /// --dw-text-on-secondary: the look button's glyph.
+    static let onSecondary = colour(TurntablePalette.onSecondary)
+    /// --dw-highlight: a 1 pt line inside the top edge.
+    static let highlight = colour(TurntablePalette.highlight)
+
+    static func colour(_ rgba: DeckRGBA) -> Color {
+        Color(.sRGB, red: Double(rgba.red) / 255, green: Double(rgba.green) / 255, blue: Double(rgba.blue) / 255,
+              opacity: rgba.alpha)
+    }
 }

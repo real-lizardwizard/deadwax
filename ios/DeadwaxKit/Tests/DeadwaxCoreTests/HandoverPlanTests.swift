@@ -30,6 +30,27 @@ import Testing
         #expect(!HandoverTiming.holdsAcross(predicted: 2.5, planSeconds: 1.2))
     }
 
+    @Test func theHandoversStartIsReadOnlyOnceItWasSeen() {
+        var starts = HandoverStarts()
+        starts.phase(playing: true, at: 1)
+        starts.phase(playing: false, at: 2)
+        // the let-go: the take paused the song; one start seen before it
+        let atLetGo = starts.count
+        #expect(atLetGo == 1)
+        #expect(HandoverTiming.actualStart(startsAtLetGo: atLetGo, starts: starts, read: 0.4, readAt: 3) == nil,
+                "no start since the let-go: the read is the last one's")
+        // the resume: loading, then playing - one start; playing said again (a new route) is no new one
+        starts.phase(playing: false, at: 3.1)
+        starts.phase(playing: true, at: 3.2)
+        starts.phase(playing: true, at: 3.3)
+        #expect(starts.count == 2 && starts.lastSeenAt == 3.2)
+        #expect(HandoverTiming.actualStart(startsAtLetGo: atLetGo, starts: starts, read: 0.4, readAt: 3.15) == nil,
+                "read before the start was seen: it may be the last one's")
+        #expect(HandoverTiming.actualStart(startsAtLetGo: atLetGo, starts: starts, read: 0.25, readAt: 3.2) == 0.25)
+        #expect(HandoverTiming.actualStart(startsAtLetGo: atLetGo, starts: starts, read: nil, readAt: 4) == nil)
+        #expect(HandoverTiming.actualStart(startsAtLetGo: atLetGo, starts: starts, read: -.infinity, readAt: 4) == nil)
+    }
+
     @Test func theTargets() {
         let plans = PlatterPlans(PlatformMaths())
         let plan = plans.motor(100, -3, 425, 1)
@@ -55,6 +76,123 @@ import Testing
     func answer(_ world: TraceWorld) {
         let window = DeckWindow(channels: [world.zeros(40 * 48000)], start: 56, end: 96, rate: 48000, source: .file, bytes: 1, madeIn: 0)
         world.asks.last?(.success(window))
+    }
+
+    /// (slice 3, slice 2's review question 2) The deck engine made the voice again at a new output rate: the window it
+    /// had is gone, so the rules ask for one again where the record is - and a press meanwhile is silent, not sounding a
+    /// window the voice no longer has.
+    @Test func aDroppedWindowIsAskedForAgain() {
+        let world = world()
+        let rules = DeckRules(host: world, clock: world, maths: PlatformMaths(), reduced: false)
+        rules.setShowing(true)
+        #expect(world.asks.count == 1)
+        answer(world)
+        #expect(rules.live(), "the window in: a press sounds")
+        world.time += 10
+        rules.windowDropped()
+        #expect(world.asks.count == 2, "asked again")
+        #expect(!rules.live(), "until it comes, a press is silent")
+        answer(world)
+        #expect(rules.live())
+    }
+
+    /// (slice 3, 3.1 and 4.6) An audio interruption ends a taken press as a cancel that RESTS: a playing record held by
+    /// the hand isn't played into the call. Without `interrupted()` the same cancel resumes the song (the web's cancel).
+    @Test func anInterruptionsCancelRests() {
+        func cancelled(interrupted: Bool) -> (effects: [String], playing: Bool) {
+            let world = world()
+            let rules = DeckRules(host: world, clock: world, maths: PlatformMaths(), reduced: false)
+            rules.setShowing(true)
+            answer(world)
+            rules.pressed(1000)
+            world.time = 1300
+            rules.takeOver(1300)
+            #expect(rules.taken() && !world.isPlaying, "the hand holds the song")
+            world.effects = []
+            if interrupted { rules.interrupted() }
+            _ = rules.release(1310, cancel: true)
+            return (world.effects, world.isPlaying)
+        }
+        let call = cancelled(interrupted: true)
+        #expect(!call.effects.contains("resume") && !call.playing, "\(call.effects)")
+        let plain = cancelled(interrupted: false)
+        #expect(plain.effects.contains("resume") && plain.playing, "the web's cancel plays on: \(plain.effects)")
+    }
+
+    /// (slice 3's review, question 27) Headphones out mid-turn: the record rests and nothing resumes the song on the
+    /// speaker - a held press's let-go, a led handover's timer, a handover's end with no lead. Each against the same case
+    /// without `outputGone()`, which resumes.
+    @Test func theOutputGoneResumesNothing() throws {
+        /// Every timer run, in the order set, until none is left (those set meanwhile included).
+        func runTimers(_ world: TraceWorld) {
+            var left = 50
+            while let id = world.timers.keys.min(), left > 0 {
+                left -= 1
+                world.time += 10
+                world.timers.removeValue(forKey: id)?()
+            }
+        }
+        func taken(lead: Double) -> (world: TraceWorld, rules: DeckRules<PlatformMaths>) {
+            let world = world()
+            let rules = DeckRules(host: world, clock: world, maths: PlatformMaths(), reduced: false)
+            rules.handoverLead = { _, _ in lead }
+            rules.setShowing(true)
+            answer(world)
+            rules.pressed(1000)
+            world.time = 1300
+            rules.takeOver(1300)
+            rules.playingChanged(false)
+            return (world, rules)
+        }
+        // a held press, let go after the output went
+        for gone in [true, false] {
+            let (world, rules) = taken(lead: 0)
+            if gone { rules.outputGone() }
+            world.effects = []
+            let out = rules.release(1310, cancel: false)
+            runTimers(world)
+            let resumed = out.play || world.effects.contains("resume")
+            #expect(resumed == !gone, "held, gone \(gone): \(out) \(world.effects)")
+        }
+        // a let-go with a lead, its resume on a timer still to come
+        for gone in [true, false] {
+            let (world, rules) = taken(lead: 0.2)
+            for k in 1...6 {
+                world.time = 1300 + Double(k) * 10
+                rules.hand(world.time, turned: -0.02 * Double(k), at: 60 - 0.006 * Double(k))
+            }
+            let out = rules.release(world.time, cancel: false)
+            try #require(!out.play && world.timers.count == 2, "a plan and its led resume: \(world.effects)")
+            world.effects = []
+            if gone { rules.outputGone() }
+            runTimers(world)
+            #expect(world.effects.contains("resume") == !gone, "led, gone \(gone): \(world.effects)")
+            if gone { #expect(!world.effects.contains { $0.hasPrefix("post drive") }, "quiet: \(world.effects)") }
+        }
+        // a handover with no lead: the song resumed at the plan's end
+        for gone in [true, false] {
+            let (world, rules) = taken(lead: 0)
+            for k in 1...6 {
+                world.time = 1300 + Double(k) * 10
+                rules.hand(world.time, turned: -0.02 * Double(k), at: 60 - 0.006 * Double(k))
+            }
+            let out = rules.release(world.time, cancel: false)
+            try #require(!out.play, "a handover plan: \(out)")
+            world.effects = []
+            if gone { rules.outputGone() }
+            runTimers(world)
+            #expect(world.effects.contains("resume") == !gone, "no lead, gone \(gone): \(world.effects)")
+        }
+        // the song changed under the hand: its resume on a timer, once the new song settles
+        for gone in [true, false] {
+            let (world, rules) = taken(lead: 0)
+            rules.songChanged("next")
+            try #require(!world.timers.isEmpty, "the settle's resume: \(world.effects)")
+            world.effects = []
+            if gone { rules.outputGone() }
+            runTimers(world)
+            #expect(world.effects.contains("resume") == !gone, "song change, gone \(gone): \(world.effects)")
+        }
     }
 
     @Test func aLeadResumesTheSongEarlyAndItsPlayIsItsOwn() throws {

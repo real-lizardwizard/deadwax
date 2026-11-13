@@ -150,6 +150,9 @@ final class PlayerModel {
     private let book: LoudnessBook
     private let reporter: PlayReporter
     @ObservationIgnored private var link: PlayerEngineLink?
+    /// The engine, for the turntable's `deck.position` queue to read (turntable.md 3.4, 2.6): its position and its
+    /// last start, read-only - nothing of the player is changed through it.
+    var engineForDeck: DeckEngineReading? { link?.engine }
     @ObservationIgnored private var controller: QueueController?
     /// The queue's entries, as QueueController.entries(queue) gives them: Up Next's keys.
     private var entries: [QueueEntry] = []
