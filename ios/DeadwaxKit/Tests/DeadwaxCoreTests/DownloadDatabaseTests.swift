@@ -22,7 +22,8 @@ private func withDatabase(_ body: (DownloadDatabase, String) throws -> Void) thr
             #expect(try db.keptQueue() == nil)
             // opened again: nothing made twice
             let again = try DownloadDatabase(path: path)
-            #expect(try again.userVersion() == 2)
+            #expect(try again.userVersion() == 3)
+            #expect(try again.keptStarts().isEmpty)
         }
     }
 
@@ -215,7 +216,7 @@ private func withDatabase(_ body: (DownloadDatabase, String) throws -> Void) thr
 
     @Test func aVersionOneFileIsGivenTheLyricsTableEveryRowKept() throws {
         try withDatabase { _, path in
-            // the file withDatabase made is version 2: a version-1 file is made beside it, as Phase 2 left one
+            // the file withDatabase made is the newest version: a version-1 file is made beside it, as Phase 2 left one
             let old = URL(fileURLWithPath: path).deletingLastPathComponent().appendingPathComponent("v1.sqlite").path
             let song = DownloadRecord(id: "a", albumID: "al", suffix: "flac", wantedAt: 1)
             do {
@@ -231,7 +232,7 @@ private func withDatabase(_ body: (DownloadDatabase, String) throws -> Void) thr
                 }
             }
             let v2 = try DownloadDatabase(path: old)
-            #expect(try v2.userVersion() == 2)
+            #expect(try v2.userVersion() == DownloadDatabase.version)
             #expect(try v2.songs() == [song])
             #expect(try v2.origins() == ["a": [.album("al")]])
             #expect(try v2.albums().map(\.id) == ["al"])

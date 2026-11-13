@@ -530,6 +530,10 @@ private struct DownloadsDebugSection: View {
                 Text("\(downloads.playsWaiting)")
                     .font(.footnote.monospacedDigit())
             }
+            LabeledContent("Starts waiting to be sent") {
+                Text("\(downloads.startsWaiting)")
+                    .font(.footnote.monospacedDigit())
+            }
             if !downloads.checkSeconds.isEmpty {
                 let times = Array(downloads.checkSeconds.values)
                 LabeledContent("Checks") {

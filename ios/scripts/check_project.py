@@ -30,8 +30,8 @@ from pathlib import Path
 IOS = Path(__file__).resolve().parent.parent
 PROJECT = IOS / "Deadwax.xcodeproj"
 BUNDLE_ID = "net.lizardlounge.deadwax"
-MARKETING_VERSION = "0.7"
-BUILD = "7"
+MARKETING_VERSION = "0.8"
+BUILD = "8"
 DEPLOYMENT_TARGET = "17.0"
 IGNORED_BESIDE_LOCAL = ("NSAllowsLocalNetworking", "NSAllowsArbitraryLoadsForMedia", "NSAllowsArbitraryLoadsInWebContent")
 

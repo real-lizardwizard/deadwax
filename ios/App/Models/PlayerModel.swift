@@ -210,6 +210,8 @@ final class PlayerModel {
     @ObservationIgnored private let resumeClock = MainQueueClock()
     // Phase 2's downloads and offline (connect)
     @ObservationIgnored private weak var downloads: DownloadModel?
+    /// (app 0.8) Play history: each song begun recorded there, each play counted marked (DeadwaxApp sets it).
+    @ObservationIgnored weak var history: HistoryModel?
     @ObservationIgnored private weak var reachability: Reachability?
     /// The skips of songs not on this phone, counted for their notice.
     @ObservationIgnored private var skipRun = OfflinePlay.SkipRun()
@@ -233,6 +235,8 @@ final class PlayerModel {
         book = LoudnessBook(server: server)
         reporter = PlayReporter(server: server)
         reporter.speedChanged(speedControl.speed)
+        reporter.onStart = { [weak self] entry, at in self?.started(entry: entry, at: at) }
+        reporter.onCounted = { [weak self] songID, at in self?.history?.counted(songID: songID, at: at) }
         book.onAnswer = { [weak self] album, answer in self?.loudnessAnswers[album] = answer }
         session.onInterruption = { [weak self] began, shouldResume in self?.interruption(began: began, shouldResume: shouldResume) }
         session.onOldDeviceGone = { [weak self] in self?.pause() }
@@ -425,6 +429,34 @@ final class PlayerModel {
         if took {
             // the entry the jump plays (Phase 2's "the song tapped", OfflinePlay.chosen): a History row's tap plays its
             // song as a new entry under a new key, so the row's own key wouldn't name it - read it from the queue
+            let played = QueueController.entries(controller.queue)
+            if played.indices.contains(controller.queue.index) { chosenKey = played[controller.queue.index].key }
+        }
+        startTicking()
+        return took
+    }
+
+    /// (app 0.8) An older row of Up Next's tapped - a song played before, above History: that song again, now, as a
+    /// History row's tap plays its song - a new entry after the song playing, moved to at once, the queue carrying on
+    /// after it (QueueController.playAgain: the web's Play Next and jump as one action). Queued at the setting's level
+    /// for a song (levelFor(normalization, .songs)), as a song's Play Next queues it. With nothing to play next to - a
+    /// queue played out - it plays as a queue of its own. True when it plays: the screen says what started only then.
+    @discardableResult
+    func playAgain(_ track: QueueTrack) -> Bool {
+        guard let controller = ensureController() else { return false }
+        var song = track
+        if let level = levelFor(normalization, .songs) { song.level = level }
+        follow()
+        if controller.playsAlone() {
+            var took = false
+            startQueue { took = $0.playAgain(song) }
+            return took
+        }
+        cancelRetry()
+        var took = false
+        act { took = controller.playAgain(song) }
+        if took {
+            // the song tapped (Phase 2's OfflinePlay.chosen): its new entry, stopped on offline rather than passed over
             let played = QueueController.entries(controller.queue)
             if played.indices.contains(controller.queue.index) { chosenKey = played[controller.queue.index].key }
         }
@@ -792,6 +824,14 @@ final class PlayerModel {
         }
     }
 
+    /// (app 0.8) A song begun - its listen's "now playing" (PlayReporter's onStart): a start in play history, of the
+    /// entry heard as the queue holds it, its queue's id and its entry's key with it. Only for the entry heard: a
+    /// report from another moment is let go.
+    private func started(entry: Int, at: Int64) {
+        guard let link, let history, let current, link.engineKey(current.key) == entry else { return }
+        history.record(PlayHistory.startOf(current.track, at: at, queue: queue))
+    }
+
     /// The engine said something changed. A state of another queue's generation (still on its way from before a new
     /// play or a stop) is dropped.
     private func engineChanged(_ state: EngineState) {
@@ -1151,7 +1191,8 @@ final class PlayerModel {
         resuming?.stop()
         let player = ResumePlayerLink(
             position: { [weak self] in MainActor.assumeIsolated { self?.heardSeconds() ?? 0 } },
-            restore: { [weak self] queue, position in MainActor.assumeIsolated { self?.putBack(queue, position: position) } }
+            restore: { [weak self] queue, position in MainActor.assumeIsolated { self?.putBack(queue, position: position) } },
+            continuing: { [weak self] queue in MainActor.assumeIsolated { self?.history?.continuing(queue) } }
         )
         let routes = ResumeRoutes(
             client: { [weak self] in self?.server.client },

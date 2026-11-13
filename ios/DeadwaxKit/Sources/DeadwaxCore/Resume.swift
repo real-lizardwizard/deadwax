@@ -7,7 +7,9 @@ import Foundation
 // web app share both: a queue saved on one is picked up on the other.
 //
 // What is saved is a WINDOW: at most `Resume.before` entries before the song playing and `Resume.maxEntries` in
-// all. The snapshot (v1, made only by toSave, read only by fromSnapshot) lists the source by id, with the whole
+// all. The snapshot (v1, made only by toSave, read only by fromSnapshot) carries the queue's id (app 0.8, the web's
+// 2.1.15 - written second, read back so the queue is the same on every device; one saved without it is given a new
+// one, or the queue held's when it is that queue: `holding`, sameQueue) and lists the source by id, with the whole
 // song (`extra`) only for source songs outside the window, one character a level per entry. It is written as
 // JSON.stringify writes it, to the byte (SnapshotJSON.swift), and read as the web reads it: every check of
 // fromSnapshot in its order. ios/scripts/export-traces.cjs records what the TypeScript writes and reads, and
@@ -111,8 +113,9 @@ private func fromChar(_ from: MarkFrom) -> String {
     }
 }
 
-/// A song as the queue needs it, without its level - what `extra` keeps.
-private func bare(_ track: QueueTrack) -> QueueTrack {
+/// A song as the queue needs it, without its level - what `extra` keeps, and (2.1.15) what a start of it carries
+/// (PlayHistory.startOf).
+func bare(_ track: QueueTrack) -> QueueTrack {
     var out = track
     out.level = nil
     return out
@@ -187,6 +190,7 @@ public func toSave(_ queue: UpNextQueue, position: Double) -> Saving {
     var made = WebJSON.Writer()
     made.open()
     made.member("v", first: true) { $0.int(1) }
+    made.member("id") { $0.string(state.id) }
     made.member("levels") { $0.string(entries.map { levelChar($0.level) }.joined()) }
     made.member("marks") { writer in
         writer.array(Array(sliced(state.marks, start, end))) { item, mark in
@@ -300,8 +304,11 @@ public func savedLevels(_ snapshot: String?, count: Int) -> [Level?] {
 /// song in neither Navidrome's songs nor `extra`, or a rebuilt state failing its checks - marks as long as the
 /// entries, each mark's `from` one of the three, a source mark's `at` inside the source and naming its song, an
 /// added mark's at and pass -1, keys unique and below nextKey, startedAt not below 0 (and past the song playing's
-/// run, lowered to it).
-public func fromSnapshot(_ snapshot: String?, tracks: [QueueTrack], index: Int, setting: Normalization) -> UpNextQueue? {
+/// run, lowered to it). (2.1.15) Its id as saved; saved without one (or one that isn't), a new one (`newId`) -
+/// unless it is the queue `holding` (the one the player holds, sameQueue): then that one's, so the starts made in it
+/// here stay its rows.
+public func fromSnapshot(_ snapshot: String?, tracks: [QueueTrack], index: Int, setting: Normalization,
+                         holding: UpNextQueue? = nil, newId: () -> String = UpNext.newQueueId) -> UpNextQueue? {
     guard let snapshot, case .object(let made)? = WebJSON.parse(snapshot), case .number(1)? = made["v"] else { return nil }
     let n = tracks.count
     guard let levels = text(made["levels"]), levels.utf16.count == n,
@@ -384,22 +391,59 @@ public func fromSnapshot(_ snapshot: String?, tracks: [QueueTrack], index: Int, 
         }
         pagedRounds = rounds
     }
-    let state = UpNextState(marks: rebuilt, source: list, shuffle: shuffle, nextKey: nextKey,
+    //? (2.1.15) the queue's id as it was saved - the same queue on this device as on the one that saved it - or, saved
+    //? without one (or one that isn't), a new one: unless it is the queue this phone holds (`holding`), saved by an app
+    //? that keeps no id (the web before 2.1.15, this app before 0.8) - then the phone's, so its starts stay its rows
+    let saved = text(made["id"]).flatMap { UpNext.isQueueId($0) ? $0 : nil }
+    var state = UpNextState(id: saved ?? newId(), marks: rebuilt, source: list, shuffle: shuffle, nextKey: nextKey,
                             startedAt: min(startedAt, run),
                             left: gone, paged: paged, pagedRounds: pagedRounds)
-    return UpNextQueue(tracks: entries, index: index, upNext: state)
+    let queue = UpNextQueue(tracks: entries, index: index, upNext: state)
+    if saved == nil, let held = holding, let kept = held.upNext?.id, !kept.isEmpty, sameQueue(held, queue) {
+        state.id = kept
+        return UpNextQueue(tracks: entries, index: index, upNext: state)
+    }
+    return queue
+}
+
+/// (2.1.15) Whether `put` - read back from a snapshot saved without an id - is the queue `held`: the same list, in the
+/// same order, and at least one entry under a key both have, every such key the same song in each. The keys are the
+/// queue's own numbering (nextKey), carried on by whichever app edits it, so another queue - an album tapped, its keys
+/// from 0 again - has other songs under them; the same album tapped again is the one case it can't tell, and then the
+/// phone's earlier starts in it are its rows, not older ones. (resume.ts sameQueue.)
+public func sameQueue(_ held: UpNextQueue, _ put: UpNextQueue) -> Bool {
+    guard let a = held.upNext, let b = put.upNext, a.source.count == b.source.count,
+          zip(a.source, b.source).allSatisfy({ WebText.same($0.id, $1.id) }) else { return false }
+    //? the web's Map of key -> song: a key twice (which no queue has) keeps its last, and one past the tracks (none)
+    //? reads as absent
+    var songs: [Int: String] = [:]
+    for (place, mark) in a.marks.enumerated() {
+        if held.tracks.indices.contains(place) {
+            songs[mark.key] = held.tracks[place].id
+        } else {
+            songs.removeValue(forKey: mark.key)
+        }
+    }
+    var common = 0
+    for (place, mark) in b.marks.enumerated() {
+        guard let song = songs[mark.key] else { continue }
+        guard put.tracks.indices.contains(place), WebText.same(put.tracks[place].id, song) else { return false }
+        common += 1
+    }
+    return common > 0
 }
 
 /// A plain list: the songs in order, from `index`, as playTracks(tracks, index) queues them - each at its level,
 /// re-fitted to this device (`levels` the ones saved, where known; a song with no level to give is left as it is).
-private func plainQueue(_ tracks: [QueueTrack], _ index: Int, _ levels: [Level?], _ setting: Normalization) -> UpNextQueue {
+private func plainQueue(_ tracks: [QueueTrack], _ index: Int, _ levels: [Level?], _ setting: Normalization,
+                        _ newId: () -> String = UpNext.newQueueId) -> UpNextQueue {
     let levelled = tracks.enumerated().map { place, track -> QueueTrack in
         guard let level = relevel(place < levels.count ? levels[place] : nil, setting) else { return track }
         var out = bare(track)
         out.level = level
         return out
     }
-    return startUpNext(levelled, start: index)
+    return startUpNext(levelled, start: index, id: newId())
 }
 
 /// A song of GET /queue's answer as a queue entry - the web's shuffledTrack (app/useShuffleFeed.ts), its album known
@@ -435,9 +479,10 @@ public struct Resumed: Sendable, Equatable {
 }
 
 /// What is put back from GET /queue's answer (its songs made entries by shuffledTrack).
-public func resumed(_ answer: QueueAnswer, setting: Normalization, device: String) -> Resumed? {
+public func resumed(_ answer: QueueAnswer, setting: Normalization, device: String, holding: UpNextQueue? = nil,
+                    newId: () -> String = UpNext.newQueueId) -> Resumed? {
     resumed(index: answer.index, position: answer.position, changedBy: answer.changed_by, kept: answer.kept,
-            tracks: answer.tracks.map(shuffledTrack), setting: setting, device: device)
+            tracks: answer.tracks.map(shuffledTrack), setting: setting, device: device, holding: holding, newId: newId)
 }
 
 /// What is put back, from the answer's parts and its songs:
@@ -451,8 +496,12 @@ public func resumed(_ answer: QueueAnswer, setting: Normalization, device: Strin
 ///  - anyone else's: a plain list at Navidrome's index held into the list - at 0 when it had to be held - at its
 ///    position.
 ///  - a song played to its end (within a second of its length): the next entry at 0, or - the queue's last - it at 0.
+///
+/// (2.1.15) `holding`: the queue the player holds - a snapshot of it saved without an id keeps its id (fromSnapshot).
+/// `newId`: where a queue's new id comes from (a test's fixed one).
 public func resumed(index said: Int?, position answered: Double, changedBy: String, kept: KeptQueue?,
-                    tracks: [QueueTrack], setting: Normalization, device: String) -> Resumed? {
+                    tracks: [QueueTrack], setting: Normalization, device: String, holding: UpNextQueue? = nil,
+                    newId: () -> String = UpNext.newQueueId) -> Resumed? {
     let n = tracks.count
     if n == 0 { return nil }
     let ids = tracks.map(\.id)
@@ -466,8 +515,9 @@ public func resumed(index said: Int?, position answered: Double, changedBy: Stri
     let survivors = kept?.ids.filter { present.contains($0) } ?? []
     if let kept, ids == kept.ids, kept.index == said {
         exact = true
-        queue = fromSnapshot(kept.snapshot, tracks: tracks, index: kept.index, setting: setting)
-            ?? plainQueue(tracks, kept.index, savedLevels(kept.snapshot, count: n), setting)
+        queue = fromSnapshot(kept.snapshot, tracks: tracks, index: kept.index, setting: setting, holding: holding,
+                             newId: newId)
+            ?? plainQueue(tracks, kept.index, savedLevels(kept.snapshot, count: n), setting, newId)
         position = kept.position
         from = keptFrom
     } else if let kept, survivors.count < kept.ids.count, survivors == ids {
@@ -483,12 +533,12 @@ public func resumed(index said: Int?, position answered: Double, changedBy: Stri
             index = before < n ? before : n - 1
             position = 0
         }
-        queue = plainQueue(tracks, index, levels, setting)
+        queue = plainQueue(tracks, index, levels, setting, newId)
         from = keptFrom
     } else {
         let index = said.map { min(max($0, 0), n - 1) } ?? 0
         position = said == index ? answered : 0
-        queue = plainQueue(tracks, index, [], setting)
+        queue = plainQueue(tracks, index, [], setting, newId)
         if let kept, ids == kept.ids {
             from = keptFrom
         } else if !changedBy.isEmpty && changedBy != Resume.deadwaxClient {

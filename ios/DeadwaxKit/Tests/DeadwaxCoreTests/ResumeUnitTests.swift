@@ -21,9 +21,9 @@ import Testing
     }
 
     @Test func theSnapshotsShapeForASmallQueue() throws {
-        let queue = withNext(startUpNext(rAlbum(3, level: .album), start: 1), [rTrack("x", level: .track)])
+        let queue = withNext(startUpNext(rAlbum(3, level: .album), start: 1, id: "q-1"), [rTrack("x", level: .track)])
         let snapshot = try #require(toSave(queue, position: 61.5).snapshot)
-        #expect(snapshot == #"{"v":1,"levels":"aata","marks":[[0,"s",0,0],[1,"s",1,0],[3,"a",-1,-1],[2,"s",2,0]],"source":["1","2","3"],"sourceLevels":"aaa","extra":{},"shuffle":false,"nextKey":4,"startedAt":1,"left":[]}"#)
+        #expect(snapshot == #"{"v":1,"id":"q-1","levels":"aata","marks":[[0,"s",0,0],[1,"s",1,0],[3,"a",-1,-1],[2,"s",2,0]],"source":["1","2","3"],"sourceLevels":"aaa","extra":{},"shuffle":false,"nextKey":4,"startedAt":1,"left":[]}"#)
         let back = fromSnapshot(snapshot, tracks: queue.tracks.map { var t = $0; t.level = nil; return t }, index: 1, setting: .auto)
         #expect(back == queue)
         //? By song: every entry at its song's level; Off: none
@@ -31,22 +31,49 @@ import Testing
         #expect(fromSnapshot(snapshot, tracks: queue.tracks, index: 1, setting: .off)?.tracks.allSatisfy { $0.level == nil } == true)
     }
 
-    /// (2.1.15) The web writes its queue's `id` second in v1 now; the phone keeps no id until its play history port, so
-    /// it reads the web's snapshot as the same queue, the id aside - and writes its own without one, as before.
-    @Test func aSnapshotWithTheWebsQueueIdReadsAsTheSameQueue() throws {
-        let queue = withNext(startUpNext(rAlbum(3, level: .album), start: 1), [rTrack("x", level: .track)])
+    /// (app 0.8, the web's 2.1.15) The queue's `id` is written second and read back - the same queue on every device;
+    /// a snapshot saved without one (the phone before 0.8, the web before 2.1.15) reads as the same queue under a new
+    /// id - or the queue held's, when it is that queue - and is saved again with it.
+    @Test func theQueuesIdIsSavedAndReadBack() throws {
+        let queue = withNext(startUpNext(rAlbum(3, level: .album), start: 1, id: "mhyx7k2c-a1b2c3d4"),
+                             [rTrack("x", level: .track)])
         let ours = try #require(toSave(queue, position: 61.5).snapshot)
-        #expect(!ours.contains(#""id""#))
-        let webs = ours.replacingOccurrences(of: #"{"v":1,"#, with: #"{"v":1,"id":"mhyx7k2c-a1b2c3d4","#)
-        #expect(webs != ours)
+        #expect(ours.hasPrefix(#"{"v":1,"id":"mhyx7k2c-a1b2c3d4","levels":"#))
+        let before = ours.replacingOccurrences(of: #""id":"mhyx7k2c-a1b2c3d4","#, with: "")
+        #expect(before != ours)
         let tracks = queue.tracks.map { var t = $0; t.level = nil; return t }
         for setting in [Normalization.auto, .song, .album, .off] {
-            let back = try #require(fromSnapshot(webs, tracks: tracks, index: 1, setting: setting))
+            var back = try #require(fromSnapshot(before, tracks: tracks, index: 1, setting: setting, newId: { "new-1" }))
+            #expect(back.upNext?.id == "new-1")
+            back.upNext?.id = queue.upNext!.id
             #expect(back == fromSnapshot(ours, tracks: tracks, index: 1, setting: setting))
         }
-        #expect(fromSnapshot(webs, tracks: tracks, index: 1, setting: .auto) == queue)
-        //? read back, it saves as the phone always has: no id
-        #expect(toSave(queue, position: 61.5).snapshot == ours)
+        #expect(fromSnapshot(ours, tracks: tracks, index: 1, setting: .auto) == queue)
+        //? while the phone holds that queue, the id-less snapshot keeps its id; holding another, a new one
+        #expect(fromSnapshot(before, tracks: tracks, index: 1, setting: .auto, holding: queue) == queue)
+        let other = startUpNext(rAlbum(3, "o"), start: 0, id: "other")
+        #expect(fromSnapshot(before, tracks: tracks, index: 1, setting: .auto, holding: other, newId: { "new-2" })?.upNext?.id == "new-2")
+        //? read back, it saves with the id it has now
+        let resaved = try #require(fromSnapshot(before, tracks: tracks, index: 1, setting: .auto, newId: { "new-3" }))
+        #expect(toSave(resaved, position: 61.5).snapshot?.hasPrefix(#"{"v":1,"id":"new-3","levels":"#) == true)
+    }
+
+    /// (2.1.15) A queue's id as the web's queueId() makes one, and what one is.
+    @Test func aQueuesId() {
+        #expect(UpNext.queueId(nowMs: 1_762_000_000_000, bytes: [0, 1, 35, 36, 37, 255, 71, 10]) == "mhg9b18g-01z013za")
+        #expect(UpNext.queueId(nowMs: -5, bytes: []) == "0-")
+        let made = UpNext.newQueueId()
+        #expect(UpNext.isQueueId(made) && made.count == 17)
+        #expect(UpNext.newQueueId() != made)
+        for good in ["a", String(repeating: "Z", count: 64), "AZaz09_-", "mhyx7k2c-a1b2c3d4"] { #expect(UpNext.isQueueId(good), "\(good)") }
+        for bad in ["", String(repeating: "a", count: 65), "q 1", "q.1", "q\u{1F600}", "caf\u{E9}", "q\n"] { #expect(!UpNext.isQueueId(bad), "\(bad)") }
+        //? a new queue gets one, every edit carries it
+        let queue = startUpNext(rAlbum(4), start: 1)
+        let id = queue.upNext?.id ?? ""
+        #expect(UpNext.isQueueId(id))
+        let edited = withShuffle(toppedUp(withRepeat(withNext(queue, [rTrack("n")]), .all), .all), true)
+        #expect(edited.upNext?.id == id)
+        #expect(startUpNext(rAlbum(4), start: 1, id: "given").upNext?.id == "given")
     }
 
     @Test func positionsAsSent() {

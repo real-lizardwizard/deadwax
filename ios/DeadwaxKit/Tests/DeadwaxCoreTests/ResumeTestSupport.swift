@@ -78,6 +78,10 @@ func canonical(_ value: WebJSON.Value) -> String {
 
 /// A resume fixture's songs: `"<level>:<id>"` (or `"...#n"`, a variant) to the song, its level with it.
 struct ResumeSongs {
+    /// (2.1.15) The id a queue read back is given when it is given a new one - the record's `"id": null` - by the
+    /// tests' own `newId`.
+    static let freshId = "fresh-id"
+
     let table: [String: QueueTrack]
 
     init(_ json: JSONValue?) throws {
@@ -124,8 +128,10 @@ struct ResumeSongs {
             }
             guard rounds?.count == items.count else { return nil }
         }
+        //? (2.1.15) the queue's id; null: one given a new id as it was read (the tests' `freshId`)
+        guard let id = state["id"].flatMap({ $0 == .null ? Self.freshId : $0.string }) else { return nil }
         return UpNextQueue(tracks: tracks, index: index, upNext: UpNextState(
-            marks: made, source: source, shuffle: shuffle, nextKey: nextKey, startedAt: startedAt, left: left,
+            id: id, marks: made, source: source, shuffle: shuffle, nextKey: nextKey, startedAt: startedAt, left: left,
             paged: state["paged"].flatMap(paged), pagedRounds: rounds))
     }
 }
@@ -141,6 +147,7 @@ func queueDifference(_ ours: UpNextQueue?, _ theirs: UpNextQueue?) -> String? {
         return "song \(at): \(ours.tracks[at].id) \(String(describing: ours.tracks[at].level)) vs \(theirs.tracks[at].id) \(String(describing: theirs.tracks[at].level))"
     }
     guard let a = ours.upNext, let b = theirs.upNext else { return "Up Next: \(ours.upNext == nil) vs \(theirs.upNext == nil)" }
+    if a.id != b.id { return "id \(a.id) vs \(b.id)" }
     if a.marks != b.marks { return "marks differ" }
     if a.source != b.source { return "source differs" }
     if a.shuffle != b.shuffle || a.nextKey != b.nextKey || a.startedAt != b.startedAt { return "shuffle/nextKey/startedAt" }
@@ -254,9 +261,15 @@ final class FakeResumePlayer: ResumePlayer {
     var playing = false
     var at = 0.0
     var restored: [(ids: [String], index: Int, position: Double)] = []
+    /// (app 0.8) every continuing() told - the queue put back mid-song, or nil
+    var continued: [UpNextQueue?] = []
     weak var controller: ResumeController?
 
     func position() -> Double { at }
+
+    func continuing(_ queue: UpNextQueue?) {
+        continued.append(queue)
+    }
 
     func restoreQueue(_ queue: UpNextQueue, position: Double) -> UpNextQueue? {
         if playing { return nil }

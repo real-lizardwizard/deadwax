@@ -52,7 +52,7 @@ final class DownloadStore {
 
     /// Whose store /me names: the person signed in, or "local" with logins off.
     static func person(_ me: Me) -> String {
-        me.loginsOn ? me.user : "local"
+        KeptOwner.person(me)
     }
 
     /// Application Support/deadwax.

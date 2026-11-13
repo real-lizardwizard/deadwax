@@ -11,6 +11,12 @@ import Foundation
 /// The model tells it: `newListen` at every song change it made (and a restart, a queue put back from where it was
 /// left), `join` when the engine ran into the next song by itself, `seeked` at every seek and retry, `began` when the
 /// entry heard is playing, `tick` from the ticker, `stop` at a stop or a new person, `speedChanged` at every speed.
+///
+/// Play history (app 0.8, notes/ios.md "Play history on the phone"): every "now playing" is a START - `onStart`, the
+/// entry and the listen's own start, the very `time` its play will carry - and every play counted is `onCounted`. A
+/// listen's "now playing" goes once (ListenTracker), so a pause and Play, a seek, a failure's retry, a wait for the
+/// network and the engine beginning its lanes again for a new speed (the same listen: the model's speed hold) are
+/// never starts; a restart, Previous to the song again or Repeat One's next time round is a new listen, and one.
 @MainActor
 final class PlayReporter {
     private let server: ServerModel
@@ -21,6 +27,11 @@ final class PlayReporter {
     var online: () -> Bool = { true }
     /// A play kept to send later: its song and its time.
     var keep: (_ songID: String, _ timeMs: Int64) -> Void = { _, _ in }
+    /// (app 0.8) A song begun - its listen's "now playing": the entry heard (the engine's key) and the listen's start,
+    /// wall ms. Play history's start.
+    var onStart: (_ entry: Int, _ atMs: Int64) -> Void = { _, _ in }
+    /// (app 0.8) A play counted: its song and its listen's start - play history's start of it, counted.
+    var onCounted: (_ songID: String, _ atMs: Int64) -> Void = { _, _ in }
 
     init(server: ServerModel) {
         self.server = server
@@ -70,6 +81,7 @@ final class PlayReporter {
     }
 
     private func send(_ report: PlayReport) {
+        told(report)
         guard let client = server.client, online() else {
             kept(report)
             return
@@ -83,6 +95,18 @@ final class PlayReporter {
             } catch {
                 // answered (a refusal is never sent again), or called off
             }
+        }
+    }
+
+    /// Play history told, before the send: a "now playing" is the listen begun - the entry it is of, and its start - and
+    /// a play is that start counted.
+    private func told(_ report: PlayReport) {
+        switch report {
+        case .nowPlaying:
+            guard let entry = listening, let at = tracker.listen.startedAt else { return }
+            onStart(entry, at)
+        case .played(let songID, let atMs):
+            onCounted(songID, atMs)
         }
     }
 

@@ -150,8 +150,16 @@ public func upNextLabel(shuffle: Bool, repeat mode: Repeat) -> String {
 public enum UpNextWords {
     public static let title = "Up Next"
     public static let playingNext = "Playing Next"
-    /// History's heading (2.1.3)
+    /// History's heading (2.1.3) - drawn nowhere since play history (app 0.8: one list with no headings, James's call),
+    /// not even for VoiceOver: there a played row says what it is by its own name ("{title}, play again", `playAgain`),
+    /// and the song playing's title is the next heading. Kept as the web's word (UpNext.tsx's HISTORY, which names its
+    /// list for a screen reader), held to it by the history vectors.
     public static let history = "History"
+    /// (app 0.8) LOADING_EARLIER: while an older page of the songs played is on its way, at the list's top
+    public static let loadingEarlier = "Loading earlier songs"
+    /// EARLIER_FAILED: what didn't work when a page of them didn't come - said through ErrorWords, with Try again
+    public static let earlierFailed = "Couldn't load the songs you played before."
+    public static let tryAgain = "Try again"
     public static let clear = "Clear"
     public static let modesGroup = "Shuffle and repeat"
     /// REPEATING_ONE, under the song playing with Repeat One on

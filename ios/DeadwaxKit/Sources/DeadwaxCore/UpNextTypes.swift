@@ -152,6 +152,12 @@ public struct PagedRound: Sendable, Equatable, Hashable {
 
 /// Up Next's account of the queue, entry by entry beside its tracks.
 public struct UpNextState: Sendable, Equatable {
+    /// (app 0.8, the web's 2.1.15) the queue's identity, made as it starts (startUpNext, `UpNext.newQueueId()`) and
+    /// carried by every edit of it - by the snapshot too (toSave writes it, fromSnapshot reads it back), so a queue put
+    /// back on another device is the same queue: what a start of a song says it was begun in (PlayHistory.swift), so
+    /// each start is drawn once - by this queue's own rows while they show its entry, else among the older plays above
+    /// them. [A-Za-z0-9_-], 1 to 64 characters (`UpNext.isQueueId`).
+    public var id: String
     /// one per entry of the queue's tracks, in step with them: always the same count
     public var marks: [Mark]
     /// the list as playTracks was given it, in its own order
@@ -168,8 +174,9 @@ public struct UpNextState: Sendable, Equatable {
     /// the TypeScript (absent, and present but empty - withRepeat can leave it so).
     public var pagedRounds: [PagedRound]?
 
-    public init(marks: [Mark], source: [QueueTrack], shuffle: Bool, nextKey: Int, startedAt: Int,
+    public init(id: String, marks: [Mark], source: [QueueTrack], shuffle: Bool, nextKey: Int, startedAt: Int,
                 left: [LeftOut] = [], paged: Paged? = nil, pagedRounds: [PagedRound]? = nil) {
+        self.id = id
         self.marks = marks
         self.source = source
         self.shuffle = shuffle

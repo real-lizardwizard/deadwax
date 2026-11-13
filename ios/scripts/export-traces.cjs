@@ -38,10 +38,13 @@
  *
  * Every snapshot recorded is also written by a reference writer here (the snapshot's form written out key by key,
  * as Resume.swift writes it) and must be the TypeScript's text - so a change of the form fails here, by name.
- * (2.1.15) The web's queue has an `id` now, which toSave writes second; the phone keeps none until its play history
- * port, so the snapshots it must write are toSave's of each queue without its id (phoneForm) - its own form, byte for
- * byte as before - and the web's own text, with a fixed id (QUEUE_ID), is among fromSnapshot's cases, for the phone
- * to read. The port records them with the id.
+ * (2.1.15; the phone's app 0.8) A queue has an `id` (UpNextState.id), which toSave writes second and fromSnapshot reads
+ * back - the phone too since its play history port, so every snapshot here is written with it and every queue
+ * recorded carries it. queueId()'s clock and random bytes are a counter while recording (ID_CLOCK, `madeIds`), so a
+ * queue made without an id given has the same one every run; a queue READ that was given a new one (a snapshot saved
+ * without an id - the web's before 2.1.15, the phone's before 0.8, which the phone still reads - or a plain list) is
+ * recorded with `"id": null`, "a new one", which the Swift tests give their own. Such id-less snapshots are among
+ * fromSnapshot's cases (`withoutId`), and those read while the queue they describe is held (`holding`, sameQueue).
  *
  * Every number a function draws is recorded as the Park-Miller generator's integer state s (the number itself is
  * (s - 1) / 2147483646 in both languages, bit for bit), so nothing depends on how a double prints. Math.random is
@@ -103,6 +106,26 @@ try {
 
 const realRandom = Math.random
 Math.random = () => { throw new Error('Math.random was called while recording: every random number must come from a tape') }
+
+//? (app 0.8) queueId()'s clock and random bytes, the same every run: its bytes are a count, written in base 36 by its
+//? own letters - so the n-th queue made here without an id given is `<ID_CLOCK in base 36>-<n in eight base-36 digits>`
+//? - and each made is noted (`madeIds`), so a queue read back that was given one is recorded as given a new one (null)
+const ID_CLOCK = 1_762_000_000_000
+const realNow = Date.now
+const realCrypto = Object.getOwnPropertyDescriptor(globalThis, 'crypto')
+const madeIds = []
+Date.now = () => ID_CLOCK
+Object.defineProperty(globalThis, 'crypto', {
+  configurable: true,
+  value: {
+    getRandomValues(bytes) {
+      const n = madeIds.length + 1
+      for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(n / 36 ** (bytes.length - 1 - i)) % 36
+      madeIds.push(`${ID_CLOCK.toString(36)}-${[...bytes].map((byte) => '0123456789abcdefghijklmnopqrstuvwxyz'[byte % 36]).join('')}`)
+      return bytes
+    },
+  },
+})
 
 const sha256 = (text) => crypto.createHash('sha256').update(text).digest('hex')
 const madeFrom = Object.fromEntries(SOURCES.map((file) => [file, sha256(fs.readFileSync(path.join(REPO, file)))]))
@@ -1233,12 +1256,17 @@ class LevelledSongs {
   table() { return Object.fromEntries([...this.byKey].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) }
 }
 
-/** A queue as the Swift test rebuilds it: song keys, the index, and Up Next's account (absent for a plain queue). */
-function queueRecord(queue, songs) {
+/** A queue as the Swift test rebuilds it: song keys, the index, and Up Next's account (absent for a plain queue) - its
+ *  id among it, or null for one made since `madeFrom` (madeIds' length then: a queue read back that was given a new id -
+ *  the Swift test gives it its own). */
+function queueRecord(queue, songs, madeFrom = null) {
   const out = { tracks: queue.tracks.map((t) => songs.key(t)), index: queue.index }
   const state = queue.upNext
   if (!state) return out
+  if (typeof state.id !== 'string') throw new Error('a queue with no id')
+  const fresh = madeFrom !== null && madeIds.indexOf(state.id, madeFrom) >= 0
   out.upNext = {
+    id: fresh ? null : state.id,
     marks: state.marks.map((m) => [m.key, FROM[m.from], m.at, m.pass]), source: state.source.map((t) => songs.key(t)),
     shuffle: state.shuffle, nextKey: state.nextKey, startedAt: state.startedAt, left: state.left.map((gone) => [gone.pass, gone.at]),
   }
@@ -1273,7 +1301,7 @@ function referenceSnapshot(queue) {
     `"suffix":${q(t.suffix)},"sampleRate":${q(t.sampleRate)},"bitDepth":${q(t.bitDepth)},"channels":${q(t.channels)}}`
   const paged = (p) => `{"token":${q(p.token)},"total":${q(p.total)},"fetched":${q(p.fetched)},"scope":${q(p.scope)}` +
     `${p.level !== undefined ? `,"level":${q(p.level)}` : ''}}`
-  return `{"v":1,"levels":${q(entries.map(char).join(''))},` +
+  return `{"v":1,"id":${q(state.id)},"levels":${q(entries.map(char).join(''))},` +
     `"marks":[${state.marks.slice(start, end).map((m) => `[${m.key},"${FROM[m.from]}",${m.at},${m.pass}]`).join(',')}],` +
     `"source":[${state.source.map((t) => q(t.id)).join(',')}],"sourceLevels":${q(state.source.map(char).join(''))},` +
     `"extra":{${keys.map((key) => `${q(key)}:${song(kept.get(key))}`).join(',')}},` +
@@ -1283,30 +1311,25 @@ function referenceSnapshot(queue) {
     `${state.pagedRounds ? `,"pagedRounds":[${state.pagedRounds.map((held) => `{"pass":${q(held.pass)},"paged":${paged(held.paged)}}`).join(',')}]` : ''}}`
 }
 
-/** (2.1.15) A queue as the phone has it until its play history port (play-history.md section 5): without the queue's
- *  `id`, which toSave then leaves out - v1 as the phone writes it, and as the web wrote it before 2.1.15. The web reads
- *  such a snapshot as a queue to give an id of its own (fromSnapshot), which nothing here records. */
-const phoneForm = (queue) => (queue.upNext ? { ...queue, upNext: (({ id: _id, ...rest }) => rest)(queue.upNext) } : queue)
-/** (2.1.15) The one queue id the export gives a queue whose snapshot it keeps WITH its id (startUpNext's `id`, never
- *  queueId()'s time and random bytes), so the files are the same run to run: the web's own text now, which the phone
- *  must read. A queue's id in the form queueId makes. */
+/** (2.1.15) A queue id given by hand (startUpNext's `id`), where the Swift test makes the same queue itself - the
+ *  recipes', the reading cases' base. A queue's id in the form queueId makes. */
 const QUEUE_ID = 'mhyx7k2c-a1b2c3d4'
-/** v1 with the queue's id second, as toSave writes it since 2.1.15 - the phone's form with `"id"` put in. */
-const withQueueId = (snapshot, id) => snapshot.replace('{"v":1,', `{"v":1,"id":${JSON.stringify(id)},`)
+/** (2.1.15) A snapshot as written without the queue's id - by the web before 2.1.15 and the phone before 0.8, which the
+ *  phone still reads (a new id given, or the held queue's: fromSnapshot's `holding`). */
+const withoutId = (snapshot, id) => {
+  const member = `"id":${JSON.stringify(id)},`
+  if (!snapshot.startsWith(`{"v":1,${member}`)) throw new Error('a snapshot without its id second')
+  return snapshot.replace(member, '')
+}
 
-/** toSave of the phone's form (phoneForm), its snapshot held to the reference writer's text (or, over the cap, to none);
- *  and the web's own text of the queue, with its id, held to that text with the id second - so a change of where or
- *  how the web writes the id stops the export here too. */
+/** toSave of a queue, its snapshot held to the reference writer's text - the form the phone writes, its id second (or,
+ *  over the cap, to none). */
 function saved(queue, position) {
-  const saving = R.toSave(phoneForm(queue), position)
+  const saving = R.toSave(queue, position)
   const reference = referenceSnapshot(queue)
   const wanted = reference !== null && reference.length <= R.RESUME_SNAPSHOT_MAX ? reference : null
   if (saving.snapshot !== wanted) {
     throw new Error(`toSave's snapshot is not the form the phone writes:\n  ${String(saving.snapshot).slice(0, 300)}\n  ${String(wanted).slice(0, 300)}`)
-  }
-  const web = R.toSave(queue, position).snapshot
-  if (web !== null && saving.snapshot !== null && (typeof queue.upNext.id !== 'string' || web !== withQueueId(saving.snapshot, queue.upNext.id))) {
-    throw new Error(`toSave's snapshot with its queue's id is not v1 with the id second:\n  ${web.slice(0, 300)}`)
   }
   return saving
 }
@@ -1315,7 +1338,7 @@ function saved(queue, position) {
 const unitHash = (text) => fnv1a(text)
 
 const resumeSongs = new LevelledSongs()
-const record = (queue) => queueRecord(queue, resumeSongs)
+const record = (queue, madeFrom = null) => queueRecord(queue, resumeSongs, madeFrom)
 const resumeCases = []
 //? resume.sim.cjs's songs: Mezzanine's, with a cover
 const rTrack = (id, fields = {}) => ({
@@ -1348,26 +1371,34 @@ for (const from of [{ device: 'Mac' }, { device: 'iPhone' }, { device: 'Android 
   for (const shared of [false, true]) resumeCases.push({ kind: 'pickedUp', from, shared, result: R.pickedUpWords(from, shared) })
 }
 
-/** A toSave case, and its snapshot read back at its index under every setting (the web's text the phone reads). */
+/** A toSave case, and its snapshot read back at its index under every setting (the web's text the phone reads) - and,
+ *  (2.1.15) as written before the queue's id (`withoutId`), read as a queue given a new one. */
 function saveCase(label, queue, position) {
   const saving = saved(queue, position)
   resumeCases.push({ kind: 'toSave', label, queue: record(queue), position, saving })
   if (saving.snapshot !== null) {
     const tracks = queue.tracks.slice(saving.start, saving.start + saving.ids.length).map(bareTrack)
     for (const setting of SETTINGS) fromCase(`${label}: read back (${setting})`, saving.snapshot, tracks, saving.index, setting)
+    fromCase(`${label}: as written before the queue's id, read back`, withoutId(saving.snapshot, queue.upNext.id), tracks, saving.index)
   }
   return saving
 }
-function fromCase(label, snapshot, tracks, index, setting = 'auto') {
-  const back = R.fromSnapshot(snapshot, tracks, index, setting)
-  resumeCases.push({ kind: 'fromSnapshot', label, snapshot, tracks: tracks.map((t) => resumeSongs.key(t)), index, setting, result: back && record(back) })
+/** A fromSnapshot case - with `holding`, the queue the player holds (2.1.15), when it has one. */
+function fromCase(label, snapshot, tracks, index, setting = 'auto', holding = null) {
+  const madeFrom = madeIds.length
+  const back = R.fromSnapshot(snapshot, tracks, index, setting, holding)
+  resumeCases.push({
+    kind: 'fromSnapshot', label, snapshot, tracks: tracks.map((t) => resumeSongs.key(t)), index, setting,
+    ...(holding ? { holding: record(holding) } : {}), result: back && record(back, madeFrom),
+  })
   return back
 }
-function resumedCase(label, answer, setting = 'auto', device = 'phone-1') {
-  const back = R.resumed(answer, answer.tracks.map(shuffledTrack), setting, device)
+function resumedCase(label, answer, setting = 'auto', device = 'phone-1', holding = null) {
+  const madeFrom = madeIds.length
+  const back = R.resumed(answer, answer.tracks.map(shuffledTrack), setting, device, holding)
   resumeCases.push({
-    kind: 'resumed', label, answer: JSON.stringify(answer), setting, device,
-    result: back && { queue: record(back.queue), position: back.position, from: back.from, exact: back.exact },
+    kind: 'resumed', label, answer: JSON.stringify(answer), setting, device, ...(holding ? { holding: record(holding) } : {}),
+    result: back && { queue: record(back.queue, madeFrom), position: back.position, from: back.from, exact: back.exact },
   })
   return back
 }
@@ -1448,16 +1479,17 @@ saveCase('Repeat One over two songs (Normalization Off): a copy\'s at its origin
 saveCase('120 songs played at 100: 50 before, `extra` the 50 before them', atIndex(U.startUpNext(rAlbum(120, 'w'), 30), 100), 42)
 
 // toSave from recipes (too big to keep as queues): resume.sim.cjs:276 and :281, and the cap in UTF-16 units
-/** The queue a recipe makes - rebuilt the same way by the Swift test. */
+/** The queue a recipe makes - rebuilt the same way by the Swift test, under the same id (QUEUE_ID). */
 function fromRecipe(recipe) {
   const tracks = rAlbum(recipe.n, recipe.prefix)
   if (recipe.pad) {
     const at = tracks.findIndex((t) => t.id === recipe.pad.id)
     tracks[at] = { ...tracks[at], title: `${tracks[at].title}${recipe.pad.unit.repeat(recipe.pad.count)}${'x'.repeat(recipe.pad.tail)}` }
   }
-  return atIndex(U.startUpNext(tracks, recipe.start), recipe.index)
+  return atIndex(U.startUpNext(tracks, recipe.start, false, undefined, undefined, recipe.id ?? QUEUE_ID), recipe.index)
 }
-function recipeCase(label, recipe) {
+function recipeCase(label, given) {
+  const recipe = { id: QUEUE_ID, ...given }
   const saving = saved(fromRecipe(recipe), recipe.position)
   resumeCases.push({
     kind: 'toSaveRecipe', label, recipe,
@@ -1473,7 +1505,7 @@ recipeCase('a 5,000-song list from its first: its next 2,000, and a snapshot ove
 recipeCase('playing the 101st of 2,500: 50 before it, 2,000 in all, startedAt floored at 0', { n: 2500, prefix: '', start: 30, index: 100, position: 7 })
 for (const unit of ['x', '😀']) {
   const base = { n: 2400, prefix: 'cap-', start: 50, index: 50, position: 0 }
-  const length = (pad) => R.toSave(phoneForm(fromRecipe({ ...base, pad })), 0).snapshot?.length ?? referenceSnapshot(fromRecipe({ ...base, pad })).length
+  const length = (pad) => R.toSave(fromRecipe({ ...base, pad }), 0).snapshot?.length ?? referenceSnapshot(fromRecipe({ ...base, pad })).length
   const bare = length({ id: 'cap-2400', unit, count: 0, tail: 0 })
   const count = Math.floor((R.RESUME_SNAPSHOT_MAX - bare) / unit.length)
   const tail = (R.RESUME_SNAPSHOT_MAX - bare) % unit.length
@@ -1486,7 +1518,7 @@ for (const unit of ['x', '😀']) {
 // fromSnapshot: snapshots broken, or written another way than toSave writes them, as the web reads them
 {
   const list = rAlbum(5)
-  const queue = U.withNext(U.startUpNext(list.map((t) => ({ ...t, level: 'album' })), 2), [rTrack('x', { level: 'track' })])
+  const queue = U.withNext(U.startUpNext(list.map((t) => ({ ...t, level: 'album' })), 2, false, undefined, undefined, QUEUE_ID), [rTrack('x', { level: 'track' })])
   const base = saved(queue, 61).snapshot
   const tracks = queue.tracks.map(bareTrack)
   const made = () => JSON.parse(base)
@@ -1542,23 +1574,48 @@ for (const unit of ['x', '😀']) {
     ['an array', '[]'], ['a string', '"{}"'], ['null', 'null'], ['nothing', ''], ['a number', '1'],
   ]
   for (const [label, snapshot] of cases) fromCase(`a snapshot ${label}`, snapshot, tracks, 2)
-  //? (2.1.15) the web's own snapshot now, its queue's id second: read as the same queue, the id aside - the phone keeps
-  //? none yet, and a queue's record has none. Then ids of every other shape, which the web reads as none (giving the
-  //? queue a new one), the rest read as ever
-  const own = U.withNext(U.startUpNext(list.map((t) => ({ ...t, level: 'album' })), 2, false, undefined, undefined, QUEUE_ID), [rTrack('x', { level: 'track' })])
-  const ownText = R.toSave(own, 61).snapshot
-  if (ownText !== withQueueId(base, QUEUE_ID)) throw new Error('the web\'s snapshot with its id is not the base with the id second')
-  for (const setting of SETTINGS) fromCase(`a snapshot as the web writes it since 2.1.15, its queue's id second (${setting})`, ownText, tracks, 2, setting)
-  const withId = (id) => withQueueId(base, 'ID').replace('"id":"ID"', `"id":${id}`)
+  //? (2.1.15) the queue's id: as written since (second), and before (none) - read as a queue given a new one, unless
+  //? it is the queue held (`holding`, sameQueue). Then ids of every other shape, which the web reads as none, the rest
+  //? read as ever
+  const idMember = `"id":${JSON.stringify(QUEUE_ID)},`
+  if (!base.startsWith(`{"v":1,${idMember}`)) throw new Error('the base snapshot has no id second')
+  const noId = withoutId(base, QUEUE_ID)
+  for (const setting of SETTINGS) fromCase(`a snapshot as written before the queue's id (${setting})`, noId, tracks, 2, setting)
+  const withId = (id) => base.replace(idMember, `"id":${id},`)
   for (const [label, snapshot] of [
     ['an id of 64 characters', withId(JSON.stringify('a'.repeat(64)))], ['an id of 65 characters', withId(JSON.stringify('a'.repeat(65)))],
     ['an id empty', withId('""')], ['an id with a space', withId('"q 1"')], ['an id with a dot', withId('"q.1"')],
     ['an id with an emoji pair escaped', withId('"q\\ud83d\\ude00"')], ['an id a number', withId('5')], ['an id null', withId('null')],
     ['an id an object', withId('{"id":"q"}')], ['an id an array', withId('["q"]')], ['an id true', withId('true')],
-    ['an id first, before v', base.replace('{"v":1,', `{"id":${JSON.stringify(QUEUE_ID)},"v":1,`)],
-    ['an id last', `${base.slice(0, -1)},"id":${JSON.stringify(QUEUE_ID)}}`],
+    ['an id of every letter it may have', withId('"AZaz09_-"')], ['an id escaped', withId('"\\u0071-1"')],
+    ['an id first, before v', noId.replace('{"v":1,', `{${idMember}"v":1,`)],
+    ['an id last', `${noId.slice(0, -1)},"id":${JSON.stringify(QUEUE_ID)}}`],
     ['an id twice', withId(`${JSON.stringify(QUEUE_ID)},"id":"other"`)],
+    ['an id twice, the last not one', withId(`${JSON.stringify(QUEUE_ID)},"id":"not one"`)],
   ]) fromCase(`a snapshot with ${label}`, snapshot, tracks, 2)
+  //? (2.1.15) read while the player holds a queue: saved without an id, the held queue's id kept when it is that queue
+  const heldElsewhere = U.withNext(U.startUpNext(list.map((t) => ({ ...t, level: 'album' })), 2, false, undefined, undefined, 'held-1'), [rTrack('x', { level: 'track' })])
+  const tappedAgain = U.startUpNext(list.map((t) => ({ ...t, level: 'album' })), 2, false, undefined, undefined, 'tapped-again')
+  const another = U.startUpNext(rAlbum(5, 'other'), 0, false, undefined, undefined, 'another')
+  const shuffledHeld = U.startUpNext(list, 2, true, parkMiller(11), undefined, 'shuffled')
+  const moved = U.movedKey(heldElsewhere, 5, 1)
+  for (const [label, holding] of [
+    ['the queue it describes', heldElsewhere], ['that queue moved on a song', atIndex(heldElsewhere, 3)],
+    ['that queue with a song moved', moved], ['the same album tapped again (keys from 0 again): the one case it can\'t tell', tappedAgain],
+    ['another album', another], ['the same album shuffled (another song under a key)', shuffledHeld],
+    ['a plain queue', { tracks: list, index: 0 }], ['nothing', Q.EMPTY_QUEUE],
+  ]) {
+    fromCase(`a snapshot written before the queue's id, read while the player holds ${label}`, noId, tracks, 2, 'auto', holding)
+    fromCase(`a snapshot with its id, read while the player holds ${label}: its own id`, base, tracks, 2, 'auto', holding)
+  }
+  for (const [label, held, put] of [
+    ['the same queue', heldElsewhere, queue], ['moved on', atIndex(heldElsewhere, 4), queue], ['a song moved', moved, queue],
+    ['tapped again', tappedAgain, queue], ['another album', another, queue], ['shuffled', shuffledHeld, queue],
+    ['a song removed', U.withoutKey(heldElsewhere, 3), queue], ['the song added gone', U.withoutAdded(heldElsewhere), queue],
+    ['no key in common', U.startUpNext(list, 0, false, undefined, undefined, 'k'), { ...queue, upNext: { ...queue.upNext, marks: queue.upNext.marks.map((m) => ({ ...m, key: m.key + 50 })) } }],
+    ['a plain queue held', { tracks: list, index: 0 }, queue], ['nothing held', Q.EMPTY_QUEUE, queue],
+    ['a source one longer', U.startUpNext([...list, rTrack('6')], 2, false, undefined, undefined, 'longer'), queue],
+  ]) resumeCases.push({ kind: 'sameQueue', label, held: record(held), put: record(put), result: R.sameQueue(held, put) })
   fromCase('an index past the songs', base, tracks, 6)
   fromCase('an index below 0', base, tracks, -1)
   fromCase('Navidrome\'s songs one short', base, tracks.slice(0, 5), 2)
@@ -1624,6 +1681,15 @@ for (const song of [
     resumedCase(`a snapshot that doesn't read back (${label}): the same songs as a plain list, at the same song and second`, answer(all, 2, 61, 'deadwax', kept({ snapshot })))
   }
   resumedCase('...and with that song kept whole as it should be: the account back, the song in the list', answer(all, 2, 61, 'deadwax', kept({ snapshot: withExtra(bareTrack(rTrack('z'))) })))
+  //? (2.1.15) the queue's id: kept from the snapshot; saved without one (an app before ids), a new one - or the held
+  //? queue's, when it is the queue held
+  const heldQueue = U.withNext(U.startUpNext(list.map((t) => ({ ...t, level: 'album' })), 2), [rTrack('x', { level: 'track' })])
+  const unsaid = withoutId(saving.snapshot, JSON.parse(saving.snapshot).id)
+  resumedCase('exact, its snapshot saved without an id: the account back, a new id', answer(all, 2, 61, 'deadwax', kept({ snapshot: unsaid })))
+  resumedCase('...while the player holds that queue: its id kept', answer(all, 2, 61, 'deadwax', kept({ snapshot: unsaid })), 'auto', 'phone-1', heldQueue)
+  resumedCase('...while the player holds another: a new id', answer(all, 2, 61, 'deadwax', kept({ snapshot: unsaid })), 'auto', 'phone-1', U.startUpNext(rAlbum(3, 'n'), 0))
+  resumedCase('exact, its snapshot with its id, while the player holds another queue: the id saved', answer(all, 2, 61, 'deadwax', kept()), 'auto', 'phone-1', heldQueue)
+  resumedCase('another app\'s, while the player holds a queue: a plain list, a new id', answer(all, 1, 5, 'Symfonium', null), 'auto', 'phone-1', heldQueue)
   {
     //? (review) an album tapped at song 5, a song played next, then Previous: before where playTracks began
     let live = U.withNext(U.startUpNext(rAlbum(10), 4), [rTrack('n')])
@@ -1811,7 +1877,8 @@ for (let run = 0; run < ROUND_TRIP_RUNS; run++) {
   const size = 1 + pick(7)
   let repeat = U.REPEATS[pick(3)]
   const paged = run % 5 === 0 ? { token: `t${run}`, total: size + 6, fetched: size, scope: 'yours', level: 'track' } : undefined
-  let queue = U.toppedUp(U.startUpNext(rAlbum(size, '', { level: level() }), random() < 0.3 ? null : pick(size), random() < 0.5, random, paged), repeat, random)
+  //? (2.1.15) the run's queue under an id of its own, which the Swift run gives it too: every snapshot carries it
+  let queue = U.toppedUp(U.startUpNext(rAlbum(size, '', { level: level() }), random() < 0.3 ? null : pick(size), random() < 0.5, random, paged, `rt-${run}`), repeat, random)
   let extra = 0
   const digests = []
   for (let step = 0; step < ROUND_TRIP_STEPS; step++) {
@@ -1853,11 +1920,11 @@ for (let run = 0; run < ROUND_TRIP_RUNS; run++) {
     let unit = queue.index
     while (unit > 0 && was.marks[unit].from === 'one') unit--
     const wanted = {
-      tracks: queue.tracks.slice(start, end), index: queue.index - start, marks: was.marks.slice(start, end), source: was.source,
+      id: was.id, tracks: queue.tracks.slice(start, end), index: queue.index - start, marks: was.marks.slice(start, end), source: was.source,
       shuffle: was.shuffle, nextKey: was.nextKey, startedAt: Math.min(Math.max(0, was.startedAt - start), unit - start), left: was.left, paged: was.paged, pagedRounds: was.pagedRounds,
     }
     const got = back && {
-      tracks: back.tracks, index: back.index, marks: back.upNext.marks, source: back.upNext.source, shuffle: back.upNext.shuffle,
+      id: back.upNext.id, tracks: back.tracks, index: back.index, marks: back.upNext.marks, source: back.upNext.source, shuffle: back.upNext.shuffle,
       nextKey: back.upNext.nextKey, startedAt: back.upNext.startedAt, left: back.upNext.left, paged: back.upNext.paged, pagedRounds: back.upNext.pagedRounds,
     }
     if (JSON.stringify(got) !== JSON.stringify(wanted)) throw new Error(`the round trip's run ${run} step ${step} didn't read back in the TypeScript`)
@@ -1910,6 +1977,9 @@ const resumeFiles = {
   }), 'states', roundTrip, 'digests', roundTripDigests)),
 }
 Math.random = realRandom
+Date.now = realNow
+if (realCrypto) Object.defineProperty(globalThis, 'crypto', realCrypto)
+else delete globalThis.crypto
 const written = [
   ...Object.entries(files).map(([name, text]) => [FIXTURES, name, text]),
   ...Object.entries(resumeFiles).map(([name, text]) => [RESUME_FIXTURES, name, text]),

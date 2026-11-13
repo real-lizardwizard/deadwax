@@ -22,6 +22,7 @@ struct DeadwaxApp: App {
     @State private var lyrics: LyricsModel
     @State private var eq: EQModel
     @State private var deck: DeckController
+    @State private var history: HistoryModel
 
     /// The one background session, made before anything else can ask it.
     private static let downloadSession = DownloadSession()
@@ -40,6 +41,10 @@ struct DeadwaxApp: App {
         let library = LibraryModel(server: server)
         let downloads = DownloadModel(server: server, reachability: reachability, files: files, session: Self.downloadSession)
         player.connect(downloads: downloads, reachability: reachability)
+        // play history (app 0.8): each song begun recorded by the player, kept and sent through the person's store
+        let history = HistoryModel(server: server, reachability: reachability)
+        history.downloads = downloads
+        player.history = history
         let debug = DebugModel(server: server, player: player, downloads: downloads)
         let lyrics = LyricsModel(server: server, player: player, downloads: downloads, reachability: reachability)
         // the turntable's deck (turntable.md 2.1): beside the player for the app's run, as Now Playing's cover comes and goes
@@ -52,6 +57,7 @@ struct DeadwaxApp: App {
             library.reset()
             debug.reset()
             lyrics.reset()
+            history.reset()
         }
         _server = State(initialValue: server)
         _player = State(initialValue: player)
@@ -63,6 +69,7 @@ struct DeadwaxApp: App {
         _lyrics = State(initialValue: lyrics)
         _eq = State(initialValue: eq)
         _deck = State(initialValue: deck)
+        _history = State(initialValue: history)
     }
 
     var body: some Scene {
@@ -78,6 +85,7 @@ struct DeadwaxApp: App {
                 .environment(lyrics)
                 .environment(eq)
                 .environment(deck)
+                .environment(history)
                 .preferredColorScheme(.dark)
                 .tint(Palette.accent)
         }

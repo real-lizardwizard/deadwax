@@ -190,3 +190,13 @@ section 9 overruling the rest):
   review's fixes, the same. **Not verified**:
   the iPhone and Safari (a pocket's starts reaching deadwax, months of rows scrolled, the tap while the one stream
   plays, VoiceOver through the list); a real Navidrome (the stand-in's shapes only).
+
+### The phone (app 0.8, on the ios branch)
+
+The phone's port is notes/ios.md "Play history on the phone": it keeps the queue's id (snapshot v1 with `id` second,
+as the web writes it), records a start at its "now playing" with its queue and entry, keeps the ones deadwax hasn't
+taken in the person's store (`start_pending`) and sends them in batches of at most `HISTORY_POST_MAX`, carries a
+listen on through a queue put back mid-song (`continuing`, as useResume does), and draws the one list above Up Next's
+History with the web's own rules (held to them by ios/scripts/export-history.cjs). So, once the phone runs 0.8, the
+open items above that waited on "the phone's port" end: its plays are in the history, a song it began that the web
+picks up mid-way is in it once, and a reloaded page reads the phone's snapshot as the same queue.

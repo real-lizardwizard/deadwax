@@ -18,7 +18,7 @@ import Testing
         var run = queue.index
         while run > 0 && state.marks[run].from == .one { run -= 1 }
         return UpNextQueue(tracks: Array(queue.tracks[range]), index: queue.index - saving.start, upNext: UpNextState(
-            marks: Array(state.marks[range]), source: state.source, shuffle: state.shuffle, nextKey: state.nextKey,
+            id: state.id, marks: Array(state.marks[range]), source: state.source, shuffle: state.shuffle, nextKey: state.nextKey,
             startedAt: min(max(0, state.startedAt - saving.start), run - saving.start), left: state.left, paged: state.paged,
             pagedRounds: state.pagedRounds))
     }
@@ -136,8 +136,9 @@ import Testing
         let tracks = rAlbum(size, level: level())
         let start: Int? = random.next() < 0.3 ? nil : pick(size)
         let shuffle = random.next() < 0.5
-        var queue = toppedUp(startUpNext(tracks, start: start, shuffle: shuffle, random: random.next, paged: paged), mode,
-                             random: random.next)
+        //? (2.1.15) the run's queue under its own id, as the export gives it: every snapshot carries it
+        var queue = toppedUp(startUpNext(tracks, start: start, shuffle: shuffle, random: random.next, paged: paged,
+                                         id: "rt-\(run)"), mode, random: random.next)
         var extra = 0
         let made = { (prefix: String, level: () -> Level) -> QueueTrack in
             defer { extra += 1 }

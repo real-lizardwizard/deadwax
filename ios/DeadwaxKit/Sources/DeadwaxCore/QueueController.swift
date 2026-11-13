@@ -233,7 +233,39 @@ public final class QueueController {
     @discardableResult
     public func jumpTo(key: Int) -> Bool {
         catchUp()
-        guard let jump = jumpedTo(queue, key) else { return false }
+        return jump { jumpedTo($0, key) }
+    }
+
+    /// (2.1.15) An older row's tap - a song played before, above History: that song again, now, as a History row's
+    /// tap plays its song - a new entry after the song playing's copies, moved to at once, the queue carrying on after
+    /// it. The web's two steps (Play Next, then a jump to the key it was given) as ONE edit, `withNext` then `jumpedTo`
+    /// its key, made as a row's tap is (jumpTo): never held, so the song never waits as Playing Next. With nothing to
+    /// play next to - nothing playing, or a queue played out with nothing after it - the song plays as a queue of its
+    /// own, as Play Next would start it (`playsAlone`: the app starts a new queue's engine keys for it). True when it
+    /// plays.
+    @discardableResult
+    public func playAgain(_ track: QueueTrack) -> Bool {
+        if playsAlone() {
+            playTracks([track], start: 0)
+            return queue.current != nil
+        }
+        return jump { queue in
+            guard let key = queue.upNext?.nextKey else { return nil }
+            return jumpedTo(withNext(queue, [track]), key)
+        }
+    }
+
+    /// Whether a song played again (playAgain) has nothing to play next to - nothing playing, or a queue played out
+    /// with nothing after it - and so plays as a queue of its own, as Play Next's would. The queue caught up first.
+    public func playsAlone() -> Bool {
+        catchUp()
+        return queue.current == nil || queue.upNext == nil || (engine.heard()?.ended == true && onward(queue) == nil)
+    }
+
+    /// A row's jump (`made`, from the queue as it is): moved to with the engine's skip, or - an edit it can't take this
+    /// moment - the queue played afresh from it, found again in the queue as it is by then.
+    private func jump(_ made: (UpNextQueue) -> Jump?) -> Bool {
+        guard let jump = made(queue) else { return false }
         if replaceUpcoming(jump.queue) {
             //? a row's tap plays it, paused or not - move() starts what the listener means to be playing
             intendsToPlay = true
@@ -243,7 +275,7 @@ public final class QueueController {
         //? the engine may have run on into the next song since the catch-up: the row found again in the queue as it
         //? is now (gone, or now the song playing: nothing more to do)
         catchUp()
-        guard let fresh = jumpedTo(queue, key) else { return false }
+        guard let fresh = made(queue) else { return false }
         queue = fresh.queue
         queue.index = fresh.index
         intendsToPlay = true
