@@ -1752,3 +1752,83 @@ Needs a look - the edits to the shared files here are kept small for that merge)
   VoiceOver through the sheet and the four pages, the chip's reach under a real finger, the back gesture
   with the sheet open), an iPad upright, a real Navidrome giving an album a new id after an apply from a
   phone, Safari's EventSource on a phone, and the merge with 2.0.0-player.46.
+
+### You on a desktop (2.1.8)
+
+James: the desktop layout of You's settings was "pretty awful", and "let's not cut corners on design". It was the
+phone's page in a 760px column - app-desktop.css had two rules for it - and, measured at 1440 as an admin:
+
+- one column pinned against the sidebar, 450px of the main area empty beside it (930px at 1920), the page 2,880px
+  tall;
+- every choice a full-width list of bars ("Any / 320 kbps / Lossless / 24-bit" four 696px rows; Getting albums'
+  three about 450px);
+- no hierarchy: a section title 13px, the size of the grey notes under it; a choice's label 13px in label grey,
+  read as one more note - and touching the list ABOVE it (0px) while 6px over its own;
+- a checkbox's box about 470px from its label;
+- notes about 110 characters a line;
+- two settings whose own notes say they do nothing on a big screen (Now Playing opens as, Pause winds the record
+  down), Manage repeating the sidebar's five items, and Sign out's row repeating the name.
+
+**The design**, shown to James with the before shots and approved ("Build it, hide both"): a desktop's settings
+page from STYLE.md's parts, CSS only - one section of app-desktop.css ("You on a desktop") and one new size token,
+theme.css section 10's desktop-only `--dw-text-section` (16px; `--dw-text-brand` the precedent for a token only the
+desktop has). No word and no behaviour changes, and a phone's You is byte-for-byte the same.
+
+- **Each section beside its title**: the title in a 200px column, a 48px gap, the settings in a column up to
+  600px (the page at most 912px with its edges, at the main area's left edge as Requests and Search are);
+  sections divided by the frame's rule (`--dw-frame-border`) with 28px above and below. Connections' Check again
+  sits under its title. The name at the top takes the desktop's page top (`--app-desk-top`, as
+  `.pl-large-header`) - it was the phone's 12px.
+- **Beside a third column (`.has-side`) or under a drawer (`.has-drawer`)** the titles go back above their
+  settings: at 1280 with a panel the main area is 578px. Under a drawer the page keeps to the part left in view,
+  Server settings' formula. Media queries can't see the main area's width (and the file's three contexts are
+  fixed, `@container` out), so the switch is the frame's classes - at 1920 with a panel there would be room for
+  two columns, and there is one.
+- **The title column is the title positioned absolutely** in a section with `padding-left` for it, not a grid:
+  the section stays block flow, so the phone's margins between choices and notes collapse as they always have,
+  and no implicit grid rows are needed for a title spanning the rest. A title is top-aligned with the first
+  thing beside it (a card's top, or a choice's label).
+- **A choice of a few short words is the app's segmented control** (`.app-segmented`'s look: the well, the
+  toggled tint for the chosen one), keyed `.app-group[role=radiogroup]:not(:has(.app-radio-note))` - When I tap
+  Get, Quality floor, Format, and Now Playing opens as where it shows. Each segment is still the `.app-radio`
+  button with its role and aria-checked, so the arrow keys move along it as before; its tick is hidden. Equal
+  widths across the column, so every control in it shares both edges; a segment's words wrap under a drawer
+  (346px) rather than overflow. Maximum quality and Normalization, whose choices each carry a sentence, stay
+  cards, with the frame's hover.
+- **A choice's label** in the heading colour, medium, 8px over its control and 20px below the choice before it.
+  **Notes** at Server settings' measure (`--app-desk-set-note`, 62ch, about 460px), 8px under what they say.
+- **A checkbox is the desktop's kind**: the row reversed (box, then label), its card dropped, the button as wide
+  as box and label (`fit-content`) - not an invisible bar across the page - with its note indented to the label.
+- **Account** is a wrapping flex row: Change password and Sign out are STYLE.md's secondary button at the
+  frame's control height, Sign out's label keeping its red and its name value hidden (the header and the note
+  under it say it). Every other child takes a whole line, so the form opens under Change password, its button
+  pressed (the toggled tint, as Get pressed), and Sign out follows the form. Change password's live region is
+  always in the page (VoiceOver reads a region only once it is there), so while it's empty it takes no line of
+  its own (`flex-basis: 0`) - `display: none` would have taken it out of the accessibility tree.
+- **Left out on a computer**: Now Playing opens as (with its note) and Pause winds the record down (with its
+  note) - hidden in the desktop context and shown again where the pointer is coarse, an iPad on its side, which
+  turned upright is a phone; and Manage, whose items are the sidebar's Managing, always in view, by the same
+  permissions with the same count (Sidebar.tsx). Hidden with CSS, so You.tsx is unchanged - it is told no frame
+  (app-rules.sim keeps "desktop" out of it).
+- **A coarse pointer** makes the segments, the checkbox rows, Check again and the Account buttons 44px
+  (`--app-desk-you-well` is 44px plus the well's four hairlines, so each segment inside it is 44).
+
+Docs: player.md's On a desktop has You's layout and what it leaves out; its You and configuration.md's two rows
+no longer say the Now Playing settings "change nothing" on a desktop but that You leaves them out; the "You →
+Manage" paths in configuration.md, getting-started.md and troubleshooting.md say "on a phone" (one said "on a
+phone or a desktop"); the README's desktop paragraph has a sentence.
+
+- **Verified**, against deadwax on a stand-in Navidrome (an admin, a listener; logins on, and off), in headless
+  Chromium at a plain-http non-local name (`deadwax.test`): before and after shots at 1100, 1280, 1440 and 1920
+  (the admin's page 2,880px tall before, 2,233 after at 1440; a listener's 2,332 to 1,962; logins off 2,511 to
+  1,934); `.has-side` at 1440 and 1920 and `.has-drawer` at 1100 (the classes set on the shell - the panels
+  themselves not opened), one column, inside the drawer's edge and no sideways scroll; a coarse pointer at 1440
+  (touch emulated: the two Now Playing settings back, every target 44px, Manage still out); computed sizes (the
+  section title 16px semibold in the heading colour, a choice's label 13px medium in it 8px over its control,
+  the notes 461px); the arrow keys moving Quality floor with its ring showing; Change password's form opening
+  under its pressed button with Sign out after it. The phone at 375 (admin, listener, logins off): the
+  screenshots byte-identical to before. pytest (4,051), every sim, `npm run build`.
+- **NOT verified**: a real iPad on its side (its coarse pointer was emulated), Safari and Firefox on a desktop,
+  VoiceOver or another screen reader through the segmented controls (their roles and states are unchanged), a
+  real side panel or drawer open over You, and Change password's "done" state (its line is laid out by the same
+  rule as the open form).

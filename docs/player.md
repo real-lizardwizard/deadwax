@@ -191,8 +191,8 @@ address (`http://your-server:8080/`) opens the app too: that address sends the b
   (Navidrome) account", or, for `deadwax`, "with the emergency admin password - this sign-in lasts 12
   hours"). **About** has the version - and, for an admin, whether logins are on. For an admin,
   **Manage**: **Needs a look**, with how many, then **Library care**, **People** (with logins on),
-  **Server settings** and **Event log** - on a phone as on a desktop
-  ([below](#looking-after-deadwax-from-a-phone)). Someone an admin gave some of these to sees only theirs: Needs a look
+  **Server settings** and **Event log** ([below](#looking-after-deadwax-from-a-phone)) - on a phone; on
+  a desktop they are the sidebar's **Manage** ([below](#on-a-desktop)), always in view, so You leaves them out. Someone an admin gave some of these to sees only theirs: Needs a look
   with Look after the library, Library care with it or Edit albums, Server settings and Event log with
   Settings and the log - People is a Navidrome admin's alone ([Sharing deadwax](sharing.md#admins-permissions-and-everyone-else)).
 - **Requests**: your downloads, under **Downloading** (a bar, "6 of 10 files · 1.8 MB/s", who it's
@@ -965,7 +965,8 @@ a second one: the same pages, the same addresses (a link or a bookmark opens the
 either size), the same settings. Make the window narrower than 1024 and it's the phone's layout
 again - and the other way round - without the music stopping: only what's around the pages
 changes. (You's **Now Playing opens as** and **Pause winds the record down** are the phone layout's
-own: there's no now-playing screen on a desktop, so they change nothing there.)
+own: there's no now-playing screen on a desktop, so You leaves them out there - an iPad on its side
+still shows them, since turned upright it's a phone.)
 
 - **A sidebar** down the left instead of the tab bar: **deadwax**, the **search field**, **Home**
   and **Requests** (with the count of what's arriving, as the tab has), the Library's views -
@@ -1004,6 +1005,12 @@ own: there's no now-playing screen on a desktop, so they change nothing there.)
 - **The Library's albums and Home's Recently added** are a grid, six covers across - fewer while a
   panel is a column beside them (from 1280 pixels wide), so a cover stays a cover's size. Home's
   **Arriving** cards sit side by side.
+- **You** is laid out as a desktop's settings page: each section's title in a column at the left and its
+  settings beside it (the title above them again while a side panel is open, as there's less room); a
+  choice of a few words - **When I tap Get**, **Quality floor**, **Format** - is a row of buttons with
+  the chosen one lit (the arrow keys move along it); a checkbox has its box before its name; and
+  **Account**'s **Change password** and **Sign out** are two buttons. It leaves out **Manage** - the
+  sidebar's - and the two Now Playing settings above. The settings and what they do are the phone's.
 - **A player bar** along the bottom instead of the mini player: the song's cover, title and "Artist
   — Album" (click that to go to the album), previous, a round play/pause and next, the scrubber with
   the time gone and the time left at its ends (click or drag along it; its dot shows when you point

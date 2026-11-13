@@ -693,6 +693,7 @@
         --dw-text-brand:       20px;   /* the sidebar's wordmark */
         --dw-text-body:        14px;
         --dw-text-heading:     13px;
+        --dw-text-section:     16px;   /* (2.1.7) You's section titles, in their column beside the settings */
         --dw-text-data:        13px;
         --dw-text-footnote:    13px;
         --dw-text-label:       12px;
