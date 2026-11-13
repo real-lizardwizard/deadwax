@@ -97,12 +97,18 @@ Moved verbatim from CLAUDE.md (2026-10-07), where it was loaded into every sessi
   harmless, and `rm -rf interface/dist` first keeps it tidy. The Preact preset
   only adds dev-time plugins, so a production bundle loses nothing. It is a LOCAL workaround -
   Docker builds on node:22 through vite as normal, and the real fix is still the Node upgrade.
-- **This checkout lives in iCloud-optimised storage, and much of it is evicted.** `ls -lO`
+- **This checkout lived in iCloud-optimised storage until 2026-11-13, and much of it was evicted.**
+  **It is now at `~/Code/deadwax`, which iCloud doesn't sync** (moved at James's request after a
+  session found builds taking eight minutes and a git index write timing out there; the plans,
+  the iOS plan and the test album stay in `~/Desktop/Code`). What it was like: `ls -lO`
   shows `compressed,dataless` on files across `node_modules/` and `.venv/`, so the first read
   of each one is a download: the pytest suite took **125s** cold and **1.4s** warm, and a
   faulthandler dump caught it 25s into importing mutagen. A tool that seems hung here is far
   more often fetching than stuck - check `ps` for CPU before killing it. (The vite hang above was
-  NOT this: 0% CPU and parked threads, where a fetch shows I/O.)
+  NOT this: 0% CPU and parked threads, where a fetch shows I/O.) The move itself was one `mv`:
+  a single `rename` that waited about six minutes on `fileproviderd` releasing ~25,000 files from
+  iCloud, then `git worktree repair` for the worktrees inside it and outside it, and the
+  `.venv/bin` scripts' shebangs rewritten to the new path.
 - **Which `launch.json` the browser preview tool reads depends on the session's working
   directory.** Sessions started in `~/Desktop/Code` read THAT folder's `.claude/launch.json`;
   the v0.6.9 session, started in this repo, read this repo's own `.claude/launch.json` - and when asked

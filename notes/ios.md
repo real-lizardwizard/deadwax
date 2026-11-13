@@ -429,7 +429,8 @@ docs/ios.md's eight checks, run on the phone. **The Mac**: MacBook Air M2 (8 GB)
 **The phone**: "Green Anole", an iPhone 17 Pro on **iOS 27.2 (24B119)** - updated since the 27.0 the plan
 names. Built from `1d9b295`, ios.yml green on it. The repo was cloned to `~/Desktop/Code/deadwax`, not
 `~/Developer/deadwax`, with iCloud's Desktop & Documents sync **on**: install.sh printed its note, and nothing
-failed on a file that wasn't on the Mac. The Once steps were begun on 2026-10-27 (Xcode's first launch, the
+failed on a file that wasn't on the Mac. (Moved to `~/Code/deadwax`, off iCloud, on 2026-11-13 - see
+notes/tooling.md.) The Once steps were begun on 2026-10-27 (Xcode's first launch, the
 Apple ID, the team) and finished on 2026-11-10 (the first Run from Xcode, then the checks).
 
 1. **Install without a Simulator - pass.** `install.sh` on its own (Xcode not needed) pulled, found ios.yml had
