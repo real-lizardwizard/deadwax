@@ -88,6 +88,13 @@ public enum PlaySpeed {
         FaderDrag(pointer: pointer, y0: y, from: nil)
     }
 
+    /// The tick at 1x (5.1, question 17's A - the phone's, the web has no way to give one): one light impact as a drag
+    /// crosses INTO the detent - the speed it moved to exactly 1x, from any other. The arrows' steps and the readout's
+    /// tap give none.
+    public static func ticks(from: Double, to: Double) -> Bool {
+        to == normal && from != normal
+    }
+
     /// The finger let go: the drag is over - unless it is another pointer's (:190).
     public static func faderEnd(_ drag: FaderDrag?, _ pointer: Int) -> FaderDrag? {
         guard let drag else { return nil }
@@ -133,5 +140,211 @@ public struct PlaySpeedScale<M: DeckMaths> {
         }
         let from = held.from!
         return (held, speedAt(from.share + (from.y - y) / travel), same)
+    }
+}
+
+// ----- kept on the phone, and the pace measured (persisted.ts:302-311; playSpeed.ts:236-257)
+
+extension PlaySpeed {
+    /// The device's speed, under the web's key (persisted.ts STORAGE_KEYS.playerSpeed): '0.25' to '2' as text.
+    public static let storageKey = "deadwax-player-speed"
+
+    /// The kept speed as the web reads it (readPlayerSpeed, :302): nothing or blank is 1x, a number that is a speed
+    /// is that speed in hundredths, anything else 1x. The phone writes only what `stored` makes, so JavaScript's
+    /// other number forms (hex and the like) are not read.
+    public static func read(_ saved: String?) -> Double {
+        guard let saved else { return normal }
+        let text = WebText.trim(saved)
+        if text.isEmpty { return normal }
+        let decimal = text.unicodeScalars.allSatisfy { (c: Unicode.Scalar) -> Bool in
+            ("0"..."9").contains(c) || c == "." || c == "e" || c == "E" || c == "+" || c == "-"
+        }
+        guard decimal, let speed = Double(text), isSpeed(speed) else { return normal }
+        return roundSpeed(speed)
+    }
+
+    /// The speed as the web writes it (writePlayerSpeed, :309): `String(speed)`.
+    public static func stored(_ speed: Double) -> String {
+        JSNumber.string(speed)
+    }
+
+    /// How much playing the measured pace is taken over, in seconds of the clock, and how much it needs before it
+    /// says anything (PACE_WINDOW_S, PACE_MIN_S).
+    public static let paceWindowS = 8.0
+    public static let paceMinS = 2.0
+
+    /// One step of playing: seconds of song, over seconds of the clock (PaceSample).
+    public struct PaceSample: Equatable, Sendable {
+        public var media: Double
+        public var wall: Double
+        public init(media: Double, wall: Double) {
+            self.media = media
+            self.wall = wall
+        }
+    }
+
+    /// The window with a step added, its oldest steps let go past PACE_WINDOW_S of the clock (paceStep). The caller
+    /// leaves out a step across a seek, a pause or a song change - nothing to measure there.
+    public static func paceStep(_ window: [PaceSample], _ sample: PaceSample) -> [PaceSample] {
+        if !(sample.wall > 0) || !(sample.media >= 0) { return window }
+        var kept = window + [sample]
+        var wall = kept.reduce(0) { (sum: Double, step: PaceSample) -> Double in sum + step.wall }
+        while kept.count > 1 && wall - kept[0].wall >= paceWindowS { wall -= kept.removeFirst().wall }
+        return kept
+    }
+
+    /// Seconds of song a second of the clock over the window - nil under PACE_MIN_S of it (paceOf).
+    public static func paceOf(_ window: [PaceSample]) -> Double? {
+        let wall = window.reduce(0) { (sum: Double, step: PaceSample) -> Double in sum + step.wall }
+        if wall < paceMinS { return nil }
+        return window.reduce(0) { (sum: Double, step: PaceSample) -> Double in sum + step.media } / wall
+    }
+}
+
+/// The speed as the player keeps it, and what the engine is told (notes/ios-specs/turntable.md 5.1, 5.2; James's
+/// answers, 2026-11-13). PlaybackEngine plays 1x out of the speed's path - the song's own samples - and any other
+/// speed through one varispeed; leaving 1x begins the lanes again into it (a short gap), and while a drag crosses 1x
+/// the chain plays on at rate 1, so the mark is passed without a gap. A drag let go AT 1x is told `exact`, which
+/// takes the lanes out of the chain again (another short gap): from there 1x is the file's own samples, bit for
+/// bit. A jump to 1x - the readout's tap, the chip's, a VoiceOver step onto it - is a let-go too.
+///
+/// `restarts` says the engine may begin its lanes again for this send - leaving 1x, or `exact` - so the player can
+/// keep the `.loading` the engine says through it off the screen and the lock screen (SpeedRestartHold).
+public struct SpeedControl: Equatable, Sendable {
+    public struct Send: Equatable, Sendable {
+        public var speed: Double
+        public var exact: Bool
+        public var restarts: Bool
+        public init(speed: Double, exact: Bool, restarts: Bool) {
+            self.speed = speed
+            self.exact = exact
+            self.restarts = restarts
+        }
+    }
+
+    /// The speed the player plays at, in hundredths, 0.25 to 2.
+    public private(set) var speed: Double
+    /// The engine may be holding its lanes in the chain at 1x: a drag (or nothing yet told) left it there.
+    public private(set) var chained: Bool
+
+    /// The kept speed, at launch: the engine is told it before anything plays, so a lane starts in the chain.
+    public init(speed: Double) {
+        self.speed = PlaySpeed.clampSpeed(speed)
+        chained = self.speed != PlaySpeed.normal
+    }
+
+    /// What the engine is told as it is made: the kept speed, or nothing at 1x (the chain is never made).
+    public var atStart: Send? {
+        speed == PlaySpeed.normal ? nil : Send(speed: speed, exact: false, restarts: false)
+    }
+
+    /// The fader mid-drag, at `to` (speedAt's, through its detent): through 1x the chain plays on at rate 1.
+    public mutating func dragged(to: Double) -> Send? {
+        let next = PlaySpeed.clampSpeed(to)
+        if next == speed { return nil }
+        let leaving = speed == PlaySpeed.normal
+        speed = next
+        chained = true
+        return Send(speed: next, exact: false, restarts: leaving)
+    }
+
+    /// The fader let go, or its touch taken by the system: at 1x after a drag through the chain, exact again.
+    public mutating func letGo() -> Send? {
+        guard speed == PlaySpeed.normal, chained else { return nil }
+        chained = false
+        return Send(speed: PlaySpeed.normal, exact: true, restarts: true)
+    }
+
+    /// A jump - the readout's tap, the chip's, a VoiceOver step: exact when it lands on 1x.
+    public mutating func set(_ to: Double) -> Send? {
+        let next = PlaySpeed.clampSpeed(to)
+        if next == PlaySpeed.normal {
+            guard next != speed || chained else { return nil }
+            speed = next
+            chained = false
+            return Send(speed: next, exact: true, restarts: true)
+        }
+        if next == speed { return nil }
+        let leaving = speed == PlaySpeed.normal
+        speed = next
+        chained = true
+        return Send(speed: next, exact: false, restarts: leaving)
+    }
+}
+
+/// The lanes begun again for the speed publish `.loading` then `.playing` (PlaybackEngine's `beginAgain`, through
+/// `begin`) - a few milliseconds on the phone, during which nothing has stopped for the listener: the transport and the
+/// lock screen keep showing the song playing. Asked as a send that `restarts` goes to the engine while the song plays;
+/// the engine's next `.loading` of that entry within `seconds` is the restart's. Past `seconds` a loading still going
+/// shows, as any other wait does (a song that really is waiting for its bytes).
+public struct SpeedRestartHold: Equatable, Sendable {
+    public static let seconds = 1.0
+
+    /// The entry playing when the send went, and until when its loading is the restart's.
+    public private(set) var entry: Int?
+    public private(set) var until = -Double.infinity
+    /// The engine says `.loading` and it is the restart's: shown as playing.
+    public private(set) var hiding = false
+
+    public init() {}
+
+    /// A send that may begin the lanes again went to the engine while `entry` played.
+    public mutating func asked(entry: Int, at now: Double) {
+        self.entry = entry
+        until = now + Self.seconds
+    }
+
+    /// The engine's phase as it comes. Playing ends the hold (the restart is done); any other phase than loading ends
+    /// it too (a pause, a failure, the end: never hidden).
+    public mutating func phase(loading: Bool, playing: Bool, entry: Int?, at now: Double) {
+        if loading, let entry, entry == self.entry, now < until {
+            hiding = true
+            return
+        }
+        hiding = false
+        if playing || !loading { self.entry = nil }
+    }
+
+    /// Time has passed: a loading hidden past the hold shows. True when that changed what shows.
+    public mutating func expired(at now: Double) -> Bool {
+        guard hiding, now >= until else { return false }
+        hiding = false
+        entry = nil
+        return true
+    }
+}
+
+/// The lock screen told a new speed during a drag (MPNowPlayingInfoCenter is another process, and a drag is a change a
+/// frame): at once, then no more often than every `gap` seconds, the last change of a run always told at the end of its
+/// gap - so the lock screen's clock runs at the speed the drag ended on.
+public struct SpeedPublishing: Equatable, Sendable {
+    public static let gap = 0.25
+
+    public enum When: Equatable, Sendable {
+        /// tell it now
+        case now
+        /// tell it at this time (nothing waits for it yet)
+        case at(Double)
+        /// one is already waiting, which will tell this change too
+        case waiting
+    }
+
+    public private(set) var lastAt = -Double.infinity
+    public private(set) var waiting = false
+
+    public init() {}
+
+    /// The speed changed at `now`.
+    public mutating func changed(at now: Double) -> When {
+        if waiting { return .waiting }
+        if now - lastAt >= Self.gap { return .now }
+        waiting = true
+        return .at(lastAt + Self.gap)
+    }
+
+    /// The lock screen was told, at `now` - for the speed's sake or any other (a pause, a song).
+    public mutating func told(at now: Double) {
+        lastAt = now
+        waiting = false
     }
 }

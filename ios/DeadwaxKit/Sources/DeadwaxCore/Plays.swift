@@ -130,6 +130,10 @@ public enum PlayReport: Equatable, Sendable {
 ///    song (and its play, if that crosses the rule, under its id and its listen's start), then a new listen
 ///    for the new song with what was already heard of it, and its "now playing".
 ///  - `stop()` at a stop, a sign-out or a new queue: the listen is dropped as it is, nothing sent.
+///  - `speedChanged` at every speed the player plays at (turntable.md 5.2): a step is capped at the clock times the
+///    speed - the web's `rate: audio.playbackRate` - so at 2x a minute of the clock counts two of the song, and half
+///    the song still makes a play, in half the time. A step that spans a change is capped at the fastest speed it
+///    spanned (the cap is a guard against a jump, never a measure): one back from 2x to 1x doesn't count half.
 ///
 /// Nothing heard counts before the listen has begun (the web counts only on `timeupdate`, which comes while
 /// playing), so a play always has its time.
@@ -139,8 +143,25 @@ public struct ListenTracker: Sendable, Equatable {
     public private(set) var lastPosition: Double = 0
     public private(set) var lastAt: Double = 0
     public private(set) var seekedSince = false
+    /// The speed the song plays at, and the fastest since the last reading - kept across listens and stops: it is
+    /// the player's, not the song's.
+    public private(set) var rate: Double = 1
+    public private(set) var fastest: Double = 1
 
     public init() {}
+
+    public mutating func speedChanged(_ speed: Double) {
+        guard speed > 0 else { return }
+        rate = speed
+        fastest = max(fastest, speed)
+    }
+
+    /// The pace a step since the last reading is capped at, and the next step's from here.
+    mutating func pace() -> Double {
+        let pace = max(rate, fastest)
+        fastest = rate
+        return pace
+    }
 
     public mutating func newListen(songID: String, at monotonic: Double, from position: Double = 0) {
         self.songID = songID
@@ -148,6 +169,7 @@ public struct ListenTracker: Sendable, Equatable {
         lastPosition = position
         lastAt = monotonic
         seekedSince = false
+        fastest = rate
     }
 
     public mutating func seeked() {
@@ -155,7 +177,10 @@ public struct ListenTracker: Sendable, Equatable {
     }
 
     public mutating func stop() {
+        let kept = rate
         self = ListenTracker()
+        rate = kept
+        fastest = kept
     }
 
     public mutating func began(wallMs: Int64) -> PlayReport? {
@@ -167,7 +192,8 @@ public struct ListenTracker: Sendable, Equatable {
 
     public mutating func tick(position: Double, monotonic: Double, duration: Double) -> PlayReport? {
         guard let songID else { return nil }
-        let step = PlayRule.listenedStep(previous: lastPosition, now: position, elapsed: monotonic - lastAt, seeked: seekedSince)
+        let step = PlayRule.listenedStep(previous: lastPosition, now: position, elapsed: monotonic - lastAt, rate: pace(),
+                                         seeked: seekedSince)
         lastPosition = position
         lastAt = monotonic
         seekedSince = false
@@ -181,7 +207,7 @@ public struct ListenTracker: Sendable, Equatable {
                               newDuration: Double, wallMs: Int64) -> [PlayReport] {
         var reports: [PlayReport] = []
         let split = PlayRule.splitAcrossJoin(previous: lastPosition, oldLength: oldLength, now: newPosition,
-                                             elapsed: monotonic - lastAt, seeked: seekedSince)
+                                             elapsed: monotonic - lastAt, rate: pace(), seeked: seekedSince)
         if let songID, let startedAt = listen.startedAt {
             let (old, submit) = listen.hearing(split.before, of: oldLength)
             listen = old

@@ -78,6 +78,8 @@ public final class TurntablePress<M: DeckMaths> {
     /// each follow a touch of their own, so the rule is kept here. `onRecord`: it came down on the record, whose lift
     /// the click follows - the drag gone under it (the song changed) or not, as a browser's click still comes.
     var following: (pointer: Int, onRecord: Bool)?
+    /// A touch is followed: the fader takes none meanwhile (slice 4 - SpeedFader.tsx:61 asks isPrimary too).
+    public var follows: Bool { following != nil }
 
     public init(deck: PressDeck, host: PressHost, maths: M) {
         self.deck = deck

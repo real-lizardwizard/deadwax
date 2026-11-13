@@ -428,6 +428,15 @@ public struct TurntableLayout: Equatable, Sendable {
     }
     /// How far the fader's knob travels, points (playSpeed.ts faderTravel).
     public var faderTravel: Double { PlaySpeed.faderTravel(height) }
+    /// The fader's target top to bottom, points: the knob's whole travel and a knob's height (SpeedFader.tsx's SPAN).
+    public var faderSpan: (top: Double, bottom: Double) {
+        let f = PlaySpeed.fader, knob = PlaySpeed.knob
+        let top = f.top - knob.height / 2, bottom = f.bottom + knob.height / 2
+        return (top / TurntableGeometry.stage.height * height, bottom / TurntableGeometry.stage.height * height)
+    }
+    /// The readout's least target, points across and down (app.css `.app-tt-readout`'s min-width and min-height:
+    /// a tap's 44 pt, at most 14% of the plinth).
+    public var readoutTarget: Double { Swift.min(TurntableFace.hit, 0.14 * width) }
 }
 
 /// A pointer's samples, as the deck is handed them (the web's ui/src/lib/deckClock.ts eventTime and pointerSamples,
