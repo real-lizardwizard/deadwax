@@ -3025,6 +3025,11 @@ and byte-equal regeneration can't hold on every machine. The Swift passed either
   tokens.json, voice/windows.json, press/handlers.json); a change to the exporter or the harness (`made_with`)
   fails everywhere. Otherwise it differs only by that Node's Math: listed, not failed (a sources-only check).
   iosdeck's PASS line names the kind that ran.
+- **tokens.json is made from the tokens it reads, not from theme.css whole** (2026-11-13): its `made_from` is the
+  sha256 of the tokens and their values. theme.css is every page's, and main's 2.1.8 added a token for You on a desktop
+  that the turntable never reads - which made tokens.json and maths.json "stale" with nothing in them moved, and
+  failed iosdeck.sim on CI (the second time; 06c4485 was the first). A token the turntable reads, or one it aliases,
+  changing still fails it: tried both ways, an unused token added (passes) and --dw-tt-arm changed (stale).
 - **Files that had no `made_from`** got one rather than being taken for Math's: jsmath.json the sha256 of
   `jsmathFixture`'s own text, voice/windows.json that of `recipeChannel` and `recipeWindow`, and maths.json every
   other file's together. jsmath.json and windows.json are also EXACT - nothing in them is a Math function's answer,

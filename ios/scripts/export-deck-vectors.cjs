@@ -345,7 +345,10 @@ function tokensFixture() {
   return {
     about: 'interface/styles/theme.css: each token the turntable and the fader are drawn in (the spec\'s 2.14), its value (a var() followed), and the colours it names in order as [r, g, b, alpha].',
     made_by: MADE_BY,
-    made_from: { 'interface/styles/theme.css': sha256(css) },
+    //? the tokens read, not the whole file: theme.css is every page's, and a token the turntable doesn't use (2.1.8's,
+    //? for You on a desktop) would otherwise make these fixtures stale - and fail iosdeck.sim on CI - with nothing in
+    //? them moved. A change to any token here, or to what one aliases, still does.
+    made_from: { 'interface/styles/theme.css, the tokens below': sha256(JSON.stringify(tokens)) },
     tokens,
   }
 }

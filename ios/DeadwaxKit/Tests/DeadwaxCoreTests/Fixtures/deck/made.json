@@ -7,7 +7,7 @@
     "arch": "arm64"
   },
   "made_with": {
-    "ios/scripts/export-deck-vectors.cjs": "d0c64bed5dd897d1167ec4de914be52bdd9085024193939f50b78be511547ce1",
+    "ios/scripts/export-deck-vectors.cjs": "46efcbc4b65c32d4fccc846a2d2a5b5ea3c9990f854d0c5339c13746941fbe14",
     "ui/test/deckHarness.cjs": "e096e0835d6032962eeed5dfdb62381931e06699758eb946a7ede4f1be8d5ece"
   }
 }
