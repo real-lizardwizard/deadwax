@@ -158,6 +158,29 @@ import Testing
         }
     }
 
+    /// The turntable's deck engine is a second output (eq.md 1.9, 5.6; turntable slice 2's review, question 5): one
+    /// change, one version, and each host's bank made at that host's own rate - the deck's at 44.1 kHz while the song's
+    /// unit runs at 48 - never one host's bank handed to the other. A host not started gets nothing; a deck's start
+    /// isn't Debug's Start took.
+    @Test func eachOutputGetsItsBankAtItsOwnRate() {
+        let s = Self.settings("vocal")
+        let desk = Self.desk()
+        let song = Host(), deck = Host(), resting = Host()
+        song.rate = 48_000
+        deck.rate = 44_100
+        let banks = desk.changed(s, route: Self.airpods.key, muffle: false, hosts: [song.taker, deck.taker, resting.taker])
+        #expect(banks.count == 3 && banks[2] == nil && resting.newest == nil)
+        #expect(song.newest?.rate == 48_000 && deck.newest?.rate == 44_100)
+        #expect(song.newest?.version == deck.newest?.version, "one version for the change")
+        let o = s.output(Self.airpods.key)!
+        #expect(deck.newest == s.bank(o, rate: 44_100, version: deck.newest!.version))
+        #expect(song.newest == s.bank(o, rate: 48_000, version: song.newest!.version))
+        desk.start(Self.airpods.key, rate: 44_100, host: deck.taker, record: false)
+        #expect(desk.lastStart == nil, "the deck's start isn't the song's Start took")
+        desk.start(Self.airpods.key, rate: 48_000, host: song.taker)
+        #expect(desk.lastStart?.rate == 48_000)
+    }
+
     /// The review: a change at a rate nothing was made ahead for makes its bank there and then, and keeps it - so the
     /// start that follows at that rate only looks it up (slice 2's review's item 1).
     @Test func aChangesBankIsKeptForTheNextStart() {

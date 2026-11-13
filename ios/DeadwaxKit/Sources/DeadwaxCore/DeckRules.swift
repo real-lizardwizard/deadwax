@@ -854,6 +854,17 @@ public final class DeckRules<M: DeckMaths> {
         report()
     }
 
+    /// (new) The voice's window is gone - the deck engine made the voice again at a new output rate (a route change,
+    /// 4.6) - so the window is asked for again, where the record is. The web's context never changes its rate.
+    public func windowDropped() {
+        window = nil
+        decodedWindow = nil
+        requestTicket += 1
+        pending = nil
+        keepHere()
+        report()
+    }
+
     /// Reduce Motion turned on or off (deck.ts:2443).
     public func reducedChanged(_ reduced: Bool) {
         self.reduced = reduced

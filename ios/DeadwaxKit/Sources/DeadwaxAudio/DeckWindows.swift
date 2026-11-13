@@ -21,6 +21,9 @@ public final class DeckWindows: @unchecked Sendable {
     private let queue = DispatchQueue(label: "deadwax.deck.window", qos: .userInitiated)
     private let lock = NSLock()
     private var ticket = 0
+    /// The `/scrub` fetch on its way, cancelled by any newer ask (slice 2's review, question 6): its answer would be
+    /// dropped by the ticket anyway, but the fetch itself - up to 60 s of FLAC - would run on for nothing.
+    private var fetch: Task<Void, Never>?
     /// Where `/scrub` answers are kept while their windows are made (Caches/deadwax/scrub).
     public let scrubFolder: URL
     /// Where answers are given: the main queue, or a test's own.
@@ -36,6 +39,8 @@ public final class DeckWindows: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         ticket += 1
+        fetch?.cancel()
+        fetch = nil
         return ticket
     }
 
@@ -66,7 +71,7 @@ public final class DeckWindows: @unchecked Sendable {
         let asked = take()
         let ask = DeckScrub.ask(from: from, seconds: seconds, outputRate: outputRate)
         let folder = scrubFolder
-        Task.detached(priority: .userInitiated) {
+        let task = Task.detached(priority: .userInitiated) {
             let got: Result<(flac: Data, header: DeckScrub.Header), DeckWindowError>?
             do {
                 got = try await client.scrub(songID: songID, at: ask.at, seconds: ask.seconds)
@@ -75,6 +80,7 @@ public final class DeckWindows: @unchecked Sendable {
             } catch {
                 got = .failure(.failed((error as? APIFailure)?.words ?? error.localizedDescription))
             }
+            self.fetched(asked)
             guard let got, self.current(asked) else { return }
             self.queue.async {
                 guard self.current(asked) else { return }
@@ -87,6 +93,22 @@ public final class DeckWindows: @unchecked Sendable {
                 self.answers.async { if self.current(asked) { answer(result) } }
             }
         }
+        lock.lock()
+        if ticket == asked { fetch = task } else { task.cancel() }
+        lock.unlock()
+    }
+
+    private func fetched(_ asked: Int) {
+        lock.lock()
+        if ticket == asked { fetch = nil }
+        lock.unlock()
+    }
+
+    /// Whether a `/scrub` fetch is on its way (the tests).
+    var fetching: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return fetch != nil
     }
 
     /// No window asked is wanted any more: what is on its way is never answered.

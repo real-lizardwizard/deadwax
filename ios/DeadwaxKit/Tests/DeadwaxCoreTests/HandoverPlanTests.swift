@@ -57,6 +57,24 @@ import Testing
         world.asks.last?(.success(window))
     }
 
+    /// (slice 3, slice 2's review question 2) The deck engine made the voice again at a new output rate: the window it
+    /// had is gone, so the rules ask for one again where the record is - and a press meanwhile is silent, not sounding a
+    /// window the voice no longer has.
+    @Test func aDroppedWindowIsAskedForAgain() {
+        let world = world()
+        let rules = DeckRules(host: world, clock: world, maths: PlatformMaths(), reduced: false)
+        rules.setShowing(true)
+        #expect(world.asks.count == 1)
+        answer(world)
+        #expect(rules.live(), "the window in: a press sounds")
+        world.time += 10
+        rules.windowDropped()
+        #expect(world.asks.count == 2, "asked again")
+        #expect(!rules.live(), "until it comes, a press is silent")
+        answer(world)
+        #expect(rules.live())
+    }
+
     @Test func aLeadResumesTheSongEarlyAndItsPlayIsItsOwn() throws {
         let world = world()
         let rules = DeckRules(host: world, clock: world, maths: PlatformMaths(), reduced: false)

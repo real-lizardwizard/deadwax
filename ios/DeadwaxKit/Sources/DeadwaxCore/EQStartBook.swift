@@ -228,12 +228,23 @@ public final class EQStartDesk: @unchecked Sendable {
     /// The bank published, if one was.
     @discardableResult
     public func changed(_ settings: EQSettings, route key: String, muffle: Bool, host: EQTaker) -> EQBank? {
+        changed(settings, route: key, muffle: muffle, hosts: [host]).first ?? nil
+    }
+
+    /// The same for every output that plays (eq.md 1.9, 5.6: the song's and the turntable's deck engine): one version
+    /// taken, then each host's bank made at **that host's own rate** - the deck engine may run at another rate than the
+    /// song's unit (slice 2's review, question 5), and a bank's coefficients are for one rate. A host not yet started
+    /// gets nothing (nil in its place): its own start puts the curve in.
+    @discardableResult
+    public func changed(_ settings: EQSettings, route key: String, muffle: Bool, hosts: [EQTaker]) -> [EQBank?] {
         let ticket = take(settings, muffle: muffle)
-        guard let rate = host.rate() else { return nil }
-        let (output, bank) = bank(key, rate: rate, ticket: ticket)
-        host.setOutput(output)
-        _ = host.publish(bank)
-        return bank
+        return hosts.map { (host: EQTaker) -> EQBank? in
+            guard let rate = host.rate() else { return nil }
+            let (output, bank) = bank(key, rate: rate, ticket: ticket)
+            host.setOutput(output)
+            _ = host.publish(bank)
+            return bank
+        }
     }
 
     /// The banks still to be made ahead for these outputs, made outside the lock (off the main thread, normally) and
@@ -276,11 +287,14 @@ public final class EQStartDesk: @unchecked Sendable {
 
     /// A start of the output (1.8), between prepare and start: the output now (`key`, from the route) and its curve
     /// at the unit's rate put in - made ahead, so the start only looks it up - and the time it took kept for Debug.
-    public func start(_ key: String, rate: Double, host: EQTaker) {
+    /// `record` false: a second output's start (the deck engine's), which isn't the song's and so isn't Debug's Start
+    /// took.
+    public func start(_ key: String, rate: Double, host: EQTaker, record: Bool = true) {
         let began = clock()
         let (output, bank, ready) = bank(plan(key, rate: rate), rate: rate)
         host.setOutput(output)
         _ = host.publish(bank)
+        guard record else { return }
         let took = EQStartTime(seconds: max(clock() - began, 0), ready: ready, rate: rate)
         lock.lock()
         last = took
