@@ -100,6 +100,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: swift test -c release --package-path ios/DeadwaxKit --filter EQRealTimeTests
 
+      # The record's render in the build that ships, release (notes/ios-specs/turntable.md 4.3, 7.2): the deck
+      # engine's render entry called 10,000 times over every message kind and two window swaps, and 1,000 blocks
+      # through AVAudioEngine's own real-time manual render, with not one allocation or free on that thread - the
+      # hook's canary seen first. A debug build's unspecialised generics allocate; it prints and bounds nothing.
+      - name: The record's render, release build
+        if: ${{ !cancelled() }}
+        run: swift test -c release --package-path ios/DeadwaxKit --filter DeckRealTimeTests
+
       # A test process that crashes can end the step with its last lines unprinted: macOS's crash
       # report says where (the faulting thread's stack, and an exception's reason)
       - name: Crash reports, if the tests died

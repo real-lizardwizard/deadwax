@@ -38,6 +38,18 @@ uint64_t alloc_hook_frees(void);
 /// One deliberate malloc and free, in C, on the calling thread: the canary.
 void alloc_hook_canary(void);
 
+/// The bytes the watched thread's own allocations hold (turntable.md 7.2: a window made in pieces): from
+/// `alloc_hook_bytes_begin`, every allocation the watched thread makes is remembered with its size until the watched
+/// thread frees it, and the most held at once kept. A pointer freed on another thread stays counted (so the peak can
+/// only read high); `alloc_hook_bytes_untracked` says how many allocations found the table full.
+void alloc_hook_bytes_begin(void);
+void alloc_hook_bytes_end(void);
+int64_t alloc_hook_bytes_held(void);
+int64_t alloc_hook_bytes_peak(void);
+uint64_t alloc_hook_bytes_untracked(void);
+/// A deliberate allocation of `size` bytes, written to and freed, in C, on the calling thread: the byte count's canary.
+void alloc_hook_bytes_canary(uint64_t size);
+
 #ifdef __cplusplus
 }
 #endif

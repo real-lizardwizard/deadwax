@@ -1,0 +1,8 @@
+{
+  "about": "deadwax's /scrub answer for deck-44k.flac at=1.8&seconds=41.2, cut by src/flac_ranges.py (written by ios/scripts/export-scrub-window.py - never edit by hand)",
+  "from": "deck-44k.flac",
+  "at": 1.8,
+  "seconds": 41.2,
+  "header": "78848/22582/44100",
+  "bytes": 90646
+}

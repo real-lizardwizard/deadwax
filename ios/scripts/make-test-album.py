@@ -11,6 +11,11 @@ runs it - the Mac's own (`xcrun python3`), or the server's.
 The second writes the four small FLACs DeadwaxAudio's download verifier is tested on (notes/ios-specs/phase2-downloads.md
 8.4, 9) - see `verifier_fixtures` - into ios/DeadwaxKit/Tests/DeadwaxAudioTests/Fixtures/verifier.
 
+    python3 ios/scripts/make-test-album.py --deck-fixtures ios/DeadwaxKit/Tests/DeadwaxAudioTests/Fixtures/deck
+
+The third writes the turntable's window fixtures (notes/ios-specs/turntable.md 7.2) - see `deck_fixtures`; then
+ios/scripts/export-scrub-window.py cuts the server's own /scrub answer from one of them.
+
 The first writes "<your music folder>/deadwax test/Start test (2026)/01 - ....flac" ... "10 - ....flac" (about 6 MB),
 replacing the album's own files if they are there and touching nothing else. Then let
 Navidrome scan. Write it into a folder of its own and copy that folder in, if you'd rather.
@@ -196,7 +201,7 @@ def flac(samples: list[int], tags: dict[str, str]) -> bytes:
 # ----------------------------------------------------------------------------- the download verifier's fixtures
 
 # FLAC's frame-header codes: the sample rate (4 bits) and the sample size (3 bits)
-RATE_CODES = {44100: 0x9, 48000: 0xA, 96000: 0xB, 192000: 0xD}
+RATE_CODES = {22050: 0x6, 44100: 0x9, 48000: 0xA, 96000: 0xB, 192000: 0xD}
 BITS_CODES = {16: 0b100, 24: 0b110}
 
 
@@ -272,7 +277,79 @@ def verifier_fixtures() -> dict[str, bytes]:
     }
 
 
+# ----------------------------------------------------------------------------- the turntable's window fixtures
+
+#? turntable.md 7.2: the window maker on the grid (4.4 (a)) at 22.05, 44.1, 48 and 96 kHz, the seam off it (4.4 (b)),
+#? and the window made in pieces. VERBATIM is the encoder's only way to hold a varying sample, so each file is CONSTANT
+#? (a few bytes a block) until just before the stretch a test reads, and short: the window's grid start is 2.0 s, its
+#? pre-roll from 1.8 s, twice the pre-roll from 1.6 s - so the signal begins at 1.5 s
+DECK_SIGNAL_FROM = 1.5
+DECK_SECONDS = 2.3
+#? the three tones of 4.4 (b): 1, 5 and 12 kHz, each at -12 dBFS, from 1.7 s (before the window's pre-roll at 1.8 s)
+DECK_TONES = (1000.0, 5000.0, 12000.0)
+DECK_TONES_FROM = 1.7
+DECK_TONES_SECONDS = 2.6
+#? the 40 s window of a 96 kHz song made in pieces: 40.5 s of CONSTANT blocks, a staircase (nothing all zeros)
+DECK_LONG_SECONDS = 40.5
+
+
+def deck_signal(rate: int, seconds: float, bits: int, seed: int) -> list[list[int]]:
+    """Two channels unlike each other: exact zeros until DECK_SIGNAL_FROM, then a rising sweep under noise on the left
+    and a falling one on the right, at about -6 dBFS - every sample its own."""
+    top = (1 << (bits - 1)) - 1
+    rng = random.Random(seed)
+    frames = int(round(seconds * rate))
+    begin = int(round(DECK_SIGNAL_FROM * rate))
+    left, right = [0] * frames, [0] * frames
+    for n in range(begin, frames):
+        t = (n - begin) / rate
+        up = math.sin(2 * math.pi * (300 * t + 2000 * t * t))
+        down = math.sin(2 * math.pi * (6000 * t - 1500 * t * t))
+        left[n] = int(round(top * (0.4 * up + 0.05 * (rng.random() * 2 - 1))))
+        right[n] = int(round(top * (0.4 * down + 0.05 * (rng.random() * 2 - 1))))
+    return [left, right]
+
+
+def deck_tones(rate: int = 44100, bits: int = 16) -> list[list[int]]:
+    """The three tones, both channels: zeros until DECK_TONES_FROM, then sum of sin(2 pi f n / rate) at -12 dBFS each,
+    rounded - so every sample's true value is known to within half a step."""
+    top = (1 << (bits - 1)) - 1
+    level = 10 ** (-12 / 20)
+    frames = int(round(DECK_TONES_SECONDS * rate))
+    begin = int(round(DECK_TONES_FROM * rate))
+    one = [0] * frames
+    for n in range(begin, frames):
+        one[n] = int(round(top * level * sum(math.sin(2 * math.pi * f * n / rate) for f in DECK_TONES)))
+    return [one, list(one)]
+
+
+def deck_long(rate: int = 96000, bits: int = 24, block: int = 1024) -> list[list[int]]:
+    """40.5 s of blocks each one value (CONSTANT subframes): a staircase on the left, its negative on the right."""
+    frames = int(round(DECK_LONG_SECONDS * rate))
+    step = 1 << (bits - 6)
+    left = [((n // block) % 31 - 15) * step for n in range(frames)]
+    return [left, [-v for v in left]]
+
+
+def deck_fixtures() -> dict[str, bytes]:
+    """The deck engine's FLACs (DeadwaxAudioTests/Fixtures/deck): `deck-<rate>.flac` at 22.05, 44.1, 48 and 96 kHz,
+    `deck-tones.flac` (44.1 kHz) and `deck-long-96k.flac`."""
+    made = {name: encode(deck_signal(rate, DECK_SECONDS, 16, seed), rate, 16)
+            for name, rate, seed in (("deck-22k.flac", 22050, 3), ("deck-44k.flac", 44100, 4),
+                                     ("deck-48k.flac", 48000, 5), ("deck-96k.flac", 96000, 6))}
+    made["deck-tones.flac"] = encode(deck_tones(), 44100, 16)
+    made["deck-long-96k.flac"] = encode(deck_long(), 96000, 24)
+    return made
+
+
 def main(argv: list[str]) -> int:
+    if len(argv) == 3 and argv[1] == "--deck-fixtures":
+        folder = Path(argv[2])
+        folder.mkdir(parents=True, exist_ok=True)
+        for name, data in deck_fixtures().items():
+            (folder / name).write_bytes(data)
+            print(f"{name}  {len(data)} bytes")
+        return 0
     if len(argv) == 3 and argv[1] == "--verifier-fixtures":
         folder = Path(argv[2])
         folder.mkdir(parents=True, exist_ok=True)
