@@ -36,6 +36,19 @@ public enum EQWords {
 
         public static func from(file: String) -> String { "From \"\(file)\"" }
 
+        /// A pasted correction's name, as the Correction row shows it (slice 5: a paste has no file name).
+        public static let pasted = "Pasted"
+
+        /// What an import replaces, in "It replaces the correction for …": "Apple AirPods Pro, from AutoEq", "from
+        /// HD650 ParametricEQ.txt", "from the clipboard", "your own filters".
+        public static func what(_ c: EQCorrection) -> String {
+            switch c.kind {
+            case .autoeq: "\(c.name), from AutoEq"
+            case .file: c.name.isEmpty ? "from the clipboard" : "from \(c.name)"
+            case .built: "your own filters"
+            }
+        }
+
         /// "10 filters, preamp -6.4 dB"; "11 filters for both ears, 2 more for the left, preamp -6.0 dB" - the
         /// file's own preamp, its shared part.
         public static func summary(_ reading: APOReading) -> String {
@@ -418,18 +431,19 @@ extension EQWords {
         public static let backToAutoEq = "Back to AutoEq's"
 
         /// Where it's from: "AutoEq, measured by crinacle" (" - changed"), "From HD650 ParametricEQ.txt"
-        /// (", converted"), "Your own filters".
+        /// (", converted"), "Your own filters" - and a paste, which has no file name, "From the clipboard" (slice 5).
         public static func source(_ c: EQCorrection) -> String {
             switch c.kind {
             case .autoeq: "AutoEq, measured by \(c.source ?? "")" + (c.changed ? " - changed" : "")
-            case .file: "From \(c.name)" + (c.converted ? ", converted" : "")
+            case .file: (c.name.isEmpty ? Import.fromClipboard : "From \(c.name)") + (c.converted ? ", converted" : "")
             case .built: "Your own filters"
             }
         }
 
-        /// The row's value: "None" or the correction's name.
+        /// The row's value: "None" or the correction's name - a paste's "Pasted".
         public static func value(_ c: EQCorrection?) -> String {
             guard let c else { return none }
+            if c.kind == .file && c.name.isEmpty { return Import.pasted }
             return c.kind == .built ? "Your own filters" : c.name
         }
 
@@ -637,6 +651,8 @@ extension EQWords {
         public static let gainRange = "Between -30 and 30 dB."
         public static let qRange = "Between 0.01 and 100."
         public static let widthRange = "Between 0.01 and 10."
+        /// A slope of 0 or less (slice 5: 3.8 gives no words for it; 3.9's refusal says "it must be above 0").
+        public static let slopeRange = "Above 0 dB an octave."
 
         /// A shelf read by its corner: "Its corner frequency, as Equalizer APO reads this shelf - it is centred at
         /// 131 Hz."
