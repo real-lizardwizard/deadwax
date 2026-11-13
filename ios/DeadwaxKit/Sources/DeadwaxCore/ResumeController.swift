@@ -40,6 +40,11 @@ import Foundation
 // once. Only open and return wait for that ask: a save due while playing, a pause,
 // a wait or the background goes as Phase 1's do - the queue playing here is the present. A 401 holds the kept save
 // for the same person (its store; saving resumes when the session moves); someone else's controller has their own.
+//
+// NOT YET FOLLOWED (2.1.15, play history): the web's take() passes the queue it holds to resumed() (`holding`, so a
+// snapshot saved without an id keeps the page's) and tells its history outbox a song put back mid-song is no new start
+// (`continuing`). Both are about the queue's id and the starts kept with it, which the phone has neither of until its
+// play history port (play-history.md section 5); without them the phone puts back exactly what it did before.
 
 /// What of the player resume reads, and its one action.
 public protocol ResumePlayer: AnyObject {

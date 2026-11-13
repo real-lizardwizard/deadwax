@@ -31,6 +31,24 @@ import Testing
         #expect(fromSnapshot(snapshot, tracks: queue.tracks, index: 1, setting: .off)?.tracks.allSatisfy { $0.level == nil } == true)
     }
 
+    /// (2.1.15) The web writes its queue's `id` second in v1 now; the phone keeps no id until its play history port, so
+    /// it reads the web's snapshot as the same queue, the id aside - and writes its own without one, as before.
+    @Test func aSnapshotWithTheWebsQueueIdReadsAsTheSameQueue() throws {
+        let queue = withNext(startUpNext(rAlbum(3, level: .album), start: 1), [rTrack("x", level: .track)])
+        let ours = try #require(toSave(queue, position: 61.5).snapshot)
+        #expect(!ours.contains(#""id""#))
+        let webs = ours.replacingOccurrences(of: #"{"v":1,"#, with: #"{"v":1,"id":"mhyx7k2c-a1b2c3d4","#)
+        #expect(webs != ours)
+        let tracks = queue.tracks.map { var t = $0; t.level = nil; return t }
+        for setting in [Normalization.auto, .song, .album, .off] {
+            let back = try #require(fromSnapshot(webs, tracks: tracks, index: 1, setting: setting))
+            #expect(back == fromSnapshot(ours, tracks: tracks, index: 1, setting: setting))
+        }
+        #expect(fromSnapshot(webs, tracks: tracks, index: 1, setting: .auto) == queue)
+        //? read back, it saves as the phone always has: no id
+        #expect(toSave(queue, position: 61.5).snapshot == ours)
+    }
+
     @Test func positionsAsSent() {
         #expect(Resume.sent(-3) == 0)
         #expect(Resume.sent(12.5) == 12.5)

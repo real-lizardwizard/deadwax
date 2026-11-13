@@ -3662,3 +3662,49 @@ into your library yet." and "It downloaded, but deadwax isn't set up to add it t
 tell (only whoever runs deadwax can put it right), and the server's own words only as the detail for them.
 error-words.json written again (its job table and job cases); the gate's navidrome.json changed only its hash of
 errorWords.ts. Nothing else on the phone named ORGANIZE_MODE or a dry run.
+
+### 2.1.14 and 2.1.15, play history: the fixtures kept current, the phone's resume unchanged
+
+Play history itself is the phone's next piece (`~/Desktop/Code/deadwax-plans/play-history.md` section 5), not this
+one. What the merge changed under the phone: `UpNextState` gained `id`, the queue's identity, minted by
+`startUpNext` (queueId(): the time and random bytes) and carried by every edit, and toSave writes it second in
+snapshot v1 (`{"v":1,"id":"...",`); fromSnapshot reads a valid one (`[A-Za-z0-9_-]`, 1 to 64) and otherwise mints one
+(or, in the web's take(), keeps the page's - `holding`). So export-traces.cjs's snapshots came out different every
+run.
+
+**The vectors the phone must write stay the phone's form.** The resume vectors hold the phone's toSave to the web's
+text to the unit, and the phone keeps no id until its port, so a fixed id in those texts would have needed the port
+itself. The export now records toSave of each queue as the phone has it - without its id (`phoneForm`), which toSave
+then leaves out: v1 exactly as the phone writes it, and as the web did before 2.1.15. Every one of those texts is
+byte for byte as before (only made_from moved). `saved()` also holds the web's own text of the same queue to that
+text with the id put second (`withQueueId`), so a change in where or how the web writes the id stops the export.
+
+**The web's own text is now read back by the phone**: 18 more fromSnapshot cases (188, from 170) - the web's 2.1.15
+snapshot with a fixed queue id (`QUEUE_ID`, 'mhyx7k2c-a1b2c3d4', in queueId's form) under all four settings, and ids
+of every other shape (64 and 65 characters, empty, a space, a dot, an escaped emoji pair, a number, null, an object,
+an array, true, first before `v`, last, twice). The web reads each as the same queue, the id aside, and the phone
+does too - its SnapshotJSON already passed over keys it doesn't know. ResumeUnitTests
+`aSnapshotWithTheWebsQueueIdReadsAsTheSameQueue` says it directly, and that the phone's own snapshot still has none.
+The upnext traces, scenarios and property digests never recorded an id (queueRecord, canonical), so they changed only
+their made_from; `--check` made twice gives the same files.
+
+**The resume controller**: useResume.ts's createResume changed (its hash moved) for play history alone - take()
+passes the page's queue to resumed() (`holding`) and tells the history outbox a queue put back mid-song is no new
+start (`continuing`). Neither applies to a phone with no queue id and no starts; ResumeController.swift says so in its
+header, and the phone puts back exactly what it did. Until the port, the web picking up a phone's snapshot mints a new
+id, so a song played in that queue before the pick-up can show twice on the web (play-history.md says so too).
+
+### Verified, and not
+
+Verified (2026-11-13, this Mac, Xcode's toolchain, on the merged tree with the three ports):
+- `swift test`: Core 986, DeadwaxAudio 158, DeadwaxTurntable 11 - all pass; the release EQRealTimeTests,
+  DeckRealTimeTests and VarispeedCostTests;
+- the unsigned Release device build (0.7 (7)); check_project.py;
+- the full pytest: 4341 passed, 1 skipped (CLAUDE.md's count);
+- `npm run build` on Node 22 (into this worktree's own `npm ci` of ui/ on Node 22 - the main checkout's node_modules,
+  installed on 20.12.2, has no rolldown binding: notes/tooling.md), and every sim, 79, on Node 22 with a scratch
+  TMPDIR; iosdeck.sim's full check on Node 20.12.2 too;
+- the 2.1.12 mutations above; export-traces.cjs `--check` made again gives the same files.
+
+Not verified: anything on the phone - the let-go after a song change (a finger resting on the record as an MP3 ends),
+and a web-saved queue (with its id) picked up on the phone and played on.

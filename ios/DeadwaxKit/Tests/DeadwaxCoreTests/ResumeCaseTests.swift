@@ -111,7 +111,7 @@ import Testing
     @Test func snapshotsReadAsTheWebReadsThem() throws {
         let loaded = try Self.load()
         let cases = loaded.cases["fromSnapshot", default: []]
-        #expect(cases.count == 170)
+        #expect(cases.count == 188)
         var nils = 0
         for item in cases {
             let label = item["label"]?.string ?? "?"

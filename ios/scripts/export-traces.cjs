@@ -38,6 +38,10 @@
  *
  * Every snapshot recorded is also written by a reference writer here (the snapshot's form written out key by key,
  * as Resume.swift writes it) and must be the TypeScript's text - so a change of the form fails here, by name.
+ * (2.1.15) The web's queue has an `id` now, which toSave writes second; the phone keeps none until its play history
+ * port, so the snapshots it must write are toSave's of each queue without its id (phoneForm) - its own form, byte for
+ * byte as before - and the web's own text, with a fixed id (QUEUE_ID), is among fromSnapshot's cases, for the phone
+ * to read. The port records them with the id.
  *
  * Every number a function draws is recorded as the Park-Miller generator's integer state s (the number itself is
  * (s - 1) / 2147483646 in both languages, bit for bit), so nothing depends on how a double prints. Math.random is
@@ -1279,13 +1283,30 @@ function referenceSnapshot(queue) {
     `${state.pagedRounds ? `,"pagedRounds":[${state.pagedRounds.map((held) => `{"pass":${q(held.pass)},"paged":${paged(held.paged)}}`).join(',')}]` : ''}}`
 }
 
-/** toSave, its snapshot held to the reference writer's text (or, over the cap, to none). */
+/** (2.1.15) A queue as the phone has it until its play history port (play-history.md section 5): without the queue's
+ *  `id`, which toSave then leaves out - v1 as the phone writes it, and as the web wrote it before 2.1.15. The web reads
+ *  such a snapshot as a queue to give an id of its own (fromSnapshot), which nothing here records. */
+const phoneForm = (queue) => (queue.upNext ? { ...queue, upNext: (({ id: _id, ...rest }) => rest)(queue.upNext) } : queue)
+/** (2.1.15) The one queue id the export gives a queue whose snapshot it keeps WITH its id (startUpNext's `id`, never
+ *  queueId()'s time and random bytes), so the files are the same run to run: the web's own text now, which the phone
+ *  must read. A queue's id in the form queueId makes. */
+const QUEUE_ID = 'mhyx7k2c-a1b2c3d4'
+/** v1 with the queue's id second, as toSave writes it since 2.1.15 - the phone's form with `"id"` put in. */
+const withQueueId = (snapshot, id) => snapshot.replace('{"v":1,', `{"v":1,"id":${JSON.stringify(id)},`)
+
+/** toSave of the phone's form (phoneForm), its snapshot held to the reference writer's text (or, over the cap, to none);
+ *  and the web's own text of the queue, with its id, held to that text with the id second - so a change of where or
+ *  how the web writes the id stops the export here too. */
 function saved(queue, position) {
-  const saving = R.toSave(queue, position)
+  const saving = R.toSave(phoneForm(queue), position)
   const reference = referenceSnapshot(queue)
   const wanted = reference !== null && reference.length <= R.RESUME_SNAPSHOT_MAX ? reference : null
   if (saving.snapshot !== wanted) {
     throw new Error(`toSave's snapshot is not the form the phone writes:\n  ${String(saving.snapshot).slice(0, 300)}\n  ${String(wanted).slice(0, 300)}`)
+  }
+  const web = R.toSave(queue, position).snapshot
+  if (web !== null && saving.snapshot !== null && (typeof queue.upNext.id !== 'string' || web !== withQueueId(saving.snapshot, queue.upNext.id))) {
+    throw new Error(`toSave's snapshot with its queue's id is not v1 with the id second:\n  ${web.slice(0, 300)}`)
   }
   return saving
 }
@@ -1452,7 +1473,7 @@ recipeCase('a 5,000-song list from its first: its next 2,000, and a snapshot ove
 recipeCase('playing the 101st of 2,500: 50 before it, 2,000 in all, startedAt floored at 0', { n: 2500, prefix: '', start: 30, index: 100, position: 7 })
 for (const unit of ['x', '😀']) {
   const base = { n: 2400, prefix: 'cap-', start: 50, index: 50, position: 0 }
-  const length = (pad) => R.toSave(fromRecipe({ ...base, pad }), 0).snapshot?.length ?? referenceSnapshot(fromRecipe({ ...base, pad })).length
+  const length = (pad) => R.toSave(phoneForm(fromRecipe({ ...base, pad })), 0).snapshot?.length ?? referenceSnapshot(fromRecipe({ ...base, pad })).length
   const bare = length({ id: 'cap-2400', unit, count: 0, tail: 0 })
   const count = Math.floor((R.RESUME_SNAPSHOT_MAX - bare) / unit.length)
   const tail = (R.RESUME_SNAPSHOT_MAX - bare) % unit.length
@@ -1521,6 +1542,23 @@ for (const unit of ['x', '😀']) {
     ['an array', '[]'], ['a string', '"{}"'], ['null', 'null'], ['nothing', ''], ['a number', '1'],
   ]
   for (const [label, snapshot] of cases) fromCase(`a snapshot ${label}`, snapshot, tracks, 2)
+  //? (2.1.15) the web's own snapshot now, its queue's id second: read as the same queue, the id aside - the phone keeps
+  //? none yet, and a queue's record has none. Then ids of every other shape, which the web reads as none (giving the
+  //? queue a new one), the rest read as ever
+  const own = U.withNext(U.startUpNext(list.map((t) => ({ ...t, level: 'album' })), 2, false, undefined, undefined, QUEUE_ID), [rTrack('x', { level: 'track' })])
+  const ownText = R.toSave(own, 61).snapshot
+  if (ownText !== withQueueId(base, QUEUE_ID)) throw new Error('the web\'s snapshot with its id is not the base with the id second')
+  for (const setting of SETTINGS) fromCase(`a snapshot as the web writes it since 2.1.15, its queue's id second (${setting})`, ownText, tracks, 2, setting)
+  const withId = (id) => withQueueId(base, 'ID').replace('"id":"ID"', `"id":${id}`)
+  for (const [label, snapshot] of [
+    ['an id of 64 characters', withId(JSON.stringify('a'.repeat(64)))], ['an id of 65 characters', withId(JSON.stringify('a'.repeat(65)))],
+    ['an id empty', withId('""')], ['an id with a space', withId('"q 1"')], ['an id with a dot', withId('"q.1"')],
+    ['an id with an emoji pair escaped', withId('"q\\ud83d\\ude00"')], ['an id a number', withId('5')], ['an id null', withId('null')],
+    ['an id an object', withId('{"id":"q"}')], ['an id an array', withId('["q"]')], ['an id true', withId('true')],
+    ['an id first, before v', base.replace('{"v":1,', `{"id":${JSON.stringify(QUEUE_ID)},"v":1,`)],
+    ['an id last', `${base.slice(0, -1)},"id":${JSON.stringify(QUEUE_ID)}}`],
+    ['an id twice', withId(`${JSON.stringify(QUEUE_ID)},"id":"other"`)],
+  ]) fromCase(`a snapshot with ${label}`, snapshot, tracks, 2)
   fromCase('an index past the songs', base, tracks, 6)
   fromCase('an index below 0', base, tracks, -1)
   fromCase('Navidrome\'s songs one short', base, tracks.slice(0, 5), 2)
