@@ -3045,6 +3045,63 @@ and byte-equal regeneration can't hold on every machine. The Swift passed either
   to the exporter: both fail. **Not seen**: x64 itself - Rosetta isn't installed here, so node-v22.23.4-darwin-x64
   wasn't run; CI's next run is the first.
 
+### Slice 2: the deck engine and the window (2026-11-13)
+
+The record gets its own engine (spec 4.3): a second AVAudioEngine whose AVAudioSourceNode renders Core's voice and
+nothing else, into the main mixer at unity. It is separate because the song's engine stops its output on every pause,
+which is exactly when the record sounds. The pieces:
+
+- `DeckVoiceHost`, the render: plain numbers and pointers only. Messages come in through an SPSC ring (CAudioRing's
+  new `audio_fifo`), windows go back through a return ring, and reports fold when their ring is full. The clock `L`
+  is Core's `DeckLead`, and the deck's own EQRender runs after the limiter (eq.md 1.9).
+- `DeckEngine`, the second engine, warmed once off the audio thread.
+- `DeckWindows`: a window from a local file or from `/scrub`, on the 2 s grid with a 0.2 s pre-roll, converted the
+  way the lane converts.
+- `DeckTrial`: the run Debug plays.
+
+The one change in ios/App is Debug's **The record's engine beside the song** (docs/ios.md, checks 0a-0c). Core gained
+`DeckScrub`, `DeckLead`, `DeckRender`, `DeckPCM` and the `scrub` route (ROUTE_COUNT 27). The FLAC fixtures are in
+DeadwaxAudioTests/Fixtures/deck (922 KB): make-test-album.py `--deck-fixtures`, and export-scrub-window.py for the
+`/scrub` answer, cut by src/flac_ranges.py itself. tests/test_ios_install.py makes them again and checks them byte for
+byte. The spec's "Slice 2, built" (under 7.2) has what was measured, each departure and why, and its questions.
+
+**Measured here.**
+- The source node is Core's voice bit for bit, over 32 runs of 8 cases.
+- Windows at 22.05, 44.1, 48 and 96 kHz are the lane's frames bit for bit, and `P` against `2P` agree bit for bit.
+- A `/scrub` window is the local file's, bit for bit.
+- The seam off the grid: the lane at -91 dB and the voice at -78 dB against the exact tones.
+- A 40 s window from 96 kHz peaks at 15.8-16.1 MB on the making thread, over six runs, against a bound of the
+  window's 14.65 MB plus 2 MB. That leaves about 0.5 MB, so a CI runner whose AVFoundation buffers more would fail
+  it there first.
+- HandoverTimingTests: the song comes in 0.53 ms after planEnd + D, and its click comes out of both engines 28 frames
+  apart, at a quantum of 32.
+- Release: 0 allocations in 10,000 direct calls and in 1,000 framework blocks, with the canary seen.
+
+**Mutations, each alone** (scratchpad's mutate.py: applied, the suite run, `git checkout`). All caught:
+
+| Mutation | Caught by |
+| --- | --- |
+| D without the limiter's lookahead | The handover's clicks 68 frames apart |
+| D without `L` | 996 frames apart |
+| The offline clock without its lead | 1050 frames apart |
+| The pre-roll's drop a frame long | The grid's bits, the length, and the seam (the voice at -0.9 dB) |
+| The grid start a file frame late | The window's start, and the grid's bits |
+| The window not levelled | The grid's bits, and 48 to 48's exact copy |
+
+The grid-start mutation passes the seam test, at -79 dB. That is right: the window still says where it starts. The
+seam test catches a window that is placed off from where it says.
+
+**Verified**:
+- `swift test`: 934 Core tests and 129 Audio tests.
+- `swift test -c release --filter DeckRealTimeTests`.
+- The unsigned iPhone Release build. It found a missing `import AVFAudio` that macOS doesn't need.
+- check_project.py, the iOS pytest files, and every ios sim, with iosdeck's full check on Node 20.12.2.
+
+**Not run**: check-linux.sh, which needs swift.org's Linux toolchain; Core's new files are Foundation-only, and ios.yml's
+ubuntu job is their first Linux build. ios.yml itself hasn't run either: nothing was pushed.
+
+**Only the phone can show**: checks 0a-0c, the real `E`, and the phone's "Window made in".
+
 ## The EQ, slice 1: Core (2026-11-12)
 
 The design is notes/ios-specs/eq.md. Its slice 1 (5.1) is the EQ's pure part, in DeadwaxCore and tested like the rest
