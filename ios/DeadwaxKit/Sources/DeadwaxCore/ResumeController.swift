@@ -41,10 +41,13 @@ import Foundation
 // a wait or the background goes as Phase 1's do - the queue playing here is the present. A 401 holds the kept save
 // for the same person (its store; saving resumes when the session moves); someone else's controller has their own.
 //
-// NOT YET FOLLOWED (2.1.15, play history): the web's take() passes the queue it holds to resumed() (`holding`, so a
-// snapshot saved without an id keeps the page's) and tells its history outbox a song put back mid-song is no new start
-// (`continuing`). Both are about the queue's id and the starts kept with it, which the phone has neither of until its
-// play history port (play-history.md section 5); without them the phone puts back exactly what it did before.
+// PLAY HISTORY (app 0.8, the web's 2.1.15 - notes/play-history.md, notes/ios.md "Play history on the phone"): take()
+// passes the queue the player holds to resumed() (`holding`), so a snapshot of it saved without an id - by an app that
+// keeps none, the web before 2.1.15 or this app before 0.8 - keeps the phone's, and the starts made here in it stay
+// its rows; and every queue put back tells the player whether it is a CONTINUATION (`continuing`): deadwax's own queue
+// put back mid-song was begun before - here or on another device - so playing it on is no new start. Another app's,
+// or one at 0 s, is (nil ends one). The phone's own kept queue put back while deadwax can't be reached is its own, the
+// same rule.
 
 /// What of the player resume reads, and its one action.
 public protocol ResumePlayer: AnyObject {
@@ -53,6 +56,15 @@ public protocol ResumePlayer: AnyObject {
     /// The queue put back paused at `position` seconds into its song (QueueController.restoreQueue): fitted to this
     /// device's Repeat, nothing loaded or played. Nil - nothing done - while the listener means music to play.
     func restoreQueue(_ queue: UpNextQueue, position: Double) -> UpNextQueue?
+    /// (2.1.15) After each queue put back: the queue when its song playing is a continuation - deadwax's own queue,
+    /// put back past 0 s - whose next start, if it is of that entry, is the same listen carrying on; nil for any
+    /// other (historyOutbox.ts continuing). The player's history outbox keeps it (`HistoryOutbox.continuing`).
+    func continuing(_ queue: UpNextQueue?)
+}
+
+extension ResumePlayer {
+    /// A player that keeps no play history hears nothing of it.
+    public func continuing(_ queue: UpNextQueue?) {}
 }
 
 /// Why a request to deadwax didn't give resume its answer: deadwax's status (401 signed out, 409 the queue changed
@@ -387,7 +399,8 @@ public final class ResumeController {
     @discardableResult
     private func take(_ answer: QueueAnswer, _ why: Why) -> Bool {
         guard let queue else { return false }
-        guard let back = resumed(answer, setting: normalization(), device: device) else { return false }
+        //? (2.1.15) the queue the player holds: a snapshot of it saved without an id keeps its id
+        guard let back = resumed(answer, setting: normalization(), device: device, holding: queue) else { return false }
         let sign = signature(answer)
         let untouched = parked.map { $0.queue == queue } ?? false
         if why == .front {
@@ -401,6 +414,9 @@ public final class ResumeController {
         taken = sign
         let position = player.position()
         parked = (put, position)
+        //? (2.1.15) deadwax's own queue put back mid-song: that song began before - its start kept then, here or on
+        //? another device - so playing it on from here is no new start. Another app's, or at 0 s, is one
+        player.continuing(answer.kept != nil && position > 0 ? put : nil)
         //? a queue merely put back is the baseline: nothing is saved for it
         saves.saved = SaveBaseline(tracks: put.tracks, upNext: put.upNext, index: put.index, position: position,
                                    start: 0, count: put.tracks.count)
@@ -517,13 +533,15 @@ public final class ResumeController {
     /// has been asked). Its ids_rev isn't believed: the first save after is a full one.
     private func putBack(_ row: QueueKept) {
         guard let queue, queue.current == nil,
-              let back = resumed(row.answer, setting: normalization(), device: device) else { return }
+              let back = resumed(row.answer, setting: normalization(), device: device, holding: queue) else { return }
         restoring = true
         let restored = player.restoreQueue(back.queue, position: back.position)
         restoring = false
         guard let put = restored else { return }
         let position = player.position()
         parked = (put, position)
+        //? this phone's own queue (or one it took from deadwax), as take()'s rule: mid-song, no new start
+        player.continuing(row.answer.kept != nil && position > 0 ? put : nil)
         saves.saved = SaveBaseline(tracks: put.tracks, upNext: put.upNext, index: put.index, position: position,
                                    start: 0, count: put.tracks.count)
         saves.idsRev = nil

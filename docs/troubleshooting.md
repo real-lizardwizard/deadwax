@@ -1664,7 +1664,8 @@ Scrolled up past the song playing, Up Next goes back through every song you've s
 ([Up Next](player.md#up-next-shuffle-and-repeat)). A song can be missing from it because:
 
 - **it was played before 2.1.15**, or in **another app** (Amperfy, Symfonium) - deadwax isn't told of those - or in
-  the native [iPhone app](ios.md), which doesn't send its plays yet;
+  the native [iPhone app](ios.md) before its 0.8 (it sends them since: one started offline is sent once deadwax
+  answers);
 - **deadwax couldn't be reached when it started**: the app tries again at the next song, and by itself 30 seconds
   on, then a minute, two, and so on up to every 10 minutes while deadwax still can't take it - but a reload or a
   closed tab before then loses it, and so do the oldest of more than 500 songs waiting;
@@ -1672,10 +1673,10 @@ Scrolled up past the song playing, Up Next goes back through every song you've s
   shares one;
 - **it's the song you picked up mid-way** ([where you left off](player.md#picking-up-where-you-left-off)): it went
   in when it first began - if that was in deadwax's app in a browser. One the native [iPhone app](ios.md) began
-  isn't in it, as that app doesn't send its plays yet.
+  before its 0.8 isn't in it.
 
 **A song shows twice**, once among the older songs and once just above the song playing: while the native iPhone
-app was the last to save your queue (it doesn't keep which queue it is yet), a page reloaded since can't tell its own
+app before its 0.8 was the last to save your queue (it didn't keep which queue it is), a page reloaded since can't tell its own
 earlier plays in that queue from older ones. Nothing is kept twice - it's only how they're drawn - and it goes once
 the queue changes (another album tapped) or the songs have moved on past the last 50.
 

@@ -31,11 +31,48 @@ import Foundation
 // drawn in exactly the TypeScript's order, so the same numbers make the same queue: ios/scripts/export-traces.cjs
 // records what the TypeScript drew and did, and UpNextTraceTests replays it.
 //
-// Pure: no I/O, no clock; built and tested on Linux.
+// THE QUEUE'S ID (app 0.8, the web's 2.1.15): made as a queue starts - startUpNext's `id`, else `newQueueId()`, the
+// time and eight random characters, never a draw of `random`, so a shuffle's order is the same as before ids were -
+// and carried by every edit (UpNextState is a value: an edit copies it). What a start of a song names its queue by
+// (PlayHistory.swift).
+//
+// Pure: no I/O; built and tested on Linux. The clock and the system's random numbers are read only by the two
+// defaults below - systemRandom() and newQueueId() - which a caller (and every test) can pass in place of.
 
 extension UpNext {
     /// The system's random number in [0, 1), Math.random's stand-in.
     public static func systemRandom() -> Double { Double.random(in: 0..<1) }
+
+    /// queueId()'s letters: a byte's place among them is the byte modulo 36.
+    static let idDigits = Array("0123456789abcdefghijklmnopqrstuvwxyz")
+
+    /// (2.1.15) A queue's id as the web's queueId() makes one: the time in milliseconds in base 36 (0 for a time
+    /// before 1970), a hyphen, and a letter for each of eight bytes (`bytes[i] % 36` of "0-9a-z"). Pure - the
+    /// time and the bytes given (newQueueId reads them).
+    public static func queueId(nowMs: Int64, bytes: [UInt8]) -> String {
+        let letters = bytes.map { String(idDigits[Int($0) % idDigits.count]) }.joined()
+        return "\(String(max(0, nowMs), radix: 36))-\(letters)"
+    }
+
+    /// A new queue's id: now, and eight bytes of the system's random numbers (the web's crypto.getRandomValues).
+    public static func newQueueId() -> String {
+        var generator = SystemRandomNumberGenerator()
+        let bytes = (0..<8).map { _ in UInt8.random(in: 0...255, using: &generator) }
+        return queueId(nowMs: Int64((Date().timeIntervalSince1970 * 1000).rounded(.down)), bytes: bytes)
+    }
+
+    /// What a queue's id is (resume.ts QUEUE_ID, src/play_history.py's): 1 to 64 of [A-Za-z0-9_-]. A snapshot's id
+    /// that isn't one is read as none.
+    public static func isQueueId(_ text: String) -> Bool {
+        let units = text.utf16
+        guard !units.isEmpty, units.count <= 64 else { return false }
+        return units.allSatisfy { unit in
+            switch unit {
+            case 0x30...0x39, 0x41...0x5A, 0x61...0x7A, 0x5F, 0x2D: return true
+            default: return false
+            }
+        }
+    }
 }
 
 /* ===== playQueue.ts ===== */
@@ -177,9 +214,11 @@ private func kept(_ queue: UpNextQueue, _ state: UpNextState, _ keep: (Mark, Int
 /// The queue playTracks plays: startQueue()'s tracks and index for the same `random` - the shuffle done over the
 /// list's places, with the same Fisher-Yates and the same calls, so every entry knows its place in the list. Every
 /// entry the list's, in its first time round; `startedAt` the index it starts at (0 when shuffled). `paged` (Part
-/// B): the first page of a whole library's shuffle - its order is the shuffle, so Shuffle reads on.
+/// B): the first page of a whole library's shuffle - its order is the shuffle, so Shuffle reads on. `id` (2.1.15):
+/// the new queue's own - `UpNext.newQueueId()` when none is given, made after the shuffle.
 public func startUpNext(_ tracks: [QueueTrack], start: Int?, shuffle: Bool = false,
-                        random: () -> Double = UpNext.systemRandom, paged: Paged? = nil) -> UpNextQueue {
+                        random: () -> Double = UpNext.systemRandom, paged: Paged? = nil,
+                        id: String? = nil) -> UpNextQueue {
     if tracks.isEmpty { return .empty }
     let index = min(max(start ?? 0, 0), tracks.count - 1)
     let places = Array(tracks.indices)
@@ -192,6 +231,7 @@ public func startUpNext(_ tracks: [QueueTrack], start: Int?, shuffle: Bool = fal
         order = [index] + shuffled(places.filter { $0 != index }, random)
     }
     let state = UpNextState(
+        id: id ?? UpNext.newQueueId(),
         marks: order.enumerated().map { Mark(key: $0.offset, from: .source, at: $0.element, pass: 0) },
         source: tracks, shuffle: shuffle || paged != nil, nextKey: order.count, startedAt: shuffle ? 0 : index,
         left: [], paged: paged)
@@ -479,13 +519,49 @@ public func jumpedTo(_ queue: UpNextQueue, _ key: Int) -> Jump? {
 public func historyRows(_ queue: UpNextQueue, back: Int = UpNext.historyBack) -> [UpNextRow] {
     guard let state = queue.upNext, queue.current != nil else { return [] }
     var rows: [UpNextRow] = []
-    var place = max(state.startedAt, queue.index - back, 0)
+    var place = historyFloor(queue, state, back: back)
     let stop = unitStart(state, queue.index)
     while place < stop {
         if state.marks[place].from != .one { rows.append(UpNextRow(key: state.marks[place].key, track: queue.tracks[place])) }
         place = unitEnd(state, place)
     }
     return rows
+}
+
+/// How far back History reaches: from where listening began, no further than `back` entries before the song playing.
+func historyFloor(_ queue: UpNextQueue, _ state: UpNextState, back: Int = UpNext.historyBack) -> Int {
+    max(state.startedAt, queue.index - back, 0)
+}
+
+/// (2.1.15) Where the entries Up Next's rows stand for begin - History's first row (its floor, past a run of copies
+/// there whose song is further back, never a row), or the song playing's unit if that comes first. The queue's length
+/// with nothing playing.
+func shownFrom(_ queue: UpNextQueue, _ state: UpNextState) -> Int {
+    guard queue.current != nil else { return queue.tracks.count }
+    let playing = unitStart(state, queue.index)
+    var place = historyFloor(queue, state)
+    while place < playing && markAt(state.marks, place)?.from == .one { place += 1 }
+    return min(place, playing)
+}
+
+/// (2.1.15) The keys of the entries Up Next's rows stand for - exactly what upNextView(queue, _, limit:) draws, each
+/// row's entry with its copies: History's units, the song playing's, the songs added, and the list's first `limit`
+/// rows. One run, from shownFrom to the end of the last list row drawn - NEVER a later time round (Repeat All's, which
+/// Up Next sums up in a line) or a list row past `limit` ("And N more songs"), though Previous can leave songs begun
+/// there. PlayHistory.swift draws a start of any other entry among the older plays above History, so each is drawn
+/// once. None with nothing playing.
+public func shownKeys(_ queue: UpNextQueue, limit: Int = UpNext.drawn) -> Set<Int> {
+    guard let state = queue.upNext, queue.current != nil else { return [] }
+    let (_, addedEnd, listEnd) = layout(queue, state)
+    let listed = unitsIn(state, addedEnd, listEnd)
+    let end = listed.count > limit ? listed[limit] : listEnd
+    var keys = Set<Int>()
+    var place = shownFrom(queue, state)
+    while place < end {
+        keys.insert(state.marks[place].key)
+        place += 1
+    }
+    return keys
 }
 
 /// Previous's move: the queue at `index` - and, back before where listening began, `startedAt` moved down to the

@@ -393,9 +393,11 @@ player bar's **Up Next** button, and opens as a panel beside the page, as Info d
   - **What goes in it**: every song that starts playing - the moment Navidrome is told "now playing" - skips
     included. Pausing and playing again, seeking, a wait for the network or a song tried again from where it
     stopped are the same play, so they add nothing; a song put back [where you left off](#picking-up-where-you-left-off)
-    and played on from the middle was already in it when it began (unless the native iPhone app began it - below).
-    Plays in other apps (Amperfy, Symfonium) aren't, as deadwax isn't told of them; nor are the native
-    [iPhone app](ios.md)'s, which doesn't send them yet.
+    and played on from the middle was already in it when it began (unless the native iPhone app began it before its
+    0.8 - below).
+    Plays in other apps (Amperfy, Symfonium) aren't, as deadwax isn't told of them; the native
+    [iPhone app](ios.md)'s are since its 0.8 (it keeps any it can't send yet and sends them once deadwax answers),
+    but not before.
   - **Kept by deadwax, for ever**, in its own database - with logins on, each person's own, so it follows you from
     the phone to a computer; with logins off, one list for everyone who uses this deadwax. There's no Clear yet.
     (Removing a person in People, or Forget, takes theirs with the rest of what deadwax kept for them.)

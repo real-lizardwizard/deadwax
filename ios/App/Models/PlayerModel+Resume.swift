@@ -9,19 +9,25 @@ import UIKit
 // with deadwax out of reach puts back, and which holds a save deadwax hasn't answered until it has been asked.
 
 /// The player as resume reads it: the engine's position now (a queue put back answers its parked second), and its
-/// one action, the queue put back paused (QueueController.restoreQueue).
+/// one action, the queue put back paused (QueueController.restoreQueue) - and (app 0.8) play history told when the
+/// queue put back carries a listen on (`continuing`: deadwax's own record, mid-song) or doesn't (nil).
 final class ResumePlayerLink: ResumePlayer {
     private let read: () -> Double
     private let put: (UpNextQueue, Double) -> UpNextQueue?
+    private let carries: (UpNextQueue?) -> Void
 
-    init(position: @escaping () -> Double, restore: @escaping (UpNextQueue, Double) -> UpNextQueue?) {
+    init(position: @escaping () -> Double, restore: @escaping (UpNextQueue, Double) -> UpNextQueue?,
+         continuing: @escaping (UpNextQueue?) -> Void) {
         read = position
         put = restore
+        carries = continuing
     }
 
     func position() -> Double { read() }
 
     func restoreQueue(_ queue: UpNextQueue, position: Double) -> UpNextQueue? { put(queue, position) }
+
+    func continuing(_ queue: UpNextQueue?) { carries(queue) }
 }
 
 /// deadwax's three queue routes. Each answer is handed back on the main thread; a request cancelled (the app let it

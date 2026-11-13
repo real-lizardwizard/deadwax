@@ -25,6 +25,17 @@ import SwiftUI
 /// the top near an album's end, where scrollTo would stop short. Done ends Edit, else closes; the sheet closes by
 /// itself once nothing is queued.
 ///
+/// PLAY HISTORY THAT LASTS (app 0.8; the web's 2.1.15, notes/ios.md "Play history on the phone" - James: "so you can
+/// always look back and see what you played yesterday"): above History, ONE CONTINUOUS LIST goes on back through every
+/// song the person has played, on this phone and on the web - no headings at all (History's own is gone too), no
+/// times, skips drawn like plays. HistoryModel holds deadwax's pages and this phone's own starts; Core's
+/// PlayHistory.pastRows leaves out every start the queue's own rows draw, so each is drawn once. Its next older page is
+/// asked for as one of the list's first rows comes into view once the sheet has been placed at the song playing - a
+/// spinner over the list's top while it comes, said in a listener's words with Try again if it can't (ErrorWords) -
+/// and anything landing above what is in view holds the view where it was: the topmost row in view put back at the
+/// top. An older row's tap plays its song again, now, as History's does (PlayerModel.playAgain): the row stays under
+/// the finger, VoiceOver's focus on it, and "Playing {title}" said. Hidden in Edit.
+///
 /// Phase 2 (phase2-downloads.md 4.3.1): every song carries its download mark at the end of its line (the album row's
 /// DownloadMark, outside the line's words), in Edit too; and while deadwax can't be reached, a song not on this phone
 /// is dimmed - not a button out of Edit, its minus and handle still whole in it; the song playing's card is marked,
@@ -33,7 +44,9 @@ import SwiftUI
 struct UpNextScreen: View {
     @Environment(PlayerModel.self) private var player
     @Environment(DownloadModel.self) private var downloads
+    @Environment(HistoryModel.self) private var history
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @State private var editing = false
     /// The entry a History tap moved to: its change of song keeps the scroll where it is (the row under the finger).
     @State private var holdAt: Int?
@@ -42,14 +55,39 @@ struct UpNextScreen: View {
     /// row down, maybe out of the List's drawn cells, until the scroll.
     @State private var focusAtCard: Focus?
     @AccessibilityFocusState private var focus: Focus?
+    /// (app 0.8) The rows in view, and whether the sheet has been placed at the song playing - kept outside SwiftUI's
+    /// state, so scrolling redraws nothing.
+    @State private var seen = Seen()
 
     /// Where VoiceOver's focus goes after a change.
     enum Focus: Hashable {
         case row(Int)
+        /// (app 0.8) an older row's, by its key
+        case past(String)
         case done
         case shuffle
     }
 
+    /// What is drawn above the song playing, and the moments it changes for anything else - what the view is held
+    /// through (`hold`).
+    private struct Above: Equatable {
+        let past: [String]
+        let failed: Bool
+        let playing: Int?
+        let editing: Bool
+    }
+
+    /// The rows in view (the older rows by key, History's and the queue's by theirs, the card), by their own
+    /// onAppear and onDisappear.
+    @MainActor
+    private final class Seen {
+        var ids: Set<AnyHashable> = []
+        /// the sheet has been scrolled to the song playing once: rows above it seen since were scrolled to
+        var placed = false
+    }
+
+    /// (app 0.8) How near the list's top - in rows - one coming into view asks for the next older page.
+    private static let loadNear = 10
     /// The covers' sizes: the song playing's, and a row's.
     private static let playingCover: CGFloat = 64
     private static let rowCover: CGFloat = 44
@@ -66,27 +104,47 @@ struct UpNextScreen: View {
         let view = player.upNext
         let listRows = view.list?.rows ?? []
         let editable = !view.added.isEmpty || !listRows.isEmpty
+        //? (app 0.8) the older rows above History - none in Edit - each start drawn once (PlayHistory.pastRows)
+        let past = editing || view.playing == nil ? [] : PlayHistory.pastRows(history.plays, queue: player.queue)
+        let failure = editing ? nil : history.failure
+        let above = Above(past: past.map(\.key), failed: failure != nil, playing: playingKey, editing: editing)
         NavigationStack {
             GeometryReader { space in
                 ScrollViewReader { proxy in
                     List {
                         if let playing = view.playing {
-                            if !editing && !view.history.isEmpty {
+                            //? (2.1.3) the songs already played, above the song playing - scrolled up to; not in Edit.
+                            //? (app 0.8) One list with no heading: every song played before, oldest at the top, then
+                            //? the queue's own History
+                            if !editing && (!past.isEmpty || !view.history.isEmpty || failure != nil) {
                                 Section {
-                                    ForEach(view.history, id: \.key) { row in
+                                    if let failure {
+                                        VStack(alignment: .leading, spacing: 8) {
+                                            ErrorNote(failure.error, failed: UpNextWords.earlierFailed, retry: true)
+                                            Button(UpNextWords.tryAgain) { history.retry() }
+                                                .buttonStyle(.borderless)
+                                        }
+                                    }
+                                    ForEach(Array(past.enumerated()), id: \.element.key) { index, row in
+                                        pastRow(row)
+                                            .accessibilityFocused($focus, equals: .past(row.key))
+                                            .onAppear { appeared(row.key, at: index) }
+                                            .onDisappear { seen.ids.remove(row.key) }
+                                    }
+                                    ForEach(Array(view.history.enumerated()), id: \.element.key) { index, row in
                                         historyRow(row)
                                             .accessibilityFocused($focus, equals: .row(row.key))
+                                            .onAppear { appeared(row.key, at: past.count + index) }
+                                            .onDisappear { seen.ids.remove(row.key) }
                                     }
-                                } header: {
-                                    Text(UpNextWords.history)
-                                        .textCase(nil)
-                                        .accessibilityAddTraits(.isHeader)
                                 }
                             }
 
                             Section {
                                 playingCard(playing)
                                     .id(Self.card)
+                                    .onAppear { seen.ids.insert(Self.card) }
+                                    .onDisappear { seen.ids.remove(Self.card) }
                                 if view.repeatOne {
                                     Text(UpNextWords.repeatingOne)
                                         .font(.footnote)
@@ -150,7 +208,25 @@ struct UpNextScreen: View {
                     //? below it, from lower bounds of what follows the card: never too little, at most a little more
                     .contentMargins(.bottom, room(space.size.height, view), for: .scrollContent)
                     .environment(\.editMode, .constant(editing ? .active : .inactive))
-                    .onAppear { toCard(proxy) }
+                    //? (app 0.8) an older page on its way: over the list's top, so nothing in it moves
+                    .overlay(alignment: .top) {
+                        if history.loading && !editing {
+                            ProgressView()
+                                .padding(10)
+                                .background(.regularMaterial, in: Capsule())
+                                .padding(.top, 8)
+                                .accessibilityLabel(UpNextWords.loadingEarlier)
+                        }
+                    }
+                    .onAppear {
+                        toCard(proxy)
+                        history.opened()
+                    }
+                    .onChange(of: above) { old, now in hold(old, now, view, proxy) }
+                    .onChange(of: scenePhase) { _, phase in
+                        //? back at the front: what the web played meanwhile
+                        if phase == .active { history.refresh() }
+                    }
                     .onChange(of: playingKey) { _, now in
                         let target = focusAtCard
                         focusAtCard = nil
@@ -216,7 +292,44 @@ struct UpNextScreen: View {
             var instant = Transaction()
             instant.disablesAnimations = true
             withTransaction(instant) { proxy.scrollTo(Self.card, anchor: .top) }
+            seen.placed = true
             if let target { focus = target }
+        }
+    }
+
+    /// (app 0.8) A row above the song playing came into view: one of the list's first `loadNear`, once the sheet has
+    /// been placed (scrolled up to, then), asks for the next older page - while there is one, none is on its way, and
+    /// the last didn't fail (Try again asks then).
+    private func appeared(_ id: AnyHashable, at index: Int) {
+        seen.ids.insert(id)
+        guard seen.placed, index < Self.loadNear, history.more, !history.loading, history.failure == nil else { return }
+        history.older()
+    }
+
+    /// (app 0.8) Something above changed - a page of older songs landed, the newest page came, a failure said or let
+    /// go - with the same song playing, in or out of Edit as before (those put the card back at the top themselves):
+    /// the view held where it was, the topmost row in view put back at the top - unless nothing above it changed.
+    /// Before the sheet is placed, nothing to hold.
+    private func hold(_ old: Above, _ now: Above, _ view: UpNextView, _ proxy: ScrollViewProxy) {
+        guard seen.placed, old.playing == now.playing, old.editing == now.editing else { return }
+        let below: [AnyHashable] = view.history.map { AnyHashable($0.key) } + [AnyHashable(Self.card)]
+            + view.added.map { AnyHashable($0.key) } + (view.list?.rows ?? []).map { AnyHashable($0.key) }
+        let order = old.past.map { AnyHashable($0) } + below
+        guard let anchor = order.first(where: { seen.ids.contains($0) }) else { return }
+        if let key = anchor.base as? String, key != Self.card {
+            guard let place = now.past.firstIndex(of: key) else { return }
+            if place == old.past.firstIndex(of: key) && old.failed == now.failed { return }
+        }
+        Task { @MainActor in
+            var instant = Transaction()
+            instant.disablesAnimations = true
+            withTransaction(instant) {
+                if let key = anchor.base as? Int {
+                    proxy.scrollTo(key, anchor: .top)
+                } else if let key = anchor.base as? String {
+                    proxy.scrollTo(key, anchor: .top)
+                }
+            }
         }
     }
 
@@ -283,6 +396,8 @@ struct UpNextScreen: View {
                 }
             }
             .accessibilityFocused($focus, equals: .row(row.key))
+            .onAppear { seen.ids.insert(row.key) }
+            .onDisappear { seen.ids.remove(row.key) }
         }
         .onMove(perform: mover(rows))
     }
@@ -303,7 +418,7 @@ struct UpNextScreen: View {
             //? next under it in view. A jump that took always changes the entry playing, so the change comes
             if player.jump(to: row.key) { focusAtCard = next.map { .row($0.key) } ?? .done }
         } label: {
-            rowLabel(row)
+            rowLabel(row.track)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(UpNextWords.playNow(row.track.title))
@@ -325,19 +440,41 @@ struct UpNextScreen: View {
                 Notice.announce(words)
             }
         } label: {
-            rowLabel(row)
+            rowLabel(row.track)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(UpNextWords.playAgain(row.track.title))
         .modifier(UpNextDownload(songID: row.track.id, part: .row))
     }
 
-    private func rowLabel(_ row: UpNextRow) -> some View {
+    /// (app 0.8) An older row - a song played before, above History: the song again, now, as a History row's tap plays
+    /// its song (PlayerModel.playAgain) - a new entry after the song playing, the queue carrying on after it. The rows
+    /// above aren't rewritten, so the row stays under the finger (the scroll held), VoiceOver's focus on it, and what
+    /// started is said - only once it took. A song not on this phone is dimmed and can't be tapped offline, as every
+    /// row is.
+    private func pastRow(_ row: PastRow) -> some View {
+        Button {
+            guard player.playAgain(row.track) else { return }
+            holdAt = playingKey
+            let words = UpNextWords.playing(row.track.title)
+            Task { @MainActor in
+                focus = .past(row.key)
+                Notice.announce(words)
+            }
+        } label: {
+            rowLabel(row.track)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(UpNextWords.playAgain(row.track.title))
+        .modifier(UpNextDownload(songID: row.track.id, part: .row))
+    }
+
+    private func rowLabel(_ track: QueueTrack) -> some View {
         HStack(spacing: 12) {
-            CoverImage(id: row.track.coverArt, size: Self.rowCover)
+            CoverImage(id: track.coverArt, size: Self.rowCover)
                 .frame(width: Self.rowCover, height: Self.rowCover)
                 .clipShape(RoundedRectangle(cornerRadius: 4))
-            text(row)
+            text(track)
             Spacer(minLength: 0)
         }
         .contentShape(Rectangle())
@@ -363,7 +500,7 @@ struct UpNextScreen: View {
             .buttonStyle(.borderless)
             .accessibilityHidden(true)
             //? offline, only the words and the mark dim: the minus and the handle stay whole, and work
-            text(row)
+            text(row.track)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .modifier(UpNextDownload(songID: row.track.id, part: .look))
         }
@@ -384,23 +521,23 @@ struct UpNextScreen: View {
 
     /// The row's title and line, the song's download mark at the line's end - outside its words, so a long line wraps
     /// before it - or, with no line, after the title (4.3.1).
-    private func text(_ row: UpNextRow) -> some View {
+    private func text(_ track: QueueTrack) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            let line = UpNextWords.songLine(artist: row.track.artist, album: row.track.album)
+            let line = UpNextWords.songLine(artist: track.artist, album: track.album)
             if line.isEmpty {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(row.track.title)
+                    Text(track.title)
                         .foregroundStyle(.primary)
-                    UpNextSongMark(songID: row.track.id)
+                    UpNextSongMark(songID: track.id)
                 }
             } else {
-                Text(row.track.title)
+                Text(track.title)
                     .foregroundStyle(.primary)
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(line)
                         .font(.footnote)
                         .foregroundStyle(Palette.quiet)
-                    UpNextSongMark(songID: row.track.id)
+                    UpNextSongMark(songID: track.id)
                 }
             }
         }

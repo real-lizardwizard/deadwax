@@ -288,6 +288,24 @@ public struct DeadwaxClient: Sendable {
                       etag: response.header("ETag"))
     }
 
+    // MARK: app 0.8's play history (server 2.1.14)
+
+    /// A page of the person's plays, newest first: the newest (`before` nil), or the one before a page's last.
+    public func historyPage(before: HistoryCursor? = nil, limit: Int = PlayHistory.page) async throws -> HistoryPage {
+        var query = [("limit", String(limit))]
+        if let before {
+            query.append(("before_at", String(before.at)))
+            query.append(("before_id", before.id))
+        }
+        return try await call(Routes.history, query: query)
+    }
+
+    /// Starts sent to be kept (at most `PlayHistory.postMax`): how many deadwax took, and how many it skipped.
+    @discardableResult
+    public func recordStarts(_ starts: [Played]) async throws -> HistoryTaken {
+        try await call(Routes.recordHistory, as: HistoryTaken.self, sending: HistoryPost(starts: starts))
+    }
+
     // MARK: the turntable's window (turntable.md 4.5)
 
     /// `/scrub`'s request: `at` and `seconds` (`DeckScrub.ask`) and nothing else.

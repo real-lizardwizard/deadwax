@@ -40,6 +40,19 @@ import Testing
         #expect(p.asked(.full).count + p.asked(.at).count == 0, "nothing saved for a queue merely put back")
     }
 
+    @Test func aQueuePutBackMidSongIsTheListenCarryingOn() { // useResume's take: continuing(kept && position > 0)
+        // deadwax's own record, put back 95 s in: its next start of that entry is no new start (play history)
+        let p = ResumePage(answer: answerOf(["1", "2", "3"], 1, 95, kept: keptOf(["1", "2", "3"], 1, 95)))
+        #expect(p.player.continued.count == 1)
+        let put = p.player.continued.first ?? nil
+        #expect(put?.index == 1 && put?.upNext?.id == p.player.queue.upNext?.id && put?.upNext?.id.isEmpty == false)
+        // put back at its start, or another app's queue (no record of deadwax's): none
+        let atStart = ResumePage(answer: answerOf(["1", "2"], 0, 0, kept: keptOf(["1", "2"], 0, 0)))
+        #expect(atStart.player.continued.count == 1 && atStart.player.continued[0] == nil)
+        let elsewhere = ResumePage(answer: answerOf(["1", "2"], 0, 50, changedBy: "Symfonium"))
+        #expect(elsewhere.player.restored.count == 1 && elsewhere.player.continued.count == 1 && elsewhere.player.continued[0] == nil)
+    }
+
     @Test func thisDevicesOwnQueueBackSaysNothing() {
         let p = ResumePage(answer: answerOf(["1", "2"], 0, 10, kept: keptOf(["1", "2"], 0, 10, device: "phone-device-1")))
         #expect(p.player.restored.count == 1 && p.said.isEmpty)

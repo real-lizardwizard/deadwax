@@ -1,0 +1,398 @@
+import Foundation
+
+// Play history that lasts (app 0.8; the web's 2.1.15, ui/src/lib/playHistory.ts, function by function) - James,
+// 2026-11-13: "I'd like it if the play history was persistent, so you can always look back and see what you played
+// yesterday." In Up Next, Apple Music's way: scrolled up past the song playing, ONE CONTINUOUS LIST of everything
+// played, newest nearest - no headings at all, no times on rows, skips drawn like plays. Kept by deadwax per person
+// (src/routes/play_history.py, /deadwax/me/history), so the phone's plays and the web's show on both.
+// notes/play-history.md, and notes/ios.md "Play history on the phone".
+//
+// A START is one song begun: the moment "now playing" goes (PlayReporter's began, or a join's - a listen's first
+// sound, never a resume, a seek, a wait or a speed's restart), dated by the listen's own `startedAt`, the very `time`
+// its counted play carries. It is recorded with the song as the queue holds it - so a row reads, and plays again, with
+// nothing fetched - and with the queue's id and its entry's key, which is how each start is drawn exactly ONCE:
+//
+//   - while the queue still draws its entry - History (what Previous walks, the songs a tap passed included), the song
+//     playing, or a row still to play - it is the QUEUE's row;
+//   - once its entry has fallen past History's 50, or isn't drawn ahead (Previous back out of Repeat All's next round,
+//     or past the list's first 100 rows), or the queue is another (an album tapped, a queue put back from another
+//     app), it is one of the older rows ABOVE History, in the order they were begun.
+//
+// Above History the older rows run oldest first, so the list read upwards from the song playing goes back in time
+// without a seam; a run of starts of one song (a restart, an hour of Repeat One) is one row, as History's unit is.
+//
+// Pure: no I/O, no clock; built and tested on Linux. Fixtures/history/vectors.json holds every function here to the
+// TypeScript's own answers (ios/scripts/export-history.cjs). The app's HistoryModel and DownloadModel act on it.
+
+/// One start, as deadwax keeps it - GET /deadwax/me/history's `plays`, and what POST takes (src/routes/play_history.py
+/// HistoryStart).
+public struct Played: Sendable, Equatable, Hashable, Codable {
+    /// when the listen began, ms since the epoch, by the phone's clock - the counted play's `time`
+    public let at: Int64
+    /// whether it crossed the rule and counted as a play - kept, not drawn (skips are drawn like plays)
+    public let counted: Bool
+    /// the queue it was begun in (UpNextState.id) and its entry's key there - how the queue's own rows are told
+    public let queue: String?
+    public let entry: Int?
+    /// the song as the queue holds it, without its level (bare())
+    public let song: QueueTrack
+
+    public init(at: Int64, counted: Bool = false, queue: String?, entry: Int?, song: QueueTrack) {
+        self.at = at
+        self.counted = counted
+        self.queue = queue
+        self.entry = entry
+        self.song = bare(song)
+    }
+
+    /// The same start, counted.
+    public var asCounted: Played { Played(at: at, counted: true, queue: queue, entry: entry, song: song) }
+
+    enum CodingKeys: String, CodingKey {
+        case at, counted, queue, entry, song
+    }
+
+    /// Read as deadwax answers it, leniently where it may say less (HistorySong): a song's id is all a start needs.
+    public init(from decoder: any Decoder) throws {
+        let fields = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(at: try fields.decode(Int64.self, forKey: .at),
+                  counted: ((try? fields.decodeIfPresent(Bool.self, forKey: .counted)) ?? nil) ?? false,
+                  queue: (try? fields.decodeIfPresent(String.self, forKey: .queue)) ?? nil,
+                  entry: (try? fields.decodeIfPresent(Int.self, forKey: .entry)) ?? nil,
+                  song: try fields.decode(HistorySong.self, forKey: .song).track)
+    }
+
+    /// Written as the web's POST writes a start: every field, none as null.
+    public func encode(to encoder: any Encoder) throws {
+        var fields = encoder.container(keyedBy: CodingKeys.self)
+        try fields.encode(at, forKey: .at)
+        try fields.encode(counted, forKey: .counted)
+        try fields.encode(queue, forKey: .queue)
+        try fields.encode(entry, forKey: .entry)
+        try fields.encode(HistorySong(song), forKey: .song)
+    }
+}
+
+/// A start's song as deadwax keeps it - the queue's song without its level (bare()), in its twelve names (the server's
+/// HistorySong) - and as the person's store keeps a start not yet sent (`start_pending.song`).
+public struct HistorySong: Sendable, Equatable, Codable {
+    public let track: QueueTrack
+
+    public init(_ track: QueueTrack) {
+        self.track = bare(track)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, artist, album, albumId, coverArt, duration, contentType, suffix, sampleRate, bitDepth, channels
+    }
+
+    /// Leniently: the id is all it needs; anything else left out reads as none ("" for its words, 0 for its numbers).
+    public init(from decoder: any Decoder) throws {
+        let song = try decoder.container(keyedBy: CodingKeys.self)
+        func text(_ key: CodingKeys) -> String { ((try? song.decodeIfPresent(String.self, forKey: key)) ?? nil) ?? "" }
+        func optional(_ key: CodingKeys) -> String? { (try? song.decodeIfPresent(String.self, forKey: key)) ?? nil }
+        func whole(_ key: CodingKeys) -> Int { ((try? song.decodeIfPresent(Int.self, forKey: key)) ?? nil) ?? 0 }
+        track = QueueTrack(
+            id: try song.decode(String.self, forKey: .id), title: text(.title), artist: text(.artist), album: text(.album),
+            albumId: optional(.albumId), coverArt: optional(.coverArt),
+            duration: ((try? song.decodeIfPresent(Double.self, forKey: .duration)) ?? nil) ?? 0,
+            contentType: optional(.contentType), suffix: optional(.suffix), sampleRate: whole(.sampleRate),
+            bitDepth: whole(.bitDepth), channels: whole(.channels))
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var out = encoder.container(keyedBy: CodingKeys.self)
+        try out.encode(track.id, forKey: .id)
+        try out.encode(track.title, forKey: .title)
+        try out.encode(track.artist, forKey: .artist)
+        try out.encode(track.album, forKey: .album)
+        try out.encode(track.albumId, forKey: .albumId)
+        try out.encode(track.coverArt, forKey: .coverArt)
+        try out.encode(track.duration.isFinite ? track.duration : 0, forKey: .duration)
+        try out.encode(track.contentType, forKey: .contentType)
+        try out.encode(track.suffix, forKey: .suffix)
+        try out.encode(track.sampleRate, forKey: .sampleRate)
+        try out.encode(track.bitDepth, forKey: .bitDepth)
+        try out.encode(track.channels, forKey: .channels)
+    }
+}
+
+/// Where a page ends: its last play's moment and song - GET's `next`, the page before it asked for by it.
+public struct HistoryCursor: Sendable, Equatable, Hashable, Codable {
+    public let at: Int64
+    public let id: String
+
+    public init(at: Int64, id: String) {
+        self.at = at
+        self.id = id
+    }
+}
+
+/// A page of them, newest first: `next` the last one's own moment and song, to ask for the page before it with.
+public struct HistoryPage: Sendable, Equatable, Codable {
+    public let plays: [Played]
+    public let next: HistoryCursor?
+    /// logins off: one history for everyone on this deadwax
+    public let shared: Bool
+
+    public init(plays: [Played], next: HistoryCursor?, shared: Bool) {
+        self.plays = plays
+        self.next = next
+        self.shared = shared
+    }
+}
+
+/// What POST /deadwax/me/history sends: the starts, at most PlayHistory.postMax.
+public struct HistoryPost: Sendable, Equatable, Encodable {
+    public let starts: [Played]
+
+    public init(starts: [Played]) {
+        self.starts = starts
+    }
+}
+
+/// What it answers: the starts kept, and those skipped (each validated on its own - one deadwax can't take is skipped,
+/// never the batch's refusal).
+public struct HistoryTaken: Sendable, Equatable, Decodable {
+    public let taken: Int
+    public let skipped: Int
+}
+
+/// One older row of Up Next's list: the first start of a run of one song - its key - and the song.
+public struct PastRow: Sendable, Equatable, Hashable {
+    public let key: String
+    public let track: QueueTrack
+
+    public init(key: String, track: QueueTrack) {
+        self.key = key
+        self.track = track
+    }
+}
+
+/// The entries of a queue whose starts its own rows draw - its id, and shownKeys(): History's, the song playing's, the
+/// songs added and the list's rows drawn (its first `limit`) - never a later time round or a row past the limit, whose
+/// starts are older rows above. None with nothing playing.
+public struct QueueShows: Sendable, Equatable {
+    public let id: String?
+    public let keys: Set<Int>
+
+    public init(id: String?, keys: Set<Int>) {
+        self.id = id
+        self.keys = keys
+    }
+
+    public static let none = QueueShows(id: nil, keys: [])
+}
+
+/// What the history model holds of deadwax's pages: every play they brought, newest first, each once; the cursor of
+/// the page before the oldest (`before` - nil: there is none, or nothing asked yet); and whether a page has come.
+public struct HistoryHeld: Sendable, Equatable {
+    public let plays: [Played]
+    public let before: HistoryCursor?
+    public let asked: Bool
+
+    public init(plays: [Played], before: HistoryCursor?, asked: Bool) {
+        self.plays = plays
+        self.before = before
+        self.asked = asked
+    }
+
+    /// NOTHING_HELD
+    public static let nothing = HistoryHeld(plays: [], before: nil, asked: false)
+}
+
+/// A queue put back mid-song (ResumeController's `continuing`): its next start, if it is of this entry, is the same
+/// listen carrying on.
+public struct Continuation: Sendable, Equatable {
+    public let queue: String
+    public let entry: Int
+
+    public init(queue: String, entry: Int) {
+        self.queue = queue
+        self.entry = entry
+    }
+}
+
+public enum PlayHistory {
+    /// The plays a page asks for - src/play_history.py HISTORY_PAGE.
+    public static let page = 100
+    /// The starts one POST sends at most - HISTORY_POST_MAX.
+    public static let postMax = 500
+    /// The starts this run keeps of its own, sent or not - drawn until a page of deadwax's holds them (OWN_KEPT).
+    public static let ownKept = 500
+    /// How long after the first failed send in a row the outbox tries again, doubling to `retryMaxMs` (RETRY_MS,
+    /// RETRY_MAX_MS).
+    public static let retryMs: Int64 = 30_000
+    public static let retryMaxMs: Int64 = 600_000
+    /// Where the newest page is kept in the person's store (DownloadDatabase's `meta`), for showing recent plays offline.
+    public static let keptPageKey = "history_newest"
+
+    /// A start's key: its moment and its song - deadwax's own (user, started_at, song_id), within one person.
+    public static func key(_ played: Played) -> String { "\(played.at):\(played.song.id)" }
+
+    /// The start of the song playing in `queue`, begun at `at` (the listen's `startedAt`) - the song as the queue holds
+    /// it, without its level, its queue's id and its entry's key with it.
+    public static func startOf(_ track: QueueTrack, at: Int64, queue: UpNextQueue) -> Played {
+        let entry = queue.upNext.flatMap { markAt($0.marks, queue.index)?.key }
+        return Played(at: at, counted: false, queue: queue.upNext?.id, entry: entry, song: track)
+    }
+
+    public static func queueShows(_ queue: UpNextQueue, limit: Int = UpNext.drawn) -> QueueShows {
+        guard let state = queue.upNext, !state.id.isEmpty, queue.current != nil else { return .none }
+        return QueueShows(id: state.id, keys: shownKeys(queue, limit: limit))
+    }
+
+    /// Whether `played` is one of the queue's own rows - begun in this queue, its entry one the queue's rows stand for.
+    /// Such a start is drawn there, never again above.
+    public static func shownByQueue(_ played: Played, _ shows: QueueShows) -> Bool {
+        guard let id = shows.id, let entry = played.entry, let queue = played.queue else { return false }
+        return WebText.same(queue, id) && shows.keys.contains(entry)
+    }
+
+    /// deadwax's pages and this phone's own starts as one list, newest first, each start once - `counted` ORed, since a
+    /// page may hold a start this phone has since seen count. Keys and ids compared as JavaScript compares them, by
+    /// UTF-16 unit (Swift's `==` takes "\u{e9}" for "e\u{301}"; deadwax and the web keep them apart).
+    public static func merged(_ pages: [Played], _ own: [Played]) -> [Played] {
+        var order: [[UInt16]] = []
+        var byKey: [[UInt16]: Played] = [:]
+        for played in pages + own {
+            let key = Array(key(played).utf16)
+            if let held = byKey[key] {
+                if played.counted && !held.counted { byKey[key] = held.asCounted }
+            } else {
+                byKey[key] = played
+                order.append(key)
+            }
+        }
+        return order.compactMap { byKey[$0] }.sorted(by: newerFirst)
+    }
+
+    /// The order deadwax pages in: newer first, and at one moment the greater song id first (UTF-16 units, as
+    /// JavaScript compares strings).
+    static func newerFirst(_ a: Played, _ b: Played) -> Bool {
+        if a.at != b.at { return a.at > b.at }
+        return b.song.id.utf16.lexicographicallyPrecedes(a.song.id.utf16)
+    }
+
+    /// The older rows above History, oldest first: every start (newest first, as `merged` gives them) the queue doesn't
+    /// show itself (`limit` the list's rows Up Next draws), a run of starts of one song one row - keyed by the run's
+    /// first start.
+    public static func pastRows(_ plays: [Played], queue: UpNextQueue, limit: Int = UpNext.drawn) -> [PastRow] {
+        let shows = queueShows(queue, limit: limit)
+        var rows: [PastRow] = []
+        var last: String?
+        for played in plays.reversed() {
+            if shownByQueue(played, shows) { continue }
+            if let last, WebText.same(played.song.id, last) { continue }
+            last = played.song.id
+            rows.append(PastRow(key: key(played), track: played.song))
+        }
+        return rows
+    }
+
+    /// Whether `a` comes after `b` in deadwax's order - its moment, then its song id (the page's ORDER BY).
+    static func after(_ a: Played, _ b: Played) -> Bool {
+        a.at > b.at || (a.at == b.at && b.song.id.utf16.lexicographicallyPrecedes(a.song.id.utf16))
+    }
+
+    /// The newest page come (Up Next opened, or the app back at the front with it open): joined to what is held - the
+    /// older pages kept, and where to ask from for them - unless it doesn't reach back to the newest held (more played
+    /// elsewhere since than a page holds), when it starts again from it, the plays between never left out. Nothing
+    /// held yet - not asked, or an empty page came first - and this page is all there is.
+    public static func withNewest(_ held: HistoryHeld, _ page: HistoryPage) -> HistoryHeld {
+        let oldest = page.plays.last
+        if !held.asked || held.plays.isEmpty
+            || (page.next != nil && oldest != nil && after(oldest!, held.plays[0])) {
+            return HistoryHeld(plays: page.plays, before: page.next, asked: true)
+        }
+        return HistoryHeld(plays: merged(page.plays, held.plays), before: page.next == nil ? nil : held.before, asked: true)
+    }
+
+    /// The page before the oldest held come, asked for from `from`: added below - unless what is held has moved on since
+    /// (the newest page started again), when it is the same `held`.
+    public static func withOlder(_ held: HistoryHeld, from: HistoryCursor, _ page: HistoryPage) -> HistoryHeld {
+        guard let before = held.before, before.at == from.at, WebText.same(before.id, from.id) else { return held }
+        return HistoryHeld(plays: merged(held.plays, page.plays), before: page.next, asked: true)
+    }
+
+    /// A start's `counted` set, when it is the one a counted play names (the play's song and `time`).
+    public static func countedIn(_ own: [Played], songID: String, at: Int64) -> [Played] {
+        guard own.contains(where: { WebText.same($0.song.id, songID) && $0.at == at && !$0.counted }) else { return own }
+        return own.map { WebText.same($0.song.id, songID) && $0.at == at ? $0.asCounted : $0 }
+    }
+
+    /// What a failed send means for the starts it carried (afterFailure): `.retry` - deadwax unreachable (nil), a 5xx, a
+    /// 408 or a 429, asked again later; or a 401, signed out, until a sign-in - or `.drop`, another 4xx: they will never
+    /// be taken.
+    public enum Failure: String, Sendable, Equatable {
+        case retry, drop
+    }
+
+    public static func afterFailure(_ status: Int?) -> Failure {
+        guard let status, (400..<500).contains(status), ![401, 408, 429].contains(status) else { return .retry }
+        return .drop
+    }
+
+    /// A send's answer, for the phone's outbox (PendingPlays.After's four): taken; held (a 401: kept, sent after the
+    /// same person signs in again); dropped (another 4xx); stopped (no answer, a 5xx, a 408 or a 429: kept, tried again
+    /// after `retryAfter`, and at the next start).
+    public static func after(status: Int?) -> PendingPlays.After {
+        guard let status else { return .stopped }
+        if (200..<300).contains(status) { return .sent }
+        if status == 401 { return .held }
+        return afterFailure(status) == .drop ? .dropped : .stopped
+    }
+
+    /// How long after the `failures`-th failed send in a row the outbox tries again, in ms: 30 s doubling - 30 s, 1 min,
+    /// 2, 4, 8 - to 10 min, so a deadwax without its database isn't sent the same starts every 30 s for ever.
+    public static func retryAfter(_ failures: Int) -> Int64 {
+        let doublings = max(0, min(failures - 1, 20))
+        return min(retryMaxMs, retryMs * (Int64(1) << Int64(doublings)))
+    }
+}
+
+/// This phone's own starts as the app keeps them in memory (player/historyOutbox.ts's `own` and `continuation`; the
+/// starts not yet taken are the person's store's `start_pending`, DownloadDatabase): the newest `PlayHistory.ownKept`,
+/// sent or not - drawn until a page of deadwax's holds them - and the continuation a queue put back set.
+public struct HistoryOutbox: Sendable, Equatable {
+    /// This run's starts, newest first.
+    public private(set) var own: [Played] = []
+    public private(set) var continuation: Continuation?
+
+    public init() {}
+
+    /// A song begun: kept - unless it is the continuation's (the same queue's same entry, put back mid-song), which is
+    /// the listen carrying on. Any start ends the continuation. False when it wasn't one to keep (nor to send).
+    public mutating func record(_ played: Played) -> Bool {
+        let went = continuation
+        continuation = nil
+        if let went, let queue = played.queue, WebText.same(queue, went.queue), played.entry == went.entry { return false }
+        own = Array(([played] + own).prefix(PlayHistory.ownKept))
+        return true
+    }
+
+    /// A counted play: `counted` set on its start (the play's song and its listen's start). True when it changed one.
+    @discardableResult
+    public mutating func counted(songID: String, at: Int64) -> Bool {
+        let next = PlayHistory.countedIn(own, songID: songID, at: at)
+        guard next != own else { return false }
+        own = next
+        return true
+    }
+
+    /// A queue of deadwax's own put back paused mid-song: its next start, if it is of the song put back, is the same
+    /// listen carrying on. Nil - any other queue put back - ends one.
+    public mutating func continuing(_ queue: UpNextQueue?) {
+        guard let queue, let state = queue.upNext, let mark = markAt(state.marks, queue.index) else {
+            continuation = nil
+            return
+        }
+        continuation = Continuation(queue: state.id, entry: mark.key)
+    }
+
+    /// Everything forgotten (another person).
+    public mutating func forget() {
+        own = []
+        continuation = nil
+    }
+}

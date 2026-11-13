@@ -144,8 +144,8 @@ def test_a_setting_in_an_xcconfig(tmp_path):
     assert helper.setting(path, "DEVELOPMENT_TEAM") == ""
     real = str(SCRIPTS.parent / "Config" / "Base.xcconfig")
     assert helper.setting(real, "PRODUCT_BUNDLE_IDENTIFIER") == "net.lizardlounge.deadwax"
-    assert helper.setting(real, "MARKETING_VERSION") == "0.7"
-    assert helper.setting(real, "CURRENT_PROJECT_VERSION") == "7"
+    assert helper.setting(real, "MARKETING_VERSION") == "0.8"
+    assert helper.setting(real, "CURRENT_PROJECT_VERSION") == "8"
 
 
 # ----------------------------------------------------------------- the project files

@@ -150,8 +150,14 @@ public func upNextLabel(shuffle: Bool, repeat mode: Repeat) -> String {
 public enum UpNextWords {
     public static let title = "Up Next"
     public static let playingNext = "Playing Next"
-    /// History's heading (2.1.3)
+    /// History's heading (2.1.3) - no longer drawn since play history (app 0.8: one list with no headings); it names
+    /// the played rows' region for VoiceOver, as the web's section's label
     public static let history = "History"
+    /// (app 0.8) LOADING_EARLIER: while an older page of the songs played is on its way, at the list's top
+    public static let loadingEarlier = "Loading earlier songs"
+    /// EARLIER_FAILED: what didn't work when a page of them didn't come - said through ErrorWords, with Try again
+    public static let earlierFailed = "Couldn't load the songs you played before."
+    public static let tryAgain = "Try again"
     public static let clear = "Clear"
     public static let modesGroup = "Shuffle and repeat"
     /// REPEATING_ONE, under the song playing with Repeat One on

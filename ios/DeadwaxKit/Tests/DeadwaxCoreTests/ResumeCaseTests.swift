@@ -96,7 +96,8 @@ import Testing
                 tracks[at].title += String(repeating: try #require(pad["unit"]?.string), count: try #require(pad["count"]?.int))
                     + String(repeating: "x", count: try #require(pad["tail"]?.int))
             }
-            let queue = startUpNext(tracks, start: try #require(recipe["start"]?.int)).at(try #require(recipe["index"]?.int))
+            let queue = startUpNext(tracks, start: try #require(recipe["start"]?.int), id: try #require(recipe["id"]?.string))
+                .at(try #require(recipe["index"]?.int))
             let saving = toSave(queue, position: try #require(recipe["position"]?.double))
             let wanted = try #require(item["saving"])
             #expect(saving.ids.count == wanted["count"]?.int, "\(label)")
@@ -111,13 +112,23 @@ import Testing
     @Test func snapshotsReadAsTheWebReadsThem() throws {
         let loaded = try Self.load()
         let cases = loaded.cases["fromSnapshot", default: []]
-        #expect(cases.count == 188)
+        #expect(cases.count == 225)
         var nils = 0
+        var fresh = 0
+        var held = 0
         for item in cases {
             let label = item["label"]?.string ?? "?"
             let tracks = try #require(loaded.songs.tracks(item["tracks"]), "\(label): tracks")
+            //? (2.1.15) the queue the player holds, when the case has one
+            var holding: UpNextQueue?
+            if let record = item["holding"] {
+                holding = try #require(loaded.songs.queue(record), "\(label): the queue held doesn't rebuild")
+                held += 1
+            }
             let back = fromSnapshot(item["snapshot"]?.string, tracks: tracks, index: try #require(item["index"]?.int),
-                                    setting: try Self.setting(item["setting"]))
+                                    setting: try Self.setting(item["setting"]), holding: holding,
+                                    newId: { ResumeSongs.freshId })
+            if item["result"]?["upNext"]?["id"] == .null { fresh += 1 }
             let wanted: UpNextQueue?
             if item["result"] == .null {
                 wanted = nil
@@ -129,7 +140,20 @@ import Testing
             let difference = queueDifference(back, wanted)
             #expect(difference == nil, "\(label): \(difference ?? "")")
         }
-        #expect(nils == 69)
+        #expect(nils == 70 && fresh == 36 && held == 16)
+    }
+
+    /// (2.1.15) Whether a queue read back without an id is the queue held: the web's sameQueue, case by case.
+    @Test func whetherItIsTheQueueHeld() throws {
+        let loaded = try Self.load()
+        let cases = loaded.cases["sameQueue", default: []]
+        #expect(cases.count == 12)
+        for item in cases {
+            let label = item["label"]?.string ?? "?"
+            let held = try #require(loaded.songs.queue(item["held"]), "\(label): held")
+            let put = try #require(loaded.songs.queue(item["put"]), "\(label): put")
+            #expect(sameQueue(held, put) == item["result"]?.bool, "\(label)")
+        }
     }
 
     @Test func levelsOfASnapshotThatDoesntReadWhole() throws {
@@ -156,11 +180,13 @@ import Testing
     @Test func whatIsPutBack() throws {
         let loaded = try Self.load()
         let cases = loaded.cases["resumed", default: []]
-        #expect(cases.count == 51)
+        #expect(cases.count == 56)
         for item in cases {
             let label = item["label"]?.string ?? "?"
             let answer = try JSONDecoder().decode(QueueAnswer.self, from: Data(try #require(item["answer"]?.string).utf8))
-            let back = resumed(answer, setting: try Self.setting(item["setting"]), device: try #require(item["device"]?.string))
+            let holding = try item["holding"].map { try #require(loaded.songs.queue($0), "\(label): the queue held") }
+            let back = resumed(answer, setting: try Self.setting(item["setting"]), device: try #require(item["device"]?.string),
+                               holding: holding, newId: { ResumeSongs.freshId })
             guard let wanted = item["result"], wanted != .null else {
                 #expect(back == nil, "\(label)")
                 continue

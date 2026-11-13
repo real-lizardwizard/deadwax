@@ -81,6 +81,13 @@ public enum Routes {
     /// An album's CD art for one disc: `disc<N>.*`, then `disc.*`, in the album's folder; a 404 when it has none.
     public static let discArt = Endpoint(method: "GET", path: "/deadwax/library/disc_art/navidrome", query: ["album", "disc"])
 
+    // app 0.8's: play history (server 2.1.14, notes/play-history.md)
+    /// The person's plays, newest first - a page of `limit` (`PlayHistory.page`), before the cursor of the last page's
+    /// last (`before_at`, `before_id`) when asked for an older one (`HistoryPage`).
+    public static let history = Endpoint(method: "GET", path: "/deadwax/me/history", query: ["limit", "before_at", "before_id"])
+    /// Songs started, kept for the person: a batch of at most `PlayHistory.postMax` (`HistoryPost`) -> `HistoryTaken`.
+    public static let recordHistory = Endpoint(method: "POST", path: "/deadwax/me/history", query: [])
+
     /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
     public static var warmLevels: Endpoint { levelAlbum }
 
@@ -94,6 +101,7 @@ public enum Routes {
         lyrics,
         autoEqSearch, autoEqProfile,
         scrub, discArt,
+        history, recordHistory,
     ]
 
     /// The routes given longer than the transport's own 8 seconds to answer, in seconds: the album index reads every

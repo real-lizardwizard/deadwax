@@ -76,6 +76,8 @@ final class DownloadModel {
     private(set) var isOpen = false
     /// Plays made while deadwax couldn't be reached, waiting to be sent.
     private(set) var playsWaiting = 0
+    /// (app 0.8) Songs begun that deadwax hasn't taken into the person's play history yet.
+    private(set) var startsWaiting = 0
 
     // Debug's (6.9)
     /// The last 50 download events, newest last.
@@ -123,6 +125,12 @@ final class DownloadModel {
     @ObservationIgnored private var verifying: String?
     @ObservationIgnored private var verifyStop = StopFlag()
     @ObservationIgnored private var sendingPlays = false
+    /// A send asked for while one was on its way: made again once it ends (a start recorded meanwhile goes then).
+    @ObservationIgnored private var sendAgain = false
+    /// Sends of starts that stopped in a row (no answer, a 5xx, a 408, a 429), and the try after the last: 30 s
+    /// doubling to 10 min (PlayHistory.retryAfter).
+    @ObservationIgnored private var startFailures = 0
+    @ObservationIgnored private var startsRetry: DispatchWorkItem?
     @ObservationIgnored private var launchedFor: Set<String> = []
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
     /// A download was answered 401 under this session (nil inside: no session): nothing more is fetched under it for a
@@ -437,17 +445,68 @@ final class DownloadModel {
         note("play kept: \(songID)")
     }
 
-    /// The plays kept sent, oldest first, one at a time: each forgotten on a 200; a 401 holds them; another 4xx drops
-    /// that one; a 5xx or no answer stops until the next time deadwax answers.
+    /// The starts and plays kept sent - the starts first (app 0.8), so a play's count finds its start at deadwax:
+    ///
+    ///  - the starts in batches of at most PlayHistory.postMax, oldest first, each batch forgotten once deadwax took it
+    ///    (it skips any one it can't take, never the batch) or refused it with another 4xx; a 401 holds everything for
+    ///    the next sign-in; no answer, a 5xx, a 408 or a 429 stops them until 30 s on - doubling to 10 min while it
+    ///    keeps failing - or the next start, whichever is first (the plays still go);
+    ///  - then the plays, one at a time: each forgotten on a 200; a 401 holds them; another 4xx drops that one; a 5xx
+    ///    or no answer stops until the next time deadwax answers.
+    ///
+    /// One send at a time: one asked for meanwhile is made once it ends.
     func sendKeptPlays() {
-        guard !sendingPlays, reachability.online, server.launch == .ready, server.signInOver == nil,
+        guard !sendingPlays else {
+            sendAgain = true
+            return
+        }
+        guard reachability.online, server.launch == .ready, server.signInOver == nil,
               let store, let client = server.client else { return }
         sendingPlays = true
+        sendAgain = false
         Task {
             defer {
                 sendingPlays = false
-                // the count is the open store's: someone else signed in meanwhile has their own
-                if self.store === store { playsWaiting = (try? store.database.keptPlays().count) ?? 0 }
+                // the counts are the open store's: someone else signed in meanwhile has their own
+                if self.store === store {
+                    playsWaiting = (try? store.database.keptPlays().count) ?? 0
+                    startsWaiting = (try? store.database.keptStartCount()) ?? 0
+                }
+                if sendAgain {
+                    sendAgain = false
+                    sendKeptPlays()
+                }
+            }
+            starts: while self.store === store {
+                let batch = (try? store.database.keptStarts(limit: PlayHistory.postMax)) ?? []
+                if batch.isEmpty { break }
+                var status: Int?
+                do {
+                    try await client.recordStarts(batch.map(\.played))
+                    status = 200
+                } catch let failure as APIFailure {
+                    status = failure.answer?.status
+                } catch {
+                    status = nil
+                }
+                guard self.store === store else { return }
+                switch PlayHistory.after(status: status) {
+                case .sent, .dropped:
+                    startFailures = 0
+                    //? (a store that can't forget them stops here, rather than send them again and again)
+                    guard (try? store.database.forgetStarts(batch.map(\.id))) != nil else { break starts }
+                    //? the log is the downloads' 50 lines: a start sent as it is made isn't news, a backlog or a refusal is
+                    if status != 200 { note("starts refused (\(status ?? 0)): \(batch.count) let go") }
+                    else if batch.count > 1 { note("starts sent: \(batch.count)") }
+                case .held:
+                    return
+                case .stopped:
+                    startFailures += 1
+                    let wait = PlayHistory.retryAfter(startFailures)
+                    note("starts not sent (\(status.map(String.init) ?? "no answer")): again in \(wait / 1000) s")
+                    retryStarts(after: wait)
+                    break starts
+                }
             }
             for play in (try? store.database.keptPlays()) ?? [] {
                 guard self.store === store else { return }
@@ -468,6 +527,47 @@ final class DownloadModel {
                 }
             }
         }
+    }
+
+    /// The next send of the starts, `ms` from now (a start recorded before then sends at once).
+    private func retryStarts(after ms: Int64) {
+        startsRetry?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated { self?.sendKeptPlays() }
+        }
+        startsRetry = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(Int(ms)), execute: work)
+    }
+
+    // MARK: play history's starts (app 0.8)
+
+    /// A song begun, kept until deadwax takes it - and sent now, if it can be. Nothing when no one's store is open.
+    func keepStart(_ played: Played) {
+        guard let store, (try? store.database.keepStart(played)) != nil else { return }
+        startsWaiting += 1
+        sendKeptPlays()
+    }
+
+    /// A play counted: its start, if it is still waiting, sent counted.
+    func countStart(songID: String, at: Int64) {
+        try? store?.database.countStart(songID: songID, at: at)
+    }
+
+    /// The starts waiting to be sent, oldest first - drawn in Up Next before deadwax has them.
+    func keptStarts() -> [Played] {
+        ((try? store?.database.keptStarts()) ?? []).map(\.played)
+    }
+
+    /// The newest page of the person's play history kept on this phone (`meta`), for Up Next with deadwax out of reach.
+    func keptHistoryPage() -> HistoryPage? {
+        guard let text = (try? store?.database.meta(PlayHistory.keptPageKey)) ?? nil else { return nil }
+        return try? JSONDecoder().decode(HistoryPage.self, from: Data(text.utf8))
+    }
+
+    /// The newest page come, kept in place of the last.
+    func keepHistoryPage(_ page: HistoryPage) {
+        guard let store, let data = try? JSONEncoder().encode(page) else { return }
+        try? store.database.setMeta(PlayHistory.keptPageKey, String(decoding: data, as: UTF8.self))
     }
 
     // MARK: the queue kept (7.5, 7.6)
@@ -584,6 +684,10 @@ final class DownloadModel {
         bytesHere = 0
         otherBytes = 0
         playsWaiting = 0
+        startsWaiting = 0
+        startFailures = 0
+        startsRetry?.cancel()
+        startsRetry = nil
         forceQuitAt = nil
         playable.set([:])
         KeptCovers.shared.set([:])
@@ -1238,6 +1342,8 @@ final class DownloadModel {
         if at != forceQuitAt { forceQuitAt = at }
         let plays = (try? store.database.keptPlays().count) ?? 0
         if plays != playsWaiting { playsWaiting = plays }
+        let starts = (try? store.database.keptStartCount()) ?? 0
+        if starts != startsWaiting { startsWaiting = starts }
     }
 
     // MARK: helpers

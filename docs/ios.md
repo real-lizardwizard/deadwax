@@ -1,4 +1,4 @@
-# The iPhone app (early: app 0.7, downloads, lyrics, the EQ and the turntable)
+# The iPhone app (early: app 0.8, downloads, lyrics, the EQ, the turntable and play history)
 
 deadwax is getting a native iPhone app, built with SwiftUI and its own audio engine, for what a web
 page can't do well: seamless joins and normalization done on the phone, downloads to play offline,
@@ -14,16 +14,19 @@ output on its own - your headphones, the speaker, the car - and switching by its
 changes, a correction for your headphones from AutoEq's measurements, and - under Advanced - filters
 and a preamp of your own and Equalizer APO files in and out (see [EQ](#eq)). App 0.6 added the
 turntable: Now Playing's second look, as the web app has it - a record you can turn by hand and hear
-as you turn it, with the album's CD art on its face (see [The turntable](#the-turntable)). **This is
-app 0.7, which adds the turntable's speed fader**: the song faster or slower, its pitch moving with
-it, as a record deck's does - and at 1x the song exactly as it is (see [The
-speed](#the-speed)). Playlists, Search and the rest come in the next phases (see [What it can't do
+as you turn it, with the album's CD art on its face (see [The turntable](#the-turntable)). App 0.7
+added the turntable's speed fader: the song faster or slower, its pitch moving with it, as a record
+deck's does - and at 1x the song exactly as it is (see [The speed](#the-speed)). **This is app 0.8,
+which adds play history**: scroll up in Up Next, past the song playing, and it goes on back through
+every song you've played - on the phone and in the web app, one list, as the web app's Up Next has it
+- and the phone's own plays now go into the web app's too (see [Up Next](#up-next) and [What you've
+played](#what-youve-played)). Playlists, Search and the rest come in the next phases (see [What it can't do
 yet](#what-it-cant-do-yet)).
 
-**Nothing of Phase 2, the lyrics, the EQ or the turntable has been seen on an iPhone yet.** It's
-built and tested on a Mac, and what only a phone can tell is what [the checks](#the-checks) are for.
-Until they're answered, read everything about downloads, lyrics, the EQ and the turntable below as
-what the app is built to do.
+**Nothing of Phase 2, the lyrics, the EQ, the turntable or play history has been seen on an iPhone
+yet.** It's built and tested on a Mac, and what only a phone can tell is what [the checks](#the-checks)
+are for. Until they're answered, read everything about downloads, lyrics, the EQ, the turntable and play
+history below as what the app is built to do.
 
 The app talks only to deadwax, never to Navidrome, through deadwax's own routes, so the phone never
 needs the Navidrome account deadwax itself uses. With logins on, you sign in with your own Navidrome
@@ -128,7 +131,7 @@ old one. It also uses up one of the few new app ids a free account may register 
 It pulls the latest code, asks GitHub whether the app's checks passed on it (and asks you before
 building one that failed or is still running), builds it (Release), and installs it **over** the app
 on the phone, so everything on the phone stays. Then it opens the app and says how long the new
-install runs: `Installed deadwax 0.7 (7), runs until Wed 18 Nov, 14:02`. It also says how long it
+install runs: `Installed deadwax 0.8 (8), runs until Wed 18 Nov, 14:02`. It also says how long it
 took and the Mac's free space before and after. Xcode doesn't need to be open.
 
 | option | what it does |
@@ -401,19 +404,25 @@ the songs you've already added, still ahead of the rest of the album. A line abo
 says which ("Playing next: Roads", "Added to Up Next: Dummy") for 5 seconds. With nothing playing,
 either just plays it.
 
-**Up Next** on Now Playing opens what plays after the song playing - and, above it, what has already
-played:
+**Up Next** on Now Playing opens what plays after the song playing - and, above it, what you've
+already played:
 
-- **History**, above the song playing: what has played since you started the album, list or shuffle -
-  songs a tap skipped past included, where they are on the album - oldest at the top. Up Next opens at
-  the song playing, even with only a song or two left after it; scroll up for History. A song Repeat One
-  played again is one row; Repeat All's earlier times round are there as they played. It goes back 50
-  plays (as many as come back when you pick the queue up on another device) - each time Repeat One
-  played a song counts as one - and starts again when you play something new. **Tap one** to hear it
-  again now ("play again", VoiceOver calls it, and says "Playing" and its title once it starts): Playing
-  Next and the album carry on after it as they were, the song that was playing joins History, and the
-  list stays where it is under your finger. VoiceOver reads History under its own heading, then the song
-  playing's title as one.
+- **What you've played**, above the song playing (app 0.8, as the web app's Up Next since deadwax
+  2.1.15): one list, the newest nearest the song playing, with no headings, dates or times - scroll up
+  and it keeps going, back through every song you've started, on the phone and in the web app. Up Next
+  opens at the song playing, even with only a song or two left after it; scroll up for the rest.
+  Nearest the song playing is what has played since you started the album, list or shuffle - songs a
+  tap skipped past included, where they are on the album; above that, everything you played before it,
+  in the order you played it. A song Repeat One played again, or that you started again, is one row;
+  Repeat All's earlier times round are there as they played. A song you skipped after a second is there
+  like any other. As you scroll near the top the next older songs come, a spinner over the top of the
+  list while they do (VoiceOver: "Loading earlier songs") - and nothing you're looking at moves when
+  they land. If they can't come, the top of the list says "Couldn't load the songs you played before.",
+  with **Try again**. **Tap any of them** to hear it again now ("play again", VoiceOver calls it, and
+  says "Playing" and its title once it starts): Playing Next and the album carry on after it as they
+  were, the song that was playing joins the list, and the list stays where it is under your finger.
+  VoiceOver reads the songs as one list with no heading, then the song playing's title as a heading.
+  What goes in it, and where it's kept: [What you've played](#what-youve-played).
 - **The song playing**, where Up Next opens - and with Repeat One on, "Repeat one: this song plays again
   until you skip it." Under it, **Shuffle** and **Repeat**, the same settings as on Now Playing.
 - **Playing Next**: the songs you've added, in the order they'll play, with **Clear** to take them all
@@ -433,7 +442,7 @@ played:
   **Clear** takes only the songs under Playing Next.
 - **Edit** gives each row a handle to drag it by and a red minus button that takes it out at once,
   one tap a song. A song moves within its own group (Playing Next, or the album's), and each change is
-  made as you make it. History isn't shown while you edit. **Done** ends Edit. Outside Edit, a row can't be swiped away, so a song isn't
+  made as you make it. What you've played isn't shown while you edit. **Done** ends Edit. Outside Edit, a row can't be swiped away, so a song isn't
   lost by accident. Inside Edit iOS has no swipe-to-delete, so the minus takes a song out with one
   tap - and there's no undo, so a quick double tap takes out the song that moves up under your finger
   too. With VoiceOver, each row's actions have Move up, Move down and Remove; with Voice Control, say
@@ -562,7 +571,7 @@ album.
   If deadwax can't be reached, it says "Couldn't reach deadwax, so you're still signed in - try
   again." Changing your password is the web app's, for now.
 - **About**: deadwax's version, whether logins are on (for an admin), and the app's own version,
-  **0.7 (7)**.
+  **0.8 (8)**.
 - **This phone**: deadwax's address, **Change address**, and **Debug**, for an admin (with logins
   off, everyone is one).
 
@@ -678,7 +687,9 @@ Debug is where Phase 0's test screen lives now:
   songs are in each state (wanted, fetching, done, failed) and their bytes; the background downloads
   iOS holds (running, waiting, and how many can carry on from where they stopped); whether deadwax can
   be reached, the phone's network (Wi-Fi, cellular, expensive, constrained) and the last check of
-  deadwax; plays waiting to be sent; how long the sound checks took; and the last 50 download events.
+  deadwax; plays waiting to be sent, and songs started that deadwax hasn't taken into your play history
+  yet (**Starts waiting to be sent**); how long the sound checks took; and the last 50 download events
+  (a backlog of starts sent, or one deadwax refused or couldn't take, is one of them).
 - **Library**: how many albums each list had, whether it came new or the kept one still stood, and
   how long it took to come.
 - At the bottom, how long this install runs. In its last two days, it also says to run install.sh
@@ -1000,6 +1011,35 @@ Navidrome passes plays on to Last.fm or ListenBrainz if it's linked to them, and
 playing now. A play that can't be sent - deadwax out of reach - is kept on the phone with its time and
 sent once deadwax answers again (see [The first time you open it](#the-first-time-you-open-it)).
 
+## What you've played
+
+Every song that starts playing on the phone goes into your play history on deadwax - the one Up Next
+scrolls back through, here and in the web app (see [Up Next](#up-next)). It goes in at the song's first
+sound, the moment Navidrome is told "now playing", skips included:
+
+- **Not a new song**: pausing and playing again, seeking (the arm or the record on the turntable too),
+  a wait for the network, a song tried again from where it stopped, or a change of
+  [speed](#the-speed). The next song, Previous, Repeat One playing a song again and a tap in Up Next
+  are each a new one - though a song started again straight after itself shows as one row.
+- **Picked up where you left off**: a queue put back paused in the middle of a song carries on that
+  song's play - it was already in the list when it began, on whichever device began it - so it isn't
+  added again. Put back at a song's start, it's a new one.
+- **Offline**: a song started with deadwax out of reach shows in Up Next at once, and is kept on the
+  phone (in your own downloads' store, so closing the app doesn't lose it) until deadwax answers - then
+  sent, oldest first, before the [plays](#plays) waiting with it, up to 500 at a time. A week away is
+  sent in one go of several batches. If deadwax answers but can't take them just then, the phone tries
+  again 30 seconds on, then a minute, two, and so on up to every 10 minutes, and at the next song.
+  Signed out, they wait for you to sign in again as the same person; they're never sent for anyone
+  else.
+- **The newest 100** are also kept on the phone each time they come, so Up Next shows what you played
+  lately with deadwax out of reach. Older ones need deadwax.
+- **Kept by deadwax, for ever** - with logins on, each person's own; with logins off, one list for
+  everyone who uses this deadwax. There's no Clear, here or in the web app. Removing someone in People,
+  or Forget, takes theirs with the rest of what deadwax kept for them.
+
+Up Next asks deadwax for the newest songs each time it opens, and again when you come back to the app
+with it open, so what you played in the web app meanwhile shows.
+
 ## Picking up where you left off
 
 The app saves what you're playing in Navidrome, as the web app does: the queue (up to 2,000 songs, 50
@@ -1109,7 +1149,11 @@ answering, **Try again**. It goes by itself once deadwax answers.
   [Picking up where you left off](#picking-up-where-you-left-off)).
 - **Lyrics**: a downloaded song's are on the phone and show as online. For a song with none kept,
   **Lyrics** is dimmed: "Lyrics - not on this phone" (see [Lyrics](#lyrics)).
-- Plays are kept and sent later; downloads waiting carry on once the phone, or deadwax, is back.
+- **Up Next** still shows what you've played: the newest 100 the phone kept, and every song started
+  since, here at once (see [What you've played](#what-youve-played)). Scrolling further up asks deadwax
+  for more, and says it couldn't.
+- Plays, and the songs you started, are kept and sent later; downloads waiting carry on once the phone,
+  or deadwax, is back.
 
 ## The checks
 
@@ -1134,9 +1178,9 @@ Phase 1 exists to answer these on the phone. Note what you see for each.
 5. **Up Next.** While an album plays: Play Next a song and Play Last another, then open Up Next. Are
    they under Playing Next, in that order? Edit: drag one, take one out with its red minus button
    (one tap), Done. Clear. Shuffle on and off: the song playing goes on untouched. Repeat One plays the
-   song again; Repeat All starts the album again after its last song. Then **History**: play an album
-   from song 5, tap song 8 in Up Next, and press Previous three times - 7, 6, 5. Scroll up: History has
-   the songs played. Tap one: it plays again, the row stays under your finger, and Up Next carries on as
+   song again; Repeat All starts the album again after its last song. Then **what you've played**: play
+   an album from song 5, tap song 8 in Up Next, and press Previous three times - 7, 6, 5. Scroll up: the
+   songs played are there. Tap one: it plays again, the row stays under your finger, and Up Next carries on as
    it was.
 6. **Picking up, both ways.** Play an album on the phone, pause it, and close the app (swipe it away).
    Open the web app on the Mac: the same queue, song and second, paused. Then play something else on
@@ -1534,6 +1578,48 @@ check says; the numbers carry on from the turntable's.
 - **38 The largest text.** At an accessibility text size: the readout's words stay inside its corner,
   and a long press on it shows `1.25x` large. On the cover, off 1x, there's no chip: the **•••**
   menu's first line is "Speed 1.25x - back to normal speed", and it goes back to 1x.
+
+### Play history's checks (app 0.8)
+
+These come with the build that adds [what you've played](#what-youve-played). Earbuds or the speaker;
+the numbers carry on from the speed's. The web app is deadwax's own page (`/player/`) in Safari or on
+the Mac, signed in as you.
+
+- **39 One list.** Play a few songs on the phone, skipping one after a second or two. Open Up Next and
+  scroll up past the song playing: every song you started, the skipped one too, newest nearest the
+  song playing, with no headings, dates or times - and nothing twice. Open the web app's Up Next: the
+  same songs, in the same order.
+- **40 Both ways.** Play two songs in the web app, then open Up Next on the phone: they're there,
+  above what the phone played before them. With Up Next open on the phone, play a song in the web app,
+  go to the Home Screen and back: it comes in.
+- **41 Further back.** With more than a hundred songs played, scroll up slowly to the top: a spinner
+  over the top of the list, then the older songs above - and the row you were looking at stays where it
+  was, with no jump. Keep going: page after page, until the oldest.
+- **42 Play one again.** Tap a song far up the list: it plays now, the row stays under your finger,
+  and Up Next goes on after it as it was. With VoiceOver: the row says "…, play again", a double tap
+  says "Playing …", and the focus stays on the row.
+- **43 Not new songs.** Up Next draws a song started again straight after itself as one row, so this
+  one is counted in Debug. Turn on Airplane Mode and play a downloaded album, with You > Debug >
+  Downloads' **Starts waiting to be sent** a look away: it goes up by one as each song starts. While
+  one plays: pause and play, drag the arm on the turntable, take hold of the record and let go, move
+  the speed fader off 1x and back, and lock the phone for a minute - the count doesn't move. Next: up
+  by one. Airplane Mode off: it goes to 0.
+- **44 Picked up.** Play a downloaded album, pause it in the middle of a song, and close the app (swipe
+  it away). Turn on Airplane Mode and open it: the song is back, paused. Note **Starts waiting to be
+  sent**, press play, look again: the same - the song carries on its play rather than starting a new
+  one. Next: up by one. Airplane Mode off afterwards.
+- **45 Offline.** Turn on Airplane Mode and play three downloaded songs: each shows in Up Next as it
+  starts, and You > Debug > Downloads counts them under **Starts waiting to be sent**. Close the app
+  (swipe it away), open it again still offline: Up Next still has them, and what you played before
+  (the newest 100). Turn Airplane Mode off: the count goes to 0, and the web app's Up Next has the
+  three, in order, before the plays they made counted in Navidrome.
+- **46 A long time away.** Days offline with the phone, playing as you do: back in reach, every song
+  arrives in the web app's Up Next (Debug's events say "starts sent" with how many).
+- **47 Can't load.** Scroll up to the top with WireGuard off on mobile data (and nothing much kept):
+  "Couldn't load the songs you played before." at the top, with **Try again**; WireGuard on, Try again:
+  the older songs come, and the line goes.
+- **48 Someone else.** With logins on, sign out and sign in as someone else: none of the first
+  person's songs in Up Next, nor sent as theirs.
 
 ## What it can't do yet
 

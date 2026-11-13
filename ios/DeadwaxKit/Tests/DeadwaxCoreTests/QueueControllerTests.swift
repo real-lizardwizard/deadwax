@@ -633,6 +633,64 @@ private extension QueueController {
     }
 }
 
+/// (app 0.8) An older row's tap - a song played before, above History: playAgain, the web's Play Next then a jump to
+/// the key it was given, as one edit.
+@Suite struct QueueControllerPlayAgainTests {
+    @Test func aSongPlayedBeforePlaysNowAfterTheSongPlaying() {
+        let (player, engine) = rig()
+        player.playTracks(simAlbum(3), start: 0)
+        engine.seconds = 30
+        #expect(player.playAgain(simTrack("x")))
+        #expect(player.queue.current?.id == "x" && player.queue.ids == ["1", "x", "2", "3"] && player.from(at: 1) == .added)
+        #expect(engine.ids == player.queue.ids && engine.current == "x" && engine.log.suffix(3) == ["replaced", "skip 1", "resume"])
+        // the song it left is History's, and the album carries on after it
+        #expect(player.view.history.map(\.track.id) == ["1"] && player.after == ["2", "3"])
+        player.previous()
+        #expect(player.queue.current?.id == "1")
+    }
+
+    @Test func itKeepsPlayingNextAfterIt() {
+        let (player, _) = rig()
+        player.playTracks(simAlbum(3), start: 0)
+        player.playNext([simTrack("9")])
+        #expect(player.playAgain(simTrack("x")))
+        #expect(player.queue.ids == ["1", "x", "9", "2", "3"] && player.after == ["9", "2", "3"])
+    }
+
+    @Test func fromAPauseItPlays() {
+        let (player, engine) = rig()
+        player.playTracks(simAlbum(2), start: 0)
+        player.intendsToPlay = false
+        #expect(player.playAgain(simTrack("x")))
+        #expect(player.queue.current?.id == "x" && player.intendsToPlay && engine.playing)
+    }
+
+    @Test func anEditTheEngineCantTakeIsPlayedAfresh() { // D4: the next song already on a node
+        let (player, engine) = rig()
+        player.playTracks(simAlbum(3), start: 0)
+        engine.seconds = 198
+        engine.nextScheduled = true
+        #expect(player.playAgain(simTrack("x")))
+        #expect(player.queue.current?.id == "x" && player.queue.ids == ["1", "x", "2", "3"] && !player.holdsAnEdit)
+        #expect(engine.log.suffix(2) == ["refused", "play 1"] && engine.current == "x" && engine.playing)
+    }
+
+    @Test func withNothingPlayingItPlaysOnItsOwn() {
+        let (fresh, engine) = rig()
+        #expect(fresh.playsAlone())
+        #expect(fresh.playAgain(simTrack("x")))
+        #expect(!fresh.playsAlone())
+        #expect(fresh.queue.ids == ["x"] && engine.log.last == "play 0" && fresh.intendsToPlay)
+        let (player, played) = rig()
+        player.playTracks([simTrack("1")], start: 0)
+        played.playOut()
+        player.queueEnded()
+        #expect(player.playsAlone())
+        #expect(player.playAgain(simTrack("x")))
+        #expect(player.queue.ids == ["x"] && played.log.last == "play 0")
+    }
+}
+
 @Suite struct QueueControllerFailureTests {
     @Test func repeatOnesFailingSongIsSkippedPastItsCopies() { // :5097
         let (player, engine) = rig(.one)

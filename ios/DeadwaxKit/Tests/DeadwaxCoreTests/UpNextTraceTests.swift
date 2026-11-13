@@ -232,8 +232,9 @@ struct Replay {
             guard let parts = gone.array, parts.count == 2, let pass = parts[0].int, let at = parts[1].int else { return nil }
             return LeftOut(pass: pass, at: at)
         }
+        //? the traces don't record a queue's id (Up Next's functions never read it): any one, carried by every edit
         return UpNextQueue(tracks: tracks, index: index, upNext: UpNextState(
-            marks: made, source: source, shuffle: shuffle, nextKey: nextKey, startedAt: startedAt, left: left,
+            id: "trace", marks: made, source: source, shuffle: shuffle, nextKey: nextKey, startedAt: startedAt, left: left,
             paged: state["paged"].flatMap(paged),
             pagedRounds: state["pagedRounds"]?.array?.compactMap { held in
                 guard let pass = held["pass"]?.int, let kept = held["paged"].flatMap(paged) else { return nil }

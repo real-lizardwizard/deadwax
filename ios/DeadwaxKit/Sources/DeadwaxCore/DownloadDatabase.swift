@@ -15,11 +15,16 @@ import Foundation
 /// - `lyrics` (version 2, app 0.4): each downloaded song's lyrics answer (`GET /navidrome/lyrics/{song_id}`'s body as it
 ///   came, none included) and its ETag, so they show offline (notes/app-lyrics.md 4.7). Kept only for a song in `song`,
 ///   and gone with its row whichever way the row goes - the trigger `song_lyrics_go`.
+/// - `start_pending` (version 3, app 0.8): the songs this phone started that deadwax hasn't taken yet - its play history
+///   (PlayHistory.swift), each start's moment, song (HistorySong's JSON), queue and entry, and whether it has counted -
+///   sent oldest first, before the kept plays. Like the plays, not downloads: Remove All leaves them. The newest page of
+///   the person's history deadwax answered is kept in `meta` (`PlayHistory.keptPageKey`), so recent plays show offline.
 ///
 /// Not thread-safe: one owner (the App's DownloadStore) calls it from one place at a time.
 public final class DownloadDatabase {
-    /// The schema's version (`PRAGMA user_version`): 1, Phase 2's (app 0.3); 2, the lyrics (app 0.4).
-    public static let version = 2
+    /// The schema's version (`PRAGMA user_version`): 1, Phase 2's (app 0.3); 2, the lyrics (app 0.4); 3, the play
+    /// history's starts (app 0.8).
+    public static let version = 3
 
     /// SQLite said no: its own words, for whoever runs deadwax.
     public struct Failure: Error, Equatable, CustomStringConvertible {
@@ -127,8 +132,25 @@ public final class DownloadDatabase {
         """,
     ]
 
+    /// Version 3's (app 0.8): the starts not yet taken - `song_id` beside the song's JSON, for a counted play to find its
+    /// start by (`countStart`); `counted` 0 or 1.
+    static let historySchema: [String] = [
+        """
+        CREATE TABLE start_pending (
+          id INTEGER PRIMARY KEY,
+          at INTEGER NOT NULL,
+          song_id TEXT NOT NULL,
+          song BLOB NOT NULL,
+          counted INTEGER NOT NULL DEFAULT 0,
+          queue TEXT,
+          entry INTEGER)
+        """,
+        "CREATE INDEX start_pending_at ON start_pending (at, id)",
+    ]
+
     /// The schema brought from the file's version up to `target` (the newest, but in a test), in one transaction: made
-    /// from nothing (version 0), or a version-1 file - Phase 2's, every row kept - given the lyrics table.
+    /// from nothing (version 0), or an older file - every row kept - given what came after it: a version-1 file (Phase
+    /// 2's) the lyrics table, a version-2 file the starts' table.
     private func migrate(to target: Int) throws {
         let current = try integer("PRAGMA user_version") ?? 0
         guard current < target else { return }
@@ -138,6 +160,9 @@ public final class DownloadDatabase {
             }
             if current < 2, target >= 2 {
                 for statement in Self.lyricsSchema { try execute(statement) }
+            }
+            if current < 3, target >= 3 {
+                for statement in Self.historySchema { try execute(statement) }
             }
             try execute("PRAGMA user_version = \(target)")
         }
@@ -351,6 +376,60 @@ public final class DownloadDatabase {
         try run("DELETE FROM play_pending WHERE id = ?", [.int(id)])
     }
 
+    // MARK: starts not yet taken (version 3, app 0.8)
+
+    /// A start kept until deadwax takes it, with its row's id.
+    public struct KeptStart: Sendable, Equatable {
+        public let id: Int64
+        public let played: Played
+    }
+
+    /// A start kept (its `counted` as it is now). The row's id.
+    @discardableResult
+    public func keepStart(_ played: Played) throws -> Int64 {
+        let song: Data
+        do {
+            song = try JSONEncoder().encode(HistorySong(played.song))
+        } catch {
+            throw Failure(words: "The start of \(played.song.id) couldn't be written (\(error)).")
+        }
+        try run("INSERT INTO start_pending (at, song_id, song, counted, queue, entry) VALUES (?, ?, ?, ?, ?, ?)",
+                [.int(played.at), .text(played.song.id), .blob(song), .int(played.counted ? 1 : 0),
+                 .text(played.queue), .int(played.entry.map { Int64($0) })])
+        return sqlite3_last_insert_rowid(db)
+    }
+
+    /// The starts kept, oldest first - at most `limit` (a batch), or every one. A row whose song can't be read is left
+    /// out (and never sent).
+    public func keptStarts(limit: Int? = nil) throws -> [KeptStart] {
+        let bounded = limit.map { " LIMIT \(max(0, $0))" } ?? ""
+        return try query("SELECT id, at, song, counted, queue, entry FROM start_pending ORDER BY at, id\(bounded)") { (row: Row) -> KeptStart? in
+            guard let id = row.int(0), let at = row.int(1), let data = row.blob(2),
+                  let song = try? JSONDecoder().decode(HistorySong.self, from: data) else { return nil }
+            let entry = row.int(5).flatMap { Int(exactly: $0) }
+            return KeptStart(id: id, played: Played(at: at, counted: (row.int(3) ?? 0) != 0, queue: row.text(4),
+                                                    entry: entry, song: song.track))
+        }
+    }
+
+    /// How many starts are kept.
+    public func keptStartCount() throws -> Int {
+        Int(try integer("SELECT COUNT(*) FROM start_pending") ?? 0)
+    }
+
+    /// Starts deadwax took (or will never take), forgotten.
+    public func forgetStarts(_ ids: [Int64]) throws {
+        guard !ids.isEmpty else { return }
+        try transaction {
+            for id in ids { try run("DELETE FROM start_pending WHERE id = ?", [.int(id)]) }
+        }
+    }
+
+    /// A counted play's start, if it is still kept, marked counted - it goes with it (deadwax's insert ORs it in).
+    public func countStart(songID: String, at: Int64) throws {
+        try run("UPDATE start_pending SET counted = 1 WHERE song_id = ? AND at = ?", [.text(songID), .int(at)])
+    }
+
     /// The queue this phone last saved or took, and whether deadwax has it: one row, replaced by each (QueueKept
     /// reads and writes it - `keptResume`, `keepResume`).
     public struct PendingQueue: Sendable, Equatable {
@@ -395,7 +474,7 @@ public final class DownloadDatabase {
     // MARK: everything
 
     /// Remove All Downloads: every song, origin, album and loudness, and (by the trigger) every song's lyrics - the
-    /// plays and the queue save kept (they aren't downloads).
+    /// plays, the starts and the queue save kept (they aren't downloads).
     public func removeAll() throws {
         try transaction {
             for table in ["origin", "song", "album", "loudness"] { try execute("DELETE FROM \(table)") }

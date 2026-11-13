@@ -28,6 +28,12 @@ And the EQ's AutoEq (server 2.1.7, eq.md 5.4): AutoEqResults, AutoEqResult, Auto
 src/autoeq.py's row_answer and profile_answer and the search route's own answer; the answers the Swift tests decode
 (Fixtures/autoeq/answers.json, written by ios/scripts/autoeq_answers.py over tests/test_autoeq.py's fake GitHub) to
 what the helper makes now; and the search's limit and longest query within what the route takes.
+
+And app 0.8's play history (server 2.1.14, notes/play-history.md): Played and HistorySong to the route's HistoryStart and
+HistorySong - every name the phone writes one the server declares, and the other way - HistoryPage, HistoryCursor and
+HistoryTaken to what src/play_history.py page() and the POST answer; a start as the phone writes it (every field, nulls
+written out - PlayHistoryTests' own JSON) taken by the real route and paged back; and the page the phone asks for and the
+batch it sends within the route's bounds.
 """
 
 import importlib.util
@@ -35,6 +41,7 @@ import inspect
 import json
 import re
 import sys
+import time
 import typing
 from pathlib import Path
 from types import SimpleNamespace
@@ -46,19 +53,21 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src import auth, autoeq, levels, loudness, lyrics, users  # noqa: E402
+from src import play_history as history_rules  # noqa: E402
 from src import play_queue as queue_rules  # noqa: E402
 from src.api.app import start  # noqa: E402
 from src.api.navidrome_endpoint import CLIENT_NAME  # noqa: E402
 from src.config import Config  # noqa: E402
 from src.routes import eq as eq_route  # noqa: E402
 from src.routes import my_library, navidrome, store_album  # noqa: E402
+from src.routes import play_history as history_route  # noqa: E402
 from src.routes.auth import SignIn  # noqa: E402
 from src.routes.download import FindCandidatesRequest  # noqa: E402
 from src.store import JobStore  # noqa: E402
 
 CORE = Path(__file__).resolve().parent.parent / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore"
 ENDPOINT = re.compile(r'Endpoint\(method: "(\w+)", path: "([^"]+)", query: \[([^\]]*)\]\)')
-ROUTE_COUNT = 28
+ROUTE_COUNT = 30
 RAW_OPENING = re.compile(r'#+"')
 HASHES = re.compile(r"#*")
 
@@ -832,3 +841,82 @@ def test_the_app_waits_for_autoeq_as_long_as_deadwax_does():
     timeouts = {name: float(seconds) for name, seconds in re.findall(r"(\w+): ([\d.]+)", literal.group(1))}
     assert timeouts["autoEqSearch"] > autoeq.FIRST_FETCH_SECONDS
     assert timeouts["autoEqProfile"] > autoeq.PROFILE_DEADLINE_SECONDS
+
+
+# ---------------------------------------------------------------------------- app 0.8: play history
+
+#? a start exactly as the phone writes it - PlayHistoryTests.writtenAsTheWebWritesAStart's JSON (every field, nil as
+#? null), with a queue and entry
+PHONE_START = ('{"at":1800000000000,"counted":false,"entry":3,"queue":"mhg9b18g-01z013za","song":{"album":"Mezzanine",'
+               '"albumId":"mez","artist":"Massive Attack","bitDepth":16,"channels":2,"contentType":"audio\\/flac",'
+               '"coverArt":null,"duration":200,"id":"1","sampleRate":44100,"suffix":"flac","title":"song 1"}}')
+
+
+def test_a_start_is_written_in_the_names_the_server_declares():
+    # Played and HistorySong write and read by their CodingKeys (their own encoders, every key): each name one the
+    # route's model declares - pydantic would drop one it doesn't without a word - and every one it declares written
+    played = coding_keys(swift_struct("Played"))
+    song = coding_keys(swift_struct("HistorySong"))
+    assert set(played.values()) == set(history_route.HistoryStart.model_fields)
+    assert set(song.values()) == set(history_route.HistorySong.model_fields)
+    assert set(song.values()) == set(history_rules.SONG_COLUMNS)
+    # what the server needs is what the phone always has: the time, and the song with its id
+    needed = {name for name, field in history_route.HistoryStart.model_fields.items() if field.is_required()}
+    assert needed == {"at", "song"} and required_fields("Played") >= needed
+    assert {name for name, field in history_route.HistorySong.model_fields.items() if field.is_required()} == {"id"}
+    assert history_route.HistoryStart.model_config.get("extra") == "ignore"
+    # the batch's one key
+    assert fields("HistoryPost") == {"starts": False}
+    assert set(history_route.HistoryPost.model_fields) == {"starts"}
+
+
+def test_a_page_and_a_sends_answer_are_what_the_app_decodes():
+    row = {"started_at": 1_800_000_000_000, "counted": 1, "queue": "q-1", "entry": 0,
+           **{column: None for column in history_rules.SONG_COLUMNS.values()}, "song_id": "so-1"}
+    for answer in (history_rules.page([row, dict(row)], 1, False), history_rules.page([row], 1, True),
+                   history_rules.page([], 100, False)):
+        assert set(fields("HistoryPage")) == set(answer), answer
+        assert_decodes("HistoryPage", answer)
+        if answer["next"] is not None:
+            assert set(fields("HistoryCursor")) == set(answer["next"])
+            assert_decodes("HistoryCursor", answer["next"])
+        for play in answer["plays"]:
+            assert set(coding_keys(swift_struct("Played")).values()) == set(play)
+            assert set(coding_keys(swift_struct("HistorySong")).values()) == set(play["song"])
+    assert optional_fields("HistoryPage") == {"next"}
+    assert returned_keys(history_route.record) == set(fields("HistoryTaken")) == {"taken", "skipped"}
+    assert required_fields("HistoryTaken") == {"taken", "skipped"}
+
+
+def test_what_the_phone_sends_is_taken_and_paged_back(monkeypatch, tmp_path):
+    monkeypatch.setattr(Config, "AUTH_MODE", None)
+    app = start()
+    store = JobStore(str(tmp_path / "deadwax.db"))
+    store.init()
+    app.state.store = store
+    client = TestClient(app)
+    # its time a minute ago (deadwax skips a start from the future): the text otherwise exactly the phone's
+    phone = PHONE_START.replace("1800000000000", str(int(time.time() * 1000) - 60_000))
+    sent = json.loads(phone)
+    later = {**sent, "at": sent["at"] + 1000, "queue": None, "entry": None}
+    answer = client.post("/deadwax/me/history", content='{"starts":[' + phone + "," + json.dumps(later) + "]}",
+                         headers={"Content-Type": "application/json"})
+    assert answer.status_code == 200 and answer.json() == {"taken": 2, "skipped": 0}, answer.text
+    page = client.get("/deadwax/me/history", params={"limit": 1}).json()
+    assert page["plays"] == [later] and page["next"] == {"at": later["at"], "id": "1"} and page["shared"]
+    older = client.get("/deadwax/me/history", params={"limit": 1, "before_at": page["next"]["at"],
+                                                       "before_id": page["next"]["id"]}).json()
+    assert older == {"plays": [sent], "next": None, "shared": True}
+
+
+def test_the_phones_page_and_batch_are_within_the_routes_bounds(monkeypatch):
+    monkeypatch.setattr(Config, "AUTH_MODE", None)
+    routes = app_routes()
+    read = routes[("GET", "/deadwax/me/history")]
+    page = swift_constant("PlayHistory.swift", "PlayHistory", "page")
+    low, high = bounds(read, "limit")
+    assert low <= page <= high and page == history_rules.HISTORY_PAGE
+    assert bounds(read, "before_at") == (0, history_rules.HISTORY_AT_MAX)
+    batch = swift_constant("PlayHistory.swift", "PlayHistory", "postMax")
+    size = {type(rule).__name__: rule for rule in history_route.HistoryPost.model_fields["starts"].metadata}
+    assert size["MinLen"].min_length == 1 and batch == size["MaxLen"].max_length == history_rules.HISTORY_POST_MAX
