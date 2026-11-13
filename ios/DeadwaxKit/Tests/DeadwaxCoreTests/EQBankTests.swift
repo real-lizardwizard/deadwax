@@ -120,7 +120,8 @@ import Testing
     }
 
     @Test func packedAsTheRenderReadsIt() {
-        #expect(EQBank.packedCount == 8 + 3 * 80 * 8)
+        #expect(EQLimits.sectionsPerChannel == 84)
+        #expect(EQBank.packedCount == 8 + 3 * 84 * 8)
         let bank = Self.make(offsets: EQPreampParts(all: -6, left: 0, right: -1.5), bands: EQGraphic.preset("vocal")!.gains)
         let p = bank.packed
         #expect(p.count == EQBank.packedCount)
@@ -128,16 +129,16 @@ import Testing
         #expect(Array(p[5..<8]) == [bank.left, bank.right, bank.shared].map { Double($0.count) })
         for (i, list) in [bank.left, bank.right, bank.shared].enumerated() {
             for (s, section) in list.enumerated() {
-                let q = Array(p[(8 + (i * 80 + s) * 8)..<(8 + (i * 80 + s + 1) * 8)])
+                let q = Array(p[(8 + (i * 84 + s) * 8)..<(8 + (i * 84 + s + 1) * 8)])
                 let c = section.coefficients
                 #expect(q == [c.b0, c.b1, c.b2, c.a1, c.a2, section.id.code, section.kind.code, 0])
             }
             //? the rest of the list's slots are empty
-            #expect(p[(8 + (i * 80 + list.count) * 8)..<(8 + (i + 1) * 80 * 8)].allSatisfy { $0 == 0 })
+            #expect(p[(8 + (i * 84 + list.count) * 8)..<(8 + (i + 1) * 84 * 8)].allSatisfy { $0 == 0 })
         }
         #expect(EQBank.identity(rate: 44100, key: "", version: 0).packed[0...7] == [44100, 1, 1, 1, 1, 0, 0, 0])
-        //? never more than 80 a list
+        //? never more than 84 a list
         let many = (1...90).map { EQSection(id: .filter($0), kind: .peak, f0: 100, coefficients: EQCoefficients(b0: 1, b1: 0, b2: 0, a1: 0, a2: 0)) }
-        #expect(EQBank(rate: 48000, key: "", version: 0, left: many, right: [], shared: [], preamp: 0, levels: [1, 1, 1]).left.count == 80)
+        #expect(EQBank(rate: 48000, key: "", version: 0, left: many, right: [], shared: [], preamp: 0, levels: [1, 1, 1]).left.count == 84)
     }
 }

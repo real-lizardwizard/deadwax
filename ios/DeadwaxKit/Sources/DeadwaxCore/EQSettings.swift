@@ -171,7 +171,7 @@ public struct EQCorrection: Codable, Equatable, Sendable {
     public var form: String?
     /// the file's text or AutoEq's ParametricEQ.txt
     public var text: String?
-    /// an AutoEq correction edited since
+    /// AutoEq's correction or a file's, edited since ("- changed")
     public var changed: Bool
     /// a GraphicEQ, converted (3.10)
     public var converted: Bool
