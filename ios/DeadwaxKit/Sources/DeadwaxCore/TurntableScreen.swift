@@ -52,6 +52,9 @@ public enum TurntableFace {
     public static let iconStroke = 1.5
     /// `--app-tt-time-gap`: the album line to the time line
     public static let timeGap = 6.0
+    /// `--app-speed-chip`, `--app-speed-chip-pad`: the speed's chip on the cover, drawn in a tap's target (5.1)
+    public static let chipFace = 28.0
+    public static let chipPad = 8.0
 }
 
 /// The plinth on Now Playing (2.2): as big as fits the cover's room both ways, at most 440 pt wide - the room less 12

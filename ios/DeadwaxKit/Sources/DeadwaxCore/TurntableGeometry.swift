@@ -426,8 +426,22 @@ public struct TurntableLayout: Equatable, Sendable {
         let target = PlaySpeed.faderTarget(width)
         return (across(target.left), across(target.right))
     }
+    /// How wide the view that takes the turntable's touches is, points: the plinth, and past its right edge as far as
+    /// the fader's target reaches - centred on the fader, a tap wide, it overhangs the plinth (about 15 pt on a 393 pt
+    /// phone), as the web's overhangs the stage into the room round it. The drawing stays the plinth's size at the
+    /// view's top left; only the target lives in the rest.
+    public var touchWidth: Double { Swift.max(width, faderTarget.right) }
     /// How far the fader's knob travels, points (playSpeed.ts faderTravel).
     public var faderTravel: Double { PlaySpeed.faderTravel(height) }
+    /// The fader's target top to bottom, points: the knob's whole travel and a knob's height (SpeedFader.tsx's SPAN).
+    public var faderSpan: (top: Double, bottom: Double) {
+        let f = PlaySpeed.fader, knob = PlaySpeed.knob
+        let top = f.top - knob.height / 2, bottom = f.bottom + knob.height / 2
+        return (top / TurntableGeometry.stage.height * height, bottom / TurntableGeometry.stage.height * height)
+    }
+    /// The readout's least target, points across and down (app.css `.app-tt-readout`'s min-width and min-height:
+    /// a tap's 44 pt, at most 14% of the plinth).
+    public var readoutTarget: Double { Swift.min(TurntableFace.hit, 0.14 * width) }
 }
 
 /// A pointer's samples, as the deck is handed them (the web's ui/src/lib/deckClock.ts eventTime and pointerSamples,

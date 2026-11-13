@@ -25,6 +25,12 @@ import SwiftUI
 /// Play/Pause on the turntable is the deck's (a pause winds the record down), and its three buttons are gestures the
 /// record's sound may start from. Lyrics on show over neither look, as the web's: the look button gives way to them.
 ///
+/// THE SPEED (app 0.7, notes/ios-specs/turntable.md 5.1): on the turntable the fader and its readout say it - the
+/// readout laid over this column at the plinth's corner, above the foot line (TurntableReadoutLayer). On the cover,
+/// off 1x, a chip - `1.25x`, a tap back to 1x - laid over the gap between AirPlay and Up Next, so nothing in the footer
+/// moves as it comes and goes; at the accessibility sizes, where it wouldn't fit, the ••• menu says it instead
+/// ("Speed 1.25x - back to normal speed"). The mini player doesn't show it.
+///
 /// Every action is PlayerModel's, called straight from the tap. Shuffle and Repeat are named in Up Next's words
 /// (shuffleLabel, repeatLabel), pressed while on, tinted while on; a library's shuffle can't be turned off, so its
 /// Shuffle stays on and does nothing. The Up Next button names what is on (upNextLabel) and is never tinted.
@@ -35,6 +41,7 @@ struct NowPlayingView: View {
     @Environment(DeckController.self) private var deck
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var showsUpNext = false
     @State private var showsInfo = false
     /// The EQ over Now Playing (eq.md 3.1), from the •••: its own stack, "Done" at its top right.
@@ -62,6 +69,15 @@ struct NowPlayingView: View {
 
     /// The look's swap: a crossfade, none under Reduce Motion (2.1, 2.12).
     private var swap: Animation? { reduceMotion ? nil : .easeInOut(duration: 0.2) }
+
+    /// The speed isn't the song's own: the chip on the cover, or the menu's line where it isn't drawn (5.1).
+    private var offSpeed: Bool { player.speed != PlaySpeed.normal }
+
+    /// The chip shows: on the cover (the readout says it on the turntable), off 1x, short of the accessibility sizes.
+    private var chipShown: Bool { !turntable && offSpeed && !dynamicTypeSize.isAccessibilitySize }
+
+    /// The ••• menu says the speed: where the chip would, at the accessibility sizes.
+    private var menuSaysSpeed: Bool { !turntable && offSpeed && dynamicTypeSize.isAccessibilitySize }
 
     var body: some View {
         ZStack {
@@ -178,6 +194,10 @@ struct NowPlayingView: View {
                 .padding(.vertical, 12)
 
             footer(track)
+        }
+        // the readout over everything in the column, the foot line included (5.1)
+        .overlayPreferenceValue(PlinthPlaceKey.self) { (place: PlinthPlace?) in
+            TurntableReadoutLayer(place: place, shown: turntable, swap: swap)
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 8)
@@ -387,6 +407,9 @@ struct NowPlayingView: View {
             Spacer()
             AirPlayButton()
                 .frame(width: 44, height: 44)
+                .anchorPreference(key: FooterGapKey.self, value: .bounds) { (bounds: Anchor<CGRect>) -> FooterGap in
+                    FooterGap(airPlay: bounds)
+                }
             Spacer()
             Button { showsUpNext = true } label: {
                 Image(systemName: "list.bullet")
@@ -396,12 +419,20 @@ struct NowPlayingView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(upNextLabel(shuffle: player.shuffle, repeat: player.repeatMode))
+            .anchorPreference(key: FooterGapKey.self, value: .bounds) { (bounds: Anchor<CGRect>) -> FooterGap in
+                FooterGap(upNext: bounds)
+            }
             Spacer()
-            NowPlayingMenu(hasAlbum: route != nil, onInfo: { showsInfo = true }, onEQ: { showsEQ = true }) {
+            NowPlayingMenu(hasAlbum: route != nil, saysSpeed: menuSaysSpeed,
+                           onInfo: { showsInfo = true }, onEQ: { showsEQ = true }) {
                 if let route { navigation.openAlbum(route) }
             }
         }
         .foregroundStyle(.primary)
+        // the chip over the gap between AirPlay and Up Next, the buttons untouched (5.1)
+        .overlayPreferenceValue(FooterGapKey.self) { (gap: FooterGap) in
+            SpeedChipPlace(gap: gap, shown: chipShown)
+        }
     }
 
     /// The sheet's drag to close, from the top half alone: it follows a finger down once it has gone
@@ -443,6 +474,78 @@ private struct ModeButton: View {
         .disabled(!enabled)
         .accessibilityLabel(label)
         .accessibilityAddTraits(on ? .isSelected : [])
+    }
+}
+
+/// AirPlay's and Up Next's targets in the footer: the chip goes in the gap between them (5.1).
+private struct FooterGap {
+    var airPlay: Anchor<CGRect>?
+    var upNext: Anchor<CGRect>?
+}
+
+private struct FooterGapKey: PreferenceKey {
+    static var defaultValue: FooterGap { FooterGap() }
+
+    static func reduce(value: inout FooterGap, nextValue: () -> FooterGap) {
+        let next = nextValue()
+        value.airPlay = value.airPlay ?? next.airPlay
+        value.upNext = value.upNext ?? next.upNext
+    }
+}
+
+/// The chip, centred in the gap between AirPlay's target and Up Next's, level with them.
+private struct SpeedChipPlace: View {
+    let gap: FooterGap
+    let shown: Bool
+    @Environment(PlayerModel.self) private var player
+
+    var body: some View {
+        GeometryReader { (space: GeometryProxy) in
+            if shown, let airPlay = gap.airPlay, let upNext = gap.upNext {
+                let left = space[airPlay]
+                let right = space[upNext]
+                SpeedChip(speed: player.speed) { player.setSpeed(PlaySpeed.normal) }
+                    .position(x: (left.maxX + right.minX) / 2, y: left.midY)
+                    .transition(.opacity)
+            }
+        }
+    }
+}
+
+/// The chip (5.1, SpeedChip.tsx): `1.25x` in the toggled face, a tap back to 1x, named for both
+/// ("1.25x, 1.25 times the song's speed: back to normal speed"). Its words stop growing at xxLarge: at 19 pt (xxxLarge)
+/// the widest, `0.25x`, is about 73 pt, past the glyphs either side of a 375 pt phone's gap (about 70 pt apart); at
+/// 17 pt it is about 67.
+private struct SpeedChip: View {
+    let speed: Double
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(TurntableWords.speedLabel(speed))
+                .font(.footnote.monospaced().weight(.semibold))
+                .foregroundStyle(Palette.accentText)
+                .lineLimit(1)
+                .fixedSize()
+        }
+        .buttonStyle(SpeedChipFace())
+        .dynamicTypeSize(...DynamicTypeSize.xxLarge)
+        .accessibilityLabel(TurntableWords.chip(speed))
+    }
+}
+
+/// STYLE.md's toggled chip (app.css .app-speed-chip-face): 28 pt tall, 8 pt across, radius 4, the toggled edge and
+/// fill - `--dw-pressed` under a finger - in a 44 pt target.
+private struct SpeedChipFace: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        let shape = RoundedRectangle(cornerRadius: CGFloat(TurntableFace.lookRadius))
+        return configuration.label
+            .padding(.horizontal, CGFloat(TurntableFace.chipPad))
+            .frame(height: CGFloat(TurntableFace.chipFace))
+            .background(shape.fill(configuration.isPressed ? Palette.pressed : Palette.toggledFill))
+            .overlay(shape.strokeBorder(Palette.toggledEdge, lineWidth: CGFloat(TurntableFace.hairline)))
+            .frame(height: CGFloat(TurntableFace.hit))
+            .contentShape(Rectangle())
     }
 }
 

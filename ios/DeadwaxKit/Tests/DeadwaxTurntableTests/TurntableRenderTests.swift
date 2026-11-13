@@ -317,6 +317,40 @@ enum Pictures {
         }
     }
 
+    /// 5.1 (slice 4): the well's inset at 1x - `--dw-well-inset`, a band inside its top edge darker than the well under
+    /// it - and none off 1x, where the toggled face has no inset (app.css's `.is-off ... box-shadow: none`). And the app's
+    /// plinth leaves it out (`drawsReadout` false): the app draws its own, above the foot line.
+    @Test func theWellHasItsInsetAtOneXAndTheAppDrawsItsOwn() {
+        for size in Self.sizes {
+            for speed in [1.0, 1.25] {
+                let layers = Self.layers(size.width)
+                var look = Self.look()
+                look.speed = speed
+                layers.set(look)
+                let render = Render(layers)
+                let box = layers.readout.frame
+                let band = Render.luminance(render.at(Double(box.minX) + 3, Double(box.minY) + 1.5))
+                let well = Render.luminance(render.at(Double(box.minX) + 3, Double(box.minY) + 2.6))
+                if speed == 1 {
+                    #expect(band < well - 4, "\(size.name): the inset band \(band) against the well \(well)")
+                } else {
+                    #expect(abs(band - well) < 2, "\(size.name) \(speed)x: no inset, \(band) against \(well)")
+                }
+            }
+            let layers = Self.layers(size.width)
+            layers.drawsReadout = false
+            var look = Self.look()
+            look.speed = 1.25
+            layers.set(look)
+            #expect(layers.readout.isHidden)
+            let render = Render(layers)
+            let at = layers.layout.readout
+            let plinth = render.at(at.x, at.y)
+            #expect(abs(plinth.r - Double(TurntablePalette.ttPlinth.red)) < 4 && abs(plinth.b - Double(TurntablePalette.ttPlinth.blue)) < 4,
+                    "\(size.name): the plinth where the readout would be, \(plinth)")
+        }
+    }
+
     /// 2.5: lifted, the head is drawn 5 units up in the arm's own frame - its middle moved by 5 units turned by the
     /// arm's angle; nothing else of the arm moves.
     @Test func theHeadIsFiveUnitsUpWhenLifted() {

@@ -145,6 +145,19 @@ def test_the_look_button_is_the_webs():
     assert square and pair("squareIcon") == (float(square.group(1)), float(square.group(2)))
 
 
+def test_the_speed_chip_is_the_webs():
+    """The cover's speed chip (turntable.md 5.1, slice 4): STYLE.md's toggled chip, 28 px tall with 8 px each side, in a
+    44 px target - app.css's .app-speed-chip and its face."""
+    assert number("chipFace") == px(APP_CSS, "app-speed-chip")
+    assert number("chipPad") == px(APP_CSS, "app-speed-chip-pad")
+    assert "height: var(--pl-hit)" in rule(".app-speed-chip")
+    face = rule(".app-speed-chip-face")
+    for want in ("height: var(--app-speed-chip)", "padding: 0 var(--app-speed-chip-pad)", "var(--dw-toggled-border)",
+                 "var(--dw-toggled-bg)", "var(--dw-accent-text)", "var(--dw-font-mono)", "var(--dw-text-footnote)",
+                 "var(--dw-weight-semibold)", "border-radius: var(--dw-radius-control)"):
+        assert want in face, want
+
+
 APP = REPO / "ios" / "App"
 
 

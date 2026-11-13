@@ -24,6 +24,7 @@ public struct TurntableLook: Equatable {
     public var contrast = false
     /// the fader and the readout (slice 4): the speed they show, nil to hide them
     public var speed: Double?
+    /// the fader's knob taken (past the slop): the arm's lighter grey
     public var faderHeld = false
     public init() {}
 }
@@ -54,8 +55,11 @@ public final class TurntableLayers {
     let faderMark = CAShapeLayer()
     let knob = CAShapeLayer()
     let grip = CAShapeLayer()
-    let readout = CALayer()
-    let readoutText = CATextLayer()
+    /// The readout (TurntableReadout): drawn in the plinth's renders; the app hosts its own above the foot line
+    /// (`drawsReadout` false).
+    let readoutFace: TurntableReadout
+    var readout: CALayer { readoutFace.root }
+    public var drawsReadout = true
     let arm = CALayer()
     let weight = CAShapeLayer()
     let bar = CAShapeLayer()
@@ -72,16 +76,16 @@ public final class TurntableLayers {
     public init(layout: TurntableLayout, scale: CGFloat, flipped: Bool) {
         self.layout = layout
         self.scale = scale
+        readoutFace = TurntableReadout(scale: scale)
         root.isGeometryFlipped = flipped
         root.masksToBounds = false
-        for layer in [plinth, highlight, platter, face, sheen, fader, readout, arm, pivot, handle] { root.addSublayer(layer) }
+        for layer in [plinth, highlight, platter, face, sheen, fader, readoutFace.root, arm, pivot, handle] { root.addSublayer(layer) }
         highlight.addSublayer(highlightLine)
         for layer in [labelBack, label, labelRing, disc, grooves, spindle, spindleRing] as [CALayer] { face.addSublayer(layer) }
         for layer in [faderSlot, faderMark, knob, grip] { fader.addSublayer(layer) }
-        readout.addSublayer(readoutText)
         for layer in [weight, bar, head] { arm.addSublayer(layer) }
         for layer in [root, plinth, highlight, highlightLine, platter, face, labelBack, label, labelRing, disc, grooves, spindle,
-                      spindleRing, sheen, fader, faderSlot, faderMark, knob, grip, readout, readoutText, arm, weight, bar, head,
+                      spindleRing, sheen, fader, faderSlot, faderMark, knob, grip, arm, weight, bar, head,
                       pivot, handle] as [CALayer] {
             layer.contentsScale = scale
             layer.actions = Self.noActions
@@ -145,10 +149,6 @@ public final class TurntableLayers {
         faderSlot.strokeColor = Self.cg(p.barEdge)
         knob.strokeColor = Self.cg(p.ttPivotEdge)
         grip.fillColor = Self.cg(p.ttSpindle)
-        readout.borderWidth = TurntableFace.hairline
-        readout.cornerRadius = TurntableFace.lookRadius
-        readoutText.alignmentMode = .center
-        readoutText.font = "Menlo-Regular" as CFString
         weight.fillColor = Self.cg(p.ttArmWeight)
         bar.fillColor = Self.cg(p.ttArm)
         head.fillColor = Self.cg(p.ttArmHead)
@@ -234,7 +234,6 @@ public final class TurntableLayers {
         knob.lineWidth = k
         grip.frame = root.bounds
         _ = mark
-        readoutText.contentsScale = scale
 
         // the arm, in its own frame: the pivot at the origin, the bar along +x (Turntable.tsx's rects)
         let a = TurntableGeometry.self
@@ -275,7 +274,7 @@ public final class TurntableLayers {
         handle.strokeColor = Self.cg(next.contrast ? TurntablePalette.textTertiary : TurntablePalette.ttHandleEdge)
         if let speed = next.speed {
             fader.isHidden = false
-            readout.isHidden = false
+            readout.isHidden = !drawsReadout
             drawFader(speed, held: next.faderHeld, k: k)
         } else {
             fader.isHidden = true
@@ -298,20 +297,10 @@ public final class TurntableLayers {
         knob.fillColor = Self.cg(held ? p.ttArm : p.ttArmWeight)
         grip.path = CGPath(rect: CGRect(x: (f.x - size.width / 2 + size.gripInset) * k, y: (knobY - size.grip / 2) * k,
                                         width: (size.width - 2 * size.gripInset) * k, height: size.grip * k), transform: nil)
-        // the readout: its words a label's size, smaller with the plinth (app.css's min(12px, 3.2cqw, 3.2cqh) of the room)
-        let text = TurntableWords.speedLabel(speed)
-        let points = Swift.min(12, 0.032 * (layout.width + 2 * TurntableFace.pad), 0.032 * (layout.height + TurntableFace.clear + TurntableFace.pad))
-        readoutText.fontSize = points
-        readoutText.string = text
-        readoutText.foregroundColor = Self.cg(normal ? Self.text2 : p.accentText)
-        let width = Double(text.count) * points * 0.6 + 2 * 0.4 * points
-        let height = points * 1.33 + 2 * 0.15 * points
-        let at = point(layout.readout)
-        readout.bounds = CGRect(x: 0, y: 0, width: width, height: height)
-        readout.position = at
-        readout.borderColor = Self.cg(normal ? p.barEdge : p.toggledEdge)
-        readout.backgroundColor = Self.cg(Self.over(normal ? p.ttWell : p.toggledFill, p.ttPlinth))
-        readoutText.frame = CGRect(x: 0, y: (height - points * 1.2) / 2, width: width, height: points * 1.2)
+        // the readout: its words a label's size, smaller with the plinth
+        guard drawsReadout else { return }
+        readoutFace.set(speed, points: TurntableReadout.points(layout))
+        readout.position = point(layout.readout)
     }
 
     // MARK: the pictures

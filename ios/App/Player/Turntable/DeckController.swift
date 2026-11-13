@@ -262,6 +262,13 @@ final class DeckController {
     @ObservationIgnored private var artOrder: [String] = []
     private static let artKeptMost = 8
 
+    // the fader (5.1, slice 4): a finger on it, the knob's travel as the press found it, the tick at 1x
+    @ObservationIgnored private var faderDrag: PlaySpeed.FaderDrag?
+    @ObservationIgnored private var faderTravel = 0.0
+    @ObservationIgnored private let speedScale = PlaySpeedScale(PlatformMaths())
+    @ObservationIgnored private let detentTick = UIImpactFeedbackGenerator(style: .light)
+    @ObservationIgnored private var speedSeen = 1.0
+
     // the player as last seen
     @ObservationIgnored private var songID = ""
     @ObservationIgnored private var wasPlaying = false
@@ -356,6 +363,7 @@ final class DeckController {
     /// had no CD art is asked again at the next opening, as the web's is.
     func closed() {
         press?.cancelFollowed()
+        faderLetGo()
         touchSince = nil
         open = false
         artFailed.removeAll()
@@ -415,7 +423,8 @@ final class DeckController {
     // MARK: touches (the views turn touches into the press's calls, 3.1) - times in ms of the host clock
 
     func touchDown(_ kind: TurntableDrag.Kind, pointer: Int, x: Double, y: Double, time: Double) {
-        guard let press else { return }
+        // one touch at a time on the turntable: a finger on the fader is the primary pointer (SpeedFader.tsx:61)
+        guard let press, faderDrag == nil else { return }
         if kind == .record { retryFailedStart() }
         switch kind {
         case .record: press.recordDown(pointer: pointer, x: x, y: y, time: time)
@@ -462,6 +471,61 @@ final class DeckController {
         updateLink()
         redraw()
     }
+
+    // MARK: the fader (5.1, slice 4) - a deck's pitch fader: up is faster, by octaves, 1x two thirds of the way up
+
+    /// A finger down on the fader's target: followed, unless the record or the arm follows a touch (one at a time, as
+    /// the web's isPrimary). Nothing moves until it has gone the slop (playSpeed.ts faderMove). False: not followed.
+    func faderDown(pointer: Int, y: Double) -> Bool {
+        guard faderDrag == nil, press?.follows != true else { return false }
+        faderDrag = PlaySpeed.faderStart(pointer, y)
+        faderTravel = PlaySpeed.faderTravel(box.height)
+        detentTick.prepare()
+        return true
+    }
+
+    /// The finger moved: once past the slop, the speed the finger's travel puts it at, from where it was then - through
+    /// the detent at 1x, with one light tick as it crosses into it (question 17's A).
+    func faderMoved(pointer: Int, y: Double) {
+        let was = faderDrag
+        let out = speedScale.faderMove(faderDrag, pointer, y, faderTravel, player.speed)
+        faderDrag = out.drag
+        if let to = out.speed {
+            let from = player.speed
+            player.dragSpeed(to: to)
+            if PlaySpeed.ticks(from: from, to: player.speed) { detentTick.impactOccurred() }
+        }
+        if (was?.from == nil) != (faderDrag?.from == nil) || out.speed != nil { redraw() }
+    }
+
+    /// The finger lifted, or UIKit took it: the drag is over where it had got to (it was live all along) - and let go
+    /// at 1x, the song's own samples again (PlayerModel.speedLetGo).
+    func faderEnded(pointer: Int) {
+        guard let drag = faderDrag, PlaySpeed.faderEnd(drag, pointer) == nil else { return }
+        faderLetGo()
+    }
+
+    private func faderLetGo() {
+        guard faderDrag != nil else { return }
+        faderDrag = nil
+        player.speedLetGo()
+        redraw()
+    }
+
+    /// The readout's tap: straight back to exactly 1x (SpeedFader.tsx:139). Nothing at 1x (the web's disabled button).
+    func readoutTapped() {
+        guard player.speed != PlaySpeed.normal else { return }
+        player.setSpeed(PlaySpeed.normal)
+    }
+
+    /// VoiceOver's swipe on the fader: a hundredth, the web's arrow keys (speedKey), past the detent as the keys go.
+    func faderAdjusted(increment: Bool) {
+        guard let to = PlaySpeed.speedKey(increment ? "ArrowUp" : "ArrowDown", player.speed) else { return }
+        player.setSpeed(to)
+    }
+
+    var faderValue: String { TurntableWords.speedWords(player.speed) }
+    var readoutLabel: String { TurntableWords.readout(player.speed) }
 
     // MARK: Debug's recording (6.3)
 
@@ -527,7 +591,8 @@ final class DeckController {
             base: AudioSessionController.ioBuffer(), output: AudioSessionController.latency())
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
         let finished = DeckRecordingWrite(recorder: recorder, about: about, url: url)
-        DispatchQueue.global(qos: .utility).async {
+        // weak from the outer closure on: the inner one's weak capture means nothing while the outer holds self strongly
+        DispatchQueue.global(qos: .utility).async { [weak self] in
             let written = finished.write()
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
@@ -560,7 +625,8 @@ final class DeckController {
         facts.windowMade = windowMade
         facts.touches = touches
         facts.slowStarts = slow
-        return TurntableDebugRows.phoneRows(facts)
+        // the Speed row (6.2), last: the player's, whether or not the turntable has shown
+        return TurntableDebugRows.phoneRows(facts) + [TurntableDebugRows.speedRow(player.speedReading())]
     }
 
     private func report() -> DeckReport? {
@@ -598,6 +664,9 @@ final class DeckController {
             MainActor.assumeIsolated { () -> Void in self?.updateSilent() }
         }
         made.setWindDown(windDown)
+        // the motor's target, a take's sound, a wind-down's start: the player's speed (5.1)
+        speedSeen = player.speed
+        made.speedChanged(speedSeen)
         rules = made
         let hand = TurntablePress(deck: made, host: world, maths: PlatformMaths())
         hand.dragChanged = { [weak self] (_: TurntableDrag?) -> Void in
@@ -616,6 +685,9 @@ final class DeckController {
     }
 
     private func destroy() {
+        // a fader held as the look switches: its touch view goes with the turntable, and its cancel may never come -
+        // let go here, or every turntable touch is refused and a drag at 1x never has its exact let-go (as closed())
+        faderLetGo()
         guard let rules else { return }
         // the rules' destroy plays on a song the hand took, and closes the deck's audio
         self.rules = nil
@@ -1038,6 +1110,7 @@ final class DeckController {
             _ = player.shownPosition
             _ = player.duration
             _ = player.errorLine
+            _ = player.speed
         } onChange: { [weak self] in
             DispatchQueue.main.async {
                 guard let self else { return }
@@ -1056,6 +1129,11 @@ final class DeckController {
             press?.songChanged(id)
             rules?.songChanged(id)
             loadPictures()
+        }
+        if player.speed != speedSeen {
+            speedSeen = player.speed
+            rules?.speedChanged(speedSeen)
+            redraw()
         }
         let playing = player.isPlaying
         if playing != wasPlaying {
@@ -1111,6 +1189,8 @@ final class DeckController {
         look.needle = trig.needleAt(shownTime, length)
         look.lifted = press?.drag?.kind == .arm
         look.contrast = contrast
+        look.speed = player.speed
+        look.faderHeld = faderDrag?.from != nil
         view.draw(look)
     }
 

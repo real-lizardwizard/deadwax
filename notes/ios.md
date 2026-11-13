@@ -3252,6 +3252,41 @@ one per lane) and what only the phone shows are in the spec's section. **Left fo
 screen's rate (NowPlayingController) and plays at speed - `Plays.listenedStep` caps a step at the clock times its
 `rate`, which PlayReporter leaves at 1 - and the `.loading` the engine publishes while it begins the lanes again.
 
+### Slice 4, second half: the fader (app 0.7, 2026-11-13)
+
+The turntable spec's 5.1 on the phone (notes/ios-specs/turntable.md "Slice 4, second half, built", with every
+departure). App 0.7 (7); PlaybackEngine untouched.
+
+- **The fader** at the plinth's right: FaderTouchView over its target, one touch at a time across the record, the arm
+  and the fader; the web's faderMove (the slop, the octave scale, the detent at 1x) and a light impact as a drag
+  crosses into the detent. A drag sends every speed to the engine as it comes; a let-go at 1x is
+  `setSpeed(1, exact: true)`, the song's own samples again; a jump to 1x (the readout, the chip, the ••• line,
+  VoiceOver) is exact too. Core's `SpeedControl` is that rule.
+- **The readout** is TurntableReadout (DeadwaxTurntable), the web's face as a layer tree: drawn in the renders by
+  TurntableLayers, and in the app by a UIControl laid over Now Playing's column at the plinth's anchor - the only way
+  to sit above the foot line, which is SwiftUI. Its VoiceOver element stays in the deck view's order.
+- **The chip** on the cover is an overlay between AirPlay's and Up Next's anchors, its text stopped at xxLarge (the
+  footer's gap is about 56 pt, not the spec's 100, since Lyrics came); at the accessibility sizes the ••• menu's
+  first line says the speed instead.
+- **Kept** under the web's key; given to the engine before any lane begins, so at 1x the chain is never made.
+- **What the first half left**: the lock screen's rate is the speed while playing (told four times a second at
+  most through a drag, `SpeedPublishing`), its elapsed time the song's; plays cap a step at the clock times the
+  fastest speed it spanned (`ListenTracker.speedChanged`), so 2x counts in full; and the restart's `.loading` is
+  shown as playing for up to a second (`SpeedRestartHold`), on Play/Pause's spinner and the lock screen.
+- **Debug's Speed row**, last in the Turntable section, with the song's pace measured over the last 8 s.
+
+**The version: 0.7 (7)**, pinned where 0.6 was: `Base.xcconfig`, `check_project.py`, `ios.yml`'s check of the built
+Info.plist, `tests/test_ios_install.py`, About's doc comment, `ios/README.md` and docs/ios.md (the title, the opening,
+install.sh's line, About's row, "The speed" under the turntable, the cover's chip, Debug's Speed row, the lock screen,
+plays, "The speed's checks (app 0.7)", and the fader gone from "What it can't do yet"). `src/__init__.py` untouched.
+
+**After the review**: the fader's target overhangs the plinth's right edge (about 15.5 pt on a 393 pt phone), and the
+plinth-sized view took no touch there - the view is `touchWidth` wide now, the plinth drawn where it was; the fader's
+touch view is under the arm's; a look switched mid-drag lets the fader go (`destroy()`, as `closed()`); a join at 2x
+tested. Details in the spec's "After the review" under "Slice 4, second half, built".
+
+Phone-only, all of it: checks 25-38.
+
 ## The EQ, slice 1: Core (2026-11-12)
 
 The design is notes/ios-specs/eq.md. Its slice 1 (5.1) is the EQ's pure part, in DeadwaxCore and tested like the rest
