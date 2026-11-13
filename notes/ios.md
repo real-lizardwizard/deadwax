@@ -3650,3 +3650,15 @@ deck's, the song changed under each, then the lift - only the click's wake, the 
 tap a tap again; the arm held as the song changes, then the record's click and its next press, both taps. Mutations:
 the line taken out (the new test and both replays of the trace fail), and set for the arm's drag too (the arm's test
 fails). docs/ios.md says it under Tap the record, in the words docs/player.md uses.
+
+### 2.1.13, the filing refusals' words
+
+errorWords.ts's JOB_ERRORS gained the two refusals filing makes now before anything moves (src/poller.py
+READ_ONLY_DOWNLOADS, slskd's folder read-only to deadwax, and FOLDERS_OVERLAP, slskd's folder and the library
+overlapping), and the dry run's sentence was reworded for a row written before 2.1.13 ("back then, deadwax only
+rehearsed adding albums") rather than removed: the server no longer writes it, but an old job still says it.
+`ErrorWords.jobErrors` follows, in the web's order: a listener reads "It downloaded, but deadwax can't move its files
+into your library yet." and "It downloaded, but deadwax isn't set up to add it to your library yet.", each with the
+tell (only whoever runs deadwax can put it right), and the server's own words only as the detail for them.
+error-words.json written again (its job table and job cases); the gate's navidrome.json changed only its hash of
+errorWords.ts. Nothing else on the phone named ORGANIZE_MODE or a dry run.

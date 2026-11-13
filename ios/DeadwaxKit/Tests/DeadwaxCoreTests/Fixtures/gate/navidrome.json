@@ -3,7 +3,7 @@
   "made_from": {
     "ui/src/app/NeedsNavidrome.tsx": "bcf92c13222f42618cf850212ba79c8019f794aaba0883846f2cbabe8b05148c",
     "ui/src/app/access.ts": "efb6d70cf02ecb7d60bb704222e15880efc105c63fbbe2dcf9a289aa39802aa4",
-    "ui/src/lib/errorWords.ts": "f878374b203a853f69ec4b576385ea148bcd190d0bbee4898c82a6f4f055c4a7",
+    "ui/src/lib/errorWords.ts": "4b1c23e36d9f3e155c83b94a8e38a8f413d8b6f54e3abecc06d82b721a7bcfa0",
     "ui/src/lib/navidromeCheck.ts": "a965da176009a527062a2da14f1b1735723b95d02bb331148333b2833b4bfe24"
   },
   "statuses": {

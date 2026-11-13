@@ -288,8 +288,13 @@ public enum ErrorWords {
         JobReason(reason: "the transfer failed", text: "The download didn't finish.", tell: false),
         JobReason(reason: "no transfers reported by slskd", text: "deadwax lost track of this download - the person sharing it may have gone offline, or downloads stopped working for a while.", tell: false),
         JobReason(reason: "cancelled from deadwax", text: "Cancelled.", tell: false),
-        JobReason(reason: "dry run - not organized", text: "Downloaded, but not added to your library: deadwax is set to rehearse adding albums, without moving any files.", tell: true),
+        // (2.1.13) a dry run's: no longer written - filing always moves - but a row from before still says it
+        JobReason(reason: "dry run - not organized", text: "Downloaded, but not added to your library: back then, deadwax only rehearsed adding albums, without moving any files.", tell: true),
         JobReason(reason: "nothing could be organized, check SLSKD_DOWNLOAD_PATH", text: "It downloaded, but deadwax couldn't find its files to add them to your library.", tell: true),
+        // (2.1.13) filing refused before anything moved: slskd's folder read-only to deadwax, or overlapping the
+        // library - each filed by itself once fixed, so "yet", and nothing to do but tell
+        JobReason(reason: "deadwax can't move files out of slskd's download folder, nothing was moved - drop :ro, or run slskd and deadwax as the same PUID/PGID; it is filed by itself once fixed", text: "It downloaded, but deadwax can't move its files into your library yet.", tell: true),
+        JobReason(reason: "slskd's download folder and the library overlap, nothing was moved - set SLSKD_DOWNLOAD_PATH and LIBRARY_PATH to separate folders; it is filed by itself once fixed", text: "It downloaded, but deadwax isn't set up to add it to your library yet.", tell: true),
         JobReason(reason: "deadwax stopped while filing this - check the library and slskd's folder", text: "deadwax stopped while it was adding this to your library.", tell: true),
     ]
 
