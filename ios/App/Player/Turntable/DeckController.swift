@@ -53,6 +53,9 @@ final class DeckPositionFeed: @unchecked Sendable {
     private var started: Double?
     /// when the read of `started` began
     private var startedReadAt = -Double.infinity
+    /// run on the main queue after each reading while set: no display link is running to deliver them (Reduce Motion,
+    /// or the deck hidden), and the 0.1 s tick would hear the song that late - Reduce Motion's take holds until it does
+    private var pushed: (@Sendable () -> Void)?
 
     deinit {
         lock.deinitialize(count: 1)
@@ -92,10 +95,12 @@ final class DeckPositionFeed: @unchecked Sendable {
             if stop { break }
             let read = engine.position()
             let ended = CACurrentMediaTime()
-            locked { () -> Void in
+            let deliver = locked { () -> (@Sendable () -> Void)? in
                 if let read { reading = Reading(seconds: read.seconds, at: ended) }
                 worst = Swift.max(worst, ended - began)
+                return read == nil ? nil : pushed
             }
+            if let deliver { DispatchQueue.main.async(execute: deliver) }
             let rest = 1 / Self.hz - (ended - began)
             if rest > 0 { Thread.sleep(forTimeInterval: rest) }
         }
@@ -105,6 +110,11 @@ final class DeckPositionFeed: @unchecked Sendable {
             started = last
             startedReadAt = readAt
         }
+    }
+
+    /// Each reading handed to the main queue as it comes (`deliver`), or not (nil): the frames deliver them.
+    func push(_ deliver: (@Sendable () -> Void)?) {
+        locked { () -> Void in pushed = deliver }
     }
 
     /// The newest reading, when fresh.
@@ -266,6 +276,8 @@ final class DeckController {
     @ObservationIgnored private var frames: [Int: (Double) -> Void] = [:]
     @ObservationIgnored private var nextFrame = 1
     @ObservationIgnored private var link: CADisplayLink?
+    /// the position queue hands its readings to the main queue: the display link isn't running to deliver them
+    @ObservationIgnored private var pushing = false
     @ObservationIgnored private let frameTarget = DeckFrameTarget()
     @ObservationIgnored private var ticker: Timer?
     /// how late the timer running now fired - the led resume's lateness, when it is the one that asks it
@@ -821,6 +833,17 @@ final class DeckController {
             link = made
         }
         link?.isPaused = !run
+        // with no frames, a handover's readings come as they are read rather than at the 0.1 s tick (2.6, 2.12)
+        if pushing == run {
+            pushing = !run
+            if pushing {
+                feed.push { @Sendable [weak self] () -> Void in
+                    MainActor.assumeIsolated { () -> Void in self?.deliverReading() }
+                }
+            } else {
+                feed.push(nil)
+            }
+        }
     }
 
     /// A frame: the voice's reports in, the handover's reading to the rules' listeners, then each frame asked for, with
