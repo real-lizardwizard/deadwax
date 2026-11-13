@@ -124,12 +124,10 @@ final class DownloadModel {
     @ObservationIgnored private var verifyQueue: [String] = []
     @ObservationIgnored private var verifying: String?
     @ObservationIgnored private var verifyStop = StopFlag()
-    @ObservationIgnored private var sendingPlays = false
-    /// A send asked for while one was on its way: made again once it ends (a start recorded meanwhile goes then).
-    @ObservationIgnored private var sendAgain = false
-    /// Sends of starts that stopped in a row (no answer, a 5xx, a 408, a 429), and the try after the last: 30 s
-    /// doubling to 10 min (PlayHistory.retryAfter).
-    @ObservationIgnored private var startFailures = 0
+    /// (app 0.8) The kept starts and plays sent: Core's KeptSender holds the loop's rules - whose, in which order,
+    /// what is forgotten after which answer, the wait after a failure, the starts held with no store.
+    @ObservationIgnored private var sender: KeptSender!
+    /// The sender's next try after a send of starts stopped (PlayHistory.retryAfter: 30 s doubling to 10 min).
     @ObservationIgnored private var startsRetry: DispatchWorkItem?
     @ObservationIgnored private var launchedFor: Set<String> = []
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
@@ -149,6 +147,12 @@ final class DownloadModel {
         DownloadStore.retirePhase0()
         session.connect { [weak self] event in self?.handle(event) }
         reachability.whenChanged { [weak self] in self?.reachabilityChanged() }
+        sender = KeptSender(world: KeptSendWorld(
+            openStore: { [weak self] in self?.keptStore() },
+            line: { [weak self] in self?.sendLine() },
+            retry: { [weak self] ms in self?.retryStarts(after: ms) },
+            note: { [weak self] line in self?.note(line) },
+            changed: { [weak self] in self?.recountWaiting() }))
         let center = NotificationCenter.default
         observers.append(center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.becameActive() }
@@ -445,88 +449,43 @@ final class DownloadModel {
         note("play kept: \(songID)")
     }
 
-    /// The starts and plays kept sent - the starts first (app 0.8), so a play's count finds its start at deadwax:
-    ///
-    ///  - the starts in batches of at most PlayHistory.postMax, oldest first, each batch forgotten once deadwax took it
-    ///    (it skips any one it can't take, never the batch) or refused it with another 4xx; a 401 holds everything for
-    ///    the next sign-in; no answer, a 5xx, a 408 or a 429 stops them until 30 s on - doubling to 10 min while it
-    ///    keeps failing - or the next start, whichever is first (the plays still go);
-    ///  - then the plays, one at a time: each forgotten on a 200; a 401 holds them; another 4xx drops that one; a 5xx
-    ///    or no answer stops until the next time deadwax answers.
-    ///
-    /// One send at a time: one asked for meanwhile is made once it ends.
+    /// The starts and plays kept sent (app 0.8): Core's KeptSender - the starts first, so a play's count finds its start
+    /// at deadwax, in batches of at most PlayHistory.postMax; then the plays, one at a time - only ever as the person
+    /// whose store is open, and one send at a time.
     func sendKeptPlays() {
-        guard !sendingPlays else {
-            sendAgain = true
-            return
-        }
-        guard reachability.online, server.launch == .ready, server.signInOver == nil,
-              let store, let client = server.client else { return }
-        sendingPlays = true
-        sendAgain = false
-        Task {
-            defer {
-                sendingPlays = false
-                // the counts are the open store's: someone else signed in meanwhile has their own
-                if self.store === store {
-                    playsWaiting = (try? store.database.keptPlays().count) ?? 0
-                    startsWaiting = (try? store.database.keptStartCount()) ?? 0
-                }
-                if sendAgain {
-                    sendAgain = false
-                    sendKeptPlays()
-                }
+        sender.send()
+    }
+
+    /// The open store as the sender reads it: whose, and its database.
+    private func keptStore() -> KeptStore? {
+        store.map { KeptStore(owner: KeptOwner(server: $0.server, person: $0.person), database: $0.database) }
+    }
+
+    /// Who is signed in on this server now - whose a start is, and who a send would go as.
+    private var signedIn: KeptOwner? {
+        KeptOwner.of(server: server.address?.key, me: server.me)
+    }
+
+    /// What sends now, and as whom: nil offline, before the launch is ready, under a sign-in, with no client or no one
+    /// signed in. Each answer comes back on the main thread.
+    private func sendLine() -> KeptLine? {
+        guard reachability.online, server.launch == .ready, server.signInOver == nil, let client = server.client,
+              let owner = signedIn else { return nil }
+        return KeptLine(owner: owner, sendStarts: { starts, done in
+            Task { @MainActor in done(await KeptLine.status { _ = try await client.recordStarts(starts) }) }
+        }, sendPlay: { play, done in
+            Task { @MainActor in
+                done(await KeptLine.status { try await client.scrobble(songID: play.songID, submission: true, time: play.timeMs) })
             }
-            starts: while self.store === store {
-                let batch = (try? store.database.keptStarts(limit: PlayHistory.postMax)) ?? []
-                if batch.isEmpty { break }
-                var status: Int?
-                do {
-                    try await client.recordStarts(batch.map(\.played))
-                    status = 200
-                } catch let failure as APIFailure {
-                    status = failure.answer?.status
-                } catch {
-                    status = nil
-                }
-                guard self.store === store else { return }
-                switch PlayHistory.after(status: status) {
-                case .sent, .dropped:
-                    startFailures = 0
-                    //? (a store that can't forget them stops here, rather than send them again and again)
-                    guard (try? store.database.forgetStarts(batch.map(\.id))) != nil else { break starts }
-                    //? the log is the downloads' 50 lines: a start sent as it is made isn't news, a backlog or a refusal is
-                    if status != 200 { note("starts refused (\(status ?? 0)): \(batch.count) let go") }
-                    else if batch.count > 1 { note("starts sent: \(batch.count)") }
-                case .held:
-                    return
-                case .stopped:
-                    startFailures += 1
-                    let wait = PlayHistory.retryAfter(startFailures)
-                    note("starts not sent (\(status.map(String.init) ?? "no answer")): again in \(wait / 1000) s")
-                    retryStarts(after: wait)
-                    break starts
-                }
-            }
-            for play in (try? store.database.keptPlays()) ?? [] {
-                guard self.store === store else { return }
-                var status: Int?
-                do {
-                    try await client.scrobble(songID: play.songID, submission: true, time: play.timeMs)
-                    status = 200
-                } catch let failure as APIFailure {
-                    status = failure.answer?.status
-                } catch {
-                    status = nil
-                }
-                switch PendingPlays.after(status: status) {
-                case .sent, .dropped:
-                    try? store.database.forgetPlay(play.id)
-                case .held, .stopped:
-                    return
-                }
-            }
-        }
+        })
+    }
+
+    /// Debug's counts: the open store's plays and starts, and the starts held with no store for whoever is signed in.
+    private func recountWaiting() {
+        let plays = (try? store?.database.keptPlays().count) ?? 0
+        let starts = ((try? store?.database.keptStartCount()) ?? 0) + sender.looseCount(signedIn)
+        if plays != playsWaiting { playsWaiting = plays }
+        if starts != startsWaiting { startsWaiting = starts }
     }
 
     /// The next send of the starts, `ms` from now (a start recorded before then sends at once).
@@ -541,16 +500,15 @@ final class DownloadModel {
 
     // MARK: play history's starts (app 0.8)
 
-    /// A song begun, kept until deadwax takes it - and sent now, if it can be. Nothing when no one's store is open.
+    /// A song begun, kept until deadwax takes it - in the person's store, or held by the sender while none is open -
+    /// and sent now, if it can be.
     func keepStart(_ played: Played) {
-        guard let store, (try? store.database.keepStart(played)) != nil else { return }
-        startsWaiting += 1
-        sendKeptPlays()
+        sender.keep(played, owner: signedIn)
     }
 
-    /// A play counted: its start, if it is still waiting, sent counted.
+    /// A play counted: its start, wherever it waits, sent counted.
     func countStart(songID: String, at: Int64) {
-        try? store?.database.countStart(songID: songID, at: at)
+        sender.counted(songID: songID, at: at)
     }
 
     /// The starts waiting to be sent, oldest first - drawn in Up Next before deadwax has them.
@@ -685,7 +643,7 @@ final class DownloadModel {
         otherBytes = 0
         playsWaiting = 0
         startsWaiting = 0
-        startFailures = 0
+        sender.storeClosed()
         startsRetry?.cancel()
         startsRetry = nil
         forceQuitAt = nil
@@ -1340,10 +1298,7 @@ final class DownloadModel {
         let quit = (try? store.database.meta("force_quit_at")).flatMap { $0.flatMap(Double.init) }
         let at = quit.map { Date(timeIntervalSince1970: $0 / 1000) }
         if at != forceQuitAt { forceQuitAt = at }
-        let plays = (try? store.database.keptPlays().count) ?? 0
-        if plays != playsWaiting { playsWaiting = plays }
-        let starts = (try? store.database.keptStartCount()) ?? 0
-        if starts != startsWaiting { startsWaiting = starts }
+        recountWaiting()
     }
 
     // MARK: helpers

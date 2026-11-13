@@ -45,6 +45,7 @@ struct UpNextScreen: View {
     @Environment(PlayerModel.self) private var player
     @Environment(DownloadModel.self) private var downloads
     @Environment(HistoryModel.self) private var history
+    @Environment(Reachability.self) private var reachability
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @State private var editing = false
@@ -86,8 +87,6 @@ struct UpNextScreen: View {
         var placed = false
     }
 
-    /// (app 0.8) How near the list's top - in rows - one coming into view asks for the next older page.
-    private static let loadNear = 10
     /// The covers' sizes: the song playing's, and a row's.
     private static let playingCover: CGFloat = 64
     private static let rowCover: CGFloat = 44
@@ -120,7 +119,7 @@ struct UpNextScreen: View {
                                 Section {
                                     if let failure {
                                         VStack(alignment: .leading, spacing: 8) {
-                                            ErrorNote(failure.error, failed: UpNextWords.earlierFailed, retry: true)
+                                            ErrorNote(failure, failed: UpNextWords.earlierFailed, retry: true)
                                             Button(UpNextWords.tryAgain) { history.retry() }
                                                 .buttonStyle(.borderless)
                                         }
@@ -227,6 +226,13 @@ struct UpNextScreen: View {
                         //? back at the front: what the web played meanwhile
                         if phase == .active { history.refresh() }
                     }
+                    //? the network back: the newest page, not asked offline
+                    .onChange(of: reachability.online) { _, online in
+                        if online { history.refresh() }
+                    }
+                    //? an older page landed with the rows near the top still in view: none came into view to ask for
+                    //? the next, so it is asked for here
+                    .onChange(of: history.landed) { _, _ in askAgainNearTop() }
                     .onChange(of: playingKey) { _, now in
                         let target = focusAtCard
                         focusAtCard = nil
@@ -297,13 +303,23 @@ struct UpNextScreen: View {
         }
     }
 
-    /// (app 0.8) A row above the song playing came into view: one of the list's first `loadNear`, once the sheet has
-    /// been placed (scrolled up to, then), asks for the next older page - while there is one, none is on its way, and
-    /// the last didn't fail (Try again asks then).
+    /// (app 0.8) A row above the song playing came into view: one of the list's first `HistoryAsking.near`, once the
+    /// sheet has been placed (scrolled up to, then), asks for the next older page - while there is one, none is on its
+    /// way, and the last older one didn't fail (Try again asks then; the newest page's failure never stops it).
     private func appeared(_ id: AnyHashable, at index: Int) {
         seen.ids.insert(id)
-        guard seen.placed, index < Self.loadNear, history.more, !history.loading, history.failure == nil else { return }
+        guard seen.placed, index < HistoryAsking.near, history.mayAskOlder else { return }
         history.older()
+    }
+
+    /// (app 0.8) An older page landed: the next asked for at once when a row among the list's first
+    /// `HistoryAsking.near` is still in view (HistoryAsking.asksAgain) - a page that added no row above them brings
+    /// none into view to ask.
+    private func askAgainNearTop() {
+        guard seen.placed, !editing, player.upNext.playing != nil, history.mayAskOlder else { return }
+        let order = PlayHistory.pastRows(history.plays, queue: player.queue).map { AnyHashable($0.key) }
+            + player.upNext.history.map { AnyHashable($0.key) }
+        if HistoryAsking.asksAgain(order, inView: seen.ids, more: history.more) { history.older() }
     }
 
     /// (app 0.8) Something above changed - a page of older songs landed, the newest page came, a failure said or let

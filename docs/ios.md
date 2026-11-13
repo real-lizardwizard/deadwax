@@ -1030,15 +1030,18 @@ sound, the moment Navidrome is told "now playing", skips included:
   sent in one go of several batches. If deadwax answers but can't take them just then, the phone tries
   again 30 seconds on, then a minute, two, and so on up to every 10 minutes, and at the next song.
   Signed out, they wait for you to sign in again as the same person; they're never sent for anyone
-  else.
+  else. If the phone can't read that store ("This phone couldn't read its downloads"), the songs you
+  start are held while the app is open and sent from there.
 - **The newest 100** are also kept on the phone each time they come, so Up Next shows what you played
   lately with deadwax out of reach. Older ones need deadwax.
 - **Kept by deadwax, for ever** - with logins on, each person's own; with logins off, one list for
   everyone who uses this deadwax. There's no Clear, here or in the web app. Removing someone in People,
   or Forget, takes theirs with the rest of what deadwax kept for them.
 
-Up Next asks deadwax for the newest songs each time it opens, and again when you come back to the app
-with it open, so what you played in the web app meanwhile shows.
+Up Next asks deadwax for the newest songs each time it opens, again when you come back to the app with
+it open, and again when the network comes back with it open, so what you played in the web app meanwhile
+shows. Offline it doesn't ask: it shows what the phone kept, with no "couldn't load" line unless you
+scroll past that for older songs.
 
 ## Picking up where you left off
 
@@ -1620,6 +1623,10 @@ the Mac, signed in as you.
   the older songs come, and the line goes.
 - **48 Someone else.** With logins on, sign out and sign in as someone else: none of the first
   person's songs in Up Next, nor sent as theirs.
+- **49 Back in reach.** Turn on Airplane Mode and open Up Next: the songs the phone kept, and no
+  "Couldn't load" line at the top. Play a song in the web app on the Mac, then, with Up Next still open
+  on the phone, turn Airplane Mode off: the web app's song comes in without closing Up Next. Scrolling
+  up then goes on loading older songs as before.
 
 ## What it can't do yet
 

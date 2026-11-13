@@ -116,8 +116,9 @@ import Testing
         var starts = 0
         var unlike: [Int] = []
         var problems: [String] = []
+        var tally = (looked: 0, above: 0)
         for run in 0..<runs {
-            let made = propertyRun(run, steps: steps, problems: &problems)
+            let made = propertyRun(run, steps: steps, problems: &problems, tally: &tally)
             starts += made.starts
             if run == 0 {
                 for (step, line) in made.lines.enumerated() where step < sample.count && !sameText(line, sample[step]) {
@@ -129,13 +130,16 @@ import Testing
         }
         #expect(problems.isEmpty, "\(problems.prefix(5))")
         #expect(starts == property["starts"]?.int)
+        // the check made here, on the phone's own answers, saw both kinds of start, many times over
+        #expect(tally.looked > 100_000 && tally.above > 10_000, "\(tally)")
         #expect(unlike.isEmpty, "\(unlike.count) runs unlike the web's, the first \(unlike.prefix(5))")
     }
 
     // MARK: - the runs
 
     /// export-history.cjs's propertyRun, move for move and number for number.
-    private func propertyRun(_ run: Int, steps: Int, problems: inout [String]) -> (lines: [String], starts: Int) {
+    private func propertyRun(_ run: Int, steps: Int, problems: inout [String],
+                             tally: inout (looked: Int, above: Int)) -> (lines: [String], starts: Int) {
         let random = Seeded(Int64(run) * 1_000_003 % 2_147_483_646 + 1)
         _ = random.next()
         let pick = { (count: Int) in random.pick(count) }
@@ -217,6 +221,7 @@ import Testing
                 began = true
             }
             if began { begin() }
+            drawnOnce(recorded, queue, mode, limit: limit, at: "run \(run) step \(step)", &problems, &tally)
             let pages = recorded.enumerated().filter { $0.offset % 3 == 0 }.map(\.element.asCounted)
             let plays = PlayHistory.merged(pages, recorded)
             let shows = PlayHistory.queueShows(queue, limit: limit)
@@ -227,6 +232,54 @@ import Testing
             ].joined(separator: "|"))
         }
         return (lines, recorded.count)
+    }
+
+    /// EACH START DRAWN EXACTLY ONCE, judged here on the phone's own answers (history.sim's check, which the lines above
+    /// only replay): every start recorded is either the queue's - and then a row Up Next draws stands for its entry
+    /// (History's, the song playing's, the songs added, the list's first `limit`) and no older row claims it - or
+    /// exactly one older row's: the run of one song it falls in, drawn by pastRows, and its entry no row of the queue's.
+    private func drawnOnce(_ recorded: [Played], _ queue: UpNextQueue, _ mode: Repeat, limit: Int, at label: String,
+                           _ problems: inout [String], _ tally: inout (looked: Int, above: Int)) {
+        guard let state = queue.upNext else { return }
+        let shows = PlayHistory.queueShows(queue, limit: limit)
+        let view = upNextView(queue, mode, limit: limit)
+        let viewKeys = Set((view.history + view.added + (view.list?.rows ?? [])).map(\.key))
+        func unitStart(_ place: Int) -> Int {
+            var at = place
+            while at > 0 && state.marks[at].from == .one { at -= 1 }
+            return at
+        }
+        let playingStart = unitStart(queue.index)
+        func drawnByQueue(_ place: Int) -> Bool {
+            place >= 0 && (unitStart(place) == playingStart || viewKeys.contains(state.marks[unitStart(place)].key))
+        }
+        let ordered = PlayHistory.merged([], recorded)
+        let pastKeys = Set(PlayHistory.pastRows(ordered, queue: queue, limit: limit).map(\.key))
+        // which older row stands for each start not the queue's: its run's first, walking oldest first
+        var runOf: [String: String] = [:]
+        var current = ""
+        var lastSong: String?
+        for played in ordered.reversed() where !PlayHistory.shownByQueue(played, shows) {
+            if lastSong.map({ !WebText.same(played.song.id, $0) }) ?? true {
+                current = PlayHistory.key(played)
+                lastSong = played.song.id
+            }
+            runOf[PlayHistory.key(played)] = current
+        }
+        for played in recorded {
+            tally.looked += 1
+            let key = PlayHistory.key(played)
+            let ours = played.queue.map { WebText.same($0, state.id) } ?? false
+            let place = ours ? (state.marks.firstIndex { $0.key == played.entry } ?? -1) : -1
+            if PlayHistory.shownByQueue(played, shows) {
+                if !drawnByQueue(place) { problems.append("\(label): \(key) the queue's, but no row of it draws it") }
+                if runOf[key] != nil { problems.append("\(label): \(key) drawn twice") }
+            } else {
+                tally.above += 1
+                if !pastKeys.contains(runOf[key] ?? "") { problems.append("\(label): \(key) drawn nowhere") }
+                if ours && drawnByQueue(place) { problems.append("\(label): \(key) above, and its entry a row of the queue's too") }
+            }
+        }
     }
 
     // MARK: - reading the fixture

@@ -18,9 +18,12 @@ import Observation
 ///    with deadwax out of reach, until a page comes.
 ///  - OLDER PAGES as Up Next is scrolled up to its oldest rows (`older`), one at a time, from the cursor the last gave
 ///    (withOlder) - until there are none. They need deadwax.
-///  - ONLY THE NEWEST ANSWER DRAWS: each ask numbered, and the person's too.
+///  - ONLY THE NEWEST ANSWER DRAWS: each ask numbered (Core's HistoryAsking, which holds these rules), and the
+///    person's too.
 ///  - A FAILURE is kept, for Up Next to say in a listener's words (ErrorWords) with Try again (`retry`, the ask that
-///    failed) - and scrolling asks no more until it is tried again.
+///    failed): an older page's stops scrolling from asking until then; the newest page's never stops the older pages,
+///    and offline the newest page isn't asked for - what this phone keeps is drawn - nor its earlier failure said.
+///    Up Next asks for it again as the network comes back.
 ///
 /// Another person (ServerModel.whenPersonChanges): everything let go (`reset`), and their own read from their store.
 @MainActor
@@ -28,26 +31,30 @@ import Observation
 final class HistoryModel {
     /// Every start held and made, newest first, each once.
     private(set) var plays: [Played] = []
-    /// An older page is on its way.
-    private(set) var loading = false
-    /// The last ask's failure - said with Try again; nil when it didn't fail.
-    private(set) var failure: Failure?
+    /// What may be asked, and what failed.
+    private(set) var asking = HistoryAsking()
+    /// Each older page that landed, counted: Up Next asks again when the rows near the top are still in view.
+    private(set) var landed = 0
     /// What deadwax's pages brought, and where to ask on from.
     private var held = HistoryHeld.nothing
 
     /// There are older plays than those held: scrolling up asks for them.
     var more: Bool { held.before != nil }
-
-    struct Failure {
-        let error: any Error
-        let ask: Ask
+    /// An older page is on its way.
+    var loading: Bool { asking.loadingOlder }
+    /// The failure to say with Try again, and its error - nil for none.
+    var failure: (any Error)? {
+        switch asking.shown(online: reachability.online) {
+        case .older?: olderError
+        case .newest?: newestError
+        case nil: nil
+        }
     }
-
-    enum Ask {
-        case newest, older
-    }
+    /// An older page may be asked for now.
+    var mayAskOlder: Bool { asking.mayAskOlder(more: more) }
 
     @ObservationIgnored private let server: ServerModel
+    @ObservationIgnored private let reachability: Reachability
     @ObservationIgnored weak var downloads: DownloadModel?
     /// This run's own starts (the newest 500) and the continuation a queue put back set.
     @ObservationIgnored private var outbox = HistoryOutbox()
@@ -57,12 +64,12 @@ final class HistoryModel {
     @ObservationIgnored private var waiting: [Played] = []
     /// The person whose kept page and starts were read (ServerModel.person); nil: not yet.
     @ObservationIgnored private var readFor: Int?
-    @ObservationIgnored private var newestAsk = 0
-    @ObservationIgnored private var olderAsk = 0
-    @ObservationIgnored private var asking = false
+    @ObservationIgnored private var newestError: (any Error)?
+    @ObservationIgnored private var olderError: (any Error)?
 
-    init(server: ServerModel) {
+    init(server: ServerModel, reachability: Reachability) {
         self.server = server
+        self.reachability = reachability
     }
 
     // MARK: what the player tells it
@@ -98,59 +105,53 @@ final class HistoryModel {
         refresh()
     }
 
-    /// The newest page, joined to what is held - as Up Next opens, and as the app comes to the front with it open
-    /// (what the web played meanwhile).
+    /// The newest page, joined to what is held - as Up Next opens, as the app comes to the front with it open (what
+    /// the web played meanwhile), and as the network comes back. Not asked offline.
     func refresh() {
-        guard let client = server.client else { return }
-        newestAsk += 1
-        let ask = newestAsk
+        guard let client = server.client, let ask = asking.askNewest(online: reachability.online) else { return }
         let person = server.person
         Task {
             do {
                 let page = try await client.historyPage()
-                guard ask == newestAsk, person == server.person else { return }
+                guard person == server.person, asking.newestCame(ask) else { return }
+                newestError = nil
                 held = PlayHistory.withNewest(held, page)
                 downloads?.keepHistoryPage(page)
-                if failure?.ask == .newest { failure = nil }
                 redraw()
             } catch {
-                guard ask == newestAsk, person == server.person, !APIFailure.isCancellation(error) else { return }
-                failure = Failure(error: error, ask: .newest)
+                guard person == server.person, !APIFailure.isCancellation(error) else { return }
+                if asking.failedNewest(ask) { newestError = error }
             }
         }
     }
 
-    /// The page before the oldest held - one at a time, while there is one, and not after a failure until Try again.
+    /// The page before the oldest held - one at a time, while there is one, and not after an older page's failure
+    /// until Try again.
     func older() {
-        guard let from = held.before, !asking, failure == nil, let client = server.client else { return }
-        asking = true
-        loading = true
-        olderAsk += 1
-        let ask = olderAsk
+        guard let from = held.before, let client = server.client, let ask = asking.askOlder(more: more) else { return }
         let person = server.person
         Task {
             do {
                 let page = try await client.historyPage(before: from)
-                guard ask == olderAsk, person == server.person else { return }
-                asking = false
-                loading = false
+                guard person == server.person, asking.olderCame(ask) else { return }
+                olderError = nil
                 held = PlayHistory.withOlder(held, from: from, page)
-                if failure?.ask == .older { failure = nil }
                 redraw()
+                landed += 1
             } catch {
-                guard ask == olderAsk, person == server.person, !APIFailure.isCancellation(error) else { return }
-                asking = false
-                loading = false
-                failure = Failure(error: error, ask: .older)
+                guard person == server.person, !APIFailure.isCancellation(error) else { return }
+                if asking.failedOlder(ask) { olderError = error }
             }
         }
     }
 
     /// Try again: the ask that failed, again.
     func retry() {
-        let ask = failure?.ask
-        failure = nil
-        if ask == .older { older() } else { refresh() }
+        switch asking.retry(online: reachability.online) {
+        case .older?: older()
+        case .newest?: refresh()
+        case nil: refresh()
+        }
     }
 
     /// Another person: nothing of the last one's kept, and every answer still on its way dropped.
@@ -160,11 +161,9 @@ final class HistoryModel {
         kept = []
         waiting = []
         readFor = nil
-        newestAsk += 1
-        olderAsk += 1
-        asking = false
-        loading = false
-        failure = nil
+        asking.reset()
+        newestError = nil
+        olderError = nil
         plays = []
     }
 

@@ -396,3 +396,112 @@ public struct HistoryOutbox: Sendable, Equatable {
         continuation = nil
     }
 }
+
+/// What Up Next's play history may ask deadwax, and which failure it says (the App's HistoryModel, which holds the
+/// answers and the errors): each ask numbered, so only the newest answer of each kind counts; an older page one at a
+/// time; and the two kinds' failures apart -
+///
+///  - an older page's failure stops scrolling from asking until Try again (or every row coming into view would ask
+///    again at once), and is always said;
+///  - the newest page's never stops the older pages, and is said only online: offline the newest page isn't asked
+///    for at all - what the phone keeps is drawn, and an ask could only fail - and one that failed before isn't news.
+///    A newest page that comes lets it go; so does the network coming back, when Up Next asks again.
+public struct HistoryAsking: Sendable, Equatable {
+    public enum Ask: Sendable, Equatable {
+        case newest, older
+    }
+
+    /// How near the list's top - in rows - a row in view asks for the next older page.
+    public static let near = 10
+
+    /// An older page is on its way.
+    public private(set) var loadingOlder = false
+    /// The last newest page asked for failed.
+    public private(set) var newestFailed = false
+    /// The last older page asked for failed.
+    public private(set) var olderFailed = false
+    private var newest = 0
+    private var older = 0
+
+    public init() {}
+
+    /// The newest page asked for: its number - nil offline.
+    public mutating func askNewest(online: Bool) -> Int? {
+        guard online else { return nil }
+        newest += 1
+        return newest
+    }
+
+    /// The newest page's answer came: whether it is the last asked (only that one counts). Its failure let go.
+    public mutating func newestCame(_ ask: Int) -> Bool {
+        guard ask == newest else { return false }
+        newestFailed = false
+        return true
+    }
+
+    /// The newest page's ask failed: whether it is the last asked.
+    public mutating func failedNewest(_ ask: Int) -> Bool {
+        guard ask == newest else { return false }
+        newestFailed = true
+        return true
+    }
+
+    /// An older page may be asked for: there is one (`more`), none is on its way, and the last didn't fail.
+    public func mayAskOlder(more: Bool) -> Bool {
+        more && !loadingOlder && !olderFailed
+    }
+
+    /// The older page asked for: its number - nil when it may not be.
+    public mutating func askOlder(more: Bool) -> Int? {
+        guard mayAskOlder(more: more) else { return nil }
+        older += 1
+        loadingOlder = true
+        return older
+    }
+
+    /// The older page's answer came: whether it is the last asked.
+    public mutating func olderCame(_ ask: Int) -> Bool {
+        guard ask == older else { return false }
+        loadingOlder = false
+        olderFailed = false
+        return true
+    }
+
+    /// The older page's ask failed: whether it is the last asked.
+    public mutating func failedOlder(_ ask: Int) -> Bool {
+        guard ask == older else { return false }
+        loadingOlder = false
+        olderFailed = true
+        return true
+    }
+
+    /// The failure Up Next says, with Try again: an older page's, else the newest page's while online - nil for none.
+    public func shown(online: Bool) -> Ask? {
+        if olderFailed { return .older }
+        return newestFailed && online ? .newest : nil
+    }
+
+    /// Try again: the ask to make again (the failure shown), its failure let go.
+    public mutating func retry(online: Bool) -> Ask? {
+        let ask = shown(online: online)
+        if ask == .older { olderFailed = false } else if ask == .newest { newestFailed = false }
+        return ask
+    }
+
+    /// Another person: every answer on its way dropped, nothing failed.
+    public mutating func reset() {
+        newest += 1
+        older += 1
+        loadingOlder = false
+        newestFailed = false
+        olderFailed = false
+    }
+
+    /// An older page landed: whether to ask for the next at once - there is one, and a row among the list's first `near`
+    /// is still in view. A row coming into view is what asks, so a page that added no row above the ones in view (its
+    /// starts all the queue's own, or one run with the oldest row's) would otherwise leave scrolling stalled at the top.
+    /// `order` the list's rows top to bottom, `inView` those in view.
+    public static func asksAgain<Key: Hashable>(_ order: [Key], inView: Set<Key>, more: Bool) -> Bool {
+        more && order.prefix(near).contains { inView.contains($0) }
+    }
+}

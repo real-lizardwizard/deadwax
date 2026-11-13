@@ -42,7 +42,7 @@ struct DeadwaxApp: App {
         let downloads = DownloadModel(server: server, reachability: reachability, files: files, session: Self.downloadSession)
         player.connect(downloads: downloads, reachability: reachability)
         // play history (app 0.8): each song begun recorded by the player, kept and sent through the person's store
-        let history = HistoryModel(server: server)
+        let history = HistoryModel(server: server, reachability: reachability)
         history.downloads = downloads
         player.history = history
         let debug = DebugModel(server: server, player: player, downloads: downloads)

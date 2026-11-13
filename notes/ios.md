@@ -3750,9 +3750,17 @@ queue's when `sameQueue` says it is the same queue, else gets a new one. ResumeC
 - **Routes**: `history` (GET, `limit`, `before_at`, `before_id`) and `recordHistory` (POST) - 30 routes;
   `DeadwaxClient.historyPage(before:limit:)` and `recordStarts`.
 - **DownloadDatabase version 3: `start_pending`** in the person's download store - the starts deadwax hasn't taken,
-  oldest first (`keepStart`, `keptStarts(limit:)`, `keptStartCount`, `forgetStarts`, `countStart`). `removeAll` keeps
+  oldest first (`keepStart`, `keptStarts(limit:)`, `keptStartCount`, `forgetStarts` - each start only while its
+  `counted` is as it was read, see "After review" below - `countStart`). `removeAll` keeps
   them (they are the person's plays, not downloads); a version 2 file gains the table with its kept plays intact. The
   newest page is kept in `meta` (`PlayHistory.keptPageKey`, JSON) for Up Next offline.
+- **KeptSend.swift** (after review): `KeptSender`, the send loop's decisions - whose (`KeptOwner`), the starts first in
+  batches, what is forgotten after which answer, the 401 hold, the wait after a failure, one send at a time, the
+  starts held with no store - over a world of closures (`KeptSendWorld`: the open store, the line, the retry timer,
+  the log, the counts), callback-based and on one thread like ResumeController. The App's DownloadModel only wires it.
+- **`HistoryAsking`** (PlayHistory.swift, after review): what Up Next's history may ask and which failure it says -
+  the newest page and the older pages each latest-only by ask number, their failures kept apart, the newest not
+  asked for offline nor its failure said, `asksAgain` (a page landed with the first 10 rows still in view).
 - **`QueueController.playAgain`**: an older row's tap as ONE edit - `withNext` then `jumpedTo` the key it was given,
   through `jump` like a row's tap, so it is never held for the join and never waits as Playing Next (the web's Play
   Next then jumpTo, as one change). With nothing to play next to (`playsAlone()`: nothing playing, no Up Next, or a
@@ -3762,19 +3770,24 @@ queue's when `sameQueue` says it is the same queue, else gets a new one. ResumeC
 
 - **HistoryModel** (`@Observable`): `plays` = `merged(held.asked ? held.plays : kept, outbox.own + waiting)`.
   `opened()` reads the person's kept page and waiting starts once (per person, once their store is open), draws, and
-  asks for the newest page (`refresh()`, latest-only by ask number and person; kept to `meta`); `older()` one page at
-  a time from `held.before`, not after a failure until Try again; `failure` is said with ErrorWords and Try again
-  (`retry()`, the ask that failed); `reset()` on another person.
-- **Sending** (`DownloadModel.sendKeptPlays`): the starts first, so a play's count finds its start - batches of at
-  most `PlayHistory.postMax` (500), oldest first; sent or refused with another 4xx, forgotten; a 401 holds them for the
-  same person's next sign-in; no answer, a 5xx, a 408 or a 429 stops them until 30 s on, doubling to 10 min
-  (`retryAfter`, a DispatchWorkItem), or the next start - then the plays as before. One send at a time: one asked for
-  meanwhile is made once it ends (`sendAgain`). A start is sent as it is made (`keepStart` asks a send). Debug >
-  Downloads: **Starts waiting to be sent**; the downloads log notes a backlog sent or a refusal, not each start.
+  asks for the newest page (`refresh()`, latest-only by ask number and person; kept to `meta`; not offline); `older()`
+  one page at a time from `held.before`, not after an older page's failure until Try again; `failure` is said with
+  ErrorWords and Try again (`retry()`, the ask that failed) - an older page's always, the newest's only online;
+  `reset()` on another person. The asking itself is Core's `HistoryAsking`.
+- **Sending** (`DownloadModel.sendKeptPlays`, Core's `KeptSender` since review): the starts first, so a play's count
+  finds its start - batches of at most `PlayHistory.postMax` (500), oldest first; taken (any 2xx) or refused with
+  another 4xx, forgotten - each only as it was read; a 401 holds them for the same person's next sign-in; no answer,
+  a 5xx, a 408 or a 429 stops them until 30 s on, doubling to 10 min (`retryAfter`, a DispatchWorkItem), or the next
+  start - then the plays as before. One send at a time: one asked for meanwhile is made once it ends. Nothing goes
+  while the store open isn't the person a request would go as. A start is sent as it is made (`keepStart` asks a
+  send). Debug > Downloads: **Starts waiting to be sent** (the store's and any held with no store); the downloads log
+  notes a backlog sent, a refusal or starts that counted on their way, not each start.
 - **Up Next** (UpNextScreen): above the card, one Section with no header - the failure (ErrorNote with Try again), the
   older rows (`PlayHistory.pastRows`), then the queue's own History; none in Edit. The newest page is asked for as Up
-  Next opens and as the app comes to the front with it open (`scenePhase`). The next older page is asked for when one
-  of the list's first 10 rows comes into view after the sheet was placed at the song playing (`toCard`). Its spinner
+  Next opens, as the app comes to the front with it open (`scenePhase`) and as the network comes back with it open
+  (`reachability.online`). The next older page is asked for when one of the list's first 10 rows comes into view
+  after the sheet was placed at the song playing (`toCard`) - and again when a page lands with one of them still in
+  view (`history.landed`, `askAgainNearTop`). Its spinner
   is an OVERLAY over the list's top ("Loading earlier songs" to VoiceOver), never a row: a row would move the list.
   **The hold**: SwiftUI's List keeps its content offset when rows land above, which would carry the view away; so
   each row's onAppear/onDisappear keeps the rows in view in a plain class (`Seen`, not observed - scrolling redraws
@@ -3784,6 +3797,46 @@ queue's when `sameQueue` says it is the same queue, else gets a new one. ResumeC
   alone), `holdAt` so the change of song keeps the scroll, VoiceOver's focus kept on the row, "Playing {title}" said.
   Each row's name is the History row's, "{title}, play again", and a song not on the phone is dimmed offline as
   every row is.
+
+### After review (0f1ab03's, the same day)
+
+The review found nothing serious; these were its points, each fixed in Core where a test reaches it:
+
+1. **A play counted while its start's batch was on its way lost "counted".** The scrobble's mark can reach deadwax
+   before the batch's insert, finding no row; forgetting the batch by id then deleted the start marked meanwhile.
+   `forgetStarts` now takes the starts as read and deletes `WHERE id = ? AND (counted != 0) = ?`: one counted
+   mid-flight stays and goes again, counted, and deadwax ORs it in (historyOutbox.ts's own rule). The log says
+   "starts counted on their way".
+2. **A send under the next person's session.** The App's change of person is a hop on the main queue
+   (serverChanged), while sign-in has already set the new client: a retry, a reachability change or the app coming
+   to the front in that hop sent the last person's starts and plays as the new one. KeptSender compares the line's
+   owner (who a request goes as, asked again before EVERY request) with the open store's, and sends nothing while
+   they differ; a start made in the hop is held for its own person until their store opens.
+3. **Starts lost with no store** (it couldn't be read, a failed migration, a start before it opens): held by the
+   sender per person (`loose`, the newest 500), put into their store once it opens, or - while none will - sent from
+   there as the web sends its own, by the same rules. Counted marks reach them too.
+4. **A 2xx whose body didn't decode wedged the outbox** (decode threw with no status, read as no answer: the same
+   batch again for ever). `recordStarts` takes any 2xx as taken and decodes `HistoryTaken` with `try?`.
+5. **A newest-page failure blocked the older pages, and was shown offline.** Up Next offline always failed its
+   refresh, and then scrolling up loaded nothing. The two failures are now kept apart (`HistoryAsking`): only an
+   older page's stops the older pages; offline, the newest page isn't asked for and its failure isn't said; it is
+   asked for again when the network comes back with Up Next open.
+6. **A page that brought no row into view stalled loading** (asked for only as a row newly appeared). After an
+   older page lands with more to come and one of the first 10 rows still in view, the next is asked for
+   (`HistoryAsking.asksAgain`, `askAgainNearTop`).
+7. **History's word.** UpNextWords.history's comment said it names the region for VoiceOver; nothing uses it, and
+   James wants no heading. The comment was corrected rather than a hidden header added: a played row already says
+   "{title}, play again", the song playing's title is the next heading, and a hidden header's effect on the List's
+   layout and the hold couldn't be checked here. The word stays, the web's, held by the vectors.
+
+Tests: KeptSenderTests (18: the order and the batches, any 2xx, the other 4xx, the 401 hold, the backoff and its
+reset, counted mid-flight both through the sender and at the store, a send asked for meanwhile, offline, another
+person's store, a change of person or a closed store mid-send, the starts held with no store - sent from there, put
+into their store, capped - a start into another person's store held, the status read, a taken batch whatever its
+body); HistoryAskingTests (4); the version 2 upgrade now fills every table (songs, origins, albums, loudness, lyrics
+and their trigger, plays, queue_pending, meta) and proves each survives; and HistoryVectorTests' property run asserts
+"each start drawn exactly once" on the phone's own answers at every step (history.sim's check, ported), not only
+replaying the TypeScript's lines.
 
 ### The fixtures
 
@@ -3813,7 +3866,7 @@ queue's when `sameQueue` says it is the same queue, else gets a new one. ResumeC
 
 docs/ios.md: the title and opening, Up Next's "What you've played", a new "What you've played" section (what goes in,
 not a new song, a continuation, offline and the batches, the newest 100 kept, no Clear), Offline, Debug's row, check
-5's words, and "Play history's checks (app 0.8)", 39-48. docs/player.md and docs/troubleshooting.md: the native app's
+5's words, and "Play history's checks (app 0.8)", 39-49 (49 since review: offline Up Next, and back in reach). docs/player.md and docs/troubleshooting.md: the native app's
 plays are sent since its 0.8 (they said "not yet"). notes/play-history.md points here.
 
 **The version: 0.8 (8)**, where 0.7 was: `Base.xcconfig`, `check_project.py`, `ios.yml`'s Info.plist check,
@@ -3831,7 +3884,13 @@ Verified (2026-11-13, this Mac, Xcode's toolchain):
 - every ios*.sim (10, ioshistory's new among them) on Node 22 with a scratch TMPDIR, into this worktree's own `npm
   ci` of ui/, deleted afterwards.
 
-Not verified: anything on a phone - checks 39-48 in docs/ios.md: the view held as a page lands above (SwiftUI's List
+After review (the same day, the same checks): `swift test` Core 1033 (from 1011: KeptSenderTests 18, HistoryAskingTests
+4), DeadwaxAudio 158, DeadwaxTurntable 11 - all pass; the release real-time tests one at a time; the unsigned Release
+device build (0.8 (8), no compiler warnings); check_project.py and the .xcodeproj unchanged; pytest iOS 160 passed, 1
+skipped, and the full 4347 passed, 1 skipped; the ten ios*.sim on Node 22 (a fresh `npm ci`, deleted after). Not run:
+the Core suites on Linux (ios.yml's ubuntu job will).
+
+Not verified: anything on a phone - checks 39-49 in docs/ios.md: the view held as a page lands above (SwiftUI's List
 and `scrollTo` with no animation are the whole mechanism, unseen), the next page asked for near the top, an older
 row's tap under the finger with VoiceOver, the newest page on coming back to the app, offline starts drawn and sent
 on reconnect before the plays, a long backlog in batches, a pick-up mid-song making no start, another person's

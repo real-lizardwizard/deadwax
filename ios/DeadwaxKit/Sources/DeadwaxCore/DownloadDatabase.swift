@@ -417,12 +417,21 @@ public final class DownloadDatabase {
         Int(try integer("SELECT COUNT(*) FROM start_pending") ?? 0)
     }
 
-    /// Starts deadwax took (or will never take), forgotten.
-    public func forgetStarts(_ ids: [Int64]) throws {
-        guard !ids.isEmpty else { return }
+    /// Starts deadwax took (or will never take), forgotten - each only while it is as it was read: one counted since
+    /// (a play counted while its batch was on its way, whose scrobble may have reached deadwax before the batch did)
+    /// stays, to go again counted - deadwax ORs it in. How many were forgotten.
+    @discardableResult
+    public func forgetStarts(_ sent: [KeptStart]) throws -> Int {
+        guard !sent.isEmpty else { return 0 }
+        var gone = 0
         try transaction {
-            for id in ids { try run("DELETE FROM start_pending WHERE id = ?", [.int(id)]) }
+            for start in sent {
+                try run("DELETE FROM start_pending WHERE id = ? AND (counted != 0) = ?",
+                        [.int(start.id), .int(start.played.counted ? 1 : 0)])
+                gone += Int(sqlite3_changes(db))
+            }
         }
+        return gone
     }
 
     /// A counted play's start, if it is still kept, marked counted - it goes with it (deadwax's insert ORs it in).

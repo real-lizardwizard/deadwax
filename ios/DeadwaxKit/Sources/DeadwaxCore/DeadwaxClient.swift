@@ -300,10 +300,20 @@ public struct DeadwaxClient: Sendable {
         return try await call(Routes.history, query: query)
     }
 
-    /// Starts sent to be kept (at most `PlayHistory.postMax`): how many deadwax took, and how many it skipped.
+    /// Starts sent to be kept (at most `PlayHistory.postMax`): how many deadwax took, and how many it skipped - nil when
+    /// its answer doesn't say. Any 2xx is taken, whatever its body: the starts are deadwax's then, and an answer the app
+    /// can't read must never keep them waiting to be sent again for ever (KeptSender forgets a batch only when this
+    /// returns).
     @discardableResult
-    public func recordStarts(_ starts: [Played]) async throws -> HistoryTaken {
-        try await call(Routes.recordHistory, as: HistoryTaken.self, sending: HistoryPost(starts: starts))
+    public func recordStarts(_ starts: [Played]) async throws -> HistoryTaken? {
+        let json: Data
+        do {
+            json = try JSONEncoder().encode(HistoryPost(starts: starts))
+        } catch {
+            throw APIFailure.other("The app couldn't write what it meant to send (HistoryPost).")
+        }
+        let response = try await answer(request(Routes.recordHistory, json: json), accept: Set(200..<300))
+        return try? JSONDecoder().decode(HistoryTaken.self, from: response.body)
     }
 
     // MARK: the turntable's window (turntable.md 4.5)

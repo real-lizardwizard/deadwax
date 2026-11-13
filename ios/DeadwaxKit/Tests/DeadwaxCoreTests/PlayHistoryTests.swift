@@ -135,7 +135,8 @@ import Testing
             try db.countStart(songID: "b", at: t)
             try db.countStart(songID: "c", at: t)
             #expect(try db.keptStarts().map(\.played.counted) == [false, true, false])
-            try db.forgetStarts([ids[0], ids[1]])
+            let read = try db.keptStarts()
+            #expect(try db.forgetStarts(read.filter { $0.id == ids[0] || $0.id == ids[1] }) == 2)
             // kept across a launch
             let again = try DownloadDatabase(path: path)
             #expect(try again.keptStarts().map(\.played) == [tie.asCounted])
@@ -145,21 +146,137 @@ import Testing
         }
     }
 
-    @Test func aVersionTwoFileIsGivenTheTableItsPlaysKept() throws {
+    @Test func aVersionTwoFileIsGivenTheTableEverythingInItKept() throws {
         try withDatabase { _, path in
             let old = URL(fileURLWithPath: path).deletingLastPathComponent().appendingPathComponent("v2.sqlite").path
+            let flac = FLACFacts(rate: 96_000, bits: 24, md5: String(repeating: "cd", count: 16))
+            let done = DownloadRecord(id: "s1", albumID: "al", disc: 1, track: 3, format: "raw", suffix: "flac",
+                                      sizeExpected: 4_000, duration: 201.5, state: .done, check: .matched, bytes: 4_000,
+                                      flac: flac, tries: 1, wantedAt: 10, doneAt: 20)
+            let waiting = DownloadRecord(id: "s2", albumID: "al", suffix: "mp3", wait: .wifi, wantedAt: 11)
+            let album = Data(#"{"id":"al","name":"Mezzanine"}"#.utf8)
+            let loudness = Data(#"{"id":"al","gain":-6.5}"#.utf8)
+            let lyrics = Data(#"{"synced":true,"lines":[{"time":1.5,"text":"one"}]}"#.utf8)
+            let queue = Data(#"{"answer":"kept"}"#.utf8)
             do {
                 let v2 = try DownloadDatabase(path: old, upTo: 2)
                 #expect(try v2.userVersion() == 2)
-                try v2.keepPlay(songID: "a", timeMs: 5)
+                try v2.put(done)
+                try v2.put(waiting)
+                try v2.addOrigin(.album("al"), song: "s1", at: 10)
+                try v2.addOrigin(.song, song: "s2", at: 11)
+                try v2.putAlbum(id: "al", json: album, fetchedAt: 12)
+                try v2.setCover(album: "al", file: "al.jpg")
+                try v2.putLoudness(album: "al", json: loudness, algorithm: 3, fetchedAt: 13)
+                #expect(try v2.putLyrics(song: "s1", json: lyrics, etag: "\"e1\"", fetchedAt: 14))
+                try v2.keepPlay(songID: "s1", timeMs: 5)
+                try v2.keepQueue(kind: "unsent", body: queue, at: 15)
+                try v2.setMeta("force_quit_at", "16")
                 #expect(throws: DownloadDatabase.Failure.self) {
                     try v2.keepStart(Played(at: 1, queue: nil, entry: nil, song: rTrack("a")))
                 }
             }
             let v3 = try DownloadDatabase(path: old)
             #expect(try v3.userVersion() == 3)
-            #expect(try v3.keptPlays().map(\.songID) == ["a"])
+            // every row of every table as it was
+            #expect(try v3.songs() == [done, waiting])
+            #expect(try v3.origins() == ["s1": [.album("al")], "s2": [.song]])
+            let albums = try v3.albums()
+            #expect(albums.map(\.id) == ["al"] && albums.first?.json == album && albums.first?.cover == "al.jpg"
+                    && albums.first?.fetchedAt == 12)
+            let levels = try v3.loudness()
+            #expect(levels.map(\.id) == ["al"] && levels.first?.json == loudness && levels.first?.algorithm == 3)
+            let kept = try v3.lyrics("s1")
+            #expect(kept?.json == lyrics && kept?.etag == "\"e1\"")
+            #expect(try v3.lyricsSongs() == ["s1"])
+            #expect(try v3.keptPlays().map(\.songID) == ["s1"] && v3.keptPlays().map(\.timeMs) == [5])
+            #expect(try v3.keptQueue() == DownloadDatabase.PendingQueue(kind: "unsent", body: queue, keptAt: 15))
+            #expect(try v3.meta("force_quit_at") == "16")
+            // and the lyrics' trigger still takes a song's lyrics with it
+            try v3.deleteSong("s1")
+            #expect(try v3.lyrics("s1") == nil)
+            // the new table, empty and working
+            #expect(try v3.keptStartCount() == 0)
             #expect(try v3.keepStart(Played(at: 1, queue: nil, entry: nil, song: rTrack("a"))) > 0)
         }
+    }
+}
+
+/// HistoryAsking: what Up Next's history may ask deadwax, and which failure it says.
+@Suite struct HistoryAskingTests {
+    // (each mutating call bound first: #expect and #require can't take one)
+    @Test func onlyTheNewestAnswerOfEachKindCounts() throws {
+        var asking = HistoryAsking()
+        let firstAsked = asking.askNewest(online: true)
+        let first = try #require(firstAsked)
+        let secondAsked = asking.askNewest(online: true)
+        let second = try #require(secondAsked)
+        let firstCounts = asking.newestCame(first)
+        let secondCounts = asking.newestCame(second)
+        #expect(!firstCounts && secondCounts)
+        let olderAsked = asking.askOlder(more: true)
+        let older = try #require(olderAsked)
+        let another = asking.askOlder(more: true)
+        #expect(asking.loadingOlder && another == nil, "one older page at a time")
+        asking.reset()
+        let late = asking.olderCame(older)
+        #expect(!late && !asking.loadingOlder, "another person: the answer on its way dropped")
+    }
+
+    @Test func offlineTheNewestPageIsntAskedForNorItsFailureSaid() throws {
+        var asking = HistoryAsking()
+        let offline = asking.askNewest(online: false)
+        #expect(offline == nil)
+        let askAsked = asking.askNewest(online: true)
+        let ask = try #require(askAsked)
+        let failed = asking.failedNewest(ask)
+        #expect(failed)
+        #expect(asking.shown(online: true) == .newest && asking.shown(online: false) == nil)
+        // a newest page that comes lets it go
+        let againAsked = asking.askNewest(online: true)
+        let again = try #require(againAsked)
+        let came = asking.newestCame(again)
+        #expect(came && asking.shown(online: true) == nil)
+    }
+
+    @Test func theNewestPagesFailureNeverStopsTheOlderPages() throws {
+        var asking = HistoryAsking()
+        let newestAsked = asking.askNewest(online: true)
+        let newest = try #require(newestAsked)
+        _ = asking.failedNewest(newest)
+        #expect(asking.mayAskOlder(more: true))
+        let olderAsked = asking.askOlder(more: true)
+        let older = try #require(olderAsked)
+        let failed = asking.failedOlder(older)
+        #expect(failed)
+        // an older page's failure stops them until Try again, and is said first, online or not
+        #expect(!asking.mayAskOlder(more: true) && asking.shown(online: false) == .older && asking.shown(online: true) == .older)
+        let retried = asking.retry(online: true)
+        #expect(retried == .older && asking.mayAskOlder(more: true))
+        let retriedNext = asking.retry(online: true)
+        #expect(retriedNext == .newest && asking.shown(online: true) == nil)
+        let retriedLast = asking.retry(online: true)
+        #expect(retriedLast == nil)
+        #expect(!asking.mayAskOlder(more: false))
+        // a stale failure changes nothing
+        let lateAsked = asking.askOlder(more: true)
+        let late = try #require(lateAsked)
+        let stale = asking.failedOlder(late - 1)
+        #expect(!stale && asking.loadingOlder)
+        let came = asking.olderCame(late)
+        #expect(came && !asking.loadingOlder && asking.shown(online: true) == nil)
+    }
+
+    @Test func aPageThatBringsNoRowIntoViewAsksForTheNextItself() {
+        let order = (0..<30).map { "r\($0)" }
+        // the rows in view near the top, after a page that added none above them: ask again
+        #expect(HistoryAsking.asksAgain(order, inView: ["r3", "r4", "r5"], more: true))
+        #expect(HistoryAsking.asksAgain(order, inView: ["r9", "r10"], more: true))
+        // a page that pushed them down past the first ten: scrolling asks, as rows come into view
+        #expect(!HistoryAsking.asksAgain(order, inView: ["r10", "r11", "r12"], more: true))
+        // none left, or nothing in view
+        #expect(!HistoryAsking.asksAgain(order, inView: ["r3"], more: false))
+        #expect(!HistoryAsking.asksAgain(order, inView: [], more: true))
+        #expect(HistoryAsking.near == 10)
     }
 }
