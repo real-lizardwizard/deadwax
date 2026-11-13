@@ -3143,7 +3143,8 @@ The full account - what was built, the renders, every departure and why, and the
 **Departures**: recording (6.3) not built, so check 23's A/B is by ear; the Handover row without its seam, which
 needs both engines' render times; two touch views, the fader's being slice 4's; no custom VoiceOver actions; the song
 engine's reset caught by the 10 Hz rule rather than its notification; disc art kept in memory, the last eight; the
-pbxproj edited by hand.
+pbxproj edited by hand; and (the review's) headphones out rests the record, where the web's page plays on (question
+27).
 
 **Mutations, each alone** (scratchpad's mutate.py: applied to TurntableScreen.swift, Core's tests run, restored):
 | Mutation | Caught by |
@@ -3169,6 +3170,35 @@ the phone's checks.
 
 **Only the phone can show** the screen in the hand: the spec's section 8, checks 1-24 (docs/ios.md's "The
 turntable's checks (app 0.6)").
+
+**Review fixes (2026-11-13)**, one commit each, written up in the spec's "Review fixes" under "Slice 3, built":
+
+- **The five bugs**:
+  - the time line no longer asks for height, which had shrunk the plinth and moved the titles at every swap;
+  - an interruption with no "ended", and a failed start, no longer silence the record for good;
+  - the label's and the spindle's rings are inside their boxes, as the web's border-box ones are (question 25
+    dropped);
+  - the let-go no longer waits on the song's engine: the main thread counts the engine's starts from its phase,
+    and the `deck.position` queue's read counts only once the start was seen.
+- **The smaller ones**:
+  - the deck engine never starts in the background;
+  - a stop never puts an older window back over a newer one;
+  - the first window is made at the route's rate;
+  - a route at a new rate is tested through a rate seam;
+  - the session is made active by DeckEngine's own `activate`, first in every start;
+  - Reduce Motion's handover hears the song as it is read;
+  - CD art is decoded at the face's size;
+  - closing Now Playing lets go of a held record;
+  - headphones out rests the record (`DeckRules.outputGone()`, question 27).
+- **Tests**: each new rule's test was shown to fail under a mutation, but one: `clearLed()` in outputGone, which
+  the led timer's own guard already makes redundant.
+- **Docs**: checks 3, 15 and 21 reworded.
+- **Verified after the last fix**:
+  - `swift test`: Core 957, DeadwaxAudio 142 and DeadwaxTurntable 10;
+  - the release DeckRealTimeTests;
+  - the device build;
+  - check_project.py;
+  - the iOS pytest files: 150 passed, 1 skipped.
 
 **The version: 0.6 (6)**, pinned where 0.5 was: `Base.xcconfig`, `check_project.py`, `ios.yml`'s check of the built
 Info.plist, `tests/test_ios_install.py`; the guide's title, opening, install.sh's line and About's row, ios/README.md,

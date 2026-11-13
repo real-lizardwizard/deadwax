@@ -1796,9 +1796,11 @@ Questions for slice 3, and for James:
     `TurntableFaceParts` draws each ring inside its share of the face (the review's fix: the web's boxes are
     border-box).
   - `TurntablePress`: `handTurn`, the drawn turn round the deck's angle (Turntable.tsx:426), and
-    `cancelFollowed()`, for an interruption.
+    `cancelFollowed()`, for an interruption, headphones out and Now Playing closing.
   - `DeckRules`: `interrupted()`, Debug's reads of the report (`reportWindow`, `fetchedBytes`, `lastFetchedAt`,
-    `health(_:)`), and `windowDropped()`, for the engine's route change.
+    `health(_:)`), `windowDropped()`, for the engine's route change, and (the review's) `outputGone()`.
+  - The review's: `DeckStartFailure`, `TurntableScreen.windowRate`, `HandoverStarts` and
+    `HandoverTiming.actualStart` (below, "Review fixes").
   - `Routes.discArt` and `DeadwaxClient.discArt` (nil for deadwax's 404). ROUTE_COUNT is 28.
 - **DeadwaxAudio**: slice 2's six review questions, answered in DeckEngine, DeckVoiceHost, DeckWindows and
   EQStartDesk (below).
@@ -1845,7 +1847,8 @@ Questions for slice 3, and for James:
    `start(record:)` lets the deck's start install without becoming the song's "last start" in Debug.
 6. **The smaller gaps**: the deck's EQ times its own process into the EQ counters; DeckWindows cancels the previous
    `/scrub` task when a newer window is asked for; and the session is made active before the deck engine starts,
-   in the app and in Debug's trial.
+   in the app and in Debug's trial - since the review by DeckEngine's own `activate`, first in every start and
+   tested (below).
 
 **Measured on this Mac.**
 
@@ -1887,9 +1890,14 @@ mark and the purple `1.25x` readout at the corner (slice 4's, hidden in the app)
 - **The song engine's configuration change** (a hardware reset that AVAudioEngine notifies) is caught by the 10 Hz
   run rule, which sees the engine stopped, rather than by the notification: PlaybackEngine's AVAudioEngine isn't
   the app's to observe, and the engine is not to be touched.
-- **The previous engine start is read at the let-go**, with a sync read of the engine's debug state on the main
-  thread while the song is held and its queue idle, so `E` is recognised as a new start after the resume. A second
-  let-go inside the same 4 s position run isn't recorded as an `E`: it is dropped after twice the run's length.
+- **The handover's actual `E` is the start seen after the let-go** (the review's fix: the slice read the previous
+  start with a sync on the engine's queue at the let-go, on the main thread mid-gesture, which 2.6 forbids). The
+  main thread counts the engine's starts from its phase; the `deck.position` queue reads the start at its run's end,
+  and it counts only when that read began after the start was seen (`HandoverTiming.actualStart`). An `E` not read
+  within twice the run's length is dropped.
+- **Headphones out, the record rests** (question 27, the review's design call): the player pauses the song, as Apple
+  asks, and `DeckRules.outputGone()` makes sure the deck resumes nothing on the speaker. The web's page plays on in
+  whatever outputs next.
 - **Debug's report stands while the deck lives**, as the web's does (deck.ts publishes null only at destroy): after
   Now Playing closes on the turntable, Debug still shows what it last did. On the phone Debug is under You, so the
   rows can only be read with Now Playing closed. Sound health is reset each time the turntable shows.
@@ -1930,6 +1938,118 @@ SwiftUI, and heat and battery over an album.
     border-box. See "Review fixes" below.)
 26. **The kept disc art**: eight in memory, or on disk with the download (question 11's A)? **Eight in memory** until
     an offline album with CD art is seen showing the plain record.
+27. **Headphones out mid-turn**: should the record rest with the song, or play on in the speaker as the web does? **Rest**
+    (built): the player already pauses the song when an output goes, as Apple asks of a music app, and a deck that
+    then resumed it - at a held press's let-go, a handover's end or its led timer - would start the song on the
+    speaker in someone's pocket. The cost is one more difference from the web, which has no such notice.
+
+#### Review fixes (2026-11-13)
+
+The review of slice 3 found five bugs and nine smaller things. Each fix is its own commit on the branch, and each
+new rule has a test that a mutation was shown to fail.
+
+**The five bugs.**
+
+1. **The time line asked for height** (c0b1bfd). Its `.frame(maxWidth: .infinity, maxHeight: .infinity)` made the
+   scrubber's row as flexible as the cover's room above it. In a Mac probe of the same column the room fell from
+   445 pt to 255.5 and the row grew from 66 to 255.5, so the plinth shrank and the titles moved at every swap. The
+   frame is wide only now. The view can't be laid out from the package (UIKit, DeckController), so
+   tests/test_ios_turntable_face.py holds the source to it: the row's ZStack and the time line ask for no
+   `maxHeight`. Putting it back fails the test.
+2. **An interruption with no "ended" silenced the record for good** (b66fa73). `interrupted` is now also cleared
+   when the song plays again and when the app comes back to the front. A "began" whose reason is
+   `appWasSuspended` (compared by its number, 1, deprecated since iOS 16) is ignored, and Debug's report says
+   "interrupted" while it stands.
+3. **A failed start silenced the record for good** (0a9b5ca). `DeckStartFailure` (Core) is forgotten at once by a
+   route change, by the deck being made again and by an interruption's end. A press 2 s or more after the failure
+   forgets it too, and the start is tried again. Nothing retries on a frame or a post, so a phone that can't make
+   the sound tries once a press at most.
+4. **The label's and the spindle's rings were outside their boxes** (062e7ce). player.css makes every box
+   border-box (`*, *::before, *::after`, linked before app.css), so the web's rings are inside the 38.75 % and
+   the 5.4 %. `TurntableFaceParts` now puts them inside: a 60 pt label in a 62 pt ring and a 7 pt spindle in a
+   10 pt one at a 372 pt plinth's face. TurntableRenderTests reads both rings' pixels, and question 25's
+   "departure" is dropped. One true difference is left: the plinth's own hairline is drawn outside its box, to keep
+   the stage's exact shape, so it is 1 pt wider each side than the web's in the same room (TurntableLayers says so).
+5. **The let-go waited on the song's engine** (658652a). `handoverLead` read
+   `engineForDeck?.debug().lastStartSeconds`, a `queue.sync` on PlaybackEngine's queue, on the main thread during
+   the gesture. **The choice: a count of starts**, not a read on the `deck.position` queue. `resumeSong` asks
+   `player.resume()` before it starts the feed, so a read at the run's start would wait behind the resume and take
+   the new start as the baseline. The main thread already watches `engineState` (through `isPlaying`), so
+   `HandoverStarts` counts each change to `.playing` and when it was seen, with no sync. The feed's end-of-run read
+   records when it began, and `HandoverTiming.actualStart` takes it only when a start was seen after the let-go and
+   the read began no earlier. That holds because PlaybackEngine writes `lastStartSeconds` in `playFromSilence`
+   before `publish(.playing)`, and `playAsked` is cleared only by that write (read from its source). Nothing was
+   needed from the engine: PlaybackEngine, PCMSource, GainedSource, StreamSource and the EQ's render have no diff.
+   tests/test_ios_turntable_deck.py holds that only DeckPositionFeed asks the engine for `position()` or `debug()`.
+
+**The smaller ones.**
+
+- **`active` in startEngine** (55e7b43): a tick's `.drive` as the app left could start the output in the
+  background. Untested app code.
+- **settleStopped restored an older window** (4e22a92). After the system stopped the output, a window posted
+  meanwhile was kept aside. The next start's settle then put the ring's older window back over it and freed the
+  newer one. A kept window is always newer than the ring's, so the ring's are now let go when one is kept.
+  DeckReviewTests' `theWindowKeptAsideIsNewerThanTheRings` covers it.
+- **The first window's rate** (5c46db0): before its first start the deck engine's rate is its 48 kHz guess, never
+  0, so the session's rate was never used. On a 44.1 kHz route the first window was made at 48 kHz, dropped at the
+  start and made again. `TurntableScreen.windowRate` takes the engine's rate only once it has started.
+- **Slice 2's question 2, the rate-change half** (fc87819). DeckEngine reads the output's rate through
+  `outputRateNow()`, with an internal `rateForTests` seam. `aNewRateDropsTheWindowAndSaysSo` covers a route at
+  44.1 kHz (routeChanged() true, windowDropped once, the voice empty, the node made again with no second word) and
+  a start that finds the rate moved by itself.
+- **Question 6's "session active before the deck starts"** (3ed985a), as a testable rule. DeckEngine's `activate`
+  runs first in every start, before the rate is read, and a throw there fails the start with nothing started. The
+  app's deck engine and Debug's trial set it rather than calling `activateShared()` by hand.
+  `theSessionIsActiveBeforeTheDeckStarts` holds the order, and the pytest holds that every deck engine the app
+  makes is given it.
+- **Reduce Motion's handover** (2f2fcc7): with no display link, the judge heard the song only at the 0.1 s tick,
+  so Reduce Motion's held take could overlap the song for up to 100 ms. The feed now hands each reading to the main
+  queue as it reads it, whenever the link isn't running. Untested app code; check 19.
+- **CD art at the face's size** (37b2386): ImageIO's thumbnail off the main thread, its shorter side the face's
+  pixels, in place of a full-size decode kept for the run. The function, run on the Mac: 3000x3000 to 1020x1020,
+  3000x2000 to 1530x1020, and 600x600 untouched.
+- **`closed()`** (8ab87be) lets go of a followed touch as a cancel, so a record held as Now Playing closes settles
+  rather than staying held.
+- **Headphones out** (5a9d735): `DeckRules.outputGone()`, question 27 above.
+  `theOutputGoneResumesNothing` runs four cases (a held press, a led handover, a handover with no lead, a song
+  change under the hand), each also without `outputGone()` to show that it resumes. The app calls it, and lets go
+  of a followed touch, on `.oldDeviceUnavailable`.
+
+**Mutations, each alone, all caught but one.**
+
+| Mutation | Caught by |
+| --- | --- |
+| The time line's `maxHeight: .infinity` put back | test_the_scrubbers_row_never_asks_for_height |
+| The face's parts content-box (rings outside) | theFacesPartsAreTheStylesheets, theLabelsRingIsWhereTheWebsIs, theSpindlesRingIsInsideItsShare, the pytest |
+| Debug's report without the interrupted row | theTurntableSoundRowSaysThePhonesStates |
+| A failed start forgotten at any press, not after 2 s | aFailedStartIsForgottenByARouteOrAPressNotByTime |
+| The start read before it was seen | theHandoversStartIsReadOnlyOnceItWasSeen |
+| A repeated "playing" counted as a start | theHandoversStartIsReadOnlyOnceItWasSeen |
+| `debug()` put back at the let-go | test_only_the_position_queue_asks_the_songs_engine |
+| The ring's older window kept over the newer | theWindowKeptAsideIsNewerThanTheRings |
+| The engine's 48 kHz guess taken before its first start | aWindowIsMadeAtTheRateTheEngineWillRunAt |
+| No windowDropped from routeChanged / from start | aNewRateDropsTheWindowAndSaysSo |
+| The session activated after the rate is read | theSessionIsActiveBeforeTheDeckStarts |
+| Debug's trial without `activate` | test_every_deck_engine_the_app_makes_activates_the_session_first |
+| outputGone without the pause intent / the handover's conversion / the settle timer's clearing | theOutputGoneResumesNothing |
+| outputGone without `clearLed()` | **not caught**: the led timer already does nothing once its plan is replaced (its own identity guard); the call stays as tidiness |
+
+**Docs**: docs/ios.md and section 8 reword check 3 (the turntable about as wide as the cover was, a few points
+narrower), check 15 (AirPods out holding the record and just after: the record rests and the song stays paused)
+and check 21 (the pause with the AirPods' stem with the turntable in view, then the lock screen, in place of
+"pause from the lock screen while the turntable shows", which no one can watch).
+
+**Verified, after the last fix**:
+- `swift test`: Core 957, DeadwaxAudio 142 and DeadwaxTurntable 10, all passed.
+- The release DeckRealTimeTests: 3, passed.
+- The unsigned Release device build, with no warnings in the app's sources.
+- check_project.py.
+- pytest tests/test_ios_*.py tests/test_source_bytes.py: 150 passed, 1 skipped.
+- The ios sims weren't run: none reads a file these fixes touched.
+
+**Not verified**: the app's wiring for every fix above is app code with no test on this Mac, built for a device
+only. The order of the player's pause and the deck's on the same route notice is not known; either order resumes
+nothing. Whether UIKit ever skips the cancel when Now Playing closes is also not known.
 
 ### 7.4 Slice 4 - the fader
 
@@ -1966,8 +2086,9 @@ usual question buttons.
    face) switches to the cover and back; closing and opening again opens on the turntable, whatever you switched
    to.
 3. On the turntable, compare with the cover: the title and the artist move to the middle; nothing moves up or
-   down - the time line sits in the scrubber's row, the transport and the footer stay. The plinth fills the room;
-   nothing overlaps. (The smallest phone's size is checked from the Mac's render, 7.3.)
+   down - the time line sits in the scrubber's row, the titles, the transport and the footer stay. The plinth is
+   about as wide as the cover was (a few points narrower, never a small record in a tall gap); nothing overlaps.
+   (The smallest phone's size is checked from the Mac's render, 7.3.)
 4. An album you've saved CD art for (Get CD art): the record's face is the CD art. A two-disc album with
    `disc2.jpg`: a disc 2 song shows it. An album with none: a black record with the cover as its label.
 5. The record turns once every 1.8 s (33⅓) while playing, smoothly - Debug > Turntable: "Frames under a hand"
@@ -1993,7 +2114,8 @@ usual question buttons.
 14. A 96 kHz album: let go at 1x - the record's sound and the song are the same loudness and tone across the
     handover. With Normalization on: the same.
 15. While holding the record: have Siri speak, or take a call - the record's sound stops, nothing stuck, and the
-    song doesn't start into the call. Take AirPods out mid-turn: no burst of sound from the speaker.
+    song doesn't start into the call. Take AirPods out mid-turn - holding the record, and just after letting go:
+    no sound from the speaker, the record comes to rest, and the song stays paused until played (question 27).
 16. Flick the record and go Home while it coasts: the sound stops at once. Come back: the song is where it was
     going.
 17. AirPlay to a speaker: turning the record is silent, with the AirPlay line.
@@ -2005,8 +2127,9 @@ usual question buttons.
     button shows its large version.
 21. **The lock screen after a wind-down.** On the turntable, with the wind-down on, tap the record to pause and
     lock the phone straight away: within two seconds the lock screen shows the song paused (▶). Press the AirPods'
-    stem (or the lock screen's play): it plays. Pause from the lock screen while the turntable is showing: the
-    platter runs down silently. Then the same with the wind-down off.
+    stem (or the lock screen's play): it plays. Unlock with the turntable showing and pause with the AirPods' stem:
+    the platter runs down silently; lock the phone then, and the lock screen shows the song paused. Then the same
+    with the wind-down off.
 22. Debug > Turntable: every row has a value; "Delay behind the hand" names the earbuds' extra on Bluetooth.
 23. **The blind A/B against Safari.** Same iPhone, same song, both on the turntable: Safari at deadwax's address,
     and the app. Someone else tosses a coin and hands you the phone with one or the other open; eyes closed, take

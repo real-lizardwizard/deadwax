@@ -1348,8 +1348,9 @@ speaker unless a check says. The numbers are the turntable plan's, so answers ca
   switches to the cover and back. Close and open it again: it opens on the turntable, whatever you
   switched to.
 - **3 Nothing jumps.** Switch between the two: the title and the artist move to the middle and back,
-  and nothing moves up or down - the time line sits in the scrubber's row, and the buttons below stay
-  put. The record fills its room, and nothing overlaps.
+  and nothing moves up or down - the time line sits in the scrubber's row, and the titles and the
+  buttons below stay put. The turntable is about as wide as the cover was (a few points narrower, not
+  a small record in a tall gap), and nothing overlaps.
 - **4 CD art.** An album you've saved CD art for (the web app's **Get CD art**): the record's face is
   the CD art. A two-disc album with a `disc2.jpg`: a disc 2 song shows it. An album with none: a black
   record with the cover as its label.
@@ -1379,8 +1380,9 @@ speaker unless a check says. The numbers are the turntable plan's, so answers ca
 - **14 Hi-res.** A 96 kHz album: let go at a playing record's own speed - the record's sound and the
   song are the same loudness and tone across the handover. The same with Normalization on.
 - **15 Interruptions.** While holding the record, have Siri speak, or take a call: the record's sound
-  stops, nothing sticks, and the song doesn't start into the call. Take AirPods out mid-turn: no burst
-  of sound from the speaker.
+  stops, nothing sticks, and the song doesn't start into the call. Take AirPods out mid-turn - while
+  holding the record, and just after letting go of it: no sound from the speaker, the record comes to
+  rest and the song stays paused until you play it.
 - **16 Going Home.** Flick the record and go Home while it coasts: the sound stops at once. Come back:
   the song is where the record was going.
 - **17 AirPlay.** AirPlay to a speaker: turning the record is silent, with the AirPlay line.
@@ -1393,8 +1395,9 @@ speaker unless a check says. The numbers are the turntable plan's, so answers ca
   large version.
 - **21 The lock screen after a wind-down.** With the wind-down on, tap the record to pause and lock the
   phone straight away: within two seconds the lock screen shows the song paused. Press the AirPods'
-  stem (or the lock screen's play): it plays. Pause from the lock screen while the turntable shows: the
-  platter runs down silently. Then the same with the wind-down off.
+  stem (or the lock screen's play): it plays. Unlock with the turntable showing and pause with the
+  AirPods' stem: the platter runs down silently; lock the phone then, and the lock screen shows the
+  song paused. Then the same with the wind-down off.
 - **22 Debug.** Debug > Turntable after a few turns: every row has a value, and **Delay behind the
   hand** names more on Bluetooth earbuds than on the speaker.
 - **23 Against Safari.** The same song on the turntable in Safari (at deadwax's address) and in the
