@@ -62,7 +62,7 @@ final class EQModel {
     /// Waiting for the phone's first unlock, when eq.json couldn't be opened at launch.
     @ObservationIgnored private var unlock: NSObjectProtocol?
     /// Each output's curve as last drawn, and what it was made from.
-    @ObservationIgnored private var drawn: [String: (sound: EQSound?, rate: Double, drawing: EQDrawing)] = [:]
+    @ObservationIgnored private var drawn: [String: (sound: EQSound?, rate: Double, advanced: Bool, drawing: EQDrawing)] = [:]
     /// Each output as last read from the settings: a page whose output has just been forgotten keeps its name while it
     /// goes.
     @ObservationIgnored private var known: [String: EQOutput] = [:]
@@ -193,14 +193,18 @@ final class EQModel {
         return host?.rate ?? EQRouteReader.rate()
     }
 
-    /// An output's curve (3.4), made again only when its sound or rate has changed.
+    /// An output's curve (3.4), made again only when its sound, its rate or Advanced has changed - Advanced draws the
+    /// tone alone too, beside the correction (3.4).
     func drawing(_ key: String) -> EQDrawing {
         let output = self.output(key)
         let sound = settings.sound(key)
         let rate = rate(key)
-        if let kept = drawn[key], kept.sound == sound, kept.rate == rate { return kept.drawing }
-        let drawing = EQDrawing.make(setting(output), in: settings, rate: rate)
-        drawn[key] = (sound, rate, drawing)
+        let advanced = settings.advanced
+        if let kept = drawn[key], kept.sound == sound, kept.rate == rate, kept.advanced == advanced {
+            return kept.drawing
+        }
+        let drawing = EQDrawing.make(setting(output), in: settings, rate: rate, advanced: advanced)
+        drawn[key] = (sound, rate, advanced, drawing)
         return drawing
     }
 
@@ -368,6 +372,78 @@ final class EQModel {
         guard settings.mark(suggestion, for: output) else { return }
         dirty = true
         scheduleSave()
+    }
+
+    // MARK: Advanced (3.8, 3.9)
+
+    /// The Advanced switch (one per phone, 4): nothing heard changes - only what the pages show - so nothing is
+    /// published; it is kept.
+    var advanced: Bool {
+        get { settings.advanced }
+        set {
+            guard newValue != settings.advanced else { return }
+            settings.advanced = newValue
+            dirty = true
+            scheduleSave()
+        }
+    }
+
+    /// A change of Core's, made and heard: published when it changed anything, "EQ on" when it turned the EQ on.
+    private func apply(_ body: (inout EQSettings) -> Bool) {
+        let before = settings
+        let turnedOn = body(&settings)
+        guard settings != before else { return }
+        changed()
+        if turnedOn { Self.say(EQWords.Said.on) }
+    }
+
+    /// Add Filter: the new filter's id, for its editor - nil when an ear already has 64.
+    func addFilter(for output: EQOutput) -> Int? {
+        let before = settings
+        guard let added = settings.addFilter(for: output) else { return nil }
+        if settings != before { changed() }
+        if added.turnedOn { Self.say(EQWords.Said.on) }
+        return added.id
+    }
+
+    /// One filter edited - its handle, its editor - and heard as it goes, as a slider is.
+    func editFilter(_ id: Int, for output: EQOutput, to filter: EQFilter) {
+        apply { (s: inout EQSettings) -> Bool in
+            s.editFilter(id, for: output) { (f: inout EQFilter) -> Void in f = filter }
+        }
+    }
+
+    /// A row's switch, or the editor's On.
+    func setFilter(_ id: Int, on: Bool, for output: EQOutput) {
+        apply { (s: inout EQSettings) -> Bool in s.setFilter(id, on: on, for: output) }
+    }
+
+    func deleteFilter(_ id: Int, for output: EQOutput) {
+        apply { (s: inout EQSettings) -> Bool in s.deleteFilter(id, for: output) }
+    }
+
+    /// "Back to AutoEq's".
+    func backToAutoEq(for output: EQOutput) {
+        apply { (s: inout EQSettings) -> Bool in s.backToAutoEq(for: output) }
+    }
+
+    /// The Preamp section's Automatic - off, beginning at the preamp the curve plays at (on, as the change turns it on),
+    /// so nothing you hear moves.
+    func setAutomaticPreamp(_ automatic: Bool, for output: EQOutput) {
+        var on = setting(output)
+        on.on = true
+        let played = settings.bank(on, rate: rate(output.key), version: 0).preamp
+        apply { (s: inout EQSettings) -> Bool in s.setAutomaticPreamp(automatic, played: played, for: output) }
+    }
+
+    /// The preamp's stepper.
+    func setHandPreamp(_ dB: Double, for output: EQOutput) {
+        apply { (s: inout EQSettings) -> Bool in s.setHandPreamp(dB, for: output) }
+    }
+
+    /// An import's Import (3.9): the output's correction from now on, crossfaded when it is playing.
+    func importCorrection(_ correction: EQCorrection, for output: EQOutput) {
+        apply { (s: inout EQSettings) -> Bool in s.importCorrection(correction, for: output) }
     }
 
     /// A finger down on an EQ page's control: the file waits for it.

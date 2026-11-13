@@ -41,6 +41,18 @@ struct RootView: View {
             // the sign-in comes over everything: Now Playing closes under it (the web's leaveFullScreen)
             if over != nil { navigation.nowPlayingShown = false }
         }
+        .onOpenURL { (url: URL) -> Void in shared(url) }
+    }
+
+    /// A file shared to deadwax (eq.md 3.9: "deadwax" in the share sheet for a .txt) - read off the main thread, then
+    /// shown in the EQ's import preview over whatever is on top, For set to the output now.
+    private func shared(_ url: URL) {
+        guard url.isFileURL else { return }
+        let navigation = self.navigation
+        Task.detached(priority: .userInitiated) { () async -> Void in
+            let item = EQImportReading.file(url, forKey: nil)
+            await MainActor.run { navigation.share(item) }
+        }
     }
 
     @ViewBuilder private var gate: some View {

@@ -22,6 +22,11 @@ struct MainTabs: View {
         .fullScreenCover(isPresented: $navigation.nowPlayingShown) {
             NowPlayingView()
         }
+        // a file shared to deadwax over the tabs (eq.md 3.9): the EQ as a sheet, the import's preview over it - over
+        // Now Playing, Now Playing opens its own
+        .sheet(isPresented: $navigation.eqImportSheet) {
+            EQSheet()
+        }
         .onChange(of: player.hasQueue) { _, queued in
             if !queued { navigation.nowPlayingShown = false }
         }

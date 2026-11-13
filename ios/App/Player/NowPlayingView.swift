@@ -27,6 +27,8 @@ struct NowPlayingView: View {
     @State private var showsInfo = false
     /// The EQ over Now Playing (eq.md 3.1), from the •••: its own stack, "Done" at its top right.
     @State private var showsEQ = false
+    /// A shared file's EQ sheet waits for Up Next or Info to close (eq.md 3.9).
+    @State private var eqWaits = false
     /// How far the sheet has been dragged down (points).
     @State private var dragY: CGFloat = 0
 
@@ -48,10 +50,31 @@ struct NowPlayingView: View {
             }
         }
         .offset(y: dragY)
-        .sheet(isPresented: $showsUpNext) { UpNextScreen() }
-        .sheet(isPresented: $showsInfo) { InfoView() }
+        .sheet(isPresented: $showsUpNext, onDismiss: eqAfterSheet) { UpNextScreen() }
+        .sheet(isPresented: $showsInfo, onDismiss: eqAfterSheet) { InfoView() }
         .sheet(isPresented: $showsEQ) { EQSheet() }
         .onAppear { lyrics.opened() }
+        .onChange(of: navigation.eqImport?.id, initial: true) { (_: UUID?, _: UUID?) -> Void in shared() }
+    }
+
+    /// A file shared to deadwax while Now Playing is up (eq.md 3.9): the EQ sheet opens, the preview over it - over the
+    /// EQ sheet already up, the preview shows in it as it stands; Up Next or Info is closed first.
+    private func shared() {
+        guard navigation.eqImport != nil, navigation.eqImportPage == nil, !navigation.eqPreviewUp, !showsEQ else { return }
+        if showsUpNext || showsInfo {
+            eqWaits = true
+            showsUpNext = false
+            showsInfo = false
+        } else {
+            showsEQ = true
+        }
+    }
+
+    /// Up Next or Info gone: the EQ sheet a shared file waited for.
+    private func eqAfterSheet() {
+        guard eqWaits else { return }
+        eqWaits = false
+        if navigation.eqImport != nil && navigation.eqImportPage == nil { showsEQ = true }
     }
 
     private func content(_ track: QueueTrack) -> some View {

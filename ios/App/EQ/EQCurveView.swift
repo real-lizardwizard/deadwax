@@ -20,12 +20,20 @@ import SwiftUI
 /// - **VoiceOver**: one element, "The EQ's curve", its value the summary (3.14), and an audio graph
 ///   (`accessibilityChartDescriptor`) - the rotor's Play Audio Graph plays it as a rising and falling tone. Not
 ///   given `.allowsDirectInteraction`. Marked as a picture for Smart Invert.
+/// - **Advanced** (3.8, slice 5): 220 pt tall, with a handle for each correction filter that is on (EQHandleLayer) and
+///   the selected one's numbers in a capsule above the plot - its room kept whether or not one is selected, so the
+///   plot doesn't move when one is. The handles are hidden from VoiceOver: each filter's row reaches everything they
+///   do. The filter's editor draws its own curve the same way, 120 pt, its one handle.
 struct EQCurveView: View {
     let drawing: EQDrawing
     /// the output's name, for the audio graph's title
     let name: String
-    /// false while a finger drags a slider: the line follows the finger, unanimated
+    /// false while a finger drags a slider or a handle: the line follows the finger, unanimated
     var animated = true
+    /// 150 pt; 220 in Advanced, 120 in the filter's editor (3.15: by the screen, never by the text size)
+    var height: CGFloat = EQCurveView.height
+    /// Advanced's handles; nil for none
+    var handles: EQHandles?
 
     static let height: CGFloat = 150
 
@@ -39,6 +47,9 @@ struct EQCurveView: View {
 
     var body: some View {
         VStack(spacing: 4) {
+            if let handles, handles.showsCapsule {
+                EQHandleCapsule(text: handles.capsule)
+            }
             // in a ZStack of its own, so the plot going and the plot coming lie over each other while they crossfade
             // - a VStack would stack the two for the 0.25 s, the row twice as tall
             ZStack {
@@ -47,8 +58,12 @@ struct EQCurveView: View {
                     // difference across lengths is zero), so it crossfades instead - a correction chosen or taken away
                     // adds or drops its f0s (slice 3's review)
                     .id(drawing.frequencies)
+                if let handles {
+                    // over the plot, not in it: the handles never crossfade with it, and a drag keeps its view
+                    EQHandleLayer(handles: handles, range: drawing.range)
+                }
             }
-            .frame(height: Self.height)
+            .frame(height: height)
             foot
         }
         .padding(.vertical, 10)
@@ -277,5 +292,214 @@ struct EQAudioGraph: AXChartDescriptorRepresentable {
         }
         return AXChartDescriptor(title: EQWords.Said.graphTitle(name), summary: drawing.summary, xAxis: x, yAxis: y,
                                  additionalAxes: [], series: series)
+    }
+}
+
+// MARK: - Advanced's handles (3.8)
+
+/// What a curve's handles show and do (3.8): one for each correction filter that is on, the selected one, its numbers
+/// for the capsule - and what a finger asks of the page: the filter as it is now, a filter selected, a filter
+/// changed, a finger down and up (so the page holds its output and the file waits, as for a slider).
+struct EQHandles {
+    let handles: [EQHandle]
+    let selected: Int?
+    /// the selected filter's numbers ("Peak · 8903 Hz · +6.0 dB · Q 1.66"); nil, the capsule's room left empty
+    let capsule: String?
+    /// the page's curve keeps the capsule's room; the editor's, whose fields say the same, has none
+    let showsCapsule: Bool
+    let filter: (Int) -> EQFilter?
+    let select: (Int) -> Void
+    let change: (Int, EQFilter) -> Void
+    let hold: (Bool) -> Void
+}
+
+/// The selected filter's numbers, above the plot (3.8): `.caption.monospacedDigit()` semibold on a capsule of
+/// `barTrack`, as a held slider's value is - stopped at `.xxxLarge` and cut in the middle (3.15); the filter's row
+/// says it in full. Its room is kept while nothing is selected, so the plot never moves.
+struct EQHandleCapsule: View {
+    let text: String?
+
+    var body: some View {
+        Text(text ?? " ")
+            .font(.caption.monospacedDigit())
+            .fontWeight(.semibold)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Palette.barTrack, in: Capsule())
+            .opacity(text == nil ? 0 : 1)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 16)
+    }
+}
+
+/// The handles over the plot (3.8): a 14 pt circle in `accent` with a 1.5 pt `barTrack` edge for each, the selected
+/// one 18 pt and white. A finger within 22 pt of one takes the nearest: a tap selects it, a drag past 4 pt moves its
+/// frequency sideways and its gain up and down (Core's EQHandleDrag, from where it engaged, so nothing jumps). Only
+/// those circles take a finger - a touch anywhere else on the curve scrolls the page. A pinch anywhere on the plot
+/// widens or narrows a filter: the one being dragged, else the nearest within 44 pt of the fingers' middle, else the
+/// selected one; once a pinch has begun, the drag under it stays where it got to until its finger is up.
+struct EQHandleLayer: View {
+    let handles: EQHandles
+    /// the plot's dB either way, as drawn
+    let range: Double
+
+    private struct Dragging {
+        let id: Int
+        var drag: EQHandleDrag
+        /// a pinch joined it: the finger's moves are ignored until it is up
+        var waiting = false
+    }
+
+    private struct Pinching {
+        let id: Int
+        let start: EQFilter
+    }
+
+    private struct Spot: Identifiable {
+        let id: Int
+        let x: Double
+        let y: Double
+    }
+
+    @State private var dragging: Dragging?
+    @State private var pinching: Pinching?
+    @State private var held = false
+    @GestureState private var dragDown = false
+    @GestureState private var pinchDown = false
+
+    var body: some View {
+        GeometryReader { (geometry: GeometryProxy) in
+            let width = Double(geometry.size.width), height = Double(geometry.size.height)
+            let spots = handles.handles.map { (h: EQHandle) -> Spot in
+                let p = EQHandleRules.point(h, width: width, height: height, range: range)
+                return Spot(id: h.id, x: p.x, y: p.y)
+            }
+            ZStack(alignment: .topLeading) {
+                ForEach(spots) { (spot: Spot) in
+                    let selected = spot.id == handles.selected
+                    Circle()
+                        .fill(selected ? Color.white : Palette.accent)
+                        .overlay(Circle().strokeBorder(Palette.barTrack, lineWidth: 1.5))
+                        .frame(width: selected ? 18 : 14, height: selected ? 18 : 14)
+                        .position(x: spot.x, y: spot.y)
+                }
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            // only the handles' own reach takes a finger
+            .contentShape(EQHandleReach(points: spots.map { CGPoint(x: $0.x, y: $0.y) }, radius: EQHandleRules.reach))
+            .gesture(drag(width: width, height: height))
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            // a pinch's second finger lands anywhere on the plot
+            .contentShape(Rectangle())
+            .simultaneousGesture(pinch(width: width, height: height))
+        }
+        .onChange(of: dragDown) { (_: Bool, down: Bool) -> Void in
+            // the touch ended or was taken away (a call, a system gesture): let go either way
+            if !down { letGoDrag() }
+        }
+        .onChange(of: pinchDown) { (_: Bool, down: Bool) -> Void in
+            if !down { letGoPinch() }
+        }
+        .onDisappear {
+            dragging = nil
+            pinching = nil
+            release()
+        }
+        .accessibilityHidden(true)
+    }
+
+    private func drag(width: Double, height: Double) -> some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .local)
+            .updating($dragDown) { (_: DragGesture.Value, state: inout Bool, _: inout Transaction) -> Void in
+                state = true
+            }
+            .onChanged { (value: DragGesture.Value) -> Void in
+                if dragging == nil {
+                    guard let id = EQHandleRules.nearest(handles.handles, x: Double(value.startLocation.x),
+                                                         y: Double(value.startLocation.y), width: width,
+                                                         height: height, range: range),
+                          let start = handles.filter(id) else { return }
+                    dragging = Dragging(id: id, drag: EQHandleDrag(start: start, range: range),
+                                        waiting: pinching != nil)
+                    handles.select(id)
+                    hold()
+                }
+                guard var now = dragging, !now.waiting, pinching == nil else { return }
+                if let f = now.drag.filter(dx: Double(value.translation.width), dy: Double(value.translation.height),
+                                           width: width, height: height),
+                   f != handles.filter(now.id) {
+                    handles.change(now.id, f)
+                }
+                dragging = now
+            }
+            .onEnded { (_: DragGesture.Value) -> Void in letGoDrag() }
+    }
+
+    private func pinch(width: Double, height: Double) -> some Gesture {
+        MagnifyGesture(minimumScaleDelta: 0)
+            .updating($pinchDown) { (_: MagnifyGesture.Value, state: inout Bool, _: inout Transaction) -> Void in
+                state = true
+            }
+            .onChanged { (value: MagnifyGesture.Value) -> Void in
+                if pinching == nil {
+                    let near = EQHandleRules.nearest(handles.handles, x: Double(value.startLocation.x),
+                                                     y: Double(value.startLocation.y), width: width, height: height,
+                                                     range: range, reach: EQHandleRules.reach * 2)
+                    guard let id = dragging?.id ?? near ?? handles.selected,
+                          handles.handles.contains(where: { (h: EQHandle) -> Bool in h.id == id }),
+                          let start = handles.filter(id) else { return }
+                    // the drag under it stays where it got to
+                    dragging?.waiting = true
+                    pinching = Pinching(id: id, start: start)
+                    handles.select(id)
+                    hold()
+                }
+                guard let now = pinching else { return }
+                let f = EQHandleRules.pinched(now.start, scale: Double(value.magnification))
+                if f != handles.filter(now.id) { handles.change(now.id, f) }
+            }
+            .onEnded { (_: MagnifyGesture.Value) -> Void in letGoPinch() }
+    }
+
+    private func letGoDrag() {
+        guard dragging != nil else { return }
+        dragging = nil
+        release()
+    }
+
+    private func letGoPinch() {
+        guard pinching != nil else { return }
+        pinching = nil
+        release()
+    }
+
+    /// One hold for every finger together: down with the first, up with the last.
+    private func hold() {
+        guard !held else { return }
+        held = true
+        handles.hold(true)
+    }
+
+    private func release() {
+        guard held, dragging == nil, pinching == nil else { return }
+        held = false
+        handles.hold(false)
+    }
+}
+
+/// The handles' reach: a circle of `radius` round each - where a touch takes one.
+struct EQHandleReach: Shape {
+    let points: [CGPoint]
+    let radius: Double
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        for p in points {
+            path.addEllipse(in: CGRect(x: p.x - radius, y: p.y - radius, width: radius * 2, height: radius * 2))
+        }
+        return path
     }
 }
