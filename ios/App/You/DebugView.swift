@@ -3,7 +3,8 @@ import DeadwaxCore
 import SwiftUI
 import UIKit
 
-/// You's Debug (admins only, D1): Phase 0's one screen, moved - Check's report, the test sounds, the hi-res row,
+/// You's Debug (admins only, D1): Phase 0's one screen, moved - Check's report, the test sounds (with the record's
+/// engine beside the song, turntable.md 7.2), the hi-res row,
 /// what is playing (with the engine's own words for its last failure, D7, and an Up Next edit held for the join, D4),
 /// the EQ (eq.md 3.13: the route's outputs, its key, the unit, the curve, what the last start put in and how long it
 /// took, the kept file) and "Muffle what plays" (slice 2), the engine's log (its last 500 lines, with Copy and
@@ -16,6 +17,7 @@ struct DebugView: View {
     @Environment(LibraryModel.self) private var library
     @Environment(DownloadModel.self) private var downloads
     @Environment(EQModel.self) private var eq
+    @State private var deckTrial = DeckTrialModel()
 
     init() {}
 
@@ -42,8 +44,12 @@ struct DebugView: View {
         .navigationTitle("Debug")
         .task { if model.report == nil { await model.check() } }
         // Muffle is a test (eq.md 5.2): it goes off as Debug closes - back out of it, or another tab - so it can't be
-        // left on under real listening. Locking the phone doesn't close it (check E0d needs Muffle on, locked).
-        .onDisappear { eq.muffle = false }
+        // left on under real listening. Locking the phone doesn't close it (check E0d needs Muffle on, locked). The record's
+        // engine beside the song (turntable.md 7.2) stops the same way.
+        .onDisappear {
+            eq.muffle = false
+            deckTrial.stop()
+        }
     }
 
     // MARK: the Library's lists
@@ -104,10 +110,11 @@ struct DebugView: View {
                 }
             }
             if let words = model.testWords { Text(words).font(.footnote) }
+            DeckTrialRows(model: deckTrial)
         } header: {
             Text("Test sounds")
         } footer: {
-            Text("Songs 1 to 8 are three beeps each: tap one to play the album from it and count the beeps - all three, every time? Songs 9 and 10 are one tone cut in two: played one into the other, the tone should never break. A song downloaded to this phone plays from there, as every song does; \"Stream even when downloaded\" (under Downloads) streams it instead, to hear the two side by side.")
+            Text("Songs 1 to 8 are three beeps each: tap one to play the album from it and count the beeps - all three, every time? Songs 9 and 10 are one tone cut in two: played one into the other, the tone should never break. A song downloaded to this phone plays from there, as every song does; \"Stream even when downloaded\" (under Downloads) streams it instead, to hear the two side by side. \(TurntableDebugRows.trialFooter)")
         }
     }
 
@@ -255,6 +262,81 @@ private struct EQDebugSection: View {
             while !Task.isCancelled {
                 rows = eq.debugRows(eq.status())
                 try? await Task.sleep(for: .seconds(1))
+            }
+        }
+    }
+}
+
+/// Test sounds' "The record's engine beside the song" (notes/ios-specs/turntable.md 7.2, checks 0a-0c): the deck engine
+/// playing DeckTrial's fixed run through its real render beside whatever the song's engine plays. Made at the first
+/// Start; DebugView stops it as Debug closes (as it turns Muffle off), so it can't be left playing.
+@MainActor
+@Observable
+final class DeckTrialModel {
+    private(set) var running = false
+    private(set) var rows: [InfoRow] = []
+    @ObservationIgnored private var trial: DeckTrial?
+    @ObservationIgnored private var failure: String?
+
+    func toggle() {
+        let made = trial ?? DeckTrial(ioBuffer: { AudioSessionController.ioBuffer() },
+                                      latency: { AudioSessionController.latency() })
+        trial = made
+        if made.isRunning {
+            made.stop()
+            running = false
+        } else {
+            do {
+                try made.start()
+                failure = nil
+                running = true
+            } catch {
+                failure = error.localizedDescription
+                running = false
+            }
+        }
+        read()
+    }
+
+    func stop() {
+        guard let trial, trial.isRunning else { return }
+        trial.stop()
+        running = false
+        read()
+    }
+
+    /// The engine's row, its Clock (6.2) and Messages dropped when there were any.
+    func read() {
+        guard let trial else { return }
+        let status = trial.status()
+        var made = [TurntableDebugRows.trialRow(rate: status.rate, blocks: status.blocks, starts: status.starts,
+                                                lastStart: status.lastStartSeconds, failure: failure ?? status.failure),
+                    status.clockRow]
+        if let dropped = TurntableDebugRows.messagesDroppedRow(status.dropped) { made.append(dropped) }
+        rows = made
+    }
+}
+
+/// Its rows: Start and Stop, then what DeckTrialModel reads - four times a second while the button's row is on screen
+/// and the app is in front.
+private struct DeckTrialRows: View {
+    let model: DeckTrialModel
+    @Environment(\.scenePhase) private var phase
+
+    var body: some View {
+        LabeledContent(TurntableDebugRows.trialLabel) {
+            Button(TurntableDebugRows.trialButton(running: model.running)) { model.toggle() }
+        }
+        .task(id: phase) {
+            guard phase == .active else { return }
+            while !Task.isCancelled {
+                model.read()
+                try? await Task.sleep(for: .seconds(0.25))
+            }
+        }
+        ForEach(Array(model.rows.enumerated()), id: \.offset) { _, row in
+            LabeledContent(row.label) {
+                Text(row.value).font(.footnote.monospacedDigit())
             }
         }
     }

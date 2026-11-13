@@ -333,5 +333,13 @@ extension Result {
         #expect(TurntableDebugRows.messagesDroppedRow(1)?.value == "1 of the record's messages was dropped")
         #expect(TurntableDebugRows.messagesDroppedRow(3)?.value == "3 of the record's messages were dropped")
         #expect(TurntableDebugRows.windowMadeRow(took: 0.214, seconds: 40, rate: 44_100).value == "0.21 s for 40 s of a 44.1 kHz song")
+        #expect(TurntableDebugRows.trialButton(running: false) == "Start" && TurntableDebugRows.trialButton(running: true) == "Stop")
+        #expect(TurntableDebugRows.trialRow(rate: 48_000, blocks: 0, starts: 0, lastStart: nil, failure: nil).value == "Not started")
+        #expect(TurntableDebugRows.trialRow(rate: 48_000, blocks: 4_410, starts: 1, lastStart: 0.0123, failure: nil).value
+                == "48 kHz, 4410 blocks rendered; started once, the last start 12.3 ms")
+        #expect(TurntableDebugRows.trialRow(rate: 44_100, blocks: 9, starts: 3, lastStart: nil, failure: nil).value
+                == "44.1 kHz, 9 blocks rendered; started 3 times")
+        #expect(TurntableDebugRows.trialRow(rate: 0, blocks: 0, starts: 0, lastStart: nil, failure: "no output").value
+                == "Couldn't start: no output")
     }
 }

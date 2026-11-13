@@ -96,5 +96,22 @@ import Testing
         #expect(engine.status().starts == 2)
         engine.stop()
     }
+
+    /// Debug's run (DeckTrial, checks 0a-0c): the hand grabs the record where the take has it and at its speed, and lets
+    /// go where it grabbed at speed 1, so the run's only cut is the loop's top; its record is 6 s, loud enough to hear
+    /// and nowhere near the limiter.
+    @Test func debugsRunIsContinuous() {
+        let grab = DeckTrial.takeFrom + DeckTrial.grabS
+        #expect(DeckTrial.hand(DeckTrial.grabS) == grab)
+        #expect(abs(DeckTrial.hand(DeckTrial.letGoS) - grab) < 1e-12)
+        let h = 1e-7
+        #expect(abs((DeckTrial.hand(DeckTrial.grabS + h) - DeckTrial.hand(DeckTrial.grabS)) / h - 1) < 1e-4)
+        #expect(abs((DeckTrial.hand(DeckTrial.letGoS) - DeckTrial.hand(DeckTrial.letGoS - h)) / h - 1) < 1e-4)
+        #expect(grab + DeckTrial.loopS - DeckTrial.letGoS <= 6, "the drive ends inside the record")
+        let record = DeckTrial.record(rate: 44_100)
+        #expect(record.frames == 6 * 44_100 && record.channelCount == 2)
+        let peak = (0..<record.frames).reduce(Float(0)) { max($0, abs(record.channel(0)[$1])) }
+        #expect(peak > 0.15 && peak < 0.5, "peak \(peak)")
+    }
 }
 #endif

@@ -457,6 +457,16 @@ Debug is where Phase 0's test screen lives now:
   Wi-Fi unless you've said otherwise, and are checked once here. A song on the phone plays from there,
   as every downloaded song does; **Stream even when downloaded** (under Downloads, below) streams it
   instead, to hear the two side by side.
+  At the end, **The record's engine beside the song** and its **Start** and **Stop** buttons. It is
+  the turntable's own sound engine, which hasn't got a screen yet. Here it plays a run of its own over
+  whatever is playing: a chord, taken from 1 second, scratched back and forth twice and let go, over
+  and over. Under the button:
+  - **The record's engine**: its rate, how many blocks it has rendered, and how many times it has started.
+  - **Clock**: how far the record's clock runs behind the audio's time stamps, and the largest lead
+    over the last 1.5 seconds.
+  - **Messages dropped**: shown only if any were.
+
+  It stops when you leave Debug. These rows are for [the checks](#the-turntables-first-checks).
 - **Hi-res**: **Find a 24/192 FLAC** looks through the library (up to 10,000 songs) for a 24-bit
   192 kHz FLAC, or the highest rate there is, to play. This needs a Navidrome that says each song's
   sample rate (OpenSubsonic's `samplingRate`).
@@ -1208,6 +1218,20 @@ deadwax.
   import this file" and why ("Line … includes another file (other.txt). Import that file itself.").
 - **E30 VoiceOver.** On the filter rows: "Filter 3: peak at … hertz …", "On", its switch "Filter 3
   on", and the Delete and Turn Off actions.
+
+### The turntable's first checks
+
+These come with the build that adds the turntable's sound engine, before it has a screen. They use
+You > Debug > Test sounds > **The record's engine beside the song**. Install the usual way, not with
+`--debug`.
+
+- **0a Both at once.** Play test sound 1, then tap **Start** on the record's engine. You hear both
+  at once: the beeps unchanged, with the record's run over them.
+- **0b Nothing in the song.** While the test sound plays, tap **Stop** and **Start** five times.
+  Nothing should be heard in the test sound: no click, no drop, no change of level.
+- **0c The clock.** Watch the **Clock** row for a minute on the speaker, then on earbuds. Once it
+  has settled, the first number moves by no more than a millisecond or two. Tell me both numbers,
+  for each.
 
 ## What it can't do yet
 

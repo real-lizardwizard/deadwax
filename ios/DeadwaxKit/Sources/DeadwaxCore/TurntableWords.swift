@@ -381,6 +381,25 @@ extension TurntableDebugRows {
                        value: dropped == 1 ? "1 of the record's messages was dropped" : "\(dropped) of the record's messages were dropped")
     }
 
+    /// Test sounds' row (7.2, checks 0a-0c): its label, its button, and what it says under the section.
+    public static let trialLabel = "The record's engine beside the song"
+    public static func trialButton(running: Bool) -> String { running ? "Stop" : "Start" }
+    public static let trialFooter = "The record's engine beside the song plays a run of its own - a chord taken from 1 s, "
+        + "scratched back and forth and let go, again and again - over whatever plays here. Start it while a test sound plays: "
+        + "you should hear both, the test sound unchanged, and stopping or starting it should never be heard in the test "
+        + "sound. Its Clock should hold within a millisecond or two once settled."
+
+    /// The record's engine, for the row: its rate, the blocks it rendered, how often it started and how long the last
+    /// start took - or why it couldn't start.
+    public static func trialRow(rate: Double, blocks: Int, starts: Int, lastStart: Double?, failure: String?) -> InfoRow {
+        let label = "The record's engine"
+        if let failure { return InfoRow(label: label, value: "Couldn't start: \(failure)") }
+        guard starts > 0 else { return InfoRow(label: label, value: "Not started") }
+        let started = starts == 1 ? "started once" : "started \(starts) times"
+        let took = lastStart.map { (seconds: Double) -> String in ", the last start \(ms(seconds))" } ?? ""
+        return InfoRow(label: label, value: "\(khz(rate)), \(blocks) blocks rendered; \(started)\(took)")
+    }
+
     /// "Window made in" (4.4): decode, level and conversion, for `seconds` of a song at `rate`.
     public static func windowMadeRow(took: Double, seconds: Double, rate: Double) -> InfoRow {
         InfoRow(label: "Window made in",
