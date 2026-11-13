@@ -30,6 +30,27 @@ import Testing
         #expect(!HandoverTiming.holdsAcross(predicted: 2.5, planSeconds: 1.2))
     }
 
+    @Test func theHandoversStartIsReadOnlyOnceItWasSeen() {
+        var starts = HandoverStarts()
+        starts.phase(playing: true, at: 1)
+        starts.phase(playing: false, at: 2)
+        // the let-go: the take paused the song; one start seen before it
+        let atLetGo = starts.count
+        #expect(atLetGo == 1)
+        #expect(HandoverTiming.actualStart(startsAtLetGo: atLetGo, starts: starts, read: 0.4, readAt: 3) == nil,
+                "no start since the let-go: the read is the last one's")
+        // the resume: loading, then playing - one start; playing said again (a new route) is no new one
+        starts.phase(playing: false, at: 3.1)
+        starts.phase(playing: true, at: 3.2)
+        starts.phase(playing: true, at: 3.3)
+        #expect(starts.count == 2 && starts.lastSeenAt == 3.2)
+        #expect(HandoverTiming.actualStart(startsAtLetGo: atLetGo, starts: starts, read: 0.4, readAt: 3.15) == nil,
+                "read before the start was seen: it may be the last one's")
+        #expect(HandoverTiming.actualStart(startsAtLetGo: atLetGo, starts: starts, read: 0.25, readAt: 3.2) == 0.25)
+        #expect(HandoverTiming.actualStart(startsAtLetGo: atLetGo, starts: starts, read: nil, readAt: 4) == nil)
+        #expect(HandoverTiming.actualStart(startsAtLetGo: atLetGo, starts: starts, read: -.infinity, readAt: 4) == nil)
+    }
+
     @Test func theTargets() {
         let plans = PlatterPlans(PlatformMaths())
         let plan = plans.motor(100, -3, 425, 1)

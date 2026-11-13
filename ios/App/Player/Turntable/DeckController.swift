@@ -28,7 +28,8 @@ extension PlaybackEngine: DeckEngineReading {}
 /// The `deck.position` queue (2.6): from a resume the deck asked for, the song's engine read at 120 Hz on a queue of
 /// its own, its newest reading kept behind an unfair lock for the frame - which never waits on the engine's queue,
 /// busiest exactly then (the resume opening the file, decoding, starting the output). A reading older than 50 ms
-/// counts as none. At the run's end it reads the engine's last start, the handover's actual `E` (3.5).
+/// counts as none. At the run's end it reads the engine's last start, the handover's actual `E` (3.5), and when that
+/// read began: the main thread takes it as the let-go's once it has seen the start before then (HandoverTiming).
 final class DeckPositionFeed: @unchecked Sendable {
     struct Reading {
         var seconds: Double
@@ -50,8 +51,8 @@ final class DeckPositionFeed: @unchecked Sendable {
     private var looping = false
     private var worst = 0.0
     private var started: Double?
-    /// runs begun so far: a handover's start is read only from a run begun after its let-go
-    private var runs = 0
+    /// when the read of `started` began
+    private var startedReadAt = -Double.infinity
 
     deinit {
         lock.deinitialize(count: 1)
@@ -73,7 +74,7 @@ final class DeckPositionFeed: @unchecked Sendable {
             looping = true
             worst = 0
             started = nil
-            runs += 1
+            startedReadAt = -Double.infinity
             return true
         }
         guard start else { return }
@@ -98,8 +99,12 @@ final class DeckPositionFeed: @unchecked Sendable {
             let rest = 1 / Self.hz - (ended - began)
             if rest > 0 { Thread.sleep(forTimeInterval: rest) }
         }
+        let readAt = CACurrentMediaTime()
         let last = engine.debug().lastStartSeconds
-        locked { () -> Void in started = last }
+        locked { () -> Void in
+            started = last
+            startedReadAt = readAt
+        }
     }
 
     /// The newest reading, when fresh.
@@ -110,9 +115,9 @@ final class DeckPositionFeed: @unchecked Sendable {
         }
     }
 
-    /// The longest the engine took to answer during the last run, its last start as read at that run's end (nil while
-    /// one runs), and how many runs have begun.
-    var facts: (worst: Double, started: Double?, runs: Int) { locked { (worst, started, runs) } }
+    /// The longest the engine took to answer during the last run, and its last start as read at that run's end and
+    /// when that read began (nil and -infinity while one runs).
+    var facts: (worst: Double, started: Double?, readAt: Double) { locked { (worst, started, startedReadAt) } }
 }
 
 /// DeckRules' and TurntablePress's world (3.3, 3.4): the Core protocols - written for Linux too, so no actor - over the
@@ -280,10 +285,10 @@ final class DeckController {
     @ObservationIgnored private var from: DeckPhoneFacts.From?
     @ObservationIgnored private var windowMade: (took: Double, seconds: Double, rate: Double)?
     @ObservationIgnored private var handover: DeckPhoneFacts.Handover?
-    /// the let-go's kind, position and route, the engine's last start before it and the position queue's runs then, and
-    /// when it was - for the actual `E`
-    @ObservationIgnored private var handoverKind: (local: Bool, position: Double, route: String, before: Double?, runs: Int,
-                                                   at: Double)?
+    /// the let-go's kind, position and route, the engine's starts seen by then, and when it was - for the actual `E`
+    @ObservationIgnored private var handoverKind: (local: Bool, position: Double, route: String, starts: Int, at: Double)?
+    /// the song's engine's starts, counted from its phase as the player says it here - never asked of its queue
+    @ObservationIgnored private var engineStarts = HandoverStarts()
     @ObservationIgnored private var localStarts: [String: [Double]] = [:]
     @ObservationIgnored private var streamStarts: [String: [(position: Double, seconds: Double)]] = [:]
     @ObservationIgnored private var touchCount = (samples: 0.0, events: 0.0)
@@ -721,10 +726,9 @@ final class DeckController {
         let d = HandoverTiming.voiceDelay(clockLead: l, latency: AudioSessionController.latency())
         let lead = HandoverTiming.lead(predicted: predicted, voiceDelay: d)
         handover = DeckPhoneFacts.Handover(lead: lead, predicted: predicted)
-        // the engine's last start before this one: read now, at the let-go - the song held since the take, its queue
-        // idle - rather than after the resume, when that queue is busiest (2.6)
-        let before = player.engineForDeck?.debug().lastStartSeconds
-        handoverKind = (isLocal, x, route, before, feed.facts.runs, CACurrentMediaTime())
+        // the starts seen so far: this let-go's is the next one. Not the engine's last start asked of it here - that
+        // waits on its queue, on the main thread, mid-gesture (2.6); the deck.position queue reads it after the resume
+        handoverKind = (isLocal, x, route, engineStarts.count, CACurrentMediaTime())
         return lead
     }
 
@@ -733,7 +737,8 @@ final class DeckController {
     private func noteStart() {
         guard let kind = handoverKind else { return }
         let facts = feed.facts
-        guard facts.runs > kind.runs, let started = facts.started, started != kind.before else {
+        guard let started = HandoverTiming.actualStart(startsAtLetGo: kind.starts, starts: engineStarts,
+                                                       read: facts.started, readAt: facts.readAt) else {
             // no resume came of it (a cancel, the song changed), or the song never started within the run: let go
             if CACurrentMediaTime() - kind.at > 2 * Self.feedSeconds { handoverKind = nil }
             return
@@ -911,6 +916,8 @@ final class DeckController {
     }
 
     private func playerChanged() {
+        // the engine's phase, watched through isPlaying: a start counted each time it says it plays again
+        engineStarts.phase(playing: player.engineState.phase == .playing, at: CACurrentMediaTime())
         let id = player.current?.track.id ?? ""
         if id != songID {
             songID = id

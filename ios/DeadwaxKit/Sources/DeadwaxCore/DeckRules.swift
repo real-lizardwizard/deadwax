@@ -1394,4 +1394,34 @@ public enum HandoverTiming {
     public static func reducedTarget(planX: Double, speed: Double, lead: Double) -> Double {
         planX + speed * lead
     }
+
+    /// The handover's actual `E`: the `deck.position` queue's read of the engine's last start, once it is this let-go's
+    /// - a start seen since the let-go (more than `startsAtLetGo`), and the read begun no earlier than that start was
+    /// seen, so the engine had written it (it writes a start's time before it says it plays). nil: not yet, or none.
+    public static func actualStart(startsAtLetGo: Int, starts: HandoverStarts, read: Double?, readAt: Double) -> Double? {
+        guard starts.count > startsAtLetGo, readAt >= starts.lastSeenAt, let read, read.isFinite, read >= 0 else {
+            return nil
+        }
+        return read
+    }
+}
+
+/// The song's engine's starts, as the main thread sees its phase (2.6, 3.5): one counted each time it says it plays
+/// after saying anything else, and when the last was seen. The let-go keeps the count rather than asking the engine
+/// for its last start: that ask waits on the engine's queue, and a gesture's thread waits on nothing.
+public struct HandoverStarts: Equatable, Sendable {
+    public private(set) var count = 0
+    public private(set) var lastSeenAt = -Double.infinity
+    private var playing = false
+
+    public init() {}
+
+    /// The engine's phase as seen at `time`: playing, or anything else (loading, paused, ended, failed).
+    public mutating func phase(playing now: Bool, at time: Double) {
+        if now && !playing {
+            count += 1
+            lastSeenAt = time
+        }
+        playing = now
+    }
 }
