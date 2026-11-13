@@ -228,9 +228,11 @@ final class AlbumModel {
     /// Add to my library (`POST /me/library/add`, the pressing the bridge found - AddRelease.from) or Remove from my
     /// library (`POST /me/library/remove`, by Navidrome's id). Taken: `changed` says so at once, and the Library is
     /// told your library changed (LibraryModel.libraryChanged: Your albums and the New marks asked again - the web's
-    /// announceAddedToLibrary / announceRemovedFromLibrary, which useMyLibrary.ts and useYourAlbums.ts hear). Refused:
+    /// announceAddedToLibrary / announceRemovedFromLibrary, which useMyLibrary.ts and useYourAlbums.ts hear) - and so are
+    /// the downloads, whose library followed is checked at once (phase3-autodownload.md 2.2's `changedHere`). Refused:
     /// `refused`, and `changed` stays as it was. Not a page's request - it runs to its answer even if the page goes.
-    func change(_ action: AlbumMine.Action, client: DeadwaxClient?, library: LibraryModel) async {
+    func change(_ action: AlbumMine.Action, client: DeadwaxClient?, library: LibraryModel,
+                downloads: DownloadModel) async {
         guard !busy, let client else { return }
         busy = true
         refused = nil
@@ -246,6 +248,7 @@ final class AlbumModel {
             changed = done
             answered += 1
             library.libraryChanged()
+            downloads.libraryChanged(album: route.id, removed: action == .remove)
         } catch {
             busy = false
             if APIFailure.isCancellation(error) { return }

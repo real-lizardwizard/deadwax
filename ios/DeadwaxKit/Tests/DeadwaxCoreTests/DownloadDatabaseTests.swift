@@ -22,7 +22,7 @@ private func withDatabase(_ body: (DownloadDatabase, String) throws -> Void) thr
             #expect(try db.keptQueue() == nil)
             // opened again: nothing made twice
             let again = try DownloadDatabase(path: path)
-            #expect(try again.userVersion() == 3)
+            #expect(try again.userVersion() == DownloadDatabase.version)
             #expect(try again.keptStarts().isEmpty)
         }
     }

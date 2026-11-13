@@ -690,6 +690,32 @@ Debug is where Phase 0's test screen lives now:
   deadwax; plays waiting to be sent, and songs started that deadwax hasn't taken into your play history
   yet (**Starts waiting to be sent**); how long the sound checks took; and the last 50 download events
   (a backlog of starts sent, or one deadwax refused or couldn't take, is one of them).
+- **Your library**: the first part of downloading your library by itself - in this build it only
+  follows your library and works out what would fit. **It never downloads or deletes anything.**
+  **Follow your library** is off unless you turn it on (the phone remembers it). On, it asks deadwax
+  for your library - the albums you've added, or with logins off every album deadwax holds - and
+  reads each album's songs, four at a time, in the order they would come onto the phone: the album
+  you added or played most recently first (a play counts for 30 days). Turning it off forgets what it
+  followed, so turning it on again reads every album from the start.
+  - **Following**: your library, or the collection.
+  - **Albums**, and **Songs read**: of the albums listed, how many have had their songs read
+    ("reading 4" while it reads).
+  - **Missing**: albums the last list didn't have. One goes only when a second check, ten minutes or
+    more after the first that missed it, agrees - "1 (the first 3 min ago)". An album you remove with
+    **Remove from my library** goes at once.
+  - **Held back**: "No", or why the last list's missing albums weren't believed: deadwax listed none,
+    more than half went at once, or the list stopped at 10,000 albums. Nothing goes then.
+  - **Last check**: "200 · 3,010 albums" (a new list), "unchanged (304)" (the same list as last
+    time - one small request), or "failed:" and why; how long it took; when.
+  - **First read**: how long reading every album's songs took the first time, and the time per album.
+  - Then what would fit: "412 of 3,010 fit in 20 GB" at your storage limit, after everything you've
+    downloaded yourself, and under it what those take and why the rest wait (over the limit, no room
+    on the phone, not read yet).
+  - **Check now** checks at once. It also checks by itself: as it's turned on, as the app opens, when
+    you come back to the app (if the last check was a minute or more ago), every 15 minutes while the
+    app is open or playing, when deadwax answers again after it couldn't be reached, and straight after
+    Add to or Remove from my library. Each check is a line starting "library" in the Downloads events
+    above.
 - **Library**: how many albums each list had, whether it came new or the kept one still stood, and
   how long it took to come.
 - At the bottom, how long this install runs. In its last two days, it also says to run install.sh
@@ -1627,6 +1653,37 @@ the Mac, signed in as you.
   "Couldn't load" line at the top. Play a song in the web app on the Mac, then, with Up Next still open
   on the phone, turn Airplane Mode off: the web app's song comes in without closing Up Next. Scrolling
   up then goes on loading older songs as before.
+
+### Your library's first checks (L0a-L0g)
+
+These come with the build that adds [Debug's Your library](#debug), the first part of downloading
+your library by itself. **Nothing downloads in this build.** You > Debug > **Your library**, with
+**Follow your library** on. The web app is deadwax's own page (`/player/`) in Safari or on the Mac,
+signed in as you.
+
+- **L0a The first read.** At home on Wi-Fi, turn **Follow your library** on and keep the app in front
+  (Auto-Lock off helps): **Albums** says how many your library has - the same as the web app's
+  Library - and **Songs read** climbs to all of them. When it's done, **First read** says how long it
+  took and the time per album: please send me both. (The time counts from the first list to the last
+  album read, so the app going to the background in between makes it longer; if it closes, First read
+  never shows - turn the switch off and on to start again.) If you can, once more over WireGuard away
+  from home: turn the switch off and on, and send that time too. It decides whether deadwax needs a
+  route that reads 50 albums at a time.
+- **L0b A star elsewhere.** Add an album in the web app (or star one in Amperfy). Wait a minute after
+  Debug's last check, go to the Home Screen and back to the app: within seconds **Albums** is one more,
+  and **Songs read** catches up.
+- **L0c Removed elsewhere.** Remove an album from your library in the web app. Back in the app a
+  minute later, or with **Check now**: **Missing** says 1. Ten minutes or more later, **Check now**:
+  Albums is one fewer, Missing is None, and the Downloads events have "library byHand: ... 1 removed".
+- **L0d Unchanged.** **Check now** twice, with nothing played in between: the second's **Last check**
+  says "unchanged (304)". (A song played in between makes it a 200: the list carries when you last
+  played each album.)
+- **L0e Removed here.** **Remove from my library** on an album's page in the app, then back to Debug:
+  Albums is already one fewer - no ten minutes.
+- **L0f Would fit.** Note the "… fit in 20 GB" line; set You > Downloads' **Storage limit** to 5 GB:
+  the line says fewer fit in 5 GB. Back to 20 GB: as before.
+- **L0g Nothing else moved.** You > Downloads is as it was, nothing is downloading that you didn't ask
+  for, and Debug's Downloads counts haven't moved.
 
 ## What it can't do yet
 

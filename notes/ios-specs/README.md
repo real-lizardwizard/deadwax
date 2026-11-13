@@ -39,3 +39,11 @@ patterns. The app is then built to the spec and reviewed against it. notes/ios.m
   (its "Design review (2026-11-12)": every form APO plays is played, its reading rules as its code has them, the
   unit's block size and allocation, no denormal flush, the bank copied in and matched by id, the crossfade measured,
   the list's path encoding, "pick yours" when several rows match, a pushed page kept on its output).
+- `phase3-autodownload.md` - auto-download your library (Phase 3, app 0.9), designed 2026-11-13 against 2.1.15 / ios
+  305f6a8 (app 0.8): the words, your library followed on the phone (the `library` table), when it is checked and what
+  a check does (a 304 ending it, removals only after two checks 10 minutes apart agree, an empty list, a large drop
+  or a truncated list held back), each album's songs read, the order (the later of the star and a play within 30
+  days), the fill to the limit (whole albums, hand downloads first and never given way, the phone's 2 GB), origin
+  `library` beside Phase 2's, Only while charging, BGAppRefreshTask and BGProcessingTask; You > Downloads' section,
+  the first ask, Downloading's one row, the album page, Debug; no server addition (the `album_songs` route named, built
+  only if the first read is slow); three slices, tests, James's checks (L0a-L0g, 50-63) and 16 open questions.

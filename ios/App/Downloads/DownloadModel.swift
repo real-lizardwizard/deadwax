@@ -87,6 +87,9 @@ final class DownloadModel {
 
     /// The engine's index of the copies here (read on its own queue) - SongFiles'.
     let playable: PlayableCopies
+    /// (Phase 3, slice 1) Your library followed onto this phone, read-only - Debug's "Follow your library"
+    /// (phase3-autodownload.md 6.1). Opened and closed with the store.
+    let follower: LibraryFollower
 
     // MARK: kept
 
@@ -142,6 +145,7 @@ final class DownloadModel {
         self.files = files
         self.session = session
         playable = files.downloads
+        follower = LibraryFollower(server: server, reachability: reachability)
         downloadOver = DownloadOver(saved: UserDefaults.standard.string(forKey: DownloadOver.storageKey))
         storageLimit = StorageLimit(saved: UserDefaults.standard.string(forKey: StorageLimit.storageKey))
         DownloadStore.retirePhase0()
@@ -153,6 +157,7 @@ final class DownloadModel {
             retry: { [weak self] ms in self?.retryStarts(after: ms) },
             note: { [weak self] line in self?.note(line) },
             changed: { [weak self] in self?.recountWaiting() }))
+        follower.note = { [weak self] line in self?.note(line) }
         let center = NotificationCenter.default
         observers.append(center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.becameActive() }
@@ -599,6 +604,7 @@ final class DownloadModel {
             isOpen = true
             note("opened \(person)")
             reload()
+            follower.opened(opened)
             Task { await settle(opened) }
         } catch {
             storeProblem = String(describing: error)
@@ -608,6 +614,7 @@ final class DownloadModel {
     }
 
     private func close(_ closing: DownloadStore) {
+        follower.closed()
         let out = records.values.filter { $0.state == .fetching }
         let tasks = Set(out.compactMap { live[$0.id] })
         // the tasks out become sign-in waits, and no resume data is kept past the person: it carries their session's
@@ -707,6 +714,7 @@ final class DownloadModel {
             if let store { await settle(store) }
         }
         sendKeptPlays()
+        follower.cameToFront()
     }
 
     private func movedToBackground() {
@@ -716,6 +724,33 @@ final class DownloadModel {
     private func reachabilityChanged() {
         replan()
         if reachability.online { sendKeptPlays() }
+        follower.reachabilityChanged()
+    }
+
+    // MARK: your library (Phase 3)
+
+    /// Add to or Remove from my library answered in this app, for the album (Navidrome's id): the library followed is
+    /// checked at once, a Remove marked so it goes without waiting for a second check (phase3-autodownload.md 2.3).
+    func libraryChanged(album: String, removed: Bool) {
+        follower.changedHere(album: album, removed: removed, at: ListenTracker.wallMs())
+    }
+
+    /// The hand downloads as the library's fill counts them (2.6): their bytes here and still to come for the songs
+    /// the planner lets go, what of that is still to come, and their songs (left out of the library's albums' bytes).
+    struct HandBytes: Equatable {
+        var bytes: Int64
+        var toCome: Int64
+        var songs: Set<String>
+    }
+
+    /// Every song asked for is a hand download until the library asks for its own (slice 2).
+    func handBytes() -> HandBytes {
+        var toCome: Int64 = 0
+        for record in records.values where record.state == .fetching
+            || (record.state == .wanted && planned[record.id] == .queued) {
+            toCome += max(record.expectedBytes - (received[record.id] ?? 0), 0)
+        }
+        return HandBytes(bytes: bytesHere + toCome, toCome: toCome, songs: Set(records.keys))
     }
 
     // MARK: asking

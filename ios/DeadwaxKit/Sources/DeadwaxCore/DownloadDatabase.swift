@@ -19,12 +19,16 @@ import Foundation
 ///   (PlayHistory.swift), each start's moment, song (HistorySong's JSON), queue and entry, and whether it has counted -
 ///   sent oldest first, before the kept plays. Like the plays, not downloads: Remove All leaves them. The newest page of
 ///   the person's history deadwax answered is kept in `meta` (`PlayHistory.keptPageKey`), so recent plays show offline.
+/// - `library` (version 4, Phase 3): your library as this phone follows it (phase3-autodownload.md 2.1, 5.1) - each
+///   album deadwax last listed, its place, the list's entry for it, its songs as the fill reads them once read, and its
+///   marks (missing since, removed here, kept off); the list's ETag, scope and held reason in `meta`. Not downloads:
+///   Remove All leaves it.
 ///
 /// Not thread-safe: one owner (the App's DownloadStore) calls it from one place at a time.
 public final class DownloadDatabase {
     /// The schema's version (`PRAGMA user_version`): 1, Phase 2's (app 0.3); 2, the lyrics (app 0.4); 3, the play
-    /// history's starts (app 0.8).
-    public static let version = 3
+    /// history's starts (app 0.8); 4, your library followed (Phase 3).
+    public static let version = 4
 
     /// SQLite said no: its own words, for whoever runs deadwax.
     public struct Failure: Error, Equatable, CustomStringConvertible {
@@ -148,6 +152,22 @@ public final class DownloadDatabase {
         "CREATE INDEX start_pending_at ON start_pending (at, id)",
     ]
 
+    /// Version 4's (Phase 3): your library as this phone follows it - `entry` the list's IndexAlbum JSON, `songs` the
+    /// FollowedSong JSON array (NULL until read), the marks in ms.
+    static let librarySchema: [String] = [
+        """
+        CREATE TABLE library (
+          album_id TEXT PRIMARY KEY,
+          position INTEGER NOT NULL,
+          entry BLOB NOT NULL,
+          songs BLOB,
+          read_at INTEGER,
+          missing_since INTEGER,
+          removed_here INTEGER,
+          kept_off INTEGER)
+        """,
+    ]
+
     /// The schema brought from the file's version up to `target` (the newest, but in a test), in one transaction: made
     /// from nothing (version 0), or an older file - every row kept - given what came after it: a version-1 file (Phase
     /// 2's) the lyrics table, a version-2 file the starts' table.
@@ -163,6 +183,9 @@ public final class DownloadDatabase {
             }
             if current < 3, target >= 3 {
                 for statement in Self.historySchema { try execute(statement) }
+            }
+            if current < 4, target >= 4 {
+                for statement in Self.librarySchema { try execute(statement) }
             }
             try execute("PRAGMA user_version = \(target)")
         }
@@ -466,6 +489,89 @@ public final class DownloadDatabase {
         try run("DELETE FROM queue_pending")
     }
 
+    // MARK: your library followed (version 4, phase3-autodownload.md 2.1, 5.1)
+
+    /// The meta keys the library's facts are kept under: the scope its list is of, that list's ETag, why its absences
+    /// weren't believed (`LibraryFollow.Held.raw`), when the last check that answered began (ms), and how long the
+    /// first read of every album's songs took (Debug's, slice 1: "<seconds> <albums>").
+    public static let libraryScopeKey = "library_scope"
+    public static let libraryETagKey = "library_etag"
+    public static let libraryHeldKey = "library_held"
+    public static let libraryCheckedKey = "library_checked_at"
+    public static let libraryFirstReadKey = "library_first_read"
+    static let libraryKeys = [libraryScopeKey, libraryETagKey, libraryHeldKey, libraryCheckedKey, libraryFirstReadKey]
+
+    /// Your library as this phone follows it, in its place. A row whose entry can't be read is left out (the next list
+    /// adds it again); songs that can't be read are unread.
+    public func library() throws -> [FollowedAlbum] {
+        let decoder = JSONDecoder()
+        return try query("""
+            SELECT album_id, position, entry, songs, read_at, missing_since, removed_here, kept_off
+            FROM library ORDER BY position, album_id
+            """) { row in
+            guard let id = row.text(0), let entry = row.blob(2),
+                  let album = try? decoder.decode(IndexAlbum.self, from: entry), album.id == id else { return nil }
+            let songs = row.blob(3).flatMap { try? decoder.decode([FollowedSong].self, from: $0) }
+            return FollowedAlbum(album: album, position: Int(row.int(1) ?? 0), songs: songs,
+                                 readAt: songs == nil ? nil : row.int(4), missingSince: row.int(5),
+                                 removedHere: row.int(6), keptOff: row.int(7))
+        }
+    }
+
+    /// `albums` as the library, `old` being the library as last read: the rows of albums no longer in it deleted, and
+    /// only the rows that differ written - a 200 that moved one album's place rewrites the rows after it, not every
+    /// song list. One transaction.
+    public func putLibrary(_ albums: [FollowedAlbum], replacing old: [FollowedAlbum]) throws {
+        var before: [String: FollowedAlbum] = [:]
+        for entry in old { before[entry.id] = entry }
+        let ids = Set(albums.map(\.id))
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        try transaction {
+            for id in before.keys where !ids.contains(id) {
+                try run("DELETE FROM library WHERE album_id = ?", [.text(id)])
+            }
+            for entry in albums where before[entry.id] != entry {
+                let songs = try entry.songs.map { try encoder.encode($0) }
+                try run("""
+                    INSERT OR REPLACE INTO library
+                      (album_id, position, entry, songs, read_at, missing_since, removed_here, kept_off)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, [.text(entry.id), .int(Int64(entry.position)), .blob(try encoder.encode(entry.album)),
+                          .blob(songs), .int(songs == nil ? nil : entry.readAt), .int(entry.missingSince),
+                          .int(entry.removedHere), .int(entry.keptOff)])
+            }
+        }
+    }
+
+    /// An album's songs, read at `at` - kept only while the album is in the library. Whether it was.
+    @discardableResult
+    public func setLibrarySongs(album: String, songs: [FollowedSong], at: Int64) throws -> Bool {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        try run("UPDATE library SET songs = ?, read_at = ? WHERE album_id = ?",
+                [.blob(try encoder.encode(songs)), .int(at), .text(album)])
+        return sqlite3_changes(db) > 0
+    }
+
+    /// Remove from my library answered in this app at `at` (ms): the next list without it removes it at once. Whether
+    /// the album was in the library.
+    @discardableResult
+    public func setRemovedHere(album: String, at: Int64) throws -> Bool {
+        try run("UPDATE library SET removed_here = ? WHERE album_id = ?", [.int(at), .text(album)])
+        return sqlite3_changes(db) > 0
+    }
+
+    /// The library forgotten: every row, and its meta - followed again from nothing.
+    public func forgetLibrary() throws {
+        try transaction {
+            try execute("DELETE FROM library")
+            for key in Self.libraryKeys {
+                try setMeta(key, nil)
+            }
+        }
+    }
+
     // MARK: meta
 
     public func meta(_ key: String) throws -> String? {
@@ -483,7 +589,7 @@ public final class DownloadDatabase {
     // MARK: everything
 
     /// Remove All Downloads: every song, origin, album and loudness, and (by the trigger) every song's lyrics - the
-    /// plays, the starts and the queue save kept (they aren't downloads).
+    /// plays, the starts, the queue save and the library followed kept (they aren't downloads).
     public func removeAll() throws {
         try transaction {
             for table in ["origin", "song", "album", "loudness"] { try execute("DELETE FROM \(table)") }

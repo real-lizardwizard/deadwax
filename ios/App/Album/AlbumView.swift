@@ -71,7 +71,9 @@ struct AlbumView: View {
                     .listRowSeparator(.hidden)
             } else if model.mineBlockShown {
                 MineBlock(mine: model.mine, busy: model.busy, refused: model.refused,
-                          act: { action in Task { await model.change(action, client: server.client, library: library) } },
+                          act: { action in
+                              Task { await model.change(action, client: server.client, library: library, downloads: downloads) }
+                          },
                           noteFocused: $noteFocused)
                     .listRowSeparator(.hidden)
             }

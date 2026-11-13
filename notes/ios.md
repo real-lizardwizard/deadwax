@@ -3895,3 +3895,101 @@ and `scrollTo` with no animation are the whole mechanism, unseen), the next page
 row's tap under the finger with VoiceOver, the newest page on coming back to the app, offline starts drawn and sent
 on reconnect before the plays, a long backlog in batches, a pick-up mid-song making no start, another person's
 history.
+
+## Phase 3, slice 1: following your library (read-only, 2026-11-13)
+
+Phase 3 is "auto-download your library" (the plan's section 5, James's answers at its top). Its spec is
+notes/ios-specs/phase3-autodownload.md: the words, the rules (2.1-2.9), the screens, the server (nothing needed),
+the machinery, three slices, tests, the checks and 16 open questions with what is built until James answers. This is
+its first slice: **the phone follows your library and works out what would fit, and nothing downloads or is
+deleted** - no origin is written and the planner is untouched. It exists to prove the rules against James's real
+library and to measure the first read of every album's songs (the plan's R13) before anything depends on it. Built
+on branch `phase3-autodownload` from ios at 305f6a8 (app 0.8); the app's version stays 0.8 (8) until the phase is
+done (0.9, slice 3). Nothing in DeadwaxAudio changed.
+
+### Core (DeadwaxCore, tested on Linux)
+
+- **LibraryFollow.swift**: `FollowedSong` (a song as the fill reads it - id, disc, track, size, suffix, content type,
+  duration; its `format` and `bytes` as the planner counts a song asked for), `FollowedAlbum` (the list's entry, its
+  place, its songs once read, and the marks missing since, removed here, kept off), `LibraryCheck` (the seven
+  reasons), and `LibraryFollow`: `sync` (2.3 - added, changed, back, missing, removed; a list's absences held back when
+  it is empty, drops more than half and more than 10, or is truncated, and a 304 after a held list held too), `due`
+  (2.2), `placedAt` and `ordered` (2.5: the later of the star - `created` without one, or for the collection - and a
+  play within 30 days), `toRead` (2.4) and `songsChanged`.
+- **LibraryFill.swift**: `plan` (2.6 - hand downloads first, the limit's and the phone's budgets, `room`,
+  `phoneFull` holding its room under the limit, `unread`, `keptOff`, give-way of albums with bytes here, N of M) and
+  `albums` (the fill's `AlbumFacts` from the library in order, songs wanted by hand left out). Named `AlbumFacts`, not
+  `Album`: tests/test_ios_contract.py finds Core's `struct Album` by name and requires one.
+- **LibraryFollowWords.swift**: Debug's lines and the downloads log's library lines, and `LibraryCheckRecord`.
+- **DownloadDatabase version 4: `library`** (5.1) - `library()`, `putLibrary(_:replacing:)` (rows gone deleted, only
+  rows that differ written, one transaction), `setLibrarySongs`, `setRemovedHere`, `forgetLibrary`; the meta keys
+  `library_scope`, `library_etag`, `library_held`, `library_checked_at` and Debug's `library_first_read`. `removeAll`
+  keeps the table (it isn't downloads); a version 3 file gains it with every other row kept.
+- **StreamFormat.format(suffix:contentType:)**, so a `FollowedSong` is counted as its stream would be fetched.
+
+### The app
+
+- **LibraryFollower** (App/Downloads/, `@MainActor @Observable`), owned by DownloadModel and given its store as it
+  opens (`opened`, `closed`): checks for `opened`, `front` (DownloadModel.becameActive), `timer` (a 60 s loop while the
+  app is alive, a check when 15 minutes have passed), `changedHere`, `byHand` (Debug's Check now) and `back`
+  (reachability coming back online); one thing at a time - a check, then the reads, a check asked for during the reads
+  made after the batch in hand. A check: `album_index?scope=` (AlbumScope.albums(for: me)) with the last list's ETag
+  (none while the library is empty), `LibraryFollow.sync` on the answer dated by the request's send time, the result
+  written in one transaction with the ETag, the held reason and the time, then `ordered`. A check that fails, or
+  can't ask (offline, signed out, the launch not ready), changes nothing - not even `lastBegan`, so the next minute's
+  timer is due. The reads: `toRead` in order, four at a time (`GET /navidrome/albums/{id}` in a task group), each
+  album's songs written as they come; a batch wholly refused stops the reads until the next check, and an album that
+  failed isn't asked again until then.
+- **Debug's switch** "Follow your library" (`debugFollowLibrary`, per phone, off by default): nothing runs without it.
+  Turned off, the library and its meta are forgotten (L0a's "off and on reads again from nothing").
+- **DownloadModel**: `follower`; `libraryChanged(album:removed:)`, called by AlbumModel.change (now given the
+  downloads) when Add or Remove answers - a Remove marks `removed_here` at the answer's time, so the next list
+  without it removes it at once, and a list asked before the answer can't clear it; `handBytes()` (the hand
+  downloads' bytes here and to come, and their songs) for the fill.
+- **DebugView**: "Your library" after Downloads - the switch, Following, Albums, Songs read, Missing, Held back, Last
+  check, First read, the fill's "N of M fit in 20 GB" and its detail (at the storage limit and the free space, read
+  every 5 s), the store's problem, Check now. Its log lines are the Downloads section's ("library <reason>: ...").
+
+### Decided here (the spec was silent)
+
+Written into the spec's 6.4 too:
+- **Another scope** under the same store (logins switched on or off): the kept list is the other scope's, so it is
+  forgotten and followed afresh, its ETag with it.
+- **A missing album stays in the fill** until two checks agree it is gone.
+- **An unread album's bytes here aren't counted as the phone's to give** - it is never given way while its songs are
+  read again.
+- **A play dated ahead of now counts as now** in the order (the spec's test list had said "ignored").
+- **The first read's time** runs from the check that listed albums into an empty library to the last listed album
+  read; it is kept in meta. Time in the background counts, and a relaunch mid-read never records one.
+- **Not built in slice 1**: the album page refreshing an album's kept songs (2.4's last point - nothing is planned from
+  the songs yet), the `background` reason (slice 3).
+
+### Tests
+
+Core 1084 (from 1033): **LibraryFollowTests** 25 (every rule of 2.2-2.5 in the spec's section 7, the drop's edges -
+exactly half, exactly 10 - removed-here before and after a check's send time, a pending mark surviving a held list,
+the held reasons' words), **LibraryFillTests** 13, **LibraryDatabaseTests** 7 (every mark kept, a list replaced, only
+changed rows written, removeAll and forgetLibrary, a version 3 file upgraded), **LibraryFollowWordsTests** 6; the two
+tests pinned to version 3 now read `DownloadDatabase.version` / open with `upTo: 3`. The spec's mutations, each run
+against the suites and each caught: the ten minutes as `>`, confirming at the first absence, a 304 not confirming, an
+empty list marking, the drop without "more than 10", a play of any age, the fill skipping hand bytes, a phone-full
+album not holding its room, give-way of an album with nothing here.
+
+### The server
+
+Nothing. The one route the spec names - `GET /deadwax/navidrome/album_songs?ids=` (permission user, up to 50 ids,
+getAlbum as the asker, `{"albums": [{"id", "songs": [...]}], "missing": [ids]}`) - is built on main as a 2.1.x patch
+only if L0a's first read over WireGuard takes more than 10 minutes.
+
+### Verified, and not
+
+Verified (2026-11-13, this Mac, Xcode's toolchain): `swift test` - Core 1084, DeadwaxAudio 158, DeadwaxTurntable 11,
+all pass; the unsigned Release device build (0.8 (8), net.lizardlounge.deadwax, no warnings); check_project.py, the
+.xcodeproj unchanged (App/ is a synchronized folder); `pytest tests/test_ios_*.py tests/test_source_bytes.py` 160
+passed, 1 skipped (nothing outside ios/, notes/ and docs/ changed, so not the full suite); the ten ios*.sim on Node 22
+with a scratch TMPDIR (a fresh `npm ci` in ui/, deleted after). Not run: Core on Linux (ios.yml's ubuntu job will).
+
+Not verified: anything on a phone - checks L0a-L0g in docs/ios.md: the first read's time at home and over WireGuard
+(R13), a star and an unstar elsewhere reaching the phone, the 304, Remove here at once, the fill following the limit,
+nothing else moving; and what a 200 of a 3,000-album list costs on the phone (Debug's Last check times it). Nothing
+drawn has been seen.

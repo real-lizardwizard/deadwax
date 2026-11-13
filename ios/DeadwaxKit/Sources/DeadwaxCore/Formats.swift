@@ -9,8 +9,14 @@ public enum StreamFormat {
     static let undecodableTypes: Set<String> = ["audio/ogg", "audio/opus", "audio/x-ms-wma"]
 
     public static func format(for song: Song) -> String {
-        if let suffix = song.suffix?.lowercased(), undecodable.contains(suffix) { return "mp3" }
-        if let type = song.contentType?.lowercased(), undecodableTypes.contains(type) { return "mp3" }
+        format(suffix: song.suffix, contentType: song.contentType)
+    }
+
+    /// The same, from the two facts it reads - for a song kept without its whole answer (your library's songs,
+    /// phase3-autodownload.md 2.4).
+    public static func format(suffix: String?, contentType: String?) -> String {
+        if let suffix = suffix?.lowercased(), undecodable.contains(suffix) { return "mp3" }
+        if let type = contentType?.lowercased(), undecodableTypes.contains(type) { return "mp3" }
         return "raw"
     }
 
