@@ -104,6 +104,16 @@ struct TurntableScreenTests {
         #expect(TurntableScreen.framesRun(asked: true, showing: true, active: true, reduced: true, held: true))
     }
 
+    /// 4.4: a window before the engine's first start is made at the session's rate, not the engine's 48 kHz guess.
+    @Test func aWindowIsMadeAtTheRateTheEngineWillRunAt() {
+        #expect(TurntableScreen.windowRate(engineRate: 48_000, engineStarted: false, sessionRate: 44_100) == 44_100,
+                "before the first start: the route's rate")
+        #expect(TurntableScreen.windowRate(engineRate: 44_100, engineStarted: true, sessionRate: 48_000) == 44_100,
+                "started: the voice's rate, which its windows must match")
+        #expect(TurntableScreen.windowRate(engineRate: 48_000, engineStarted: false, sessionRate: 0) == 48_000)
+        #expect(TurntableScreen.windowRate(engineRate: 0, engineStarted: false, sessionRate: 0) == 48_000)
+    }
+
     /// 4.6, question 13 C.
     @Test func theDeckEngineRunsAsQuestion13Says() {
         let ready = DeckEngineState(prepared: true)

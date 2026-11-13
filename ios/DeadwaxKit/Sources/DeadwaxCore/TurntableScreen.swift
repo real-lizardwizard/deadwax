@@ -193,6 +193,16 @@ public enum TurntableScreen {
         engine.prepared && engine.failure == nil && !engine.airPlay && !engine.interrupted
     }
 
+    /// The rate a window is made at (4.4): the deck engine's once it has started at one (and the new route's after a
+    /// route change made it again), else the session's - the rate it will start at. Before its first start the
+    /// engine's own rate is a 48 kHz guess, and a first window made at it on a 44.1 kHz route would be dropped at that
+    /// start and made again. 48 kHz when neither says.
+    public static func windowRate(engineRate: Double, engineStarted: Bool, sessionRate: Double) -> Double {
+        if engineStarted && engineRate > 0 { return engineRate }
+        if sessionRate > 0 { return sessionRate }
+        return engineRate > 0 ? engineRate : 48_000
+    }
+
     /// The record can't make its sound on this phone at all (the press's `noAudio`): the engine couldn't start.
     public static func noAudio(_ engine: DeckEngineState) -> Bool {
         engine.failure != nil

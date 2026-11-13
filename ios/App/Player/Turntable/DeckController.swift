@@ -666,13 +666,13 @@ final class DeckController {
     }
 
     /// The window (4.4, 4.5): from the download, else the stream cache's whole copy, else deadwax's `/scrub` - none
-    /// offline - at the deck engine's rate and the entry's level.
+    /// offline - at the rate the deck engine runs at (the session's before its first start) and the entry's level.
     func window(_ song: DeckSong, from start: Double, seconds: Double,
                 answer: @escaping (Result<DeckWindow, DeckWindowError>) -> Void) {
         guard let entry = player.current, entry.track.id == song.id else { return }
-        let sessionRate = AVAudioSession.sharedInstance().sampleRate
-        let engineRate = engine?.rate ?? 0
-        let rate = engineRate > 0 ? engineRate : (sessionRate > 0 ? sessionRate : 48_000)
+        let rate = TurntableScreen.windowRate(engineRate: engine?.rate ?? 0,
+                                              engineStarted: (engine?.status().starts ?? 0) > 0,
+                                              sessionRate: AVAudioSession.sharedInstance().sampleRate)
         let factor = player.levelDecisions.decided(entry.key)?.multiplier
         let fileRate = Double(entry.track.sampleRate)
         let made = { [weak self] (result: Result<DeckWindow, DeckWindowError>) -> Void in
