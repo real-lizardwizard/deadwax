@@ -251,10 +251,20 @@ public enum APOReader {
         return Match(start: start, end: i, capture: capture)
     }
 
-    /// The leftmost match anywhere.
+    /// The leftmost match anywhere. A pattern that begins with whitespace and fails from a space fails from every
+    /// later space of the same run too - each reaches the run's end and the same rest, with less of it - so the run is
+    /// stepped over: one pass, where trying each start in it took a 256 KB line of spaces hours.
     static func search(_ parts: [Part], _ s: Line) -> Match? {
-        for start in 0...s.count {
+        var start = 0
+        while start <= s.count {
             if let m = match(parts, s, at: start) { return m }
+            if case .space? = parts.first, start < s.count, isSpace(s[start]) {
+                var end = start + 1
+                while end < s.count && isSpace(s[end]) { end += 1 }
+                start = end
+            } else {
+                start += 1
+            }
         }
         return nil
     }
@@ -621,6 +631,9 @@ public enum APOReader {
         if kind.hasGain && !(-EQLimits.gain <= gainValue && gainValue <= EQLimits.gain) {
             throw EQWords.Import.gain(line: n, dB: gainValue)
         }
+        //? a band pass's gain plays nothing and is kept only to be written back; an overflow to infinity can't be kept
+        //? (eq.json holds no infinity: every save after it was lost), so it is refused as any filter's
+        if !gainValue.isFinite { throw EQWords.Import.gain(line: n, dB: gainValue) }
         switch width {
         case .q(let v)? where v != 0 && !EQLimits.q.contains(v):
             throw EQWords.Import.q(line: n, q: v)
@@ -628,6 +641,8 @@ public enum APOReader {
             throw EQWords.Import.width(line: n, octaves: v)
         case .slope(let v)? where v < 0:
             throw EQWords.Import.slope(line: n, dB: v)
+        case .slope(let v)? where v > 0 && !EQCookbook.shelfRadicand(gain: gainValue, s: v / 12).isFinite:
+            throw EQWords.Import.tooGentle(line: n, dB: v)
         case .slope(let v)? where v > 0 && EQCookbook.shelfRadicand(gain: gainValue, s: v / 12) <= 0:
             throw EQWords.Import.tooSteep(line: n, kind: kind, slope: v, gain: gainValue)
         default:

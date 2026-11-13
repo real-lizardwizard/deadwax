@@ -149,6 +149,11 @@ public enum EQWords {
             refusal(.slope, n, "Line \(n): a slope of \(number(dB)) dB won't make a filter - it must be above 0.")
         }
 
+        /// A slope so near 0 its shelf's S overflows: no filter - its coefficients would be NaN.
+        public static func tooGentle(line n: Int, dB: Double) -> APORefusal {
+            refusal(.slope, n, "Line \(n): a slope of \(number(dB)) dB is too gentle to make a filter.")
+        }
+
         public static func tooSteep(line n: Int, kind: EQKind, slope: Double, gain: Double) -> APORefusal {
             refusal(.tooSteep, n, "Line \(n): \(typePhrase[kind]!) this steep (\(number(slope)) dB an octave) can't have \(number(gain)) dB of gain - Equalizer APO can't play it either.")
         }
@@ -653,11 +658,13 @@ extension EQWords {
         public static let widthRange = "Between 0.01 and 10."
         /// A slope of 0 or less (slice 5: 3.8 gives no words for it; 3.9's refusal says "it must be above 0").
         public static let slopeRange = "Above 0 dB an octave."
+        /// A slope so near 0 its shelf's S overflows (EQWords.Import.tooGentle's).
+        public static let tooGentle = "Too gentle to make a filter."
 
         /// A shelf read by its corner: "Its corner frequency, as Equalizer APO reads this shelf - it is centred at
         /// 131 Hz."
         public static func corner(centredAt f0: Double) -> String {
-            "Its corner frequency, as Equalizer APO reads this shelf - it is centred at \(Int(f0.rounded())) Hz."
+            "Its corner frequency, as Equalizer APO reads this shelf - it is centred at \(number(f0.rounded())) Hz."
         }
 
         /// A slope too steep for the gain (1.3): the steepest it can be, rounded down so it is.

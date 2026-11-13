@@ -561,4 +561,197 @@ import Testing
         #expect(EQWords.Import.what(Self.built([])) == "your own filters")
         #expect(EQWords.Editor.slopeRange == "Above 0 dB an octave.")
     }
+
+    // MARK: the review (slice 5)
+
+    /// An edit that would take an ear past 64 is refused: 63 for both and one for each ear - the left one's moved to
+    /// both makes the right 65, the right one's moved to the left makes the left 65.
+    @Test func anEditPastSixtyFourIsRefused() {
+        let shared = (1...63).map { Self.peak($0, Double(100 + $0)) }
+        let c = Self.built(shared + [Self.peak(64, 5000, channel: .left), Self.peak(65, 6000, channel: .right)])
+        var settings = Self.settings(c)
+        let before = settings
+        #expect(settings.editFilter(64, for: Self.airpods) { (f: inout EQFilter) -> Void in f.channel = .all } == false)
+        #expect(settings.editFilter(65, for: Self.airpods) { (f: inout EQFilter) -> Void in f.channel = .left } == false)
+        #expect(settings == before)
+    }
+
+    /// Add Filter alone, or a delete alone, makes AutoEq's correction yours - "- changed", and Back offered.
+    @Test func addingOrDeletingMarksAutoEqChanged() throws {
+        let original = try Self.autoEq()
+        var added = Self.settings(original)
+        added.addFilter(for: Self.airpods)
+        #expect(added.output(Self.airpods.key)?.correction?.changed == true)
+        var deleted = Self.settings(original)
+        deleted.deleteFilter(original.filters[0].id, for: Self.airpods)
+        #expect(deleted.output(Self.airpods.key)?.correction?.changed == true)
+        #expect(EQAdvancedRules.goesBack(deleted.output(Self.airpods.key)?.correction))
+    }
+
+    /// A filter at 0 dB plays nothing, but isn't "left out" - that is only for one above the rate.
+    @Test func aFlatFilterIsNotLeftOut() {
+        let c = Self.built([Self.peak(1, 1000, 0), EQFilter(id: 2, kind: .lowShelf, fc: 100, gain: 0, width: .slope(12))])
+        #expect(EQAdvancedRules.rows(c, rate: 44_100).map(\.leftOut) == [false, false])
+    }
+
+    /// An `LS` or `HS` read with no width plays by its centre; given one - its field, a step, a pinch - it is written
+    /// `LSC`/`HSC`, since an `LS` given a Q is read by its corner (0.3) and an export read again would move it. One read
+    /// by its corner keeps its corner. Exported and read again, each plays as it did.
+    @Test func aShelfGivenAWidthPlaysTheSameExported() throws {
+        let text = "Filter: ON LS Fc 100 Hz Gain 6 dB\nFilter: ON HS Fc 8000 Hz Gain -4 dB\nFilter: ON LS Fc 200 Hz Gain 3 dB Q 0.7\n"
+        guard case .success(let reading) = APOReader.read(Data(text.utf8)) else { throw Failure.unread }
+        var settings = Self.settings(EQImportRules.correction(name: "a.txt", text: text, reading: reading))
+        let ids = reading.filters.map(\.id)
+        let stepped = try #require(EQEditorRules.stepped(reading.filters[0], .q, up: true))
+        settings.editFilter(ids[0], for: Self.airpods) { (f: inout EQFilter) -> Void in f = stepped }
+        settings.editFilter(ids[1], for: Self.airpods) { (f: inout EQFilter) -> Void in f = EQHandleRules.pinched(f, scale: 2) }
+        settings.editFilter(ids[2], for: Self.airpods) { (f: inout EQFilter) -> Void in f.width = .q(0.8) }
+        let filters = try #require(settings.output(Self.airpods.key)?.correction?.filters)
+        #expect(filters.map(\.written) == ["LSC", "HSC", "LS"] && filters.map(\.corner) == [false, false, true])
+        #expect(filters[0].f0 == 100 && filters[1].f0 == 8000)
+        let file = APOWriter.write(filters: filters, preamp: .zero)
+        guard case .success(let back) = APOReader.read(Data(file.utf8)) else { throw Failure.unread }
+        #expect(back.filters.count == 3)
+        for (mine, read) in zip(filters, back.filters) {
+            #expect(mine.f0 == read.f0, "\(file)")
+            #expect(mine.design(rate: 48_000).coefficients == read.design(rate: 48_000).coefficients, "\(file)")
+        }
+    }
+
+    /// No edit leaves a filter the reader would refuse - a NaN or an infinity from anywhere, a frequency, gain or width
+    /// out of range, a slope too steep or so gentle it overflows: nothing changes. In range, it does.
+    @Test func anEditNeverLeavesAFilterTheReaderWouldRefuse() {
+        // 6 dB takes up to 211 dB an octave; 24 dB an octave, under 23 dB of gain
+        let shelf = EQFilter(id: 2, kind: .lowShelf, fc: 100, gain: 6, width: .slope(24))
+        let before = Self.settings(Self.built([Self.peak(1, 1000), shelf]), on: false)
+        let peakEdits: [(inout EQFilter) -> Void] = [
+            { (f: inout EQFilter) -> Void in f.fc = .nan },
+            { (f: inout EQFilter) -> Void in f.fc = .infinity },
+            { (f: inout EQFilter) -> Void in f.fc = 0.5 },
+            { (f: inout EQFilter) -> Void in f.fc = 22_001 },
+            { (f: inout EQFilter) -> Void in f.gain = .nan },
+            { (f: inout EQFilter) -> Void in f.gain = -.infinity },
+            { (f: inout EQFilter) -> Void in f.gain = 30.1 },
+            { (f: inout EQFilter) -> Void in f.width = .q(.nan) },
+            { (f: inout EQFilter) -> Void in f.width = .q(0.001) },
+            { (f: inout EQFilter) -> Void in f.width = .q(101) },
+            { (f: inout EQFilter) -> Void in f.width = .bandwidth(10.5) },
+        ]
+        for (i, edit) in peakEdits.enumerated() {
+            var settings = before
+            #expect(settings.editFilter(1, for: Self.airpods, edit) == false && settings == before, "peak \(i)")
+        }
+        let shelfEdits: [(inout EQFilter) -> Void] = [
+            { (f: inout EQFilter) -> Void in f.width = .slope(-1) },
+            { (f: inout EQFilter) -> Void in f.width = .slope(1e-310) },
+            { (f: inout EQFilter) -> Void in f.width = .slope(.nan) },
+            { (f: inout EQFilter) -> Void in f.width = .slope(.infinity) },
+            { (f: inout EQFilter) -> Void in f.width = .slope(300) },
+            { (f: inout EQFilter) -> Void in f.gain = 30 },
+        ]
+        for (i, edit) in shelfEdits.enumerated() {
+            var settings = before
+            #expect(settings.editFilter(2, for: Self.airpods, edit) == false && settings == before, "shelf \(i)")
+        }
+        var settings = before
+        #expect(settings.editFilter(1, for: Self.airpods) { (f: inout EQFilter) -> Void in f.fc = 22_000 })
+        #expect(settings.editFilter(2, for: Self.airpods) { (f: inout EQFilter) -> Void in f.width = nil } == false)
+        #expect(settings.output(Self.airpods.key)?.correction?.filters.map(\.fc) == [22_000, 100])
+        #expect(settings.output(Self.airpods.key)?.correction?.filters[1].width == nil)
+        #expect(EQAdvancedRules.takes(EQFilter(id: 3, kind: .lowPass, fc: 100, width: .q(0))))
+        // a band pass's gain plays nothing, and a file's of 45 dB is kept: it can still be switched off
+        let file = "Filter: ON BP Fc 1000 Hz Gain 45 dB Q 2"
+        guard case .success(let reading) = APOReader.read(Data(file.utf8)) else {
+            Issue.record("a band pass's gain is kept as written")
+            return
+        }
+        var pass = Self.settings(EQImportRules.correction(name: "b.txt", text: file, reading: reading))
+        pass.setFilter(reading.filters[0].id, on: false, for: Self.airpods)
+        #expect(pass.output(Self.airpods.key)?.correction?.filters.map(\.on) == [false])
+    }
+
+    /// Every filter a file or AutoEq gives is one an edit may leave, so each can be switched and edited: the guard
+    /// above refuses only what no reading makes.
+    @Test func everyFilterAFileGivesCanBeEdited() throws {
+        var filters: [EQFilter] = []
+        for c in try EQFixtures.apo().readings {
+            if case .success(let reading) = APOReader.read(try EQFixtures.bytes(of: c), pasted: c.pasted) {
+                filters += reading.filters
+            }
+        }
+        for profile in try EQFixtures.profiles().profiles {
+            if case .success(let reading) = APOReader.read(try Fixtures.data("eq/\(profile.path)")) {
+                filters += reading.filters
+            }
+        }
+        #expect(filters.count > 500)
+        for f in filters { #expect(EQAdvancedRules.takes(f), "\(f)") }
+    }
+
+    /// A corner shelf whose centre is no frequency - 0 Hz, or past any number (a gain of 30 dB and Q 0.01 moves it
+    /// that far) - is dragged from its Fc: it moves, and never to NaN.
+    @Test func aCornerWithNoCentreIsDraggedFromItsFc() {
+        let w = 350.0, h = 220.0, r = 15.0
+        let down = EQFilter(id: 1, kind: .highShelf, written: "HS", fc: 1000, gain: 30, width: .q(0.01), corner: true)
+        let up = EQFilter(id: 2, kind: .lowShelf, written: "LS", fc: 100, gain: 30, width: .q(0.01), corner: true)
+        #expect(down.f0 == 0 && up.f0 == .infinity)
+        #expect(EQHandleRules.dragged(down, dx: w / 10, dy: 0, width: w, height: h, range: r).fc == 2000)
+        #expect(EQHandleRules.dragged(up, dx: w / 10, dy: 0, width: w, height: h, range: r).fc == 200)
+    }
+
+    /// A finger never moves straight: an axis follows it only once it has gone 4 pt along that axis, from there - so a
+    /// drag up that wobbles sideways keeps an imported 31.25 Hz, and 3 pt each way is still a tap.
+    @Test func aDragUpThatWobblesKeepsItsFrequency() {
+        let start = EQFilter(id: 1, kind: .peak, fc: 31.25, gain: 2.5, width: .q(1.41))
+        var drag = EQHandleDrag(start: start, range: 15)
+        #expect(drag.filter(dx: 3, dy: -3, width: 350, height: 220) == nil)
+        #expect(drag.filter(dx: 1, dy: -4, width: 350, height: 220) == start)
+        let up = drag.filter(dx: -3.5, dy: -4 - 22, width: 350, height: 220)
+        #expect(up?.fc == 31.25 && up?.gain == 5.5)
+        // sideways past 4 pt: the frequency follows from there, without a jump
+        #expect(drag.filter(dx: 6, dy: -4 - 22, width: 350, height: 220)?.fc == 31.25)
+        let across = drag.filter(dx: 6 + 35, dy: -4 - 22, width: 350, height: 220)
+        #expect(abs((across?.fc ?? 0) - 62.5) <= 0.5 && across?.gain == 5.5)
+    }
+
+    /// A slope so near 0 its S overflows is refused by its field ("Too gentle to make a filter."), as the reader refuses
+    /// it.
+    @Test func aSlopeTooGentleIsRefusedByItsField() {
+        let shelf = EQFilter(id: 1, kind: .lowShelf, fc: 100, gain: 6, width: .slope(12))
+        let tiny = "0." + String(repeating: "0", count: 309) + "1"
+        #expect(EQEditorRules.parse(tiny) == 1e-310)
+        #expect(EQEditorRules.check(tiny, .slope, for: shelf) == .problem("Too gentle to make a filter."))
+        #expect(EQEditorRules.check("0.0001", .slope, for: shelf) == .value(0.0001))
+    }
+
+    /// A corner shelf moved past any frequency (an `LS` of 0.1 dB an octave and 30 dB: f0 1e47 Hz, or infinity) says
+    /// so in numbers - the line under Frequency once trapped turning it into an Int.
+    @Test func aCornerFarAwaySaysWhereWithoutTrapping() {
+        let far = EQFilter(id: 1, kind: .lowShelf, written: "LS", fc: 100, gain: 30, width: .slope(0.1), corner: true)
+        #expect(far.f0! > 1e40)
+        #expect(EQEditorRules.cornerNote(far)?.hasSuffix(" Hz.") == true)
+        let gone = EQFilter(id: 1, kind: .lowShelf, written: "LS", fc: 100, gain: 30, width: .q(0.01), corner: true)
+        #expect(EQEditorRules.cornerNote(gone) == "Its corner frequency, as Equalizer APO reads this shelf - it is centred at inf Hz.")
+        #expect(EQWords.Editor.corner(centredAt: 130.6) == "Its corner frequency, as Equalizer APO reads this shelf - it is centred at 131 Hz.")
+    }
+
+    /// The Advanced state written to eq.json and read again (4): the switch, every width's form, a corner, an ear's own,
+    /// one off, the counter, AutoEq's "changed" and its text, and the preamp by hand.
+    @Test func theAdvancedStateIsKeptAcrossALaunch() throws {
+        var c = try Self.autoEq()
+        c.filters += [
+            EQFilter(id: 20, kind: .lowShelf, written: "LS", fc: 100, gain: 5, width: .slope(6), corner: true),
+            EQFilter(id: 21, kind: .highShelf, written: "HSC", fc: 9000, gain: -3, width: .q(0.7)),
+            EQFilter(id: 22, kind: .lowPass, written: "LPQ", fc: 18_000, width: .bandwidth(1.5), channel: .left),
+            EQFilter(id: 23, kind: .notch, written: "NO", fc: 60, width: nil, channel: .right, on: false),
+        ]
+        c.nextFilterID = 24
+        c.changed = true
+        var settings = Self.settings(c, preamp: .hand(-7.5))
+        settings.advanced = true
+        let again = try #require(EQSettings.read(try settings.written()))
+        #expect(again == settings)
+        #expect(again.advanced && again.output(Self.airpods.key)?.correction?.changed == true)
+        #expect(EQAdvancedRules.goesBack(again.output(Self.airpods.key)?.correction))
+    }
 }

@@ -2518,6 +2518,73 @@ and no Simulator: every look, touch and sound is checks E22-E30's (docs/ios.md, 
   ios sims but iosdeck, which fails on `ios` before this slice (2.1.8's theme.css token not re-exported into the deck's
   tokens.json, ios/scripts/export-deck-vectors.cjs, on the Node that made them). Not verified: ios.yml's Xcode 26.6
   Swift (every multi-statement closure's type is spelled out), and anything on a phone.
+- **Review** (2026-11-12, on 58e31be..35f4161's four commits). Read against 5.5, 3.2-3.4, 3.8-3.11, 3.13-3.18, 0.3, 4,
+  6's 22-30, the Design review and the earlier slices' reviews, the code before the account; the import read as
+  untrusted input, with probes of 256 KB files of every shape and of absurd numbers. Changed:
+  - **A run of spaces made the reader quadratic** (slice 1's, found here): `APOReader.search` tried each start, and
+    from each space of a run walked to its end, so a line of n spaces with no "Gain" after them cost n squared - 20,000
+    took 11 s, a 256 KB file of them hours, the import hung. A pattern beginning with whitespace that fails from a
+    space fails from every later space of that run (each reaches the same end and the same rest, with less of it), so
+    the search steps over the run; 256 KB of any shape tried now reads in at most a second, 8,000 GraphicEQ lines
+    aside (8.5 s in a debug build, off the main thread). `aLongRunOfSpacesIsReadInOnePass`, failing first.
+  - **A slope so gentle its S overflows played NaN** (slice 1's): `LSC 1e-310 dB` - 1/S past the largest Double -
+    made b0 and a2 NaN in the bank. The reader refuses it as a slope, "Line 1: a slope of 1e-310 dB is too gentle to
+    make a filter."; the editor's field "Too gentle to make a filter.". `aSlopeTooGentleToMakeAFilterIsRefused`,
+    failing first; `aSlopeTooGentleIsRefusedByItsField`.
+  - **A band pass's infinite gain stopped every save** (slice 1's): a band pass plays no gain, so its `Gain` went
+    unchecked, and `Gain 1e999 dB` - wcstod's infinity - was kept; eq.json can't hold an infinity, and EQStore's
+    `try? written()` then dropped every save until the correction was replaced. Refused now by the gain's own words;
+    a finite one is kept as before. `anInfiniteGainIsRefusedOnABandPassToo`, failing first, also writing every
+    fixture's reading to eq.json.
+  - **An `LS` given a Q moved when exported**: a shelf read with no width plays by its centre, and its field, step or
+    pinch gave it a Q still written `LS` - which APO, and deadwax's import, read by its corner (100 Hz played, 117 Hz
+    read back). editFilter writes such a shelf `LSC`/`HSC`, by its centre as it plays; one read by its corner keeps
+    `LS`. `aShelfGivenAWidthPlaysTheSameExported` (export, read again, the same f0 and coefficients).
+  - **No edit is left that the reader would refuse** (`EQAdvancedRules.takes`, held by editFilter): Fc 1-22000 Hz, a
+    peak's or shelf's gain within 30 dB (a band pass's, which plays none, kept as a file wrote it), a Q, a width or a
+    slope in range, every number finite - so no NaN reaches the bank, the file or eq.json from a handle, a field or a
+    step. `anEditNeverLeavesAFilterTheReaderWouldRefuse` (a file's band pass of 45 dB still switched off);
+    `everyFilterAFileGivesCanBeEdited` (every fixture's and AutoEq profile's filter passes it).
+  - **A drag made NaN of a corner shelf with no centre**: `HS Fc 1000 Hz Gain 30 dB Q 0.01` is centred at 0 Hz
+    (`LS`: infinity), and a drag across divided by it. It is dragged from its Fc then. `aCornerWithNoCentreIsDraggedFromItsFc`.
+  - **The one-axis drag held only for a finger moved exactly straight** (departure 2): any wobble sideways rounded
+    31.25 Hz to 31. Each axis now engages on its own once the finger has gone 4 pt along it, and follows from there
+    without a jump; 3 pt each way is still a tap. `aDragUpThatWobblesKeepsItsFrequency`.
+  - **Opening a far-moved corner shelf's editor crashed**: its line turned f0 into an Int, which traps past Int.max -
+    `LS 0.1 dB` at 30 dB is centred at 1e47 Hz, with Q 0.01 at infinity - and a file can say either. It is written as
+    a number now ("centred at inf Hz"). `aCornerFarAwaySaysWhereWithoutTrapping` (traps on the old code).
+  - **A file of no reported size was read whole** (`Data(contentsOf:)` when `fileSizeKey` is nil): read now through a
+    FileHandle to one byte past 256 KB, its size from the end where iOS can say. And the preview's summary rows were
+    identified by their text, which two ears converted alike share; by place now.
+  - **Tests** for what the suite let through: an edit taking an ear past 64, Add Filter and a delete each marking
+    AutoEq's "changed", a 0 dB filter not "left out", UTF-16 big-endian text, and the Advanced state - the switch,
+    every width's form, a corner, an ear's own, one off, the counter, "changed" and the hand preamp - read back from
+    eq.json the same. Seventeen mutations - each Core fix above undone (twelve ways, the reader's three among them,
+    the guard's gain held for a band pass too), the 64 guard, either "changed", the left-out rule, the big-endian
+    order - each fails a test (the corner line's Int by trapping). The two App fixes have no test of their own (the App has none).
+  - **Agreed, not changed**: departures 1, 3-15, 17-19 sound as given; EQModel's operations write only the bound
+    output's setting; the closures' types stated and nothing newer than iOS 17; VoiceOver's rows, handles and
+    actions and Dynamic Type's stacking as 3.18 has them; the document type and check_project.py; `.onOpenURL`'s copy
+    deleted from Documents/Inbox only, after a security-scoped read; the refused line for whoever runs deadwax alone.
+  - **Left, noted**: the Python mirror (make-eq-fixtures.py) lacks the two reader refusals added here - no fixture
+    reaches them, and the fixtures can't be made again without scipy, so it is for whoever next makes them; the 0.4 s
+    before a preview over a fresh EQ sheet has no retry if a slow phone isn't ready; a shared file arriving over the
+    Files picker or an alert (the builder's own note); typed text not submitted is dropped when the editor is left;
+    EQStore's failed save says nothing (only this one cause of it is gone); an admin's refused line shown uncut, a
+    256 KB line included; `LSC 1e-300 dB` (just short of the overflow) and a corner centred at 0 Hz play their
+    degenerate sections as APO does; the row's "BW %.1f" rounds 0.04 octaves to 0.0; an Arabic decimal mark isn't
+    read.
+  - **James's to decide** (design, not changed): the words "a slope of … dB is too gentle to make a filter." and
+    "Too gentle to make a filter.", and "centred at inf Hz" / "1e+47 Hz" for a corner moved past any frequency; an
+    `LS` given a width written `LSC` (it stays where it plays) rather than made a corner (as APO would read `LS … Q`,
+    the handle jumping); 4 pt an axis before it moves; a grouping mark read as a decimal ("1,000" is 1 Hz on a phone
+    writing a point, "1.000" on one writing a comma); two ears' "Converted from a GraphicEQ curve…" lines naming no
+    ear; and the four above, with check 26 over a Flat tone only.
+  - **Tests**: Core **921 in 118** (EQAdvancedTests 39, APOReaderTests 21, EQImportRulesTests' text test grown),
+    Audio 114 in 9; pytest's iOS files and test_source_bytes.py (137, 1 skipped); the unsigned Release device build
+    (Xcode 27.2), only AppIntents' usual warning; check_project.py; the ios sims and vocabulary but iosdeck (as above).
+    Not verified: ios.yml's Xcode 26.6 Swift, and anything on a phone - the per-axis drag's feel and the bounded read
+    of a shared file among them.
 
 ### 5.6 With the turntable
 

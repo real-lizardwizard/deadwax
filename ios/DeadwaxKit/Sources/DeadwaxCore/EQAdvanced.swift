@@ -69,6 +69,26 @@ public enum EQAdvancedRules {
         return c.kind == .autoeq && c.changed && c.text != nil
     }
 
+    /// A filter an edit may leave (3.8): one the reader would take (1.3, 3.9) - its Fc 1 to 22000 Hz, a peak's or a
+    /// shelf's gain within 30 dB (another's, which plays none, kept as written but finite), a Q 0.01 to 100 and a width
+    /// 0.01 to 10 octaves (or 0, none), a shelf's slope 0 or above it and neither too steep for its gain nor so gentle
+    /// its S overflows - so no NaN or infinity reaches the bank, the file or eq.json, however a handle, a field or a
+    /// step got there, and every filter a file or AutoEq gave can still be switched and edited.
+    public static func takes(_ f: EQFilter) -> Bool {
+        guard EQLimits.frequency.contains(f.fc), f.gain.isFinite, !f.kind.hasGain || abs(f.gain) <= EQLimits.gain
+        else { return false }
+        switch f.width {
+        case nil: return true
+        case .q(let v)?: return v == 0 || EQLimits.q.contains(v)
+        case .bandwidth(let v)?: return v == 0 || EQLimits.bandwidth.contains(v)
+        case .slope(let v)? where f.kind.isShelf:
+            guard v != 0 else { return true }
+            let r = EQCookbook.shelfRadicand(gain: f.gain, s: v / 12)
+            return v > 0 && r > 0 && r.isFinite
+        case .slope(let v)?: return v.isFinite
+        }
+    }
+
     /// The preamp set by hand: to 0.1 dB, inside -30 to +12 (8, question 18) - never "-0".
     public static func handPreamp(_ dB: Double) -> Double {
         let r = EQLimits.handPreamp
@@ -98,9 +118,11 @@ extension EQSettings {
         return (id, turnedOn)
     }
 
-    /// One filter edited - by its handle, its row's switch or its editor - its id kept. Nothing when it is unchanged, or
-    /// would take an ear past 64; an AutoEq correction edited is marked changed ("- changed"). True when it turned the
-    /// EQ on.
+    /// One filter edited - by its handle, its row's switch or its editor - its id kept. Nothing when it is unchanged,
+    /// would take an ear past 64, or isn't a filter the reader would take (`takes`); an AutoEq correction edited is
+    /// marked changed ("- changed"). A shelf written by its corner's name (`LS`, `HS`) that plays by its centre and is
+    /// given a width is written as one by its centre (`LSC`, `HSC`): an `LS` given a Q is read by its corner (0.3), so
+    /// an export would otherwise move it. True when it turned the EQ on.
     @discardableResult
     public mutating func editFilter(_ id: Int, for o: EQOutput, _ body: (inout EQFilter) -> Void) -> Bool {
         guard var c = setting(for: o).correction, let i = c.filters.firstIndex(where: { $0.id == id }) else {
@@ -109,7 +131,10 @@ extension EQSettings {
         var f = c.filters[i]
         body(&f)
         f.id = id
-        guard f != c.filters[i] else { return false }
+        if f.kind.isShelf && !f.corner && !f.written.hasSuffix("C") && f.playedWidth?.given == true {
+            f.written = f.kind.defaultWritten
+        }
+        guard f != c.filters[i], EQAdvancedRules.takes(f) else { return false }
         c.filters[i] = f
         guard EQAdvancedRules.fits(c.filters) else { return false }
         if c.kind == .autoeq { c.changed = true }
@@ -251,7 +276,9 @@ public enum EQHandleRules {
                                range: Double) -> EQFilter {
         var f = start
         if dx != 0 && width > 0 {
-            let from = start.f0 ?? start.fc
+            // a corner shelf's centre, unless it is none a drag can move from (0 Hz, or past any number)
+            let f0 = start.f0 ?? start.fc
+            let from = f0 > 0 && f0.isFinite ? f0 : start.fc
             let ratio = frequency(x: EQDrawing.x(from, width: width) + dx, width: width) / from
             let lo = min(start.fc, frequencies.lowerBound), hi = max(start.fc, frequencies.upperBound)
             f.fc = min(max(snappedFrequency(start.fc * ratio), lo), hi)
@@ -299,27 +326,29 @@ public enum EQHandleRules {
 }
 
 /// One finger's drag on a handle (3.8): the filter as it was when the finger came down, the plot's range then (so the
-/// axis growing under it doesn't change what a point is worth), and where it engaged - nothing moves until the finger
-/// has gone `engage`, and from there the handle follows it without a jump.
+/// axis growing under it doesn't change what a point is worth), and where each axis engaged - an axis moves nothing
+/// until the finger has gone `engage` along it, and from there follows it without a jump. So a drag up that wobbles a
+/// point or two sideways leaves the frequency as it was (an imported 31.25 Hz isn't rounded to 31), and a tap moves
+/// nothing.
 public struct EQHandleDrag: Sendable {
     public let start: EQFilter
     public let range: Double
-    public private(set) var engagedAt: (dx: Double, dy: Double)?
+    /// where the finger was (pt from where it came down) when each axis engaged - nil until it has
+    public private(set) var engagedAt: (dx: Double?, dy: Double?) = (nil, nil)
 
     public init(start: EQFilter, range: Double) {
         self.start = start
         self.range = range
     }
 
-    /// The filter for the finger's movement so far (pt, down positive) - nil until it has engaged.
+    /// The filter for the finger's movement so far (pt, down positive) - nil until an axis has engaged.
     public mutating func filter(dx: Double, dy: Double, width: Double, height: Double) -> EQFilter? {
-        if engagedAt == nil {
-            guard (dx * dx + dy * dy).squareRoot() >= EQHandleRules.engage else { return nil }
-            engagedAt = (dx, dy)
-        }
-        let from = engagedAt ?? (0, 0)
-        return EQHandleRules.dragged(start, dx: dx - from.dx, dy: dy - from.dy, width: width, height: height,
-                                     range: range)
+        if engagedAt.dx == nil && abs(dx) >= EQHandleRules.engage { engagedAt.dx = dx }
+        if engagedAt.dy == nil && abs(dy) >= EQHandleRules.engage { engagedAt.dy = dy }
+        guard engagedAt.dx != nil || engagedAt.dy != nil else { return nil }
+        let across = engagedAt.dx.map { (at: Double) -> Double in dx - at } ?? 0
+        let down = engagedAt.dy.map { (at: Double) -> Double in dy - at } ?? 0
+        return EQHandleRules.dragged(start, dx: across, dy: down, width: width, height: height, range: range)
     }
 }
 
@@ -411,6 +440,7 @@ public enum EQEditorRules {
         case .slope:
             if empty { return .value(nil) }
             guard let v, v > 0 else { return .problem(EQWords.Editor.slopeRange) }
+            guard EQCookbook.shelfRadicand(gain: f.gain, s: v / 12).isFinite else { return .problem(EQWords.Editor.tooGentle) }
             if EQCookbook.shelfRadicand(gain: f.gain, s: v / 12) <= 0, let words = EQWords.Editor.tooSteep(gain: f.gain) {
                 return .problem(words)
             }

@@ -94,6 +94,9 @@ import Testing
         var utf16 = Data([0xFF, 0xFE])
         for unit in "Preamp: -2 dB".utf16 { utf16.append(contentsOf: [UInt8(unit & 0xFF), UInt8(unit >> 8)]) }
         #expect(EQImportRules.text(utf16) == "Preamp: -2 dB")
+        var bigEnd = Data([0xFE, 0xFF])
+        for unit in "Preamp: -2 dB".utf16 { bigEnd.append(contentsOf: [UInt8(unit >> 8), UInt8(unit & 0xFF)]) }
+        #expect(EQImportRules.text(bigEnd) == "Preamp: -2 dB")
         // 0x93 0x94 are Windows-1252's curly quotes; 0xE9 its e-acute
         let cp = EQImportRules.text(Data(Array("# ".utf8) + [0x93, 0x45, 0x94, 0x20, 0x63, 0x61, 0x66, 0xE9]))
         #expect(cp.unicodeScalars.map(\.value) == [0x23, 0x20, 0x201C, 0x45, 0x201D, 0x20, 0x63, 0x61, 0x66, 0xE9])

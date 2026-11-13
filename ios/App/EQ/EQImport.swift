@@ -20,8 +20,9 @@ struct EQImportItem: Identifiable, Equatable, Sendable {
 
 /// The three ways in (3.9), read off the main thread - a GraphicEQ's conversion takes a moment.
 enum EQImportReading {
-    /// A file from Files or from another app, through its security-scoped URL: past 256 KB it is refused unread; the
-    /// copy iOS made in Documents/Inbox (a shared file) is deleted once read.
+    /// A file from Files or from another app, through its security-scoped URL: past 256 KB it is refused unread - and
+    /// one whose size iOS doesn't say is read no further than one byte past it, so no file is ever read whole into
+    /// memory; the copy iOS made in Documents/Inbox (a shared file) is deleted once read.
     static func file(_ url: URL, forKey: String?) -> EQImportItem {
         let scoped = url.startAccessingSecurityScopedResource()
         defer {
@@ -29,12 +30,21 @@ enum EQImportReading {
             deleteIfInbox(url)
         }
         let name = url.lastPathComponent
+        func tooBig(_ size: Int) -> EQImportItem {
+            EQImportItem(name: name, text: "", result: .failure(EQWords.Import.tooBig(bytes: size)), detail: nil,
+                         forKey: forKey)
+        }
         if let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize, size > APOReader.maxBytes {
-            return EQImportItem(name: name, text: "", result: .failure(EQWords.Import.tooBig(bytes: size)), detail: nil,
-                                forKey: forKey)
+            return tooBig(size)
         }
         do {
-            let data = try Data(contentsOf: url)
+            let handle = try FileHandle(forReadingFrom: url)
+            defer { try? handle.close() }
+            let data = try handle.read(upToCount: APOReader.maxBytes + 1) ?? Data()
+            if data.count > APOReader.maxBytes {
+                let end = try? handle.seekToEnd()
+                return tooBig(end.map { (bytes: UInt64) -> Int in Int(clamping: bytes) } ?? data.count)
+            }
             return EQImportItem(name: name, text: EQImportRules.text(data), result: APOReader.read(data), detail: nil,
                                 forKey: forKey)
         } catch {
@@ -208,7 +218,8 @@ struct EQImportPreview: View {
                     .listRowInsets(EdgeInsets())
             }
             Section {
-                ForEach(lines.summary, id: \.self) { (line: String) in
+                // by place: two ears converted alike say the same words
+                ForEach(Array(lines.summary.enumerated()), id: \.offset) { (_: Int, line: String) in
                     Text(line)
                 }
                 Text(lines.preamp)

@@ -731,15 +731,18 @@ puts AutoEq's back as it came.
 - **Gain** (peaks and shelves), in dB, with - and + of a tenth of a decibel.
 - **Q** - or **Width** in octaves, or **Slope** in dB an octave, as the filter was written - with - and +;
   a width or a slope has **Use Q instead**, which turns it into the Q that plays the same. A filter
-  with no width shows its type's own ("0.71") greyed in the field.
+  with no width shows its type's own ("0.71") greyed in the field. A shelf written `LS` or `HS` with
+  no width keeps its place when you give it one, and is exported as `LSC` or `HSC` - by its centre,
+  as it plays - since Equalizer APO reads an `LS` with a Q by its corner.
 - **Ear** (only when the correction has filters for one ear): Both, Left or Right.
 - **On**, and **Delete Filter**.
 
 Type a number and tap Done on the keyboard (or move to another field) to use it; a decimal comma or
 point both work. A number out of range stays in the field in red, with what's allowed under it -
 "Between 1 and 22000 Hz.", "Between -30 and 30 dB.", "Between 0.01 and 100." (a Q), "Between 0.01
-and 10." (a width), "Above 0 dB an octave." (a slope), or "Too steep for this gain - at most 19.6 dB
-an octave." - and nothing changes until it's in range. The editor stays with the output it was
+and 10." (a width), "Above 0 dB an octave." (a slope), "Too steep for this gain - at most 19.6 dB
+an octave.", or "Too gentle to make a filter." (a slope so near 0 it makes none) - and nothing changes
+until it's in range. The editor stays with the output it was
 opened for, as the presets page does.
 
 **Preamp**, after Tone: **Automatic**, on by default, is deadwax's own (above) and shows what it is
@@ -786,8 +789,8 @@ sounds the same here as there:
 play differently here than in Equalizer APO: another file included (`Include:`); what deadwax can't
 play (`Convolution:`, `Delay:`, `Copy:`, `Eval:`, `If:`, `Stage:`, `VSTPlugin:`,
 `LoudnessCorrection:`, `IIR` filters); settings for several devices; lines ending the old Mac way;
-a number out of range (a frequency over 22000 Hz, a gain or preamp over 30 dB); a shelf too steep
-for its gain; more than 64 filters for one ear; or nothing in it to play. For whoever runs deadwax,
+a number out of range (a frequency over 22000 Hz, a gain or preamp over 30 dB, a number too large to
+read at all); a shelf too steep for its gain, or with a slope so near 0 it makes no filter; more than 64 filters for one ear; or nothing in it to play. For whoever runs deadwax,
 the line it stopped at shows under the reason.
 
 **Exporting.** **Export…** has **The Whole Curve** - the correction and the tone together, with the
