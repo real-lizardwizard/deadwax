@@ -207,9 +207,9 @@ public final class TurntableLayers {
         disc.frame = face.bounds
         disc.cornerRadius = d / 2
         grooves.frame = face.bounds
-        if groovesMade?.size != d || groovesMade?.scale != scale {
+        if groovesMade?.size != Double(d) || groovesMade?.scale != scale {
             grooves.contents = Self.grooves(diameter: d, scale: scale)
-            groovesMade = (d, scale)
+            groovesMade = (size: Double(d), scale: scale)   // spelled out: Xcode 26.6's Swift won't convert inside a tuple
         }
         spindle.frame = face.bounds
         spindle.path = circle(centre, parts.spindleOuter)
