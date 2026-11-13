@@ -3441,7 +3441,7 @@
     .app-desk.has-drawer .app-index { display: none; }
 }
 
-/* ===== You on a desktop (2.1.7): app/You.tsx and the choices it draws =====
+/* ===== You on a desktop (2.1.8): app/You.tsx and the choices it draws =====
    You was the phone's page in a 760px column (James: "pretty awful"). Here it is a desktop's settings page, drawn
    from STYLE.md's parts and changing no word and no behaviour:
    - each section beside its title: the title in a column of its own at the left (Connections' Check again under
@@ -3460,13 +3460,16 @@
      has no Now Playing view and no turntable - their notes said so), shown again where the pointer is coarse, an
      iPad on its side, which turns into a phone; and Manage, whose items are the sidebar's Managing, always in view,
      the same items by the same permissions with the same count.
-   A phone's You is untouched: every rule is the frame's. */
+   A phone's You is untouched: every rule is the frame's.
+   (2.1.10) James: "the width of you still doesn't match the screen". It stopped at 912px - 808px of black beside it
+   at 1920 - where Home and the Library run to the main area's edges. Now it runs to them too: from 1280px with no
+   panel beside it, in two columns (below, "You across the main area"); under that, the title column above, its
+   settings column as wide as the main area leaves. */
 @media (min-width: 1024px) {
     :root {
         --app-desk-you-rail: 200px;           /* a section's title, in its column */
         --app-desk-you-rail-gap: 48px;        /* ...to its settings */
-        --app-desk-you-body: 600px;           /* the settings' column, at its widest */
-        --app-desk-you-page: calc(var(--app-desk-you-rail) + var(--app-desk-you-rail-gap) + var(--app-desk-you-body) + var(--pl-edge-left) + var(--pl-edge-right));
+        --app-desk-you-body: 600px;           /* Change password's form, at its widest */
         --app-desk-you-indent: calc(var(--app-desk-you-rail) + var(--app-desk-you-rail-gap));
         --app-desk-you-section: 28px;         /* a section's rule, and the space above it and below */
         --app-desk-you-title-gap: 12px;       /* a title over its settings, where it is above them */
@@ -3482,16 +3485,16 @@
         --app-desk-you-buttons-gap: 12px;
     }
 
-    /* the page: room for the title column, at the main area's edge as every page is; under a drawer, the part left
-       in view (Server settings' measure) */
-    .app-desk:not(.has-side):not(.has-drawer) .app-you { max-width: var(--app-desk-you-page); }
+    /* the page: to the main area's edges, as Home's and the Library's are (2.1.10); under a drawer, the part left in
+       view (Server settings' measure); beside a third column, the readable width every list drawn for a phone keeps */
+    .app-desk:not(.has-side):not(.has-drawer) .app-you { max-width: none; }
     .app-desk.has-drawer .app-you { max-width: calc(100% - var(--app-desk-panel) + var(--pl-edge-right) - var(--app-desk-gap)); }
 
     /* the name at the top of the page as every page's title is (.pl-large-header's) */
     .app-desk .app-you .app-identity { padding-top: var(--app-desk-top); }
 
     /* each section under the frame's rule */
-    .app-desk .app-you > .app-section {
+    .app-desk .app-you-part > .app-section {
         margin-top: var(--app-desk-you-section);
         padding-top: var(--app-desk-you-section);
         border-top: var(--dw-hairline) solid var(--dw-frame-border);
@@ -3512,13 +3515,13 @@
     .app-desk .app-you .app-section-head .app-text-button { min-height: var(--app-desk-you-button); padding: 0; }
 
     /* ...beside its settings, where the main area has room: the title in its column, Check again under it */
-    .app-desk:not(.has-side):not(.has-drawer) .app-you > .app-section {
+    .app-desk:not(.has-side):not(.has-drawer) .app-you-part > .app-section {
         position: relative;
         padding-left: var(--app-desk-you-indent);
     }
 
-    .app-desk:not(.has-side):not(.has-drawer) .app-you > .app-section > .app-section-title,
-    .app-desk:not(.has-side):not(.has-drawer) .app-you > .app-section > .app-section-head {
+    .app-desk:not(.has-side):not(.has-drawer) .app-you-part > .app-section > .app-section-title,
+    .app-desk:not(.has-side):not(.has-drawer) .app-you-part > .app-section > .app-section-head {
         position: absolute;
         top: var(--app-desk-you-section);
         left: 0;
@@ -3526,13 +3529,13 @@
         margin: 0;
     }
 
-    .app-desk:not(.has-side):not(.has-drawer) .app-you > .app-section > .app-section-head {
+    .app-desk:not(.has-side):not(.has-drawer) .app-you-part > .app-section > .app-section-head {
         flex-direction: column;
         align-items: flex-start;
     }
 
     /* the note that what deadwax said of your permissions isn't confirmed, between two sections: in the settings' column */
-    .app-desk:not(.has-side):not(.has-drawer) .app-you > .app-footnote { margin-left: var(--app-desk-you-indent); }
+    .app-desk:not(.has-side):not(.has-drawer) .app-you-part > .app-footnote { margin-left: var(--app-desk-you-indent); }
 
     /* notes: under what they say, at a readable measure */
     .app-desk .app-you .app-footnote {
@@ -3693,4 +3696,52 @@
     .app-desk .app-you #app-look-note,
     .app-desk .app-you .app-group:has(> [aria-describedby='app-wind-down-note']),
     .app-desk .app-you #app-wind-down-note { display: block; }
+}
+
+/* ===== You across the main area (2.1.10) =====
+   James, on 2.1.8: "the width of you still doesn't match the screen". You stopped at 912px while Home and the
+   Library run to the main area's edges - at 1920, 808px of black beside it. Stretched to the edge as it was, its
+   cards became bars 1,370px wide with their words in the left third (the problem 2.1.8 fixed for the checkboxes),
+   so from 1280px with no panel beside it the page is two columns across the whole main area: what you get (Your
+   library, Getting albums) and the rest (Connections, Account, About) down the left, Playback - the tallest - down
+   the right. You.tsx's three parts (plain blocks, nothing on a phone) are the columns' pieces: the rest sits in a
+   row of its own under what you get, a flexible one, so Playback's height only ever adds space under the rest,
+   never between its sections. A column is too narrow for a title beside its settings (468px at 1280), so titles go
+   back above them; the columns' first rules line up. Below 1280 - or beside a third column, or under a drawer - the
+   rules above lay it out. */
+@media (min-width: 1280px) {
+    :root { --app-desk-you-columns-gap: 56px; }
+
+    .app-desk:not(.has-side):not(.has-drawer) .app-you {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        grid-template-rows: auto auto 1fr;
+        align-items: start;
+        column-gap: var(--app-desk-you-columns-gap);
+    }
+
+    .app-desk:not(.has-side):not(.has-drawer) .app-you > .app-identity { grid-column: 1 / -1; }
+    .app-desk:not(.has-side):not(.has-drawer) .app-you-get { grid-row: 2; grid-column: 1; }
+    .app-desk:not(.has-side):not(.has-drawer) .app-you-play { grid-row: 2 / span 2; grid-column: 2; }
+    .app-desk:not(.has-side):not(.has-drawer) .app-you-more { grid-row: 3; grid-column: 1; }
+
+    /* a title above its settings again, Check again at its row's end */
+    .app-desk:not(.has-side):not(.has-drawer) .app-you-part > .app-section { position: static; padding-left: 0; }
+
+    .app-desk:not(.has-side):not(.has-drawer) .app-you-part > .app-section > .app-section-title,
+    .app-desk:not(.has-side):not(.has-drawer) .app-you-part > .app-section > .app-section-head {
+        position: static;
+        width: auto;
+        margin: 0 0 var(--app-desk-you-title-gap);
+    }
+
+    .app-desk:not(.has-side):not(.has-drawer) .app-you-part > .app-section > .app-section-head {
+        flex-direction: row;
+        align-items: center;
+    }
+
+    .app-desk:not(.has-side):not(.has-drawer) .app-you-part > .app-footnote { margin-left: 0; }
+
+    /* a choice's sentence in a card at the notes' measure: a column at 1920 is 784px, and its lines ran 120 letters */
+    .app-desk:not(.has-side):not(.has-drawer) .app-you .app-radio-note { max-width: var(--app-desk-set-note); }
 }

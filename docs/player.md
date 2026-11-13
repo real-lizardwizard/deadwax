@@ -1005,12 +1005,16 @@ still shows them, since turned upright it's a phone.)
 - **The Library's albums and Home's Recently added** are a grid, six covers across - fewer while a
   panel is a column beside them (from 1280 pixels wide), so a cover stays a cover's size. Home's
   **Arriving** cards sit side by side.
-- **You** is laid out as a desktop's settings page: each section's title in a column at the left and its
-  settings beside it (the title above them again while a side panel is open, as there's less room); a
-  choice of a few words - **When I tap Get**, **Quality floor**, **Format** - is a row of buttons with
-  the chosen one lit (the arrow keys move along it); a checkbox has its box before its name; and
-  **Account**'s **Change password** and **Sign out** are two buttons. It leaves out **Manage** - the
-  sidebar's - and the two Now Playing settings above. The settings and what they do are the phone's.
+- **You** is laid out as a desktop's settings page. From 1280 pixels wide it runs across the page to
+  the same edges as Home and the Library, in two columns: Your library and Getting albums, then
+  Connections, Account and About, down the left, and Playback down the right, each section's title
+  above its settings. Narrower than that, each section's title is in a column at the left with its
+  settings beside it; while a side panel is open it is one column, each title above its settings, as
+  there's less room. A choice of a few words - **When I tap Get**, **Quality floor**, **Format** - is a
+  row of buttons with the chosen one lit (the arrow keys move along it); a checkbox has its box before
+  its name; and **Account**'s **Change password** and **Sign out** are two buttons. It leaves out
+  **Manage** - the sidebar's - and the two Now Playing settings above. The settings and what they do
+  are the phone's.
 - **A player bar** along the bottom instead of the mini player: the song's cover, title and "Artist
   — Album" (click that to go to the album), previous, a round play/pause and next, the scrubber with
   the time gone and the time left at its ends (click or drag along it; its dot shows when you point
