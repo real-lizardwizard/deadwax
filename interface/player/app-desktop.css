@@ -3440,3 +3440,257 @@
     .app-desk.has-drawer .app-shelf-wrap.has-index { grid-template-columns: minmax(0, 1fr); }
     .app-desk.has-drawer .app-index { display: none; }
 }
+
+/* ===== You on a desktop (2.1.7): app/You.tsx and the choices it draws =====
+   You was the phone's page in a 760px column (James: "pretty awful"). Here it is a desktop's settings page, drawn
+   from STYLE.md's parts and changing no word and no behaviour:
+   - each section beside its title: the title in a column of its own at the left (Connections' Check again under
+     it), the settings in a column beside it, sections divided by the frame's rule. Beside a third column or under a
+     drawer the main area is too narrow for two, and a title goes back above its settings - under a drawer the page
+     keeps to the part left in view, as Server settings does;
+   - a real hierarchy: section titles at the desktop's own section size, a choice's label in the heading colour and
+     over its own control (it touched the list above), notes at Server settings' measure;
+   - a choice of a few short words the app's segmented control: a well, the chosen one in the toggled tint, the
+     arrow keys moving along it as they always have. Maximum quality and Normalization, whose choices each carry a
+     sentence, stay a list of cards;
+   - a checkbox the desktop's kind: its box before its label, no bar across the page, its note under the label;
+   - Account's Change password and Sign out two buttons; the name Sign out's row repeated (the header and the note
+     under it both say it) left out;
+   - what does nothing on a computer left out: "Now Playing opens as" and "Pause winds the record down" (a big screen
+     has no Now Playing view and no turntable - their notes said so), shown again where the pointer is coarse, an
+     iPad on its side, which turns into a phone; and Manage, whose items are the sidebar's Managing, always in view,
+     the same items by the same permissions with the same count.
+   A phone's You is untouched: every rule is the frame's. */
+@media (min-width: 1024px) {
+    :root {
+        --app-desk-you-rail: 200px;           /* a section's title, in its column */
+        --app-desk-you-rail-gap: 48px;        /* ...to its settings */
+        --app-desk-you-body: 600px;           /* the settings' column, at its widest */
+        --app-desk-you-page: calc(var(--app-desk-you-rail) + var(--app-desk-you-rail-gap) + var(--app-desk-you-body) + var(--pl-edge-left) + var(--pl-edge-right));
+        --app-desk-you-indent: calc(var(--app-desk-you-rail) + var(--app-desk-you-rail-gap));
+        --app-desk-you-section: 28px;         /* a section's rule, and the space above it and below */
+        --app-desk-you-title-gap: 12px;       /* a title over its settings, where it is above them */
+        --app-desk-you-choice-gap: 20px;      /* one choice to the next */
+        --app-desk-you-label-gap: 8px;        /* a choice's label to its control */
+        --app-desk-you-note-gap: 8px;         /* a control to its note */
+        --app-desk-you-well: var(--dw-segmented);   /* a segmented control's well */
+        --app-desk-you-segment-pad-y: 4px;    /* a segment's padding, if its words wrap */
+        --app-desk-you-segment-pad-x: 12px;
+        --app-desk-you-check: var(--dw-checkbox);   /* a checkbox's row: its box's height */
+        --app-desk-you-check-gap: 10px;       /* the box to its label */
+        --app-desk-you-button: var(--app-desk-control);   /* Change password, Sign out */
+        --app-desk-you-buttons-gap: 12px;
+    }
+
+    /* the page: room for the title column, at the main area's edge as every page is; under a drawer, the part left
+       in view (Server settings' measure) */
+    .app-desk:not(.has-side):not(.has-drawer) .app-you { max-width: var(--app-desk-you-page); }
+    .app-desk.has-drawer .app-you { max-width: calc(100% - var(--app-desk-panel) + var(--pl-edge-right) - var(--app-desk-gap)); }
+
+    /* the name at the top of the page as every page's title is (.pl-large-header's) */
+    .app-desk .app-you .app-identity { padding-top: var(--app-desk-top); }
+
+    /* each section under the frame's rule */
+    .app-desk .app-you > .app-section {
+        margin-top: var(--app-desk-you-section);
+        padding-top: var(--app-desk-you-section);
+        border-top: var(--dw-hairline) solid var(--dw-frame-border);
+    }
+
+    /* a title, its settings, its notes and the labels in it at the column's edge - a card's words keep its inset */
+    .app-desk .app-you .app-section-title,
+    .app-desk .app-you .app-footnote,
+    .app-desk .app-you .app-choice-title { padding: 0; }
+
+    .app-desk .app-you .app-section-title {
+        margin-bottom: var(--app-desk-you-title-gap);
+        font-size: var(--dw-text-section);
+    }
+
+    .app-desk .app-you .app-section-head { margin-bottom: var(--app-desk-you-title-gap); }
+    .app-desk .app-you .app-section-head .app-section-title { margin: 0; }
+    .app-desk .app-you .app-section-head .app-text-button { min-height: var(--app-desk-you-button); padding: 0; }
+
+    /* ...beside its settings, where the main area has room: the title in its column, Check again under it */
+    .app-desk:not(.has-side):not(.has-drawer) .app-you > .app-section {
+        position: relative;
+        padding-left: var(--app-desk-you-indent);
+    }
+
+    .app-desk:not(.has-side):not(.has-drawer) .app-you > .app-section > .app-section-title,
+    .app-desk:not(.has-side):not(.has-drawer) .app-you > .app-section > .app-section-head {
+        position: absolute;
+        top: var(--app-desk-you-section);
+        left: 0;
+        width: var(--app-desk-you-rail);
+        margin: 0;
+    }
+
+    .app-desk:not(.has-side):not(.has-drawer) .app-you > .app-section > .app-section-head {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    /* the note that what deadwax said of your permissions isn't confirmed, between two sections: in the settings' column */
+    .app-desk:not(.has-side):not(.has-drawer) .app-you > .app-footnote { margin-left: var(--app-desk-you-indent); }
+
+    /* notes: under what they say, at a readable measure */
+    .app-desk .app-you .app-footnote {
+        max-width: var(--app-desk-set-note);
+        margin-top: var(--app-desk-you-note-gap);
+    }
+
+    /* a choice: its label in the heading colour, over its own control and clear of the one before */
+    .app-desk .app-you .app-choice-title {
+        margin: 0 0 var(--app-desk-you-label-gap);
+        color: var(--dw-text-heading-color);
+        font-weight: var(--dw-weight-medium);
+        line-height: var(--dw-leading-label);
+    }
+
+    .app-desk .app-you .app-choice + .app-choice,
+    .app-desk .app-you .app-choice-follows { margin-top: var(--app-desk-you-choice-gap); }
+    .app-desk .app-you .app-choice-gap { margin-bottom: var(--app-desk-you-choice-gap); }
+
+    /* a list of cards (Maximum quality, Normalization): the row under the mouse */
+    .app-desk .app-you .app-radio:hover { background: var(--app-desk-hover); }
+
+    /* a choice of a few short words: STYLE.md's segmented control - a well, the chosen one in the toggled tint */
+    .app-desk .app-you .app-group[role='radiogroup']:not(:has(.app-radio-note)) {
+        display: grid;
+        grid-auto-columns: minmax(0, 1fr);
+        grid-auto-flow: column;
+        gap: var(--app-segment-gap);
+        padding: var(--dw-hairline);
+        border-radius: var(--dw-radius-control);
+        background: var(--dw-well);
+        box-shadow: var(--dw-well-inset);
+    }
+
+    .app-desk .app-you .app-group[role='radiogroup']:not(:has(.app-radio-note)) .app-radio {
+        justify-content: center;
+        min-height: calc(var(--app-desk-you-well) - 4 * var(--dw-hairline));
+        padding: var(--app-desk-you-segment-pad-y) var(--app-desk-you-segment-pad-x);
+        border: var(--dw-hairline) solid transparent;
+        border-radius: var(--dw-radius-tag);
+        color: var(--dw-text-2);
+        text-align: center;
+    }
+
+    .app-desk .app-you .app-group[role='radiogroup']:not(:has(.app-radio-note)) .app-radio-text { flex: 0 1 auto; align-items: center; }
+
+    .app-desk .app-you .app-group[role='radiogroup']:not(:has(.app-radio-note)) .app-radio-label {
+        font-size: var(--dw-text-footnote);
+        font-weight: var(--dw-weight-semibold);
+    }
+
+    .app-desk .app-you .app-group[role='radiogroup']:not(:has(.app-radio-note)) .app-check { display: none; }
+    .app-desk .app-you .app-group[role='radiogroup']:not(:has(.app-radio-note)) .app-radio:hover { color: var(--dw-text); }
+
+    .app-desk .app-you .app-group[role='radiogroup']:not(:has(.app-radio-note)) .app-radio[aria-checked='true'] {
+        border-color: var(--dw-toggled-border);
+        background: var(--dw-toggled-bg);
+        color: var(--dw-accent-text);
+    }
+
+    /* a checkbox: its box before its label, no bar across the page - and its note under the label */
+    .app-desk .app-you .app-group:has(> .app-check-row) {
+        overflow: visible;
+        border: 0;
+        border-radius: 0;
+        background: none;
+        box-shadow: none;
+    }
+
+    .app-desk .app-you .app-check-row {
+        flex-direction: row-reverse;
+        justify-content: flex-end;
+        gap: var(--app-desk-you-check-gap);
+        width: fit-content;
+        max-width: 100%;
+        min-height: var(--app-desk-you-check);
+        padding: 0;
+    }
+
+    .app-desk .app-you .app-check-row:active { background: none; }
+    .app-desk .app-you .app-check-row:focus-visible { outline-offset: var(--app-ring); }
+    .app-desk .app-you .app-check-row:hover .app-checkbox:not(.is-on) { border-color: var(--dw-toggled-border); }
+    .app-desk .app-you .app-group:has(> .app-check-row) + .app-footnote { padding-left: calc(var(--dw-checkbox) + var(--app-desk-you-check-gap)); }
+
+    /* Account: Change password and Sign out, two of STYLE.md's secondary buttons side by side - the form opens under
+       Change password, and Sign out follows it there */
+    .app-desk .app-you .app-section:has(#app-account-title) {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+    }
+
+    .app-desk .app-you .app-section:has(#app-account-title) > * { flex: 0 0 100%; min-width: 0; }
+
+    .app-desk .app-you .app-section:has(#app-account-title) > .app-own-password,
+    .app-desk .app-you .app-section:has(#app-account-title) > .app-signout {
+        flex: none;
+        margin: 0 var(--app-desk-you-buttons-gap) 0 0;
+        overflow: visible;
+        border: 0;
+        border-radius: 0;
+        background: none;
+        box-shadow: none;
+    }
+
+    /* nothing said yet: no line of its own between the two (it stays in the page, a live region) */
+    .app-desk .app-you .app-section:has(#app-account-title) > .app-own-password-said:empty { flex-basis: 0; }
+    .app-desk .app-you .app-section:has(#app-account-title) > .app-own-password-form ~ .app-signout,
+    .app-desk .app-you .app-section:has(#app-account-title) > .app-own-password-said:not(:empty) ~ .app-signout { margin-top: var(--app-desk-you-buttons-gap); }
+    .app-desk .app-you .app-own-password-form { max-width: var(--app-desk-you-body); }
+
+    .app-desk .app-you .app-own-password-row,
+    .app-desk .app-you .app-signout-row {
+        width: auto;
+        min-height: var(--app-desk-you-button);
+        padding: 0 var(--app-desk-control-pad);
+        border: var(--dw-hairline) solid var(--dw-secondary-border);
+        border-radius: var(--dw-radius-control);
+        background: var(--dw-secondary-bg);
+        box-shadow: var(--dw-highlight);
+        color: var(--dw-text-on-secondary);
+        font-weight: var(--dw-weight-medium);
+    }
+
+    .app-desk .app-you .app-own-password-row:active,
+    .app-desk .app-you .app-signout-row:active { background: var(--dw-secondary-bg-active); }
+
+    .app-desk .app-you .app-own-password-row:focus-visible,
+    .app-desk .app-you .app-signout-row:focus-visible { outline-offset: var(--app-ring); }
+
+    /* the form open: its button pressed, as Get is while the panel shows its sources */
+    .app-desk .app-you .app-own-password-row[aria-expanded='true'] {
+        border-color: var(--dw-toggled-border);
+        background: var(--dw-toggled-bg);
+        box-shadow: none;
+        color: var(--dw-accent-text);
+    }
+
+    .app-desk .app-you .app-signout-row .app-row-value { display: none; }
+
+    /* what does nothing on a computer: a phone's two Now Playing settings, and Manage (the sidebar's Managing) */
+    .app-desk .app-you .app-choice:has(#app-look-title),
+    .app-desk .app-you #app-look-note,
+    .app-desk .app-you .app-group:has(> [aria-describedby='app-wind-down-note']),
+    .app-desk .app-you #app-wind-down-note,
+    .app-desk .app-you .app-section:has(#app-managing-title) { display: none; }
+}
+
+/* an iPad on its side: a finger's targets - and the two Now Playing settings back, since turned upright it is a phone */
+@media (min-width: 1024px) and (pointer: coarse) {
+    :root {
+        --app-desk-you-well: calc(var(--pl-hit) + 4 * var(--dw-hairline));   /* each segment a finger's 44px inside it */
+        --app-desk-you-check: var(--pl-hit);
+        --app-desk-you-button: var(--pl-hit);
+    }
+
+    .app-desk .app-you .app-choice:has(#app-look-title),
+    .app-desk .app-you #app-look-note,
+    .app-desk .app-you .app-group:has(> [aria-describedby='app-wind-down-note']),
+    .app-desk .app-you #app-wind-down-note { display: block; }
+}

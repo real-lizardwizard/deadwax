@@ -129,7 +129,7 @@ dry run nobody can reach Server settings to set it again, and without Navidrome 
 4. **Download something small.** Search for an album, open it, pick a pressing, press **Get the
    album**, then **Get** on a good source. [Finding music](finding-music.md) and
    [Downloading](downloading.md) walk through it.
-5. **Watch the log** (the sidebar's **Event log**, or **You → Manage → Event log**). Organizing starts in **dry run**, so when
+5. **Watch the log** (the sidebar's **Event log**, or **You → Manage → Event log** on a phone). Organizing starts in **dry run**, so when
    the download finishes the log says where each file *would* have been filed, and nothing is
    written. Check the paths look right.
 6. **Switch organizing on.** In Settings → Library → Organizing, set `ORGANIZE_MODE` to `copy`

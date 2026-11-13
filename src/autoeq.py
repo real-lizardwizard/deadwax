@@ -89,6 +89,13 @@ _RUNS = re.compile(r"[^\W_]+")
 LETTERS = str.maketrans({"æ": "ae", "ð": "d", "đ": "d", "ħ": "h", "ı": "i", "ł": "l", "ø": "o", "œ": "oe", "ŧ": "t",
                          "þ": "th"})
 
+#? `+` and `&` read as the words they stand for, not dropped as punctuation (2.1.9) - as the iPhone app's suggestion
+#? reads them (EQSuggestion.folded on ios). A `+` names another model: Apple's "Beats Studio Buds +" isn't the Beats
+#? Studio Buds, and dropped it folded the two into one row, the other model's measurements under "Other measurements"
+#? with nothing saying so; read as "plus", "T2+" also finds the "T2 Plus". `&` is "and", so "Bang & Olufsen" and "Bang
+#? and Olufsen" are one name.
+SYMBOL_WORDS = str.maketrans({"+": " plus ", "&": " and "})
+
 
 @dataclass(frozen=True)
 class Result:
@@ -115,11 +122,11 @@ class Row:
 
 def fold(text: str) -> str:
     """A name or a query as searching compares them: NFKD, marks dropped, lowercased (casefold, so a `ß` is `ss`),
-    the letters NFKD keeps whole made plain (LETTERS: `ø` is `o`, `æ` is `ae`), every run of anything not a letter or
-    digit one space."""
+    the letters NFKD keeps whole made plain (LETTERS: `ø` is `o`, `æ` is `ae`), `+` and `&` the words "plus" and "and"
+    (SYMBOL_WORDS), every run of anything not a letter or digit one space."""
     decomposed = unicodedata.normalize("NFKD", text or "")
     unmarked = "".join(c for c in decomposed if not unicodedata.combining(c))
-    return " ".join(_RUNS.findall(unmarked.casefold().translate(LETTERS)))
+    return " ".join(_RUNS.findall(unmarked.casefold().translate(LETTERS).translate(SYMBOL_WORDS)))
 
 
 def result_id(path: str) -> str:

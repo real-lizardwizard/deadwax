@@ -3240,6 +3240,16 @@ Left, and why:
 - **A gzip'd answer is measured after each piece is decoded**: one compressed piece can decode to about a thousand
   times its size before the cap sees it. Accepted, as the only host deadwax asks is GitHub's.
 
+### `+` and `&` as words (2.1.9)
+
+The fold read `+` and `&` as punctuation, so "Beats Studio Buds +" and the Beats Studio Buds folded to one name and
+became one row - the other model's measurements under "Other measurements", with nothing saying it's another
+headphone. Found by EQ slice 4's review on `ios`, whose suggestion already read `+` as "plus" and `&` as "and"
+(EQSuggestion.folded). `fold()` now does too (SYMBOL_WORDS, after LETTERS): "T2+" finds the "T2 Plus", "Bang &
+Olufsen" and "Bang and Olufsen" are one name. A kept list is folded again as it's read (the review's), so an install
+upgrading needs nothing fetched. One ranking moved: "(51dB + ANC)" now folds longer than "(ANC mode)", so crinacle's
+two modes come before his listening levels for "airpods pro". test_plus_and_ampersand_are_words_of_the_name.
+
 ## The EQ, slice 4: AutoEq on the phone (app 0.5, 2026-11-12)
 
 eq.md's slice 4 (5.4), the phone's half of the 2.1.7 routes above: a correction for your headphones from AutoEq,

@@ -390,8 +390,8 @@ fetched behind it for the next time.
   behind it; ask once more and the new one is shown. If MusicBrainz didn't answer the refresh, it's
   tried again the next time the answer is read from the file - after the hour it is kept in memory, or
   after deadwax restarts.
-- **Or clear them now**: **Clear MusicBrainz's saved answers**, under Settings → Connections (or the
-  app's You → Manage → Server settings → Connections), empties the file and the memory, and the next answers
+- **Or clear them now**: **Clear MusicBrainz's saved answers**, under Settings → Connections (or, on a
+  phone, the app's You → Manage → Server settings → Connections), empties the file and the memory, and the next answers
   are asked of MusicBrainz again. Only speed is lost.
 - To stop saving answers altogether, set `MUSICBRAINZ_CACHE_MB` to `0`.
 - If the line beside Clear says **Nothing is being saved**, or the `MUSICBRAINZ_CACHE_PATH` row is
@@ -418,7 +418,7 @@ refreshed behind itself once it's old (a search after 7 days, the rest after 30)
   the same artist, album or song as a saved row isn't shown twice - the saved row stands for it, as it was
   saved, until the words are searched again after the saved answers behind it are refreshed (above).
 - **Or clear them now**: **Clear MusicBrainz's saved answers** (Server settings → Connections - the desktop
-  sidebar's Server settings, or You → Manage → Server settings) empties what's saved and what Search finds in it; the next searches ask
+  sidebar's Server settings, or You → Manage → Server settings on a phone) empties what's saved and what Search finds in it; the next searches ask
   MusicBrainz again.
 - **Nothing saved ever shows**: saving is off (`MUSICBRAINZ_CACHE_MB` is `0`), nothing has been saved yet,
   or the line beside Clear says why nothing is being saved ([above](#a-musicbrainz-answer-looks-out-of-date)).
@@ -1453,7 +1453,7 @@ can be written as `PUID`/`PGID`, then restart deadwax (or recreate the container
 
 ## The Event log is missing lines, says "Lost the live feed", or starts empty
 
-The **Event log** (the desktop sidebar's **Manage → Event log**, or **You → Manage → Event log** on a phone or a desktop) shows
+The **Event log** (the desktop sidebar's **Manage → Event log**, or **You → Manage → Event log** on a phone) shows
 deadwax's event log, newest first. As it opens it reads what deadwax kept: **the last 500
 lines since deadwax started** - nothing from before a restart (a Komodo redeploy starts it empty), and
 nothing older than those 500. Then it follows deadwax live, joining the two so no line is missing or
