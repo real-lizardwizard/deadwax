@@ -136,6 +136,38 @@ struct TurntableScreenTests {
         #expect(want(sounding: true, engine: DeckEngineState(prepared: false, failure: "no")) == .off)
     }
 
+    /// 4.6 (the review's fix): a failed start stands until something that may change the answer - a route change, the
+    /// deck made again, an interruption's end - or a press 2 s after it; then the engine runs as the rule says again.
+    @Test func aFailedStartIsForgottenByARouteOrAPressNotByTime() {
+        var failure = DeckStartFailure()
+        let nothing = failure.pressed(at: 100)
+        #expect(failure.words == nil && !nothing, "nothing to forget")
+        failure.failed("the output refused (-10851)", at: 100)
+        let failed = DeckEngineState(prepared: true, failure: failure.words)
+        #expect(TurntableScreen.engineWant(showing: true, songPlaying: true, sounding: true, quietFor: nil, pausedFor: nil,
+                                           active: true, engine: failed) == .off, "the engine left alone while it stands")
+        #expect(!TurntableScreen.soundReady(failed))
+        // a press too soon after it: still failed - one try a press at most, never every frame
+        let soon = failure.pressed(at: 101.9)
+        #expect(!soon && failure.words != nil)
+        let later = failure.pressed(at: 102)
+        #expect(later && failure.words == nil, "2 s on, a press tries again")
+        let again = DeckEngineState(prepared: true, failure: failure.words)
+        #expect(TurntableScreen.engineWant(showing: true, songPlaying: true, sounding: false, quietFor: nil, pausedFor: nil,
+                                           active: true, engine: again) == .running)
+        // failing again at the retry: the next press waits its 2 s from then
+        failure.failed("again", at: 102.1)
+        let tooSoonAgain = failure.pressed(at: 103)
+        #expect(!tooSoonAgain)
+        // a route change, the deck made, an interruption's end: forgotten at once
+        failure.forget()
+        #expect(failure.words == nil)
+        failure.failed("x", at: 200)
+        failure.started()
+        let afterStart = failure.pressed(at: 300)
+        #expect(failure.words == nil && !afterStart)
+    }
+
     // MARK: the settings and the look (6.1, 2.1)
 
     @Test func theSettingsAreTheWebsKeysAndDefaults() {

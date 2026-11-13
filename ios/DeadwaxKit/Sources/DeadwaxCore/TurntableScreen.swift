@@ -135,6 +135,47 @@ public struct DeckEngineState: Equatable, Sendable {
     }
 }
 
+/// The deck engine's failed start (4.6): its words, kept so the record isn't asked to sound on a phone that couldn't
+/// start it - `engineWant` is `.off` and a press scrubs silently while they stand - but only until something that could
+/// change the answer. A route change, the deck made again and an interruption's end forget it, and the next want
+/// starts the engine again; a press (or another gesture the sound may start from) forgets it once the last failure is
+/// `retryGap` old. Nothing else does: no post or frame starts a failed engine, so a phone that truly can't make the
+/// sound is asked again once a press at most, never at every frame.
+public struct DeckStartFailure: Equatable, Sendable {
+    /// The least time from a failed start to the press that may try again.
+    public static let retryGap = 2.0
+
+    /// the engine's own words, while the failure stands
+    public private(set) var words: String?
+    /// when it failed, seconds
+    public private(set) var at = -Double.infinity
+
+    public init() {}
+
+    /// The start threw, at `now`.
+    public mutating func failed(_ words: String, at now: Double) {
+        self.words = words
+        at = now
+    }
+
+    /// The start succeeded.
+    public mutating func started() {
+        words = nil
+    }
+
+    /// A route change, the deck made, an interruption ended: the answer may be different now.
+    public mutating func forget() {
+        words = nil
+    }
+
+    /// A press at `now`: the failure forgotten when it is `retryGap` old - true when it was, and the start may be tried.
+    public mutating func pressed(at now: Double) -> Bool {
+        guard words != nil, now - at >= Self.retryGap else { return false }
+        words = nil
+        return true
+    }
+}
+
 /// What the deck engine should be doing (4.6).
 public enum DeckEngineWant: Equatable, Sendable {
     /// not made or let go: the turntable doesn't show, or it can't be had here (AirPlay)

@@ -267,7 +267,9 @@ final class DeckController {
     @ObservationIgnored private var firingLate: Double?
 
     // the engine
-    @ObservationIgnored private var failure: String?
+    /// a start that threw: the record silent until a route change, the deck made again, an interruption's end, or a
+    /// press 2 s after it (DeckStartFailure)
+    @ObservationIgnored private var failure = DeckStartFailure()
     @ObservationIgnored private var airPlay = false
     @ObservationIgnored private var interrupted = false
     @ObservationIgnored private var routeKey = ""
@@ -353,9 +355,18 @@ final class DeckController {
         TurntablePress<PlatformMaths>.toggle(rules, world)
     }
 
-    /// A gesture the record's sound may start from (the web's wakeDeckAudio): the run rule looked at again now.
+    /// A gesture the record's sound may start from (the web's wakeDeckAudio): a failed start tried again when it is old
+    /// enough, and the run rule looked at again now.
     func wake() {
+        retryFailedStart()
         evaluate()
+    }
+
+    /// A press after a failed start (4.6): forgotten when the failure is DeckStartFailure.retryGap old, so the engine is
+    /// started again as the run rule says - or by the press that needs it - and the rules ask for a window again.
+    private func retryFailedStart() {
+        guard engine != nil, failure.pressed(at: CACurrentMediaTime()) else { return }
+        audioChanged()
     }
 
     // MARK: VoiceOver (2.10)
@@ -378,6 +389,7 @@ final class DeckController {
 
     func touchDown(_ kind: TurntableDrag.Kind, pointer: Int, x: Double, y: Double, time: Double) {
         guard let press else { return }
+        if kind == .record { retryFailedStart() }
         switch kind {
         case .record: press.recordDown(pointer: pointer, x: x, y: y, time: time)
         case .arm: press.armDown(pointer: pointer, x: x, y: y)
@@ -447,13 +459,15 @@ final class DeckController {
     // MARK: the deck
 
     var engineState: DeckEngineState {
-        DeckEngineState(prepared: engine != nil, failure: failure, airPlay: airPlay, interrupted: interrupted)
+        DeckEngineState(prepared: engine != nil, failure: failure.words, airPlay: airPlay, interrupted: interrupted)
     }
 
-    var voiceMade: Bool { engine != nil && failure == nil }
+    var voiceMade: Bool { engine != nil && failure.words == nil }
 
     private func make() {
         guard rules == nil else { return }
+        // made again: a start that failed before is tried again
+        failure.forget()
         if engine == nil { makeEngine() }
         active = UIApplication.shared.applicationState == .active
         airPlay = AudioSessionController.onAirPlay()
@@ -524,7 +538,7 @@ final class DeckController {
         }
         eq?.attachDeck(made)
         engine = made
-        failure = nil
+        failure.forget()
     }
 
     /// closeDeckAudio (deck.ts:1397): the engine stopped and its voice let go, windows and all.
@@ -555,20 +569,22 @@ final class DeckController {
         }
     }
 
+    /// The deck engine started - never on AirPlay, during an interruption, or after a start that failed (until
+    /// DeckStartFailure forgets it: no post or frame retries a failed start).
     private func startEngine(forPress: Bool) {
-        guard let engine, !airPlay, !interrupted else { return }
+        guard let engine, !airPlay, !interrupted, failure.words == nil else { return }
         let began = CACurrentMediaTime()
         do {
             // the session is the app's (4.6): made active, as pressing Play would - never its category changed
             try AudioSessionController.activateShared()
             try engine.start()
-            failure = nil
+            failure.started()
         } catch {
-            failure = error.localizedDescription
+            failure.failed(error.localizedDescription, at: CACurrentMediaTime())
         }
         let took = CACurrentMediaTime() - began
         if rules != nil { startTicking() }
-        if forPress && failure == nil && took > DeckConstants.takeBackS {
+        if forPress && failure.words == nil && took > DeckConstants.takeBackS {
             slow = ((slow?.count ?? 0) + 1, Swift.max(slow?.worst ?? 0, took - DeckConstants.takeBackS))
         }
         audioChanged()
@@ -1099,6 +1115,8 @@ final class DeckController {
     private func interruptionOver() {
         guard interrupted else { return }
         interrupted = false
+        // a start that failed during it is tried again
+        failure.forget()
         audioChanged()
         evaluate()
     }
@@ -1112,6 +1130,8 @@ final class DeckController {
         guard now != routeKey else { return }
         routeKey = now
         airPlay = AudioSessionController.onAirPlay()
+        // a new output may start where the old one refused
+        failure.forget()
         engine?.routeChanged()
         audioChanged()
         evaluate()
