@@ -3,6 +3,7 @@ import DeadwaxAudio
 import DeadwaxCore
 import DeadwaxTurntable
 import Foundation
+import ImageIO
 import Observation
 import QuartzCore
 import UIKit
@@ -1021,11 +1022,12 @@ final class DeckController {
     private func loadPictures() {
         guard rules != nil, let entry = player.current else { return }
         let track = entry.track
+        // the record's face across, in points
+        let across = (box.width > 0 ? box.width : 320) * 2 * TurntableGeometry.record.r / TurntableGeometry.stage.width
         if coverFor != track.coverArt {
             coverFor = track.coverArt
             setCover(nil)
             if let id = track.coverArt, let client = server.client {
-                let across = (box.width > 0 ? box.width : 320) * 2 * TurntableGeometry.record.r / TurntableGeometry.stage.width
                 let size = CoverSize.step(for: Int(across * TurntableFace.labelShare * Double(UIScreen.main.scale)))
                 Task { @MainActor [weak self] in
                     let got = await CoverCache.shared.load(client: client, id: id, size: size)
@@ -1050,10 +1052,12 @@ final class DeckController {
         }
         setArt(nil, for: key)
         guard !artFailed.contains(key), reachability.online, let client = server.client else { return }
+        let pixels = Int((across * Double(UIScreen.main.scale)).rounded(.up))
         Task { @MainActor [weak self] in
             let data = try? await client.discArt(albumID: album, disc: disc)
-            let decoded = data.flatMap { (bytes: Data) -> UIImage? in UIImage(data: bytes) }
-            let image = await decoded?.byPreparingForDisplay() ?? decoded
+            let image = await Task.detached(priority: .utility) { () -> UIImage? in
+                data.flatMap { (bytes: Data) -> UIImage? in DeckController.discThumbnail(bytes, pixels: pixels) }
+            }.value
             guard let self, self.artFor == key else { return }
             if let picture = image?.cgImage {
                 self.keep(picture, as: key)
@@ -1062,6 +1066,25 @@ final class DeckController {
                 self.artFailed.insert(key)
             }
         }
+    }
+
+    /// The CD art decoded at the face's size on this screen (`pixels` across), off the main thread and now rather than
+    /// at its first draw: ImageIO's thumbnail, its shorter side `pixels`, as the face fills with it - never the file's
+    /// own size, which a scan can make tens of megabytes decoded, kept for the run (artKept).
+    nonisolated private static func discThumbnail(_ data: Data, pixels: Int) -> UIImage? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        var longest = Swift.max(pixels, 1)
+        if let facts = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+           let width = facts[kCGImagePropertyPixelWidth] as? Int, let height = facts[kCGImagePropertyPixelHeight] as? Int,
+           width > 0, height > 0 {
+            longest = Int((Double(longest) * Double(Swift.max(width, height)) / Double(Swift.min(width, height))).rounded(.up))
+        }
+        let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true,
+                                        kCGImageSourceCreateThumbnailWithTransform: true,
+                                        kCGImageSourceShouldCacheImmediately: true,
+                                        kCGImageSourceThumbnailMaxPixelSize: longest]
+        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        return UIImage(cgImage: image)
     }
 
     private func setCover(_ image: CGImage?) {
