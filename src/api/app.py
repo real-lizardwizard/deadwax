@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse, RedirectResponse, Response
 from starlette.middleware.gzip import GZipMiddleware
 
 from src.routes import search_musicbrainz, interface_logs, monitor_slskd, download, library, settings, navidrome, me, pins, store_album
+from src.routes import play_history
 from src.routes import auth as auth_routes, describe, eq, held, my_library, own_password, people
 from src import auth, permissions, player_cache, stars
 from src.api import navidrome_admin
@@ -450,6 +451,8 @@ def start() -> FastAPI:
     app.include_router(pins.router, prefix="/deadwax/me/pins", tags=["me"], dependencies=signed_in)
     #? (2.0.0-player.51) each user's own library - their starred albums - and the admin's "held by nobody"
     app.include_router(my_library.router, prefix="/deadwax/me/library", tags=["me"], dependencies=signed_in)
+    #? (2.1.14) the songs each user played, in either app - Up Next's lasting history, deadwax's own
+    app.include_router(play_history.router, prefix="/deadwax/me/history", tags=["me"], dependencies=signed_in)
     #? (2.0.2) your own Navidrome password, changed as you - see routes/own_password.py
     app.include_router(own_password.router, prefix="/deadwax/me/password", tags=["me"], dependencies=signed_in)
     app.include_router(held.router, prefix="/deadwax/library/held", tags=["library"], dependencies=[Depends(require("library"))])

@@ -46,6 +46,8 @@ export interface KnownOnly {
   permissions: number
   /** (2.0.0-player.64) the play queue deadwax keeps beside Navidrome's */
   queue?: boolean
+  /** (2.1.14) how many songs they played that deadwax keeps - Up Next's lasting history */
+  history?: number
 }
 
 export interface PeopleState {

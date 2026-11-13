@@ -993,8 +993,8 @@ didn't get an answer. Check in Navidrome's own Users page that they have a libra
 ### People can't make an account: "deadwax still keeps pins, settings or a library for an earlier …"
 
 deadwax still keeps something under that name - an account removed in Navidrome's own Users page, or a
-removal deadwax couldn't finish - and a new person must not inherit someone else's library, pins, play queue or
-permissions. Find the name under **Known only to deadwax** at the foot of People and **Forget** it, then
+removal deadwax couldn't finish - and a new person must not inherit someone else's library, pins, play queue,
+played songs or permissions. Find the name under **Known only to deadwax** at the foot of People and **Forget** it, then
 make the account; or choose another name.
 
 ### Signed in over HTTPS, and now the http address won't sign in

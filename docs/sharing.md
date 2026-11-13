@@ -273,14 +273,14 @@ admin's job, give it under their **Permissions** instead ([below](#admins-permis
 - **Removing a person.** In People, **Remove…** on their row opens a dialog saying exactly what goes:
   in Navidrome, for good, their account, play counts and history, favourites, every playlist they own
   (shared ones too) and their Last.fm or ListenBrainz link; in deadwax, their sign-ins, library list,
-  pins, play queue, Getting albums settings and permissions. Every album stays in the collection, and a download only
+  pins, play queue and the songs they played, Getting albums settings and permissions. Every album stays in the collection, and a download only
   they were waiting for carries on, filed for nobody (cancel it in Requests first if nobody wants it).
   There's no undo: type their user name to remove them. They're signed out on every device at once.
   If they may come back, reset their password instead.
   An account deleted in Navidrome's own Users page instead signs them out within about six minutes,
   and what deadwax kept for them shows in People under **Known only to deadwax**, with **Forget** -
   until it's forgotten, deadwax won't make a new account of that name in People, so a new person never
-  inherits someone else's library, pins, play queue or permissions.
+  inherits someone else's library, pins, play queue, played songs or permissions.
 - **Changing your own password**: **You → Account → Change password**, for anyone signed in with their own
   Navidrome account - your current password, then the new one twice (8 to 128 characters, not your user
   name, not the one you have), **Show** to see what you typed. deadwax checks the current one against the

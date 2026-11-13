@@ -202,6 +202,8 @@ ROUTES = {
     ("GET", "/deadwax/me/pins"): "user",
     ("PUT", "/deadwax/me/pins"): "user",
     ("POST", "/deadwax/me/pins/toggle"): "user",
+    ("GET", "/deadwax/me/history"): "user",
+    ("POST", "/deadwax/me/history"): "user",
     ("GET", "/deadwax/store/album"): "user",
     #? (2.0.13) the artist and album pages' descriptions
     ("GET", "/deadwax/describe/artist"): "user",

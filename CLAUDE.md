@@ -204,6 +204,8 @@ src/
   play_queue.py    PURE. Resume what was playing (2.0.0-player.64): the window kept, GET /queue's
                    answer from Navidrome's play queue and deadwax's record (store.py play_queue) -
                    see "Resume what was playing".
+  play_history.py  PURE. Play history that lasts (2.1.14): a start as its play_history row (or skipped), the page -
+                   routes/play_history.py's /deadwax/me/history, see notes/play-history.md.
   api/             musicbrainz_endpoint.py, slskd_endpoint.py, coverart_endpoint.py,
                    artist_images_endpoint.py (Wikidata/Commons + TheAudioDB),
                    lrclib_endpoint.py (LRCLIB), wikipedia_endpoint.py (Wikidata's sitelinks and
@@ -243,7 +245,8 @@ src/
                    EQ: the list kept in store.py's autoeq_list/autoeq_meta, refreshed weekly behind
                    itself, profiles in autoeq_profile - see "The EQ's AutoEq routes (2.1.7)");
                    library's /queue/summary is the app's Needs-a-look count, from the saved
-                   scan alone - see "Needs a look"
+                   scan alone - see "Needs a look"; play_history (/deadwax/me/history, every song each
+                   person started, kept for ever - see notes/play-history.md)
 interface/         the app's pages: player/ (the app, its stylesheets, manifest and icons),
                    player/lab/ (the bench), styles/theme.css and its fonts; `/` (and
                    /index.html) redirects to /player/ (307) - see "The main page retired".
@@ -331,7 +334,7 @@ ui/                Preact + Vite + TypeScript: the app (src/player/main.tsx -> s
                    ui/src/lab/ is the turntable's test bench at /player/lab/, a third page built
                    in a pass of its own: the real Turntable and deck over signals it makes, set
                    beside an ideal turntable - see notes/turntable-bench.md.
-tests/             4052 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
+tests/             4216 tests, all Python, all fixture-driven (+ ui/test/*.sim.cjs scripts)
 ios/               the native iPhone app (SwiftUI), built on James's Mac, never in the image:
                    DeadwaxKit/ (its Core tested on Linux with swift.org's toolchain in
                    ~/.local/swift, its Audio engine on ios.yml's macOS runner), App/, the
@@ -395,6 +398,7 @@ section of that title in notes/: `grep -rn "### X" notes/` finds it.
 | the name, why Lidarr was dropped, the old Next up list | `notes/history.md` |
 | the native iPhone app (ios/): DeadwaxKit, the audio engine, the project without Xcode, install.sh, ios.yml, the phases; the EQ's AutoEq routes on the server (2.1.7) | `notes/ios.md` |
 | lyrics for listeners: the route by song id, the view on Now Playing, the phone's (design and build) | `notes/app-lyrics.md` |
+| play history that lasts: every song started, per person, kept for ever - the table, the routes, Up Next's list | `notes/play-history.md` |
 
 **A change's write-up goes into its area's notes file** (a new file for a new area, added to the
 table above), never here. Add to this file only a rule that holds everywhere.
@@ -550,7 +554,7 @@ phone's sheet.
 
 ```bash
 .venv/bin/python -m src.main          # needs .env; the dev one sets DB_PATH=.devdata/jimbrainz.db
-.venv/bin/python -m pytest tests/ -q  # 4052 tests (the audio ones skip without numpy, soxr and soundfile)
+.venv/bin/python -m pytest tests/ -q  # 4216 tests (the audio ones skip without numpy, soxr and soundfile)
 ```
 
 Frontend, from `ui/`. **Needs Node `^20.19.0 || >=22.12.0`** — see `notes/tooling.md`:
@@ -588,7 +592,7 @@ code sees before James's Mac (notes/ios.md).
 
 ## What the tests cannot tell you
 
-All 4052 tests are fixture-driven, and **nothing in the suite has ever talked to a real
+All 4216 tests are fixture-driven, and **nothing in the suite has ever talked to a real
 slskd** - the application now has, once, and the first search it tried was refused. The parts
 most likely to break on deployment are exactly the parts tests can't reach:
 

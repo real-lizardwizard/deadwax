@@ -94,7 +94,7 @@ console.log('\nRemove')
 const lines = L.removeLines(person({ signed_in: 2, waiting_alone: 1 }))
 check('what goes, what stays, from the server\'s numbers', [lines.navidrome, lines.deadwax, lines.stays, lines.undo], [
   "In Navidrome, for good: ethan's account, their play counts and play history, their favourites (the 312 albums in their library), all their playlists - shared ones too - and their Last.fm or ListenBrainz link.",
-  'In deadwax: their sign-ins (2 devices), their library list, their pins, their play queue, Getting albums settings and permissions.',
+  'In deadwax: their sign-ins (2 devices), their library list, their pins, their play queue and the songs they played, Getting albums settings and permissions.',
   'Stays: every album in the collection. 1 download only they are waiting for carries on and is filed for nobody - cancel it in Requests first if nobody wants it.',
   "There's no undo. If they might come back, reset their password instead."])
 check('...no numbers where there are none - never "the 0 albums" or "(0 devices)"', [L.removeLines(person({ library: 0 })).navidrome.includes('their favourites, all'), L.removeLines(person()).deadwax.startsWith('In deadwax: their sign-ins, their')],
@@ -121,6 +121,11 @@ check('Known only to deadwax: what is kept', L.knownWords({ user: 'olduser', ses
 //? (2.0.0-player.64) a name with only a play queue left - which still keeps a new account of that name from being made
 check('...a play queue alone, said', L.knownWords({ user: 'olduser', sessions: 0, credential: false, library: 0, pins: 0, preferences: false, requests: 0, permissions: 0, queue: true }),
   'deadwax keeps a play queue.')
+//? (2.1.14) and the songs they played - kept for ever, so a name may have nothing else left
+check('...the songs they played, counted', L.knownWords({ user: 'olduser', sessions: 0, credential: false, library: 0, pins: 0, preferences: false, requests: 0, permissions: 0, queue: true, history: 1234 }),
+  'deadwax keeps a play queue, 1,234 songs they played.')
+check('...one song', L.knownWords({ user: 'olduser', sessions: 0, credential: false, library: 0, pins: 0, preferences: false, requests: 0, permissions: 0, history: 1 }),
+  'deadwax keeps 1 song they played.')
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')
 process.exit(failures ? 1 : 0)
