@@ -354,8 +354,8 @@ def test_each_profile_address_has_every_segment_encoded_exactly_once():
 def test_folding_drops_marks_case_and_punctuation():
     assert A.fold("Sennheiser HD 650") == "sennheiser hd 650"
     assert A.fold("AüR Audio Aure") == "aur audio aure"
-    assert A.fold("Apple AirPods Pro 2 (51dB + ANC)") == "apple airpods pro 2 51db anc"
-    assert A.fold("  Bruel & Kjaer\t5128 ") == "bruel kjaer 5128"
+    assert A.fold("Apple AirPods Pro 2 (51dB + ANC)") == "apple airpods pro 2 51db plus anc"
+    assert A.fold("  Bruel & Kjaer\t5128 ") == "bruel and kjaer 5128"
     assert A.fold("Bose QuietComfort 35 II Gaming Headset" + chr(0x200B)) == "bose quietcomfort 35 ii gaming headset"
     assert A.fold("Straße") == "strasse"
     assert A.fold("!!!") == ""
@@ -374,6 +374,24 @@ def test_letters_nfkd_keeps_whole_fold_to_plain_ones():
     assert A.fold("Straße STRAẞE") == "strasse strasse"
     #? a letter with no one plain spelling is left as it is
     assert A.fold("Ŋ ĸ") == "ŋ ĸ"
+
+
+def test_plus_and_ampersand_are_words_of_the_name():
+    """2.1.9: a `+` is "plus" and a `&` is "and", as the phone's suggestion reads them - so a model named apart only
+    by a `+` is a row of its own, not folded into the other's row with nothing saying it's another headphone."""
+    assert A.fold("Beats Studio Buds +") == "beats studio buds plus"
+    assert A.fold("Moondrop T2+") == A.fold("Moondrop T2 Plus") == "moondrop t2 plus"
+    assert A.fold("Bang & Olufsen") == A.fold("Bang and Olufsen") == "bang and olufsen"
+    #? a fullwidth plus is NFKD's plain one
+    assert A.fold("T2" + chr(0xFF0B)) == "t2 plus"
+    buds = A.parse_line("- [Beats Studio Buds](./Test/in-ear/Beats%20Studio%20Buds) by Test")
+    plus = A.parse_line("- [Beats Studio Buds +](./Test/in-ear/Beats%20Studio%20Buds%20%2B) by Test")
+    rows = A.rows_of([buds, plus])
+    assert [[result.name for result in row.results] for row in rows] == [["Beats Studio Buds"], ["Beats Studio Buds +"]]
+    #? the plain name finds both, each its own row; "buds plus" and "buds+" only the other
+    assert [row.results[0].name for row in A.search(rows, "studio buds")] == ["Beats Studio Buds", "Beats Studio Buds +"]
+    for q in ("studio buds plus", "studio buds+"):
+        assert [row.results[0].name for row in A.search(rows, q)] == ["Beats Studio Buds +"], q
 
 
 def test_rode_finds_the_rode_nth_100():
@@ -403,11 +421,12 @@ def test_hd650_and_hd_650_find_the_same():
 
 
 def test_airpods_pro_and_the_ranking():
-    #? every word starts a word of each; then shorter names, then by name - "(51dB + ANC)" and "(ANC mode)" fold
-    #? to 28 letters each, and "51db" sorts before "anc"
-    assert found("airpods pro")[:5] == ["Apple AirPods Pro", "Apple AirPods Pro2", "Apple Airpods Pro 2",
+    #? every word starts a word of each; then shorter names, then by name - since 2.1.9 a `+` is the word "plus", so
+    #? "(51dB + ANC)" folds longer than "(ANC mode)" and "(passive mode)", and crinacle's listening levels follow the
+    #? two modes
+    assert found("airpods pro")[:7] == ["Apple AirPods Pro", "Apple AirPods Pro2", "Apple Airpods Pro 2",
+                                        "Apple AirPods Pro 2 (ANC mode)", "Apple AirPods Pro 2 (passive mode)",
                                         "Apple AirPods Pro 2 (51dB + ANC)", "Apple AirPods Pro 2 (56dB + ANC)"]
-    assert found("airpods pro").index("Apple AirPods Pro 2 (ANC mode)") == 14
     assert len(found("airpods pro")) == 17
     #? "2" starts no word of "Pro2": the shortest name comes last
     ranked = found("pro 2")
