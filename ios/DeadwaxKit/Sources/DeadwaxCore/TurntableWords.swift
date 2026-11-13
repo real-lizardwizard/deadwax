@@ -429,6 +429,13 @@ extension TurntableDebugRows {
                     "Record 20 s")
         }
     }
+
+    /// The Recording row's second button (**phone**, slice 4's review): once a recording is saved, another - the web's
+    /// row offers none, and the phone's would otherwise need a relaunch. Starting it removes the saved file.
+    public static func recordAgain(_ status: DeckRecordingStatus, turntable: Bool) -> String? {
+        guard turntable, case .saved = status else { return nil }
+        return "Record 20 s again"
+    }
 }
 
 /// Debug's recording of the record's sound (turntable.md 6.2, 6.3), as the phone has it.

@@ -154,6 +154,79 @@ import Testing
         #expect(deck.host.pointee.tapOn == false || audio_counters_load(deck.host.pointee.tapControl!, 0) == 0)
         #expect(deck.recorder == nil)
     }
+
+    /// A rest across its end ends it (slice 4's review): judged by the last block kept, a recording whose end fell in a
+    /// rest never ended - the blocks after the rest are past it and dropped - so the tap stayed on and Debug's tick
+    /// never stopped. Ended by the clock now: offline at the first block past the end, live by host time while the
+    /// record rests, with no block at all. And another recording runs after each, with no relaunch.
+    @Test func aRestAcrossItsEndEndsIt() throws {
+        let deck = try DeckCases.offlineDeck(rate: Self.rate)
+        #expect(deck.host.pointee.tapControl == nil && deck.host.pointee.tapAudio == nil,
+                "no tap rings until a recording asks for them")
+        deck.post(.window(Self.window().voiceWindow(start: 0, rate: Self.rate)), keeping: Self.window())
+        var done = 0
+        func render(_ count: Int) throws {
+            for i in 0..<count {
+                deck.setOfflineClock(frames: Double(done) - Double(deck.engine.manualRenderingSampleTime))
+                _ = try deck.renderOffline(1_024)
+                done += 1_024
+                if i % 5 == 4 { deck.drainTap() }
+            }
+            deck.drainTap()
+        }
+        func sound() { deck.post(.take(at: 1, rate: 1, time: Double(done) / Self.rate, until: .infinity), keeping: nil) }
+        func tapOff() -> Bool { audio_counters_load(deck.host.pointee.tapControl!, 0) == 0 }
+
+        // offline: 1 s asked, 10 blocks (0.21 s), 2 s of rest, 200 blocks - ended by the first block past its end
+        deck.record(seconds: 1)
+        try deck.start()
+        #expect(deck.host.pointee.tapControl != nil, "made at the start")
+        sound()
+        try render(10)
+        deck.stop()
+        done += Int(2 * Self.rate)
+        #expect(!deck.recordingDone, "offline, a rest moves no clock: only a block does")
+        try deck.start()
+        sound()
+        try render(200)
+        #expect(deck.recordingDone, "the first block after the rest is past its end")
+        #expect(tapOff() && deck.host.pointee.tapOn == false, "the tap asked off - and the render heard it")
+        let first = try #require(deck.finishRecording())
+        #expect(first.blocks.count == 10 && first.over, "the ten before the rest, nothing after its end")
+        #expect(deck.recorder == nil)
+
+        // live, resting: 0.5 s asked, 10 blocks, the record rests - ended by host time, no block needed
+        deck.record(seconds: 0.5)
+        deck.stop()
+        try deck.start()
+        sound()
+        try render(10)
+        deck.stop()
+        #expect(!deck.recordingDone)
+        deck.host.pointee.offline = false
+        #expect(deck.recordingDone, "live and resting: host time is past its end")
+        deck.drainTap()
+        deck.host.pointee.offline = true
+        #expect(tapOff(), "the tap asked off")
+        try deck.start()
+        try render(2)
+        #expect(deck.host.pointee.tapOn == false, "not on again at the next start")
+        let second = try #require(deck.finishRecording())
+        #expect(second.blocks.count == 10)
+
+        // and a third, as Debug's Record 20 s again: from the next start, its seconds, then done
+        deck.record(seconds: 0.5)
+        deck.stop()
+        try deck.start()
+        sound()
+        try render(40)
+        #expect(deck.recordingDone)
+        let third = try #require(deck.finishRecording())
+        #expect(third.recordedSeconds >= 0.5 && third.recordedSeconds < 0.5 + 1_024 / Self.rate + 1e-9,
+                "\(third.recordedSeconds) s")
+        #expect(third.blocks.first.map { $0.now >= Double(done - 40 * 1_024) / Self.rate - 1e-9 } == true,
+                "from its own start, nothing of the ones before")
+    }
 }
 
 extension DeckRealTimeTests {
@@ -165,6 +238,7 @@ extension DeckRealTimeTests {
         let deck = try DeckCases.offlineDeck(rate: rate)
         deck.host.pointee.offline = false
         deck.record(seconds: 1_000)
+        deck.makeTap()
         deck.host.pointee.tapOn = true
         deck.tapBegun = true
         audio_counters_store(deck.host.pointee.tapControl!, 0, 1)

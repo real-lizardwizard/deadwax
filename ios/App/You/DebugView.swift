@@ -333,6 +333,9 @@ private struct TurntableRecordingRow: View {
                     Button(action, action: record)
                 }
             }
+            if let again = TurntableDebugRows.recordAgain(status, turntable: shown) {
+                Button(again, action: record)
+            }
         }
     }
 }

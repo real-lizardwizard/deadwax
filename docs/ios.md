@@ -585,8 +585,11 @@ Debug is where Phase 0's test screen lives now:
     go to Now Playing's turntable and turn the record as you would; 20 seconds later the row says
     "20 s recorded: save the file and send it", and **Save the recording (… MB)** opens the share
     sheet (AirDrop it to the Mac, or Save to Files). A file is 15-30 MB: it carries the sound as it
-    was made and the part of the song the record played, so the Mac can play it again exactly. Until
-    the turntable has shown, the row says "Shows the turntable first: the recording is of its sound".
+    was made and the part of the song the record played, so the Mac can play it again exactly. The
+    20 seconds count from the first sound, rests included: a recording whose 20 seconds end while the
+    record is still finishes then. **Record 20 s again**, under the save button, starts another (the
+    saved file is deleted; the app keeps only the newest). Until the turntable has shown, the row
+    says "Shows the turntable first: the recording is of its sound".
     On the Mac, `swift run --package-path ios/DeadwaxKit replay-deck-recording <file>` plays it again
     through the app's own code and says whether it made the same sound (it should, to the bit). The
     same command takes a recording from the web app's Debug, with `--song <the song's file>`.

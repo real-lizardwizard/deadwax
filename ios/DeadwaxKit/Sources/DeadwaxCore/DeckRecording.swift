@@ -94,11 +94,24 @@ public struct DeckRecorder {
         return now - first.now >= seconds
     }
 
+    /// Over: its seconds have passed by the clock - a block at or past its end seen (and not kept), its last block's
+    /// end there, or the deck engine's clock there while the record rested. Once over, nothing more is kept. Judged by
+    /// the clock, not by the last block kept: a rest across the end gives no block inside it, and a recording judged by
+    /// its last block would then never end (slice 4's review).
+    public private(set) var over = false
+
+    /// Over, by the clock at voice time `now` (the deck engine's word, from a block or from its clock).
+    public mutating func clock(_ now: Double) {
+        if done(now: now) { over = true }
+    }
+
     /// The bytes of its audio so far: what Debug says while it runs.
     public var frames: Int { left.count }
 
     /// A block the tap gave, with its samples (`right` nil: one channel).
     public mutating func block(_ block: DeckTapBlock, left: UnsafePointer<Float>, right: UnsafePointer<Float>?) {
+        clock(block.now)
+        if over { return }
         lostBlocks = Swift.max(lostBlocks, block.lostBlocks)
         lostMessages = Swift.max(lostMessages, block.lostMessages)
         blocks.append(block)

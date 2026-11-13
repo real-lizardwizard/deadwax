@@ -471,14 +471,30 @@ final class DeckController {
     /// Whether a recording is asked for or under way (the touch view hands its raw samples only then).
     var isRecording: Bool { engine?.recorder != nil }
 
-    /// Debug's "Record 20 s": the deck engine records from the record's next sound, drained by the tick.
+    /// Debug's "Record 20 s" (and, once one is saved, "Record 20 s again"): the deck engine records from the record's
+    /// next sound, drained by the tick. Earlier recordings' files go first - the share sheet offers only the newest,
+    /// and each is a few MB of temporary space (slice 4's review).
     func record() {
         guard let engine else { return }
         recordingFile = nil
         recordingFailure = nil
         recordingWriting = nil
+        Self.removeRecordings()
         engine.record()
         startTicking()
+    }
+
+    /// The name every recording's file starts with, in the temporary directory.
+    static let recordingPrefix = "deadwax-turntable-phone-"
+
+    /// Earlier recordings' files removed from the temporary directory - this launch's and any an earlier one left.
+    private static func removeRecordings() {
+        let files = FileManager.default
+        let folder = files.temporaryDirectory
+        guard let names = try? files.contentsOfDirectory(atPath: folder.path) else { return }
+        for name in names where name.hasPrefix(recordingPrefix) && name.hasSuffix(".json") {
+            try? files.removeItem(at: folder.appendingPathComponent(name))
+        }
     }
 
     /// Debug's Recording row's state.
@@ -504,7 +520,7 @@ final class DeckController {
         recordingWriting = seconds
         let stamp = ISO8601DateFormatter.string(from: Date(), timeZone: TimeZone(identifier: "UTC") ?? .current,
                                                 formatOptions: [.withInternetDateTime, .withFractionalSeconds])
-        let name = "deadwax-turntable-phone-\(stamp.replacingOccurrences(of: ":", with: "-").replacingOccurrences(of: ".", with: "-").prefix(19)).json"
+        let name = "\(Self.recordingPrefix)\(stamp.replacingOccurrences(of: ":", with: "-").replacingOccurrences(of: ".", with: "-").prefix(19)).json"
         let device = UIDevice.current
         let about = DeckRecorder.About(
             when: stamp, userAgent: "deadwax iPhone app \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?") (\(device.model); \(device.systemName) \(device.systemVersion))",
