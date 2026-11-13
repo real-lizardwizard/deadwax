@@ -393,7 +393,9 @@ func allocations(_ body: (_ pause: (() -> Void) -> Void) throws -> Void) rethrow
     /// Test 9 (1.5's denormals): `EQRender.process` called directly - a +12 dB, Q 10 peak at 20 Hz and a high pass at
     /// 0.45 x the rate, at 192 kHz - given a second of noise and then 5 minutes of exact zeros, the states decaying
     /// into the subnormals on the way. No stretch of the silence costs more than twice what noise does a block.
-    /// Bounded in the release build; printed in both.
+    /// Bounded in the release build; printed in both. Measured up to three times, from a fresh render each time, and
+    /// the best attempt is the one bounded: a denormal slowdown is in every attempt, while a shared CI runner's slow
+    /// ten seconds is in one (ios.yml's release step once had a single stretch at 2.01x, every other at 1.0-1.2x).
     @Test func silenceCostsNoMoreThanNoise() throws {
         let rate = 192_000.0, frames = 4_096, channels = 2
         let bank = EQBank.make(rate: rate, key: "", version: 0, on: true,
@@ -401,8 +403,6 @@ func allocations(_ body: (_ pause: (() -> Void) -> Void) throws -> Void) rethrow
                                             EQFilter(id: 2, kind: .highPass, fc: 0.45 * rate)],
                                offsets: .zero, bands: EQGraphic.flat, preamp: 0)
         #expect(bank.left.count == 2, "both filters play at 192 kHz")
-        let state = EQRender.make(rate: rate, channels: channels, maximumFrames: frames)
-        defer { EQRender.free(state) }
         let samples = UnsafeMutablePointer<Float>.allocate(capacity: channels * frames)
         let pointers = UnsafeMutablePointer<UnsafeMutablePointer<Float>>.allocate(capacity: channels)
         defer {
@@ -411,51 +411,70 @@ func allocations(_ body: (_ pause: (() -> Void) -> Void) throws -> Void) rethrow
         }
         for c in 0..<channels { pointers[c] = samples + c * frames }
         let packed = bank.packed
-        var random = SeededRandom(seed: 9)
         let tick = EQHost.secondsPerTick
 
-        func timed(_ offered: UnsafePointer<Double>?) -> Double {
-            let began = mach_absolute_time()
-            EQRender.process(state, buffers: UnsafePointer(pointers), frames: frames, offered: offered)
-            return Double(mach_absolute_time() - began) * tick
-        }
-        // a second of noise at full scale: the burst, and what a block costs over noise
-        var noise: [Double] = []
-        for block in 0..<47 {
-            for i in 0..<(channels * frames) { samples[i] = Float(random.next()) }
-            if block == 0 {
-                noise.append(packed.withUnsafeBufferPointer { timed($0.baseAddress) })
-            } else {
-                noise.append(timed(nil))
+        /// One attempt: a fresh render, a second of noise, 5 minutes of zeros. Answers silence's slowest 10 s
+        /// stretch over noise's median block.
+        func attempt(_ number: Int) -> Double {
+            let state = EQRender.make(rate: rate, channels: channels, maximumFrames: frames)
+            defer { EQRender.free(state) }
+            var random = SeededRandom(seed: 9)
+            func timed(_ offered: UnsafePointer<Double>?) -> Double {
+                let began = mach_absolute_time()
+                EQRender.process(state, buffers: UnsafePointer(pointers), frames: frames, offered: offered)
+                return Double(mach_absolute_time() - began) * tick
             }
+            // a second of noise at full scale: the burst, and what a block costs over noise
+            var noise: [Double] = []
+            for block in 0..<47 {
+                for i in 0..<(channels * frames) { samples[i] = Float(random.next()) }
+                if block == 0 {
+                    noise.append(packed.withUnsafeBufferPointer { (buffer: UnsafeBufferPointer<Double>) -> Double in
+                        timed(buffer.baseAddress)
+                    })
+                } else {
+                    noise.append(timed(nil))
+                }
+            }
+            // 5 minutes of zeros
+            let blocks = Int(300 * rate) / frames
+            var silence: [Double] = []
+            silence.reserveCapacity(blocks)
+            var quietFrom: Int?
+            for block in 0..<blocks {
+                samples.update(repeating: 0, count: channels * frames)
+                silence.append(timed(nil))
+                if quietFrom == nil, (0..<(channels * frames)).allSatisfy({ samples[$0] == 0 }) { quietFrom = block }
+            }
+            let noiseMedian = median(Array(noise.dropFirst()))
+            // each 10 s stretch's median: a denormal slowdown lasts as long as the states are subnormal, a scheduler's
+            // interruption one block
+            let stretch = Int(10 * rate) / frames
+            let stretches = stride(from: 0, to: blocks, by: stretch).map { median(Array(silence[$0..<min($0 + stretch, blocks)])) }
+            let slowestStretch = stretches.max() ?? 0
+            let slowestBlock = silence.max() ?? 0
+            let slowestAt = silence.firstIndex(of: slowestBlock) ?? 0
+            print("EQ silence at 192 kHz, attempt \(number): a block of noise \(String(format: "%.4f", noiseMedian * 1_000)) ms (median); "
+                  + "the output exactly 0 from \(quietFrom.map { String(format: "%.1f s", Double($0 * frames) / rate) } ?? "never"); "
+                  + "each 10 s of silence (median a block, ms): "
+                  + stretches.map { String(format: "%.4f", $0 * 1_000) }.joined(separator: " ")
+                  + "; the slowest stretch \(String(format: "%.2f", slowestStretch / noiseMedian))x noise, the slowest block "
+                  + "\(String(format: "%.4f", slowestBlock * 1_000)) ms (\(String(format: "%.2f", slowestBlock / noiseMedian))x, "
+                  + "at \(String(format: "%.1f", Double(slowestAt * frames) / rate)) s)")
+            return slowestStretch / noiseMedian
         }
-        // 5 minutes of zeros
-        let blocks = Int(300 * rate) / frames
-        var silence: [Double] = []
-        silence.reserveCapacity(blocks)
-        var quietFrom: Int?
-        for block in 0..<blocks {
-            samples.update(repeating: 0, count: channels * frames)
-            silence.append(timed(nil))
-            if quietFrom == nil, (0..<(channels * frames)).allSatisfy({ samples[$0] == 0 }) { quietFrom = block }
+        #if DEBUG
+        let attempts = 1   // only printed in a debug build, where an attempt takes a minute: measured once
+        #else
+        let attempts = 3
+        #endif
+        var best = Double.infinity
+        for number in 1...attempts {
+            best = min(best, attempt(number))
+            if best <= 2 { break }
         }
-        let noiseMedian = median(Array(noise.dropFirst()))
-        // each 10 s stretch's median: a denormal slowdown lasts as long as the states are subnormal, a scheduler's
-        // interruption one block
-        let stretch = Int(10 * rate) / frames
-        let stretches = stride(from: 0, to: blocks, by: stretch).map { median(Array(silence[$0..<min($0 + stretch, blocks)])) }
-        let slowestStretch = stretches.max() ?? 0
-        let slowestBlock = silence.max() ?? 0
-        let slowestAt = silence.firstIndex(of: slowestBlock) ?? 0
-        print("EQ silence at 192 kHz: a block of noise \(String(format: "%.4f", noiseMedian * 1_000)) ms (median); "
-              + "the output exactly 0 from \(quietFrom.map { String(format: "%.1f s", Double($0 * frames) / rate) } ?? "never"); "
-              + "each 10 s of silence (median a block, ms): "
-              + stretches.map { String(format: "%.4f", $0 * 1_000) }.joined(separator: " ")
-              + "; the slowest stretch \(String(format: "%.2f", slowestStretch / noiseMedian))x noise, the slowest block "
-              + "\(String(format: "%.4f", slowestBlock * 1_000)) ms (\(String(format: "%.2f", slowestBlock / noiseMedian))x, "
-              + "at \(String(format: "%.1f", Double(slowestAt * frames) / rate)) s)")
         #if !DEBUG
-        #expect(slowestStretch <= 2 * noiseMedian, "silence costs \(slowestStretch / noiseMedian)x noise")
+        #expect(best <= 2, "silence costs \(best)x noise at best of three")
         #endif
     }
 }
