@@ -1,0 +1,762 @@
+{
+ "made_from": "src/routes/eq.py over tests/test_autoeq.py's GitHub (ios/scripts/autoeq_answers.py)",
+ "limit": 50,
+ "searches": [
+  {
+   "name": "the HD 650 by its name: one headphone, and five of its own with a word in parentheses",
+   "path": "/deadwax/eq/autoeq",
+   "query": {
+    "q": "Sennheiser HD 650",
+    "limit": "50"
+   },
+   "status": 200,
+   "answer": {
+    "results": [
+     {
+      "id": "1ab8a126e99b778f",
+      "name": "Sennheiser HD 650",
+      "source": "oratory1990",
+      "rig": null,
+      "form": "over-ear",
+      "others": [
+       {
+        "id": "9cb3fd4601c49d6e",
+        "source": "crinacle",
+        "rig": "GRAS 43AG-7",
+        "form": "over-ear"
+       },
+       {
+        "id": "3f5b6abdebd4bbc7",
+        "source": "Rtings",
+        "rig": "HMS II.3",
+        "form": "over-ear"
+       },
+       {
+        "id": "a7e3b0578169c464",
+        "source": "Innerfidelity",
+        "rig": null,
+        "form": "over-ear"
+       },
+       {
+        "id": "047b54e1a4e824a6",
+        "source": "Headphone.com Legacy",
+        "rig": null,
+        "form": "over-ear"
+       },
+       {
+        "id": "853becfc339e405f",
+        "source": "Auriculares Argentina",
+        "rig": null,
+        "form": "over-ear"
+       },
+       {
+        "id": "64e888047f0f411b",
+        "source": "Kuulokenurkka",
+        "rig": null,
+        "form": "over-ear"
+       }
+      ]
+     },
+     {
+      "id": "874d534e3b607f9a",
+      "name": "Sennheiser HD 650 (2020)",
+      "source": "crinacle",
+      "rig": "GRAS 43AG-7",
+      "form": "over-ear",
+      "others": []
+     },
+     {
+      "id": "141b6e97d72640bd",
+      "name": "Sennheiser HD 650 (balanced)",
+      "source": "Headphone.com Legacy",
+      "rig": null,
+      "form": "over-ear",
+      "others": []
+     },
+     {
+      "id": "cdda0c87574917f0",
+      "name": "Sennheiser HD 650 (2020, worn earpads)",
+      "source": "crinacle",
+      "rig": "GRAS 43AG-7",
+      "form": "over-ear",
+      "others": []
+     },
+     {
+      "id": "85eb00804ece0b29",
+      "name": "Sennheiser HD 650 (pre-2020, worn earpads)",
+      "source": "crinacle",
+      "rig": "GRAS 43AG-7",
+      "form": "over-ear",
+      "others": []
+     },
+     {
+      "id": "005a17244d98b331",
+      "name": "Sennheiser HD 650 (pre-2020, semi-worn earpads)",
+      "source": "crinacle",
+      "rig": "GRAS 43AG-7",
+      "form": "over-ear",
+      "others": []
+     }
+    ],
+    "total": 6,
+    "list_from": "2026-11-12T09:30:00Z"
+   }
+  },
+  {
+   "name": "the AirPods Pro as iOS names them, an owner's name taken off: the first generation and the Pro 2's",
+   "path": "/deadwax/eq/autoeq",
+   "query": {
+    "q": "AirPods Pro",
+    "limit": "50"
+   },
+   "status": 200,
+   "answer": {
+    "results": [
+     {
+      "id": "62695364457ab538",
+      "name": "Apple AirPods Pro",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": [
+       {
+        "id": "95107ef9878ff09d",
+        "source": "Super Review",
+        "rig": null,
+        "form": "in-ear"
+       },
+       {
+        "id": "cae6e64bdda134ba",
+        "source": "HypetheSonics",
+        "rig": "Bruel & Kjaer 5128",
+        "form": "in-ear"
+       },
+       {
+        "id": "d5e8026e2d443843",
+        "source": "Rtings",
+        "rig": "HMS II.3",
+        "form": "in-ear"
+       }
+      ]
+     },
+     {
+      "id": "7a95b30a11047abb",
+      "name": "Apple AirPods Pro2",
+      "source": "Rtings",
+      "rig": "Bruel & Kjaer 5128",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "44056f8c944baef6",
+      "name": "Apple Airpods Pro 2",
+      "source": "HypetheSonics",
+      "rig": "GRAS RA0045",
+      "form": "in-ear",
+      "others": [
+       {
+        "id": "7813ae1d8ead90cd",
+        "source": "Filk",
+        "rig": null,
+        "form": "in-ear"
+       },
+       {
+        "id": "4594b2c30da6e686",
+        "source": "Harpo",
+        "rig": null,
+        "form": "in-ear"
+       }
+      ]
+     },
+     {
+      "id": "339e15bf651f3869",
+      "name": "Apple AirPods Pro 2 (51dB + ANC)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "bd21438f5bb959bc",
+      "name": "Apple AirPods Pro 2 (56dB + ANC)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "88064fce678e199c",
+      "name": "Apple AirPods Pro 2 (60dB + ANC)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "b0c1fe8c095194ea",
+      "name": "Apple AirPods Pro 2 (65dB + ANC)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "bd4ea0f3959ca72a",
+      "name": "Apple AirPods Pro 2 (69dB + ANC)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "c1ef00b9249f6dbe",
+      "name": "Apple AirPods Pro 2 (73dB + ANC)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "5df980b25fe755b7",
+      "name": "Apple AirPods Pro 2 (77dB + ANC)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "476e26ccd5bddf99",
+      "name": "Apple AirPods Pro 2 (81dB + ANC)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "abbeffaa1693509b",
+      "name": "Apple AirPods Pro 2 (84dB + ANC)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "30738905ac72f3f4",
+      "name": "Apple AirPods Pro 2 (88dB + ANC)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "3b05c65adc3f7212",
+      "name": "Apple AirPods Pro 2 (91dB + ANC)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "c2cd7dd8f70cadad",
+      "name": "Apple AirPods Pro 2 (ANC mode)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "a6b424d62f9f7f5f",
+      "name": "Apple AirPods Pro 2 (passive mode)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "0ef6c0180f646139",
+      "name": "Apple AirPods Pro 2 (transparency mode)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     }
+    ],
+    "total": 17,
+    "list_from": "2026-11-12T09:30:00Z"
+   }
+  },
+  {
+   "name": "an AirPods Pro renamed with its maker: still the first generation and the Pro 2's",
+   "path": "/deadwax/eq/autoeq",
+   "query": {
+    "q": "Apple AirPods Pro",
+    "limit": "50"
+   },
+   "status": 200,
+   "answer": {
+    "results": [
+     {
+      "id": "62695364457ab538",
+      "name": "Apple AirPods Pro",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": [
+       {
+        "id": "95107ef9878ff09d",
+        "source": "Super Review",
+        "rig": null,
+        "form": "in-ear"
+       },
+       {
+        "id": "cae6e64bdda134ba",
+        "source": "HypetheSonics",
+        "rig": "Bruel & Kjaer 5128",
+        "form": "in-ear"
+       },
+       {
+        "id": "d5e8026e2d443843",
+        "source": "Rtings",
+        "rig": "HMS II.3",
+        "form": "in-ear"
+       }
+      ]
+     },
+     {
+      "id": "7a95b30a11047abb",
+      "name": "Apple AirPods Pro2",
+      "source": "Rtings",
+      "rig": "Bruel & Kjaer 5128",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "44056f8c944baef6",
+      "name": "Apple Airpods Pro 2",
+      "source": "HypetheSonics",
+      "rig": "GRAS RA0045",
+      "form": "in-ear",
+      "others": [
+       {
+        "id": "7813ae1d8ead90cd",
+        "source": "Filk",
+        "rig": null,
+        "form": "in-ear"
+       },
+       {
+        "id": "4594b2c30da6e686",
+        "source": "Harpo",
+        "rig": null,
+        "form": "in-ear"
+       }
+      ]
+     },
+     {
+      "id": "339e15bf651f3869",
+      "name": "Apple AirPods Pro 2 (51dB + ANC)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "bd21438f5bb959bc",
+      "name": "Apple AirPods Pro 2 (56dB + ANC)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "88064fce678e199c",
+      "name": "Apple AirPods Pro 2 (60dB + ANC)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "b0c1fe8c095194ea",
+      "name": "Apple AirPods Pro 2 (65dB + ANC)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "bd4ea0f3959ca72a",
+      "name": "Apple AirPods Pro 2 (69dB + ANC)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "c1ef00b9249f6dbe",
+      "name": "Apple AirPods Pro 2 (73dB + ANC)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "5df980b25fe755b7",
+      "name": "Apple AirPods Pro 2 (77dB + ANC)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "476e26ccd5bddf99",
+      "name": "Apple AirPods Pro 2 (81dB + ANC)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "abbeffaa1693509b",
+      "name": "Apple AirPods Pro 2 (84dB + ANC)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "30738905ac72f3f4",
+      "name": "Apple AirPods Pro 2 (88dB + ANC)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "3b05c65adc3f7212",
+      "name": "Apple AirPods Pro 2 (91dB + ANC)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "c2cd7dd8f70cadad",
+      "name": "Apple AirPods Pro 2 (ANC mode)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "a6b424d62f9f7f5f",
+      "name": "Apple AirPods Pro 2 (passive mode)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     },
+     {
+      "id": "0ef6c0180f646139",
+      "name": "Apple AirPods Pro 2 (transparency mode)",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": []
+     }
+    ],
+    "total": 17,
+    "list_from": "2026-11-12T09:30:00Z"
+   }
+  },
+  {
+   "name": "a speaker: AutoEq measures headphones",
+   "path": "/deadwax/eq/autoeq",
+   "query": {
+    "q": "JBL Flip 6",
+    "limit": "50"
+   },
+   "status": 200,
+   "answer": {
+    "results": [],
+    "total": 0,
+    "list_from": "2026-11-12T09:30:00Z"
+   }
+  },
+  {
+   "name": "the model alone, its words run together",
+   "path": "/deadwax/eq/autoeq",
+   "query": {
+    "q": "hd650",
+    "limit": "50"
+   },
+   "status": 200,
+   "answer": {
+    "results": [
+     {
+      "id": "1ab8a126e99b778f",
+      "name": "Sennheiser HD 650",
+      "source": "oratory1990",
+      "rig": null,
+      "form": "over-ear",
+      "others": [
+       {
+        "id": "9cb3fd4601c49d6e",
+        "source": "crinacle",
+        "rig": "GRAS 43AG-7",
+        "form": "over-ear"
+       },
+       {
+        "id": "3f5b6abdebd4bbc7",
+        "source": "Rtings",
+        "rig": "HMS II.3",
+        "form": "over-ear"
+       },
+       {
+        "id": "a7e3b0578169c464",
+        "source": "Innerfidelity",
+        "rig": null,
+        "form": "over-ear"
+       },
+       {
+        "id": "047b54e1a4e824a6",
+        "source": "Headphone.com Legacy",
+        "rig": null,
+        "form": "over-ear"
+       },
+       {
+        "id": "853becfc339e405f",
+        "source": "Auriculares Argentina",
+        "rig": null,
+        "form": "over-ear"
+       },
+       {
+        "id": "64e888047f0f411b",
+        "source": "Kuulokenurkka",
+        "rig": null,
+        "form": "over-ear"
+       }
+      ]
+     },
+     {
+      "id": "874d534e3b607f9a",
+      "name": "Sennheiser HD 650 (2020)",
+      "source": "crinacle",
+      "rig": "GRAS 43AG-7",
+      "form": "over-ear",
+      "others": []
+     },
+     {
+      "id": "141b6e97d72640bd",
+      "name": "Sennheiser HD 650 (balanced)",
+      "source": "Headphone.com Legacy",
+      "rig": null,
+      "form": "over-ear",
+      "others": []
+     },
+     {
+      "id": "cdda0c87574917f0",
+      "name": "Sennheiser HD 650 (2020, worn earpads)",
+      "source": "crinacle",
+      "rig": "GRAS 43AG-7",
+      "form": "over-ear",
+      "others": []
+     },
+     {
+      "id": "85eb00804ece0b29",
+      "name": "Sennheiser HD 650 (pre-2020, worn earpads)",
+      "source": "crinacle",
+      "rig": "GRAS 43AG-7",
+      "form": "over-ear",
+      "others": []
+     },
+     {
+      "id": "005a17244d98b331",
+      "name": "Sennheiser HD 650 (pre-2020, semi-worn earpads)",
+      "source": "crinacle",
+      "rig": "GRAS 43AG-7",
+      "form": "over-ear",
+      "others": []
+     }
+    ],
+    "total": 6,
+    "list_from": "2026-11-12T09:30:00Z"
+   }
+  },
+  {
+   "name": "a letter outside ASCII, typed plain",
+   "path": "/deadwax/eq/autoeq",
+   "query": {
+    "q": "aur audio",
+    "limit": "50"
+   },
+   "status": 200,
+   "answer": {
+    "results": [
+     {
+      "id": "8f0ccc7ac78dc581",
+      "name": "A\u00fcR Audio Aure",
+      "source": "Jaytiss",
+      "rig": null,
+      "form": "in-ear",
+      "others": [
+       {
+        "id": "c85eb622f1f1eb39",
+        "source": "Kazi",
+        "rig": null,
+        "form": "in-ear"
+       }
+      ]
+     }
+    ],
+    "total": 1,
+    "list_from": "2026-11-12T09:30:00Z"
+   }
+  },
+  {
+   "name": "more found than asked for",
+   "path": "/deadwax/eq/autoeq",
+   "query": {
+    "q": "apple",
+    "limit": "3"
+   },
+   "status": 200,
+   "answer": {
+    "results": [
+     {
+      "id": "9bdf4892078c1716",
+      "name": "Apple EarPods",
+      "source": "Super Review",
+      "rig": null,
+      "form": "earbud",
+      "others": [
+       {
+        "id": "18cca940db107caa",
+        "source": "Rtings",
+        "rig": "HMS II.3",
+        "form": "earbud"
+       },
+       {
+        "id": "51250570e5782124",
+        "source": "Innerfidelity",
+        "rig": null,
+        "form": "earbud"
+       },
+       {
+        "id": "cef76edb4cf8199b",
+        "source": "Headphone.com Legacy",
+        "rig": null,
+        "form": "earbud"
+       }
+      ]
+     },
+     {
+      "id": "62695364457ab538",
+      "name": "Apple AirPods Pro",
+      "source": "crinacle",
+      "rig": "711",
+      "form": "in-ear",
+      "others": [
+       {
+        "id": "95107ef9878ff09d",
+        "source": "Super Review",
+        "rig": null,
+        "form": "in-ear"
+       },
+       {
+        "id": "cae6e64bdda134ba",
+        "source": "HypetheSonics",
+        "rig": "Bruel & Kjaer 5128",
+        "form": "in-ear"
+       },
+       {
+        "id": "d5e8026e2d443843",
+        "source": "Rtings",
+        "rig": "HMS II.3",
+        "form": "in-ear"
+       }
+      ]
+     },
+     {
+      "id": "7a95b30a11047abb",
+      "name": "Apple AirPods Pro2",
+      "source": "Rtings",
+      "rig": "Bruel & Kjaer 5128",
+      "form": "in-ear",
+      "others": []
+     }
+    ],
+    "total": 18,
+    "list_from": "2026-11-12T09:30:00Z"
+   }
+  },
+  {
+   "name": "GitHub not answering, no list kept",
+   "path": "/deadwax/eq/autoeq",
+   "query": {
+    "q": "AirPods Pro",
+    "limit": "50"
+   },
+   "status": 503,
+   "answer": {
+    "detail": "deadwax can't reach AutoEq just now."
+   }
+  }
+ ],
+ "profiles": [
+  {
+   "name": "crinacle's AirPods Pro",
+   "path": "/deadwax/eq/autoeq/62695364457ab538",
+   "query": {},
+   "status": 200,
+   "answer": {
+    "id": "62695364457ab538",
+    "name": "Apple AirPods Pro",
+    "source": "crinacle",
+    "rig": "711",
+    "form": "in-ear",
+    "text": "Preamp: -6.0 dB\nFilter 1: ON LSC Fc 105 Hz Gain 2.6 dB Q 0.70\nFilter 2: ON PK Fc 514 Hz Gain -4.4 dB Q 0.68\nFilter 3: ON PK Fc 8903 Hz Gain 6.0 dB Q 1.66\nFilter 4: ON PK Fc 183 Hz Gain 2.0 dB Q 0.77\nFilter 5: ON PK Fc 4613 Hz Gain 3.4 dB Q 2.46\nFilter 6: ON HSC Fc 10000 Hz Gain -0.5 dB Q 0.70\nFilter 7: ON PK Fc 1517 Hz Gain -1.0 dB Q 2.33\nFilter 8: ON PK Fc 929 Hz Gain 1.2 dB Q 2.75\nFilter 9: ON PK Fc 44 Hz Gain -0.5 dB Q 2.16\nFilter 10: ON PK Fc 618 Hz Gain -0.5 dB Q 2.86\n"
+   }
+  },
+  {
+   "name": "oratory1990's HD 650",
+   "path": "/deadwax/eq/autoeq/1ab8a126e99b778f",
+   "query": {},
+   "status": 200,
+   "answer": {
+    "id": "1ab8a126e99b778f",
+    "name": "Sennheiser HD 650",
+    "source": "oratory1990",
+    "rig": null,
+    "form": "over-ear",
+    "text": "Preamp: -6.1 dB\nFilter 1: ON LSC Fc 105 Hz Gain 6.4 dB Q 0.70\nFilter 2: ON PK Fc 8800 Hz Gain 5.1 dB Q 1.42\nFilter 3: ON PK Fc 118 Hz Gain -3.1 dB Q 0.50\nFilter 4: ON PK Fc 37 Hz Gain 0.7 dB Q 3.96\nFilter 5: ON PK Fc 3169 Hz Gain -1.7 dB Q 3.89\nFilter 6: ON HSC Fc 10000 Hz Gain -2.1 dB Q 0.70\nFilter 7: ON PK Fc 1227 Hz Gain -1.2 dB Q 2.53\nFilter 8: ON PK Fc 2055 Hz Gain 1.2 dB Q 3.23\nFilter 9: ON PK Fc 587 Hz Gain 0.4 dB Q 1.19\nFilter 10: ON PK Fc 5332 Hz Gain -1.1 dB Q 5.75\n"
+   }
+  },
+  {
+   "name": "in the list, but GitHub has no file for it: gone",
+   "path": "/deadwax/eq/autoeq/95107ef9878ff09d",
+   "query": {},
+   "status": 404,
+   "answer": {
+    "detail": "AutoEq doesn't have that measurement any more."
+   }
+  },
+  {
+   "name": "not in the list: gone",
+   "path": "/deadwax/eq/autoeq/0123456789abcdef",
+   "query": {},
+   "status": 404,
+   "answer": {
+    "detail": "AutoEq doesn't have that measurement any more."
+   }
+  },
+  {
+   "name": "GitHub not answering: a profile not fetched before",
+   "path": "/deadwax/eq/autoeq/cae6e64bdda134ba",
+   "query": {},
+   "status": 503,
+   "answer": {
+    "detail": "deadwax can't reach AutoEq just now."
+   }
+  }
+ ]
+}

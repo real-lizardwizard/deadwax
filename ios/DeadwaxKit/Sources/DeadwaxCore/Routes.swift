@@ -66,6 +66,12 @@ public enum Routes {
     /// with an ETag - asked again with it (`DeadwaxClient.lyrics(songID:ifNoneMatch:)`).
     public static let lyrics = Endpoint(method: "GET", path: "/deadwax/navidrome/lyrics/{song_id}", query: [])
 
+    // the EQ's AutoEq (server 2.1.7, eq.md 2.2): deadwax's copy of AutoEq's list searched, and one result's profile
+    /// AutoEq's rows whose names hold every word of `q` (`AutoEqResults`), at most `limit` (`AutoEqAsk.limit`).
+    public static let autoEqSearch = Endpoint(method: "GET", path: "/deadwax/eq/autoeq", query: ["q", "limit"])
+    /// One result's ParametricEQ.txt (`AutoEqProfile`), by its 16-hex-digit id.
+    public static let autoEqProfile = Endpoint(method: "GET", path: "/deadwax/eq/autoeq/{id}", query: [])
+
     /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
     public static var warmLevels: Endpoint { levelAlbum }
 
@@ -77,6 +83,7 @@ public enum Routes {
         queue, saveQueue, saveQueueAt,
         storeAlbum, myLibrary, libraryAdd, libraryRemove, librarySeen,
         lyrics,
+        autoEqSearch, autoEqProfile,
     ]
 
     /// The routes given longer than the transport's own 8 seconds to answer, in seconds: the album index reads every

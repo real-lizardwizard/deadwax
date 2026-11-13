@@ -23,6 +23,11 @@ tests/test_ios_library_contract.py, which reads every DeadwaxCore file the same 
 And app 0.4's lyrics (notes/app-lyrics.md 4.8): SongLyrics and LyricLine to what the lyrics route sends (src/lyrics.py
 song_lyrics(), sent whole by the route), and the answers the Swift tests decode (Fixtures/lyrics/answers.json, written
 by ios/scripts/lyrics_answers.py) to song_lyrics() itself, case by case.
+
+And the EQ's AutoEq (server 2.1.7, eq.md 5.4): AutoEqResults, AutoEqResult, AutoEqMeasurement and AutoEqProfile to
+src/autoeq.py's row_answer and profile_answer and the search route's own answer; the answers the Swift tests decode
+(Fixtures/autoeq/answers.json, written by ios/scripts/autoeq_answers.py over tests/test_autoeq.py's fake GitHub) to
+what the helper makes now; and the search's limit and longest query within what the route takes.
 """
 
 import importlib.util
@@ -40,11 +45,12 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src import auth, levels, loudness, lyrics, users  # noqa: E402
+from src import auth, autoeq, levels, loudness, lyrics, users  # noqa: E402
 from src import play_queue as queue_rules  # noqa: E402
 from src.api.app import start  # noqa: E402
 from src.api.navidrome_endpoint import CLIENT_NAME  # noqa: E402
 from src.config import Config  # noqa: E402
+from src.routes import eq as eq_route  # noqa: E402
 from src.routes import my_library, navidrome, store_album  # noqa: E402
 from src.routes.auth import SignIn  # noqa: E402
 from src.routes.download import FindCandidatesRequest  # noqa: E402
@@ -52,7 +58,7 @@ from src.store import JobStore  # noqa: E402
 
 CORE = Path(__file__).resolve().parent.parent / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore"
 ENDPOINT = re.compile(r'Endpoint\(method: "(\w+)", path: "([^"]+)", query: \[([^\]]*)\]\)')
-ROUTE_COUNT = 24
+ROUTE_COUNT = 26
 RAW_OPENING = re.compile(r'#+"')
 HASHES = re.compile(r"#*")
 
@@ -713,3 +719,101 @@ def test_the_lyrics_answers_are_the_ones_the_helper_makes():
     assert LYRICS_ANSWERS.read_text(encoding="utf-8") == helper.text()
     assert helper.SNAPSHOT == test_navidrome_lyrics.SNAPSHOT
     assert LYRICS_ANSWERS.read_bytes().isascii()
+
+
+# ---------------------------------------------------------------------------- the EQ's AutoEq (2.1.7)
+
+AUTOEQ_HELPER = Path(__file__).resolve().parent.parent / "ios" / "scripts" / "autoeq_answers.py"
+AUTOEQ_ANSWERS = (Path(__file__).resolve().parent.parent / "ios" / "DeadwaxKit" / "Tests" / "DeadwaxCoreTests"
+                  / "Fixtures" / "autoeq" / "answers.json")
+
+
+def _autoeq_helper():
+    spec = importlib.util.spec_from_file_location("ios_autoeq_answers", AUTOEQ_HELPER)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_the_autoeq_models_are_what_the_routes_answer():
+    # each model reads exactly the keys its answer has - the search's row and the measurements under it (row_answer),
+    # the profile (profile_answer), the search's own literal - rig and form optional (a folder may name neither),
+    # everything else needed
+    results, _ = autoeq.parse_index((Path(__file__).resolve().parent / "fixtures" / "autoeq" / "INDEX.md")
+                                    .read_text(encoding="utf-8"))
+    rows = autoeq.rows_of(results)
+    several = next(row for row in rows if len(row.results) > 1 and any(r.rig is None for r in row.results[1:]))
+    row = autoeq.row_answer(several)
+    assert fields("AutoEqResult") == {"id": False, "name": False, "source": False, "rig": True, "form": True,
+                                      "others": False}
+    assert set(row) == set(fields("AutoEqResult"))
+    assert_decodes("AutoEqResult", row)
+    assert fields("AutoEqMeasurement") == {"id": False, "source": False, "rig": True, "form": True}
+    for other in row["others"]:
+        assert set(other) == set(fields("AutoEqMeasurement"))
+        assert_decodes("AutoEqMeasurement", other)
+    assert any(other["rig"] is None for other in row["others"])
+    assert fields("AutoEqResults") == {"results": False, "total": False, "list_from": False}
+    assert returned_keys(eq_route.search_autoeq) == set(fields("AutoEqResults"))
+    profile = autoeq.profile_answer(results[0], "Preamp: -6.0 dB")
+    assert fields("AutoEqProfile") == {"id": False, "name": False, "source": False, "rig": True, "form": True,
+                                       "text": False}
+    assert set(profile) == set(fields("AutoEqProfile"))
+    assert_decodes("AutoEqProfile", profile)
+
+
+def test_the_autoeq_answers_the_app_decodes_are_the_routes():
+    # every answer in the fixture the Swift tests decode is one the route sent: the 200s read whole, the failures
+    # deadwax's two sentences in `detail` (ErrorWords says a 503's as deadwax wrote it, a 404's as the page's gone)
+    answers = json.loads(AUTOEQ_ANSWERS.read_text(encoding="utf-8"))
+    seen = set()
+    for case in answers["searches"]:
+        answer = case["answer"]
+        if case["status"] == 200:
+            assert_decodes("AutoEqResults", answer)
+            assert len(answer["results"]) == min(answer["total"], int(case["query"]["limit"]))
+            for row in answer["results"]:
+                assert_decodes("AutoEqResult", row)
+                for other in row["others"]:
+                    assert_decodes("AutoEqMeasurement", other)
+            seen.add("found" if answer["results"] else "none")
+            if answer["total"] > len(answer["results"]):
+                seen.add("more than the limit")
+        else:
+            assert (case["status"], answer) == (503, {"detail": eq_route.UNREACHABLE})
+            seen.add("503")
+    for case in answers["profiles"]:
+        answer = case["answer"]
+        if case["status"] == 200:
+            assert_decodes("AutoEqProfile", answer)
+            assert answer["text"].startswith("Preamp:")
+            seen.add("profile")
+        else:
+            assert answer == {"detail": {404: eq_route.GONE, 503: eq_route.UNREACHABLE}[case["status"]]}
+            seen.add(f"profile {case['status']}")
+    assert seen == {"found", "none", "more than the limit", "503", "profile", "profile 404", "profile 503"}
+
+
+def test_the_autoeq_answers_are_the_ones_the_helper_makes(monkeypatch):
+    # Fixtures/autoeq/answers.json is what ios/scripts/autoeq_answers.py writes now, byte for byte, over the route
+    # tests' own fake GitHub - a route's answer changed (or the file by hand) fails until it is written again
+    monkeypatch.setattr(Config, "AUTH_MODE", None)
+    helper = _autoeq_helper()
+    assert AUTOEQ_ANSWERS.read_text(encoding="utf-8") == helper.text()
+    assert AUTOEQ_ANSWERS.read_bytes().isascii()
+
+
+def test_what_the_app_asks_autoeq_is_within_the_routes_bounds(monkeypatch):
+    # the limit the phone asks with (AutoEqAsk.limit, the fixture's too) and the longest query it sends
+    # (AutoEqAsk.longest) - a bound lowered under either makes every search a 422
+    monkeypatch.setattr(Config, "AUTH_MODE", None)
+    route = app_routes()[("GET", "/deadwax/eq/autoeq")]
+    limit = swift_constant("AutoEq.swift", "AutoEqAsk", "limit")
+    longest = swift_constant("AutoEq.swift", "AutoEqAsk", "longest")
+    low, high = bounds(route, "limit")
+    assert low <= limit <= high and (low, high) == (1, 50)
+    assert _autoeq_helper().LIMIT == limit
+    query = next(f for f in route.dependant.query_params if f.alias == "q")
+    lengths = {type(rule).__name__: rule for rule in query.field_info.metadata}
+    assert lengths["MinLen"].min_length == 1
+    assert longest == lengths["MaxLen"].max_length == 100

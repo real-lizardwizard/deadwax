@@ -441,7 +441,7 @@ extension EQWords {
         public static func suggestion(_ name: String) -> String { "AutoEq has a correction for \(name)" }
         public static func measuredBy(_ source: String) -> String { "Measured by \(source)" }
         public static func suggestions(_ query: String) -> String { "AutoEq has corrections for \(query)" }
-        public static func models(_ n: Int) -> String { "\(n) models - pick yours" }
+        public static func models(_ n: Int) -> String { "\(count(n, "model")) - pick yours" }
         public static let notNow = "Not now"
     }
 
