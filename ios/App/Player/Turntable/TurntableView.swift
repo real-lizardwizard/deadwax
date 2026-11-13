@@ -43,6 +43,12 @@ private struct DeckPlinth: UIViewRepresentable {
 /// The time line in the scrubber's row (2.1, 2.11): "2:31 of 7:05", led by "Needle up" or "Scrubbing" while a hand
 /// moves it - the web's mono in the note's colour, one line whatever it says (smaller first, then cut at its end),
 /// centred in a row the scrubber's height, so the swap moves no row.
+///
+/// Wide, never tall: the row's ZStack centres it on the hidden scrubber, which gives the row its height. A frame that
+/// asked for the most height (`maxHeight: .infinity`) made the row as flexible as the cover's room above it, and the
+/// column split its leftover height between the two - measured in a Mac probe of the same column, the room went from
+/// 445 pt to 255.5 and the row from 66 to 255.5, so the plinth shrank and the titles jumped at every swap.
+/// tests/test_ios_turntable_face.py holds the row to this.
 struct TurntableTimeLine: View {
     @Environment(DeckController.self) private var deck
 
@@ -53,7 +59,7 @@ struct TurntableTimeLine: View {
             .lineLimit(1)
             .minimumScaleFactor(0.8)
             .truncationMode(.tail)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            .frame(maxWidth: .infinity)
     }
 }
 

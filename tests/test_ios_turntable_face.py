@@ -124,3 +124,39 @@ def test_the_look_button_is_the_webs():
     assert record and pair("recordIconRings") == (float(record.group(1)), float(record.group(2)))
     square = re.search(r"SquareIcon = thin\(<rect [^>]*width=\"([0-9.]+)\" [^>]*rx=\"([0-9.]+)\" />", icons)
     assert square and pair("squareIcon") == (float(square.group(1)), float(square.group(2)))
+
+
+APP = REPO / "ios" / "App"
+
+
+def braced(text: str, start: str) -> str:
+    """The text from `start` to the brace closing the first one opened after it."""
+    at = text.index(start)
+    opened = text.index("{", at)
+    depth = 0
+    for i in range(opened, len(text)):
+        if text[i] == "{":
+            depth += 1
+        elif text[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return text[at:i + 1]
+    raise AssertionError(f"{start!r} is never closed")
+
+
+def test_the_scrubbers_row_never_asks_for_height():
+    """The time line takes the scrubber's place in the scrubber's own row, so the turntable's swap moves no row (2.1).
+
+    A view in that row that asks for the most height (`maxHeight: .infinity`) makes the row as flexible as the cover's
+    room above it, and the column then splits its leftover height between the two: a Mac probe of the same column
+    measured the room at 445 pt and the row at 66 on the cover, and both at 255.5 on the turntable - a plinth of about
+    222 pt on an iPhone 16 instead of 321, and the titles jumping about 190 pt at every swap. The row's height is the
+    hidden scrubber's; nothing in it may ask for more.
+    """
+    view = (APP / "Player" / "NowPlayingView.swift").read_text()
+    row = braced(view, "ZStack {\n                ScrubberView()")
+    assert "TurntableTimeLine()" in row
+    assert "maxHeight" not in row
+    line = braced((APP / "Player" / "Turntable" / "TurntableView.swift").read_text(), "struct TurntableTimeLine: View")
+    body = line[line.index("var body"):]
+    assert "maxHeight" not in body and ".infinity" in body, "wide, never tall"
