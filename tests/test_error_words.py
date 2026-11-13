@@ -72,9 +72,9 @@ def test_no_secret_key_says_nobody_can_sign_in_and_names_the_key_only_as_the_why
 
 
 def test_organizing_off_says_so_only_in_the_why(on, monkeypatch):
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "dry_run")
+    monkeypatch.setattr(Config, "LIBRARY_PATH", None)
     body = on.client.get(ME).json()
-    assert body["detail"] == auth.CANT_SIGN_IN and "ORGANIZE_MODE" in body["why"]
+    assert body["detail"] == auth.CANT_SIGN_IN and "LIBRARY_PATH" in body["why"] and "LIBRARY_PATH" not in body["detail"]
 
 
 def test_a_database_that_cant_be_read_is_said_in_two_halves(on):

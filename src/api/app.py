@@ -28,7 +28,7 @@ from src.api.wikipedia_endpoint import wikipedia
 from src.api.autoeq_endpoint import autoeq_client
 from src.api.same_origin import SameOriginWrites
 from src.api.navidrome_endpoint import SignedOut, navidrome as navidrome_client
-from src.config import Config
+from src.config import Config, clear_retired_settings
 from src import __version__
 
 #? The routes that answer with a picture or with audio - bytes deadwax didn't make. The library's
@@ -99,12 +99,18 @@ async def lifespan(app: FastAPI):
     #? request or the poller starts. Order matters: the store has to be open to read them,
     #? and Config has to be reconciled before the first read of any setting - otherwise the
     #? first request in gets the environment's value and the one after it gets the override.
-    Config.apply_overrides(app.state.store.stored_settings())
+    stored = app.state.store.stored_settings()
+    Config.apply_overrides(stored)
+    #? (2.1.13) a setting deadwax no longer reads (ORGANIZE_MODE), saved before it went: apply_overrides
+    #? passes over it, and its row is cleared here, once, so it can't linger in the database unseen - no
+    #? Server settings row shows it any more, to revert it from. Said below, with one in the environment.
+    await clear_retired_settings(app.state.store, stored)
 
     #? Here rather than in Config.check(), which runs before the overrides exist - an email set
     #? in the settings tab would otherwise be reported missing on every single restart (and, until
     #? 2.0.3, slskd's address and key were, to the app's Log, while slskd worked).
     Config.report_slskd()
+    Config.report_retired(stored)
     Config.report_musicbrainz()
     Config.report_navidrome()
     #? after the overrides too: whether a sign-in can reach Navidrome depends on NAVIDROME_URL, which can be one

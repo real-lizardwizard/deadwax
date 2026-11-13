@@ -134,7 +134,7 @@ src/
                    words - GET /search_musicbrainz/saved, Search's saved rows - see "Search what's
                    saved (2.0.0-player.56)".
   poller.py        background task: slskd transfers -> job status transitions.
-  organizer.py     writes downloads into the library. Plan/execute split, dry_run default.
+  organizer.py     writes downloads into the library - always a move (2.1.13). Plan/execute split.
   retag.py         the metadata manager's write half - applies a chosen release to an album
                    already on disk. Same plan/execute split, for the same reasons.
   scan_wait.py     PURE. Whether Navidrome has finished a scan that began after an apply's
@@ -439,10 +439,12 @@ table above), never here. Add to this file only a rule that holds everywhere.
 One line each; the reasoning, and what went wrong before each was made, is in `notes/decisions.md`.
 
 - **Matching is pure** (`matching.py` does no I/O).
-- **The organizer is plan/execute**; dry run runs the identical plan and declines to act.
+- **The organizer is plan/execute, and filing only ever moves** (James, 2026-11-13: ORGANIZE_MODE - off,
+  dry run, copy - removed in 2.1.13); tests plan without executing.
 - **The release is stored denormalized** in the job row: filing must not depend on MusicBrainz.
 - **Progress is never persisted**: derived from slskd on read, divided by the files wanted.
-- **`ORGANIZE_MODE` defaults to `dry_run`.**
+- **An old `ORGANIZE_MODE` is ignored, not obeyed** (2.1.13): start-up says so once and clears a saved row;
+  organizing is on whenever `SLSKD_DOWNLOAD_PATH` and `LIBRARY_PATH` are both set.
 - **Edition is a weighted signal, never a filter.**
 - **The folder is named after the album's year** (the release group's first release, `original_year`),
   not the pressing's; the `date` tag keeps the pressing's.
@@ -465,7 +467,9 @@ One line each; the reasoning, and what went wrong before each was made, is in `n
 - **Review rows of gone albums are pruned only after a scan that found albums**; deadwax's own delete
   forgets its row at once.
 - **The new-import prompt is recorded at import time**, a partly filed download included.
-- **A move-organize clears the slskd folder, but never past audio.**
+- **A filing (always a move) clears the slskd folder, but never past anything not known to be disposable**
+  (music in any format keeps it), and **never touches the library**: nothing is filed while
+  SLSKD_DOWNLOAD_PATH and LIBRARY_PATH overlap, and a refused filing files itself once fixed.
 - **An artist folder a re-file empties is removed with `rmdir`** only.
 - **Cancelling removes partials only with `SLSKD_INCOMPLETE_PATH` set**, and more strictly than
   `find_local_file` guesses; deadwax also clears slskd's empty incomplete folders (rmdir, older than

@@ -59,7 +59,6 @@ def fresh(monkeypatch):
     monkeypatch.setattr(Config, "NAVIDROME_URL", None)
     monkeypatch.setattr(Config, "AUTO_RETRY_PEER", "off")
     monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", None)
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "off")
     yield
     library.clear_scan_cache()
     library_routes._cache_loaded_for = None
@@ -699,6 +698,7 @@ def test_a_download_that_completed_while_organizing_was_off_is_never_on_its_way(
 
 
 def test_finished_downloads_are_not_in_flight(store):
+    #? a row from before 2.1.13, when filing could be a dry run
     job_in(store, "complete", error="dry run - not organized")
     job_in(store, "organized")
     job_in(store, "failed", error="the peer refused")
@@ -1199,7 +1199,6 @@ ALL_DONE = [{"username": "bob", "directories": [{"files": [
 def test_filing_indexes_the_album(tmp_path, store, monkeypatch):
     monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(downloads_with_flacs(tmp_path)))
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path / "music"))
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "copy")
     filed_job(store)
 
     run(poll_downloads_once(FakeSlskd(transfers=ALL_DONE), store, {}))
@@ -1211,10 +1210,12 @@ def test_filing_indexes_the_album(tmp_path, store, monkeypatch):
     assert run(held_copy(store, str(tmp_path / "music"), "mb-1", {"tracks": []}))["complete"]
 
 
-def test_a_dry_run_indexes_nothing(tmp_path, store, monkeypatch):
-    monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(downloads_with_flacs(tmp_path)))
+def test_a_download_nothing_of_was_filed_indexes_nothing(tmp_path, store, monkeypatch):
+    """Its files aren't where SLSKD_DOWNLOAD_PATH says, so nothing reached the library. (Until 2.1.13 the case
+    was a dry run.)"""
+    downloads_with_flacs(tmp_path)
+    monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(tmp_path / "elsewhere"))
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path / "music"))
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "dry_run")
     filed_job(store)
     run(poll_downloads_once(FakeSlskd(transfers=ALL_DONE), store, {}))
     assert rows(store) == []
@@ -1223,12 +1224,10 @@ def test_a_dry_run_indexes_nothing(tmp_path, store, monkeypatch):
 def test_filing_that_partly_failed_still_indexes_what_landed(tmp_path, store, monkeypatch):
     monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(tmp_path / "downloads"))
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path))
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "copy")
     landed = on_disk(tmp_path, tracks=1)
 
-    async def organize(job, download_root, library_root, mode, on_plan=None):
-        return {"organized": 1, "skipped": 0, "failed": 1, "dry_run": False, "mode": mode,
-                "plan": {"album_dir": str(landed)}}
+    async def organize(job, download_root, library_root, on_plan=None):
+        return {"organized": 1, "skipped": 0, "failed": 1, "plan": {"album_dir": str(landed)}}
 
     monkeypatch.setattr(poller, "organize_job", organize)
     job_id = filed_job(store)
@@ -1240,7 +1239,7 @@ def test_filing_that_partly_failed_still_indexes_what_landed(tmp_path, store, mo
 
 def test_filing_that_partly_failed_both_indexes_and_enrols(tmp_path, store, monkeypatch):
     """
-    The real organizer this time, with one track's copy failing as a full disk would. The job ends
+    The real organizer this time, with one track's move failing as a full disk would. The job ends
     `complete` with the failure, and for the track that did land the folder is both indexed (step
     2) and enrolled for review (main's 1.1.2) - one block before the status is written, since
     main was merged in at 2.0.0-player.8.
@@ -1248,16 +1247,15 @@ def test_filing_that_partly_failed_both_indexes_and_enrols(tmp_path, store, monk
     from src import organizer
     monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(downloads_with_flacs(tmp_path)))
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path / "music"))
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "copy")
     monkeypatch.setattr(Config, "FETCH_LYRICS", "off")
-    real_copy = shutil.copy2
+    real_move = shutil.move
 
-    def copy2(source, target, *args, **kwargs):
+    def move(source, target, *args, **kwargs):
         if str(source).endswith("02.flac"):
             raise OSError(28, "No space left on device")
-        return real_copy(source, target, *args, **kwargs)
+        return real_move(source, target, *args, **kwargs)
 
-    monkeypatch.setattr(organizer.shutil, "copy2", copy2)
+    monkeypatch.setattr(organizer.shutil, "move", move)
     job_id = filed_job(store)
     run(poll_downloads_once(FakeSlskd(transfers=ALL_DONE), store, {}))
 
@@ -1350,17 +1348,15 @@ def test_a_folder_being_filed_is_never_paired_with_a_tombstone(tmp_path, store):
 def test_the_poller_marks_the_folder_being_filed_until_it_is_indexed(tmp_path, store, monkeypatch):
     monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(tmp_path / "downloads"))
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path))
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "copy")
     seen = []
 
-    async def organize(job, download_root, library_root, mode, on_plan=None):
+    async def organize(job, download_root, library_root, on_plan=None):
         landed = on_disk(tmp_path)
         on_plan({"album_dir": str(landed)})
         seen.append(("copying", store_index.being_filed(DUMMY)))
         if job["album"] == "broken":
             raise OSError("disk full")
-        return {"organized": 2, "skipped": 0, "failed": 0, "dry_run": False, "mode": mode,
-                "plan": {"album_dir": str(landed)}}
+        return {"organized": 2, "skipped": 0, "failed": 0, "plan": {"album_dir": str(landed)}}
 
     indexing = poller.index_folder
 

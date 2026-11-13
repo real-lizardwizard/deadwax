@@ -11,6 +11,8 @@ import asyncio
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.poller import UNMATCHED_GRACE_POLLS, poll_downloads_once  # noqa: E402
@@ -208,29 +210,36 @@ def test_completed_job_is_left_alone_when_organizing_is_disabled(tmp_path, monke
     assert status_of(store, job_id) == "complete"
 
 
-def test_dry_run_does_not_claim_the_job_was_organized(tmp_path, monkeypatch):
+@pytest.mark.parametrize("old", [None, "dry_run", "off", "copy", "move", "sideways"])
+def test_a_finished_download_is_MOVED_whatever_an_old_organize_mode_says(tmp_path, monkeypatch, old):
     """
-    The status has to stay honest: nothing moved, so 'organized' would be a lie the user
-    would only discover by going and looking at their library.
+    (2.1.13) Filing always moves - James: "I would like it to only move the files". An ORGANIZE_MODE still in
+    the environment is not read: the old default dry_run, off, copy and junk all file the album the same way -
+    into the library, out of slskd's folder, which goes once nothing is left in it.
     """
     from src.config import Config
     downloads = tmp_path / "downloads" / "album"
     downloads.mkdir(parents=True)
-    (downloads / "01.flac").write_bytes(b"x")
-    (downloads / "02.flac").write_bytes(b"x")
+    (downloads / "01.flac").write_bytes(b"one")
+    (downloads / "02.flac").write_bytes(b"two")
+    if old is None:
+        monkeypatch.delenv("ORGANIZE_MODE", raising=False)
+    else:
+        monkeypatch.setenv("ORGANIZE_MODE", old)
 
     monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(tmp_path / "downloads"))
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path / "music"))
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "dry_run")
+    monkeypatch.setattr(Config, "FETCH_LYRICS", "off")
 
     store = make_store(tmp_path)
     job_id = seed_job(store)
     asyncio.run(poll_downloads_once(FakeSlskd(_all_done()), store, {}))
 
     job = next(j for j in asyncio.run(store.list_jobs()) if j["id"] == job_id)
-    assert job["status"] == "complete"
-    assert "dry run" in job["error"]
-    assert not (tmp_path / "music").exists()
+    assert (job["status"], job["error"]) == ("organized", None)
+    album = tmp_path / "music" / "Boards of Canada" / "Music Has the Right to Children (1998)"
+    assert sorted((p.name, p.read_bytes()) for p in album.iterdir()) == [("01.flac", b"one"), ("02.flac", b"two")]
+    assert not downloads.exists()
 
 
 def test_successful_organize_marks_the_job_organized(tmp_path, monkeypatch):
@@ -242,7 +251,6 @@ def test_successful_organize_marks_the_job_organized(tmp_path, monkeypatch):
 
     monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(tmp_path / "downloads"))
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path / "music"))
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "copy")
 
     store = make_store(tmp_path)
     job_id = seed_job(store)
@@ -260,7 +268,6 @@ def test_organize_failure_does_not_mark_the_download_failed(tmp_path, monkeypatc
     from src.config import Config
     monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(tmp_path / "nonexistent"))
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path / "music"))
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "copy")
 
     store = make_store(tmp_path)
     job_id = seed_job(store)
@@ -285,7 +292,6 @@ def test_job_whose_files_all_already_existed_is_not_reported_as_organized(tmp_pa
 
     monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(tmp_path / "downloads"))
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path / "music"))
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "copy")
 
     store = make_store(tmp_path)
     job_id = seed_job(store)
@@ -294,6 +300,10 @@ def test_job_whose_files_all_already_existed_is_not_reported_as_organized(tmp_pa
     asyncio.run(poll_downloads_once(FakeSlskd(_all_done()), store, {}))
     assert status_of(store, job_id) == "organized"
 
+    #? the filing MOVED them out of slskd's folder (2.1.13): the second download brings its own
+    downloads.mkdir(parents=True)
+    (downloads / "01.flac").write_bytes(b"x")
+    (downloads / "02.flac").write_bytes(b"x")
     second = seed_job(store)
     asyncio.run(poll_downloads_once(FakeSlskd(_all_done()), store, {}))
 
@@ -319,7 +329,6 @@ def test_a_filed_album_is_enrolled_in_the_metadata_queue(tmp_path, monkeypatch):
 
     monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(tmp_path / "downloads"))
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path / "music"))
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "copy")
 
     store = make_store(tmp_path)
     seed_job(store)
@@ -334,18 +343,18 @@ def test_a_filed_album_is_enrolled_in_the_metadata_queue(tmp_path, monkeypatch):
     )
 
 
-def _copy_failing_for(names, monkeypatch):
-    """Let the organizer copy for real, except the named files, which fail as a full disk would."""
+def _move_failing_for(names, monkeypatch):
+    """Let the organizer move for real, except the named files, which fail as a full disk would."""
     import shutil
     from src import organizer
-    real_copy = shutil.copy2
+    real_move = shutil.move
 
-    def copy2(source, target, *args, **kwargs):
+    def move(source, target, *args, **kwargs):
         if Path(source).name in names:
             raise OSError(28, "No space left on device")
-        return real_copy(source, target, *args, **kwargs)
+        return real_move(source, target, *args, **kwargs)
 
-    monkeypatch.setattr(organizer.shutil, "copy2", copy2)
+    monkeypatch.setattr(organizer.shutil, "move", move)
 
 
 def _organizing_into_a_library(tmp_path, monkeypatch, extra_files=()):
@@ -358,7 +367,6 @@ def _organizing_into_a_library(tmp_path, monkeypatch, extra_files=()):
 
     monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(tmp_path / "downloads"))
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path / "music"))
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "copy")
     monkeypatch.setattr(Config, "FETCH_LYRICS", "off")
     #? as a full scan leaves it, so only the filing can set it
     monkeypatch.setattr(library, "_behind", False)
@@ -366,14 +374,14 @@ def _organizing_into_a_library(tmp_path, monkeypatch, extra_files=()):
 
 def test_a_partly_filed_album_is_announced_like_a_filed_one(tmp_path, monkeypatch):
     """
-    One track failed to copy, so the job ends `complete` with the failure on its row - but the
+    One track failed to move, so the job ends `complete` with the failure on its row - but the
     other track is in the library all the same (v1.1.2). Only a clean `organized` used to say
     so: /library/owned went on answering from a snapshot without the album, and the new-import
     badge never counted it.
     """
     from src.library import library_is_behind
     _organizing_into_a_library(tmp_path, monkeypatch)
-    _copy_failing_for({"02.flac"}, monkeypatch)
+    _move_failing_for({"02.flac"}, monkeypatch)
 
     store = make_store(tmp_path)
     job_id = seed_job(store)
@@ -401,7 +409,7 @@ def test_a_folder_left_holding_only_a_cover_is_not_enrolled(tmp_path, monkeypatc
     """
     from src.library import library_is_behind
     _organizing_into_a_library(tmp_path, monkeypatch, extra_files=("cover.jpg",))
-    _copy_failing_for({"01.flac", "02.flac"}, monkeypatch)
+    _move_failing_for({"01.flac", "02.flac"}, monkeypatch)
 
     store = make_store(tmp_path)
     job_id = seed_job(store)
@@ -420,16 +428,12 @@ def test_a_folder_left_holding_only_a_cover_is_not_enrolled(tmp_path, monkeypatc
     assert asyncio.run(store.new_import_summary())["count"] == 0
 
 
-def test_a_dry_run_enrols_nothing(tmp_path, monkeypatch):
-    """Nothing was filed, so there is nothing new to prompt about."""
+def test_a_download_nothing_of_was_filed_enrols_nothing(tmp_path, monkeypatch):
+    """Nothing was filed - its files aren't where SLSKD_DOWNLOAD_PATH says - so there is nothing new to prompt
+    about. (Until 2.1.13 the case was a dry run.)"""
     from src.config import Config
-    downloads = tmp_path / "downloads" / "album"
-    downloads.mkdir(parents=True)
-    (downloads / "01.flac").write_bytes(b"x")
-
     monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(tmp_path / "downloads"))
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path / "music"))
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "dry_run")
 
     store = make_store(tmp_path)
     seed_job(store)

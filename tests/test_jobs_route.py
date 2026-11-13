@@ -167,6 +167,7 @@ def test_each_outcome_from_the_status_and_the_named_messages(store):
         "failed": ("failed", "the peer went offline"),
         "cancelled": ("cancelled", "cancelled from deadwax"),
         "no track filed": ("complete", f"3 {FAILED_TO_ORGANIZE}, {NO_TRACK_FILED}"),
+        #? a row from before 2.1.13, when filing could be a dry run
         "dry run": ("complete", "dry run - not organized"),
         "organizing off": ("complete", None),
         "nothing to file": ("complete", "nothing could be organized, check SLSKD_DOWNLOAD_PATH"),
@@ -217,7 +218,8 @@ def test_free_text_that_merely_mentions_a_message_is_not_that_outcome():
     #? every track failed and only the cover landed: a folder, but none of the album in the library
     ({"organized": 1, "tracks_organized": 0, "failed": 2, "skipped": 0}, "2 file(s) failed to organize, no track was filed", None),
     ({"organized": 0, "failed": 0, "skipped": 3}, "all 3 file(s) already existed, nothing was filed", None),
-    ({"organized": 2, "failed": 0, "skipped": 0, "dry_run": True}, "dry run - not organized", None),
+    #? (2.1.13) a result still carrying an old dry_run flag files as any other: there is no dry run to say
+    ({"organized": 2, "failed": 0, "skipped": 0, "dry_run": True}, None, "filed"),
 ])
 def test_the_messages_the_poller_writes_read_back_as_their_outcome(store, monkeypatch, tmp_path, results, message, outcome):
     """
@@ -226,11 +228,10 @@ def test_the_messages_the_poller_writes_read_back_as_their_outcome(store, monkey
     """
     monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(tmp_path / "downloads"))
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path / "music"))
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "copy")
     monkeypatch.setattr(Config, "FETCH_LYRICS", "off")
 
-    async def organize(job, download_root, library_root, mode, on_plan=None):
-        return {"dry_run": False, "mode": mode, "plan": {}, **results}
+    async def organize(job, download_root, library_root, on_plan=None):
+        return {"plan": {}, **results}
 
     monkeypatch.setattr(poller, "organize_job", organize)
     job_id = job(store)

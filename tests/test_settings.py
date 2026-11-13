@@ -20,7 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.config import Config  # noqa: E402
-from src.routes.settings import ORGANIZE_MODES, _describe_path, _validate, settings  # noqa: E402
+from src.routes.settings import _describe_path, _validate, settings  # noqa: E402
 
 
 def call_settings() -> dict:
@@ -92,9 +92,10 @@ def test_a_real_directory_passes(tmp_path):
 
 def test_a_readonly_directory_fails_only_when_writing_is_required(tmp_path):
     """
-    LIBRARY_PATH is written to and SLSKD_DOWNLOAD_PATH is only read, so the same folder is
-    fine for one and broken for the other. Getting this backwards would either wave through
-    a library the organizer cannot write to, or refuse a downloads folder for no reason.
+    The same folder is fine where nothing is written and broken where something is. Getting this
+    backwards would either wave through a library the organizer cannot write to, or refuse a folder
+    for no reason. (Until 2.1.13 SLSKD_DOWNLOAD_PATH was only read; filing always moves now, so it is
+    checked for writing too - test_organize_move_only.py.)
     """
     readonly = tmp_path / "readonly"
     readonly.mkdir()
@@ -132,21 +133,22 @@ def test_an_unset_optional_setting_is_not_flagged(monkeypatch):
 # ===== the organizing verdict =================================================
 
 
-def test_dry_run_is_reported_as_a_blocker_even_when_everything_else_is_right(
-    monkeypatch, tmp_path
-):
+def test_both_folders_set_is_all_organizing_needs(monkeypatch, tmp_path):
     """
-    dry_run is the DEFAULT, so "I set everything up and nothing was filed" is the expected
-    first experience rather than an edge case. It has to be named as the reason.
+    (2.1.13) Filing always moves, so there is no mode to stand in the way: both folders set and usable,
+    and organizing is on. Until then the default, dry_run, was named here as the reason nothing was
+    filed even with both set. (Two folders apart: one folder for both is a blocker of its own since the review
+    of moving-always - tests/test_filing_guards.py.)
     """
-    monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(tmp_path))
-    monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path))
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "dry_run")
+    (tmp_path / "downloads").mkdir()
+    (tmp_path / "music").mkdir()
+    monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(tmp_path / "downloads"))
+    monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path / "music"))
 
     organizing = call_settings()["organizing"]
 
-    assert organizing["enabled"] is False
-    assert any("Dry run" in blocker for blocker in organizing["blockers"])
+    assert organizing["enabled"] is True
+    assert organizing["blockers"] == []
 
 
 def test_every_missing_prerequisite_is_listed_not_just_the_first(monkeypatch):
@@ -156,42 +158,26 @@ def test_every_missing_prerequisite_is_listed_not_just_the_first(monkeypatch):
     """
     monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", None)
     monkeypatch.setattr(Config, "LIBRARY_PATH", None)
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "off")
 
     blockers = call_settings()["organizing"]["blockers"]
 
-    assert len(blockers) == 3
+    assert len(blockers) == 2
     assert any("SLSKD_DOWNLOAD_PATH" in b for b in blockers)
     assert any("LIBRARY_PATH" in b for b in blockers)
-    assert any("set to Off" in b for b in blockers)
 
 
-def test_a_fully_configured_move_setup_reports_organizing_as_active(monkeypatch, tmp_path):
-    monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(tmp_path))
-    monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path))
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "move")
+def test_the_settings_answer_has_no_organize_mode_any_more(monkeypatch, tmp_path):
+    """(2.1.13) No ORGANIZE_MODE row, no list of modes, no blocker naming one - and the Organizing group says
+    plainly that a finished download is moved."""
+    monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", None)
+    payload = call_settings()
 
-    organizing = call_settings()["organizing"]
-
-    assert organizing["enabled"] is True
-    assert organizing["blockers"] == []
-
-
-def test_an_unrecognised_organize_mode_is_an_error(monkeypatch):
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "sideways")
-
-    row = find(call_settings(), "ORGANIZE_MODE")
-
-    assert row["status"] == "error"
-    assert "off" in row["detail"] and "dry_run" in row["detail"]
-
-
-def test_the_documented_modes_match_what_the_organizer_accepts():
-    """
-    These are rendered to the user as the valid values, so they must not drift from the set
-    config.py validates against.
-    """
-    assert set(ORGANIZE_MODES) == {"off", "dry_run", "copy", "move"}
+    assert "organize_modes" not in payload
+    assert [s["key"] for g in payload["groups"] for s in g["settings"] if s["key"] == "ORGANIZE_MODE"] == []
+    assert not [b for b in payload["organizing"]["blockers"] if "ORGANIZE_MODE" in b or "Dry run" in b]
+    group = next(g for g in payload["groups"] if g["id"] == "organizing")
+    assert "is moved out of slskd's folder into your library" in group["note"]
+    assert "ORGANIZE_MODE" not in str(payload)
 
 
 # ===== url problems reach the row =============================================
@@ -268,8 +254,10 @@ def test_only_settings_that_can_change_at_runtime_are_editable():
     assert "DB_PATH" in Config.NOT_EDITABLE
     assert "DB_PATH" not in Config.EDITABLE
 
-    for key in ("SLSKD_URL", "SLSKD_APIKEY", "ORGANIZE_MODE", "LIBRARY_PATH"):
+    for key in ("SLSKD_URL", "SLSKD_APIKEY", "COVER_ART_SIZE", "LIBRARY_PATH"):
         assert key in Config.EDITABLE
+    #? (2.1.13) no longer a setting at all
+    assert "ORGANIZE_MODE" not in Config.EDITABLE and not hasattr(Config, "ORGANIZE_MODE")
 
 
 def test_the_locked_setting_says_why_rather_than_just_refusing():
@@ -283,7 +271,7 @@ def test_the_locked_setting_says_why_rather_than_just_refusing():
 
 def test_definitionally_invalid_values_are_rejected():
     """These can never work whatever else changes, so storing them helps nobody."""
-    assert _validate("ORGANIZE_MODE", "sideways") is not None
+    assert _validate("COVER_ART_SIZE", "huge") is not None
     assert "missing the scheme" in _validate("SLSKD_URL", "slskd:5030")
 
 
@@ -298,8 +286,8 @@ def test_environmentally_invalid_values_are_allowed_through():
 
 
 def test_valid_values_pass():
-    for mode in ORGANIZE_MODES:
-        assert _validate("ORGANIZE_MODE", mode) is None
+    for choice in ("on", "off"):
+        assert _validate("COUNTRY_IN_FOLDER", choice) is None
     assert _validate("SLSKD_URL", "http://slskd:5030") is None
 
 
@@ -310,18 +298,18 @@ def test_an_override_replaces_the_environment_and_is_reported_as_such(monkeypatc
     nobody remembers setting, so the row has to say it is overriding and what it would
     revert to.
     """
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "dry_run")
+    monkeypatch.setattr(Config, "COVER_ART_SIZE", "500")
     monkeypatch.setattr(Config, "OVERRIDDEN", set(), raising=False)
     monkeypatch.setattr(Config, "ENV_VALUES", {}, raising=False)
 
-    Config.apply_overrides({"ORGANIZE_MODE": "move"})
+    Config.apply_overrides({"COVER_ART_SIZE": "1200"})
 
-    assert Config.ORGANIZE_MODE == "move"
-    assert "ORGANIZE_MODE" in Config.OVERRIDDEN
+    assert Config.COVER_ART_SIZE == "1200"
+    assert "COVER_ART_SIZE" in Config.OVERRIDDEN
 
-    row = find(call_settings(), "ORGANIZE_MODE")
+    row = find(call_settings(), "COVER_ART_SIZE")
     assert row["overridden"] is True
-    assert row["env_value"] == "dry_run"   # what reverting would restore
+    assert row["env_value"] == "500"   # what reverting would restore
 
 
 def test_a_stored_row_for_a_non_editable_key_is_ignored(monkeypatch):
@@ -344,14 +332,14 @@ def test_reverting_is_absence_not_a_copied_value(monkeypatch):
     Revert deletes the row. Writing the environment's value back instead would pin whatever
     compose said that day, so a later compose change would silently stop taking effect.
     """
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "dry_run")
+    monkeypatch.setattr(Config, "COVER_ART_SIZE", "500")
     monkeypatch.setattr(Config, "OVERRIDDEN", set(), raising=False)
     monkeypatch.setattr(Config, "ENV_VALUES", {}, raising=False)
 
     Config.apply_overrides({})   # no rows == nothing overridden
 
     assert Config.OVERRIDDEN == set()
-    assert find(call_settings(), "ORGANIZE_MODE")["overridden"] is False
+    assert find(call_settings(), "COVER_ART_SIZE")["overridden"] is False
 
 
 def test_reverting_actually_restores_the_environment_value(monkeypatch):
@@ -361,33 +349,33 @@ def test_reverting_actually_restores_the_environment_value(monkeypatch):
     the true environment value was gone. Deleting the row then left the overridden value in
     place - "revert" cleared the row and changed nothing.
     """
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "dry_run")
+    monkeypatch.setattr(Config, "COVER_ART_SIZE", "500")
     monkeypatch.setattr(Config, "OVERRIDDEN", set(), raising=False)
     monkeypatch.setattr(Config, "ENV_VALUES", {}, raising=False)
 
-    Config.apply_overrides({"ORGANIZE_MODE": "copy"})
-    assert Config.ORGANIZE_MODE == "copy"
+    Config.apply_overrides({"COVER_ART_SIZE": "1200"})
+    assert Config.COVER_ART_SIZE == "1200"
 
     #? the revert: the row is gone, so nothing is stored any more
     Config.apply_overrides({})
 
-    assert Config.ORGANIZE_MODE == "dry_run"
+    assert Config.COVER_ART_SIZE == "500"
     assert Config.OVERRIDDEN == set()
 
 
 def test_repeated_applies_do_not_drift(monkeypatch):
     """Every save calls apply_overrides again; the environment baseline must not move."""
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "dry_run")
+    monkeypatch.setattr(Config, "COVER_ART_SIZE", "500")
     monkeypatch.setattr(Config, "OVERRIDDEN", set(), raising=False)
     monkeypatch.setattr(Config, "ENV_VALUES", {}, raising=False)
 
-    for mode in ("copy", "move", "off", "copy"):
-        Config.apply_overrides({"ORGANIZE_MODE": mode})
-        assert Config.ORGANIZE_MODE == mode
-        assert Config.ENV_VALUES["ORGANIZE_MODE"] == "dry_run"
+    for size in ("1200", "full", "250", "1200"):
+        Config.apply_overrides({"COVER_ART_SIZE": size})
+        assert Config.COVER_ART_SIZE == size
+        assert Config.ENV_VALUES["COVER_ART_SIZE"] == "500"
 
     Config.apply_overrides({})
-    assert Config.ORGANIZE_MODE == "dry_run"
+    assert Config.COVER_ART_SIZE == "500"
 
 
 def test_the_api_key_never_reports_an_env_value_even_when_overridden(monkeypatch):
@@ -490,10 +478,6 @@ def test_the_cover_art_size_accepts_only_what_the_archive_serves():
         assert _validate("COVER_ART_SIZE", size) is None
 
     assert _validate("COVER_ART_SIZE", "4000") is not None
-
-
-def test_organize_mode_is_offered_as_a_choice_too():
-    assert set(find(call_settings(), "ORGANIZE_MODE")["choices"]) == set(ORGANIZE_MODES)
 
 
 def test_the_lyrics_lead_takes_milliseconds_and_refuses_anything_else():

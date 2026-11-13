@@ -75,7 +75,7 @@ def test_an_mp3_copy_is_not_filed_beside_the_flac_one(tmp_path):
     assert [op.get("duplicate_of") for op in plan["operations"]] == \
         ["01 - Wildlife Analysis.flac", "02 - An Eagle in Your Mind.flac"]
 
-    results = execute_plan(plan, RELEASE, "copy")
+    results = execute_plan(plan, RELEASE)
     assert (results["organized"], results["skipped"], results["duplicates"]) == (0, 2, 2)
     assert album_files(library) == ["01 - Wildlife Analysis.flac", "02 - An Eagle in Your Mind.flac"]
 
@@ -86,7 +86,7 @@ def test_a_missing_track_still_fills_the_gap(tmp_path):
     names = ["01 Wildlife Analysis.flac", "02 An Eagle in Your Mind.flac"]
     downloads = downloads_with(tmp_path, names)
 
-    results = execute_plan(plan_organization(job(names), downloads, library), RELEASE, "copy")
+    results = execute_plan(plan_organization(job(names), downloads, library), RELEASE)
     assert (results["organized"], results["duplicates"]) == (1, 1)
     assert "02 - An Eagle in Your Mind.flac" in album_files(library)
 
@@ -102,7 +102,7 @@ def test_a_grab_with_no_tracklist_is_judged_by_its_own_tags(tmp_path):
     })
 
     plan = plan_organization(job(names, release), downloads, library)
-    results = execute_plan(plan, release, "copy")
+    results = execute_plan(plan, release)
 
     assert results["duplicates"] == 2
     #? an untagged, unnumbered file can't be judged, so it files as it always did
@@ -132,12 +132,12 @@ def test_an_empty_or_new_folder_has_nothing_to_duplicate(tmp_path):
 
 
 def test_the_duplicate_stays_in_slskds_folder(tmp_path):
-    """Counted as skipped, so a move's clean-up keeps the folder rather than deleting unfiled music."""
+    """Counted as skipped, so the clean-up after a move keeps the folder rather than deleting unfiled music."""
     library = library_with(tmp_path, 1, 2)
     names = ["01 Wildlife Analysis.mp3", "02 An Eagle in Your Mind.mp3"]
     downloads = downloads_with(tmp_path, names)
 
-    execute_plan(plan_organization(job(names), downloads, library), RELEASE, "move")
+    execute_plan(plan_organization(job(names), downloads, library), RELEASE)
     assert sorted(p.name for p in (Path(downloads) / "BoC").iterdir()) == names
 
 
@@ -152,10 +152,9 @@ class FakeStore:
 def test_the_job_says_it_was_already_in_the_store(monkeypatch):
     monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", "/downloads")
     monkeypatch.setattr(Config, "LIBRARY_PATH", "/music")
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "move")
 
     async def organized(*args, **kwargs):
-        return {"organized": 0, "skipped": 10, "duplicates": 10, "failed": 0, "dry_run": False}
+        return {"organized": 0, "skipped": 10, "duplicates": 10, "failed": 0}
 
     monkeypatch.setattr(poller, "organize_job", organized)
     store = FakeStore()
@@ -210,7 +209,7 @@ def test_the_sidecars_of_an_unfiled_copy_stay_with_it(tmp_path):
 
     plan = plan_organization(job(names), downloads, library)
     assert plan["companion_count"] == 0
-    results = execute_plan(plan, RELEASE, "move")
+    results = execute_plan(plan, RELEASE)
     assert results["organized"] == 0, "nothing arrived, so it mustn't read as organized"
     assert "rip.log" in {p.name for p in (Path(downloads) / "BoC").iterdir()}
 
@@ -218,10 +217,9 @@ def test_the_sidecars_of_an_unfiled_copy_stay_with_it(tmp_path):
 def test_already_in_the_store_counts_the_tracks_not_a_skipped_cover(monkeypatch):
     monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", "/downloads")
     monkeypatch.setattr(Config, "LIBRARY_PATH", "/music")
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "move")
 
     async def organized(*args, **kwargs):
-        return {"organized": 0, "skipped": 11, "duplicates": 10, "failed": 0, "dry_run": False}
+        return {"organized": 0, "skipped": 11, "duplicates": 10, "failed": 0}
 
     monkeypatch.setattr(poller, "organize_job", organized)
     store = FakeStore()

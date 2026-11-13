@@ -140,7 +140,6 @@ def test_the_sign_in_answers_what_the_app_decodes(monkeypatch, tmp_path):
     monkeypatch.setattr(Config, "DEADWAX_SECRET_KEY", "0123456789abcdef0123456789abcdef-test-key")
     monkeypatch.setattr(Config, "DEADWAX_ADMIN_PASSWORD", "break-the-glass-please")
     monkeypatch.setattr(Config, "NAVIDROME_URL", "http://navidrome:4533")
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "copy")
     monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(tmp_path / "slskd"))
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path / "library"))
     monkeypatch.setattr(auth, "throttle", auth.Throttle())

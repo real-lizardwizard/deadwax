@@ -104,7 +104,6 @@ def on(monkeypatch, tmp_path):
     monkeypatch.setattr(Config, "DEADWAX_SECRET_KEY", SECRET)
     monkeypatch.setattr(Config, "DEADWAX_ADMIN_PASSWORD", GLASS)
     monkeypatch.setattr(Config, "NAVIDROME_URL", "http://navidrome:4533")
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "copy")
     monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(tmp_path / "slskd"))
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path / "library"))
     monkeypatch.setattr(Config, "SLSKD_INCOMPLETE_PATH", None)
@@ -1152,24 +1151,35 @@ def test_the_gate_lets_the_next_start_in_as_soon_as_one_has(caplog):
 
 # ----------------------------------------------------------------- organizing must be on
 
-@pytest.mark.parametrize("mode", ["dry_run", "off"])
-def test_logins_are_refused_while_nothing_would_be_filed(on, monkeypatch, mode):
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", mode)
+def test_logins_are_refused_while_nothing_would_be_filed(on, monkeypatch):
+    """(2.1.13) Nothing is filed only when a folder is missing now - filing always moves, there is no mode."""
+    monkeypatch.setattr(Config, "LIBRARY_PATH", None)
     client = TestClient(on.app)
     for answer in (client.get("/deadwax/me"), client.get(JOBS),
                    client.post(LOGIN, json={"username": "james", "password": PASSWORDS["james"]})):
         assert answer.status_code == 503
         #? (2.0.4) the setting for whoever runs deadwax (`why`); the sentence for anyone (src/auth.py Explained)
         assert answer.json()["detail"] == auth.CANT_SIGN_IN
-        assert f"ORGANIZE_MODE is '{mode}'" in answer.json()["why"] and "copy or move" in answer.json()["why"]
+        assert "LIBRARY_PATH is not set" in answer.json()["why"] and "ORGANIZE_MODE" not in answer.json()["why"]
     #? the health check judges deadwax alone, and the pages still draw (the sign-in shows why)
     assert client.get("/deadwax/health").status_code == 200
     assert client.get("/player/").status_code == 200
 
 
+@pytest.mark.parametrize("old", ["dry_run", "off", "copy", "move", "sideways", ""])
+def test_an_old_organize_mode_stops_no_logins(on, monkeypatch, old):
+    """(2.1.13) The logins rule is the two folders alone: an ORGANIZE_MODE still in the environment - the old
+    default dry_run, off, or junk - is ignored, and signing in works as it does without one."""
+    monkeypatch.setenv("ORGANIZE_MODE", old)
+    assert Config.describe_logins_organizing() is None and auth.unusable() is None
+    client = TestClient(on.app)
+    assert client.post(LOGIN, json={"username": "james", "password": PASSWORDS["james"]}).status_code == 200
+    assert client.get(JOBS).status_code == 200
+
+
 def test_a_signed_in_session_is_refused_too_once_organizing_is_off(on, monkeypatch):
     james = signed_in(on, "james")
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "dry_run")
+    monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", None)
     assert james.get(JOBS).status_code == 503
 
 
@@ -1184,42 +1194,50 @@ def test_logins_are_refused_without_organizings_folders(on, monkeypatch, folder)
 
 
 def test_start_up_says_why_and_where_to_change_it(on, monkeypatch, caplog):
+    """(2.1.13) What to set now is the folders, never ORGANIZE_MODE - which is no setting any more."""
     caplog.set_level(logging.INFO)
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "dry_run")
+    monkeypatch.setattr(Config, "LIBRARY_PATH", None)
     monkeypatch.setattr(Config, "OVERRIDDEN", set())
     Config.report_logins()
-    assert "logins are on but ORGANIZE_MODE is 'dry_run'" in caplog.text
-    assert "set ORGANIZE_MODE=copy or move in the container's environment" in caplog.text
+    assert "logins are on but LIBRARY_PATH is not set, so nothing downloaded would ever be filed" in caplog.text
+    assert "set LIBRARY_PATH and recreate the container (or set it in Server settings with logins off)" in caplog.text
+    assert "ORGANIZE_MODE" not in caplog.text and "copy or move" not in caplog.text
 
-    #? saved in the settings tab, which beats the environment: the way back is through logins off
-    monkeypatch.setattr(Config, "OVERRIDDEN", {"ORGANIZE_MODE"})
-    assert "switch logins off" in Config.describe_logins_organizing()
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "move")
+    monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", None)
+    said = Config.describe_logins_organizing()
+    assert "SLSKD_DOWNLOAD_PATH and LIBRARY_PATH are not set" in said and "set them in Server settings" in said
+    monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(on.tmp / "slskd"))
+    monkeypatch.setattr(Config, "LIBRARY_PATH", str(on.tmp / "library"))
     assert Config.describe_logins_organizing() is None
 
 
 def test_the_settings_tab_wont_switch_organizing_off_under_logins(on, monkeypatch):
     james = signed_in(on, "james")
-    for update in ({"key": "ORGANIZE_MODE", "value": "dry_run"}, {"key": "ORGANIZE_MODE", "value": "off"},
-                   {"key": "LIBRARY_PATH", "value": ""}, {"key": "SLSKD_DOWNLOAD_PATH", "value": ""}):
+    for update in ({"key": "LIBRARY_PATH", "value": ""}, {"key": "SLSKD_DOWNLOAD_PATH", "value": ""}):
         answer = james.put("/deadwax/settings", json=[update])
         assert answer.status_code == 400, update
         assert "they need organizing to stay on" in answer.json()["detail"]
+        assert "SLSKD_DOWNLOAD_PATH and LIBRARY_PATH both set" in answer.json()["detail"]
+        assert "Organize mode" not in answer.json()["detail"]
     assert on.store.stored_settings() == {}
 
-    #? a revert to an environment that says dry_run would switch it off too
-    monkeypatch.setattr(Config, "ENV_VALUES", {"ORGANIZE_MODE": "dry_run", "LIBRARY_PATH": str(on.tmp / "library"),
-                                               "SLSKD_DOWNLOAD_PATH": str(on.tmp / "slskd")})
-    assert james.put("/deadwax/settings", json=[{"key": "ORGANIZE_MODE", "value": None}]).status_code == 400
+    #? a revert to an environment with no library would switch it off too
+    monkeypatch.setattr(Config, "ENV_VALUES", {"LIBRARY_PATH": "", "SLSKD_DOWNLOAD_PATH": str(on.tmp / "slskd")})
+    assert james.put("/deadwax/settings", json=[{"key": "LIBRARY_PATH", "value": None}]).status_code == 400
     monkeypatch.setattr(Config, "ENV_VALUES", {})
 
-    assert james.put("/deadwax/settings", json=[{"key": "ORGANIZE_MODE", "value": "move"}]).status_code == 200
+    #? (2.1.13) the old mode is no setting: refused for what it is, never as switching organizing off
+    answer = james.put("/deadwax/settings", json=[{"key": "ORGANIZE_MODE", "value": "move"}])
+    assert answer.status_code == 400 and "no longer a setting" in answer.json()["detail"]
+    assert "they need organizing" not in answer.json()["detail"]
+
+    assert james.put("/deadwax/settings", json=[{"key": "LIBRARY_PATH", "value": str(on.tmp / "music")}]).status_code == 200
     Config.apply_overrides({})
 
 
-def test_with_logins_off_dry_run_is_as_it_always_was(monkeypatch, tmp_path):
+def test_with_logins_off_a_missing_folder_is_as_it_always_was(monkeypatch, tmp_path):
     monkeypatch.setattr(Config, "AUTH_MODE", "off")
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "dry_run")
+    monkeypatch.setattr(Config, "LIBRARY_PATH", None)
     assert Config.describe_logins_organizing() is not None
     assert auth.unusable() is not None  # what logins WOULD say - but nothing asks with them off
     client = TestClient(start())
@@ -1228,7 +1246,6 @@ def test_with_logins_off_dry_run_is_as_it_always_was(monkeypatch, tmp_path):
 
 def test_with_logins_off_the_settings_tab_saves_organizing_as_it_always_did(monkeypatch, tmp_path):
     monkeypatch.setattr(Config, "AUTH_MODE", "off")
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "copy")
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path / "library"))
     monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(tmp_path / "slskd"))
     store = JobStore(str(tmp_path / "jobs.db"))
@@ -1237,7 +1254,7 @@ def test_with_logins_off_the_settings_tab_saves_organizing_as_it_always_did(monk
     app.state.store = store
     client = TestClient(app)
     try:
-        for update in ({"key": "ORGANIZE_MODE", "value": "dry_run"}, {"key": "SLSKD_DOWNLOAD_PATH", "value": ""}):
+        for update in ({"key": "LIBRARY_PATH", "value": ""}, {"key": "SLSKD_DOWNLOAD_PATH", "value": ""}):
             assert client.put("/deadwax/settings", json=[update]).status_code == 200, update
     finally:
         Config.apply_overrides({})

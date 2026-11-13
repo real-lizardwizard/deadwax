@@ -1019,6 +1019,13 @@ the same and are fixed with it. ORGANIZE_MODE's dropdown names its modes Off,
 Dry run, Copy and Move (ORGANIZE_MODE_CHOICES; the values stay `off`/`dry_run`/`copy`/`move`, and the Organize
 modes list under the group still shows them as compose takes them). The rows are still titled by their
 environment names: an admin types those into compose, so they are words a person acts on.
+**(2.1.13) ORGANIZE_MODE, its dropdown, ORGANIZE_MODE_CHOICES, the Organize modes list (`organize_modes`,
+SettingsView's `OrganizeModes` and its `.settings-mode*` rules) and the mode's blockers are gone**: filing always
+moves ("Filing only moves (2.1.13)" in notes/decisions.md). The Organizing group keeps the folder template, the
+country and the rename wait; its note says a finished download is moved into the library whenever both folders
+are set and nothing in it is overwritten, and the verdict "Organizing is active — finished downloads will be moved
+into the library, tagged and filed." The words test keeps its scans; settingslog.sim's choice row is COVER_ART_SIZE
+now.
 
 **Docs.** player.md's "Gapless playback (experimental)" is "Gapless playback" (its anchor `#gapless-playback`,
 every link to it changed), the README's "Gapless, as an experiment" and troubleshooting's "is an experiment" went,
@@ -1096,7 +1103,8 @@ TRANSFER_FAILURE_REASONS, poller.py's `_fail` and filing messages, routes/downlo
 ("The person sharing it refused to send it.", "deadwax lost track of this download - the person sharing
 it may have gone offline, or downloads stopped working for a while." - slskd down or restarted looks the same as a
 peer gone, since get_downloads answers [] on any failure, "It downloaded, but deadwax couldn't find its files to add them to your library." for
-`NOTHING_ORGANIZED`, "…couldn't be added to your library." for `organize failed: <exception>`, a dry run's, the
+`NOTHING_ORGANIZED`, "…couldn't be added to your library." for `organize failed: <exception>`, a dry run's (since
+2.1.13 only an old row's, in the past tense: "back then, deadwax only rehearsed adding albums"), the
 already-there and failed-to-organize counts; "3 of 10 files arrived." after a failure's reason). A RequestRow
 carries `reason` (everyone's), `reasonTell` (JobCard adds "Tell whoever runs deadwax." for anyone else) and
 `reasonDetail` (the job's own words, for whoever runs it); a retry's problem `problemDetail` likewise
@@ -1536,7 +1544,8 @@ nothing filed"), *In your library - 2 files couldn't be added* (was "Partly file
 but not added to your library* with the tell (organizing off), with logins on *In their library* (was "Filed - in their
 library"), *Not added - the collection's copy may be another pressing, so an admin has been asked to check it* / *…; an
 admin has checked it* (grant_for's FLAGGED is another pressing OR an untagged rip, so "may be"), *In your library - 2
-files couldn't be added* for an incomplete grant. The dry run's sentence says "rehearse adding albums" (errorWords). A row
+files couldn't be added* for an incomplete grant. The dry run's sentence says "rehearse adding albums" (errorWords;
+since 2.1.13 an old row's alone, "back then, deadwax only rehearsed…"). A row
 that can't open: *Not ready to play yet - it may still be scanning.*, *Can't find this album to open it - it may have moved, or isn't
 matched to a pressing.*, *Couldn't open it - tap to try again.* (R19). The ✕ asks *…You'll lose your place in their queue.* Empty
 Requests says "tap Get" only to someone who can Get; anyone else reads GET_OFF (the review's "Albums you join show here"

@@ -243,7 +243,7 @@ export function outcomeWords(job: Pick<DownloadJob, 'outcome' | 'error' | 'libra
     default:
       //? a dry run, nothing that could be filed, no track filed: (2.0.4) the row's words in a listener's
       //? (jobErrorWords - never "check SLSKD_DOWNLOAD_PATH" or an exception). With no words at all,
-      //? organizing is off - ORGANIZE_MODE 'off', or LIBRARY_PATH or SLSKD_DOWNLOAD_PATH not set
+      //? organizing is off - LIBRARY_PATH or SLSKD_DOWNLOAD_PATH not set (or, before 2.1.13, its mode 'off')
       //? - their own words (SLSKD_DOWNLOAD_PATH, the exception) kept for whoever runs deadwax, the one who fixes it,
       //? as a Needs-attention reason keeps them (review: a Done row lost them)
       if (!job.error) return { text: 'Downloaded, but not added to your library', tone: 'warning', tell: true }

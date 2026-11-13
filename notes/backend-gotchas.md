@@ -713,6 +713,11 @@ whose rule still holds (`test_the_compose_example_has_no_line_that_is_only_a_com
   slskd's folder) rather than landing in the container's own layer - checked on the test image, where
   `os.makedirs("/music/a/b")` as 1000:1000 is refused. Unless PUID is 0. Not guarded further, deliberately: a guard would change filing for anyone whose LIBRARY_PATH folder
   doesn't exist yet and is made by the first filing.
+  **(2.1.13) There is no dry run now** (see "Filing only moves (2.1.13)" in notes/decisions.md): such an install
+  tries every download it finishes, and each file fails as above - the mkdir is refused before anything moves, so
+  slskd's folder keeps it - unless PUID is 0, when it would be MOVED into the container's own layer, slskd's
+  folder cleared after it, and lost on the next recreate. Still not guarded, for the same reason; the docs say to
+  check both mounts before the first download.
 - **`.env.example` is the secrets and the environment-only settings**, every line commented out (an uncommented empty
   `LIBRARY_PATH=` is a value and would take the image's `/music` away): PUID/PGID, slskd's address and key, Navidrome's
   address, user and password, the three logins, TRUSTED_ORIGINS. **The two addresses ride with their secrets, beyond
@@ -769,9 +774,11 @@ whose rule still holds (`test_the_compose_example_has_no_line_that_is_only_a_com
     compose's value in saves nothing, and taking the line out then loses it (ORGANIZE_MODE back to dry_run, which
     with logins on 503s every route, Server settings included). Now: the line out, recreate, set it again; an address
     with its key; and with logins on ORGANIZE_MODE and the Navidrome lines stay (or logins off while trimming).
-    The 2.0.3 release notes' Upgrading must say the same.
+    The 2.0.3 release notes' Upgrading must say the same. (2.1.13: ORGANIZE_MODE is no setting now - only the
+    Navidrome lines stay, and the page says an ORGANIZE_MODE line can simply go.)
   - **.env.example's AUTH_MODE comment says to set Organizing (and Navidrome) BEFORE turning logins on** - with
-    them on and organizing dry run, nothing can be reached; configuration.md's AUTH_MODE row likewise.
+    them on and organizing dry run, nothing can be reached; configuration.md's AUTH_MODE row likewise. (2.1.13:
+    "Organizing on" is now SLSKD_DOWNLOAD_PATH and LIBRARY_PATH both set, and both say that.)
   - The README's settings paragraph named PUID/PGID as shown-but-locked; they aren't rows at all. It now names
     DB_PATH and the three logins as locked and PUID/PGID and TRUSTED_ORIGINS as environment only.
   - getting-started step 7 said to uncomment the Navidrome lines in `.env.example`; it's `.env`, then recreate.
@@ -790,7 +797,9 @@ whose rule still holds (`test_the_compose_example_has_no_line_that_is_only_a_com
   beside `report_musicbrainz()` and `report_navidrome()`, and says the address, the key, the two paths and the
   organize mode there - with the source "Server settings" for a saved one, and Server settings named first in the
   "not set" lines. `check()` keeps only what is the environment's alone (empty values hiding `.env`, the legacy
-  database, an unreadable ORGANIZE_MODE or COVER_ART_SIZE corrected in place). Tests in test_slskd_settings.py: no
+  database, an unreadable ORGANIZE_MODE or COVER_ART_SIZE corrected in place - since 2.1.13 COVER_ART_SIZE alone, and
+  report_slskd names no mode, since filing always moves; `report_retired()` beside it says once that an old
+  ORGANIZE_MODE is ignored). Tests in test_slskd_settings.py: no
   slskd line in the Log at start-up with slskd only saved, the "not set" line naming Server settings first,
   `check()` judging none of the five, and the lifespan's order.
   Python 3676 collected (3674 passed, 2 skipped); pyflakes, tsc, every sim and the build clean; the engine files

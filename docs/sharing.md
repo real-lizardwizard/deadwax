@@ -87,10 +87,10 @@ deadwax too, in **People**. Then, for each person:
   Keep `NAVIDROME_USER` set once logins are on: deadwax still uses that account for what belongs to
   nobody in particular, such as fetching a song once into the player's cache for every phone. If your
   Navidrome gives users libraries of their own, give that account every one.
-- **Organizing on**: `ORGANIZE_MODE` set to `copy` or `move`, with `LIBRARY_PATH` and
-  `SLSKD_DOWNLOAD_PATH` set. A download becomes the asker's when it's filed, and in dry run nothing
-  ever is - so with logins on and organizing off, deadwax refuses everything (but its health check
-  and the pages themselves) until it's fixed, saying why.
+- **Organizing on**: `LIBRARY_PATH` and `SLSKD_DOWNLOAD_PATH` both set - the image sets them, so
+  this only matters if one was emptied. A download becomes the asker's when it's filed, and with
+  either folder unset nothing is - so with logins on and organizing off, deadwax refuses everything
+  (but its health check and the pages themselves) until it's fixed, saying why.
 - **HTTPS before anything leaves your network.** Plain `http://` is fine on your own network and over
   a VPN such as WireGuard or Tailscale. Anywhere else, put HTTPS in front of deadwax first: over plain
   http a password and a session can be read on the way. deadwax doesn't serve HTTPS itself - that

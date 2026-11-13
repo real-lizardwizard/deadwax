@@ -343,8 +343,7 @@ def test_a_secrets_row_says_whether_the_environment_holds_one_and_nothing_more(a
 
 
 def test_the_start_up_check_never_logs_a_login_in_the_address(env, monkeypatch, caplog):
-    #? check() corrects these two in place when they're unrecognised; keep that from leaking out
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", Config.ORGANIZE_MODE)
+    #? check() corrects this one in place when it is unrecognised; keep that from leaking out
     monkeypatch.setattr(Config, "COVER_ART_SIZE", Config.COVER_ART_SIZE)
 
     for url in ("http://me:hunter2@slskd:5030", "me:hunter2@slskd:5030"):
@@ -377,7 +376,6 @@ def test_an_slskd_saved_in_server_settings_is_not_reported_missing_at_start_up(e
     start - with the advice to set it in compose - while it worked."""
     monkeypatch.setattr(Config, "SLSKD_URL", None)
     monkeypatch.setattr(Config, "SLSKD_APIKEY", None)
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", Config.ORGANIZE_MODE)
     monkeypatch.setattr(Config, "COVER_ART_SIZE", Config.COVER_ART_SIZE)
 
     with caplog.at_level(logging.INFO):
@@ -393,7 +391,6 @@ def test_an_slskd_saved_in_server_settings_is_not_reported_missing_at_start_up(e
 def test_an_slskd_set_nowhere_is_reported_with_server_settings_first(env, monkeypatch, caplog):
     monkeypatch.setattr(Config, "SLSKD_URL", None)
     monkeypatch.setattr(Config, "SLSKD_APIKEY", None)
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", Config.ORGANIZE_MODE)
     monkeypatch.setattr(Config, "COVER_ART_SIZE", Config.COVER_ART_SIZE)
 
     start_up({})
@@ -409,7 +406,6 @@ def test_check_leaves_slskd_and_organizing_to_the_report(env, monkeypatch, caplo
     """check() runs before the settings tab's overrides exist, so what can be saved there it doesn't judge."""
     monkeypatch.setattr(Config, "SLSKD_URL", None)
     monkeypatch.setattr(Config, "SLSKD_APIKEY", None)
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", Config.ORGANIZE_MODE)
     monkeypatch.setattr(Config, "COVER_ART_SIZE", Config.COVER_ART_SIZE)
 
     with caplog.at_level(logging.INFO):

@@ -14,8 +14,8 @@ that user's Navidrome FAVOURITES - their starred albums - two-way with Amperfy).
   every file already there - added only if that folder holds the same release, else flagged for the
   admin (it hit another pressing or an untagged rip); some files failed - added, marked incomplete; a
   second copy of a release already held - not filed beside the first, ends "already in the store", and
-  added (that is "every file already there" in the same release's folder); a dry run, organizing off,
-  failed, nothing filed - nothing (grant_for). A Get of a release already in the store offers Add to my
+  added (that is "every file already there" in the same release's folder); organizing off, failed,
+  nothing filed - nothing (grant_for). A Get of a release already in the store offers Add to my
   library instead (routes/my_library.py).
 
   WITH LOGINS OFF nothing visible changes: the one user, `local`, is given what it files, silently - an
@@ -96,7 +96,8 @@ def grant_for(results: dict | None, same_release: bool) -> str | None:
     whether the album folder it filed into already held this very release (`same_release` - the plan's,
     read before anything was written): ADDED, INCOMPLETE, FLAGGED, or None for nothing.
 
-      - a dry run, or no results (organizing off, filing that raised): nothing - the row says why
+      - no results (organizing off, filing that raised): nothing - the row says why. (A dry run gave
+        nothing too, until 2.1.13: filing always moves now.)
       - some files failed: INCOMPLETE when a track landed, else nothing (no track filed)
       - nothing placed and nothing already there (nothing could be filed): nothing
       - nothing placed, everything already there: ADDED in the same release's folder (a second copy of a
@@ -104,7 +105,7 @@ def grant_for(results: dict | None, same_release: bool) -> str | None:
         holds another pressing or an untagged rip, which is nobody's to be given on a guess
       - otherwise (filed): ADDED
     """
-    if not results or results.get("dry_run"):
+    if not results:
         return None
     if results.get("failed"):
         return INCOMPLETE if results.get("tracks_organized", results.get("organized")) else None

@@ -393,11 +393,10 @@ def test_nothing_set_is_said_plainly_with_what_needs_it(env, monkeypatch, caplog
 
 def test_check_leaves_navidrome_to_the_report(env, monkeypatch, caplog):
     """check() runs before the settings tab's overrides exist, so it says nothing about Navidrome."""
-    #? check() corrects these two in place when they're unrecognised; keep that from leaking out
-    #? (2.0.3) an unreadable mode, so check() has something of its own to say now slskd and organizing are
-    #? reported after the overrides too
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "bogus")
-    monkeypatch.setattr(Config, "COVER_ART_SIZE", Config.COVER_ART_SIZE)
+    #? check() corrects this in place when it's unrecognised, and monkeypatch puts it back
+    #? (2.0.3) an unreadable cover size, so check() has something of its own to say now slskd and organizing are
+    #? reported after the overrides too (until 2.1.13 an unreadable ORGANIZE_MODE, which is no setting now)
+    monkeypatch.setattr(Config, "COVER_ART_SIZE", "bogus")
 
     with caplog.at_level(logging.INFO):
         Config.check()

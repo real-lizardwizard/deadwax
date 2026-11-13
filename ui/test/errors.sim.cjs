@@ -286,17 +286,20 @@ console.log('\na download\'s reasons: every one the server writes, in a listener
     ...[...download.matchAll(/update_status\([^)]*?"(?:complete|failed|cancelled)", "([^"]+)"\)/g)].map((m) => m[1]),
     /failure_reason"\) or "([^"]+)"/.exec(poller)[1],
   ]
+  //? (2.1.13) what the server no longer writes, but a row from before can still carry: a dry run's (filing always moves)
+  const legacy = ['dry run - not organized']
+  check('...a row from before can still say these, which the server no longer writes', legacy.map((raw) => poller.includes(`"${raw}"`)), legacy.map(() => false))
   check('the names the formatted ones are made of are still what this sim builds them from',
     [constant('FAILED_TO_ORGANIZE'), constant('NO_TRACK_FILED'), constant('ALREADY_THERE'), constant('NOTHING_FILED'), constant('ORGANIZE_FAILED')],
     ['file(s) failed to organize', 'no track was filed', 'already in the store', 'nothing was filed', 'organize failed:'])
   const every = [
-    ...transfer, ...literals, constant('NOTHING_ORGANIZED'), constant('INTERRUPTED_FILING'),
+    ...transfer, ...literals, constant('NOTHING_ORGANIZED'), constant('INTERRUPTED_FILING'), constant('READ_ONLY_DOWNLOADS'), constant('FOLDERS_OVERLAP'),
     '2 file(s) failed to organize', '1 file(s) failed to organize, no track was filed',
     'already in the store: all 10 track(s) were already there, nothing was filed', 'all 3 file(s) already existed, nothing was filed',
     "organize failed: [Errno 13] Permission denied: '/music/Portishead/Dummy (1994)/01.flac'",
     ...transfer.map((reason) => `${reason} (3 of 10 file(s) arrived)`),
   ]
-  check('the server writes these (read out of the Python)', [transfer.length >= 4, literals.length >= 4, every.every(Boolean)], [true, true, true])
+  check('the server writes these (read out of the Python)', [transfer.length >= 4, literals.length >= 3, every.every(Boolean)], [true, true, true])
   const said = every.map((raw) => [raw, V.retryProblemWords && E.jobErrorWords(raw)])
   check('...each has a sentence of its own - never its raw words, never plumbing', said.filter(([raw, words]) => words.text === raw || E.plumbing(words.text) || !words.text).map(([raw]) => raw), [])
   check('...and keeps its own words for whoever runs deadwax', said.filter(([raw, words]) => words.detail !== raw).map(([raw]) => raw), [])
@@ -321,11 +324,13 @@ console.log('\na download\'s reasons: every one the server writes, in a listener
     'the transfer failed': ["The download didn't finish.", false],
     'no transfers reported by slskd': [NOT_RUN, false],
     'cancelled from deadwax': ['Cancelled.', false],
-    'dry run - not organized': ['Downloaded, but not added to your library: deadwax is set to rehearse adding albums, without moving any files.', true],
+    'dry run - not organized': ['Downloaded, but not added to your library: back then, deadwax only rehearsed adding albums, without moving any files.', true],
     'nothing could be organized, check SLSKD_DOWNLOAD_PATH': ["It downloaded, but deadwax couldn't find its files to add them to your library.", true],
+    "deadwax can't move files out of slskd's download folder, nothing was moved - drop :ro, or run slskd and deadwax as the same PUID/PGID; it is filed by itself once fixed": ["It downloaded, but deadwax can't move its files into your library yet.", true],
+    "slskd's download folder and the library overlap, nothing was moved - set SLSKD_DOWNLOAD_PATH and LIBRARY_PATH to separate folders; it is filed by itself once fixed": ["It downloaded, but deadwax isn't set up to add it to your library yet.", true],
     "deadwax stopped while filing this - check the library and slskd's folder": ['deadwax stopped while it was adding this to your library.', true],
   })
-  check('...the table holds every fixed string the server writes, and nothing it doesn\'t', [...new Set(every.filter((raw) => !/\d/.test(raw)).filter((raw) => !raw.startsWith('organize failed:')))].sort(),
+  check('...the table holds every fixed string the server writes (or a row from before still says), and nothing else', [...new Set([...every, ...legacy].filter((raw) => !/\d/.test(raw)).filter((raw) => !raw.startsWith('organize failed:')))].sort(),
     Object.keys(E.JOB_ERRORS).sort())
   const whole = (raw) => { const words = E.jobErrorWords(raw); return [words.text, words.tell] }
   check('...and the formatted ones, whole', [
@@ -337,7 +342,7 @@ console.log('\na download\'s reasons: every one the server writes, in a listener
     ["It downloaded, but couldn't be added to your library.", true], ["2 files couldn't be added to your library.", true], ["1 file couldn't be added to your library.", true],
     ['It downloaded, but none of its songs could be added to your library.', true], ['Its files were already in the collection, so nothing was added.', false],
     ['Every song was already in the collection, so nothing was added.', false], ['The person sharing it stopped responding. 1 of 1 file arrived.', false],
-    ['Downloaded, but not added to your library: deadwax is set to rehearse adding albums, without moving any files. 3 of 10 files arrived.', true], ["It stopped, and deadwax couldn't say why.", true],
+    ['Downloaded, but not added to your library: back then, deadwax only rehearsed adding albums, without moving any files. 3 of 10 files arrived.', true], ["It stopped, and deadwax couldn't say why.", true],
   ])
   check('words the server writes that are fit to be read pass as written; plumbing never',
     [E.jobErrorWords('reel2reel went offline after 4 of 10 files').text, E.jobErrorWords("couldn't reach slskd to queue it: HTTPConnectionPool(host='x')").text],

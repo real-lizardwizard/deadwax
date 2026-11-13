@@ -3,11 +3,14 @@ Tests for the library organizer.
 
 This is the only code in deadwax that writes to the user's filesystem, so it gets the most
 paranoid coverage: everything below runs against real files in a pytest tmp_path, and the
-destructive cases (overwrite, collision, move-vs-copy) are asserted explicitly rather than
-assumed.
+destructive cases (overwrite, collision, the move and its clean-up) are asserted explicitly
+rather than assumed. Since 2.1.13 filing only ever MOVES - James: "I would like it to only move the
+files" - so there is no copy, dry run or off left to test; the plan is still checked on its own,
+without executing it.
 """
 
 import asyncio
+import inspect
 import sys
 from pathlib import Path
 
@@ -187,42 +190,46 @@ def test_plan_writes_nothing(tmp_path):
 
 # ---------------------------------------------------------------- executing
 
-def test_dry_run_touches_nothing(tmp_path):
+def test_the_plan_names_every_move_and_makes_none(tmp_path):
+    """The split that stays (2.1.13): the plan says where each file goes, and nothing has moved until the
+    execute - the source still there, no library yet."""
     root = seed_downloads(tmp_path, ["01 - Wildlife Analysis.flac"])
     library = tmp_path / "music"
     job = make_job([r"share\BoC\MHTRTC\01 - Wildlife Analysis.flac"])
 
     plan = plan_organization(job, str(root), str(library))
-    results = execute_plan(plan, RELEASE, mode="dry_run")
 
-    assert results["dry_run"] is True
-    assert results["organized"] == 1      # reports what it *would* do
-    assert not library.exists()           # but nothing exists
-    assert (root / "MHTRTC" / "01 - Wildlife Analysis.flac").exists()
-
-
-def test_off_mode_does_nothing_at_all(tmp_path):
-    root = seed_downloads(tmp_path, ["01 - Wildlife Analysis.flac"])
-    library = tmp_path / "music"
-    job = make_job([r"share\BoC\MHTRTC\01 - Wildlife Analysis.flac"])
-
-    results = execute_plan(plan_organization(job, str(root), str(library)), RELEASE, mode="off")
-
-    assert results["organized"] == 0
+    assert [Path(op["target"]).relative_to(library).as_posix() for op in plan["operations"]] == [
+        "Boards of Canada/Music Has the Right to Children (1998)/01 - Wildlife Analysis.flac"]
+    assert plan["source_dirs"] == [str(root / "MHTRTC")]
     assert not library.exists()
+    assert (root / "MHTRTC" / "01 - Wildlife Analysis.flac").exists()
 
 
-def test_copy_leaves_the_source_in_place(tmp_path):
+def test_filing_has_no_mode_any_more():
+    """2.1.13: execute_plan and organize_job take no mode - off, dry run and copy are gone - and their results
+    say nothing of one."""
+    assert list(inspect.signature(execute_plan).parameters) == ["plan", "release"]
+    assert list(inspect.signature(organize_job).parameters) == ["job", "download_root", "library_root", "on_plan"]
+    import src.organizer as organizer
+    assert not hasattr(organizer, "ORGANIZE_MODES")
+
+
+def test_filing_MOVES_the_file_never_copies_it(tmp_path):
+    """The one way filing goes: the file arrives in the library, byte for byte, and is gone from slskd's
+    folder - one copy of it on the disk, not two."""
     root = seed_downloads(tmp_path, ["01 - Wildlife Analysis.flac"])
+    (root / "MHTRTC" / "01 - Wildlife Analysis.flac").write_bytes(b"the very bytes slskd fetched")
     library = tmp_path / "music"
     job = make_job([r"share\BoC\MHTRTC\01 - Wildlife Analysis.flac"])
 
-    results = execute_plan(plan_organization(job, str(root), str(library)), RELEASE, mode="copy")
+    results = execute_plan(plan_organization(job, str(root), str(library)), RELEASE)
 
-    assert results["organized"] == 1
-    assert (library / "Boards of Canada" / "Music Has the Right to Children (1998)"
-            / "01 - Wildlife Analysis.flac").exists()
-    assert (root / "MHTRTC" / "01 - Wildlife Analysis.flac").exists()
+    filed = library / "Boards of Canada" / "Music Has the Right to Children (1998)" / "01 - Wildlife Analysis.flac"
+    assert results == {"organized": 1, "tracks_organized": 1, "skipped": 0, "duplicates": 0, "failed": 0}
+    assert filed.read_bytes() == b"the very bytes slskd fetched"
+    assert not (root / "MHTRTC" / "01 - Wildlife Analysis.flac").exists()
+    assert [path.name for path in tmp_path.rglob("*.flac")] == ["01 - Wildlife Analysis.flac"]
 
 
 def test_move_removes_the_source(tmp_path):
@@ -230,7 +237,7 @@ def test_move_removes_the_source(tmp_path):
     library = tmp_path / "music"
     job = make_job([r"share\BoC\MHTRTC\01 - Wildlife Analysis.flac"])
 
-    execute_plan(plan_organization(job, str(root), str(library)), RELEASE, mode="move")
+    execute_plan(plan_organization(job, str(root), str(library)), RELEASE)
 
     assert (library / "Boards of Canada" / "Music Has the Right to Children (1998)"
             / "01 - Wildlife Analysis.flac").exists()
@@ -247,23 +254,12 @@ def test_existing_destination_is_never_overwritten(tmp_path):
     destination.write_bytes(b"the copy i already had")
 
     job = make_job([r"share\BoC\MHTRTC\01 - Wildlife Analysis.flac"])
-    results = execute_plan(plan_organization(job, str(root), str(library)), RELEASE, mode="move")
+    results = execute_plan(plan_organization(job, str(root), str(library)), RELEASE)
 
     assert results["skipped"] == 1
     assert results["organized"] == 0
     assert destination.read_bytes() == b"the copy i already had"
     assert (root / "MHTRTC" / "01 - Wildlife Analysis.flac").exists()  # source untouched too
-
-
-def test_unknown_mode_falls_back_to_dry_run(tmp_path):
-    root = seed_downloads(tmp_path, ["01 - Wildlife Analysis.flac"])
-    library = tmp_path / "music"
-    job = make_job([r"share\BoC\MHTRTC\01 - Wildlife Analysis.flac"])
-
-    results = execute_plan(plan_organization(job, str(root), str(library)), RELEASE, mode="nonsense")
-
-    assert results["dry_run"] is True
-    assert not library.exists()
 
 
 # ---------------------------------------------------------------- tagging
@@ -307,7 +303,7 @@ def test_tags_are_written_from_the_release(tmp_path):
 
     library = tmp_path / "music"
     job = make_job([r"share\BoC\MHTRTC\01 - Wildlife Analysis.flac"])
-    execute_plan(plan_organization(job, str(tmp_path / "downloads"), str(library)), RELEASE, mode="copy")
+    execute_plan(plan_organization(job, str(tmp_path / "downloads"), str(library)), RELEASE)
 
     written = FLAC(str(library / "Boards of Canada" / "Music Has the Right to Children (1998)"
                        / "01 - Wildlife Analysis.flac"))
@@ -324,7 +320,7 @@ def test_untaggable_file_is_still_filed(tmp_path):
     library = tmp_path / "music"
     job = make_job([r"share\BoC\MHTRTC\01 - Wildlife Analysis.flac"])
 
-    results = execute_plan(plan_organization(job, str(root), str(library)), RELEASE, mode="copy")
+    results = execute_plan(plan_organization(job, str(root), str(library)), RELEASE)
 
     assert results["organized"] == 1
     assert results["failed"] == 0
@@ -332,17 +328,22 @@ def test_untaggable_file_is_still_filed(tmp_path):
 
 # ---------------------------------------------------------------- end to end
 
-def test_organize_job_end_to_end_dry_run(tmp_path):
+def test_organize_job_end_to_end_moves_the_album_and_tidies_slskd_s_folder(tmp_path):
     root = seed_downloads(tmp_path, ["01 - Wildlife Analysis.flac", "02 - An Eagle in Your Mind.flac"])
     library = tmp_path / "music"
     job = make_job([r"share\BoC\MHTRTC\01 - Wildlife Analysis.flac",
                     r"share\BoC\MHTRTC\02 - An Eagle in Your Mind.flac"])
+    told = []
 
-    results = asyncio.run(organize_job(job, str(root), str(library), "dry_run"))
+    results = asyncio.run(organize_job(job, str(root), str(library), on_plan=told.append))
 
-    assert results["organized"] == 2
-    assert results["plan"]["album_dir"].endswith("Music Has the Right to Children (1998)")
-    assert not library.exists()
+    album = library / "Boards of Canada" / "Music Has the Right to Children (1998)"
+    assert results["organized"] == 2 and results["tracks_organized"] == 2
+    assert results["plan"]["album_dir"] == str(album) and told == [results["plan"]]
+    assert sorted(path.name for path in album.iterdir()) == ["01 - Wildlife Analysis.flac",
+                                                             "02 - An Eagle in Your Mind.flac"]
+    assert results["removed_dirs"] == [str(root / "MHTRTC")] and not (root / "MHTRTC").exists()
+    assert "dry_run" not in results and "mode" not in results
 
 
 def test_organize_job_reports_when_nothing_is_on_disk(tmp_path):
@@ -350,7 +351,7 @@ def test_organize_job_reports_when_nothing_is_on_disk(tmp_path):
     root.mkdir()
     job = make_job([r"share\BoC\MHTRTC\01 - Wildlife Analysis.flac"])
 
-    results = asyncio.run(organize_job(job, str(root), str(tmp_path / "music"), "copy"))
+    results = asyncio.run(organize_job(job, str(root), str(tmp_path / "music")))
 
     assert results["organized"] == 0
     assert results["plan"]["problems"]
@@ -375,10 +376,12 @@ def test_cover_art_is_carried_into_the_library(tmp_path):
     plan = plan_organization(job, str(root), str(library))
     assert plan["companion_count"] == 2
 
-    execute_plan(plan, RELEASE, mode="copy")
+    execute_plan(plan, RELEASE)
     album = library / "Boards of Canada" / "Music Has the Right to Children (1998)"
     assert (album / "cover.jpg").exists()
     assert (album / "album.log").exists()
+    #? moved with the tracks, like them
+    assert not (root / "MHTRTC" / "cover.jpg").exists() and not (root / "MHTRTC" / "album.log").exists()
 
 
 def test_unrelated_file_types_are_not_dragged_along(tmp_path):
@@ -393,21 +396,23 @@ def test_move_removes_the_emptied_source_folder(tmp_path):
     library = tmp_path / "music"
     job = make_job([r"share\BoC\MHTRTC\01 - Wildlife Analysis.flac"])
 
-    results = asyncio.run(organize_job(job, str(root), str(library), "move"))
+    results = asyncio.run(organize_job(job, str(root), str(library)))
 
     assert results["removed_dirs"]
     assert not (root / "MHTRTC").exists()
 
 
-def test_copy_never_removes_the_source(tmp_path):
-    """copy exists precisely so the original stays put."""
-    root = seed_with_extras(tmp_path, ["01 - Wildlife Analysis.flac"], [])
+def test_a_filing_never_deletes_audio_it_did_not_file(tmp_path):
+    """The clean-up runs after every filing now (until 2.1.13, only after a move): a folder still holding
+    music nobody asked for - another job's, or files of this share not wanted - is kept, music and all."""
+    root = seed_with_extras(tmp_path, ["01 - Wildlife Analysis.flac"], ["99 - Bonus.flac"])
     job = make_job([r"share\BoC\MHTRTC\01 - Wildlife Analysis.flac"])
 
-    results = asyncio.run(organize_job(job, str(root), str(tmp_path / "music"), "copy"))
+    results = asyncio.run(organize_job(job, str(root), str(tmp_path / "music")))
 
-    assert "removed_dirs" not in results
-    assert (root / "MHTRTC" / "01 - Wildlife Analysis.flac").exists()
+    assert results["organized"] == 1 and results["removed_dirs"] == []
+    assert (root / "MHTRTC" / "99 - Bonus.flac").exists()
+    assert not (root / "MHTRTC" / "01 - Wildlife Analysis.flac").exists()
 
 
 def test_source_is_kept_when_something_was_skipped(tmp_path):
@@ -420,7 +425,7 @@ def test_source_is_kept_when_something_was_skipped(tmp_path):
     destination.write_bytes(b"already here")
 
     job = make_job([r"share\BoC\MHTRTC\01 - Wildlife Analysis.flac"])
-    results = asyncio.run(organize_job(job, str(root), str(library), "move"))
+    results = asyncio.run(organize_job(job, str(root), str(library)))
 
     assert results["skipped"] == 1
     assert results["removed_dirs"] == []
@@ -577,7 +582,7 @@ def test_the_albumartist_tag_follows_the_folder_and_the_track_keeps_its_credit(t
     library = tmp_path / "music"
     job = make_job([r"share\Kanye West\Donda\01 - Donda Chant.flac"], release=DONDA,
                    directory=r"share\Kanye West\Donda")
-    execute_plan(plan_organization(job, str(tmp_path / "downloads"), str(library)), DONDA, mode="copy")
+    execute_plan(plan_organization(job, str(tmp_path / "downloads"), str(library)), DONDA)
 
     written = FLAC(str(library / "Ye" / "Donda (2021)" / "01 - Donda Chant.flac"))
     assert written["albumartist"] == ["Ye"]

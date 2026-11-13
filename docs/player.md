@@ -2043,7 +2043,7 @@ it is that once - and so does any other song of the album that comes up while it
 straight away, without a wait of its own. Info's **Normalization** row says so (`Played as it is this
 time`), and the turntable plays it as it is too. Once the album is measured, its songs play levelled. An
 album is measured once: the measurements are kept, and a download deadwax files is measured as it's
-filed (not in dry run). After that, a song waits only while its levelled copy is made, a second or so,
+filed. After that, a song waits only while its levelled copy is made, a second or so,
 and with Gapless off or while AirPlaying the next song's copy is asked for a few seconds into each song.
 
 **Nothing is written to your files.** The measurements live in deadwax's database, kept by each FLAC

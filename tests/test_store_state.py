@@ -60,7 +60,8 @@ def fresh(monkeypatch, tmp_path):
     library.clear_scan_cache()
     monkeypatch.setattr(store_index, "_FILING_NOW", {})
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path / "music"))
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "off")
+    #? organizing off: no slskd folder (2.1.13 - until then ORGANIZE_MODE off)
+    monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", None)
     yield
     library.clear_scan_cache()
 

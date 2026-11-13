@@ -11,7 +11,7 @@ What these hold (every rule decided with James on 2026-09-27):
 
   - Grants on every way a download ends, to each requester still waiting: filed - added; every file already
     there - added in the same release's folder (a second copy not filed beside the first), flagged for the
-    admin in an untagged one; some files failed - added, incomplete; a dry run, nothing filed - nothing.
+    admin in an untagged one; some files failed - added, incomplete; nothing filed - nothing.
   - Starred AS THE USER once Navidrome has it (search3 by release id, star, confirmed by getAlbum's starred;
     `star` answering OK proves nothing), retried with a growing wait; never NAVIDROME_USER's login. A
     credential Navidrome refuses dies - the albums wait, the library says "sign in again" - and a new
@@ -200,7 +200,6 @@ def on(monkeypatch, tmp_path):
     #? the player's shared login - which no star is ever made with
     monkeypatch.setattr(Config, "NAVIDROME_USER", "demo")
     monkeypatch.setattr(Config, "NAVIDROME_PASSWORD", "demo-pw")
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "copy")
     monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(tmp_path / "downloads"))
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path / "library"))
     monkeypatch.setattr(Config, "SLSKD_INCOMPLETE_PATH", None)
@@ -319,7 +318,6 @@ def credential(on, user: str) -> dict | None:
     ({"organized": 1, "tracks_organized": 0, "skipped": 0, "failed": 1}, True, None),
     #? nothing placed, nothing there: nothing could be filed
     ({"organized": 0, "skipped": 0, "failed": 0}, True, None),
-    ({"organized": 2, "tracks_organized": 2, "skipped": 0, "failed": 0, "dry_run": True}, True, None),
     (None, True, None),
 ])
 def test_what_each_way_a_download_ends_gives(results, same, given):
@@ -388,6 +386,8 @@ def test_a_second_copy_of_a_release_held_is_not_filed_and_is_given(on):
     job(on, "james")
     file_it(on)
     [album] = run(on.store.index_present(on.root, "mb-1"))
+    #? the first filing MOVED its files out of slskd's folder (2.1.13): the second download brings its own
+    downloads(on)
     second = job(on, "ethan", peer="carol")
 
     file_it(on, "carol")
@@ -416,14 +416,14 @@ def test_everything_already_in_an_untagged_folder_is_flagged_for_the_admin_and_g
 
 def test_some_files_failing_to_file_still_gives_it_marked_incomplete(on, monkeypatch):
     downloads(on)
-    real_copy = shutil.copy2
+    real_move = shutil.move
 
-    def copy2(source, target, *args, **kwargs):
+    def move(source, target, *args, **kwargs):
         if str(source).endswith("02.flac"):
             raise OSError(28, "No space left on device")
-        return real_copy(source, target, *args, **kwargs)
+        return real_move(source, target, *args, **kwargs)
 
-    monkeypatch.setattr(organizer.shutil, "copy2", copy2)
+    monkeypatch.setattr(organizer.shutil, "move", move)
     job_id = job(on, "ethan")
     file_it(on)
 
@@ -432,15 +432,14 @@ def test_some_files_failing_to_file_still_gives_it_marked_incomplete(on, monkeyp
     assert run(on.store.get_job(job_id))["library_grant"] == "incomplete"
 
 
-@pytest.mark.parametrize("mode_or_problem", ["dry_run", "nothing", "no track"])
-def test_a_dry_run_or_nothing_filed_gives_nothing(on, monkeypatch, mode_or_problem):
+@pytest.mark.parametrize("problem", ["nothing", "no track"])
+def test_nothing_filed_gives_nothing(on, monkeypatch, problem):
+    """(Until 2.1.13 a dry run was a case here too: filing always moves now.)"""
     downloads(on)
-    if mode_or_problem == "dry_run":
-        monkeypatch.setattr(Config, "ORGANIZE_MODE", "dry_run")
-    elif mode_or_problem == "nothing":
+    if problem == "nothing":
         monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", str(on.tmp / "elsewhere"))
     else:
-        monkeypatch.setattr(organizer.shutil, "copy2", lambda *a, **k: (_ for _ in ()).throw(OSError(13, "denied")))
+        monkeypatch.setattr(organizer.shutil, "move", lambda *a, **k: (_ for _ in ()).throw(OSError(13, "denied")))
     job_id = job(on, "ethan")
     file_it(on)
     assert entries(on) == {}
@@ -1191,6 +1190,7 @@ def test_a_download_nothing_of_could_be_filed_offers_the_next_peer_with_logins_o
 def test_a_partly_filed_or_dry_run_download_is_not_one_nothing_could_be_filed_of():
     assert poller.job_outcome("complete", "1 file(s) failed to organize", not_filed=True) == "partly_filed"
     assert poller.job_outcome("complete", "1 file(s) failed to organize, no track was filed", not_filed=True) == "not_filed"
+    #? a row from before 2.1.13, when filing could be a dry run: still not one the next peer can start again
     assert poller.job_outcome("complete", "dry run - not organized", not_filed=True) is None
     assert poller.job_outcome("complete", poller.NOTHING_ORGANIZED) is None
 

@@ -75,13 +75,14 @@ export interface ServerSettings {
   /** Always false today. Present so the tab states it rather than implying it. */
   editable: boolean
   groups: SettingGroup[]
-  organize_modes: Record<string, string>
   /**
-   * Whether organizing can actually happen, and every reason it can't.
+   * Whether organizing - moving each finished download into the library - can actually happen,
+   * and every reason it can't.
    *
    * Derived server-side and deliberately reported as a list: "why did nothing get filed" has
-   * four separate possible causes, and checking them one at a time is how people conclude
-   * the feature is broken.
+   * several possible causes (either folder unset, or unusable from inside the container), and
+   * checking them one at a time is how people conclude the feature is broken. (2.1.13) No
+   * `organize_modes` any more: filing always moves.
    */
   organizing: { enabled: boolean; blockers: string[] }
 }

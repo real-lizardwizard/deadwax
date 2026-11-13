@@ -1018,6 +1018,27 @@ class JobStore:
             logger.error(f"failed to read jobs in {statuses}")
             return []
 
+    async def jobs_with_error(self, status: str, errors: tuple[str, ...]) -> list[dict]:
+        """Every job in `status` whose error is exactly one of `errors`, oldest first (2.1.13: refile_refused)."""
+        if not self.available or not errors:
+            return []
+
+        def read():
+            placeholders = ",".join("?" for _ in errors)
+            with self._connect() as connection:
+                rows = connection.execute(
+                    f"SELECT * FROM jobs WHERE status = ? AND error IN ({placeholders}) ORDER BY id",
+                    (status, *errors),
+                ).fetchall()
+                return [self._row_to_job(r) for r in rows]
+
+        try:
+            return await asyncio.to_thread(read)
+
+        except Exception:
+            logger.error(f"failed to read {status} jobs by their error")
+            return []
+
     async def update_status(self, job_id: int, status: str, error: str | None = None) -> None:
         if not self.available:
             return

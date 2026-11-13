@@ -621,7 +621,7 @@ console.log('\nDone: how it ended, and how long ago')
     { text: 'Stopped while being added to your library', tone: 'warning', tell: true, detail: "deadwax stopped while filing this - check the library and slskd's folder" })
   //? (2.0.4) the row's own words in a listener's (lib/errorWords.ts jobErrorWords) - never "check SLSKD_DOWNLOAD_PATH"
   check('any other ending, in the row\'s words, as a listener reads them - and the tell and its own words, for the row to draw',
-    words(null, 'dry run - not organized'), { text: 'Downloaded, but not added to your library: deadwax is set to rehearse adding albums, without moving any files.', tone: 'warning', tell: true, detail: 'dry run - not organized' })
+    words(null, 'dry run - not organized'), { text: 'Downloaded, but not added to your library: back then, deadwax only rehearsed adding albums, without moving any files.', tone: 'warning', tell: true, detail: 'dry run - not organized' })
   check('finished with organizing off', words(null, null), { text: 'Downloaded, but not added to your library', tone: 'warning', tell: true })
   check('never read out of the error text: "already in the store" with no outcome is its own words',
     words(null, 'already in the store: all 3 track(s)').text, 'already in the store: all 3 track(s)')
@@ -651,7 +651,7 @@ console.log('\npersonal libraries (2.0.0-player.51): what a filing gave, and a d
     { text: "In your library - 2 files couldn't be added", tone: 'warning', detail: '2 file(s) failed to organize' })
   check('logins off (no `library`): the words it always had', [words('filed', null, undefined).text, words('already_there', 'x', undefined).text],
     ['In your library', 'You already had it'])
-  check('...and nothing given says its own words, as a listener reads them', words(null, 'dry run - not organized', null, true).text, 'Downloaded, but not added to your library: deadwax is set to rehearse adding albums, without moving any files.')
+  check('...and nothing given says its own words, as a listener reads them', words(null, 'dry run - not organized', null, true).text, 'Downloaded, but not added to your library: back then, deadwax only rehearsed adding albums, without moving any files.')
 
   const notFiled = job('complete', { outcome: 'not_filed', error: 'nothing could be organized, check SLSKD_DOWNLOAD_PATH', alternatives_left: 2 })
   const v = view([notFiled])

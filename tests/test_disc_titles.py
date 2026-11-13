@@ -147,8 +147,7 @@ def test_a_download_is_filed_with_its_disc_titles(tmp_path):
            "files": [{"filename": f"share\\DSOTM\\{t['position']:02d} - {t['title']}.flac", "size": 1}
                      for t in BOX["tracks"]]}
 
-    results = execute_plan(plan_organization(job, str(tmp_path / "downloads"), str(tmp_path / "music")),
-                           BOX, mode="copy")
+    results = execute_plan(plan_organization(job, str(tmp_path / "downloads"), str(tmp_path / "music")), BOX)
     assert results["organized"] == 4
     filed = {p.name: read_current_tags(p).get("discsubtitle") for p in (tmp_path / "music").rglob("*.flac")}
     assert sorted(filed.values()) == sorted(["Remastered Original Album"] * 2 + [LIVE] * 2)

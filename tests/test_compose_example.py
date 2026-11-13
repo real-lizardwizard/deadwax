@@ -70,9 +70,11 @@ def _compose() -> str:
 
 def test_the_scan_finds_what_deadwax_is_known_to_read():
     """The scan is only as good as its patterns: every setting Config knows, TRUSTED_ORIGINS (os.getenv), the removed
-    DEADWAX_ADMINS (still read, to say it's ignored) and the start-up script's PUID/PGID are all found by it."""
+    DEADWAX_ADMINS and ORGANIZE_MODE (2.1.13) - each still read, to say it's ignored - and the start-up script's
+    PUID/PGID are all found by it."""
     found = _read_by_deadwax()
-    known = set(Config.EDITABLE) | set(Config.NOT_EDITABLE) | {"TRUSTED_ORIGINS", "DEADWAX_ADMINS", "PUID", "PGID"}
+    known = set(Config.EDITABLE) | set(Config.NOT_EDITABLE) | {"TRUSTED_ORIGINS", "DEADWAX_ADMINS", "ORGANIZE_MODE",
+                                                                "PUID", "PGID"}
     assert known <= found, sorted(known - found)
 
 
@@ -112,7 +114,8 @@ def test_the_list_gives_the_defaults_the_code_has():
         row = next(line for line in section.splitlines() if line.startswith(f"| `{name}` |"))
         assert row.startswith(f"| `{name}` | `{default}` |"), row
         checked += 1
-    assert checked >= 9
+    #? (2.1.13) 8: ORGANIZE_MODE's dry_run was one of them, and it is no setting now
+    assert checked >= 8
 
 
 def test_the_list_gives_the_defaults_the_code_computes():
@@ -206,10 +209,11 @@ def test_an_environment_change_is_never_said_to_need_only_a_restart(monkeypatch)
     said = [config.LOGINS_LOCKED, auth.unusable()]
     monkeypatch.setattr(Config, "DEADWAX_SECRET_KEY", "x" * 64)
     monkeypatch.setattr(Config, "OVERRIDDEN", set())
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "dry_run")
-    said.append(Config.describe_logins_organizing())
-    monkeypatch.setattr(Config, "ORGANIZE_MODE", "copy")
+    #? (2.1.13) organizing off is a folder unset - one or both - since there is no mode any more
+    monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", "/downloads")
     monkeypatch.setattr(Config, "LIBRARY_PATH", None)
+    said.append(Config.describe_logins_organizing())
+    monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", None)
     said.append(Config.describe_logins_organizing())
     for words in said:
         assert words and "recreate the container" in words and "restart deadwax" not in words, words
@@ -224,22 +228,27 @@ def test_the_compose_example_s_env_file_is_said_to_be_optional_everywhere():
 def test_trimming_an_old_compose_file_is_said_in_an_order_that_works():
     """Server settings saves only a value that differs from the one it shows (editedEnvDraft drops a draft equal to
     the committed value), so "save it there first, then take the line out" saves nothing and loses the setting. The
-    line comes out first; and with logins on, ORGANIZE_MODE and Navidrome stay, or nothing can be reached."""
+    line comes out first; and with logins on, Navidrome stays, or only the break-glass sign-in can reach anything.
+    (2.1.13) An ORGANIZE_MODE line is no setting now - it can simply go, and the page says so."""
     text = re.sub(r"\s+", " ", (REPO / "docs/getting-started.md").read_text(encoding="utf-8"))
     trim = text[text.index("**Already have a longer compose file?**"):text.index("## The first run")]
     assert "first (its row" not in trim
     assert trim.index("take a setting's line out") < trim.index("set the setting again in Server settings")
-    assert "With logins on, leave `ORGANIZE_MODE`" in trim and "`NAVIDROME_`" in trim
+    assert "With logins on, leave the three `NAVIDROME_` lines" in trim
+    assert "An `ORGANIZE_MODE` line can simply go: deadwax no longer reads it" in trim
     view = (REPO / "ui/src/components/SettingsView.tsx").read_text(encoding="utf-8")
     assert "(committed.value ?? '') === value) delete next[key]" in view
 
 
 def test_the_example_env_says_to_set_organizing_before_logins():
-    """Logins on with organizing still dry run makes every route 503, Server settings included - so .env.example's
-    AUTH_MODE line says to set Organizing first, not merely that it's needed."""
+    """Logins on with organizing off makes every route 503, Server settings included - so .env.example's AUTH_MODE
+    line says to have Organizing on first, not merely that it's needed. (2.1.13) Organizing on is the two folders set
+    - there is no mode to set any more - and the block names them, never ORGANIZE_MODE or a dry run."""
     text = (REPO / ".env.example").read_text(encoding="utf-8")
     block = text[text.index("# Logins"):text.index("#AUTH_MODE=on")]
     assert "BEFORE you turn it" in block and "Organizing" in block and "Server settings included" in block
+    assert "SLSKD_DOWNLOAD_PATH" in block and "LIBRARY_PATH" in block
+    assert "ORGANIZE_MODE" not in block and "dry run" not in block and "copy or move" not in block
 
 
 def test_the_readme_names_the_locked_settings_as_server_settings_shows_them():

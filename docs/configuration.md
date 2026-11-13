@@ -19,7 +19,7 @@ There are three kinds of setting:
 **Most of them are meant to be set in the app.** The [compose example](../docker-compose.example.yml)
 holds only what Docker needs - the image, the folders and the port - and everything else starts at a
 sensible default: open deadwax after its first start and set slskd, MusicBrainz's email and Navidrome
-in Server settings → Connections, and organizing under Library. Any of them can be an environment
+in Server settings → Connections, and how albums are named under Library. Any of them can be an environment
 variable instead; [the list](#environment-variables) has every one, with how to give it.
 
 A server setting can be given in three places. The first one found wins:
@@ -152,9 +152,9 @@ answer in memory for an hour, as it always did.)
 
 | setting | default | what it does |
 | --- | --- | --- |
-| `SLSKD_DOWNLOAD_PATH` | `/downloads` in the image | where slskd's **finished** downloads appear inside this container: mount slskd's downloads folder at `/downloads` and the image's default is right. It must be the same files slskd writes; see [the three folders](getting-started.md#the-three-folders). |
+| `SLSKD_DOWNLOAD_PATH` | `/downloads` in the image | where slskd's **finished** downloads appear inside this container: mount slskd's downloads folder at `/downloads` and the image's default is right. It must be the same files slskd writes; see [the three folders](getting-started.md#the-three-folders). Mount it **read-write**, and run slskd as the same user as deadwax (`PUID`/`PGID`): each finished download is moved out of the folder slskd made for it, and one deadwax can't write in is refused before anything moves, then filed by itself once it can be. It must not be `LIBRARY_PATH`, inside it, or a folder holding it. |
 | `SLSKD_INCOMPLETE_PATH` | | optional: slskd's **incomplete** folder inside this container. Setting it turns on two clean-ups: a cancelled download's half-finished file is deleted, and the empty folders slskd leaves in there are cleared every ten minutes. Leave it unset to keep slskd's own behaviour, which keeps partial files so a retry can resume. |
-| `LIBRARY_PATH` | `/music` in the image | your music library inside this container: mount it at `/music` and the image's default is right. Organized albums are filed here, and Needs a look, Library care, the Edit panel and the "already have it" checks read it. The Library tab shows what Navidrome has scanned, not this folder. Everything else works without it. |
+| `LIBRARY_PATH` | `/music` in the image | your music library inside this container: mount it at `/music` and the image's default is right. A folder of its own, never inside `SLSKD_DOWNLOAD_PATH` (nothing is filed while the two overlap). Organized albums are filed here, and Needs a look, Library care, the Edit panel and the "already have it" checks read it. The Library tab shows what Navidrome has scanned, not this folder. Everything else works without it. |
 | `DB_PATH` | `/config/deadwax.db` | deadwax's database. An install from before the rename keeps using `/config/jimbrainz.db` if that's where its data is. |
 | `PLAYER_CACHE_PATH` | *(the container's temporary space)* | where [the player](player.md#seeking-and-where-safari-lands) keeps the FLAC songs it repackages: as MP4s for Safari and iPhones, whose seeks only land where you asked in an MP4, and as the fragmented MP4s [Gapless](player.md#one-stream-for-flac) joins into one stream, in any browser, including hi-res songs resampled to 48 kHz for [Maximum quality](player.md#maximum-quality-hi-res-at-48-khz) (a resampled copy is kept apart from the song's original, and is about a quarter of its size). deadwax makes a folder of its own inside it, `deadwax-player`, private to the user it runs as, and touches nothing else there, so it can be a folder other things use too. **It's only a cache**: nothing in it needs backing up, deleting it is always safe, and a song that isn't in it is made again from Navidrome the next time it's played, which only makes that first play start a moment later. Left empty, it's the container's temporary space, which starts empty whenever the container is recreated. Best on a fast disk (an SSD); see below. A change applies to the next song, with no restart. |
 | `PLAYER_CACHE_MB` | `1024` | the most that cache holds, in MB, from 64 to 1048576. A CD-quality song is 20 to 60 MB, so the default is a few albums. The songs played longest ago are cleared first. While a song is being made its download sits beside it until it's done, so the folder can briefly hold one song more than this. A song another song is waiting behind is never cleared while it's being played (it was served in the last two minutes), so a song that doesn't fit beside the ones playing waits: Safari is sent it as FLAC, and the gapless stream plays it the ordinary way. A single song bigger than the whole setting is made only while nothing else in the cache is being played, and is then kept on its own. The MP4 and the fragmented MP4 of one song are two files, and both count. With the player's [Normalization](player.md#normalization) on (the default) most FLAC songs are kept as levelled 24-bit copies, about 1.5 times a CD song's file, so the default holds fewer albums: a few GB on an SSD suits it better. Songs being measured for it are downloaded into this folder too, a few at a time, and deleted once measured. deadwax also leaves the disk 128 MB spare and needs room for two copies of the song being made: when there isn't, older songs are cleared to make room, and if there still isn't enough, Safari is sent the FLAC and the gapless stream plays that song the ordinary way. Nothing is cleared for a song clearing couldn't make room for. The desktop's [visualizer](player.md#the-visualizer) (and the phone's turntable) cut their stretches from a song's MP4 here when there is one - with Normalization on, a levelled song's own levelled copy - and otherwise - in a browser that plays the FLAC as it is, Chrome, Firefox or Edge with Gapless off and Normalization off - straight from the FLAC on Navidrome, adding nothing to the cache; only where that can't be done (the log says so once a song) is an MP4 made and kept for them, as Safari's would be. |
@@ -189,9 +189,22 @@ can land seconds off.
 
 ### Organizing
 
+**Every finished download is moved into the library**, tagged and filed, whenever `SLSKD_DOWNLOAD_PATH`
+and `LIBRARY_PATH` are both set ([Paths](#paths)) - and the slskd folder it came from is removed once
+nothing is left in it but art, scans, checksums, rip logs and system clutter (a file it doesn't know,
+music in any format included, keeps the folder). A file the library already has is never overwritten. There is no setting for
+it: `ORGANIZE_MODE` (off, dry run, copy or move) was taken out in 2.1.13, and an old `ORGANIZE_MODE`
+line in your compose file or `.env` is ignored - start-up says so in the log - and can be deleted.
+**deadwax has to be able to write in slskd's download folders now**: a move takes each file out of
+the folder slskd made for it. So `/downloads` is mounted read-write (no `:ro` - a copy used to need
+only read access), and slskd and deadwax run as the same user and group, since slskd makes each
+download's folder as its own user. Where deadwax can't, it refuses to file that download (nothing is
+moved, copied or left half-done), the download's row and the log say why, Settings → Library says so,
+and the download is filed by itself once deadwax can write there - at a restart, or within 15
+minutes. See [Organizing](organizing.md) and [troubleshooting](troubleshooting.md#downloads-finish-but-nothing-appears-in-my-library).
+
 | setting | default | what it does |
 | --- | --- | --- |
-| `ORGANIZE_MODE` | `dry_run` | what happens when a download finishes. `off`: nothing. `dry_run`: the log says where each file would go, and nothing is written. `copy`: files are tagged and copied into the library, and slskd's copies stay. `move`: files are tagged and moved, and slskd's emptied folder is removed. See [Organizing](organizing.md). With [logins](#logins-environment-only) on it has to be `copy` or `move`. |
 | `ALBUM_FOLDER_TEMPLATE` | `{album} ({year}) [{edition}]` | how an album's folder is named. The artist folder above it is always the artist. See [folder names](organizing.md#folder-names). |
 | `COUNTRY_IN_FOLDER` | `off` | `on` lets a release's country name its folder when nothing else tells the pressing apart, as in `Dummy (1994) [GB]`. Two different releases never share a folder either way. |
 | `RETAG_RENAME_WAIT` | `20` | when applying a release changes an album's tags **and** its folder, Edit album's Release tab writes the tags first and renames the folder afterwards, because Navidrome keeps plays, ratings and favourites across either change, but not both at once. Without Navidrome set up, this is the seconds it waits between the two. **With Navidrome set up** (its three settings, [above](#navidrome-settings--connections)), it asks Navidrome instead, and renames as soon as Navidrome has finished a scan that began after the tags were written, usually a few seconds later; the number then only has to be more than 0, and is the fixed wait used if Navidrome answers from the start in a way deadwax can't use (a refused login, say). If Navidrome finishes no scan within 90 seconds, or can't be reached at all, the folder is left where it is and the Release tab says so; applying the album again checks with Navidrome first, and renames once it has scanned (see [troubleshooting](troubleshooting.md#applying-a-release-left-the-folder-where-it-was)). `0` renames straight away, either way. From 0 to 300. |
@@ -218,7 +231,7 @@ can land seconds off.
 
 | setting | default | what it does |
 | --- | --- | --- |
-| `FETCH_LYRICS` | `on` | look up lyrics on [LRCLIB](https://lrclib.net) for each album as it's filed, and save them as a `.lrc` file beside each track. It only ever adds files, and nothing is fetched in dry run. |
+| `FETCH_LYRICS` | `on` | look up lyrics on [LRCLIB](https://lrclib.net) for each album as it's filed, and save them as a `.lrc` file beside each track. It only ever adds files. |
 | `LYRICS_LEAD_MS` | `0` | milliseconds to move synced lyrics *earlier* as they're written (negative moves them later), from −5000 to 5000. LRCLIB's timings are tapped along by people and tend to trail the singing a little, so if lines light up a beat late in your player (Now Playing's lyrics included), try `300`. **Re-time saved lyrics**, beside it in Server settings, applies the saved value to lyrics already saved - refused while the lead has an unsaved change. |
 
 ### The container
@@ -259,11 +272,11 @@ on its way rather than fetching it twice; your cancel leaves a download others s
 Clear done clears it from your list - an admin, or someone given Everyone's downloads, sees and
 cancels everyone's. See [Downloading](downloading.md#with-logins-on-downloads-per-person).
 
-**Organizing has to be on**: with logins on, `ORGANIZE_MODE` must be `copy` or
-`move`, with `LIBRARY_PATH` and `SLSKD_DOWNLOAD_PATH` set - a download is the person's who asked for it
-once it's filed, and in dry run nothing ever is. Until it is, everything but the health check and the
-pages answers 503 saying why, and start-up logs it; while logins are on, Server settings refuses a
-save that would switch organizing off.
+**Organizing has to be on**: with logins on, `LIBRARY_PATH` and `SLSKD_DOWNLOAD_PATH` must both be
+set - a download is the person's who asked for it once it's filed, and with either folder unset
+nothing is. The image sets both, so this only bites if one was emptied or you run deadwax outside the
+image. Until both are set, everything but the health check and the pages answers 503 saying why, and
+start-up logs it; while logins are on, Server settings refuses a save that would empty either folder.
 
 **Staying signed in.** Signing in keeps you signed in on that device for 30 days from when you last
 used deadwax there, through restarts. Every few minutes deadwax asks Navidrome whether the login you
@@ -314,7 +327,7 @@ deadwax's database, or for the few the app can't set (**environment only**).
 
   ```yaml
       environment:
-        - ORGANIZE_MODE=copy
+        - COVER_ART_SIZE=1200
         - TRUSTED_ORIGINS=https://music.example.com
   ```
 
@@ -351,7 +364,6 @@ deadwax's database, or for the few the app can't set (**environment only**).
 | `SLSKD_INCOMPLETE_PATH` | *(none - clean-up off)* | Library → Paths | slskd's incomplete folder inside this container: a cancel then deletes its partial file, and slskd's empty folders there are cleared. | `/incomplete` |
 | `PLAYER_CACHE_PATH` | *(the container's temporary space)* | Library → Paths | where the player keeps the copies of songs it makes; only a cache, best on an SSD. | `/cache` |
 | `PLAYER_CACHE_MB` | `1024` | Library → Paths | the most that cache holds, in MB, 64 to 1048576. | `4096` |
-| `ORGANIZE_MODE` | `dry_run` | Library → Organizing | `off`, `dry_run`, `copy` or `move`: what happens when a download finishes; [more](#organizing). | `copy` |
 | `ALBUM_FOLDER_TEMPLATE` | `{album} ({year}) [{edition}]` | Library → Organizing | how an album's folder is named ([folder names](organizing.md#folder-names)). | `{album} ({year})` |
 | `COUNTRY_IN_FOLDER` | `off` | Library → Organizing | `on` lets a pressing's country name its folder when nothing else tells it apart. | `on` |
 | `RETAG_RENAME_WAIT` | `20` | Library → Organizing | seconds between an apply's new tags and its folder rename, 0 to 300 (with Navidrome set up it asks instead). | `30` |
@@ -365,12 +377,13 @@ deadwax's database, or for the few the app can't set (**environment only**).
 
 | variable | default | in the app | what it does | example |
 | --- | --- | --- | --- | --- |
-| `AUTH_MODE` | `off` | shown, locked: Connections → Logins | `on`: everyone signs in with their Navidrome account. Anything but `off` or `on` is read as `on`. Needs `DEADWAX_SECRET_KEY`, and `ORGANIZE_MODE` `copy` or `move` - set that first: with logins on and organizing off, nothing can be reached to set it; [logins](#logins-environment-only). | `on` |
+| `AUTH_MODE` | `off` | shown, locked: Connections → Logins | `on`: everyone signs in with their Navidrome account. Anything but `off` or `on` is read as `on`. Needs `DEADWAX_SECRET_KEY`, and `SLSKD_DOWNLOAD_PATH` and `LIBRARY_PATH` both set (the image sets them) - check that first: with logins on and organizing off, nothing can be reached to set it; [logins](#logins-environment-only). | `on` |
 | `DEADWAX_SECRET_KEY` | *(none - required with logins on)* | shown, locked: Connections → Logins | encrypts the Navidrome logins deadwax keeps; at least 32 characters, from `openssl rand -hex 32`. In `.env` only. | `openssl rand -hex 32`'s output |
 | `DEADWAX_ADMIN_PASSWORD` | *(none - no such sign-in)* | shown, locked: Connections → Logins | the break-glass sign-in, as `deadwax`, for when Navidrome is down; make it long and random. | `openssl rand -base64 18`'s output |
 | `TRUSTED_ORIGINS` | *(none)* | no | behind a reverse proxy that rewrites the `Host` header, the address you open deadwax at, with the scheme, comma-separated for more; [the container](#the-container). | `https://music.example.com` |
 | `DB_PATH` | `/config/deadwax.db` *(or an older `/config/jimbrainz.db`, where that's the one there)* | shown, locked: Library → Paths | deadwax's database, which holds what Server settings saves - so it can't be moved from there. Never rename a `jimbrainz.db` to match. | `/config/deadwax.db` |
 | `DEADWAX_ADMINS` | - | no | **no longer read** (Navidrome's admins are deadwax's); while it's set, start-up says so. Take it out. | - |
+| `ORGANIZE_MODE` | - | no | **no longer read** (since 2.1.13 every finished download is moved into the library, whenever both folders are set - [Organizing](#organizing)); while it's set, start-up says so, and a value once saved in Server settings is cleared. Take it out. | - |
 
 ### The image's own
 
