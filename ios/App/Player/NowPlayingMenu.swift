@@ -12,14 +12,20 @@ import SwiftUI
 /// more (one is "Download") and never during a library's shuffle (that queue is your whole library; keeping it on the
 /// phone is Phase 3's own setting). Each is said over Now Playing ("Downloading: Roads", "Downloading 23 songs from Up
 /// Next", "Removed from this phone: Roads"), which has no mark to change. Every item carries its symbol.
+///
+/// The EQ (eq.md 3.1, app 0.5): a last section, one item - "EQ", `slider.vertical.3`, the output now's short setting
+/// as its subtitle ("Off", "Bass Boost") - opening the EQ as a sheet over Now Playing. "EQ", not "EQ…": it opens a
+/// page, as Info does.
 struct NowPlayingMenu: View {
     /// The song playing names its album: Go to album is in the menu.
     let hasAlbum: Bool
     let onInfo: () -> Void
+    let onEQ: () -> Void
     let onAlbum: () -> Void
 
     @Environment(PlayerModel.self) private var player
     @Environment(DownloadModel.self) private var downloads
+    @Environment(EQModel.self) private var eq
 
     var body: some View {
         let song = player.current.map { player.song(for: $0) ?? Song(queued: $0.track) }
@@ -42,6 +48,16 @@ struct NowPlayingMenu: View {
                     }
                 }
             }
+            Section {
+                Button(action: onEQ) {
+                    Label {
+                        Text(EQWords.nowPlaying)
+                        Text(eq.now.short)
+                    } icon: {
+                        Image(systemName: "slider.vertical.3")
+                    }
+                }
+            }
         } label: {
             Image(systemName: "ellipsis")
                 .font(.title3)
@@ -52,7 +68,7 @@ struct NowPlayingMenu: View {
         // drawn as the plain button it was (no tint): a button-styled menu with .buttonStyle, as Apple pairs them
         .menuStyle(.button)
         .buttonStyle(.plain)
-        .accessibilityLabel(NowPlayingWords.more(hasAlbum: hasAlbum, download: downloads.isOpen))
+        .accessibilityLabel(NowPlayingWords.more(hasAlbum: hasAlbum, download: downloads.isOpen, eq: true))
     }
 
     /// Download Up Next: each song from the one playing on that isn't here or didn't download, asked for as a song.

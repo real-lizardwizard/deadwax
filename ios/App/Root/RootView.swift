@@ -7,6 +7,7 @@ import SwiftUI
 struct RootView: View {
     @Environment(ServerModel.self) private var server
     @Environment(PlayerModel.self) private var player
+    @Environment(EQModel.self) private var eq
     @Environment(AppNavigation.self) private var navigation
     @Environment(\.scenePhase) private var scenePhase
 
@@ -28,8 +29,10 @@ struct RootView: View {
                 CoverCache.shared.forgetFailures()
                 server.becameActive()
                 player.becameActive()
+                eq.becameActive()
             case .background:
                 player.movedToBackground()
+                eq.movedToBackground()
             default:
                 break
             }

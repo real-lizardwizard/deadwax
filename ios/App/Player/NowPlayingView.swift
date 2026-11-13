@@ -25,6 +25,8 @@ struct NowPlayingView: View {
     @Environment(\.colorSchemeContrast) private var contrast
     @State private var showsUpNext = false
     @State private var showsInfo = false
+    /// The EQ over Now Playing (eq.md 3.1), from the •••: its own stack, "Done" at its top right.
+    @State private var showsEQ = false
     /// How far the sheet has been dragged down (points).
     @State private var dragY: CGFloat = 0
 
@@ -48,6 +50,7 @@ struct NowPlayingView: View {
         .offset(y: dragY)
         .sheet(isPresented: $showsUpNext) { UpNextScreen() }
         .sheet(isPresented: $showsInfo) { InfoView() }
+        .sheet(isPresented: $showsEQ) { EQSheet() }
         .onAppear { lyrics.opened() }
     }
 
@@ -145,7 +148,7 @@ struct NowPlayingView: View {
         case .synced, .plain:
             if let shown = lyrics.shown {
                 // made afresh for each song: a new song's lines start at their top
-                LyricsView(lyrics: shown, covered: showsUpNext || showsInfo)
+                LyricsView(lyrics: shown, covered: showsUpNext || showsInfo || showsEQ)
                     .id(track.id)
             }
         case .loading:
@@ -273,7 +276,7 @@ struct NowPlayingView: View {
             .buttonStyle(.plain)
             .accessibilityLabel(upNextLabel(shuffle: player.shuffle, repeat: player.repeatMode))
             Spacer()
-            NowPlayingMenu(hasAlbum: route != nil, onInfo: { showsInfo = true }) {
+            NowPlayingMenu(hasAlbum: route != nil, onInfo: { showsInfo = true }, onEQ: { showsEQ = true }) {
                 if let route { navigation.openAlbum(route) }
             }
         }

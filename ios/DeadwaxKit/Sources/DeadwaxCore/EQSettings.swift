@@ -38,6 +38,12 @@ public struct EQSettings: Codable, Equatable, Sendable {
     /// The name an unreadable file is set aside under, beside it: `eq-unreadable-2026-11-12.json`.
     public static func unreadableName(day: String) -> String { "eq-unreadable-\(day).json" }
 
+    /// The same, when one is already set aside that day (slice 3, the store): the second `eq-unreadable-2026-11-12-2.json`
+    /// and on - never one written over another.
+    public static func unreadableName(day: String, attempt: Int) -> String {
+        attempt <= 1 ? unreadableName(day: day) : "eq-unreadable-\(day)-\(attempt).json"
+    }
+
     public func output(_ key: String) -> EQOutputSetting? { outputs.first { $0.key == key } }
 
     /// A tone's ten gains: a built-in's, yours (flat if it has gone), or Custom's own.

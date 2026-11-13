@@ -1,4 +1,4 @@
-# The iPhone app (early: app 0.4, downloads and lyrics)
+# The iPhone app (early: app 0.5, downloads, lyrics and the EQ)
 
 deadwax is getting a native iPhone app, built with SwiftUI and its own audio engine, for what a web
 page can't do well: seamless joins and normalization done on the phone, downloads to play offline,
@@ -8,13 +8,15 @@ single test screen that proved the tools, the connection and the audio engine. P
 Up Next, Now Playing, normalization, the lock screen, plays counted, and picking up where you left
 off. Phase 2, downloads (app 0.3), followed: an album, or a song, downloaded to the phone plays from
 there, bit for bit as deadwax has it - and goes on playing when deadwax can't be reached (see
-[Downloads](#downloads) and [Offline](#offline)). **This is app 0.4, which adds lyrics** on Now
-Playing, as the web app shows them (see [Lyrics](#lyrics)). Playlists, Search and the rest come in
-the next phases (see [What it can't do yet](#what-it-cant-do-yet)).
+[Downloads](#downloads) and [Offline](#offline)). App 0.4 added lyrics on Now Playing, as the web app
+shows them (see [Lyrics](#lyrics)). **This is app 0.5, which adds the EQ**: ten sliders and nine
+presets, kept for each output on its own - your headphones, the speaker, the car - and switching by
+itself when the output changes (see [EQ](#eq)). Playlists, Search and the rest come in the next
+phases (see [What it can't do yet](#what-it-cant-do-yet)).
 
-**Nothing of Phase 2 or the lyrics has been seen on an iPhone yet.** It's built and tested on a Mac,
-and what only a phone can tell is what [the checks](#the-checks) are for. Until they're answered,
-read everything about downloads and lyrics below as what the app is built to do.
+**Nothing of Phase 2, the lyrics or the EQ has been seen on an iPhone yet.** It's built and tested on
+a Mac, and what only a phone can tell is what [the checks](#the-checks) are for. Until they're
+answered, read everything about downloads, lyrics and the EQ below as what the app is built to do.
 
 The app talks only to deadwax, never to Navidrome, through deadwax's own routes, so the phone never
 needs the Navidrome account deadwax itself uses. With logins on, you sign in with your own Navidrome
@@ -114,7 +116,7 @@ old one. It also uses up one of the few new app ids a free account may register 
 It pulls the latest code, asks GitHub whether the app's checks passed on it (and asks you before
 building one that failed or is still running), builds it (Release), and installs it **over** the app
 on the phone, so everything on the phone stays. Then it opens the app and says how long the new
-install runs: `Installed deadwax 0.4 (4), runs until Wed 18 Nov, 14:02`. It also says how long it
+install runs: `Installed deadwax 0.5 (5), runs until Wed 18 Nov, 14:02`. It also says how long it
 took and the Mac's free space before and after. Xcode doesn't need to be open.
 
 | option | what it does |
@@ -266,10 +268,11 @@ thin line along it for how far in the song is. Tap it for Now Playing.
   **Repeat all** to **Repeat one** and back to off, and this phone remembers it.
 - **Lyrics**, **AirPlay**, **Up Next**, and **•••** along the bottom. **Lyrics** (the speech bubble) shows
   the song's lyrics in the cover's place (see [Lyrics](#lyrics)). The **•••** menu has **Info**, **Go to album**, **Download** (or
-  Remove Download) for the song playing, and **Download Up Next** - every song still to play that
-  isn't on the phone, when that's two or more. Go to album closes Now Playing and opens the album's
-  page on the tab you're on. What a download item did is said for a moment at the top of Now Playing
-  ("Downloading: Roads", "Downloading 23 songs from Up Next").
+  Remove Download) for the song playing, **Download Up Next** - every song still to play that
+  isn't on the phone, when that's two or more - and last **EQ**, with the output's setting under it
+  ("Off", "Bass Boost"), which opens the [EQ](#eq) over Now Playing. Go to album closes Now Playing
+  and opens the album's page on the tab you're on. What a download item did is said for a moment at
+  the top of Now Playing ("Downloading: Roads", "Downloading 23 songs from Up Next").
 - The chevron at the top, or a swipe down, closes it.
 
 ### Up Next
@@ -388,13 +391,16 @@ takes away their soft top and bottom edges. Nothing about lyrics is on the lock 
   distorting", "Measuring the album… (3 of 10 songs)", "Off for this song - only FLAC songs are
   adjusted", or "Off" when Normalization is off. **Plays from**: "This phone - checked" (or "checked
   by size", or "not checked yet") for a song downloaded to the phone, "Streamed from deadwax" for one
-  that isn't.
+  that isn't. **EQ**, only while the EQ is on: what it's set to, on which output, and its preamp -
+  "Bass Boost on James's AirPods Pro, preamp -6.1 dB".
 
 An admin also has a **Debug** tab: the file, what was sent to the phone and how it's being played
 (**Sent as**, **On this phone** - the downloaded copy's check, and for a FLAC its fingerprint, bits,
 rate and channels -, **Normalization** in numbers like "Album, -3.60 dB · the album at -14.4 LUFS",
-**Gapless**, **Output**, **Conversion**, **Lane**, **Buffered ahead** and **Last start**), and every
-field Navidrome sent about the song and its album.
+**Gapless**, **Output**, **Conversion**, **Lane**, **Buffered ahead**, **Last start** and **EQ** -
+"Filtering: 4 filters at 48 kHz, preamp -6.1 dB", "Off: every sample passed through untouched" or
+"Changing: crossfading to the new curve"), and every field Navidrome sent about the song and its
+album.
 
 ## You
 
@@ -418,6 +424,9 @@ field Navidrome sent about the song and its album.
     album was still being measured" ("the song was" for a song levelled on its own). One song
     running into the next never waits. The choice is kept on this phone, and takes effect from the
     next thing you play.
+  - **EQ**: the output playing now under it ("iPhone speaker", "James's AirPods Pro") and its setting
+    at the right ("Off", "Bass Boost", "Custom"). It opens the [EQ](#eq) for that output. Each output
+    keeps its own EQ, and it's kept on this phone.
 - **Downloads**: what's on this phone ("2.1 GB"), opening [You > Downloads](#you--downloads). Under
   it, only while something is happening: "Downloading - 6 songs to go", what it's waiting for, or, in
   amber, "2 songs didn't download".
@@ -426,7 +435,7 @@ field Navidrome sent about the song and its album.
   If deadwax can't be reached, it says "Couldn't reach deadwax, so you're still signed in - try
   again." Changing your password is the web app's, for now.
 - **About**: deadwax's version, whether logins are on (for an admin), and the app's own version,
-  **0.4 (4)**.
+  **0.5 (5)**.
 - **This phone**: deadwax's address, **Change address**, and **Debug**, for an admin (with logins
   off, everyone is one).
 
@@ -450,24 +459,31 @@ Debug is where Phase 0's test screen lives now:
   the song to it, as any app must: an iPhone's own outputs and AirPods run at 48 kHz or lower. Under
   it, "An edit held for the next song" when one is (see [the checks](#what-only-a-phone-can-tell)), and
   the last song that failed, in its own words.
-- **EQ**: the EQ's audio unit, which sits between the app's mixer and the output whether the EQ is on
-  or not. **Unit** says what it is doing: "In the graph: passing every sample through" (off: every
+- **EQ**: what the [EQ](#eq) is doing. **Output** is the route as iOS gives it - each output's kind,
+  name and ID, raw ("Bluetooth (A2DP) · James's AirPods Pro · 60:F8:…"), one line each - and **Key**
+  the name the EQ keeps that output's setting under. Then the EQ's audio unit, which sits between the
+  app's mixer and the output whether the EQ is on or not. **Unit** says what it is doing: "In the graph: passing every sample through" (off: every
   sample goes out exactly as it came in), "filtering", "crossfading" (a change is fading in, over 20
   ms), "the output is stopped" (paused), "waiting for its first block of sound" (only for a moment as
   the output starts), or "Not made" with the reason, when the phone couldn't make it - or the output
   has more than 8 channels - and the music plays on without it. **Render block** says whether iOS
   asked the unit for the part that does its work: "iOS asked for it 3 times" or so (twice as it's
   made, once each time the output starts); "iOS hasn't asked for it" means no sound can go through
-  the EQ, and is worth telling me. **At this rate** is the output's rate and how many filter
-  sections each channel runs; **Changes** counts the crossfades, the changes that waited for the one
-  before, and any made for another rate; **Started with** is what was put in as the output last
-  started; **Over full scale** counts the samples the EQ pushed past the loudest a file can hold;
-  **Render** is how long the EQ takes per block of sound, against how long the block lasts.
+  the EQ, and is worth telling me. **Curve** is what the output's EQ is made of - for Bass Boost "4
+  tone bands", the curve's top (+6.0 dB) and where, and "preamp -6.1 dB (automatic)" - or "Off"; **At this rate** is the output's
+  rate and how many filter sections each channel runs; **Changes** counts the crossfades, the changes
+  that waited for the one before, and any made for another rate; **Started with** is what was put in
+  as the output last started ("James's AirPods Pro's curve, put in 0.1 ms before the output
+  started"), and **Start took** how long putting it in took - "0.016 ms, its curve made ahead" when
+  it was ready, as it should be, or "its curve made then, for 44.1 kHz" at a rate the output hadn't
+  started at before; **Over full scale** counts the samples the EQ pushed past the loudest a file can
+  hold; **Render** is how long the EQ takes per block of sound, against how long the block lasts;
+  **Kept** is what eq.json holds ("eq.json: 3 outputs, 1 preset of yours, 1.2 KB"), or the name an
+  unreadable one was set aside under.
   **Muffle what plays** is a test, for the checks below: it puts a steep treble cut (a -24 dB high
   shelf at 2 kHz) through the real unit, so whatever plays sounds muffled at once, and plain again
-  when you turn it off. It turns itself off when you leave Debug (locking the phone doesn't), and
-  it's off each time the app opens. The EQ itself - your settings for each output - comes in a
-  later build.
+  when you turn it off, the output's own EQ again. It turns itself off when you leave Debug (locking
+  the phone doesn't), and it's off each time the app opens.
 - **Engine log**: the app's audio engine says what it does, line by line - each song's lane starting,
   joins, a buffer played, a stream that ran dry, an edit held for the next song, a failure - and Debug
   keeps its last 500 lines, the newest last. While a song plays it writes about two lines a second, so
@@ -489,6 +505,96 @@ Debug is where Phase 0's test screen lives now:
   how long it took to come.
 - At the bottom, how long this install runs. In its last two days, it also says to run install.sh
   before then.
+
+## EQ
+
+The EQ shapes the sound on this phone, **for each output on its own**: your AirPods, wired
+headphones, the iPhone's speaker, the car, an AirPlay speaker each keep their own EQ, and the phone
+switches to the right one by itself whenever the output changes - AirPods connecting mid-song have
+their own EQ from the first sound in them. An output the phone hasn't met before starts **Off**.
+
+Open it from **You > Playback > EQ**, or from Now Playing's **•••** > **EQ**, which opens it over Now
+Playing (**Done** closes it). Either way it opens on the output playing now.
+
+**The EQ page**, top to bottom:
+
+- **The output**: its name and "Connected now" (or "Not connected"), and the **EQ** switch. Over
+  AirPlay, a note says a change is heard about 2 seconds later.
+- **The curve**: what you hear on that output, low notes on the left and high on the right, louder
+  above the middle line and quieter below. It goes grey and flat while the EQ is off. The line under
+  it says what is happening: "Off: nothing changes the sound.", "Flat: nothing changes the sound
+  yet.", or the preamp - "Preamp -6.1 dB, so loud songs don't clip." (below).
+- **Tone**: **Preset**, which opens the list of presets (below), then **ten sliders**, one for each
+  band from 31 Hz to 16 kHz, each from -12 to +12 dB in half-decibel steps. Touch anywhere in a
+  slider's column and drag up or down: the knob goes with your finger from wherever it was (it never
+  jumps to your finger), and the sound follows as you drag. There's a small tick under your thumb as
+  it reaches 0. Double-tap a column to put it back to 0. Moving a slider makes the tone **Custom**,
+  and then **Save as Preset…** keeps it under a name of yours.
+- **Other outputs**: every other output the phone has met, the most recent first, with the iPhone
+  speaker always there, and each one's setting ("Off", "Bass Boost"). Tap one to open its own EQ
+  page, which stays on that output. Swipe one for **Rename** and **Forget** (not the speaker).
+  Other outputs shows only on the page of the output that's playing.
+- On the page of an output that isn't connected: "Not connected: this is what it plays when it is."
+  above its curve, and **Forget This Output** at the bottom. Forgetting asks first ("Forget James's
+  AirPods Pro? Its EQ is deleted. It starts Off next time it connects."), as Forget does in Other
+  outputs.
+
+The **•••** at the top has **Rename…**: give an output a name of your own; leave it empty to go back
+to the name iOS gives it.
+
+**While the EQ is off, everything still works, and any change turns it on**: choosing a preset or
+moving a slider switches it on (VoiceOver says "EQ on"). Turning the switch off brings back the
+sound exactly as it was: off, the EQ passes every sample through untouched.
+
+**The page follows the output.** Opened from You or Now Playing, it changes to the output that's
+playing when that changes (VoiceOver says "EQ for James's AirPods Pro") - but not while your finger
+is on a slider, and not while something is open over it; it catches up when you let go or come back
+to it. The presets page always stays with the output it was opened for: a preset chosen there goes
+to that output even if it was disconnected meanwhile, and the top of the page says so ("James's
+AirPods Pro isn't connected: changes are kept for when it is.").
+
+**Presets.** Choosing one moves the sliders there and turns the EQ on; the page stays, so you can
+listen through several. **Custom** is at the top while your own slider positions are in use, and
+stays for as long as the page is open, so you can try a few presets and go back to where you were.
+
+| preset | what it does |
+| --- | --- |
+| Flat | Nothing changed. |
+| Bass Boost | More low end. |
+| Bass Reduce | Less low end. |
+| Treble Boost | More sparkle and air. |
+| Treble Reduce | Softer highs, for bright recordings or headphones. |
+| Vocal | Voices brought forward. |
+| Loudness | For listening quietly: the lows and highs lifted, as ears hear less of them at low volume. |
+| Small Speakers | For small speakers that can't play deep bass: the upper bass lifted instead. |
+| Spoken Word | For podcasts and audiobooks: rumble cut, voices clearer. |
+
+Your own presets are listed under **Your presets**: swipe one for **Rename** or **Delete**. A name
+can be up to 40 characters, and can't be one already used, a built-in's included, whatever its
+capitals or accents ("There's already a preset called "Bass Boost"."). Deleting a preset an output
+uses leaves that output's sliders where they were, as Custom. Presets are shared by every output;
+each output keeps which one it uses.
+
+**The preamp.** Neighbouring bands overlap, so the curve can go a little past a slider's value:
+Bass Boost's +5 dB slider makes about +6 dB of bass. So nothing ever clips, the EQ turns every song
+on that output down by the curve's highest boost - "Preamp -6.1 dB" for Bass Boost - and never turns
+anything up. That's why everything sounds a little quieter with a boost on: the volume buttons give
+it back.
+
+**The sound.** Every change - a slider, a preset, the switch, another output - fades in over 20
+milliseconds, so it never clicks. When an output starts, its EQ is in place before its first sound.
+
+**Where it's kept.** On this phone, in the app's own storage (`eq.json`, which the phone's backup
+keeps): it belongs to the phone, not to whoever is signed in, so signing out or in as someone else
+keeps it, and nothing of it goes to deadwax. If the file ever can't be read, it's set aside (Debug
+says under what name) and every output starts Off.
+
+**VoiceOver and text sizes.** The curve is one item that says its shape ("Up to 6 decibels louder in
+the bass. Preamp minus 6.1 decibels.") - and the rotor's **Audio Graphs** has **Play Audio Graph**,
+which plays it as a rising and falling tone. Each slider is one adjustable item ("125 hertz, plus 3.5 decibels"): swipe up or down
+to move it a decibel, and its actions include **Reset to 0**. At the largest text sizes the ten
+sliders become ten rows, each with a - and + button. With Reduce Motion, the curve and the sliders
+jump to a new setting rather than gliding.
 
 ## The lock screen and interruptions
 
@@ -780,8 +886,9 @@ hand: several of these ask how it compares.
 
 ### The EQ's first checks
 
-The EQ's audio unit is in this build, with nothing to set yet but Debug's test (You > Debug > EQ). Install
-the usual way, not with `--debug`: a Debug build's EQ runs far slower than the one that ships. AirPods:
+These came with the build that put the EQ's audio unit in, before it had anything to set but Debug's
+test (You > Debug > EQ); they still hold. Install the usual way, not with `--debug`: a Debug build's
+EQ runs far slower than the one that ships. AirPods:
 
 - **E0a Muffle.** Play test sound 1. Debug's EQ says "Unit: In the graph: passing every sample
   through" and "Render block: iOS asked for it" some number of times (tell me the number; if it says
@@ -795,6 +902,50 @@ the usual way, not with `--debug`: a Debug build's EQ runs far slower than the o
   AirPod's stem: the lock screen shows play after the pause, and the press plays. Do it with Muffle
   on, then off. (Leaving Debug turns Muffle off, so start each from Debug.)
 
+### The EQ's checks (app 0.5)
+
+The EQ's own page, with AirPods unless it says. Install the usual way, not with `--debug`.
+
+- **E1 You's row.** You > Playback: after Normalization, **EQ**, with "iPhone speaker" under it and
+  "Off" at the right; its note below.
+- **E2 The speaker, off.** Open it with the speaker playing: "iPhone speaker", "Connected now", the EQ
+  switch off, a flat curve in grey, "Off: nothing changes the sound."
+- **E3 It follows the output.** Connect the AirPods and play: the page changes to "James's AirPods
+  Pro" by itself (if your finger isn't on a slider). The speaker is now under **Other outputs**, Off.
+- **E4 Bass Boost.** Preset > **Bass Boost**: the switch turns on; back on the EQ page the sliders
+  show it, the curve shows the bass lifted, and the line says "Preamp -6.1 dB, so loud songs don't
+  clip." You hear more bass - and everything a little quieter, which the volume buttons give back.
+- **E5 A slider.** Drag the 125 slider up and down while a song plays: the sound follows your finger,
+  smoothly, never clicking; a small tick under your thumb at 0. Touch its column away from the knob:
+  the knob doesn't jump. Double-tap it: back to 0. "Preset" now says "Custom".
+- **E6 Your preset.** **Save as Preset…**, call it "Mine": it's under "Your presets" in Preset. Try to
+  save another as "bass boost": "There's already a preset called "Bass Boost"." Rename "Mine", then
+  delete it - the sliders stay where they were.
+- **E7 On and off.** Flip the EQ switch on and off while a song plays, a dozen times: a clean A/B, no
+  click.
+- **E8 Out and back in.** Take the AirPods out mid-song: it pauses, as before. Play: the speaker plays
+  Off - flat. Put them back in and play: Bass Boost again from the first sound. Then You > Debug > EQ:
+  what does **Start took** say?
+- **E9 Tune the presets.** Try each of the nine on two albums you know. Tell me any that sound wrong,
+  and which way (too much, too little, the wrong place) - the numbers move to what you settle.
+- **E10 From Now Playing.** Now Playing > **•••**: **EQ**, with "Bass Boost" under it (or only "EQ" -
+  tell me which); it opens the same page over Now Playing, and **Done** closes it.
+- **E11 Info.** Info > About > Sound shows **EQ**, "Bass Boost on James's AirPods Pro, preamp -6.1
+  dB"; turn the EQ off: the row goes.
+- **E12 An hour locked.** With the EQ on, lock the phone and play a whole album: nothing different
+  from off but the sound - no drop-outs, no silence; pause and play from the lock screen and the
+  AirPods: play and pause right every time. Unlock and open Debug's EQ: the Render row's "refused
+  blocks" should be 0.
+- **E13 Two rates.** Play a hi-res album and a 44.1 kHz album back to back with the EQ on: no break
+  between them; Debug's EQ **At this rate** says 48 kHz.
+- **E14 VoiceOver.** The page reads the output, the switch, "The EQ's curve" with what it does (try
+  the rotor's Audio Graphs > Play Audio Graph), the line under it, Preset, then "31 hertz, 0 decibels, adjustable" … -
+  swipe up: "plus 1 decibel".
+- **E15 The outputs' IDs.** Debug's EQ, **Output**: tell me the AirPods' ID; switch the phone off and
+  on, and tell me again - and the same for the car, and a USB DAC if you have one.
+- **E16 The largest text.** Settings > Accessibility > Display & Text Size > Larger Text at the
+  largest: the sliders are ten rows with - and + buttons; everything else wraps.
+
 ## What it can't do yet
 
 These are the web app's for now. Most of them come to the phone in the next phases:
@@ -805,6 +956,10 @@ These are the web app's for now. Most of them come to the phone in the next phas
 - **Home** and **pins**.
 - **Looking after deadwax**: People, Server settings, the event log, Needs a look, Library care, the
   editors, and changing your password. For an admin, **Set up Navidrome** opens the web app in Safari.
+
+And two parts of the [EQ](#eq) come in its next builds: **AutoEq**, a correction for your
+headphones from AutoEq's measurements, next; then **Advanced** - filters of your own, the preamp
+set by hand, and importing and exporting Equalizer APO files.
 
 ## When something goes wrong
 

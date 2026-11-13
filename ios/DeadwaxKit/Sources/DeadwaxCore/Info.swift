@@ -275,10 +275,13 @@ public enum InfoDebug {
         public var aheadSeconds: Double?
         /// from the last play asked for to its first sample heard, in seconds
         public var lastStartSeconds: Double?
+        /// what the EQ's unit does with the sound now (eq.md 3.1, slice 3): "Filtering: 20 filters at 48 kHz, preamp
+        /// -6.4 dB", "Off: every sample passed through untouched", "Changing: crossfading to the new curve"
+        public var eq: String?
 
         public init(outputRate: Double? = nil, outputName: String? = nil, latency: Double? = nil, conversion: String? = nil,
                     laneRate: Double? = nil, laneChannels: Int? = nil, nodeRate: Double? = nil, converting: Bool? = nil,
-                    aheadSeconds: Double? = nil, lastStartSeconds: Double? = nil) {
+                    aheadSeconds: Double? = nil, lastStartSeconds: Double? = nil, eq: String? = nil) {
             self.outputRate = outputRate
             self.outputName = outputName
             self.latency = latency
@@ -289,6 +292,7 @@ public enum InfoDebug {
             self.converting = converting
             self.aheadSeconds = aheadSeconds
             self.lastStartSeconds = lastStartSeconds
+            self.eq = eq
         }
     }
 
@@ -330,6 +334,10 @@ public enum InfoDebug {
         }
         if let start = engine.lastStartSeconds, start.isFinite, start >= 0 {
             rows.append(InfoRow(label: "Last start", value: "\(jsFixed(start, 2)) s from the tap to sound"))
+        }
+        //? after the engine's rows (eq.md 3.1)
+        if let eq = engine.eq, !eq.isEmpty {
+            rows.append(InfoRow(label: EQWords.Info.label, value: eq))
         }
         return rows
     }
@@ -418,9 +426,10 @@ public enum NowPlayingWords {
 
     /// The ••• button's name: what the menu holds - "Go to album" only for a song that names its album, and "download"
     /// while this phone's downloads can be used (Phase 2) - NowPlaying.tsx's `More: info, add to a playlist, go to
-    /// album, pin`, without what the app hasn't got.
-    public static func more(hasAlbum: Bool, download: Bool = false) -> String {
-        "More: info\(hasAlbum ? ", go to album" : "")\(download ? ", download" : "")"
+    /// album, pin`, without what the app hasn't got. And ", EQ" last, always, once the EQ is in (eq.md 3.1, 3.13).
+    public static func more(hasAlbum: Bool, download: Bool = false, eq: Bool = false) -> String {
+        let base = "More: info\(hasAlbum ? ", go to album" : "")\(download ? ", download" : "")"
+        return eq ? EQWords.moreName(base) : base
     }
 }
 

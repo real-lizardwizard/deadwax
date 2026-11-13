@@ -3,7 +3,7 @@ import SwiftUI
 
 /// The You tab (screens.md 8, the web's app/You.tsx as Phase 1 has it), top to bottom: who is signed in - the
 /// avatar's letter, the name, "No sign-in needed" with logins off - and the UNVERIFIED line under them when /me says
-/// so; Playback (Gapless, Normalization); Downloads (Phase 2: what's on this phone, pushing You > Downloads); Account (Sign out, with logins on); About (deadwax's version, and for an
+/// so; Playback (Gapless, Normalization, EQ); Downloads (Phase 2: what's on this phone, pushing You > Downloads); Account (Sign out, with logins on); About (deadwax's version, and for an
 /// admin whether logins are on, and the app's own version and build - with /me's failure said under them); This phone
 /// (the address, Change address, and Debug for an admin, D1).
 ///
@@ -90,7 +90,7 @@ struct YouView: View {
         }
     }
 
-    /// About's App row: "0.4 (4)", from the bundle.
+    /// About's App row: "0.5 (5)", from the bundle.
     static var appVersion: String {
         let info = Bundle.main.infoDictionary
         return YouWords.app(version: info?["CFBundleShortVersionString"] as? String, build: info?["CFBundleVersion"] as? String)

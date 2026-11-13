@@ -89,8 +89,8 @@ enum InfoAsk {
 extension InfoDebug.Engine {
     /// What the phone's engine says of the song heard, as Debug's rows read it: the output (its rate and latency,
     /// the route's name), Phase 0's readout of the file against the output, and the lane the song heard is on -
-    /// else the first - with what it has scheduled ahead.
-    init(_ debug: EngineDebug?, outputName: String?, readout: String?) {
+    /// else the first - with what it has scheduled ahead; and what the EQ's unit does with the sound (eq.md 3.1).
+    init(_ debug: EngineDebug?, outputName: String?, readout: String?, eq: String? = nil) {
         let lane = debug?.lanes.first(where: \.heard) ?? debug?.lanes.first
         self.init(outputRate: debug?.outputRate,
                   outputName: outputName,
@@ -101,6 +101,7 @@ extension InfoDebug.Engine {
                   nodeRate: lane?.nodeRate,
                   converting: lane?.converting,
                   aheadSeconds: lane?.aheadSeconds,
-                  lastStartSeconds: debug?.lastStartSeconds)
+                  lastStartSeconds: debug?.lastStartSeconds,
+                  eq: eq)
     }
 }

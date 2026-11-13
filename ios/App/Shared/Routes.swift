@@ -23,6 +23,8 @@ enum AppRoute: Hashable {
     case serverAddress
     /// You's Debug (admins only).
     case debug
+    /// You > Playback > EQ, and the EQ's own pages (eq.md 3.1-3.2): the EQ page, an output's, the presets.
+    case eq(EQRoute)
 }
 
 /// The album page's address: the album's id, and what the row that opened it already knew - drawn at once, while
@@ -142,6 +144,7 @@ extension View {
                 case .downloads: DownloadsScreen()
                 case .serverAddress: ServerAddressView()
                 case .debug: DebugView()
+                case .eq(let page): EQDestination(route: page)
                 }
             }
             .clearsPlayer()

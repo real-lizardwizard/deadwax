@@ -2084,6 +2084,175 @@ it went in.
   (checks 1-16). Nothing here needs a Simulator: what the runner can't show - touch, VoiceOver, Dynamic Type, the
   sound - is the phone's list.
 
+#### Slice 3, built (2026-11-12)
+
+Built on `ios` from 6664261 (slice 2's review), in six commits: the rules in Core with the start's bank made ahead,
+EQModel and EQStore, the screens, the ways in, app 0.5 (5), and these notes. Measured on the same M2; nothing drawn or
+heard on a phone, and no Simulator, so every look, touch and sound here is checks E1-E16's (docs/ios.md).
+
+- **Files**: in Core, `EQScreenRules.swift` (EQPage, EQSound, the settings' changes, EQLine, EQPlaying, the rules,
+  EQSliderRules), `EQDrawing.swift` (the curve with its preamp, its summary and audio graph), `EQStartBook.swift`
+  (EQStartBook, EQStartDesk, EQTaker, EQTicket, EQStartTime), and words in `EQWords` and `Info`
+  (`InfoDebug.Engine.eq`, `NowPlayingWords.more(…, eq:)`); `EQSettings.unreadableName(day:attempt:)`. In ios/App/EQ:
+  `EQModel`, `EQStore`, `EQRouteReader`, `EQScreen`, `EQCurveView`, `EQSliders` (with `EQStepperRow`),
+  `EQPresetsScreen`, `EQOutputViews`, `EQNameAlert`, `EQRoute`. Changed: PlayerModel (Muffle and the slice-2 hook out,
+  `eq?.attach(engine)` in), DeadwaxApp (EQModel, the Palette's three), Routes (`AppRoute.eq`), RootView (saved as the
+  app goes to the back), PlaybackSection, NowPlayingMenu, NowPlayingView, InfoView and InfoDetails, DebugView. The
+  engine (DeadwaxAudio), Normalization's rows and Now Playing's layout have no diff but the one item and the sheet.
+- **Tests**: DeadwaxCore 809 in 110 suites before, **849 in 113** after (EQScreenRulesTests 22, EQDrawingTests 9,
+  EQStartBookTests 9, and expects added to EQSettingsTests and EQWordsTests); DeadwaxAudio 111 in 8 before, **114 in
+  9** (EQStartTests 3, against the real EQHost and engine).
+
+**Slice 2's review, item 1 - the start's bank made ahead.** The start made its output's bank on the engine's queue,
+the automatic preamp's golden-section search and all. Now EQStartBook keeps, for every output that is on, its bank
+made ahead - off the main thread, as settings change and outputs are met - at the rates it has started at (the last
+three) and at 48 and 44.1 kHz; the start looks its curve up and stamps it with its own version. A rate never seen is
+made then, and Debug's Start took says so. EQStartTests on the real EQHost, 200 starts each:
+
+| a start | debug, median / worst | release, median / worst |
+| --- | --- | --- |
+| slice 2's hook (the test curve made at the start) | 0.810 / 2.057 ms | 0.059 / 0.116 ms |
+| Bass Boost, made at the start | 1.371 / 1.615 ms | 0.121 / 0.274 ms |
+| Bass Boost, made ahead | **0.001 / 0.012 ms** | **0.000 / 0.011 ms** |
+| ten bands, made at the start | 2.751 / 3.018 ms | 0.238 / 0.408 ms |
+| ten bands, made ahead | **0.001 / 0.019 ms** | **0.000 / 0.003 ms** |
+| ten bands and a 10-filter correction, made at the start | 5.286 / 6.083 ms | 0.435 / 0.590 ms |
+| the same, made ahead | **0.001 / 0.031 ms** | **0.000 / 0.002 ms** |
+
+Through the offline engine's own start (prepare, `eqStart`, start): "0.016 ms, its curve made ahead" in debug, 0.004
+ms in release - Debug's Start took row, which check E8 reads on the phone. (Run inside the whole suite, with tests in
+parallel, the debug numbers double: 2.09 ms for Bass Boost made at the start, 0.001 made ahead.)
+
+**Item 2 - a new version on a route or rate change.** EQHost drops a bank of the last published version made for
+another rate while the newest is at the unit's rate (slice 2's review), so a change racing a start at a new rate could
+have left the old bank in. Every change, every route change and every start now takes a version of its own from one
+counter (EQStartDesk, under its lock), and the main thread takes it **before** reading the host's rate. EQStartBookTests
+plays all 20 orders of a change and a start at a new rate against a model of the host's two rules; EQStartTests the
+same against the real EQHost: each ends with the new settings at the unit's rate. Mutations: a change that takes no
+version of its own fails theRightBankLandsInEveryOrder; a start that takes none fails versionsOnlyRise and three
+more; each restored byte for byte.
+
+**5.3's mutation**: `maySwitch` with `kind != .output` (a pushed page following the route) fails
+aPushedPageStaysOnItsOutput with 6 issues. Restored.
+
+- **Departures from the spec, and why**:
+  - **Correction, Preamp and Advanced aren't drawn** (slices 4 and 5), and nothing stands in their place: the page is
+    3.2's sections 1, 2, 4, 6 and 8, in that order, so slice 4 adds Correction between the curve and Tone, slice 5
+    Preamp after Tone and Advanced after Other outputs. 3.14's reading order skips Correction until then, and the
+    audio graph has the one series, "What you hear".
+  - **The App's file is `EQOutputViews.swift`**, not 5.3's `EQOutputs.swift`: Core has an `EQOutputs` already, and one
+    name for two things in two modules misleads whoever reads either.
+  - **The sliders' row is about 255 pt**, not 236: the 200 pt track, 14 pt above and below it for the knob's half and
+    the held value's capsule, the band names and the row's padding. The columns are 3.5's width (the row's insets are
+    zero).
+  - **The presets page keeps Custom for its own life** once the tone has been Custom while it's open, and tapping it
+    puts back those gains - so trying a few presets never loses where you left the sliders. 3.6 had Custom only while
+    the tone is Custom, which would have dropped it at the first preset tapped.
+  - **The swipe Forget in Other outputs asks first**, with Forget This Output's dialog: 3.12 named no confirmation,
+    and a swipe deletes more easily than a button at a page's foot.
+  - **"Done" is on every page of the sheet**, closing the sheet (the sheet's own dismiss, carried in the environment):
+    3.1 put it at the sheet's top; from the presets page, a Done that only went Back would have been a trap.
+  - **The pushed page's line** (3.2) and state 7's "Not connected: this is what it plays when it is." sit in their
+    section's header, in `.footnote` `quiet`, case kept; the line under the curve is the curve section's footer.
+  - **"On top" includes Now Playing**: the EQ page on You's stack counts as covered while Now Playing is over it (and
+    while an alert or the dialog is up, and while its tab isn't shown), so it never switches, and VoiceOver never
+    hears "EQ for …", where nobody is looking. The sheet's own page follows the route as 3.2 says.
+  - **Steppers hold through their own `onEditingChanged`**: a stepper's press is a hold, so the page doesn't switch
+    under it - no heuristic needed.
+  - **New words** (each in EQWords and tested): Debug's Curve row "Off" while the output's EQ is; the toolbar •••'s
+    name "More for this output" (as the album page's "More for this album"); Debug's "Start took" ("0.031 ms, its
+    curve made ahead" / "1.90 ms, its curve made then, for 44.1 kHz"); the stepper rows' "31 Hz" … "16 kHz"; and
+    Muffle's footer, whose "Off, the unit passes every sample through untouched" (slice 2's) is now "Off, the
+    output's own EQ plays again".
+  - **The speaker sorts last in Other outputs when it was never met** (its `seen` is empty), the others most recent
+    first, ties by name. Renaming a never-met speaker keeps its setting first, as it would start, without counting it
+    as met.
+  - **Off is drawn in `quiet` at `Palette.off`** (the spec's "grey").
+  - **Lines of different lengths don't morph**: they can't, point for point. While there is no correction a line is
+    always the grid's 241 points (`EQChart.grid`, the ten bands' centres on it), so every simple-face change morphs -
+    EQDrawingTests' everyToneIsDrawnOnTheGrid holds it for every preset, Custom, each band alone and Off; slice 4's
+    corrections add their own f0s, and a line whose length changes is drawn at once.
+  - **Muffle, and the unit's status, moved from PlayerModel to EQModel**, through the same door as every change: on,
+    the test curve on its own key; off, the route's own curve (no longer Off).
+  - **EQModel reads the route again before each publish**, so a change never lands on an output that has just gone
+    (the notification can trail the route by a moment).
+  - **eq.json is never written over when it can't be read as it should**: one that couldn't be moved aside, and one
+    that is there but can't be opened yet - a background launch before the phone's first unlock, under data
+    protection - which EQModel reads again at `protectedDataDidBecomeAvailable`. Without that, a locked launch would
+    have started every output Off and saved it over the real file half a second later. A second unreadable file the
+    same day is set aside as `eq-unreadable-<day>-2.json`, never over the first.
+  - **A page whose output is forgotten keeps its name while it goes** (EQModel remembers each output as last read).
+  - **The host clock**: EQModel times the start with `AVAudioTime.seconds(forHostTime: mach_absolute_time())`,
+    `PlaybackEngine.hostSeconds()` itself being internal to DeadwaxAudio, which this slice doesn't touch.
+  - **"EQ on" is said by EQModel**, after the change that turned it on (a preset chosen, a slider moved), wherever
+    the change was made.
+- **What only the phone can show**, by check: You's row and its footer (E1); the page's look - the curve, the grey Off,
+  the sliders' columns and knob, the list's spacing (E2, E4); the route followed, and not under a finger (E3); a
+  preset heard, and its preamp (E4); a drag heard as it goes, the tick, the knob not jumping, the double-tap (E5);
+  the name alerts and their refusals coming back (E6); On/Off clean (E7); the start's curve from the first sound
+  and Start took on the phone's cores (E8); the presets by ear (E9); the menu item's subtitle - whether iOS 17 draws
+  the second Text - and the sheet's Done (E10); Info's rows (E11); a locked album, refused blocks (E12); the two rates
+  (E13); VoiceOver's reading, the audio graph, the adjustable bands (E14); the outputs' UIDs (E15); the stepper rows
+  and wrapping at the largest size (E16). And beyond the checks: where the toolbar puts ••• beside Done, whether the
+  sliders' drag ever loses to the List's scroll, whether `routeChangeNotification` arrives for every switch, and
+  whether a Forget from the dialog pops the page cleanly.
+- **Not verified**: anything on a phone; ios.yml's Xcode 26.6 Swift on the App's new files (every multi-statement
+  closure says its type, but the App target is only built on this Mac's Xcode 27.1); each commit building alone - the
+  model-and-store commit was not built by itself (it holds no file the later ones change but DeadwaxApp.swift's
+  Palette lines, which came with the screens).
+- **Review** (2026-11-12, on 6664261..6ee2eca's six commits). Read against 3.1-3.6, 3.12-3.18, 4, 5.3, 6's E1-E16 and
+  the Design review, the code before the account, and Core's rules mutated: 25 mutations of EQScreenRules, EQStartBook
+  and EQDrawing, of which 5 passed every test (now each fails one, below). Changed:
+  - **A slider's knob jumped as the finger passed back over where it came down.** The drag took its engaging side
+    (6 pt up or down) from the finger's side of the touch-down point at every move, so a drag engaged downward and
+    brought back up past that point moved the knob 12 pt - 1.44 dB, heard as a step - at once, the wrong way. The
+    drag's state is Core's now (`EQSliderDrag`: the side kept from the moment it engaged), and EQSliders draws it;
+    `aDragNeverJumps` walks a finger back over the point both ways in 0.1 pt steps and fails on the old rule.
+  - **A page could change another output.** `EQModel.output(key)` fell back to the output now for a key it didn't
+    know, and never remembered an output while it was the route - so a page bound to the AirPods, drawn while they
+    played, then forgotten from another page, would have read and written the car's setting: the one thing 3.2's
+    binding is for. The rule is Core's (`EQScreenRules.output`: as kept, the route's own, the speaker, as the page
+    last drew it, else named by its key - never another output), every answer remembered; `aPageIsAlwaysItsOwnOutput`
+    fails with the old fallback.
+  - **eq.json could stay unwritten for the rest of a locked launch's process.** The first unlock's observer was added
+    after the read, so an unlock between the two was never heard - and an app suspended in the background when the
+    phone unlocks may not hear it at all. EQModel now reads again once the observer is in, and whenever the app
+    comes to the front still waiting (RootView's `.active`, `EQModel.becameActive`) - the phone is unlocked if the app
+    is in front. Still never written over while it can't be opened.
+  - **A hold could outlive its slider.** EQSliders lets go when it disappears with a finger down (a second finger on
+    Back, the text size crossing into the stepper rows), so the page and EQModel aren't left holding - which kept
+    eq.json unwritten until the app went to the back.
+  - **For CI's compiler**: EQStartTests' `host.newest.map { b in var c = b; … }` says its type.
+  - **Five tests that passed with the code broken** now fail: the clip warning's edge (a hand preamp taking away
+    exactly the curve's top is enough), a band moved to where it already is (a preset stays itself, Off stays Off - a
+    VoiceOver step at the range's end), a route with no output leaving the page connected, a change's bank kept for
+    the next start at that rate, and every part of a sound - the switch, the tone, the correction, the hand preamp -
+    dropping the banks made from it.
+  - **Agreed, not changed**: the one version counter and its two orders - every mutation of the desk tried (banks
+    never dropped, kept unchecked, unstamped, a start's bank not kept, Muffle ignored, rates not noted) fails a test,
+    and no stale bank can be published (`keep` checks the sound under the lock, a bank is a function of its sound and
+    rate alone, and is stamped at use); the store otherwise (a file there but unreadable is never written, a garbled
+    or newer one is moved aside under a name never used, writes are atomic); a route change mid-drag (the page and
+    the drag keep their output, the sound follows the route, the file waits for the finger); Off, presets, Custom and
+    Forget as 3.2, 3.6 and 3.12 have them; no diff in DeadwaxAudio; no newer-only syntax or API in the App's or Core's
+    new files, and no other multi-statement closure whose result type is inferred.
+  - **The departures**: 17 sound as given. Two were incomplete as written: "a page whose output is forgotten keeps its
+    name" (the route's own wasn't remembered - fixed above), and "lines of different lengths don't morph", which holds
+    for slice 3 (every simple-face line is the grid's 241 points) but not as EQVector is: its `-` of two lengths is
+    `.zero`, so the animation would draw the old values against the new frequencies for 0.25 s and then jump - slice
+    4, whose corrections add their own f0s, must draw such a change without the animation.
+  - **James's to decide** (design, not changed): the presets page keeping Custom for its life (3.6: only while the
+    tone is Custom); the swipe Forget asking first (3.12 named no dialog); Done on every page of the sheet (3.1: the
+    sheet's top); the tick only when a drag lands on 0 - a fast one stepping over 0 gives none (3.5's "crosses into");
+    the "+12", "0", "-12" scale inside the first column, under its knob's travel (3.5's place).
+  - **For the phone**: a route with no outputs, if iOS ever reports one mid-switch, is the speaker (EQRouteReader, on
+    the main thread and the start's) - EQPage's rule would leave the last output standing, but EQModel never hands it
+    one; E3 and E8 show whether the page flickers to "iPhone speaker" as AirPods come and go.
+  - **Tests**: Core **853 in 113** (`aDragNeverJumps`, `aPageIsAlwaysItsOwnOutput`, `everyPartOfTheSoundDropsItsBanks`,
+    `aChangesBankIsKeptForTheNextStart`, and expects added to four more), Audio 114 in 9; the unsigned device build
+    (Xcode 27.1); check_project.py; pytest's iOS files; the ios sims. Not verified: ios.yml's Xcode 26.6 Swift, and
+    anything on a phone.
+
 ### 5.4 Slice 4 - AutoEq
 
 - **On main first** (2.1.7): `src/autoeq.py`, `src/api/autoeq_endpoint.py`, `src/routes/eq.py`, the router included in

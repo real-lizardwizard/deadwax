@@ -19,8 +19,13 @@ import SwiftUI
 /// Phase 2 (phase2-downloads.md 4.4): Sound gains "Plays from" after the web's three rows - this phone, and how its copy
 /// was checked, or streamed (what is heard: with Debug's "Stream even when downloaded" on, streamed) - and Debug's Sent
 /// to this device gains "On this phone", the check and STREAMINFO's facts in Debug's words.
+///
+/// The EQ (eq.md 3.1, app 0.5): Sound gains "EQ" after Plays from while it is on - "Bass Boost on James's AirPods Pro,
+/// preamp -6.1 dB" - and Debug's Sent to this device gains "EQ" after the engine's rows: what its unit does with the
+/// sound now.
 struct InfoView: View {
     @Environment(PlayerModel.self) private var player
+    @Environment(EQModel.self) private var eq
     @Environment(ServerModel.self) private var server
     @Environment(DownloadModel.self) private var downloads
     @Environment(AppNavigation.self) private var navigation
@@ -152,6 +157,10 @@ struct InfoView: View {
             }
             // the phone's own row, apart from the web's three
             LabeledContent(DownloadWords.playsFrom, value: playsFrom(track.id))
+            // and the EQ, only while it is on (3.1)
+            if let sound = eq.infoSound {
+                LabeledContent(EQWords.Info.label, value: sound)
+            }
         }
 
         //? last: a path to copy, and a line landing late here moves no card a finger is reaching for
@@ -201,7 +210,8 @@ struct InfoView: View {
         let album = raw.flatMap { $0.albumID == track.albumId ? $0.answer : nil }
         //? the engine's rows move as it plays: read again at each tick (`tick` read so the rows are drawn again)
         let _ = tick
-        let engine = InfoDebug.Engine(player.engineDebug(), outputName: player.outputName, readout: player.conversion)
+        let engine = InfoDebug.Engine(player.engineDebug(), outputName: player.outputName, readout: player.conversion,
+                                      eq: eq.infoDebug)
         let sections = InfoDebug.sections(song: song, level: track.level, key: entry.key, decisions: player.levelDecisions,
                                           live: track.albumId.flatMap { player.loudness(albumID: $0) },
                                           engine: engine, album: album).map { section in

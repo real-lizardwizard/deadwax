@@ -92,8 +92,9 @@ jobs:
 
       # The EQ's render in the build that ships, release (notes/ios-specs/eq.md 1.5, 1.7 tests 5 and 8-10): its
       # render block called as the AU framework calls it, 10,000 times, with not one allocation or free on that
-      # thread (the allocation hook first proves itself with a canary); the worst case - 74 sections a channel at
-      # 192 kHz, crossfading every block - under 10% of a block; 5 minutes of silence no dearer than noise; a
+      # thread (the allocation hook first proves itself with a canary); the heaviest EQ - 74 sections a channel at
+      # 192 kHz, crossfading every block - its median block under 15% of a block's time (slice 2's review: a shared
+      # runner's pauses move a mean, not a median); 5 minutes of silence no dearer than noise; a
       # block of 4,097 frames refused. A debug build prints these and bounds none of them.
       - name: The EQ's render, release build
         if: ${{ !cancelled() }}
@@ -145,7 +146,7 @@ jobs:
           test -f "$app/AppIcon60x60@3x.png"
           test ! -e "$app/Assets.car"
           test "$(plutil -extract CFBundleIdentifier raw "$app/Info.plist")" = net.lizardlounge.deadwax
-          test "$(plutil -extract CFBundleShortVersionString raw "$app/Info.plist")" = 0.4
+          test "$(plutil -extract CFBundleShortVersionString raw "$app/Info.plist")" = 0.5
           test "$(plutil -extract UIBackgroundModes.0 raw "$app/Info.plist")" = audio
           test "$(plutil -extract NSAppTransportSecurity.NSAllowsArbitraryLoads raw "$app/Info.plist")" = true
           python3 ios/scripts/check_project.py
