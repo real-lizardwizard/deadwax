@@ -30,3 +30,20 @@ def test_only_the_position_queue_asks_the_songs_engine():
             if "engineForDeck" in line:
                 assert "feed.run(engine" in line, f"{path.name}: the song's engine is only handed to the feed: {line}"
     assert feed_seen, "DeckPositionFeed not found"
+
+
+def test_every_deck_engine_the_app_makes_activates_the_session_first():
+    """Slice 2's review, question 6: the session is active before the deck starts. DeckEngine's `activate` does it at
+    the top of every start (DeckReviewTests holds the order); here, every deck engine the app makes is given it."""
+    made = 0
+    for path in sorted((REPO / "ios" / "App").rglob("*.swift")):
+        lines = path.read_text().splitlines()
+        for number, line in enumerate(lines):
+            code = line.split("//")[0]
+            if "DeckEngine(" not in code and "DeckTrial(" not in code:
+                continue
+            made += 1
+            after = "\n".join(lines[number:number + 8])
+            assert "activate = { try AudioSessionController.activateShared() }" in after, (
+                f"{path.name}:{number + 1} makes a deck engine without the session's activation")
+    assert made >= 2, "the deck's engine and Debug's trial"

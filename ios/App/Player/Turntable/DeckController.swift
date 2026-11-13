@@ -538,6 +538,8 @@ final class DeckController {
         let made = DeckEngine()
         made.ioBuffer = { AudioSessionController.ioBuffer() }
         made.latency = { AudioSessionController.latency() }
+        // the session is the app's (4.6): made active at every start, as pressing Play would - never its category changed
+        made.activate = { try AudioSessionController.activateShared() }
         made.windowDropped = { [weak self] in
             DispatchQueue.main.async { self?.rules?.windowDropped() }
         }
@@ -581,8 +583,7 @@ final class DeckController {
         guard let engine, active, !airPlay, !interrupted, failure.words == nil else { return }
         let began = CACurrentMediaTime()
         do {
-            // the session is the app's (4.6): made active, as pressing Play would - never its category changed
-            try AudioSessionController.activateShared()
+            // the app's session made active first, by the engine's `activate` (makeEngine)
             try engine.start()
             failure.started()
         } catch {

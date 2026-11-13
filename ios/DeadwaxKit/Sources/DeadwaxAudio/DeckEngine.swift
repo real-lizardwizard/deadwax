@@ -85,6 +85,10 @@ public final class DeckEngine {
     public var ioBuffer: () -> TimeInterval = { 0 }
     /// The deck engine's own `outputLatency + ioBufferDuration` - its part of `D` (3.5). The app sets it.
     public var latency: () -> TimeInterval = { 0 }
+    /// At every start, first (slice 2's review, question 6): the app's audio session made active, as a play makes it -
+    /// before the output's rate is read, so the voice is made at the rate the route will run at. A throw is the start's
+    /// failure, nothing started. The app sets it; nothing by default (the tests' offline engines).
+    public var activate: () throws -> Void = {}
     /// At every start, between prepare and start (eq.md 1.8): the deck's EQ host, its rate and channels - the app
     /// publishes the output's curve here, as it does for the song's engine.
     public var eqStart: (_ host: EQHost, _ rate: Double, _ channels: Int) -> Void = { _, _, _ in }
@@ -201,6 +205,12 @@ public final class DeckEngine {
         if started && engine.isRunning { return }
         // stopped by the system (its configuration changed, 4.6): settled as a stop of ours first
         if started { stop() }
+        do {
+            try activate()
+        } catch {
+            failure = error.localizedDescription
+            throw error
+        }
         Self.warm()
         let began = PlaybackEngine.hostSeconds()
         let now = outputRateNow()

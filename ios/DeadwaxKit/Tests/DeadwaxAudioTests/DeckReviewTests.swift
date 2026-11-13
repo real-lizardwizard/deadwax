@@ -216,6 +216,27 @@ import Testing
         #expect(!deck.routeChanged())
     }
 
+    /// Question 6's other part (slice 3's review): the session is made active at the start of a start - before the
+    /// engine runs and before the rate is read, so a route the activation moved is the one the voice is made at - and a
+    /// session that can't be made active is the start's failure, nothing started.
+    @Test func theSessionIsActiveBeforeTheDeckStarts() throws {
+        let deck = try DeckCases.offlineDeck(rate: Self.rate, eq: false)
+        let runningThen = Locked<Bool?>(nil)
+        deck.activate = { [unowned deck] in
+            runningThen.set(deck.engine.isRunning)
+            deck.rateForTests = 44_100
+        }
+        try deck.start()
+        #expect(runningThen.get() == false, "made active before the engine starts")
+        #expect(deck.rate == 44_100, "and before the rate is read")
+        deck.stop()
+        struct Refused: Error {}
+        deck.activate = { throw Refused() }
+        #expect(throws: Refused.self) { try deck.start() }
+        let status = deck.status()
+        #expect(!status.running && status.starts == 1 && status.failure != nil, "\(status)")
+    }
+
     /// Question 6: the deck's EQ counts its render time as the song's EQUnit does - ticks and the longest block.
     @Test func theDecksEQCountsItsTime() throws {
         let deck = try DeckCases.offlineDeck(rate: Self.rate, eq: true)

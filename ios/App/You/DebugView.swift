@@ -313,17 +313,20 @@ final class DeckTrialModel {
     @ObservationIgnored private var failure: String?
 
     func toggle() {
-        let made = trial ?? DeckTrial(ioBuffer: { AudioSessionController.ioBuffer() },
-                                      latency: { AudioSessionController.latency() })
+        let made = trial ?? { () -> DeckTrial in
+            let made = DeckTrial(ioBuffer: { AudioSessionController.ioBuffer() },
+                                 latency: { AudioSessionController.latency() })
+            // the app's session made active at every start, as a play's is (slice 2's review, question 6): with nothing
+            // played yet it isn't, and the engine would start on an inactive session
+            made.engine.activate = { try AudioSessionController.activateShared() }
+            return made
+        }()
         trial = made
         if made.isRunning {
             made.stop()
             running = false
         } else {
             do {
-                // the app's session made active first, as a play's is (slice 2's review, question 6): with nothing played
-                // yet it isn't, and the engine would start on an inactive session
-                try AudioSessionController.activateShared()
                 try made.start()
                 failure = nil
                 running = true
