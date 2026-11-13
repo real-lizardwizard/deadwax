@@ -14,8 +14,8 @@
     "ui/src/app/LookChoice.tsx LOOKS": "48aadb0bca38a9353bab0a377775b58ac8fa020a1e482fa070c2188e9f0aadf3",
     "ui/src/app/LookChoice.tsx the choice's title": "60e3a2a12040876be292a70d3d3c806a4591c7892d33806dbce318de9be78894",
     "ui/src/app/WindDownChoice.tsx the check's label": "06294e2dc1df9e0be2886ccec6e0f20e2fe9af7c772a73fb19d61a07179c652a",
-    "ui/src/app/You.tsx the app-look-note paragraph": "f03e01b9722429dcf6dec6f154ac0e0b1f8047ad242b463aef9dbc47e8220bc7",
-    "ui/src/app/You.tsx the app-wind-down-note paragraph": "ff78784805449b31df96e1ffd4dfdbebe9fcc36e5f287427e347fdd14af0233a"
+    "ui/src/app/You.tsx the app-look-note paragraph": "12e7aa0ee06d4680b1d30c9deeb721f7dcbfebbc916f429aa1397c4995cd9dae",
+    "ui/src/app/You.tsx the app-wind-down-note paragraph": "34efd477e70f49913420c1f102054756ff63cfe2ac721e3df3a26347c2518c3e"
   },
   "lookButton": {
     "cover": "Show as a turntable",
