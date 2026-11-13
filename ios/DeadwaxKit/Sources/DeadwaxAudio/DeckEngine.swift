@@ -418,25 +418,36 @@ public final class DeckEngine {
                 free(list.unsafeMutablePointer)
                 time.deallocate()
             }
+            var timebase = mach_timebase_info_data_t()
+            mach_timebase_info(&timebase)
             func block() {
                 for c in 0..<2 {
                     list[c] = AudioBuffer(mNumberChannels: 1, mDataByteSize: 1_024 * 4, mData: UnsafeMutableRawPointer(left + c * 1_024))
                 }
+                // live, a host time 10 ms ahead, as a device's
+                time.pointee.mHostTime = mach_absolute_time() + UInt64(0.01 * 1e9 * Double(timebase.denom) / Double(timebase.numer))
                 _ = DeckVoiceHost.render(deck.host, time, 1_024, list.unsafeMutablePointer)
                 time.pointee.mSampleTime += 1_024
             }
-            block()
-            let messages: [VoiceMessage] = [
-                .take(at: 0.5, rate: 1, time: 0, until: 0.1), .drive(at: 0.5, rate: 1, accel: -1, time: 0.02, until: 0.5),
-                .hand(at: 0.51, time: 0.03), .hand(at: 0.52, time: 0.04), .fade(seconds: 0.03), .stop, .window(nil),
-            ]
-            deck.post(.window(pcm.voiceWindow(start: 0, rate: rate)), keeping: pcm)
-            block()
-            for message in messages {
-                deck.post(message, keeping: nil)
+            // each message kind, on the sample clock and then on the host's (the clock's lead, quiet and sounding)
+            for live in [false, true] {
+                deck.host.pointee.offline = !live
+                time.pointee.mFlags = live ? [.sampleTimeValid, .hostTimeValid] : .sampleTimeValid
+                let at = live ? Double(mach_absolute_time()) * deck.host.pointee.secondsPerTick : 0
                 block()
+                let messages: [VoiceMessage] = [
+                    .take(at: 0.5, rate: 1, time: at, until: at + 0.1), .drive(at: 0.5, rate: 1, accel: -1, time: at + 0.02, until: at + 0.5),
+                    .hand(at: 0.51, time: at + 0.03), .hand(at: 0.52, time: at + 0.04), .fade(seconds: 0.03), .stop, .window(nil),
+                ]
+                deck.post(.window(pcm.voiceWindow(start: 0, rate: rate)), keeping: pcm)
+                block()
+                for message in messages {
+                    deck.post(message, keeping: nil)
+                    block()
+                    block()
+                }
+                deck.collect()
             }
-            deck.collect()
             return true
         }
     }()

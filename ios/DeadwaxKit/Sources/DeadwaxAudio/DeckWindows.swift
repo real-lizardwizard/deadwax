@@ -12,7 +12,9 @@ import Foundation
 /// GainedSource at the entry's factor; converted, when the file's rate isn't the output's, by an AVAudioConverter set
 /// as the lane's is (mastering, `.max`, prime method `.normal`) with the pre-roll's output dropped; one second of the
 /// file at a time, straight into the window's own memory (DeckPCM). The newest asked only is answered.
-public final class DeckWindows {
+///
+/// Sendable by hand: its one changing value, the newest ticket, is read and written under its lock; the rest is let.
+public final class DeckWindows: @unchecked Sendable {
     /// The file a window is decoded through, one second at a time.
     public static let pieceSeconds = 1.0
 

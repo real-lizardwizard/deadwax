@@ -82,14 +82,24 @@ import Testing
         on(8_000) { deck.post(.take(at: 5, rate: 2, time: at(8_000), until: at(8_000) + 0.12), keeping: nil) }
         on(9_000) { deck.post(.stop, keeping: nil) }
         on(9_500) { deck.post(.window(nil), keeping: nil) }
-        // the warm-up's work, outside the count: the first blocks and first messages
+        // the warm-up's work, outside the count: the first blocks and first messages, on both clocks - and the test's
+        // own clock read once (AVAudioTime's first use allocates, on whichever thread makes it)
         DeckEngine.warm()
+        _ = PlaybackEngine.hostSeconds()
+        // the count after each call (made before the count starts), so a nonzero count says which calls allocated
+        var after = [UInt64](repeating: 0, count: 10_000)
+        var paused = [Bool](repeating: false, count: 10_000)
         let counted = allocations { (pause: (() -> Void) -> Void) -> Void in
             for i in 0..<10_000 {
-                if let posts = schedule[i] { pause { for post in posts { post() } } }
+                if let posts = schedule[i] {
+                    pause { for post in posts { post() } }
+                    paused[i] = true
+                }
                 call(i % 100 == 99 ? 4_096 : 512)
+                after[i] = alloc_hook_allocations()
             }
         }
+        let allocating = (0..<10_000).filter { (i: Int) -> Bool in after[i] > (i == 0 || paused[i] ? 0 : after[i - 1]) }
         let status = deck.status()
         print("Deck allocations: 10,000 render calls, \(counted.map { "\($0.made) allocations and \($0.freed) frees" } ?? "not counted") "
               + "on the rendering thread; \(status.messages) messages applied, \(status.windowsReturned) windows given back, "
@@ -102,7 +112,8 @@ import Testing
         #expect(status.lead != nil)
         #if !DEBUG
         if let counted {
-            #expect(counted.made == 0 && counted.freed == 0, "the render allocated \(counted.made), freed \(counted.freed)")
+            #expect(counted.made == 0 && counted.freed == 0,
+                    "the render allocated \(counted.made), freed \(counted.freed), in calls \(allocating.prefix(20))")
         }
         #endif
     }

@@ -1,4 +1,6 @@
 #if canImport(AVFAudio)
+// AVFAudio for UnsafeMutableAudioBufferListPointer: AudioToolbox alone brings it on macOS, not on iOS (the device build)
+import AVFAudio
 import AudioToolbox
 import CAudioRing
 import DeadwaxCore
