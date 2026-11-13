@@ -3140,10 +3140,10 @@ through slice 2's engine, and it hands the song back where the hand left it. App
 The full account - what was built, the renders, every departure and why, and the questions - is the spec's
 "Slice 3, built", under 7.3. In brief:
 
-**Departures**: the label and spindle centred (the web's sit 2-3 pt off and wobble); recording (6.3) not built, so
-check 23's A/B is by ear; the Handover row without its seam, which needs both engines' render times; two touch views,
-the fader's being slice 4's; no custom VoiceOver actions; the song engine's reset caught by the 10 Hz rule rather
-than its notification; disc art kept in memory, the last eight; the pbxproj edited by hand.
+**Departures**: recording (6.3) not built, so check 23's A/B is by ear; the Handover row without its seam, which
+needs both engines' render times; two touch views, the fader's being slice 4's; no custom VoiceOver actions; the song
+engine's reset caught by the 10 Hz rule rather than its notification; disc art kept in memory, the last eight; the
+pbxproj edited by hand.
 
 **Mutations, each alone** (scratchpad's mutate.py: applied to TurntableScreen.swift, Core's tests run, restored):
 | Mutation | Caught by |

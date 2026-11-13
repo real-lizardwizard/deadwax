@@ -172,7 +172,9 @@ public final class TurntableLayers {
         let w = layout.width, h = layout.height
         let k = layout.across(1)
         root.bounds = CGRect(x: 0, y: 0, width: w, height: h)
-        // the plinth's border is outside its drawing box, as the web's content-box border is
+        // the plinth's border is outside its drawing box, so the drawing keeps the stage's exact shape - the web's is
+        // border-box (player.css), inside its box, so this plinth is 1 pt wider each side than the web's in the same
+        // room (the label's and the spindle's rings are inside theirs, as the web's: TurntableFaceParts)
         plinth.frame = CGRect(x: -TurntableFace.hairline, y: -TurntableFace.hairline, width: w + 2 * TurntableFace.hairline,
                               height: h + 2 * TurntableFace.hairline)
         plinth.cornerRadius = TurntableFace.plinthRadius

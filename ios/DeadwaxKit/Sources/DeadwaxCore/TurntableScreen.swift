@@ -9,13 +9,14 @@ import Foundation
 /// units (TurntableGeometry) aren't: CSS draws the grooves, the rings and the plinth's room in px, a point on an
 /// iPhone. tests/test_ios_turntable_face.py reads each from the stylesheets.
 public enum TurntableFace {
-    /// `.app-tt-label`: the cover, round, 38.75% of the face's width, 30.625% in
+    /// `.app-tt-label`: the label, round, 38.75% of the face's width, 30.625% in - centred
     public static let labelShare = 0.3875
-    /// `--app-tt-label-ring`: its ring, outside the cover (the label's box is content-box: the border adds to it)
+    /// `--app-tt-label-ring`: its ring, inside that share - player.css makes every box border-box (`*, *::before,
+    /// *::after`), so the border is drawn inside the 38.75% and the cover is that less twice the ring
     public static let labelRing = 2.0
-    /// `.app-tt-spindle`: 6.25% of the face, 46.875% in
+    /// `.app-tt-spindle`: 6.25% of the face, 46.875% in - centred
     public static let spindleShare = 0.0625
-    /// `--app-tt-spindle-ring`
+    /// `--app-tt-spindle-ring`: inside that share, as the label's
     public static let spindleRing = 3.0
     /// `--dw-tt-grooves`: a repeating radial gradient, a ring every 4 pt - clear to 2, black at 0.2 at 3, clear at 4
     public static let groovePeriod = 4.0
@@ -71,24 +72,27 @@ public enum TurntableFit {
     }
 }
 
-/// The face's parts as the layers draw them: each a circle about the record's centre, radii in points.
+/// The face's parts as the layers draw them: each a circle about the record's centre, radii in points. The web's
+/// boxes are border-box (player.css's `*, *::before, *::after`, linked before app.css), so each ring is inside its
+/// share of the face: the label's outer edge is 38.75% of the face across and the cover is that less twice its 2 pt
+/// ring, the spindle's 6.25% less twice its 3 pt.
 public struct TurntableFaceParts: Equatable, Sendable {
     /// the record's radius
     public var record: Double
-    /// the cover inside the label's ring, and the ring's outer edge
+    /// the cover inside the label's ring, and the ring's outer edge (the label's share)
     public var label: Double
     public var labelOuter: Double
-    /// the spindle inside its ring, and the ring's outer edge
+    /// the spindle inside its ring, and the ring's outer edge (the spindle's share)
     public var spindle: Double
     public var spindleOuter: Double
 
     public init(_ layout: TurntableLayout) {
         let face = layout.record.width
         record = face / 2
-        label = face * TurntableFace.labelShare / 2
-        labelOuter = label + TurntableFace.labelRing
-        spindle = face * TurntableFace.spindleShare / 2
-        spindleOuter = spindle + TurntableFace.spindleRing
+        labelOuter = face * TurntableFace.labelShare / 2
+        label = Swift.max(0, labelOuter - TurntableFace.labelRing)
+        spindleOuter = face * TurntableFace.spindleShare / 2
+        spindle = Swift.max(0, spindleOuter - TurntableFace.spindleRing)
     }
 }
 

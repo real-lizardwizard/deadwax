@@ -200,8 +200,8 @@ enum Pictures {
         }
     }
 
-    /// 2.4: the label's 2 pt ring lies outside a cover 38.75% of the face across (app.css's content-box label) - the
-    /// cover's red inside it, the ring's grey on it, the vinyl outside it - read at four angles.
+    /// 2.4: the label's 2 pt ring lies inside a label 38.75% of the face across (player.css makes app.css's label
+    /// border-box) - the cover's red inside it, the ring's grey on it, the vinyl outside the 38.75% - read at four angles.
     @Test func theLabelsRingIsWhereTheWebsIs() {
         for size in Self.sizes {
             let layers = Self.layers(size.width)
@@ -210,7 +210,8 @@ enum Pictures {
             layers.set(Self.look())
             let render = Render(layers)
             let parts = TurntableFaceParts(layers.layout)
-            #expect(abs(parts.label - layers.layout.record.width * 0.3875 / 2) < 1e-9)
+            #expect(abs(parts.labelOuter - layers.layout.record.width * 0.3875 / 2) < 1e-9)
+            #expect(abs(parts.label - (parts.labelOuter - 2)) < 1e-9)
             // where the test cover is red (its white bar is along its top, its blue square at its top left)
             for degrees in [100.0, 160, 200, 250] {
                 let inside = render.onRecord(parts.label - 1.5, degrees)
@@ -219,6 +220,30 @@ enum Pictures {
                 #expect(inside.r > 150 && inside.g < 80, "\(size.name) \(degrees): the cover inside (\(inside))")
                 #expect(abs(ring.r - ring.g) < 12 && abs(ring.g - ring.b) < 12 && ring.r > 55, "\(size.name) \(degrees): the ring's grey (\(ring))")
                 #expect(Render.luminance(outside) < 40, "\(size.name) \(degrees): the vinyl outside (\(outside))")
+            }
+        }
+    }
+
+    /// 2.4: the spindle's 3 pt ring lies inside its 6.25% of the face, as the label's does (border-box) - its own dark
+    /// inside the ring, the ring's grey, and the cover's red just past the 6.25% - read at four angles.
+    @Test func theSpindlesRingIsInsideItsShare() {
+        for size in Self.sizes {
+            let layers = Self.layers(size.width)
+            layers.arm.isHidden = true
+            layers.handle.isHidden = true
+            layers.set(Self.look())
+            let render = Render(layers)
+            let parts = TurntableFaceParts(layers.layout)
+            #expect(abs(parts.spindleOuter - layers.layout.record.width * 0.0625 / 2) < 1e-9)
+            #expect(abs(parts.spindle - (parts.spindleOuter - 3)) < 1e-9)
+            for degrees in [100.0, 160, 200, 250] {
+                let inside = render.onRecord(parts.spindle - 1.5, degrees)
+                let ring = render.onRecord(parts.spindleOuter - 1.5, degrees)
+                let outside = render.onRecord(parts.spindleOuter + 1.5, degrees)
+                #expect(Render.luminance(inside) < 30, "\(size.name) \(degrees): the spindle inside its ring (\(inside))")
+                #expect(abs(ring.r - ring.g) < 12 && abs(ring.g - ring.b) < 12 && ring.r > 55,
+                        "\(size.name) \(degrees): the ring's grey (\(ring))")
+                #expect(outside.r > 150 && outside.g < 80, "\(size.name) \(degrees): the cover past it (\(outside))")
             }
         }
     }

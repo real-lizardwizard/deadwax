@@ -1792,7 +1792,9 @@ Questions for slice 3, and for James:
     hold). `TurntableSettings`: the two settings under the web's keys, and the look and lyrics taps. Debug's
     Turntable section: the web's rows in the web's order, with the phone's own beside them (Window from, Handover,
     Position read in, Touches under a hand, Slow starts), and `phoneReport`, the deck's report as the phone has it.
-  - `TurntableLayout` centres the label and the spindle on the record (a departure, below).
+  - `TurntableLayout` places the label and the spindle on the record's centre, as the web's are, and
+    `TurntableFaceParts` draws each ring inside its share of the face (the review's fix: the web's boxes are
+    border-box).
   - `TurntablePress`: `handTurn`, the drawn turn round the deck's angle (Turntable.tsx:426), and
     `cancelFollowed()`, for an interruption.
   - `DeckRules`: `interrupted()`, Debug's reads of the report (`reportWindow`, `fetchedBytes`, `lastFetchedAt`,
@@ -1867,9 +1869,6 @@ mark and the purple `1.25x` readout at the corner (slice 4's, hidden in the app)
 
 **Departures, and why.**
 
-- **The label and the spindle are centred on the record.** The web's are content-box: their 2 and 3 px rings sit
-  outside a box placed by its top left, so the web's are 2 and 3 pt off centre and wobble as the record turns. The
-  phone draws them centred (question 25 below).
 - **The readout's inset shadow isn't drawn, and its face is Menlo.** Both are slice 4's to judge, when the readout
   shows.
 - **The pbxproj was edited by hand** to link DeadwaxTurntable: one build file and one product dependency, the
@@ -1927,8 +1926,8 @@ SwiftUI, and heat and battery over an album.
 24. **The Handover row's seam**: give DeckEngine and PlaybackEngine a render-time stamp the app can read, or leave the
     seam to the ear? **To the ear first** (check 8): measuring it means touching the engine, and the timing the app
     does see (the start's `E` and the timer's lateness) may be enough to say whether question 2's B is needed.
-25. **The centred label**: keep it centred, or draw the web's 2-3 pt offset? **Centred**: the web's offset is a CSS
-    box-model side effect, and a wobbling label reads as a fault on a record.
+25. (Dropped in the review: the web's label and spindle were never off centre - player.css makes every box
+    border-box. See "Review fixes" below.)
 26. **The kept disc art**: eight in memory, or on disk with the download (question 11's A)? **Eight in memory** until
     an offline album with CD art is seen showing the plain record.
 

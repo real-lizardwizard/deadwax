@@ -24,16 +24,18 @@ struct TurntableScreenTests {
     @Test func theFacesPartsAreTheStylesheets() {
         let layout = TurntableLayout(width: 372)
         let parts = TurntableFaceParts(layout)
-        // the record 320 across at full size: the cover 124 across (38.75%), its ring 2 pt outside it - 62 to 64,
-        // the grooves' inner edge - and the spindle 20 across (6.25%), its ring 3 pt outside
+        // the record 320 across at full size: the label 124 across (38.75%) with its 2 pt ring inside it, the cover 120
+        // (60 to 62) - and the spindle 20 across (6.25%), its 3 pt ring inside: the web's boxes are border-box
         #expect(abs(parts.record - 160) < 1e-9)
-        #expect(abs(parts.label - 62) < 1e-9 && abs(parts.labelOuter - 64) < 1e-9)
-        #expect(abs(parts.spindle - 10) < 1e-9 && abs(parts.spindleOuter - 13) < 1e-9)
+        #expect(abs(parts.label - 60) < 1e-9 && abs(parts.labelOuter - 62) < 1e-9)
+        #expect(abs(parts.spindle - 7) < 1e-9 && abs(parts.spindleOuter - 10) < 1e-9)
         // the label's and the spindle's frames centred on the record's
         let record = layout.record, label = layout.label, spindle = layout.spindle
         #expect(abs((label.left + label.width / 2) - (record.left + record.width / 2)) < 1e-9)
         #expect(abs((spindle.top + spindle.height / 2) - (record.top + record.height / 2)) < 1e-9)
         #expect(abs(label.width - 124) < 1e-9 && abs(spindle.width - 20) < 1e-9)
+        // the outer edges are the boxes, as the web's border-box ones
+        #expect(abs(parts.labelOuter * 2 - label.width) < 1e-9 && abs(parts.spindleOuter * 2 - spindle.width) < 1e-9)
         // the rings are points, not units: on a 284 pt plinth still 2 and 3
         let small = TurntableFaceParts(TurntableLayout(width: 284))
         #expect(abs(small.labelOuter - small.label - 2) < 1e-9 && abs(small.spindleOuter - small.spindle - 3) < 1e-9)

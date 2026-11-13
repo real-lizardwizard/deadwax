@@ -78,13 +78,32 @@ def test_the_plinths_room_is_the_webs():
 def test_the_label_and_the_spindle_are_the_webs_share_of_the_record():
     label = percent(".app-tt-label", "width")
     assert number("labelShare") == label == percent(".app-tt-label", "height")
-    # the web places the label's content box from its top left: its centre is the record's
+    # the web places the label's box from its top left: its centre is the record's
     assert abs(percent(".app-tt-label", "top") + label / 2 - 0.5) < 1e-12
     assert number("labelRing") == px(APP_CSS, "app-tt-label-ring")
     spindle = percent(".app-tt-spindle", "width")
     assert number("spindleShare") == spindle == percent(".app-tt-spindle", "height")
     assert abs(percent(".app-tt-spindle", "top") + spindle / 2 - 0.5) < 1e-12
     assert number("spindleRing") == px(APP_CSS, "app-tt-spindle-ring")
+
+
+def test_the_rings_are_inside_the_label_and_the_spindle():
+    """TurntableFaceParts draws each ring inside its share of the face, the cover (or the spindle's dark) inside the
+    ring - because the web's boxes are border-box: player.css sets it on every box, the app's page links player.css
+    before app.css, and neither the label nor the spindle sets it back. A content-box label would have its 2 px ring
+    outside the 38.75% (and be 2 px off centre, placed from its top left)."""
+    assert re.search(r"\n\*, \*::before, \*::after \{ box-sizing: border-box; \}", PLAYER_CSS.read_text())
+    page = (REPO / "interface" / "player" / "index.html").read_text()
+    assert page.index('href="/player/player.css"') < page.index('href="/player/app.css"')
+    for selector in (".app-tt-label", ".app-tt-spindle"):
+        assert "box-sizing" not in rule(selector)
+    swift = SWIFT.read_text()
+    parts = swift[swift.index("public struct TurntableFaceParts"):]
+    parts = parts[:parts.index("\n}\n")]
+    assert "labelOuter = face * TurntableFace.labelShare / 2" in parts
+    assert "labelOuter - TurntableFace.labelRing" in parts
+    assert "spindleOuter = face * TurntableFace.spindleShare / 2" in parts
+    assert "spindleOuter - TurntableFace.spindleRing" in parts
 
 
 def test_the_grooves_are_the_webs_gradient():

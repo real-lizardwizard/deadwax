@@ -401,10 +401,10 @@ public struct TurntableLayout: Equatable, Sendable {
 
     public var platter: StageBox { frame(TurntableGeometry.platter) }
     public var record: StageBox { frame(TurntableGeometry.record) }
-    /// The label's cover - 38.75% of the face (app.css's `.app-tt-label`), centred - its ring outside it
-    /// (TurntableFaceParts). Not the exporter's grooves' inner edge less 4: the CSS is what the web draws.
+    /// The label - 38.75% of the face (app.css's `.app-tt-label`), centred - its ring inside it, the cover inside that
+    /// (TurntableFaceParts: the web's boxes are border-box).
     public var label: StageBox { centred(record.width * TurntableFace.labelShare) }
-    /// The spindle: 6.25% of the face (`.app-tt-spindle`), centred, its ring outside it.
+    /// The spindle: 6.25% of the face (`.app-tt-spindle`), centred, its ring inside it.
     public var spindle: StageBox { centred(record.width * TurntableFace.spindleShare) }
     /// A circle `across` points wide on the record's centre.
     func centred(_ across: Double) -> StageBox {
