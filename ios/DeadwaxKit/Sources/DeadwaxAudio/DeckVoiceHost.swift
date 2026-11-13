@@ -80,6 +80,22 @@ struct DeckHostState {
     /// EQUnit counts its own the same way, so Debug's EQ rows read both alike)
     var eqTicks: UInt64 = 0
     var eqWorst: UInt64 = 0
+
+    // Debug's recorder (turntable.md 6.3): every block the voice renders and every message it is told, into rings made
+    // with the engine - a block's record and its samples in the slot's own stretch of `tapAudio`. On from a start
+    // (`tapOn`, written while stopped, like the rest of this state) until the main side's word in `tapControl` asks it
+    // off; a ring full loses the block or the message and counts it, never waits.
+    var tapOn = false
+    var tapBlocks: UnsafeMutablePointer<DeckTapBlock>?
+    var tapAudio: UnsafeMutablePointer<Float>?
+    var tapFifo: OpaquePointer?
+    var tapMessages: UnsafeMutablePointer<DeckTapMessage>?
+    var tapMessageFifo: OpaquePointer?
+    var tapControl: OpaquePointer?
+    var tapLostBlocks: UInt64 = 0
+    var tapLostMessages: UInt64 = 0
+    /// the engine's starts, counted by the main side before each (the voice is from rest at every one)
+    var starts: UInt64 = 0
 }
 
 enum DeckVoiceHost {
@@ -106,6 +122,15 @@ enum DeckVoiceHost {
         let rate = h.pointee.rate
         let voice = h.pointee.voice
 
+        // the recorder's tap: on until the main side's word says off
+        var tapping = false
+        if h.pointee.tapOn, let control = h.pointee.tapControl {
+            if audio_counters_load(control, 0) == 0 { h.pointee.tapOn = false } else { tapping = true }
+        }
+        let windowBefore = h.pointee.window
+        var told: UInt32 = 0
+        var blockLead = 0.0
+
         // the clock: the voice's now, `L` behind the block's presentation
         let now: Double
         let stamp = timestamp.pointee
@@ -117,6 +142,7 @@ enum DeckVoiceHost {
             let lead = h.pointee.lead.pointee.block(hostOut: hostOut, frames: frames, rate: rate, entry: entry,
                                                      sounding: DeckRender.sounding(voice))
             now = hostOut - lead
+            blockLead = lead
             h.pointee.lastHostOut = hostOut
             h.pointee.lastSeconds = Double(frames) / rate
         } else {
@@ -126,6 +152,7 @@ enum DeckVoiceHost {
             let lead = h.pointee.lead.pointee.value
             let hostOut = h.pointee.lastHostOut >= 0 ? h.pointee.lastHostOut + h.pointee.lastSeconds : entry + lead
             now = hostOut - lead
+            blockLead = lead
             h.pointee.lastHostOut = hostOut
             h.pointee.lastSeconds = Double(frames) / rate
         }
@@ -140,6 +167,8 @@ enum DeckVoiceHost {
                 if old != 0 && old != h.pointee.window { giveBack(h, old) }
             }
             DeckRender.command(voice, message.pointee.message, now: now, rate: rate)
+            if tapping { tapMessage(h, message.pointee) }
+            told &+= 1
             audio_fifo_release(h.pointee.messages)
             h.pointee.applied &+= 1
         }
@@ -148,6 +177,23 @@ enum DeckVoiceHost {
         let outputs = UnsafeMutableBufferPointer(start: h.pointee.outputs, count: channels)
         DeckRender.render(voice, outputs, frames: frames, rate: rate, now: now)
         if let heard = DeckRender.report(voice, frames: frames, rate: rate, now: now) { tell(h, heard) }
+        if tapping {
+            var record = DeckTapBlock()
+            record.block = h.pointee.blocks
+            record.starts = h.pointee.starts
+            record.frames = frameCount
+            record.channels = UInt32(channels)
+            record.rate = rate
+            record.now = now
+            record.lead = blockLead
+            record.hostTime = hostValid ? stamp.mHostTime : 0
+            record.sampleTime = stamp.mSampleTime
+            record.windowBefore = windowBefore
+            record.window = h.pointee.window
+            record.messages = told
+            record.pos = voice.pointee.pos
+            tapBlock(h, &record, frames: frames, channels: channels)
+        }
 
         // the EQ, after the limiter: the newest bank offered at the block's start (eq.md 1.6)
         if let eq = h.pointee.eq, let triple = h.pointee.eqTriple, let slots = h.pointee.eqSlots {
@@ -178,6 +224,47 @@ enum DeckVoiceHost {
         audio_counters_store(counters, DeckCounter.hostTime.rawValue, hostValid ? 1 : 0)
         audio_counters_store(counters, DeckCounter.eqBlocks.rawValue, h.pointee.eqBlocks)
         return noErr
+    }
+
+    /// The recorder's: a block's record and its samples (the voice's, before the EQ) into the tap ring - or, full, lost
+    /// and counted.
+    static func tapBlock(_ h: UnsafeMutablePointer<DeckHostState>, _ record: inout DeckTapBlock, frames: Int, channels: Int) {
+        guard let fifo = h.pointee.tapFifo, let blocks = h.pointee.tapBlocks, let audio = h.pointee.tapAudio else { return }
+        var slot: UInt32 = 0
+        guard audio_fifo_reserve(fifo, &slot) else {
+            h.pointee.tapLostBlocks &+= 1
+            return
+        }
+        let stride = h.pointee.maximumFrames
+        let to = audio + Int(slot) * 2 * stride
+        var peak: Float = 0
+        for c in 0..<2 {
+            let from = h.pointee.outputs[Swift.min(c, channels - 1)]
+            let into = to + c * stride
+            for i in 0..<frames {
+                let v = from[i]
+                into[i] = v
+                let size = v < 0 ? -v : v
+                if size > peak { peak = size }
+            }
+        }
+        record.peak = peak
+        record.lostBlocks = h.pointee.tapLostBlocks
+        record.lostMessages = h.pointee.tapLostMessages
+        blocks[Int(slot)] = record
+        audio_fifo_commit(fifo)
+    }
+
+    /// The recorder's: a message as the voice was told it, before which block - or, the ring full, lost and counted.
+    static func tapMessage(_ h: UnsafeMutablePointer<DeckHostState>, _ message: DeckSlot) {
+        guard let fifo = h.pointee.tapMessageFifo, let messages = h.pointee.tapMessages else { return }
+        var slot: UInt32 = 0
+        guard audio_fifo_reserve(fifo, &slot) else {
+            h.pointee.tapLostMessages &+= 1
+            return
+        }
+        messages[Int(slot)] = DeckTapMessage(block: h.pointee.blocks, slot: message)
+        audio_fifo_commit(fifo)
     }
 
     /// A window the voice let go of, back to the main side - or, the ring full, kept (leaked until the engine stops,

@@ -2062,6 +2062,160 @@ nothing. Whether UIKit ever skips the cancel when Now Playing closes is also not
 - **Must not touch**: anything that plays at 1x - the measured gate decides how the varispeed is out of the path.
 - **Verified**: ios.yml; the phone (8, checks 25-31).
 
+#### Slice 4, first half, built (2026-11-13)
+
+Two parts, each its own commit, stopped before the fader's view: Debug's recorder and its replay (6.3, question 23),
+then the engine change (5.2), measured by 5.3's eight on the macOS job - and, after the review, a commit of fixes to
+each. Nothing in the app sets a speed yet.
+
+**What was built.**
+
+- **The recorder** (ae84f26). Debug's "Record 20 s" writes the web's own file (deck.ts's version 3: int16 audio,
+  blockTimes, blockPeaks, messages, heard) with the phone's keys under `phone`: each block's now, `L`, host and sample
+  time, the windows before and after, the messages applied before it, float32 audio, and the touches and handovers.
+  The deck engine's render taps every block and message into rings (32 blocks, 1,024 messages) made at the first
+  start a recording asks for them, drained ten times a second; a full ring loses and counts, never waits. Saved
+  through ShareLink; "Record 20 s again" under it starts another, deleting the files before it. It ends by the
+  clock - `seconds` from its first block, rests included (below). `replay-deck-recording` (a `swift run` target)
+  plays a recording through the Swift voice: the phone's from its applied messages, the web's at the timing the lab's
+  planTiming finds. A phone recording replays to the bit; the web's (exported by deck.ts's own recorder,
+  `ios/scripts/export-deck-recording.cjs`) with every 16-bit sample the same.
+- **The engine change** (PlaybackEngine.swift):
+  - **the speed's chain**: every lane in the path into one AVAudioMixerNode, through ONE AVAudioUnitVarispeed (render
+    quality 127, the most), into the main mixer. Made the first time a lane needs it; hooked into the main mixer only
+    while a lane is in it (`speedChain`, `unhookSpeedChain`); dropped and made again at a new output format;
+  - at 1x **out of the path** - each lane's node straight into the main mixer, as before the speed - which item 1
+    measured exact; with the speed never moved the chain is never made;
+  - the path decided as a lane begins (its first buffer after a clear, `fitPath`): in it while the speed isn't 1, or
+    when a lane in it is playing or has buffers on it (a join takes the path of the lane it follows); every clear at
+    1x takes the lanes out and unhooks the chain;
+  - `setSpeed(_:exact:)` (held to 0.25-4, not-a-number to 1) and `speed`, for the fader; the chain takes a new speed
+    at the next render;
+  - leaving 1x while a lane plays straight to the mixer: the lanes begun again in the chain from the frame the render
+    reached (`renderedSpot`: the last render's reading and one IO buffer); paused, from the frame heard;
+  - back at 1x the chain plays on at rate 1 (no gap mid-drag); **`setSpeed(1, exact: true)`** - the fader let go at
+    1x, James's answer - begins the lanes again straight to the main mixer from the frame the chain gave out (the
+    reading less its 48-frame delay and the one frame its resampler reads past it), the song's own samples from there;
+  - while a lane begun again hasn't yet rendered what the output's latency holds, the position is still the song
+    before it (`stillHeard`) - no jump at either restart;
+  - positions in the song's time: the node's frame less the varispeed's 48 frames, less the latency in the song's
+    time - over the speeds it was rendered at (`HeardEstimate.songSeconds`, Core, with `SpeedChange`; live by host
+    time, offline by the render's own seconds). A reading keeps the speed it was read at and those song seconds
+    (`HeardReading.speed`, `.behind`), so an estimate after iOS stops the output carries on at the reading's speed;
+  - a change of lane at speed: both nodes in the chain's one time base, the new lane started at the sample the first
+    ends at; starts from silence count the margin and the lead at the speed; the clock's backstop (`ranOut`, a
+    quarter of a second) and the window that puts a converter's last frames on before a node runs out are counted in
+    the output's time, so `speed` of the node's frames;
+  - `Settings.varispeedAtOne` (`outOfPath`, `bypassed`, `atRateOne`), for the measurement only.
+- **Tests**: VarispeedMeasuredTests (items 1-5, 7 and 8, a mono song at speed, 4x on a locked phone's buffer) and
+  VarispeedCostTests (item 6), on the macOS job; every test engine reads `DEADWAX_VARISPEED_AT_ONE`, so the render
+  suites run each way; ios.yml runs the cost again in a release build. DeckRecordingTests for the recorder.
+
+**Measured (5.3).** On this Mac, offline, a debug build unless it says - after the review's fixes.
+
+| item | what | bar | measured |
+| --- | --- | --- | --- |
+| 1 | 30 s of noise and a sweep (a 48 kHz FLAC) at 1x | the file's own samples, every bit | out of the path: all 1,440,000 frames the same, from the first. Bypassed: every sample exact, but 47 frames late. In the path at rate 1: 48 frames late, and filtered - up to 0.34 (-9.3 dB) off on the noise |
+| 1 | the render suites (147 audio tests, before the review's) | all pass | out of the path: all pass. Bypassed: 62 fail. At rate 1: 64 fail |
+| 2 | a -6 dBFS 1 kHz tone: what isn't the tone | over 60 dB under it | 140.4 dB at 0.25x, 140.7 at 0.5x, 132.8 at 1.5x, 144.7 at 2x; its level 0.0 dB at each |
+| 2 | 20 kHz | - | 0.25x (5 kHz): 135.1 dB clean; 0.5x (10 kHz): 136.1 dB |
+| 2 | what folds back past 24 kHz | under -40 dB | 20 kHz at 1.5x (30 kHz): -119.5 dB; at 2x (40 kHz): -116.6 dB; 15 kHz at 2x (30 kHz, the bar's own): -113.1 dB |
+| 2 | a mono song at 1.5x and 0.5x | its level at 1x, on both channels | 133.7 and 141.1 dB clean, 0.0 dB from 1x on each channel; its position 0.00 frames off the clicks |
+| 3 | the position against clicks heard, 1.5x | within 1 output frame | 0.00 frames off at 186 readings; with 0.1 s of latency 0.00 at 176; 0.25x, and 2x with latency, 0.00 too |
+| 4 | test sounds 9 and 10 (one lane) | the join's largest stray under -50 dB | 2x: -135.8 dB (the tone 144.7 dB clean); 0.25x: -129.5 dB (139.3); 1x: -137.6 dB |
+| 4 | a change of lane, 44.1 into 96 kHz, the phone's buffering | no worse than the same join at 1x (+3 dB) | see the table below: every speed -46.2 dB or under, against 1x's -46.6 |
+| 4 | the same at 2x with 0.3 s ahead and 4,096-frame renders | not over the first lane | on time: no frame of silence at the join (the longest quiet is 1 frame, a zero crossing), -53.9 dB |
+| 5 | 1.5x, 0.75x, 2x, 0.6x, a second apart | no click, no position jump | each change's largest step equals the faster tone's own; 0 jumps in 399 readings |
+| 6 | a 192 kHz FLAC to a 48 kHz output, 2x | (release) median block under 15% | a 4,096-frame block: 0.04% of its time at 1x, 0.19% at 2x, 0.14% at 0.25x; release: 0.03% at 1x, 0.15% at 2x, 0.12% at 0.25x (the one chain). The 12 s file decoded, converted and scheduled in 0.81 s at 1x, 0.80 s at 2x (release) |
+| 7 | a drag 0.9x-1.1x-0.9x, 0.01 every 10 ms | no click, no gap | the largest step the 1.1x tone's own (0.03167); no 10 ms under 0.4999 of the tone's 0.5. Then a pause and play at 1x: the song's own samples, bit for bit |
+| 7 | begun at 1x, then 1.01x, the output's latency 0.1 s, a ramp for the song | on from the frame rendered | the song from frame 48000.00 - the frame the render had reached (the ear was at 43200); it comes in 48 frames after the change (the chain's delay, 48 / 1.01); the position 0.90000 s before and after, never back across it |
+| 7 | held at 1x in the chain, then let go (`exact`) | the song's own samples again | the chain's last frame out the song's 76751, then the song from 76752 - bit for bit for 40,000 frames, no frame of silence offline; the position 1.49902 s before and after |
+| 8 | the varispeed's own delay | measured, not assumed | 48.00 of the node's frames at 0.25x, 1x (in the path), 1.5x and 2x. Its kAudioUnitProperty_Latency says 0 |
+| - | 4x, 4,096-frame IO buffer, a 44.1 kHz song whose next hasn't come | its end on time, as with nothing after it | its converter's last frames put on with 30,464 of the node's frames left; the render bit for bit the song alone's; the backstop past 1.5 IO buffers' clock error at 0.25x-4x |
+
+**A change of lane at each speed** (44.1 kHz into 96 kHz, the phone's buffering; the largest stray sample within 50
+ms of the join, the bar 1x's own +3 dB). Before the review's fix there was a varispeed per lane: each lane's own
+fractional phase, so a change of lane was clean only where the two happened to agree (0.73x, 1.01x and 1.37x are the
+review's numbers; the others were 05fb130's).
+
+| speed | one varispeed (now) | a varispeed per lane (before) |
+| --- | --- | --- |
+| 1x | -46.6 dB (the bar) | -46.6 |
+| 0.25x | -46.2 | -46.2 |
+| 0.73x | -46.6 | -35.2 |
+| 1.01x | -48.6 | -36.0 |
+| 1.37x | -52.2 | -39.3 |
+| 2x | -53.9 | -53.9 |
+| 2.9x | -58.2 | - |
+| 4x | -60.0 | -60.0 |
+
+**Mutations, each caught**: bypassed at 1x (61 render tests, and items 1, 3 and 7); in the path at rate 1 at 1x (61
+render tests, item 1); the delay not taken off (item 3); the latency not counted at the speed (item 3); the join not
+put into the new lane's time (item 4); the speed not given to a lane playing (item 5). After the review: resuming
+from the frame heard, not the frame rendered (crossingOneX: the ramp's frame, the position, the let-go); the let-go
+doing nothing (its bit-for-bit samples); the chain's delay alone taken off at a let-go (one frame skipped); the flush
+window and the backstop in the node's time (the 4x test); no `renderAtStart` at a reconnect (the position at the
+let-go); the position not kept across a restart (both); a recording judged by its last block kept (the rest test).
+
+**Departures, and why.**
+
+- **Out of the path, not bypassed, at 1x**: item 1. Bypassed is every sample right, 47 frames late - every position,
+  join and resume the render suites check moves. So item 7's "bypassed at the next fresh start" is "taken out of the
+  path", and the other way can't be a flag: a node reconnected while it plays stops and drops its schedule. **The
+  first move off 1x begins the lanes again** in the chain (James: take the short gap): offline 48 frames before the
+  song comes in (the chain's delay); on the phone also the wait for the reconnected node's first render (one or two
+  IO buffers: 5-20 ms unlocked, more locked). The spec's 7 put the click at bypassing back at 1x; here it is a short
+  gap at leaving it - and, James's second answer, another at letting go at 1x.
+- **One varispeed for every lane, not one per lane** (5.2 said per lane): the review measured a change of lane at
+  speeds between round ones 7-11 dB worse than at 1x, each lane's resampler at its own fractional phase. One chain
+  puts both nodes in one time base, so a join is the sample the first ends at, through one resampler.
+- **From the frame rendered, not the one heard**: unlike a pause or a new route, the output still plays all it holds;
+  begun again from the frame heard, the latency would play twice (0.2 s on AirPods).
+- **`aheadSeconds` stays in the song's frames**, as 5.2 says: at 4x, 2 s ahead is 0.5 s of the clock.
+- **A change of lane rings at a cut mid-waveform at 1x too** (-46.6 dB): each lane's converter takes its part as a
+  song on its own. Today's engine, not the speed's; item 4's lane bar is held to it.
+- **The lock screen's rate and plays at speed are the fader's half**: both are the app's. The engine's positions are
+  the song's time at any speed (item 3), but `Plays.listenedStep` caps a step at the clock times its `rate`, which
+  PlayReporter leaves at 1 - so at 2x it would count half. PlayerModel passes the speed there with the fader.
+- **For the fader's half: the first move off 1x, and a let-go, publish `.loading` then `.playing`** - the lanes begun
+  again go through `begin`. The fader's view and the transport mustn't flash a loading state for it.
+- **The app stays 0.6 (6)**: a Debug feature and an engine API nothing calls yet.
+
+**What only the phone shows.** A reconnected node's first live render time (offline it has none until rendered; live
+it reads a stale one, which `renderAtStart` now refuses); the gaps at the first move off 1x and at a let-go, live;
+whether the restart's frame is exact live (offline the reading is the render's end; live it is the last render's
+start plus an IO buffer, and the varispeed's pulls needn't be IO buffers); the latency at speed on AirPods and
+AirPlay (`songSeconds` over the speed's history); the chain's cost on the phone's chip; a rate changed under a live
+render (offline it takes the next render exactly); the chain at 4x on a locked phone (offline its 4,096-frame renders
+pulled 16,384 frames through the mixer without a refusal); the lock screen at speed (8).
+
+**James's answers** (2026-11-13).
+
+1. **The first move off 1x is a short gap**: take it.
+2. **Exact again on let-go**: when the fader is let go at 1x, the chain comes out of the path (one short gap then),
+   rather than staying filtered until the next pause, seek or song - in this engine nearly every song change is a
+   join, so "until the next fresh start" could be a whole session of filtered 1x. Built in the engine
+   (`setSpeed(1, exact: true)`), for the fader to call on release; mid-drag, crossing 1x stays in the chain at rate 1.
+
+**After the review** (2026-11-13). The review of ae84f26 and the speed's commit confirmed 1x untouched in every path
+while the speed is never moved, and found:
+
+1. **The recorder never finished across a rest**: "done" was judged from the last block kept and blocks past the end
+   were dropped, so a recording whose 20 s ended while the record rested kept its tap on and Debug's tick running.
+   Now ended by the clock (a block at or past the end; live, host time while resting); "Record 20 s again" after a
+   save; earlier files deleted; the tap's rings (about 1.1 MB) made at the first recording's start, not in every deck
+   engine.
+2. **A change of lane was clean only at the speeds tested** (above): one chain for every lane.
+3. **The backstop and the flush window were in the node's frames**: at 4x a quarter second of them is 62 ms, under a
+   locked IO buffer. In the output's time now.
+4. **A reconnected node's stale render time** (of the base it left) could be taken for a time to start at:
+   `renderAtStart` is set at every reconnect.
+5. **The crossing test ran with no latency on a sine**, so resuming from the frame heard passed it: with 0.1 s of
+   latency and a ramp it reads the frame resumed at off the sound. A mono lane at speed added.
+6. **Smaller**: a reading's latency was kept divided by the speed then and read back at the speed now (the speed and
+   the song's seconds kept instead); a join followed only a lane already started (a lane with buffers on it counts
+   now); `nodeOffset` reads one render by its host time too; the trace's speed lines are a drag's every half second.
+
 ---
 
 ## 8. James's checks on his iPhone
@@ -2154,7 +2308,8 @@ usual question buttons.
 29. At 2x and at 0.5x: Test sounds 9 and 10 still unbroken; the lock screen's scrubber moves at the speed.
 30. At 1.5x, take and let go of the record: it comes back to 1.5x (50 rpm), the song at 1.5x.
 31. While a song plays, drag the fader slowly up through 1x and back down through it, several times: no click
-    or jump at the mark either way.
+    or jump at the mark either way. Then let go at the mark: one short gap (a few ms), then the song exactly as
+    before the fader existed (James's answer: exact again on let-go). The first move off 1x has a short gap too.
 
 ---
 

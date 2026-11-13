@@ -579,6 +579,20 @@ Debug is where Phase 0's test screen lives now:
     then what iOS says the output adds), and, only when there are some, **Messages dropped**, **Not
     restarted**, **Interruptions** and **Slow starts** (presses whose sound began late because the
     record's engine was slow to start).
+  - **Recording**: **Record 20 s** records the record's sound for a bug report - what it played, every
+    touch and what the record's engine made of it - as the web app's Debug does, in the same kind of
+    file. It begins with the record's next sound ("Waiting for the record's next sound"), so tap it,
+    go to Now Playing's turntable and turn the record as you would; 20 seconds later the row says
+    "20 s recorded: save the file and send it", and **Save the recording (… MB)** opens the share
+    sheet (AirDrop it to the Mac, or Save to Files). A file is 15-30 MB: it carries the sound as it
+    was made and the part of the song the record played, so the Mac can play it again exactly. The
+    20 seconds count from the first sound, rests included: a recording whose 20 seconds end while the
+    record is still finishes then. **Record 20 s again**, under the save button, starts another (the
+    saved file is deleted; the app keeps only the newest). Until the turntable has shown, the row
+    says "Shows the turntable first: the recording is of its sound".
+    On the Mac, `swift run --package-path ios/DeadwaxKit replay-deck-recording <file>` plays it again
+    through the app's own code and says whether it made the same sound (it should, to the bit). The
+    same command takes a recording from the web app's Debug, with `--song <the song's file>`.
 - **EQ**: what the [EQ](#eq) is doing. **Output** is the route as iOS gives it - each output's kind,
   name and ID, raw ("Bluetooth (A2DP) · James's AirPods Pro · 60:F8:…"), one line each - and **Key**
   the name the EQ keeps that output's setting under. Then the EQ's audio unit, which sits between the

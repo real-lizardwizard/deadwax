@@ -3205,6 +3205,53 @@ turntable's checks (app 0.6)").
 Info.plist, `tests/test_ios_install.py`; the guide's title, opening, install.sh's line and About's row, ios/README.md,
 and YouView's doc comment. `src/__init__.py` wasn't touched.
 
+### Slice 4, first half: the recorder, and the speed measured (2026-11-13)
+
+The turntable spec's slice 4 up to the fader's view (notes/ios-specs/turntable.md "Slice 4, first half, built", with
+the numbers). Two commits, then one of the review's fixes to each; the app stays 0.6 (6), since nothing calls the
+speed yet.
+
+- **Debug's recorder and its replay** (ae84f26, spec 6.3): "Record 20 s" writes deck.ts's own recording file with
+  the phone's keys beside it, from rings the deck engine's render fills (no allocation on that thread, release-built;
+  the rings made at the first recording's start); `swift run replay-deck-recording` plays a phone or a web recording
+  through the Swift voice. Both replay exactly. It ends by the clock - a rest across its end ends it too - and
+  "Record 20 s again" follows a save, the earlier file deleted.
+- **The speed in PlaybackEngine** (spec 5.2): **one** AVAudioUnitVarispeed for every lane - lanes into a mixer, through
+  it, into the main mixer - and **out of the sound's path at 1x**: each node straight into the main mixer, the chain
+  not even hooked up, so every sample at 1x is today's. `setSpeed(_:exact:)`, 0.25 to 4, is the fader's API;
+  `exact` at 1x (the fader let go, James's answer) takes the lanes out of the chain again, the song's own samples
+  from the frame the chain gave out. Positions stay in the song's time at any speed: the varispeed's own delay (48 of
+  the node's frames, measured) and the output's latency counted at the speeds it was rendered at
+  (`HeardEstimate.songSeconds`) come off the node's frame, and stay put across a restart (`stillHeard`).
+
+#### The speed, measured
+
+5.3's eight, as tests on ios.yml's macOS job (VarispeedMeasuredTests, and VarispeedCostTests again in a release
+build). The short of it:
+
+- **1x is bit for bit**, the varispeed out of the path: 30 s of noise and a sweep from a FLAC, every sample the file's
+  own. Bypassed in the path it was every sample right but 47 frames late, failing 62 of the 147 audio tests; at rate 1,
+  48 frames late and filtered, failing 64. Every test engine reads `DEADWAX_VARISPEED_AT_ONE` (`outOfPath`,
+  `bypassed`, `atRateOne`), so that comparison can be run again.
+- **Its quality** is far past the lane converter's bar: a 1 kHz tone 133-145 dB above everything else at 0.25x-2x,
+  and what 1.5x and 2x put past 24 kHz left at -113 to -120 dB. A mono song at speed is at its 1x level on both
+  channels.
+- **The position** is within 0.00 output frames of the clicks heard, with latency and without.
+- **Joins at speed** are exact on a lane (-130 dB and under); a change of lane is no worse than at 1x (-46.6 dB, the
+  two converters ringing at a cut mid-waveform, in today's engine too) at 0.25x, 0.73x, 1.01x, 1.37x, 2x, 2.9x and
+  4x: -46.2 to -60.0 dB. With a varispeed per lane, as first built, 0.73x-1.37x were 7-11 dB worse (the review).
+- **A speed changed while playing**, and a drag through 1x, make no click and no jump. Leaving 1x resumes at the
+  very frame the render had reached (with 0.1 s of latency, read off a ramp); a let-go at 1x is the song's own
+  samples again from the frame after the chain's last.
+- **Its cost** is 0.15% of a block at 2x on a 192 kHz file (release).
+- **4x on a locked phone's 4,096-frame buffer**: a song's end is on time when the next is late - the windows that
+  watch a node's clock count the output's time.
+
+The departures (the first move off 1x and a let-go at 1x each begin the lanes again, a short gap; one varispeed, not
+one per lane) and what only the phone shows are in the spec's section. **Left for the fader's half**: the lock
+screen's rate (NowPlayingController) and plays at speed - `Plays.listenedStep` caps a step at the clock times its
+`rate`, which PlayReporter leaves at 1 - and the `.loading` the engine publishes while it begins the lanes again.
+
 ## The EQ, slice 1: Core (2026-11-12)
 
 The design is notes/ios-specs/eq.md. Its slice 1 (5.1) is the EQ's pure part, in DeadwaxCore and tested like the rest

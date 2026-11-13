@@ -126,4 +126,16 @@ import Testing
             #expect(row.label == t[0].string && row.value == t[1].string && row.note == t[2].string, "speed row \(i): \(row)")
         }
     }
+
+    /// Once a recording is saved, a second one is offered beside the share button (slice 4's review: none, and Debug
+    /// needed a relaunch to record again).
+    @Test func aSecondRecordingAfterTheFirstIsSaved() {
+        let saved = DeckRecordingStatus.saved(seconds: 20, bytes: 1_300_000, name: "deadwax-turntable-phone-x.json")
+        #expect(TurntableDebugRows.recordingRow(saved, turntable: true).action == "Save the recording (1.2 MB)")
+        #expect(TurntableDebugRows.recordAgain(saved, turntable: true) == "Record 20 s again")
+        #expect(TurntableDebugRows.recordAgain(saved, turntable: false) == nil)
+        for other in [DeckRecordingStatus.idle, .waiting(seconds: 20), .recording(seconds: 20), .writing(seconds: 20), .failed("x")] {
+            #expect(TurntableDebugRows.recordAgain(other, turntable: true) == nil, "\(other): its own button, or none")
+        }
+    }
 }

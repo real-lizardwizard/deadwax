@@ -260,4 +260,32 @@ private let flac = Song(id: "song-1", suffix: "flac", size: 1_000)
         let speaker = HeardReading(frame: 480_000, at: nil, latency: 0.1)
         #expect(HeardEstimate.atStop(speaker, now: nil, rate: 48_000, end: 10_000_000) == 480_000 - 4_800)
     }
+
+    /// A reading taken at a speed (turntable.md 5.2; slice 4's review): carried on at the speed it was read at, and the
+    /// ear the song's seconds its latency held behind - whatever the speed is when it is read back (it was kept as the
+    /// latency over the speed then, and read back at the speed now).
+    @Test func aReadingAtSpeedKeepsItsOwnSpeed() {
+        let reading = HeardReading(frame: 480_000, at: 50.0, latency: 0.1, speed: 2, behind: 0.15)
+        #expect(HeardEstimate.rendered(reading, now: 50.5, rate: 48_000, end: 10_000_000) == 480_000 + 48_000)
+        #expect(HeardEstimate.atStop(reading, now: 50.5, rate: 48_000, end: 10_000_000) == 480_000 + 48_000 - 7_200)
+        let plain = HeardReading(frame: 480_000, at: 50.0, latency: 0.1)
+        #expect(plain.speed == 1 && plain.behind == 0.1, "1x: the latency itself")
+        #expect(HeardReading(frame: 0, at: nil, latency: 0.1, speed: 0.5).behind == 0.05, "no history: the latency at its speed")
+    }
+
+    /// turntable.md 5.2: what the latency holds of the song is each output second at the speed it was rendered at.
+    @Test func theLatencyHoldsTheSongAtEachSpeedItWasRenderedAt() {
+        let none: [SpeedChange] = []
+        #expect(HeardEstimate.songSeconds(latency: 0.2, at: 10, changes: none, before: 1) == 0.2)
+        #expect(HeardEstimate.songSeconds(latency: 0.2, at: 10, changes: none, before: 2) == 0.4)
+        // 2x from 9.9: 0.1 s of it at 1x, then 0.1 s at 2x
+        let up = [SpeedChange(at: 9.9, speed: 2)]
+        #expect(abs(HeardEstimate.songSeconds(latency: 0.2, at: 10, changes: up, before: 1) - 0.3) < 1e-12)
+        // changes before the latency's span only set the speed it starts at; ones after the reading don't count
+        let many = [SpeedChange(at: 1, speed: 0.5), SpeedChange(at: 5, speed: 1.5), SpeedChange(at: 9.95, speed: 0.25),
+                    SpeedChange(at: 10.5, speed: 4)]
+        #expect(abs(HeardEstimate.songSeconds(latency: 0.2, at: 10, changes: many, before: 1) - (0.15 * 1.5 + 0.05 * 0.25)) < 1e-12)
+        #expect(HeardEstimate.songSeconds(latency: 0, at: 10, changes: many, before: 1) == 0)
+        #expect(HeardEstimate.songSeconds(latency: .nan, at: 10, changes: many, before: 1) == 0)
+    }
 }

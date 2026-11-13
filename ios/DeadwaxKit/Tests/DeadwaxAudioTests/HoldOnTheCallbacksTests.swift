@@ -13,7 +13,7 @@ import Testing
 // one of the review's or its judges' probes, its prints made expectations; each fails without its change.
 
 /// The first open is `first` (a stream behind); a reopen (play after a pause) has the whole song, from where asked.
-private func gatedTrack(_ first: PCMSource, _ song: [[Float]], rate: Double, key: Int = 0, id: String = "s") -> EngineTrack {
+func gatedTrack(_ first: PCMSource, _ song: [[Float]], rate: Double, key: Int = 0, id: String = "s") -> EngineTrack {
     var opened = false
     return EngineTrack(key: key, audio: "\(id)|off", song: Song(id: id)) { start in
         if !opened, start == .beginning {

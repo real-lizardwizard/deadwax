@@ -275,6 +275,7 @@ private struct TurntableDebugSection: View {
     @Environment(DeckController.self) private var deck
     @Environment(\.scenePhase) private var phase
     @State private var rows: [InfoRow] = []
+    @State private var recording: DeckRecordingStatus = .idle
 
     var body: some View {
         Section {
@@ -288,6 +289,10 @@ private struct TurntableDebugSection: View {
                     }
                 }
             }
+            TurntableRecordingRow(status: recording, shown: deck.hasDeck, url: deck.recordingURL) {
+                deck.record()
+                recording = deck.recordingStatus
+            }
         } header: {
             Text("Turntable")
         }
@@ -295,7 +300,41 @@ private struct TurntableDebugSection: View {
             guard phase == .active else { return }
             while !Task.isCancelled {
                 rows = deck.debugRows()
+                recording = deck.recordingStatus
                 try? await Task.sleep(for: .seconds(0.25))
+            }
+        }
+    }
+}
+
+/// Debug's Recording row (turntable.md 6.2, 6.3): "Record 20 s", how it is going, then the file through the share
+/// sheet - what James sends back when the record's sound is wrong on the phone.
+private struct TurntableRecordingRow: View {
+    let status: DeckRecordingStatus
+    let shown: Bool
+    let url: URL?
+    let record: () -> Void
+
+    var body: some View {
+        let said = TurntableDebugRows.recordingRow(status, turntable: shown)
+        VStack(alignment: .leading, spacing: 6) {
+            LabeledContent(said.row.label) {
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(said.row.value).font(.footnote)
+                    if let note = said.row.note {
+                        Text(note).font(.caption).foregroundStyle(Palette.quiet)
+                    }
+                }
+            }
+            if let action = said.action {
+                if case .saved = status, let url {
+                    ShareLink(item: url) { Text(action) }
+                } else {
+                    Button(action, action: record)
+                }
+            }
+            if let again = TurntableDebugRows.recordAgain(status, turntable: shown) {
+                Button(again, action: record)
             }
         }
     }

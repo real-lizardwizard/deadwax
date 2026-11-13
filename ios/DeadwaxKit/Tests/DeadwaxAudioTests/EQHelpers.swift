@@ -18,6 +18,7 @@ func eqEngine(rate: Double, channels: AVAudioChannelCount = 2, eq: Bool = true) 
     settings.bufferSeconds = 0.1
     settings.changeSettleSeconds = 0
     settings.eq = eq
+    settings.varispeedAtOne = testVarispeedAtOne
     let engine = try PlaybackEngine(settings: settings)
     engine.scheduleLag = testScheduleLag
     return engine

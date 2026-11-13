@@ -23,6 +23,7 @@ func liveEngine(rate: Double, channels: AVAudioChannelCount = 2, ahead: Double =
     settings.startSeconds = 0
     settings.bufferSeconds = 0.1
     settings.changeSettleSeconds = changeSettle
+    settings.varispeedAtOne = testVarispeedAtOne
     let engine = try PlaybackEngine(settings: settings)
     engine.latency = { latency }
     engine.scheduleLag = testScheduleLag
@@ -36,6 +37,12 @@ func liveEngine(rate: Double, channels: AVAudioChannelCount = 2, ahead: Double =
 /// now (notes/ios.md "A node's buffers, taken late").
 let testScheduleLag: TimeInterval = Double(ProcessInfo.processInfo.environment["DEADWAX_TEST_SCHEDULE_LAG"] ?? "") ?? 0
 
+/// Where every test engine's varispeed is at 1x (turntable.md 5.3, item 1): DEADWAX_VARISPEED_AT_ONE - outOfPath (unset:
+/// the app's), bypassed or atRateOne. The render tests were run with each, and only out of the path passed them all
+/// (notes/ios.md "The speed, measured").
+let testVarispeedAtOne = PlaybackEngine.VarispeedAtOne(
+    rawValue: ProcessInfo.processInfo.environment["DEADWAX_VARISPEED_AT_ONE"] ?? "") ?? .outOfPath
+
 /// An offline engine with the phone's own buffering - a second scheduled before a start from silence, 2 s
 /// kept ahead - in 0.1 s buffers.
 func phoneLikeEngine(rate: Double, channels: AVAudioChannelCount = 2) throws -> PlaybackEngine {
@@ -45,6 +52,7 @@ func phoneLikeEngine(rate: Double, channels: AVAudioChannelCount = 2) throws -> 
     settings.startSeconds = 1
     settings.bufferSeconds = 0.1
     settings.changeSettleSeconds = 0
+    settings.varispeedAtOne = testVarispeedAtOne
     let engine = try PlaybackEngine(settings: settings)
     engine.scheduleLag = testScheduleLag
     return engine

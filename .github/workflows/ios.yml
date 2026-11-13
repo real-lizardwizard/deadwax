@@ -121,6 +121,15 @@ jobs:
         if: ${{ !cancelled() }}
         run: swift test -c release --package-path ios/DeadwaxKit --filter DeckRealTimeTests
 
+      # The speed's measurements (notes/ios-specs/turntable.md 5.3, the gate the fader is built on) run in the
+      # steps above with the rest of the engine's renders - VarispeedMeasuredTests: 1x the file's own samples bit
+      # for bit, the products at 0.25x-2x, the position against clicks, joins, a change while playing, crossing
+      # 1x. Its cost again in the build that ships: a 192 kHz file at 2x through the varispeed, its median block
+      # under 15% of the block's time (a debug build prints it and bounds nothing).
+      - name: The speed's cost, release build
+        if: ${{ !cancelled() }}
+        run: swift test -c release --package-path ios/DeadwaxKit --filter VarispeedCostTests
+
       # A test process that crashes can end the step with its last lines unprinted: macOS's crash
       # report says where (the faulting thread's stack, and an exception's reason)
       - name: Crash reports, if the tests died
