@@ -347,11 +347,16 @@ final class DeckController {
     }
 
     /// Now Playing went away: the deck isn't showing, but lives on - a coast or a run back to speed still ends by
-    /// handing the song back (2.1). A disc that had no CD art is asked again at the next opening, as the web's is.
+    /// handing the song back (2.1). A touch it followed went with the view, whose cancel may never come: let go as a
+    /// cancel first, as the web's lost pointer capture is, so the record settles rather than staying held. A disc that
+    /// had no CD art is asked again at the next opening, as the web's is.
     func closed() {
+        press?.cancelFollowed()
+        touchSince = nil
         open = false
         artFailed.removeAll()
         applyShowing()
+        redraw()
     }
 
     /// The plinth's view, laid out at `layout` (its own coordinates are the press's box).
