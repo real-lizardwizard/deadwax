@@ -11,8 +11,9 @@ there, bit for bit as deadwax has it - and goes on playing when deadwax can't be
 [Downloads](#downloads) and [Offline](#offline)). App 0.4 added lyrics on Now Playing, as the web app
 shows them (see [Lyrics](#lyrics)). **This is app 0.5, which adds the EQ**: ten sliders and nine
 presets, kept for each output on its own - your headphones, the speaker, the car - and switching by
-itself when the output changes, and a correction for your headphones from AutoEq's measurements
-(see [EQ](#eq)). Playlists, Search and the rest come in the next
+itself when the output changes, a correction for your headphones from AutoEq's measurements, and -
+under Advanced - filters and a preamp of your own and Equalizer APO files in and out (see
+[EQ](#eq)). Playlists, Search and the rest come in the next
 phases (see [What it can't do yet](#what-it-cant-do-yet)).
 
 **Nothing of Phase 2, the lyrics or the EQ has been seen on an iPhone yet.** It's built and tested on
@@ -684,6 +685,123 @@ to move it a decibel, and its actions include **Reset to 0**. At the largest tex
 sliders become ten rows, each with a - and + button. With Reduce Motion, the curve and the sliders
 jump to a new setting rather than gliding.
 
+**Headphone Accommodations.** iOS's own Headphone Accommodations (Settings > Accessibility > Audio &
+Visual), on AirPods and some Beats, shapes the sound after deadwax's EQ, on every app. With a
+correction on, turn it off - otherwise the two stack, and the headphones no longer sound neutral.
+Spatialize Stereo works after the EQ too: whether a correction still sounds right with it on is for
+your ears.
+
+### Advanced: your own filters, the preamp, and Equalizer APO files
+
+**Advanced**, a switch at the bottom of the EQ page, opens up what the EQ is made of: a correction's
+filters to see and change, filters of your own, the preamp set by hand, and correction files to
+import and export in [Equalizer APO](https://sourceforge.net/projects/equalizerapo/)'s format - the
+one AutoEq's ParametricEQ.txt files are in. It's one switch for the whole phone, and turning it on or
+off changes nothing you hear, only what the EQ page shows.
+
+**The curve** grows taller, with a **handle** - a small circle - for each correction filter that's
+on. Touch one (or near it) to select it: it turns white, and its numbers show above the curve
+("Peak · 8903 Hz · +6.0 dB · Q 1.66"). Drag it sideways for its frequency (to the hertz under 1 kHz,
+ten hertz above), up and down for its gain (a tenth of a decibel), and pinch for how wide it is. The
+sound follows as you go. A touch on the curve away from the handles scrolls the page as usual.
+
+**Correction** lists the filters under the Correction row, low notes first, as the handles run left
+to right. Each says its type - "Peak", "Low shelf", "High shelf", "Low pass", "High pass", "Band
+pass", "Notch", "All pass" - and under it its numbers: "105 Hz · +2.6 dB · Q 0.70" ("BW 1.0 oct" for a
+width in octaves, "12 dB/oct" for a shelf's slope, "Left" or "Right" after it for one ear's filter).
+Each has its own switch. A filter above the highest note an output plays says "Above what this
+output plays, so it's left out." Tap a filter to edit it; swipe it for **Delete**. Under the
+filters:
+
+- **Add Filter**: a peak at 1000 Hz, 0 dB, Q 1, opened for you to edit. Up to 64 filters for each ear;
+  past that it says "64 filters is the most deadwax plays". Adding a filter with no correction yet
+  starts "Your own filters"; deleting the last of them leaves the output with no correction.
+- **Import from Files…**, **Paste** and **Export…** (below).
+
+Changing an AutoEq correction makes it yours to change: it reads "AutoEq, measured by crinacle -
+changed", and **Back to AutoEq's** - touch and hold the Correction row, or in the **•••** at the top -
+puts AutoEq's back as it came.
+
+**A filter's editor** ("Filter 3", its place in the list): its own curve with its handle, then
+
+- **Type**: changing it keeps the frequency, and the gain and width where the new type has them.
+- **Frequency**, in hertz, with a slider from 20 Hz to 20 kHz under it. A shelf filter that a file
+  gives by its corner says so: "Its corner frequency, as Equalizer APO reads this shelf - it is
+  centred at 131 Hz."
+- **Gain** (peaks and shelves), in dB, with - and + of a tenth of a decibel.
+- **Q** - or **Width** in octaves, or **Slope** in dB an octave, as the filter was written - with - and +;
+  a width or a slope has **Use Q instead**, which turns it into the Q that plays the same. A filter
+  with no width shows its type's own ("0.71") greyed in the field. A shelf written `LS` or `HS` with
+  no width keeps its place when you give it one, and is exported as `LSC` or `HSC` - by its centre,
+  as it plays - since Equalizer APO reads an `LS` with a Q by its corner.
+- **Ear** (only when the correction has filters for one ear): Both, Left or Right.
+- **On**, and **Delete Filter**.
+
+Type a number and tap Done on the keyboard (or move to another field) to use it; a decimal comma or
+point both work. A number out of range stays in the field in red, with what's allowed under it -
+"Between 1 and 22000 Hz.", "Between -30 and 30 dB.", "Between 0.01 and 100." (a Q), "Between 0.01
+and 10." (a width), "Above 0 dB an octave." (a slope), "Too steep for this gain - at most 19.6 dB
+an octave.", or "Too gentle to make a filter." (a slope so near 0 it makes none) - and nothing changes
+until it's in range. The editor stays with the output it was
+opened for, as the presets page does.
+
+**Preamp**, after Tone: **Automatic**, on by default, is deadwax's own (above) and shows what it is
+("-6.4 dB"). Turn it off to set it yourself, in tenths of a decibel from -30 to +12 dB, for every
+song on that output; it starts where Automatic was, so turning it off changes nothing you hear. If
+yours takes away less than the curve's highest boost, it says "Loud songs may clip: the curve boosts
+2.1 dB more than this preamp takes away." - here and under the curve.
+
+**Importing a file.** Three ways in:
+
+- **Import from Files…** on the EQ page, for a `.txt` file in Files or iCloud Drive.
+- **Paste**, iOS's own button, for an Equalizer APO setting copied as text - iOS doesn't ask first.
+- **From another app**: share a `.txt` file to deadwax - AirDrop it from your Mac, or save it from
+  Safari, Mail or Files and choose **deadwax** among the apps. The app opens with the file's preview
+  over whatever was showing. deadwax gets a copy, and deletes it once read.
+
+Each shows a **preview** first: where it's from ("From "HD650 ParametricEQ.txt"" or "From the
+clipboard"), **For** - which output it goes on, the one playing first (from an output's own page,
+that output), and any other the phone has met - the curve of what was read, what it is ("10
+filters, preamp -6.4 dB"), the preamp it will play at, what it replaces ("It replaces the correction
+for James's AirPods Pro (Apple AirPods Pro, from AutoEq).") and anything **Skipped**. **Import** makes
+it that output's correction and turns the EQ on; **Cancel** changes nothing. A pasted correction
+reads "Pasted", "From the clipboard" under it.
+
+**What it reads** is what Equalizer APO itself plays, read the way Equalizer APO reads it, so a file
+sounds the same here as there:
+
+- `Preamp: -6.4 dB`; `Filter 1: ON PK Fc 105 Hz Gain 2.6 dB Q 0.70` and the other filter types
+  (`LSC`, `HSC`, `LS`, `HS`, `LP`, `LPQ`, `HP`, `HPQ`, `BP`, `NO`, `AP`, `PEQ`, `Modal`), with `Q`,
+  `BW Oct` or a shelf's slope (`LSC 12 dB`); `OFF` filters, kept switched off; `Channel: L`, `R` or
+  `all`, for filters for one ear; one `Device:` line at the top, skipped.
+- `GraphicEQ:` (AutoEq's GraphicEQ.txt, Wavelet's): turned into up to 61 filters close to its curve,
+  and the preview says how close - "Converted from a GraphicEQ curve: 54 filters, within 0.1 dB of it
+  on average and 0.5 dB at most up to 16 kHz; above that, up to 3.8 dB." It's then filters like any
+  other, its row "From Wavelet.txt, converted".
+- Words and units as Equalizer APO wants them, capitals included: `Preamp`, not `preamp`; `Fc 100 Hz`,
+  with the `Hz`; `Gain 6 dB`, with the `dB`. A line Equalizer APO wouldn't play is skipped, as it
+  would be there, and the preview says which and why ("Line 9 isn't something Equalizer APO plays
+  either (Volume: 5)."). A comma for a decimal point is fine. Lines starting `#` are comments.
+- Up to 256 KB, in UTF-8 or Windows' own text; a UTF-16 file (Notepad's "Unicode") is read too, with
+  a note that Equalizer APO doesn't read it.
+
+**Refused**, the whole file - "Can't import this file" and why, with only **Done** - when it would
+play differently here than in Equalizer APO: another file included (`Include:`); what deadwax can't
+play (`Convolution:`, `Delay:`, `Copy:`, `Eval:`, `If:`, `Stage:`, `VSTPlugin:`,
+`LoudnessCorrection:`, `IIR` filters); settings for several devices; lines ending the old Mac way;
+a number out of range (a frequency over 22000 Hz, a gain or preamp over 30 dB, a number too large to
+read at all); a shelf too steep for its gain, or with a slope so near 0 it makes no filter; more than 64 filters for one ear; or nothing in it to play. For whoever runs deadwax,
+the line it stopped at shows under the reason.
+
+**Exporting.** **Export…** has **The Whole Curve** - the correction and the tone together, with the
+preamp as it plays, so Equalizer APO on a PC (or any app that reads its files) plays what you hear -
+and **The Correction Alone**, its filters and its own preamp. Each is a file named after the output
+("James's AirPods Pro EQ.txt") for the share sheet: Files, AirDrop, Mail. **Importing a whole curve
+back** onto an output with a tone plays the tone twice - the file holds it already - so set that
+output's tone to **Flat** first, or export the correction alone. And a whole curve made from a
+converted GraphicEQ can hold more than 64 filters for one ear: Equalizer APO plays it, but deadwax
+won't import it back.
+
 ## The lock screen and interruptions
 
 The lock screen and Control Center show the song, its artist, album, cover and how far in it is. The
@@ -1059,6 +1177,38 @@ Needs deadwax 2.1.7 or later (`:experimental` for now). AirPods with no correcti
 - **E21 Headphone Accommodations.** If you use Headphone Accommodations (Settings > Accessibility >
   Audio & Visual), turn it off with a correction on: the two stack otherwise.
 
+### Advanced's checks (app 0.5)
+
+AirPods with an AutoEq correction on (E17), unless it says. Import and export need nothing of
+deadwax.
+
+- **E22 Advanced on.** At the bottom of the EQ page, turn **Advanced** on: the curve grows, with a
+  handle for each filter; Correction lists the filters, lowest first; **Preamp** after Tone says
+  "Automatic". Then You > Debug's EQ section, **Render**: tell me both numbers.
+- **E23 The handles.** Drag a handle sideways, then up and down, then pinch it: the sound follows,
+  its numbers show above the curve, its row changes too, and the Correction row says "- changed".
+  Tell me whether a drag on the curve away from the handles still scrolls the page, and whether the
+  pinch takes the filter you meant. Then **Back to AutoEq's** (touch and hold the Correction row):
+  the curve and the sound go back.
+- **E24 A filter of your own.** **Add Filter**: a peak at 1000 Hz opens. Type +6 for Gain and 4 for
+  Q: you hear a peak in the upper mids. Back on the EQ page, switch its row off and on.
+- **E25 The preamp by hand.** Turn **Automatic** off: nothing changes in the sound. Set the preamp
+  to -2 dB with Bass Boost on: "Loud songs may clip: the curve boosts … dB more than this preamp
+  takes away." in amber, under the curve and under Preamp.
+- **E26 Export, and back.** Set the tone to **Flat**, then Export… > **The Whole Curve** to Files;
+  then **Import from Files…** that file: the preview shows the same curve and numbers; Import -
+  nothing changes in the sound.
+- **E27 Shared from another app.** AirDrop a ParametricEQ.txt from your Mac (or save one from
+  Safari) and share it to deadwax - once with the Library showing, once with Now Playing open, once
+  with Up Next open: the preview opens over whatever is showing, For set to the output playing.
+  Tell me if any of the three didn't show it.
+- **E28 A GraphicEQ.** Import a GraphicEQ.txt from AutoEq: "Converted from a GraphicEQ curve: …
+  filters, within … dB"; compare it by ear with the same headphone's ParametricEQ.txt.
+- **E29 Refused.** Copy an Equalizer APO setting with `Include: other.txt` in it, and Paste: "Can't
+  import this file" and why ("Line … includes another file (other.txt). Import that file itself.").
+- **E30 VoiceOver.** On the filter rows: "Filter 3: peak at … hertz …", "On", its switch "Filter 3
+  on", and the Delete and Turn Off actions.
+
 ## What it can't do yet
 
 These are the web app's for now. Most of them come to the phone in the next phases:
@@ -1069,10 +1219,6 @@ These are the web app's for now. Most of them come to the phone in the next phas
 - **Home** and **pins**.
 - **Looking after deadwax**: People, Server settings, the event log, Needs a look, Library care, the
   editors, and changing your password. For an admin, **Set up Navidrome** opens the web app in Safari.
-
-And one part of the [EQ](#eq) comes in its next build: **Advanced** - a correction's filters to see
-and change, filters of your own, the preamp set by hand, and importing and exporting Equalizer APO
-files.
 
 ## When something goes wrong
 

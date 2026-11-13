@@ -257,4 +257,50 @@ import Testing
         #expect(Self.refusal(exactly) == nil)
         #expect(Self.refusal(exactly + " ")?.kind == .tooBig)
     }
+
+    /// A long run of spaces is read once, not again from each space in it: the search for "Gain" or "Q" after a run
+    /// of n spaces took n squared steps, and a 256 KB line of them hung the import for hours (eq.md 5.5's review).
+    @Test func aLongRunOfSpacesIsReadInOnePass() {
+        let text = "Filter: ON PK" + String(repeating: " ", count: 20_000) + "Fc 100 Hz Gain 1 dB Q 1\n"
+        var filters: [EQFilter] = []
+        let took = ContinuousClock().measure { filters = Self.filters(text) }
+        #expect(filters.map(\.fc) == [100] && filters.map(\.gain) == [1] && filters.map(\.width) == [.q(1)])
+        #expect(took < .seconds(2), "\(took)")
+    }
+
+    /// A band pass plays no gain but keeps the one written, for an export: an overflowing one - `wcstod`'s infinity - is
+    /// refused by the gain's words, as any filter's, since eq.json can't hold an infinity and every save after it was
+    /// lost. A finite one, however large, is kept.
+    @Test func anInfiniteGainIsRefusedOnABandPassToo() throws {
+        #expect(Self.refusal("Filter: ON BP Fc 100 Hz Gain 1e999 dB Q 1")?.text
+                == "Line 1: a gain of inf dB is more than deadwax plays - at most 30 dB either way.")
+        #expect(Self.filters("Filter: ON BP Fc 100 Hz Gain 1e300 dB Q 1").map(\.gain) == [1e300])
+        // every reading of the fixtures is one eq.json can hold
+        for c in try EQFixtures.apo().readings {
+            let bytes = try EQFixtures.bytes(of: c)
+            guard case .success(let reading) = APOReader.read(bytes, pasted: c.pasted) else { continue }
+            var settings = EQSettings()
+            var o = EQSettings.newOutput(EQOutputs.speaker, seen: "")
+            o.correction = EQCorrection.file(name: "x.txt", text: EQImportRules.text(bytes), reading: reading)
+            settings.outputs = [o]
+            #expect(throws: Never.self, "\(c.name)") { _ = try settings.written() }
+        }
+    }
+
+    /// A slope so gentle its shelf's S overflows - 1/S past the largest Double - makes no filter: its coefficients
+    /// would be NaN, and a NaN in the bank is silence or noise. Refused, as a slope; the gentlest that plays still reads.
+    @Test func aSlopeTooGentleToMakeAFilterIsRefused() {
+        let r = Self.refusal("Filter: ON LSC 1e-310 dB Fc 100 Hz Gain 6 dB")
+        #expect(r?.kind == .slope && r?.line == 1)
+        #expect(r?.text == "Line 1: a slope of 1e-310 dB is too gentle to make a filter.")
+        #expect(Self.refusal("Filter: ON HS 1e-308 dB Fc 1000 Hz Gain 0 dB")?.kind == .slope)
+        let gentle = Self.filters("Filter: ON LSC 1e-300 dB Fc 100 Hz Gain 6 dB")
+        #expect(gentle.count == 1)
+        for f in gentle {
+            for rate in [44_100.0, 48_000, 192_000] {
+                let c = f.design(rate: rate).coefficients
+                #expect(c != nil && [c!.b0, c!.b1, c!.b2, c!.a1, c!.a2].allSatisfy(\.isFinite), "\(rate)")
+            }
+        }
+    }
 }

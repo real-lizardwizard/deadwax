@@ -12,7 +12,8 @@ Checks the iPhone app's project files without Xcode - what can be checked on Lin
     gitignored Local.xcconfig, and commit no team;
   - Info.plist has the keys the app needs: ATS open for plain http (NSAllowsArbitraryLoads ALONE -
     beside NSAllowsLocalNetworking it is ignored), the Local Network text, background audio, a launch
-    screen without a storyboard, and the loose-PNG icons it names, each an opaque PNG of its size;
+    screen without a storyboard, and the loose-PNG icons it names, each an opaque PNG of its size; and
+    plain text as a document type, Alternate, handed over as a copy (an EQ file shared to deadwax, eq.md 3.9);
   - no asset catalog, storyboard, xib or entitlements file anywhere under ios/ (the plan's risk R2: actool
     and ibtool need a Simulator runtime James's Mac doesn't have; and a free account has no use for
     entitlements).
@@ -279,6 +280,19 @@ def check_info_plist(problems: list) -> None:
                        ("CFBundleVersion", "$(CURRENT_PROJECT_VERSION)")):
         if info.get(key) != value:
             problems.append(f"Info.plist: {key} isn't {value} (the xcconfig is where it is set)")
+    # an Equalizer APO file shared to deadwax (eq.md 3.9): plain text offered, never deadwax the default for it, and
+    # handed over as a copy (Documents/Inbox), which the import deletes once read
+    types = info.get("CFBundleDocumentTypes", [])
+    plain = [t for t in types if "public.plain-text" in t.get("LSItemContentTypes", [])]
+    if not plain:
+        problems.append("Info.plist: no CFBundleDocumentTypes entry for public.plain-text - an EQ file can't be shared to deadwax")
+    for t in plain:
+        if t.get("LSHandlerRank") != "Alternate":
+            problems.append("Info.plist: the plain-text document type's LSHandlerRank isn't Alternate - deadwax would claim every text file")
+        if t.get("CFBundleTypeRole") != "Viewer":
+            problems.append("Info.plist: the plain-text document type's CFBundleTypeRole isn't Viewer")
+    if info.get("LSSupportsOpeningDocumentsInPlace") is not False:
+        problems.append("Info.plist: LSSupportsOpeningDocumentsInPlace isn't NO - iOS must hand deadwax a copy of a shared file")
     files = info.get("CFBundleIcons", {}).get("CFBundlePrimaryIcon", {}).get("CFBundleIconFiles", [])
     if not files:
         problems.append("Info.plist: no CFBundleIconFiles - the loose-PNG icon isn't named")

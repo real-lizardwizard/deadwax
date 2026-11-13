@@ -90,6 +90,39 @@ final class AppNavigation {
     private(set) var libraryScrollToTop = 0
     private(set) var youScrollToTop = 0
 
+    /// An EQ import's preview (eq.md 3.9), one at a time: a file shared to deadwax, or one an EQ page read from Files or
+    /// the clipboard. A second arriving while a preview is up takes its place there.
+    private(set) var eqImport: EQImportItem?
+    /// The EQ page whose own preview shows it (its import from Files or Paste) - nil: the EQ sheet's, for a shared
+    /// file.
+    private(set) var eqImportPage: UUID?
+    /// The EQ sheet over the tabs, opened for a shared file - over Now Playing, Now Playing opens its own.
+    var eqImportSheet = false
+    /// A preview is drawn (EQImportSheetContent says so).
+    var eqPreviewUp = false
+
+    /// A file shared to deadwax (`.onOpenURL`): shown by the preview that is up, in place - else by the EQ sheet,
+    /// opened over Now Playing (by Now Playing) or over the tabs (here).
+    func share(_ item: EQImportItem) {
+        eqImport = item
+        guard !eqPreviewUp else { return }
+        eqImportPage = nil
+        if !nowPlayingShown { eqImportSheet = true }
+    }
+
+    /// An EQ page's own import (Files, Paste): its preview, over that page.
+    func importOnPage(_ page: UUID, _ item: EQImportItem) {
+        eqImportPage = page
+        eqImport = item
+    }
+
+    /// The preview answered - Import, Cancel, Done - or gone with what it showed.
+    func importAnswered(_ id: UUID? = nil) {
+        guard id == nil || eqImport?.id == id else { return }
+        eqImport = nil
+        eqImportPage = nil
+    }
+
     /// A tab tapped. The tab already shown: back to its root - and, at its root already, to the top of its list.
     func select(_ tapped: AppTab) {
         guard tapped == tab else {
@@ -143,6 +176,8 @@ final class AppNavigation {
         library.removeAll()
         you.removeAll()
         nowPlayingShown = false
+        eqImportSheet = false
+        importAnswered()
         tab = .library
     }
 }

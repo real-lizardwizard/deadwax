@@ -154,6 +154,31 @@ def test_the_project_files_check_out(capsys):
     assert project.main() == 0, capsys.readouterr().out
 
 
+def test_an_eq_file_can_be_shared_to_deadwax_and_only_as_a_copy(tmp_path, monkeypatch):
+    """eq.md 3.9: Info.plist offers deadwax for plain text, never as its default, and is handed a copy - each key the
+    check requires, and each missing or wrong one named."""
+    real = plistlib.loads((project.IOS / "Config" / "Info.plist").read_bytes())
+    (tmp_path / "Config").mkdir()
+    monkeypatch.setattr(project, "IOS", tmp_path)
+
+    def problems(info):
+        (tmp_path / "Config" / "Info.plist").write_bytes(plistlib.dumps(info))
+        found = []
+        project.check_info_plist(found)
+        return [p for p in found if "document type" in p or "Documents" in p or "DocumentTypes" in p
+                or "OpeningDocumentsInPlace" in p]
+
+    assert problems(real) == []
+    assert len(problems({k: v for k, v in real.items() if k != "CFBundleDocumentTypes"})) == 1
+    assert len(problems({k: v for k, v in real.items() if k != "LSSupportsOpeningDocumentsInPlace"})) == 1
+    owner = dict(real, CFBundleDocumentTypes=[dict(real["CFBundleDocumentTypes"][0], LSHandlerRank="Owner")])
+    assert any("Alternate" in p for p in problems(owner))
+    editor = dict(real, CFBundleDocumentTypes=[dict(real["CFBundleDocumentTypes"][0], CFBundleTypeRole="Editor")])
+    assert any("Viewer" in p for p in problems(editor))
+    in_place = dict(real, LSSupportsOpeningDocumentsInPlace=True)
+    assert any("copy" in p for p in problems(in_place))
+
+
 def test_the_old_style_plist_parser():
     parsed = project.parse_openstep('// !$*UTF8*$!\n{ a = 1; /* c */ b = ( x, "y z", ); c = { d = "q\\"r"; }; }')
     assert parsed == {"a": "1", "b": ["x", "y z"], "c": {"d": 'q"r'}}

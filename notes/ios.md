@@ -51,8 +51,10 @@ ios/
                             AlbumIndexStore, AlbumModel, DebugModel), Root/ (the gates, MainTabs), Shared/
                             (Routes, CoverImage, ErrorNote, Notice), Library/, Album/, Player/, UpNext/,
                             Info/, You/ (DebugView is Phase 0's test screen), EQ/ (app 0.5: EQModel,
-                            EQStore, EQRouteReader, and the screens - EQScreen, EQCurveView, EQSliders,
-                            EQPresetsScreen, EQOutputViews, EQNameAlert, EQRoute); URLSessionTransport,
+                            EQStore, EQRouteReader, and the screens - EQScreen, EQCurveView (and slice 5's
+                            handles), EQSliders, EQPresetsScreen, EQOutputViews, EQNameAlert, EQRoute;
+                            slice 4's EQCorrectionScreen and EQProfileScreen; slice 5's EQFilterEditor,
+                            EQImport, EQExport); URLSessionTransport,
                             SessionKeychain, AudioSessionController, NowPlayingController, SongFiles (stream
                             cache, downloads); Icon/ loose PNGs
   DeadwaxKit/               Package.swift (tools 6.0; iOS 17, macOS 14)
@@ -64,7 +66,7 @@ ios/
     Tests/DeadwaxCoreTests/ Swift Testing, 64 tests in Phase 0, 508 in 69 suites at app 0.2, 633 in 83 at 0.3,
                             745 in 98 with the EQ's slice 1 (its fixtures in Fixtures/eq/, 1.5 MB), 809 in
                             110 at its slice 2 (the turntable's slice 1 between), 849 in 113 at its slice 3
-                            (853 after its review)
+                            (853 after its review), 873 in 116 at its slice 4, 907 in 118 at its slice 5
     Tests/DeadwaxAudioTests/  offline-render tests, macOS only (12 in Phase 0, 54 at app 0.2, 93 at 0.3, 111 in 8
                             suites with the EQ's slice 2 and its review - EQRealTimeTests bounded in a release build;
                             114 in 9 at its slice 3, EQStartTests the start's bank made ahead)
@@ -3272,3 +3274,26 @@ crossfades rather than morphs when its frequencies change. The suggestion offers
 list has six HD 650 rows - and never the first of several (the AirPods Pro's 16); that and every other departure, the
 mutations tried and what only the phone shows: eq.md's "Slice 4, built". docs/ios.md's AutoEq section and checks
 E17-E21 are James's. The app's version stays 0.5 (5).
+
+## The EQ, slice 5: Advanced (app 0.5, 2026-11-12)
+
+eq.md's slice 5 (5.5): building a correction yourself, the preamp by hand, and Equalizer APO files in and out. **Core**
+holds every rule the views follow, so Linux tests them: `EQAdvanced.swift` - the filter rows in frequency order (the
+export's, so a row's number is the file's), 64 an ear for Add Filter and every edit, Add Filter starting "Your own
+filters", an edit marking AutoEq's correction changed and "Back to AutoEq's" reading its kept text again, the preamp by
+hand (0.1 dB, -30 to +12, beginning at the one playing), the handles (at f0, their own gain; the nearest within 22 pt;
+a drag engaging at 4 pt, moving only the axis it moved along; a pinch in the width's own form), the editor's fields,
+steps, type change and "Use Q instead" - and `EQImportRules.swift`, the import preview's lines. **App**: the Advanced
+switch (per phone; it publishes nothing, as nothing heard changes), the 220 pt curve with its handles and capsule
+(`EQCurveView`'s EQHandleLayer: only the handles' 22 pt reach takes one finger, so the curve still scrolls the page;
+a pinch anywhere on the plot), the filter rows, Add Filter, `EQFilterEditor` (pushed as `EQRoute.filter`, bound to its
+output and the filter's id), the Preamp section, `EQImport` (Files, Paste, and a file shared to deadwax through
+`.onOpenURL` - Info.plist's plain-text document type, Alternate, handed a copy, which check_project.py requires) and
+`EQExport` (ShareLinks of a file Core's APOWriter writes when it is shared). AppNavigation holds one import at a time:
+an EQ page's own is previewed over that page, a shared file over whatever is on top (Now Playing opens its EQ sheet,
+closing Up Next or Info first; the tabs get one from MainTabs; a preview already up takes it in place). Exporting the
+whole curve and importing it back plays the same within 1e-9 dB, over a Flat tone - over any other the tone plays twice
+(docs/ios.md says so). The 64-an-ear limit stays as the spec has it; whether the import's should be 70, so a converted
+GraphicEQ with a tone reads back, is James's to answer. Every departure, the mutations tried and what only the phone
+shows: eq.md's "Slice 5, built". docs/ios.md's Advanced section and checks E22-E30 are James's. The app's version stays
+0.5 (5).

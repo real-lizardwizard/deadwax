@@ -2415,6 +2415,177 @@ and no Simulator: every look, touch and sound here is checks E17-E21's (docs/ios
 - **Must not touch**: the engine; Core's reader and writer except for a bug found here (with its test first).
 - **Verified**: Core (already); the device build; checks 22-30.
 
+#### Slice 5, built (2026-11-12)
+
+Built on `ios` from e797aa4 (slices 1-4 and main's 2.1.9 merged), in four commits: Core's rules (58e31be); the share
+sheet's document type and its check; the App; these notes and the guide. Nothing drawn, touched or heard on a phone,
+and no Simulator: every look, touch and sound is checks E22-E30's (docs/ios.md, 6's 22-30).
+
+- **Files**: in Core, `EQAdvanced.swift` (EQFilterRow and EQAdvancedRules - the rows, 64 an ear, Add Filter's peak,
+  the hand preamp's rounding; EQSettings' `addFilter`, `editFilter`, `setFilter`, `deleteFilter`, `backToAutoEq`,
+  `setAutomaticPreamp`, `setHandPreamp`, `importCorrection`; EQHandle, EQHandleRules and EQHandleDrag; EQField and
+  EQEditorRules; `EQDrawing.filter`) and `EQImportRules.swift` (the preview's lines, For's outputs, the text kept, a
+  refused line found), and words (`Import.pasted`, `Import.what`, `Editor.slopeRange`; a paste's source and value).
+  In ios/App: `EQ/EQFilterEditor.swift`, `EQ/EQImport.swift` (EQImportItem, EQImportReading, EQImportRows, the preview
+  and its sheet), `EQ/EQExport.swift` (the menu and its Transferable file); the handles and the capsule in
+  `EQCurveView.swift` (EQHandles, EQHandleCapsule, EQHandleLayer, EQHandleReach, and `height`); EQScreen's Advanced
+  switch, filter rows (`EQFilterRowView`), Add Filter, the import and export rows, "Back to AutoEq's" and the Preamp
+  section; EQModel's `advanced` and the eight operations; EQRoute's `.filter(EQFilterPage)` and EQSheet's preview;
+  AppNavigation's import slot (`eqImport`, `eqImportPage`, `eqImportSheet`, `eqPreviewUp`, `share`, `importOnPage`,
+  `importAnswered`); RootView's `.onOpenURL`; MainTabs' EQ sheet; Now Playing opening its own. Info.plist's document
+  type and check_project.py's check of it. The project file is unchanged (the App folder is synchronised); no diff in
+  DeadwaxAudio, APOReader, APOWriter or src/.
+- **Measured** (EQImportRulesTests, on the fixture's AutoEq profiles): every profile, with the preamp automatic and by
+  hand (-7.5 dB), exported and imported again plays the same - the response within 1e-9 dB at every grid point and the
+  same preamp - the whole curve imported over a Flat tone, the correction alone under Bass Boost. "Use Q instead" gives
+  the same coefficients at 48 kHz for a width in octaves, and at every rate for a shelf's slope (its S has no rate in
+  it). Fourteen mutations of Core's new rules each fail a test (unsorted rows, Add Filter at 64, a drag snapping the
+  axis not moved, a jump on engaging, the hand preamp to +30, Use Q's analog width, a peak left with no width by a type
+  change, the last of your own filters kept, a slope of 0 taken, an edit not marked changed, a pinch not stretched to
+  where it began, a touch taking any handle, the import's hand preamp in the preview and in the setting).
+- **Departures, and why**:
+  1. **The pinch keeps the width's own form.** 3.8 says "pinch for Q"; a filter written with a width in octaves stays
+     one (to 0.01, up to 10), a shelf with a slope a slope (to 0.1 dB an octave, never too steep), so a filter is
+     changed only in what you change - 3.8's own rule for the editor. A filter given no width starts from the Q it
+     plays as. A pinch is taken anywhere on the plot (its second finger lands where it likes): the filter being dragged,
+     else the nearest within 44 pt of the fingers' middle, else the selected one; a drag under it waits until its finger
+     is up.
+  2. **A drag moves only the axis the finger moved along**, so an imported 31.25 Hz isn't rounded to 31 by a drag up;
+     its frequencies are the slider's 20 Hz-20 kHz, stretched to take in where the filter began; a corner shelf's Fc
+     moves with its f0, so it keeps its corner; a shelf with a slope stops where the slope would be too steep.
+  3. **Handles at f0, their own gain** - a corner shelf's at its centre, where its gain is half (3.8's own corner line
+     says so), and not on the line drawn, which carries the preamp and the tone. A pass or a notch at 0 dB.
+  4. **The capsule's room is kept** above the plot whether or not a handle is selected, so selecting one never moves
+     the curve under the finger.
+  5. **A filter row is a button and a switch, no chevron**: a NavigationLink round a Toggle takes the switch's tap.
+     Its editor is pushed on the stack the page is on (the sheet's, or You's).
+  6. **"Back to AutoEq's" is in the Correction row's context menu and the toolbar's •••**: a NavigationLink row has no
+     menu of its own but a long press, which nobody finds unaided.
+  7. **"Use Q instead" is a button row** under the field (3.8: "a menu item"): there is no menu there to hold it. The
+     Q it gives is rounded to three significant figures (0.707, 4.32).
+  8. **A field is applied when it is submitted or left**, and its line shows only once it was applied and refused
+     (then until the text is in range) - not on every keystroke, where "-" on its way to "-3" would flash red.
+  9. **Steps**: the gain 0.1 dB, a Q and a width in octaves x1.1 (at least 0.01 a step), a slope 1 dB an octave (3.8
+     gives the Q's only); each from the value the filter plays, held to its range, the stepper's half disabled at an end.
+  10. **The Type picker's carry-over**: the frequency kept; the gain when both types have one; a width in octaves dropped
+     on a shelf (APO ignores it there) and a slope off one; written as the new type is by default (a shelf by its centre,
+     `LSC`/`HSC`); and a peak or an all pass left with no width given Add Filter's Q 1, as it would play nothing.
+  11. **A slope of 0 or less says "Above 0 dB an octave."** - 3.8 has no words for it (3.9's refusal says it must be
+     above 0).
+  12. **Your own filters, the last deleted, are None** - a correction of no filters is no correction; the switch is left
+     as None leaves it (slice 4's departure 7). Delete Filter and the swipe ask nothing: one filter, its row there to
+     add it back, as Apple's own list rows delete.
+  13. **A paste has no name**: its correction reads "Pasted", "From the clipboard" under it; the preview "From the
+     clipboard"; what an import replaces "from the clipboard".
+  14. **For starts on the page's output** for an import from an EQ page (its own Files and Paste) - the page of
+     Other outputs' AirPods is about the AirPods - and on the output now for a shared file. For lists the output now
+     and then every output Other outputs lists.
+  15. **A preamp set by hand taken from a file is held to -30...+12 dB**, the stepper's range (8, question 18); a
+     file's own may be +30.
+  16. **A shared file over a preview already up takes its place there**, never closing it first (3.9 says both; one
+     import at a time is the rule that holds). Over any other sheet - Up Next, Info - Now Playing closes it and opens
+     its EQ sheet once it has gone; over the tabs MainTabs opens an EQ sheet; the preview comes up 0.4 s after an EQ
+     sheet it opens, as a sheet presented while another slides in isn't shown.
+  17. **The correction picker (3.7) gets no import rows**: 3.8 puts Import from Files…, Paste and Export… in Advanced's
+     Correction section, and the picker is AutoEq's.
+  18. **The Automatic row shows the preamp that would play while the EQ is Off** (every control works while Off, 3.2),
+     where the drawing - flat - has none.
+  19. **"Back to AutoEq's" gives the filters their ids as they came**: an editor open on a filter of it lands on that
+     filter as AutoEq wrote it.
+- **Check 26 holds only over a Flat tone** (or for The Correction Alone): The Whole Curve writes the tone's ten
+  filters into the file, so importing it on the output that plays that tone plays the tone twice. docs/ios.md says to
+  set the tone to Flat first. And a converted GraphicEQ (up to 61 peaks, 3.10, the zeros dropped) with a tone's 10
+  makes more than 64 to an ear: the export writes it, and deadwax's own import refuses it ("This file has 71 filters
+  for one ear - deadwax plays up to 64.") - **still open, James's to answer**: raise the import's limit to 70 (the
+  render's 80 less the tone's 10; slice 1's "Left for James", the brief's question 15 - eq.md section 8's own 15 is
+  the Bluetooth UIDs), which reads back every export but one whose GraphicEQ kept all 61, or have the export say so
+  first. The 64 stays as the spec has it, by decision.
+- **Design questions for James** (built as recommended; each a word or a line to change):
+  1. An edited file correction still reads "From HD650 ParametricEQ.txt" - only AutoEq's says "- changed" (3.2). Say
+     "- changed" for a file too, or call it "Your own filters" once it is edited? Recommended: "- changed", as AutoEq's.
+  2. Delete with no confirmation (departure 12) - or Undo-less deletes asked first. Recommended: as built.
+  3. The pinch keeping the width's form (departure 1) - or every pinch making a Q, as 3.8 reads. Recommended: as built.
+  4. The 64/70 limit above.
+- **Only the phone shows**: the handles' feel - 22 pt reach, 4 pt engage, the pinch - and whether the pinch's
+  full-plot gesture leaves a one-finger drag on the curve scrolling the page (it should: only the handles' circles take
+  one finger); the capsule's place; the editor's fields with the phone's decimal comma and `.numbersAndPunctuation`;
+  Paste without a prompt; "deadwax" in the share sheet, the Inbox copy gone after; the preview over the tabs, over Now
+  Playing, over Up Next or Info, and replacing a preview up; a shared file arriving while an alert or the Files picker
+  is up (nothing here makes room for them); Export's share sheet and the file in Files; and the sound of each (E22-E30).
+- **Tests**: Core **907 in 118** (EQAdvancedTests 28, EQImportRulesTests 6 - both new), Audio 114 in 9; pytest's iOS
+  files and test_source_bytes.py (137, 1 skipped; the new `test_an_eq_file_can_be_shared_to_deadwax_and_only_as_a_copy`);
+  the unsigned Release device build (Xcode 27.2), its warnings read - only AppIntents' usual line; check_project.py; the
+  ios sims but iosdeck, which fails on `ios` before this slice (2.1.8's theme.css token not re-exported into the deck's
+  tokens.json, ios/scripts/export-deck-vectors.cjs, on the Node that made them). Not verified: ios.yml's Xcode 26.6
+  Swift (every multi-statement closure's type is spelled out), and anything on a phone.
+- **Review** (2026-11-12, on 58e31be..35f4161's four commits). Read against 5.5, 3.2-3.4, 3.8-3.11, 3.13-3.18, 0.3, 4,
+  6's 22-30, the Design review and the earlier slices' reviews, the code before the account; the import read as
+  untrusted input, with probes of 256 KB files of every shape and of absurd numbers. Changed:
+  - **A run of spaces made the reader quadratic** (slice 1's, found here): `APOReader.search` tried each start, and
+    from each space of a run walked to its end, so a line of n spaces with no "Gain" after them cost n squared - 20,000
+    took 11 s, a 256 KB file of them hours, the import hung. A pattern beginning with whitespace that fails from a
+    space fails from every later space of that run (each reaches the same end and the same rest, with less of it), so
+    the search steps over the run; 256 KB of any shape tried now reads in at most a second, 8,000 GraphicEQ lines
+    aside (8.5 s in a debug build, off the main thread). `aLongRunOfSpacesIsReadInOnePass`, failing first.
+  - **A slope so gentle its S overflows played NaN** (slice 1's): `LSC 1e-310 dB` - 1/S past the largest Double -
+    made b0 and a2 NaN in the bank. The reader refuses it as a slope, "Line 1: a slope of 1e-310 dB is too gentle to
+    make a filter."; the editor's field "Too gentle to make a filter.". `aSlopeTooGentleToMakeAFilterIsRefused`,
+    failing first; `aSlopeTooGentleIsRefusedByItsField`.
+  - **A band pass's infinite gain stopped every save** (slice 1's): a band pass plays no gain, so its `Gain` went
+    unchecked, and `Gain 1e999 dB` - wcstod's infinity - was kept; eq.json can't hold an infinity, and EQStore's
+    `try? written()` then dropped every save until the correction was replaced. Refused now by the gain's own words;
+    a finite one is kept as before. `anInfiniteGainIsRefusedOnABandPassToo`, failing first, also writing every
+    fixture's reading to eq.json.
+  - **An `LS` given a Q moved when exported**: a shelf read with no width plays by its centre, and its field, step or
+    pinch gave it a Q still written `LS` - which APO, and deadwax's import, read by its corner (100 Hz played, 117 Hz
+    read back). editFilter writes such a shelf `LSC`/`HSC`, by its centre as it plays; one read by its corner keeps
+    `LS`. `aShelfGivenAWidthPlaysTheSameExported` (export, read again, the same f0 and coefficients).
+  - **No edit is left that the reader would refuse** (`EQAdvancedRules.takes`, held by editFilter): Fc 1-22000 Hz, a
+    peak's or shelf's gain within 30 dB (a band pass's, which plays none, kept as a file wrote it), a Q, a width or a
+    slope in range, every number finite - so no NaN reaches the bank, the file or eq.json from a handle, a field or a
+    step. `anEditNeverLeavesAFilterTheReaderWouldRefuse` (a file's band pass of 45 dB still switched off);
+    `everyFilterAFileGivesCanBeEdited` (every fixture's and AutoEq profile's filter passes it).
+  - **A drag made NaN of a corner shelf with no centre**: `HS Fc 1000 Hz Gain 30 dB Q 0.01` is centred at 0 Hz
+    (`LS`: infinity), and a drag across divided by it. It is dragged from its Fc then. `aCornerWithNoCentreIsDraggedFromItsFc`.
+  - **The one-axis drag held only for a finger moved exactly straight** (departure 2): any wobble sideways rounded
+    31.25 Hz to 31. Each axis now engages on its own once the finger has gone 4 pt along it, and follows from there
+    without a jump; 3 pt each way is still a tap. `aDragUpThatWobblesKeepsItsFrequency`.
+  - **Opening a far-moved corner shelf's editor crashed**: its line turned f0 into an Int, which traps past Int.max -
+    `LS 0.1 dB` at 30 dB is centred at 1e47 Hz, with Q 0.01 at infinity - and a file can say either. It is written as
+    a number now ("centred at inf Hz"). `aCornerFarAwaySaysWhereWithoutTrapping` (traps on the old code).
+  - **A file of no reported size was read whole** (`Data(contentsOf:)` when `fileSizeKey` is nil): read now through a
+    FileHandle to one byte past 256 KB, its size from the end where iOS can say. And the preview's summary rows were
+    identified by their text, which two ears converted alike share; by place now.
+  - **Tests** for what the suite let through: an edit taking an ear past 64, Add Filter and a delete each marking
+    AutoEq's "changed", a 0 dB filter not "left out", UTF-16 big-endian text, and the Advanced state - the switch,
+    every width's form, a corner, an ear's own, one off, the counter, "changed" and the hand preamp - read back from
+    eq.json the same. Seventeen mutations - each Core fix above undone (twelve ways, the reader's three among them,
+    the guard's gain held for a band pass too), the 64 guard, either "changed", the left-out rule, the big-endian
+    order - each fails a test (the corner line's Int by trapping). The two App fixes have no test of their own (the App has none).
+  - **Agreed, not changed**: departures 1, 3-15, 17-19 sound as given; EQModel's operations write only the bound
+    output's setting; the closures' types stated and nothing newer than iOS 17; VoiceOver's rows, handles and
+    actions and Dynamic Type's stacking as 3.18 has them; the document type and check_project.py; `.onOpenURL`'s copy
+    deleted from Documents/Inbox only, after a security-scoped read; the refused line for whoever runs deadwax alone.
+  - **Left, noted**: the Python mirror (make-eq-fixtures.py) lacks the two reader refusals added here - no fixture
+    reaches them, and the fixtures can't be made again without scipy, so it is for whoever next makes them; the 0.4 s
+    before a preview over a fresh EQ sheet has no retry if a slow phone isn't ready; a shared file arriving over the
+    Files picker or an alert (the builder's own note); typed text not submitted is dropped when the editor is left;
+    EQStore's failed save says nothing (only this one cause of it is gone); an admin's refused line shown uncut, a
+    256 KB line included; `LSC 1e-300 dB` (just short of the overflow) and a corner centred at 0 Hz play their
+    degenerate sections as APO does; the row's "BW %.1f" rounds 0.04 octaves to 0.0; an Arabic decimal mark isn't
+    read.
+  - **James's to decide** (design, not changed): the words "a slope of … dB is too gentle to make a filter." and
+    "Too gentle to make a filter.", and "centred at inf Hz" / "1e+47 Hz" for a corner moved past any frequency; an
+    `LS` given a width written `LSC` (it stays where it plays) rather than made a corner (as APO would read `LS … Q`,
+    the handle jumping); 4 pt an axis before it moves; a grouping mark read as a decimal ("1,000" is 1 Hz on a phone
+    writing a point, "1.000" on one writing a comma); two ears' "Converted from a GraphicEQ curve…" lines naming no
+    ear; and the four above, with check 26 over a Flat tone only.
+  - **Tests**: Core **921 in 118** (EQAdvancedTests 39, APOReaderTests 21, EQImportRulesTests' text test grown),
+    Audio 114 in 9; pytest's iOS files and test_source_bytes.py (137, 1 skipped); the unsigned Release device build
+    (Xcode 27.2), only AppIntents' usual warning; check_project.py; the ios sims and vocabulary but iosdeck (as above).
+    Not verified: ios.yml's Xcode 26.6 Swift, and anything on a phone - the per-axis drag's feel and the bounded read
+    of a shared file among them.
+
 ### 5.6 With the turntable
 
 The deck's few lines (1.9) go in with the turntable's slice 2, which lands after this; that slice uses `CAudioRing`
