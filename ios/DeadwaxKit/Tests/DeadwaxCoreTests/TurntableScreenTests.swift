@@ -178,6 +178,10 @@ struct TurntableScreenTests {
         #expect(row(Self.report(DeckEngineState(prepared: false, failure: "the output refused (-10851)")))
                 == "Off: the output refused (-10851)")
         #expect(row(Self.report(DeckEngineState(prepared: false, airPlay: true))) == "Off: the record makes no sound over AirPlay")
+        // an interruption that hasn't ended: off, whatever window is in - never Ready while a press is silent
+        let ready = DeckReport.Window(start: 42, end: 82, kind: "FLAC", decodedAt: 48_000, bytes: 1_400_000)
+        #expect(row(Self.report(DeckEngineState(prepared: true, interrupted: true), window: ready))
+                == "Off: an interruption (a call, Siri, an alarm) hasn't ended - a press scrubs silently until it does")
         #expect(row(Self.report(DeckEngineState(prepared: true), refused: "it isn't a FLAC file (it is MP3)"))
                 == "Off: it isn't a FLAC file (it is MP3)")
         let window = DeckReport.Window(start: 42, end: 82, kind: "FLAC", decodedAt: 48_000, bytes: 1_400_000)

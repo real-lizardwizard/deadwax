@@ -905,6 +905,8 @@ final class DeckController {
         if playing != wasPlaying {
             wasPlaying = playing
             pausedAt = playing ? nil : CACurrentMediaTime()
+            // the song plays: whatever interrupted the sound is over
+            if playing { interruptionOver() }
             rules?.playingChanged(playing)
         }
         if player.position != lastPosition {
@@ -1033,8 +1035,11 @@ final class DeckController {
         observers.append(center.addObserver(forName: AVAudioSession.interruptionNotification, object: session,
                                             queue: .main) { [weak self] (note: Notification) -> Void in
             let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+            let reason = note.userInfo?[AVAudioSessionInterruptionReasonKey] as? UInt
             MainActor.assumeIsolated { () -> Void in
                 guard let raw, let type = AVAudioSession.InterruptionType(rawValue: raw) else { return }
+                // the app was suspended, not interrupted: told late, as it runs again, with no "ended" to follow
+                if type == .began, reason == Self.appWasSuspended { return }
                 self?.interruption(began: type == .began)
             }
         })
@@ -1067,6 +1072,10 @@ final class DeckController {
         })
     }
 
+    /// AVAudioSessionInterruptionReasonAppWasSuspended's number. Deprecated in iOS 16 ("no longer present"), so
+    /// compared by its number rather than its name, which would warn: a "began" for a suspension is no interruption.
+    nonisolated static let appWasSuspended: UInt = 1
+
     /// A call, Siri, an alarm (3.1, 4.6): a taken press let go as a cancel that rests, the engine stopped, no sound
     /// until it ends; counted.
     private func interruption(began: Bool) {
@@ -1077,9 +1086,19 @@ final class DeckController {
             rules?.interrupted()
             press?.cancelFollowed()
             if let engine, engine.isRunning { stopEngine() }
+            audioChanged()
+            evaluate()
         } else {
-            interrupted = false
+            interruptionOver()
         }
+    }
+
+    /// The interruption over, as far as the deck can tell (4.6): its "ended" came - which Apple doesn't promise - or the
+    /// song plays again, or the app came back to the front. Without the last two, one "began" with no "ended" left the
+    /// record silent for the rest of the run, every press a silent scrub.
+    private func interruptionOver() {
+        guard interrupted else { return }
+        interrupted = false
         audioChanged()
         evaluate()
     }
@@ -1112,6 +1131,7 @@ final class DeckController {
     /// The app leaving the front (4.6): the engine stopped at once and the deck hidden (setShowing(false)). A touch UIKit
     /// cancels is the press's cancel, from the touch view.
     private func activeChanged(_ now: Bool) {
+        if now { interruptionOver() }
         guard now != active else { return }
         active = now
         applyShowing()

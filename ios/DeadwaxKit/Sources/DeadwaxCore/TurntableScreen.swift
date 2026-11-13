@@ -275,6 +275,9 @@ extension TurntableDebugRows {
     /// The phone's voice, in the web's row (debugRows.ts:372 says "an AudioWorklet").
     public static let phoneVoice = "On its own audio thread (an AVAudioSourceNode)"
 
+    /// The Turntable sound row's words while an interruption lasts.
+    public static let interruptedWords = "an interruption (a call, Siri, an alarm) hasn't ended - a press scrubs silently until it does"
+
     /// "Window from" (new).
     public static func windowFromRow(_ from: DeckPhoneFacts.From) -> InfoRow {
         let value: String
@@ -359,8 +362,9 @@ extension TurntableDebugRows {
     }
 
     /// The deck's report as the phone has it (6.2): `context` from the engine - 'failed' with its words when it
-    /// couldn't start or is on AirPlay, 'starting' until it is prepared, else 'running' (the web's word for a context
-    /// that can sound; the phone's rests between sounds by design) - and the rest from the deck's rules.
+    /// couldn't start, is on AirPlay or an interruption hasn't ended (a call, Siri, an alarm: soundReady is false, so
+    /// the row mustn't read Ready), 'starting' until it is prepared, else 'running' (the web's word for a context that
+    /// can sound; the phone's rests between sounds by design) - and the rest from the deck's rules.
     public static func phoneReport(engine: DeckEngineState, window: DeckReport.Window?, loading: Bool, refused: String?,
                                    failed: String?, fetched: Double, lastFetchAt: Double, ioBuffer: Double?,
                                    outputLatency: Double?, health: DeckReport.DeckHealth?) -> DeckReport {
@@ -372,6 +376,9 @@ extension TurntableDebugRows {
         } else if engine.airPlay {
             context = "failed"
             problem = "the record makes no sound over AirPlay"
+        } else if engine.interrupted {
+            context = "failed"
+            problem = interruptedWords
         } else if !engine.prepared {
             context = "starting"
         } else {
