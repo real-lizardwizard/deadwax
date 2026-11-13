@@ -426,6 +426,11 @@ public struct TurntableLayout: Equatable, Sendable {
         let target = PlaySpeed.faderTarget(width)
         return (across(target.left), across(target.right))
     }
+    /// How wide the view that takes the turntable's touches is, points: the plinth, and past its right edge as far as
+    /// the fader's target reaches - centred on the fader, a tap wide, it overhangs the plinth (about 15 pt on a 393 pt
+    /// phone), as the web's overhangs the stage into the room round it. The drawing stays the plinth's size at the
+    /// view's top left; only the target lives in the rest.
+    public var touchWidth: Double { Swift.max(width, faderTarget.right) }
     /// How far the fader's knob travels, points (playSpeed.ts faderTravel).
     public var faderTravel: Double { PlaySpeed.faderTravel(height) }
     /// The fader's target top to bottom, points: the knob's whole travel and a knob's height (SpeedFader.tsx's SPAN).

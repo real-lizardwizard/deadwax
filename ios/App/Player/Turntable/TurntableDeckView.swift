@@ -36,7 +36,9 @@ final class TurntableDeckUIView: UIView {
         armElement = ArmElement(accessibilityContainer: NSObject())
         faderElement = FaderElement(accessibilityContainer: NSObject())
         readoutElement = ReadoutElement(accessibilityContainer: NSObject())
-        super.init(frame: CGRect(x: 0, y: 0, width: layout.width, height: layout.height))
+        // as wide as the fader's target reaches, past the plinth's right edge (touchWidth): a touch outside a view's
+        // bounds never reaches its subviews, and the target is a tap wide. The layers stay the plinth's size, at the left.
+        super.init(frame: CGRect(x: 0, y: 0, width: layout.touchWidth, height: layout.height))
         backgroundColor = .clear
         clipsToBounds = false
         layer.addSublayer(layers.root)
@@ -47,7 +49,8 @@ final class TurntableDeckUIView: UIView {
         }
         fader.deck = deck
         fader.space = self
-        addSubview(fader)
+        // under the arm, as the web draws the handle over the fader: at a song's start the handle's ring is the arm's
+        insertSubview(fader, belowSubview: arm)
         for element in [recordElement, armElement, faderElement, readoutElement] as [UIAccessibilityElement] {
             element.accessibilityContainer = self
         }
@@ -134,7 +137,7 @@ private enum TouchNumbers {
 private final class DeckTouchView: UIView {
     let kind: TurntableDrag.Kind
     weak var deck: DeckController?
-    /// the view whose points the press measures in (its box is that view's bounds)
+    /// the view whose points the press measures in (its box is the plinth, at that view's top left)
     weak var space: UIView?
     private var following: (touch: UITouch, pointer: Int)?
 

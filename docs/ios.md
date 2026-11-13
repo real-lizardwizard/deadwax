@@ -1494,7 +1494,9 @@ check says; the numbers carry on from the turntable's.
 
 - **25 The fader.** On the turntable, drag the knob up: the song speeds up and its pitch rises, the
   readout says `1.25x` in purple, and the record turns faster. Back near the mark it snaps to exactly
-  1x with one small tick under your thumb, and the mark goes green.
+  1x with one small tick under your thumb, and the mark goes green. The knob takes a thumb a little to
+  either side of it - just past the turntable's right edge too - and at a song's start, the arm's
+  handle beside it takes the arm.
 - **26 The readout.** Off 1x, tap the readout: straight back to 1x.
 - **27 The cover.** Off 1x, switch to the cover: `1.25x` between AirPlay and Up Next, nothing in that
   row moved; tap it - 1x, and it's gone. The mini player shows nothing.

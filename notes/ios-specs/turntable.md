@@ -2304,6 +2304,28 @@ spanned.
 restart is a start - only a fader moved in the fraction of a second between a let-go of the record and the song
 being heard could make the Handover row read the restart's start rather than the handover's.
 
+**After the review** (2026-11-13). The review of the fader found the fidelity rules, plays at 2x and the lock screen
+holding, and:
+
+1. **The outer part of the fader's target took no touch** (medium): the target is centred on the fader and a tap wide,
+   so it overhangs the plinth's right edge - by about 15.5 pt on a 393 pt phone (321 pt plinth) and on a 303 pt one,
+   6.6 on a 440 - but the deck's UIView and its SwiftUI frame were the plinth's size, so a touch there never reached
+   the touch view: 28.5 pt of 44 worked on the 393 pt phone. Now the view is `TurntableLayout.touchWidth` wide (the
+   plinth, and as far as the target reaches), laid out in a plinth-wide frame with the rest overhanging its right,
+   into the room's 12 pt and Now Playing's 24 pt margin - so the plinth is drawn where it was. Held by
+   `theWholeFaderTargetIsInsideTheViewThatTakesTouches` (Core, five rooms) and a source test of the app's wiring.
+2. **The fader was above the arm**, so at a song's start a few points of the handle's ring went to it: its touch view
+   is under the arm's now, as the web draws the handle over the fader.
+3. **A look switched mid-drag kept the fader held**: `destroy()` didn't let it go, as `closed()` does, and the touch
+   view went with the turntable, its cancel perhaps never sent - every turntable touch would then be refused and a
+   drag at 1x never get its exact let-go. `destroy()` lets it go first now.
+4. **The join's speed went untested**: the join in theSpeedOutlivesAStopAndANewListen fitted 1x's cap too.
+   aJoinAtTwoXCountsBothSidesInFull's doesn't (caught with `rate: pace()` taken out of the join).
+
+Left as they are: the hold armed by a send that turns out not to restart (up to a second in which a real loading of
+the same song would show late); and Debug's own Play/Pause, which reads the engine's phase directly, so it flashes
+during a restart as Now Playing's no longer does.
+
 **What only the phone shows.** All of the app's half: the fader under a thumb (its target, the slop, the speed
 following, the knob lit while held), the tick and its timing, the readout's place over the plinth's corner and over
 the foot line, its tap, the large content viewer, the chip's place and its fit at each text size, the menu's line,
@@ -2396,7 +2418,8 @@ usual question buttons.
 
 25. The fader: drag the knob up - the song speeds up and its pitch rises; the readout says `1.25x` in purple; the
     platter turns faster. Back near the mark it snaps to exactly 1x with one small tick under your thumb; the mark
-    goes green.
+    goes green. The knob takes a thumb a little either side of it, just past the plinth's right edge too (the
+    review's fix); at a song's start the arm's handle beside it takes the arm.
 26. Tap the readout: straight back to 1x.
 27. Off 1x, switch to the cover: `1.25x` between AirPlay and Up Next; tap it - 1x. The mini player shows nothing.
 28. At 1x everything sounds as before the fader existed (Test sounds 9 and 10 unbroken).

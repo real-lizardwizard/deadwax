@@ -17,7 +17,11 @@ struct TurntableView: View {
         GeometryReader { (space: GeometryProxy) in
             let layout = TurntableFit.layout(roomWidth: Double(space.size.width), roomHeight: Double(space.size.height))
             DeckPlinth(deck: deck, layout: layout)
-                .frame(width: CGFloat(layout.width), height: CGFloat(layout.height))
+                // the view reaches past the plinth's right edge as far as the fader's target does (touchWidth, 5.1),
+                // the plinth laid out at its own size and drawn where it was: the rest overhangs its right, into the
+                // room's padding - laid out wider, the plinth would move left to centre the overhang
+                .frame(width: CGFloat(layout.touchWidth), height: CGFloat(layout.height))
+                .frame(width: CGFloat(layout.width), height: CGFloat(layout.height), alignment: .leading)
                 // where the readout goes: Now Playing lays it over its column there (TurntableReadoutLayer)
                 .anchorPreference(key: PlinthPlaceKey.self, value: .bounds) { (bounds: Anchor<CGRect>) -> PlinthPlace? in
                     PlinthPlace(bounds: bounds, layout: layout)

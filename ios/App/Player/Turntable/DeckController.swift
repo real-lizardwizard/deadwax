@@ -685,6 +685,9 @@ final class DeckController {
     }
 
     private func destroy() {
+        // a fader held as the look switches: its touch view goes with the turntable, and its cancel may never come -
+        // let go here, or every turntable touch is refused and a drag at 1x never has its exact let-go (as closed())
+        faderLetGo()
         guard let rules else { return }
         // the rules' destroy plays on a song the hand took, and closes the deck's audio
         self.rules = nil

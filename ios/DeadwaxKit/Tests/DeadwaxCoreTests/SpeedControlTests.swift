@@ -262,6 +262,27 @@ import Testing
         #expect(layout.readoutTarget == 44, "a 321 pt plinth holds a tap's target")
         #expect(abs(TurntableLayout(width: 200).readoutTarget - 28) < 1e-9, "14% of a small one")
     }
+
+    @Test func theWholeFaderTargetIsInsideTheViewThatTakesTouches() {
+        //? the review: the target overhangs the plinth's right edge, and a plinth-sized view took only the part over
+        //? the plinth - 28.5 pt of 44 on a 393 pt phone. The touch view is touchWidth wide; the drawing stays the plinth's.
+        //? Plinths of a 375 and a 393 pt phone's room (and one squeezed in height), the 440 pt most, and a small one.
+        let rooms: [(Double, Double)] = [(327, 500), (345, 500), (345, 330), (900, 900), (240, 300)]
+        for (roomWidth, roomHeight) in rooms {
+            let layout = TurntableFit.layout(roomWidth: roomWidth, roomHeight: roomHeight)
+            let target = layout.faderTarget, span = layout.faderSpan
+            #expect(target.left >= 0 && target.right <= layout.touchWidth, "across, at \(layout.width) pt")
+            #expect(span.top >= 0 && span.bottom <= layout.height, "down, at \(layout.width) pt")
+            //? a tap wide unless the plinth is too small (the 14% cap), and never on the record
+            #expect(abs((target.right - target.left) - Swift.min(TurntableFace.hit, 0.14 * layout.width)) < 1e-9)
+            #expect(target.left >= layout.record.left + layout.record.width)
+            //? the overhang stays inside the room's 12 pt round the plinth and Now Playing's 24 pt side margin
+            #expect(layout.touchWidth - layout.width < TurntableFace.pad + 24, "on the screen, at \(layout.width) pt")
+        }
+        let phone = TurntableFit.layout(roomWidth: 345, roomHeight: 500)
+        #expect(phone.width == 321 && phone.faderTarget.right > phone.width, "a 393 pt phone's target overhangs its plinth")
+        #expect(TurntableLayout(width: 1000).touchWidth == 1000, "a plinth that holds it is the view")
+    }
 }
 
 /// Plays counted at the speed (turntable.md 5.2, "at 2x that comes in half the time"): the step is capped at the clock
@@ -328,6 +349,20 @@ import Testing
         //? a join across songs counts at the speed too
         let reports = tracker.join(into: "c", oldLength: 2.5, newPosition: 0.5, monotonic: 2, newDuration: 100, wallMs: 5)
         #expect(tracker.listen.heard == 0.5, "the new song's start")
+        #expect(reports == [.nowPlaying(songID: "c")])
+    }
+
+    @Test func aJoinAtTwoXCountsBothSidesInFull() {
+        //? the review: the join above fits 1x's cap too, so the join's speed went untested
+        var tracker = ListenTracker()
+        tracker.speedChanged(2)
+        tracker.newListen(songID: "b", at: 0)
+        _ = tracker.began(wallMs: 1)
+        _ = tracker.tick(position: 2, monotonic: 1, duration: 3.5)
+        //? a second of the clock across the join: the old song's last 1.5 s and the new one's first 0.5 - 2 s of song,
+        //? past the 1.5 s 1x allows a second with its slack, which would take it off the new song first
+        let reports = tracker.join(into: "c", oldLength: 3.5, newPosition: 0.5, monotonic: 2, newDuration: 100, wallMs: 5)
+        #expect(tracker.listen.heard == 0.5, "the new song's start, in full")
         #expect(reports == [.nowPlaying(songID: "c")])
     }
 }

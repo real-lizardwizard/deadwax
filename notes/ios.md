@@ -3280,6 +3280,11 @@ Info.plist, `tests/test_ios_install.py`, About's doc comment, `ios/README.md` an
 install.sh's line, About's row, "The speed" under the turntable, the cover's chip, Debug's Speed row, the lock screen,
 plays, "The speed's checks (app 0.7)", and the fader gone from "What it can't do yet"). `src/__init__.py` untouched.
 
+**After the review**: the fader's target overhangs the plinth's right edge (about 15.5 pt on a 393 pt phone), and the
+plinth-sized view took no touch there - the view is `touchWidth` wide now, the plinth drawn where it was; the fader's
+touch view is under the arm's; a look switched mid-drag lets the fader go (`destroy()`, as `closed()`); a join at 2x
+tested. Details in the spec's "After the review" under "Slice 4, second half, built".
+
 Phone-only, all of it: checks 25-38.
 
 ## The EQ, slice 1: Core (2026-11-12)
