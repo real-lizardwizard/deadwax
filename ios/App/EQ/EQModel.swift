@@ -94,11 +94,19 @@ final class EQModel {
                                                             object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.unlocked() }
             }
+            // an unlock between the read above and the observer would never be heard: read again now it is there
+            unlocked()
         }
     }
 
+    /// The app came to the front: if eq.json couldn't be opened at launch and nothing has said the phone unlocked since
+    /// (a suspended app may not hear it), read it now - the phone is unlocked if the app is in front.
+    func becameActive() {
+        if unlock != nil { unlocked() }
+    }
+
     /// The phone unlocked after a launch that couldn't open eq.json (a background launch since it started): read now,
-    /// and the route met again on what was kept.
+    /// and the route met again on what was kept. Nothing while it still can't be opened.
     private func unlocked() {
         let loaded = store.load()
         guard !loaded.locked else { return }
@@ -169,16 +177,13 @@ final class EQModel {
     /// An output's setting - or, never met, the one it would start with: Off.
     func setting(_ output: EQOutput) -> EQOutputSetting { settings.setting(for: output) }
 
-    /// The output a key is: the route's own when it is the output now (iOS's name as it is now), else as kept - or,
-    /// just forgotten, as it was.
+    /// The output a key is (Core's EQScreenRules.output): as kept, the route's own, the speaker - or, just forgotten, as
+    /// it was last drawn. Never another output's: a page bound to the AirPods changes the AirPods. Each answer is
+    /// remembered, the route's included, so a page whose output goes keeps its name while it goes.
     func output(_ key: String) -> EQOutput {
-        if key == route.key { return settings.output(key)?.output ?? route }
-        if let kept = settings.output(key) {
-            known[key] = kept.output
-            return kept.output
-        }
-        if key == EQOutputs.speaker.key { return EQOutputs.speaker }
-        return known[key] ?? route
+        let output = EQScreenRules.output(key, route: route, in: settings, lastDrawn: known[key])
+        known[key] = output
+        return output
     }
 
     /// The rate an output's curve is drawn at: the unit's own while it is the output now, 48 kHz while it isn't

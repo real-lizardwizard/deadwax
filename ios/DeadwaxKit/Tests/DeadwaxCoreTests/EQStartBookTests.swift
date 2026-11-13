@@ -133,6 +133,47 @@ import Testing
         #expect(book.ready[Self.car.key] == nil)
     }
 
+    /// The review: a bank is dropped when any part of its output's sound changes - the switch, the tone, the correction,
+    /// the preamp set by hand (slice 5's) - so no start or change ever plays a bank made from a setting it no longer has.
+    @Test func everyPartOfTheSoundDropsItsBanks() {
+        let base = Self.settings("bassBoost")
+        let peak = EQCorrection(kind: .built, name: "Mine", nextFilterID: 2,
+                                filters: [EQFilter(id: 1, kind: .peak, fc: 1_000, gain: 3, width: .q(1))])
+        let changes: [(name: String, change: (inout EQOutputSetting) -> Void)] = [
+            ("off", { (o: inout EQOutputSetting) -> Void in o.on = false }),
+            ("tone", { (o: inout EQOutputSetting) -> Void in o.tone = .preset("vocal") }),
+            ("correction", { (o: inout EQOutputSetting) -> Void in o.correction = peak }),
+            ("preamp", { (o: inout EQOutputSetting) -> Void in o.preamp = .hand(-9) }),
+        ]
+        for (name, change) in changes {
+            var book = EQStartBook()
+            book.update(base)
+            let sound = book.sounds[Self.airpods.key]!
+            let kept = book.keep(sound.bank(key: Self.airpods.key, rate: 48_000, version: 0), from: sound)
+            #expect(kept)
+            var s = base
+            change(&s.outputs[0])
+            book.update(s)
+            #expect(book.ready[Self.airpods.key] == nil, "\(name)")
+        }
+    }
+
+    /// The review: a change at a rate nothing was made ahead for makes its bank there and then, and keeps it - so the
+    /// start that follows at that rate only looks it up (slice 2's review's item 1).
+    @Test func aChangesBankIsKeptForTheNextStart() {
+        let s = Self.settings("vocal")
+        let desk = Self.desk()
+        let host = Host()
+        host.rate = 96_000
+        let published = desk.changed(s, route: Self.airpods.key, muffle: false, host: host.taker)
+        #expect(published != nil && host.newest == published)
+        guard case .ready(let bank) = desk.plan(Self.airpods.key, rate: 96_000) else {
+            Issue.record("the change's bank at 96 kHz wasn't kept for the start")
+            return
+        }
+        #expect(bank == s.bank(s.output(Self.airpods.key)!, rate: 96_000, version: 2))
+    }
+
     /// An output never met starts Off (3.12), and so does one whose EQ is off: the identity, nothing made.
     @Test func neverMetOrOffIsTheIdentity() {
         var book = EQStartBook()

@@ -36,11 +36,11 @@ struct EQSliders: View {
     @GestureState private var pressing = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// The knob a finger holds: its band, the value it took hold at, and whether it has moved yet.
+    /// The knob a finger holds: its band, its drag (Core's EQSliderDrag: where it took hold, where it engaged) and the
+    /// value last given.
     private struct Grab {
         var band: Int
-        var start: Double
-        var engaged = false
+        var drag: EQSliderDrag
         var last: Double
     }
 
@@ -80,6 +80,10 @@ struct EQSliders: View {
             // the touch ended or was taken away (a call, a system gesture): let go either way
             if !now { letGo() }
         }
+        // gone with a finger still down (a second finger on Back, the text size crossing into the stepper rows): let
+        // go, so the page and EQModel aren't left holding - a hold never let go would keep eq.json unwritten until the
+        // app went to the back
+        .onDisappear { letGo() }
     }
 
     /// "+12", "0", "-12" inside the first column, beside the track's top, middle and foot.
@@ -117,29 +121,24 @@ struct EQSliders: View {
             .onChanged { value in
                 if grab == nil {
                     let band = min(max(Int(value.startLocation.x / max(column, 1)), 0), gains.count - 1)
-                    grab = Grab(band: band, start: gains[band], last: gains[band])
+                    grab = Grab(band: band, drag: EQSliderDrag(start: gains[band]), last: gains[band])
                     haptic.prepare()
                     onHold(true)
                 }
                 guard var held = grab else { return }
+                // from where it engaged, so neither taking hold nor passing back over it makes the knob jump
                 let dy = Double(value.translation.height)
-                if !held.engaged {
-                    guard EQSliderRules.engaged(dy: dy) else { return }
-                    held.engaged = true
-                }
-                // from where it engaged, so taking hold never makes the knob jump
-                let moved = dy - (dy > 0 ? EQSliderRules.engage : -EQSliderRules.engage)
-                let value = EQSliderRules.value(from: held.start, dy: moved, track: Double(Self.track))
-                if value != held.last {
-                    if EQSliderRules.ticks(from: held.last, to: value) { haptic.impactOccurred() }
-                    held.last = value
-                    onChange(held.band, value)
+                guard let gain = held.drag.value(dy: dy, track: Double(Self.track)) else { return }
+                if gain != held.last {
+                    if EQSliderRules.ticks(from: held.last, to: gain) { haptic.impactOccurred() }
+                    held.last = gain
+                    onChange(held.band, gain)
                 }
                 grab = held
             }
             .onEnded { _ in
                 guard let held = grab else { return }
-                if !held.engaged {
+                if !held.drag.engaged {
                     // a tap: two on the same band, quickly, put it back to 0
                     if let tap = lastTap, tap.band == held.band, Date().timeIntervalSince(tap.at) < 0.35 {
                         if gains[held.band] != 0 {

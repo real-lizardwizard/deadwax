@@ -2200,6 +2200,58 @@ aPushedPageStaysOnItsOutput with 6 issues. Restored.
   closure says its type, but the App target is only built on this Mac's Xcode 27.1); each commit building alone - the
   model-and-store commit was not built by itself (it holds no file the later ones change but DeadwaxApp.swift's
   Palette lines, which came with the screens).
+- **Review** (2026-11-12, on 6664261..6ee2eca's six commits). Read against 3.1-3.6, 3.12-3.18, 4, 5.3, 6's E1-E16 and
+  the Design review, the code before the account, and Core's rules mutated: 25 mutations of EQScreenRules, EQStartBook
+  and EQDrawing, of which 5 passed every test (now each fails one, below). Changed:
+  - **A slider's knob jumped as the finger passed back over where it came down.** The drag took its engaging side
+    (6 pt up or down) from the finger's side of the touch-down point at every move, so a drag engaged downward and
+    brought back up past that point moved the knob 12 pt - 1.44 dB, heard as a step - at once, the wrong way. The
+    drag's state is Core's now (`EQSliderDrag`: the side kept from the moment it engaged), and EQSliders draws it;
+    `aDragNeverJumps` walks a finger back over the point both ways in 0.1 pt steps and fails on the old rule.
+  - **A page could change another output.** `EQModel.output(key)` fell back to the output now for a key it didn't
+    know, and never remembered an output while it was the route - so a page bound to the AirPods, drawn while they
+    played, then forgotten from another page, would have read and written the car's setting: the one thing 3.2's
+    binding is for. The rule is Core's (`EQScreenRules.output`: as kept, the route's own, the speaker, as the page
+    last drew it, else named by its key - never another output), every answer remembered; `aPageIsAlwaysItsOwnOutput`
+    fails with the old fallback.
+  - **eq.json could stay unwritten for the rest of a locked launch's process.** The first unlock's observer was added
+    after the read, so an unlock between the two was never heard - and an app suspended in the background when the
+    phone unlocks may not hear it at all. EQModel now reads again once the observer is in, and whenever the app
+    comes to the front still waiting (RootView's `.active`, `EQModel.becameActive`) - the phone is unlocked if the app
+    is in front. Still never written over while it can't be opened.
+  - **A hold could outlive its slider.** EQSliders lets go when it disappears with a finger down (a second finger on
+    Back, the text size crossing into the stepper rows), so the page and EQModel aren't left holding - which kept
+    eq.json unwritten until the app went to the back.
+  - **For CI's compiler**: EQStartTests' `host.newest.map { b in var c = b; … }` says its type.
+  - **Five tests that passed with the code broken** now fail: the clip warning's edge (a hand preamp taking away
+    exactly the curve's top is enough), a band moved to where it already is (a preset stays itself, Off stays Off - a
+    VoiceOver step at the range's end), a route with no output leaving the page connected, a change's bank kept for
+    the next start at that rate, and every part of a sound - the switch, the tone, the correction, the hand preamp -
+    dropping the banks made from it.
+  - **Agreed, not changed**: the one version counter and its two orders - every mutation of the desk tried (banks
+    never dropped, kept unchecked, unstamped, a start's bank not kept, Muffle ignored, rates not noted) fails a test,
+    and no stale bank can be published (`keep` checks the sound under the lock, a bank is a function of its sound and
+    rate alone, and is stamped at use); the store otherwise (a file there but unreadable is never written, a garbled
+    or newer one is moved aside under a name never used, writes are atomic); a route change mid-drag (the page and
+    the drag keep their output, the sound follows the route, the file waits for the finger); Off, presets, Custom and
+    Forget as 3.2, 3.6 and 3.12 have them; no diff in DeadwaxAudio; no newer-only syntax or API in the App's or Core's
+    new files, and no other multi-statement closure whose result type is inferred.
+  - **The departures**: 17 sound as given. Two were incomplete as written: "a page whose output is forgotten keeps its
+    name" (the route's own wasn't remembered - fixed above), and "lines of different lengths don't morph", which holds
+    for slice 3 (every simple-face line is the grid's 241 points) but not as EQVector is: its `-` of two lengths is
+    `.zero`, so the animation would draw the old values against the new frequencies for 0.25 s and then jump - slice
+    4, whose corrections add their own f0s, must draw such a change without the animation.
+  - **James's to decide** (design, not changed): the presets page keeping Custom for its life (3.6: only while the
+    tone is Custom); the swipe Forget asking first (3.12 named no dialog); Done on every page of the sheet (3.1: the
+    sheet's top); the tick only when a drag lands on 0 - a fast one stepping over 0 gives none (3.5's "crosses into");
+    the "+12", "0", "-12" scale inside the first column, under its knob's travel (3.5's place).
+  - **For the phone**: a route with no outputs, if iOS ever reports one mid-switch, is the speaker (EQRouteReader, on
+    the main thread and the start's) - EQPage's rule would leave the last output standing, but EQModel never hands it
+    one; E3 and E8 show whether the page flickers to "iPhone speaker" as AirPods come and go.
+  - **Tests**: Core **853 in 113** (`aDragNeverJumps`, `aPageIsAlwaysItsOwnOutput`, `everyPartOfTheSoundDropsItsBanks`,
+    `aChangesBankIsKeptForTheNextStart`, and expects added to four more), Audio 114 in 9; the unsigned device build
+    (Xcode 27.1); check_project.py; pytest's iOS files; the ios sims. Not verified: ios.yml's Xcode 26.6 Swift, and
+    anything on a phone.
 
 ### 5.4 Slice 4 - AutoEq
 

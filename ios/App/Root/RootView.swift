@@ -29,6 +29,7 @@ struct RootView: View {
                 CoverCache.shared.forgetFailures()
                 server.becameActive()
                 player.becameActive()
+                eq.becameActive()
             case .background:
                 player.movedToBackground()
                 eq.movedToBackground()

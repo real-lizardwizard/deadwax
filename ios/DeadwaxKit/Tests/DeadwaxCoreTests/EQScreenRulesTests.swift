@@ -22,9 +22,9 @@ import Testing
         #expect(page.output == Self.airpods.key && page.connected)
         //? the same route again is no switch
         #expect(page.heard(route: Self.airpods.key) == false)
-        //? a route with no output leaves the last one standing
+        //? a route with no output leaves the last one standing - still connected
         #expect(page.heard(route: nil) == false)
-        #expect(page.output == Self.airpods.key)
+        #expect(page.output == Self.airpods.key && page.connected)
     }
 
     /// Covered (a page pushed over it, an alert, another tab), it keeps its output - and switches when shown again.
@@ -153,6 +153,13 @@ import Testing
         #expect(s.gains(s.output(Self.airpods.key)!.tone)[0] == 1.5)
         //? a band that isn't one changes nothing
         #expect(s.setBand(10, to: 3, for: Self.airpods) == false)
+        //? nor does a band moved to where it already is (a VoiceOver step at the end of the range): a preset stays
+        //? itself, and Off stays Off
+        var t = EQSettings()
+        t.choose(.preset("bassBoost"), for: Self.airpods)
+        t.setOn(false, for: Self.airpods)
+        #expect(t.setBand(0, to: 5, for: Self.airpods) == false)
+        #expect(t.output(Self.airpods.key)?.tone == .preset("bassBoost") && t.output(Self.airpods.key)?.on == false)
     }
 
     @Test func theRouteMet() {
@@ -269,6 +276,9 @@ import Testing
                 == EQLine("Preamp -6.0 dB, set by you."))
         #expect(R.line(on: true, identity: false, preamp: .hand(-3.6), played: -3.6, top: 6, unitNotMade: false)
                 == EQLine("Loud songs may clip: the curve boosts 2.4 dB more than this preamp takes away.", .amber))
+        //? a preamp taking away exactly the curve's top is enough; a tenth less is not
+        #expect(R.line(on: true, identity: false, preamp: .hand(-6), played: -6, top: 6, unitNotMade: false).tone == .quiet)
+        #expect(R.line(on: true, identity: false, preamp: .hand(-6), played: -6, top: 6.1, unitNotMade: false).tone == .amber)
         //? the unit not made says so before anything - Off included
         #expect(R.line(on: false, identity: true, preamp: .automatic, played: 0, top: 0, unitNotMade: true).tone == .danger)
     }
@@ -350,6 +360,70 @@ import Testing
         //? VoiceOver's swipe: 1 dB; a stepper row's 0.5; inside the range
         #expect(S.adjusted(3.5, up: true) == 4.5 && S.adjusted(-11.5, up: false) == -12)
         #expect(S.adjusted(0, up: false, step: 0.5) == -0.5)
+    }
+
+    /// The review: a drag engages 6 pt from where the finger came down and follows it from there - and the knob never
+    /// jumps, not as it engages and not as the finger passes back over where it came down. The first build took the
+    /// engaging side afresh at every move, so crossing that point moved the knob 12 pt (1.44 dB) at once, the wrong
+    /// way.
+    @Test func aDragNeverJumps() {
+        var down = EQSliderDrag(start: 3)
+        let early = down.value(dy: 5.9)
+        #expect(early == nil && !down.engaged)
+        let engaged = down.value(dy: 6)
+        #expect(engaged == 3 && down.engaged)
+        //? 25 pt down from where it engaged: 3 dB down
+        let lower = down.value(dy: 31)
+        #expect(lower == 0)
+        //? back up, past where it came down and on: the knob rises with the finger, a step at a time
+        var last = 0.0
+        for tenth in stride(from: 310, through: -400, by: -1) {
+            let dy = Double(tenth) / 10
+            let value = down.value(dy: dy) ?? .nan
+            #expect(value >= last && value - last <= EQGraphic.step, "\(dy) pt: \(last) to \(value)")
+            last = value
+        }
+        #expect(last == 8.5)
+        //? engaged upward, then down past where it came down
+        var up = EQSliderDrag(start: -2)
+        let upward = up.value(dy: -6)
+        #expect(upward == -2)
+        last = -2
+        for tenth in stride(from: -60, through: 400, by: 1) {
+            let dy = Double(tenth) / 10
+            let value = up.value(dy: dy) ?? .nan
+            #expect(value <= last && last - value <= EQGraphic.step, "\(dy) pt: \(last) to \(value)")
+            last = value
+        }
+        #expect(last == -7.5)
+    }
+
+    /// The review: the output a page bound to a key draws and changes is that output, whatever has connected or been
+    /// forgotten since - the first build fell back to the output now, so a page whose output had just been forgotten
+    /// would have changed the one playing.
+    @Test func aPageIsAlwaysItsOwnOutput() {
+        typealias R = EQScreenRules
+        var s = EQSettings()
+        s.met(Self.airpods, at: "2026-11-12T10:00:00Z")
+        s.rename(Self.airpods.key, to: "Pods")
+        //? kept: as kept, yours from Rename, playing or not
+        #expect(R.output(Self.airpods.key, route: Self.airpods, in: s, lastDrawn: nil).name == "Pods")
+        #expect(R.output(Self.airpods.key, route: Self.car, in: s, lastDrawn: nil).name == "Pods")
+        //? the output now before it is kept, and the speaker never met
+        #expect(R.output(Self.car.key, route: Self.car, in: s, lastDrawn: nil) == Self.car)
+        #expect(R.output("speaker", route: Self.car, in: s, lastDrawn: nil) == Self.speaker)
+        //? forgotten while a page bound to it is up: as that page last drew it - never the car, which plays now
+        let drawn = R.output(Self.airpods.key, route: Self.airpods, in: s, lastDrawn: nil)
+        s.forget(Self.airpods.key)
+        s.met(Self.car, at: "2026-11-12T11:00:00Z")
+        #expect(R.output(Self.airpods.key, route: Self.car, in: s, lastDrawn: drawn) == drawn)
+        #expect(R.output(Self.airpods.key, route: Self.car, in: s, lastDrawn: Self.kitchen).key == Self.airpods.key)
+        let unknown = R.output(Self.airpods.key, route: Self.car, in: s, lastDrawn: nil)
+        #expect(unknown.key == Self.airpods.key && unknown.name == Self.airpods.key)
+        //? and a slider moved on that page changes its own setting, not the car's
+        s.setBand(0, to: 6, for: R.output(Self.airpods.key, route: Self.car, in: s, lastDrawn: drawn))
+        #expect(s.output(Self.car.key)?.on == false && s.output(Self.car.key)?.tone == .preset("flat"))
+        #expect(s.output(Self.airpods.key)?.on == true)
     }
 
     @Test func theBandsWords() {

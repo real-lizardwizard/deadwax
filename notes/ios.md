@@ -64,6 +64,7 @@ ios/
     Tests/DeadwaxCoreTests/ Swift Testing, 64 tests in Phase 0, 508 in 69 suites at app 0.2, 633 in 83 at 0.3,
                             745 in 98 with the EQ's slice 1 (its fixtures in Fixtures/eq/, 1.5 MB), 809 in
                             110 at its slice 2 (the turntable's slice 1 between), 849 in 113 at its slice 3
+                            (853 after its review)
     Tests/DeadwaxAudioTests/  offline-render tests, macOS only (12 in Phase 0, 54 at app 0.2, 93 at 0.3, 111 in 8
                             suites with the EQ's slice 2 and its review - EQRealTimeTests bounded in a release build;
                             114 in 9 at its slice 3, EQStartTests the start's bank made ahead)

@@ -142,7 +142,7 @@ import Testing
                 desk.start(Self.key, rate: 48_000, host: Self.taker(host))
             }
             #expect(desk.lastStart?.ready == true)
-            #expect(host.newest.map { b in var c = b; c.version = 0; return c }
+            #expect(host.newest.map { (b: EQBank) -> EQBank in var c = b; c.version = 0; return c }
                     == s.bank(s.output(Self.key)!, rate: 48_000, version: 0))
         }
         // made ahead, a start costs no more than slice 2's own, and far less than making the bank there

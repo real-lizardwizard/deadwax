@@ -266,6 +266,20 @@ public enum EQScreenRules {
     /// Other outputs' Forget (3.12): never the speaker.
     public static func forgets(_ key: String) -> Bool { key != EQOutputs.speaker.key }
 
+    /// The output a page bound to `key` draws and changes (3.2): as kept (iOS's name as it was last met, yours from
+    /// Rename), else the route's own while it is the output now, the speaker (always there), or as the page last drew
+    /// it - one just forgotten keeps its name while it goes. **Never another output**: whatever has connected or been
+    /// forgotten meanwhile, a page bound to the AirPods reads and writes the AirPods (the review: the first build fell
+    /// back to the output now, so a page whose output had been forgotten would have changed the one playing). An output
+    /// none of those knows (Debug's Started with, for one forgotten since) is named by its key.
+    public static func output(_ key: String, route: EQOutput, in settings: EQSettings, lastDrawn: EQOutput?) -> EQOutput {
+        if let kept = settings.output(key) { return kept.output }
+        if key == route.key { return route }
+        if key == EQOutputs.speaker.key { return EQOutputs.speaker }
+        if let lastDrawn, lastDrawn.key == key { return lastDrawn }
+        return EQOutput(key: key, port: .other, portType: "", uid: "", name: key, symbol: "speaker.wave.2")
+    }
+
     /// You's row and Now Playing's subtitle (3.1): the output now's name and its short setting.
     public static func now(_ settings: EQSettings, route: EQOutput) -> (name: String, short: String) {
         let setting = settings.setting(for: route)
@@ -407,5 +421,33 @@ public enum EQSliderRules {
     /// VoiceOver's swipe up or down (3.14): `step` dB, inside the range - 1 for a slider, 0.5 for a stepper row.
     public static func adjusted(_ gain: Double, up: Bool, step: Double = spoken) -> Double {
         min(max(gain + (up ? step : -step), EQGraphic.range.lowerBound), EQGraphic.range.upperBound)
+    }
+}
+
+/// One finger's drag on a slider (3.5): the value it took hold at, and - once the finger has gone `engage` up or down -
+/// the point it engaged at, kept for the rest of the drag. The knob follows the finger's movement from there, so
+/// taking hold never makes it jump, and nor does the finger passing back over where it came down (the review: the
+/// first build took the engaging side from the finger's side of that point at every move, so crossing it moved the knob
+/// 12 pt - 1.44 dB - at once).
+public struct EQSliderDrag: Equatable, Sendable {
+    /// the band's value when the finger came down
+    public let start: Double
+    /// where the drag engaged (pt from where it came down, down positive) - nil until it has
+    public private(set) var engagedAt: Double?
+
+    public init(start: Double) {
+        self.start = start
+    }
+
+    public var engaged: Bool { engagedAt != nil }
+
+    /// The value for the finger's movement so far (`dy` pt, down positive), to the step and inside the range - nil
+    /// while it hasn't gone `engage` up or down yet.
+    public mutating func value(dy: Double, track: Double = EQSliderRules.track) -> Double? {
+        if engagedAt == nil {
+            guard EQSliderRules.engaged(dy: dy) else { return nil }
+            engagedAt = dy > 0 ? EQSliderRules.engage : -EQSliderRules.engage
+        }
+        return EQSliderRules.value(from: start, dy: dy - (engagedAt ?? 0), track: track)
     }
 }
