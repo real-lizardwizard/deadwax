@@ -15,6 +15,16 @@ import SwiftUI
 /// offline) shows the cover, the button still lit. The backdrop darkens under them so the dim lines read over the
 /// brightest cover.
 ///
+/// THE TURNTABLE (app 0.6, notes/ios-specs/turntable.md 2.1): the look button at the top row's right switches between
+/// the cover and the turntable for as long as Now Playing stays open - it opens as You > Playback says, every time, and
+/// the button never changes that. On the turntable the plinth takes the cover's room (TurntableView), the title and
+/// the album line are centred, the time line takes the scrubber's place in the scrubber's own row (so nothing below
+/// moves), a failure's line or the silent record's is laid over the plinth's foot, and the grip is the top row alone -
+/// the record and the arm are outside it. The swap is a 0.2 s crossfade, none under Reduce Motion. The deck itself is
+/// DeckController's, which outlives this view (a coast still hands the song back after a close); the transport's
+/// Play/Pause on the turntable is the deck's (a pause winds the record down), and its three buttons are gestures the
+/// record's sound may start from. Lyrics on show over neither look, as the web's: the look button gives way to them.
+///
 /// Every action is PlayerModel's, called straight from the tap. Shuffle and Repeat are named in Up Next's words
 /// (shuffleLabel, repeatLabel), pressed while on, tinted while on; a library's shuffle can't be turned off, so its
 /// Shuffle stays on and does nothing. The Up Next button names what is on (upNextLabel) and is never tinted.
@@ -22,7 +32,9 @@ struct NowPlayingView: View {
     @Environment(PlayerModel.self) private var player
     @Environment(AppNavigation.self) private var navigation
     @Environment(LyricsModel.self) private var lyrics
+    @Environment(DeckController.self) private var deck
     @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showsUpNext = false
     @State private var showsInfo = false
     /// The EQ over Now Playing (eq.md 3.1), from the •••: its own stack, "Done" at its top right.
@@ -31,6 +43,8 @@ struct NowPlayingView: View {
     @State private var eqWaits = false
     /// How far the sheet has been dragged down (points).
     @State private var dragY: CGFloat = 0
+    /// The look the button switched to while this stays open; nil: as You > Playback says (the web's, reset as it opens).
+    @State private var switched: TurntableSettings.Look?
 
     /// The cover's scale while paused (--pl-paused-scale).
     private static let pausedScale: CGFloat = 0.82
@@ -39,6 +53,15 @@ struct NowPlayingView: View {
 
     /// Lyrics take the cover's place: on, and the song has some (or they are on their way, or failed).
     private var lyricsShown: Bool { Lyrics.shows(lyrics.have, on: lyrics.showing) }
+
+    /// The look showing, the button's or You's.
+    private var look: TurntableSettings.Look { switched ?? deck.opensAs }
+
+    /// The turntable shows: its look, with the lyrics off (NowPlaying.tsx:269).
+    private var turntable: Bool { TurntableSettings.showsTurntable(look, lyricsOn: lyrics.showing) }
+
+    /// The look's swap: a crossfade, none under Reduce Motion (2.1, 2.12).
+    private var swap: Animation? { reduceMotion ? nil : .easeInOut(duration: 0.2) }
 
     var body: some View {
         ZStack {
@@ -54,6 +77,9 @@ struct NowPlayingView: View {
         .sheet(isPresented: $showsInfo, onDismiss: eqAfterSheet) { InfoView() }
         .sheet(isPresented: $showsEQ) { EQSheet() }
         .onAppear { lyrics.opened() }
+        // the deck told what shows as it opens and as the look changes - and that it doesn't, as it closes (2.1)
+        .onChange(of: turntable, initial: true) { (_: Bool, now: Bool) -> Void in deck.screen(turntable: now) }
+        .onDisappear { deck.closed() }
         .onChange(of: navigation.eqImport?.id, initial: true) { (_: UUID?, _: UUID?) -> Void in shared() }
     }
 
@@ -92,6 +118,11 @@ struct NowPlayingView: View {
                     lyricsFace(track)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .transition(.opacity)
+                } else if turntable {
+                    // outside the grip too: the record and the arm are controls (2.7)
+                    TurntableView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .transition(.opacity)
                 } else {
                     VStack(spacing: 0) {
                         Spacer(minLength: 12)
@@ -112,22 +143,36 @@ struct NowPlayingView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            VStack(alignment: .leading, spacing: 4) {
-                if let error = player.errorLine, !error.isEmpty {
-                    Text(error)
-                        .font(.footnote)
-                        .foregroundStyle(Palette.quiet)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Text(track.title)
-                    .font(.title2.bold())
-                    .lineLimit(1)
-                byline(track)
+            // the titles crossfade between the looks (leading on the cover, centred on the turntable) - a fade, not a
+            // slide; in a ZStack, so the two share their place through it
+            ZStack {
+                titles(track, centred: turntable)
+                    .id(turntable)
+                    .transition(.opacity)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            // on the turntable a failure's line, or the silent record's, is laid over the plinth's foot: its bottom
+            // --pl-error-gap above the title, taking no touch, so the plinth never moves for it (2.1, 2.8)
+            .overlay(alignment: .top) {
+                if turntable, let line = footLine {
+                    TurntableFootLine(text: line)
+                        .alignmentGuide(.top) { (d: ViewDimensions) -> CGFloat in d[.bottom] + Self.errorGap }
+                        .transition(.opacity)
+                }
+            }
             .padding(.bottom, 12)
 
-            ScrubberView()
+            // the scrubber's row either way: the scrubber on the cover, the time line centred in it on the turntable,
+            // so the swap moves no row (2.1)
+            ZStack {
+                ScrubberView()
+                    .opacity(turntable ? 0 : 1)
+                    .allowsHitTesting(!turntable)
+                    .accessibilityHidden(turntable)
+                if turntable {
+                    TurntableTimeLine()
+                        .transition(.opacity)
+                }
+            }
 
             transport
                 .padding(.vertical, 12)
@@ -138,7 +183,34 @@ struct NowPlayingView: View {
         .padding(.bottom, 8)
     }
 
-    /// The chevron, and the notice over the row.
+    /// --pl-error-gap: a failure's line to the title under it.
+    static let errorGap: CGFloat = 6
+
+    /// The line over the plinth's foot: the player's failure, else the silent record's (which never shows over one).
+    private var footLine: String? {
+        if let error = player.errorLine, !error.isEmpty { return error }
+        return deck.silentLine
+    }
+
+    /// The failure's line (on the cover: above the title, in the flow), the title and "Artist — Album" - centred on the
+    /// turntable, as the web's are.
+    private func titles(_ track: QueueTrack, centred: Bool) -> some View {
+        VStack(alignment: centred ? .center : .leading, spacing: 4) {
+            if !centred, let error = player.errorLine, !error.isEmpty {
+                Text(error)
+                    .font(.footnote)
+                    .foregroundStyle(Palette.quiet)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Text(track.title)
+                .font(.title2.bold())
+                .lineLimit(1)
+            byline(track, centred: centred)
+        }
+        .frame(maxWidth: .infinity, alignment: centred ? .center : .leading)
+    }
+
+    /// The chevron, the notice over the row, and the look button opposite the chevron.
     private var topRow: some View {
         HStack {
             Button(action: close) {
@@ -150,6 +222,7 @@ struct NowPlayingView: View {
             .buttonStyle(.plain)
             .accessibilityLabel(NowPlayingWords.close)
             Spacer()
+            LookButton(showingTurntable: turntable, action: lookTapped)
         }
         // the notice (D11), said over Now Playing - which covers the capsule over the mini player: in the top
         // row, centred, where nothing else is, so it moves nothing and covers no button (phase2-downloads.md
@@ -162,6 +235,17 @@ struct NowPlayingView: View {
             }
         }
         .animation(.default, value: player.notice)
+    }
+
+    /// The look button (NowPlaying.tsx:343): the other look for as long as this stays open, the lyrics giving way to it;
+    /// switching to the turntable is a gesture the record's sound may start from.
+    private func lookTapped() {
+        let tapped = TurntableSettings.lookTapped(look, lyricsOn: lyrics.showing)
+        if tapped.wake { deck.wake() }
+        withAnimation(swap) {
+            if tapped.lyricsOff { lyrics.showing = false }
+            switched = tapped.look
+        }
     }
 
     /// The lyrics' place (4.2): the lines; the spinner while they're asked with none in hand; a failure in a listener's
@@ -202,7 +286,10 @@ struct NowPlayingView: View {
         let on = lyrics.showing
         let dimmed = Lyrics.dimmed(have, on: on)
         return Button {
-            withAnimation(.easeInOut(duration: 0.25)) { lyrics.showing.toggle() }
+            // off over the turntable's look goes back to the record, a gesture its sound may start from
+            let tapped = TurntableSettings.lyricsTapped(look, lyricsOn: on)
+            if tapped.wake { deck.wake() }
+            withAnimation(.easeInOut(duration: 0.25)) { lyrics.showing = tapped.lyricsOn }
         } label: {
             Image(systemName: on ? "quote.bubble.fill" : "quote.bubble")
                 .font(.title3)
@@ -217,7 +304,7 @@ struct NowPlayingView: View {
         .accessibilityAddTraits(on ? .isSelected : [])
     }
 
-    @ViewBuilder private func byline(_ track: QueueTrack) -> some View {
+    @ViewBuilder private func byline(_ track: QueueTrack, centred: Bool) -> some View {
         let byline = PlayerWords.byline(artist: track.artist, album: track.album)
         if let route = PlayedAlbum.route(track, player: player) {
             Button {
@@ -227,7 +314,7 @@ struct NowPlayingView: View {
                     .font(.body)
                     .foregroundStyle(Palette.quiet)
                     .lineLimit(1)
-                    .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
+                    .frame(maxWidth: .infinity, minHeight: 28, alignment: centred ? .center : .leading)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -249,14 +336,20 @@ struct NowPlayingView: View {
                 if !paged { player.toggleShuffle() }
             }
             Spacer(minLength: 0)
-            Button { player.previous() } label: {
+            Button {
+                if turntable { deck.wake() }
+                player.previous()
+            } label: {
                 Image(systemName: "backward.fill").font(.title)
                     .frame(minWidth: 56, minHeight: 56)
                     .contentShape(Rectangle())
             }
             .accessibilityLabel(NowPlayingWords.previous)
             Spacer(minLength: 0)
-            Button { player.toggle() } label: {
+            Button {
+                // on the turntable the deck's: a pause winds the record down, a play during a coast starts from it
+                if turntable { deck.toggle() } else { player.toggle() }
+            } label: {
                 ZStack {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                         .font(.system(size: 44))
@@ -268,7 +361,10 @@ struct NowPlayingView: View {
             }
             .accessibilityLabel(PlayerWords.playPause(playing: player.isPlaying))
             Spacer(minLength: 0)
-            Button { player.next() } label: {
+            Button {
+                if turntable { deck.wake() }
+                player.next()
+            } label: {
                 Image(systemName: "forward.fill").font(.title)
                     .frame(minWidth: 56, minHeight: 56)
                     .contentShape(Rectangle())

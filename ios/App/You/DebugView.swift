@@ -29,6 +29,7 @@ struct DebugView: View {
                 hiRes
             }
             playing
+            TurntableDebugSection()
             EQDebugSection()
             EngineLogSection()
             DownloadsDebugSection()
@@ -267,6 +268,39 @@ private struct EQDebugSection: View {
     }
 }
 
+/// Debug's Turntable (turntable.md 6.2): the web's rows where the phone has the same fact, and the phone's own - read
+/// four times a second while they show and the app is in front. "Off: the turntable isn't showing" until the turntable
+/// has shown once; after that, what it last did, while its deck lives.
+private struct TurntableDebugSection: View {
+    @Environment(DeckController.self) private var deck
+    @Environment(\.scenePhase) private var phase
+    @State private var rows: [InfoRow] = []
+
+    var body: some View {
+        Section {
+            ForEach(Array(rows.enumerated()), id: \.offset) { (_: Int, row: InfoRow) in
+                LabeledContent(row.label) {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(row.value).font(row.mono ? .footnote.monospaced() : .footnote)
+                        if let note = row.note {
+                            Text(note).font(.caption).foregroundStyle(Palette.quiet)
+                        }
+                    }
+                }
+            }
+        } header: {
+            Text("Turntable")
+        }
+        .task(id: phase) {
+            guard phase == .active else { return }
+            while !Task.isCancelled {
+                rows = deck.debugRows()
+                try? await Task.sleep(for: .seconds(0.25))
+            }
+        }
+    }
+}
+
 /// Test sounds' "The record's engine beside the song" (notes/ios-specs/turntable.md 7.2, checks 0a-0c): the deck engine
 /// playing DeckTrial's fixed run through its real render beside whatever the song's engine plays. Made at the first
 /// Start; DebugView stops it as Debug closes (as it turns Muffle off), so it can't be left playing.
@@ -287,6 +321,9 @@ final class DeckTrialModel {
             running = false
         } else {
             do {
+                // the app's session made active first, as a play's is (slice 2's review, question 6): with nothing played
+                // yet it isn't, and the engine would start on an inactive session
+                try AudioSessionController.activateShared()
                 try made.start()
                 failure = nil
                 running = true
