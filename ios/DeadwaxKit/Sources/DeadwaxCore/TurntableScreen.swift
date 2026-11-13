@@ -160,10 +160,12 @@ public enum TurntableScreen {
         return TurntableWords.silentNote(flac: flac, noAudio: noAudio(engine), airPlay: engine.airPlay)
     }
 
-    /// The display link runs (2.6) only while the deck has asked for a frame, the turntable shows on Now Playing, the
-    /// scene is active and Reduce Motion is off - a still record costs nothing.
-    public static func framesRun(asked: Bool, showing: Bool, active: Bool, reduced: Bool) -> Bool {
-        asked && showing && active && !reduced
+    /// The display link runs (2.6) only while the deck has asked for a frame, the turntable shows on Now Playing and
+    /// the scene is active - a still record costs nothing - and under Reduce Motion only while a hand holds the record:
+    /// the web's loop asks a frame for a held record whatever the motion setting (`moving()`, deck.ts:2074), to show
+    /// the time line and count the frames under the hand, and the platter never turns by itself then.
+    public static func framesRun(asked: Bool, showing: Bool, active: Bool, reduced: Bool, held: Bool) -> Bool {
+        asked && showing && active && (!reduced || held)
     }
 
     /// The deck engine's run rule (4.6, question 13 C). `showing`: the turntable shows; `songPlaying`: the player is

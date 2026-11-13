@@ -84,6 +84,30 @@ import Testing
         #expect(p.drag == nil)
     }
 
+    /// (slice 3) The followed touch let go as a cancel - an interruption's - with no click after it; with none
+    /// followed, nothing. And the hand's turn drawn: the drag's own once it has moved, kept after the lift.
+    @Test func theFollowedTouchIsCancelledAndTheHandsTurnDrawn() {
+        let deck = FakeDeck(), host = FakeHost()
+        let p = press(deck, host)
+        p.cancelFollowed()
+        #expect(deck.calls.isEmpty && host.calls.isEmpty)
+        let a = onRecord(0), b = onRecord(20)
+        p.recordDown(pointer: 3, x: a.x, y: a.y, time: 1000)
+        #expect(p.handTurn == 0, "inside the slop, not drawn turned")
+        p.moved(pointer: 3, samples: [(1010, b.x, b.y)])
+        #expect(abs(p.handTurn - 20) < 1e-9, "the drag's own turn: \(p.handTurn)")
+        deck.calls = []
+        host.calls = []
+        p.cancelFollowed()
+        #expect(deck.calls.first?.hasSuffix("cancel") == true, "\(deck.calls)")
+        #expect(!host.calls.contains("toggle"), "no click after a cancel: \(host.calls)")
+        #expect(p.drag == nil && p.handTurn == 0, "a cancel keeps no turn")
+        // the finger's own lift after it changes nothing
+        host.calls = []
+        p.ended(pointer: 3, how: .up, time: 1100)
+        #expect(!host.calls.contains("toggle"))
+    }
+
     @Test func aTapOnAPausedRecordPlaysFromWhereItIs() {
         let deck = FakeDeck(), host = FakeHost()
         host.isPlaying = false

@@ -75,6 +75,29 @@ import Testing
         #expect(rules.live())
     }
 
+    /// (slice 3, 3.1 and 4.6) An audio interruption ends a taken press as a cancel that RESTS: a playing record held by
+    /// the hand isn't played into the call. Without `interrupted()` the same cancel resumes the song (the web's cancel).
+    @Test func anInterruptionsCancelRests() {
+        func cancelled(interrupted: Bool) -> (effects: [String], playing: Bool) {
+            let world = world()
+            let rules = DeckRules(host: world, clock: world, maths: PlatformMaths(), reduced: false)
+            rules.setShowing(true)
+            answer(world)
+            rules.pressed(1000)
+            world.time = 1300
+            rules.takeOver(1300)
+            #expect(rules.taken() && !world.isPlaying, "the hand holds the song")
+            world.effects = []
+            if interrupted { rules.interrupted() }
+            _ = rules.release(1310, cancel: true)
+            return (world.effects, world.isPlaying)
+        }
+        let call = cancelled(interrupted: true)
+        #expect(!call.effects.contains("resume") && !call.playing, "\(call.effects)")
+        let plain = cancelled(interrupted: false)
+        #expect(plain.effects.contains("resume") && plain.playing, "the web's cancel plays on: \(plain.effects)")
+    }
+
     @Test func aLeadResumesTheSongEarlyAndItsPlayIsItsOwn() throws {
         let world = world()
         let rules = DeckRules(host: world, clock: world, maths: PlatformMaths(), reduced: false)

@@ -90,6 +90,13 @@ public final class TurntablePress<M: DeckMaths> {
         dragChanged?(next)
     }
 
+    /// The face's turn the hand adds, degrees (Turntable.tsx:426, `handTurn`): what stays turned, and the drag's own
+    /// while the record's drag has moved or the deck took it - drawn round the deck's own angle.
+    public var handTurn: Double {
+        guard let drag, drag.kind == .record, TurntableGeometry.moved(drag) || (live && deck.taken()) else { return turn }
+        return turn + drag.turned * Self.degrees
+    }
+
     /// The silent record's line (:288-290): from the first silent turn of the song until the song changes.
     public var silentLine: String? {
         let track = host.track()
@@ -205,6 +212,13 @@ public final class TurntablePress<M: DeckMaths> {
         }
         setDrag(end.drag)
         if let seek = end.seek, length > 0 { host.seek(seek) }
+    }
+
+    /// The touch the turntable follows let go as a cancel (an audio interruption, 4.6: after `DeckRules.interrupted()`)
+    /// - nothing, with none.
+    public func cancelFollowed() {
+        guard let following else { return }
+        ended(pointer: following.pointer, how: .cancel, time: nil)
     }
 
     /// onRecordClick (:401) - THE TAP: play or pause, nothing awaited before it.

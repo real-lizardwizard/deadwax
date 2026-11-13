@@ -93,11 +93,13 @@ struct TurntableScreenTests {
     }
 
     @Test func framesRunOnlyWhenAskedShowingActiveAndMotionAllowed() {
-        #expect(TurntableScreen.framesRun(asked: true, showing: true, active: true, reduced: false))
-        #expect(!TurntableScreen.framesRun(asked: false, showing: true, active: true, reduced: false))
-        #expect(!TurntableScreen.framesRun(asked: true, showing: false, active: true, reduced: false))
-        #expect(!TurntableScreen.framesRun(asked: true, showing: true, active: false, reduced: false))
-        #expect(!TurntableScreen.framesRun(asked: true, showing: true, active: true, reduced: true))
+        #expect(TurntableScreen.framesRun(asked: true, showing: true, active: true, reduced: false, held: false))
+        #expect(!TurntableScreen.framesRun(asked: false, showing: true, active: true, reduced: false, held: true))
+        #expect(!TurntableScreen.framesRun(asked: true, showing: false, active: true, reduced: false, held: true))
+        #expect(!TurntableScreen.framesRun(asked: true, showing: true, active: false, reduced: false, held: true))
+        #expect(!TurntableScreen.framesRun(asked: true, showing: true, active: true, reduced: true, held: false))
+        // a held record under Reduce Motion: the web's loop still asks, for the time line and the hand's frames
+        #expect(TurntableScreen.framesRun(asked: true, showing: true, active: true, reduced: true, held: true))
     }
 
     /// 4.6, question 13 C.

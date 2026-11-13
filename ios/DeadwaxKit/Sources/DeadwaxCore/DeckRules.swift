@@ -419,6 +419,12 @@ public final class DeckRules<M: DeckMaths> {
         return sounding(recordAt())
     }
 
+    /// (3.1, 4.6) An audio interruption began (a call, Siri): a taken press is to rest when its touch is cancelled - its
+    /// intent made a pause first, so the cancel doesn't ask the song to play into the call.
+    public func interrupted() {
+        press?.intent = .pause
+    }
+
     /// deck.ts:1426
     public func taken() -> Bool {
         press?.taken ?? false
@@ -1300,6 +1306,30 @@ public final class DeckRules<M: DeckMaths> {
     public var refusedWhy: String? { refused.flatMap { $0.song == host.song()?.id ? $0.why : nil } }
     public var failedWhy: String? { failed.flatMap { $0.song == host.song()?.id ? $0.why : nil } }
     public var loading: Bool { pending != nil }
+
+    /// The report's window, for this song only (deck.ts report(), :2463-2469).
+    public var reportWindow: DeckReport.Window? {
+        guard let window, let song = host.song(), window.song == song.id else { return nil }
+        return DeckReport.Window(start: window.start, end: window.end, kind: song.kind.isEmpty ? "FLAC" : song.kind,
+                                 decodedAt: window.decodedAt, bytes: Double(window.bytes))
+    }
+
+    /// `/scrub`'s bytes since the turntable showed, and the last window's place (deck.ts report(), :2473-2474).
+    public var fetchedBytes: Double { Double(fetched) }
+    public var lastFetchedAt: Double { lastFetchAt }
+
+    /// The report's health (deck.ts health(), :2450): the voice's part as the host counted it, the deck's own frames
+    /// and hand-backs over it.
+    public func health(_ sound: DeckReport.DeckHealth) -> DeckReport.DeckHealth {
+        var health = sound
+        health.frames = Double(frames)
+        health.slowFrames = Double(slowFrames)
+        health.worstFrameMs = worstFrameMs
+        health.backMs = backMs
+        health.motorMs = motorMs
+        health.notBack = Double(notBack)
+        return health
+    }
 }
 
 /// The handover's arithmetic on the phone (3.5): the voice's delay as heard, the song's predicted start, the lead,
