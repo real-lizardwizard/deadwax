@@ -241,7 +241,10 @@ final class DeckController {
     @ObservationIgnored private var art: CGImage?
     @ObservationIgnored private var artFor: String?
     @ObservationIgnored private var artFailed: Set<String> = []
+    /// the discs' CD art fetched this run, the newest last - a few only, each a decoded picture of the face's size
     @ObservationIgnored private var artKept: [String: CGImage] = [:]
+    @ObservationIgnored private var artOrder: [String] = []
+    private static let artKeptMost = 8
 
     // the player as last seen
     @ObservationIgnored private var songID = ""
@@ -953,8 +956,18 @@ final class DeckController {
         view.draw(look)
     }
 
+    /// A disc's CD art kept for its next showing, the oldest let go past `artKeptMost` (question 11: in memory, as
+    /// fetched this run - and so a picture replaced by hand shows once its disc has been let go, or the app has started
+    /// again).
+    private func keep(_ picture: CGImage, as key: String) {
+        artKept[key] = picture
+        artOrder.removeAll { (each: String) -> Bool in each == key }
+        artOrder.append(key)
+        while artOrder.count > Self.artKeptMost { artKept[artOrder.removeFirst()] = nil }
+    }
+
     /// The label's cover and the disc's CD art (2.3): the cover from the app's cache, the art from deadwax's disc_art
-    /// route - kept while the app runs, a disc that had none asked again at the next opening (the web's rule).
+    /// route - the last `artKeptMost` discs kept, a disc that had none asked again at the next opening (the web's rule).
     private func loadPictures() {
         guard rules != nil, let entry = player.current else { return }
         let track = entry.track
@@ -993,7 +1006,7 @@ final class DeckController {
             let image = await decoded?.byPreparingForDisplay() ?? decoded
             guard let self, self.artFor == key else { return }
             if let picture = image?.cgImage {
-                self.artKept[key] = picture
+                self.keep(picture, as: key)
                 self.setArt(picture, for: key)
             } else {
                 self.artFailed.insert(key)

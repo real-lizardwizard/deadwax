@@ -222,7 +222,9 @@ struct NowPlayingView: View {
             .buttonStyle(.plain)
             .accessibilityLabel(NowPlayingWords.close)
             Spacer()
-            LookButton(showingTurntable: turntable, action: lookTapped)
+            // named for the look, not for what shows (NowPlaying.tsx:382): over the lyrics, the look's square still says
+            // a tap shows the cover, as it will
+            LookButton(showingTurntable: look == .turntable, action: lookTapped)
         }
         // the notice (D11), said over Now Playing - which covers the capsule over the mini player: in the top
         // row, centred, where nothing else is, so it moves nothing and covers no button (phase2-downloads.md
