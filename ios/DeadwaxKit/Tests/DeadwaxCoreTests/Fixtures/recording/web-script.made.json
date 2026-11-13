@@ -1,0 +1,44 @@
+{
+ "made_on": {
+  "node": "v20.12.2",
+  "platform": "darwin",
+  "arch": "arm64"
+ },
+ "made_with": [
+  [
+   "ios/scripts/export-deck-recording.cjs",
+   "e37fdf448dde31da11cf9d653c09d526c663a1e89b9583f52863e78225c9cd55"
+  ]
+ ],
+ "made_from": [
+  [
+   "ui/src/lib/platter.ts",
+   "5fadaee1aac3916c9fe113563f44d6bf8c626f73dec3d6986b7bb007f58dfe28"
+  ],
+  [
+   "ui/src/lib/deckVoice.ts",
+   "66602fe62bc0e283dfb802d315cad1632aa8202e9edb4ed23ed4d4b5ca2dd978"
+  ],
+  [
+   "ui/src/player/deck.ts",
+   "7b1b18dc391a651d10560a43fd0c67eb44babd08138ebea133ddbf37ebc6278c"
+  ],
+  [
+   "ui/src/lib/turntable.ts",
+   "a731a7598c05444e8c2fe958b16a4c3c7f81a3ee98bf7292e8d159ab766e89a5"
+  ],
+  [
+   "ui/src/lib/deckClock.ts",
+   "d56be8cf57c49f391c73a8f34c586b321c32cfbd17f9d2be109cb0b3bf2f63c4"
+  ],
+  [
+   "ui/test/deckHarness.cjs",
+   "e096e0835d6032962eeed5dfdb62381931e06699758eb946a7ede4f1be8d5ece"
+  ]
+ ],
+ "window": {
+  "recipe": "sweep",
+  "seed": 5,
+  "channels": 2
+ }
+}

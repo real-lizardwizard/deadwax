@@ -405,6 +405,42 @@ extension TurntableDebugRows {
         InfoRow(label: "Window made in",
                 value: "\(jsFixed(took, 2)) s for \(JSNumber.string((seconds * 10).rounded() / 10)) s of a \(khz(rate)) song")
     }
+
+    /// "Recording" (debugRows.ts:474-487; 6.2, 6.3): the row, and its button's words (nil: none) - "Record 20 s", or the
+    /// share sheet's "Save the recording (1.2 MB)" (**phone**: the web's save is a download). The web's words, but where
+    /// the phone's differs: it waits for the record's next sound to begin (**phone**), and its file takes a moment.
+    public static func recordingRow(_ status: DeckRecordingStatus, turntable: Bool) -> (row: InfoRow, action: String?) {
+        let label = "Recording"
+        switch status {
+        case .waiting(let seconds):
+            return (InfoRow(label: label, value: "Waiting for the record's next sound - the \(n(seconds)) s start with it: turn the record as you would"), nil)
+        case .recording(let seconds):
+            return (InfoRow(label: label, value: "Recording the record's sound for \(n(seconds)) s - turn the record as you would"), nil)
+        case .writing(let seconds):
+            return (InfoRow(label: label, value: "\(n(seconds)) s recorded: writing the file"), nil)
+        case let .saved(seconds, bytes, name):
+            return (InfoRow(label: label, value: "\(n(seconds)) s recorded: save the file and send it", note: name),
+                    "Save the recording (\(jsFixed(Double(bytes) / 1_048_576, 1)) MB)")
+        case .failed(let why):
+            return (InfoRow(label: label, value: "The recording couldn't be written - \(why)"), turntable ? "Record 20 s" : nil)
+        case .idle:
+            guard turntable else { return (InfoRow(label: label, value: "Shows the turntable first: the recording is of its sound"), nil) }
+            return (InfoRow(label: label, value: "20 s of what the record's sound plays, with every touch and what the voice made of it, as a file to send with a bug report"),
+                    "Record 20 s")
+        }
+    }
+}
+
+/// Debug's recording of the record's sound (turntable.md 6.2, 6.3), as the phone has it.
+public enum DeckRecordingStatus: Equatable, Sendable {
+    case idle
+    /// asked for: it begins with the record's next sound (the voice from rest), and runs its seconds from there
+    case waiting(seconds: Double)
+    case recording(seconds: Double)
+    /// its seconds recorded; the file is being written
+    case writing(seconds: Double)
+    case saved(seconds: Double, bytes: Int, name: String)
+    case failed(String)
 }
 
 extension String {

@@ -309,6 +309,10 @@ final class DeckController {
     @ObservationIgnored private var touches: (samples: Double, events: Double)?
     @ObservationIgnored private var slow: (count: Int, worst: Double)?
     @ObservationIgnored private var sound = DeckReport.DeckHealth()
+    /// Debug's recording of the record's sound (6.3): the deck engine records; the file once written
+    @ObservationIgnored private var recordingFile: (url: URL, bytes: Int, name: String, seconds: Double)?
+    @ObservationIgnored private var recordingWriting: Double?
+    @ObservationIgnored private var recordingFailure: String?
 
     /// A sound this recent (the voice's report of one, or a message that makes one) is the record sounding (4.6).
     static let soundingFor = 0.15
@@ -421,12 +425,21 @@ final class DeckController {
             touchSince = CACurrentMediaTime()
             touchCount = (0, 0)
         }
+        engine?.noteForRecording { (recorder: inout DeckRecorder) -> Void in
+            recorder.touch(kind == .record ? "down" : "arm down", pointer: pointer, at: time, x: x, y: y)
+        }
         updateLink()
         redraw()
     }
 
-    func touchMoved(pointer: Int, samples: [(time: Double, x: Double, y: Double)]) {
+    func touchMoved(pointer: Int, samples: [(time: Double, x: Double, y: Double)],
+                    raw: [(time: Double, x: Double, y: Double)] = []) {
         guard let press, !samples.isEmpty else { return }
+        engine?.noteForRecording { (recorder: inout DeckRecorder) -> Void in
+            for (i, sample) in samples.enumerated() {
+                recorder.touch("move", pointer: pointer, at: sample.time, x: sample.x, y: sample.y, raw: i == 0 ? raw : [])
+            }
+        }
         if touchSince != nil, press.drag?.pointer == pointer {
             touchCount.samples += Double(samples.count)
             touchCount.events += 1
@@ -437,6 +450,9 @@ final class DeckController {
 
     func touchEnded(pointer: Int, how: DeckLetGo, time: Double?) {
         guard let press else { return }
+        engine?.noteForRecording { (recorder: inout DeckRecorder) -> Void in
+            recorder.touch(how == .cancel ? "cancel" : "up", pointer: pointer, at: time, x: nil, y: nil)
+        }
         if let since = touchSince, press.drag?.pointer == pointer {
             let seconds = CACurrentMediaTime() - since
             if seconds > 0.2, touchCount.samples > 0 { touches = (touchCount.samples / seconds, touchCount.events / seconds) }
@@ -445,6 +461,67 @@ final class DeckController {
         press.ended(pointer: pointer, how: how, time: time)
         updateLink()
         redraw()
+    }
+
+    // MARK: Debug's recording (6.3)
+
+    /// Whether the deck has made its engine - the turntable has shown (Debug: "Shows the turntable first").
+    var hasDeck: Bool { engine != nil }
+
+    /// Whether a recording is asked for or under way (the touch view hands its raw samples only then).
+    var isRecording: Bool { engine?.recorder != nil }
+
+    /// Debug's "Record 20 s": the deck engine records from the record's next sound, drained by the tick.
+    func record() {
+        guard let engine else { return }
+        recordingFile = nil
+        recordingFailure = nil
+        recordingWriting = nil
+        engine.record()
+        startTicking()
+    }
+
+    /// Debug's Recording row's state.
+    var recordingStatus: DeckRecordingStatus {
+        if let recorder = engine?.recorder {
+            return recorder.started ? .recording(seconds: recorder.seconds) : .waiting(seconds: recorder.seconds)
+        }
+        if let seconds = recordingWriting { return .writing(seconds: seconds) }
+        if let file = recordingFile { return .saved(seconds: file.seconds, bytes: file.bytes, name: file.name) }
+        if let why = recordingFailure { return .failed(why) }
+        return .idle
+    }
+
+    /// The saved recording's file, for the share sheet.
+    var recordingURL: URL? { recordingFile?.url }
+
+    /// Ten times a second: the tap drained, and once it has its seconds the file written off the main thread.
+    private func recordingTick() {
+        guard let engine, engine.recorder != nil else { return }
+        engine.drainTap()
+        guard engine.recordingDone, let recorder = engine.finishRecording() else { return }
+        let seconds = recorder.seconds
+        recordingWriting = seconds
+        let stamp = ISO8601DateFormatter.string(from: Date(), timeZone: TimeZone(identifier: "UTC") ?? .current,
+                                                formatOptions: [.withInternetDateTime, .withFractionalSeconds])
+        let name = "deadwax-turntable-phone-\(stamp.replacingOccurrences(of: ":", with: "-").replacingOccurrences(of: ".", with: "-").prefix(19)).json"
+        let device = UIDevice.current
+        let about = DeckRecorder.About(
+            when: stamp, userAgent: "deadwax iPhone app \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?") (\(device.model); \(device.systemName) \(device.systemVersion))",
+            base: AudioSessionController.ioBuffer(), output: AudioSessionController.latency())
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+        let finished = DeckRecordingWrite(recorder: recorder, about: about, url: url)
+        DispatchQueue.global(qos: .utility).async {
+            let written = finished.write()
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.recordingWriting = nil
+                switch written {
+                case .success(let bytes): self.recordingFile = (url, bytes, name, seconds)
+                case .failure(let error): self.recordingFailure = error.localizedDescription
+                }
+            }
+        }
     }
 
     // MARK: Debug (6.2)
@@ -745,6 +822,9 @@ final class DeckController {
         let d = HandoverTiming.voiceDelay(clockLead: l, latency: AudioSessionController.latency())
         let lead = HandoverTiming.lead(predicted: predicted, voiceDelay: d)
         handover = DeckPhoneFacts.Handover(lead: lead, predicted: predicted)
+        engine?.noteForRecording { (recorder: inout DeckRecorder) -> Void in
+            recorder.handover(at: CACurrentMediaTime() * 1_000, lead: lead, predicted: predicted, took: nil)
+        }
         // the starts seen so far: this let-go's is the next one. Not the engine's last start asked of it here - that
         // waits on its queue, on the main thread, mid-gesture (2.6); the deck.position queue reads it after the resume
         handoverKind = (isLocal, x, route, engineStarts.count, CACurrentMediaTime())
@@ -764,6 +844,11 @@ final class DeckController {
         }
         handoverKind = nil
         handover?.took = started
+        if let handover {
+            engine?.noteForRecording { (recorder: inout DeckRecorder) -> Void in
+                recorder.handover(at: CACurrentMediaTime() * 1_000, lead: handover.lead, predicted: handover.predicted, took: started)
+            }
+        }
         if kind.local {
             localStarts[kind.route] = Array(((localStarts[kind.route] ?? []) + [started]).suffix(Self.startsKept))
         } else {
@@ -892,10 +977,11 @@ final class DeckController {
         deliverReading()
         noteStart()
         evaluate()
+        recordingTick()
         // nothing to look at while the deck is hidden, its engine resting, no timer of its own waiting and no handover's
         // start to note: the tick stops until it shows, its engine starts, or the deck resumes the song
         let running = engine?.isRunning ?? false
-        if !showing && !running && timers.isEmpty && handoverKind == nil { stopTicking() }
+        if !showing && !running && timers.isEmpty && handoverKind == nil && engine?.recorder == nil { stopTicking() }
     }
 
     /// The voice's reports (the web's port.onmessage, deck.ts heard()): to the rules, and counted for the Limiter row.

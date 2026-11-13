@@ -80,6 +80,10 @@ public final class DeckEngine {
     public static let returnCapacity: UInt32 = 8
     /// Reports waiting to be read: 2 s of the voice's 30 a second.
     public static let reportCapacity: UInt32 = 64
+    /// The recorder's tap (6.3): blocks in flight to the main side, which drains them ten times a second - 32 blocks
+    /// are 0.68 s of 1,024 frames at 48 kHz, 2.7 s of the 4,096 a locked screen asks - and the messages beside them.
+    public static let tapCapacity: UInt32 = 32
+    public static let tapMessageCapacity: UInt32 = 1_024
 
     /// The output's IO buffer (AVAudioSession's ioBufferDuration): `L` starts at twice it (3.2). The app sets it.
     public var ioBuffer: () -> TimeInterval = { 0 }
@@ -123,6 +127,10 @@ public final class DeckEngine {
     private var pending: (slot: DeckSlot, pcm: DeckPCM)?
     private var stale = 0
     private let windowQueue = DispatchQueue(label: "deadwax.deck.windows", qos: .utility)
+    /// Debug's recording (6.3), while one is asked for or under way
+    public private(set) var recorder: DeckRecorder?
+    /// whether its tap has begun (at a start): until then the tap's rings hold nothing of it
+    var tapBegun = false
 
     public init(settings: Settings = Settings()) {
         self.settings = settings
@@ -160,6 +168,22 @@ public final class DeckEngine {
             host.pointee.eqPacked = eq.packedCount
             eq.made()
         }
+        // the recorder's tap, made now so the render never waits on one being made
+        guard let tapFifo = audio_fifo_make(Self.tapCapacity), let tapMessageFifo = audio_fifo_make(Self.tapMessageCapacity),
+              let tapControl = audio_counters_make(1)
+        else { fatalError("No memory for the deck's recorder") }
+        let tapBlocks = UnsafeMutablePointer<DeckTapBlock>.allocate(capacity: Int(Self.tapCapacity))
+        tapBlocks.initialize(repeating: DeckTapBlock(), count: Int(Self.tapCapacity))
+        let tapAudio = UnsafeMutablePointer<Float>.allocate(capacity: Int(Self.tapCapacity) * 2 * settings.maximumFrames)
+        tapAudio.initialize(repeating: 0, count: Int(Self.tapCapacity) * 2 * settings.maximumFrames)
+        let tapMessages = UnsafeMutablePointer<DeckTapMessage>.allocate(capacity: Int(Self.tapMessageCapacity))
+        tapMessages.initialize(repeating: DeckTapMessage(), count: Int(Self.tapMessageCapacity))
+        host.pointee.tapFifo = tapFifo
+        host.pointee.tapMessageFifo = tapMessageFifo
+        host.pointee.tapControl = tapControl
+        host.pointee.tapBlocks = tapBlocks
+        host.pointee.tapAudio = tapAudio
+        host.pointee.tapMessages = tapMessages
         if let format = settings.offline {
             do {
                 try engine.enableManualRenderingMode(settings.realtimeManual ? .realtime : .offline, format: format,
@@ -188,6 +212,12 @@ public final class DeckEngine {
         audio_fifo_free(h.reports)
         audio_counters_free(h.counters)
         if let eqState = h.eq { EQRender.free(eqState) }
+        h.tapBlocks?.deallocate()
+        h.tapAudio?.deallocate()
+        h.tapMessages?.deallocate()
+        if let fifo = h.tapFifo { audio_fifo_free(fifo) }
+        if let fifo = h.tapMessageFifo { audio_fifo_free(fifo) }
+        if let control = h.tapControl { audio_counters_free(control) }
         host.deinitialize(count: 1)
         host.deallocate()
     }
@@ -257,6 +287,8 @@ public final class DeckEngine {
         // the clock starts afresh (a block with no host time is placed after the last one, which a stop has made old),
         // and the window posted while it rested goes in first
         host.pointee.lastHostOut = -1
+        host.pointee.starts &+= 1
+        tapAtStart()
         if let waiting = pending {
             pending = nil
             if post(waiting.slot, keeping: waiting.pcm) == false { windowQueue.async { _ = waiting.pcm.capacity } }
@@ -353,6 +385,99 @@ public final class DeckEngine {
         voice.pointee.window = window
     }
 
+    // MARK: Debug's recording (6.3)
+
+    /// A recording asked for: it begins at the next start - the voice is from rest there, so the file replays exactly
+    /// from its first block - and runs `seconds` of the voice's clock from its first block. Stopped and started meanwhile
+    /// (the deck rests between sounds), the tap goes on; a start at a new rate is written down too, each block saying its
+    /// own. An earlier recording not yet finished is dropped.
+    public func record(seconds: Double = DeckRecorder.seconds) {
+        if let control = host.pointee.tapControl { audio_counters_store(control, 0, 0) }
+        drainTap()
+        recorder = DeckRecorder(seconds: seconds, armedAt: PlaybackEngine.hostSeconds() * 1_000)
+        tapBegun = false
+        if !engine.isRunning {
+            host.pointee.tapOn = false
+            emptyTap()
+        }
+    }
+
+    /// Something for the recording under way (the deck's touches and handovers).
+    public func noteForRecording(_ change: (inout DeckRecorder) -> Void) {
+        guard recorder != nil else { return }
+        change(&recorder!)
+    }
+
+    /// The tap's blocks and messages into the recording - the main side's, ten times a second while one runs - and the
+    /// tap asked off once it has its seconds.
+    public func drainTap() {
+        guard let fifo = host.pointee.tapFifo, let messageFifo = host.pointee.tapMessageFifo,
+              let blocks = host.pointee.tapBlocks, let audio = host.pointee.tapAudio, let messages = host.pointee.tapMessages
+        else { return }
+        var slot: UInt32 = 0
+        while audio_fifo_peek(messageFifo, &slot) {
+            if tapBegun { recorder?.message(messages[Int(slot)]) }
+            audio_fifo_release(messageFifo)
+        }
+        let stride = settings.maximumFrames
+        while audio_fifo_peek(fifo, &slot) {
+            let block = blocks[Int(slot)]
+            let from = audio + Int(slot) * 2 * stride
+            if tapBegun, recorder?.done(now: block.now) == false {
+                recorder?.block(block, left: from, right: block.channels > 1 ? from + stride : nil)
+            }
+            audio_fifo_release(fifo)
+        }
+        if let recorder, let last = recorder.blocks.last, recorder.done(now: last.now + Double(last.frames) / last.rate),
+           let control = host.pointee.tapControl {
+            audio_counters_store(control, 0, 0)
+        }
+    }
+
+    /// Whether the recording has its seconds (drained to now).
+    public var recordingDone: Bool {
+        guard let recorder, let last = recorder.blocks.last else { return false }
+        return recorder.done(now: last.now + Double(last.frames) / last.rate)
+    }
+
+    /// The recording, finished: the tap asked off, the last of it drained - and the deck engine done with it.
+    public func finishRecording() -> DeckRecorder? {
+        if let control = host.pointee.tapControl { audio_counters_store(control, 0, 0) }
+        drainTap()
+        if !engine.isRunning {
+            host.pointee.tapOn = false
+            emptyTap()
+        }
+        defer { recorder = nil }
+        return recorder
+    }
+
+    /// At a start, while stopped: the tap on for a recording asked for or under way, and the window the voice has
+    /// handed to it (no message of the recording's brings it).
+    private func tapAtStart() {
+        guard let recorder, let control = host.pointee.tapControl else { return }
+        if let last = recorder.blocks.last, recorder.done(now: last.now + Double(last.frames) / last.rate) { return }
+        if !host.pointee.tapOn {
+            emptyTap()
+            host.pointee.tapLostBlocks = 0
+            host.pointee.tapLostMessages = 0
+        }
+        host.pointee.tapOn = true
+        tapBegun = true
+        audio_counters_store(control, 0, 1)
+        let id = host.pointee.window
+        if id != 0, let pcm = live[id], let window = host.pointee.voice.pointee.window {
+            self.recorder?.window(id, pcm, shape: DeckSlot(.window(window), id: id))
+        }
+    }
+
+    /// The tap's rings emptied - only while the render isn't running.
+    private func emptyTap() {
+        var slot: UInt32 = 0
+        if let fifo = host.pointee.tapFifo { while audio_fifo_peek(fifo, &slot) { audio_fifo_release(fifo) } }
+        if let fifo = host.pointee.tapMessageFifo { while audio_fifo_peek(fifo, &slot) { audio_fifo_release(fifo) } }
+    }
+
     /// The newest window waiting for a start; the one it replaces freed off the main thread.
     private func keepAside(_ slot: DeckSlot, _ pcm: DeckPCM) {
         if let older = pending { windowQueue.async { _ = older.pcm.capacity } }
@@ -392,6 +517,7 @@ public final class DeckEngine {
     /// for the next start, the newest only.
     @discardableResult
     public func post(_ message: DeckPost) -> Bool {
+        recorder?.posted(message, at: PlaybackEngine.hostSeconds() * 1_000)
         if !(started && engine.isRunning) {
             guard case .window(let window) = message else {
                 stale += 1
@@ -435,6 +561,7 @@ public final class DeckEngine {
             made.id = nextID
             nextID = nextID == UInt32.max ? 1 : nextID + 1
             live[made.id] = pcm
+            recorder?.window(made.id, pcm)
         }
         host.pointee.slots[Int(slot)] = made
         audio_fifo_commit(host.pointee.messages)
@@ -443,6 +570,7 @@ public final class DeckEngine {
 
     /// Windows the voice let go of, freed on the window queue; reports kept for `reports()`.
     func collect() {
+        if recorder != nil { drainTap() }
         var slot: UInt32 = 0
         var freed: [DeckPCM] = []
         while audio_fifo_peek(host.pointee.returns, &slot) {
@@ -452,6 +580,9 @@ public final class DeckEngine {
         if !freed.isEmpty { windowQueue.async { _ = freed.count } }
         while audio_fifo_peek(host.pointee.reports, &slot) {
             heard.append(host.pointee.heard[Int(slot)].heard)
+            if let first = recorder?.blocks.first, host.pointee.heard[Int(slot)].block >= first.block {
+                recorder?.heard(host.pointee.heard[Int(slot)].heard)
+            }
             audio_fifo_release(host.pointee.reports)
         }
         // kept for `reports()` as the ring keeps them, the newest 2 s: every post collects, so with no one reading them

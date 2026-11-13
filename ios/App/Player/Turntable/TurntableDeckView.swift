@@ -141,7 +141,13 @@ private final class DeckTouchView: UIView {
         }
         let coalesced = event?.coalescedTouches(for: touch)?.map(raw)
         let samples = PointerSamples.samples(raw(touch), coalesced: coalesced, now: Self.ms(CACurrentMediaTime()))
-        deck.touchMoved(pointer: pointer, samples: samples)
+        // Debug's recording (6.3) keeps what UIKit gave, before PointerSamples kept or dropped any: each sample's own
+        // timestamp, seconds, and place
+        let given = deck.isRecording ? (event?.coalescedTouches(for: touch) ?? [touch]).map { (sample: UITouch) -> (time: Double, x: Double, y: Double) in
+            let at = sample.location(in: space)
+            return (sample.timestamp, Double(at.x), Double(at.y))
+        } : []
+        deck.touchMoved(pointer: pointer, samples: samples, raw: given)
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {

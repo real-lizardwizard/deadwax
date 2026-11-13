@@ -13,6 +13,10 @@
 //                 `#if canImport(QuartzCore)`: nothing on Linux.
 //   CAudioRing    C11 atomics for the real-time renders (the EQ's triple buffer and counters; the turntable's
 //                 rings): indices and bits, no floating point, nothing Apple's - so it builds on Linux too.
+//   replay-deck-recording  a command for the Mac (turntable.md 6.3): a recording of the record's sound - Safari's or
+//                 the phone's, from Debug - played again through the Swift voice and held to what it heard.
+//                 `swift run --package-path ios/DeadwaxKit replay-deck-recording <file.json>`. Core's alone, plus
+//                 AVFAudio to decode `--song` where there is one; never part of the app.
 //
 // See notes/ios.md.
 
@@ -25,6 +29,7 @@ let package = Package(
         .library(name: "DeadwaxCore", targets: ["DeadwaxCore"]),
         .library(name: "DeadwaxAudio", targets: ["DeadwaxAudio"]),
         .library(name: "DeadwaxTurntable", targets: ["DeadwaxTurntable"]),
+        .executable(name: "replay-deck-recording", targets: ["ReplayDeckRecording"]),
     ],
     targets: [
         // SQLite, for the download store (Phase 2): the system's own - Apple's SDKs carry it, and Linux gets it from
@@ -39,6 +44,10 @@ let package = Package(
                 swiftSettings: [.swiftLanguageMode(.v5)]),
         // Swift 5 mode, as DeadwaxAudio: Core Animation's layers and actions aren't Sendable.
         .target(name: "DeadwaxTurntable", dependencies: ["DeadwaxCore"], swiftSettings: [.swiftLanguageMode(.v5)]),
+        // A recording of the record's sound replayed on the Mac (turntable.md 6.3, slice 4); Swift 5 mode, as the
+        // audio targets, for AVFAudio's decode.
+        .executableTarget(name: "ReplayDeckRecording", dependencies: ["DeadwaxCore"],
+                          swiftSettings: [.swiftLanguageMode(.v5)]),
         // Test-only: the allocation detector the real-time tests use (turntable.md 4.3, built first for the EQ's
         // EQRealTimeTests). No product, so the app never links it; stubs off Apple's platforms.
         .target(name: "CAllocHook", path: "Tests/CAllocHook"),
