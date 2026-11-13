@@ -499,7 +499,16 @@ public final class DownloadDatabase {
     public static let libraryHeldKey = "library_held"
     public static let libraryCheckedKey = "library_checked_at"
     public static let libraryFirstReadKey = "library_first_read"
-    static let libraryKeys = [libraryScopeKey, libraryETagKey, libraryHeldKey, libraryCheckedKey, libraryFirstReadKey]
+    /// (slice 2) You said Remove to the empty list's or the large drop's question: such a list is believed until a list
+    /// that needs no believing comes ("1").
+    public static let libraryBelieveKey = "library_believe"
+    /// (slice 2) You said Keep Them: the question is put away until a list is believed again ("1").
+    public static let libraryHeldKeptKey = "library_held_kept"
+    /// (slice 2) The albums checks removed whose library downloads haven't been let go yet (ids, one per line) - kept with
+    /// the list that removed them, so a quit between the two loses nothing.
+    public static let libraryRemovedKey = "library_removed"
+    static let libraryKeys = [libraryScopeKey, libraryETagKey, libraryHeldKey, libraryCheckedKey, libraryFirstReadKey,
+                              libraryBelieveKey, libraryHeldKeptKey, libraryRemovedKey]
 
     /// Your library as this phone follows it, in its place. A row whose entry can't be read is left out (the next list
     /// adds it again); songs that can't be read are unread.
@@ -559,6 +568,14 @@ public final class DownloadDatabase {
     @discardableResult
     public func setRemovedHere(album: String, at: Int64) throws -> Bool {
         try run("UPDATE library SET removed_here = ? WHERE album_id = ?", [.int(at), .text(album)])
+        return sqlite3_changes(db) > 0
+    }
+
+    /// (slice 2) Remove Download on an album of the library at `at` (ms): left off this phone - or nil, downloaded again.
+    /// Whether the album was in the library.
+    @discardableResult
+    public func setKeptOff(album: String, at: Int64?) throws -> Bool {
+        try run("UPDATE library SET kept_off = ? WHERE album_id = ?", [.int(at), .text(album)])
         return sqlite3_changes(db) > 0
     }
 

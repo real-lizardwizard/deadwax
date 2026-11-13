@@ -30,10 +30,10 @@ public struct LibraryCheckRecord: Sendable, Equatable {
 /// deadwax: Debug is an admin's.
 public enum LibraryFollowWords {
     public static let section = "Your library"
-    public static let follow = "Follow your library"
-    public static let followNote = "Follows your library with deadwax and works out what would fit on this phone. Nothing downloads and nothing is deleted. Turning it off forgets what it followed, so turning it on again reads every album from the start."
+    /// (slice 2) Debug shows what Download your library follows; it is turned on and off in You > Downloads.
+    public static let followNote = "What Download your library follows, what fits on this phone, and the last check. It is turned on and off in You > Downloads; the library's log lines are the Downloads section's."
     public static let checkNow = "Check now"
-    public static let notFollowing = "Not following: turn it on to read your library."
+    public static let notFollowing = "Off: Download your library is turned off in You > Downloads."
     public static let noCheckYet = "No check yet"
 
     /// What is followed.

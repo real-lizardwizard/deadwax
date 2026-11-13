@@ -154,6 +154,14 @@ public enum DownloadOrigin: Sendable, Hashable, Comparable {
     }
 
     public static func < (a: DownloadOrigin, b: DownloadOrigin) -> Bool { a.raw < b.raw }
+
+    /// Phase 3's: asked for with your library (phase3-autodownload.md 2.7) - the raw "library" Phase 2 reserved, so a
+    /// store written before Phase 3 reads it as the same origin. Taken only by the library's own rules (removed, given
+    /// way, kept off, the switch off) and by Remove Download; never deletes a song that carries any other origin.
+    public static let library = DownloadOrigin.other("library")
+
+    /// The song is wanted by the library and by nothing else.
+    public static func onlyLibrary(_ origins: Set<DownloadOrigin>) -> Bool { origins == [.library] }
 }
 
 /// The store's `song.state`.

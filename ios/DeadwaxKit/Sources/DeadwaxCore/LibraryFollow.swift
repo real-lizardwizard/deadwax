@@ -34,6 +34,11 @@ public struct FollowedSong: Codable, Sendable, Equatable {
                   contentType: song.contentType, duration: song.duration)
     }
 
+    /// The song as a download is asked for it (DownloadRecord(song:albumID:now:)): only the facts kept.
+    public var song: Song {
+        Song(id: id, track: track, discNumber: disc, duration: duration, suffix: suffix, contentType: contentType, size: size)
+    }
+
     /// `raw`, or `mp3` for what iOS can't decode - as its stream is fetched (StreamFormat).
     public var format: String { StreamFormat.format(suffix: suffix, contentType: contentType) }
 
@@ -175,9 +180,11 @@ public enum LibraryFollow {
         public var removed: [String] = []
         /// Why this list's absences weren't believed; nil when they were.
         public var held: Held?
+        /// They were believed only because you said Remove to the question (`believing`): the list would have been held.
+        public var believed = false
 
         public init(albums: [FollowedAlbum], added: [String] = [], changed: [String] = [], missing: [String] = [],
-                    back: [String] = [], removed: [String] = [], held: Held? = nil) {
+                    back: [String] = [], removed: [String] = [], held: Held? = nil, believed: Bool = false) {
             self.albums = albums
             self.added = added
             self.changed = changed
@@ -185,20 +192,40 @@ public enum LibraryFollow {
             self.back = back
             self.removed = removed
             self.held = held
+            self.believed = believed
         }
     }
 
     /// The library after `answer` (2.3). `kept`: the library before it; `held`: why the last list's absences weren't
     /// believed (the store's meta); `at`: when the request was sent (ms) - the moment the list describes, which a
-    /// missing mark is dated by and a `removedHere` mark set after it survives.
-    public static func sync(_ kept: [FollowedAlbum], answer: Answer, held: Held?, at: Int64) -> Outcome {
+    /// missing mark is dated by and a `removedHere` mark set after it survives. `believing`: you answered Remove to an
+    /// empty list's or a large drop's question (slice 2) - such a list's absences are believed, and go by the same rule
+    /// as any: missing first, removed only when a check ten minutes or more on agrees. A truncated list is never
+    /// believed.
+    public static func sync(_ kept: [FollowedAlbum], answer: Answer, held: Held?, at: Int64,
+                            believing: Bool = false) -> Outcome {
         let before = kept.sorted { a, b in a.position != b.position ? a.position < b.position : a.id < b.id }
         switch answer {
         case .unchanged:
             return unchanged(before, held: held, at: at)
         case .listed(let list):
-            return listed(before, list: list, at: at)
+            return listed(before, list: list, at: at, believing: believing)
         }
+    }
+
+    /// Whether a Remove answered to the question (`believing`) still stands after `out`: a list that wasn't held on its
+    /// own (`listed` and not `believed`) ends it - so does a check that leaves nothing missing (what it let go is gone).
+    /// So it is spent on the list it was answered for, and a later empty list is asked about again.
+    public static func keepsBelieving(_ out: Outcome, listed: Bool) -> Bool {
+        if listed && !out.believed { return false }
+        return out.albums.contains { !$0.isListed }
+    }
+
+    /// Whether the person is asked about a held list (3.1's question): an empty list or a large drop, not yet answered
+    /// Keep Them.
+    public static func asks(_ held: Held?, keptThem: Bool) -> Bool {
+        guard let held, held.isQuestion else { return false }
+        return !keptThem
     }
 
     /// A 304: the last list again, read afresh. It confirms what has been missing long enough, and nothing else -
@@ -221,7 +248,7 @@ public enum LibraryFollow {
     }
 
     /// A 200: added, changed, back - and the absences, when the list is whole and plausible.
-    static func listed(_ kept: [FollowedAlbum], list: AlbumIndexAnswer, at: Int64) -> Outcome {
+    static func listed(_ kept: [FollowedAlbum], list: AlbumIndexAnswer, at: Int64, believing: Bool = false) -> Outcome {
         var ids = Set<String>()
         var albums: [IndexAlbum] = []
         for album in list.albums where ids.insert(album.id).inserted { albums.append(album) }
@@ -231,6 +258,7 @@ public enum LibraryFollow {
         let wasListed = kept.filter(\.isListed)
         let newlyGone = wasListed.filter { !ids.contains($0.id) && $0.removedHere == nil }.count
         var held: Held?
+        var believed = false
         if list.truncated {
             held = .truncated
         } else if albums.isEmpty && !kept.isEmpty {
@@ -238,8 +266,12 @@ public enum LibraryFollow {
         } else if newlyGone > dropAtLeast && newlyGone * 2 > wasListed.count {
             held = .drop(gone: newlyGone, of: wasListed.count)
         }
+        if believing, let reason = held, reason.isQuestion {
+            held = nil
+            believed = true
+        }
 
-        var out = Outcome(albums: [], held: held)
+        var out = Outcome(albums: [], held: held, believed: believed)
         for (place, album) in albums.enumerated() {
             guard var entry = keptByID[album.id] else {
                 out.albums.append(FollowedAlbum(album: album, position: place))

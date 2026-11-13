@@ -12,10 +12,12 @@ struct MineBlock: View {
     let refused: (any Error)?
     let act: (AlbumMine.Action) -> Void
     var noteFocused: AccessibilityFocusState<Bool>.Binding
+    /// (Phase 3) Remove from my library takes the album's download from this phone too: said with the line.
+    var goesToo = false
 
     var body: some View {
         VStack(spacing: 10) {
-            if let note = mine.note, !note.isEmpty {
+            if let note = line, !note.isEmpty {
                 Text(note)
                     .font(.footnote)
                     .foregroundStyle(Palette.quiet)
@@ -44,6 +46,13 @@ struct MineBlock: View {
             }
         }
         .frame(maxWidth: .infinity)
+    }
+
+    /// Whose's line - with "Its download goes from this phone too." while its button is Remove from my library and the
+    /// album's download is your library's alone (phase3-autodownload.md 3.4).
+    private var line: String? {
+        guard goesToo, mine.action == .remove else { return mine.note }
+        return [mine.note, AutoDownloadWords.goesToo].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
     }
 }
 

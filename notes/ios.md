@@ -3993,3 +3993,157 @@ Not verified: anything on a phone - checks L0a-L0g in docs/ios.md: the first rea
 (R13), a star and an unstar elsewhere reaching the phone, the 304, Remove here at once, the fill following the limit,
 nothing else moving; and what a 200 of a 3,000-album list costs on the phone (Debug's Last check times it). Nothing
 drawn has been seen.
+
+## Phase 3, slice 2: downloading your library (2026-11-13)
+
+The spec's slice 2 (notes/ios-specs/phase3-autodownload.md, 6.2): **the library downloads, and lets go**. Built on
+branch `phase3-autodownload` from slice 1's merge (481c736). The app stays 0.8 (8) until slice 3; nothing in
+DeadwaxAudio changed; no server change. This is the slice that deletes files, so its rules were built as Core rules
+first, each tested with a mutation that breaks it:
+
+1. **Nothing wanted another way is ever removed by the library.** The library takes only its own origin
+   (`LibraryDownloads.gives == [.library]`), only from songs that carry it, and every delete is Phase 2's:
+   `DownloadDatabase.removeOrigins` deletes a song only when no origin is left. A song downloaded by hand (`.song`,
+   `.album`), one in a downloaded playlist (`.other("playlist:...")`, for Phase 4) or with any other origin keeps it,
+   and the song. A kept play, start or queue is never the downloads' to remove (Remove All keeps them too).
+2. **An empty or suspicious list deletes nothing.** Slice 1's held lists (empty while albums are kept, a drop of more
+   than half and more than 10, a truncated list) change no album, so the library takes nothing; a 304 of a held list
+   is held too. An album that is neither in the library nor removed by a check keeps its songs - nothing goes on a
+   guess.
+3. **A removal is acted on only after two checks at least 10 minutes apart agree** (slice 1's `missingSince` and
+   `confirmAfterMs`): a missing album still fits and is still the library's; only `removed` (an album a check took
+   out) is let go. The one exception is an album removed in this app (`removedHere`, open question 9), which goes when
+   the next list confirms it.
+4. **Every delete goes through the same guarded path as Phase 2's Remove** (`DownloadModel.removeOrigins` -> the
+   database's `removeOrigins` -> `DownloadRules.afterRemoving`): the library's takes, the switch turned off, Remove
+   All, an album's Remove Download.
+
+### Core (DeadwaxCore)
+
+- **DownloadModels**: `DownloadOrigin.library` (`.other("library")`, stored as `library`), and `onlyLibrary(origins)`
+  (the library and nothing else).
+- **LibraryDownloads.swift** (new): `StoreSong` (a store song as the rules read it: id, album, origins - none kept
+  reads as `[.song]`, never the library's - state, bytes), and `LibraryDownloads`:
+  - `songs(records, origins:, library:)` - each song read on the library album whose read songs have it (else its
+    record's album), so a song asked for with another album is still counted;
+  - `fillInputs` - the songs wanted by hand (their bytes are the hand downloads'), each album's library-only bytes
+    here, and their total (`libraryHere`);
+  - `turn(ordered, removed:, songs:, bytesHere:, handToCome:, limit:, freeSpace:, reserve:, readsPending:)` - the fill
+    (`LibraryFill.plan`, after the hand downloads here and to come) and `actions`;
+  - `actions` - **takes**: of the library's songs only, for an album `removed`; for the fill's `keptOff`; for
+    `room`/`phoneFull` (`gaveWay` if any of its library songs are here, `waits` if only asked); and a song no longer
+    on its album (`notOnAlbum`). An `unread` album keeps everything. **Asks**: the albums that fit, in order, that are
+    listed (not missing), not removed here and read, for their songs not yet the library's - at most
+    `albumsAtOnce` (10) albums on their way at once, none taken this turn, and none below the first album still to
+    read while reads are pending (so an album read late never makes one asked before it give way);
+  - `switchedOff` (every song with the origin, why `.switchedOff`), `deleted` (what Phase 2's rule would delete of
+    the takes - always library-only songs; the tests compare it with the database), `listed` (the Library's
+    Downloaded: an album only the library wants is listed once a song of it is here or on its way), `progress`
+    (Downloading's row: albums that fit and aren't all here, of all that fit, bytes to come; an album whose missing
+    songs all failed isn't counted), `mark` (the album page's: `downloaded`, `waits`, `keptOff`).
+  - `AutoDownload`: the switches' keys - `autoDownloadLibrary`, `autoDownloadOnlyWhileCharging` (slice 3's),
+    `autoDownloadAsked`.
+- **DownloadPlan**: `Asked.libraryRank`; a song only the library wants (`isLibrary`) is planned in a unit
+  `library:<album>` after every hand unit, by the fill's order. The planner was rebuilt on one `walk`: library units
+  are checked against the phone's reserve only (the fill already held them to the limit), and a hand unit's room
+  credits the library's bytes here (`Facts.libraryHere`) - they are the library's to give back, so a hand download is
+  never held for them. `handToCome` - what the hand downloads that fit have yet to receive - feeds the fill.
+- **LibraryFollow**: `sync(..., believing:)` - you answered Remove to the question, so a held empty list's or drop's
+  absences are believed, marked missing and **still removed only by a second check 10 minutes on**; `keepsBelieving`
+  (a list that wasn't held on its own ends it, as does one leaving nothing missing); `asks(held, keptThem:)` (the
+  question shows for an empty list or a drop, until Keep Them; never for a truncated list); `FollowedSong.song`.
+- **DownloadRules**: `DownloadChoice.forSong(_:keptByLibrary:)` and `forSongs(_:gone:keptByLibrary:)` - no song-level
+  Remove Download for a song your library keeps (it would come back at the next turn; remove its album instead).
+- **DownloadDatabase**: `setKeptOff(album:at:)`; meta `library_believe`, `library_held_kept`, `library_removed` (the
+  albums the last checks removed whose downloads haven't been let go - written with the list, cleared only after the
+  takes succeed), all forgotten with the library.
+- **AutoDownloadWords.swift** (new): the spec's 1.2 lines - the switch and its note, the fit and reading lines,
+  Checked and Couldn't check, the question and its buttons, Downloading's row, You's footer, the album page's lines,
+  the menu titles, the mine block's line, Remove All's addition, the first ask. LibraryFollowWords lost Debug's switch
+  line.
+
+### The app
+
+- **LibraryFollower**: the switch is `on` (AutoDownload.libraryKey, per phone; slice 1's `debugFollowLibrary` key is
+  removed). Off stops it and lets go of everything the library downloaded (`switchedOff`), **keeping the list**, so
+  turning it on again says what fits at once. A check also works out `removed` (the albums to let go, kept until
+  DownloadModel acts), `believing` and `keptThem`, all written in the check's one transaction; `fresh` is false until
+  a check answers after the store opens or the switch goes on - until then nothing new is asked for from a list that
+  may be days old (its removals stand). `changed` asks DownloadModel for a plan after each check and each batch of
+  reads; Keep Them, Remove (believe, the ETag dropped so the next check is a 200, a check at once) and `setKeptOff`.
+- **DownloadModel**: every plan, with the switch on, builds the store's songs and the turn, publishes the fill and
+  the progress, acts (takes through `removeOrigins(LibraryDownloads.gives, ...)`, then `wantLibrary`: the asks in
+  one transaction, `addOrigin(.library)`, each album's answer, cover and loudness kept as a hand download's) - and
+  plans again after. The planner's facts carry `libraryHere` and each song's `libraryRank`. An album's Remove
+  Download takes `.song`, `.album(id)` and `.library` and marks it kept off; an album's Download clears the mark;
+  Remove All turns the switch off first. Downloaded and the albums count list only `listed` albums; Downloading's
+  albums leave out the library-only ones (the one row has them).
+- **You > Downloads**: "Your library" ("The collection") after Storage - the switch and its note, the fit line with
+  a bar (amber when not all fit) or the reading line, the question with Keep Them and Remove, and "Checked ..." or
+  "Couldn't check with deadwax" under it. Downloading's first row is the library's (a tap opens the Library's
+  Downloaded); pull to refresh checks now. Remove All's message adds the switch. A failed row of a library album
+  swipes to `remove(failed:album:)`: those songs' origins taken, the library's too, and the album kept off (the rest
+  of it goes at the next turn; its songs downloaded by hand stay).
+- **The Library**: the first-ask card at the top of the root (3.2) - shown once per phone, while the switch is off and
+  the Library has albums and is online; Turn On or Not Now puts it away for good.
+- **The album page**: the menu headed "Downloaded with your library" for an album it downloaded; a line under the
+  title for one that waits for room or that you removed; the mine block's "Its download goes from this phone too."
+  on Remove from my library when the library downloaded it and you didn't.
+- **You's Downloads row** falls back to the library's footer ("Your library: 38 of 412 albums to go").
+- **Debug**: no switch (it's You > Downloads'); Held back says "believing (Remove)" or "kept them", "Removed, to let
+  go" counts `removed`, and the fill shown is DownloadModel's.
+
+### Decided here (the spec was silent, or this departs from it)
+
+Written into the spec's 6.5 too:
+- **Remove on the question still waits for a second check.** The spec's 2.3 has Remove act on the held list; built,
+  Remove makes the next checks believe such a list (`believing`), and its absences go by the same two-checks rule -
+  so one bad answer never deletes, even after a tap. The question stays until a list isn't held.
+- **Removed here goes when the next list confirms it** (open question 9's "at once"): a check is made straight after
+  Remove from my library answers, so in practice within seconds.
+- **Another scope now drops only the ETag**, not the list (slice 1 forgot it): the next 200's absences are judged by
+  the drop rule, and a scope change that empties the list is held like any other.
+- **Nothing new is asked from a kept list until a check answers** (`fresh`).
+- **10 albums on their way at once**, and **nothing asked below an album still to read** - the spec didn't say how
+  much to hand over at once; a library of thousands asked in one go would keep thousands of answers, covers and
+  loudness fetches and tasks in flight.
+- **A song your library keeps has no Remove Download of its own** (it would come back); a failed library song's
+  swipe lets it go and keeps its album off (its songs downloaded by hand stay).
+- **The Library's Downloaded lists a library album once a song of it is here or downloading** - not while it only
+  waits its turn (open question 15's "nowhere but the fit line").
+- **Debug's switch is retired**; the switch is You > Downloads'.
+
+### Tests
+
+Core 1136 (from 1084): **LibraryDownloadsTests** 35 - each strict rule as its own test (the origin taken, a hand,
+album, playlist or other origin never deleted, the switch off, every delete equal to Phase 2's rule, and one in a
+real store: a library-only song deleted and the hand, album and playlist songs, kept plays, starts and the queue all
+kept; an empty list, a drop and a truncated list deleting nothing, then or an hour later or as a 304; an album absent
+for any other reason keeping its songs; two checks ten minutes apart, nine not enough, back before the second keeping
+everything, removed here, believing still waiting and ending), then the fill's give-way, kept off, a song no longer on
+its album, an unread album, the asks, Downloaded, progress, the page's mark and the song-level Remove. Most run the
+pipeline whole - `LibraryFollow.sync`, then `ordered`, then `turn`. **LibraryPlanTests** 8 (the planner's library
+units), **AutoDownloadWordsTests** 8 (every line, and the words never used), **LibraryDatabaseTests** +1 (kept off).
+
+**Mutations, 31, each caught by a failing test** (scratchpad mutate2.py, every file restored after): the library
+giving `.song` too; deleting over every origin; takes from any song; the switch off taking from any song; the fill
+counting hand songs as the library's; no origin read as the library's; an album absent from the table taken; an
+empty list not held; a drop not held; a truncated list believed; believing never ending; Keep Them asked again; a
+missing album taken; ten minutes as `>`; nine minutes; kept off not given back; a song no longer on its album kept;
+an unread album given way; hand bytes taken as room; asking past an album still to read; no limit on albums at once;
+asking for an album removed here, or a missing one; asking only songs not in the store; library units before hand; a
+hand unit not crediting the library's bytes; library units held to the limit; hand-to-come counting the library's;
+progress counting failed albums; Downloaded listing waiting albums; a library song's own Remove offered.
+
+### Verified, and not
+
+Verified (2026-11-13, this Mac, Xcode's toolchain): `swift test` - Core 1136, DeadwaxAudio 158, DeadwaxTurntable 11,
+all pass; the 31 mutations; the unsigned Release device build (0.8 (8)); check_project.py with the .xcodeproj
+unchanged; `pytest tests/test_ios_*.py tests/test_source_bytes.py`; the ios sims on Node 22. Not run: Core on Linux
+(ios.yml's ubuntu job will).
+
+Not verified: anything on a phone - checks 50-53 and 55-60 in docs/ios.md (54 and 61-63 are slice 3's): an
+overnight fill and its time, a star and an unstar elsewhere, Add and Remove here, the limit lowered, a hand download
+on a full phone, Remove Download kept off, the first ask, Remove All, an empty list asked. Nor whether the phone's
+free-space reading agrees with Settings near the 2 GB floor, nor what a library of thousands costs the plan, which
+now builds the store's songs at every turn. Nothing drawn has been seen.

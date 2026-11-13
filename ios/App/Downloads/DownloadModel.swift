@@ -58,6 +58,12 @@ final class DownloadModel {
     private(set) var origins: [String: Set<DownloadOrigin>] = [:]
     /// The planner's latest wait for each song not here - the shared reasons (network, sign-in) said at once.
     private(set) var planned: [String: DownloadWait] = [:]
+    /// (Phase 3) Your library's fill at the last plan - "N of M albums fit" - nil while it is off.
+    private(set) var libraryFill: LibraryFill.Plan?
+    /// Downloading's one row for your library: its albums still to come - nil when none is.
+    private(set) var libraryProgress: LibraryDownloads.Progress?
+    /// What its songs wait for, while none of them is being fetched (the row says it in place of its progress).
+    private(set) var libraryWait: DownloadWait?
     /// Bytes each task has brought, while a screen follows progress.
     private(set) var received: [String: Int64] = [:]
     /// The albums' kept answers (`GET /navidrome/albums/{id}` as answered), by id.
@@ -158,6 +164,8 @@ final class DownloadModel {
             note: { [weak self] line in self?.note(line) },
             changed: { [weak self] in self?.recountWaiting() }))
         follower.note = { [weak self] line in self?.note(line) }
+        follower.changed = { [weak self] in self?.replan() }
+        follower.switchedOff = { [weak self] in self?.libraryOff() }
         let center = NotificationCenter.default
         observers.append(center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.becameActive() }
@@ -210,14 +218,42 @@ final class DownloadModel {
     /// Anything of the album asked for or here (its songs' records, by id) - nil for none.
     func songIDs(album albumID: String) -> [String]? { songsOfAlbum[albumID] }
 
-    /// A ••• menu's download items for one song.
+    /// A ••• menu's download items for one song - no Remove Download of a song your library keeps (it would come
+    /// back at once: its album's Remove Download keeps the album off).
     func choices(song songID: String) -> [DownloadChoice] {
-        DownloadChoice.forSong(state(songID))
+        DownloadChoice.forSong(state(songID), keptByLibrary: keptByLibrary(songID))
     }
 
-    /// An album's or Up Next's download items; `gone` when the album is no longer in the collection.
-    func choices(songs: [Song], gone: Bool = false) -> [DownloadChoice] {
-        DownloadChoice.forSongs(songs.map { state($0.id) }, gone: gone)
+    /// An album's download items (its Remove Download takes your library's too); `gone` when the album is no longer in
+    /// the collection. `alone`: Up Next's or a selection's songs, each asked for alone - Remove Download only for a song
+    /// your library doesn't keep.
+    func choices(songs: [Song], gone: Bool = false, alone: Bool = false) -> [DownloadChoice] {
+        let states = songs.map { state($0.id) }
+        guard alone else { return DownloadChoice.forSongs(states, gone: gone) }
+        return DownloadChoice.forSongs(states, gone: gone, keptByLibrary: songs.map { keptByLibrary($0.id) })
+    }
+
+    /// The song carries your library's origin.
+    func keptByLibrary(_ songID: String) -> Bool { origins[songID]?.contains(.library) == true }
+
+    /// What Download your library keeps - yours, or the collection - as its words name it.
+    var libraryScope: AlbumScope { follower.scope ?? AlbumScope.albums(for: server.me) }
+
+    /// What the album's page says of it and your library (3.4): with it, waiting for room, or kept off.
+    func libraryMark(album albumID: String) -> LibraryDownloads.AlbumMark {
+        guard follower.on else { return .none }
+        let entry = follower.ordered.first { $0.id == albumID }
+        let songs = LibraryDownloads.songs(records.values.filter { $0.albumID == albumID }, origins: origins,
+                                           library: entry.map { [$0] } ?? [])
+        return LibraryDownloads.mark(albumID, following: true, library: entry, fill: libraryFill, songs: songs)
+    }
+
+    /// Remove from my library lets the album's download go too: your library has some of it here, and no song of it
+    /// was downloaded by hand (3.4, open question 9).
+    func goesWithLibrary(album albumID: String) -> Bool {
+        guard libraryMark(album: albumID) == .withLibrary else { return false }
+        let songs = LibraryDownloads.songs(records.values.filter { $0.albumID == albumID }, origins: origins, library: [])
+        return !songs.contains { $0.byHand }
     }
 
     /// Now Playing's Download Up Next: how many of `songs` it would ask for (two or more), else nil.
@@ -237,7 +273,9 @@ final class DownloadModel {
     var downloadedAlbums: [IndexAlbum] {
         var arrived: [String: Int64] = [:]
         var asked: [String: Int64] = [:]
-        for record in records.values {
+        // an album your library alone wants only once something of it came (3.3)
+        let listed = listedAlbums
+        for record in records.values where listed.contains(record.albumID) {
             asked[record.albumID] = min(asked[record.albumID] ?? record.wantedAt, record.wantedAt)
             guard record.state == .done else { continue }
             let at = record.doneAt ?? record.wantedAt
@@ -247,7 +285,15 @@ final class DownloadModel {
     }
 
     /// How many albums Downloaded lists - the Library root's On this phone row's count (5.2).
-    var albumCount: Int { songsOfAlbum.keys.reduce(0) { $0 + (albums[$1] != nil ? 1 : 0) } }
+    var albumCount: Int {
+        let listed = listedAlbums
+        return songsOfAlbum.keys.reduce(0) { $0 + (albums[$1] != nil && listed.contains($1) ? 1 : 0) }
+    }
+
+    /// The albums Downloaded lists (LibraryDownloads.listed): never one your library alone wants that only waits.
+    private var listedAlbums: Set<String> {
+        LibraryDownloads.listed(LibraryDownloads.songs(Array(records.values), origins: origins, library: []))
+    }
 
     /// The song as its album's kept answer has it (a row's title and artist), or nil.
     func song(_ songID: String) -> Song? {
@@ -255,9 +301,13 @@ final class DownloadModel {
         return albums[record.albumID]?.song?.first { $0.id == songID }
     }
 
-    /// You > Downloads' Downloading section: every song asked for and not here or failed, in the order they go.
+    /// You > Downloads' Downloading section: every song asked for and not here or failed, in the order they go - but
+    /// not your library's own (its one row is `libraryProgress`'s, 3.3).
     var downloading: [DownloadRecord] {
-        ordered(records.values.filter { $0.state == .wanted || $0.state == .fetching })
+        ordered(records.values.filter { record in
+            (record.state == .wanted || record.state == .fetching)
+                && !DownloadOrigin.onlyLibrary(origins[record.id] ?? [.song])
+        })
     }
 
     /// Its Didn't download section.
@@ -363,8 +413,10 @@ final class DownloadModel {
         want([song], origin: .song)
     }
 
-    /// An album's Download: its songs not here, planned whole.
+    /// An album's Download: its songs not here, planned whole - a hand download, first in the order and never given
+    /// way, even of an album of your library waiting for room; one kept off is kept off no more (2.7).
     func download(album: Album) {
+        follower.setKeptOff(album: album.id, at: nil)
         want(album.song ?? [], origin: .album(album.id), album: album)
     }
 
@@ -379,10 +431,21 @@ final class DownloadModel {
         removeOrigins([.song, .album(record.albumID)], from: [songID])
     }
 
-    /// An album's Remove Download: every song of it asked for through the album or alone.
+    /// An album's Remove Download: every song of it asked for through the album or alone, and with your library - which
+    /// then leaves it off this phone until it is downloaded again (2.7, open question 7). Marked first, so the plan the
+    /// removal starts doesn't ask for it again.
     func remove(album albumID: String) {
+        if follower.on { follower.setKeptOff(album: albumID, at: ListenTracker.wallMs()) }
         let songs = records.values.filter { $0.albumID == albumID }.map(\.id)
-        removeOrigins([.song, .album(albumID)], from: songs)
+        removeOrigins([.song, .album(albumID), .library], from: songs)
+    }
+
+    /// Didn't download's Remove of an album your library keeps: those songs' origins taken, the library's with them,
+    /// and the album kept off - else the library would ask for them again. The library then lets go of the rest of it
+    /// at the next turn, as for any album kept off; a song of it downloaded by hand stays.
+    func remove(failed songIDs: [String], album albumID: String) {
+        if follower.on { follower.setKeptOff(album: albumID, at: ListenTracker.wallMs()) }
+        removeOrigins([.song, .album(albumID), .library], from: songIDs)
     }
 
     /// Up Next's or a selection's Remove Download.
@@ -404,9 +467,11 @@ final class DownloadModel {
     }
 
     /// Remove All Downloads (6.7): every task cancelled, every copy and kept album deleted - the plays waiting to be
-    /// sent kept.
+    /// sent kept. With Download your library on, it is turned off first (its dialog says so) - else the next check
+    /// would download it all again; the library's list is kept.
     func removeAll() {
         guard let store else { return }
+        if follower.on { follower.on = false }
         let tasks = Set(live.values)
         live = [:]
         madeAt = [:]
@@ -735,22 +800,41 @@ final class DownloadModel {
         follower.changedHere(album: album, removed: removed, at: ListenTracker.wallMs())
     }
 
-    /// The hand downloads as the library's fill counts them (2.6): their bytes here and still to come for the songs
-    /// the planner lets go, what of that is still to come, and their songs (left out of the library's albums' bytes).
-    struct HandBytes: Equatable {
-        var bytes: Int64
-        var toCome: Int64
-        var songs: Set<String>
+    /// The switch went off: the library's origin taken from every song that carries it - those left with none
+    /// deleted, through Phase 2's removeOrigins as every library removal is.
+    private func libraryOff() {
+        let songs = LibraryDownloads.songs(Array(records.values), origins: origins, library: [])
+        let actions = LibraryDownloads.switchedOff(songs)
+        libraryFill = nil
+        libraryProgress = nil
+        libraryWait = nil
+        guard !actions.take.isEmpty else { return }
+        note("library: switched off - \(actions.take.count) songs let go")
+        removeOrigins(LibraryDownloads.gives, from: actions.take)
     }
 
-    /// Every song asked for is a hand download until the library asks for its own (slice 2).
-    func handBytes() -> HandBytes {
-        var toCome: Int64 = 0
-        for record in records.values where record.state == .fetching
-            || (record.state == .wanted && planned[record.id] == .queued) {
-            toCome += max(record.expectedBytes - (received[record.id] ?? 0), 0)
+    /// What the library does at this plan (2.7): its takes through removeOrigins (its own origin only), then its asks.
+    /// Whether anything was done (a plan follows it).
+    private func act(_ actions: LibraryDownloads.Actions, removedAlbums: Set<String>) -> Bool {
+        var acted = false
+        if !actions.take.isEmpty {
+            let byWhy = Dictionary(grouping: actions.why.keys.sorted(), by: { (album: String) -> String in
+                actions.why[album]?.rawValue ?? ""
+            })
+            for (why, albums) in byWhy.sorted(by: { $0.key < $1.key }) {
+                note("library: \(why) - \(albums.count == 1 ? albums[0] : "\(albums.count) albums")")
+            }
+            // the store couldn't be written: nothing more this plan, and nothing marked done
+            guard removeOrigins(LibraryDownloads.gives, from: actions.take) else { return true }
+            acted = true
         }
-        return HandBytes(bytes: bytesHere + toCome, toCome: toCome, songs: Set(records.keys))
+        // the removed albums' downloads are let go (or they had none): done with
+        follower.removalsDone(removedAlbums)
+        if !actions.ask.isEmpty {
+            wantLibrary(actions.ask)
+            acted = true
+        }
+        return acted
     }
 
     // MARK: asking
@@ -799,14 +883,58 @@ final class DownloadModel {
         replan()
     }
 
-    private func removeOrigins(_ removed: Set<DownloadOrigin>, from songIDs: [String]) {
-        guard let store, !songIDs.isEmpty else { return }
+    /// Your library's albums that fit asked for under its origin (2.7) - one transaction, one plan after: a song already
+    /// asked for by hand gains the origin beside its own; each album's answer, cover and loudness kept as a hand
+    /// download's.
+    private func wantLibrary(_ asks: [LibraryDownloads.Ask]) {
+        guard let store else { return }
+        let now = ListenTracker.wallMs()
+        var fresh: [Song] = []
+        var count = 0
+        do {
+            try store.database.transaction {
+                for ask in asks {
+                    for followed in ask.songs {
+                        let at = now + Int64(count)
+                        count += 1
+                        if var record = try store.database.song(followed.id) {
+                            if record.state == .failed {
+                                record = DownloadRules.apply(.retry, to: record)
+                                try store.database.put(record)
+                            }
+                        } else {
+                            try store.database.put(DownloadRecord(song: followed.song, albumID: ask.album, now: at))
+                            fresh.append(followed.song)
+                        }
+                        try store.database.addOrigin(.library, song: followed.id, at: at)
+                    }
+                }
+            }
+        } catch {
+            note("library: couldn't keep the ask: \(error)")
+            return
+        }
+        note("library: asked \(asks.count == 1 ? asks[0].album : "\(asks.count) albums") (\(count) songs)")
+        for song in fresh {
+            if let cached = files.cache.reusable(song) { cachedCopies[song.id] = cached }
+        }
+        for ask in asks where albums[ask.album] == nil { keepAlbum(ask.album, client: server.client) }
+        reload()
+        replan()
+    }
+
+    /// Origins taken from songs - Remove Download's, and the only way your library ever lets one go: a song left with
+    /// none is deleted, its file, its task and (with its album's last song) the album's answer and cover. False when
+    /// the store couldn't be written.
+    @discardableResult
+    private func removeOrigins(_ removed: Set<DownloadOrigin>, from songIDs: [String]) -> Bool {
+        guard let store, !songIDs.isEmpty else { return true }
         var deleted: [String] = []
         do {
             deleted = try store.database.removeOrigins(removed, songs: songIDs)
         } catch {
             note("couldn't remove: \(error)")
-            return
+            return false
         }
         let tasks = Set(deleted.compactMap { live.removeValue(forKey: $0) })
         if !tasks.isEmpty { Task { _ = await session.cancel(tasks, resume: false) } }
@@ -825,6 +953,7 @@ final class DownloadModel {
         note("removed: \(deleted.count)")
         reload()
         replan()
+        return true
     }
 
     // MARK: the plan (8.5)
@@ -854,15 +983,53 @@ final class DownloadModel {
             }
         }
         let asked = records.values.filter { $0.state == .wanted || $0.state == .fetching }
-        let facts = DownloadPlan.Facts(bytesHere: bytesHere, limit: storageLimit.bytes,
-                                       freeSpace: DownloadStore.freeSpace() ?? Int64.max / 4,
+        let freeSpace = DownloadStore.freeSpace() ?? Int64.max / 4
+        // your library (Phase 3): the store's songs as its rules read them, its albums' places in the fill's order
+        let library = follower.on ? follower.ordered : []
+        let storeSongs = LibraryDownloads.songs(Array(records.values), origins: origins, library: library)
+        let libraryHere = LibraryDownloads.fillInputs(storeSongs).libraryHere
+        var rank: [String: Int] = [:]
+        for (place, entry) in library.enumerated() where rank[entry.id] == nil { rank[entry.id] = place }
+        var albumOf: [String: String] = [:]
+        for song in storeSongs { albumOf[song.id] = song.albumID }
+        let facts = DownloadPlan.Facts(bytesHere: bytesHere, libraryHere: libraryHere, limit: storageLimit.bytes,
+                                       freeSpace: freeSpace,
                                        reach: reachability.reach, path: reachability.path,
                                        signedIn: server.launch == .ready && server.signInOver == nil && server.client != nil
                                            && !refused(server.client?.session),
                                        over: downloadOver)
-        let decisions = DownloadPlan.plan(asked.map { DownloadPlan.Asked($0, origins: origins[$0.id] ?? [.song],
-                                                                          received: received[$0.id] ?? 0) }, facts)
+        let askedSongs = asked.map { (record: DownloadRecord) -> DownloadPlan.Asked in
+            DownloadPlan.Asked(record, origins: origins[record.id] ?? [.song], received: received[record.id] ?? 0,
+                               libraryRank: rank[albumOf[record.id] ?? record.albumID])
+        }
+        if follower.on {
+            // what the library asks for and gives back, before anything is planned: a plan follows whatever it does
+            let removedAlbums = follower.removed
+            let turn = LibraryDownloads.turn(library, removed: removedAlbums, songs: storeSongs, bytesHere: bytesHere,
+                                             handToCome: DownloadPlan.handToCome(askedSongs, facts),
+                                             limit: storageLimit.bytes, freeSpace: freeSpace,
+                                             readsPending: follower.readsPending)
+            if turn.fill != libraryFill { libraryFill = turn.fill }
+            let progress = LibraryDownloads.progress(library, fill: turn.fill, songs: storeSongs)
+            if progress != libraryProgress { libraryProgress = progress }
+            // a list kept from before this launch (or before the switch went on) asks for nothing new until a check
+            // has answered: what it gives back stands - the fill's and the checks' own
+            var actions = turn.actions
+            if !follower.fresh { actions.ask = [] }
+            if act(actions, removedAlbums: removedAlbums) { return }
+        } else if libraryFill != nil || libraryProgress != nil {
+            libraryFill = nil
+            libraryProgress = nil
+        }
+        let decisions = DownloadPlan.plan(askedSongs, facts)
         planned = decisions.mapValues(\.wait)
+        // the row's wait: what the library's songs wait for while none is fetched
+        let libraryAsked = askedSongs.filter { (song: DownloadPlan.Asked) -> Bool in song.isLibrary }
+        let fetching = libraryAsked.contains { (song: DownloadPlan.Asked) -> Bool in song.out }
+        let wait: DownloadWait? = fetching ? nil
+            : libraryAsked.compactMap { (song: DownloadPlan.Asked) -> DownloadWait? in decisions[song.id]?.wait }
+                .first { (wait: DownloadWait) -> Bool in wait != .queued }
+        if wait != libraryWait { libraryWait = wait }
         // tasks the plan lets go: cancelled, their resume data kept - but not a sign-out's (it carries the old cookie)
         let letGo = asked.filter { $0.state == .fetching && decisions[$0.id]?.task == false }
         if !letGo.isEmpty {

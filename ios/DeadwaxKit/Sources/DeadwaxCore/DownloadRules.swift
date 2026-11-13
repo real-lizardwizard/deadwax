@@ -358,6 +358,21 @@ public enum DownloadChoice: String, Sendable, CaseIterable {
         }
     }
 
+    /// (Phase 3) One song's items when your library keeps it (it carries the library's origin): no Remove Download of the
+    /// song alone - the library would ask for it again at once. Its album's Remove Download keeps the album off.
+    public static func forSong(_ state: SongDownload, keptByLibrary: Bool) -> [DownloadChoice] {
+        let choices = forSong(state)
+        return keptByLibrary ? choices.filter { $0 != .remove } : choices
+    }
+
+    /// (Phase 3) Several songs asked for each alone (Up Next, a selection - not an album): Remove Download only when a
+    /// song that isn't your library's is asked for or here; `keptByLibrary` beside `states`.
+    public static func forSongs(_ states: [SongDownload], gone: Bool = false, keptByLibrary: [Bool]) -> [DownloadChoice] {
+        let choices = forSongs(states, gone: gone)
+        let removable = zip(states, keptByLibrary).contains { pair in pair.0 != .none && !pair.1 }
+        return removable ? choices : choices.filter { $0 != .remove }
+    }
+
     /// Several songs' (an album, Up Next): Download when any is none or failed - and the album is still in the
     /// collection (`gone` false: there is nothing to fetch otherwise); Remove Download when any is anything but none.
     public static func forSongs(_ states: [SongDownload], gone: Bool = false) -> [DownloadChoice] {

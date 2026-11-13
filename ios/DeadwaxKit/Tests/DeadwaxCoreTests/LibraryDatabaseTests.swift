@@ -86,6 +86,18 @@ private func followed(_ id: String, _ position: Int, songs: [FollowedSong]? = ni
         }
     }
 
+    @Test func keptOffIsMarkedAndClearedOnAnAlbumOfTheLibrary() throws {
+        try withDatabase { db in
+            try db.putLibrary([followed("a", 0, songs: songs, readAt: 1)], replacing: [])
+            #expect(try db.setKeptOff(album: "a", at: 88))
+            #expect(try !db.setKeptOff(album: "elsewhere", at: 88))
+            #expect(try db.library().first?.keptOff == 88)
+            #expect(try db.setKeptOff(album: "a", at: nil))
+            #expect(try db.library().first?.keptOff == nil)
+            #expect(try db.library().first?.songs == songs, "nothing else moves")
+        }
+    }
+
     @Test func removeAllLeavesTheLibraryAndForgetLibraryTakesItWithItsMeta() throws {
         try withDatabase { db in
             try db.putLibrary([followed("a", 0, songs: songs, readAt: 1)], replacing: [])

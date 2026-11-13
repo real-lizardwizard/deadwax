@@ -432,6 +432,27 @@ this spec was silent, each kept for slices 2 and 3 unless James says otherwise:
 - **The album page refreshing an album's kept songs** (2.4's last point) waits for slice 2, where it matters (in
   slice 1 nothing is planned from the songs).
 
+### 6.5 Slice 2, built (2026-11-13)
+
+Written up in notes/ios.md, "Phase 3, slice 2: downloading your library". Open questions 1-10, 12, 13 and 15 are built
+as recommended (11 is slice 3's; 14 waits for L0a). What the build decided, or did differently:
+
+- **Remove on the question (2.3) doesn't act on that list.** It makes the next checks believe a held list
+  (`believing`, kept in meta), whose absences are marked missing and removed only by a second check 10 minutes or
+  more on - the same rule as any removal. A list that isn't held ends it. Keep Them keeps everything and puts the
+  question away until a list isn't held again.
+- **Removed here** (open question 9) goes when the next list confirms it - a check is made as soon as Remove from my
+  library answers.
+- **Another scope** now drops only the ETag, not the list (6.4's first point is replaced): the drop rule judges the
+  next list, so a scope change that empties it is held.
+- **Nothing new is asked from a kept list until a check has answered** since the store opened or the switch went on.
+- **At most 10 albums on their way at once**, the next as those arrive, and **nothing asked below an album whose
+  songs are still to be read**.
+- **A song your library keeps offers no Remove Download of its own**; a failed library song's swipe lets it go and keeps
+  its album off - the library lets go of the rest of the album, and its songs downloaded by hand stay.
+- **The Library's Downloaded** lists a library album only once a song of it is here or on its way (open question 15).
+- **Debug's switch is retired**: You > Downloads' Download your library replaces it.
+
 ## 7. Tests (Swift Testing; Core's on Linux and macOS)
 
 - **LibraryFollowTests**: added in the list's order; changed (songCount, duration past half a second) clears the songs,
