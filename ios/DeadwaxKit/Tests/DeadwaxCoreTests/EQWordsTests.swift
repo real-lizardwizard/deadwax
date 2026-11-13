@@ -68,6 +68,7 @@ import Testing
         #expect(W.Screen.airPlayFooter == "Over AirPlay, a change is heard about 2 seconds later.")
         #expect(W.Screen.off == "Off: nothing changes the sound.")
         #expect(W.Screen.flat == "Flat: nothing changes the sound yet.")
+        #expect(W.Screen.cutsOnly == "Cuts only: nothing gets louder.")
         #expect(W.Screen.automatic(-6.4) == "Preamp -6.4 dB, so loud songs don't clip.")
         #expect(W.Screen.hand(-6, top: 5.9) == "Preamp -6.0 dB, set by you.")
         #expect(W.Screen.hand(-6, top: 6) == "Preamp -6.0 dB, set by you.")
@@ -175,7 +176,7 @@ import Testing
         #expect(a.said(left, number: 3) == "Filter 3: peak at 8903 hertz, plus 6 decibels, Q 1.66, left ear only")
         #expect(a.switchSaid(3) == "Filter 3 on" && a.on == "On" && a.off == "Off" && a.turnOn == "Turn On" && a.turnOff == "Turn Off")
         #expect(a.above == "Above what this output plays, so it's left out.")
-        #expect(a.addFilter == "Add Filter" && a.mostFilters == "64 filters is the most deadwax plays" && a.delete == "Delete")
+        #expect(a.addFilter == "Add Filter" && a.mostFilters == "64 filters is the most you can add" && a.delete == "Delete")
         let e = W.Editor.self
         #expect(e.title(3) == "Filter 3" && e.type == "Type" && e.frequency == "Frequency" && e.hz == "Hz")
         #expect(e.gain == "Gain" && e.dB == "dB" && e.q == "Q" && e.width == "Width" && e.octaves == "octaves")

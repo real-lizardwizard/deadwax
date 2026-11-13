@@ -44,14 +44,17 @@ public enum EQAdvancedRules {
         return (all + filters.filter { $0.channel == .left }.count, all + filters.filter { $0.channel == .right }.count)
     }
 
-    /// Within 64 an ear (3.8): what an import is held to, and what no edit takes a correction past.
-    public static func fits(_ filters: [EQFilter]) -> Bool {
-        let n = perEar(filters)
-        return max(n.left, n.right) <= EQLimits.filtersPerEar
+    /// What no edit takes a correction past (3.8): 64 an ear, or as many as that ear already had - a file may bring up
+    /// to 74 (`EQLimits.importPerEar`), and its filters can still be switched, edited and moved between the ears, but
+    /// no ear grows past 64 by it. So a correction you made stays within 64, and its whole curve exported - the tone's
+    /// ten added - within the 74 an import reads back.
+    public static func fits(_ filters: [EQFilter], before: [EQFilter]) -> Bool {
+        let n = perEar(filters), was = perEar(before)
+        return n.left <= max(EQLimits.filtersPerEar, was.left) && n.right <= max(EQLimits.filtersPerEar, was.right)
     }
 
-    /// Add Filter is offered: one more, for both ears, still fits - else it is disabled and says "64 filters is the
-    /// most deadwax plays".
+    /// Add Filter is offered: one more, for both ears, still fits within 64 - else it is disabled and says "64
+    /// filters is the most you can add".
     public static func canAdd(_ correction: EQCorrection?) -> Bool {
         let n = perEar(correction?.filters ?? [])
         return max(n.left, n.right) < EQLimits.filtersPerEar
@@ -100,8 +103,8 @@ public enum EQAdvancedRules {
 
 extension EQSettings {
     /// Add Filter (3.8): Add Filter's peak, with the correction's next id - and, with no correction, one of your own
-    /// begun ("Your own filters"). An AutoEq correction is marked changed. The new filter's id and whether it turned the
-    /// EQ on - nil when an ear already has 64.
+    /// begun ("Your own filters"). AutoEq's correction or a file's is marked changed. The new filter's id and whether it
+    /// turned the EQ on - nil when an ear already has 64.
     @discardableResult
     public mutating func addFilter(for o: EQOutput) -> (id: Int, turnedOn: Bool)? {
         guard EQAdvancedRules.canAdd(setting(for: o).correction) else { return nil }
@@ -112,17 +115,18 @@ extension EQSettings {
             id = max(c.nextFilterID, (c.filters.map(\.id).max() ?? 0) + 1)
             c.nextFilterID = id + 1
             c.filters.append(EQAdvancedRules.newFilter(id: id))
-            if c.kind == .autoeq { c.changed = true }
+            if c.kind != .built { c.changed = true }
             s.correction = c
         }
         return (id, turnedOn)
     }
 
     /// One filter edited - by its handle, its row's switch or its editor - its id kept. Nothing when it is unchanged,
-    /// would take an ear past 64, or isn't a filter the reader would take (`takes`); an AutoEq correction edited is
-    /// marked changed ("- changed"). A shelf written by its corner's name (`LS`, `HS`) that plays by its centre and is
-    /// given a width is written as one by its centre (`LSC`, `HSC`): an `LS` given a Q is read by its corner (0.3), so
-    /// an export would otherwise move it. True when it turned the EQ on.
+    /// would take an ear past 64 (or past what it had, `fits`), or isn't a filter the reader would take (`takes`);
+    /// AutoEq's correction or a file's edited is marked changed ("- changed", back-home 15l for a file's). A shelf
+    /// written by its corner's name (`LS`, `HS`) that plays by its centre and is given a width is written as one by its
+    /// centre (`LSC`, `HSC`): an `LS` given a Q is read by its corner (0.3), so an export would otherwise move it. True
+    /// when it turned the EQ on.
     @discardableResult
     public mutating func editFilter(_ id: Int, for o: EQOutput, _ body: (inout EQFilter) -> Void) -> Bool {
         guard var c = setting(for: o).correction, let i = c.filters.firstIndex(where: { $0.id == id }) else {
@@ -135,9 +139,10 @@ extension EQSettings {
             f.written = f.kind.defaultWritten
         }
         guard f != c.filters[i], EQAdvancedRules.takes(f) else { return false }
+        let before = c.filters
         c.filters[i] = f
-        guard EQAdvancedRules.fits(c.filters) else { return false }
-        if c.kind == .autoeq { c.changed = true }
+        guard EQAdvancedRules.fits(c.filters, before: before) else { return false }
+        if c.kind != .built { c.changed = true }
         return change(o) { (s: inout EQOutputSetting) -> Void in s.correction = c }
     }
 
@@ -155,7 +160,7 @@ extension EQSettings {
         guard var c = setting(for: o).correction, c.filters.contains(where: { $0.id == id }) else { return false }
         c.filters.removeAll { $0.id == id }
         if c.kind == .built && c.filters.isEmpty { return use(nil, for: o) }
-        if c.kind == .autoeq { c.changed = true }
+        if c.kind != .built { c.changed = true }
         return change(o) { (s: inout EQOutputSetting) -> Void in s.correction = c }
     }
 

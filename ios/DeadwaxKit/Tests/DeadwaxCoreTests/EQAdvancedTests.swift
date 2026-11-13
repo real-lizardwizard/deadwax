@@ -2,8 +2,8 @@ import Foundation
 import Testing
 @testable import DeadwaxCore
 
-/// eq.md 3.8 (slice 5, Advanced): the filter list's order and numbers, the 64-an-ear limit, Add Filter, an edit
-/// marking AutoEq's correction changed and "Back to AutoEq's", the preamp set by hand, an import's preamp; the handles
+/// eq.md 3.8 (slice 5, Advanced): the filter list's order and numbers, the 64-an-ear limit (a file's 74 kept, not
+/// grown), Add Filter, an edit marking AutoEq's correction or a file's changed and "Back to AutoEq's", the preamp set by hand, an import's preamp; the handles
 /// - where each is drawn, which a touch takes, a drag and a pinch; and the editor's fields, steps, type change and
 /// "Use Q instead".
 @Suite struct EQAdvancedTests {
@@ -79,13 +79,55 @@ import Testing
         #expect(EQAdvancedRules.canAdd(nil))
         let full = shared + [Self.peak(64, 5000)]
         #expect(!EQAdvancedRules.canAdd(Self.built(full)))
-        #expect(EQAdvancedRules.fits(full))
-        #expect(!EQAdvancedRules.fits(full + [Self.peak(65, 6000, channel: .left)]))
+        #expect(EQAdvancedRules.fits(full, before: shared))
+        #expect(!EQAdvancedRules.fits(full + [Self.peak(65, 6000, channel: .left)], before: full))
         // 60 shared and 4 for the left: the left is full, the right has room - Add Filter adds for both
         let leftFull = Array(shared.prefix(60)) + (61...64).map { Self.peak($0, 7000, channel: .left) }
         #expect(EQAdvancedRules.perEar(leftFull) == (left: 64, right: 60))
         #expect(!EQAdvancedRules.canAdd(Self.built(leftFull)))
-        #expect(EQWords.Advanced.mostFilters == "64 filters is the most deadwax plays")
+        #expect(EQWords.Advanced.mostFilters == "64 filters is the most you can add")
+    }
+
+    /// A file may bring 74 an ear (back-home 15: 64 and a tone's ten, so a whole curve exported reads back). Its
+    /// filters are still switched, edited, deleted and moved between the ears, but Add Filter isn't offered and no
+    /// edit grows an ear - past 64, or past what that ear had.
+    @Test func aFilesSeventyFourAreEditedButNotGrown() throws {
+        let lines = (1...70).map { (i: Int) -> String in "Filter \(i): ON PK Fc \(20 * i + 30) Hz Gain 1.0 dB Q 2.00" }
+            + ["Channel: L"] + (71...74).map { (i: Int) -> String in "Filter \(i): ON PK Fc \(1000 * (i - 69)) Hz Gain -1.0 dB Q 2.00" }
+        let text = "Preamp: -1.0 dB\n" + lines.joined(separator: "\n") + "\n"
+        guard case .success(let reading) = APOReader.read(Data(text.utf8)) else {
+            Issue.record("74 for the left, 70 for the right, refused")
+            return
+        }
+        let file = EQImportRules.correction(name: "Seventy-four.txt", text: text, reading: reading)
+        #expect(EQAdvancedRules.perEar(file.filters) == (left: 74, right: 70))
+        #expect(!EQAdvancedRules.canAdd(file))
+        var settings = Self.settings(file)
+        func filters() -> [EQFilter] { settings.output(Self.airpods.key)?.correction?.filters ?? [] }
+        func filter(_ id: Int) -> EQFilter? { filters().first { $0.id == id } }
+        #expect(settings.addFilter(for: Self.airpods) == nil)
+        //? a gain, a switch: the left keeps its 74
+        settings.editFilter(3, for: Self.airpods) { (f: inout EQFilter) -> Void in f.gain = 2 }
+        settings.setFilter(4, on: false, for: Self.airpods)
+        #expect(filter(3)?.gain == 2 && filter(4)?.on == false)
+        #expect(EQAdvancedRules.perEar(filters()) == (left: 74, right: 70))
+        //? the left's own to both ears grows the right past its 70: refused; a shared one to the left shrinks the right
+        let before = settings
+        settings.editFilter(71, for: Self.airpods) { (f: inout EQFilter) -> Void in f.channel = .all }
+        #expect(settings == before)
+        settings.editFilter(5, for: Self.airpods) { (f: inout EQFilter) -> Void in f.channel = .left }
+        #expect(filter(5)?.channel == .left)
+        #expect(EQAdvancedRules.perEar(filters()) == (left: 74, right: 69))
+        //? and back again: the right has 69 now, so 70 would grow it - refused, though the file came with 70
+        settings.editFilter(5, for: Self.airpods) { (f: inout EQFilter) -> Void in f.channel = .all }
+        #expect(filter(5)?.channel == .left)
+        //? deleted down to 63 for the left, Add Filter is offered again - once
+        for id in 6...16 { settings.deleteFilter(id, for: Self.airpods) }
+        #expect(EQAdvancedRules.perEar(filters()) == (left: 63, right: 58))
+        #expect(settings.addFilter(for: Self.airpods) != nil)
+        #expect(settings.addFilter(for: Self.airpods) == nil)
+        #expect(EQAdvancedRules.perEar(filters()) == (left: 64, right: 59))
+        #expect(EQWords.Correction.source(settings.output(Self.airpods.key)!.correction!) == "From Seventy-four.txt - changed")
     }
 
     /// The editor's Ear: only when the correction has one ear's filter or preamp.
@@ -577,6 +619,64 @@ import Testing
     }
 
     /// Add Filter alone, or a delete alone, makes AutoEq's correction yours - "- changed", and Back offered.
+    /// back-home 15l: a file's correction edited says so, as AutoEq's does - "- changed" after where it's from, a
+    /// paste's and a converted GraphicEQ's too, by an edit, a switch, Add Filter or a delete alone - and the export's
+    /// comment says it. There is nothing to go back to (no "Back to AutoEq's"); a new import is unchanged again, and
+    /// eq.json keeps it. Your own filters are never "changed".
+    @Test func anEditMarksAFileChanged() throws {
+        let text = "Preamp: -6.4 dB\nFilter 1: ON PK Fc 1000 Hz Gain 6 dB Q 1\nFilter 2: ON LSC Fc 105 Hz Gain 2.6 dB Q 0.7\n"
+        guard case .success(let reading) = APOReader.read(Data(text.utf8)) else {
+            Issue.record("refused")
+            return
+        }
+        let named = EQImportRules.correction(name: "HD650 ParametricEQ.txt", text: text, reading: reading)
+        let pasted = EQImportRules.correction(name: nil, text: text, reading: reading)
+        var converted = named
+        converted.name = "Wavelet.txt"
+        converted.converted = true
+        #expect(EQWords.Correction.source(named) == "From HD650 ParametricEQ.txt")
+        let ways: [(String, (inout EQSettings) -> Void)] = [
+            ("an edit", { (s: inout EQSettings) -> Void in _ = s.editFilter(1, for: Self.airpods) { (f: inout EQFilter) -> Void in f.gain = 4 } }),
+            ("a switch", { (s: inout EQSettings) -> Void in _ = s.setFilter(2, on: false, for: Self.airpods) }),
+            ("Add Filter", { (s: inout EQSettings) -> Void in _ = s.addFilter(for: Self.airpods) }),
+            ("a delete", { (s: inout EQSettings) -> Void in _ = s.deleteFilter(1, for: Self.airpods) }),
+        ]
+        for (c, said) in [(named, "From HD650 ParametricEQ.txt - changed"), (pasted, "From the clipboard - changed"),
+                          (converted, "From Wavelet.txt, converted - changed")] {
+            for (way, change) in ways {
+                var settings = Self.settings(c)
+                change(&settings)
+                let edited = try #require(settings.output(Self.airpods.key)?.correction)
+                #expect(edited.changed && edited.kind == .file, "\(way)")
+                #expect(EQWords.Correction.source(edited) == said, "\(way)")
+                #expect(EQWords.Correction.value(edited) == EQWords.Correction.value(c), "\(way)")
+                #expect(!EQAdvancedRules.goesBack(edited))
+                #expect(settings.backToAutoEq(for: Self.airpods) == false)
+                //? kept in eq.json
+                let kept = try JSONDecoder().decode(EQSettings.self, from: try JSONEncoder().encode(settings))
+                #expect(kept.output(Self.airpods.key)?.correction?.changed == true)
+            }
+        }
+        var settings = Self.settings(named)
+        settings.editFilter(1, for: Self.airpods) { (f: inout EQFilter) -> Void in f.gain = 4 }
+        let comments = EQWords.Export.comments(output: "James's AirPods Pro", day: "2026-11-13",
+                                               correction: settings.output(Self.airpods.key)?.correction, tone: nil)
+        #expect(comments == ["deadwax EQ for James's AirPods Pro, 2026-11-13", "Correction: From HD650 ParametricEQ.txt - changed"])
+        //? an edit that changes nothing marks nothing
+        var unchanged = Self.settings(named)
+        unchanged.editFilter(1, for: Self.airpods) { (f: inout EQFilter) -> Void in f.gain = 6 }
+        #expect(unchanged.output(Self.airpods.key)?.correction?.changed == false)
+        //? a new import is as it came
+        settings.importCorrection(named, for: Self.airpods)
+        #expect(EQWords.Correction.source(settings.output(Self.airpods.key)!.correction!) == "From HD650 ParametricEQ.txt")
+        //? your own filters, edited, are still your own
+        var yours = Self.settings(Self.built([Self.peak(1, 100)]))
+        yours.editFilter(1, for: Self.airpods) { (f: inout EQFilter) -> Void in f.gain = 5 }
+        yours.addFilter(for: Self.airpods)
+        #expect(yours.output(Self.airpods.key)?.correction?.changed == false)
+        #expect(EQWords.Correction.source(yours.output(Self.airpods.key)!.correction!) == "Your own filters")
+    }
+
     @Test func addingOrDeletingMarksAutoEqChanged() throws {
         let original = try Self.autoEq()
         var added = Self.settings(original)

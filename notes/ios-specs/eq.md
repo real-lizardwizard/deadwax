@@ -464,7 +464,8 @@ deck's render (1.9), and the Linux tests.
 - **Section-major, channels paired**: the block is converted once into a Double scratch buffer
   (`maximumFramesToRender` × channels, made at allocation), and each section runs over it in place, both channels of a
   pair in one loop, so the two recursions interleave; cost is in 1.10.
-- **Up to 80 sections a channel** (64 for the correction, 10 for the tone, room to spare), up to 8 channels; channel 0
+- **Up to 80 sections a channel** (64 for the correction, 10 for the tone, room to spare; **84 since the follow-ups**
+  of 13 Nov - a file may hold 74, notes/ios.md "The EQ's follow-ups"), up to 8 channels; channel 0
   takes the left's list, 1 the right's, the rest the shared list (`Channel: all`). A one-channel output plays the left
   ear's.
 - **Denormals: none flushed.** A Double's subnormals start at 2.2e-308 - 260 orders of magnitude under the smallest
@@ -689,7 +690,8 @@ The sequence when AirPods connect mid-song (the same for the car, a DAC, AirPlay
 
 ### 1.10 What it costs
 
-The worst case: 74 sections a channel, two channels, at 192 kHz, during a crossfade (both banks running) - about 0.5
+The worst case: 74 sections a channel (84 since the follow-ups of 13 Nov, measured there - notes/ios.md "The EQ's
+follow-ups"), two channels, at 192 kHz, during a crossfade (both banks running) - about 0.5
 Gflop a second, the recursions latency-bound at roughly 7-8 cycles a section a sample (a multiply and an add on the
 `y` chain) with the two channels interleaved: about 6% of a performance core, for the 20 ms a crossfade lasts - and
 for as long as a drag goes on, which is a crossfade after another (1.6); half that steady. At 384 kHz, twice that. At
@@ -2506,6 +2508,8 @@ and no Simulator: every look, touch and sound is checks E22-E30's (docs/ios.md, 
   2. Delete with no confirmation (departure 12) - or Undo-less deletes asked first. Recommended: as built.
   3. The pinch keeping the width's form (departure 1) - or every pinch making a Q, as 3.8 reads. Recommended: as built.
   4. The 64/70 limit above.
+- **Answered** (13 Nov, built on `eq-followups`, notes/ios.md "The EQ's follow-ups"): 1 - "- changed" for a file too;
+  4 - an import takes 74 an ear (the 64 you add and the tone's ten), and the render 84 a channel.
 - **Only the phone shows**: the handles' feel - 22 pt reach, 4 pt engage, the pinch - and whether the pinch's
   full-plot gesture leaves a one-finger drag on the curve scrolling the page (it should: only the handles' circles take
   one finger); the capsule's place; the editor's fields with the phone's decimal comma and `.numbersAndPunctuation`;

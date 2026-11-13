@@ -485,7 +485,7 @@ public enum APOReader {
 
         for ear in [EQChannel.left, .right] {
             let count = filters.filter { $0.channel == .all || $0.channel == ear }.count
-            if count > EQLimits.filtersPerEar { throw EQWords.Import.tooMany(count: count) }
+            if count > EQLimits.importPerEar { throw EQWords.Import.tooMany(count: count) }
         }
         if !readPreamp && filters.isEmpty && graphic.isEmpty { throw EQWords.Import.nothing(pasted: pasted) }
 

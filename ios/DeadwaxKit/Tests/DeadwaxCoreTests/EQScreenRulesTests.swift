@@ -272,6 +272,17 @@ import Testing
                 == EQLine("Flat: nothing changes the sound yet."))
         #expect(R.line(on: true, identity: false, preamp: .automatic, played: -4.2, top: 4.2, unitNotMade: false)
                 == EQLine("Preamp -4.2 dB, so loud songs don't clip."))
+        //? a curve that only cuts: the automatic preamp is 0, and the line says so plainly (back-home 15a) - the
+        //  smallest boost takes a tenth off, and says the preamp
+        #expect(R.line(on: true, identity: false, preamp: .automatic, played: 0, top: 0, unitNotMade: false)
+                == EQLine("Cuts only: nothing gets louder."))
+        #expect(R.line(on: true, identity: false, preamp: .automatic, played: -0.0, top: -3, unitNotMade: false)
+                == EQLine("Cuts only: nothing gets louder."))
+        #expect(R.line(on: true, identity: false, preamp: .automatic, played: -0.1, top: 0.01, unitNotMade: false)
+                == EQLine("Preamp -0.1 dB, so loud songs don't clip."))
+        //? set by hand at 0, it is yours, and said as yours
+        #expect(R.line(on: true, identity: false, preamp: .hand(0), played: 0, top: 0, unitNotMade: false)
+                == EQLine("Preamp 0.0 dB, set by you."))
         #expect(R.line(on: true, identity: false, preamp: .hand(-6), played: -6, top: 5, unitNotMade: false)
                 == EQLine("Preamp -6.0 dB, set by you."))
         #expect(R.line(on: true, identity: false, preamp: .hand(-3.6), played: -3.6, top: 6, unitNotMade: false)
@@ -281,6 +292,24 @@ import Testing
         #expect(R.line(on: true, identity: false, preamp: .hand(-6), played: -6, top: 6.1, unitNotMade: false).tone == .amber)
         //? the unit not made says so before anything - Off included
         #expect(R.line(on: false, identity: true, preamp: .automatic, played: 0, top: 0, unitNotMade: true).tone == .danger)
+    }
+
+    /// back-home 15a, from the presets themselves: each that only cuts (Bass Reduce, Treble Reduce) plays at an
+    /// automatic preamp of 0 and gets the plain line, at both rates; each that boosts, its preamp's.
+    @Test func aPresetThatOnlyCutsSaysSoPlainly() {
+        for rate in [44_100.0, 48_000.0] {
+            for preset in EQGraphic.presets where preset.id != "flat" {
+                let bank = EQBank.make(rate: rate, key: "k", version: 0, on: true, correction: [], offsets: .zero,
+                                       bands: preset.gains, preamp: nil)
+                let line = EQScreenRules.line(on: true, identity: bank.isIdentity, preamp: .automatic,
+                                              played: bank.preamp, top: 0, unitNotMade: false)
+                let cuts = preset.gains.allSatisfy { $0 <= 0 }
+                #expect(cuts == ["bassReduce", "trebleReduce"].contains(preset.id))
+                #expect((bank.preamp == 0) == cuts, "\(preset.id) at \(rate): \(bank.preamp)")
+                #expect(line == EQLine(cuts ? "Cuts only: nothing gets louder." : EQWords.Screen.automatic(bank.preamp)),
+                        "\(preset.id) at \(rate)")
+            }
+        }
     }
 
     @Test func infoRows() {

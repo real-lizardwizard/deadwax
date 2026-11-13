@@ -294,7 +294,8 @@ public enum EQScreenRules {
 
     /// The line under the curve (3.3): the unit not made (state 11, in danger's colour) before anything; Off; on and
     /// flat (the identity bank: no sections at this rate and the level exactly 1); a preamp set by hand, enough or not
-    /// (amber); else the automatic preamp. `top` is the curve's top over the ears before the preamp (only read for a
+    /// (amber); else the automatic preamp - or, at 0, the curve only cuts (it never boosts, 3.2), said plainly as Flat
+    /// is, with no preamp (back-home 15a). `top` is the curve's top over the ears before the preamp (only read for a
     /// preamp by hand).
     public static func line(on: Bool, identity: Bool, preamp: EQPreampSetting, played: Double, top: Double,
                             unitNotMade: Bool) -> EQLine {
@@ -305,7 +306,7 @@ public enum EQScreenRules {
         case .hand(let dB):
             return EQLine(EQWords.Screen.hand(dB, top: top), top + dB > 1e-9 ? .amber : .quiet)
         case .automatic:
-            return EQLine(EQWords.Screen.automatic(played))
+            return EQLine(played == 0 ? EQWords.Screen.cutsOnly : EQWords.Screen.automatic(played))
         }
     }
 

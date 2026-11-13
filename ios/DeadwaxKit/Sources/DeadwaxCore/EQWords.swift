@@ -163,7 +163,7 @@ public enum EQWords {
         }
 
         public static func tooMany(count: Int) -> APORefusal {
-            refusal(.tooMany, nil, "This file has \(count) filters for one ear - deadwax plays up to 64.")
+            refusal(.tooMany, nil, "This file has \(count) filters for one ear - deadwax plays up to 74.")
         }
 
         public static func graphicEmpty(line n: Int) -> APORefusal {
@@ -401,6 +401,9 @@ extension EQWords {
         // the line under the curve
         public static let off = "Off: nothing changes the sound."
         public static let flat = "Flat: nothing changes the sound yet."
+        /// A curve that only cuts (Bass Reduce), whose automatic preamp is 0 - said plainly, as Flat is, with no preamp
+        /// (back-home 15a).
+        public static let cutsOnly = "Cuts only: nothing gets louder."
         public static func automatic(_ preamp: Double) -> String {
             "Preamp \(signedDB(preamp)), so loud songs don't clip."
         }
@@ -435,13 +438,16 @@ extension EQWords {
         public static let none = "None"
         public static let backToAutoEq = "Back to AutoEq's"
 
-        /// Where it's from: "AutoEq, measured by crinacle" (" - changed"), "From HD650 ParametricEQ.txt"
-        /// (", converted"), "Your own filters" - and a paste, which has no file name, "From the clipboard" (slice 5).
+        /// Where it's from: "AutoEq, measured by crinacle", "From HD650 ParametricEQ.txt" (", converted"), "Your own
+        /// filters" - and a paste, which has no file name, "From the clipboard" (slice 5); AutoEq's or a file's edited
+        /// since, " - changed" after it (back-home 15l).
         public static func source(_ c: EQCorrection) -> String {
+            let changed = c.changed ? " - changed" : ""
             switch c.kind {
-            case .autoeq: "AutoEq, measured by \(c.source ?? "")" + (c.changed ? " - changed" : "")
-            case .file: (c.name.isEmpty ? Import.fromClipboard : "From \(c.name)") + (c.converted ? ", converted" : "")
-            case .built: "Your own filters"
+            case .autoeq: return "AutoEq, measured by \(c.source ?? "")" + changed
+            case .file:
+                return (c.name.isEmpty ? Import.fromClipboard : "From \(c.name)") + (c.converted ? ", converted" : "") + changed
+            case .built: return "Your own filters"
             }
         }
 
@@ -629,7 +635,9 @@ extension EQWords {
         public static let turnOff = "Turn Off"
         public static let above = "Above what this output plays, so it's left out."
         public static let addFilter = "Add Filter"
-        public static let mostFilters = "64 filters is the most deadwax plays"
+        /// Under Add Filter when it is disabled: 64 is the most you make (a file may bring up to 74 - the 64 and a
+        /// tone's ten - so a whole curve exported reads back).
+        public static let mostFilters = "64 filters is the most you can add"
         public static let delete = "Delete"
     }
 
