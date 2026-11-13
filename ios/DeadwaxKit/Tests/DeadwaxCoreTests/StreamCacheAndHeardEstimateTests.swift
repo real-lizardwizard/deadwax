@@ -261,6 +261,18 @@ private let flac = Song(id: "song-1", suffix: "flac", size: 1_000)
         #expect(HeardEstimate.atStop(speaker, now: nil, rate: 48_000, end: 10_000_000) == 480_000 - 4_800)
     }
 
+    /// A reading taken at a speed (turntable.md 5.2; slice 4's review): carried on at the speed it was read at, and the
+    /// ear the song's seconds its latency held behind - whatever the speed is when it is read back (it was kept as the
+    /// latency over the speed then, and read back at the speed now).
+    @Test func aReadingAtSpeedKeepsItsOwnSpeed() {
+        let reading = HeardReading(frame: 480_000, at: 50.0, latency: 0.1, speed: 2, behind: 0.15)
+        #expect(HeardEstimate.rendered(reading, now: 50.5, rate: 48_000, end: 10_000_000) == 480_000 + 48_000)
+        #expect(HeardEstimate.atStop(reading, now: 50.5, rate: 48_000, end: 10_000_000) == 480_000 + 48_000 - 7_200)
+        let plain = HeardReading(frame: 480_000, at: 50.0, latency: 0.1)
+        #expect(plain.speed == 1 && plain.behind == 0.1, "1x: the latency itself")
+        #expect(HeardReading(frame: 0, at: nil, latency: 0.1, speed: 0.5).behind == 0.05, "no history: the latency at its speed")
+    }
+
     /// turntable.md 5.2: what the latency holds of the song is each output second at the speed it was rendered at.
     @Test func theLatencyHoldsTheSongAtEachSpeedItWasRenderedAt() {
         let none: [SpeedChange] = []

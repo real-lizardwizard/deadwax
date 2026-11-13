@@ -115,6 +115,29 @@ func largestStep(_ x: [Float], in range: Range<Int>) -> (step: Float, at: Int) {
 
 func db(_ x: Double) -> String { String(format: "%.1f dB", x) }
 
+/// A ramp's step: each frame of the song its own value, n x 2^-20 - exact in a Float to 8 s at 48 kHz.
+let rampStep = 1.0 / 1_048_576
+
+/// The song frame a ramp resumed at, through the speed's chain from output frame `from` at `speed`: the chain's frame
+/// j is the node's j x speed - 48, so a line fitted to j = 400..<4400 (past the resampler's start) - its slope the
+/// resampler's level times `rampStep` times the speed - is the node's first frame where it says 48 at j = 0.
+func rampStart(_ out: [Float], from: Int, speed: Double) -> Double {
+    let js = 400..<4_400
+    var sj = 0.0, sy = 0.0, sjj = 0.0, sjy = 0.0
+    for j in js {
+        let y = Double(out[from + j])
+        sj += Double(j)
+        sy += y
+        sjj += Double(j * j)
+        sjy += Double(j) * y
+    }
+    let n = Double(js.count)
+    let slope = (n * sjy - sj * sy) / (n * sjj - sj * sj)
+    let intercept = (sy - slope * sj) / n
+    let level = slope / (rampStep * speed)
+    return intercept / (level * rampStep) + Double(PlaybackEngine.varispeedDelayFrames)
+}
+
 /// Every channel of a render, `piece` frames at a time, the buffer completions handled between - `before` called with
 /// the frames rendered so far ahead of each piece.
 func renderPieces(_ engine: PlaybackEngine, frames: Int, piece: Int, before: ((Int) -> Void)? = nil,
@@ -305,10 +328,12 @@ func bestLag(_ got: [Float], _ expected: [Float], at: Int) -> Int {
     /// two back to back) at 2x and 0.25x (and 1x, to compare): a sine fitted across the join, what is not the sine within
     /// 50 ms of it held to -50 dB at its largest. And a change of lane at speed, with the phone's buffering (2 s ahead, 1 s
     /// before a start, 4,096-frame renders - a locked phone's): a 441 Hz tone, 3 s of it at 44.1 kHz and the next 0.5 s
-    /// at 96 kHz, cut at a crossing on a whole frame of the output - the second lane made and put through its varispeed
-    /// while the first plays, and started at the sample the first ends at, in its own node's time. Each lane's
-    /// converter rings at the cut (it takes its part for a song on its own: notes/ios.md "The speed, measured"), so the
-    /// bar is 1x's own join: no worse at speed, 4x (the reach shortest) among them.
+    /// at 96 kHz, cut at a crossing on a whole frame of the 48 kHz output - the second lane made and put into the speed's
+    /// chain while the first plays, and started at the sample the first ends at. Each lane's converter rings at the cut
+    /// (it takes its part for a song on its own: notes/ios.md "The speed, measured"), so the bar is 1x's own join: no
+    /// worse at any speed - the ends (0.25x, 4x), the round ones (2x), and ones that put the join between the output's
+    /// frames (0.73x, 1.01x, 1.37x, 2.9x), where a varispeed per lane gave each lane its own fractional phase (slice 4's
+    /// review: -35.2, -36.0 and -39.3 dB at 0.73x, 1.01x and 1.37x). One varispeed for every lane: one phase.
     @Test func joinsAtSpeedAreUnbroken() throws {
         let rate = 48_000.0
         var lines: [String] = []
@@ -353,9 +378,9 @@ func bestLag(_ got: [Float], _ expected: [Float], at: Int) -> Int {
         let lanes = [memoryTrack([firstPart, firstPart], rate: 44_100, key: 0),
                      memoryTrack([secondPart, secondPart], rate: 96_000, key: 1)]
         var atOne = 0.0
-        for speed in [1.0, 2.0, 4.0, 0.25] {
+        for speed in [1.0, 0.25, 0.73, 1.01, 1.37, 2.0, 2.9, 4.0] {
             let (out, trace) = try rendered(lanes, speed: speed, seconds: 3.45, phone: true)
-            let join = Int(3 * rate / speed)
+            let join = Int((3 * rate / speed).rounded())
             let near = (join - 2_400)..<(join + 2_400)
             let away = (join - 12_000)..<(join - 2_400)
             let nearFit = fitTone(out, cycles: 441 * speed / rate, in: near)
@@ -367,16 +392,20 @@ func bestLag(_ got: [Float], _ expected: [Float], at: Int) -> Int {
                 + "largest \(db(awayFit.worst))"
             #expect(nearFit.worst <= atOne + 3, "\(line): worse than the same join at 1x (\(db(atOne)))\n\(trace)")
             #expect(awayFit.snr > 60, "\(line)")
+            #expect(!trace.description.contains("off the heard lane's"), "the two nodes in one time base\n\(trace)")
             lines.append(line)
         }
-        // the new lane can be started only once a render has pulled its node through its varispeed (its time begins
-        // then): with less ahead than a render, the first lane runs out first and the second starts from silence after
-        // it - late, never over it. 0.3 s ahead at 2x is 7,200 frames: under two 4,096-frame renders
+        // with less ahead than a render (0.3 s at 2x is 7,200 frames: under two 4,096-frame renders): a varispeed per
+        // lane gave the new lane's node no time until a render had pulled it, so the first lane ran out first and the
+        // second started from silence after it - late. In the chain's one time base it starts at the first's end.
         do {
             let engine = try speedEngine(rate: rate, ahead: 0.3)
+            let trace = TraceLines()
+            engine.trace = trace.add
             engine.setSpeed(2)
+            let after = sine(441, rate: 96_000, seconds: 0.5, level: 0.25, from: 0.5)
             let short = [memoryTrack([Array(firstPart[..<22_050]), Array(firstPart[..<22_050])], rate: 44_100, key: 0),
-                         memoryTrack([Array(secondPart), Array(secondPart)], rate: 96_000, key: 1)]
+                         memoryTrack([after, after], rate: 96_000, key: 1)]
             engine.play(short, from: 0)
             engine.settle()
             let out = try renderChannels(engine, frames: 24_000)[0]
@@ -389,9 +418,11 @@ func bestLag(_ got: [Float], _ expected: [Float], at: Int) -> Int {
                     gapAt = i - run + 1
                 }
             }
-            let line = "a change of lane at 2x with 0.3 s ahead and 4,096-frame renders: \(gap) frames of silence from \(gapAt) "
-                + "(the first lane ends at 12000)"
-            #expect(gapAt + gap >= 12_000 && (gap <= 2 || gapAt >= 11_990), "\(line): over the first lane's end")
+            let near = fitTone(out, cycles: 441 * 2 / rate, in: 9_600..<14_400)
+            let line = "a change of lane at 2x with 0.3 s ahead and 4,096-frame renders: the longest quiet \(gap) frames "
+                + "(from \(gapAt)); within 50 ms of the join (at 12000) \(db(near.snr)), its largest stray sample \(db(near.worst))"
+            #expect(gap <= 2, "\(line): a gap at the join\n\(trace)")
+            #expect(near.worst <= atOne + 3, "\(line)\n\(trace)")
             lines.append(line)
         }
         print(lines.joined(separator: "\n"))
@@ -442,13 +473,16 @@ func bestLag(_ got: [Float], _ expected: [Float], at: Int) -> Int {
     }
 
     /// 5.3 item 7: crossing 1x while playing, both ways. A drag from 0.9x up through 1x to 1.1x and back, a step of 0.01
-    /// every 10 ms: the varispeed stays in the path at 1 (at rate 1, never bypassed - this engine takes it out of the path
+    /// every 10 ms: the chain stays in the path at 1 (at rate 1, never bypassed - this engine takes it out of the path
     /// at 1x, which can't be done to a node playing), so no click and no gap. Then a pause and play at 1x: out of the
-    /// path again, the song's own samples. And a song begun at 1x, the speed then moved off it: the lane begun again in
-    /// the path, from the frame the render reached - the gap that leaves, measured.
+    /// path again, the song's own samples. A song begun at 1x, the speed then moved off it: the lane begun again in the
+    /// chain from the frame the render reached - with the output's latency 0.1 s, read off a ramp to the frame - and the
+    /// gap that leaves, measured. And let go at 1x (`setSpeed(1, exact: true)`, James's answer): out of the chain again
+    /// from the frame it gave out, the song's own samples bit for bit.
     @Test func crossingOneX() throws {
         let rate = 48_000.0
         let song = sine(440, rate: rate, seconds: 8, level: 0.5)
+        let ramp = (0..<(8 * 48_000)).map { (n: Int) -> Float in Float(Double(n) * rampStep) }
         var lines: [String] = []
         do {
             let engine = try speedEngine(rate: rate)
@@ -490,12 +524,17 @@ func bestLag(_ got: [Float], _ expected: [Float], at: Int) -> Int {
             lines.append(words)
         }
         do {
-            // begun at 1x (out of the path), then 1.01x: begun again through the varispeed
-            let engine = try speedEngine(rate: rate)
-            engine.play([memoryTrack([song, song], rate: rate, key: 0)], from: 0)
+            // begun at 1x (straight to the main mixer), then 1.01x: begun again in the speed's chain from the frame the
+            // render reached - not the frame heard, the output's latency (0.1 s) behind it, which would play that 0.1 s
+            // twice. The song a ramp, each frame its own value, so the frame it resumes at is read off the sound.
+            let engine = try speedEngine(rate: rate, latency: 0.1)
+            let trace = TraceLines()
+            engine.trace = trace.add
+            engine.play([memoryTrack([ramp, ramp], rate: rate, key: 0)], from: 0)
             engine.settle()
             let start = 48_000
             var before: Double?, afterwards: Double?
+            var readings: [(rendered: Int, frame: Double)] = []
             let out = try renderPieces(engine, frames: start + 48_000, piece: 480) { (done: Int) -> Void in
                 if done == start {
                     before = engine.position()?.seconds
@@ -503,29 +542,180 @@ func bestLag(_ got: [Float], _ expected: [Float], at: Int) -> Int {
                     engine.settle()
                     afterwards = engine.position()?.seconds
                 }
+                if done >= start - 4_800, let at = engine.position() { readings.append((done, at.seconds * rate)) }
             }[0]
-            let exactBefore = firstDifference(out[4_096..<start], song[4_096..<start])
-            // the gap: the longest run of near silence where the tone was (a 440 Hz sine at 0.5 is under 0.001 for one
-            // frame at most, at a crossing)
-            var gap = 0, run = 0, gapAt = start
-            for i in (start - 480)..<(start + 4_800) {
-                run = abs(out[i]) < 0.001 ? run + 1 : 0
-                if run > gap {
-                    gap = run
-                    gapAt = i - run + 1
-                }
+            let exactBefore = firstDifference(out[4_096..<start], ramp[4_096..<start])
+            // the chain's frame j after the start is the node's j x 1.01 - 48 (thePositionIsTheClicksHeard): a line
+            // fitted to the ramp it gives out says the node's first frame, the song frame it resumed at (its level and
+            // so the line's slope the resampler's own)
+            let resumed = rampStart(out, from: start, speed: 1.01)
+            // the gap: where the song comes in - its first frame's step half way up, through the resampler's filter
+            let onset = (0..<200).first { Double(out[start + $0]) >= 0.5 * resumed * rampStep } ?? 200
+            // the position across it: never back, never on by more than the frames rendered at the faster speed
+            var worstStep = (back: 0.0, ahead: 0.0)
+            for (a, b) in zip(readings, readings.dropFirst()) {
+                let moved = b.frame - a.frame, most = Double(b.rendered - a.rendered) * 1.01
+                worstStep = (min(worstStep.back, moved), max(worstStep.ahead, moved - most))
             }
-            let fit = fitTone(out, cycles: 440 * 1.01 / rate, in: (start + 4_800)..<(start + 48_000))
-            let line = "begun at 1x, then 1.01x at \(start): before it, \(exactBefore ?? "the song's own samples"); the position "
-                + "\(before.map { String(format: "%.5f", $0) } ?? "-") s before the change and "
-                + "\(afterwards.map { String(format: "%.5f", $0) } ?? "-") s after it; the longest quiet \(gap) frames, from "
-                + "\(gapAt - start) after the change; then a 444.4 Hz tone \(db(fit.snr)) above everything else"
+            let line = "begun at 1x, then 1.01x at \(start), the output's latency 0.1 s: before it, \(exactBefore ?? "the song's own samples"); "
+                + "the position \(before.map { String(format: "%.5f", $0) } ?? "-") s before the change and "
+                + "\(afterwards.map { String(format: "%.5f", $0) } ?? "-") s after it, never back (least move "
+                + String(format: "%.1f", worstStep.back) + ") and at most " + String(format: "%.1f", worstStep.ahead)
+                + " frames past the speed a reading; the song from frame " + String(format: "%.2f", resumed)
+                + " (the render had reached \(start), the ear \(start - 4_800)), coming in \(onset) frames after the change"
             #expect(exactBefore == nil, "\(line)")
-            #expect(before != nil && before == afterwards, "\(line)")
-            #expect(fit.snr > 60, "\(line)")
+            #expect(before != nil && before == afterwards, "the position stays the frame heard: \(line)")
+            #expect(worstStep.back >= 0 && worstStep.ahead <= 8, "\(line)\n\(trace)")
+            #expect(abs(resumed - Double(start)) <= 1, "on from the frame the render reached: \(line)\n\(trace)")
+            #expect(onset <= 49, "\(line)")
             lines.append(line)
         }
+        do {
+            // let go at 1x (James, 2026-11-13): the fader held at 1x plays on in the chain at rate 1, 48 frames late and
+            // filtered; let go, the lane is begun again straight to the main mixer from the frame the chain gave out -
+            // the song's own samples from there, bit for bit
+            let engine = try speedEngine(rate: rate, latency: 0.1)
+            let trace = TraceLines()
+            engine.trace = trace.add
+            engine.setSpeed(1.2)
+            engine.play([memoryTrack([ramp, ramp], rate: rate, key: 0)], from: 0)
+            engine.settle()
+            let down = 24_000, letGo = 72_000
+            var before: Double?, afterwards: Double?
+            let out = try renderPieces(engine, frames: letGo + 48_000, piece: 480) { (done: Int) -> Void in
+                if done == down { engine.setSpeed(1) }
+                if done == letGo {
+                    before = engine.position()?.seconds
+                    engine.setSpeed(1, exact: true)
+                    engine.settle()
+                    afterwards = engine.position()?.seconds
+                }
+            }[0]
+            // the last frame the chain gave out, read off the ramp (its slope there the resampler's level)
+            let slope = Double(out[letGo - 1] - out[letGo - 4_801]) / 4_800
+            let lastOut = Double(out[letGo - 1]) / slope
+            var gap = 0
+            while letGo + gap < out.count, out[letGo + gap] == 0 { gap += 1 }
+            let from = letGo + gap
+            let resumed = Int((Double(out[from]) / rampStep).rounded())
+            let exact = firstDifference(out[from..<(from + 40_000)], ramp[resumed..<(resumed + 40_000)])
+            let line = "held at 1x in the chain, then let go: the chain's last frame out the song's "
+                + String(format: "%.2f", lastOut) + ", then \(gap) frames of silence and the song from frame \(resumed): "
+                + (exact ?? "its own samples, bit for bit, for 40000 frames") + "; the position "
+                + "\(before.map { String(format: "%.5f", $0) } ?? "-") s before the let-go and \(afterwards.map { String(format: "%.5f", $0) } ?? "-") s after"
+            #expect(exact == nil, "\(line)\n\(trace)")
+            #expect(abs(Double(resumed) - (lastOut + 1)) < 0.5, "on from the very frame after the chain's last: \(line)")
+            #expect(gap <= 1, "\(line)")
+            #expect(before != nil && before == afterwards, "\(line)")
+            #expect(trace.description.contains("let go at 1x") && trace.description.contains("the speed's chain out"), "\(trace)")
+            lines.append(line)
+            // and a let-go with nothing in the chain does nothing
+            let calm = try speedEngine(rate: rate)
+            let calmTrace = TraceLines()
+            calm.trace = calmTrace.add
+            calm.play([memoryTrack([ramp, ramp], rate: rate, key: 0)], from: 0)
+            calm.settle()
+            let first = try renderChannels(calm, frames: 9_600)[0]
+            calm.setSpeed(1, exact: true)
+            calm.settle()
+            let then = try renderChannels(calm, frames: 9_600)[0]
+            #expect(firstDifference(first + then, ramp[0..<19_200]) == nil && !calmTrace.description.contains("let go"),
+                    "at 1x all along: nothing begun again\n\(calmTrace)")
+        }
         print(lines.joined(separator: "\n"))
+    }
+
+    /// A mono song at speed (slice 4's review): through the speed's chain - its one mixer spreads it as the main mixer
+    /// spreads a mono lane straight at 1x - at the level 1x plays it, on both channels, and in place.
+    @Test func aMonoSongAtSpeed() throws {
+        let rate = 48_000.0
+        let tone = sine(1_000, rate: rate, seconds: 3)
+        func rendered(_ speed: Double) throws -> [[Float]] {
+            let engine = try speedEngine(rate: rate)
+            engine.setSpeed(speed)
+            engine.play([memoryTrack([tone], rate: rate, key: 0)], from: 0)
+            engine.settle()
+            return try renderChannels(engine, frames: 48_000)
+        }
+        let plain = try rendered(1)
+        var lines: [String] = []
+        for speed in [1.5, 0.5] {
+            let fast = try rendered(speed)
+            for channel in 0..<2 {
+                let atOne = fitTone(plain[channel], cycles: 1_000 / rate, in: 9_600..<33_600)
+                let at = fitTone(fast[channel], cycles: 1_000 * speed / rate, in: 9_600..<33_600)
+                let level = 20 * log10(at.amplitude / atOne.amplitude)
+                let line = "a mono song at \(speed)x, channel \(channel): \(db(at.snr)) above everything else, \(db(level)) from its level at 1x"
+                #expect(at.snr > 60 && abs(level) < 0.1, "\(line)")
+                lines.append(line)
+            }
+        }
+        // in place: clicks at 1.5x, where the position says
+        let every = 480
+        let song = clicks(frames: 96_000, every: every, first: 9_600)
+        let engine = try speedEngine(rate: rate)
+        engine.setSpeed(1.5)
+        engine.play([memoryTrack([song], rate: rate, key: 0)], from: 0)
+        engine.settle()
+        var readings: [(rendered: Int, frame: Double)] = []
+        let out = try renderPieces(engine, frames: 48_000, piece: 480) { (done: Int) -> Void in
+            if done > 0, let at = engine.position() { readings.append((done, at.seconds * rate)) }
+        }[0]
+        let places = clickPlaces(out, apart: Int(Double(every) / 1.5))
+        var worst = 0.0
+        for reading in readings {
+            let at = Double(reading.rendered)
+            guard let i = places.firstIndex(where: { $0 > at }), i > 0 else { continue }
+            let song = 9_600 + Double(i - 1) * Double(every) + (at - places[i - 1]) * Double(every) / (places[i] - places[i - 1])
+            worst = max(worst, abs(reading.frame - song) / 1.5)
+        }
+        let line = "a mono song at 1.5x: the position against the clicks heard, out by at most " + String(format: "%.2f", worst) + " output frames"
+        #expect(places.count > 10 && worst <= 1, "\(line)")
+        lines.append(line)
+        print(lines.joined(separator: "\n"))
+    }
+
+    /// At 4x on a locked phone's IO buffer (4,096 frames, 85 ms; slice 4's review): a 44.1 kHz song whose next song
+    /// hasn't come by its end has its converter's last frames put on while the node still plays - the window that
+    /// looks for it is in the output's time, so 4x of the node's frames - and plays to its end exactly as with nothing
+    /// after it. And the clock's backstop is a quarter of a second of the output's: past a play(at:) start's error of
+    /// 1.5 IO buffers at every speed.
+    @Test func atFourXOnALockedPhonesBuffer() throws {
+        let rate = 48_000.0, songRate = 44_100.0, io = 4_096 / rate
+        let a = signal(frames: 88_200, channels: 2, seed: 0.72) // 2 s of song: 24000 of the output's at 4x
+        let b = signal(frames: 44_100, channels: 2, seed: 0.73)
+        func made() throws -> PlaybackEngine {
+            let engine = try liveEngine(rate: rate, ahead: 3)
+            engine.ioBuffer = { io }
+            engine.setSpeed(4)
+            return engine
+        }
+        let alone = try made()
+        alone.play([entry(a, rate: songRate, key: 0, id: "a")], from: 0)
+        alone.settle()
+        let expected = try render(alone, frames: 36_864, piece: 4_096)
+        let gate = GatedFrames(b, rate: songRate, arrived: 0)
+        let engine = try made()
+        let trace = TraceLines()
+        engine.trace = trace.add
+        engine.play([entry(a, rate: songRate, key: 0, id: "a"), gatedTrack(gate, b, rate: songRate, key: 1, id: "b")], from: 0)
+        engine.settle()
+        // four renders: 65536 of the node's 96000 played, 30464 left - a render and more at 4x
+        var out = try render(engine, frames: 16_384, piece: 4_096)
+        waitFor(engine, seconds: 1) { trace.description.contains("about to play out all on it") }
+        #expect(trace.description.contains("about to play out all on it, the next song not here"), "\(trace)")
+        out += try render(engine, frames: 36_864 - 16_384, piece: 4_096)
+        #expect(firstDifference(out, expected) == nil, "A to its end on time at 4x, as with nothing after it\n\(trace)")
+        #expect(!trace.description.contains("converter holding"), "nothing left for after the node ran out\n\(trace)")
+        gate.release()
+        waitFor(engine) { engine.phase == .playing && engine.stateNow.key == 1 }
+        #expect(engine.phase == .playing && engine.stateNow.key == 1, "B on (\(engine.phase))\n\(trace)")
+        for speed in [0.25, 1, 2, 4] {
+            let error = 1.5 * 4_096 * speed // a play(at:) start's render edge, in the node's frames
+            #expect(Double(PlaybackEngine.ranOutBackstop(rate: rate, speed: speed)) > error,
+                    "the backstop at \(speed)x is past the clock's own error of \(error) frames")
+        }
+        #expect(PlaybackEngine.ranOutBackstop(rate: rate, speed: 1) == 12_000, "1x as before the speed")
     }
 
     /// The speed as the engine takes it: 0.25 to 4, anything else held to the nearer end (and not a number, 1).

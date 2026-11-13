@@ -7,11 +7,19 @@ public struct HeardReading: Sendable, Equatable {
     public var frame: Int64
     public var at: Double?
     public var latency: Double
+    /// The speed the song played at as it was read (notes/ios-specs/turntable.md 5.2): the render goes on from it
+    /// `speed` of the song's seconds to the output's second. 1 at 1x.
+    public var speed: Double
+    /// The song's seconds the output's latency held as it was read - each of its seconds at the speed it was rendered
+    /// at (`songSeconds`): what the ear was behind the render, in the song. The latency itself at 1x.
+    public var behind: Double
 
-    public init(frame: Int64, at: Double?, latency: Double) {
+    public init(frame: Int64, at: Double?, latency: Double, speed: Double = 1, behind: Double? = nil) {
         self.frame = frame
         self.at = at
         self.latency = latency
+        self.speed = speed
+        self.behind = behind ?? latency * speed
     }
 }
 
@@ -45,24 +53,25 @@ public enum HeardEstimate {
         max(rendered - frames(max(latency, 0), rate: rate), 0)
     }
 
-    /// Where the render had got to by `now`: the reading carried on at `rate` for the time since (at
-    /// most `maxExtrapolation` seconds - past it, the reading as it is), never past `end`, the end of
-    /// what was scheduled. With no clock (`now` or the reading's time nil) it is the reading.
+    /// Where the render had got to by `now`: the reading carried on at `rate` (the song's own) times the
+    /// speed it was read at, for the time since (at most `maxExtrapolation` seconds - past it, the reading
+    /// as it is), never past `end`, the end of what was scheduled. With no clock (`now` or the reading's
+    /// time nil) it is the reading.
     public static func rendered(_ reading: HeardReading, now: Double?, rate: Double, end: Int64) -> Int64 {
         var frame = reading.frame
         if let now, let at = reading.at, rate > 0 {
             let since = now - at
             if since > 0, since <= maxExtrapolation {
-                frame += Int64((since * rate).rounded(.down))
+                frame += Int64((since * rate * reading.speed).rounded(.down))
             }
         }
         return max(min(frame, max(end, reading.frame)), 0)
     }
 
-    /// The frame heard when iOS stopped the output: `rendered`, less the latency of the route the
-    /// reading was taken on.
+    /// The frame heard when iOS stopped the output: `rendered`, less the song's seconds the latency of
+    /// the route the reading was taken on held (`behind`: the latency itself at 1x).
     public static func atStop(_ reading: HeardReading, now: Double?, rate: Double, end: Int64) -> Int64 {
-        heard(rendered: rendered(reading, now: now, rate: rate, end: end), latency: reading.latency, rate: rate)
+        heard(rendered: rendered(reading, now: now, rate: rate, end: end), latency: reading.behind, rate: rate)
     }
 
     /// The song's seconds that `latency` of output holds, rendered up to a reading at host time `at` (notes/ios-specs/
