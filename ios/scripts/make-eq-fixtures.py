@@ -399,7 +399,7 @@ TYPE_PHRASE = {"peak": "a peak filter", "lowShelf": "a low-shelf filter", "highS
                "lowPass": "a low-pass filter", "highPass": "a high-pass filter", "bandPass": "a band-pass filter",
                "notch": "a notch filter", "allPass": "an all-pass filter"}
 MAX_BYTES = 256 * 1024
-MOST_FILTERS = 64
+MOST_FILTERS = 74
 
 CP1252 = {0x80: 0x20AC, 0x82: 0x201A, 0x83: 0x0192, 0x84: 0x201E, 0x85: 0x2026, 0x86: 0x2020, 0x87: 0x2021,
           0x88: 0x02C6, 0x89: 0x2030, 0x8A: 0x0160, 0x8B: 0x2039, 0x8C: 0x0152, 0x8E: 0x017D, 0x91: 0x2018,
@@ -808,7 +808,7 @@ def read_apo_or_refuse(data, pasted):
     for ear in ("left", "right"):
         count = sum(1 for f in filters if f["channel"] in ("all", ear))
         if count > MOST_FILTERS:
-            raise Refused("tooMany", None, "This file has %d filters for one ear - deadwax plays up to 64." % count)
+            raise Refused("tooMany", None, "This file has %d filters for one ear - deadwax plays up to 74." % count)
     if not read_preamp and not filters and not graphic:
         raise Refused("nothing", None, "There's no EQ in %s: no Preamp, Filter or GraphicEQ lines."
                       % ("what you pasted" if pasted else "this file"))

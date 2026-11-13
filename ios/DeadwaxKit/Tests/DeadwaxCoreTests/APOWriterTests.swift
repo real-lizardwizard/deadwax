@@ -33,18 +33,20 @@ import Testing
         }
     }
 
-    /// An export of more than 64 filters for an ear - a converted GraphicEQ's 60 and a tone's 10 - is refused when
-    /// it is read back, as any file is (3.9): the render plays 80, but an import is held to 64. Checked as such.
+    /// Every one reads back since an import takes 74 an ear (back-home 15; it took 64, and ten of these - a converted
+    /// GraphicEQ's 60 under a preset - were refused): the fixtures' largest is that 60, and a preset moves at most nine
+    /// bands. One over 74 would be refused, as any file is (3.9).
     @Test func everyFixtureAndPresetReadsBackTheSame() throws {
         let corrections = try Self.corrections()
         #expect(corrections.count == 31 + 14)
-        var files = 0, tooMany = 0
+        var files = 0, tooMany = 0, largest = 0
         for (name, reading) in corrections {
             for preset in [nil] + EQGraphic.presets {
                 let filters = APOWriter.curve(correction: reading.filters, bands: preset?.gains)
                 let text = APOWriter.write(filters: filters, preamp: reading.preamp, comments: ["deadwax EQ for \(name)"])
                 let most = [EQChannel.left, .right].map { ear in filters.filter { $0.channel == .all || $0.channel == ear }.count }.max()!
-                if most > EQLimits.filtersPerEar {
+                largest = max(largest, most)
+                if most > EQLimits.importPerEar {
                     guard case .failure(let refusal) = APOReader.read(Data(text.utf8)) else {
                         Issue.record("\(name) + \(preset?.id ?? "nothing"): \(most) filters for an ear read back")
                         continue
@@ -67,8 +69,10 @@ import Testing
                 files += 1
             }
         }
-        #expect(files + tooMany == (31 + 14) * 10)
-        print("APOWriterTests: \(files) exports read back the same, bit for bit; \(tooMany) over 64 filters for an ear refused")
+        #expect(files == (31 + 14) * 10 && tooMany == 0)
+        #expect(largest == 60 + 9)
+        print("APOWriterTests: \(files) exports read back the same, bit for bit (the largest \(largest) filters an ear); "
+              + "\(tooMany) over 74 refused")
     }
 
     /// AutoEq's files are its own shape exactly: the reader's filters written back are the file, byte for byte.

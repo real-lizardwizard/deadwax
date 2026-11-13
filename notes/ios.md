@@ -3534,3 +3534,81 @@ whole curve and importing it back plays the same within 1e-9 dB, over a Flat ton
 GraphicEQ with a tone reads back, is James's to answer. Every departure, the mutations tried and what only the phone
 shows: eq.md's "Slice 5, built". docs/ios.md's Advanced section and checks E22-E30 are James's. The app's version stays
 0.5 (5).
+
+## The EQ's follow-ups (back-home 15, 15a, 15l; 2026-11-13)
+
+James's answers to three of slices 3 and 5's questions (`~/Desktop/Code/deadwax-plans/back-home.md` 15, 15a, 15l), on
+the `eq-followups` branch from `ios`. The app's version stays 0.6 (6): small follow-ups don't move it (slices 4 and 5
+didn't), and the turntable already took 0.6.
+
+**15, the import's limit: 74 an ear, not 70.** James chose "raise it to 70, so deadwax reads back its own exports".
+The Whole Curve writes a correction's filters and the tone's moved bands as ten more filters (APOWriter.curve), so the
+most it writes for an ear is **the most a correction holds, plus 10** - and an import is a correction, so no single
+limit can cover every export: at 70 for imports and edits, a correction of 70 under a full tone writes 80. 70 would
+not even cover the two cases that are ordinary: a converted GraphicEQ keeping all 61 of its peaks under a Custom tone
+with all ten bands moved (71 - every built-in preset moves at most nine, Spoken Word's), and 64 filters you added
+(Add Filter's limit, unchanged) under any tone of seven or more bands (up to 74). So the limits now are two:
+
+- **`EQLimits.filtersPerEar` = 64**, what you make: Add Filter stops there ("64 filters is the most you can add",
+  was "... deadwax plays", now untrue) and **no edit grows an ear past 64, or past what that ear already had**
+  (`EQAdvancedRules.fits(_:before:)` - per ear, so moving a filter between the ears can't creep one up; a file's
+  extra filters stay editable, switchable, deletable and movable).
+- **`EQLimits.importPerEar` = 74** = 64 + the tone's ten: what a file may hold (APOReader; "This file has 90
+  filters for one ear - deadwax plays up to 74."). So every whole curve of a correction within 64 an ear - all you
+  can build, every AutoEq profile, every converted GraphicEQ (at most 61), every file of up to 64 - reads back under
+  any tone, and The Correction Alone always does.
+- **`EQLimits.sectionsPerChannel` = 84** (was 80) = a file's 74 + the tone's 10, so the render plays an imported 74
+  under a full tone with nothing dropped (EQBank's `prefix` would have cut the last tone bands silently, with the
+  automatic preamp worked out from sections that didn't play). Everything sized by it follows: `EQBank.packedCount`
+  (8 + 3 x 84 x 8 doubles), EQRender's slots and states, EQHost's three slots, EQUnit's and DeckVoiceHost's copies.
+
+**The true maximum the exporter writes for an ear is therefore 84** - only for a correction over 64, which only a
+file brings, under a tone again: in practice a whole curve read back (its tone already in it, so it plays twice -
+docs/ios.md already says to set the tone Flat first) and exported again. That one is refused ("84 filters"); over
+Flat it reads back. Every other export is at most 74 and reads back. Going higher can't close this - each step up adds
+ten to the next export - and 74 keeps the render's growth to four sections.
+
+**The cost**: 1.10's worst case grows from 74 sections a channel (64 + 10) to 84 (74 + 10). EQRealTimeTests' test 8
+now runs 74 correction filters and the tone's ten at 192 kHz, crossfading every block: **2.050 ms a block's median,
+9.6% of its 21.3 ms** (9.7% on average, 2.246 ms at worst), release, on this M2 - it measured 8.5-8.6% at 74, so
+about what ten more sections cost. Its bound (the median block at 15%) is unchanged.
+
+**15a, a curve that only cuts**: its automatic preamp is 0 (it never boosts, 3.2), and the line under the curve said
+"Preamp 0.0 dB, so loud songs don't clip." Now it says **"Cuts only: nothing gets louder."**, in Flat's plain form,
+with no preamp - `EQScreenRules.line` when the preamp is automatic and the one playing is 0 (`EQPreamp.automatic`
+gives exactly 0 when the curve's top is at or under 0 dB, else -0.1 or lower). A preamp set by hand at 0 still says
+"Preamp 0.0 dB, set by you.". Info's Sound row already left a 0 dB preamp out. Bass Reduce and Treble Reduce are the
+built-in presets that only cut.
+
+**15l, "- changed" for a file**: Add Filter, an edit, a switch or a delete marks a file's correction changed, as
+AutoEq's (`kind != .built`), and the Correction row reads "From HD650 ParametricEQ.txt - changed" ("From the clipboard
+- changed" for a paste; "From Wavelet.txt, converted - changed"). The export's comment says the same (`Export.comments`
+uses `Correction.source`). There is no "Back to the file's" - importing it again is that, and an import comes in
+unchanged. eq.json already kept `changed` for any kind; your own filters never get it.
+
+**Tests** (Core): EQImportRulesTests `theMostAnExportWritesReadsBack` - three worst cases exported through the real
+`APOWriter.export` and read back bit for bit: 64 for both ears by Add Filter itself; 60 shared and four for each
+ear's own (78 lines, 74 an ear); a GraphicEQ alternating +1 and -1 dB at the 61 centres (all 61 kept, 71 under the tone)
+with three filters added - each under a Custom tone of ten moved bands, so 74 an ear. Each, imported over Flat, plays
+as before within 1e-9 dB at the same preamp; under the tone again the render plays all 84 sections; and that,
+exported, is refused at 84 while over Flat it reads back. `anImportTakesSeventyFourAnEar` holds the boundary (74
+reads, 75 refused, shared counted for both ears). APOWriterTests' every-fixture-and-preset export now reads back all
+450 (it refused ten at 64; the largest is 69 an ear). EQAdvancedTests: a file's 74 edited but never grown, and
+`anEditMarksAFileChanged` (four ways, a paste, a converted one, the export's comment, eq.json, a new import, your own
+filters never). EQScreenRulesTests: the line's cases, and every built-in preset's real bank at 44.1 and 48 kHz. The
+Python mirror (make-eq-fixtures.py's MOST_FILTERS and refusal) moved with it; the fixtures written again changed only
+a34's refusal text and made.json's sha.
+
+**Verified** (2026-11-13, this Mac, Xcode's toolchain):
+- `swift test`: Core 967, DeadwaxAudio 158, DeadwaxTurntable 10 - all pass;
+- the release EQRealTimeTests (test 8's 9.6%, above);
+- seven mutations, each undoing one part (the import's 74 back to 64, the render's 84 back to 80, an edit allowed to
+  grow an ear to 74, an edit held to 64 whatever the ear had, only AutoEq's marked changed, a file's source without
+  "- changed", the preamp line at 0 again) - each fails at least one of the new tests;
+- the unsigned Release device build; check_project.py;
+- the iOS pytest files and test_source_bytes.py, and test_ios_eq_fixtures.py byte for byte (in the venv with scipy
+  that wrote the fixtures; the project's .venv skips it).
+
+**Not verified**: anything on the phone - docs/ios.md's checks E31-E33 (Bass Reduce's line; a file's "- changed"; a
+GraphicEQ with all ten sliders moved, exported whole and read back) are James's; and ios.yml's runner (Linux's
+`swift test`, its release cost on slower cores).

@@ -340,10 +340,11 @@ func allocations(_ body: (_ pause: (() -> Void) -> Void) throws -> Void) rethrow
         #expect(rig.call(4_096) == noErr && rig.host.status().blocks == 2)
     }
 
-    /// Test 8 (1.10): the worst case - 74 sections a channel (64 correction filters and the tone's ten), two
-    /// channels, at 192 kHz, a new bank every block so it is always crossfading (a drag) - in the unit's own count of
-    /// its render time. Bounded in the release build on the MEDIAN block, at 15% of a block's duration (the review):
-    /// this M2 measures 8.5-8.6%, and ios.yml's runner is a shared virtual machine on slower cores, where a mean taken
+    /// Test 8 (1.10): the worst case - 84 sections a channel (a file's 74 correction filters, the most an import takes
+    /// since back-home 15, and the tone's ten; 74 before it), two channels, at 192 kHz, a new bank every block so it is
+    /// always crossfading (a drag) - in the unit's own count of its render time. Bounded in the release build on the
+    /// MEDIAN block, at 15% of a block's duration (the review): this M2 measures 9.6% (8.5-8.6% at 74 sections), and
+    /// ios.yml's runner is a shared virtual machine on slower cores, where a mean taken
     /// against 10% (1.10's first bound) would fail on the hardware rather than the code - and a mean moves with every
     /// block the scheduler takes the thread away for, where a median doesn't. 15% still fails a render twice as slow.
     /// The mean (Debug's Render row) and the worst are printed beside it.
@@ -351,8 +352,8 @@ func allocations(_ body: (_ pause: (() -> Void) -> Void) throws -> Void) rethrow
         let rate = 192_000.0
         let rig = try UnitRig(rate: rate)
         rig.host.setOutput(EQTestCurve.key)
-        let correction = (0..<64).map { (i: Int) -> EQFilter in
-            EQFilter(id: i + 1, kind: .peak, fc: 30 * pow(500, Double(i) / 63), gain: i % 2 == 0 ? 3 : -3,
+        let correction = (0..<EQLimits.importPerEar).map { (i: Int) -> EQFilter in
+            EQFilter(id: i + 1, kind: .peak, fc: 30 * pow(500, Double(i) / 73), gain: i % 2 == 0 ? 3 : -3,
                      width: .q(1))
         }
         func bank(_ version: Int) -> EQBank {
@@ -362,7 +363,7 @@ func allocations(_ body: (_ pause: (() -> Void) -> Void) throws -> Void) rethrow
                                offsets: .zero, bands: gains, preamp: nil)
         }
         let banks = (0..<301).map(bank)
-        #expect(banks[0].left.count == 74 && banks[0].right.count == 74)
+        #expect(banks[0].left.count == 84 && banks[0].right.count == 84)
         rig.host.publish(banks[0])
         rig.call(4_096)
         let tick = EQHost.secondsPerTick
@@ -379,7 +380,7 @@ func allocations(_ body: (_ pause: (() -> Void) -> Void) throws -> Void) rethrow
         let blockSeconds = 4_096 / rate
         let share = status.meanSeconds / blockSeconds
         let medianShare = median(blocks) / blockSeconds
-        print("EQ cost at 192 kHz, 74 sections x 2 channels, crossfading every block: "
+        print("EQ cost at 192 kHz, 84 sections x 2 channels, crossfading every block: "
               + "\(String(format: "%.3f", median(blocks) * 1_000)) ms a block's median - "
               + "\(String(format: "%.1f", medianShare * 100))% of its \(String(format: "%.1f", blockSeconds * 1_000)) ms; "
               + "\(String(format: "%.3f", status.meanSeconds * 1_000)) ms on average (\(String(format: "%.1f", share * 100))%), "

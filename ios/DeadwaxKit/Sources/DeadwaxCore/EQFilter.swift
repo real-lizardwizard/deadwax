@@ -288,10 +288,16 @@ public enum EQLimits {
     public static let filePreamp = 30.0
     /// the preamp set by hand (8, question 18)
     public static let handPreamp = -30.0...12.0
-    /// a correction's filters for one ear
+    /// a correction's filters for one ear, as you make it: Add Filter stops here, and no edit takes an ear past it -
+    /// or past what a file gave it
     public static let filtersPerEar = 64
-    /// the render's sections a channel: 64 and the tone's 10, with room
-    public static let sectionsPerChannel = 80
+    /// what a file may hold for one ear (back-home 15): the most you make and the tone's ten bands, which The Whole
+    /// Curve writes as ten more filters - so every export of a correction you made, AutoEq's or a file within the 64
+    /// reads back, whatever the tone. An import of one is a correction of up to 74 that the next export adds a tone
+    /// to again, so no limit reads back every export: over a Flat tone (the correction alone) one still does.
+    public static let importPerEar = 74
+    /// the render's sections a channel: a file's 74 and the tone's 10
+    public static let sectionsPerChannel = 84
     public static let channels = 8
     /// a filter whose f0 is at or above this fraction of the rate is left out at that rate
     public static let topFraction = 0.49

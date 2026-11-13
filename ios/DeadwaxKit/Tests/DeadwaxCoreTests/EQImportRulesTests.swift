@@ -149,4 +149,168 @@ import Testing
             }
         }
     }
+
+    /// The largest difference between two banks' curves, each ear's at its level, over the chart's grid at 48 kHz.
+    static func difference(_ a: EQBank, _ b: EQBank) -> Double {
+        let grid = EQChart.grid.filter { $0 < 24_000 }
+        var most = 0.0
+        for (x, y) in [(a.left, b.left), (a.right, b.right)] {
+            let ra = EQResponse.curve(x.map(\.coefficients), at: grid, rate: 48_000, offset: a.preamp)
+            let rb = EQResponse.curve(y.map(\.coefficients), at: grid, rate: 48_000, offset: b.preamp)
+            most = max(most, zip(ra, rb).map { (p: (Double, Double)) -> Double in abs(p.0 - p.1) }.max() ?? 0)
+        }
+        return most
+    }
+
+    /// back-home 15: the most The Whole Curve writes for an ear reads back. It writes the correction's filters and
+    /// the tone's moved bands, so its most is the most a correction is made with - 64 an ear, Add Filter's - under all
+    /// ten bands moved: 74, what an import takes (`EQLimits.importPerEar`). Three ways there: 64 for both ears, by
+    /// Add Filter itself; 60 for both and four for each ear's own (78 lines, 74 an ear); and a converted GraphicEQ
+    /// keeping all 61 of its peaks - 71 under the tone, the case back-home named - with three filters added. Each
+    /// reads back filter for filter, bit for bit; imported over a Flat tone it plays as it did to 1e-9 dB, and under
+    /// the tone the render plays all 84 of its sections, none dropped. The step after is the bound no limit passes:
+    /// that import, exported again under the tone, writes 84 an ear and is refused - over Flat, as docs/ios.md says to
+    /// set it, it reads back.
+    @Test func theMostAnExportWritesReadsBack() throws {
+        let custom: [Double] = [3, -2.5, 1.5, -1, 0.5, -0.5, 1, -1.5, 2, -3]
+        #expect(custom.allSatisfy { $0 != 0 } && custom.count == EQGraphic.names.count)
+        #expect(EQLimits.importPerEar == EQLimits.filtersPerEar + custom.count)
+        #expect(EQLimits.sectionsPerChannel == EQLimits.importPerEar + custom.count)
+
+        /// The whole curve's file read back, checked bit for bit against what was written, with each ear's count.
+        func wholeCurve(_ settings: EQSettings, _ what: String) throws -> (file: String, reading: APOReading, most: Int) {
+            let setting = try #require(settings.output(Self.airpods.key))
+            let file = APOWriter.export(setting, in: settings, whole: true, day: "2026-11-13")
+            let written = APOWriterTests.asWritten(APOWriter.curve(correction: setting.correction?.filters ?? [],
+                                                                   bands: settings.gains(setting.tone)))
+            let back = try Self.read(file)
+            #expect(back.filters.count == written.count, "\(what)")
+            for (mine, theirs) in zip(back.filters, written) {
+                #expect(EQFixtures.sameBits(mine, theirs), "\(what): \(mine) written as \(theirs)")
+            }
+            let n = EQAdvancedRules.perEar(back.filters)
+            return (file, back, max(n.left, n.right))
+        }
+
+        /// Read back, imported on the output and heard over Flat: as the curve played before. Then under the tone
+        /// again: every section played - and that, exported, is past what an import takes.
+        func readsBack(_ settings: EQSettings, _ what: String) throws {
+            let (file, reading, most) = try wholeCurve(settings, what)
+            #expect(most == EQLimits.importPerEar, "\(what): \(most) an ear")
+            var after = settings
+            after.importCorrection(EQImportRules.correction(name: "AirPods EQ.txt", text: file, reading: reading),
+                                   for: Self.airpods)
+            after.choose(.preset("flat"), for: Self.airpods)
+            let before = settings.bank(settings.output(Self.airpods.key)!, rate: 48_000, version: 0)
+            let heard = after.bank(after.output(Self.airpods.key)!, rate: 48_000, version: 0)
+            #expect(before.preamp == heard.preamp, "\(what): \(before.preamp) dB, then \(heard.preamp) dB")
+            #expect(Self.difference(before, heard) < 1e-9, "\(what)")
+            //? over Flat, its own export is the correction it is - which reads back
+            #expect(try wholeCurve(after, what + ", read back").most == EQLimits.importPerEar)
+            //? under the tone, the render plays every section: 74 and the tone's 10, none cut off
+            after.change(Self.airpods) { (s: inout EQOutputSetting) -> Void in s.tone = .custom(custom) }
+            let twice = after.bank(after.output(Self.airpods.key)!, rate: 48_000, version: 0)
+            let left = EQBank.sections(reading.filters.filter { $0.channel != .right }, rate: 48_000).count + custom.count
+            let right = EQBank.sections(reading.filters.filter { $0.channel != .left }, rate: 48_000).count + custom.count
+            #expect(left == 84 && right == 84 && twice.left.count == left && twice.right.count == right,
+                    "\(what): \(twice.left.count) of \(left), \(twice.right.count) of \(right)")
+            //? and exported so, 84 an ear: refused, as any file over 74 is
+            let again = APOWriter.export(after.output(Self.airpods.key)!, in: after, whole: true, day: "2026-11-13")
+            guard case .failure(let refusal) = APOReader.read(Data(again.utf8)) else {
+                Issue.record("\(what): 84 an ear read back")
+                return
+            }
+            #expect(refusal.kind == .tooMany && refusal.text == "This file has 84 filters for one ear - deadwax plays up to 74.",
+                    "\(what): \(refusal.text)")
+        }
+
+        // 64 for both ears, by Add Filter, each moved somewhere of its own
+        var made = EQSettings()
+        Self.setting(&made, Self.airpods, seen: "1", tone: .custom(custom))
+        for i in 0..<EQLimits.filtersPerEar {
+            let added = made.addFilter(for: Self.airpods)
+            let id = try #require(added?.id)
+            made.editFilter(id, for: Self.airpods) { (f: inout EQFilter) -> Void in
+                f.fc = (25 * pow(800, Double(i) / 63)).rounded()
+                f.gain = i % 2 == 0 ? 2.5 : -2
+                f.width = .q(2)
+            }
+        }
+        let built = try #require(made.output(Self.airpods.key)?.correction)
+        #expect(built.kind == .built && built.filters.count == 64 && Set(built.filters.map(\.fc)).count == 64)
+        #expect(built.filters.allSatisfy { $0.gain != 0 && $0.width == .q(2) })
+        #expect(made.addFilter(for: Self.airpods) == nil)
+        try readsBack(made, "64 for both ears")
+
+        // 60 for both and four for each ear's own
+        let shared = (0..<60).map { (i: Int) -> EQFilter in
+            EQAdvancedTests.peak(i + 1, (30 * pow(600, Double(i) / 59)).rounded(), i % 2 == 0 ? 2 : -1.5)
+        }
+        let own = (0..<8).map { (i: Int) -> EQFilter in
+            EQAdvancedTests.peak(61 + i, 150 + 1000 * Double(i), 1.5, channel: i < 4 ? .left : .right)
+        }
+        var ears = EQSettings()
+        Self.setting(&ears, Self.airpods, seen: "1", correction: EQAdvancedTests.built(shared + own), tone: .custom(custom))
+        #expect(!EQAdvancedRules.canAdd(ears.output(Self.airpods.key)?.correction))
+        let lines = try wholeCurve(ears, "four for each ear").file.split(separator: "\n").filter { $0.hasPrefix("Filter ") }
+        #expect(lines.count == 60 + 8 + custom.count)
+        try readsBack(ears, "four for each ear")
+
+        // a converted GraphicEQ keeping all 61 of its peaks: 71 under the tone; three more added, 74
+        let points = GraphicEQFit.centres.enumerated().map { (k: Int, c: Double) -> String in
+            "\(Int(c)) \(k % 2 == 0 ? 1 : -1)"
+        }
+        let graphic = "GraphicEQ: " + points.joined(separator: "; ") + "\n"
+        let fitted = try Self.read(graphic)
+        #expect(fitted.fits.first?.fit.kept == GraphicEQFit.centres.count && fitted.filters.count == 61)
+        var converted = EQSettings()
+        Self.setting(&converted, Self.airpods, seen: "1", tone: .custom(custom))
+        converted.importCorrection(EQImportRules.correction(name: "Wavelet.txt", text: graphic, reading: fitted),
+                                   for: Self.airpods)
+        #expect(try wholeCurve(converted, "a converted GraphicEQ").most == 61 + custom.count)
+        for k in 0..<3 {
+            //? each given a gain: Add Filter's own 0 dB peak is written and read, but plays no section
+            let added = converted.addFilter(for: Self.airpods)
+            let id = try #require(added?.id)
+            converted.editFilter(id, for: Self.airpods) { (f: inout EQFilter) -> Void in
+                f.fc = 300 + 2000 * Double(k)
+                f.gain = 2
+            }
+        }
+        #expect(converted.addFilter(for: Self.airpods) == nil)
+        try readsBack(converted, "a converted GraphicEQ and three more")
+    }
+
+    /// An import takes 74 an ear (back-home 15) - the shared filters counted for both, an ear's own for it alone -
+    /// and refuses 75.
+    @Test func anImportTakesSeventyFourAnEar() throws {
+        func file(shared: Int, left: Int, right: Int) -> String {
+            var lines = ["Preamp: -3 dB"]
+            var n = 0
+            func add(_ count: Int) {
+                for _ in 0..<count {
+                    n += 1
+                    lines.append("Filter \(n): ON PK Fc \(20 + 100 * n) Hz Gain \(n % 2 == 0 ? 1 : -1) dB Q 2")
+                }
+            }
+            add(shared)
+            lines.append("Channel: L")
+            add(left)
+            lines.append("Channel: R")
+            add(right)
+            return lines.joined(separator: "\n") + "\n"
+        }
+        for (shared, left, right) in [(74, 0, 0), (70, 4, 4), (0, 74, 74), (60, 14, 0)] {
+            let reading = try Self.read(file(shared: shared, left: left, right: right))
+            #expect(reading.filters.count == shared + left + right)
+        }
+        for (shared, left, right, most) in [(75, 0, 0, 75), (70, 4, 5, 75), (0, 74, 75, 75), (74, 1, 0, 75), (90, 0, 0, 90)] {
+            guard case .failure(let refusal) = APOReader.read(Data(file(shared: shared, left: left, right: right).utf8)) else {
+                Issue.record("\(shared) + \(left) + \(right) read")
+                continue
+            }
+            #expect(refusal.kind == .tooMany && refusal.line == nil)
+            #expect(refusal.text == "This file has \(most) filters for one ear - deadwax plays up to 74.")
+        }
+    }
 }

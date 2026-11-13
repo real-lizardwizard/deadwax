@@ -698,7 +698,8 @@ Playing (**Done** closes it). Either way it opens on the output playing now.
 - **The curve**: what you hear on that output, low notes on the left and high on the right, louder
   above the middle line and quieter below. It goes grey and flat while the EQ is off. The line under
   it says what is happening: "Off: nothing changes the sound.", "Flat: nothing changes the sound
-  yet.", or the preamp - "Preamp -6.1 dB, so loud songs don't clip." (below).
+  yet.", the preamp - "Preamp -6.1 dB, so loud songs don't clip." (below) - or, for a curve that
+  only cuts (Bass Reduce, Treble Reduce), "Cuts only: nothing gets louder."
 - **Correction**: **Correction**, "None" or the correction's name at the right and where it's from
   under it ("AutoEq, measured by crinacle"), which opens the correction picker - and, for Bluetooth
   and USB headphones with no correction yet, AutoEq's suggestion for them (see
@@ -759,7 +760,8 @@ each output keeps which one it uses.
 Bass Boost's +5 dB slider makes about +6 dB of bass. So nothing ever clips, the EQ turns every song
 on that output down by the curve's highest boost - "Preamp -6.1 dB" for Bass Boost - and never turns
 anything up. That's why everything sounds a little quieter with a boost on: the volume buttons give
-it back.
+it back. A curve that only cuts needs no preamp, and the line under it says so: "Cuts only: nothing
+gets louder."
 
 **The sound.** Every change - a slider, a preset, the switch, another output - fades in over 20
 milliseconds, so it never clicks. When an output starts, its EQ is in place before its first sound.
@@ -881,14 +883,19 @@ Each has its own switch. A filter above the highest note an output plays says "A
 output plays, so it's left out." Tap a filter to edit it; swipe it for **Delete**. Under the
 filters:
 
-- **Add Filter**: a peak at 1000 Hz, 0 dB, Q 1, opened for you to edit. Up to 64 filters for each ear;
-  past that it says "64 filters is the most deadwax plays". Adding a filter with no correction yet
-  starts "Your own filters"; deleting the last of them leaves the output with no correction.
+- **Add Filter**: a peak at 1000 Hz, 0 dB, Q 1, opened for you to edit. You can add up to 64 filters
+  for each ear; past that it says "64 filters is the most you can add". (A file can bring up to 74 -
+  see Exporting, below - and every one of them can be changed, switched, deleted and moved between
+  the ears; no change takes an ear past 64, or past as many as it had.) Adding a filter with no
+  correction yet starts "Your own filters"; deleting the last of them leaves the output with no
+  correction.
 - **Import from Files…**, **Paste** and **Export…** (below).
 
 Changing an AutoEq correction makes it yours to change: it reads "AutoEq, measured by crinacle -
 changed", and **Back to AutoEq's** - touch and hold the Correction row, or in the **•••** at the top -
-puts AutoEq's back as it came.
+puts AutoEq's back as it came. A correction from a file says so the same way once you change it -
+"From HD650 ParametricEQ.txt - changed", "From the clipboard - changed" - and an export of it says so
+in its comment; to have the file's back, import it again.
 
 **A filter's editor** ("Filter 3", its place in the list): its own curve with its handle, then
 
@@ -958,7 +965,7 @@ play differently here than in Equalizer APO: another file included (`Include:`);
 play (`Convolution:`, `Delay:`, `Copy:`, `Eval:`, `If:`, `Stage:`, `VSTPlugin:`,
 `LoudnessCorrection:`, `IIR` filters); settings for several devices; lines ending the old Mac way;
 a number out of range (a frequency over 22000 Hz, a gain or preamp over 30 dB, a number too large to
-read at all); a shelf too steep for its gain, or with a slope so near 0 it makes no filter; more than 64 filters for one ear; or nothing in it to play. For whoever runs deadwax,
+read at all); a shelf too steep for its gain, or with a slope so near 0 it makes no filter; more than 74 filters for one ear; or nothing in it to play. For whoever runs deadwax,
 the line it stopped at shows under the reason.
 
 **Exporting.** **Export…** has **The Whole Curve** - the correction and the tone together, with the
@@ -966,9 +973,12 @@ preamp as it plays, so Equalizer APO on a PC (or any app that reads its files) p
 and **The Correction Alone**, its filters and its own preamp. Each is a file named after the output
 ("James's AirPods Pro EQ.txt") for the share sheet: Files, AirDrop, Mail. **Importing a whole curve
 back** onto an output with a tone plays the tone twice - the file holds it already - so set that
-output's tone to **Flat** first, or export the correction alone. And a whole curve made from a
-converted GraphicEQ can hold more than 64 filters for one ear: Equalizer APO plays it, but deadwax
-won't import it back.
+output's tone to **Flat** first, or export the correction alone. **deadwax reads back what it
+exports**: a file can hold up to 74 filters for one ear - the 64 you can add, and the tone's ten
+sliders, which The Whole Curve writes as ten more filters - so a whole curve made from your own
+filters, AutoEq's or a file within 64 (a converted GraphicEQ is at most 61) reads back whatever the
+tone. The one export that doesn't: a whole curve that was itself imported back, exported again with a
+tone on top (up to 84 for an ear) - set its tone to Flat first, as above, and it reads back.
 
 ## The lock screen and interruptions
 
@@ -1377,6 +1387,18 @@ deadwax.
   import this file" and why ("Line … includes another file (other.txt). Import that file itself.").
 - **E30 VoiceOver.** On the filter rows: "Filter 3: peak at … hertz …", "On", its switch "Filter 3
   on", and the Delete and Turn Off actions.
+
+### The EQ's follow-ups' checks
+
+- **E31 Cuts only.** Choose **Bass Reduce**: the line under the curve says "Cuts only: nothing gets
+  louder." and Preamp (in Advanced) "0.0 dB"; then **Bass Boost**: "Preamp -6.1 dB, so loud songs
+  don't clip."
+- **E32 A file, changed.** Import a ParametricEQ.txt, then change one of its filters: the Correction
+  row's line reads "From … ParametricEQ.txt - changed". Import it again: "- changed" is gone.
+- **E33 A big export, read back.** Import a GraphicEQ.txt from AutoEq, move every one of the ten
+  sliders off 0 (Custom), Export… > **The Whole Curve** to Files, then **Import from Files…** that
+  file: the preview shows the same curve, with no "Can't import this file". Cancel (imported under
+  the same tone, it would play twice).
 
 ### The turntable's first checks
 

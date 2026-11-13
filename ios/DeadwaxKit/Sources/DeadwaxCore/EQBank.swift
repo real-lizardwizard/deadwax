@@ -28,7 +28,7 @@ public struct EQBank: Equatable, Sendable {
         self.rate = rate
         self.key = key
         self.version = version
-        //? never more than the render holds: an import is held to 64 filters an ear and the tone adds 10
+        //? never more than the render holds: a file is held to 74 filters an ear and the tone adds 10
         self.left = Array(left.prefix(most))
         self.right = Array(right.prefix(most))
         self.shared = Array(shared.prefix(most))
@@ -95,7 +95,7 @@ public struct EQBank: Equatable, Sendable {
     public static let slot = 8
     /// rate, identity (1 or 0), the three levels, the three counts
     public static let header = 8
-    /// The doubles a packed bank takes: the header, then three lists of 80 slots (left, right, shared).
+    /// The doubles a packed bank takes: the header, then three lists of 84 slots (left, right, shared).
     public static let packedCount = header + 3 * EQLimits.sectionsPerChannel * slot
 
     /// The bank as the render copies it, into `packedCount` doubles.
