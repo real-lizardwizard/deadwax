@@ -72,3 +72,60 @@ uint64_t audio_counters_load(const audio_counters *counters, uint32_t index) {
     // a relaxed load of a const object: C11's atomic_load takes a pointer to non-const before C17's DR 459
     return atomic_load_explicit((_Atomic(uint64_t) *)&counters->words[index], memory_order_relaxed);
 }
+
+struct audio_fifo {
+    uint32_t mask;
+    /// slots committed, ever (the producer's; wraps)
+    _Atomic(uint32_t) written;
+    /// slots released, ever (the consumer's; wraps)
+    _Atomic(uint32_t) read;
+};
+
+audio_fifo *audio_fifo_make(uint32_t capacity) {
+    if (capacity < 2u || (capacity & (capacity - 1u)) != 0u) return NULL;
+    audio_fifo *fifo = malloc(sizeof(audio_fifo));
+    if (fifo == NULL) return NULL;
+    fifo->mask = capacity - 1u;
+    atomic_init(&fifo->written, 0u);
+    atomic_init(&fifo->read, 0u);
+    return fifo;
+}
+
+void audio_fifo_free(audio_fifo *fifo) { free(fifo); }
+
+uint32_t audio_fifo_capacity(const audio_fifo *fifo) { return fifo->mask + 1u; }
+
+bool audio_fifo_reserve(const audio_fifo *fifo, uint32_t *slot) {
+    // its own count, relaxed; the consumer's with acquire, so the consumer's reads of a slot it released are done
+    uint32_t written = atomic_load_explicit((_Atomic(uint32_t) *)&fifo->written, memory_order_relaxed);
+    uint32_t read = atomic_load_explicit((_Atomic(uint32_t) *)&fifo->read, memory_order_acquire);
+    if (written - read > fifo->mask) return false;
+    *slot = written & fifo->mask;
+    return true;
+}
+
+void audio_fifo_commit(audio_fifo *fifo) {
+    // release: the slot's contents, written before this, are seen by the consumer's acquire in peek
+    uint32_t written = atomic_load_explicit(&fifo->written, memory_order_relaxed);
+    atomic_store_explicit(&fifo->written, written + 1u, memory_order_release);
+}
+
+bool audio_fifo_peek(const audio_fifo *fifo, uint32_t *slot) {
+    uint32_t read = atomic_load_explicit((_Atomic(uint32_t) *)&fifo->read, memory_order_relaxed);
+    uint32_t written = atomic_load_explicit((_Atomic(uint32_t) *)&fifo->written, memory_order_acquire);
+    if (written == read) return false;
+    *slot = read & fifo->mask;
+    return true;
+}
+
+void audio_fifo_release(audio_fifo *fifo) {
+    // release: the slot is read before the producer may write it again
+    uint32_t read = atomic_load_explicit(&fifo->read, memory_order_relaxed);
+    atomic_store_explicit(&fifo->read, read + 1u, memory_order_release);
+}
+
+uint32_t audio_fifo_count(const audio_fifo *fifo) {
+    uint32_t read = atomic_load_explicit((_Atomic(uint32_t) *)&fifo->read, memory_order_acquire);
+    uint32_t written = atomic_load_explicit((_Atomic(uint32_t) *)&fifo->written, memory_order_acquire);
+    return written - read;
+}

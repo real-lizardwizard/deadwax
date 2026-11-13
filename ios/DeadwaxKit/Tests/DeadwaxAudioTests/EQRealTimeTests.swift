@@ -131,11 +131,20 @@ final class UnitRig {
     }
 }
 
+/// The allocation hook is the process's one - one malloc_logger, one watched thread - and the suites run side by side
+/// (the release steps filter to one suite; a plain `swift test` doesn't): each use holds this, or one test's watch
+/// moves another's count off its thread and its remove stops the other's count mid-run, so a count can read low and
+/// pass (turntable slice 2's review: DeckWindowTests' byte count, 16.12 MB every time run alone, read as low as
+/// 15.80 in the full suite).
+let allocationHookInUse = NSLock()
+
 /// The allocations and frees made on this thread while `body` runs, with `pause` able to step outside the count (a
 /// bank published: the producers allocate, the render must not). Nil where the hook can't run, or when the canary -
 /// one malloc made on purpose - isn't seen.
 func allocations(_ body: (_ pause: (() -> Void) -> Void) throws -> Void) rethrows -> (made: UInt64, freed: UInt64)? {
     guard alloc_hook_available() else { return nil }
+    allocationHookInUse.lock()
+    defer { allocationHookInUse.unlock() }
     alloc_hook_install()
     defer { alloc_hook_remove() }
     alloc_hook_watch_this_thread()

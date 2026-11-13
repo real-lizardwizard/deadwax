@@ -340,3 +340,33 @@ def test_the_verifiers_fixtures_are_the_scripts_and_libsndfile_hears_what_their_
         else:
             assert heard == info.md5_signature
         assert ints.min() == -(1 << (bits - 1)) and ints.max() == (1 << (bits - 1)) - 1   # both extremes, for the sign
+
+
+def test_the_decks_fixtures_are_the_scripts_and_the_scrub_answer_the_servers():
+    """The deck engine's window tests (notes/ios-specs/turntable.md 4.4, 4.5, 7.2) read FLACs make-test-album.py writes
+    (--deck-fixtures) and a /scrub answer cut from one of them by the server's own src/flac_ranges.py
+    (export-scrub-window.py). Here both are made again: the committed bytes are what the scripts write now - so a change
+    to how deadwax cuts a window fails here until the answer is cut again and the phone's reader is held to it. And
+    libsndfile, an independent decoder, hears the tones' file as the Swift seam test computes it."""
+    album = load("make-test-album")
+    made = album.deck_fixtures()
+    folder = SCRIPTS.parent / "DeadwaxKit" / "Tests" / "DeadwaxAudioTests" / "Fixtures" / "deck"
+    assert sorted([*made, "deck-44k-scrub.flac"]) == sorted(p.name for p in folder.glob("*.flac"))
+    for name, data in made.items():
+        assert (folder / name).read_bytes() == data, f"{name} isn't what the script writes: run it again"
+    flac, about = load("export-scrub-window").answer()
+    assert (folder / "deck-44k-scrub.flac").read_bytes() == flac, "the /scrub answer isn't deadwax's: run export-scrub-window.py"
+    assert (folder / "deck-44k-scrub.json").read_text(encoding="utf-8") == about
+    first, samples, rate = (int(part) for part in json.loads(about)["header"].split("/"))
+    assert rate == 44100 and first <= int(1.8 * 44100) and first + samples == int(round(2.3 * 44100))
+
+    soundfile = pytest.importorskip("soundfile")
+    import numpy as np
+
+    tones, rate = soundfile.read(str(folder / "deck-tones.flac"), dtype="float64")
+    assert rate == 44100
+    n = np.arange(int(1.7 * 44100), tones.shape[0])
+    level = 10 ** (-12 / 20) * 32767 / 32768
+    exact = level * sum(np.sin(2 * np.pi * f * n / 44100) for f in (1000, 5000, 12000))
+    assert np.abs(tones[n, 0] - exact).max() <= 1 / 32768        # each sample its true value, rounded
+    assert not tones[: int(1.7 * 44100)].any()

@@ -40,7 +40,8 @@ let package = Package(
         // vectors shared with the Python suite (ios/scripts/export-traces.cjs writes them). One folder
         // per area; read by Fixtures.url (Tests/DeadwaxCoreTests/FixtureFiles.swift): from the checkout,
         // else this copy in the test bundle.
-        .testTarget(name: "DeadwaxCoreTests", dependencies: ["DeadwaxCore"],
+        // CAudioRing too: its queue is tested here, on Linux as well (DeckHostRingTests).
+        .testTarget(name: "DeadwaxCoreTests", dependencies: ["DeadwaxCore", "CAudioRing"],
                     resources: [.copy("Fixtures")]),
         .testTarget(name: "DeadwaxAudioTests", dependencies: ["DeadwaxAudio", "DeadwaxCore", "CAudioRing", "CAllocHook"],
                     resources: [.copy("Fixtures")],

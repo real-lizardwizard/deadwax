@@ -23,9 +23,14 @@ public struct DeckSong: Equatable, Sendable {
 /// A window of the song, decoded (3.3): its channels (1 or 2), the stretch of the song it was cut from (`start` and
 /// `end`, seconds, as the maker said them), the rate its channels are at, where it came from, its size, and how long it
 /// took to make.
+///
+/// The phone's window maker (slice 2, DeckWindows.swift) gives its channels as `pcm` - memory of its own, which the
+/// voice reads by pointer on the audio thread - and `channels` empty; a test's hand-made window gives `channels`. The
+/// deck reads its size through `frames` and `channelCount`, which answer for either.
 public struct DeckWindow: Sendable {
     public enum Source: Sendable { case file, server }
     public var channels: [[Float]]
+    public var pcm: DeckPCM?
     public var start: Double
     public var end: Double
     public var rate: Double
@@ -40,6 +45,66 @@ public struct DeckWindow: Sendable {
         self.source = source
         self.bytes = bytes
         self.madeIn = madeIn
+    }
+
+    public init(pcm: DeckPCM, start: Double, end: Double, rate: Double, source: Source, bytes: Int, madeIn: Double) {
+        self.init(channels: [], start: start, end: end, rate: rate, source: source, bytes: bytes, madeIn: madeIn)
+        self.pcm = pcm
+    }
+
+    /// Its length, in frames at `rate`.
+    public var frames: Int { pcm?.frames ?? channels.first?.count ?? 0 }
+    /// How many channels: 1 or 2 from the maker.
+    public var channelCount: Int { pcm?.channelCount ?? channels.count }
+}
+
+/// A window's channels as the phone's maker makes them (turntable.md 4.3, 4.4): Float32s in memory of their own,
+/// `channelCount` runs of `capacity`, of which the first `frames` are the window's. Made and filled off the audio
+/// thread; the voice is handed pointers into it, so whoever posts the window keeps this alive until the voice has let
+/// go of it (the deck engine's return ring) - and frees it off the audio thread, where its last reference goes.
+public final class DeckPCM: @unchecked Sendable {
+    public let channelCount: Int
+    public let capacity: Int
+    /// how many of each channel's `capacity` are the window's - set by the maker as it finishes, before it is posted
+    public private(set) var frames: Int
+    private let base: UnsafeMutablePointer<Float>
+
+    /// `channelCount` channels of `capacity` frames, every one 0.
+    public init(channelCount: Int, capacity: Int) {
+        precondition(channelCount >= 1 && capacity >= 0)
+        self.channelCount = channelCount
+        self.capacity = capacity
+        frames = capacity
+        base = .allocate(capacity: max(1, channelCount * capacity))
+        base.initialize(repeating: 0, count: max(1, channelCount * capacity))
+    }
+
+    deinit { base.deallocate() }
+
+    /// Channel `c`'s first sample.
+    public func channel(_ c: Int) -> UnsafeMutablePointer<Float> { base + min(max(c, 0), channelCount - 1) * capacity }
+
+    /// The window is the first `count` of each channel (at most `capacity`).
+    public func keep(_ count: Int) { frames = min(max(count, 0), capacity) }
+
+    /// Its bytes in memory.
+    public var bytes: Int { channelCount * capacity * MemoryLayout<Float>.stride }
+
+    /// The voice's view of it, from song second `start` at `rate`: at most two channels' pointers.
+    public func voiceWindow(start: Double, rate: Double) -> VoiceWindow {
+        VoiceWindow(first: UnsafePointer(channel(0)), second: channelCount > 1 ? UnsafePointer(channel(1)) : nil,
+                    length: frames, start: start, rate: rate)
+    }
+
+    /// A copy of `channels` (a test's hand-made window).
+    public convenience init(_ channels: [[Float]]) {
+        let length = channels.map(\.count).min() ?? 0
+        self.init(channelCount: max(1, channels.count), capacity: length)
+        for (c, samples) in channels.enumerated() {
+            samples.withUnsafeBufferPointer { (from: UnsafeBufferPointer<Float>) -> Void in
+                if let address = from.baseAddress, length > 0 { channel(c).update(from: address, count: length) }
+            }
+        }
     }
 }
 
@@ -1197,7 +1262,7 @@ public final class DeckRules<M: DeckMaths> {
         decodedWindow = nil
         if pending?.song == decoded.song { pending = nil }
         let got = decoded.window
-        let length = got.channels.first?.count ?? 0
+        let length = got.frames
         post(.window(got))
         window = WindowHad(song: decoded.song, start: got.start, end: got.start + Double(length) / got.rate, bytes: got.bytes, decodedAt: got.rate)
         if let press, press.taken, heardNow() == nil, sounding(press.at) {

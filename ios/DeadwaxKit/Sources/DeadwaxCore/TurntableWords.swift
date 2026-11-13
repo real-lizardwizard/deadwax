@@ -356,6 +356,57 @@ public enum TurntableDebugRows {
     }
 }
 
+/// The phone's own rows (turntable.md 6.2, **new**: no web words to hold them to), as slice 2 shows them under Test
+/// sounds' "The record's engine beside the song" and slice 3 in the Turntable section.
+extension TurntableDebugRows {
+    static func ms(_ seconds: Double) -> String { "\(jsFixed(seconds * 1000, 1)) ms" }
+
+    /// "Clock" (3.2): `L` and the largest lead under the last hand - or, with no hand since the engine started, the
+    /// largest over the last 1.5 s. Nil `lead`: nothing rendered yet.
+    public static func clockRow(lead: Double?, largest: Double?, underHand: Bool) -> InfoRow {
+        let label = "Clock"
+        guard let lead, lead.isFinite else { return InfoRow(label: label, value: "The record's engine hasn't rendered yet") }
+        var value = "The record's clock runs \(ms(lead)) behind the render's time stamps"
+        if let largest, largest.isFinite {
+            value += underHand ? "; the largest lead under the last hand \(ms(largest))"
+                : "; the largest lead over the last 1.5 s \(ms(largest))"
+        }
+        return InfoRow(label: label, value: value)
+    }
+
+    /// "Messages dropped" (4.3): shown only when not 0.
+    public static func messagesDroppedRow(_ dropped: Int) -> InfoRow? {
+        guard dropped > 0 else { return nil }
+        return InfoRow(label: "Messages dropped",
+                       value: dropped == 1 ? "1 of the record's messages was dropped" : "\(dropped) of the record's messages were dropped")
+    }
+
+    /// Test sounds' row (7.2, checks 0a-0c): its label, its button, and what it says under the section.
+    public static let trialLabel = "The record's engine beside the song"
+    public static func trialButton(running: Bool) -> String { running ? "Stop" : "Start" }
+    public static let trialFooter = "The record's engine beside the song plays a run of its own - a chord taken from 1 s, "
+        + "scratched back and forth and let go, again and again - over whatever plays here. Start it while a test sound plays: "
+        + "you should hear both, the test sound unchanged, and stopping or starting it should never be heard in the test "
+        + "sound. Its Clock should hold within a millisecond or two once settled."
+
+    /// The record's engine, for the row: its rate, the blocks it rendered, how often it started and how long the last
+    /// start took - or why it couldn't start.
+    public static func trialRow(rate: Double, blocks: Int, starts: Int, lastStart: Double?, failure: String?) -> InfoRow {
+        let label = "The record's engine"
+        if let failure { return InfoRow(label: label, value: "Couldn't start: \(failure)") }
+        guard starts > 0 else { return InfoRow(label: label, value: "Not started") }
+        let started = starts == 1 ? "started once" : "started \(starts) times"
+        let took = lastStart.map { (seconds: Double) -> String in ", the last start \(ms(seconds))" } ?? ""
+        return InfoRow(label: label, value: "\(khz(rate)), \(blocks) blocks rendered; \(started)\(took)")
+    }
+
+    /// "Window made in" (4.4): decode, level and conversion, for `seconds` of a song at `rate`.
+    public static func windowMadeRow(took: Double, seconds: Double, rate: Double) -> InfoRow {
+        InfoRow(label: "Window made in",
+                value: "\(jsFixed(took, 2)) s for \(JSNumber.string((seconds * 10).rounded() / 10)) s of a \(khz(rate)) song")
+    }
+}
+
 extension String {
     /// `String.prototype.replace(text, with)`: the first occurrence only.
     func replacingFirst(_ text: String, with replacement: String) -> String {

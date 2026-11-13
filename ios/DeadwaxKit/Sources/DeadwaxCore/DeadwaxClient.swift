@@ -275,6 +275,35 @@ public struct DeadwaxClient: Sendable {
                       etag: response.header("ETag"))
     }
 
+    // MARK: the turntable's window (turntable.md 4.5)
+
+    /// `/scrub`'s request: `at` and `seconds` (`DeckScrub.ask`) and nothing else.
+    public func scrubRequest(songID: String, at: Double, seconds: Double) -> HTTPRequest {
+        var built = request(Routes.scrub, path: ["song_id": songID], query: DeckScrub.query(at: at, seconds: seconds))
+        built.headers["Accept"] = "audio/flac"
+        return built
+    }
+
+    /// A window's FLAC from deadwax and where it sits in the song (`X-Deadwax-Window`) - or why there is none, as the
+    /// deck's rules take it (`DeckScrub.failure`): nil for a 204, deadwax's answer to a request it saw go away. Not
+    /// reaching deadwax at all is thrown (APIFailure), as every route's is; a cancel is thrown as CancellationError.
+    public func scrub(songID: String, at: Double, seconds: Double) async throws
+        -> Result<(flac: Data, header: DeckScrub.Header), DeckWindowError>? {
+        let sent = scrubRequest(songID: songID, at: at, seconds: seconds)
+        let response = try await send(sent)
+        if response.status == 200 {
+            guard let header = DeckScrub.Header.parse(response.header("X-Deadwax-Window")) else {
+                return .failure(.failed("its answer didn't say where it is in the song"))
+            }
+            return .success((response.body, header))
+        }
+        let words = failure(response, to: sent).words
+        let detail = response.status == 415 ? detailWords(response.body, status: 415) : nil
+        return DeckScrub.failure(status: response.status,
+                                 detail: detail?.hasPrefix("deadwax answered") == true ? nil : detail,
+                                 words: words).map { .failure($0) }
+    }
+
     // MARK: answers
 
     func send(_ request: HTTPRequest) async throws -> HTTPResponse {

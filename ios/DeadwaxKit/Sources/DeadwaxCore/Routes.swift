@@ -72,6 +72,12 @@ public enum Routes {
     /// One result's ParametricEQ.txt (`AutoEqProfile`), by its 16-hex-digit id.
     public static let autoEqProfile = Endpoint(method: "GET", path: "/deadwax/eq/autoeq/{id}", query: [])
 
+    // the turntable's /scrub fallback (turntable.md 4.5): a window of a song whose copy isn't whole on the phone yet
+    /// A stretch of a FLAC song from `at` for `seconds` (at most `DeckScrub.maxSeconds`) as a FLAC file of its own,
+    /// its place in the song in `X-Deadwax-Window` (`DeckScrub.Header`). Asked without `max_rate` and `level`, so it
+    /// is the original's own frames: the phone converts and levels them as it does a local file's.
+    public static let scrub = Endpoint(method: "GET", path: "/deadwax/navidrome/scrub/{song_id}", query: ["at", "seconds"])
+
     /// The levels spec's name for `levelAlbum`: the album's levels warmed before its first play.
     public static var warmLevels: Endpoint { levelAlbum }
 
@@ -84,6 +90,7 @@ public enum Routes {
         storeAlbum, myLibrary, libraryAdd, libraryRemove, librarySeen,
         lyrics,
         autoEqSearch, autoEqProfile,
+        scrub,
     ]
 
     /// The routes given longer than the transport's own 8 seconds to answer, in seconds: the album index reads every

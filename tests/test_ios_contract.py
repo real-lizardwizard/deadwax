@@ -58,7 +58,7 @@ from src.store import JobStore  # noqa: E402
 
 CORE = Path(__file__).resolve().parent.parent / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore"
 ENDPOINT = re.compile(r'Endpoint\(method: "(\w+)", path: "([^"]+)", query: \[([^\]]*)\]\)')
-ROUTE_COUNT = 26
+ROUTE_COUNT = 27
 RAW_OPENING = re.compile(r'#+"')
 HASHES = re.compile(r"#*")
 
@@ -270,6 +270,7 @@ def test_what_the_app_sends_is_within_the_servers_bounds(monkeypatch):
     search = routes[("GET", "/deadwax/navidrome/search")]
     cover = routes[("GET", "/deadwax/navidrome/cover/{cover_id}")]
     scrobble = routes[("POST", "/deadwax/navidrome/scrobble/{song_id}")]
+    scrub = routes[("GET", "/deadwax/navidrome/scrub/{song_id}")]
     hi_res = swift_constant("TestSongs.swift", "HiRes", "pageSize")
     pages = swift_constant("TestSongs.swift", "HiRes", "maxPages")
     sent = [
@@ -280,6 +281,10 @@ def test_what_the_app_sends_is_within_the_servers_bounds(monkeypatch):
         ((cover, "size"), [swift_constant("Routes.swift", "CoverSize", name) for name in ("row", "tile", "hero", "lockScreen")]),
         # milliseconds since 1970: one in 2026, and one in 2027
         ((scrobble, "time"), [0, 1_767_312_000_000, 1_800_000_000_000]),
+        # the turntable's /scrub (turntable.md 4.5): the longest it asks, and the shortest (a window of nothing, its
+        # pre-roll and its second)
+        ((scrub, "seconds"), [swift_constant("DeckScrub.swift", "DeckScrub", "maxSeconds"), 1]),
+        ((scrub, "at"), [0]),
     ]
     assert bounds(search, "songCount")[1] == navidrome.SEARCH_MAX_SONGS     # the bounds are read at all
     assert bounds(cover, "size") == (16, 2000)

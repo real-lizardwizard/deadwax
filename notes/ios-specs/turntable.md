@@ -1588,6 +1588,169 @@ iosdeck's --check); check-linux.sh and ios.yml were not run - Linux by reading.
 - **Verified**: ios.yml (its macOS job runs these; its device build compiles them); check-linux.sh for the Core
   parts and the C target. The engine's existing tests pass unchanged. No Simulator.
 
+#### Slice 2, built (2026-11-13)
+
+**What was built.**
+
+- **Core**:
+  - `DeckScrub.swift`: the window's plan (4.4), and `/scrub`'s ask, query, `X-Deadwax-Window` reader and statuses
+    (4.5).
+  - `DeckLead.swift`: `L` (3.2). A monotonic deque of 2048 leads over 1.5 s. It moves freely while the voice is
+    quiet and slews at 0.0005 s/s under a sound.
+  - `DeckRender.swift`: the render's own entries, specialised over PlatformMaths in Core. `DeckSlot` is the
+    message as plain numbers and pointers.
+  - `DeckPCM`, in DeckRules.swift: a window's own memory, which the voice reads in place.
+  - `Routes.scrub` and `DeadwaxClient.scrub`.
+  - Debug's rows in TurntableWords.swift: Clock, Messages dropped, Window made in, and the trial's row.
+- **CAudioRing** gains `audio_fifo`, an SPSC ring of slot indices. The payload lives in Swift's own POD slot
+  arrays, and the C side only moves indices, with acquire and release.
+- **DeadwaxAudio**:
+  - `DeckVoiceHost.swift`: the render block - the clock, the messages, the voice, the report, then the deck's EQ.
+  - `DeckEngine.swift`: the second engine.
+  - `DeckWindows.swift`: windows from a file and from `/scrub`.
+  - `DeckTrial.swift`: Debug's run.
+- **ios/App**: one change only - DebugView's row "The record's engine beside the song", with `DeckTrialModel`
+  beside it in the same file.
+- **Scripts and checks**:
+  - `ios/scripts/make-test-album.py --deck-fixtures` and `ios/scripts/export-scrub-window.py`.
+  - tests/test_ios_install.py makes both again and checks them byte for byte.
+  - ios.yml has a release step for DeckRealTimeTests.
+  - ROUTE_COUNT is 27.
+
+**Measured on this Mac (debug build, except where it says release).**
+
+| What | Result |
+| --- | --- |
+| The source node against Core's voice | Bit for bit, over test A's 32 runs of 8 cases. The deck's EQ is EQRender after the voice, bit for bit. |
+| Windows on the grid (22.05, 44.1, 48 and 96 kHz to 48 kHz) | Bit-exact against the lane's frames from 0. The 48 kHz one is the file times the gain, exactly. |
+| `P` against `2P` | Bit for bit at all three converting rates, so `P` stays 0.2 s. |
+| A `/scrub` window against the local one | Bit for bit. The answer was cut by src/flac_ranges.py and placed by its header. |
+| The seam off the grid | The lane at -91.0 dB and the voice at -78.4 dB against the exact tones (bound -50). |
+| A 40 s window from 96 kHz | The making thread held at most 15.80-16.12 MB over six runs, against a 14.65 MB window: about 0.5 MB under the bound. Made in 930-1060 ms (debug). |
+| HandoverTimingTests | E was 300.0 ms in all three starts, D 142.8 ms. The song's first sample landed 0.53 ms from planEnd + D, and its 2.1 s click came out of both engines 28 frames apart (quantum 32). |
+| Allocations, release | 0 allocations and 0 frees in 10,000 direct calls (every message kind, three window swaps, the report ring folding, the EQ crossfading in) and in 1,000 blocks of AVAudioEngine's own real-time manual render. The canary was seen first. |
+
+- **The first release run's allocations.** It counted 6 allocations, all in the first call. They were the
+  test's own first read of the host clock (AVAudioTime's first use): with that read moved before the count and
+  the warm-up kept as it is, the count is 0. The warm-up now also renders each message kind on the host clock,
+  because before this it never ran the live clock's path.
+- **The direct test's `L`** reads 95.3 ms. That is its 10 ms host-time lead plus a 4096-frame block, because
+  3.2's lead counts the block's own length.
+
+**Departures, and why.**
+
+- **No `CDeckRing`.** CAudioRing is already the C11-atomics target, built on Linux and used by the EQ's triple
+  buffer. A second target would only have repeated its atomics, so the deck's three rings are `audio_fifo`s in it.
+- **Reports: a full ring folds, it doesn't overwrite.** With one producer and one consumer, the producer can't
+  safely take the oldest slot back from under the reader. A report that finds the ring full is folded into the
+  next: the newest position, rate and gain are kept, with the counts summed and the lowest gain kept. Status
+  counts the folds as `reportsFolded`.
+- **"Sounding" for `L`'s slew is the voice's gain**: `gainTarget > 0 || gain > 1e-5`. The render can't see a
+  hand or a plan, only what the voice is doing.
+- **The offline clock** is `now = (sampleTime + offlineFrames) / rate - offlineLead`, written so that it is
+  bit-exact with Core's `(from + done) / rate`. HandoverTimingTests sets the lead to `L`.
+- **The memory bound is CAllocHook's byte count on the making thread, not `task_info`.** The suite shares its
+  process with every other suite running at the same time, so the resident size is printed and not bounded.
+  CAllocHook gained a per-thread byte count, with a 1 MB canary.
+- **The seam's seek is to 2.0123 s, not 42.0123 s.** This keeps the fixtures small: 922 KB in all, since each
+  is constant until just before the stretch a test reads.
+- **HandoverTimingTests renders in quanta of 32 frames**, with the song's `startLead` at 0.3 s so that E > D. At
+  a device's 512, a mistake of the limiter's 72 frames would hide inside the quantum.
+- **Debug's run is made in code (`DeckTrial`), not replayed from `rules/`.** Bundling a test fixture would need
+  resources added to the project or the package. The run is a 6 s chord taken from 1 s, then grabbed at speed at
+  1.5 s and scratched twice. It is let go at 2.5 s at speed 1 and loops every 4 s, with hand samples at 120 Hz
+  stamped with the host's now. It plays without the deck's EQ: slice 3 wires the output's curve into
+  `DeckEngine.eqStart`, and the trial leaves EQModel's desk alone.
+- **`DeckEngine.ioBuffer` and `latency` are hooks the app sets.** The trial sets them from
+  AudioSessionController.
+- **`stop()` keeps the voice and its window.** `reset()` works only while the engine is stopped. A new output
+  rate remakes the source node and the voice.
+
+**Mutations, each one alone, against the slice's tests**: six, all caught. The table is in notes/ios.md's
+"Slice 2". It covers D's two terms, the offline clock's lead, the pre-roll's drop, the grid's start and the level.
+
+**What only the phone shows** (checks 0a-0c, then 9):
+- Whether two engines play together.
+- Whether the deck's start or stop is ever heard in the song.
+- `L` on the speaker and on earbuds.
+- The phone's "Window made in" for a 40 s window of a 44.1 kHz song (4.4's 150 ms).
+- The real `E`.
+
+**Questions** (my recommendation first):
+1. Should Debug's run play through the deck's EQ, as slice 3's deck will? **Leave it off until slice 3**: the
+   checks are about two engines together, and the desk is the song's.
+2. Should `reportsFolded` show in Debug beside Messages dropped? **Only if it is ever above 0 on the phone.**
+   Folding means the main thread didn't read for 2 s, which the Clock row would show first.
+3. The memory bound is the spec's, with about 0.5 MB to spare here. If it fails on ios.yml's runner, should the
+   bound get more room, or the pieces get smaller (0.5 s)? **Smaller pieces first**: the margin is what 4.4 step 5
+   promises.
+
+**Review (2026-11-13).** Read against 4.1-4.7, eq.md 1.9 and deck.ts, and mutated. Four things were wrong and are
+fixed, each with a test that fails without it:
+- **The deck's EQ started from its last run.** `start()` made the EQ's render state only when there was none or the
+  rate was new. So a stop and a start at the same rate kept the filters' old state and counts, and crossfaded from
+  the old bank. eq.md 1.9 asks for the same install as the song's at the first block after the engine's own start,
+  and an Off set while stopped wasn't bit-exact for the crossfade's 20 ms. The state is now made again at every
+  start, as the song's EQUnit makes its own at every allocation (`theDecksEQStartsAfreshAtEveryStart`: the first
+  block after a restart is a fresh EQRender's, bit for bit, and Off after a restart is the plain deck's).
+- **`X-Deadwax-Window` could trap.** `first + samples` overflowed an Int64, and a large count or rate made a Double
+  too big for the Int the plan converts it to. The reader now refuses what a FLAC can't say: samples under 2^36 and
+  the rate under 2^20, STREAMINFO's widths. `end` saturates. `plan` holds every product under 2^40 before
+  converting, so a number from outside gives a plan or nil
+  (`aHeaderPastWhatAFLACCanSayIsRefusedAndNothingTraps`).
+- **Reports nobody read piled up.** `collect()` appended to `heard` without bound, so a caller that seldom reads
+  `reports()`, like Debug's trial, grew it by about 1.7 KB/s, 6 MB an hour. It now keeps the newest 64, the ring's
+  depth (`unreadReportsDontPileUp`).
+- **The memory and allocation counts could pass low.** CAllocHook watches one thread for the whole process, and
+  Swift Testing runs suites in parallel. So EQRealTimeTests' count and DeckWindowTests' could overlap, and either
+  could count the other's thread instead of its own. The 40 s window's bytes, 16.12 MB every time it ran alone, read
+  as low as 15.80 in the full suite: the table's range above is probably that. Both now hold one lock round the
+  hook.
+
+New tests for what had none:
+- full rings drop, keep and count (`fullRingsDropKeepAndCount`);
+- the window given back is the old one, and only once the voice has let go (`aWindowIsGivenBackOnlyOnceTheVoiceLetsGoOfIt`,
+  reading `live`, now `private(set)`);
+- the render's `L` slews under a sound and moves freely in quiet (`theRendersClockSlewsUnderASound`).
+
+Six mutations, each alone, are caught by these tests: the EQ state reused, reports unbounded, the new window given
+back, never sounding, a drop not counted, and the header's bounds gone. One mutation is caught by nothing: a fold
+that doesn't sum `held` and `peaks`. That count only feeds Debug's words, so it is left untested.
+
+Judged and left as built:
+- **The render is real-time safe.** Release counts 0 allocations in both tests. It takes no locks and makes no
+  runtime calls. DeckLead and DeckVoice read static lets, which is fine in release once the warm-up has run.
+- **DeckWindows' `@unchecked Sendable` holds.** `ticket` is behind its lock and the rest is `let`. `answer` is
+  called only on the answers queue. DeckPCM is mutable behind its own `@unchecked`, which is safe only because a
+  window is filled before it is posted. A write after posting would be a race that no type catches.
+- **The second EQHost is eq.md 1.9's**: its own triple buffer and state, after the limiter. Off is bit-exact from
+  the first block of a start.
+- **The handover's arithmetic is 3.5's** (`r = planEnd + D - E`). The quantum of 32 proves it to 0.67 ms. On the
+  phone the resume isn't quantized to blocks, so the bound there is tighter than the spec's.
+- **ios.yml runs the release step** beside the EQ's. The must-not-touch files have no diff. ROUTE_COUNT is 27, and
+  the `/scrub` client asks only `at` and `seconds`.
+- **Swift 6.3.3 with the 26.5 SDK** (CI's Xcode 26.6) compiles Core and Audio. The test targets weren't checked
+  under it: the Command Line Tools' Testing macros don't match their own framework. The review's closures state
+  their types, except `#expect(throws:)`'s, a form CI already compiles in eight places.
+- **The memory bound measures the right thing, with a 0.53 MB margin.** The overhead above the window is a constant
+  1.47 MB at every length, and about 1.0-1.16 MB of that is AVAudioFile's own FLAC open. CI's load won't move it,
+  but another OS's decoder could. Smaller pieces buy little: the pieces' own transient is about 0.4 MB, so 0.5 s
+  pieces would save about 0.2 MB. That answers question 3 the other way. If the bound fails on CI, subtract the
+  decoder's open cost, measured as a one-frame window's, rather than shrink the pieces or loosen the bound.
+
+Questions for slice 3, and for James:
+- **The live clock's fallback.** It falls back to sample time if the host time is ever invalid, but that is a
+  different time base, so `L` would jump. Should it hold the last host time instead?
+- **`L` on a route change.** 4.6 restarts `L` at every route change. DeckEngine restarts it only on a new rate,
+  and has no call for a route change at the same rate.
+- **A rate change drops messages.** Its `resetStopped()` drops what was posted while stopped, which `stop()`'s doc
+  says is applied at the next start.
+- **Messages posted while stopped.** They are applied at the next start with their old times, and enough of them
+  fill the ring.
+- **The EQ's banks.** When the deck's EQ is wired, EQModel must make each host's bank at that host's own rate.
+- **Smaller gaps.** DeckTrial doesn't activate the session. The deck's EQ counters don't record its render's
+  ticks. A `/scrub` fetch isn't cancelled by a newer ask.
+
 ### 7.3 Slice 3 - the look, the touch views, the deck's rules, settings, Debug, docs
 
 - **Files**: `ios/App/Player/Turntable/` - `TurntableView.swift` (SwiftUI: the plinth's place, the time line, the
