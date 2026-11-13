@@ -401,12 +401,20 @@ public struct TurntableLayout: Equatable, Sendable {
 
     public var platter: StageBox { frame(TurntableGeometry.platter) }
     public var record: StageBox { frame(TurntableGeometry.record) }
-    /// The label: inside the grooves' inner edge by 4.
-    public var label: StageBox {
-        frame(StageCircle(x: TurntableGeometry.record.x, y: TurntableGeometry.record.y, r: TurntableGeometry.grooves.inner - 4))
+    /// The label's cover - 38.75% of the face (app.css's `.app-tt-label`), centred - its ring outside it
+    /// (TurntableFaceParts). Not the exporter's grooves' inner edge less 4: the CSS is what the web draws.
+    public var label: StageBox { centred(record.width * TurntableFace.labelShare) }
+    /// The spindle: 6.25% of the face (`.app-tt-spindle`), centred, its ring outside it.
+    public var spindle: StageBox { centred(record.width * TurntableFace.spindleShare) }
+    /// A circle `across` points wide on the record's centre.
+    func centred(_ across: Double) -> StageBox {
+        let box = record
+        return StageBox(left: box.left + (box.width - across) / 2, top: box.top + (box.height - across) / 2, width: across, height: across)
     }
-    public var spindle: StageBox {
-        frame(StageCircle(x: TurntableGeometry.record.x, y: TurntableGeometry.record.y, r: TurntableGeometry.spindleShare * TurntableGeometry.record.r))
+    /// The arm's handle, points across (app.css:1314): the stage's 56 units, at least a tap's 44 pt - unless that is
+    /// more than 30% of the plinth, which is then the most it is.
+    public var handleSize: Double {
+        Swift.max(handle, Swift.min(TurntableFace.hit, TurntableFace.handleCap * width))
     }
     public var pivot: StagePoint { point(StagePoint(x: TurntableGeometry.arm.x, y: TurntableGeometry.arm.y)) }
     public var readout: StagePoint { point(StagePoint(x: PlaySpeed.readout.x, y: PlaySpeed.readout.y)) }
