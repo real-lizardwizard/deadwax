@@ -802,9 +802,10 @@ From specs/engine.md with D4 and D9, then the review's fixes (DeadwaxAudio; its 
 
 ### The API, models and errors in the listener's words
 
-- **Routes.swift** names all 24 routes the app calls (the 24th, `lyrics`, since app 0.4), one `Endpoint(method:path:query:)` a line in the form
+- **Routes.swift** names all 26 routes the app calls (`lyrics` the 24th, since app 0.4; the EQ's `autoEqSearch` and `autoEqProfile` since its slice 4), one `Endpoint(method:path:query:)` a line in the form
   tests/test_ios_contract.py reads, all listed in `Routes.all`. `Routes.timeouts` gives album_index 30 s (D2),
-  everything else the transport's 8 s; `CoverSize` is row 128, tile 400, hero 1024 (and the lock screen's 1024).
+  AutoEq's two 20 s (deadwax waits up to 15 s for AutoEq's list or a file - EQ slice 4's review), everything else the
+  transport's 8 s; `CoverSize` is row 128, tile 400, hero 1024 (and the lock screen's 1024).
 - **Models.swift** reads Navidrome's pass-through answers leniently: a field of another type is absent, and a song
   that can't be read is left out rather than losing the album. Me's version, permissions and
   permissions_unverified are optional, so an older server still reads. `NavidromeStatus` was added at the merge
@@ -3238,3 +3239,21 @@ Left, and why:
 - **`folded` is still written** to `autoeq_list`, though read back it is folded again: 2.3's table has it.
 - **A gzip'd answer is measured after each piece is decoded**: one compressed piece can decode to about a thousand
   times its size before the cap sees it. Accepted, as the only host deadwax asks is GitHub's.
+
+## The EQ, slice 4: AutoEq on the phone (app 0.5, 2026-11-12)
+
+eq.md's slice 4 (5.4), the phone's half of the 2.1.7 routes above: a correction for your headphones from AutoEq,
+through deadwax. **Core**: `AutoEq.swift` - the two answers as models (held by test_ios_contract.py to `row_answer`,
+`profile_answer` and the search's literal; ROUTE_COUNT 26), `AutoEqProfile.correction()` (APOReader as it is), the
+pages' `AutoEqPage`, `AutoEqAsk` (limit 50, query 100 scalars, the 0.3 s pause) and DeadwaxClient's two calls - and
+`EQSuggestion.swift`: 3.7's one, several or none, the rules for when it is asked and shown, and the settings' `use`
+(a correction, or None) and `mark` (Not now, for good; shown). The Swift tests read the server's own answers:
+`ios/scripts/autoeq_answers.py` drives the real routes over tests/test_autoeq.py's fake GitHub into
+`Fixtures/autoeq/answers.json`, which the contract test holds to what it makes now, as lyrics'. **App**: the EQ page's
+Correction section and the suggestion row (asked once a launch per Bluetooth or USB output with no correction),
+`EQCorrectionScreen` (the picker) and `EQProfileScreen` (a profile, "Use for …"), both bound to their output; "Use"
+goes back to the EQ page (`AppNavigation.backToEQPage()`, the sheet's own stack, `EQSheetStack`); and the curve
+crossfades rather than morphs when its frequencies change. The suggestion offers one headphone, not one row - the real
+list has six HD 650 rows - and never the first of several (the AirPods Pro's 16); that and every other departure, the
+mutations tried and what only the phone shows: eq.md's "Slice 4, built". docs/ios.md's AutoEq section and checks
+E17-E21 are James's. The app's version stays 0.5 (5).

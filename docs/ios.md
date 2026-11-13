@@ -11,7 +11,8 @@ there, bit for bit as deadwax has it - and goes on playing when deadwax can't be
 [Downloads](#downloads) and [Offline](#offline)). App 0.4 added lyrics on Now Playing, as the web app
 shows them (see [Lyrics](#lyrics)). **This is app 0.5, which adds the EQ**: ten sliders and nine
 presets, kept for each output on its own - your headphones, the speaker, the car - and switching by
-itself when the output changes (see [EQ](#eq)). Playlists, Search and the rest come in the next
+itself when the output changes, and a correction for your headphones from AutoEq's measurements
+(see [EQ](#eq)). Playlists, Search and the rest come in the next
 phases (see [What it can't do yet](#what-it-cant-do-yet)).
 
 **Nothing of Phase 2, the lyrics or the EQ has been seen on an iPhone yet.** It's built and tested on
@@ -32,7 +33,12 @@ time - the album's volume couldn't be checked" ("the song's" for a song levelled
 isn't a release yet: until it is, it's in the `:experimental` image, not `:latest` (see "Which image
 tag" under [The compose file](getting-started.md#the-compose-file)). You > About shows which deadwax
 you have. [Lyrics](#lyrics) need **deadwax 2.1.5 or later** - for now also only in `:experimental` -
-and with an older one say "Couldn't load the lyrics."
+and with an older one say "Couldn't load the lyrics." The EQ's
+[AutoEq corrections](#autoeq-a-correction-for-your-headphones) need **deadwax 2.1.7 or later**, also only
+in `:experimental` for now: with an older one, no suggestion appears and the correction picker's search
+says "Something went wrong." - an admin sees why, folded under it: "This deadwax is too old for AutoEq's
+corrections: they need deadwax 2.1.7 or later." The rest of the EQ is on the phone and needs nothing of
+deadwax.
 
 **Where Phase 1 is.** It's on the `ios` branch while it's being built. `main` has Phase 0, released
 with deadwax 2.1.0. install.sh builds whichever branch is checked out, so to try Phase 1, switch to
@@ -524,6 +530,11 @@ Playing (**Done** closes it). Either way it opens on the output playing now.
   above the middle line and quieter below. It goes grey and flat while the EQ is off. The line under
   it says what is happening: "Off: nothing changes the sound.", "Flat: nothing changes the sound
   yet.", or the preamp - "Preamp -6.1 dB, so loud songs don't clip." (below).
+- **Correction**: **Correction**, "None" or the correction's name at the right and where it's from
+  under it ("AutoEq, measured by crinacle"), which opens the correction picker - and, for Bluetooth
+  and USB headphones with no correction yet, AutoEq's suggestion for them (see
+  [AutoEq](#autoeq-a-correction-for-your-headphones) below). With both a correction and a tone, the
+  curve is the two together, with the correction alone as a thin dashed line.
 - **Tone**: **Preset**, which opens the list of presets (below), then **ten sliders**, one for each
   band from 31 Hz to 16 kHz, each from -12 to +12 dB in half-decibel steps. Touch anywhere in a
   slider's column and drag up or down: the knob goes with your finger from wherever it was (it never
@@ -588,6 +599,83 @@ milliseconds, so it never clicks. When an output starts, its EQ is in place befo
 keeps): it belongs to the phone, not to whoever is signed in, so signing out or in as someone else
 keeps it, and nothing of it goes to deadwax. If the file ever can't be read, it's set aside (Debug
 says under what name) and every output starts Off.
+
+### AutoEq: a correction for your headphones
+
+Every pair of headphones changes the sound on its way to your ears - a bump in the bass, a peak in
+the treble. [AutoEq](https://github.com/jaakkopasanen/AutoEq), Jaakko Pasanen's project, works out a
+**correction** for each headphone measured by oratory1990, crinacle, Rtings and its other sources: a
+set of filters that evens that out, so the headphones sound neutral. The EQ plays one as the
+headphones' correction, with your tone on top: Bass Boost on corrected AirPods is Bass Boost on
+neutral ones. A correction is a starting point - how in-ears sit in your ears changes what you
+hear - so listen, and turn it off and on to compare.
+
+The phone never talks to GitHub: deadwax searches its own copy of AutoEq's list and fetches the
+correction you pick (see [AutoEq's corrections](../README.md#autoeqs-corrections-for-the-iphone-apps-eq)
+in the README for what the server does). Once you've used one, it's kept on the phone with the
+output's EQ, and plays without deadwax.
+
+**The suggestion.** On the EQ page of Bluetooth or USB headphones with no correction, deadwax is asked
+once each time the app runs whether AutoEq has the headphones' name - the name iOS gives them, with
+an owner's "James's " taken off: "James's AirPods Pro" asks for "AirPods Pro". What it finds shows
+under the Correction row:
+
+- **One headphone**: "AutoEq has a correction for Sennheiser HD 650", "Measured by oratory1990".
+  Tap it for its page. A headphone AutoEq has measured in more than one condition - "Sennheiser HD 650
+  (2020)", "(balanced)" - counts as the one headphone, and the plain one is offered.
+- **Several**: "AutoEq has corrections for AirPods Pro", "16 models - pick yours" (as many as AutoEq
+  has). Nothing is picked
+  for you. Tap it for the picker, with "AirPods Pro" already searched and the models under
+  **Suggested for James's AirPods Pro**. A name with another word in it is another model - "Apple
+  AirPods Pro 2" isn't the AirPods Pro, "Beats Studio Buds +" aren't the Beats Studio Buds - so it
+  is a choice even when it's the only one AutoEq has.
+- **Nothing** (a speaker, a car, a name AutoEq doesn't have): no row.
+
+It's only ever a suggestion - nothing changes until you tap **Use**. Swipe it for **Not now** (or
+use VoiceOver's action) and it doesn't come back for those headphones. It isn't shown offline, or
+once the headphones have a correction.
+
+**Picking AirPods.** iOS calls the first AirPods Pro and the AirPods Pro 2 both "AirPods Pro", so the
+name can't tell which you have, and the app always lets you pick. The first generation is **Apple
+AirPods Pro**. For the **Pro 2**, crinacle measured them fourteen ways - at eleven listening levels
+with noise cancelling on ("Apple AirPods Pro 2 (51dB + ANC)" to "(91dB + ANC)"), and in noise
+cancelling, passive and transparency modes; pick the mode you use, and with noise cancelling the
+level nearest how loud you listen. "Apple Airpods Pro 2" (HypetheSonics, Harpo, Filk) and
+Rtings' "Apple AirPods Pro2" are the same model, measured by others. The same goes for other
+headphones that have had a second generation under one name.
+
+**The correction picker** (Correction on the EQ page), for the output it was opened from:
+
+- **None** (ticked when there's no correction) takes the correction away and goes back. The
+  correction there is, ticked, goes back keeping it.
+- **Suggested for …**, when there's a suggestion.
+- **Find your headphones**: type a name or a model - "hd650" and "hd 650" both find the Sennheiser HD
+  650. It searches as you stop typing. Each result is one headphone, with who measured it, its form
+  ("crinacle · in-ear") and how many more measurements there are ("3 more measurements"). No match
+  says "AutoEq has no headphones called "xyz"." - try the model alone.
+
+**A correction's page**: the correction's curve on its own, who measured it and on what ("Measured
+by crinacle, on a 711 rig (in-ear)."), its filters and the preamp AutoEq gave it ("10 filters,
+preamp -6.0 dB"), then **Use for James's AirPods Pro**. Use makes it that output's correction,
+turns the EQ on if it was off, and takes you back to the EQ page. Once used, the button says "Used
+for James's AirPods Pro". **Other measurements** are the same headphones measured by other sources,
+each with its own page. At the foot, **AutoEq on GitHub** opens AutoEq's page in Safari (the music
+keeps playing).
+
+Like the presets, the picker and a correction's page stay with the output they were opened for: take
+the AirPods out while reading and **Use for James's AirPods Pro** still puts it on the AirPods - kept
+for when they're back - never on the speaker, and the top of the page says they aren't connected.
+
+**When it can't.** Offline: "Can't connect to deadwax." and "Check your connection." with **Try
+again**; the correction you have plays on. deadwax unable to reach GitHub: "deadwax can't reach
+AutoEq just now." (see [AutoEq can't be reached](troubleshooting.md#autoeq-cant-be-reached)). A
+correction AutoEq no longer has: "AutoEq doesn't have that measurement any more." A deadwax older
+than 2.1.7, which has no AutoEq: "Something went wrong." (an admin sees why, folded under it). If
+AutoEq ever changed its files so the app can't read one: "deadwax couldn't read this correction."
+
+**Thanks.** The corrections are AutoEq's (MIT licence, Copyright (c) 2018-2022 Jaakko Pasanen), made
+from measurements by oratory1990, crinacle, Rtings, Super Review, Innerfidelity, HypetheSonics and
+AutoEq's other sources - the measurements are theirs.
 
 **VoiceOver and text sizes.** The curve is one item that says its shape ("Up to 6 decibels louder in
 the bass. Preamp minus 6.1 decibels.") - and the rotor's **Audio Graphs** has **Play Audio Graph**,
@@ -946,6 +1034,31 @@ The EQ's own page, with AirPods unless it says. Install the usual way, not with 
 - **E16 The largest text.** Settings > Accessibility > Display & Text Size > Larger Text at the
   largest: the sliders are ten rows with - and + buttons; everything else wraps.
 
+### AutoEq's checks (app 0.5)
+
+Needs deadwax 2.1.7 or later (`:experimental` for now). AirPods with no correction, unless it says.
+
+- **E17 The suggestion, and Use.** On the AirPods' EQ page, under Correction: "AutoEq has corrections
+  for AirPods Pro", "16 models - pick yours" (or however many AutoEq has by then). Tap it: the picker, "AirPods Pro" searched, the first
+  generation and the Pro 2's under **Suggested for James's AirPods Pro**. Open the one for your
+  generation (for the Pro 2, the listening level and ANC you use): "Measured by …", the curve, Other
+  measurements - then take the AirPods out on that page before tapping: the button still says **Use
+  for James's AirPods Pro**, the line at the top says they aren't connected, and using it goes back to
+  their EQ page, the correction on them - the speaker's EQ unchanged. Put them back in: it plays.
+- **E18 What it does.** With the tone Flat, flip the EQ off and on while a song plays: the
+  correction's difference (more neutral: often a little less bass bloom and more treble detail on
+  AirPods). Then Bass Boost on top: both, one curve, the correction as a thin dashed line under it.
+  Tell me how the curve changes when you choose the correction - does it fade across or jump?
+- **E19 Searching.** In the picker, search "hd650", "hd 650" and "airpods": each finds what you'd
+  expect. Search "zzz": "AutoEq has no headphones called "zzz"." Then None: the correction goes, and
+  back on the EQ page the suggestion is back. Swipe it for **Not now**: it goes, and doesn't come back
+  after closing the app and opening it again.
+- **E20 Offline.** Airplane mode (or WireGuard off away from home), then search: "Can't connect to
+  deadwax." with Try again - and the correction still plays. The suggestion isn't shown while
+  offline.
+- **E21 Headphone Accommodations.** If you use Headphone Accommodations (Settings > Accessibility >
+  Audio & Visual), turn it off with a correction on: the two stack otherwise.
+
 ## What it can't do yet
 
 These are the web app's for now. Most of them come to the phone in the next phases:
@@ -957,9 +1070,9 @@ These are the web app's for now. Most of them come to the phone in the next phas
 - **Looking after deadwax**: People, Server settings, the event log, Needs a look, Library care, the
   editors, and changing your password. For an admin, **Set up Navidrome** opens the web app in Safari.
 
-And two parts of the [EQ](#eq) come in its next builds: **AutoEq**, a correction for your
-headphones from AutoEq's measurements, next; then **Advanced** - filters of your own, the preamp
-set by hand, and importing and exporting Equalizer APO files.
+And one part of the [EQ](#eq) comes in its next build: **Advanced** - a correction's filters to see
+and change, filters of your own, the preamp set by hand, and importing and exporting Equalizer APO
+files.
 
 ## When something goes wrong
 
@@ -983,6 +1096,7 @@ set by hand, and importing and exporting Equalizer APO files.
 | Lyrics: **"Couldn't load the lyrics."** | deadwax, or Navidrome behind it, couldn't give them just then: **Try again**. If it's every song, deadwax may be older than 2.1.5, which has no lyrics for the app (an admin sees why, folded under it). |
 | Lyrics: **"This song isn't here any more - it may have been moved or deleted."** | Navidrome no longer has the song the queue names (a rescan moved it). Play it again from its album. |
 | **Lyrics** is dimmed | The song has none - none on LRCLIB, or none fetched yet (**Get lyrics** in the album's Edit, on the web app). Offline, "Lyrics - not on this phone": none were kept for it, which happens to a song downloaded with app 0.3 until the app has been opened with deadwax in reach. |
+| The EQ's correction picker: **"Something went wrong."**, with **Try again** | deadwax answered with an error. If it's every search, deadwax may be older than 2.1.7, which has no AutoEq for the app (an admin sees why, folded under it). |
 | An album stays on **"Waiting for Wi-Fi"** | Download over is Wi-Fi only (You > Downloads): join a Wi-Fi network that isn't a phone's hotspot, with Low Data Mode off - or choose Wi-Fi and cellular. |
 | **"Waiting for room - the storage limit is reached"** | Raise the Storage limit in You > Downloads, or remove something there (largest first). |
 | **"Waiting for space on this phone"** | The phone itself is full: make room in Settings > General > iPhone Storage. |

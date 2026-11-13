@@ -2,12 +2,12 @@ import DeadwaxCore
 import SwiftUI
 
 /// The EQ page (eq.md 3.2, 3.3): one output's EQ, top to bottom - the output and its switch, the curve and the line
-/// under it, the tone (Preset, the ten sliders, Save as Preset…), Other outputs, and Forget This Output for one that
-/// isn't connected. An inset grouped List titled "EQ", large when pushed from You, inline in the sheet; a toolbar •••
-/// with "Rename…", and "Done" in the sheet.
+/// under it, the correction (the Correction row and AutoEq's suggestion, slice 4), the tone (Preset, the ten sliders,
+/// Save as Preset…), Other outputs, and Forget This Output for one that isn't connected. An inset grouped List titled
+/// "EQ", large when pushed from You, inline in the sheet; a toolbar ••• with "Rename…", and "Done" in the sheet.
 ///
-/// Slices 4 and 5 add their sections where 3.2 puts them - Correction between the curve and Tone, Preamp after Tone,
-/// Advanced after Other outputs - so nothing here stands in for them.
+/// Slice 5 adds its sections where 3.2 puts them - Preamp after Tone, Advanced after Other outputs, and the
+/// correction's own rows in Correction - so nothing here stands in for them.
 ///
 /// - **Which output** (3.2, Core's EQPage): opened from You or Now Playing's •••, the page is the output now's and
 ///   follows the route - only while it is on top (nothing pushed or presented over it, its tab shown, Now Playing not
@@ -21,6 +21,7 @@ struct EQScreen: View {
 
     @Environment(EQModel.self) private var eq
     @Environment(ServerModel.self) private var server
+    @Environment(Reachability.self) private var reachability
     @Environment(AppNavigation.self) private var navigation
     @Environment(\.eqDone) private var done
     @Environment(\.dismiss) private var dismiss
@@ -60,6 +61,7 @@ struct EQScreen: View {
         List {
             outputSection(output, on: setting.on, connected: connected)
             curveSection(key, name: output.name, connected: connected, held: page.held > 0)
+            correctionSection(output, setting: setting)
             toneSection(output, tone: setting.tone)
             if EQScreenRules.showsOthers(page) {
                 othersSection(key)
@@ -101,6 +103,17 @@ struct EQScreen: View {
         .onChange(of: eq.route.key) { _, route in
             if self.page?.heard(route: route) == true { switched() }
         }
+        // AutoEq's suggestion for the output shown (3.7): asked once a launch, and again when deadwax comes back in reach
+        .task(id: SuggestionAsk(key: key, online: reachability.online, correction: setting.correction == nil)) {
+            eq.askSuggestion(for: output, client: server.client, online: reachability.online)
+        }
+    }
+
+    /// What the suggestion is asked again on: the output shown, deadwax in reach, the output without a correction.
+    private struct SuggestionAsk: Equatable {
+        let key: String
+        let online: Bool
+        let correction: Bool
     }
 
     // MARK: the sections
@@ -146,6 +159,50 @@ struct EQScreen: View {
                 }
             }
         }
+    }
+
+    /// 3. Correction (3.2, 3.7): the Correction row - its value None or the correction's name, where it's from under
+    /// the label - pushing the picker; and, when it applies, AutoEq's suggestion: one headphone's profile, or the
+    /// picker searched for the output's name. Swipe (or VoiceOver's action) for Not now, which puts it away for good.
+    private func correctionSection(_ output: EQOutput, setting: EQOutputSetting) -> some View {
+        let suggestion = eq.suggestion(output.key)
+        let shows = EQSuggestionRules.shows(output, setting, suggestion, online: reachability.online)
+        return Section {
+            EQLink(route: .correction(output.key)) {
+                LabeledContent {
+                    Text(EQWords.Correction.value(setting.correction))
+                } label: {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(EQWords.Correction.header)
+                        if let correction = setting.correction {
+                            Text(EQWords.Correction.source(correction))
+                                .font(.footnote)
+                                .foregroundStyle(Palette.quiet)
+                        }
+                    }
+                }
+            }
+            if shows, let suggestion, let lines = suggestion.lines {
+                EQLink(route: Self.route(suggestion, for: output.key)) {
+                    EQSuggestionRow(title: lines.title, detail: lines.detail)
+                }
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button(EQWords.Correction.notNow) { eq.mark(.notNow, for: output) }
+                }
+                .accessibilityAction(named: EQWords.Correction.notNow) { eq.mark(.notNow, for: output) }
+                .onAppear { eq.mark(.shown, for: output) }
+            }
+        } header: {
+            Text(EQWords.Correction.header)
+        } footer: {
+            Text(EQWords.Correction.footer(output))
+        }
+    }
+
+    /// Where the suggestion goes: one headphone's profile, or the picker, searched (3.7).
+    private static func route(_ suggestion: EQSuggestion, for key: String) -> EQRoute {
+        if case .one(let row) = suggestion { return .profile(AutoEqPage(output: key, row: row)) }
+        return .correction(key)
     }
 
     /// 4. Tone: the Preset row, the ten sliders - ten stepper rows at the accessibility sizes (3.15) - and Save as
@@ -272,5 +329,28 @@ struct EQScreen: View {
         case .amber: return Palette.amber
         case .danger: return Palette.danger
         }
+    }
+}
+
+/// AutoEq's suggestion's row (3.7): `wand.and.stars` in accent, its two lines - one element, the chevron the link's.
+struct EQSuggestionRow: View {
+    let title: String
+    let detail: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Image(systemName: "wand.and.stars")
+                .foregroundStyle(Palette.accent)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(detail)
+                    .font(.footnote)
+                    .foregroundStyle(Palette.quiet)
+            }
+        }
+        .accessibilityElement(children: .combine)
     }
 }

@@ -362,7 +362,7 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
     }
 
     @Test func everyRouteIsDeadwaxsOwn() {
-        #expect(Routes.all.count == 24)
+        #expect(Routes.all.count == 26)
         #expect(Set(Routes.all).count == Routes.all.count)
         for endpoint in Routes.all {
             #expect(endpoint.path.hasPrefix("/deadwax/"))
@@ -373,16 +373,19 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
 
     // MARK: Phase 1's
 
-    @Test func theAlbumIndexIsGivenThirtySecondsAndEveryOtherRouteTheTransports() {
+    @Test func theAlbumIndexAndAutoEqAreGivenLongerAndEveryOtherRouteTheTransports() {
         let (deadwax, _) = client()
         let index = deadwax.request(Routes.albumIndex, query: [("scope", "yours")])
         #expect(index.timeout == 30)
         #expect(index.url.query == "scope=yours")
-        for endpoint in Routes.all where endpoint != Routes.albumIndex {
+        // AutoEq's two, 20 s: deadwax may wait 15 s for AutoEq's list or a file (test_ios_contract.py holds it there)
+        let longer: [Endpoint: Double] = [Routes.albumIndex: 30, Routes.autoEqSearch: 20, Routes.autoEqProfile: 20]
+        #expect(Routes.timeouts == longer)
+        for endpoint in Routes.all {
             // each path parameter filled in: a brace left in a path is no URL
             let names = endpoint.path.split(separator: "{").dropFirst().map { String($0.prefix { $0 != "}" }) }
             let filled = Dictionary(uniqueKeysWithValues: names.map { ($0, "x") })
-            #expect(deadwax.request(endpoint, path: filled).timeout == nil, "\(endpoint.path)")
+            #expect(deadwax.request(endpoint, path: filled).timeout == longer[endpoint], "\(endpoint.path)")
         }
     }
 

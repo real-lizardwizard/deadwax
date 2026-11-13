@@ -100,14 +100,9 @@ public enum EQOutputs {
         return words.joined(separator: " ")
     }
 
-    /// The rows whose names hold every word of the query, case aside (3.7): one is offered, several are a choice,
-    /// none is nothing.
+    /// The rows whose names hold every word of the query, as whole words, folded (3.7) - EQSuggestion's own test,
+    /// which says what is offered from them.
     public static func suggested(_ query: String, rows: [String]) -> [Int] {
-        let wanted = query.lowercased().split(whereSeparator: { $0.isWhitespace })
-        guard !wanted.isEmpty else { return [] }
-        return rows.indices.filter { i in
-            let words = Set(rows[i].lowercased().split(whereSeparator: { $0.isWhitespace }))
-            return wanted.allSatisfy { words.contains($0) }
-        }
+        rows.indices.filter { (i: Int) -> Bool in EQSuggestion.holdsEveryWord(query, rows[i]) }
     }
 }

@@ -315,6 +315,61 @@ final class EQModel {
         changed()
     }
 
+    // MARK: AutoEq (3.7)
+
+    /// A correction chosen: AutoEq's profile used (the EQ turned on if it was Off - "EQ on"), or None. Crossfaded, as
+    /// every change is.
+    func use(_ correction: EQCorrection?, for output: EQOutput) {
+        let before = settings
+        let turnedOn = settings.use(correction, for: output)
+        guard settings != before else { return }
+        changed()
+        if turnedOn { Self.say(EQWords.Said.on) }
+    }
+
+    /// Each output's suggestion this launch, once answered: what deadwax's search for its cleaned name offers, and the
+    /// answer itself, which the picker opens with. Kept in memory only - asked again at the next launch.
+    private(set) var suggestions: [String: (suggestion: EQSuggestion, query: String, answer: AutoEqResults)] = [:]
+    /// The outputs whose suggestion is being asked for.
+    @ObservationIgnored private var asking: Set<String> = []
+
+    /// An output's suggestion, when it was asked for and answered this launch.
+    func suggestion(_ key: String) -> EQSuggestion? { suggestions[key]?.suggestion }
+
+    /// The EQ page shows an output (3.7): its suggestion asked for once a launch - a Bluetooth or USB output with no
+    /// correction, not put away with Not now, deadwax in reach. A failure keeps nothing, so the next time the page
+    /// shows it is asked again; an answer stands for the launch.
+    func askSuggestion(for output: EQOutput, client: DeadwaxClient?, online: Bool) {
+        let key = output.key
+        let setting = self.setting(output)
+        guard online, let client, suggestions[key] == nil, !asking.contains(key),
+              EQSuggestionRules.asks(output, setting),
+              let query = AutoEqAsk.query(EQSuggestionRules.query(output, setting)) else { return }
+        asking.insert(key)
+        Task { [weak self] () async -> Void in
+            let answer = try? await client.autoEq(search: query)
+            guard let self else { return }
+            self.asking.remove(key)
+            guard let answer else { return }
+            self.suggestions[key] = (EQSuggestion.of(query, answer: answer), query, answer)
+        }
+    }
+
+    /// The picker's start (3.7): the suggestion's query and deadwax's answer to it, when it was a choice - so the field
+    /// opens holding the cleaned name, already searched.
+    func searched(_ key: String) -> (query: String, answer: AutoEqResults)? {
+        guard let kept = suggestions[key], kept.suggestion.searched != nil else { return nil }
+        return (kept.query, kept.answer)
+    }
+
+    /// The suggestion's row was drawn ("shown"), or put away for good ("Not now") - kept in the file, nothing heard
+    /// differently, so no new curve is published.
+    func mark(_ suggestion: EQOutputSetting.Suggestion, for output: EQOutput) {
+        guard settings.mark(suggestion, for: output) else { return }
+        dirty = true
+        scheduleSave()
+    }
+
     /// A finger down on an EQ page's control: the file waits for it.
     func hold() { held += 1 }
 

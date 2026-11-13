@@ -116,6 +116,9 @@ import Testing
         #expect(p.empty == "Search by name or model - \"hd650\" finds the Sennheiser HD 650. Corrections come from AutoEq, which works out one for each headphone it has a measurement of.")
         #expect(p.noMatch("xyz") == "AutoEq has no headphones called \"xyz\".")
         #expect(p.tryTheModel == "Try the model alone, like \"hd650\".")
+        #expect(p.tryAgain == "Try again")
+        #expect(p.tooOld == "This deadwax is too old for AutoEq's corrections: they need deadwax 2.1.7 or later.")
+        #expect(W.Profile.gitHubAddress == "https://github.com/jaakkopasanen/AutoEq")
         let f = W.Profile.self
         #expect(f.measured(source: "crinacle", rig: "711", form: "in-ear") == "Measured by crinacle, on a 711 rig (in-ear).")
         #expect(f.measured(source: "crinacle", rig: nil, form: "in-ear") == "Measured by crinacle.")

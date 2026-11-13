@@ -1,8 +1,9 @@
 import DeadwaxCore
 import SwiftUI
 
-/// The EQ's pages (eq.md 3.2, 3.6, 3.12): pushed on You's stack as `AppRoute.eq`, and in the sheet over Now Playing on
-/// the sheet's own stack - so the pages link through `EQLink`, which pushes the value the stack they are on takes.
+/// The EQ's pages (eq.md 3.2, 3.6, 3.7, 3.12): pushed on You's stack as `AppRoute.eq`, and in the sheet over Now
+/// Playing on the sheet's own stack - so the pages link through `EQLink`, which pushes the value the stack they are on
+/// takes.
 enum EQRoute: Hashable {
     /// The EQ page of the output now (You's row, Now Playing's •••): it follows the route.
     case now
@@ -10,12 +11,41 @@ enum EQRoute: Hashable {
     case output(String)
     /// The presets, for one output: bound to it (8, question 30).
     case presets(String)
+    /// The correction picker (3.7), for one output: bound to it.
+    case correction(String)
+    /// One AutoEq profile's page (3.7), for one output: bound to it - "Use for James's AirPods Pro" does what it says.
+    case profile(AutoEqPage)
+
+    /// An EQ page itself, not one pushed from it: where "Use for …" goes back to.
+    var isPage: Bool {
+        switch self {
+        case .now, .output: return true
+        case .presets, .correction, .profile: return false
+        }
+    }
 }
 
 extension EnvironmentValues {
     /// Set in the sheet over Now Playing, whose pages are on its own stack (not You's): it closes the sheet, from its
     /// "Done" on every page.
     @Entry var eqDone: DismissAction? = nil
+}
+
+/// The sheet's own stack (3.1): the pages pushed over its EQ page - put in the sheet's environment, so a page on it
+/// can go back to the EQ page ("Use for …", 3.7). On You's stack, AppNavigation's `backToEQPage()` does it.
+@MainActor
+@Observable
+final class EQSheetStack {
+    var path: [EQRoute] = []
+
+    /// Every page over the topmost EQ page popped at once.
+    func backToPage() {
+        if let page = path.lastIndex(where: { $0.isPage }) {
+            path.removeSubrange((page + 1)...)
+        } else {
+            path.removeAll()
+        }
+    }
 }
 
 /// A link to an EQ page, on whichever stack the page is on.
@@ -43,6 +73,8 @@ struct EQDestination: View {
         case .now: EQScreen(opened: .now)
         case .output(let key): EQScreen(opened: .output(key))
         case .presets(let key): EQPresetsScreen(key: key)
+        case .correction(let key): EQCorrectionScreen(key: key)
+        case .profile(let page): EQProfileScreen(page: page)
         }
     }
 }
@@ -52,15 +84,18 @@ struct EQDestination: View {
 struct EQSheet: View {
     /// The sheet's own (read outside its stack, so it closes the sheet rather than popping a page).
     @Environment(\.dismiss) private var dismiss
+    /// The pages pushed over the EQ page.
+    @State private var stack = EQSheetStack()
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $stack.path) {
             EQScreen(opened: .now)
                 .navigationDestination(for: EQRoute.self) { route in
                     EQDestination(route: route)
                 }
         }
         .environment(\.eqDone, dismiss)
+        .environment(stack)
     }
 }
 
