@@ -1088,6 +1088,36 @@ SongId = Annotated[str, StringConstraints(min_length=1, max_length=ID_MAX)]
 PlaylistIdPath = Annotated[str, PathParam(min_length=1, max_length=ID_MAX)]
 
 
+#? (2.1.17) a playlist id -> (the event loop, its lock): one write at a time per playlist. Every write here reads the
+#? playlist and then writes from what it read - add's duplicates question, edit's `base` check - so two at once (two
+#? apps, a phone's picker opened twice) both read it before either wrote: two adds of the same songs both found them
+#? absent and both appended, the question never asked. Held across the read and the write; made afresh for another
+#? loop, as _queue_lock's are. deadwax serves from one process (src/main.py), so one lock per id is the whole guard.
+_playlist_locks: "OrderedDict[str, tuple[asyncio.AbstractEventLoop, asyncio.Lock]]" = OrderedDict()
+PLAYLIST_LOCKS_KEPT = 1000
+
+
+def forget_playlist_locks() -> None:
+    """Every playlist's lock forgotten (the tests)."""
+    _playlist_locks.clear()
+
+
+def _playlist_lock(playlist_id: str) -> asyncio.Lock:
+    loop = asyncio.get_running_loop()
+    held = _playlist_locks.get(playlist_id)
+    if held is None or held[0] is not loop:
+        held = (loop, asyncio.Lock())
+        _playlist_locks[playlist_id] = held
+    _playlist_locks.move_to_end(playlist_id)
+    while len(_playlist_locks) > PLAYLIST_LOCKS_KEPT:
+        #? the oldest let go - only ever one that isn't held, so a write in flight keeps its guard
+        oldest = next((key for key, (_, lock) in _playlist_locks.items() if not lock.locked()), None)
+        if oldest is None:
+            break
+        del _playlist_locks[oldest]
+    return held[1]
+
+
 def _named(text: str) -> str:
     name = playlist_rules.clean_name(text)
     if name is None:
@@ -1311,19 +1341,20 @@ async def add_to_playlist(playlist_id: PlaylistIdPath, adding: PlaylistAdd, requ
     nothing already there moves. Read first, as it is at the tap: some of the songs in it already, and `ask` (the
     default) writes nothing and says how many (`done: false`); `skip` adds only the others, `add` every one.
     """
-    client = client_for(request)
-    asker = asked_as(client)
-    found = await _read_playlist(client, playlist_id)
-    _writable(found, asker)
-    present = [str(song.get("id")) for song in playlist_rules.songs_of(found)]
-    asked = list(adding.song_ids)
-    to_add, already = playlist_rules.split_duplicates(present, asked, adding.duplicates)
-    if adding.duplicates == "ask" and already > 0:
-        return {"done": False, "already": already, "asked": len(asked)}
-    if not to_add:
-        return {"done": True, "added": 0, "already": already}
-    await _write(client, "updatePlaylist", {"playlistId": playlist_id, "songIdToAdd": to_add})
-    return {"done": True, "added": len(to_add), "already": already}
+    async with _playlist_lock(playlist_id):
+        client = client_for(request)
+        asker = asked_as(client)
+        found = await _read_playlist(client, playlist_id)
+        _writable(found, asker)
+        present = [str(song.get("id")) for song in playlist_rules.songs_of(found)]
+        asked = list(adding.song_ids)
+        to_add, already = playlist_rules.split_duplicates(present, asked, adding.duplicates)
+        if adding.duplicates == "ask" and already > 0:
+            return {"done": False, "already": already, "asked": len(asked)}
+        if not to_add:
+            return {"done": True, "added": 0, "already": already}
+        await _write(client, "updatePlaylist", {"playlistId": playlist_id, "songIdToAdd": to_add})
+        return {"done": True, "added": len(to_add), "already": already}
 
 
 @router.post("/playlists/{playlist_id}/edit")
@@ -1343,63 +1374,64 @@ async def edit_playlist(playlist_id: PlaylistIdPath, edit: PlaylistEdit, request
     from may itself have been left by a Done that failed before it). The new list must only remove and reorder the
     songs as they are now (422). Everything written and only the read after it failing is a 502 saying it was saved.
     """
-    client = client_for(request)
-    asker = asked_as(client)
-    found, _ = await _read_with_counter(client, playlist_id)
-    _writable(found, asker)
-    current = [str(song.get("id")) for song in playlist_rules.songs_of(found)]
-    if len(current) > playlist_rules.PLAYLIST_SONGS_MAX:
-        raise HTTPException(status_code=409, detail=playlist_rules.TOO_LONG)
-    base, wanted = list(edit.base), list(edit.song_ids)
-    #? (review) a Done that failed may have written its songs first: a retry finds them there, not base - which is
-    #? no change made in another app, and answering CHANGED would say the user's own save wasn't saved
-    left = [base]
-    if edit.tried is not None:
-        left.append(list(edit.tried))
-    #? emptying, after a Done that failed: its first step leaves one song of the list IT began from - which, every
-    #? list here being base with songs removed and reordered, is one of base's - so any one of base's is where an
-    #? emptying may have stopped, however many Dones failed before (review: base[:1] alone made a third Done a 409)
-    stopped_emptying = edit.tried == [] and len(current) == 1 and current[0] in base
-    if current not in left and not stopped_emptying:
-        raise HTTPException(status_code=409, detail=playlist_rules.CHANGED)
-    if not playlist_rules.is_rearrangement(current, wanted):
-        raise HTTPException(status_code=422, detail=playlist_rules.ONLY_REARRANGES)
+    async with _playlist_lock(playlist_id):
+        client = client_for(request)
+        asker = asked_as(client)
+        found, _ = await _read_with_counter(client, playlist_id)
+        _writable(found, asker)
+        current = [str(song.get("id")) for song in playlist_rules.songs_of(found)]
+        if len(current) > playlist_rules.PLAYLIST_SONGS_MAX:
+            raise HTTPException(status_code=409, detail=playlist_rules.TOO_LONG)
+        base, wanted = list(edit.base), list(edit.song_ids)
+        #? (review) a Done that failed may have written its songs first: a retry finds them there, not base - which is
+        #? no change made in another app, and answering CHANGED would say the user's own save wasn't saved
+        left = [base]
+        if edit.tried is not None:
+            left.append(list(edit.tried))
+        #? emptying, after a Done that failed: its first step leaves one song of the list IT began from - which, every
+        #? list here being base with songs removed and reordered, is one of base's - so any one of base's is where an
+        #? emptying may have stopped, however many Dones failed before (review: base[:1] alone made a third Done a 409)
+        stopped_emptying = edit.tried == [] and len(current) == 1 and current[0] in base
+        if current not in left and not stopped_emptying:
+            raise HTTPException(status_code=409, detail=playlist_rules.CHANGED)
+        if not playlist_rules.is_rearrangement(current, wanted):
+            raise HTTPException(status_code=422, detail=playlist_rules.ONLY_REARRANGES)
 
-    songs_written = False
-    if wanted != current:
-        if wanted:
-            await _write(client, "createPlaylist", {"playlistId": playlist_id, "songId": wanted})
-        else:
-            #? current isn't empty here (an empty list and an empty playlist are equal): replaced by its first song -
-            #? every row deleted, hidden and orphaned ones too - then that one removed
-            await _write(client, "createPlaylist", {"playlistId": playlist_id, "songId": [current[0]]})
-            await _write(client, "updatePlaylist", {"playlistId": playlist_id, "songIndexToRemove": 0})
-        songs_written = True
+        songs_written = False
+        if wanted != current:
+            if wanted:
+                await _write(client, "createPlaylist", {"playlistId": playlist_id, "songId": wanted})
+            else:
+                #? current isn't empty here (an empty list and an empty playlist are equal): replaced by its first song -
+                #? every row deleted, hidden and orphaned ones too - then that one removed
+                await _write(client, "createPlaylist", {"playlistId": playlist_id, "songId": [current[0]]})
+                await _write(client, "updatePlaylist", {"playlistId": playlist_id, "songIndexToRemove": 0})
+            songs_written = True
 
-    said = playlist_rules.summary(found, asker)
-    changes = {}
-    if edit.name is not None and edit.name != said["name"]:
-        changes["name"] = edit.name
-    if edit.comment is not None and edit.comment != said["comment"]:
-        changes["comment"] = edit.comment
-    if edit.public is not None and edit.public != said["public"]:
-        changes["public"] = "true" if edit.public else "false"
-    if changes:
+        said = playlist_rules.summary(found, asker)
+        changes = {}
+        if edit.name is not None and edit.name != said["name"]:
+            changes["name"] = edit.name
+        if edit.comment is not None and edit.comment != said["comment"]:
+            changes["comment"] = edit.comment
+        if edit.public is not None and edit.public != said["public"]:
+            changes["public"] = "true" if edit.public else "false"
+        if changes:
+            try:
+                await client.call("updatePlaylist", {"playlistId": playlist_id, **changes}, form=True)
+            except NavidromeError as e:
+                if songs_written and not (isinstance(e, SignedOut) or e.status == 401):
+                    raise Explained(502, playlist_rules.PART_SAVED, str(e))
+                raise _playlist_fail(e)
+
         try:
-            await client.call("updatePlaylist", {"playlistId": playlist_id, **changes}, form=True)
-        except NavidromeError as e:
-            if songs_written and not (isinstance(e, SignedOut) or e.status == 401):
-                raise Explained(502, playlist_rules.PART_SAVED, str(e))
-            raise _playlist_fail(e)
-
-    try:
-        found, counter = await _read_with_counter(client, playlist_id)
-    except HTTPException as e:
-        #? (review) written, and only the read after failing: said so - never a bare 502 the page takes for nothing saved
-        if (songs_written or changes) and e.status_code != 404:
-            raise Explained(502, playlist_rules.SAVED_UNREAD, str(e.detail))
-        raise
-    return _answer(found, counter, asker)
+            found, counter = await _read_with_counter(client, playlist_id)
+        except HTTPException as e:
+            #? (review) written, and only the read after failing: said so - never a bare 502 the page takes for nothing saved
+            if (songs_written or changes) and e.status_code != 404:
+                raise Explained(502, playlist_rules.SAVED_UNREAD, str(e.detail))
+            raise
+        return _answer(found, counter, asker)
 
 
 @router.post("/playlists/{playlist_id}/delete")
@@ -1409,11 +1441,12 @@ async def delete_playlist(playlist_id: PlaylistIdPath, request: Request):
     is refused (FROM_FILE): it would come back at Navidrome's next scan of that folder, and the page offers no Delete
     for it. There is no undo - Navidrome has none; the page's confirmation is the net.
     """
-    client = client_for(request)
-    found = await _read_playlist(client, playlist_id)
-    _writable(found, asked_as(client))
-    await _write(client, "deletePlaylist", {"id": playlist_id})
-    return {"deleted": True}
+    async with _playlist_lock(playlist_id):
+        client = client_for(request)
+        found = await _read_playlist(client, playlist_id)
+        _writable(found, asked_as(client))
+        await _write(client, "deletePlaylist", {"id": playlist_id})
+        return {"deleted": True}
 
 
 # ---------------------------------------------------------------- resume what was playing (2.0.0-player.64)

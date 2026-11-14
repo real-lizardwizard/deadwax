@@ -794,3 +794,67 @@ def test_a_signed_in_users_form_carries_their_login_in_the_body(player):
     ethan.post(f"{PLAYER}/playlists/pl-ethan/add", json={"song_ids": [SONG], "duplicates": "add"})
     added = next(call for call in player.fake.playlist_calls if call["endpoint"] == "updatePlaylist")
     assert added["query"] == "" and added["values"]["u"] == ["ethan"]
+
+
+# ----------------------------------------------------------------- one write at a time per playlist (2.1.17)
+
+def held_during(fake, playlist_id: str) -> list[tuple[str, bool]]:
+    """(endpoint, whether deadwax held that playlist's lock) for every playlist call while it is in place."""
+    from src.routes import navidrome as navidrome_routes
+    seen: list[tuple[str, bool]] = []
+    real = fake.playlist_call
+
+    def watching(endpoint, user, values):
+        held = navidrome_routes._playlist_locks.get(playlist_id)
+        seen.append((endpoint, bool(held and held[1].locked())))
+        return real(endpoint, user, values)
+
+    fake.playlist_call = watching
+    return seen
+
+
+@pytest.mark.parametrize("route, body", [
+    ("add", {"song_ids": ["t3"], "duplicates": "add"}),
+    ("edit", None),
+    ("delete", None),
+])
+def test_every_write_holds_its_playlists_lock_across_its_read_and_its_write(player, route, body):
+    """Two writes at once to one playlist - two apps, a picker opened twice - each read it before either wrote, so two
+    adds of the same songs both found them absent and both appended without the question: each route now reads and
+    writes inside the playlist's lock, and the next one reads what this one wrote."""
+    from src.routes import navidrome as navidrome_routes
+    navidrome_routes.forget_playlist_locks()
+    eleven(player.fake)
+    client = signed_in(player, "ethan")
+    if route == "edit":
+        body = {"base": base_of(client, "pl-late"), "song_ids": ["t2", "t1"]}
+    forget(player.fake)
+    seen = held_during(player.fake, "pl-late")
+    answer = client.post(f"{PLAYER}/playlists/pl-late/{route}", **({"json": body} if body is not None else {}))
+    assert answer.status_code == 200, answer.text
+    wrote = {"add": "updatePlaylist", "edit": "createPlaylist", "delete": "deletePlaylist"}[route]
+    assert [endpoint for endpoint, _ in seen][:1] == ["getPlaylist"] and wrote in [endpoint for endpoint, _ in seen]
+    assert all(held for endpoint, held in seen if endpoint in ("getPlaylist", wrote)), seen
+    #? and let go once answered: the next write takes it at once
+    assert not navidrome_routes._playlist_locks["pl-late"][1].locked()
+
+
+def test_a_playlists_lock_is_its_own_and_only_an_idle_one_is_let_go(monkeypatch):
+    import asyncio
+    from src.routes import navidrome as navidrome_routes
+    navidrome_routes.forget_playlist_locks()
+    monkeypatch.setattr(navidrome_routes, "PLAYLIST_LOCKS_KEPT", 2)
+
+    async def scene():
+        first = navidrome_routes._playlist_lock("a")
+        assert navidrome_routes._playlist_lock("a") is first and navidrome_routes._playlist_lock("b") is not first
+        await first.acquire()
+        navidrome_routes._playlist_lock("b")
+        navidrome_routes._playlist_lock("c")
+        #? past the bound the oldest idle one goes - "b" - never "a", held by a write in flight
+        kept = list(navidrome_routes._playlist_locks)
+        first.release()
+        return kept
+
+    assert asyncio.run(scene()) == ["a", "c"]
+    navidrome_routes.forget_playlist_locks()
