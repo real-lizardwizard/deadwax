@@ -144,8 +144,8 @@ def test_a_setting_in_an_xcconfig(tmp_path):
     assert helper.setting(path, "DEVELOPMENT_TEAM") == ""
     real = str(SCRIPTS.parent / "Config" / "Base.xcconfig")
     assert helper.setting(real, "PRODUCT_BUNDLE_IDENTIFIER") == "net.lizardlounge.deadwax"
-    assert helper.setting(real, "MARKETING_VERSION") == "0.8"
-    assert helper.setting(real, "CURRENT_PROJECT_VERSION") == "8"
+    assert helper.setting(real, "MARKETING_VERSION") == "0.9"
+    assert helper.setting(real, "CURRENT_PROJECT_VERSION") == "9"
 
 
 # ----------------------------------------------------------------- the project files
@@ -177,6 +177,45 @@ def test_an_eq_file_can_be_shared_to_deadwax_and_only_as_a_copy(tmp_path, monkey
     assert any("Viewer" in p for p in problems(editor))
     in_place = dict(real, LSSupportsOpeningDocumentsInPlace=True)
     assert any("copy" in p for p in problems(in_place))
+
+
+def test_your_library_may_run_in_the_background(tmp_path, monkeypatch):
+    """app 0.9 (phase3-autodownload.md 2.9): UIBackgroundModes audio first, then fetch and processing, and
+    BGTaskSchedulerPermittedIdentifiers exactly Core's two identifiers, in their order - each missing or wrong one
+    named, and the identifiers read from LibraryBackground.swift itself."""
+    real = plistlib.loads((project.IOS / "Config" / "Info.plist").read_bytes())
+    swift = (project.IOS / "DeadwaxKit" / "Sources" / "DeadwaxCore" / "LibraryBackground.swift").read_text(encoding="utf-8")
+    assert real["UIBackgroundModes"] == ["audio", "fetch", "processing"]
+    assert real["BGTaskSchedulerPermittedIdentifiers"] == ["net.lizardlounge.deadwax.library",
+                                                           "net.lizardlounge.deadwax.charging"]
+    core = tmp_path / "DeadwaxKit" / "Sources" / "DeadwaxCore"
+    core.mkdir(parents=True)
+    (tmp_path / "Config").mkdir()
+    monkeypatch.setattr(project, "IOS", tmp_path)
+
+    def problems(info, source=swift):
+        (tmp_path / "Config" / "Info.plist").write_bytes(plistlib.dumps(info))
+        (core / "LibraryBackground.swift").write_text(source, encoding="utf-8")
+        found = []
+        project.check_info_plist(found)
+        return [p for p in found if "Background" in p or "BGTask" in p]
+
+    assert problems(real) == []
+    for mode in ("fetch", "processing"):
+        less = dict(real, UIBackgroundModes=[m for m in real["UIBackgroundModes"] if m != mode])
+        assert any(f"no {mode}" in p for p in problems(less))
+    assert any("audio first" in p for p in problems(dict(real, UIBackgroundModes=["fetch", "audio", "processing"])))
+    assert any("no audio" in p for p in problems(dict(real, UIBackgroundModes=["fetch", "processing"])))
+    one = dict(real, BGTaskSchedulerPermittedIdentifiers=["net.lizardlounge.deadwax.library"])
+    assert any("crashes" in p for p in problems(one))
+    assert any("crashes" in p for p in problems({k: v for k, v in real.items() if k != "BGTaskSchedulerPermittedIdentifiers"}))
+    swapped = dict(real, BGTaskSchedulerPermittedIdentifiers=list(reversed(real["BGTaskSchedulerPermittedIdentifiers"])))
+    assert any("crashes" in p for p in problems(swapped))
+    # Core renamed without the plist: named
+    renamed = swift.replace('"net.lizardlounge.deadwax.charging"', '"net.lizardlounge.deadwax.power"')
+    assert any("crashes" in p for p in problems(real, renamed))
+    assert any("bundle id" in p for p in problems(real, swift.replace('"net.lizardlounge.deadwax.library"', '"io.x.library"')))
+    assert any("no chargingID" in p for p in problems(real, swift.replace("chargingID =", "chargerID =")))
 
 
 def test_the_old_style_plist_parser():

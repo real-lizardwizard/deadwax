@@ -20,6 +20,10 @@ import Observation
 /// One thing at a time: a check, then the reads; a check asked for while reads run is made after the batch in hand,
 /// then the reads go on. Nothing is asked while deadwax can't be reached or the person must sign in - a check that
 /// can't answer changes nothing anyway.
+///
+/// **In the background** (slice 3, 2.9): `background(reads:)` is a BGTask's run - the same check and reads, the reads
+/// stopped at 20 albums. Nothing about the rules differs: what a check gives back still needs a second check 10 minutes
+/// on to agree, and DownloadModel's plan decides what goes, as in front.
 @MainActor
 @Observable
 final class LibraryFollower {
@@ -128,6 +132,9 @@ final class LibraryFollower {
     @ObservationIgnored private var failedBefore: Set<String> = []
     /// Bumped by the question's Remove: a check already out when it was answered keeps it standing.
     @ObservationIgnored private var believeToken = 0
+    /// (slice 3) A background run's cap on the albums read, and how many it has read: nil in front.
+    @ObservationIgnored private var readCap: Int?
+    @ObservationIgnored private var readCount = 0
 
     init(server: ServerModel, reachability: Reachability) {
         self.server = server
@@ -193,6 +200,43 @@ final class LibraryFollower {
         guard LibraryFollow.due(reason, lastBegan: lastBegan, now: ListenTracker.wallMs()) else { return }
         if pending == nil { pending = reason }
         if !running { Task { await run() } }
+    }
+
+    /// (slice 3, 2.9) A background task's run: waits up to `LibraryBackground.openWaitMs` for the store and for deadwax
+    /// to be askable (the app may have just launched for it), then a check - unless one began within the minute, as
+    /// the store's opening one does at a launch for it - and the reads, at most `reads` albums. Nil: nothing could be
+    /// asked. Returns once the run has ended, or the task calling it is cancelled (iOS ended it).
+    func background(reads cap: Int) async -> (checked: Bool, read: Int)? {
+        let clock = ContinuousClock()
+        let deadline = clock.now + .milliseconds(LibraryBackground.openWaitMs)
+        while !(on && store != nil && canAsk) {
+            guard clock.now < deadline, !Task.isCancelled else { return nil }
+            try? await Task.sleep(for: .milliseconds(250))
+        }
+        let now = ListenTracker.wallMs()
+        // the check that stands for this run: one begun within the minute (out now, or answered), else this one
+        var from = now
+        readCap = cap
+        readCount = 0
+        defer { readCap = nil }
+        if LibraryFollow.due(.front, lastBegan: lastBegan, now: now) {
+            check(.background)
+        } else {
+            from = min(lastBegan ?? now, now)
+            if !running { Task { await run() } }
+        }
+        // the run (made by check, or the one under way) to its end
+        try? await Task.sleep(for: .milliseconds(50))
+        while running || pending != nil {
+            guard !Task.isCancelled else { break }
+            try? await Task.sleep(for: .milliseconds(200))
+        }
+        let checked: Bool = {
+            guard let record = lastCheck, record.began >= from else { return false }
+            if case .failed = record.result { return false }
+            return true
+        }()
+        return (checked, readCount)
     }
 
     // MARK: the marks and the question
@@ -329,7 +373,14 @@ final class LibraryFollower {
                 firstReadEnded()
                 return
             }
-            let batch = Array(next.prefix(LibraryFollow.readsAtOnce))
+            // a background run's reads stop at its cap: the rest at the next chance
+            var room = LibraryFollow.readsAtOnce
+            if let cap = readCap {
+                guard readCount < cap else { return }
+                room = min(room, cap - readCount)
+            }
+            let batch = Array(next.prefix(room))
+            readCount += batch.count
             // a read of an album read before and not due its second read is a stale list read again
             refreshed += batch.filter { (id: String) -> Bool in
                 guard let entry = ordered.first(where: { $0.id == id }), entry.songs != nil else { return false }

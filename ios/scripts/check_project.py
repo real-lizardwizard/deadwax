@@ -14,6 +14,9 @@ Checks the iPhone app's project files without Xcode - what can be checked on Lin
     beside NSAllowsLocalNetworking it is ignored), the Local Network text, background audio, a launch
     screen without a storyboard, and the loose-PNG icons it names, each an opaque PNG of its size; and
     plain text as a document type, Alternate, handed over as a copy (an EQ file shared to deadwax, eq.md 3.9);
+    and (app 0.9, phase3-autodownload.md 2.9) your library in the background: UIBackgroundModes audio first,
+    then fetch and processing, and BGTaskSchedulerPermittedIdentifiers exactly the two identifiers Core's
+    LibraryBackground registers - an identifier missing there makes BGTaskScheduler.register crash the app;
   - no asset catalog, storyboard, xib or entitlements file anywhere under ios/ (the plan's risk R2: actool
     and ibtool need a Simulator runtime James's Mac doesn't have; and a free account has no use for
     entitlements).
@@ -30,8 +33,8 @@ from pathlib import Path
 IOS = Path(__file__).resolve().parent.parent
 PROJECT = IOS / "Deadwax.xcodeproj"
 BUNDLE_ID = "net.lizardlounge.deadwax"
-MARKETING_VERSION = "0.8"
-BUILD = "8"
+MARKETING_VERSION = "0.9"
+BUILD = "9"
 DEPLOYMENT_TARGET = "17.0"
 IGNORED_BESIDE_LOCAL = ("NSAllowsLocalNetworking", "NSAllowsArbitraryLoadsForMedia", "NSAllowsArbitraryLoadsInWebContent")
 
@@ -268,8 +271,21 @@ def check_info_plist(problems: list) -> None:
             problems.append(f"Info.plist: {key} beside NSAllowsArbitraryLoads makes iOS ignore the latter")
     if not str(info.get("NSLocalNetworkUsageDescription", "")).strip():
         problems.append("Info.plist: no NSLocalNetworkUsageDescription - a LAN connection would just fail")
-    if "audio" not in info.get("UIBackgroundModes", []):
+    modes = info.get("UIBackgroundModes", [])
+    if "audio" not in modes:
         problems.append("Info.plist: UIBackgroundModes has no audio - nothing would play locked")
+    elif modes[0] != "audio":
+        problems.append("Info.plist: UIBackgroundModes doesn't list audio first (ios.yml reads UIBackgroundModes.0)")
+    # your library in the background (app 0.9): the refresh needs fetch, the charger's task processing
+    for mode, task in (("fetch", "the library's refresh (BGAppRefreshTask)"),
+                       ("processing", "the charger's task (BGProcessingTask)")):
+        if mode not in modes:
+            problems.append(f"Info.plist: UIBackgroundModes has no {mode} - {task} could never be asked for")
+    permitted = info.get("BGTaskSchedulerPermittedIdentifiers", [])
+    wanted = background_identifiers(problems)
+    if wanted is not None and list(permitted) != wanted:
+        problems.append(f"Info.plist: BGTaskSchedulerPermittedIdentifiers is {list(permitted)}, not {wanted} as "
+                        "LibraryBackground.swift registers them - a missing one crashes the app at launch")
     # the turntable's display link asks for up to 120 Hz (turntable.md 2.6): without this key an iPhone holds every
     # app's CADisplayLink to 60 whatever its preferredFrameRateRange says
     if info.get("CADisableMinimumFrameDurationOnPhone") is not True:
@@ -310,6 +326,27 @@ def check_info_plist(problems: list) -> None:
                 problems.append(f"the icon {icon.name} is missing or isn't a PNG")
             elif size[:2] != (points * scale, points * scale) or size[2] != 2:
                 problems.append(f"the icon {icon.name} is {size[0]}x{size[1]} colour type {size[2]}, not an opaque RGB {points * scale}x{points * scale}")
+
+
+def background_identifiers(problems: list):
+    """The two background task identifiers, as Core's LibraryBackground.swift spells them (refreshID, chargingID) - in
+    that order, each under the bundle id. None (and a problem) when they can't be read."""
+    path = IOS / "DeadwaxKit" / "Sources" / "DeadwaxCore" / "LibraryBackground.swift"
+    try:
+        source = path.read_text(encoding="utf-8")
+    except OSError as error:
+        problems.append(f"LibraryBackground.swift can't be read for the background task identifiers: {error}")
+        return None
+    found = []
+    for name in ("refreshID", "chargingID"):
+        match = re.search(rf'public static let {name} = "([^"]+)"', source)
+        if not match:
+            problems.append(f"LibraryBackground.swift: no {name} to check BGTaskSchedulerPermittedIdentifiers against")
+            return None
+        if not match.group(1).startswith(BUNDLE_ID + "."):
+            problems.append(f"LibraryBackground.swift: {name} {match.group(1)} isn't under the bundle id {BUNDLE_ID}")
+        found.append(match.group(1))
+    return found
 
 
 def check_no_catalogs(problems: list) -> None:

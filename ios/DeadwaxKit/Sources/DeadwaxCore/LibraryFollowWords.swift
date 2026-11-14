@@ -87,6 +87,41 @@ public enum LibraryFollowWords {
         return "\(rounded / 60) min \(rounded % 60) s"
     }
 
+    // MARK: slice 3's (Debug)
+
+    /// The phone's power, as Only while charging reads it: "Charging", "Full, on the charger", "Not charging",
+    /// "Not known".
+    public static func power(_ state: PowerState) -> String {
+        switch state {
+        case .charging: return "Charging"
+        case .full: return "Full, on the charger"
+        case .unplugged: return "Not charging"
+        case .unknown: return "Not known"
+        }
+    }
+
+    /// A background run: "Refresh · checked, 3 read, 1 album downloading, charging · 4.20 s · 2 h ago" - or "Charger ·
+    /// ended by iOS · ...", "Refresh · nothing to ask: Download your library is off · ...", "Refresh · couldn't ask
+    /// deadwax · ...". "No background runs yet" for none.
+    public static func backgroundRun(_ run: LibraryBackground.Run, now: Int64) -> String {
+        let task = run.task == LibraryBackground.chargingID ? "Charger" : "Refresh"
+        let what: String
+        switch run.outcome {
+        case .ran(let checked, let read, let downloading, let charging):
+            var parts = [checked ? "checked" : "check failed"]
+            if read > 0 { parts.append("\(count(read)) read") }
+            if downloading > 0 { parts.append("\(count(downloading)) album\(downloading == 1 ? "" : "s") downloading") }
+            parts.append(charging ? "charging" : "not charging")
+            what = parts.joined(separator: ", ")
+        case .off: what = "nothing to ask: Download your library is off"
+        case .couldntAsk: what = "couldn't ask deadwax"
+        case .expired: what = "ended by iOS"
+        }
+        return "\(task) \u{00B7} \(what) \u{00B7} \(duration(run.seconds)) \u{00B7} \(ago(run.began, now: now))"
+    }
+
+    public static let noBackgroundRun = "No background runs yet"
+
     /// "200 · 3,010 albums · 0.84 s · 3 min ago", "unchanged (304) · 0.12 s · just now", "failed: <words> · ...".
     public static func lastCheck(_ record: LibraryCheckRecord, now: Int64) -> String {
         let what: String

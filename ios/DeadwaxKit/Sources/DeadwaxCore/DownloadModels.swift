@@ -21,6 +21,8 @@ public enum DownloadWait: String, Sendable, CaseIterable, Codable {
     case room
     /// 2 GB of the phone must stay free.
     case phoneFull = "phone_full"
+    /// (Phase 3, slice 3) Only while charging is on and the phone isn't: a song only your library wants waits for it.
+    case charging
     /// Its task is out and hasn't had a byte yet (the session fetches three at a time).
     case queued
 
@@ -28,8 +30,11 @@ public enum DownloadWait: String, Sendable, CaseIterable, Codable {
     /// so iOS starts it by itself the moment the network allows - the app need not be running then.
     public var isTheNetwork: Bool { self == .connection || self == .wifi || self == .hotspot || self == .lowData }
 
-    /// A wait one of the two settings causes - the control's menu names it (spec 3.1).
-    public var isTheSettings: Bool { self == .wifi || self == .hotspot || self == .lowData || self == .room }
+    /// A wait one of the settings causes - the control's menu names it (spec 3.1): Download over, the storage limit,
+    /// and (Phase 3) Only while charging.
+    public var isTheSettings: Bool {
+        self == .wifi || self == .hotspot || self == .lowData || self == .room || self == .charging
+    }
 }
 
 /// How a copy on this phone was checked (spec 2.1, 8.4).

@@ -151,6 +151,7 @@ public enum DownloadWords {
         case .lowData: return "Waiting - Low Data Mode is on"
         case .room: return "Waiting for room - the storage limit is reached"
         case .phoneFull: return "Waiting for space on this phone"
+        case .charging: return "Waiting for the phone to charge"
         }
     }
 
@@ -159,6 +160,7 @@ public enum DownloadWords {
         switch reason {
         case .wifi, .hotspot, .lowData: return "Download over is Wi-Fi only - in You > Downloads."
         case .room: return "The storage limit is \(limit.label) - in You > Downloads."
+        case .charging: return "Only while charging is on - in You > Downloads."
         default: return nil
         }
     }

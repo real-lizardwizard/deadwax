@@ -520,6 +520,42 @@ broken (notes/ios.md, "Phase 3, after the review"). What changed, against the se
   whose clock is moved forward by 10 minutes or more between two checks could have them agree early. That is a
   known limit, left as it is. The deficit's 3 minutes are on the uptime clock, which Settings can't move.
 
+### 6.7 Slice 3, built (2026-11-13)
+
+Written up in notes/ios.md, "Phase 3, slice 3: only while charging, and in the background". Open question 11 is built
+as recommended, literally. App 0.9 (9). What the build decided, or did differently:
+
+- **One album at a time, within the library's 20** - not 2.8's "its songs, or 20, whichever is more". The review
+  capped the library at 20 tasks out (6.6), so an album of more than 20 songs is handed over 20 at a time, the rest of
+  the same album as those end, and never beside another album of the library. An unplug overnight still overruns by
+  one album at most. Hand downloads beside it keep their own slots.
+- **The batch is the first album of the library with a task out**, else the first in the fill's order that may make
+  one. A new star above it doesn't take its place: iOS may be part-way through those songs with the app suspended.
+  Any other album's tasks out are let go, their resume data kept.
+- **The batch rule holds whenever Only while charging is on**, plugged in or not. Unplugged there are no library tasks
+  at all; plugged in, the bound is what makes an unplug the app can't see cost one album.
+- **The charging wait holds no room**, and the fill doesn't see it: an album waiting for the charger is still one
+  that fits, so Only while charging never makes anything give way or go.
+- **The power is read** from UIDevice's battery-state notification while the app runs, and again at every coming to
+  the front, every background run and every relaunch for the session's events - iOS never tells a suspended app.
+  `unknown` (monitoring off, or iOS can't tell) is not charging: Only while charging is literal.
+- **A background run checks only if no check began within the minute** (`due(.front)`): a launch for the task makes
+  the store's own opening check, and the run waits for that and its reads rather than asking twice. It waits up to
+  10 seconds for the store and deadwax to be askable, then reads at most 20 albums' songs, then plans.
+- **Nothing in the background deletes where the front wouldn't.** The run is the same check, the same plan and the
+  same `removeOrigins([.library])`. The two checks 10 minutes apart are the store's, on the wall clock. The phone's
+  deficit is confirmed on plans 3 minutes apart in one process on its uptime clock, so a run that launched the app,
+  which iOS gives about 30 seconds, never confirms one - it waits for the app in front, or a long-lived background.
+- **The tasks are asked for** at each move to the background, after each run (the refresh 15 minutes on again), and
+  whenever a plan in the background changes what is wanted - so an unplug seen at a relaunch asks for the charger's
+  task. A task not wanted has its request cancelled.
+- **A relaunch for the session's events waits for a plan** (5 seconds at most) before telling iOS its events are
+  done, so the next batch is handed over before the app is suspended again.
+- **Debug keeps the last five runs** (UserDefaults `libraryBackgroundRuns`, per phone): which task, when, how long,
+  and what came of it - check 61's evidence that iOS ran one at all.
+- **Only while charging shows only while Download your library is on** (3.1's third row), off until chosen, per
+  phone (`autoDownloadOnlyWhileCharging`).
+
 ## 7. Tests (Swift Testing; Core's on Linux and macOS)
 
 - **LibraryFollowTests**: added in the list's order; changed (songCount, duration past half a second) clears the songs,

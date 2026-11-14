@@ -1,4 +1,4 @@
-# The iPhone app (early: app 0.8, downloads, lyrics, the EQ, the turntable and play history)
+# The iPhone app (early: app 0.9, downloads, lyrics, the EQ, the turntable, play history and your library)
 
 deadwax is getting a native iPhone app, built with SwiftUI and its own audio engine, for what a web
 page can't do well: seamless joins and normalization done on the phone, downloads to play offline,
@@ -16,19 +16,20 @@ and a preamp of your own and Equalizer APO files in and out (see [EQ](#eq)). App
 turntable: Now Playing's second look, as the web app has it - a record you can turn by hand and hear
 as you turn it, with the album's CD art on its face (see [The turntable](#the-turntable)). App 0.7
 added the turntable's speed fader: the song faster or slower, its pitch moving with it, as a record
-deck's does - and at 1x the song exactly as it is (see [The speed](#the-speed)). **This is app 0.8,
-which adds play history**: scroll up in Up Next, past the song playing, and it goes on back through
-every song you've played - on the phone and in the web app, one list, as the web app's Up Next has it
-- and the phone's own plays now go into the web app's too (see [Up Next](#up-next) and [What you've
-played](#what-youve-played)). Being built on its own branch, not yet in a build of the app: your
-library downloaded by itself, as much as fits (see [Your library on this
-phone](#your-library-on-this-phone)). Playlists, Search and the rest come in the next phases (see [What it can't do
-yet](#what-it-cant-do-yet)).
+deck's does - and at 1x the song exactly as it is (see [The speed](#the-speed)). App 0.8 added play
+history: scroll up in Up Next, past the song playing, and it goes on back through every song you've
+played - on the phone and in the web app, one list, as the web app's Up Next has it - and the phone's
+own plays go into the web app's too (see [Up Next](#up-next) and [What you've
+played](#what-youve-played)). **This is app 0.9, which adds your library downloaded by itself**, as
+much as fits your storage limit, kept in step with what you star and unstar anywhere - only while the
+phone is charging if you choose, and with the app in the background when iOS allows (see [Your library
+on this phone](#your-library-on-this-phone)). Playlists, Search and the rest come in the next phases
+(see [What it can't do yet](#what-it-cant-do-yet)).
 
-**Nothing of Phase 2, the lyrics, the EQ, the turntable or play history has been seen on an iPhone
-yet.** It's built and tested on a Mac, and what only a phone can tell is what [the checks](#the-checks)
-are for. Until they're answered, read everything about downloads, lyrics, the EQ, the turntable and play
-history below as what the app is built to do.
+**Nothing of Phase 2, the lyrics, the EQ, the turntable, play history or your library downloaded has
+been seen on an iPhone yet.** It's built and tested on a Mac, and what only a phone can tell is what
+[the checks](#the-checks) are for. Until they're answered, read everything about downloads, lyrics, the
+EQ, the turntable, play history and your library below as what the app is built to do.
 
 The app talks only to deadwax, never to Navidrome, through deadwax's own routes, so the phone never
 needs the Navidrome account deadwax itself uses. With logins on, you sign in with your own Navidrome
@@ -133,7 +134,7 @@ old one. It also uses up one of the few new app ids a free account may register 
 It pulls the latest code, asks GitHub whether the app's checks passed on it (and asks you before
 building one that failed or is still running), builds it (Release), and installs it **over** the app
 on the phone, so everything on the phone stays. Then it opens the app and says how long the new
-install runs: `Installed deadwax 0.8 (8), runs until Wed 18 Nov, 14:02`. It also says how long it
+install runs: `Installed deadwax 0.9 (9), runs until Wed 18 Nov, 14:02`. It also says how long it
 took and the Mac's free space before and after. Xcode doesn't need to be open.
 
 | option | what it does |
@@ -594,7 +595,7 @@ album.
   If deadwax can't be reached, it says "Couldn't reach deadwax, so you're still signed in - try
   again." Changing your password is the web app's, for now.
 - **About**: deadwax's version, whether logins are on (for an admin), and the app's own version,
-  **0.8 (8)**.
+  **0.9 (9)**.
 - **This phone**: deadwax's address, **Change address**, and **Debug**, for an admin (with logins
   off, everyone is one).
 
@@ -740,8 +741,17 @@ Debug is where Phase 0's test screen lives now:
   - **Check now** checks at once. It also checks by itself: as it's turned on, as the app opens, when
     you come back to the app (if the last check was a minute or more ago), every 15 minutes while the
     app is open or playing, when deadwax answers again after it couldn't be reached, and straight after
-    Add to or Remove from my library. Each check is a line starting "library" in the Downloads events
-    above.
+    Add to or Remove from my library - and when iOS runs the app in the background for it. Each check
+    is a line starting "library" in the Downloads events above.
+  - **Power**: the phone's power as Only while charging reads it - "Charging", "Full, on the charger",
+    "Not charging" or "Not known" - and "only while charging" when that's on. **Albums out**: how many
+    of your library's albums have downloads handed to iOS now (with Only while charging on, never more
+    than one).
+  - **In the background**: the last five times iOS ran the app in the background for your library,
+    newest first - "Refresh · checked, 3 read, 1 album downloading, charging · 4.20 s · 2 h ago" (the
+    refresh, or **Charger** for the run iOS starts when the phone is plugged in), or "ended by iOS",
+    "couldn't ask deadwax", "nothing to ask: Download your library is off". "No background runs yet"
+    until iOS has run one: iOS decides when, and may not at all.
 - **Library**: how many albums each list had, whether it came new or the kept one still stood, and
   how long it took to come.
 - At the bottom, how long this install runs. In its last two days, it also says to run install.sh
@@ -1154,7 +1164,8 @@ normalization as a stream.
   tries). A song plays before its check is done.
 - **Waiting.** A download waits, and says so, for Wi-Fi (see Download over, below), for a connection,
   for deadwax, for you to sign in, for room under the storage limit, or for space on the phone, and
-  starts by itself when it can.
+  starts by itself when it can. Your library's own downloads can also wait for the phone to charge
+  (see [Only while charging](#your-library-on-this-phone)).
 - **Removing** one album or song needs no confirmation: it can be downloaded again. **Remove All
   Downloads** asks first.
 - **Per person.** Each person signed in on the phone has their own downloads. Signing out keeps
@@ -1168,8 +1179,8 @@ normalization as a stream.
   room, and it says so in amber. (Albums [your library](#your-library-on-this-phone) downloaded by
   itself make way, from the bottom.) The 2 GB of songs kept from streaming are apart from it. With other accounts' downloads on
   the phone, **Other accounts on this phone** has their size and **Remove** (it asks first).
-- **Your library** ("The collection" with logins off): **Download your library**, and what it's doing
-  - see [Your library on this phone](#your-library-on-this-phone).
+- **Your library** ("The collection" with logins off): **Download your library**, what it's doing,
+  and **Only while charging** - see [Your library on this phone](#your-library-on-this-phone).
 - **Download over**: **Wi-Fi only** (the default) - never mobile data, a phone's hotspot or Low Data
   Mode - or **Wi-Fi and cellular**. Under them, what the phone is on now ("On mobile data now -
   downloads wait for Wi-Fi."), in amber while a download waits for it. Changing it applies at once.
@@ -1193,8 +1204,7 @@ normalization as a stream.
 card) keeps your library on the phone by itself: the albums you've added, newest first, as many as
 fit in your storage limit. With logins off, and for the break-glass `deadwax` sign-in, it's **Download
 the collection**: every album deadwax holds, newest first. The phone remembers the setting, for
-whoever is signed in. This is being built: it's on the `phase3-autodownload` branch, not yet in a
-release.
+whoever is signed in. This is app 0.9's, on the `ios` branch - not yet in a release.
 
 - **What comes first**: the album you added or played most recently (a play counts for 30 days).
   Whole albums only, and only after everything you downloaded yourself: what you download is never
@@ -1210,7 +1220,8 @@ release.
 - **When it checks**: as the app opens, when you come back to it after a minute or more, every 15
   minutes while it's open or playing, when deadwax answers again, straight after Add to or Remove from
   my library - and when you pull down on You > Downloads. A check that fails doesn't put off the
-  next one. It downloads ten albums at a time, and the next as those arrive.
+  next one. It downloads ten albums at a time, and the next as those arrive (one at a time with Only
+  while charging on, below).
 - **Keeping up with deadwax**: each album's songs are read once, then again when its album page is
   opened, and once a week (up to 20 each check), so a song deadwax re-tags under a new id is
   followed. An album that can't be read is skipped, and read after the others at the next check.
@@ -1246,7 +1257,26 @@ release.
   could make them agree early. The few minutes of "the phone is full" go by the phone's own running
   time, which Settings can't move.
 - **Covers, lyrics and normalization** of the albums it downloads are kept as for any download.
-- Only while charging, and downloading with the app in the background, come in the next build.
+- **Only while charging** (under the line of what fits, off until you turn it on, kept on this phone):
+  "Your library's albums download only while the phone is charging. Albums you download yourself don't
+  wait." On, with the phone unplugged, your library's albums wait, and say "Waiting for the phone to
+  charge" - in an album's download menu, with "Only while charging is on - in You > Downloads." under
+  it, and in Downloading's row for your library. Unplug it
+  while the app is open or playing and what's downloading for your library stops at once, keeping
+  what had come, and carries on from there when you plug it in again. With the app in the background,
+  iOS downloads what it's been handed and the app can't stop it, so with Only while charging on your
+  library hands iOS one album at a time (at most 20 songs at once): unplugged overnight, at most one
+  album more comes down. Albums you download yourself never wait for it.
+- **In the background**: with the app closed (but not swiped away), iOS may run it now and then -
+  about 15 minutes after you leave it, at the soonest - to check your library and hand over what's
+  next, reading at most 20 new albums' songs each time; and, with Only while charging on and an album
+  waiting for it, once the phone is plugged in. iOS decides when, possibly rarely; Background App
+  Refresh off (Settings > General > Background App Refresh), or Low Power Mode, can stop it. It
+  follows the same rules as with the app open: nothing goes that wouldn't then - the ten minutes
+  between two checks hold, and the phone being short of space is never believed within a run that
+  started the app, which iOS gives only seconds. Downloads iOS starts
+  while the app is in the background may wait for Wi-Fi and power by themselves. Swiping deadwax away
+  in the app switcher stops all of it until you open it again.
 
 ## Offline
 
@@ -1760,7 +1790,7 @@ the Mac, signed in as you.
 These came with the build that added [Debug's Your library](#debug), the first part of downloading
 your library by itself, when nothing downloaded yet. You > Debug > **Your library**, with **Follow
 your library** on - in the build after it, that switch is You > Downloads' **Download your library**,
-which downloads too (see [the next checks](#your-librarys-checks-50-53-55-60)). The web app is
+which downloads too (see [the next checks](#your-librarys-checks-50-63)). The web app is
 deadwax's own page (`/player/`) in Safari or on the Mac, signed in as you.
 
 - **L0a The first read.** At home on Wi-Fi, turn **Follow your library** on and keep the app in front
@@ -1787,17 +1817,18 @@ deadwax's own page (`/player/`) in Safari or on the Mac, signed in as you.
 - **L0g Nothing else moved.** You > Downloads is as it was, nothing is downloading that you didn't ask
   for, and Debug's Downloads counts haven't moved.
 
-### Your library's checks (50-53, 55-60)
+### Your library's checks (50-63)
 
-These come with the build that downloads your library by itself. Debug's own switch is gone: **You >
+These come with the builds that download your library by itself (54 and 61-63 with app 0.9). Debug's own switch is gone: **You >
 Downloads > Download your library** does what it did, and downloads too, so L0a-L0f above now run
 with it (L0g no longer holds: things download). Note what you see for each; the Downloads events in
 You > Debug have a "library" line for everything it asks for and lets go, and why.
 
-- **50 Overnight.** At home on Wi-Fi, turn on Download your library with the phone on charge, the app
-  open and Auto-Lock off (it downloads in the background only once started, and starting by itself in
-  the background comes in the next build): in the morning your library is downloaded - or as much as
-  fits, said in numbers in You > Downloads. Note the time it took, and the size.
+- **50 Overnight.** At home on Wi-Fi, turn on Download your library with the phone on charge, open
+  the app, then lock the phone: in the morning your library is downloaded - or as much as fits, said in
+  numbers in You > Downloads. Note the time it took, and the size, and what You > Debug > Your library >
+  In the background lists. (If little came, try once more with the app open and Auto-Lock off: that
+  tells iOS's background apart from the app's.)
 - **51 A star elsewhere.** Add an album in the web app (or star one in Amperfy): within 15 minutes of
   the app being open, or straight away when you come back to it, it starts downloading.
 - **52 An unstar.** Remove an album from your library in the web app: it stays on the phone at the
@@ -1807,6 +1838,11 @@ You > Debug have a "library" line for everything it asks for and lets go, and wh
 - **53 Add and Remove here.** **Add to my library** on an album's page: it starts downloading within
   seconds (if it fits). **Remove from my library** on one it downloaded: the line under the button says
   "Its download goes from this phone too.", and it goes within seconds.
+- **54 Only while charging.** Turn it on (You > Downloads, under the line of what fits) and unplug the
+  phone while your library is downloading: what was downloading stops, and your library's albums say
+  "Waiting for the phone to charge" - Downloading's row, and an album's download menu. Download an
+  album yourself meanwhile: it doesn't wait. Plug the phone in: your library carries on, from where it
+  stopped, one album at a time (Debug's **Albums out** says 1).
 - **55 The limit lowered.** With your library filling 20 GB, set Storage limit to 10 GB: the albums at
   the bottom go, whole, and nothing you downloaded yourself; the line says what fits now, in amber.
   Back to 20 GB: they come back.
@@ -1824,8 +1860,19 @@ You > Debug have a "library" line for everything it asks for and lets go, and wh
   Keep Them keeps them, and the question goes. If you try Remove: still nothing goes at once, and the
   albums go only if a check ten minutes or more later says the same.
 
-54 and 61-63 (only while charging, the background, VoiceOver and the largest text) come with the next
-build.
+- **61 In the background.** Add an album in the web app on the Mac, and leave the phone locked and not
+  playing for an hour (the app not swiped away): note whether it came down without opening the app.
+  iOS decides when, and may not at all - You > Debug > Your library > In the background says whether
+  iOS ran the app, when, and what came of it. Please send me those lines either way.
+- **62 Unplugged overnight.** With Only while charging on, start a big library downloading on the
+  charger, note how many albums are on the phone (You > Downloads > Downloaded), then unplug the phone
+  and lock it. In the morning: at most one album more than when you unplugged, and the rest say
+  "Waiting for the phone to charge". Then plug it in overnight with the app closed: note in the morning
+  whether it carried on by itself (In the background has a **Charger** line if iOS ran it).
+- **63 VoiceOver and the largest text.** With VoiceOver on, and again at the largest text size
+  (Settings > Accessibility > Display & Text Size > Larger Text): You > Downloads' Your library section
+  - each switch read as one, with its note as the hint, the line of what fits as one - the Library's
+  card, and Downloading's row for your library. Nothing cut off or overlapping.
 
 ## What it can't do yet
 
@@ -1865,6 +1912,8 @@ These are the web app's for now. Most of them come to the phone in the next phas
 | The EQ's correction picker: **"Something went wrong."**, with **Try again** | deadwax answered with an error. If it's every search, deadwax may be older than 2.1.7, which has no AutoEq for the app (an admin sees why, folded under it). |
 | An album stays on **"Waiting for Wi-Fi"** | Download over is Wi-Fi only (You > Downloads): join a Wi-Fi network that isn't a phone's hotspot, with Low Data Mode off - or choose Wi-Fi and cellular. |
 | **"Waiting for room - the storage limit is reached"** | Raise the Storage limit in You > Downloads, or remove something there (largest first). |
+| Your library's albums stay on **"Waiting for the phone to charge"** | Only while charging is on (You > Downloads, under Download your library): plug the phone in, or turn it off. Albums you download yourself don't wait for it. |
+| Your library didn't download with the app closed | iOS decides when the app runs in the background, and may not for hours; Background App Refresh off (Settings > General) or Low Power Mode stops it, and so does swiping deadwax away in the app switcher. Opening the app checks and downloads at once. You > Debug > Your library > In the background (an admin's) says whether iOS ran it. |
 | **"Waiting for space on this phone"** | The phone itself is full: make room in Settings > General > iPhone Storage. |
 | **"2 songs didn't download"**, with why ("The copy kept arriving the wrong size.", "The copy's sound didn't match the original.", "This song isn't on deadwax any more.") | **Try again** in You > Downloads. If it keeps failing, the file on the server may be damaged: play it on the web app. |
 | You > Downloads: **"This phone couldn't read its downloads - close deadwax from the app switcher and open it again."** | Downloads are off until the app opens again; nothing is deleted, and downloaded songs stream meanwhile. If it lasts, the phone may be nearly full. |

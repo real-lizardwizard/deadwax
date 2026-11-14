@@ -21,6 +21,14 @@ public enum AutoDownloadWords {
     /// The section's header: what the switch keeps.
     public static func header(_ scope: AlbumScope) -> String { scope == .yours ? "Your library" : "The collection" }
 
+    /// (slice 3) Only while charging's switch, under Download your library while it is on.
+    public static let onlyWhileCharging = "Only while charging"
+
+    /// Its note.
+    public static func chargingNote(_ scope: AlbumScope) -> String {
+        "\(scope == .yours ? "Your library's" : "The collection's") albums download only while the phone is charging. Albums you download yourself don't wait."
+    }
+
     /// "1,240 albums" / "1 album".
     static func albums(_ n: Int) -> String { "\(UpNextWords.grouped(n)) \(n == 1 ? "album" : "albums")" }
 
@@ -189,11 +197,12 @@ public enum AutoDownloadWords {
     /// Every line, both scopes, for the ban list.
     public static var everyLine: [String] {
         var lines: [String] = [couldntCheck, questionNote, keepThem, remove, goesToo, turnOn, notNow, offAndRemove,
-                               offMessage(bytes: 12_400_000_000), keepOffTitle("Album")]
+                               offMessage(bytes: 12_400_000_000), keepOffTitle("Album"), onlyWhileCharging]
         let plan = LibraryFill.plan([.init(id: "a", bytes: 1), .init(id: "b", bytes: 30_000_000_000)],
                                     .init(limit: StorageLimit.gb20.bytes, freeSpace: 25_000_000_000))
         for scope in AlbumScope.allCases {
-            lines += [switchName(scope), note(scope), header(scope), reading(scope, read: 1_240, of: 3_010),
+            lines += [switchName(scope), note(scope), header(scope), chargingNote(scope),
+                      reading(scope, read: 1_240, of: 3_010),
                       waitsForRoom(scope, limit: .gb20), waitsForRoom(scope, limit: .none), keptOff(scope),
                       menuTitle(scope), controlMenuTitle(scope, bytesHere: 412_000_000), removeAllToo(scope), askTitle(scope), askLine(scope, limit: .gb20),
                       askLine(scope, limit: .none),

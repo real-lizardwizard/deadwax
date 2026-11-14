@@ -4286,3 +4286,122 @@ Not verified: anything on a phone, and the App-side wiring that has no Core test
 minutes on, the sweep at settle, the guarded cleanup, `pageRead` from an album page, the failure cap and the
 `retryLast` order in the run, `believeToken` with a check really in flight, `lastBegan` put back. Nor are the two
 confirmations, as drawn and spoken: a full swipe on a row that asks should spring back while the question shows.
+
+## Phase 3, slice 3: only while charging, and in the background (2026-11-13)
+
+The spec's 2.8 and 2.9 and open question 11, taken literally, on branch `phase3-autodownload` from db805b2 (slices 1-2
+with the review's fixes). **App 0.9 (9)**, the phase's version: Base.xcconfig, check_project.py, ios.yml's Info.plist
+check, tests/test_ios_install.py, YouView's comment, ios/README.md and docs/ios.md, as 0.8 did. src/__init__.py
+untouched; no server change. The spec's 6.7 says what the build decided; docs/ios.md says it for James.
+
+### Core (DeadwaxCore)
+
+- **`DownloadWait.charging`** (raw `charging`): a setting's wait (`isTheSettings`), so an album's download menu names
+  it - "Waiting for the phone to charge", "Only while charging is on - in You > Downloads."
+- **DownloadPlan**: `Facts.onlyWhileCharging` and `charging`, and `libraryWaitsToCharge` (on, and not charging). In
+  the walk, a library unit then waits `charging` after the shared waits and before the room, started or not, and
+  holds no room. In the plan, its tasks out are let go - `charging`, no task - so the app cancels them with their
+  resume data. With Only while charging on, **one album at a time**: the batch is the first library unit with a task
+  out, else the first reached that may make one. Only its outs are kept, within the library's 20. No other library
+  unit makes a task, so a big album is handed over 20 at a time, never beside another.
+- **LibraryBackground**: the two identifiers (`identifiers`, which check_project.py reads), `refreshAfterMs` (15 min),
+  `readsPerRun` (20), `openWaitMs` (10 s), and `asks(on:onlyWhileCharging:waits:)`: the refresh with the switch on,
+  the charger's too with Only while charging on and a song waiting `charging`. `Run` and `Outcome` (ran, off,
+  couldntAsk, expired), `keep` (newest first, 5), `raw`/`runs` (JSON for UserDefaults, an unreadable list read as
+  none). **PowerState** (unknown, unplugged, charging, full): `charging` is charging or full, never unknown.
+- **Words**: AutoDownloadWords' `onlyWhileCharging` and `chargingNote(scope)`, both in `everyLine` (the ban list
+  over them); LibraryFollowWords' `power`, `backgroundRun`, `noBackgroundRun` (Debug).
+
+### The app
+
+- **DownloadModel**: `onlyWhileCharging` (UserDefaults `autoDownloadOnlyWhileCharging`, a replan on change), `power`
+  (UIDevice.batteryState with monitoring on; its notification, and `readPower()` at becoming active, every background
+  run and every relaunch for the session's events), both passed to the planner's Facts. The plan's existing let-go
+  does the unplug's cancel, with resume data. `askBackgroundTasks(always:)` asks BackgroundWork for
+  `LibraryBackground.asks(...)` - always at the move to the background and after a run, and when a plan in the
+  background changes the set. `backgroundRun(task:)` reads the power, runs the follower's `background(reads: 20)`,
+  waits for the plan to settle (5 s at most), keeps the Run (UserDefaults `libraryBackgroundRuns`) and logs it.
+  `eventsHandled()` waits for a plan after a relaunch's events, so the next batch is handed over before suspension.
+  `libraryAlbumsOut` for Debug.
+- **LibraryFollower.background(reads:)**: waits up to 10 s for the store and `canAsk`; makes `check(.background)`
+  unless a check began within the minute (`due(.front)` - a launch for the task already made the opening check),
+  else starts the reads; caps the reads at 20 albums (`readCap`, lifted as it returns); waits for the run to end or
+  the task to be cancelled; answers whether a check that stands for the run answered, and how many albums it read.
+- **BackgroundWork** (App/Downloads, `import BackgroundTasks`, never in Core): registers both identifiers on the main
+  queue from the app delegate's didFinishLaunching; `ask(_:)` submits the BGAppRefreshTaskRequest (earliestBeginDate
+  15 minutes on) and the BGProcessingTaskRequest (requiresExternalPower, requiresNetworkConnectivity) and cancels
+  what isn't asked; a run is DownloadModel's in a Task, its expiration cancelling it, setTaskCompleted called exactly
+  once (`Completion`).
+- **DeadwaxApp**: `@UIApplicationDelegateAdaptor(AppDelegate.self)`; `BackgroundWork.shared.downloads` set in init,
+  before the delegate registers; the `.backgroundTask(.urlSession)` closure awaits `eventsHandled()` after
+  `eventsDelivered()`.
+- **You > Downloads**: Only while charging under the fit line while the switch is on (`ChargingToggle`), read by
+  VoiceOver as one switch with its note as the hint. **Debug > Your library**: Power, Albums out, and In the
+  background (the five runs, or "No background runs yet").
+- **Info.plist**: UIBackgroundModes `audio`, `fetch`, `processing` (audio first: ios.yml reads `.0`), and
+  BGTaskSchedulerPermittedIdentifiers with both identifiers. **check_project.py** checks the modes and that the
+  identifiers are exactly LibraryBackground.swift's, in order, under the bundle id: a missing one makes
+  BGTaskScheduler.register crash at launch. **ios.yml** asserts the built Info.plist's `UIBackgroundModes.1/.2` and
+  `BGTaskSchedulerPermittedIdentifiers.0/.1`, and 0.9.
+
+### Decided here (the spec was silent, or this departs from it)
+
+Written into the spec's 6.7 too:
+- **One album at a time within the library's 20**, not 2.8's "its songs, or 20, whichever is more": the review's cap
+  stands, and an album over 20 songs goes 20 at a time, never beside another.
+- **The batch is the first album with a task out**, so a new star above doesn't displace what iOS may be fetching.
+- **The batch rule holds whenever Only while charging is on**, plugged in or not.
+- **The charging wait holds no room and the fill doesn't see it**: Only while charging never makes anything go.
+- **`unknown` power is not charging.**
+- **A background run checks only if no check began within the minute**, and reads at most 20 albums.
+- **The deficit is never confirmed by a run that launched the app**: deficitSince is per process, on the uptime clock,
+  and 3 minutes outlast the ~30 s iOS gives - conservative, and the same rule as in front.
+- **The tasks are asked at the move to the background, after each run, and when a background plan changes the set**;
+  a relaunch for the session's events waits up to 5 s for a plan.
+- **Debug keeps the last five runs**, per phone.
+
+### Tests
+
+Core 1171 (from 1160): **LibraryChargingTests** 11 - the library waits unplugged and a hand download doesn't (nor a
+song you and the library both want), plugged in or off it goes; the shared waits first; an unplug lets the library's
+tasks go and keeps the hand's (and `handToCome` is the hand's alone); one album at a time, and off the library's 20
+across albums; the batch the first album with a task out, the others' let go; a big album 20 at a time beside a hand
+album's 10; an album waiting for the phone isn't the batch; PowerState; the asks; the runs kept and their codec; every
+word. DownloadWordsTests' every-wait map has `charging`. **tests/test_ios_install.py**: 0.9 (9), and
+`test_your_library_may_run_in_the_background` - the real Info.plist's modes and identifiers, and each missing,
+reordered or renamed one (in the plist or in LibraryBackground.swift) named by check_project.py.
+
+**Mutations, 17, each caught by a failing test, none by a build error** (scratchpad mutate_s3.py, every file restored
+byte for byte, sha-256 checked): the charging wait gone; hand downloads waiting too; the library waiting while
+charging; an unplug keeping the tasks as queued; the charging wait before the shared ones; new tasks spanning albums;
+no batch from the tasks out; the batch the first album rather than the first with a task out; the other albums'
+tasks out kept; the charger's task asked with nothing waiting; tasks asked with the switch off; runs kept oldest
+first; six runs kept; full not charging; unknown charging; the wait not a setting's; the wait's words.
+
+### Verified, and not
+
+Verified (2026-11-13, this Mac, Xcode's toolchain): `swift test` - Core 1171, DeadwaxAudio 158, DeadwaxTurntable 11,
+all pass; the 17 mutations; the unsigned Release device build with no warnings, its Info.plist 0.9 (9) with audio,
+fetch, processing and both identifiers; check_project.py with the .xcodeproj unchanged; `pytest
+tests/test_ios_*.py tests/test_source_bytes.py` 161 passed, 1 skipped; the ios sims (10) on Node 22. Not run: Core on
+Linux (ios.yml's ubuntu job will).
+
+Not verified - only the phone can tell, and none of the App's wiring has a test:
+- Checks 54 and 61-63 in docs/ios.md: an unplug's wait and its resume, a hand download not waiting; whether iOS runs
+  the refresh at all for a free-account install, and how often; an overnight unplug costing at most one album, and
+  whether the charger's BGProcessingTask runs overnight; VoiceOver and the largest text on both switches, the card and
+  Downloading's row.
+- **Whether `@UIApplicationDelegateAdaptor` leaves SwiftUI's `.backgroundTask(.urlSession)` delivering the session's
+  events** (the delegate doesn't implement handleEventsForBackgroundURLSession). Phase 2's background downloads
+  depend on it: a download finishing with the app suspended must still land.
+- That registering from didFinishLaunching under SwiftUI's lifecycle is in time (a late or missing registration
+  crashes, or the task never runs).
+- Whether the battery-state notification arrives promptly in front and playing, and what a background launch reads
+  before it.
+- Whether a relaunch for the session's events comes after each batch, or only once every task of the session (hand
+  downloads included) has ended, and whether 5 s is enough for the plan to hand over the next batch.
+- How long the discretionary tasks iOS makes in the background wait for power and Wi-Fi.
+- That the store and UserDefaults read in a background launch with the phone locked (after the first unlock).
+- What BGTaskScheduler.submit says with Background App Refresh off or in Low Power Mode (a "background: couldn't ask"
+  line in the downloads log).
+- Nothing drawn has been seen.
