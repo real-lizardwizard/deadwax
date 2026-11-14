@@ -2316,8 +2316,8 @@ button (still app 0.9). Earlier checks' "Library > Playlists" is now the switch'
   play an evening): Up Next keeps going, never ending at 200. With Repeat off it ends only once every song
   of your library has played; with Repeat All, at the end a new order begins with a different song. Lock
   the phone mid-shuffle for an hour: does it keep going?
-- **97 Started over.** Shuffle, then restart deadwax (or leave the phone a day) and press Next past 150:
-  "Your shuffle started over - deadwax no longer had its order", once, and the music carries on.
+- **97 Started over.** Shuffle, then restart the deadwax container (or leave the phone a day) and press Next past
+  150: "Your shuffle started over - deadwax no longer had its order", once, and the music carries on.
 - **98 Offline.** Airplane Mode: the Library's Albums page is Downloaded, under the same switch; ••• >
   Shuffle downloads, and a pull ("Release to shuffle your downloads"), play only songs on the phone -
   every one of them in time. ••• > Your albums is the way back. With nothing downloaded: no Shuffle in the
