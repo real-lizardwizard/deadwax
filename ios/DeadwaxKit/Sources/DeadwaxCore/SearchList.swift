@@ -401,6 +401,14 @@ public enum SearchList {
         return SearchPool(artists: artists, albums: albums, songs: songs)
     }
 
+    /// Rows as the phone draws them: each key once, the first kept. search3 can name a song twice (the fixture's
+    /// seeded answers do), and a SwiftUI ForEach given one id twice draws the wrong rows; the web's list keeps the repeat
+    /// (React keys warn, and draw), and the sections' rules stay the web's - this is the drawing's alone.
+    public static func drawable(_ rows: [SearchRow]) -> [SearchRow] {
+        var seen = Set<String>()
+        return rows.filter { (row: SearchRow) -> Bool in seen.insert(row.key).inserted }
+    }
+
     /// A section's rows in the order drawn (`sectionRows`, the library's part): yours, then the collection's, each in
     /// search3's order - the first `cap` of them (the All view's preview), or all.
     public static func sectionRows(_ placed: [SearchPlaced], cap: Int? = nil) -> [SearchRow] {

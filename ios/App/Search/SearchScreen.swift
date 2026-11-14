@@ -17,6 +17,7 @@ import SwiftUI
 struct SearchScreen: View {
     @Environment(SearchModel.self) private var search
     @Environment(ArtistsModel.self) private var artists
+    @Environment(LibraryModel.self) private var library
     @Environment(Reachability.self) private var reachability
     @Environment(AppNavigation.self) private var navigation
     @Environment(\.scenePhase) private var scenePhase
@@ -62,6 +63,10 @@ struct SearchScreen: View {
             guard online else { return }
             search.shown()
             search.resumed()
+        }
+        .onChange(of: library.generations[.yours]) { _, _ in
+            // your albums let go (an Add, a Remove, a star seen elsewhere): asked again, so whose a row is follows
+            search.shown()
         }
         .onChange(of: search.navidromeAway == nil) { _, there in
             // Navidrome found again: what was skipped while it wasn't, asked
@@ -134,8 +139,10 @@ struct SearchScreen: View {
             case .skipped:
                 EmptyView()
             case .answered:
-                let rows = SearchList.kindRows(kind, rows: own.rows, text: state.query, allResults: state.results,
-                                               ownedArtists: search.owned?.artists ?? [], artistList: artists.list)
+                // each key once (search3 can name a song twice)
+                let rows: [SearchRow] = SearchList.drawable(SearchList.kindRows(
+                    kind, rows: own.rows, text: state.query, allResults: state.results,
+                    ownedArtists: search.owned?.artists ?? [], artistList: artists.list))
                 if rows.isEmpty {
                     ShelfNote(SearchWords.nothing(SearchView(kind), state.query))
                 } else {
@@ -187,13 +194,13 @@ private struct DrawnList: View {
                 .padding(.top, 10)
                 .padding(.bottom, 2)
                 .accessibilityAddTraits(.isHeader)
-            ForEach(drawn.top) { (row: SearchRow) in
+            ForEach(SearchList.drawable(drawn.top)) { (row: SearchRow) in
                 SearchRowView(row: row, marks: marks, top: true)
             }
         }
         ForEach(drawn.sections) { (section: SearchList.Drawn.Section) in
             SectionHead(kind: section.kind, seeAll: true)
-            ForEach(section.rows) { (row: SearchRow) in
+            ForEach(SearchList.drawable(section.rows)) { (row: SearchRow) in
                 SearchRowView(row: row, marks: marks, top: false)
             }
         }
@@ -250,7 +257,8 @@ private struct FailureNote: View {
             if let failure {
                 ErrorNote(failure, retry: true)
             } else {
-                ErrorNote(text: SearchWords.offline)
+                // never drawn without its failure in hand (SearchModel keeps it with the list); said plainly if it is
+                ErrorNote(text: reachability.online ? ErrorWords.other : SearchWords.offline)
             }
             Button(SearchWords.tryAgain) {
                 if reachability.online { retry() } else { reachability.tryNow() }
@@ -336,45 +344,67 @@ struct SearchRowView: View {
     @Environment(AppNavigation.self) private var navigation
     @Environment(\.dynamicTypeSize) private var typeSize
 
+    // Each part its own small function, every value's type spelled out: the one body this was type-checked in 366 ms
+    // (7291225's review), and CI's older Swift is slower still.
     var body: some View {
-        let line = SearchList.line(row, marks, top: top)
+        let line: SearchList.Line = SearchList.line(row, marks, top: top)
         VStack(spacing: 0) {
-            switch row {
-            case .artist(let artist):
-                // as the Library's Artists: offline, an artist with no album on this phone opens nothing
-                let dimmed = !reachability.online && !hasSongsHere(artist: artist.id)
-                NavigationLink(value: AppRoute.artist(ArtistRoute(artist))) {
-                    face(line, round: true, cover: artist.coverArt, plays: false)
-                        .opacity(dimmed ? Palette.off : 1)
-                }
-                .buttonStyle(.plain)
-                .disabled(dimmed)
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel(spoken(line))
-                .accessibilityValue(dimmed ? DownloadWords.notOnPhone : "")
-            case .album(let album):
-                let dimmed = !reachability.online && !downloads.album(id: album.id).hasSongsHere
-                NavigationLink(value: AppRoute.album(AlbumRoute(album))) {
-                    face(line, round: false, cover: album.coverArt, plays: false)
-                        .opacity(dimmed ? Palette.off : 1)
-                }
-                .buttonStyle(.plain)
-                .disabled(dimmed)
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel(spoken(line))
-                .accessibilityValue(dimmed ? DownloadWords.notOnPhone : "")
-            case .song(let song):
-                songRow(song, line)
-            }
+            content(line)
             Divider().padding(.leading, LibraryRow.textInset)
         }
     }
 
-    /// An album of the artist's with songs on this phone (ArtistsScreen's `artistsHere`).
-    private func hasSongsHere(artist id: String) -> Bool {
-        downloads.downloadedAlbums.contains { (album: IndexAlbum) -> Bool in
+    @ViewBuilder private func content(_ line: SearchList.Line) -> some View {
+        switch row {
+        case .artist(let artist):
+            link(AppRoute.artist(ArtistRoute(artist)), line, round: true, cover: artist.coverArt,
+                 dimmed: dims(artist: artist.id))
+        case .album(let album):
+            link(AppRoute.album(AlbumRoute(album)), line, round: false, cover: album.coverArt,
+                 dimmed: dims(album: album.id))
+        case .song(let song):
+            songRow(song, line)
+        }
+    }
+
+    /// An artist's or an album's row: its page pushed on Search's stack.
+    private func link(_ route: AppRoute, _ line: SearchList.Line, round: Bool, cover: String?,
+                      dimmed: Bool) -> some View {
+        let opacity: Double = dimmed ? Palette.off : 1
+        let value: String = dimmed ? DownloadWords.notOnPhone : ""
+        return NavigationLink(value: route) {
+            face(line, round: round, cover: cover, plays: false)
+                .opacity(opacity)
+        }
+        .buttonStyle(.plain)
+        .disabled(dimmed)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(spoken(line))
+        .accessibilityValue(value)
+    }
+
+    // MARK: offline
+
+    /// Offline, an album with nothing on this phone (the Library's Albums).
+    private func dims(album id: String) -> Bool {
+        if reachability.online { return false }
+        let download: AlbumDownload = downloads.album(id: id)
+        return !download.hasSongsHere
+    }
+
+    /// Offline, an artist with no album on this phone (ArtistsScreen's `artistsHere`).
+    private func dims(artist id: String) -> Bool {
+        if reachability.online { return false }
+        let here: Bool = downloads.downloadedAlbums.contains { (album: IndexAlbum) -> Bool in
             album.artistId == id && downloads.album(id: album.id).hasSongsHere
         }
+        return !here
+    }
+
+    /// Offline, a song not on this phone.
+    private func dims(song id: String) -> Bool {
+        if reachability.online { return false }
+        return !downloads.isHere(id)
     }
 
     // MARK: a song's
@@ -390,40 +420,52 @@ struct SearchRowView: View {
     /// What a song's tap plays: its album's songs (those on this phone, offline), with it among them.
     private func playable(_ song: Song) -> (album: Album, songs: [Song], at: Int)? {
         guard let album = album(of: song), let songs = album.song else { return nil }
-        let shown = reachability.online ? songs : OfflineAlbum.playable(songs, here: downloads.isHere)
+        let shown: [Song] = reachability.online ? songs : OfflineAlbum.playable(songs, here: downloads.isHere)
         guard let at = shown.firstIndex(where: { (each: Song) -> Bool in each.id == song.id }) else { return nil }
         return (album, shown, at)
     }
 
+    /// What VoiceOver adds of a song's tap - only where the tap does it (a dimmed row does nothing).
+    private static func tapSaid(plays: Bool, opens: Bool, dimmed: Bool) -> String {
+        if dimmed { return "" }
+        if plays { return SearchWords.playsSaid }
+        return opens ? SearchWords.opensSaid : ""
+    }
+
     @ViewBuilder private func songRow(_ song: Song, _ line: SearchList.Line) -> some View {
-        let plays = playable(song)
-        let dimmed = !reachability.online && !downloads.isHere(song.id)
-        let opens = song.albumId.map { !$0.isEmpty } ?? false
+        let plays: Bool = playable(song) != nil
+        let dimmed: Bool = dims(song: song.id)
+        let opens: Bool = !(song.albumId ?? "").isEmpty
+        let opacity: Double = dimmed ? Palette.off : 1
+        let said: String = spoken(line) + Self.tapSaid(plays: plays, opens: opens, dimmed: dimmed)
+        let value: String = dimmed ? DownloadWords.notOnPhone : ""
         HStack(spacing: 4) {
             Button {
                 tapped(song)
             } label: {
-                face(line, round: false, cover: song.coverArt, plays: plays != nil && !dimmed)
-                    .opacity(dimmed ? Palette.off : 1)
+                face(line, round: false, cover: song.coverArt, plays: plays && !dimmed)
+                    .opacity(opacity)
             }
             .buttonStyle(.plain)
-            .disabled(dimmed || (plays == nil && !opens))
+            .disabled(dimmed || (!plays && !opens))
             .accessibilityElement(children: .combine)
-            // what the tap does, only where it does it (a dimmed row does nothing)
-            .accessibilityLabel(spoken(line) + (dimmed ? "" : plays != nil ? SearchWords.playsSaid
-                                                    : opens ? SearchWords.opensSaid : ""))
-            .accessibilityValue(dimmed ? DownloadWords.notOnPhone : "")
-            QueueMenu(request: menu(song)) {
-                Image(systemName: "ellipsis")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Palette.quiet)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
-            }
-            .menuStyle(.button)
-            .buttonStyle(.plain)
-            .accessibilityLabel(AlbumPageLines.moreForSong(song.title ?? ""))
+            .accessibilityLabel(said)
+            .accessibilityValue(value)
+            songMenu(song)
         }
+    }
+
+    private func songMenu(_ song: Song) -> some View {
+        QueueMenu(request: menu(song)) {
+            Image(systemName: "ellipsis")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(Palette.quiet)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .accessibilityLabel(AlbumPageLines.moreForSong(song.title ?? ""))
     }
 
     /// The song's ••• - as its album's when that album is in hand, else the song alone (Songs' row).
@@ -451,59 +493,75 @@ struct SearchRowView: View {
     }
 
     private func face(_ line: SearchList.Line, round: Bool, cover: String?, plays: Bool) -> some View {
-        let large = typeSize.isAccessibilitySize
+        let large: Bool = typeSize.isAccessibilitySize
+        let titleLines: Int = large ? 3 : 1
         return HStack(spacing: 12) {
-            if round {
-                ArtistPicture(id: cover, side: LibraryRow.cover, pixels: CoverSize.row)
-            } else {
-                LibraryCover(id: cover, pixels: CoverSize.row)
-                    .frame(width: LibraryRow.cover, height: LibraryRow.cover)
-                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                    .accessibilityHidden(true)
-            }
+            picture(round: round, cover: cover)
             VStack(alignment: .leading, spacing: 1) {
                 Text(row.title)
                     .foregroundStyle(.primary)
-                    .lineLimit(large ? 3 : 1)
-                if large {
-                    if !line.said.isEmpty {
-                        Text(line.said)
-                            .font(.footnote)
-                            .foregroundStyle(Palette.quiet)
-                            .lineLimit(2)
-                    }
-                } else if !line.said.isEmpty {
-                    // the facts take the ellipsis; the place is never cut
-                    HStack(spacing: 0) {
-                        if !line.line.isEmpty {
-                            Text(line.line)
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-                        }
-                        if !line.place.isEmpty {
-                            Text(line.line.isEmpty ? line.place : " \u{00B7} \(line.place)")
-                                .lineLimit(1)
-                                .fixedSize()
-                        }
-                    }
-                    .font(.footnote)
-                    .foregroundStyle(Palette.quiet)
-                }
+                    .lineLimit(titleLines)
+                lineText(line, large: large)
             }
             Spacer(minLength: 8)
-            if plays {
-                Image(systemName: "play.fill")
-                    .font(.caption2)
-                    .foregroundStyle(Palette.quiet)
-                    .accessibilityHidden(true)
-            } else if case .artist = row {
-                Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-                    .accessibilityHidden(true)
-            }
+            trailing(plays: plays)
         }
         .padding(.vertical, 8)
         .contentShape(Rectangle())
+    }
+
+    @ViewBuilder private func picture(round: Bool, cover: String?) -> some View {
+        if round {
+            ArtistPicture(id: cover, side: LibraryRow.cover, pixels: CoverSize.row)
+        } else {
+            LibraryCover(id: cover, pixels: CoverSize.row)
+                .frame(width: LibraryRow.cover, height: LibraryRow.cover)
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                .accessibilityHidden(true)
+        }
+    }
+
+    /// The line under the title: the facts take the ellipsis, the place is never cut - at accessibility sizes, both
+    /// as one, wrapping.
+    @ViewBuilder private func lineText(_ line: SearchList.Line, large: Bool) -> some View {
+        if line.said.isEmpty {
+            EmptyView()
+        } else if large {
+            Text(line.said)
+                .font(.footnote)
+                .foregroundStyle(Palette.quiet)
+                .lineLimit(2)
+        } else {
+            let place: String = line.line.isEmpty ? line.place : " \u{00B7} " + line.place
+            HStack(spacing: 0) {
+                if !line.line.isEmpty {
+                    Text(line.line)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                if !line.place.isEmpty {
+                    Text(place)
+                        .lineLimit(1)
+                        .fixedSize()
+                }
+            }
+            .font(.footnote)
+            .foregroundStyle(Palette.quiet)
+        }
+    }
+
+    /// ▶ for a song that plays from its tap, › for an artist.
+    @ViewBuilder private func trailing(plays: Bool) -> some View {
+        if plays {
+            Image(systemName: "play.fill")
+                .font(.caption2)
+                .foregroundStyle(Palette.quiet)
+                .accessibilityHidden(true)
+        } else if case .artist = row {
+            Image(systemName: "chevron.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
+        }
     }
 }

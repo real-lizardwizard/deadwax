@@ -166,6 +166,111 @@ import Testing
         #expect(none.nothing && SearchWords.nothing(.all, none.text) == "No results for \u{201C}zzz\u{201D}.")
     }
 
+    @Test func deadwaxBackAsksAFailedLibraryAgainAndDrawsItsAnswer() throws {
+        // (7291225's review) a first search over a dropping connection runs and fails - its failure drawn - before the
+        // phone counts itself offline; deadwax answering again asks it again, and the answer takes the failure's place
+        var state = SearchState()
+        state.typed("roads")
+        let token = state.askingLibrary()
+        state.libraryFailed(token, "roads")
+        let failedMade = Self.advance(&state)
+        let failed = try #require(failedMade)
+        #expect(failed.failed)
+        // asked again without a new run, the answer would be drawn nowhere: the failure stays (the bug)
+        var stale = state
+        let staleToken = stale.askingLibrary()
+        stale.libraryAnswered(staleToken, "roads", Self.found)
+        let nowhere = Self.advance(&stale)
+        #expect(nowhere == nil && stale.drawn == failed)
+        // resumed: asked again, and drawn afresh once it lands
+        let resumed = state.resumed()
+        #expect(resumed && state.wantsLibrary)
+        let again = state.askingLibrary()
+        let asking = Self.advance(&state)
+        #expect(asking == nil && state.drawn == failed, "the failure stays drawn while it is asked again")
+        state.libraryAnswered(again, "roads", Self.found)
+        let answeredMade = Self.advance(&state)
+        let answered = try #require(answeredMade)
+        #expect(!answered.failed && answered.top.first?.key == "song:s-roads")
+    }
+
+    @Test func navidromeFoundAgainAsksASkippedLibraryAndDrawsItsAnswer() throws {
+        var state = SearchState()
+        state.typed("roads")
+        state.librarySkipped()
+        let skippedMade = Self.advance(&state)
+        let skipped = try #require(skippedMade)
+        #expect(skipped.skipped && !state.wantsLibrary)
+        let resumed = state.resumed()
+        #expect(resumed && state.wantsLibrary)
+        let token = state.askingLibrary()
+        state.libraryAnswered(token, "roads", Self.found)
+        let answeredMade = Self.advance(&state)
+        let answered = try #require(answeredMade)
+        #expect(!answered.skipped && answered.sections.map(\.kind) == [.artists, .albums, .songs])
+    }
+
+    @Test func resumingLeavesAnAnswerAndAKindViewsRunAlone() throws {
+        // an answer for the words: nothing to ask again, no new run
+        var state = Self.answered("roads")
+        _ = Self.advance(&state)
+        let resumed = state.resumed()
+        let none = Self.advance(&state)
+        #expect(!resumed && !state.wantsLibrary && none == nil)
+        // a failure for other words than the box's: the box's own are asked as they always are
+        var other = SearchState()
+        other.typed("roads")
+        let token = other.askingLibrary()
+        other.libraryFailed(token, "roads")
+        other.typed("glory")
+        let forOther = other.resumed()
+        #expect(!forOther && other.wantsLibrary)
+        // a failure while a chip is on: asked again, drawn when All is chosen - All draws afresh anyway
+        var kind = SearchState()
+        kind.typed("roads")
+        kind.choose(.songs)
+        let failed = kind.askingLibrary()
+        kind.libraryFailed(failed, "roads")
+        let resumedInKind = kind.resumed()
+        #expect(resumedInKind && kind.wantsLibrary)
+        let again = kind.askingLibrary()
+        kind.libraryAnswered(again, "roads", Self.found)
+        let inKind = Self.advance(&kind)
+        kind.choose(.all)
+        let allMade = Self.advance(&kind)
+        let all = try #require(allMade)
+        #expect(inKind == nil && !all.failed)
+    }
+
+    @Test func backToWordsAlreadyAnsweredDrawsWithoutAsking() throws {
+        // (7291225's review) "port" asked, "porta" typed, "port"'s answer lands under "porta" - then back to "port"
+        // inside the pause: nothing to ask, and its list is drawn at once (the web's advance runs on every render)
+        var state = SearchState()
+        state.typed("port")
+        let token = state.askingLibrary()
+        state.typed("porta")
+        let kept = state.libraryAnswered(token, "port", Self.found)
+        let underOther = Self.advance(&state)
+        #expect(kept && underOther == nil, "not the box's words")
+        state.typed("port")
+        #expect(!state.wantsLibrary && state.settled)
+        let drawnMade = Self.advance(&state)
+        let drawn = try #require(drawnMade)
+        #expect(drawn.text == "port" && drawn.top.map(\.key) == ["artist:ar-p", "album:nd-dummy", "song:s-roads"])
+    }
+
+    @Test func aRowNamedTwiceIsDrawnOnce() {
+        // search3 can name a song twice; a ForEach can't draw one id twice - the first is kept, the order is search3's
+        let rows: [SearchRow] = [.song(Self.roads), .song(Self.glory), .song(Self.roads), .album(Self.dummy),
+                                 .artist(Self.portishead), .album(Self.dummy)]
+        let drawn = SearchList.drawable(rows)
+        #expect(drawn.map(\.key) == ["song:s-roads", "song:s-glory", "album:nd-dummy", "artist:ar-p"])
+        #expect(SearchList.drawable([]).isEmpty)
+        // a song and its album share an id's words, never a key
+        let same = Song(id: "nd-dummy", title: "Dummy")
+        #expect(SearchList.drawable([.album(Self.dummy), .song(same)]).count == 2)
+    }
+
     // MARK: a kind view's own
 
     @Test func aKindViewAsksItsOwnAndMoreByOffset() throws {

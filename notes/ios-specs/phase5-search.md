@@ -381,7 +381,9 @@ version 0.11 (11) with everything pinned to it; docs/ios.md and README for the p
 What slice 1 is, as built, is in notes/ios.md's "Phase 5, slice 1: Search, your library's half" - Core (Owned.swift,
 SearchReading.swift, SearchList.swift, SearchState.swift, held to the web by export-search-vectors.cjs), the app
 (SearchModel, SearchScreen, the Search tab), what was decided here, the tests and mutations, and what was verified.
-Questions 1-7 and 10 were built with it; questions 11-13 came of it. docs/ios.md's checks 121-129 are its.
+Questions 1-7 and 10 were built with it; questions 11-13 came of it. docs/ios.md's checks 121-129 are its. Its
+review's fixes (a failure asked again drawn, words come back to drawn, your albums asked again, a repeated row):
+"Phase 5, slice 1, after its review".
 
 ## 7. Tests (Swift Testing; Core's on Linux and macOS)
 

@@ -6897,3 +6897,95 @@ Not verified - only the phone can tell (the spec's section 9; docs/ios.md's chec
 - Navidrome's real search3 ordering and matching as the fixtures' fakes do.
 - VoiceOver's rows and announcements; offline's dimmed rows.
 - CI's Xcode 26.6 (the older Swift): the new code spells out its closures' types.
+
+## Phase 5, slice 1, after its review (2026-11-14)
+
+The review of 7291225 found the Core port solid and four bugs in the app's wiring, the first two confirmed by a probe of
+Core. All four are fixed in one commit on `phase5-search`, with Core holding each rule it can; then `ios` 45c4c5f (the
+Phase 4 spec's question 32 answered, docs only) is merged in. The app stays 0.10 (10); no server change.
+
+### What was wrong, and the fix
+
+1. **A failed search asked again when deadwax came back was never drawn.** Reachability counts the phone offline only
+   after two failures, so a first search over a dropping WireGuard runs, fails, and its failure is drawn. When
+   deadwax answered again, `resumed()` asked again, but started a new run only for a library *skipped*, never for one
+   that *failed*. `advance` then had nothing new to draw - and the answer cleared `failure`, so the failure's note
+   fell back to "Search works once deadwax is back." while online.
+   - **Core: `SearchState.resumed()`**, the web's own rule (Search.tsx's status effect, :1087-1100, from its late
+     review): the words' library, failed or skipped, is asked again, and a list this run drew for the words starts a
+     new run, so the answer takes its place. SearchModel's `resumed()` calls it whenever Navidrome isn't known to be
+     away.
+   - **The failure's words stay with the list drawn with them**: SearchModel lets `failure` go only when a list
+     without a failure is drawn, not when an answer lands. The note's fallback (never reached now) says "Something went
+     wrong." online, the offline line only offline.
+2. **Going back to words whose answer had landed drew nothing.** Type "port", pause (asked), type "a": "port"'s answer
+   lands under "porta" and isn't drawn. Backspace inside the pause: the words were asked already, so nothing is asked
+   again - and nothing drew, because SearchModel drew only as an answer landed, where the web's `advance` runs on every
+   render. A spinner for ever, or the last words' list under these.
+   - **SearchModel draws as the box changes, as the pause ends and on the keyboard's Search**, besides as an answer
+     lands. `advance` draws nothing unless the library has settled for the box's words, so drawing more often draws
+     nothing more.
+3. **Your albums were never asked again once in hand.** `shown()` loaded `.yours` only when there was none. After an
+   Add or a Remove, LibraryModel keeps the old list under a forgotten generation, so Search read whose a row is from a
+   list let go; the web asks again on each Add or Remove (`yoursGeneration`).
+   - `shown()` looks at your albums every time (LibraryModel asks only when the generation has moved), and SearchScreen
+     calls it as `library.generations[.yours]` moves while Search is on screen - an Add, a Remove, a star seen from
+     elsewhere. `/library/owned` is asked again with it (a 304 unless something changed; its `yours` follows an Add too).
+4. **Repeated ids reached a SwiftUI ForEach.** search3 can name a song twice (the fixture's seeded answers do), and a
+   ForEach given one id twice draws the wrong rows.
+   - **Core: `SearchList.drawable`** - each key once, the first kept, search3's order otherwise. The screen draws Top
+     results, each section and a kind view's rows through it. The sections' rules stay the web's (the vectors hold the
+     web's repeats); this is the drawing's alone.
+
+And the review's note on type-checking: `SearchScreen.swift:356` took 366 ms. The row view is now small functions with
+every value's type spelled out (the link rows, the three `dims`, the song row and its menu, the face's picture, line
+and trailing mark). Measured with `-warn-long-expression-type-checking=40 -warn-long-function-bodies=80`:
+- **Release (whole module)**: nothing in the Search files over either limit.
+- **Debug**: the row view's slowest function took 374 ms - `dims(album:)`, one `downloads.album(id:)` call.
+  - Moving `dims(song:)` above it moved the cost to `!downloads.isHere(id)`, 267 ms: it is the first member lookup
+    into DownloadModel in the file's frontend job, an @Observable class whose macro-made members are expanded for that
+    lookup. The expression's own complexity has nothing to do with it.
+  - The same one-time cost lands on SongsScreen's `allSongsCan` (374 ms), BackgroundWork's `downloads` didSet (260-346
+    ms), AlbumView's `libraryLine` (365 ms) and others in the same build. `tapped` (147 ms) is the file's first lookup
+    into PlayerModel.
+  - SearchScreen's body is 102-123 ms (its longest expression 57-62 ms).
+  - No spelling of the expression avoids that lookup: whichever line asks DownloadModel first pays it, once per file.
+    A whole-module build - Release, which is what CI's device build is (ios.yml) - pays it once per module.
+
+### Tests
+
+- **SearchTests** (+5, 23):
+  - `deadwaxBackAsksAFailedLibraryAgainAndDrawsItsAnswer`: the failure drawn; asked again without a new run, drawn
+    nowhere (the bug, held as a fact); resumed, the failure staying while it is asked, then the answer in its place.
+  - `navidromeFoundAgainAsksASkippedLibraryAndDrawsItsAnswer`.
+  - `resumingLeavesAnAnswerAndAKindViewsRunAlone`: an answer isn't asked again; another text's failure isn't the
+    box's; a failure under a chip is asked again and drawn when All is chosen.
+  - `backToWordsAlreadyAnsweredDrawsWithoutAsking`: the review's "port", "porta", "port".
+  - `aRowNamedTwiceIsDrawnOnce`: the first kept, search3's order, a song and an album with one id both drawn.
+- **Mutations**: 8 more, each applied alone with SearchTests and SearchVectorTests run, all caught:
+  1. resumed starting no new run;
+  2. resumed not asking a skipped library again;
+  3. resumed for another text's failure;
+  4. resumed only for a skip (the bug);
+  5. resumed for an answer too;
+  6. drawable keeping repeats;
+  7. drawable keeping the last of a repeat;
+  8. drawable by id alone.
+
+  The model's own wiring (when it calls `resumed`, `draw` and `load`) has no test: SearchModel is the app's, untested
+  off a phone, as every model is.
+
+### Verified, and not
+
+Verified, on the fixed tree before its commit (the merge of `ios` after it brings two lines of the Phase 4 spec):
+- `swift test`: Core 1439, Audio 158, Turntable 12.
+- The unsigned Debug and Release device builds: no warnings but the usual appintentsmetadataprocessor line; the
+  .xcodeproj unchanged.
+- `check_project.py` ok.
+- `npm run build` and all 84 sims on Node 22.23.4.
+- The full pytest suite: 4382 passed, 1 skipped.
+- The 8 mutations above; the type-check timings above, Debug and Release.
+
+Not verified - only the phone can tell: each fix as James would see it (docs/ios.md's checks 127 and 128 cover the
+first two: words typed back to, and a search when deadwax comes back), and Search's lines following an Add made from
+an album page pushed over it.

@@ -87,6 +87,19 @@ public struct SearchState: Sendable {
         run += 1
     }
 
+    /// deadwax back, or Navidrome found again (Search.tsx's status effect, :1087-1100): the words' library, failed or
+    /// skipped, is asked again - and a list this run drew with the failure in it, or without the library, starts a new
+    /// run, so the new answer is drawn in its place (the web's late review: "asked again, its answer was drawn
+    /// nowhere"). True when the library is to be asked again.
+    @discardableResult
+    public mutating func resumed() -> Bool {
+        guard !query.isEmpty, let libraryText, WebText.same(libraryText, query),
+              library == .failed || library == .skipped else { return false }
+        libraryAsked = nil
+        if drawnRun == run, let drawn, WebText.same(drawn.text, query) { run += 1 }
+        return true
+    }
+
     /// The keyboard's Search: All asked now when not yet asked for the words, or failed - a list drawn with the failure
     /// drawn afresh once the new answer lands (Search.tsx's submit, the library's part).
     public mutating func submitted() {

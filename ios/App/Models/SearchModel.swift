@@ -79,12 +79,14 @@ final class SearchModel {
 
     // MARK: what the screen tells it
 
-    /// Search shows (the tab picked, the app back in front on it): `/library/owned` asked again (a 304 unless the
-    /// library changed), and your albums and the library's artists when not in hand.
+    /// Search shows (the tab picked, the app back in front on it, your library changed): `/library/owned` asked again
+    /// (a 304 unless the library changed), your albums looked at - LibraryModel asks only when its generation moved,
+    /// as an Add or a Remove moves it (the web's yoursGeneration), so whose a row is never reads a list let go - and the
+    /// library's artists when not in hand.
     func shown() {
         guard reachability.online, server.client != nil else { return }
         askOwned()
-        if personal, library.albums(.yours) == nil {
+        if personal {
             Task { await library.load(.yours) }
         }
         if artists.list == nil {
@@ -105,6 +107,9 @@ final class SearchModel {
             return
         }
         guard state.query != before else { return }
+        // words whose answer is in hand already (back to them inside the pause): drawn now - the web's advance runs on
+        // every render; nothing is drawn unless the library has settled for the box's words
+        draw()
         // asked once typing pauses - a keystroke meanwhile starts the pause again
         settling?.cancel()
         settling = Task { [weak self] in
@@ -120,6 +125,7 @@ final class SearchModel {
         state.submitted()
         askLibrary()
         askKind()
+        draw()
     }
 
     /// A chip, See all, Back to All.
@@ -167,12 +173,11 @@ final class SearchModel {
         }
     }
 
-    /// Deadwax is back, or Navidrome found: what wasn't asked for the words, asked now - a library skipped while
-    /// Navidrome wasn't there, again.
+    /// deadwax is back, or Navidrome found: what wasn't asked for the words, asked now - the library's failure or skip
+    /// asked again and its answer drawn in its place (SearchState.resumed), a kind view's failed or skipped own again.
     func resumed() {
         guard !state.query.isEmpty, reachability.online else { return }
-        if state.library == .skipped, navidromeAway == nil { state.tryAgain() }
-        if state.kindShown?.state == .skipped, navidromeAway == nil { askKind() }
+        if navidromeAway == nil { state.resumed() }
         askLibrary()
         askKind()
     }
@@ -191,10 +196,12 @@ final class SearchModel {
 
     // MARK: the asks
 
-    /// The pause passed: All's search3 for the words, and a kind view's own.
+    /// The pause passed: All's search3 for the words, and a kind view's own - and the list drawn, should the words'
+    /// answer be in hand already.
     private func settled() {
         askLibrary()
         askKind()
+        draw()
     }
 
     /// All's search3, when the state wants it for the words.
@@ -214,7 +221,6 @@ final class SearchModel {
                 let found = try await client.searchLibrary(words, counts: SearchPacing.all)
                 guard let self, epoch == self.epoch else { return }
                 guard self.state.libraryAnswered(token, words, found) else { return }
-                self.failure = nil
                 self.prefetch(self.state.albumsWanted(words, found, ownedArtists: self.owned?.artists ?? [],
                                                       artistList: self.artists.list, marks: self.marks),
                               library: token)
@@ -296,6 +302,8 @@ final class SearchModel {
         guard let drawn = state.advance(ownedArtists: owned?.artists ?? [], artistList: artists.list, marks: marks) else {
             return
         }
+        // the failure's words kept while a list drawn with it stands - let go only as one without it takes its place
+        if !drawn.failed { failure = nil }
         if drawn.nothing {
             Notice.announce(SearchWords.nothing(.all, drawn.text))
         } else {
