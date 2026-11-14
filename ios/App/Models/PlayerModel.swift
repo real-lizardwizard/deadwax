@@ -221,6 +221,10 @@ final class PlayerModel {
     @ObservationIgnored private var skipRun = OfflinePlay.SkipRun()
     /// The Up Next entry the listener tapped: offline, a song not here is stopped on, never passed over.
     @ObservationIgnored private var chosenKey: Int?
+    /// (Phase 4, slice 3b) The library's shuffle's feed (useShuffleFeed.ts, Core's ShuffleFeedRun): the rest of the order
+    /// brought in as it plays - and the retry of a page that wouldn't come.
+    @ObservationIgnored private var feedRun = ShuffleFeedRun()
+    @ObservationIgnored private var feedRetry: Task<Void, Never>?
 
     /// The speed, and what the engine was told (Core's SpeedControl: exact again at 1x on a let-go).
     private var speedControl = SpeedControl(speed: PlaySpeed.read(UserDefaults.standard.string(forKey: PlaySpeed.storageKey)))
@@ -281,6 +285,17 @@ final class PlayerModel {
         played.rememberQueue(plan.albums, keeping: QueueAlbums.named(plan.tracks))
         shelve(songs)
         startQueue { $0.playTracks(plan.tracks, start: index, shuffle: shuffle) }
+    }
+
+    /// (Phase 4, slice 3b) The Library's Shuffle - the •••'s tap, the pull's release (phase4-library.md 2.8;
+    /// ShuffleSongs.tsx's tap): the first page asked ahead, played from its first song as a library's shuffle (`paged`:
+    /// the order's token and total, the songs fetched, the scope, the level the first song got) - the feed brings in the
+    /// rest as it plays. Its songs are shelved for Info and the stream cache, as resume's are; no album is remembered
+    /// (each track names its own, and Info asks). Call it in the tap, nothing awaited first.
+    func play(shuffled taken: ShuffleAhead.Taken) {
+        guard !taken.tracks.isEmpty else { return }
+        shelve(taken.songs)
+        startQueue { $0.playTracks(taken.tracks, start: 0, shuffle: false, paged: taken.paged) }
     }
 
     /// Play Next from a ••• menu: the pick queued straight after the song playing's copies (pick.choose(.next,
@@ -515,6 +530,7 @@ final class PlayerModel {
     /// Stops and forgets the queue: the mini player goes.
     func stop() {
         cancelRetry()
+        feedStop()
         reporter.stop()
         link?.stop()
         controller = nil
@@ -713,6 +729,86 @@ final class PlayerModel {
     private func repeatChanged(_ mode: Repeat) {
         repeatMode = mode
         UserDefaults.standard.set(mode.rawValue, forKey: Repeat.storageKey)
+        feedLook()
+    }
+
+    // MARK: the library's shuffle's feed (Phase 4, slice 3b - phase4-library.md 2.8; useShuffleFeed.ts)
+
+    /// The queue or Repeat changed (or a retry is due): the ask the feed makes now, if any - made of deadwax as the
+    /// person signed in, in an unstructured task, its answer handed back to the feed, whose step is carried out here.
+    /// It only ever adds to the queue: nothing in it plays.
+    private func feedLook() {
+        guard let ask = feedRun.look(queue, repeat: repeatMode) else { return }
+        feedSend(ask)
+    }
+
+    private func feedSend(_ ask: FeedAsk) {
+        feedRetry?.cancel()
+        feedRetry = nil
+        guard let client = server.client else {
+            carry(feedRun.failed(ask), songs: [])
+            return
+        }
+        Task { [weak self] in
+            switch ask.kind {
+            case .page(let offset):
+                do {
+                    let page = try await client.shufflePage(token: ask.token, offset: offset)
+                    guard let self else { return }
+                    self.carry(self.feedRun.page(ask, songs: page.songs), songs: page.songs)
+                } catch let failure as APIFailure where failure.status == 404 {
+                    // the order gone from deadwax (it restarted, or a day untouched): a fresh one, as the rest of this round
+                    guard let self else { return }
+                    self.carry(self.feedRun.gone(ask), songs: [])
+                } catch {
+                    guard let self else { return }
+                    self.carry(self.feedRun.failed(ask), songs: [])
+                }
+            case .fresh:
+                do {
+                    let first = try await client.shuffleStart(scope: ask.scope, claim: true)
+                    guard let self else { return }
+                    self.carry(self.feedRun.fresh(ask, first, repeat: self.repeatMode), songs: first.songs)
+                } catch {
+                    guard let self else { return }
+                    self.carry(self.feedRun.failed(ask), songs: [])
+                }
+            }
+        }
+    }
+
+    /// A step of the feed's carried out: songs added to the shuffle (shelved, for Info and the stream cache), a fresh
+    /// order asked, or the look made again in FEED_RETRY_MS while the queue has songs.
+    private func carry(_ step: FeedStep, songs: [Song]) {
+        switch step {
+        case .extend(let token, let tracks, let next, let notice):
+            guard let controller else { return }
+            shelve(songs)
+            follow()
+            controller.extendQueue(token: token, tracks: tracks, next: next)
+            if let notice { say(notice) }
+        case .ask(let ask):
+            feedSend(ask)
+        case .retry:
+            feedRetry?.cancel()
+            feedRetry = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(ShuffleFeed.retrySeconds))
+                guard !Task.isCancelled, let self else { return }
+                self.feedRetry = nil
+                self.feedRun.retried()
+                guard self.hasQueue else { return }
+                self.feedLook()
+            }
+        case .nothing:
+            break
+        }
+    }
+
+    /// The player stopped, or a new person: every ask of the feed's let go.
+    private func feedStop() {
+        feedRetry?.cancel()
+        feedRetry = nil
+        feedRun.reset()
     }
 
     // MARK: the speed (notes/ios-specs/turntable.md 5)
@@ -817,6 +913,7 @@ final class PlayerModel {
         keepAndPrefetch()
         observeResume()
         showNowPlaying()
+        feedLook()
     }
 
     /// Another entry is heard: its words and its retry start afresh (usePlayer.ts at every load and join), and its

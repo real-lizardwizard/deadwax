@@ -326,11 +326,11 @@ struct NewPlaylistFields: View {
             }
             HStack {
                 Button(busy ? PlaylistWords.creating : PlaylistWords.create, action: send)
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(PrimaryFace())
                     .disabled(blank || busy || busyOutside)
                 Spacer()
                 Button(PlaylistWords.cancel, role: .cancel, action: cancel)
-                    .buttonStyle(.bordered)
+                    .buttonStyle(SecondaryPill())
             }
         }
         .onAppear { focused = true }

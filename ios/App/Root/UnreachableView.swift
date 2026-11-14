@@ -35,15 +35,13 @@ struct UnreachableView: View {
                     } label: {
                         Text(UnreachedLines.tryAgain).frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
+                    .buttonStyle(PrimaryFace(large: true))
                     Button {
                         server.changeAddress()
                     } label: {
                         Text(UnreachedLines.changeAddress).frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
+                    .buttonStyle(SecondaryPill(large: true))
                 }
                 if let address = server.address {
                     Text(address.description)

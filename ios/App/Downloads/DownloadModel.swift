@@ -383,6 +383,27 @@ final class DownloadModel {
         return albums[record.albumID]?.song?.first { $0.id == songID }
     }
 
+    /// (Phase 4, slice 3b) Every song on this phone, each once - as its album's kept answer has it, or a downloaded
+    /// playlist's for one whose album isn't kept: the Library's Shuffle while deadwax can't be reached (ShuffleHere).
+    var songsHere: [Song] {
+        let ids = records.values.filter { $0.state == .done }.map(\.id)
+        var fromPlaylists: [String: Song]?
+        return ShuffleHere.songs(ids) { (id: String) -> Song? in
+            if let found = song(id) { return found }
+            if fromPlaylists == nil {
+                var made: [String: Song] = [:]
+                for kept in playlists.kept {
+                    for each in kept.answer?.songs ?? [] where made[each.id] == nil { made[each.id] = each }
+                }
+                fromPlaylists = made
+            }
+            return fromPlaylists?[id]
+        }
+    }
+
+    /// How many songs are on this phone (the Shuffle's offline count).
+    var songsHereCount: Int { records.values.reduce(0) { $0 + ($1.state == .done ? 1 : 0) } }
+
     /// You > Downloads' Downloading section: every song asked for and not here or failed, in the order they go - but
     /// not your library's own (its one row is `libraryProgress`'s, 3.3).
     var downloading: [DownloadRecord] {

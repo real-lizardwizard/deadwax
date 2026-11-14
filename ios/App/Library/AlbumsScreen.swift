@@ -7,30 +7,51 @@ import SwiftUI
 /// by AlbumListBody, the order, headers, Find, count and index by Shelf.view (through LibraryModel.drawn, made once per
 /// list, sort and Find), the words LibraryWords' and DownloadWords'.
 ///
-/// A scope's list is the model's, shared by every screen of the scope and kept on disk; this screen asks for it as it
-/// shows and again whenever its generation moves (an Add or a Remove, the starred count, older than a minute), pull
-/// to refresh asks now. A list asked again swaps in where the old one was - never emptied, the scroll kept.
-/// Downloaded is never asked of deadwax: it is DownloadModel's albums, its Recently added the moment each arrived.
-/// Choosing a sort or typing into Find goes back to the top. Tapping the Library tab again scrolls the root to its
-/// top; the other lists are pages of the tab's own (AppRoute.albums, .downloaded), so the tab's tap pops them with
-/// whatever album is over them. Nothing here plays (the gesture rule): a tile opens its album.
+/// Two ways it is drawn (Phase 4, slice 3b - phase4-library.md 2.8, 3.1). As the Library's Albums page (`page`), under
+/// the switch: the albums alone from the top, their count and then the albums - no rows above them (James: "I like
+/// just opening library to your albums") - with the switch's Find, bar and •••, and a pull that shuffles (3.5), never
+/// refreshes. Pushed on the tab's path (All albums, Downloaded - AppRoute.albums, .downloaded): its own title, Find,
+/// sort and layout, and pull to refresh.
 ///
-/// While deadwax can't be reached (5.4) an album with nothing on this phone is dimmed and opens nothing, a list that
-/// couldn't be asked again says nothing of it (the banner says it once for every page), and a pull asks whether deadwax
-/// is back.
+/// A scope's list is the model's, shared by every screen of the scope and kept on disk; this screen asks for it as it
+/// shows and again whenever its generation moves (an Add or a Remove, the starred count, older than a minute). A list
+/// asked again swaps in where the old one was - never emptied, the scroll kept. Downloaded is never asked of deadwax: it
+/// is DownloadModel's albums, its Recently added the moment each arrived; at its top, the first ask's card (question
+/// 17) and Downloaded playlists. Choosing a sort or typing into Find goes back to the top. Tapping the Library tab again
+/// scrolls the page shown to its top; the pushed lists are pages of the tab's own, so the tab's tap pops them with
+/// whatever album is over them. Nothing here plays but the pull (the gesture rule): a tile opens its album.
+///
+/// While deadwax can't be reached (5.4) the Albums page is Downloaded, named at its top, with "Only downloaded albums play
+/// until deadwax is back."; an album with nothing on this phone is dimmed and opens nothing, a list that couldn't be
+/// asked again says nothing of it (the banner says it once for every page), and a pushed list's pull asks whether
+/// deadwax is back.
 struct AlbumsScreen: View {
-    let list: AlbumList
-    /// The tab's root - the places above its albums (Playlists, All music, On this phone), and the tab's tap scrolls it to
-    /// the top.
-    let root: Bool
-
-    init(scope: AlbumScope, root: Bool) {
-        self.init(list: .scope(scope), root: root)
+    /// The Library's Albums page (slice 3b): what the switch hands it.
+    struct Page {
+        /// Find's words - the switch's field, this page's own text in it.
+        let typed: Binding<String>
+        /// The page the switch shows: the tab's tap scrolls it to its top.
+        let current: Bool
+        /// It pulls to shuffle: the page shown, on screen.
+        let pulls: Bool
+        let pull: ShufflePull
+        let shuffle: ShuffleCan
+        /// The shuffle, started in the lift that releases the pull.
+        let start: () -> Void
     }
 
-    init(list: AlbumList, root: Bool) {
+    let list: AlbumList
+    /// nil: a screen pushed on the tab's path.
+    let page: Page?
+
+    /// A scope's albums, pushed (All music's All albums, the way back to your albums).
+    init(scope: AlbumScope) {
+        self.init(list: .scope(scope))
+    }
+
+    init(list: AlbumList, page: Page? = nil) {
         self.list = list
-        self.root = root
+        self.page = page
     }
 
     @Environment(LibraryModel.self) private var library
@@ -38,8 +59,8 @@ struct AlbumsScreen: View {
     @Environment(AppNavigation.self) private var navigation
     @Environment(DownloadModel.self) private var downloads
     @Environment(Reachability.self) private var reachability
-    /// What is typed into Find - the screen's own: leaving it clears it.
-    @State private var typed = ""
+    /// What is typed into a pushed screen's Find - the screen's own: leaving it clears it.
+    @State private var ownTyped = ""
     /// On screen (not covered by a page pushed over it).
     @State private var shown = false
 
@@ -59,8 +80,51 @@ struct AlbumsScreen: View {
         return nil
     }
 
+    /// Find's words: the switch's for the page, the screen's own pushed.
+    private var typed: String { page?.typed.wrappedValue ?? ownTyped }
+
+    /// Showing: on screen, and - as a page - the one the switch shows.
+    private var showing: Bool { shown && (page?.current ?? true) }
+
     var body: some View {
         let personal = server.access.hasLibrary
+        Group {
+            if let page {
+                shelf(personal: personal, page: page)
+            } else {
+                shelf(personal: personal, page: nil)
+                    .navigationTitle(title(personal: personal))
+                    .searchable(text: $ownTyped, placement: .navigationBarDrawer(displayMode: .always),
+                                prompt: Text(LibraryWords.findPlaceholder))
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .toolbar {
+                        ToolbarItemGroup(placement: .topBarTrailing) {
+                            LibrarySortMenu()
+                            LibraryLayoutSwitch()
+                        }
+                    }
+                    .refreshable { await pulled() }
+            }
+        }
+        .task(id: LoadKey(person: server.person, generation: scope.map { library.generations[$0] ?? 0 } ?? 0)) {
+            guard let scope else { return }
+            await library.load(scope)
+        }
+        // a ring moves only while it shows: the root stays in the tab's stack under its pages
+        .task(id: showing) {
+            guard showing else { return }
+            await downloads.followProgress()
+        }
+        .onAppear {
+            shown = true
+            if let scope, reachability.online { library.refreshIfOld(scope) }
+        }
+        .onDisappear { shown = false }
+    }
+
+    @ViewBuilder
+    private func shelf(personal: Bool, page: Page?) -> some View {
         let online = reachability.online
         let drawn = self.drawn
         let failure = scope.flatMap { library.failures[$0] }
@@ -74,9 +138,16 @@ struct AlbumsScreen: View {
                     Color.clear
                         .frame(height: 0)
                         .id(ShelfAnchor.top)
-                    // the root's places - and Downloaded's own, pushed too (slice 3: its downloaded playlists)
-                    if (root || list == .downloaded) && !finding {
-                        places(personal: personal, online: online, hasAlbums: drawn?.albums.isEmpty == false)
+                        .overlay(alignment: .bottom) {
+                            // the pull's graphic, in the room the pull opens above the first row (3.5)
+                            if let page {
+                                PullShuffleGraphic(state: page.pull, can: page.shuffle)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    // Downloaded's own top (slice 3: its downloaded playlists; 3b: the first ask's card)
+                    if list == .downloaded && !finding {
+                        downloadedTop(page: page, online: online)
                     }
                     if let drawn, !drawn.view.countText.isEmpty, !(list == .downloaded && drawn.albums.isEmpty) {
                         Text(drawn.view.countText)
@@ -99,6 +170,9 @@ struct AlbumsScreen: View {
                 .padding(.bottom, 24)
             }
             .scrollIndicators(entries.isEmpty ? .automatic : .hidden)
+            .pullsToShuffle(page.map { (page: Page) -> PullShuffling in
+                PullShuffling(state: page.pull, can: page.shuffle, on: page.pulls, start: page.start)
+            })
             .overlay(alignment: .trailing) {
                 if !entries.isEmpty {
                     ShelfIndexStrip(entries: entries, years: years) { group in
@@ -110,37 +184,11 @@ struct AlbumsScreen: View {
             .onChange(of: typed) { _, _ in jump(proxy, to: .top) }
             .onChange(of: library.sort) { _, _ in jump(proxy, to: .top) }
             .onChange(of: navigation.libraryScrollToTop) { _, _ in
-                // the Library tab tapped at its root: the root list goes to its top
-                guard shown, root else { return }
+                // the Library tab tapped at its root: the page shown goes to its top
+                guard shown, page?.current == true else { return }
                 jump(proxy, to: .top, animated: true)
             }
         }
-        .navigationTitle(title(personal: personal))
-        .searchable(text: $typed, placement: .navigationBarDrawer(displayMode: .always),
-                    prompt: Text(LibraryWords.findPlaceholder))
-        .autocorrectionDisabled()
-        .textInputAutocapitalization(.never)
-        .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                LibrarySortMenu()
-                LibraryLayoutSwitch()
-            }
-        }
-        .refreshable { await pulled() }
-        .task(id: LoadKey(person: server.person, generation: scope.map { library.generations[$0] ?? 0 } ?? 0)) {
-            guard let scope else { return }
-            await library.load(scope)
-        }
-        // a ring moves only while it shows: the root stays in the tab's stack under its pages
-        .task(id: shown) {
-            guard shown else { return }
-            await downloads.followProgress()
-        }
-        .onAppear {
-            shown = true
-            if let scope, online { library.refreshIfOld(scope) }
-        }
-        .onDisappear { shown = false }
     }
 
     /// The list drawn: a scope's from the model's kept list, Downloaded from the albums on this phone.
@@ -158,7 +206,7 @@ struct AlbumsScreen: View {
         }
     }
 
-    /// A pull: the list asked again now - or, while deadwax can't be reached, whether it is back (a probe at once).
+    /// A pushed list's pull: asked again now - or, while deadwax can't be reached, whether it is back (a probe at once).
     private func pulled() async {
         guard reachability.online else {
             reachability.tryNow()
@@ -168,61 +216,39 @@ struct AlbumsScreen: View {
         await library.refresh(scope)
     }
 
-    // MARK: the places above the root's albums (5.2, 5.4)
+    // MARK: Downloaded's top (5.2, 5.4; slice 3b)
 
     @ViewBuilder
-    private func places(personal: Bool, online: Bool, hasAlbums: Bool) -> some View {
-        switch list {
-        case .scope(let scope):
-            // the first ask (phase3-autodownload.md 3.2): once deadwax answered with albums to download
-            if hasAlbums && online {
+    private func downloadedTop(page: Page?, online: Bool) -> some View {
+        // the playlists its screen lists (the shelf: those whose answer can be read), never an unreadable row's
+        let downloadedPlaylists = PlaylistDownloads.shelf(downloads.playlists.kept).count
+        let offlinePage = page != nil && !online
+        VStack(alignment: .leading, spacing: 0) {
+            if page != nil {
+                // the Albums page while deadwax can't be reached is Downloaded: named here, the switch holding the bar
+                Text(DownloadWords.downloadedTitle)
+                    .font(.title2.weight(.bold))
+                    .accessibilityAddTraits(.isHeader)
+                    .padding(.bottom, 6)
+            }
+            // the first ask (phase3-autodownload.md 3.2; question 17): no longer over the albums - here, once deadwax
+            // answered with albums of the Library's to download
+            if online, library.albums(library.scope)?.albums.isEmpty == false {
                 FirstAskCard()
             }
-            // Navidrome's playlists, as you (phase4-library.md 3.1): the first of the places
-            PlaceRow(symbol: "music.note.list", label: PlaylistWords.title, route: .playlists)
-            if scope == .yours && personal {
-                PlaceGroup(title: LibraryWords.allMusic) {
-                    PlaceRow(symbol: "square.stack", label: LibraryWords.allAlbums, route: .albums(.store))
-                }
+            // (slice 3) the playlists downloaded to this phone, under Downloaded
+            if downloadedPlaylists > 0 {
+                PlaceRow(symbol: "music.note.list", label: PlaylistDownloadWords.place,
+                         count: downloadedPlaylists, counted: PlaylistDownloadWords.count,
+                         route: .downloadedPlaylists, divider: !offlinePage)
             }
-            if !downloads.records.isEmpty || !downloads.playlists.kept.isEmpty {
-                PlaceGroup(title: DownloadWords.onThisPhone) {
-                    PlaceRow(symbol: DownloadWords.downloadSymbol, label: DownloadWords.downloadedTitle,
-                             count: downloads.albumCount, route: .downloaded)
-                }
-            }
-        case .downloaded:
-            // the playlists its screen lists (the shelf: those whose answer can be read), never an unreadable row's
-            let downloadedPlaylists = PlaylistDownloads.shelf(downloads.playlists.kept).count
-            if root || downloadedPlaylists > 0 {
-                VStack(alignment: .leading, spacing: 0) {
-                    if root {
-                        // the root is Downloaded (deadwax couldn't be reached as it was last shown): the way back to
-                        // the albums - named as the page it opens is titled: "Your albums", or "Albums" without a
-                        // library of your own
-                        PlaceRow(symbol: "square.stack", label: LibraryWords.title(library.scope, personal: personal),
-                                 route: .albums(library.scope))
-                        // and to the playlists (phase4-library.md 3.1): those whose page is in hand open with what is
-                        // here
-                        PlaceRow(symbol: "music.note.list", label: PlaylistWords.title, route: .playlists,
-                                 divider: online || downloadedPlaylists > 0)
-                    }
-                    // (slice 3) the playlists downloaded to this phone: under Downloaded, where the Library's redesign
-                    // (slice 3b) will want them - never a place of their own above the albums
-                    if downloadedPlaylists > 0 {
-                        PlaceRow(symbol: "music.note.list", label: PlaylistDownloadWords.place,
-                                 count: downloadedPlaylists, counted: PlaylistDownloadWords.count,
-                                 route: .downloadedPlaylists, divider: !(root && !online))
-                    }
-                    if root && !online {
-                        Text(DownloadWords.onlyDownloadedPlay)
-                            .font(.footnote)
-                            .foregroundStyle(Palette.quiet)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.bottom, 10)
-                        Divider()
-                    }
-                }
+            if offlinePage {
+                Text(DownloadWords.onlyDownloadedPlay)
+                    .font(.footnote)
+                    .foregroundStyle(Palette.quiet)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.vertical, 10)
+                Divider()
             }
         }
     }
@@ -346,7 +372,7 @@ enum ShelfAnchor: Hashable {
 }
 
 /// The Albums screens' order (ALBUM_SORTS, the web's labels), one choice for both scopes, saved per device.
-private struct LibrarySortMenu: View {
+struct LibrarySortMenu: View {
     @Environment(LibraryModel.self) private var library
 
     var body: some View {
@@ -367,7 +393,7 @@ private struct LibrarySortMenu: View {
 }
 
 /// Tiles or rows, per device (the phone's own: the web has only tiles).
-private struct LibraryLayoutSwitch: View {
+struct LibraryLayoutSwitch: View {
     @Environment(LibraryModel.self) private var library
 
     var body: some View {
@@ -379,11 +405,9 @@ private struct LibraryLayoutSwitch: View {
     }
 }
 
-/// One group of the root's places (app/LibraryHome.tsx's groups): All music with a library of your own, On this phone
-/// once anything is downloaded, on its way or failed (5.2) - each a header and its rows, so the groups read as one list
-/// of places, as Apple Music's Library lists Downloaded among its own.
-/// The first ask (phase3-autodownload.md 3.2, open question 1): a card at the top of the Library's root, once per
-/// phone, not a dialog at launch - the app opens to music. Its title, its line with the storage limit, Turn On (the
+/// The first ask (phase3-autodownload.md 3.2, open question 1): a card at the top of the Library's Downloaded (Phase 4,
+/// slice 3b, question 17 - it was over the root's albums until the switch), once per phone, not a dialog at launch - the
+/// app opens to music. Its title, its line with the storage limit, Turn On (the
 /// accent) and Not Now; either answer puts it away for good (AutoDownload.askedKey). Not shown while downloads can't be
 /// used, or with the switch already on. The setting is in You > Downloads either way.
 struct FirstAskCard: View {
@@ -411,6 +435,7 @@ struct FirstAskCard: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.toggledFill))
             .accessibilityElement(children: .contain)
+            .padding(.bottom, 12)
         }
     }
 
@@ -420,12 +445,14 @@ struct FirstAskCard: View {
             asked = true
             downloads.follower.on = true
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(PrimaryFace())
         Button(AutoDownloadWords.notNow) { asked = true }
-            .buttonStyle(.bordered)
+            .buttonStyle(SecondaryPill())
     }
 }
 
+/// One group of places (app/LibraryHome.tsx's groups): a header and its rows - since slice 3b only the Navidrome gate's
+/// On this phone, the switch and its ••• holding the rest.
 struct PlaceGroup<Rows: View>: View {
     let title: String
     @ViewBuilder let rows: () -> Rows

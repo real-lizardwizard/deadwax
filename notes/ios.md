@@ -5528,3 +5528,181 @@ is now two `Rectangle`s (the track white at 0.2, the fill white at 0.85, as befo
 on it (the same eased grow, 0.15 s), no knob - as the web's phone bar since main's 2.1.20 (notes/app.md "Now
 Playing's bar, squared off and thicker"). The target is still the whole 44 pt row; nothing about how it seeks
 changed. Verified: CI's device build (ios.yml). Not seen: on the phone - with the next install.
+
+## Phase 4, slice 3b: the Library's switch, pull to shuffle, the Play button (2026-11-14)
+
+James's, of 2026-11-14 (notes/ios-specs/phase4-library.md 2.8, 3.1, 3.5 and 6.3b; 6.9 points here): "I'm not a huge fan
+of the weird section of buttons at the top of the library page. I like just opening library to your albums" - a switch
+at the top, Albums | Playlists | Artists | Songs, "and I would also like to be able to swipe left and right between
+them, and maybe a way to rearrange the order"; a pull that shuffles ("if you drag down far enough there can be a cool
+little shuffle graphic that changes as you pull down, and then once you go far enough, it changes, and starts shuffling
+when you release"), the Library's pull never refreshing; and "the color of the play button on the album page doesn't
+show the play icon." On `phase4-library` from `ios` 5aeb89a. **The app stays 0.9 (9)**; src/__init__.py untouched;
+**no server change**: the Library's Shuffle reads the web's two routes, `GET /deadwax/navidrome/shuffle` and
+`/shuffle/{token}` (2.0.0-player.57). ROUTE_COUNT 38. Artists and Songs join the switch in slices 4 and 5.
+
+### Core (DeadwaxCore)
+
+- **LibrarySwitch.swift** (new): `LibraryPage` (albums, playlists; its switch word); `LibraryPages` - the order kept
+  per phone under `deadwax-library-pages` ("playlists,albums"), `read` with care (a name unknown or a page twice left
+  out, every page not named added after in the standard order, so never empty), `saved`, `moved` (a List's own
+  offsets and destination, clamped), `first`; `ShuffleCan` (ready, downloads, gettingReady, failed(words),
+  nothingHere, none - `of(online:ready:empty:failed:songsHere:)`, `starts`); `LibraryMenuItem` (its words, `enabled`)
+  and `LibraryMenu.sections` - Shuffle; then Downloaded or, offline where the Albums page is Downloaded, the way back to
+  the scope's albums; All music (a library of your own, online); then Refresh and Edit order; `LibrarySwitchWords`.
+- **PullShuffle.swift** (new): the pull's machine, as TurntablePress, Scrub and LyricsHold are - idle, pulling(progress),
+  armed at `line` (110 pt) once per arming (the haptic's event), back under `line - slack` (100) pulling, a lift while
+  armed and ready `.shuffle` (released until the page is at rest), a bounce no finger began idle, never armed unready
+  (the full ring, `pulling(1)`), a pull that is no number rest. `PullShuffleWords.line(_:can:)`.
+- **Shuffle.swift** (new), ShuffleSongs.tsx and useShuffleFeed.ts ported: `ShuffleStart` and `ShufflePage` (the two
+  answers, decoded leniently), `ShuffleWords` (the web's three, and `unready(status:detail:)` - a 413's own words);
+  **`ShuffleAhead`**, the first page asked ahead (`shown` - asked when none was, the last failed, or more than
+  `freshSeconds`, 600, ago; `answered`, `failed`, `take` - the tap's tracks at the songs level, `paged`, the next ask
+  naming the order played until one gets through; `reset`; another scope starts afresh; an older ask's answer
+  dropped); **`ShuffleFeed`** (`below` 50, `retrySeconds` 30, `track`, `startingElsewhere`, `songsAhead`), **`FeedAsk`**,
+  **`FeedStep`**, and **`ShuffleFeedRun`** - one ask at a time, keyed on the order and how far it has got, the newest
+  only: `look`, `page`, `gone` (a 404: a fresh claimed order, as the rest of this round), `fresh` (Repeat as it is
+  now), `failed` and `retried`, `reset`; **`ShuffleHere`** (offline: every song on the phone, each once).
+- **PrimaryButton.swift** (new): `PrimaryButton` - theme.css's --dw-primary-* (top #a24ef2, bottom #8a2ee0, edge
+  #7c3aed, the highlight, the white label, pressed 0.92, the 4 pt corners, the pill's 48 pt) and `fill(at:)`; and
+  `Contrast` - WCAG 2's relative luminance and ratio, `mix`, `brightness`.
+- **Routes**: `shuffle` (scope, playing, claim) and `shufflePage` (offset) - 38. **DeadwaxClient**:
+  `shuffleStart(scope:playing:claim:)`, `shufflePage(token:offset:)` (a 404 thrown, for the feed to read).
+- **Playlists.swift**: `PlaylistRules.found` - Find on the Playlists page (every word, Find's folding).
+
+### The app
+
+- **LibraryView**, rewritten at its top: the bar's principal slot holds the switch (a segmented Picker over the order,
+  animated unless Reduce Motion), its trailing slot the page's own buttons (Albums: the order and Grid or list;
+  Playlists: New playlist's +) and the Library's ••• (LibraryMenu; "More for the Library"); Find under it, its binding
+  the page shown's own; under them the pages side by side - a horizontal ScrollView of `containerRelativeFrame` pages,
+  `.scrollTargetBehavior(.paging)`, `.scrollPosition(id: $page)`, so the swipe and the switch set the one `page` (the
+  ForEach identified by the page itself, `id: \.self`: scrollPosition matches the views' ids against its binding's
+  type, and LibraryPage's `id` is a String - found by reading, not by the build). The
+  page is nil until the first draw (then the order's first) and set to the first for a new person, Find cleared. As
+  the Library comes into view (first, the tab, the app back in front on it, back online, a new person) - `shown()`:
+  LibraryModel's libraryShown and ShuffleModel's `shown(scope)`; and again when the scope comes in. Edit order: a sheet,
+  a List in edit mode, each move saved through LibraryPages at once. The •••'s Refresh: your albums and the playlists
+  asked now and the Shuffle's `shown` (a failure tried again); offline, a probe. The Shuffle (the •••'s, the pull's
+  release): `.ready` - ShuffleModel's `take` then `player.play(shuffled:)`; `.downloads` - DownloadModel's `songsHere`
+  through the playlist path, shuffled. The Navidrome gate is drawn in the switch's place, unchanged.
+- **AlbumsScreen** draws two ways: as the Albums page (`Page`: the switch's Find, whether it is the page shown, the
+  pull) - no title, toolbar or refreshable of its own, the albums from the top, the pull's graphic over the top anchor;
+  or pushed (All albums, Downloaded), as before, with pull to refresh. Downloaded's top: its heading when it is the
+  page (offline), the **FirstAskCard** (question 17: moved here from over the albums; online, with albums to download),
+  Downloaded playlists' row, and offline the note. AppRoute's `.playlists` is gone (the switch's page).
+- **PlaylistsPage** (PlaylistsScreen.swift) replaces PlaylistsScreen: a ScrollView of rows (PlaylistRow's `inList:
+  false` draws its own chevron and divider), Find by `PlaylistRules.found` (From files opened while it finds, "No
+  playlists match “…”."), asked when it becomes the page shown and when the app comes back to it, the graphic and the
+  pull, New playlist's sheet driven by the bar's +.
+- **PullShuffleView.swift** (new): `ShufflePull` (the page's PullShuffle, the ticks, the finger from the scroll's
+  phase), `PullShuffling`, `.pullsToShuffle(_:)` - iOS 18's `onScrollGeometryChange` (the pull is
+  `-(contentOffset.y + contentInsets.top)`) and `onScrollPhaseChange` (`.interacting` is the finger; its end is the
+  lift, and the shuffle starts in that call), `.sensoryFeedback(.impact(weight: .light))` on each arming, reset when the
+  page stops being the one shown; nothing on iOS 17. `PullShuffleGraphic`: the 40 pt ring and mark, the armed disc in
+  the primary's purple, the release's turn, its line; Reduce Motion keeps the mark still; hidden from VoiceOver.
+- **ShuffleModel** (new, an environment object made with the server): ShuffleAhead's asks made as the person signed in
+  in unstructured tasks; reset for a new person (DeadwaxApp's whenPersonChanges).
+- **PlayerModel**: `play(shuffled:)` (the songs shelved for Info and the stream cache, `playTracks(..., paged:)`, no
+  album remembered - each track names its own); the feed - `feedLook()` after every queue change and Repeat change,
+  `feedSend` (a page, or a fresh claimed order), `carry` (extend: shelved, `controller.extendQueue`, the notice said;
+  ask; a retry 30 s on, `retried()` then a look; nothing), `feedStop()` in `stop()`.
+- **DownloadModel**: `songsHere` (ShuffleHere over the songs downloaded, a playlist's kept answer standing in for a
+  song with no album row) and `songsHereCount`.
+- **ButtonFaces.swift** (new): `PrimaryFace` and `SecondaryPill` (ButtonStyles over one face: semibold, 16 by 6, 36 pt
+  or the 48 pt pill, the 4 pt corners, the highlight inside the top edge, the 1 pt edge; pressed, the primary
+  multiplied by 0.92 - CSS's brightness - and the secondary's pressed face; disabled faded to Palette.off) and the
+  Palette's primary colours. Every `.borderedProminent` takes PrimaryFace - the album's and the playlist's Play
+  (large), Add to my library (MineBlock, twice), the EQ's Use for, the picker's Create, Sign in, Try again on the
+  unreachable screen, the Navidrome gate's Try again and Set up Navidrome, the first ask's Turn On; the `.bordered`
+  beside one takes SecondaryPill - the hero's Shuffle (large), Change address, the picker's Cancel, Not Now - and the
+  empty Playlists' New playlist.
+
+### Decided here (the spec was silent, or this departs from it)
+
+Questions 17-26 in the spec, each built to its recommendation: the first ask at the top of Downloaded (17); no row
+swipes on the switch's pages (18); the same switch offline, its Albums page Downloaded (19); the •••'s Shuffle for
+VoiceOver and Switch Control (20); every page pulls the same shuffle (21); offline, the downloads shuffled (22); Edit
+order a sheet, a page added later joining at the end (23); the feed's behaviour held by hand, its numbers and words
+by the contract test (24); the web's button shape, the `.bordered` beside it the secondary pill (25); slices 4-5 to
+move the order and layout into the ••• when four pages crowd the bar (26, nothing built). And:
+
+- **From files is open while Find finds**, so a match folded away doesn't read as none.
+- **The library's shuffle remembers no album** for Info, as resume's queue doesn't: each track names its album and Info
+  asks for the rest.
+- **Refresh asks the Shuffle again** (`shown`), so a failed first page is tried again from the •••.
+- **The Playlists page asks when it becomes the page shown**, not as it is built beside Albums.
+- **A failed page waits out its 30 s** (`retried`): the first build cleared its key at once, so the next song asked
+  again - the web's effect isn't run again by a song changing, so it waits; the feed now waits too.
+- **Made plainer by the mutation runs** (each an equivalent mutant): the order the last tap played let go on any newest
+  answer (the web's "if it is still the one named" is always true behind the serial); the feed's key without Repeat,
+  and no token of its own (another shuffle, or none, already lets an ask go through `look` or `letGo`); the pull's
+  `towards` without its cap and floor (it is only asked between the top and the line).
+
+### Tests
+
+- **LibrarySwitchTests** (8): the order read from every kind of value and written back; every move of the List's (a
+  destination or offsets out of range clamped); the first page; ShuffleCan from every state; the •••'s sections and
+  words, online and off, with and without a library of your own; Find on playlists.
+- **PullShuffleTests** (10): the line and slack; pulling to the line and arming at it, not a point before; one tick per
+  arming; disarmed under the slack and not at it; a lift while armed shuffling, then released until at rest; a lift
+  before the line nothing; a bounce no finger made never drawn; never armed unready (the full ring), ready again
+  mid-pull arming; a pull that is no number at rest; the graphic's words.
+- **ShuffleTests** (20): the numbers and words; a song as the queue takes it; `startingElsewhere` and `songsAhead`
+  over shuffle.sim.cjs's own cases; the feed through a whole order (199 and 50 ahead nothing, 49 the next page from
+  `fetched`, one ask whatever changes meanwhile, a failure asked again only when its retry is due, a late answer
+  dropped, the whole order in nothing under Off and One and a fresh claimed round under All never starting with the
+  song ending); a short last page asking the next round at once; a page at the shuffle's level; a 404 starting over
+  said once; an empty fresh order; another shuffle or none letting an ask go; a retry due after another ask letting
+  nothing go; Repeat turned off with a round on its way; ShuffleAhead (asked as shown, the 600 s bound, the tap and the
+  next ask naming it until one gets through - then no more, a failure asked again, another scope or person, total 0);
+  the answers decoded leniently; the two calls; ShuffleHere.
+- **PrimaryButtonTests** (5): WCAG's own pairs; the colours the web's, the mix rounded per channel; the label on the
+  gradient; pressed; against black, and the old fill.
+- **tests/test_ios_contract.py**: ROUTE_COUNT 38; the shuffle answers within what the app decodes (the token required,
+  the songs `shuffledTrack` reads within SHUFFLE_FIELDS); `PagedScope` the route's Literal; `claim` a bool sent as
+  "true"; the offset's bounds; the 404 and the 413 where the routes raise them; and the numbers and words read from
+  ShuffleSongs.tsx and useShuffleFeed.ts - SHUFFLE_FRESH_MS (and the route's SHUFFLE_LIST_TTL_S), FEED_BELOW,
+  FEED_RETRY_MS, SHUFFLE_GETTING_READY, SHUFFLE_UNREADY, SHUFFLE_STARTED_OVER, and SHUFFLE_TOO_BIG.
+- **tests/test_ios_palette.py** (new): PrimaryButton's numbers theme.css's and player.css's (the gradient, edge,
+  highlight, label, pressed, radius, the pill's height); `.pl-pill.is-primary` drawn from them; no
+  `.borderedProminent` left in ios/App; ButtonFaces reading every PrimaryButton field.
+- **Mutations**: the final run, 67 over LibrarySwitch, PullShuffle, ShuffleAhead, the feed, ShuffleHere,
+  PlaylistRules.found and Contrast: 65 caught by a failing test, and 2 (a move's offsets and destination left
+  unclamped) trapping in the test that gives them out of range. The first run, 61, missed 10: those 2 traps (the
+  harness counted only recorded issues), 4 equivalent (made plainer - "Decided here"), and 4 closed by tests - a bounce
+  drawn while it bounces, the order played still named after its ask got through, a page queued without the
+  shuffle's level, the gradient's mix truncated. The code made plainer was mutated again: the feed's key without how
+  far the order had got was missed, and closed by a short last page that leaves the music near its end asking the
+  next round at once. The 30 s wait (`retrying`, `retried`) came with four of its own, all caught.
+
+### The contrast, measured
+
+`Contrast` (WCAG 2), white on the primary: #8a2ee0 (the foot) 5.92:1; the gradient's middle 5.05:1; a fifth of the way
+down - the top of a label's line on the 48 pt pill - 4.57:1, and every tenth below it over 4.5:1; #a24ef2 at the very
+top edge, where no glyph is drawn, 4.28:1. Pressed (brightness 0.92): 4.92:1 at the top, 6.72:1 at the foot. The edge
+against white 5.70:1. So the label is AA (4.5:1) wherever it is drawn, and the play glyph (a graphic, 3:1) everywhere.
+The old fill, the tint #C084FC, under white: 2.64:1 - what James couldn't see. Against the black page the button
+itself is 4.91:1 at its top and 3.55:1 at its foot.
+
+### Verified, and not
+
+Verified:
+- `swift test`: Core 1328 (1285 + 43), Audio 158, Turntable 12.
+- The unsigned Release and Debug device builds (Xcode, `generic/platform=iOS`): no warnings.
+- `check_project.py` ok.
+- The iOS pytest files and test_source_bytes: 179 passed, 1 skipped (test_ios_palette.py new).
+- The 11 ios sims and shuffle.sim.cjs.
+
+Not verified - only the phone can tell (the spec's section 9; docs/ios.md's checks 85-94):
+- That a horizontal paging ScrollView of two pages, each its own vertical ScrollView, swipes and scrolls as hoped: a
+  vertical scroll never pages, and whether a sideways drag that begins on the letter index pages (question 18).
+- That iOS 18's scroll geometry reads the pull as 0 at rest under Find's drawer and the inline bar, inside the pager;
+  that the scroll's phase leaves `.interacting` the moment the finger lifts, so the music starts then; the tick once
+  per arming; the graphic in the room the pull opens at every text size.
+- How the bar collapses and Find's drawer behaves with nested scroll views; that `.scrollPosition(id:)` keeps the
+  page shown across an Edit order and a rotation.
+- The feed's asks answered on a locked phone mid-shuffle; Repeat All's next round past the end of a real library.
+- The primary's purple on James's screen beside the web's; the pressed darkening (colorMultiply standing in for CSS's
+  brightness).
+- iOS 17: no pull (by design), only the •••'s Shuffle - not run on one.

@@ -31,7 +31,7 @@ struct MineBlock: View {
                     switch action {
                     case .add:
                         Button(words) { if !busy { act(action) } }
-                            .buttonStyle(.borderedProminent)
+                            .buttonStyle(PrimaryFace())
                     case .remove:
                         Button(words) { if !busy { act(action) } }
                             .buttonStyle(.borderless)
@@ -66,7 +66,7 @@ struct MinePlaceholder: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             Button(Whose.placeholderButton) {}
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(PrimaryFace())
         }
         .frame(maxWidth: .infinity)
         .hidden()

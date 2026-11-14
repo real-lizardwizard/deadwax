@@ -1,29 +1,56 @@
 import DeadwaxCore
 import SwiftUI
 
-/// The Library tab's root (D2): the Albums screen of the person's scope - "Your albums" with a library of your own
-/// (and, above them, All music's one row, All albums), "Albums" with logins off and for the break-glass admin - or,
-/// when a check finds deadwax has no Navidrome that answers, the Navidrome gate in its place (NavidromeGate).
+/// The Library tab's root (D2; since Phase 4 slice 3b the switch - phase4-library.md 2.8, 3.1). James: "I like just
+/// opening library to your albums", with a switch at the top - Albums | Playlists (Artists and Songs join in slices 4
+/// and 5) - "and I would also like to be able to swipe left and right between them, and maybe a way to rearrange the
+/// order". So the bar holds the switch (a segmented control, the pages in the order kept on this phone, LibraryPages),
+/// the page's own buttons and the Library's ••• (LibraryMenu: Shuffle, Downloaded or the way back to the albums, All
+/// music, Refresh, Edit order); Find under it; and under them the pages side by side, a swipe moving between them as
+/// the switch does - each following the other. The Library opens on the first page of the order, and on it again for a
+/// new person; after that, on the one last shown. Pulling a page down shuffles your library (2.8's PullShuffle; 3.5's
+/// graphic) - never refreshes: the Library refreshes itself as it shows, and the •••'s Refresh asks now.
 ///
-/// While deadwax can't be reached (phase2-downloads.md 5.4) the root is Downloaded - what is on this phone - and the
-/// gate isn't consulted; its check runs again when deadwax answers. The root never swaps under a finger: Core's
-/// LibraryRoot changes it only while it isn't on screen (another tab, a page pushed over it, the app in the
-/// background), and the app opening starts on the list it should - so the first look waits for the phone's path to be
-/// known, a moment at launch.
+/// The Albums page is the Albums list of the person's scope - "Your albums" with a library of your own, "Albums" with
+/// logins off and for the break-glass admin - or, when a check finds deadwax has no Navidrome that answers, the Navidrome
+/// gate in the switch's place (NavidromeGate). While deadwax can't be reached (phase2-downloads.md 5.4) the Albums page
+/// is Downloaded - what is on this phone - and the gate isn't consulted; its check runs again when deadwax answers. The
+/// page never swaps under a finger: Core's LibraryRoot changes it only while it isn't on screen (another tab, a page
+/// pushed over it, the app in the background), and the app opening starts on the list it should - so the first look
+/// waits for the phone's path to be known, a moment at launch.
 ///
-/// As the tab comes into view - picked, the app back in front on it, a new person - its lists are asked again if
-/// over a minute old and your library is asked for its New marks (App.tsx's libraryShown), whichever page of the
-/// tab is on top: the root stays in the tab's stack under its pages, so it hears the tab and the scene change.
+/// As the tab comes into view - picked, the app back in front on it, a new person - its lists are asked again if over a
+/// minute old, your library is asked for its New marks (App.tsx's libraryShown), and the Shuffle's first page is asked
+/// ahead when it should be (ShuffleModel), whichever page of the tab is on top: the root stays in the tab's stack under
+/// its pages, so it hears the tab and the scene change.
 struct LibraryView: View {
     @Environment(LibraryModel.self) private var library
     @Environment(ServerModel.self) private var server
     @Environment(AppNavigation.self) private var navigation
     @Environment(Reachability.self) private var reachability
+    @Environment(ShuffleModel.self) private var shuffles
+    @Environment(PlayerModel.self) private var player
+    @Environment(DownloadModel.self) private var downloads
+    @Environment(PlaylistsModel.self) private var playlists
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shownOnce = false
-    /// Which list the root is (Core's rule, kept here: changed only off screen).
+    /// Which list the Albums page is (Core's rule, kept here: changed only off screen).
     @State private var rootRule = LibraryRoot()
     @State private var rootList: LibraryRootList?
+    /// The pages' order, as this phone keeps it (LibraryPages: read with care).
+    @AppStorage(LibraryPages.storageKey) private var savedOrder = ""
+    /// The page shown - nil until the Library first draws, when it is the first of the order.
+    @State private var page: LibraryPage?
+    /// Each page's own words in Find.
+    @State private var findAlbums = ""
+    @State private var findPlaylists = ""
+    /// Each page's pull.
+    @State private var albumsPull = ShufflePull()
+    @State private var playlistsPull = ShufflePull()
+    @State private var editingOrder = false
+    /// New playlist's sheet (the Playlists page's +), while it is up.
+    @State private var newPlaylist: PlaylistsPage.NewSheet?
 
     init() {}
 
@@ -31,9 +58,10 @@ struct LibraryView: View {
         root
             .onAppear {
                 look()
+                if page == nil { page = LibraryPages.first(order) }
                 guard !shownOnce else { return }
                 shownOnce = true
-                if reachability.online { library.libraryShown() }
+                if reachability.online { shown() }
             }
             .task {
                 // the path is known within moments of the start; should the monitor never say, the root is drawn anyway
@@ -42,26 +70,40 @@ struct LibraryView: View {
             }
             .onChange(of: navigation.tab) { _, tab in
                 look()
-                if tab == .library, reachability.online { library.libraryShown() }
+                if tab == .library, reachability.online { shown() }
             }
             .onChange(of: scenePhase) { _, phase in
                 look()
-                if phase == .active, navigation.tab == .library, reachability.online { library.libraryShown() }
+                if phase == .active, navigation.tab == .library, reachability.online { shown() }
             }
             .onChange(of: navigation.library.count) { _, _ in look() }
             .onChange(of: reachability.pathKnown) { _, _ in look() }
             .onChange(of: reachability.online) { _, online in
                 look()
                 // back: Navidrome asked again - a check that failed while deadwax was away says nothing of it
-                if online { library.libraryShown() }
+                if online { shown() }
             }
             .onChange(of: server.person) { _, _ in
-                library.libraryShown()
+                // a new person opens on the first page, Find empty
+                page = LibraryPages.first(order)
+                findAlbums = ""
+                findPlaylists = ""
+                shown()
+            }
+            .onChange(of: library.scope) { _, scope in
+                // who the person is came in (or changed): the Shuffle of their scope
+                if reachability.online { shuffles.shown(scope) }
             }
             .onChange(of: server.signInOver == nil) { _, gone in
                 // signed in again over the app, as the same person: what failed while signed out is asked again
                 if gone { library.signedInAgain() }
             }
+    }
+
+    /// The Library came into view: its lists, your library's New marks, and the Shuffle's first page.
+    private func shown() {
+        library.libraryShown()
+        shuffles.shown(library.scope)
     }
 
     /// The root on screen: its tab chosen, nothing pushed over it, the app not in the background.
@@ -85,14 +127,11 @@ struct LibraryView: View {
             Color.clear
                 .navigationTitle("Library")
         case .downloaded:
-            AlbumsScreen(list: .downloaded, root: true)
-                .id("downloaded")
+            pager(albums: .downloaded)
         case .albums:
             switch gate {
             case .open:
-                AlbumsScreen(scope: library.scope, root: true)
-                    // another scope is another screen: its own Find and its own place in the list
-                    .id(library.scope)
+                pager(albums: .scope(library.scope))
             case .connecting:
                 ProgressView()
                     .controlSize(.large)
@@ -108,6 +147,213 @@ struct LibraryView: View {
     private var gate: NavidromeGate.Shown {
         guard NavidromeGate.consulted(reachability.reach), library.navidrome?.offline != true else { return .open }
         return NavidromeGate.shownOnPhone(library.navidrome, access: server.access)
+    }
+
+    // MARK: the switch (slice 3b)
+
+    /// The pages in the order kept.
+    private var order: [LibraryPage] { LibraryPages.read(savedOrder) }
+
+    /// The page shown.
+    private var shownPage: LibraryPage { page ?? LibraryPages.first(order) }
+
+    /// What the Shuffle can do now (ShuffleCan): play the first page in hand, shuffle the downloads, or why not.
+    private var shuffleCan: ShuffleCan {
+        ShuffleCan.of(online: reachability.online, ready: shuffles.ready, empty: shuffles.empty,
+                      failed: shuffles.failure, songsHere: downloads.songsHereCount)
+    }
+
+    /// The pages side by side under the switch, a swipe between them; Find, the bar and the ••• the switch's.
+    private func pager(albums: AlbumList) -> some View {
+        let order = self.order
+        let can = shuffleCan
+        let shownPage = self.shownPage
+        let online = reachability.online
+        return ScrollView(.horizontal) {
+            HStack(spacing: 0) {
+                // identified by the page itself, not its `id` string: scrollPosition(id:) matches the views' ids against
+                // its binding's type, LibraryPage
+                ForEach(order, id: \.self) { (each: LibraryPage) in
+                    pageView(each, albums: albums, can: can, current: each == shownPage)
+                        .containerRelativeFrame([.horizontal, .vertical])
+                }
+            }
+            .scrollTargetLayout()
+        }
+        .scrollTargetBehavior(.paging)
+        .scrollPosition(id: $page)
+        .scrollIndicators(.hidden)
+        .navigationTitle("Library")
+        .navigationBarTitleDisplayMode(.inline)
+        .searchable(text: shownPage == .albums ? $findAlbums : $findPlaylists,
+                    placement: .navigationBarDrawer(displayMode: .always),
+                    prompt: Text(shownPage == .albums ? LibraryWords.findPlaceholder : LibrarySwitchWords.findPlaylists))
+        .autocorrectionDisabled()
+        .textInputAutocapitalization(.never)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                switcher(order)
+            }
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                switch shownPage {
+                case .albums:
+                    LibrarySortMenu()
+                    LibraryLayoutSwitch()
+                case .playlists:
+                    Button {
+                        newPlaylist = PlaylistsPage.NewSheet()
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .disabled(!online)
+                    .accessibilityLabel(PlaylistWords.newPlaylist)
+                }
+                more(albums: albums, can: can)
+            }
+        }
+        .sheet(isPresented: $editingOrder) {
+            EditOrderSheet(saved: $savedOrder)
+        }
+    }
+
+    @ViewBuilder
+    private func pageView(_ each: LibraryPage, albums: AlbumList, can: ShuffleCan, current: Bool) -> some View {
+        let pulls = current && onScreen
+        switch each {
+        case .albums:
+            ZStack {
+                AlbumsScreen(list: albums, page: AlbumsScreen.Page(typed: $findAlbums, current: current, pulls: pulls,
+                                                                   pull: albumsPull, shuffle: can, start: shuffleNow))
+                    // another scope (or Downloaded) is another list: its own place in it
+                    .id(albums)
+            }
+        case .playlists:
+            PlaylistsPage(typed: $findPlaylists, current: current,
+                          pulling: PullShuffling(state: playlistsPull, can: can, on: pulls, start: shuffleNow),
+                          newSheet: $newPlaylist)
+        }
+    }
+
+    /// The switch: the pages in the order kept, its tap moving the page (at once under Reduce Motion).
+    private func switcher(_ order: [LibraryPage]) -> some View {
+        Picker(LibrarySwitchWords.switchLabel, selection: Binding(get: { shownPage }, set: { (chosen: LibraryPage) in
+            if reduceMotion {
+                page = chosen
+            } else {
+                withAnimation(.snappy) { page = chosen }
+            }
+        })) {
+            ForEach(order) { (each: LibraryPage) in
+                Text(each.title).tag(each)
+            }
+        }
+        .pickerStyle(.segmented)
+        .fixedSize()
+        .accessibilityLabel(LibrarySwitchWords.switchLabel)
+    }
+
+    /// The Library's ••• (LibraryMenu, Core's): its sections, each item's words and whether it can be used now.
+    private func more(albums: AlbumList, can: ShuffleCan) -> some View {
+        let personal = server.access.hasLibrary
+        let sections = LibraryMenu.sections(shuffle: can, albumsPage: albums == .downloaded ? .downloaded : .albums,
+                                            scope: library.scope, personal: personal, online: reachability.online)
+        return Menu {
+            ForEach(sections.indices, id: \.self) { (section: Int) in
+                Section {
+                    ForEach(sections[section].indices, id: \.self) { (index: Int) in
+                        menuItem(sections[section][index], personal: personal)
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+        }
+        .accessibilityLabel(LibrarySwitchWords.more)
+    }
+
+    @ViewBuilder
+    private func menuItem(_ item: LibraryMenuItem, personal: Bool) -> some View {
+        let words = item.words(personal: personal)
+        switch item {
+        case .shuffle:
+            Button(action: shuffleNow) { Label(words, systemImage: "shuffle") }
+                .disabled(!item.enabled)
+        case .downloaded:
+            Button { navigation.open(.downloaded) } label: { Label(words, systemImage: DownloadWords.downloadSymbol) }
+        case .albums(let scope):
+            Button { navigation.open(.albums(scope)) } label: { Label(words, systemImage: "square.stack") }
+        case .allMusic:
+            Button { navigation.open(.albums(.store)) } label: { Label(words, systemImage: "square.stack.3d.up") }
+        case .refresh:
+            Button(action: refresh) { Label(words, systemImage: "arrow.clockwise") }
+        case .editOrder:
+            Button { editingOrder = true } label: { Label(words, systemImage: "line.3.horizontal") }
+        }
+    }
+
+    // MARK: doing
+
+    /// The Shuffle - the •••'s tap, a pull's release - started here, in that call, nothing awaited first: the first page
+    /// in hand played as a library's shuffle at the songs level (2.8), or, while deadwax can't be reached, every song on
+    /// this phone shuffled as a playlist's Shuffle is (question 22). Nothing when neither can.
+    private func shuffleNow() {
+        switch shuffleCan {
+        case .ready:
+            guard let taken = shuffles.take(level: PlaylistPlay.songsLevel(player.normalization)) else { return }
+            player.play(shuffled: taken)
+        case .downloads:
+            player.play(playlist: downloads.songsHere, at: nil, shuffle: true)
+        case .gettingReady, .failed, .nothingHere, .none:
+            break
+        }
+    }
+
+    /// The •••'s Refresh: your albums and the playlists asked now, whatever their age - or, while deadwax can't be
+    /// reached, whether it is back (a probe at once).
+    private func refresh() {
+        guard reachability.online else {
+            reachability.tryNow()
+            return
+        }
+        let scope = library.scope
+        Task { await library.refresh(scope) }
+        Task { await playlists.ask(fresh: true) }
+        shuffles.shown(scope)
+    }
+}
+
+/// Edit order (3.5): the pages as rows, each with its drag handle - a List held in edit mode, no deletions - kept as
+/// each move is made; the footer says the Library opens on the first.
+private struct EditOrderSheet: View {
+    @Binding var saved: String
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        let order = LibraryPages.read(saved)
+        NavigationStack {
+            List {
+                Section {
+                    ForEach(order) { (page: LibraryPage) in
+                        Text(page.title)
+                    }
+                    .onMove { (from: IndexSet, to: Int) -> Void in
+                        saved = LibraryPages.saved(LibraryPages.moved(order, from: from, to: to))
+                    }
+                } footer: {
+                    Text(LibrarySwitchWords.orderFooter)
+                }
+            }
+            .environment(\.editMode, .constant(.active))
+            .navigationTitle(LibrarySwitchWords.orderTitle)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(LibrarySwitchWords.done) { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }
 
@@ -146,13 +392,13 @@ struct NavidromeGateView: View {
                             Text(NavidromeGate.tryAgain)
                         }
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(PrimaryFace())
                     .disabled(library.checkingNavidrome)
                     .accessibilityLabel(NavidromeGate.tryAgain)
                 }
                 if closed.setUp, let address = server.address, let url = NavidromeGate.setUpURL(address) {
                     Button(NavidromeGate.setUp) { openURL(url) }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(PrimaryFace())
                 }
                 if NavidromeGate.showsDownloaded(.closed(closed), anythingHere: downloads.anythingHere) {
                     // Navidrome down is no reason to hide what plays from this phone (5.4)

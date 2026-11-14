@@ -153,7 +153,7 @@ struct EQProfileScreen: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 6)
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(PrimaryFace())
         .disabled(used)
     }
 

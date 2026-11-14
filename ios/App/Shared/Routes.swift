@@ -12,10 +12,10 @@ enum AppTab: Hashable {
 enum AppRoute: Hashable {
     /// An album's page, by Navidrome's album id (with what the list knew, to draw before it loads).
     case album(AlbumRoute)
-    /// An Albums screen of a scope, pushed: All music's All albums (the store's), over Your albums - and, while the root
-    /// is Downloaded, the root's own row back to your albums.
+    /// An Albums screen of a scope, pushed: All music's All albums (the store's) - and, while the Albums page is
+    /// Downloaded, the way back to your albums (both from the Library's •••, slice 3b).
     case albums(AlbumScope)
-    /// The Library's Downloaded (Phase 2): every album on this phone, as an Albums screen.
+    /// The Library's Downloaded (Phase 2): every album on this phone, as an Albums screen - from the Library's •••.
     case downloaded
     /// You > Downloads (Phase 2): what's on this phone, the two settings, what's on its way and what didn't arrive.
     case downloads
@@ -25,9 +25,8 @@ enum AppRoute: Hashable {
     case debug
     /// You > Playback > EQ, and the EQ's own pages (eq.md 3.1-3.2): the EQ page, an output's, the presets.
     case eq(EQRoute)
-    /// The Library's Playlists (Phase 4, phase4-library.md 3.2): yours, shared with you, from files.
-    case playlists
-    /// One playlist's page (3.3), by Navidrome's playlist id.
+    /// One playlist's page (3.3), by Navidrome's playlist id. (The Playlists list itself is a page of the Library's
+    /// switch since slice 3b, not a page pushed.)
     case playlist(PlaylistRoute)
     /// (Phase 4, slice 3) The playlists downloaded to this phone - reached from Downloaded.
     case downloadedPlaylists
@@ -261,13 +260,12 @@ extension View {
             Group {
                 switch route {
                 case .album(let album): AlbumView(route: album)
-                case .albums(let scope): AlbumsScreen(scope: scope, root: false)
-                case .downloaded: AlbumsScreen(list: .downloaded, root: false)
+                case .albums(let scope): AlbumsScreen(scope: scope)
+                case .downloaded: AlbumsScreen(list: .downloaded)
                 case .downloads: DownloadsScreen()
                 case .serverAddress: ServerAddressView()
                 case .debug: DebugView()
                 case .eq(let page): EQDestination(route: page)
-                case .playlists: PlaylistsScreen()
                 case .playlist(let playlist): PlaylistView(route: playlist)
                 case .downloadedPlaylists: DownloadedPlaylistsScreen()
                 }

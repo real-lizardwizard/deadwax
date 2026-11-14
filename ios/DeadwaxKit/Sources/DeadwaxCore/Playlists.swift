@@ -184,6 +184,18 @@ public enum PlaylistRules {
     }
 
     /// groupPlaylists: the list cut into its groups, each in the list's order.
+    /// (slice 3b, phase4-library.md 2.8) Find on the Library's Playlists page: the playlists whose name holds every word
+    /// typed, in any order and anywhere in it - folded as the albums' Find folds (Find.words, Fold.findText) - in the
+    /// order handed in. Nothing typed (or spaces): every one.
+    public static func found(_ list: [Playlist], typed: String) -> [Playlist] {
+        let words = Find.words(typed)
+        if words.isEmpty { return list }
+        return list.filter { (playlist: Playlist) -> Bool in
+            let name = FoldKey(Fold.findText(playlist.name))
+            return words.allSatisfy { name.contains($0) }
+        }
+    }
+
     public static func groups(_ list: [Playlist]) -> PlaylistGroups {
         var groups = PlaylistGroups()
         for playlist in list {

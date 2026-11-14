@@ -50,10 +50,12 @@ words are new and listed in section 1.
   | `GET /deadwax/navidrome/artists` (`:398`) | `{artists: [{id, name, albumCount, coverArt, musicBrainzId}]}` | 4 |
   | `GET /deadwax/navidrome/artists/{artist_id}` (`:420`) | getArtist's artist with its `album` list | 4 |
   | `GET /deadwax/navidrome/search` (`:351`, already `Routes.search`) | an empty `q` pages every song (`songCount`, `songOffset`) | 5 |
-  | `GET /deadwax/navidrome/shuffle` (`:1014`) | `{token, total, songs}` (the first 200) | 5 |
-  | `GET /deadwax/navidrome/shuffle/{token}` (`:1057`) | `{total, songs}` from `offset`; 404 "gone" | 5 |
+  | `GET /deadwax/navidrome/shuffle` (`:1014`) | `{token, total, songs}` (the first 200) | 3b |
+  | `GET /deadwax/navidrome/shuffle/{token}` (`:1057`) | `{total, songs}` from `offset`; 404 "gone" | 3b |
 
-  tests/test_ios_contract.py's ROUTE_COUNT moves 30 -> 32 (slice 1), 36 (2), 38 (4), 40 (5).
+  tests/test_ios_contract.py's ROUTE_COUNT moves 30 -> 32 (slice 1), 36 (2), 38 (3b: the two shuffle routes, which
+  were slice 5's until the Library's pull to shuffle needed them), 40 (4); slice 5 adds none (Songs pages the
+  search route the app already calls).
 - **A playlist's summary** (`summary`, `src/playlists.py:84`): `id, name, comment, songCount, duration, created,
   changed, owner, public, coverArt (null for none), mine, editable` - every field always sent ('' or 0 for what
   Navidrome left out). On one playlist, `songCount` and `duration` are the songs listed (`with_songs`, `:109`), and
@@ -119,7 +121,7 @@ of 12" and "Roads removed" (VoiceOver). As built, also the web's: the picker's "
 playlist…", "No playlists yet - make one:", "Adding…", "Nothing added - some are in Late night already" and "Couldn't add
 to Late night." (both said in the notice when the sheet has closed meanwhile), the menus' "Add to a playlist…",
 NewPlaylistForm's Name / Create / Creating… / Cancel, PlaylistsPage's "Made Late night" and PlaylistPage's "Deleted Late
-night"; and two of the phone's own: the New playlist sheet's title ("New playlist") and Edit's "Songs" heading. Slice 3's: section 6.3. Slice 4's: `playsLine` ("Plays the 2 albums you have",
+night"; and two of the phone's own: the New playlist sheet's title ("New playlist") and Edit's "Songs" heading. Slice 3's: section 6.3. Slice 3b's: section 6.3b. Slice 4's: `playsLine` ("Plays the 2 albums you have",
 "Getting the songs of the 2 albums you have…", "Plays 1 of the 2 albums you have - the rest didn't load",
 "Couldn't load their songs.", "None of their albums are here to play."), "Artists", "Your artists", "All artists",
 "Name" / "Most albums", the album count line. Slice 5's: "Songs" / "All songs", "Shuffle", "Getting ready…",
@@ -231,7 +233,14 @@ and the picks the menus make (`PlaylistPick` from a QueuePick of songs, or from 
   buttons. Every album remembered (`rememberQueue`). No MusicBrainz discography, description, pins or managing
   (question 4).
 
-### 2.7 Songs and the Library's Shuffle (slice 5)
+### 2.7 Songs and the Library's Shuffle (slice 5; the Shuffle itself built in slice 3b)
+
+**Built in slice 3b** (2.8): the Library's Shuffle of your library - its first page asked ahead, the tap's play path
+and the feed, every rule below but Songs and All songs' Shuffle - since the Library's pull shuffles (James,
+2026-11-14). Slice 5 adds Songs and, with a library of your own, All songs' Shuffle for the collection, through the
+same `ShuffleAhead` (a second one, of the store's scope) and the same feed; and its exporter holds the feed's pure
+part (`startingElsewhere`, `songsAhead`) to useShuffleFeed.ts, which 3b holds by hand - its numbers and words are
+held by the contract test already (question 24).
 
 - **Songs**: every song, 100 a page (search3 with an empty `q`, SONGS_PAGE), in Navidrome's order; a row opens its
   album (the web's: a fetch-then-play would start the music outside the tap); its ••• is the song's Play Next / Play
@@ -245,23 +254,124 @@ and the picks the menus make (`PlaylistPick` from a QueuePick of songs, or from 
   under Repeat All, a fresh claimed order; a 404 starts a fresh order and says SHUFFLE_STARTED_OVER once; a failure
   is asked again after 30 s while songs remain. 413 (over 200,000 songs) says the server's words.
 
+### 2.8 The Library's switch, pull to shuffle, and the primary button (slice 3b)
+
+James, 2026-11-14 (the coordinator's words of his, binding): "I'm not a huge fan of the weird section of buttons at the
+top of the library page. I like just opening library to your albums." He chose a switch at the top - Albums |
+Playlists | Artists | Songs - "and I would also like to be able to swipe left and right between them, and maybe a way
+to rearrange the order"; and for the pull, "if you drag down far enough there can be a cool little shuffle graphic
+that changes as you pull down, and then once you go far enough, it changes, and starts shuffling when you release" -
+choosing "Pull shuffles": the Library's pull never refreshes. And: "the color of the play button on the album page
+doesn't show the play icon."
+
+- **The pages** (`LibraryPage`, Core): Albums and Playlists in slice 3b; Artists joins in slice 4, Songs in slice 5.
+  **The order** (`LibraryPages`): kept per phone in UserDefaults under `deadwax-library-pages`, the pages' names
+  joined with commas ("playlists,albums"), read with care - a name it doesn't know, or a page named twice, left out;
+  a page the value doesn't name (one added since, a damaged value, nothing saved) added after the rest in the
+  default order (Albums, Playlists, Artists, Songs) - so it is never empty and holds every page once. Edit order's
+  move is the List's own (offsets to a destination), the other pages keeping their order; the switch follows it at
+  once and the page shown stays shown.
+- **Which page shows**: the first of the order as the app opens and when the person changes; after that the one
+  last shown (another tab and back, the app back in front). The switch and the swipe set it and each follows the
+  other. The Library tab tapped at its root scrolls the page shown to its top, as the root list did.
+- **Find** is the switch's: one field under the bar, each page with its own words in it. Albums' as before; on
+  Playlists it keeps the playlists whose name holds every word typed, in any order and anywhere (Find's folding,
+  `PlaylistRules.found`), the groups drawn as before - and none: "No playlists match “…”." (`Find.noMatchText`).
+- **The pull** (`PullShuffle`, Core: a state machine, as TurntablePress, Scrub and LyricsHold are). The app feeds it
+  how far the page shown is pulled past its top, in points (0 at rest), and whether a finger is on it, and draws what
+  it says. **idle** -> **pulling** (its progress, the pull over the line, `line` 110 pt, held under 1) -> **armed** at
+  the line: once per arming, the event the haptic tick is drawn from -> pulled back under `line - slack` (100 pt):
+  **pulling** again (no tick) -> the finger lifts while armed: **released**, and the shuffle starts in that same call,
+  nothing awaited first - then released until the page is back at rest (0), idle after. Lifted while pulling: no
+  shuffle; the graphic follows the page back to rest. A pull no finger made (a fling's bounce at the top) stays idle.
+  It arms only when a shuffle can start (`ready`); otherwise the graphic reaches its full ring and says why, and a
+  lift does nothing. Every page of the switch pulls the same shuffle (question 21): no page refreshes on a pull now.
+  The lists pushed over the switch - All albums, Downloaded, Downloaded playlists - keep their pull to refresh.
+- **The Library's Shuffle** (ShuffleSongs.tsx ported: `ShuffleAhead`, Core). Its scope is the Library's: `yours`
+  with a library of your own, else `store` (logins off, the break-glass admin). Its first page is asked as the
+  Library comes into view - the app opening on it, the tab picked, the app back in front on it, a new person - and
+  again when it does so more than 10 minutes after the last ask (SHUFFLE_FRESH_MS, the route's SHUFFLE_LIST_TTL_S),
+  the page in hand let go; never twice meanwhile. Ready once a page with songs is in. The ••• Shuffle's tap and the
+  pull's release play that page from its first song at the songs level (each at its own track level under Auto, none
+  with Off), each song with its album as the answer names it, as a library's shuffle (`paged`: the token, the total,
+  the songs fetched, the scope, the level the first song got) - then ask for a new order naming the one just played
+  (`playing`), until one gets through, so deadwax claims it. An ask that fails leaves it unready, saying
+  "Couldn't get your songs ready to shuffle" - or, for a 413, the server's own words ("Your library is too big to
+  shuffle here") - and asks again the next time the Library shows. A scope with no songs at all (`total` 0) offers no
+  Shuffle: the ••• leaves it out, and the pull draws nothing. Only the newest answer counts; a new person lets every
+  ask go.
+- **The feed** (useShuffleFeed.ts ported: `ShuffleFeed`, `ShuffleFeedRun`, Core; PlayerModel carries it out), for any
+  queue that is a library's shuffle - this phone's, or one put back paused from the web's or the phone's own. Looked at
+  each time the queue or Repeat changes, and on a retry: under 50 of the list's songs after the song playing
+  (FEED_BELOW, `songsAhead`), the next page from where the order has got to (`fetched`), added at the end as the list's
+  songs (`extendQueue`) at the level the shuffle was queued at; with the whole order in, nothing more under Repeat off
+  or One, and under Repeat All a fresh order, asked for claimed, as the next time round, never starting with the song
+  that ends this one (`startingElsewhere`). A 404 - the order gone from deadwax (it restarted, or a day untouched) -
+  asks a fresh order, claimed, as the rest of this round, and the notice says "Your shuffle started over - deadwax no
+  longer had its order" once (not for an empty one). One ask at a time, keyed on the order, `fetched` and, with the
+  whole order in, Repeat: what is being asked is never asked again meanwhile. Another shuffle, or none, lets an ask
+  go; Repeat moved off All while a fresh round is on its way lets it go, and an answer landing anyway is dropped
+  unless Repeat is All. A page that won't come is asked again 30 s later (FEED_RETRY_MS) while the queue has songs -
+  and not sooner, though the songs move on meanwhile (`retried`; the web's effect isn't run again by a song changing);
+  the music plays on. A fresh order with no songs is appended as nothing and asked for no more. It only ever adds
+  to the queue: nothing in it plays.
+- **Offline** (the phone's own, question 22): while deadwax can't be reached, Shuffle shuffles every song on this
+  phone - a queue of its own (not paged: every one is in hand), in a random order, each song with its own album, at
+  the songs level, as a playlist's Shuffle is. The ••• says "Shuffle downloads"; the pull "Pull to shuffle your
+  downloads" and "Release to shuffle your downloads". Nothing on the phone: no Shuffle in the •••, and the pull says
+  "Nothing on this phone to shuffle" and never arms.
+- **The Library's •••** (`LibraryMenu`, its items Core's): Shuffle (or "Getting ready…", dimmed; offline "Shuffle
+  downloads"; none with nothing to shuffle); then Downloaded - or, offline, where the Albums page is Downloaded, the
+  way back to the albums ("Your albums", "Albums" without a library of your own); All music (with a library of your
+  own and online: the store's albums, pushed); then Refresh (Your albums and the playlists asked now, whatever their
+  age - or, offline, whether deadwax is back) and Edit order. Its button reads "More for the Library".
+- **The primary button** (`PrimaryButton`, Core's colours, held to theme.css by tests/test_ios_palette.py): the
+  web's (app.css .app-rg-get, player.css .pl-pill.is-primary) - --dw-primary-bg, #a24ef2 to #8a2ee0 top to bottom;
+  a 1 pt edge of --dw-primary-border #7c3aed; --dw-primary-highlight, a 1 pt line of white at 0.22 inside the top
+  edge; --dw-radius-control's 4 pt corners; the label white (--dw-text), semibold; pressed, --dw-primary-pressed
+  (brightness 0.92 over the whole button); disabled, faded to 0.45 (Palette.off). The large one is the web's pill,
+  48 pt (--pl-pill-height). It replaces `.borderedProminent`, whose fill was the app's tint, #C084FC - the web's
+  accent for text on black - under a white label: 2.64:1. Measured (`Contrast`, WCAG 2's relative luminance; Core,
+  tested): white on #8a2ee0 5.92:1, on the middle of the gradient 5.05:1, a fifth of the way down - the top of a
+  label's line on the 48 pt button - 4.57:1, and on #a24ef2 at the very top edge, where no glyph is drawn, 4.28:1;
+  pressed, 4.92:1 and 6.72:1; the edge against white 5.70:1. So the label passes AA (4.5:1) wherever it is drawn, and
+  the play glyph - a graphic, 3:1 - everywhere. Every `.borderedProminent` in the app takes it (the album's and the
+  playlist's Play, Your library's Add, the EQ's Use for, the picker's Create, the sign-in, Try again on the
+  unreachable and Navidrome gates, Set up Navidrome); a `.bordered` button beside one in the same pair takes the
+  web's secondary pill (--dw-secondary-bg, the look button's face) so the pair is one shape (question 25).
+
 ## 3. The screens
 
-### 3.1 The Library's root (slice 1: Playlists; 4: Artists; 5: Songs and Shuffle)
+### 3.1 The Library's root (slice 3b: the switch; 4: Artists; 5: Songs)
 
-Phase 1's root stays (question 1): the albums, with places above them. Slice 1 adds one row at the top, under the
-first ask's card, **Playlists** (the playlist symbol, no count), pushing the Playlists screen. It is on the Downloaded
-root too (the Library's root while deadwax can't be reached), under the way back to the albums: without it, the
-playlists in hand that question 5 lets play offline could be reached only from a screen already open (changed as
-slice 1 was built; this said "not while the root is Downloaded"). Slices 4 and 5 add Your artists, Shuffle and Songs
-beside it.
+**Since slice 3b** (2.8, James's): the switch. The bar holds the switch in its middle - a segmented control,
+Albums | Playlists in the order chosen - with the page's own buttons and the Library's ••• at its right (Albums: the
+order and Show as list/grid; Playlists: New playlist's +), and Find under it. Under them, the pages side by side: a
+swipe left or right moves between them, the switch following, and a tap on the switch moves the page (at once under
+Reduce Motion). The Albums page is the albums alone, from the top: their count, then the albums - no rows above them.
+The Playlists page is 3.2's list, drawn as rows of the same height, cover, words and chevron. Pulling either page
+down shuffles (2.8, 3.5).
+
+What went from the top of the albums: the first ask's card (question 17: now at the top of Downloaded), Playlists
+(the switch's), All music > All albums and On this phone > Downloaded (the •••'s). Downloaded playlists stays at the
+top of Downloaded (question 15), now reached from the •••.
+
+While deadwax can't be reached (the root's rule, Phase 2's 5.4, unchanged - the Albums page changes only off screen,
+question 19): the same switch; the Albums page is Downloaded - its heading, Downloaded playlists' row when there are
+any, "Only downloaded albums play until deadwax is back." and the albums on the phone - and the Playlists
+page lists as it does offline (question 5, slice 3's downloaded ones). The way back to the albums is the •••'s. When
+Navidrome can't be reached, the Navidrome gate is drawn in the switch's place, as before.
+
+(Phase 1 to slice 3, superseded: the albums with places above them - Playlists, All music, On this phone - and the
+first ask's card over them; question 1.)
 
 ### 3.2 Playlists (slice 1)
 
 Large title "Playlists"; Yours, Shared with you (each a heading and its rows), From files (N) as a disclosure row
 opening its rows in place for the screen's life. A row: the cover (Navidrome's 2x2 mosaic, or the playlist symbol on a
 quiet square for none) at the rows' 48 pt, the name, `rowLine`, the chevron; a tap opens the playlist, nothing plays.
-Pull to refresh asks now. Empty: "No playlists yet." Slice 2 adds New playlist to the bar - built as the bar's +
+Pull to refresh asks now (since slice 3b a page of the switch: no title of its own, and the pull shuffles - 3.1).
+Empty: "No playlists yet." Slice 2 adds New playlist to the bar - built as the bar's +
 (dimmed while deadwax can't be reached), opening a sheet with the name: Create makes an empty playlist and opens its
 page once the sheet has gone (question 12); and, empty, PLAYLISTS_EMPTY_HOW and a New playlist button under the line.
 
@@ -292,6 +402,24 @@ value is "collapsed" / "expanded"; a song row reads "Roads, Portishead · Dummy,
 one the player has, and its download state; its ••• is "More for Roads"; the bar's is "More for this playlist". At the
 accessibility sizes the rows' text wraps (three lines for a title) and Play and Shuffle stack.
 
+### 3.5 The pull's graphic, and Edit order (slice 3b)
+
+**The graphic** rides above the page's first row, in the room the pull opens, and follows it. Pulling: a ring round
+the shuffle mark, filling as the pull nears the line, the mark growing from 0.6 to its full size and turning a half
+turn by the line; its line under it, "Pull to shuffle". Armed: the ring a solid disc in the primary's purple, the mark
+white on it, with a light haptic tick as it changes; "Release to shuffle". Released: "Shuffling", the mark going round
+once while the page settles. Not ready: the ring and the mark as pulling, never the disc, and why: "Getting ready…",
+"Couldn't get your songs ready to shuffle" (or the server's words), "Nothing on this phone to shuffle". Offline, its
+words are the downloads' (2.8). Nothing at all is drawn with no songs to shuffle. **Reduce Motion**: the mark keeps its
+size and doesn't turn or go round; the ring still fills with the finger (a measure, not a motion) and the states swap
+at once. **VoiceOver** doesn't read it - the ••• Shuffle is the way there (and Switch Control's); the haptic is only
+the touch's. **iOS 17** can't read how far a List or a ScrollView is pulled without iOS 18's scroll geometry, so
+there is no pull on 17, only the ••• Shuffle (the app's target is 17; James's phone is on 27).
+
+**Edit order**: the •••'s Edit order opens a sheet titled "Edit order" - the pages as rows, each with its drag handle
+(a List held in edit mode, no deletions), "Drag the pages into the order you want. The Library opens on the first." as
+its footer, Done in its bar. Kept as each move is made.
+
 ## 4. The server
 
 **One field** (slice 3's review, question 16): `smart: bool` in each playlist summary (src/playlists.py `summary()`),
@@ -316,14 +444,17 @@ step (it is: Navidrome moves it on every add and removal, `notes/playlists.md`),
 | slice 2: `PlaylistChanges.swift` - the four writes' bodies and answers, the picker's order, the picks, the add words and question, `PlaylistEdit` (Edit's rows, moves, removes, the body, a refusal's meaning); 4 routes (36) | `PlaylistsModel`'s writes (each telling the list and the pages, `lastChange`), `PlaylistPageModel`'s Edit and Delete, `PlaylistPicker` (MainTabs' sheet, and Now Playing's own), `NewPlaylistFields`, New on Playlists |
 | slice 3: `DownloadOrigin.playlist`, `PlaylistDownloads` (the keeping-in-step rules, the control, the rows), `DownloadRemoval`; store v6 | `PlaylistKeeper` (DownloadModel's), the playlist's control and ••• items, Downloaded > Downloaded playlists, You > Downloads' rows |
 | slice 4: the artist sorts and lines; 2 routes | Artists, an artist's page |
-| slice 5: the shuffle feed's rules; 2 routes | Songs, the Shuffle button, the feed |
+| slice 3b: `LibraryPage`/`LibraryPages`, `PullShuffle`, `ShuffleAhead`, `ShuffleFeed`/`ShuffleFeedRun`, `ShuffleHere`, `PlaylistRules.found`, `PrimaryButton`/`Contrast`; 2 routes (38) and `DeadwaxClient.shuffleStart`/`shufflePage` | the switch and its pages (LibraryView, AlbumsScreen as a page, PlaylistsPage), the ••• and Edit order, the pull's graphic, `ShuffleModel`, `PlayerModel.play(shuffled:)` and the feed, the primary and secondary button styles |
+| slice 5: Songs; the feed held to the web (5.2) | Songs, All songs' Shuffle |
 
 ### 5.2 Held to the web
 
 `ios/scripts/export-playlist-vectors.cjs` compiles `ui/src/lib/playlists.ts` and `ui/src/lib/playedAlbums.ts` with the
 repo's TypeScript and writes `Fixtures/playlists/playlist-vectors.json`; `ui/test/iosplaylists.sim.cjs` runs it with
 `--check`. Slice 2 adds the edit and add rules to the same file; slice 4 adds `lib/shelves.ts`' artist rules and
-`lib/artistPage.ts`' `playsLine` (to export-library-vectors.cjs or a new file); slice 5 the feed's pure part.
+`lib/artistPage.ts`' `playsLine` (to export-library-vectors.cjs or a new file); slice 5 the feed's pure part (built in slice 3b: its behaviour held by hand until then, over shuffle.sim.cjs's own
+cases; its numbers and words already held by tests/test_ios_contract.py, read from ShuffleSongs.tsx and
+useShuffleFeed.ts - question 24).
 
 ## 6. The slices
 
@@ -354,6 +485,23 @@ so this one plays only while deadwax can be reached." (a smart one's page) and "
 each time, so this download stays as it was when you made it." (one downloaded before deadwax said it was smart).
 Built: 6.8.
 
+### 6.3b Slice 3b - the Library's switch, pull to shuffle, the Play button (James's, 2026-11-14)
+
+The switch (Albums | Playlists) with the swipe, the order and Edit order, Find on both pages, the rows above the
+albums gone and the Library's •••, the first ask's card moved to Downloaded (2.8, 3.1); the pull's machine and its
+graphic (3.5); the Library's Shuffle - its first page asked ahead, the play path, the feed, the two routes, offline
+(2.7, 2.8); the primary button and the secondary pill beside it (2.8). The app stays 0.9 (9); no server change.
+
+Words (the phone's own unless named): "Albums" and "Playlists" (the switch); "More for the Library" (the •••'s
+button); "Shuffle", "Getting ready…" and "Couldn't get your songs ready to shuffle" (ShuffleSongs.tsx), "Shuffle
+downloads", "Downloaded" (Phase 2's), "Your albums" / "Albums" (Phase 1's titles), "All music" (Phase 1's), "Refresh",
+"Edit order"; the sheet's "Edit order", "Drag the pages into the order you want. The Library opens on the first." and
+"Done"; the pull's "Pull to shuffle", "Release to shuffle", "Shuffling", "Pull to shuffle your downloads", "Release to
+shuffle your downloads", "Nothing on this phone to shuffle"; the notice's "Your shuffle started over - deadwax no
+longer had its order" (useShuffleFeed.ts); the 413's "Your library is too big to shuffle here" (the server's);
+Find's "Find in playlists" and "No playlists match “…”."; Downloaded's own note, "Only downloaded albums play until
+deadwax is back." (Phase 2's).
+
 ### 6.4 Slice 4 - Artists
 
 The root's Your artists (or Artists), All music > All artists with a library of your own; the list (tiles or rows,
@@ -362,8 +510,8 @@ the round picture; the sorts, Find, the index); an artist's page (2.6); Go to th
 
 ### 6.5 Slice 5 - Songs and the Library's Shuffle (app 0.10)
 
-Songs (2.7) and the Shuffle button with its feed; the app's version 0.10 (10) with everything pinned to it; docs/ios.md
-and README for the phase.
+Songs (2.7), with All songs' Shuffle for the collection on slice 3b's Shuffle and feed; the feed's fixture; the app's
+version 0.10 (10) with everything pinned to it; docs/ios.md and README for the phase.
 
 ### 6.6 Slice 1, built (2026-11-13)
 
@@ -382,6 +530,12 @@ the store's version 6) and the app (PlaylistKeeper, the control, the rows), what
 mutations, and what was verified. Questions 14-15 came of it. Downloaded playlists sit under the Library's Downloaded,
 where the Library's switch (slice 3b, James's 2026-11-14) wants them. Its review's fixes, and question 16: "Phase 4,
 slice 3, after its review".
+
+### 6.9 Slice 3b, built (2026-11-14)
+
+What slice 3b is, as built, is in notes/ios.md's "Phase 4, slice 3b: the Library's switch, pull to shuffle, the Play
+button" - Core and the app, what was decided here, the tests and mutations, and what was verified. Questions 17-26
+came of it.
 
 ## 7. Tests (Swift Testing; Core's on Linux and macOS)
 
@@ -427,6 +581,28 @@ slice 3, after its review".
   from the future; a list at the moment of a download; the rows' rules; the keeper's order (a write before its
   effects, nothing after a failed write or take, an older answer dropped); smart playlists. The contract reads
   `smart` ahead of the server (`PLAYLIST_AHEAD`).
+
+- **Slice 3b** (LibrarySwitchTests, PullShuffleTests, ShuffleTests, PrimaryButtonTests): the order read from every
+  kind of value (nothing, one page, both, reversed, a name unknown, a page twice, spaces, a damaged value) and written
+  back; each move of the List's; the first page. The pull through every path - pulling, armed at the line and not a
+  point before, one tick per arming, disarmed under the slack and not at it, released on a lift only while armed and
+  ready, at rest after, a bounce with no finger never pulling, not ready never arming. The Shuffle ahead: asked as it
+  shows, not again inside 10 minutes and again past them, ready only with songs, the tap's tracks and `paged`, the ask
+  after it naming the order played until one gets through, a failure asked again the next time it shows, an older
+  answer dropped, a new scope or person starting afresh, total 0. The feed: nothing for a plain queue or with 50
+  ahead, a page at 49 from `fetched`, one ask at a time whatever changes meanwhile, an answer for a superseded ask
+  dropped, the whole order in under Off and One nothing and under All a fresh claimed round never starting with the
+  song ending - at once when a short last page leaves the music near its end - a 404 starting over said once (not for
+  an empty order), a failure retried only when its retry is due (and a retry due after another ask letting nothing
+  go), a page queued at the shuffle's level, Repeat turned off with a round on its way; `startingElsewhere` and `songsAhead` by hand over the web's own cases (shuffle.sim.cjs). The two
+  answers decoded (leniently), the two calls (paths, `scope`, `playing`, `claim`, `offset`). Offline: every song here,
+  each once. Find on playlists. The contrast: WCAG's own pairs, and the primary's numbers in 2.8.
+- **The contract** (slice 3b): ROUTE_COUNT 38; `ShuffleStart`'s and `ShufflePage`'s fields what the routes return;
+  `PagedScope`'s raw values the route's Literal; `ShuffleAhead.freshSeconds` the route's SHUFFLE_LIST_TTL_S and
+  ShuffleSongs.tsx's SHUFFLE_FRESH_MS; `ShuffleFeed.below` and `retrySeconds` useShuffleFeed.ts's FEED_BELOW and
+  FEED_RETRY_MS; "Getting ready…", the unready line and the started-over notice the web's own constants; the 413's
+  words the route's own. tests/test_ios_palette.py: `PrimaryButton`'s colours, edge, highlight, pressed, corner and
+  height theme.css's and player.css's.
 
 ## 8. James's checks (on his iPhone)
 
@@ -506,6 +682,39 @@ Slice 3's:
 
 docs/ios.md's "Downloaded playlists' checks (77-84)" holds them as James reads them.
 
+Slice 3b's:
+
+- **85 The switch.** The Library opens on Albums, with nothing above the albums but their count; Albums | Playlists in
+  the bar. Swipe left: Playlists, the switch moving with it; tap Albums: back. Leave for You and come back: the same
+  page. Scroll down a long way and tap the Library tab: the page shown goes to its top. Force-quit and open: Albums.
+- **86 Edit order.** ••• > Edit order: drag Playlists above Albums, Done. The switch reads Playlists | Albums; force-quit
+  and open: the Library opens on Playlists.
+- **87 The •••.** Downloaded opens what's on the phone (its first ask's card at the top, once, on a phone that never
+  answered it); All music opens All albums (with a library of your own); Refresh asks now (a playlist made in the web
+  app shows); Shuffle plays your library shuffled.
+- **88 Pull to shuffle.** On Albums, pull down slowly: the ring fills and the mark grows and turns, "Pull to shuffle";
+  at the line a tick, the purple disc, "Release to shuffle"; push back up a little: the ring again, no tick; down again:
+  a tick. Let go armed: "Shuffling", and your library plays shuffled - the mini player, a song from anywhere in it. Let
+  go before the line: nothing plays. The same on Playlists. A fast fling to the top shows nothing.
+- **89 Past the first 200** (the phase's). With the shuffle playing, skip ahead with Next 160 times or so (or let it
+  play an evening): Up Next keeps going, never ending at 200; with Repeat off it ends only once every song of your
+  library has played. With Repeat All, at the end a new round starts with a different song.
+- **90 Started over.** Shuffle, then restart deadwax (or leave the phone a day) and skip ahead past 150: "Your shuffle
+  started over - deadwax no longer had its order", once, and the music carries on.
+- **91 Offline.** Airplane Mode: the Library on Downloaded's albums under the same switch; ••• > Shuffle downloads, and
+  the pull's "Release to shuffle your downloads": only songs on the phone, every one of them in time. ••• > Your albums
+  is the way back. With nothing downloaded: no Shuffle, and the pull says "Nothing on this phone to shuffle".
+- **92 The Play button.** An album's page and a playlist's: Play is the web's purple with a white triangle and word,
+  plainly readable; Shuffle beside it the web's grey pill, the same height and corners. Pressed, both darken. The other
+  purple buttons - Add to my library, the EQ's Use for, Create in the picker, Sign in, Try again - the same purple.
+- **93 Find on Playlists.** On Playlists type part of a name: only the playlists that hold it; nonsense: "No playlists
+  match “…”."; back on Albums, Find holds its own words.
+- **94 VoiceOver and Reduce Motion.** The switch reads "Albums, 1 of 2" (or as iOS words it); the ••• reads "More for
+  the Library", Shuffle first. With Reduce Motion on, the pull's mark doesn't grow or turn, the states change at once,
+  and a tap on the switch moves the page without sliding.
+
+docs/ios.md's "The Library's switch's checks (85-94)" holds them as James reads them.
+
 ## 9. What only the phone can tell
 
 - That the mosaic covers (`pl-<id>_<hash>`) come through deadwax's cover route at the rows' and the hero's sizes as
@@ -528,13 +737,22 @@ docs/ios.md's "Downloaded playlists' checks (77-84)" holds them as James reads t
   including one never yet worked out (the field main's `smart` can be read from, going by the source at 46c4327); and
   that a rename's Done while a song's file is being moved keeps that song.
 
+- Slice 3b's: that a horizontal paging ScrollView of two pages, each its own vertical ScrollView, swipes and scrolls
+  as one would hope - a vertical scroll never pages, a sideways swipe on the letter index pages or not (question
+  18), Find and the bar sitting over both; that iOS 18's scroll geometry reads the pull under Find's drawer from 0
+  at rest; that the scroll's phase leaves `interacting` the moment a finger lifts, so the release starts the music
+  then; that the tick lands at the line and not twice; that the graphic sits in the room the pull opens on every
+  text size; that the feed's asks are answered on a locked phone mid-shuffle (the phone runs while it plays); and the
+  primary's purple on James's screen as the web's.
+
 ## 10. Open questions (each with what the build does until James answers)
 
 1. **The Library's top level.** Apple Music's Library is a list of rows (Playlists, Artists, Albums, Songs,
    Downloaded) with Recently Added under it; the web's phone has a root of rows too. Phase 1's answer (library.md
    Open question 1) opened the tab straight on the Albums. *Recommend, and built*: keep it - the albums with the places
    above them, Playlists the first; Your artists, Songs and Shuffle join them in slices 4-5. A list of rows would put a
-   tap between the Library and every album.
+   tap between the Library and every album. **Superseded by James (2026-11-14, slice 3b)**: the switch - Albums |
+   Playlists | Artists | Songs, swiped between, in an order he chooses - and nothing above the albums (2.8, 3.1).
 2. **"All your songs".** Subsonic can't list a person's songs alone (search3 with an empty query is the collection's).
    *Recommend*: as the web - Songs is the collection's (All music > All songs with a library of your own), and your
    songs come through your albums and the Shuffle, which deadwax builds from your albums.
@@ -590,3 +808,48 @@ docs/ios.md's "Downloaded playlists' checks (77-84)" holds them as James reads t
     agree it has gone. Ordinary and .m3u-synced playlists download as before. The server sends `smart` from main's
     2.1.x; until then the phone can tell no playlist is smart (`readonly` is true for .m3u-synced ones and anyone
     else's too), so none is treated as one.
+17. **Where the first ask went** (slice 3b). Its card sat at the top of the albums - the rows James took away.
+    *Recommend, and built*: at the top of Downloaded (pushed from the •••, or the Albums page while deadwax can't be
+    reached), once per phone as before and only while deadwax can be reached - where downloading is what is on the
+    screen; the setting stays in You > Downloads. A phone that never opens Downloaded is never asked, which is the
+    point: the Library opens to music. Not a dialog at launch (Phase 3's question 1).
+18. **The swipe and swipes of rows'.** Neither page has a row with a swipe action (a playlist's and an album's actions
+    are their ••• menus and their pages'), so the pages' sideways swipe takes nothing from a row. *Recommend, and
+    built*: keep it so - a page that joins the switch (Artists, Songs) puts a row's actions in its •••, never in a
+    swipe. The letter index down Albums' right edge is a vertical drag; whether a sideways drag that begins on it pages
+    is the phone's to say (section 9).
+19. **The switch while deadwax can't be reached.** *Recommend, and built*: the same switch. The Albums page is
+    Downloaded (Phase 2's 5.4 rule, unchanged: it changes only off screen), headed so, with Downloaded playlists'
+    row and the line saying only what's downloaded plays; Playlists lists as it does offline. The •••'s Downloaded
+    becomes the way back to the albums ("Your albums"), All music goes, Shuffle shuffles the downloads, Refresh asks
+    whether deadwax is back. A switch that changed its pages offline would move under a finger as the connection
+    came and went.
+20. **The Library's Shuffle without the pull** (VoiceOver, Switch Control, anyone who doesn't pull). *Recommend, and
+    built*: the •••'s first item, Shuffle - "Getting ready…" dimmed until its page is in. Not a button over the
+    albums: that is the row of buttons James took away.
+21. **Which pages pull to shuffle.** *Recommend, and built*: every page of the switch, the same shuffle of your
+    library - no page refreshes on a pull now (Refresh is the •••'s), and a gesture that did different things on
+    different pages would have to be relearnt on each. Lists pushed over the switch keep pull to refresh.
+22. **Shuffle while deadwax can't be reached.** The web's Shuffle is deadwax's order. *Recommend, and built*: shuffle
+    every song on this phone ("Shuffle downloads") - offline, only those play, and they are all in hand, so the queue
+    is complete with no paging; with nothing on the phone, no Shuffle and the pull says so. Saying "can't" would
+    leave the gesture dead exactly when the phone is all there is.
+23. **Edit order's form.** *Recommend, and built*: a sheet from the •••, the pages as rows with drag handles (a List
+    in edit mode), kept per phone as each move is made, the switch following at once. A page added later (Artists,
+    Songs) joins at the end of an order already saved, so nobody's order is rearranged for them.
+24. **The feed held by hand until slice 5.** useShuffleFeed.ts's pure part lives in a hook file that imports Preact,
+    and the exporters compile pure lib files. *Recommend, and built*: its numbers and words held to the web's files
+    now - tests/test_ios_contract.py reads FEED_BELOW, FEED_RETRY_MS and SHUFFLE_STARTED_OVER from useShuffleFeed.ts,
+    and SHUFFLE_FRESH_MS and the two Shuffle lines from ShuffleSongs.tsx - and its behaviour (`startingElsewhere`,
+    `songsAhead`, the run) by hand in 3b, over shuffle.sim.cjs's own cases; slice 5's exporter compiles the hook with
+    shuffle.sim's Preact stand-in, as that sim does, and holds the behaviour too. Moving the two functions into a lib
+    file would be a web change, main's to make.
+25. **The primary's shape, and the button beside it.** iOS 26 draws `.borderedProminent` as a capsule; the web's
+    primary has 4 pt corners. *Recommend, and built*: the web's button, corners and all - one look across the web app
+    and the phone, as the turntable's look button already is - and a `.bordered` button paired with a primary (the
+    album's and the playlist's Shuffle, the unreachable gate's Change address, the picker's Cancel) the web's
+    secondary pill, so a pair is one shape. Other `.bordered` buttons stay the system's until James sees these.
+26. **Room in the bar for four pages.** The switch sits in the bar's middle with the page's own buttons at its right
+    (Albums: the order and the layout, then the •••). Albums | Playlists fits any phone; Albums | Playlists | Artists |
+    Songs at a large text size won't, beside three buttons. *Recommend* (for slices 4-5, nothing built yet): the order
+    and the layout move into the ••• then, leaving the switch and the ••• alone in the bar.
