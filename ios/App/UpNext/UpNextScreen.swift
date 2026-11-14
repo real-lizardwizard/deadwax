@@ -464,16 +464,16 @@ struct UpNextScreen: View {
     }
 
     /// (app 0.8; the web's 2.1.18) An older row - a song played before, above History: rolled back to, everywhere
-    /// (PlayerModel.rollBack) - it and every older row below it (PlayHistory.rowsFrom) come back into the queue ahead of
-    /// History's songs, in the order drawn, and it plays. `floor` the first entry Up Next draws for this queue now -
-    /// History's first row, else the song playing's: the rows were read against it. The rows above it aren't rewritten,
+    /// (PlayerModel.rollBack) - it and every older row below it come back into the queue ahead of History's songs, in
+    /// the order drawn, and it plays: what PlayHistory.brought hands it (the web's replayPast, held to it by
+    /// export-history.cjs's vectors) - the rows from the one tapped at the setting's level for a song, and the floor,
+    /// the first entry Up Next draws for this queue now, which the rows were read against. The rows above it aren't rewritten,
     /// so the card is where the row was (the scroll held), then focus to what plays next and what started said - only
     /// once it took. A song not on this phone is dimmed and can't be tapped offline, as every row is.
     private func pastRow(_ row: PastRow) -> some View {
         Button {
-            let past = PlayHistory.pastRows(history.plays, queue: player.queue)
-            guard player.rollBack(PlayHistory.rowsFrom(past, row.key), floor: player.upNext.history.first?.key ?? playingKey)
-            else { return }
+            let handed = PlayHistory.brought(history.plays, queue: player.queue, key: row.key, setting: player.normalization)
+            guard player.rollBack(handed.rows, floor: handed.floor) else { return }
             rolledTo(row.track)
         } label: {
             rowLabel(row.track)

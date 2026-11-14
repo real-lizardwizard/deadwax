@@ -176,6 +176,50 @@ import Testing
         #expect(p.asked(.full).count == 2 && p.ask(.full, 1).full?.index == 1)
     }
 
+    /// (review of the roll-back's port) A server before 2.1.18 takes a v1 snapshot alone and answers a v2 with a 422: the
+    /// save is sent once more, at once, without its snapshot - the same songs, index and second - and kept; a second
+    /// 422 is the failure it always was (tried again 30 s on), and a v1's 422 is never sent again without it.
+    @Test func aV2SnapshotRefusedIsSentOnceMoreWithoutIt() throws {
+        let p = ResumePage()
+        p.server.asks.removeAll()
+        let played = startUpNext(queueOf(["1", "2", "3"]), start: 0).at(2)
+        let first1 = try #require(played.upNext?.marks[0].key)
+        let rolled = try #require(jumpedTo(played, first1, .off)).queue
+        p.set(rolled, playing: true)
+        p.play(2_250)
+        let first = p.ask(.full, 0)
+        #expect(first.full?.snapshot?.hasPrefix(#"{"v":2,"#) == true, "rolled back: v2")
+        first.refuse(.status(422))
+        #expect(p.asked(.full).count == 2, "sent once more at once")
+        let plain = p.ask(.full, 1)
+        #expect(plain.full?.snapshot == nil && plain.full?.ids == first.full?.ids && plain.full?.index == first.full?.index
+                && plain.full?.position == first.full?.position)
+        plain.ok(3, 3)
+        p.set(p.player.queue.at(1))
+        p.play(1_250, from: 0)
+        #expect(p.asked(.at).count == 1 && p.ask(.at, 0).at?.ids_rev == 3, "kept: the next song change saved by its position")
+        //? refused again without it: the failure it was
+        let q = ResumePage()
+        q.server.asks.removeAll()
+        q.set(rolled, playing: true)
+        q.play(2_250)
+        q.ask(.full, 0).refuse(.status(422))
+        q.ask(.full, 1).refuse(.status(422))
+        q.play(29_000)
+        #expect(q.asked(.full).count == 2, "nothing more inside 30 s")
+        q.play(1_500)
+        #expect(q.asked(.full).count == 3 && q.ask(.full, 2).full?.snapshot?.hasPrefix(#"{"v":2,"#) == true, "then in full again")
+        //? a v1 refused: not sent again without it
+        let r = ResumePage()
+        r.server.asks.removeAll()
+        r.set(startUpNext(queueOf(["1", "2", "3"]), start: 0), playing: true)
+        r.play(2_250)
+        #expect(r.ask(.full, 0).full?.snapshot?.hasPrefix(#"{"v":1,"#) == true)
+        r.ask(.full, 0).refuse(.status(422))
+        r.run(10)
+        #expect(r.asked(.full).count == 1)
+    }
+
     @Test func goingToTheBackgroundSendsWhatIsDueAtOnce() {
         let p = ResumePage()
         p.server.asks.removeAll()

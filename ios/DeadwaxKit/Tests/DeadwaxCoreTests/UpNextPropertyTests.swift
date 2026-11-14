@@ -332,17 +332,28 @@ import Testing
                 continue
             }
             let mark = now.marks[i]
-            let right = moves
-                ? mark.key == marks[p].key && mark.from == marks[p].from && mark.at == marks[p].at && mark.pass == marks[p].pass
-                    && j.tracks[i] == queue.tracks[p]
-                : mark.from == .added && mark.key >= state.nextKey && mark.at == -1 && mark.pass == -1 && j.tracks[i] == row.track
+            //? in parts, each a few comparisons: one ternary of && chains is slow to type-check in newer Swift
+            let right: Bool
+            if moves {
+                let place = mark.key == marks[p].key && mark.from == marks[p].from
+                let round = mark.at == marks[p].at && mark.pass == marks[p].pass
+                right = place && round && j.tracks[i] == queue.tracks[p]
+            } else {
+                let added = mark.from == .added && mark.key >= state.nextKey
+                let unplaced = mark.at == -1 && mark.pass == -1
+                right = added && unplaced && j.tracks[i] == row.track
+            }
             if moves { tally.broughtMoved += 1 } else { tally.broughtNew += 1 }
             if !right || mark.starts != row.starts { note("older row \(i): not \(moves ? "moved" : "a new song added") with its starts") }
         }
         let keeps = { (i: Int) -> Bool in i >= from && !(mode != .one && marks[i].from == .one) }
         let rest = queue.tracks.indices.filter(keeps)
-        if j.tracks.count != rows.count + rest.count
-            || rest.enumerated().contains(where: { n, i in j.tracks[rows.count + n] != queue.tracks[i] || now.marks[rows.count + n] != marks[i] }) {
+        let sameLength = j.tracks.count == rows.count + rest.count
+        //? read only at the same length: past it the indexes run off the end
+        let restMoved = sameLength && rest.enumerated().contains { (n: Int, i: Int) -> Bool in
+            j.tracks[rows.count + n] != queue.tracks[i] || now.marks[rows.count + n] != marks[i]
+        }
+        if !sameLength || restMoved {
             note("older rows: the queue after them not as it was")
         }
         let was = now.marks.prefix(rows.count).map(\.key) + historyRows(queue).map(\.key) + [playingKey(queue)] + aheadKeys(queue, mode)

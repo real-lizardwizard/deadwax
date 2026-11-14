@@ -320,11 +320,25 @@ public final class ResumeController {
                                  label: label, snapshot: saving.snapshot)
         let baseline = SaveBaseline(tracks: sending.tracks, upNext: sending.upNext, index: sending.index,
                                     position: position, start: saving.start, count: saving.ids.count)
+        saveFull(body, baseline, sentAt: now, write: write)
+    }
+
+    /// A full save sent - and (review of the roll-back's port) when deadwax refuses it with a 422 while it carries a v2
+    /// snapshot, sent ONCE more without it. A server before 2.1.18 takes v1 alone (src/play_queue.py snapshot_problem),
+    /// so a queue rolled back, or one with older rows brought back, was refused every 30 s for ever and nothing of it
+    /// was kept. Without its snapshot it is the songs, the one playing and the second, which any server keeps: put back
+    /// as a plain list there, as every reader before 2.1.18 puts a v2 back. The phone's own kept row still holds it
+    /// whole. A second refusal is the failure it always was.
+    private func saveFull(_ body: QueueSaveBody, _ baseline: SaveBaseline, sentAt now: Int64, write: Int, again: Bool = false) {
         flying += 1
         server.save(body) { [weak self] result in
             guard let self else { return }
             switch result {
             case .success(let answer): self.answered(baseline, answer, sentAt: now, full: true, write: write)
+            case .failure(.status(422)) where !again && body.snapshot?.hasPrefix(#"{"v":2,"#) == true:
+                let plain = QueueSaveBody(ids: body.ids, index: body.index, position: body.position, device: body.device,
+                                          label: body.label, snapshot: nil)
+                self.saveFull(plain, baseline, sentAt: now, write: write, again: true)
             case .failure(let failure): self.refused(failure, position: false)
             }
             self.settled()

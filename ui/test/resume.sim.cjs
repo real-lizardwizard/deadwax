@@ -42,6 +42,18 @@
  *    lib files, frozen in fixtures/resume-2.1.17 (James's tabs opened before 2.1.18 run it; the iPhone app's 0.9 a port
  *    of it) - given each kind: a v1 read whole, as before; a v2 the plain list of every song in the window, in order, at
  *    the song playing, kept whole by restoreQueue's Repeat (off, One, All); the same snapshots written v1 losing songs.
+ *  - (2.1.22) a library's shuffle played long: its list saved as the window's own songs (savedList), so 2,000 songs in -
+ *    and 20,000 - it is still saved (2.1.17's toSave, which 2.1.21's was, left it out from 750), put back exactly and
+ *    paged, and its feed carries on from where it was: the songs it plays from there those it would have played with no
+ *    reload - on to the order's end and every song heard once (Repeat off), a fresh order as the next round (All) - and
+ *    the reader before 2.1.18 reads it whole too; the window beginning among a song's Repeat One copies; at every step
+ *    of the 1,000 runs a library's shuffle's list the songs its window names, and nothing it took out one of them.
+ *  - (2.1.23) gone back twice with a full save between while how far it had got played (the iPhone port's review's
+ *    probe): the second tap a song change alone, saved by its position, and deadwax's record - that save at the song
+ *    tapped - carrying the reach (v2), so it puts back what a full save would (Repeat off 1 2 3 1 2 x 3, not
+ *    1 2 3 x; Repeat All drawing every song moved down), the reader before 2.1.18 the plain list; played past the
+ *    reach, left out. And at every step of the 1,000 runs, History's first row tapped and Previous: each one saved by
+ *    its position alone reads back from this step's snapshot as a full save of it would.
  *  - (review) a window's focus asked only after its grace, so the click that focused it lands first; the notice not
  *    said again for the same pick-up followed; keepalive by bytes, and by the bytes of every keepalive out; a Repeat
  *    One record under Repeat off saved in full; the 30 s from playing starting; a 422 then a full save; a scrubbed
@@ -204,7 +216,8 @@ console.log('\ntoSave then fromSnapshot: 1,000 seeded runs of every edit, the qu
     if (queue.upNext.marks.some((m, i) => m.at >= 0 && queue.upNext.source[m.at]?.id !== queue.tracks[i].id)) return 'an entry not its place in the list'
     return null
   }
-  let compared = 0, shared = 0, behind = 0, histories = 0, rolled = 0, brought = 0, reachedKept = 0, startsKept = 0
+  let compared = 0, shared = 0, behind = 0, histories = 0, rolled = 0, brought = 0, reachedKept = 0, startsKept = 0, pagedSaved = 0, pagedNamed = 0
+  let pagedLeft = 0, leftNamed = 0, positionOnly = 0, positionReach = 0
   for (let run = 0; run < 1000; run++) {
     const random = seeded(run + 7)
     //? a small seed's first draw is always near 0 - which started every run from its first song, null: let it go
@@ -270,15 +283,29 @@ console.log('\ntoSave then fromSnapshot: 1,000 seeded runs of every edit, the qu
       if (!back) { note(run, step, 'did not read back'); continue }
       const was = queue.upNext
       //? (2.1.3 review) startedAt past the song playing's run - an app before 2.1.3 saved it so - comes back lowered to it
-      let run = queue.index
-      while (run > 0 && was.marks[run].from === 'one') run--
+      let runStart = queue.index
+      while (runStart > 0 && was.marks[runStart].from === 'one') runStart--
       //? (2.1.18) how far it had got, while that is after the song playing (and in the window); the marks' starts with them
       const reachAt = was.marks.findIndex((m) => m.key === was.reached)
       const reached = reachAt > queue.index && reachAt < end ? was.reached : undefined
+      //? (2.1.22) a library's shuffle: its list back as the songs the window's entries are (a copy its song's), in the
+      //? list's order - each place counted among those - and nothing of what was taken out: none of it is one of
+      //? those places (leftNamed, below), and a library's shuffle never reads it
+      const named = was.paged ? [...new Set(was.marks.slice(start, end).filter((m) => m.at >= 0).map((m) => m.at))].sort((a, b) => a - b) : null
+      const placed = (at) => (named && at >= 0 ? named.indexOf(at) : at)
+      if (named) {
+        pagedSaved++
+        if (named.length < was.source.length) pagedNamed++
+        if (was.left.length) pagedLeft++
+        if (was.left.some((gone) => named.includes(gone.at))) leftNamed++
+      }
       const wanted = {
         tracks: queue.tracks.slice(start, end), index: queue.index - start,
-        marks: was.marks.slice(start, end), source: was.source, shuffle: was.shuffle, nextKey: was.nextKey,
-        startedAt: Math.min(Math.max(0, was.startedAt - start), run - start), left: was.left, paged: was.paged, pagedRounds: was.pagedRounds, reached,
+        marks: was.marks.slice(start, end).map((m) => (named && m.at >= 0 ? { ...m, at: placed(m.at) } : m)),
+        source: named ? named.map((at) => was.source[at]) : was.source, shuffle: was.shuffle, nextKey: was.nextKey,
+        startedAt: Math.min(Math.max(0, was.startedAt - start), runStart - start),
+        left: named ? [] : was.left,
+        paged: was.paged, pagedRounds: was.pagedRounds, reached,
       }
       const got = {
         tracks: back.tracks, index: back.index, marks: back.upNext.marks, source: back.upNext.source, shuffle: back.upNext.shuffle,
@@ -311,6 +338,27 @@ console.log('\ntoSave then fromSnapshot: 1,000 seeded runs of every edit, the qu
       }
       if (back.tracks.some((song) => back.upNext.source.includes(song))) shared++
       if (queue.upNext.startedAt > queue.index) behind++
+      //? (2.1.23) a move that leaves the queue's account as it was - History's first row tapped, or Previous, with the
+      //? furthest unit what it was - is a song change alone (changedSince), saved by its position: deadwax's record is
+      //? then THIS step's snapshot at the song moved to, which must read back as a full save of the move would - how far
+      //? it had got, Up Next's songs to come, what restoreQueue keeps under every Repeat. No draw of `random`: the runs
+      //? go on as before
+      const history = U.upNextView(queue, repeat).history
+      const tap = history.length ? U.jumpedTo(queue, history[0].key, repeat) : null
+      const prev = U.backward(queue, 0)
+      for (const moved of [tap?.queue ?? null, prev.kind === 'go' ? U.wentBack(queue, prev.index) : null]) {
+        const baseline = { tracks: queue.tracks, upNext: queue.upNext, index: queue.index, position: 12.5, start, count: end - start }
+        if (!moved || R.changedSince(baseline, moved, 12.5) !== 'song' || moved.index < start || moved.index >= end) continue
+        positionOnly++
+        if (moved.upNext.reached !== undefined && moved.upNext.marks.findIndex((m) => m.key === moved.upNext.reached) > moved.index) positionReach++
+        const asRecord = R.fromSnapshot(saving.snapshot, navidrome, moved.index - start, 'auto')
+        const full = R.toSave(moved, 12.5)
+        const asFull = R.fromSnapshot(full.snapshot, moved.tracks.slice(full.start, full.start + full.ids.length).map(bare), full.index, 'auto')
+        //? (Repeat All's time round shuffled by one seeded draw each, so the two put-backs are asked alike)
+        const kept = (q) => q && ['off', 'one', 'all'].map((r) => { const t = U.toppedUp(U.withRepeat(q, r), r, seeded(1)); return t.tracks.slice(t.index).map((x) => x.id).join(' ') })
+        const said = (q) => q && JSON.stringify([q.upNext.reached ?? null, ahead(q), kept(q)])
+        if (said(asRecord) !== said(asFull)) note(run, step, `a move saved by its position reads back otherwise: ${said(asRecord)} for ${said(asFull)}`)
+      }
     }
   }
   check('every step of every run read back the same, keeping the invariant', problems, [])
@@ -319,6 +367,10 @@ console.log('\ntoSave then fromSnapshot: 1,000 seeded runs of every edit, the qu
   check(`...thousands with a History, back the same (${histories})`, histories > 5_000 ? true : histories, true)
   check(`...(2.1.18) roll-backs (${rolled} History taps, ${brought} older rows brought back) - saved with how far they had got (${reachedKept}) and the starts held (${startsKept})`,
     [rolled > 100 || rolled, brought > 300 || brought, reachedKept > 1000 || reachedKept, startsKept > 1000 || startsKept], [true, true, true, true])
+  check(`...(2.1.23) moves saved by their position alone (${positionOnly}) read back as a full save of them would - every one back before how far it had got (any other move back names a new furthest)`,
+    [positionOnly > 3000 || positionOnly, positionReach === positionOnly], [true, true])
+  check(`...(2.1.22) libraries' shuffles (${pagedSaved}), their lists saved as the window's own songs - fewer than they had in ${pagedNamed}; songs taken out of ${pagedLeft}, none of them a place the window keeps`,
+    [pagedSaved > 2000 || pagedSaved, pagedNamed > 300 || pagedNamed, pagedLeft > 300 || pagedLeft, leftNamed], [true, true, true, 0])
 }
 
 /* ===== the window ===== */
@@ -466,6 +518,181 @@ console.log('\nthe window: 50 before, 2,000 in all')
   }
   check('the window helper on its own', [R.windowOf(10, 3), R.windowOf(5000, 100), R.windowOf(2500, 2200), R.windowOf(0, 0)],
     [{ start: 0, end: 10 }, { start: 50, end: 2050 }, { start: 2150, end: 2500 }, { start: 0, end: 0 }])
+}
+
+/* ===== (2.1.22) a library's shuffle, played long ===== */
+
+console.log('\n(2.1.22) a library\'s shuffle 2,000 songs in: saved, put back paged, its feed carrying on')
+{
+  //? the review's: the list kept whole, every song played before the window whole in `extra` - over RESUME_SNAPSHOT_MAX
+  //? some 750 songs in, the queue came back a plain list with no `paged`: Repeat off, the shuffle stopped after the
+  //? songs it had; Repeat All, those songs went round again instead of a fresh order
+  const F = require(path.join(OUT, 'app/useShuffleFeed.js'))
+  const OLD = require(path.join(__dirname, 'fixtures/resume-2.1.17/resume.cjs'))
+  const PAGE = 200 // src/routes/navidrome.py SHUFFLE_PAGE
+  //? songs as Navidrome sends them: 22-character ids, a cover's id with its stamp, ordinary titles
+  const id22 = (prefix, n) => `${prefix}${String(n).padStart(22 - prefix.length, '0')}`
+  const libSong = (n) => track(id22('s', n), {
+    title: `An ordinary song title ${n}`, artist: 'An artist of ordinary name', album: `An album title ${Math.floor(n / 12)}`,
+    albumId: id22('a', Math.floor(n / 12)), coverArt: `al-${id22('a', Math.floor(n / 12))}_67a1b2c3`, duration: 241.53, level: 'track',
+  })
+  //? deadwax's orders: each token's its own shuffle of the library, made once
+  const orders = new Map()
+  const orderOf = (token, size) => {
+    const name = `${token}:${size}`
+    if (!orders.has(name)) {
+      const random = seeded(Number(token.split('-')[1]) * 7919)
+      const order = Array.from({ length: size }, (_, n) => libSong(n))
+      for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]] }
+      orders.set(name, order)
+    }
+    return orders.get(name)
+  }
+  //? useShuffleFeed, as it asks: fewer than FEED_BELOW of the shuffle's songs ahead - the next page from `fetched`, or,
+  //? the order whole and Repeat All, a fresh order (claimed, never starting with the song that ends this one)
+  const feed = (queue, repeat, size) => {
+    const p = queue.upNext.paged
+    if (!p || F.songsAhead(queue) >= F.FEED_BELOW) return queue
+    if (p.fetched < p.total) return U.withMore(queue, p.token, orderOf(p.token, size).slice(p.fetched, p.fetched + PAGE))
+    if (repeat !== 'all') return queue
+    const token = `order-${Number(p.token.split('-')[1]) + 1}`
+    const first = F.startingElsewhere(orderOf(token, size).slice(0, PAGE), queue.tracks[queue.tracks.length - 1].id, () => 0.5)
+    return U.withMore(queue, p.token, first, { token, total: size, fetched: 0, scope: 'yours', level: 'track' })
+  }
+  //? `count` songs on, as the engine moves, the feed asked after each; the songs heard
+  const play = (queue, count, repeat, size) => {
+    const heard = []
+    for (let i = 0; i < count; i++) {
+      const next = U.onward(queue)
+      if (next === null) break
+      queue = U.toppedUp(feed(at(queue, next), repeat, size), repeat)
+      heard.push(queue.tracks[queue.index].id)
+    }
+    return { queue, heard }
+  }
+  const start = (size) => feed(U.startUpNext(orderOf('order-1', size).slice(0, PAGE), 0, false, seeded(1),
+    { token: 'order-1', total: size, fetched: PAGE, scope: 'yours', level: 'track' }), 'off', size)
+  const kept = (saving) => ({ index: saving.index, position: 42, changed_by: 'deadwax',
+    kept: { rev: 1, ids_rev: 1, ids: saving.ids, index: saving.index, position: 42, snapshot: saving.snapshot, device: 'desk-2', label: 'Mac' } })
+  const navidromeOf = (queue, saving) => queue.tracks.slice(saving.start, saving.start + saving.ids.length).map(bare)
+  const pagedOf = (queue) => JSON.stringify(queue.upNext.paged ?? null)
+
+  //? before: the measure the review took, 2.1.17's toSave (2.1.21's wrote the list the same)
+  {
+    const size = 5000
+    const at700 = play(start(size), 700, 'off', size).queue
+    const at750 = play(at700, 50, 'off', size).queue
+    const old700 = OLD.toSave(at700, 42).snapshot
+    check(`before 2.1.22, the list kept whole: ${old700?.length} units 700 songs in, none from 750 - now ${R.toSave(at700, 42).snapshot.length} and ${R.toSave(at750, 42).snapshot?.length}`,
+      [old700 !== null && old700.length > 200_000, OLD.toSave(at750, 42).snapshot, R.toSave(at750, 42).snapshot !== null], [true, null, true])
+  }
+
+  for (const [repeat, size, on] of [['off', 5000, 4000], ['all', 1500, 1500]]) {
+    const before = play(start(size), 2000, repeat, size)
+    const q = before.queue
+    const saving = R.toSave(q, 42)
+    const made = JSON.parse(saving.snapshot ?? 'null')
+    const back = R.resumed(kept(saving), navidromeOf(q, saving), 'auto', 'phone-1')
+    check(`Repeat ${repeat}, a library of ${size}, 2,000 songs in (${q.upNext.source.length} fetched): saved (${saving.snapshot?.length} units) - the list the window's own songs, nothing kept whole, v1`,
+      [saving.snapshot !== null, made?.source.length, Object.keys(made?.extra ?? {}).length, made?.v, made && made.source.every((id) => saving.ids.includes(id))],
+      [true, new Set(made?.marks.map((m) => m[2])).size, 0, 1, true])
+    check('...put back exactly, a library\'s shuffle still - the same order (token), fetched, total, scope and level - at the song playing',
+      [back?.exact, pagedOf(back.queue), back.queue.tracks.map((t) => t.id).join() === saving.ids.join(), back.queue.tracks[back.queue.index].id],
+      [true, pagedOf(q), true, q.tracks[q.index].id])
+    //? ...and on: the songs it plays from there are the ones it would have played had nothing been reloaded
+    const carried = play(back.queue, on, repeat, size)
+    const unbroken = play(q, on, repeat, size)
+    const tokens = (queue) => (queue.upNext.paged ? [queue.upNext.paged.token, queue.upNext.paged.fetched] : null)
+    check(`...its feed carrying on from where it was: the songs it plays from there (${unbroken.heard.length}) those it would have played without the reload, the order as far`,
+      [carried.heard.length, carried.heard.join() === unbroken.heard.join(), tokens(carried.queue)], [unbroken.heard.length, true, tokens(unbroken.queue)])
+    if (repeat === 'off') {
+      check('...Repeat off: on to the order\'s end, then nothing - every song of the library heard once', [U.onward(carried.queue), new Set([...before.heard, ...carried.heard, q.upNext.source[0].id]).size, before.heard.length + carried.heard.length + 1], [null, size, size])
+    } else {
+      //? the second order's last song, then the third's first page as the feed handed it on
+      const third = carried.queue.upNext.marks.findIndex((m) => m.pass === 2)
+      check('...Repeat All: past its order\'s end a fresh order as the next time round (order-3, its own round) - not the songs it had going round',
+        [tokens(carried.queue)?.[0], third > back.queue.index, carried.queue.tracks.slice(third, third + PAGE).map((t) => t.id).join() === F.startingElsewhere(orderOf('order-3', size).slice(0, PAGE), carried.queue.tracks[third - 1].id, () => 0.5).map((t) => t.id).join()],
+        ['order-3', true, true])
+      //? ...and on, eighteen thousand songs later: no bigger than the window
+      const later = play(q, 18_000, repeat, size).queue
+      const far = R.toSave(later, 42).snapshot
+      check(`...20,000 songs in (${later.upNext.source.length} fetched, round ${later.upNext.paged.token}): still saved, ${far?.length} units - under RESUME_SNAPSHOT_MAX by half`,
+        [far !== null && far.length < R.RESUME_SNAPSHOT_MAX / 2, !!far && JSON.parse(far).source.length <= 2000], [true, true])
+    }
+    //? the reader before 2.1.18 (James's tabs opened before, the iPhone's 0.9): a valid snapshot of the same queue - read
+    //? whole, a library's shuffle too
+    const old = OLD.resumed(kept(saving), navidromeOf(q, saving), 'auto', 'phone-1')
+    check('...the reader before 2.1.18 (2.1.17\'s) reads it whole too: exact, paged, the same marks and list',
+      [old?.exact, pagedOf(old.queue), JSON.stringify(old.queue.upNext.marks) === JSON.stringify(back.queue.upNext.marks), old.queue.upNext.source.map((t) => t.id).join() === made.source.join()],
+      [true, pagedOf(q), true, true])
+  }
+  {
+    //? the window's edge among a song's copies: Repeat One on the 30th song, 60 times round as it ends each time - the window begins 50
+    //? entries back, among its copies, its own entry before it - the copies still name its place
+    const size = 500
+    let q = play(start(size), 29, 'off', size).queue
+    q = U.toppedUp(q, 'one')
+    for (let i = 0; i < 60; i++) q = U.toppedUp(at(q, q.index + 1), 'one')
+    const saving = R.toSave(q, 42)
+    const back = R.resumed(kept(saving), navidromeOf(q, saving), 'auto', 'phone-1')
+    const firstCopy = q.upNext.marks[saving.start]
+    check('...the window beginning among Repeat One\'s copies of a song, its own entry before the window: saved and put back exactly, paged, the copies the same song',
+      [firstCopy.from, q.upNext.marks.findIndex((m) => m.from === 'source' && m.at === firstCopy.at) < saving.start, back?.exact, pagedOf(back.queue),
+        back.queue.upNext.marks.filter((m) => m.from === 'one').every((m) => back.queue.upNext.source[m.at]?.id === q.tracks[q.index].id)],
+      ['one', true, true, pagedOf(q), true])
+  }
+  //? a list as played is kept whole as before: Repeat All's rounds and Shuffle are made from it
+  const listed = at(U.startUpNext(album(2500), 0), 100)
+  const listSaved = JSON.parse(R.toSave(listed, 0).snapshot ?? 'null')
+  check('...a list that isn\'t a library\'s shuffle: kept whole, as before', [listSaved?.source.length, Object.keys(listSaved?.extra ?? {}).length], [2500, 500])
+}
+
+/* ===== (2.1.23) gone back twice, a save between ===== */
+
+console.log('\n(2.1.23) gone back twice, a full save between while how far it had got played: the record still carries it')
+{
+  //? the iPhone port's review (its Core probe): Repeat All, 3 songs, the second time round's 2 playing; History's
+  //? first 1 tapped (rolled back, `reached` the later 2); played on to that 2 again; Play Next x - a full save, while
+  //? the reach is the song playing; the first 1 tapped again - the reach the same, so a song change alone, saved by
+  //? its position: deadwax's record is that full save at the song tapped
+  const OLD = require(path.join(__dirname, 'fixtures/resume-2.1.17/resume.cjs'))
+  const on = (q) => U.toppedUp(at(q, U.onward(q)), 'all')
+  let q = U.toppedUp(U.startUpNext(album(3), 0), 'all')
+  for (let i = 0; i < 4; i++) q = on(q)
+  const first1 = q.upNext.marks[0].key
+  const later2 = q.upNext.marks[4].key
+  q = U.jumpedTo(q, first1, 'all').queue
+  for (let i = 0; i < 4; i++) q = on(q)
+  const played = U.withNext(q, [track('x')])
+  const between = R.toSave(played, 30)
+  const tapped = U.jumpedTo(played, first1, 'all').queue
+  const baseline = { tracks: played.tracks, upNext: played.upNext, index: played.index, position: 30, start: between.start, count: between.ids.length }
+  check('the setup: the reach (the later 2) playing at the save between, then the first 1 tapped - the reach the same, a song change alone',
+    [played.tracks[played.index].id, played.upNext.reached === later2, played.upNext.marks[played.index].key === later2, tapped.upNext.reached === later2, R.changedSince(baseline, tapped, 30)],
+    ['2', true, true, true, 'song'])
+  //? deadwax's record: the save between's ids and snapshot, the index the position save sent
+  const record = (snapshot, index, ids = between.ids) => ({ index, position: 0, changed_by: 'deadwax',
+    kept: { rev: 2, ids_rev: 1, ids, index, position: 0, snapshot, device: 'phone-1', label: 'iPhone' } })
+  const navidrome = between.ids.map((id) => bare(id === 'x' ? track('x') : album(3).find((t) => t.id === id)))
+  const back = R.resumed(record(between.snapshot, tapped.index - between.start), navidrome, 'auto', 'desk-2')
+  const full = R.toSave(tapped, 0)
+  const wholly = R.resumed(record(full.snapshot, full.index, full.ids), full.ids.map((id) => bare(id === 'x' ? track('x') : album(3).find((t) => t.id === id))), 'auto', 'desk-2')
+  const under = (queue, repeat) => { const t = U.toppedUp(U.withRepeat(queue, repeat), repeat); return t.tracks.slice(t.index).map((x) => x.id).join(' ') }
+  const drawn = (queue) => { const v = U.upNextView(queue, 'all', Infinity); return (v.list?.rows ?? []).map((row) => row.track.id).join(' ') }
+  check('...the save between written with how far it had got (the song playing\'s own unit) - v2',
+    [JSON.parse(between.snapshot).reached === later2, JSON.parse(between.snapshot).v], [true, 2])
+  check('...put back from the record at the song tapped: how far it had got with it - Repeat off keeps the songs moved back down (1 2 3 1 2 x 3, not 1 2 3 x), as a full save of it would',
+    [back.queue.upNext.reached === later2, under(back.queue, 'off'), under(wholly.queue, 'off'), under(back.queue, 'one') === under(wholly.queue, 'one')], [true, '1 2 3 1 2 x 3', '1 2 3 1 2 x 3', true])
+  check('...and Repeat All\'s Up Next draws every song moved back down (x among them, added after the 2 it moved down with), as with a full save',
+    [drawn(back.queue), drawn(back.queue) === drawn(wholly.queue)], ['2 3 1 2 x 3', true])
+  //? the reader before 2.1.18 (James's tabs opened before it, the iPhone's 0.9 before its port): v2, so the plain list
+  const old = OLD.resumed(record(between.snapshot, tapped.index - between.start), navidrome, 'auto', 'desk-2')
+  check('...the reader before 2.1.18 given it: not read (v2) - the plain list of the window, in order, at the song tapped',
+    [old.queue.upNext.marks.every((m) => m.from === 'source' && m.pass === 0), old.queue.tracks.map((t) => t.id).join(' '), old.queue.index], [true, between.ids.join(' '), tapped.index - between.start])
+  //? played on past the reach, then back: a new furthest - a change saved in full - so the reach is left out there
+  const past = on(on(played))
+  check('...played on past it: left out (any move back from there names a new furthest, saved in full)',
+    ['reached' in JSON.parse(R.toSave(past, 0).snapshot), U.jumpedTo(past, first1, 'all').queue.upNext === past.upNext], [false, false])
 }
 
 /* ===== what is put back ===== */

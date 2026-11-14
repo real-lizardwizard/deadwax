@@ -340,6 +340,27 @@ private extension QueueController {
         #expect(engine.entries.map(\.key) == player.queue.upNext?.marks.map(\.key))
     }
 
+    @Test func aChangeHeldThroughAHistoryTapThatLetsCopiesGoIsMadeAfterIt() { // review of the port: jump's runHeld
+        // Play Next with the next song scheduled is held; History's row then tapped lets Repeat One's copy go - other
+        // entries, played afresh - and the change held is made on the queue as it is then: 9 after the row tapped
+        let (player, engine) = rig(.one)
+        player.playTracks(simAlbum(3), start: 0)
+        engine.join()
+        player.engineChanged()
+        player.setRepeat(.off)
+        player.next()
+        #expect(player.queue.current?.id == "2" && player.queue.ids == ["1", "1", "2", "3"])
+        engine.seconds = 198
+        engine.nextScheduled = true
+        #expect(!player.playNext([simTrack("9")]))
+        #expect(player.holdsAnEdit && player.after == ["3"])
+        #expect(player.jumpTo(key: player.view.history[0].key))
+        #expect(player.queue.current?.id == "1" && player.queue.ids == ["1", "9", "2", "3"] && !player.holdsAnEdit,
+                "\(player.queue.ids)")
+        #expect(engine.ids == ["1", "9", "2", "3"] && engine.log.suffix(2) == ["play 0", "replaced"], "\(engine.log)")
+        #expect(engine.entries.map(\.key) == player.queue.upNext?.marks.map(\.key))
+    }
+
     @Test func aRollBackUnderRepeatOneKeepsItsCopiesAndSkips() { // :5032-5048's other half: jumpedTo gets the device's Repeat
         let (player, engine) = rig(.one)
         player.playTracks(simAlbum(3), start: 0)
@@ -736,6 +757,21 @@ private extension QueueController {
         ran.join()
         #expect(other.rollBack([row("1", [7], entry: other.key(at: 0))], floor: nil))
         #expect(!other.queue.ids.contains("2") && other.queue.ids.first == "1")
+    }
+
+    @Test func aChangeHeldThroughItIsMadeAfterIt() { // review of the port: jump's runHeld, an older row's tap
+        // Play Next with the next song scheduled is held; an older row then tapped plays afresh from it, and the change
+        // held is made on the queue as it is then: 9 after the row tapped, ahead of the queue rolled back through
+        let (player, engine) = rig()
+        player.playTracks(simAlbum(3), start: 0)
+        engine.seconds = 198
+        engine.nextScheduled = true
+        #expect(!player.playNext([simTrack("9")]))
+        #expect(player.holdsAnEdit && player.after == ["2", "3"])
+        #expect(player.rollBack([row("x", [5])], floor: nil))
+        #expect(player.queue.current?.id == "x" && player.after == ["9", "1", "2", "3"] && !player.holdsAnEdit, "\(player.queue.ids)")
+        #expect(engine.ids == ["x", "9", "1", "2", "3"] && engine.log.suffix(2) == ["play 0", "replaced"], "\(engine.log)")
+        #expect(engine.entries.map(\.key) == player.queue.upNext?.marks.map(\.key))
     }
 
     @Test func withNothingPlayingItDoesNothing() { // the web's jumpTo: broughtBack has no queue to bring them into

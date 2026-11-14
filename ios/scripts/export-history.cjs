@@ -23,6 +23,12 @@
  *     queueShows (its keys and, 2.1.18, the starts it holds) and pastRows (each row's starts and entry) answer
  *     (limits 8 and 100 by turns), each run's lines as one FNV-1a digest, run 0's lines in full. The Swift test runs the same moves from the same Park-Miller
  *     numbers through DeadwaxCore's own Up Next (held to the web's by export-traces.cjs) and must make every line.
+ *     Each line also says what an older row's tap hands the roll-back (review of the port: PlayHistory.brought) - the
+ *     rows from the middle row tapped, each song at the level of a setting taken by turns, and the floor - made as
+ *     app/UpNext.tsx's replayPast makes it, from the web's own parts;
+ *   - brought: the same over rows given whole, a song's own level among them (kept under Off, as queued() keeps it),
+ *     a key no row has, a queue with no History, a plain queue. replayPast's text is hashed in (`replayPast`): a change
+ *     to it fails the check, to be ported to PlayHistory.brought.
  *
  * Every queue here is given its id (`q<run>-<n>`), so nothing calls queueId()'s clock or random - the export stops if
  * anything does.
@@ -44,7 +50,7 @@ const CHECK = process.argv.includes('--check')
 
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'deadwax-ios-history-'))
 execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
-  'src/lib/playHistory.ts', 'src/lib/upNext.ts', 'src/lib/playQueue.ts', 'src/lib/resume.ts',
+  'src/lib/playHistory.ts', 'src/lib/upNext.ts', 'src/lib/playQueue.ts', 'src/lib/resume.ts', 'src/lib/loudness.ts',
   '--rootDir', 'src', '--outDir', OUT,
   '--module', 'commonjs', '--target', 'es2022', '--skipLibCheck', '--moduleResolution', 'node', '--lib', 'es2022,dom,dom.iterable',
 ], { cwd: UI, stdio: 'inherit' })
@@ -52,6 +58,7 @@ execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
 const P = require(path.join(OUT, 'lib/playHistory.js'))
 const U = require(path.join(OUT, 'lib/upNext.js'))
 const R = require(path.join(OUT, 'lib/resume.js'))
+const L = require(path.join(OUT, 'lib/loudness.js'))
 fs.rmSync(OUT, { recursive: true, force: true })
 
 //? a queue's id made by the clock and random here would differ every run: every queue is given one, and this says so
@@ -172,6 +179,66 @@ function countedCases() {
   return cases
 }
 
+/* ===== what an older row's tap hands the roll-back (app/UpNext.tsx replayPast) ===== */
+
+//? replayPast is a component's inline handler, so nothing can call it: it is read from UpNext.tsx exactly as it is
+//? written - the export stops when it isn't - hashed into the fixture, and made below from the very parts it calls
+const REPLAY_PAST = (() => {
+  const text = fs.readFileSync(path.join(UI, 'src/app/UpNext.tsx'), 'utf8')
+  const found = [...text.matchAll(/\n {2}const replayPast = \(row: PastRow\) => \{\n[\s\S]*?\n {2}\}\n/g)]
+  if (found.length !== 1) throw new Error(`ui/src/app/UpNext.tsx has ${found.length} replayPast (1 wanted): update the exporter, and PlayHistory.brought with it`)
+  const body = [
+    '    tapped.current = rolledTo(row, { entry: row.entry })',
+    '    const floor = view.history[0]?.key ?? player.queue.upNext?.marks[player.queue.index]?.key',
+    '    const back = rowsFrom(past, row.key)',
+    "    const tracks = queued(back.map((each) => each.track), 'songs')",
+    '    player.jumpTo(back.map((each, i) => ({ track: tracks[i]!, starts: each.starts, entry: each.entry })), floor)',
+  ].join('\n')
+  if (!found[0][0].includes(body)) throw new Error('app/UpNext.tsx replayPast changed: port it to PlayHistory.brought, then update the exporter')
+  return require('crypto').createHash('sha256').update(found[0][0]).digest('hex')
+})()
+const SETTINGS = ['auto', 'song', 'album', 'off']
+
+/** replayPast's hand-over, from the web's own parts: `past` its pastRows (the default limit, as Up Next draws them),
+ *  view.history historyRows (upNextView's), queued() levelled at `setting` (queued reads it from storage). */
+function replayed(plays, queue, key, setting) {
+  const past = P.pastRows(plays, queue)
+  const floor = U.historyRows(queue)[0]?.key ?? queue.upNext?.marks[queue.index]?.key
+  const back = P.rowsFrom(past, key)
+  const tracks = L.levelled(back.map((each) => each.track), setting, 'songs')
+  return { rows: back.map((each, i) => ({ track: tracks[i], starts: each.starts, entry: each.entry })), floor }
+}
+const handedLine = (handed) => `${handed.floor ?? '-'}>` +
+  handed.rows.map((r) => `${r.track.id}:${r.track.level ?? '-'}/${r.starts.join('.')}/${r.entry ?? '-'}`).join(',')
+
+/** Rows given whole - [key, song id, level or null, starts, entry or null] - through replayPast's hand-over: its
+ *  floor read from the queue, the rows from the key. pastRows isn't asked: rowsFrom and the levels are. */
+function broughtCases() {
+  const cases = []
+  const level = (t, l) => (l ? { ...t, level: l } : t)
+  const given = [
+    ['k3', '3', null, [T + 3], 2], ['k2', '2', 'album', [T + 2, T + 1], null], ['k1', 'x', 'track', [T], null], ['k0', '1', null, [T - 1], 0],
+  ]
+  const past = given.map(([key, id, l, starts, entry]) => ({ key, track: level(track(id), l), starts, entry }))
+  const queues = {
+    history: { ...U.startUpNext(album(4), 0, false, undefined, undefined, 'qb-1'), index: 2 },
+    none: U.startUpNext(album(4), 1, false, undefined, undefined, 'qb-2'),
+    plain: { tracks: album(2), index: 1 },
+  }
+  for (const [name, queue] of Object.entries(queues)) {
+    for (const setting of SETTINGS) {
+      for (const key of ['k3', 'k1', 'k0', 'nope']) {
+        const floor = U.historyRows(queue)[0]?.key ?? queue.upNext?.marks[queue.index]?.key
+        const back = P.rowsFrom(past, key)
+        const tracks = L.levelled(back.map((each) => each.track), setting, 'songs')
+        const rows = back.map((each, i) => ({ track: tracks[i], starts: each.starts, entry: each.entry }))
+        cases.push({ queue: name, setting, key, out: handedLine({ rows, floor }) })
+      }
+    }
+  }
+  return { past: given, queues: Object.keys(queues), cases }
+}
+
 /* ===== each start drawn once: the property, line by line ===== */
 
 const RUNS = 300
@@ -249,10 +316,16 @@ function propertyRun(run) {
     const plays = P.merged(pages, recorded)
     const shows = P.queueShows(queue, limit)
     const rows = P.pastRows(plays, queue, limit)
+    //? (review of the port) the middle row of Up Next's as drawn tapped: what replayPast hands the roll-back, at a
+    //? setting by turns - nothing drawn
+    const drawn = P.pastRows(plays, queue)
+    const tapped = drawn[Math.floor(drawn.length / 2)]
+    const handed = tapped ? handedLine(replayed(plays, queue, tapped.key, SETTINGS[step % 4])) : '-'
     //? (2.1.18) the starts the queue holds (sorted: a Set's order is its own), each row's starts and its entry
     lines.push([
       `${step}:${op}`, queue.index, shows.id ?? '-', [...shows.keys].sort((a, b) => a - b).join(','), [...shows.held].sort().join(','),
       rows.map((r) => `${r.key}=${r.track.id}/${r.starts.join('.')}/${r.entry ?? '-'}`).join(','), plays.filter((s) => s.counted).length, plays.length,
+      handed,
     ].join('|'))
   }
   return { lines, starts: recorded.length }
@@ -313,6 +386,8 @@ function vectors() {
     afterFailure: [null, 0, 100, 200, 204, 301, 399, 400, 401, 403, 404, 408, 409, 413, 422, 429, 499, 500, 502, 503, 599]
       .map((status) => ({ status, out: P.afterFailure(status) })),
     retryAfter: Array.from({ length: 28 }, (_, i) => i - 2).map((failures) => ({ failures, ms: P.retryAfter(failures) })),
+    replayPast: REPLAY_PAST,
+    brought: broughtCases(),
     property: property(),
   }
 }

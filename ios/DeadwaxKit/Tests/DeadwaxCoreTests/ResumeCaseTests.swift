@@ -68,7 +68,7 @@ import Testing
     @Test func theSnapshotIsTheWebsToTheUnit() throws {
         let loaded = try Self.load()
         let cases = loaded.cases["toSave", default: []]
-        #expect(cases.count == 29) // (2.1.18) with v2, reached and starts
+        #expect(cases.count == 33) // (2.1.18) with v2, reached and starts; (2.1.23) gone back twice
         for item in cases {
             let label = item["label"]?.string ?? "?"
             let queue = try #require(loaded.songs.queue(item["queue"]), "\(label): the queue doesn't rebuild")
@@ -109,10 +109,72 @@ import Testing
         }
     }
 
+    /// (the web's 2.1.22) The library's shuffle a recipe makes, as export-traces.cjs's fromPagedRecipe makes it: its
+    /// pages fetched one after another, played to `index`, entries taken out, songs played next, a Repeat, Repeat One's
+    /// copies played.
+    static func pagedQueue(_ recipe: JSONValue) throws -> UpNextQueue {
+        let size = try #require(recipe["page"]?.int)
+        let pages = try #require(recipe["pages"]?.int)
+        let prefix = try #require(recipe["prefix"]?.string)
+        let token = try #require(recipe["token"]?.string)
+        let total = size * pages + (try #require(recipe["more"]?.int))
+        let page = { (k: Int) in rAlbum(size, "\(prefix)\(k)-", level: .track) }
+        let paged = Paged(token: token, total: total, fetched: size, scope: .yours, level: .track)
+        var queue = startUpNext(page(0), start: 0, paged: paged, id: try #require(recipe["id"]?.string))
+        for k in 1..<pages { queue = withMore(queue, token: token, tracks: page(k)) }
+        queue = queue.at(try #require(recipe["index"]?.int))
+        for place in try #require(recipe["without"]?.array) {
+            queue = withoutKey(queue, queue.upNext!.marks[try #require(place.int)].key)
+        }
+        let next = try #require(recipe["next"]?.int)
+        if next > 0 { queue = withNext(queue, rAlbum(next, "\(prefix)n", level: .track)) }
+        if let mode = recipe["repeat"]?.string.flatMap(Repeat.init(rawValue:)) { queue = toppedUp(withRepeat(queue, mode), mode) }
+        for _ in 0..<(try #require(recipe["copies"]?.int)) { queue = toppedUp(queue.at(queue.index + 1), .one) }
+        return queue
+    }
+
+    /// (the web's 2.1.22) A library's shuffle thousands of songs in: the snapshot the web's text, under the cap, its list
+    /// the songs its window names - and read back a library's shuffle still, its feed where it was.
+    @Test func librariesShufflesThousandsOfSongsIn() throws {
+        let loaded = try Self.load()
+        let cases = loaded.cases["toSavePaged", default: []]
+        #expect(cases.count == 6)
+        for item in cases {
+            let label = item["label"]?.string ?? "?"
+            let recipe = try #require(item["recipe"])
+            let queue = try Self.pagedQueue(recipe)
+            let saving = toSave(queue, position: try #require(recipe["position"]?.double))
+            let wanted = try #require(item["saving"])
+            #expect(saving.ids.count == wanted["count"]?.int, "\(label)")
+            #expect(saving.ids.first == wanted["first"]?.string && saving.ids.last == wanted["last"]?.string, "\(label)")
+            #expect(saving.index == wanted["index"]?.int && saving.start == wanted["start"]?.int, "\(label)")
+            #expect(queue.upNext?.source.count == wanted["queueSource"]?.int && queue.upNext?.left.count == wanted["left"]?.int,
+                    "\(label): the queue isn't the web's")
+            let snapshot = try #require(saving.snapshot, "\(label): over the cap")
+            #expect(snapshot.utf16.count == wanted["length"]?.int, "\(label): length")
+            #expect(unitHash(snapshot) == wanted["hash"]?.string, "\(label): hash")
+            #expect(unitPrefix(snapshot, 120) == wanted["head"]?.string.map { Array($0.utf16) }, "\(label): head")
+            let bare = queue.tracks[saving.start..<(saving.start + saving.ids.count)].map { track -> QueueTrack in
+                var plain = track
+                plain.level = nil
+                return plain
+            }
+            let back = try #require(fromSnapshot(snapshot, tracks: bare, index: saving.index, setting: .auto), "\(label): not read back")
+            let was = try #require(item["back"])
+            #expect(back.tracks.count == was["tracks"]?.int && back.index == was["index"]?.int, "\(label): read back")
+            #expect(back.upNext?.source.count == wanted["source"]?.int && was["source"]?.bool == true, "\(label): its list")
+            let paged = try #require(back.upNext?.paged, "\(label): read back without its feed")
+            #expect(paged.token == was["paged"]?["token"]?.string && paged.total == was["paged"]?["total"]?.int
+                    && paged.fetched == was["paged"]?["fetched"]?.int, "\(label): its feed")
+            let mode = recipe["repeat"]?.string.flatMap(Repeat.init(rawValue:)) ?? .off
+            #expect(upNextView(back, mode, limit: Int.max).list?.rows.count ?? 0 == was["ahead"]?.int, "\(label): Up Next")
+        }
+    }
+
     @Test func snapshotsReadAsTheWebReadsThem() throws {
         let loaded = try Self.load()
         let cases = loaded.cases["fromSnapshot", default: []]
-        #expect(cases.count == 303) // (2.1.18) with v 1 or 2, reached and starts, read or refused
+        #expect(cases.count == 327) // (2.1.18) with v 1 or 2, reached and starts, read or refused; (2.1.23) the record
         var nils = 0
         var fresh = 0
         var held = 0
@@ -140,7 +202,7 @@ import Testing
             let difference = queueDifference(back, wanted)
             #expect(difference == nil, "\(label): \(difference ?? "")")
         }
-        #expect(nils == 91 && fresh == 45 && held == 16)
+        #expect(nils == 91 && fresh == 49 && held == 16)
     }
 
     /// (2.1.15) Whether a queue read back without an id is the queue held: the web's sameQueue, case by case.
